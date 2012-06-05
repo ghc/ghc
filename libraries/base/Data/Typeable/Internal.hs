@@ -24,6 +24,7 @@
 
 module Data.Typeable.Internal (
     TypeRep(..),
+    Fingerprint(..),
     TyCon(..),
     mkTyCon,
     mkTyCon3,

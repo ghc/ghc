@@ -104,7 +104,6 @@ import Data.Maybe
 import GHC.Base
 import GHC.Err          (undefined)
 
-import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
    -- loop: GHC.Fingerprint -> Foreign.Ptr -> Data.Typeable
    -- Better to break the loop here, because we want non-SOURCE imports
