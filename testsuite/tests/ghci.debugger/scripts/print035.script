@@ -1,0 +1,10 @@
+-- Unboxed tuples in data constructor arguments need to be
+-- handled correctly by RtClosureInspect
+
+:set -XUnboxedTuples -fobject-code
+:l ../Unboxed
+:p o1
+:p o2
+force_them
+:p o1
+:p o2
