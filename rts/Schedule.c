@@ -2454,7 +2454,7 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
 	sched_state = SCHED_INTERRUPTING;
         Capability *cap = task->cap;
         waitForReturnCapability(&cap,task);
-        scheduleDoGC(&cap,task,rtsFalse);
+        scheduleDoGC(&cap,task,rtsTrue);
         ASSERT(task->incall->tso == NULL);
         releaseCapability(cap);
     }
