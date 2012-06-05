@@ -1056,6 +1056,8 @@ tests/typecheck/should_run/T3731
 tests/typecheck/should_run/T3731-short
 tests/typecheck/should_run/T4809
 tests/typecheck/should_run/T5759
+tests/typecheck/should_run/T5573a
+tests/typecheck/should_run/T5573b
 tests/typecheck/should_run/church
 tests/typecheck/should_run/mc17
 tests/typecheck/should_run/tcrun001
@@ -1102,6 +1104,11 @@ tests/typecheck/should_run/tcrun043
 tests/typecheck/should_run/tcrun044
 tests/typecheck/should_run/tcrun045
 tests/typecheck/should_run/tcrun046
+tests/typecheck/should_run/tcrun047
+tests/typecheck/should_run/tcrun048
+tests/typecheck/should_run/tcrun049
+tests/typecheck/should_run/tcrun050
+tests/typecheck/should_run/tcrun051
 tests/typecheck/should_run/testeq2
 tests/typecheck/testeq1/typecheck.testeq1
 
