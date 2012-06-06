@@ -201,7 +201,6 @@ getArgAmode :: NonVoid StgArg -> FCode CmmExpr
 getArgAmode (NonVoid (StgVarArg var))  =
   do { info  <- getCgIdInfo var; return (idInfoToAmode info) }
 getArgAmode (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
-getArgAmode (NonVoid (StgTypeArg _))   = panic "getArgAmode: type arg"
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args, 

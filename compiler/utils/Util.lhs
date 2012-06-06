@@ -19,7 +19,7 @@ module Util (
         unzipWith,
 
         mapFst, mapSnd,
-        mapAndUnzip, mapAndUnzip3,
+        mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith, splitEithers,
 
         foldl1', foldl2, count, all2,
@@ -35,6 +35,7 @@ module Util (
         -- * Tuples
         fstOf3, sndOf3, thirdOf3,
         firstM, first3M,
+        third3,
         uncurry3,
 
         -- * List operations controlled by another list
@@ -224,6 +225,9 @@ fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thirdOf3    (_,_,c) =  c
 
+third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
+third3 f (a, b, c) = (a, b, f c)
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
 \end{code}
@@ -353,6 +357,12 @@ mapAndUnzip3 f (x:xs)
         (rs1, rs2, rs3) = mapAndUnzip3 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3)
+
+mapAccumL2 :: (s1 -> s2 -> a -> (s1, s2, b)) -> s1 -> s2 -> [a] -> (s1, s2, [b])
+mapAccumL2 f s1 s2 xs = (s1', s2', ys)
+  where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
+                                                       (s1', s2', y) -> ((s1', s2'), y))
+                                     (s1, s2) xs
 \end{code}
 
 \begin{code}

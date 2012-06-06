@@ -159,9 +159,7 @@ Note [The kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The kinds
    #          UnliftedTypeKind
-   ArgKind    super-kind of *, #
-   (#)        UbxTupleKind
-   OpenKind   super-kind of ArgKind, ubxTupleKind
+   OpenKind   super-kind of *, #
 
 can never appear under an arrow or type constructor in a kind; they
 can only be at the top level of a kind.  It follows that primitive TyCons,

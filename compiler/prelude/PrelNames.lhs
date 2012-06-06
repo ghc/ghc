@@ -1302,14 +1302,11 @@ superKindTyConKey                     = mkPreludeTyConUnique 85
 
 -- Kind constructors
 liftedTypeKindTyConKey, anyKindTyConKey, openTypeKindTyConKey,
-  unliftedTypeKindTyConKey, ubxTupleKindTyConKey, argTypeKindTyConKey,
-  constraintKindTyConKey :: Unique
+  unliftedTypeKindTyConKey, constraintKindTyConKey :: Unique
 anyKindTyConKey                         = mkPreludeTyConUnique 86
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 openTypeKindTyConKey                    = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
-ubxTupleKindTyConKey                    = mkPreludeTyConUnique 90
-argTypeKindTyConKey                     = mkPreludeTyConUnique 91
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
 
 -- Coercion constructors

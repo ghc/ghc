@@ -276,20 +276,7 @@ warnPrags id bad_sigs herald
 -----------------
 mkLocalBinder :: Name -> TcType -> TcM TcId
 mkLocalBinder name ty
-  = do { checkUnboxedTuple ty $ 
-            ptext (sLit "The variable") <+> quotes (ppr name)
-       ; return (Id.mkLocalId name ty) }
-
-checkUnboxedTuple :: TcType -> SDoc -> TcM ()
--- Check for an unboxed tuple type
---      f = (# True, False #)
--- Zonk first just in case it's hidden inside a meta type variable
--- (This shows up as a (more obscure) kind error 
---  in the 'otherwise' case of tcMonoBinds.)
-checkUnboxedTuple ty what
-  = do { zonked_ty <- zonkTcType ty
-       ; checkTc (not (isUnboxedTupleType zonked_ty))
-                 (unboxedTupleErr what zonked_ty) }
+  = return (Id.mkLocalId name ty)
 \end{code}
 
 Note [Polymorphism and pattern bindings]
@@ -413,9 +400,7 @@ tc_pat _ p@(QuasiQuotePat _) _ _
   = pprPanic "Should never see QuasiQuotePat in type checker" (ppr p)
 
 tc_pat _ (WildPat _) pat_ty thing_inside
-  = do	{ checkUnboxedTuple pat_ty $
-               ptext (sLit "A wild-card pattern")
-        ; res <- thing_inside 
+  = do	{ res <- thing_inside 
 	; return (WildPat pat_ty, res) }
 
 tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
@@ -431,11 +416,9 @@ tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
 	    -- If you fix it, don't forget the bindInstsOfPatIds!
 	; return (mkHsWrapPatCo co (AsPat (L nm_loc bndr_id) pat') pat_ty, res) }
 
-tc_pat penv vpat@(ViewPat expr pat _) overall_pat_ty thing_inside 
-  = do	{ checkUnboxedTuple overall_pat_ty $
-               ptext (sLit "The view pattern") <+> ppr vpat
-
-	 -- Morally, expr must have type `forall a1...aN. OPT' -> B` 
+tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside 
+  = do	{
+         -- Morally, expr must have type `forall a1...aN. OPT' -> B` 
          -- where overall_pat_ty is an instance of OPT'.
          -- Here, we infer a rho type for it,
          -- which replaces the leading foralls and constraints
@@ -1060,9 +1043,4 @@ lazyUnliftedPatErr pat
   = failWithTc $
     hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types:"))
        2 (ppr pat)
-
-unboxedTupleErr :: SDoc -> Type -> SDoc
-unboxedTupleErr what ty
-  = hang (what <+> ptext (sLit "cannot have an unboxed tuple type:"))
-       2 (ppr ty)
 \end{code}

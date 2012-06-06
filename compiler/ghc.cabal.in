@@ -360,6 +360,7 @@ Library
         SRT
         SimplStg
         StgStats
+        UnariseStg
         Rules
         SpecConstr
         Specialise

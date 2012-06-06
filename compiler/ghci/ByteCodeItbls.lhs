@@ -25,6 +25,7 @@ import NameEnv
 import ClosureInfo
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import Type             ( flattenRepType, repType )
 import Constants        ( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery        ( mkVirtHeapOffsets )
 import Util
@@ -98,7 +99,7 @@ make_constr_itbls cons
 
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr = do
-           let rep_args = [ (typeCgRep arg,arg) | arg <- dataConRepArgTys dcon ]
+           let rep_args = [ (typeCgRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
                (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False{-not a THUNK-} rep_args
 
                ptrs'  = ptr_wds
