@@ -369,7 +369,7 @@ lookupRule is_active id_unf in_scope fn args rules
 
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms []           = ms
-    go ms (r:rs) = case (matchRule is_active id_unf in_scope args rough_args r) of
+    go ms (r:rs) = case (matchRule fn is_active id_unf in_scope args rough_args r) of
                         Just e  -> go ((r,e):ms) rs
                         Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$
                                    --   ppr [ (arg_id, unfoldingTemplate unf)
@@ -446,7 +446,7 @@ to lookupRule are the result of a lazy substitution
 
 \begin{code}
 ------------------------------------
-matchRule :: (Activation -> Bool) -> IdUnfoldingFun
+matchRule :: Id -> (Activation -> Bool) -> IdUnfoldingFun
           -> InScopeSet
           -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
@@ -473,14 +473,14 @@ matchRule :: (Activation -> Bool) -> IdUnfoldingFun
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule _is_active id_unf _in_scope args _rough_args
+matchRule fn _is_active id_unf _in_scope args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = case match_fn id_unf args of
+  = case match_fn fn id_unf args of
         Just expr -> Just expr
         Nothing   -> Nothing
 
-matchRule is_active id_unf in_scope args rough_args
+matchRule _ is_active id_unf in_scope args rough_args
           (Rule { ru_act = act, ru_rough = tpl_tops,
                   ru_bndrs = tpl_vars, ru_args = tpl_args,
                   ru_rhs = rhs })
@@ -1089,7 +1089,7 @@ ruleAppCheck_help env fn args rules
         = ptext (sLit "Rule") <+> doubleQuotes (ftext name)
 
     rule_info rule
-        | Just _ <- matchRule noBlackList (rc_id_unf env) emptyInScopeSet args rough_args rule
+        | Just _ <- matchRule fn noBlackList (rc_id_unf env) emptyInScopeSet args rough_args rule
         = text "matches (which is very peculiar!)"
 
     rule_info (BuiltinRule {}) = text "does not match"
