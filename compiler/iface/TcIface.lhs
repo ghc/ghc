@@ -997,7 +997,7 @@ tcIfaceExpr (IfaceExt gbl)
 tcIfaceExpr (IfaceLit lit)
   = do lit' <- tcIfaceLit lit
        return (Lit lit')
-
+ 
 tcIfaceExpr (IfaceFCall cc ty) = do
     ty' <- tcIfaceType ty
     u <- newUnique
@@ -1081,12 +1081,12 @@ tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal
--- Integer literals deserialise to (LitInteeger i <error thunk>) 
--- so tcIfaceLit just fills in the mkInteger Id 
+-- Integer literals deserialise to (LitInteger i <error thunk>) 
+-- so tcIfaceLit just fills in the type.
 -- See Note [Integer literals] in Literal
 tcIfaceLit (LitInteger i _)
-  = do mkIntegerId <- tcIfaceExtId mkIntegerName
-       return (mkLitInteger i mkIntegerId)
+  = do t <- tcIfaceTyCon (IfaceTc integerTyConName)
+       return (mkLitInteger i (mkTyConTy t))
 tcIfaceLit lit = return lit
 
 -------------------------

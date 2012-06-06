@@ -31,7 +31,6 @@ import DataCon     ( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
-import TypeRep
 import OccName     ( occNameFS )
 import PrelNames
 import Maybes      ( orElse )
@@ -789,18 +788,15 @@ match_Integer_divop_both :: (Integer -> Integer -> (Integer, Integer))
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
 match_Integer_divop_both divop _ id_unf [xl,yl]
-  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  | Just (LitInteger x t) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   , (r,s) <- x `divop` y
-  = case idType i of
-      FunTy _ (FunTy _ integerTy) ->
-              Just $ mkConApp (tupleCon UnboxedTuple 2)
-                              [Type integerTy,
-                               Type integerTy,
-                               Lit (LitInteger r i),
-                               Lit (LitInteger s i)]
-      _ -> panic "match_Integer_divop_both: mkIntegerId has the wrong type"
+  = Just $ mkConApp (tupleCon UnboxedTuple 2)
+                    [Type t,
+                     Type t,
+                     Lit (LitInteger r t),
+                     Lit (LitInteger s t)]
 match_Integer_divop_both _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
