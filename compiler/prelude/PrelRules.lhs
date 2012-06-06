@@ -31,6 +31,7 @@ import DataCon     ( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
+import TypeRep
 import OccName     ( occNameFS )
 import PrelNames
 import Maybes      ( orElse )
@@ -621,8 +622,8 @@ builtinRules
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
- [-- TODO: smallInteger rule
-  -- TODO: wordToInteger rule
+ [rule_IntToInteger   "smallInteger"        smallIntegerName,
+  rule_WordToInteger  "wordToInteger"       wordToIntegerName,
   rule_convert        "integerToWord"       integerToWordName       mkWordLitWord,
   rule_convert        "integerToInt"        integerToIntName        mkIntLitInt,
   rule_convert        "integerToWord64"     integerToWord64Name     mkWord64LitWord64,
@@ -662,6 +663,12 @@ builtinIntegerRules =
     where rule_convert str name convert
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_convert convert }
+          rule_IntToInteger str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_IntToInteger }
+          rule_WordToInteger str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_WordToInteger }
           rule_unop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_unop op }
@@ -748,6 +755,32 @@ match_inline _ (Type _ : e : _)
 match_inline _ _ = Nothing
 
 -- Integer rules
+
+match_IntToInteger :: Id
+                   -> IdUnfoldingFun
+                   -> [Expr CoreBndr]
+                   -> Maybe (Expr CoreBndr)
+match_IntToInteger id id_unf [xl]
+  | Just (MachInt x) <- exprIsLiteral_maybe id_unf xl
+  = case idType id of
+    FunTy _ integerTy ->
+        Just (Lit (LitInteger x integerTy))
+    _ ->
+        panic "match_IntToInteger: Id has the wrong type"
+match_IntToInteger _ _ _ = Nothing
+
+match_WordToInteger :: Id
+                    -> IdUnfoldingFun
+                    -> [Expr CoreBndr]
+                    -> Maybe (Expr CoreBndr)
+match_WordToInteger id id_unf [xl]
+  | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
+  = case idType id of
+    FunTy _ integerTy ->
+        Just (Lit (LitInteger x integerTy))
+    _ ->
+        panic "match_WordToInteger: Id has the wrong type"
+match_WordToInteger _ _ _ = Nothing
 
 match_Integer_convert :: Num a
                       => (a -> Expr CoreBndr)

@@ -255,6 +255,7 @@ basicKnownKeyNames
         integerTyConName, mkIntegerName,
         integerToWord64Name, integerToInt64Name,
         plusIntegerName, timesIntegerName, smallIntegerName,
+        wordToIntegerName,
         integerToWordName, integerToIntName, minusIntegerName,
         negateIntegerName, eqIntegerName, neqIntegerName,
         absIntegerName, signumIntegerName,
@@ -840,6 +841,7 @@ negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
 integerTyConName, mkIntegerName,
     integerToWord64Name, integerToInt64Name,
     plusIntegerName, timesIntegerName, smallIntegerName,
+    wordToIntegerName,
     integerToWordName, integerToIntName, minusIntegerName,
     negateIntegerName, eqIntegerName, neqIntegerName,
     absIntegerName, signumIntegerName,
@@ -858,6 +860,7 @@ integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    int
 plusIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "plusInteger")       plusIntegerIdKey
 timesIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "timesInteger")      timesIntegerIdKey
 smallIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "smallInteger")      smallIntegerIdKey
+wordToIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "wordToInteger")     wordToIntegerIdKey
 integerToWordName     = varQual gHC_INTEGER_TYPE (fsLit "integerToWord")     integerToWordIdKey
 integerToIntName      = varQual gHC_INTEGER_TYPE (fsLit "integerToInt")      integerToIntIdKey
 minusIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "minusInteger")      minusIntegerIdKey
@@ -1501,7 +1504,8 @@ otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
 runSTRepIdKey                 = mkPreludeMiscIdUnique 45
 
-mkIntegerIdKey, smallIntegerIdKey, integerToWordIdKey, integerToIntIdKey,
+mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
+    integerToWordIdKey, integerToIntIdKey,
     integerToWord64IdKey, integerToInt64IdKey,
     plusIntegerIdKey, timesIntegerIdKey, minusIntegerIdKey,
     negateIntegerIdKey,
@@ -1549,6 +1553,7 @@ xorIntegerIdKey               = mkPreludeMiscIdUnique 91
 complementIntegerIdKey        = mkPreludeMiscIdUnique 92
 shiftLIntegerIdKey            = mkPreludeMiscIdUnique 93
 shiftRIntegerIdKey            = mkPreludeMiscIdUnique 94
+wordToIntegerIdKey            = mkPreludeMiscIdUnique 95
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 100
