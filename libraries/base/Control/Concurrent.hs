@@ -36,6 +36,7 @@ module Control.Concurrent (
 
         forkIO,
 #ifdef __GLASGOW_HASKELL__
+        forkFinally,
         forkIOWithUnmask,
         killThread,
         throwTo,
@@ -204,6 +205,25 @@ attribute will block all other threads.
 Using Hugs, all I\/O operations and foreign calls will block all other
 Haskell threads.
 -}
+
+-- | fork a thread and call the supplied function when the thread is about
+-- to terminate, with an exception or a returned value.  The function is
+-- called with asynchronous exceptions masked.
+--
+-- > forkFinally action and_then =
+-- >   mask $ \restore ->
+-- >     forkIO $ try (restore action) >>= and_then
+--
+-- This function is useful for informing the parent when a child
+-- terminates, for example.
+--
+forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
+forkFinally action and_then =
+  mask $ \restore ->
+    forkIO $ try (restore action) >>= and_then
+
+-- -----------------------------------------------------------------------------
+-- Merging streams
 
 #ifndef __HUGS__
 max_buff_size :: Int
@@ -598,11 +618,10 @@ foreign import ccall safe "fdReady"
 >   myForkIO :: IO () -> IO (MVar ())
 >   myForkIO io = do
 >     mvar <- newEmptyMVar
->     forkIO (io `finally` putMVar mvar ())
+>     forkFinally io (\_ -> putMVar mvar ())
 >     return mvar
 
-      Note that we use 'finally' from the
-      "Control.Exception" module to make sure that the
+      Note that we use 'forkFinally' to make sure that the
       'MVar' is written to even if the thread dies or
       is killed for some reason.
 
@@ -627,7 +646,7 @@ foreign import ccall safe "fdReady"
 >        mvar <- newEmptyMVar
 >        childs <- takeMVar children
 >        putMVar children (mvar:childs)
->        forkIO (io `finally` putMVar mvar ())
+>        forkFinally io (\_ -> putMVar mvar ())
 >
 >     main =
 >       later waitForChildren $
