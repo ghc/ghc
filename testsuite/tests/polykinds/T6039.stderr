@@ -2,4 +2,3 @@
 T6039.hs:5:14:
     Kind variable `j' cannot appear in a function position
     In the kind `j k'
-    In the data declaration for `T'
