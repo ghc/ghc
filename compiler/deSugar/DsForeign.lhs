@@ -47,6 +47,8 @@ import Config
 import Constants
 import OrdList
 import Pair
+import Util
+
 import Data.Maybe
 import Data.List
 \end{code}
@@ -707,9 +709,12 @@ toCType = f False
               = pprPanic "toCType" (ppr t)
 
 typeTyCon :: Type -> TyCon
-typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of
-                 Just (tc,_) -> tc
-                 Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
+typeTyCon ty
+  | UnaryRep rep_ty <- repType ty
+  , Just (tc, _) <- tcSplitTyConApp_maybe rep_ty
+  = tc
+  | otherwise
+  = pprPanic "DsForeign.typeTyCon" (ppr ty)
 
 insertRetAddr :: DynFlags -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
@@ -752,7 +757,7 @@ ret_addr_arg = (text "original_return_addr", text "void*", undefined,
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).
-getPrimTyOf :: Type -> Type
+getPrimTyOf :: Type -> UnaryType
 getPrimTyOf ty
   | isBoolTy rep_ty = intPrimTy
   -- Except for Bool, the types we are interested in have a single constructor
@@ -765,7 +770,7 @@ getPrimTyOf ty
         prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
-        rep_ty = repType ty
+        UnaryRep rep_ty = repType ty
 
 -- represent a primitive type as a Char, for building a string that
 -- described the foreign function type.  The types are size-dependent,

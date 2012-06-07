@@ -41,6 +41,7 @@ import FastString
 import UniqSupply
 import SrcLoc
 import BasicTypes
+import Util
 
 import Outputable
 import Exception     ( evaluate )

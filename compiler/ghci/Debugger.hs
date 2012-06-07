@@ -27,6 +27,7 @@ import GHC
 import Outputable
 import PprTyThing
 import MonadUtils
+import DynFlags
 import Exception
 
 import Control.Monad
@@ -34,7 +35,6 @@ import Data.List
 import Data.Maybe
 import Data.IORef
 
-import System.IO
 import GHC.Exts
 
 -------------------------------------
@@ -58,7 +58,8 @@ pprintClosureCommand bindThings force str = do
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
-  liftIO $ (printForUser stdout unqual . vcat)
+  dflags <- getDynFlags
+  liftIO $ (printOutputForUser dflags unqual . vcat)
            (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
                     ids
                     docterms)
@@ -226,4 +227,4 @@ pprTypeAndContents id = do
 traceOptIf :: GhcMonad m => DynFlag -> SDoc -> m ()
 traceOptIf flag doc = do
   dflags <- GHC.getSessionDynFlags
-  when (dopt flag dflags) $ liftIO $ printForUser stderr alwaysQualify doc
+  when (dopt flag dflags) $ liftIO $ printInfoForUser dflags alwaysQualify doc

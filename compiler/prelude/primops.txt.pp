@@ -1057,6 +1057,14 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
+primop  SetByteArrayOp "setByteArray#" GenPrimOp
+  MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
+  {Set the range of the MutableByteArray# to the specified character.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail = True
+
 ------------------------------------------------------------------------
 section "Arrays of arrays"
 	{Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}

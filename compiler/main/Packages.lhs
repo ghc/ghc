@@ -59,6 +59,7 @@ import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
+import Data.Char (isSpace)
 import Data.List as List
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -234,7 +235,11 @@ readPackageConfig dflags conf_file = do
                 "can't find a package database at " ++ conf_file
             debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
             str <- readFile conf_file
-            return (map installedPackageInfoToPackageConfig $ read str)
+            case reads str of
+                [(configs, rest)]
+                    | all isSpace rest -> return (map installedPackageInfoToPackageConfig configs)
+                _ -> ghcError $ InstallationError $
+                        "invalid package database file " ++ conf_file
 
   let
       top_dir = topDir dflags

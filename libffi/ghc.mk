@@ -70,8 +70,11 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	mv libffi/build/ltmain.sh libffi/build/ltmain.sh.orig
 	sed 's#cmd //c echo "\$$1"#cmd /c "echo $$1"#' < libffi/build/ltmain.sh.orig > libffi/build/ltmain.sh
 
-# Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
-# warnings off or the compilation of libffi might fail due to warnings
+# * Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
+#   warnings off or the compilation of libffi might fail due to warnings;
+#   hence the -w flags.
+# * We specify --libdir, as we need to know the path to libffi.a, but on
+#   some platforms it defaults to .../lib64/ rather than .../lib/.
 	cd libffi && \
 	    $(LIBFFI_PATH_MANGLE) \
 	    cd build && \
@@ -83,6 +86,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --prefix=$(TOP)/libffi/build/inst \
+	          --libdir=$(TOP)/libffi/build/inst/lib \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
 	          --host=$(TargetPlatformFull)

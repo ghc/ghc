@@ -81,6 +81,7 @@ import Outputable
 import Unique
 import FastString
 import ListSetOps
+import Util
 \end{code}
 
 

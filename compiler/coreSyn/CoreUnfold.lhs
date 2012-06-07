@@ -570,16 +570,50 @@ conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
   | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(10))    -- Like variables
 
--- See Note [Unboxed tuple result discount]
+-- See Note [Unboxed tuple size and result discount]
   | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox (10 * (1 + n_val_args)))
 
--- See Note [Constructor size]
-  | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (10 + n_val_args)))
-     -- discont was (10 * (1 + n_val_args)), but it turns out that
-     -- adding a bigger constant here is an unambiguous win.  We
-     -- REALLY like unfolding constructors that get scrutinised.
-     -- [SDM, 25/5/11]
+-- See Note [Constructor size and result discount]
+  | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (1 + n_val_args)))
 \end{code}
+
+Note [Constructor size and result discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Treat a constructors application as size 10, regardless of how many
+arguments it has; we are keen to expose them (and we charge separately
+for their args).  We can't treat them as size zero, else we find that
+(Just x) has size 0, which is the same as a lone variable; and hence
+'v' will always be replaced by (Just x), where v is bound to Just x.
+
+The "result discount" is applied if the result of the call is
+scrutinised (say by a case).  For a constructor application that will
+mean the constructor application will disappear, so we don't need to
+charge it to the function.  So the discount should at least match the
+cost of the constructor application, namely 10.  But to give a bit
+of extra incentive we give a discount of 10*(1 + n_val_args).
+
+Simon M tried a MUCH bigger discount: (10 * (10 + n_val_args)), 
+and said it was an "unambiguous win", but its terribly dangerous
+because a fuction with many many case branches, each finishing with
+a constructor, can have an arbitrarily large discount.  This led to
+terrible code bloat: see Trac #6099.
+
+Note [Unboxed tuple size and result discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+However, unboxed tuples count as size zero. I found occasions where we had 
+	f x y z = case op# x y z of { s -> (# s, () #) }
+and f wasn't getting inlined.
+
+I tried giving unboxed tuples a *result discount* of zero (see the
+commented-out line).  Why?  When returned as a result they do not
+allocate, so maybe we don't want to charge so much for them If you
+have a non-zero discount here, we find that workers often get inlined
+back into wrappers, because it look like
+    f x = case $wf x of (# a,b #) -> (a,b)
+and we are keener because of the case.  However while this change
+shrank binary sizes by 0.5% it also made spectral/boyer allocate 5%
+more. All other changes were very small. So it's not a big deal but I
+didn't adopt the idea.
 
 Note [Function application discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -606,31 +640,6 @@ There's no point in doing so -- any optimsations will see the S#
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.
-
-Note [Constructor size]
-~~~~~~~~~~~~~~~~~~~~~~~
-Treat a constructors application as size 1, regardless of how many
-arguments it has; we are keen to expose them (and we charge separately
-for their args).  We can't treat them as size zero, else we find that
-(Just x) has size 0, which is the same as a lone variable; and hence
-'v' will always be replaced by (Just x), where v is bound to Just x.
-
-However, unboxed tuples count as size zero. I found occasions where we had 
-	f x y z = case op# x y z of { s -> (# s, () #) }
-and f wasn't getting inlined.
-
-Note [Unboxed tuple result discount]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-I tried giving unboxed tuples a *result discount* of zero (see the
-commented-out line).  Why?  When returned as a result they do not
-allocate, so maybe we don't want to charge so much for them If you
-have a non-zero discount here, we find that workers often get inlined
-back into wrappers, because it look like
-    f x = case $wf x of (# a,b #) -> (a,b)
-and we are keener because of the case.  However while this change
-shrank binary sizes by 0.5% it also made spectral/boyer allocate 5%
-more. All other changes were very small. So it's not a big deal but I
-didn't adopt the idea.
 
 \begin{code}
 primOpSize :: PrimOp -> Int -> ExprSize

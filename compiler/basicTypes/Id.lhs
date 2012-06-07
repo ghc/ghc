@@ -41,8 +41,8 @@ module Id (
 	mkWorkerId, mkWiredInIdName,
 
 	-- ** Taking an Id apart
-	idName, idType, idUnique, idInfo, idDetails,
-	idPrimRep, recordSelectorFieldLabel,
+	idName, idType, idUnique, idInfo, idDetails, idRepArity,
+	recordSelectorFieldLabel,
 
 	-- ** Modifying an Id
 	setIdName, setIdUnique, Id.setIdType, 
@@ -126,7 +126,7 @@ import Outputable
 import Unique
 import UniqSupply
 import FastString
-import Util( count )
+import Util
 import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
@@ -157,9 +157,6 @@ idUnique  = Var.varUnique
 
 idType   :: Id -> Kind
 idType    = Var.varType
-
-idPrimRep :: Id -> PrimRep
-idPrimRep id = typePrimRep (idType id)
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
@@ -461,6 +458,9 @@ idArity id = arityInfo (idInfo id)
 
 setIdArity :: Id -> Arity -> Id
 setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
+
+idRepArity :: Id -> RepArity
+idRepArity x = typeRepArity (idArity x) (idType x)
 
 -- | Returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool

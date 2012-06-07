@@ -27,6 +27,7 @@ import Module
 import FastString
 import Panic
 import Outputable
+import Util
 
 -- Standard libraries
 

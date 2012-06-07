@@ -24,13 +24,13 @@ module TcHsType (
 
 		-- Kind-checking types
                 -- No kind generalisation, no checkValidType
-	tcHsTyVarBndrs, 
-        tcHsLiftedType, 
+	kcHsTyVarBndrs, tcHsTyVarBndrs, 
+        tcHsLiftedType, tcHsOpenType,
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
 
         ExpKind(..), ekConstraint, expArgKind, checkExpectedKind,
-        kindGeneralize,
+        bindScopedKindVars, kindGeneralize,
 
 		-- Sort-checking kinds
 	tcLHsKind, 
@@ -73,6 +73,8 @@ import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import UniqSupply
 import Outputable
 import FastString
+import Util
+
 import Control.Monad ( unless, when, zipWithM )
 \end{code}
 
@@ -247,7 +249,7 @@ tcHsConArgType NewType  bty = tcHsLiftedType (getBangType bty)
   -- Newtypes can't have bangs, but we don't check that
   -- until checkValidDataCon, so do not want to crash here
 
-tcHsConArgType DataType bty = tcHsArgType (getBangType bty)
+tcHsConArgType DataType bty = tcHsOpenType (getBangType bty)
   -- Can't allow an unlifted type for newtypes, because we're effectively
   -- going to remove the constructor while coercing it to a lifted type.
   -- And newtypes can't be bang'd
@@ -266,10 +268,10 @@ tc_hs_arg_tys what tys kinds
              | (ty,kind,n) <- zip3 tys kinds [1..] ]
 
 ---------------------------
-tcHsArgType, tcHsLiftedType :: LHsType Name -> TcM TcType
+tcHsOpenType, tcHsLiftedType :: LHsType Name -> TcM TcType
 -- Used for type signatures
 -- Do not do validity checking
-tcHsArgType ty 	  = addTypeCtxt ty $ tc_lhs_type ty ekArg  
+tcHsOpenType ty   = addTypeCtxt ty $ tc_lhs_type ty ekOpen
 tcHsLiftedType ty = addTypeCtxt ty $ tc_lhs_type ty ekLifted
 
 -- Like tcHsType, but takes an expected kind
@@ -331,7 +333,7 @@ tc_hs_type hs_ty@(HsTyVar name) exp_kind
        ; return ty }
 
 tc_hs_type ty@(HsFunTy ty1 ty2) exp_kind@(EK _ ctxt)
-  = do { ty1' <- tc_lhs_type ty1 (EK argTypeKind  ctxt)
+  = do { ty1' <- tc_lhs_type ty1 (EK openTypeKind ctxt)
        ; ty2' <- tc_lhs_type ty2 (EK openTypeKind ctxt)
        ; checkExpectedKind ty liftedTypeKind exp_kind
        ; return (mkFunTy ty1' ty2') }
@@ -477,7 +479,7 @@ tc_tuple hs_ty tup_sort tys exp_kind
   where
     arg_kind = case tup_sort of
                  HsBoxedTuple      -> liftedTypeKind
-                 HsUnboxedTuple    -> argTypeKind
+                 HsUnboxedTuple    -> openTypeKind
                  HsConstraintTuple -> constraintKind
                  _                 -> panic "tc_hs_type arg_kind"
     cxt_doc = case tup_sort of
@@ -500,7 +502,7 @@ finish_tuple hs_ty tup_sort tau_tys exp_kind
             _                 -> panic "tc_hs_type HsTupleTy"
 
     res_kind = case tup_sort of
-                 HsUnboxedTuple    -> ubxTupleKind
+                 HsUnboxedTuple    -> unliftedTypeKind
                  HsBoxedTuple      -> liftedTypeKind
                  HsConstraintTuple -> constraintKind
                  _                 -> panic "tc_hs_type arg_kind"
@@ -577,12 +579,16 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
                ty = dataConUserType dc
                tc = buildPromotedDataCon dc
 
-           ANothing -> failWithTc (ptext (sLit "Promoted kind") <+> 
-                              quotes (ppr name) <+>
-                              ptext (sLit "used in a mutually recursive group"))
+           AFamDataCon -> bad_promote (ptext (sLit "it comes from a data family instance"))
+           ARecDataCon -> bad_promote (ptext (sLit "it is defined and used in the same recursive group"))
 
            _  -> wrongThingErr "type" thing name }
   where
+    bad_promote reason
+      = failWithTc (hang (ptext (sLit "You can't use data constructor") <+> quotes (ppr name)
+                          <+> ptext (sLit "here")) 
+                       2 (parens reason))
+
     get_loopy_tc name
       = do { env <- getGblEnv
            ; case lookupNameEnv (tcg_type_env env) name of
@@ -783,19 +789,42 @@ then we'd also need
                           since we only have BOX for a super kind)
 
 \begin{code}
-bindScopedKindVars :: [Name] -> TcM a -> TcM a
+bindScopedKindVars :: [Name] -> ([KindVar] -> TcM a) -> TcM a
 -- Given some tyvar binders like [a (b :: k -> *) (c :: k)]
 -- bind each scoped kind variable (k in this case) to a fresh
 -- kind skolem variable
-bindScopedKindVars kvs thing_inside 
-  = tcExtendTyVarEnv (map mkKindSigVar kvs) thing_inside
+bindScopedKindVars kv_ns thing_inside 
+  = tcExtendTyVarEnv kvs (thing_inside kvs)
+  where
+    kvs = map mkKindSigVar kv_ns
+
+kcHsTyVarBndrs :: Bool    -- Default UserTyVar to *
+               -> LHsTyVarBndrs Name 
+	       -> ([TcKind] -> TcM r)
+	       -> TcM r
+kcHsTyVarBndrs default_to_star (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
+  = bindScopedKindVars kvs $ \ _ -> 
+    do { nks <- mapM (kc_hs_tv . unLoc) hs_tvs
+       ; tcExtendKindEnv nks (thing_inside (map snd nks)) }
+  where
+    kc_hs_tv :: HsTyVarBndr Name -> TcM (Name, TcKind)
+    kc_hs_tv (UserTyVar n)     
+      = do { mb_thing <- tcLookupLcl_maybe n
+           ; kind <- case mb_thing of
+               	       Just (AThing k) -> return k
+               	       _ | default_to_star -> return liftedTypeKind
+               	         | otherwise       -> newMetaKindVar
+           ; return (n, kind) }
+    kc_hs_tv (KindedTyVar n k) 
+      = do { kind <- tcLHsKind k
+           ; return (n, kind) }
 
 tcHsTyVarBndrs :: LHsTyVarBndrs Name 
 	       -> ([TyVar] -> TcM r)
 	       -> TcM r
 -- Bind the type variables to skolems, each with a meta-kind variable kind
 tcHsTyVarBndrs (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
-  = bindScopedKindVars kvs $
+  = bindScopedKindVars kvs $ \ _ -> 
     do { tvs <- mapM tcHsTyVarBndr hs_tvs
        ; traceTc "tcHsTyVarBndrs" (ppr hs_tvs $$ ppr tvs)
        ; tcExtendTyVarEnv tvs (thing_inside tvs) }
@@ -829,15 +858,24 @@ kindGeneralize tkvs
   = do { gbl_tvs  <- tcGetGlobalTyVars -- Already zonked
        ; tidy_env <- tcInitTidyEnv
        ; tkvs     <- zonkTyVarsAndFV tkvs
-       ; let kvs_to_quantify = varSetElems (tkvs `minusVarSet` gbl_tvs)
+       ; let kvs_to_quantify = filter isKindVar (varSetElems (tkvs `minusVarSet` gbl_tvs))
                 -- Any type varaibles in tkvs will be in scope,
                 -- and hence in gbl_tvs, so after removing gbl_tvs
                 -- we should only have kind variables left
+		--
+ 		-- BUT there is a smelly case (to be fixed when TH is reorganised)
+		--     f t = [| e :: $t |]
+                -- When typechecking the body of the bracket, we typecheck $t to a
+                -- unification variable 'alpha', with no biding forall.  We don't
+                -- want to kind-quantify it!
 
              (_, tidy_kvs_to_quantify) = tidyTyVarBndrs tidy_env kvs_to_quantify
                            -- We do not get a later chance to tidy!
 
        ; ASSERT2 (all isKindVar kvs_to_quantify, ppr kvs_to_quantify $$ ppr tkvs)
+             -- This assertion is obviosy true because of the filter isKindVar
+             -- but we'll remove that when reorganising TH, and then the assertion
+             -- will mean something
          zonkQuantifiedTyVars tidy_kvs_to_quantify }
 \end{code}
 
@@ -895,7 +933,7 @@ kcTyClTyVars :: Name -> LHsTyVarBndrs Name -> (TcKind -> TcM a) -> TcM a
 -- Used for the type variables of a type or class decl,
 -- when doing the initial kind-check.  
 kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
-  = bindScopedKindVars kvs $
+  = bindScopedKindVars kvs $ \ _ -> 
     do 	{ tc_kind <- kcLookupKind name
 	; let (arg_ks, res_k) = splitKindFunTysN (length hs_tvs) tc_kind
                      -- There should be enough arrows, because
@@ -1192,9 +1230,9 @@ data ExpKind = EK TcKind SDoc
 instance Outputable ExpKind where
   ppr (EK k _) = ptext (sLit "Expected kind:") <+> ppr k
 
-ekLifted, ekArg, ekConstraint :: ExpKind
+ekLifted, ekOpen, ekConstraint :: ExpKind
 ekLifted     = EK liftedTypeKind (ptext (sLit "Expected"))
-ekArg        = EK argTypeKind    (ptext (sLit "Expected"))
+ekOpen       = EK openTypeKind   (ptext (sLit "Expected"))
 ekConstraint = EK constraintKind (ptext (sLit "Expected"))
 
 -- Build an ExpKind for arguments
@@ -1345,7 +1383,6 @@ tc_kind_var_app name arg_kis
   = do { (_errs, mb_thing) <- tryTc (tcLookup name)
        ;  case mb_thing of
   	   Just (AGlobal (ATyCon tc))
-  	     | isAlgTyCon tc || isTupleTyCon tc
   	     -> do { data_kinds <- xoptM Opt_DataKinds
   	           ; unless data_kinds $ addErr (dataKindsErr name)
   	     	   ; case isPromotableTyCon tc of

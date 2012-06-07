@@ -44,6 +44,7 @@ import Module
 import FastString( mkFastString, fsLit )
 import Constants
 import DynFlags
+import Util
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects

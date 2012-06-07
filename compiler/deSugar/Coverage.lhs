@@ -109,7 +109,9 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
      hashNo <- writeMixEntries dflags mod count entries orig_file2
      modBreaks <- mkModBreaks count entries
 
-     doIfSet_dyn dflags Opt_D_dump_ticked $ printDump (pprLHsBinds binds1)
+     doIfSet_dyn dflags Opt_D_dump_ticked $
+         log_action dflags SevDump noSrcSpan defaultDumpStyle
+             (pprLHsBinds binds1)
    
      return (binds1, HpcInfo count hashNo, modBreaks)
 

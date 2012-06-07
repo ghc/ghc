@@ -159,7 +159,7 @@ matchExpectedFunTys herald arity orig_ty
     ------------
     defer n_req fun_ty 
       = addErrCtxtM mk_ctxt $
-        do { arg_tys <- newFlexiTyVarTys n_req argTypeKind
+        do { arg_tys <- newFlexiTyVarTys n_req openTypeKind
            ; res_ty  <- newFlexiTyVarTy openTypeKind
            ; co   <- unifyType fun_ty (mkFunTys arg_tys res_ty)
            ; return (co, arg_tys, res_ty) }

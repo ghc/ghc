@@ -16,13 +16,13 @@ import Tar
 -- * Check installed trees too
 -- * Check hashbangs
 
--- Only size changes > sizeAbs are considered an issue
-sizeAbs :: Integer
-sizeAbs = 1000
-
--- Only a size change of sizePercentage% or more is considered an issue
-sizePercentage :: Integer
-sizePercentage = 150
+sizeChangeThresholds :: [(Integer,  -- Theshold only applies if one of
+                                    -- the files is at least this big
+                          Integer)] -- Size changed if the larger file's
+                                    -- size is at least this %age of the
+                                    -- smaller file's size
+sizeChangeThresholds = [(     1000, 150),
+                        (50 * 1000, 110)]
 
 main :: IO ()
 main = do args <- getArgs
@@ -260,9 +260,12 @@ compareTarLine tl1 tl2
           perms2 = tlPermissions tl2
           size1 = tlSize tl1
           size2 = tlSize tl2
-          sizeChanged = abs (size1 - size2) > sizeAbs
-                     && (((100 * size1) `div` size2) > sizePercentage ||
-                         ((100 * size2) `div` size1) > sizePercentage)
+          sizeMin = size1 `min` size2
+          sizeMax = size1 `max` size2
+          sizeChanged = any sizeChangeThresholdReached sizeChangeThresholds
+          sizeChangeThresholdReached (reqSize, percentage)
+              = (sizeMax >= reqSize)
+             && (((100 * sizeMax) `div` sizeMin) >= percentage)
 
 versionRE :: String
 versionRE = "([0-9]+(\\.[0-9]+)*)"

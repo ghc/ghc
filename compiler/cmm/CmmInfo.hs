@@ -27,6 +27,8 @@ import Platform
 import StaticFlags
 import UniqSupply
 import MonadUtils
+import Util
+
 import Data.Bits
 import Data.Word
 

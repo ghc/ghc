@@ -50,8 +50,7 @@ import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
 import StaticFlags
-import Util ( on, global, toArgs, toCmdArgs, removeSpaces, getCmd,
-              filterOut, seqList, looksLikeModuleName, partitionWith )
+import Util
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -69,7 +68,7 @@ import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
 import Data.Maybe
 
-import Exception hiding (catch, block, unblock)
+import Exception hiding (catch)
 
 import Foreign.C
 import Foreign.Safe
@@ -2078,7 +2077,9 @@ showCmd str = do
         ["imports"]  -> showImports
         ["modules" ] -> showModules
         ["bindings"] -> showBindings
-        ["linker"]   -> liftIO showLinkerState
+        ["linker"]   ->
+            do dflags <- getDynFlags
+               liftIO $ showLinkerState dflags
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages
@@ -2889,8 +2890,8 @@ showException se =
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: MonadException m => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = Haskeline.catch m $ \e -> unblock (h e)
+ghciHandle :: ExceptionMonad m => (SomeException -> m a) -> m a -> m a
+ghciHandle h m = gcatch m $ \e -> gunblock (h e)
 
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)

@@ -59,6 +59,7 @@ import SrcLoc
 import Bag
 import FastString
 import Outputable
+import Util
 -- import Data.Traversable( traverse )
 \end{code}
 

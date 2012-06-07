@@ -83,7 +83,6 @@ lintStgBindings whodunnit binds
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
-lintStgArg a               = pprPanic "lintStgArg" (ppr a)
 
 lintStgVar :: Id -> LintM (Maybe Kind)
 lintStgVar v = do checkInScope v
@@ -175,7 +174,7 @@ lintStgExpr (StgOpApp _ args res_ty) = runMaybeT $ do
     _maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
     return res_ty
 
-lintStgExpr (StgLam _ bndrs _) = do
+lintStgExpr (StgLam bndrs _) = do
     addErrL (ptext (sLit "Unexpected StgLam") <+> ppr bndrs)
     return Nothing
 
@@ -196,18 +195,19 @@ lintStgExpr (StgSCC _ _ _ expr) = lintStgExpr expr
 lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut
 
-    MaybeT $ liftM Just $
+    in_scope <- MaybeT $ liftM Just $
      case alts_type of
-        AlgAlt tc    -> check_bndr tc
-        PrimAlt tc   -> check_bndr tc
-        UbxTupAlt tc -> check_bndr tc
-        PolyAlt      -> return ()
+        AlgAlt tc    -> check_bndr tc >> return True
+        PrimAlt tc   -> check_bndr tc >> return True
+        UbxTupAlt _  -> return False -- Binder is always dead in this case
+        PolyAlt      -> return True
 
-    MaybeT $ addInScopeVars [bndr] $
+    MaybeT $ addInScopeVars [bndr | in_scope] $
              lintStgAlts alts scrut_ty
   where
-    scrut_ty      = idType bndr
-    check_bndr tc = case tyConAppTyCon_maybe (repType scrut_ty) of
+    scrut_ty          = idType bndr
+    UnaryRep scrut_rep = repType scrut_ty -- Not used if scrutinee is unboxed tuple
+    check_bndr tc = case tyConAppTyCon_maybe scrut_rep of
                         Just bndr_tc -> checkL (tc == bndr_tc) bad_bndr
                         Nothing      -> addErrL bad_bndr
                   where
@@ -431,24 +431,27 @@ stgEqType :: Type -> Type -> Bool
 -- Fundamentally this is a losing battle because of unsafeCoerce
 
 stgEqType orig_ty1 orig_ty2 
-  = go rep_ty1 rep_ty2
+  = gos (repType orig_ty1) (repType orig_ty2)
   where
-    rep_ty1 = deepRepType orig_ty1
-    rep_ty2 = deepRepType orig_ty2
+    gos :: RepType -> RepType -> Bool
+    gos (UbxTupleRep tys1) (UbxTupleRep tys2)
+      = equalLength tys1 tys2 && and (zipWith go tys1 tys2)
+    gos (UnaryRep ty1) (UnaryRep ty2) = go ty1 ty2
+    gos _ _ = False
+
+    go :: UnaryType -> UnaryType -> Bool
     go ty1 ty2
       | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
       , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
       , let res = if tc1 == tc2 
-                  then equalLength tc_args1 tc_args2 
-                    && and (zipWith go tc_args1 tc_args2)
+                  then equalLength tc_args1 tc_args2 && and (zipWith (gos `on` repType) tc_args1 tc_args2)
                   else  -- TyCons don't match; but don't bleat if either is a 
                         -- family TyCon because a coercion might have made it 
                         -- equal to something else
                     (isFamilyTyCon tc1 || isFamilyTyCon tc2)
       = if res then True
         else 
-        pprTrace "stgEqType: unequal" (vcat [ppr orig_ty1, ppr orig_ty2, ppr rep_ty1
-                                            , ppr rep_ty2, ppr ty1, ppr ty2]) 
+        pprTrace "stgEqType: unequal" (vcat [ppr ty1, ppr ty2]) 
         False
 
       | otherwise = True  -- Conservatively say "fine".  

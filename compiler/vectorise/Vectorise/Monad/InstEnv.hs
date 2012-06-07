@@ -14,6 +14,7 @@ import Class
 import Type
 import TyCon
 import Outputable
+import Util
 
 
 #include "HsVersions.h"

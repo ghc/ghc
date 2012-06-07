@@ -64,7 +64,11 @@ import Control.Concurrent.MVar
 
 import System.FilePath
 import System.IO
+#if __GLASGOW_HASKELL__ > 704
+import System.Directory hiding (findFile)
+#else
 import System.Directory
+#endif
 
 import Distribution.Package hiding (depends, PackageId)
 
@@ -231,10 +235,11 @@ filterNameMap mods env
 
 
 -- | Display the persistent linker state.
-showLinkerState :: IO ()
-showLinkerState
+showLinkerState :: DynFlags -> IO ()
+showLinkerState dflags
   = do pls <- readIORef v_PersistentLinkerState >>= readMVar
-       printDump (vcat [text "----- Linker state -----",
+       log_action dflags SevDump noSrcSpan defaultDumpStyle
+                 (vcat [text "----- Linker state -----",
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
                         text "BCOs:" <+> ppr (bcos_loaded pls)])
@@ -294,7 +299,7 @@ reallyInitDynLinker dflags =
           -- (d) Link .o files from the command-line
         ; cmdline_ld_inputs <- readIORef v_Ld_inputs
 
-        ; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs
+        ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
 
           -- (e) Link any MacOS frameworks
         ; let framework_paths
@@ -320,12 +325,13 @@ reallyInitDynLinker dflags =
         ; return pls
         }}
 
-classifyLdInput :: FilePath -> IO (Maybe LibrarySpec)
-classifyLdInput f
+classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput dflags f
   | isObjectFilename f = return (Just (Object f))
   | isDynLibFilename f = return (Just (DLLPath f))
   | otherwise          = do
-        hPutStrLn stderr ("Warning: ignoring unrecognised input `" ++ f ++ "'")
+        log_action dflags SevInfo noSrcSpan defaultUserStyle
+            (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()

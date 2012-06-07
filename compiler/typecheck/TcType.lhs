@@ -115,10 +115,10 @@ module TcType (
   --------------------------------
   -- Rexported from Kind
   Kind, typeKind,
-  unliftedTypeKind, liftedTypeKind, argTypeKind,
+  unliftedTypeKind, liftedTypeKind,
   openTypeKind, constraintKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isSubOpenTypeKind, 
-  isSubArgTypeKind, tcIsSubKind, splitKindFunTys, defaultKind,
+  tcIsSubKind, splitKindFunTys, defaultKind,
   mkMetaKindVar,
 
   --------------------------------
@@ -609,8 +609,8 @@ tidyCos env = map (tidyCo env)
 %************************************************************************
 
 \begin{code}
-
--- | Finds type family instances occuring in a type after expanding synonyms.
+-- | Finds outermost type-family applications occuring in a type,
+-- after expanding synonyms.
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts ty 
   | Just exp_ty <- tcView ty    = tcTyFamInsts exp_ty

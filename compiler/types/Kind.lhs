@@ -15,15 +15,13 @@ module Kind (
         SuperKind, Kind, typeKind,
 
 	-- Kinds
-	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
-        argTypeKind, ubxTupleKind, constraintKind,
+	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, constraintKind,
         mkArrowKind, mkArrowKinds,
         typeNatKind, typeStringKind,
 
         -- Kind constructors...
         anyKindTyCon, liftedTypeKindTyCon, openTypeKindTyCon,
-        unliftedTypeKindTyCon, argTypeKindTyCon, ubxTupleKindTyCon,
-        constraintKindTyCon,
+        unliftedTypeKindTyCon, constraintKindTyCon,
 
         -- Super Kinds
 	superKind, superKindTyCon, 
@@ -36,14 +34,13 @@ module Kind (
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-        isUbxTupleKind, isArgTypeKind, isConstraintKind,
-        isConstraintOrLiftedKind, isKind, isKindVar,
+        isConstraintKind, isConstraintOrLiftedKind, isKind, isKindVar,
         isSuperKind, isSuperKindTyCon,
         isLiftedTypeKindCon, isConstraintKindCon,
         isAnyKind, isAnyKindCon,
         okArrowArgKind, okArrowResultKind,
 
-        isSubArgTypeKind, isSubOpenTypeKind, 
+        isSubOpenTypeKind, 
         isSubKind, isSubKindCon, 
         tcIsSubKind, tcIsSubKindCon,
         defaultKind,
@@ -63,6 +60,7 @@ import TyCon
 import VarSet
 import PrelNames
 import Outputable
+import Util
 \end{code}
 
 %************************************************************************
@@ -107,11 +105,10 @@ synTyConResKind :: TyCon -> Kind
 synTyConResKind tycon = kindAppResult (tyConKind tycon) (map mkTyVarTy (tyConTyVars tycon))
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
-isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind,
+isOpenTypeKind, isUnliftedTypeKind,
   isConstraintKind, isAnyKind, isConstraintOrLiftedKind :: Kind -> Bool
 
-isOpenTypeKindCon, isUbxTupleKindCon, isArgTypeKindCon,
-  isUnliftedTypeKindCon, isSubArgTypeKindCon, 
+isOpenTypeKindCon, isUnliftedTypeKindCon,
   isSubOpenTypeKindCon, isConstraintKindCon,
   isLiftedTypeKindCon, isAnyKindCon :: TyCon -> Bool
 
@@ -119,8 +116,6 @@ isOpenTypeKindCon, isUbxTupleKindCon, isArgTypeKindCon,
 isLiftedTypeKindCon   tc = tyConUnique tc == liftedTypeKindTyConKey
 isAnyKindCon          tc = tyConUnique tc == anyKindTyConKey
 isOpenTypeKindCon     tc = tyConUnique tc == openTypeKindTyConKey
-isUbxTupleKindCon     tc = tyConUnique tc == ubxTupleKindTyConKey
-isArgTypeKindCon      tc = tyConUnique tc == argTypeKindTyConKey
 isUnliftedTypeKindCon tc = tyConUnique tc == unliftedTypeKindTyConKey
 isConstraintKindCon   tc = tyConUnique tc == constraintKindTyConKey
 
@@ -129,12 +124,6 @@ isAnyKind _               = False
 
 isOpenTypeKind (TyConApp tc _) = isOpenTypeKindCon tc
 isOpenTypeKind _               = False
-
-isUbxTupleKind (TyConApp tc _) = isUbxTupleKindCon tc
-isUbxTupleKind _               = False
-
-isArgTypeKind (TyConApp tc _) = isArgTypeKindCon tc
-isArgTypeKind _               = False
 
 isUnliftedTypeKind (TyConApp tc _) = isUnliftedTypeKindCon tc
 isUnliftedTypeKind _               = False
@@ -158,10 +147,7 @@ okArrowArgKindCon kc
   | isConstraintKindCon   kc = True
   | otherwise                = False
 
-okArrowResultKindCon kc
-  | okArrowArgKindCon kc = True
-  | isUbxTupleKindCon kc = True
-  | otherwise            = False
+okArrowResultKindCon = okArrowArgKindCon
 
 okArrowArgKind, okArrowResultKind :: Kind -> Bool
 okArrowArgKind    (TyConApp kc []) = okArrowArgKindCon kc
@@ -181,22 +167,12 @@ isSubOpenTypeKind (TyConApp kc []) = isSubOpenTypeKindCon kc
 isSubOpenTypeKind _                = False
 
 isSubOpenTypeKindCon kc
-  =  isSubArgTypeKindCon kc
-  || isUbxTupleKindCon   kc
-  || isOpenTypeKindCon   kc
-
-isSubArgTypeKindCon kc
-  =  isUnliftedTypeKindCon kc
+  =  isOpenTypeKindCon   kc
+  || isUnliftedTypeKindCon kc
   || isLiftedTypeKindCon   kc  
-  || isArgTypeKindCon      kc     
   || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
                               -- and so that (Ord a -> Eq a) is well-kinded
                               -- and so that (# Eq a, Ord b #) is well-kinded
-
-isSubArgTypeKind :: Kind -> Bool
--- ^ True of any sub-kind of ArgTypeKind 
-isSubArgTypeKind (TyConApp kc []) = isSubArgTypeKindCon kc
-isSubArgTypeKind _                = False
 
 -- | Is this a kind (i.e. a type-of-types)?
 isKind :: Kind -> Bool
@@ -233,7 +209,6 @@ isSubKindCon :: TyCon -> TyCon -> Bool
 -- ^ @kc1 \`isSubKindCon\` kc2@ checks that @kc1@ <: @kc2@
 isSubKindCon kc1 kc2
   | kc1 == kc2            = True
-  | isArgTypeKindCon  kc2 = isSubArgTypeKindCon  kc1
   | isOpenTypeKindCon kc2 = isSubOpenTypeKindCon kc1 
   | otherwise             = False
 
@@ -281,7 +256,6 @@ defaultKind :: Kind -> Kind
 -- The test is really whether the kind is strictly above '*'
 defaultKind (TyConApp kc _args)
   | isOpenTypeKindCon kc = ASSERT( null _args ) liftedTypeKind
-  | isArgTypeKindCon  kc = ASSERT( null _args ) liftedTypeKind
 defaultKind k = k
 
 -- Returns the free kind variables in a kind

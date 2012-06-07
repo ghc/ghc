@@ -39,7 +39,7 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        printSDoc, printErrs, printOutput, hPrintDump, printDump,
+        hPrintDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
@@ -78,7 +78,7 @@ import FastString
 import FastTypes
 import Platform
 import qualified Pretty
-import Util             ( snocView )
+import Util
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
@@ -88,7 +88,7 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
-import System.IO        ( Handle, stderr, stdout, hFlush )
+import System.IO        ( Handle, hFlush )
 import System.FilePath
 
 
@@ -318,25 +318,6 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
--- Unused [7/02 sof]
-printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext sty))
-  hFlush stdout
-
--- I'm not sure whether the direct-IO approach of Pretty.printDoc
--- above is better or worse than the put-big-string approach here
-printErrs :: SDoc -> PprStyle -> IO ()
-printErrs doc sty = do
-  Pretty.printDoc PageMode stderr (runSDoc doc (initSDocContext sty))
-  hFlush stderr
-
-printOutput :: Doc -> IO ()
-printOutput doc = Pretty.printDoc PageMode stdout doc
-
-printDump :: SDoc -> IO ()
-printDump doc = hPrintDump stdout doc
-
 hPrintDump :: Handle -> SDoc -> IO ()
 hPrintDump h doc = do
    Pretty.printDoc PageMode h
@@ -955,6 +936,7 @@ pprPanicFastInt heading pretty_msg =
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
 -- Should typically be accessed with the WARN macros
+warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x

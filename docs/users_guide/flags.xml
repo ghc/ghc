@@ -834,13 +834,14 @@
           </row>
           <row>
             <entry><option>-XDataKinds</option></entry>
-            <entry>Enable <link linkend="kind-polymorphism-and-promotion">datatype promotion</link>.</entry>
+            <entry>Enable <link linkend="promotion">datatype promotion</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDataKinds</option></entry>
           </row>
           <row>
             <entry><option>-XPolyKinds</option></entry>
-            <entry>Enable <link linkend="kind-polymorphism-and-promotion">kind polymorphism</link>.</entry>
+            <entry>Enable <link linkend="kind-polymorphism">kind polymorphism</link>.
+                   Implies <option>-XKindSignatures</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPolyKinds</option></entry>
           </row>

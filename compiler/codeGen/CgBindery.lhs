@@ -411,15 +411,12 @@ getArgAmode (StgLitArg lit)
   = do  { cmm_lit <- cgLit lit
         ; return (typeCgRep (literalType lit), CmmLit cmm_lit) }
 
-getArgAmode (StgTypeArg _) = panic "getArgAmode: type arg"
-
 getArgAmodes :: [StgArg] -> FCode [(CgRep, CmmExpr)]
 getArgAmodes [] = returnFC []
 getArgAmodes (atom:atoms)
-  | isStgTypeArg atom = getArgAmodes atoms
-  | otherwise         = do { amode  <- getArgAmode  atom 
-                           ; amodes <- getArgAmodes atoms
-                           ; return ( amode : amodes ) }
+  = do { amode  <- getArgAmode  atom 
+       ; amodes <- getArgAmodes atoms
+       ; return ( amode : amodes ) }
 \end{code}
 
 %************************************************************************

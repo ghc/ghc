@@ -6,13 +6,6 @@
 HsTypes: Abstract syntax: user-defined types
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsTypes (
@@ -33,7 +26,7 @@ module HsTypes (
         
         mkHsQTvs, hsQTvBndrs,
         mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
-        hsTyVarName, hsTyVarNames, mkHsWithBndrs,
+        hsTyVarName, mkHsWithBndrs, hsLKiTyVarNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
         splitLHsInstDeclTy_maybe,
         splitHsClassTy_maybe, splitLHsClassTy_maybe,
@@ -50,6 +43,7 @@ import HsLit
 
 import NameSet( FreeVars )
 import Name( Name )
+import RdrName( RdrName )
 import Type
 import HsDoc
 import BasicTypes
@@ -142,8 +136,13 @@ data LHsTyVarBndrs name
     }
   deriving( Data, Typeable )
 
-mkHsQTvs :: [LHsTyVarBndr name] -> LHsTyVarBndrs name
+mkHsQTvs :: [LHsTyVarBndr RdrName] -> LHsTyVarBndrs RdrName
+-- Just at RdrName because in the Name variant we should know just
+-- what the kind-variable binders are; and we don't
 mkHsQTvs tvs = HsQTvs { hsq_kvs = panic "mkHsQTvs", hsq_tvs = tvs }
+
+emptyHsQTvs :: LHsTyVarBndrs name   -- Use only when you know there are no kind binders
+emptyHsQTvs =  HsQTvs { hsq_kvs = [], hsq_tvs = [] }
 
 hsQTvBndrs :: LHsTyVarBndrs name -> [LHsTyVarBndr name]
 hsQTvBndrs = hsq_tvs
@@ -368,18 +367,18 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
 --
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
-mkImplicitHsForAllTy ::                        LHsContext name -> LHsType name -> HsType name
-mkExplicitHsForAllTy :: [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
+mkImplicitHsForAllTy ::                           LHsContext RdrName -> LHsType RdrName -> HsType RdrName
+mkExplicitHsForAllTy :: [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
 mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit []  ctxt ty
 mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
 
-mkHsForAllTy :: HsExplicitFlag -> [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
+mkHsForAllTy :: HsExplicitFlag -> [LHsTyVarBndr RdrName] -> LHsContext RdrName -> LHsType RdrName -> HsType RdrName
 -- Smart constructor for HsForAllTy
 mkHsForAllTy exp tvs (L _ []) ty = mk_forall_ty exp tvs ty
 mkHsForAllTy exp tvs ctxt     ty = HsForAllTy exp (mkHsQTvs tvs) ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty :: HsExplicitFlag -> [LHsTyVarBndr name] -> LHsType name -> HsType name
+mk_forall_ty :: HsExplicitFlag -> [LHsTyVarBndr RdrName] -> LHsType RdrName -> HsType RdrName
 mk_forall_ty exp  tvs  (L _ (HsParTy ty))                    = mk_forall_ty exp tvs ty
 mk_forall_ty exp1 tvs1 (L _ (HsForAllTy exp2 qtvs2 ctxt ty)) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ hsq_tvs qtvs2) ctxt ty
 mk_forall_ty exp  tvs  ty                                    = HsForAllTy exp (mkHsQTvs tvs) (noLoc []) ty
@@ -406,11 +405,14 @@ hsTyVarName (KindedTyVar n _) = n
 hsLTyVarName :: LHsTyVarBndr name -> name
 hsLTyVarName = hsTyVarName . unLoc
 
-hsTyVarNames :: [HsTyVarBndr name] -> [name]
-hsTyVarNames tvs = map hsTyVarName tvs
-
 hsLTyVarNames :: LHsTyVarBndrs name -> [name]
+-- Type variables only
 hsLTyVarNames qtvs = map hsLTyVarName (hsQTvBndrs qtvs)
+
+hsLKiTyVarNames :: LHsTyVarBndrs Name -> [Name]
+-- Kind and type variables
+hsLKiTyVarNames (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs })
+  = kvs ++ map hsLTyVarName tvs
 
 hsLTyVarLocName :: LHsTyVarBndr name -> Located name
 hsLTyVarLocName = fmap hsTyVarName
@@ -450,7 +452,7 @@ splitLHsForAllTy poly_ty
   = case unLoc poly_ty of
         HsParTy ty              -> splitLHsForAllTy ty
         HsForAllTy _ tvs cxt ty -> (tvs, unLoc cxt, ty)
-        _                       -> (mkHsQTvs [], [], poly_ty)
+        _                       -> (emptyHsQTvs, [], poly_ty)
         -- The type vars should have been computed by now, even if they were implicit
 
 splitHsClassTy_maybe :: HsType name -> Maybe (name, [LHsType name])

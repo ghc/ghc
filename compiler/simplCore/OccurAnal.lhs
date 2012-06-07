@@ -44,7 +44,7 @@ import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique
 import UniqFM
-import Util             ( mapAndUnzip, filterOut, fstOf3 )
+import Util
 import Bag
 import Outputable
 import FastString

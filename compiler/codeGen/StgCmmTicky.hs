@@ -197,7 +197,7 @@ registerTickyCtr ctr_lbl
 		   (CmmLit (mkIntCLit 1)) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
 
-tickyReturnOldCon, tickyReturnNewCon :: Arity -> FCode ()
+tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
 tickyReturnOldCon arity 
   = ifTicky $ do { bumpTickyCounter (fsLit "RET_OLD_ctr")
 	         ; bumpHistogram    (fsLit "RET_OLD_hst") arity }
@@ -205,7 +205,7 @@ tickyReturnNewCon arity
   = ifTicky $ do { bumpTickyCounter (fsLit "RET_NEW_ctr")
 	         ; bumpHistogram    (fsLit "RET_NEW_hst") arity }
 
-tickyUnboxedTupleReturn :: Int -> FCode ()
+tickyUnboxedTupleReturn :: RepArity -> FCode ()
 tickyUnboxedTupleReturn arity
   = ifTicky $ do { bumpTickyCounter (fsLit "RET_UNBOXED_TUP_ctr")
  	         ; bumpHistogram    (fsLit "RET_UNBOXED_TUP_hst") arity }
@@ -219,7 +219,7 @@ tickyVectoredReturn family_size
 -- Ticky calls
 
 -- Ticks at a *call site*:
-tickyDirectCall :: Arity -> [StgArg] -> FCode ()
+tickyDirectCall :: RepArity -> [StgArg] -> FCode ()
 tickyDirectCall arity args
   | arity == length args = tickyKnownCallExact
   | otherwise = do tickyKnownCallExtraArgs

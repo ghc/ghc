@@ -21,13 +21,15 @@ import CostCentre       ( CollectedCCs )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
+import UnariseStg       ( unarise )
 import SRT		( computeSRTs )
 
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, StgToDo(..),
 			  getStgToDo )
 import Id		( Id )
 import Module		( Module )
-import ErrUtils		( doIfSet_dyn, dumpIfSet_dyn, showPass )
+import ErrUtils
+import SrcLoc
 import UniqSupply	( mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 \end{code}
@@ -44,15 +46,16 @@ stg2stg dflags module_name binds
 	; us <- mkSplitUniqSupply 'g'
 
 	; doIfSet_dyn dflags Opt_D_verbose_stg2stg 
-		      (printDump (text "VERBOSE STG-TO-STG:"))
+		      (log_action dflags SevDump noSrcSpan defaultDumpStyle (text "VERBOSE STG-TO-STG:"))
 
 	; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[],[]) binds
 
 		-- Do the main business!
+        ; let (us0, us1) = splitUniqSupply us'
 	; (processed_binds, _, cost_centres) 
-		<- foldl_mn do_stg_pass (binds', us', ccs) (getStgToDo dflags)
+		<- foldl_mn do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
 
-	; let srt_binds = computeSRTs processed_binds
+	; let srt_binds = computeSRTs (unarise us1 processed_binds)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
 	     		(pprStgBindingsWithSRTs srt_binds)

@@ -217,18 +217,22 @@ instance ExceptionMonad GHCi where
 instance MonadIO GHCi where
   liftIO = MonadUtils.liftIO
 
+instance Haskeline.MonadException Ghc where
+  controlIO f = Ghc $ \s -> Haskeline.controlIO $ \(Haskeline.RunIO run) -> let
+                    run' = Haskeline.RunIO (fmap (Ghc . const) . run . flip unGhc s)
+                    in fmap (flip unGhc s) $ f run'
+
 instance Haskeline.MonadException GHCi where
-  catch = gcatch
-  block = gblock
-  unblock = gunblock
-  -- XXX when Haskeline's MonadException changes, we can drop our
-  -- deprecated block/unblock methods
+  controlIO f = GHCi $ \s -> Haskeline.controlIO $ \(Haskeline.RunIO run) -> let
+                    run' = Haskeline.RunIO (fmap (GHCi . const) . run . flip unGHCi s)
+                    in fmap (flip unGHCi s) $ f run'
 
 instance ExceptionMonad (InputT GHCi) where
   gcatch = Haskeline.catch
-  gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
-  gblock = Haskeline.block
-  gunblock = Haskeline.unblock
+  gmask f = Haskeline.liftIOOp gmask (f . Haskeline.liftIOOp_)
+
+  gblock = Haskeline.liftIOOp_ gblock
+  gunblock = Haskeline.liftIOOp_ gunblock
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

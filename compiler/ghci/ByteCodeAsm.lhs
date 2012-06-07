@@ -34,6 +34,7 @@ import ClosureInfo -- CgRep stuff
 import DynFlags
 import Outputable
 import Platform
+import Util
 
 import Control.Monad
 import Control.Monad.ST ( runST )

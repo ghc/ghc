@@ -17,6 +17,7 @@ module TcErrors(
 
 #include "HsVersions.h"
 
+import TcCanonical( occurCheckExpand )
 import TcRnMonad
 import TcMType
 import TcType
@@ -455,17 +456,20 @@ mkEqErr1 ctxt ct
         msg   = mkExpectedActualMsg exp act
     mk_err ctxt1 _ = mkEqErr_help ctxt1 ct False ty1 ty2
 
-mkEqErr_help :: ReportErrCtxt
-             -> Ct
-             -> Bool     -- True  <=> Types are correct way round;
-                         --           report "expected ty1, actual ty2"
-                         -- False <=> Just report a mismatch without orientation
-                         --           The ReportErrCtxt has expected/actual 
-             -> TcType -> TcType -> TcM ErrMsg
+mkEqErr_help, reportEqErr 
+   :: ReportErrCtxt
+   -> Ct
+   -> Bool     -- True  <=> Types are correct way round;
+               --           report "expected ty1, actual ty2"
+               -- False <=> Just report a mismatch without orientation
+               --           The ReportErrCtxt has expected/actual 
+   -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help ctxt ct oriented ty1 ty2
   | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr ctxt ct oriented tv1 ty2
   | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr ctxt ct oriented tv2 ty1
-  | otherwise   -- Neither side is a type variable
+  | otherwise                        = reportEqErr ctxt ct oriented ty1 ty2
+
+reportEqErr ctxt ct oriented ty1 ty2
   = do { ctxt' <- mkEqInfoMsg ctxt ct ty1 ty2
        ; mkErrorReport ctxt' (misMatchOrCND ctxt' ct oriented ty1 ty2) }
 
@@ -484,7 +488,7 @@ mkTyVarEqErr ctxt ct oriented tv1 ty2
   = mkErrorReport ctxt $ (kindErrorMsg (mkTyVarTy tv1) ty2)
 
   -- Occurs check
-  | tv1 `elemVarSet` tyVarsOfType ty2
+  | isNothing (occurCheckExpand tv1 ty2)
   = let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:") 2
                            (sep [ppr ty1, char '=', ppr ty2])
     in mkErrorReport ctxt occCheckMsg
@@ -524,21 +528,10 @@ mkTyVarEqErr ctxt ct oriented tv1 ty2
        ; mkErrorReport (addExtraTyVarInfo ctxt ty1 ty2) (msg $$ nest 2 extra) }
 
   | otherwise
-  = pprTrace "mkTyVarEqErr" (ppr tv1 $$ ppr ty2 $$ ppr (cec_encl ctxt)) $
-    panic "mkTyVarEqErr"
-    	-- I don't think this should happen, and if it does I want to know
-	-- Trac #5130 happened because an actual type error was not
-	-- reported at all!  So not reporting is pretty dangerous.
-	-- 
-	-- OLD, OUT OF DATE COMMENT
-        -- This can happen, by a recursive decomposition of frozen
-        -- occurs check constraints
-        -- Example: alpha ~ T Int alpha has frozen.
-        --          Then alpha gets unified to T beta gamma
-        -- So now we have  T beta gamma ~ T Int (T beta gamma)
-        -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
-        -- The (gamma ~ T beta gamma) is the occurs check, but
-        -- the (beta ~ Int) isn't an error at all.  So return ()
+  = reportEqErr ctxt ct oriented (mkTyVarTy tv1) ty2
+        -- This *can* happen (Trac #6123, and test T2627b)
+        -- Consider an ambiguous top-level constraint (a ~ F a)
+        -- Not an occurs check, becuase F is a type function.
   where         
     k1 	= tyVarKind tv1
     k2 	= typeKind ty2

@@ -31,7 +31,7 @@ module DataCon (
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
-	dataConSourceArity, dataConRepArity,
+	dataConSourceArity, dataConRepArity, dataConRepRepArity,
 	dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
 	dataConRepStrictness,
@@ -692,8 +692,13 @@ dataConSourceArity dc = length (dcOrigArgTys dc)
 -- | Gives the number of actual fields in the /representation/ of the 
 -- data constructor. This may be more than appear in the source code;
 -- the extra ones are the existentially quantified dictionaries
-dataConRepArity :: DataCon -> Int
+dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
+
+-- | The number of fields in the /representation/ of the constructor
+-- AFTER taking into account the unpacking of any unboxed tuple fields
+dataConRepRepArity :: DataCon -> RepArity
+dataConRepRepArity dc = typeRepArity (dataConRepArity dc) (dataConRepType dc)
 
 -- | Return whether there are any argument types for this 'DataCon's original source type
 isNullarySrcDataCon :: DataCon -> Bool
@@ -1029,7 +1034,9 @@ isPromotableType ty
 -- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
 isPromotableTyCon :: TyCon -> Maybe Int
 isPromotableTyCon tc
-  | all isLiftedTypeKind (res:args) = Just $ length args
+  | isDataTyCon tc  -- Only *data* types can be promoted, not newtypes
+    		    -- not synonyms, not type families
+  , all isLiftedTypeKind (res:args) = Just $ length args
   | otherwise                       = Nothing
   where
     (args, res) = splitKindFunTys (tyConKind tc)

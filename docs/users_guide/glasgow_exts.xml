@@ -3962,6 +3962,25 @@ must be of the form <literal>C (T a1 ... an)</literal>, where
 and the <literal>a1 ... an</literal> are distinct type variables.
 GHC relaxes these rules in two ways.
 <itemizedlist>
+<listitem><para>
+With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
+synonyms. As always, using a type synonym is just shorthand for
+writing the RHS of the type synonym definition.  For example:
+<programlisting>
+  type Point a = (a,a)
+  instance C (Point a)   where ...
+</programlisting>
+is legal.  The instance declaration is equivalent to
+<programlisting>
+  instance C (a,a) where ...
+</programlisting>
+As always, type synonyms
+must be fully applied.  You cannot, for example, write:
+<programlisting>
+  instance Monad Point where ...
+</programlisting>
+</para></listitem>
+
 <listitem>
 <para>
 The <option>-XFlexibleInstances</option> flag allows the head of the instance
@@ -3971,37 +3990,9 @@ For example, this becomes a legal instance declaration
   instance C (Maybe Int) where ...
 </programlisting>
 See also the <link linkend="instance-overlap">rules on overlap</link>.
-</para></listitem>
-<listitem><para>
-With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
-synonyms. As always, using a type synonym is just shorthand for
-writing the RHS of the type synonym definition.  For example:
-
-
-<programlisting>
-  type Point = (Int,Int)
-  instance C Point   where ...
-  instance C [Point] where ...
-</programlisting>
-
-
-is legal.  However, if you added
-
-
-<programlisting>
-  instance C (Int,Int) where ...
-</programlisting>
-
-
-as well, then the compiler will complain about the overlapping
-(actually, identical) instance declarations.  As always, type synonyms
-must be fully applied.  You cannot, for example, write:
-
-<programlisting>
-  type P a = [[a]]
-  instance Monad P where ...
-</programlisting>
-
+</para>
+<para>
+The <option>-XFlexibleInstances</option> flag implies <option>-XTypeSynonymInstances</option>.
 </para></listitem>
 </itemizedlist>
 </para>
@@ -5163,60 +5154,19 @@ instance Show v => Show (GMap () v) where ...
 
 </sect1>
 
-<sect1 id="kind-polymorphism-and-promotion">
-<title>Kind polymorphism and promotion</title>
 
+<sect1 id="kind-polymorphism">
+<title>Kind polymorphism</title>
 <para>
-Standard Haskell has a rich type language. Types classify terms and serve to
-avoid many common programming mistakes. The kind language, however, is
-relatively simple, distinguishing only lifted types (kind <literal>*</literal>),
-type constructors (eg. kind <literal>* -> * -> *</literal>), and unlifted
-types (<xref linkend="glasgow-unboxed"/>). In particular when using advanced
-type system features, such as type families (<xref linkend="type-families"/>)
-or GADTs (<xref linkend="gadt"/>), this simple kind system is insufficient,
-and fails to prevent simple errors. Consider the example of type-level natural
-numbers, and length-indexed vectors:
-<programlisting>
-data Ze
-data Su n
-
-data Vec :: * -> * -> * where
-  Nil  :: Vec a Ze
-  Cons :: a -> Vec a n -> Vec a (Su n)
-</programlisting>
-The kind of <literal>Vec</literal> is <literal>* -> * -> *</literal>. This means
-that eg. <literal>Vec Int Char</literal> is a well-kinded type, even though this
-is not what we intend when defining length-indexed vectors.
-</para>
-
-<para>
-With the flags <option>-XPolyKinds</option> and <option>-XDataKinds</option>,
-users get access to a richer kind language.
-<option>-XPolyKinds</option> enables kind polymorphism, while
-<option>-XDataKinds</option> enables user defined kinds through datatype
-promotion. With <option>-XDataKinds</option>, the example above can then be
-rewritten to:
-<programlisting>
-data Nat = Ze | Su Nat
-
-data Vec :: * -> Nat -> * where
-  Nil  :: Vec a Ze
-  Cons :: a -> Vec a n -> Vec a (Su n)
-</programlisting>
-With the improved kind of <literal>Vec</literal>, things like
-<literal>Vec Int Char</literal> are now ill-kinded, and GHC will report an
-error.
-</para>
-
-<para>
-In this section we show a few examples of how to make use of the new kind
-system. This extension is described in more detail in the paper
+This section describes <emphasis>kind polymorphism</emphasis>, and extension
+enabled by <option>-XPolyKinds</option>.  
+It is described in more detail in the paper
 <ulink url="http://dreixel.net/research/pdf/ghp.pdf">Giving Haskell a
 Promotion</ulink>, which appeared at TLDI 2012.
 </para>
 
-<sect2 id="kind-polymorphism">
-<title>Kind polymorphism</title>
+<sect2> <title>Overview of kind polymorphism</title>
+
 <para>
 Currently there is a lot of code duplication in the way Typeable is implemented
 (<xref linkend="deriving-typeable"/>):
@@ -5249,34 +5199,148 @@ Note that the datatype <literal>Proxy</literal> has kind
 <literal>Typeable</literal> class has kind
 <literal>forall k. k -> Constraint</literal>.
 </para>
+</sect2>
+
+<sect2> <title>Overview</title>
 
 <para>
-There are some restrictions in the current implementation:
+Generally speaking, with <option>-XPolyKinds</option>, GHC will infer a polymorphic
+kind for un-decorated whenever possible.  For example:
+<programlisting>
+data T m a = MkT (m a)
+-- GHC infers kind   T :: forall k. (k -> *) -> k -> *
+</programlisting>
+Just as in the world of terms, you can restrict polymorphism using a signature
+(<option>-XPolyKinds</option> implies <option>-XKindSignatures</option>):
+<programlisting>
+data T m (a :: *) = MkT (m a)
+-- GHC now infers kind   T :: (* -> *) -> * -> *
+</programlisting>
+There is no "forall" for kind variables.  Instead, you can simply mention a kind
+variable in a kind signature, thus:
+<programlisting>
+data T (m :: k -> *) a = MkT (m a)
+-- GHC now infers kind   T :: forall k. (k -> *) -> k -> *
+</programlisting>
+</para>
+</sect2>
+
+<sect2> <title>Polymorphic kind recursion and complete kind signatures</title>
+
+<para>
+Just as in type inference, kind inference for recursive types can only use <emphasis>monomorphic</emphasis> recursion.
+Consider this (contrived) example:
+<programlisting>
+data T m a = MkT (m a) (T Maybe (m a))
+-- GHC infers kind  T :: (* -> *) -> * -> *
+</programlisting>
+The recursive use of <literal>T</literal> forced the second argument to have kind <literal>*</literal>.
+However, just as in type inference, you can achieve polymorphic recursion by giving a 
+<emphasis>complete kind signature</emphasis> for <literal>T</literal>. The way to give
+a complete kind signature for a data type is to use a GADT-style declaration with an
+explicit kind signature thus:
+<programlisting>
+data T :: (k -> *) -> k -> * where
+  MkT :: m a -> T Maybe (m a) -> T m a
+</programlisting>
+The complete user-supplied kind signature specifies the polymorphic kind for <literal>T</literal>,
+and this signature is used for all the calls to <literal>T</literal> including the recursive ones.
+In particular, the recursive use of <literal>T</literal> is at kind <literal>*</literal>.
+</para>
+
+<para>
+What exactly is considered to be a "complete user-supplied kind signature" for a type constructor?
+These are the forms:
 <itemizedlist>
- <listitem><para>You cannot (yet) explicitly abstract over kinds, or mention
- kind variables. So the following are all rejected:
+<listitem><para>
+A GADT-style data type declaration, with an explicit "<literal>::</literal>" in the header.
+For example:
 <programlisting>
-data D1 (t :: k)
+data T1 :: (k -> *) -> k -> *       where ...   -- Yes  T1 :: forall k. (k->*) -> k -> *
+data T2 (a :: k -> *) :: k -> *     where ...   -- Yes  T2 :: forall k. (k->*) -> k -> *
+data T3 (a :: k -> *) (b :: k) :: * where ...   -- Yes  T3 :: forall k. (k->*) -> k -> *
+data T4 a (b :: k)             :: * where ...   -- YES  T4 :: forall k. * -> k -> *
 
-data D2 :: k -> *
+data T5 a b                         where ...   -- NO  kind is inferred
+data T4 (a :: k -> *) (b :: k)      where ...   -- NO  kind is inferred
+</programlisting>
+It makes no difference where you put the "<literal>::</literal>" but it must be there.
+You cannot give a complete kind signature using a Haskell-98-style data type declaration;
+you must use GADT syntax.
+</para></listitem>
 
-data D3 (k :: BOX)
-</programlisting></para>
- </listitem>
- <listitem><para>The return kind of a type family is always defaulted to
- <literal>*</literal>. So the following is rejected:
+<listitem><para>
+A type or data family declaration <emphasis>always</emphasis> have a 
+complete user-specified kind signature; no "<literal>::</literal>" is required:
 <programlisting>
-type family F a
-type instance F Int = Maybe
-</programlisting></para>
- </listitem>
+data family D1 a           	-- D1 :: * -> *
+data family D2 (a :: k)    	-- D2 :: forall k. k -> *
+data family D3 (a :: k) :: *    -- D3 :: forall k. k -> *
+type family S1 a :: k -> *      -- S1 :: forall k. * -> k -> *
+</programlisting>
+</para></listitem>
 </itemizedlist>
+In a complete user-specified kind signature, any un-decorated type variable to the
+left of the "<literal>::</literal>" is considered to have kind "<literal>*</literal>".
+If you want kind polymorphism, specify a kind variable.
 </para>
 
 </sect2>
+</sect1>
 
-<sect2 id="promotion">
+<sect1 id="promotion">
 <title>Datatype promotion</title>
+
+<para>
+This section describes <emphasis>data type promotion</emphasis>, an extension
+to the kind system that complements kind polymorphism.  It is enabled by <option>-XDataKinds</option>,
+and described in more detail in the paper
+<ulink url="http://dreixel.net/research/pdf/ghp.pdf">Giving Haskell a
+Promotion</ulink>, which appeared at TLDI 2012.
+</para>
+
+<sect2> <title>Motivation</title>
+
+<para>
+Standard Haskell has a rich type language. Types classify terms and serve to
+avoid many common programming mistakes. The kind language, however, is
+relatively simple, distinguishing only lifted types (kind <literal>*</literal>),
+type constructors (eg. kind <literal>* -> * -> *</literal>), and unlifted
+types (<xref linkend="glasgow-unboxed"/>). In particular when using advanced
+type system features, such as type families (<xref linkend="type-families"/>)
+or GADTs (<xref linkend="gadt"/>), this simple kind system is insufficient,
+and fails to prevent simple errors. Consider the example of type-level natural
+numbers, and length-indexed vectors:
+<programlisting>
+data Ze
+data Su n
+
+data Vec :: * -> * -> * where
+  Nil  :: Vec a Ze
+  Cons :: a -> Vec a n -> Vec a (Su n)
+</programlisting>
+The kind of <literal>Vec</literal> is <literal>* -> * -> *</literal>. This means
+that eg. <literal>Vec Int Char</literal> is a well-kinded type, even though this
+is not what we intend when defining length-indexed vectors.
+</para>
+
+<para>
+With <option>-XDataKinds</option>, the example above can then be
+rewritten to:
+<programlisting>
+data Nat = Ze | Su Nat
+
+data Vec :: * -> Nat -> * where
+  Nil  :: Vec a Ze
+  Cons :: a -> Vec a n -> Vec a (Su n)
+</programlisting>
+With the improved kind of <literal>Vec</literal>, things like
+<literal>Vec Int Char</literal> are now ill-kinded, and GHC will report an
+error.
+</para>
+</sect2>
+
+<sect2><title>Overview</title>
 <para>
 With <option>-XDataKinds</option>, GHC automatically promotes every suitable
 datatype to be a kind, and its (value) constructors to be type constructors.
@@ -5324,10 +5388,13 @@ The following restrictions apply to promotion:
  <listitem><para>We do not promote datatypes whose constructors are kind
  polymorphic, involve constraints, or use existential quantification.
  </para></listitem>
+ <listitem><para>We do not promote data family instances (<xref linkend="data-families"/>).
+ </para></listitem>
 </itemizedlist>
 </para>
+</sect2>
 
-<sect3 id="promotion-syntax">
+<sect2 id="promotion-syntax">
 <title>Distinguishing between types and constructors</title>
 <para>
 Since constructors and types share the same namespace, with promotion you can
@@ -5352,9 +5419,9 @@ ambiguous, we do not allow quotes in kind names.
 <para>Just as in the case of Template Haskell (<xref linkend="th-syntax"/>), there is
 no way to quote a data constructor or type constructor whose second character
 is a single quote.</para>
-</sect3>
+</sect2>
 
-<sect3 id="promoted-lists-and-tuples">
+<sect2 id="promoted-lists-and-tuples">
 <title>Promoted lists and tuples types</title>
 <para>
 Haskell's list and tuple types are natively promoted to kinds, and enjoy the
@@ -5369,9 +5436,9 @@ data Tuple :: (*,*) -> * where
 </programlisting>
 Note that this requires <option>-XTypeOperators</option>.
 </para>
-</sect3>
+</sect2>
 
-<sect3 id="promoted-literals">
+<sect2 id="promoted-literals">
 <title>Promoted Literals</title>
 <para>
 Numeric and string literals are prmoted to the type level, giving convenient
@@ -5413,24 +5480,10 @@ instance Has Point "y" Int where from (Point _ y) _ = y
 example = from (Point 1 2) (Get :: Label "x")
 </programlisting>
 </para>
-</sect3>
-
-
-
-</sect2>
-
-<sect2 id="kind-polymorphism-limitations">
-<title>Shortcomings of the current implementation</title>
-<para>
-For the release on GHC 7.4 we focused on getting the new kind-polymorphic core
-to work with all existing programs (which do not make use of kind polymorphism).
-Many things already work properly with <option>-XPolyKinds</option>, but we
-expect that some things will not work. If you run into trouble, please
-<link linkend="bug-reporting">report a bug</link>!
-</para>
 </sect2>
 
 </sect1>
+
 
   <sect1 id="equality-constraints">
     <title>Equality constraints</title>

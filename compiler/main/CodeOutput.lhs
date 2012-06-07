@@ -23,10 +23,11 @@ import DynFlags
 import Config
 import SysTools
 
-import ErrUtils         ( dumpIfSet_dyn, showPass, ghcExit )
+import ErrUtils
 import Outputable
 import Module
 import Maybes           ( firstJusts )
+import SrcLoc
 
 import Control.Exception
 import Control.Monad
@@ -56,7 +57,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
                 { showPass dflags "CmmLint"
                 ; let lints = map (cmmLint (targetPlatform dflags)) flat_abstractC
                 ; case firstJusts lints of
-                        Just err -> do { printDump err
+                        Just err -> do { log_action dflags SevDump noSrcSpan defaultDumpStyle err
                                        ; ghcExit dflags 1
                                        }
                         Nothing  -> return ()

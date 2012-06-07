@@ -50,6 +50,7 @@ escape(char *result, const char *name)
         }
         *result++ = *name++;
     }
+    *result = '\0';
 }
 
 static void

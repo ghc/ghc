@@ -44,6 +44,8 @@ module DynFlags (
         fFlags, fWarningFlags, fLangFlags, xFlags,
         wayNames, dynFlagDependencies,
 
+        printOutputForUser, printInfoForUser,
+
         -- ** Safe Haskell
         SafeHaskellMode(..),
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
@@ -66,6 +68,7 @@ module DynFlags (
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultLogAction,
+        defaultLogActionHPrintDoc,
         defaultFlushOut,
         defaultFlushErr,
 
@@ -114,6 +117,7 @@ import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic
 import Util
 import Maybes           ( orElse )
+import qualified Pretty
 import SrcLoc
 import FastString
 import Outputable
@@ -965,15 +969,23 @@ type LogAction = Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 
 defaultLogAction :: LogAction
 defaultLogAction severity srcSpan style msg
- = case severity of
-   SevOutput -> printSDoc msg style
-   SevInfo   -> printErrs msg style
-   SevFatal  -> printErrs msg style
-   _         -> do hPutChar stderr '\n'
-                   printErrs (mkLocMessage severity srcSpan msg) style
-                   -- careful (#2302): printErrs prints in UTF-8, whereas
-                   -- converting to string first and using hPutStr would
-                   -- just emit the low 8 bits of each unicode char.
+    = case severity of
+      SevOutput -> printSDoc msg style
+      SevDump   -> hPrintDump stdout msg
+      SevInfo   -> printErrs msg style
+      SevFatal  -> printErrs msg style
+      _         -> do hPutChar stderr '\n'
+                      printErrs (mkLocMessage severity srcSpan msg) style
+                      -- careful (#2302): printErrs prints in UTF-8, whereas
+                      -- converting to string first and using hPutStr would
+                      -- just emit the low 8 bits of each unicode char.
+    where printSDoc = defaultLogActionHPrintDoc stdout
+          printErrs = defaultLogActionHPrintDoc stderr
+
+defaultLogActionHPrintDoc :: Handle -> SDoc -> PprStyle -> IO ()
+defaultLogActionHPrintDoc h d sty
+    = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext sty))
+         hFlush h
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -984,6 +996,16 @@ newtype FlushErr = FlushErr (IO ())
 
 defaultFlushErr :: FlushErr
 defaultFlushErr = FlushErr $ hFlush stderr
+
+printOutputForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printOutputForUser = printSevForUser SevOutput
+
+printInfoForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printInfoForUser = printSevForUser SevInfo
+
+printSevForUser :: Severity -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printSevForUser sev dflags unqual doc
+    = log_action dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
 
 {-
 Note [Verbosity levels]
@@ -2112,6 +2134,7 @@ impliedFlags
     , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
+    , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)  -- Ditto polmorphic kinds
 
     -- We turn this on so that we can export associated type
     -- type synonyms in subordinates (e.g. MyClass(type AssocType))

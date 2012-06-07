@@ -37,7 +37,6 @@ import DynFlags
 import StaticFlags
 
 import Control.Monad
-import System.IO (stderr)
 
 
 -- The Vectorisation Monad ----------------------------------------------------
@@ -112,8 +111,9 @@ maybeCantVectoriseM s d p
 --
 emitVt :: String -> SDoc -> VM () 
 emitVt herald doc
-  = liftDs $
-      liftIO . printForUser stderr alwaysQualify $
+  = liftDs $ do
+      dflags <- getDynFlags
+      liftIO . printInfoForUser dflags alwaysQualify $
         hang (text herald) 2 doc
 
 -- |Output a trace message if -ddump-vt-trace is active.
@@ -140,7 +140,8 @@ dumpOptVt flag header doc
 dumpVt :: String -> SDoc -> VM ()
 dumpVt header doc 
   = do { unqual <- liftDs mkPrintUnqualifiedDs
-       ; liftIO $ printForUser stderr unqual (mkDumpDoc header doc)
+       ; dflags <- liftDs getDynFlags
+       ; liftIO $ printInfoForUser dflags unqual (mkDumpDoc header doc)
        }
 
 
@@ -185,8 +186,9 @@ tryErrV (VM p) = VM $ \bi genv lenv ->
     case r of
       Yes genv' lenv' x -> return (Yes genv' lenv' (Just x))
       No reason         -> do { unqual <- mkPrintUnqualifiedDs
+                              ; dflags <- getDynFlags
                               ; liftIO $ 
-                                  printForUser stderr unqual $ 
+                                  printInfoForUser dflags unqual $
                                     text "Warning: vectorisation failure:" <+> reason
                               ; return (Yes genv  lenv  Nothing)
                               }

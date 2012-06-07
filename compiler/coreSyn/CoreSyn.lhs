@@ -539,7 +539,7 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+	ru_try  :: Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args

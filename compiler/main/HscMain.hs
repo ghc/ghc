@@ -147,6 +147,7 @@ import UniqFM           ( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag
 import Exception
+import Util
 
 import Data.List
 import Control.Monad
@@ -1258,7 +1259,7 @@ hscGenHardCode cgguts mod_summary = do
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
         prepd_binds <- {-# SCC "CorePrep" #-}
-                       corePrepPgm dflags core_binds data_tycons ;
+                       corePrepPgm dflags hsc_env core_binds data_tycons ;
         -----------------  Convert to STG ------------------
         (stg_binds, cost_centre_info)
             <- {-# SCC "CoreToStg" #-}
@@ -1311,8 +1312,9 @@ hscInteractive (iface, details, cgguts) mod_summary = do
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
+    hsc_env <- getHscEnv
     prepd_binds <- {-# SCC "CorePrep" #-}
-                   liftIO $ corePrepPgm dflags core_binds data_tycons ;
+                   liftIO $ corePrepPgm dflags hsc_env core_binds data_tycons
     -----------------  Generate byte code ------------------
     comp_bc <- liftIO $ byteCodeGen dflags this_mod prepd_binds
                                     data_tycons mod_breaks
@@ -1497,7 +1499,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
     prepd_binds <- {-# SCC "CorePrep" #-}
-                    liftIO $ corePrepPgm dflags core_binds data_tycons
+                    liftIO $ corePrepPgm dflags hsc_env core_binds data_tycons
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen dflags this_mod
@@ -1674,7 +1676,7 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
         let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
 
         {- Prepare for codegen -}
-        prepd_expr <- corePrepExpr dflags tidy_expr
+        prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
         {- Lint if necessary -}
         -- ToDo: improve SrcLoc
@@ -1706,7 +1708,7 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
     eps <- readIORef (hsc_EPS hsc_env)
-    dumpIfSet (dump_if_trace || dump_rn_stats)
+    dumpIfSet dflags (dump_if_trace || dump_rn_stats)
               "Interface statistics"
               (ifaceStats eps)
   where

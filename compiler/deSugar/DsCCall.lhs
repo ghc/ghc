@@ -49,6 +49,7 @@ import PrelNames
 import VarSet
 import Constants
 import Outputable
+import Util
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,

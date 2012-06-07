@@ -35,7 +35,7 @@ import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import ghczmprim_GHCziTypes_False_closure;
-#if defined(GhcUnregisterised) || !defined(mingw32_HOST_OS)
+#if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import sm_mutex;
 #endif
 

@@ -551,17 +551,10 @@ tcRnHsBootDecls decls
         ; mapM_ (badBootDecl "rule")    rule_decls
         ; mapM_ (badBootDecl "vect")    vect_decls
 
-                -- Typecheck type/class decls
+                -- Typecheck type/class/isntance decls
         ; traceTc "Tc2 (boot)" empty
-        ; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
-        ; setGblEnv tcg_env    $ do {
-
-                -- Typecheck instance decls
-                -- Family instance declarations are rejected here
-        ; traceTc "Tc3" empty
         ; (tcg_env, inst_infos, _deriv_binds)
-            <- tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls
-
+             <- tcTyClsInstDecls emptyModDetails tycl_decls inst_decls deriv_decls
         ; setGblEnv tcg_env     $ do {
 
                 -- Typecheck value declarations
@@ -583,7 +576,7 @@ tcRnHsBootDecls decls
               }
 
         ; setGlobalTypeEnv gbl_env type_env2
-   }}}
+   }}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: String -> Located decl -> TcM ()
@@ -897,14 +890,11 @@ tcTopSrcDecls boot_details
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
 
-        tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
-        setGblEnv tcg_env       $ do {
-
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, deriv_binds)
-            <- tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls;
+            <- tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls ;
         setGblEnv tcg_env       $ do {
 
                 -- Foreign import declarations next.
@@ -964,8 +954,54 @@ tcTopSrcDecls boot_details
                                  , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
 
         return (tcg_env', tcl_env)
-    }}}}}}}
+    }}}}}}
+
+---------------------------
+tcTyClsInstDecls :: ModDetails 
+                 -> [TyClGroup Name] 
+                 -> [LInstDecl Name]
+                 -> [LDerivDecl Name]
+                 -> TcM (TcGblEnv,            -- The full inst env
+                         [InstInfo Name],     -- Source-code instance decls to process;
+                                              -- contains all dfuns for this module
+                          HsValBinds Name)    -- Supporting bindings for derived instances
+
+tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
+ = tcExtendTcTyThingEnv [(con, AFamDataCon) | lid <- inst_decls
+                                            , con <- get_cons lid ] $
+      -- Note [AFamDataCon: not promoting data family constructors]
+   do { tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
+      ; setGblEnv tcg_env $
+        tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls }
+  where
+    -- get_cons extracts the *constructor* bindings of the declaration
+    get_cons :: LInstDecl Name -> [Name]
+    get_cons (L _ (FamInstD { lid_inst = fid }))       = get_fi_cons fid
+    get_cons (L _ (ClsInstD { cid_fam_insts = fids })) = concatMap (get_fi_cons . unLoc) fids
+
+    get_fi_cons :: FamInstDecl Name -> [Name]
+    get_fi_cons (FamInstDecl { fid_defn = TyData { td_cons = cons } }) 
+      = map (unLoc . con_name . unLoc) cons
+    get_fi_cons (FamInstDecl {}) = []
 \end{code}
+
+Note [AFamDataCon: not promoting data family constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data family T a
+  data instance T Int = MkT
+  data Proxy (a :: k)
+  data S = MkS (Proxy 'MkT)
+
+Is it ok to use the promoted data family instance constructor 'MkT' in
+the data declaration for S?  No, we don't allow this. It *might* make
+sense, but at least it would mean that we'd have to interleave
+typechecking instances and data types, whereas at present we do data
+types *then* instances.
+
+So to check for this we put in the TcLclEnv a binding for all the family
+constructors, bound to AFamDataCon, so that if we trip over 'MkT' when
+type checking 'S' we'll produce a decent error message.
 
 
 %************************************************************************

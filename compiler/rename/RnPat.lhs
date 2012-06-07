@@ -50,12 +50,11 @@ import RnEnv
 import RnTypes
 import DynFlags
 import PrelNames
-import Constants	( mAX_TUPLE_SIZE )
 import Name
 import NameSet
 import RdrName
 import BasicTypes
-import Util		( notNull )
+import Util
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc
@@ -626,15 +625,6 @@ rnOverLit lit@(OverLit {ol_val=val})
 %************************************************************************
 
 \begin{code}
-checkTupSize :: Int -> RnM ()
-checkTupSize tup_size
-  | tup_size <= mAX_TUPLE_SIZE 
-  = return ()
-  | otherwise		       
-  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
-		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
-		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
-
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)

@@ -43,6 +43,7 @@ import Module
 import FastString
 import Outputable
 import StaticFlags
+import Util
 
 ------------------------------------------------------------------------
 --	Primitive operations and foreign calls
@@ -478,11 +479,13 @@ emitPrimOp res WriteByteArrayOp_Word16    args = doWriteByteArrayOp (Just mo_Wor
 emitPrimOp res WriteByteArrayOp_Word32    args = doWriteByteArrayOp (Just mo_WordTo32) res args
 emitPrimOp res WriteByteArrayOp_Word64    args = doWriteByteArrayOp Nothing res args
 
--- Copying byte arrays
+-- Copying and setting byte arrays
 emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyByteArrayOp src src_off dst dst_off n
 emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyMutableByteArrayOp src src_off dst dst_off n
+emitPrimOp [] SetByteArrayOp [ba,off,len,c] =
+    doSetByteArrayOp ba off len c
 
 -- Population count
 emitPrimOp [res] PopCnt8Op [w] = emitPopCntCall res w W8
@@ -812,6 +815,18 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     dst_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
     src_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
     copy src dst dst_p src_p n
+
+-- ----------------------------------------------------------------------------
+-- Setting byte arrays
+
+-- | Takes a 'MutableByteArray#', an offset into the array, a length,
+-- and a byte, and sets each of the selected bytes in the array to the
+-- character.
+doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                 -> FCode ()
+doSetByteArrayOp ba off len c
+    = do p <- assignTempE $ cmmOffsetExpr (cmmOffsetB ba arrWordsHdrSize) off
+         emitMemsetCall p c len (CmmLit (mkIntCLit 1))
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays

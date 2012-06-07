@@ -46,7 +46,7 @@ import RdrName
 import LoadIface	( loadInterfaceForName )
 import UniqSet
 import Data.List
-import Util		( isSingleton, snocView )
+import Util
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc
