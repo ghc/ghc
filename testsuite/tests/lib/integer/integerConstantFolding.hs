@@ -2,6 +2,7 @@
 module Main (main) where
 
 import Data.Bits
+import Data.Word
 
 main :: IO ()
 main = do p "plusInteger"        plusInteger
@@ -50,6 +51,10 @@ main = do p "plusInteger"        plusInteger
           p "floatFromInteger"  floatFromInteger
           p "encodeIntegerDouble" encodeIntegerDouble
           p "encodeIntegerFloat"  encodeIntegerFloat
+          p "integerToWord"       integerToWord
+          p "integerToInt"        integerToInt
+          p "wordToInteger"       wordToInteger
+          p "intToInteger"        intToInteger
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -178,4 +183,16 @@ encodeIntegerDouble = encodeFloat 100069 2
 
 encodeIntegerFloat :: Float
 encodeIntegerFloat = encodeFloat 100070 2
+
+integerToWord :: Word
+integerToWord = fromInteger 100071 + 100072
+
+integerToInt :: Int
+integerToInt = fromInteger 100073 + 100074
+
+wordToInteger :: Integer
+wordToInteger = toInteger (100075 :: Word) + 100076
+
+intToInteger :: Integer
+intToInteger = toInteger (100077 :: Int) + 100078
 

@@ -44,3 +44,7 @@ doubleFromInteger: 200131.0
 floatFromInteger: 200135.0
 encodeIntegerDouble: 400276.0
 encodeIntegerFloat: 400280.0
+integerToWord: 200143
+integerToInt: 200147
+wordToInteger: 200151
+intToInteger: 200155
