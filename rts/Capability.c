@@ -694,6 +694,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
         // See Note [migrated bound threads 2]
         if (task->cap == cap) {
             return rtsTrue;
+        }
     }
 
 	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
