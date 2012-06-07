@@ -17,6 +17,7 @@ import CoreUnfold
 import CoreFVs
 import CoreTidy
 import CoreMonad
+import CorePrep
 import CoreUtils
 import Literal
 import Rules
@@ -34,7 +35,10 @@ import Name hiding (varName)
 import NameSet
 import NameEnv
 import Avail
+import PrelNames
 import IfaceEnv
+import TcEnv
+import TcRnMonad
 import TcType
 import DataCon
 import TyCon
@@ -51,9 +55,9 @@ import SrcLoc
 import Util
 import FastString
 
-import Control.Monad    ( when )
+import Control.Monad
 import Data.List        ( sortBy )
-import Data.IORef       ( IORef, readIORef, writeIORef )
+import Data.IORef       ( readIORef, writeIORef )
 \end{code}
 
 
@@ -325,8 +329,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- Then pick just the ones we need to expose
                 -- See Note [Which rules to expose]
 
-        ; let { (tidy_env, tidy_binds)
-                 = tidyTopBinds hsc_env unfold_env tidy_occ_env binds }
+        ; (tidy_env, tidy_binds)
+                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env binds
 
         ; let { export_set = availsToNameSet exports
               ; final_ids  = [ id | id <- bindersOfBinds tidy_binds,
@@ -1036,38 +1040,41 @@ tidyTopBinds :: HscEnv
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
-             -> (TidyEnv, CoreProgram)
+             -> IO (TidyEnv, CoreProgram)
 
 tidyTopBinds hsc_env unfold_env init_occ_env binds
-  = tidy init_env binds
+  = do mkIntegerId <- liftM tyThingId
+                    $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+       return $ tidy mkIntegerId init_env binds
   where
     init_env = (init_occ_env, emptyVarEnv)
 
     this_pkg = thisPackage (hsc_dflags hsc_env)
 
-    tidy env []     = (env, [])
-    tidy env (b:bs) = let (env1, b')  = tidyTopBind this_pkg unfold_env env b
-                          (env2, bs') = tidy env1 bs
-                      in
-                          (env2, b':bs')
+    tidy _           env []     = (env, [])
+    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind this_pkg mkIntegerId unfold_env env b
+                                      (env2, bs') = tidy mkIntegerId env1 bs
+                                  in
+                                      (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: PackageId
+             -> Id
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind this_pkg unfold_env (occ_env,subst1) (NonRec bndr rhs)
+tidyTopBind this_pkg mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs this_pkg subst1 (idArity bndr) rhs
+    caf_info      = hasCafRefs this_pkg (mkIntegerId, subst1) (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind this_pkg unfold_env (occ_env,subst1) (Rec prs)
+tidyTopBind this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -1084,7 +1091,7 @@ tidyTopBind this_pkg unfold_env (occ_env,subst1) (Rec prs)
         -- the CafInfo for a recursive group says whether *any* rhs in
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
-        | or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
+        | or [ mayHaveCafRefs (hasCafRefs this_pkg (mkIntegerId, subst1) (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
 
@@ -1221,7 +1228,7 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
-hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
+hasCafRefs  :: PackageId -> (Id, VarEnv Var) -> Arity -> CoreExpr -> CafInfo
 hasCafRefs this_pkg p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
@@ -1236,7 +1243,7 @@ hasCafRefs this_pkg p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: VarEnv Id -> Expr a -> FastBool
+cafRefsE :: (Id, VarEnv Id) -> Expr a -> FastBool
 cafRefsE p (Var id)            = cafRefsV p id
 cafRefsE p (Lit lit)           = cafRefsL p lit
 cafRefsE p (App f a)           = fastOr (cafRefsE p f) (cafRefsE p) a
@@ -1248,18 +1255,19 @@ cafRefsE p (Cast e _co)        = cafRefsE p e
 cafRefsE _ (Type _)            = fastBool False
 cafRefsE _ (Coercion _)        = fastBool False
 
-cafRefsEs :: VarEnv Id -> [Expr a] -> FastBool
+cafRefsEs :: (Id, VarEnv Id) -> [Expr a] -> FastBool
 cafRefsEs _ []    = fastBool False
 cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
 
-cafRefsL :: VarEnv Id -> Literal -> FastBool
--- Don't forget that the embeded mk_integer id might have Caf refs!
--- See Note [Integer literals] in Literal
-cafRefsL p (LitInteger _ mk_integer) = cafRefsV p mk_integer
+cafRefsL :: (Id, VarEnv Id) -> Literal -> FastBool
+-- Don't forget that mk_integer id might have Caf refs!
+-- We first need to convert the Integer into its final form, to
+-- see whether mkInteger is used.
+cafRefsL p@(mk_integer, _) (LitInteger i _) = cafRefsE p (cvtLitInteger mk_integer i)
 cafRefsL _ _                         = fastBool False
 
-cafRefsV :: VarEnv Id -> Id -> FastBool
-cafRefsV p id
+cafRefsV :: (Id, VarEnv Id) -> Id -> FastBool
+cafRefsV (_, p) id
   | not (isLocalId id)            = fastBool (mayHaveCafRefs (idCafInfo id))
   | Just id' <- lookupVarEnv p id = fastBool (mayHaveCafRefs (idCafInfo id'))
   | otherwise                     = fastBool False

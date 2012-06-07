@@ -155,7 +155,7 @@ dsStrictBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar upat
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
-       ; return (scrungleMatch var rhs result) }
+       ; return (bindNonRec var rhs result) }
 
 dsStrictBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
@@ -164,37 +164,12 @@ strictMatchOnly :: HsBind Id -> Bool
 strictMatchOnly (AbsBinds { abs_binds = binds })
   = anyBag (strictMatchOnly . unLoc) binds
 strictMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = ty })
-  =  isUnboxedTupleType ty 
+  =  isUnLiftedType ty 
   || isBangLPat lpat   
   || any (isUnLiftedType . idType) (collectPatBinders lpat)
 strictMatchOnly (FunBind { fun_id = L _ id })
   = isUnLiftedType (idType id)
 strictMatchOnly _ = False -- I hope!  Checked immediately by caller in fact
-
-scrungleMatch :: Id -> CoreExpr -> CoreExpr -> CoreExpr
--- Returns something like (let var = scrut in body)
--- but if var is an unboxed-tuple type, it inlines it in a fragile way
--- Special case to handle unboxed tuple patterns; they can't appear nested
--- The idea is that 
---      case e of (# p1, p2 #) -> rhs
--- should desugar to
---      case e of (# x1, x2 #) -> ... match p1, p2 ...
--- NOT
---      let x = e in case x of ....
---
--- But there may be a big 
---      let fail = ... in case e of ...
--- wrapping the whole case, which complicates matters slightly
--- It all seems a bit fragile.  Test is dsrun013.
-
-scrungleMatch var scrut body
-  | isUnboxedTupleType (idType var) = scrungle body
-  | otherwise                       = bindNonRec var scrut body
-  where
-    scrungle (Case (Var x) bndr ty alts)
-                    | x == var = Case scrut bndr ty alts
-    scrungle (Let binds body)  = Let binds (scrungle body)
-    scrungle other = panic ("scrungleMatch: tuple pattern:\n" ++ showSDoc (ppr other))
 
 \end{code}
 
@@ -327,7 +302,7 @@ dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty))
   | otherwise
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
-       ; return (scrungleMatch discrim_var core_discrim matching_code) }
+       ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints

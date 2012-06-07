@@ -43,6 +43,7 @@ import Bag
 import Outputable 
 import FastString
 import UniqSupply
+import Util
 
 #include "HsVersions.h"
 \end{code}

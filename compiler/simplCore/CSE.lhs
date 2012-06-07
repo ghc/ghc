@@ -38,8 +38,7 @@ import CoreSubst
 import Var		( Var )
 import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
 import CoreUtils	( mkAltExpr
-                        , exprIsTrivial, exprIsCheap )
-import DataCon		( isUnboxedTupleCon )
+                        , exprIsTrivial)
 import Type		( tyConAppArgs )
 import CoreSyn
 import Outputable
@@ -111,19 +110,6 @@ to the reverse CSE mapping if the scrutinee is a non-trivial expression.
 (If the scrutinee is a simple variable we want to add the mapping
 	case binder -> scrutinee 
 to the substitution
-
-Note [Unboxed tuple case binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-	case f x of t { (# a,b #) -> 
-	case ... of
-	  True -> f x
-	  False -> 0 }
-
-We must not replace (f x) by t, because t is an unboxed-tuple binder.
-Instead, we shoudl replace (f x) by (# a,b #).  That is, the "reverse mapping" is
-	f x --> (# a,b #)
-That is why the CSEMap has pairs of expressions.
 
 Note [CSE for INLINE and NOINLINE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -257,20 +243,6 @@ cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty alts'
 					-- play safe here and bring them all to life
 
 cseAlts :: CSEnv -> OutExpr -> InBndr -> InBndr -> [InAlt] -> [OutAlt]
-
-cseAlts env scrut' bndr _bndr' [(DataAlt con, args, rhs)]
-  | isUnboxedTupleCon con
-	-- Unboxed tuples are special because the case binder isn't
-	-- a real value.  See Note [Unboxed tuple case binders]
-  = [(DataAlt con, args'', tryForCSE new_env rhs)]
-  where
-    (env', args') = addBinders env args
-    args'' = map zapIdOccInfo args'	-- They should all be ids
-	-- Same motivation for zapping as [Case binders 2] only this time
-	-- it's Note [Unboxed tuple case binders]
-    new_env | exprIsCheap scrut' = env'
-	    | otherwise 	 = extendCSEnv env' scrut' tup_value
-    tup_value = mkAltExpr (DataAlt con) args'' (tyConAppArgs (idType bndr))
 
 cseAlts env scrut' bndr bndr' alts
   = map cse_alt alts

@@ -311,4 +311,5 @@ shimForeignCallArg arg expr
   | otherwise = expr
   where
         -- should be a tycon app, since this is a foreign call
-        tycon = tyConAppTyCon (repType (stgArgType arg))
+        UnaryRep rep_ty = repType (stgArgType arg)
+        tycon           = tyConAppTyCon rep_ty

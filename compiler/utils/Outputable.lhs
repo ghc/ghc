@@ -78,7 +78,7 @@ import FastString
 import FastTypes
 import Platform
 import qualified Pretty
-import Util             ( snocView )
+import Util
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
@@ -936,6 +936,7 @@ pprPanicFastInt heading pretty_msg =
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
 -- Should typically be accessed with the WARN macros
+warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x

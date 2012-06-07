@@ -28,7 +28,7 @@ import Outputable
 import UniqFM
 import VarSet
 import FastString
-import Util( filterOut, sortWith )
+import Util
 import Maybes
 import Control.Monad
 import Data.Map (Map)

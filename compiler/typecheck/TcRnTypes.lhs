@@ -119,6 +119,7 @@ import DynFlags
 import Outputable
 import ListSetOps
 import FastString
+import Util
 
 import Data.Set (Set)
 

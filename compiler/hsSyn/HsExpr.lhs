@@ -32,7 +32,7 @@ import Name
 import BasicTypes
 import DataCon
 import SrcLoc
-import Util( dropTail )
+import Util
 import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString

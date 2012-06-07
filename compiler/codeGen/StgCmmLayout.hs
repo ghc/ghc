@@ -50,7 +50,7 @@ import StgSyn
 import Id
 import Name
 import TyCon		( PrimRep(..) )
-import BasicTypes	( Arity )
+import BasicTypes	( RepArity )
 import DynFlags
 import StaticFlags
 
@@ -128,7 +128,7 @@ adjustHpBackwards
 --	Making calls: directCall and slowCall
 -------------------------------------------------------------------------
 
-directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
+directCall :: CLabel -> RepArity -> [StgArg] -> FCode ()
 -- (directCall f n args)
 -- calls f(arg1, ..., argn), and applies the result to the remaining args
 -- The function f has arity n, and there are guaranteed at least n args
@@ -144,7 +144,7 @@ slowCall fun stg_args
 	; slow_call fun cmm_args (argsReps stg_args) }
 
 --------------
-direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
+direct_call :: String -> CLabel -> RepArity -> [CmmExpr] -> [ArgRep] -> FCode ()
 -- NB1: (length args) may be less than (length reps), because
 --     the args exclude the void ones
 -- NB2: 'arity' refers to the *reps* 
@@ -186,7 +186,7 @@ slow_call fun args reps
     (rts_fun, arity) = slowCallPattern reps
 
 -- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [ArgRep] -> (FastString, Arity)
+slowCallPattern :: [ArgRep] -> (FastString, RepArity)
 -- Returns the generic apply function and arity
 slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
 slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)

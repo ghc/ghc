@@ -49,6 +49,7 @@ import Data.Maybe
 import Data.List
 import TcRnMonad (doptM)
 import DynFlags (DynFlag(Opt_AvoidVect))
+import Util
 
 
 -- Main entry point to vectorise expressions -----------------------------------

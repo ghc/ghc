@@ -36,7 +36,7 @@ import VarSet
 import TcSMonad
 import FastString
 
-import Util ( equalLength )
+import Util
 
 
 import TysWiredIn ( eqTyCon )

@@ -31,7 +31,7 @@ import Id		( isOneShotBndr, idType )
 import Var
 import Type		( isUnLiftedType )
 import VarSet
-import Util		( zipEqual, zipWithEqual, count )
+import Util
 import UniqFM
 import Outputable
 \end{code}

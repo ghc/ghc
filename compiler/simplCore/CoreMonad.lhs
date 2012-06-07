@@ -71,7 +71,6 @@ import CoreSyn
 import PprCore
 import CoreUtils
 import CoreLint		( lintCoreBindings )
-import PrelNames        ( iNTERACTIVE )
 import HscTypes
 import Module           ( Module )
 import DynFlags
@@ -84,7 +83,7 @@ import Id		( Id )
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
 import TcEnv            ( tcLookupGlobal )
-import TcRnMonad        ( TcM, initTc )
+import TcRnMonad        ( initTcForLookup )
 
 import Outputable
 import FastString
@@ -1020,13 +1019,6 @@ debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DynFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
-\end{code}
-
-\begin{code}
-
-initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc hsc_env HsSrcFile False iNTERACTIVE
-
 \end{code}
 
 

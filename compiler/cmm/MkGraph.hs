@@ -42,6 +42,7 @@ import SMRep (ByteOff)
 import StaticFlags
 import Unique
 import UniqSupply
+import Util
 
 #include "HsVersions.h"
 

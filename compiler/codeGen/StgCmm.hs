@@ -46,6 +46,7 @@ import TyCon
 import Module
 import ErrUtils
 import Outputable
+import Util
 
 codeGen :: DynFlags
 	 -> Module
@@ -273,8 +274,8 @@ cgDataCon data_con
 					    (tagForCon data_con)] }
                         -- The case continuation code expects a tagged pointer
 
-	    arg_reps :: [(PrimRep, Type)]
-	    arg_reps = [(typePrimRep ty, ty) | ty <- dataConRepArgTys data_con]
+	    arg_reps :: [(PrimRep, UnaryType)]
+	    arg_reps = [(typePrimRep rep_ty, rep_ty) | ty <- dataConRepArgTys data_con, rep_ty <- flattenRepType (repType ty)]
 
 	    -- Dynamic closure code for non-nullary constructors only
 	; whenC (not (isNullaryRepDataCon data_con))

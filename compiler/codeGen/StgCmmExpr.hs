@@ -497,7 +497,7 @@ cgConApp con stg_args
        ; emitReturn arg_exprs }
 
   | otherwise	--  Boxed constructors; allocate and return
-  = ASSERT( stg_args `lengthIs` dataConRepArity con )
+  = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
     do	{ (idinfo, init) <- buildDynCon (dataConWorkId con) currentCCS con stg_args
 	   	-- The first "con" says that the name bound to this closure is
 		-- is "con", which is a bit of a fudge, but it only affects profiling

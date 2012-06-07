@@ -458,7 +458,7 @@ newUnboxedTupleRegs res_ty
 	; ASSERT( regs `equalLength` reps )
 	  return (regs, map primRepForeignHint reps) }
   where
-    ty_args = tyConAppArgs (repType res_ty)
+    UbxTupleRep ty_args = repType res_ty
     reps = [ rep
 	   | ty <- ty_args
     	   , let rep = typePrimRep ty

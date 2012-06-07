@@ -65,7 +65,7 @@ import Bag
 import FastString
 import ForeignCall
 import MonadUtils
-import Util( equalLength, filterOut )
+import Util
 
 import Data.Maybe
 import Control.Monad

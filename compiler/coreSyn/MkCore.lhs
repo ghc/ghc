@@ -85,7 +85,7 @@ import Outputable
 import FastString
 import UniqSupply
 import BasicTypes
-import Util             ( notNull, zipEqual, sortLe )
+import Util
 import Pair
 import Constants
 
@@ -257,8 +257,8 @@ mkWordExprWord w = mkConApp wordDataCon [mkWordLitWord w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i = do mkIntegerId <- lookupId mkIntegerName
-                     return (Lit (mkLitInteger i mkIntegerId))
+mkIntegerExpr i = do t <- lookupTyCon integerTyConName
+                     return (Lit (mkLitInteger i (mkTyConTy t)))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr
