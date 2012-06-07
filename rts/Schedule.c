@@ -638,15 +638,24 @@ scheduleFindWork (Capability **pcap)
 
 #if defined(THREADED_RTS)
 STATIC_INLINE rtsBool
-shouldYieldCapability (Capability *cap, Task *task)
+shouldYieldCapability (Capability *cap, Task *task, rtsBool didGcLast)
 {
     // we need to yield this capability to someone else if..
-    //   - another thread is initiating a GC
+    //   - another thread is initiating a GC, and we didn't just do a GC
+    //     (see Note [GC livelock])
     //   - another Task is returning from a foreign call
     //   - the thread at the head of the run queue cannot be run
     //     by this Task (it is bound to another Task, or it is unbound
     //     and this task it bound).
-    return (pending_sync ||
+    //
+    // Note [GC livelock]
+    //
+    // If we are interrupted to do a GC, then we do not immediately do
+    // another one.  This avoids a starvation situation where one
+    // Capability keeps forcing a GC and the other Capabilities make no
+    // progress at all.
+
+    return ((pending_sync && !didGcLast) ||
             cap->returning_tasks_hd != NULL ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
                                      ? cap->run_queue_hd->bound != NULL
@@ -667,20 +676,22 @@ static void
 scheduleYield (Capability **pcap, Task *task)
 {
     Capability *cap = *pcap;
+    int didGcLast = rtsFalse;
 
     // if we have work, and we don't need to give up the Capability, continue.
     //
-    if (!shouldYieldCapability(cap,task) && 
+    if (!shouldYieldCapability(cap,task,rtsFalse) && 
         (!emptyRunQueue(cap) ||
          !emptyInbox(cap) ||
-         sched_state >= SCHED_INTERRUPTING))
+         sched_state >= SCHED_INTERRUPTING)) {
         return;
+    }
 
     // otherwise yield (sleep), and keep yielding if necessary.
     do {
-        yieldCapability(&cap,task);
+        didGcLast = yieldCapability(&cap,task, !didGcLast);
     } 
-    while (shouldYieldCapability(cap,task));
+    while (shouldYieldCapability(cap,task,didGcLast));
 
     // note there may still be no threads on the run queue at this
     // point, the caller has to check.
@@ -1374,7 +1385,7 @@ static nat requestSync (Capability **pcap, Task *task, nat sync_type)
             debugTrace(DEBUG_sched, "someone else is trying to sync (%d)...",
                        prev_pending_sync);
             ASSERT(*pcap);
-            yieldCapability(pcap,task);
+            yieldCapability(pcap,task,rtsTrue);
         } while (pending_sync);
         return prev_pending_sync; // NOTE: task->cap might have changed now
     }

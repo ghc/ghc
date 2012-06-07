@@ -257,7 +257,7 @@ EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 // On return: *pCap is NULL if the capability was released.  The
 // current task should then re-acquire it using waitForCapability().
 //
-void yieldCapability (Capability** pCap, Task *task);
+rtsBool yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed);
 
 // Acquires a capability for doing some work.
 //
