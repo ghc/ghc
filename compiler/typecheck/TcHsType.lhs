@@ -19,13 +19,13 @@ module TcHsType (
 
                 -- Type checking type and class decls
 	kcTyClTyVars, tcTyClTyVars,
-        tcHsArgType, tcHsConArgType, tcDataKindSig, 
+        tcHsConArgType, tcDataKindSig, 
         tcClassSigType, 
 
 		-- Kind-checking types
                 -- No kind generalisation, no checkValidType
 	kcHsTyVarBndrs, tcHsTyVarBndrs, 
-        tcHsLiftedType, 
+        tcHsLiftedType, tcHsOpenType,
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
 

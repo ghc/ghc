@@ -433,7 +433,7 @@ kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
   = addErrCtxt (dataConCtxt name) $
     kcHsTyVarBndrs False ex_tvs $ \ _ -> 
     do { _ <- tcHsContext ex_ctxt
-       ; mapM_ (tcHsArgType . getBangType) (hsConDeclArgTys details)
+       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
        ; _ <- tcConRes res
        ; return () }
 \end{code}
