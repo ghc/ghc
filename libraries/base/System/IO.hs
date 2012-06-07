@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -240,6 +241,7 @@ import Data.Bits
 import Data.List
 import Data.Maybe
 import Foreign.C.Error
+import Foreign.C.String
 import Foreign.C.Types
 import System.Posix.Internals
 import System.Posix.Types
@@ -623,10 +625,30 @@ openNewFile filepath binary mode = do
   if fd < 0
     then do
       errno <- getErrno
-      if errno == eEXIST
-        then return FileExists
-        else return (OpenNewError errno)
+      case errno of
+        _ | errno == eEXIST -> return FileExists
+# ifdef mingw32_HOST_OS
+        -- If c_open throws EACCES on windows, it could mean that filepath is a
+        -- directory. In this case, we want to return FileExists so that the
+        -- enclosing openTempFile can try again instead of failing outright.
+        -- See bug #4968.
+        _ | errno == eACCES -> do
+          withCString filepath $ \path -> do
+          -- There is a race here: the directory might have been moved or
+          -- deleted between the c_open call and the next line, but there
+          -- doesn't seem to be any direct way to detect that the c_open call
+          -- failed because of an existing directory.
+          exists <- c_fileExists path
+          return $ if exists
+            then FileExists
+            else OpenNewError errno
+# endif
+        _ -> return (OpenNewError errno)
     else return (NewFileCreated fd)
+
+# ifdef mingw32_HOST_OS
+foreign import ccall "file_exists" c_fileExists :: CString -> IO Bool
+# endif
 #endif
 
 -- XXX Should use filepath library

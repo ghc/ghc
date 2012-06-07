@@ -127,4 +127,10 @@ int get_unique_file_info(int fd, HsWord64 *dev, HsWord64 *ino)
     return -1;
 }
 
+BOOL file_exists(LPCTSTR path)
+{
+    DWORD r = GetFileAttributes(path);
+    return r != INVALID_FILE_ATTRIBUTES;
+}
+
 #endif
