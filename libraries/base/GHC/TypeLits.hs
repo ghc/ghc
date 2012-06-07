@@ -59,7 +59,7 @@ data Symbol
 
 
 --------------------------------------------------------------------------------
-data family Sing n
+data family Sing (n :: k)
 
 newtype instance Sing (n :: Nat)    = SNat Integer
 
