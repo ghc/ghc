@@ -3962,6 +3962,25 @@ must be of the form <literal>C (T a1 ... an)</literal>, where
 and the <literal>a1 ... an</literal> are distinct type variables.
 GHC relaxes these rules in two ways.
 <itemizedlist>
+<listitem><para>
+With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
+synonyms. As always, using a type synonym is just shorthand for
+writing the RHS of the type synonym definition.  For example:
+<programlisting>
+  type Point a = (a,a)
+  instance C (Point a)   where ...
+</programlisting>
+is legal.  The instance declaration is equivalent to
+<programlisting>
+  instance C (a,a) where ...
+</programlisting>
+As always, type synonyms
+must be fully applied.  You cannot, for example, write:
+<programlisting>
+  instance Monad Point where ...
+</programlisting>
+</para></listitem>
+
 <listitem>
 <para>
 The <option>-XFlexibleInstances</option> flag allows the head of the instance
@@ -3971,37 +3990,9 @@ For example, this becomes a legal instance declaration
   instance C (Maybe Int) where ...
 </programlisting>
 See also the <link linkend="instance-overlap">rules on overlap</link>.
-</para></listitem>
-<listitem><para>
-With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
-synonyms. As always, using a type synonym is just shorthand for
-writing the RHS of the type synonym definition.  For example:
-
-
-<programlisting>
-  type Point = (Int,Int)
-  instance C Point   where ...
-  instance C [Point] where ...
-</programlisting>
-
-
-is legal.  However, if you added
-
-
-<programlisting>
-  instance C (Int,Int) where ...
-</programlisting>
-
-
-as well, then the compiler will complain about the overlapping
-(actually, identical) instance declarations.  As always, type synonyms
-must be fully applied.  You cannot, for example, write:
-
-<programlisting>
-  type P a = [[a]]
-  instance Monad P where ...
-</programlisting>
-
+</para>
+<para>
+The <option>-XFlexibleInstances</option> flag implies <option>-XTypeSynonymInstances</option>.
 </para></listitem>
 </itemizedlist>
 </para>
