@@ -773,7 +773,7 @@ zonkTcType ty
 		       | otherwise	 = TyVarTy <$> updateTyVarKindM go tyvar
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
-    go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar ) do
+    go (ForAllTy tyvar ty) = ASSERT2( isImmutableTyVar tyvar, ppr tyvar ) do
                              ty' <- go ty
                              tyvar' <- updateTyVarKindM go tyvar
                              return (ForAllTy tyvar' ty')

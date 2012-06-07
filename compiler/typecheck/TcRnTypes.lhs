@@ -579,27 +579,11 @@ data TcTyThing
                      -- Can be a mono-kind or a poly-kind; in TcTyClsDcls see
                      -- Note [Type checking recursive type and class declarations]
 
-  | ANothing                    -- see Note [ANothing]
+  | AFamDataCon      -- Data constructor for a data family
+                     -- See Note [AFamDataCon: not promoting data family constructors] in TcRnDriver
 
-{-
-Note [ANothing]
-~~~~~~~~~~~~~~~
-
-We don't want to allow promotion in a strongly connected component
-when kind checking.
-
-Consider:
-  data T f = K (f (K Any))
-
-When kind checking the `data T' declaration the local env contains the
-mappings:
-  T -> AThing <some initial kind>
-  K -> ANothing
-
-ANothing is only used for DataCons, and only used during type checking
-in tcTyClGroup.
--}
-
+  | ARecDataCon      -- Data constructor in a reuursive loop
+                     -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = pprTyThing g
@@ -610,15 +594,18 @@ instance Outputable TcTyThing where	-- Debugging only
 				 <+> ppr (tct_level elt))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
-   ppr ANothing         = text "ANothing"
+   ppr AFamDataCon      = text "AFamDataCon"
+   ppr ARecDataCon      = text "ARecDataCon"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
 pprTcTyThingCategory (ATyVar {})     = ptext (sLit "Type variable")
 pprTcTyThingCategory (ATcId {})      = ptext (sLit "Local identifier")
 pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
-pprTcTyThingCategory ANothing        = ptext (sLit "Opaque thing")
+pprTcTyThingCategory AFamDataCon     = ptext (sLit "Family data con")
+pprTcTyThingCategory ARecDataCon     = ptext (sLit "Recursive data con")
 \end{code}
+
 
 Note [Bindings with closed types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

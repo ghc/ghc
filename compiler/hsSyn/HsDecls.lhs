@@ -471,8 +471,10 @@ data HsTyDefn name   -- The payload of a type synonym or data type defn
              td_kindSig:: Maybe (LHsKind name),
                      -- ^ Optional kind signature.
                      --
-                     -- @(Just k)@ for a GADT-style @data@, or @data
-                     -- instance@ decl with explicit kind sig
+                     -- @(Just k)@ for a GADT-style @data@, 
+                     -- or @data instance@ decl, with explicit kind sig
+                     --
+                     -- Always @Nothing@ for H98-syntax decls
 
              td_cons   :: [LConDecl name],
                      -- ^ Data constructors

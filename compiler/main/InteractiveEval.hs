@@ -73,6 +73,7 @@ import MonadUtils
 
 import System.Directory
 import Data.Dynamic
+import Data.Either
 import Data.List (find)
 import Control.Monad
 #if __GLASGOW_HASKELL__ >= 701
@@ -813,26 +814,39 @@ fromListBL bound l = BL (length l) bound l []
 setContext :: GhcMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
-       ; all_env <- liftIO $ findGlobalRdrEnv hsc_env imports
+       ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
+       ; case all_env_err of
+           Left (mod, err) -> ghcError (formatError mod err)
+           Right all_env -> do {
        ; let old_ic        = hsc_IC hsc_env
              final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env
        ; modifySession $ \_ ->
          hsc_env{ hsc_IC = old_ic { ic_imports    = imports
-                                  , ic_rn_gbl_env = final_rdr_env }}}
+                                  , ic_rn_gbl_env = final_rdr_env }}}}
+  where
+    formatError mod err = ProgramError . showSDoc $
+      text "Cannot add module" <+> ppr mod <+>
+      text "to context:" <+> text err
 
-findGlobalRdrEnv :: HscEnv -> [InteractiveImport] -> IO GlobalRdrEnv
+findGlobalRdrEnv :: HscEnv -> [InteractiveImport]
+                 -> IO (Either (ModuleName, String) GlobalRdrEnv)
 -- Compute the GlobalRdrEnv for the interactive context
 findGlobalRdrEnv hsc_env imports
   = do { idecls_env <- hscRnImportDecls hsc_env idecls
                     -- This call also loads any orphan modules
-       ; imods_env  <- mapM (mkTopLevEnv (hsc_HPT hsc_env)) imods
-       ; return (foldr plusGlobalRdrEnv idecls_env imods_env) }
+       ; return $ case partitionEithers (map mkEnv imods) of
+           ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
+           (err : _, _)       -> Left err }
   where
     idecls :: [LImportDecl RdrName]
     idecls = [noLoc d | IIDecl d <- imports]
 
     imods :: [ModuleName]
     imods = [m | IIModule m <- imports]
+
+    mkEnv mod = case mkTopLevEnv (hsc_HPT hsc_env) mod of
+      Left err -> Left (mod, err)
+      Right env -> Right env
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
@@ -845,17 +859,14 @@ availsToGlobalRdrEnv mod_name avails
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
 
-mkTopLevEnv :: HomePackageTable -> ModuleName -> IO GlobalRdrEnv
+mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String GlobalRdrEnv
 mkTopLevEnv hpt modl
   = case lookupUFM hpt modl of
-      Nothing -> ghcError (ProgramError ("mkTopLevEnv: not a home module " ++
-                                                showSDoc (ppr modl)))
+      Nothing -> Left "not a home module"
       Just details ->
          case mi_globals (hm_iface details) of
-                Nothing  ->
-                   ghcError (ProgramError ("mkTopLevEnv: not interpreted "
-                                                ++ showSDoc (ppr modl)))
-                Just env -> return env
+                Nothing  -> Left "not interpreted"
+                Just env -> Right env
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set

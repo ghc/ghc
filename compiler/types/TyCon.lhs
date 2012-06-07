@@ -1014,9 +1014,9 @@ isDataTyCon :: TyCon -> Bool
 --     get an info table.  The family declaration 'TyCon' does not
 isDataTyCon (AlgTyCon {algTcRhs = rhs})
   = case rhs of
-        DataFamilyTyCon {} -> False
         DataTyCon {}       -> True
         NewTyCon {}        -> False
+        DataFamilyTyCon {} -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConTupleSort = sort}) = isBoxed (tupleSortBoxity sort)
 isDataTyCon _ = False

@@ -1210,8 +1210,7 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
           ATcId { tct_closed = cl } -> isTopLevel cl  -- This is the key line
           ATyVar {}                 -> False          -- In-scope type variables
           AGlobal {}                -> True           --    are not closed!
-          AThing {}                 -> pprPanic "is_closed_id" (ppr name)
-          ANothing {}               -> pprPanic "is_closed_id" (ppr name)
+          _                         -> pprPanic "is_closed_id" (ppr name)
       | otherwise
       = WARN( isInternalName name, ppr name ) True
         -- The free-var set for a top level binding mentions

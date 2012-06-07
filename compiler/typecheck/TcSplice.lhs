@@ -1188,8 +1188,7 @@ reifyThing (ATyVar tv tv1)
        ; ty2 <- reifyType ty1
        ; return (TH.TyVarI (reifyName tv) ty2) }
 
-reifyThing (AThing {}) = panic "reifyThing AThing"
-reifyThing ANothing = panic "reifyThing ANothing"
+reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 ------------------------------
 reifyAxiom :: CoAxiom -> TcM TH.Info
