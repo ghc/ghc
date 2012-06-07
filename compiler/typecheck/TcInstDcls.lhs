@@ -19,8 +19,12 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 import HsSyn
 import TcBinds
-import TcTyClsDecls
-import TcClassDcl
+import TcTyClsDecls( tcAddImplicits, tcAddFamInstCtxt, tcSynFamInstDecl, 
+                     wrongKindOfFamily, tcFamTyPats, kcTyDefn, dataDeclChecks,
+                     tcConDecls, checkValidTyCon, badATErr, wrongATArgErr )
+import TcClassDcl( tcClassDecl2, 
+                   HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
+                   findMethodBind, instantiateMethod, tcInstanceMethodBody )
 import TcPat      ( addInlinePrags )
 import TcRnMonad
 import TcMType
@@ -51,15 +55,14 @@ import PrelNames  ( typeableClassNames )
 import Bag
 import BasicTypes
 import DynFlags
+import ErrUtils
 import FastString
 import Id
 import MkId
 import Name
 import NameSet
-import NameEnv
 import Outputable
 import SrcLoc
-import Digraph( SCC(..) )
 import Util
 
 import Control.Monad
@@ -373,8 +376,12 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             -- round)
 
             -- Do class and family instance declarations
-       ; (gbl_env, local_infos) <- tcLocalInstDecls (calcInstDeclCycles inst_decls)
-       ; setGblEnv gbl_env $
+       ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
+       ; let (local_infos_s, fam_insts_s) = unzip stuff
+             local_infos = concat local_infos_s
+             fam_insts   = concat fam_insts_s
+       ; addClsInsts local_infos $
+         addFamInsts fam_insts   $ 
 
     do {    -- Compute instances from "deriving" clauses;
             -- This stuff computes a context for the derived instance
@@ -389,7 +396,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; th_stage <- getStage   -- See Note [Deriving inside TH brackets ]
        ; (gbl_env, deriv_inst_info, deriv_binds)
               <- if isBrackStage th_stage 
-                 then return (gbl_env, emptyBag, emptyValBindsOut)
+                 then do { gbl_env <- getGblEnv
+                         ; return (gbl_env, emptyBag, emptyValBindsOut) }
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
 
@@ -413,20 +421,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     typInstCheck ty = is_cls (iSpec ty) `elem` typeableClassNames
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
-
-tcLocalInstDecls :: [SCC (LInstDecl Name)] -> TcM (TcGblEnv, [InstInfo Name])
-tcLocalInstDecls [] 
- = do { gbl_env <- getGblEnv
-      ; return (gbl_env, []) }
-tcLocalInstDecls (AcyclicSCC inst_decl : sccs)
- = do { (inst_infos, fam_insts) <- recoverM (return ([], [])) $
-                                   tcLocalInstDecl inst_decl
-      ; (gbl_env, more_infos) <- addClsInsts inst_infos  $
-                                 addFamInsts fam_insts   $ 
-                                 tcLocalInstDecls sccs
-      ; return (gbl_env, inst_infos ++ more_infos) }
-tcLocalInstDecls (CyclicSCC inst_decls : _)
-  = do { cyclicDeclErr inst_decls; failM }
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -463,59 +457,6 @@ all.  (A less brutal solution would be to generate them with no
 bindings.)  This will become moot when we shift to the new TH plan, so 
 the brutal solution will do.
 
-
-Note [Instance declaration cycles]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With -XDataKinds we can get this
-   data instance Foo [a] = MkFoo (MkFoo a)
-where the constructor MkFoo is used in a type before it is
-defined.  Here is a more complicated situation, involving an 
-associated type and mutual recursion
-
-   data instance T [a] = MkT (MkS a)
-
-   instance C [a] where
-     data S [a] = MkS (MkT a)
-
-When type checking ordinary data type decls we detect this staging
-problem in the kind-inference phase, but there *is* no kind inference
-phase here.
-
-So intead we extract the strongly connected components and look for
-cycles.
-
-
-\begin{code}
-calcInstDeclCycles :: [LInstDecl Name] -> [SCC (LInstDecl Name)]
--- see Note [Instance declaration cycles]
-calcInstDeclCycles decls
-  = depAnal get_defs get_uses decls
-  where
-    -- get_defs extracts the *constructor* bindings of the declaration
-    get_defs :: LInstDecl Name -> [Name]
-    get_defs (L _ (FamInstD { lid_inst = fid }))       = get_fi_defs fid
-    get_defs (L _ (ClsInstD { cid_fam_insts = fids })) = concatMap (get_fi_defs . unLoc) fids
-
-    get_fi_defs :: FamInstDecl Name -> [Name]
-    get_fi_defs (FamInstDecl { fid_defn = TyData { td_cons = cons } }) 
-      = map (unLoc . con_name . unLoc) cons
-    get_fi_defs (FamInstDecl {}) = []
-
-    -- get_uses extracts the *tycon or constructor* uses of the declaration
-    get_uses :: LInstDecl Name -> [Name]
-    get_uses (L _ (FamInstD { lid_inst = fid })) = nameSetToList (fid_fvs fid)
-    get_uses (L _ (ClsInstD { cid_fam_insts = fids })) 
-        = nameSetToList (foldr (unionNameSets . fid_fvs . unLoc) emptyNameSet fids)
-
-cyclicDeclErr :: Outputable d => [Located d] -> TcRn ()
-cyclicDeclErr inst_decls
-  = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [ptext (sLit "Cycle in type declarations: data constructor used (in a type) before it is defined"),
-		 nest 2 (vcat (map ppr_decl sorted_decls))])
-  where
-    sorted_decls = sortLocated inst_decls
-    ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
-\end{code}
 
 \begin{code}
 tcLocalInstDecl :: LInstDecl Name
@@ -878,7 +819,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
    loc       = getSrcSpan dfun_id
 
 ------------------------------
-----------------------
 mkMethIds :: HsSigFun -> Class -> [TcTyVar] -> [EvVar] 
           -> [TcType] -> Id -> TcM (TcId, TcSigInfo)
 mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
@@ -1274,6 +1214,22 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
          (sel_tvs, sel_rho) = tcSplitForAllTys (idType sel_id)
          (_, local_meth_ty) = tcSplitPredFunTy_maybe sel_rho
                               `orElse` pprPanic "tcInstanceMethods" (ppr sel_id)
+
+------------------
+mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
+mkGenericDefMethBind clas inst_tys sel_id dm_name
+  = 	-- A generic default method
+    	-- If the method is defined generically, we only have to call the
+        -- dm_name.
+    do	{ dflags <- getDynFlags
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
+		   (vcat [ppr clas <+> ppr inst_tys,
+			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
+
+        ; return (noLoc $ mkTopFunBind (noLoc (idName sel_id))
+                                       [mkSimpleMatch [] rhs]) }
+  where
+    rhs = nlHsVar dm_name
 
 ----------------------
 wrapId :: HsWrapper -> id -> HsExpr id
