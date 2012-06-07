@@ -565,12 +565,15 @@ setupUpdate closure_info node body
       then do tickyUpdateFrameOmitted; body
       else do
           tickyPushUpdateFrame
-          --dflags <- getDynFlags
-          let es = [CmmReg (CmmLocal node), mkLblExpr mkUpdInfoLabel]
-          --if not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
-          --  then pushUpdateFrame es body -- XXX black hole
-          --  else pushUpdateFrame es body
-          pushUpdateFrame es body
+          dflags <- getDynFlags
+          let
+              bh = blackHoleOnEntry closure_info &&
+                   not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+
+              lbl | bh        = mkBHUpdInfoLabel
+                  | otherwise = mkUpdInfoLabel
+
+          pushUpdateFrame [CmmReg (CmmLocal node), mkLblExpr lbl] body
 
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
@@ -579,7 +582,7 @@ setupUpdate closure_info node body
 	  then do	-- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf True
 		; pushUpdateFrame [CmmReg (CmmLocal upd_closure),
-                                     mkLblExpr mkUpdInfoLabel] body } -- XXX black hole
+                                   mkLblExpr mkBHUpdInfoLabel] body }
 	  else do {tickyUpdateFrameOmitted; body}
     }
 
