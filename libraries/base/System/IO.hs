@@ -563,13 +563,6 @@ openTempFile' loc tmp_dir template binary mode = do
          _                      -> error "bug in System.IO.openTempFile"
 
 #ifndef __NHC__
-    oflags1 = rw_flags .|. o_EXCL
-
-    binary_flags
-      | binary    = o_BINARY
-      | otherwise = 0
-
-    oflags = oflags1 .|. binary_flags
 #endif
 
 #if defined(__NHC__)
@@ -577,24 +570,19 @@ openTempFile' loc tmp_dir template binary mode = do
                         return (filepath, h)
 #elif defined(__GLASGOW_HASKELL__)
     findTempName x = do
-      fd <- withFilePath filepath $ \ f ->
-              c_open f oflags mode
-      if fd < 0
-       then do
-         errno <- getErrno
-         if errno == eEXIST
-           then findTempName (x+1)
-           else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
-       else do
+      r <- openNewFile filepath binary mode
+      case r of
+        FileExists -> findTempName (x + 1)
+        OpenNewError errno -> ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+        NewFileCreated fd -> do
+          (fD,fd_type) <- FD.mkFD fd ReadWriteMode Nothing{-no stat-}
+                               False{-is_socket-}
+                               True{-is_nonblock-}
 
-         (fD,fd_type) <- FD.mkFD fd ReadWriteMode Nothing{-no stat-}
-                              False{-is_socket-} 
-                              True{-is_nonblock-}
+          enc <- getLocaleEncoding
+          h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
-         enc <- getLocaleEncoding
-         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
-
-         return (filepath, h)
+          return (filepath, h)
 #else
          h <- fdToHandle fd `onException` c_close fd
          return (filepath, h)
@@ -613,6 +601,32 @@ openTempFile' loc tmp_dir template binary mode = do
 
 #if __HUGS__
         fdToHandle fd   = openFd (fromIntegral fd) False ReadWriteMode binary
+#endif
+
+#if defined(__GLASGOW_HASKELL__)
+data OpenNewFileResult
+  = NewFileCreated CInt
+  | FileExists
+  | OpenNewError Errno
+
+openNewFile :: FilePath -> Bool -> CMode -> IO OpenNewFileResult
+openNewFile filepath binary mode = do
+  let oflags1 = rw_flags .|. o_EXCL
+
+      binary_flags
+        | binary    = o_BINARY
+        | otherwise = 0
+
+      oflags = oflags1 .|. binary_flags
+  fd <- withFilePath filepath $ \ f ->
+          c_open f oflags mode
+  if fd < 0
+    then do
+      errno <- getErrno
+      if errno == eEXIST
+        then return FileExists
+        else return (OpenNewError errno)
+    else return (NewFileCreated fd)
 #endif
 
 -- XXX Should use filepath library
