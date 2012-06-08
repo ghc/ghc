@@ -663,31 +663,6 @@ flatten d _f ctxt ty@(ForAllTy {})
   = do { let (tvs, rho) = splitForAllTys ty
        ; (rho', co) <- flatten d FMSubstOnly ctxt rho
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
-                      {- DELETEME  
-       ; when (under_families tvs rho) $ wrapErrTcS $ flattenForAllErrorTcS ctxt ty
-       ; (rho', co) <- flatten d FMSubstOnly ctxt rho
-                       -- Only do substitutions, not flattening under ForAlls
-       ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
-
--- DV: Simon and I have a better plan here related to #T5934 and that plan is to 
--- first normalize completely the rho type with respect to the top-level instances, 
--- and then flatten out only the family equations that do not mention the quantified
--- variable. Keep the rest as they are. There is no worry that we don't normalize with
--- the givens because the givens can't possibly mention the quantified variable anyway!
-
-  where under_families tvs rho 
-            = go (mkVarSet tvs) rho 
-            where go _bound (TyVarTy _tv) = False
-                  go _ (LitTy {}) = False
-                  go bound (TyConApp tc tys)
-                      | isSynFamilyTyCon tc
-                      , (args,rest) <- splitAt (tyConArity tc) tys
-                      = (tyVarsOfTypes args `intersectsVarSet` bound) || any (go bound) rest
-                      | otherwise = any (go bound) tys
-                  go bound (FunTy arg res)  = go bound arg || go bound res
-                  go bound (AppTy fun arg)  = go bound fun || go bound arg
-                  go bound (ForAllTy tv ty) = go (bound `extendVarSet` tv) ty
--}
 
 \end{code}
 
