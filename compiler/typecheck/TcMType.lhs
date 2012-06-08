@@ -1250,38 +1250,6 @@ check_class_pred_tys dflags ctxt kts
     flexible_contexts = xopt Opt_FlexibleContexts dflags
     undecidable_ok = xopt Opt_UndecidableInstances dflags
 
-{-
-Note [Kind polymorphic type classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-class C f where
-  empty :: f a
--- C :: forall k. k -> Constraint
--- empty :: forall (a :: k). f a
-
-MultiParam:
-~~~~~~~~~~~
-
-instance C Maybe where
-  empty = Nothing
-
-The dictionary gets type [C * Maybe] even if it's not a MultiParam
-type class.
-
-Flexible:
-~~~~~~~~~
-
-data D a = D
--- D :: forall k. k -> *
-
-instance C D where
-  empty = D
-
-The dictionary gets type [C * (D *)]. IA0_TODO it should be
-generalized actually.
-
--}
-
 -------------------------
 tyvar_head :: Type -> Bool
 tyvar_head ty			-- Haskell 98 allows predicates of form 
@@ -1292,21 +1260,77 @@ tyvar_head ty			-- Haskell 98 allows predicates of form
 	Nothing	     -> False
 \end{code}
 
-Check for ambiguity
-~~~~~~~~~~~~~~~~~~~
-	  forall V. P => tau
-is ambiguous if P contains generic variables
-(i.e. one of the Vs) that are not mentioned in tau
+Note [Kind polymorphic type classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MultiParam check:
 
-However, we need to take account of functional dependencies
-when we speak of 'mentioned in tau'.  Example:
-	class C a b | a -> b where ...
-Then the type
-	forall x y. (C x y) => x
-is not ambiguous because x is mentioned and x determines y
+    class C f where...   -- C :: forall k. k -> Constraint
+    instance C Maybe where...
 
-NB; the ambiguity check is only used for *user* types, not for types
-coming from inteface files.  The latter can legitimately have
+  The dictionary gets type [C * Maybe] even if it's not a MultiParam
+  type class.
+
+Flexibility check:
+
+    class C f where...   -- C :: forall k. k -> Constraint
+    data D a = D a
+    instance C D where
+
+  The dictionary gets type [C * (D *)]. IA0_TODO it should be
+  generalized actually.
+
+Note [The ambiguity check for type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+checkAmbiguity is a check on user-supplied type signatures.  It is
+*purely* there to report functions that cannot possibly be called.  So for
+example we want to reject:
+   f :: C a => Int
+The idea is there can be no legal calls to 'f' because every call will
+give rise to an ambiguous constraint.  We could soundly omit the
+ambiguity check on type signatures entirely, at the expense of
+delaying ambiguity errors to call sites.
+
+What about this, though?
+   g :: C [a] => Int
+Is every call to 'g' ambiguous?  After all, we might have
+   intance C [a] where ...
+at the call site.  So maybe that type is ok!  Indeed even f's
+quintessentially ambiguous type might, just possibly be callable: 
+with -XUndecidableInstances we could have
+  instance C a where ...
+and now a call could be legal after all!  (But only with  -XUndecidableInstances!)
+
+What about things like this:
+   class D a b | a -> b where ..
+   h :: D Int b => Int 
+The Int may well fix 'b' at the call site, so that signature should
+not be rejected.  Moreover, using *visible* fundeps is too
+conservative.  Consider
+   class X a b where ...
+   class D a b | a -> b where ...
+   instance D a b => X [a] b where...
+   h :: X a b => a -> a
+Here h's type looks ambiguous in 'b', but here's a legal call:
+   ...(h [True])...
+That gives rise to a (X [Bool] beta) constraint, and using the
+instance means we need (D Bool beta) and that fixes 'beta' via D's
+fundep!
+
+ So I think the only types we can reject as *definitely* ambiguous are ones like this
+   f :: (Cambig, Cnonambig) => tau
+where
+  * 'Cambig', 'Cnonambig' are each a set of constraints.
+  * fv(Cambig) does not intersect fv( Cnonambig => tau )
+  * The constraints in 'Cambig' are all of form (C a b c) 
+    where a,b,c are type variables
+  * 'Cambig' is non-empty
+  * '-XUndecidableInstances' is not on.
+
+And that is what checkAmbiguity does.  See Trac #6134.
+
+
+Side note: the ambiguity check is only used for *user* types, not for
+types coming from inteface files.  The latter can legitimately have
 ambiguous types. Example
 
    class S a where s :: a -> (Int,Int)
@@ -1318,33 +1342,51 @@ ambiguous types. Example
 Here the worker for f gets the type
 	fw :: forall a. S a => Int -> (# Int, Int #)
 
-If the list of tv_names is empty, we have a monotype, and then we
-don't need to check for ambiguity either, because the test can't fail
-(see is_ambig).
+Note [Implicit parameters and ambiguity] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only a *class* predicate can give rise to ambiguity
+An *implicit parameter* cannot.  For example:
+	foo :: (?x :: [a]) => Int
+	foo = length ?x
+is fine.  The call site will suppply a particular 'x'
 
-In addition, GHC insists that at least one type variable
-in each constraint is in V.  So we disallow a type like
-	forall a. Eq b => b -> b
-even in a scope where b is in scope.
+Furthermore, the type variables fixed by an implicit parameter
+propagate to the others.  E.g.
+	foo :: (Show a, ?x::[a]) => Int
+	foo = show (?x++?x)
+The type of foo looks ambiguous.  But it isn't, because at a call site
+we might have
+	let ?x = 5::Int in foo
+and all is well.  In effect, implicit parameters are, well, parameters,
+so we can take their type variables into account as part of the
+"tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
+
 
 \begin{code}
 checkAmbiguity :: [TyVar] -> ThetaType -> TyVarSet -> TcM ()
+-- Note [The ambiguity check for type signatures]
 checkAmbiguity forall_tyvars theta tau_tyvars
-  = mapM_ complain (filter is_ambig theta)
+  = do { undecidable_instances <- xoptM Opt_UndecidableInstances
+       ; unless undecidable_instances $
+         mapM_  ambigErr (filter is_ambig candidates) }
   where
-    complain pred     = addErrTc (ambigErr pred)
-    extended_tau_vars = growThetaTyVars theta tau_tyvars
-
 	-- See Note [Implicit parameters and ambiguity] in TcSimplify
-    is_ambig pred     = isClassPred  pred &&
-			any ambig_var (varSetElems (tyVarsOfType pred))
+    is_candidate pred 
+      | Just (_, tys) <- getClassPredTys_maybe pred
+      , all isTyVarTy tys = True
+      | otherwise         = False
 
-    ambig_var ct_var  = (ct_var `elem` forall_tyvars) &&
-		        not (ct_var `elemVarSet` extended_tau_vars)
+    forall_tv_set = mkVarSet forall_tyvars
+    (candidates, others) = partition is_candidate theta
+    unambig_vars = growThetaTyVars theta (tau_tyvars `unionVarSet` tyVarsOfTypes others)
 
-ambigErr :: PredType -> SDoc
+    is_ambig pred = (tyVarsOfType pred `minusVarSet` unambig_vars)
+                    `intersectsVarSet` forall_tv_set
+
+ambigErr :: PredType -> TcM ()
 ambigErr pred
-  = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprType pred),
+  = addErrTc $
+    sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprType pred),
 	 nest 2 (ptext (sLit "At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext (sLit "must be reachable from the type after the '=>'"))]
 \end{code}
@@ -1369,39 +1411,14 @@ growThetaTyVars theta tvs
 
 growPredTyVars :: TcPredType
                -> TyVarSet	-- The set to extend
-	       -> TyVarSet	-- TyVars of the predicate if it intersects
-	       	  		-- the set, or is implicit parameter
-growPredTyVars pred tvs = go (classifyPredType pred)
+	       -> TyVarSet	-- TyVars of the predicate if it intersects the set, 
+growPredTyVars pred tvs 
+   | pred_tvs `intersectsVarSet` tvs = pred_tvs
+   | otherwise                       = emptyVarSet
   where
-    grow pred_tvs | pred_tvs `intersectsVarSet` tvs = pred_tvs
-                  | otherwise                       = emptyVarSet
-
-    go (IPPred _ ty)     = tyVarsOfType ty -- See Note [Implicit parameters and ambiguity]
-    go (ClassPred _ tys) = grow (tyVarsOfTypes tys)
-    go (EqPred ty1 ty2)  = grow (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2)
-    go (TuplePred ts)    = unionVarSets (map (go . classifyPredType) ts)
-    go (IrredPred ty)    = grow (tyVarsOfType ty)
+    pred_tvs = tyVarsOfType pred
 \end{code}
     
-Note [Implicit parameters and ambiguity] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only a *class* predicate can give rise to ambiguity
-An *implicit parameter* cannot.  For example:
-	foo :: (?x :: [a]) => Int
-	foo = length ?x
-is fine.  The call site will suppply a particular 'x'
-
-Furthermore, the type variables fixed by an implicit parameter
-propagate to the others.  E.g.
-	foo :: (Show a, ?x::[a]) => Int
-	foo = show (?x++?x)
-The type of foo looks ambiguous.  But it isn't, because at a call site
-we might have
-	let ?x = 5::Int in foo
-and all is well.  In effect, implicit parameters are, well, parameters,
-so we can take their type variables into account as part of the
-"tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
-
 
 \begin{code}
 checkThetaCtxt :: UserTypeCtxt -> ThetaType -> SDoc
@@ -1462,13 +1479,13 @@ checkValidInstHead ctxt clas cls_args
        ; unless spec_inst_prag $
          do { checkTc (xopt Opt_TypeSynonymInstances dflags ||
                        all tcInstHeadTyNotSynonym ty_args)
-                 (instTypeErr pp_pred head_type_synonym_msg)
+                 (instTypeErr clas cls_args head_type_synonym_msg)
             ; checkTc (xopt Opt_FlexibleInstances dflags ||
                        all tcInstHeadTyAppAllTyVars ty_args)
-                 (instTypeErr pp_pred head_type_args_tyvars_msg)
+                 (instTypeErr clas cls_args head_type_args_tyvars_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
                        isSingleton ty_args)  -- Only count type arguments
-                 (instTypeErr pp_pred head_one_type_msg) }
+                 (instTypeErr clas cls_args head_one_type_msg) }
 
          -- May not contain type family applications
        ; mapM_ checkTyFamFreeness ty_args
@@ -1484,7 +1501,6 @@ checkValidInstHead ctxt clas cls_args
   where
     spec_inst_prag = case ctxt of { SpecInstCtxt -> True; _ -> False }
 
-    pp_pred = pprClassPred clas cls_args
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
                 text "where T is not a synonym." $$
@@ -1500,10 +1516,11 @@ checkValidInstHead ctxt clas cls_args
                 text "Only one type can be given in an instance head." $$
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
 
-instTypeErr :: SDoc -> SDoc -> SDoc
-instTypeErr pp_ty msg
-  = sep [ptext (sLit "Illegal instance declaration for") <+> quotes pp_ty, 
-	 nest 2 msg]
+instTypeErr :: Class -> [Type] -> SDoc -> SDoc
+instTypeErr cls tys msg
+  = hang (ptext (sLit "Illegal instance declaration for") 
+          <+> quotes (pprClassPred cls tys))
+       2 msg
 \end{code}
 
 validDeivPred checks for OK 'deriving' context.  See Note [Exotic
@@ -1545,18 +1562,23 @@ checkValidInstance ctxt hs_type ty
            Just (clas,inst_tys)  -> 
     do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
         ; checkValidTheta ctxt theta
-	; checkAmbiguity tvs theta (tyVarsOfTypes inst_tys)
 
+        -- The Termination and Coverate Conditions
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98 this will already have been done by checkValidTheta,
         -- but as we may be using other extensions we need to check.
+        -- 
+        -- Note that the Termination Condition is *more conservative* than 
+        -- the checkAmbiguity test we do on other type signatures
+        --   e.g.  Bar a => Bar Int is ambiguous, but it also fails
+        --   the termination condition, because 'a' appears more often
+        --   in the constraint than in the head
 	; undecidable_ok <- xoptM Opt_UndecidableInstances
         ; unless undecidable_ok $
-	  mapM_ addErrTc (checkInstTermination inst_tys theta)
-	
-	-- The Coverage Condition
-	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
-	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
+	  do { checkInstTermination inst_tys theta
+	     ; checkTc (checkInstCoverage clas inst_tys)
+                       (instTypeErr clas inst_tys msg) }
+	  	  
         ; return (tvs, theta, clas, inst_tys) } } }
   where
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
@@ -1589,19 +1611,19 @@ The underlying idea is that
 
 
 \begin{code}
-checkInstTermination :: [TcType] -> ThetaType -> [MsgDoc]
+checkInstTermination :: [TcType] -> ThetaType -> TcM ()
 checkInstTermination tys theta
-  = mapCatMaybes check theta
+  = mapM_ check theta
   where
    fvs  = fvTypes tys
    size = sizeTypes tys
    check pred 
       | not (null (fvType pred \\ fvs)) 
-      = Just (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
+      = addErrTc (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
       | sizePred pred >= size
-      = Just (predUndecErr pred smallerMsg $$ parens undecidableMsg)
+      = addErrTc (predUndecErr pred smallerMsg $$ parens undecidableMsg)
       | otherwise
-      = Nothing
+      = return ()
 
 predUndecErr :: PredType -> SDoc -> SDoc
 predUndecErr pred msg = sep [msg,
