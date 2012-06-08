@@ -24,6 +24,13 @@ main = do
   getGhcField fields "GhcRTSWays" "RTS ways"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
 
+  let pkgdb_flag = case lookup "Project version" fields of
+        Just v
+          | parseVersion v >= [7,5] -> "package-db"
+        _ -> "package-conf"
+  putStrLn $ "GhcPackageDbFlag" ++ '=':pkgdb_flag
+
+
 getGhcField :: [(String,String)] -> String -> String -> IO ()
 getGhcField fields mkvar key =
    case lookup key fields of
@@ -49,3 +56,9 @@ fixSlashes = map f
     where f '\\' = '/'
           f c    = c
 
+parseVersion :: String -> [Int]
+parseVersion v = case break (== '.') v of
+  (n, rest) -> read n : case rest of
+    [] -> []
+    ('.':v') -> parseVersion v'
+    _ -> error "bug in parseVersion"
