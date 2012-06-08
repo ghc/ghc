@@ -18,7 +18,7 @@ test2 :: SBool b -> If1 b Int Char
 test2 STrue = 42
 test2 SFalse = 'H'
 
-type family Apply f x
+type family Apply (f :: k1 -> k2) (x :: k1) :: k2
 type instance Apply f x = f x
 
 higher1v1 :: SBool b -> (If1 b Maybe []) Char

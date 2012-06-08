@@ -21,7 +21,7 @@ data SMaybe a where
   SNothing :: SMaybe 'Nothing
   SJust :: Sing a -> SMaybe ('Just a)
 
-type family Sing a
+type family Sing (a :: k)
 type instance Sing (a :: Nat) = SNat a
 type instance Sing (a :: Bool) = SBool a
 type instance Sing (a :: Maybe *) = SMaybe a -- want to say Maybe k

@@ -1,6 +1,4 @@
 
-PolyKinds06.hs:10:11:
-    Promoted kind `A1' used in a mutually recursive group
-    In the type `B A1'
-    In the definition of data constructor `B1'
-    In the data declaration for `B'
+PolyKinds06.hs:9:11:
+    Promoted kind `A' used in a mutually recursive group
+    In the kind `A -> *'
