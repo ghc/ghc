@@ -44,7 +44,7 @@ import UniqFM		( addToUFM_Directly, lookupUFM_Directly,
 			  minusUFM, filterUFM )
 import Type		( isUnLiftedType, eqType, tyConAppTyCon_maybe )
 import Coercion         ( coercionKind )
-import Util		( mapAndUnzip, lengthIs, zipEqual )
+import Util
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
 			  RecFlag(..), isRec, isMarkedStrict )
 import Maybes		( orElse, expectJust )

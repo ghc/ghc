@@ -144,6 +144,7 @@ endif
 include rules/prof.mk
 include rules/trace.mk
 include rules/make-command.mk
+include rules/pretty_commands.mk
 
 # -----------------------------------------------------------------------------
 # Macros for standard targets
@@ -1029,9 +1030,9 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 endif
 
 ifeq "$(mingw32_TARGET_OS)" "1"
-DOCDIR_TO_PUBLISH = bindisttest/"install dir"/doc
+DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/doc
 else
-DOCDIR_TO_PUBLISH = bindisttest/"install dir"/share/doc/ghc
+DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/share/doc/ghc
 endif
 
 .PHONY: publish-docs

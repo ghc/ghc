@@ -26,6 +26,7 @@ import Outputable
 import Pair
 import Maybes( allMaybes )
 import FastString
+import Util
 \end{code}
 
 %************************************************************************

@@ -26,7 +26,7 @@ import TcType
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
-import Util	( all2, takeList, zipEqual )
+import Util
 import ListSetOps ( runs )
 import Id
 import NameEnv

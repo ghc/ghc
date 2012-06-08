@@ -156,8 +156,7 @@ throwTo (Capability *cap,	// the Capability we hold
     MessageThrowTo *msg;
 
     msg = (MessageThrowTo *) allocate(cap, sizeofW(MessageThrowTo));
-    // message starts locked; the caller has to unlock it when it is
-    // ready.
+    // the message starts locked; see below
     SET_HDR(msg, &stg_WHITEHOLE_info, CCS_SYSTEM);
     msg->source      = source;
     msg->target      = target;
@@ -166,9 +165,16 @@ throwTo (Capability *cap,	// the Capability we hold
     switch (throwToMsg(cap, msg))
     {
     case THROWTO_SUCCESS:
+        // unlock the message now, otherwise we leave a WHITEHOLE in
+        // the heap (#6103)
+        SET_HDR(msg, &stg_MSG_THROWTO_info, CCS_SYSTEM);
         return NULL;
+
     case THROWTO_BLOCKED:
     default:
+        // the caller will unlock the message when it is ready.  We
+        // cannot unlock it yet, because the calling thread will need
+        // to tidy up its state first.
         return msg;
     }
 }

@@ -49,6 +49,7 @@ import Data.List        ( mapAccumL )
 import Outputable
 import FastString
 import Pair
+import Util
 \end{code}
 
 

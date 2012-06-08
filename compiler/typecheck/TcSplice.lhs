@@ -66,7 +66,7 @@ import Serialized
 import ErrUtils
 import SrcLoc
 import Outputable
-import Util             ( dropList )
+import Util
 import Data.List        ( mapAccumL )
 import Pair
 import Unique
@@ -470,11 +470,9 @@ tcTopSplice expr res_ty
        ; expr2 <- runMetaE zonked_q_expr
        ; showSplice "expression" expr (ppr expr2)
 
-        -- Rename it, but bale out if there are errors
-        -- otherwise the type checker just gives more spurious errors
        ; addErrCtxt (spliceResultDoc expr) $ do
-       { (exp3, _fvs) <- checkNoErrs (rnLExpr expr2)
-
+       { (exp3, _fvs) <- checkNoErrs $ rnLExpr expr2
+                         -- checkNoErrs: see Note [Renamer errors]
        ; exp4 <- tcMonoExpr exp3 res_ty
        ; return (unLoc exp4) } }
 
@@ -508,6 +506,13 @@ tcTopSpliceExpr tc_action
           -- Zonk it and tie the knot of dictionary bindings
        ; zonkTopLExpr (mkHsDictLet (EvBinds const_binds) expr') }
 \end{code}
+
+Note [Renamer errors]
+~~~~~~~~~~~~~~~~~~~~~
+It's important to wrap renamer calls in checkNoErrs, because the
+renamer does not fail for out of scope variables etc. Instead it
+returns a bogus term/type, so that it can report more than one error.
+We don't want the type checker to see these bogus unbound variables.
 
 
 %************************************************************************
@@ -559,11 +564,10 @@ tcTopSpliceType expr
         ; hs_ty2 <- runMetaT zonked_q_expr
         ; showSplice "type" expr (ppr hs_ty2)
   
-        -- Rename it, but bale out if there are errors
-        -- otherwise the type checker just gives more spurious errors
         ; addErrCtxt (spliceResultDoc expr) $ do 
         { let doc = SpliceTypeCtx hs_ty2
-        ; (hs_ty3, _fvs) <- checkNoErrs (rnLHsType doc hs_ty2)
+        ; (hs_ty3, _fvs) <- checkNoErrs $ rnLHsType doc hs_ty2
+                         -- checkNoErrs: see Note [Renamer errors]
         ; tcLHsType hs_ty3 }}
 \end{code}
 
@@ -997,7 +1001,7 @@ illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (withou
 \begin{code}
 reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
-   = addErrCtxt (ptext (sLit "In reifyInstances")
+   = addErrCtxt (ptext (sLit "In the argument of reifyInstances:")
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { thing <- getThing th_nm
         ; case thing of
@@ -1026,8 +1030,9 @@ reifyInstances th_nm th_tys
                              <+> int tc_arity <> rparen))
            ; loc <- getSrcSpanM
            ; rdr_tys <- mapM (cvt loc) th_tys    -- Convert to HsType RdrName
-           ; (rn_tys, _fvs)  <- rnLHsTypes doc rdr_tys   -- Rename  to HsType Name
-           ; (tys, _res_k) <- tcInferApps tc (tyConKind tc) rn_tys
+           ; (rn_tys, _fvs) <- checkNoErrs $ rnLHsTypes doc rdr_tys   -- Rename  to HsType Name
+                         -- checkNoErrs: see Note [Renamer errors]
+           ; (tys, _res_k)  <- tcInferApps tc (tyConKind tc) rn_tys
            ; return tys }
 
     cvt :: SrcSpan -> TH.Type -> TcM (LHsType RdrName)
@@ -1183,8 +1188,7 @@ reifyThing (ATyVar tv tv1)
        ; ty2 <- reifyType ty1
        ; return (TH.TyVarI (reifyName tv) ty2) }
 
-reifyThing (AThing {}) = panic "reifyThing AThing"
-reifyThing ANothing = panic "reifyThing ANothing"
+reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 ------------------------------
 reifyAxiom :: CoAxiom -> TcM TH.Info

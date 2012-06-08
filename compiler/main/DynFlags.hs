@@ -1785,8 +1785,12 @@ package_flags = [
   , Flag "user-package-db"       (NoArg (addPkgConfRef UserPkgConf))
 
     -- backwards compat with GHC<=7.4 :
-  , Flag "package-conf"          (HasArg (addPkgConfRef . PkgConfFile))
-  , Flag "no-user-package-conf"  (NoArg removeUserPkgConf)
+  , Flag "package-conf"          (HasArg $ \path -> do
+                                    addPkgConfRef (PkgConfFile path)
+                                    deprecate "Use -package-db instead")
+  , Flag "no-user-package-conf"  (NoArg $ do
+                                    removeUserPkgConf
+                                    deprecate "Use -no-user-package-db instead")
 
   , Flag "package-name"          (hasArg setPackageName)
   , Flag "package-id"            (HasArg exposePackageId)
@@ -2134,6 +2138,7 @@ impliedFlags
     , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
+    , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)  -- Ditto polymorphic kinds
 
     -- We turn this on so that we can export associated type
     -- type synonyms in subordinates (e.g. MyClass(type AssocType))

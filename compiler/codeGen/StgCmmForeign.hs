@@ -304,5 +304,6 @@ add_shim arg_ty expr
 
   | otherwise = expr
   where
-    tycon = tyConAppTyCon (repType arg_ty)
+    UnaryRep rep_ty = repType arg_ty
+    tycon           = tyConAppTyCon rep_ty
         -- should be a tycon app, since this is a foreign call

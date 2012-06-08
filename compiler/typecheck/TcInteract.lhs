@@ -55,6 +55,7 @@ import Pair ()
 import UniqFM
 import FastString ( sLit ) 
 import DynFlags
+import Util
 \end{code}
 **********************************************************************
 *                                                                    * 

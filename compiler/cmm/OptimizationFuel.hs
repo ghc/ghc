@@ -22,6 +22,7 @@ import Control.Monad
 import StaticFlags (opt_Fuel)
 import UniqSupply
 import Panic
+import Util
 
 import Compiler.Hoopl
 import Compiler.Hoopl.GHC (getFuel, setFuel)

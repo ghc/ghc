@@ -20,6 +20,8 @@ the STG paper.
 -- for details
 
 module ClosureInfo (
+        idRepArity,
+
 	ClosureInfo(..), LambdaFormInfo(..),	-- would be abstract but
 	StandardFormInfo(..),			-- mkCmmInfo looks inside
         SMRep,
@@ -96,6 +98,7 @@ import Outputable
 import FastString
 import Constants
 import DynFlags
+import Util
 \end{code}
 
 
@@ -156,7 +159,7 @@ ClosureInfo contains a LambdaFormInfo.
 data LambdaFormInfo
   = LFReEntrant		-- Reentrant closure (a function)
 	TopLevelFlag	-- True if top level
-	!Int		-- Arity. Invariant: always > 0
+	!RepArity	-- Arity. Invariant: always > 0
 	!Bool		-- True <=> no fvs
 	ArgDescr	-- Argument descriptor (should reall be in ClosureInfo)
 
@@ -180,7 +183,7 @@ data LambdaFormInfo
 
   | LFLetNoEscape	-- See LetNoEscape module for precise description of
 			-- these "lets".
-	!Int		-- arity;
+	!RepArity	-- arity;
 
   | LFBlackHole		-- Used for the closures allocated to hold the result
 			-- of a CAF.  We want the target of the update frame to
@@ -211,7 +214,7 @@ data StandardFormInfo
 	-- The code for the thunk just pushes x2..xn on the stack and enters x1.
 	-- There are a few of these (for 1 <= n <= MAX_SPEC_AP_SIZE) pre-compiled
 	-- in the RTS to save space.
-	Int		-- Arity, n
+	RepArity	-- Arity, n
 \end{code}
 
 
@@ -288,7 +291,7 @@ idCgRep x = typeCgRep . idType $ x
 tyConCgRep :: TyCon -> CgRep
 tyConCgRep = primRepToCgRep . tyConPrimRep
 
-typeCgRep :: Type -> CgRep
+typeCgRep :: UnaryType -> CgRep
 typeCgRep = primRepToCgRep . typePrimRep 
 \end{code}
 
@@ -384,9 +387,12 @@ might_be_a_function :: Type -> Bool
 -- Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as poss
 might_be_a_function ty
-  = case tyConAppTyCon_maybe (repType ty) of
-	Just tc -> not (isDataTyCon tc)
-	Nothing -> True
+  | UnaryRep rep <- repType ty
+  , Just tc <- tyConAppTyCon_maybe rep
+  , isDataTyCon tc
+  = False
+  | otherwise
+  = True
 \end{code}
 
 @mkConLFInfo@ is similar, for constructors.
@@ -404,7 +410,7 @@ mkSelectorLFInfo id offset updatable
   = LFThunk NotTopLevel False updatable (SelectorThunk offset) 
 	(might_be_a_function (idType id))
 
-mkApLFInfo :: Id -> UpdateFlag -> Int -> LambdaFormInfo
+mkApLFInfo :: Id -> UpdateFlag -> RepArity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
   = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
 	(might_be_a_function (idType id))
@@ -416,12 +422,12 @@ Miscellaneous LF-infos.
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id = LFUnknown (might_be_a_function (idType id))
 
-mkLFLetNoEscape :: Int -> LambdaFormInfo
+mkLFLetNoEscape :: RepArity -> LambdaFormInfo
 mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
-  = case idArity id of
+  = case idRepArity id of
       n | n > 0 -> LFReEntrant TopLevel n True (panic "arg_descr")  -- n > 0
       _ -> mkLFArgument id -- Not sure of exact arity
 \end{code}
@@ -634,13 +640,13 @@ data CallMethod
 
   | DirectEntry 			-- Jump directly, with args in regs
 	CLabel 				--   The code label
-	Int 				--   Its arity
+	RepArity			--   Its arity
 
 getCallMethod :: DynFlags
               -> Name		-- Function being applied
               -> CafInfo        -- Can it refer to CAF's?
 	      -> LambdaFormInfo	-- Its info
-	      -> Int		-- Number of available arguments
+	      -> RepArity	-- Number of available arguments
 	      -> CallMethod
 
 getCallMethod _ _ _ lf_info _
@@ -725,7 +731,7 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
         LFLetNoEscape _           -> False
-        LFThunk _ no_fvs _updatable _ _ -> not no_fvs -- to plug space-leaks.
+        LFThunk _ _no_fvs _updatable _ _ -> True
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isKnownFun :: LambdaFormInfo -> Bool
@@ -911,11 +917,11 @@ isConstrClosure_maybe :: ClosureInfo -> Maybe DataCon
 isConstrClosure_maybe (ConInfo { closureCon = data_con }) = Just data_con
 isConstrClosure_maybe _ 				  = Nothing
 
-closureFunInfo :: ClosureInfo -> Maybe (Int, ArgDescr)
+closureFunInfo :: ClosureInfo -> Maybe (RepArity, ArgDescr)
 closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
 closureFunInfo _ = Nothing
 
-lfFunInfo :: LambdaFormInfo ->  Maybe (Int, ArgDescr)
+lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
 lfFunInfo _                                 = Nothing
 
@@ -935,7 +941,7 @@ funTagLFInfo lf
   | otherwise
   = 0
 
-tagForArity :: Int -> Maybe Int
+tagForArity :: RepArity -> Maybe Int
 tagForArity i | i <= mAX_PTR_TAG = Just i
               | otherwise        = Nothing
 

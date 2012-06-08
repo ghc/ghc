@@ -8,20 +8,13 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Panic (
      GhcException(..), showGhcException, throwGhcException, handleGhcException,
      ghcError, progName,
      pgmError,
 
      panic, sorry, panicFastInt, assertPanic, trace,
-     
+
      Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
      installSignalHandlers,
@@ -37,7 +30,7 @@ import Data.Dynamic
 #if __GLASGOW_HASKELL__ < 705
 import Data.Maybe
 #endif
-import Debug.Trace	  ( trace )
+import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Exit
 import System.Environment
@@ -62,31 +55,31 @@ import System.Mem.Weak  ( Weak, deRefWeak )
 --   error messages all take the form:
 --
 --  @
---	<location>: <error>
+--      <location>: <error>
 --  @
--- 
---   If the location is on the command line, or in GHC itself, then 
---   <location>="ghc".  All of the error types below correspond to 
+--
+--   If the location is on the command line, or in GHC itself, then
+--   <location>="ghc".  All of the error types below correspond to
 --   a <location> of "ghc", except for ProgramError (where the string is
 --  assumed to contain a location already, so we don't print one).
 
 data GhcException
-  = PhaseFailed  String		-- name of phase 
-  		 ExitCode	-- an external phase (eg. cpp) failed
+  = PhaseFailed  String         -- name of phase
+                 ExitCode       -- an external phase (eg. cpp) failed
 
   -- | Some other fatal signal (SIGHUP,SIGTERM)
-  | Signal Int 
+  | Signal Int
 
   -- | Prints the short usage msg after the error
-  | UsageError   String		
+  | UsageError   String
 
   -- | A problem with the command line arguments, but don't print usage.
   | CmdLineError String
 
   -- | The 'impossible' happened.
-  | Panic        String		
+  | Panic        String
 
-  -- | The user tickled something that's known not to work yet, 
+  -- | The user tickled something that's known not to work yet,
   --   but we're not counting it as a bug.
   | Sorry        String
 
@@ -137,36 +130,36 @@ safeShowException e = do
 showGhcException :: GhcException -> String -> String
 showGhcException exception
  = case exception of
-	UsageError str
-   	 -> showString str . showChar '\n' . showString short_usage
+        UsageError str
+         -> showString str . showChar '\n' . showString short_usage
 
-	PhaseFailed phase code
-	 -> showString "phase `" . showString phase . 
-	    showString "' failed (exitcode = " . shows (int_code code) . 
-	    showString ")"
+        PhaseFailed phase code
+         -> showString "phase `" . showString phase .
+            showString "' failed (exitcode = " . shows (int_code code) .
+            showString ")"
 
-	CmdLineError str	-> showString str
-	ProgramError str	-> showString str
-	InstallationError str	-> showString str
-	Signal n		-> showString "signal: " . shows n
+        CmdLineError str        -> showString str
+        ProgramError str        -> showString str
+        InstallationError str   -> showString str
+        Signal n                -> showString "signal: " . shows n
 
-	Panic s
-	 -> showString $
-		"panic! (the 'impossible' happened)\n"
-		++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
-	        ++ s ++ "\n\n"
-	        ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n"
+        Panic s
+         -> showString $
+                "panic! (the 'impossible' happened)\n"
+                ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
+                ++ s ++ "\n\n"
+                ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n"
 
-	Sorry s
-   	 -> showString $
-		"sorry! (unimplemented feature or known bug)\n"
-		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
-	         ++ s ++ "\n"
+        Sorry s
+         -> showString $
+                "sorry! (unimplemented feature or known bug)\n"
+                 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
+                 ++ s ++ "\n"
 
-  where	int_code code = 
-      	  case code of
-        	ExitSuccess   -> (0::Int)
-		ExitFailure x -> x
+  where int_code code =
+          case code of
+                ExitSuccess   -> (0::Int)
+                ExitFailure x -> x
 
 
 -- | Alias for `throwGhcException`
@@ -205,8 +198,8 @@ panicFastInt s = case (panic s) of () -> _ILIT(0)
 
 -- | Throw an failed assertion exception for a given filename and line number.
 assertPanic :: String -> Int -> a
-assertPanic file line = 
-  Exception.throw (Exception.AssertionFailed 
+assertPanic file line =
+  Exception.throw (Exception.AssertionFailed
            ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
 
 
@@ -253,7 +246,7 @@ installSignalHandlers = do
 
   --
 #if !defined(mingw32_HOST_OS)
-  _ <- installHandler sigQUIT  (Catch interrupt) Nothing 
+  _ <- installHandler sigQUIT  (Catch interrupt) Nothing
   _ <- installHandler sigINT   (Catch interrupt) Nothing
   -- see #3656; in the future we should install these automatically for
   -- all Haskell programs in the same way that we install a ^C handler.

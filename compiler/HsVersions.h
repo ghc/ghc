@@ -46,18 +46,9 @@ name :: IORef (ty);                 \
 name = Util.globalM (value);
 #endif
 
-#ifdef DEBUG
-#define ASSERT(e)      if (not (e)) then (assertPanic __FILE__ __LINE__) else
-#define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
+#define ASSERT(e)      if debugIsOn && not (e) then (assertPanic __FILE__ __LINE__) else
+#define ASSERT2(e,msg) if debugIsOn && not (e) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg)) $
-#else
--- We have to actually use all the variables we are given or we may get
--- unused variable warnings when DEBUG is off.
-#define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
-#define ASSERT2(e,msg) if False && (const False (e,msg)) then pprPanic "ASSERT2" (msg) else
-#define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
--- Here we deliberately don't use when as Control.Monad might not be imported
-#endif
 
 -- Examples:   Assuming   flagSet :: String -> m Bool
 -- 

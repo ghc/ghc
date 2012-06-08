@@ -985,7 +985,7 @@ cond_typeableOK :: Condition
 --	      (b) 7 or fewer args
 cond_typeableOK (_, tc)
   | tyConArity tc > 7 = Just too_many
-  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars tc))
+  | not (all (isSubOpenTypeKind . tyVarKind) (tyConTyVars tc))
                       = Just bad_kind
   | otherwise	      = Nothing
   where

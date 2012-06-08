@@ -15,7 +15,6 @@ Typechecking class declarations
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
-                    mkGenericDefMethBind,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
 		    tcAddDeclCtxt, badMethodErr
 		  ) where
@@ -41,13 +40,12 @@ import NameEnv
 import NameSet
 import Var
 import Outputable
-import DynFlags
-import ErrUtils
 import SrcLoc
 import Maybes
 import BasicTypes
 import Bag
 import FastString
+import Util
 
 import Control.Monad
 \end{code}
@@ -346,52 +344,6 @@ and wrap it in a let, thus
 	  $dmop2 = let op2 = e in op2
 This makes the error messages right.
 
-
-%************************************************************************
-%*									*
-	Extracting generic instance declaration from class declarations
-%*									*
-%************************************************************************
-
-@getGenericInstances@ extracts the generic instance declarations from a class
-declaration.  For exmaple
-
-	class C a where
-	  op :: a -> a
-	
-	  op{ x+y } (Inl v)   = ...
-	  op{ x+y } (Inr v)   = ...
-	  op{ x*y } (v :*: w) = ...
-	  op{ 1   } Unit      = ...
-
-gives rise to the instance declarations
-
-	instance C (x+y) where
-	  op (Inl v)   = ...
-	  op (Inr v)   = ...
-	
-	instance C (x*y) where
-	  op (v :*: w) = ...
-
-	instance C 1 where
-	  op Unit      = ...
-
-\begin{code}
-mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
-mkGenericDefMethBind clas inst_tys sel_id dm_name
-  = 	-- A generic default method
-    	-- If the method is defined generically, we only have to call the
-        -- dm_name.
-    do	{ dflags <- getDynFlags
-	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
-		   (vcat [ppr clas <+> ppr inst_tys,
-			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
-
-        ; return (noLoc $ mkTopFunBind (noLoc (idName sel_id))
-                                       [mkSimpleMatch [] rhs]) }
-  where
-    rhs = nlHsVar dm_name
-\end{code}
 
 %************************************************************************
 %*									*

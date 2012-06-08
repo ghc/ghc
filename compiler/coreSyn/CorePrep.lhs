@@ -8,11 +8,12 @@ Core pass to saturate constructors and PrimOps
 {-# LANGUAGE BangPatterns #-}
 
 module CorePrep (
-      corePrepPgm, corePrepExpr
+      corePrepPgm, corePrepExpr, cvtLitInteger
   ) where
 
 #include "HsVersions.h"
 
+import HscTypes
 import PrelNames
 import CoreUtils
 import CoreArity
@@ -24,6 +25,8 @@ import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
 import Type
 import Literal
 import Coercion
+import TcEnv
+import TcRnMonad
 import TyCon
 import Demand
 import Var
@@ -43,7 +46,6 @@ import DynFlags
 import Util
 import Pair
 import Outputable
-import MonadUtils
 import FastString
 import Config
 import Data.Bits
@@ -100,8 +102,8 @@ The goal of this pass is to prepare for code generation.
 
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.lhs
 
-10. Convert (LitInteger i mkInteger) into the core representation
-    for the Integer i. Normally this uses the mkInteger Id, but if
+10. Convert (LitInteger i t) into the core representation
+    for the Integer i. Normally this uses mkInteger, but if
     we are using the integer-gmp implementation then there is a
     special case where we use the S# constructor for Integers that
     are in the range of Int.
@@ -150,35 +152,37 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 %************************************************************************
 
 \begin{code}
-corePrepPgm :: DynFlags -> CoreProgram -> [TyCon] -> IO CoreProgram
-corePrepPgm dflags binds data_tycons = do
+corePrepPgm :: DynFlags -> HscEnv -> CoreProgram -> [TyCon] -> IO CoreProgram
+corePrepPgm dflags hsc_env binds data_tycons = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
+    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
     let implicit_binds = mkDataConWorkers data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
             -- so that they are suitably cloned and eta-expanded
 
         binds_out = initUs_ us $ do
-                      floats1 <- corePrepTopBinds binds
-                      floats2 <- corePrepTopBinds implicit_binds
+                      floats1 <- corePrepTopBinds initialCorePrepEnv binds
+                      floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
     endPass dflags CorePrep binds_out []
     return binds_out
 
-corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
-corePrepExpr dflags expr = do
+corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
+corePrepExpr dflags hsc_env expr = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
-    let new_expr = initUs_ us (cpeBodyNF emptyCorePrepEnv expr)
+    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
     dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" (ppr new_expr)
     return new_expr
 
-corePrepTopBinds :: [CoreBind] -> UniqSM Floats
+corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats
 -- Note [Floating out of top level bindings]
-corePrepTopBinds binds
-  = go emptyCorePrepEnv binds
+corePrepTopBinds initialCorePrepEnv binds
+  = go initialCorePrepEnv binds
   where
     go _   []             = return emptyFloats
     go env (bind : binds) = do (env', bind') <- cpeBind TopLevel env bind
@@ -463,8 +467,8 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
-cpeRhsE env (Lit (LitInteger i mk_integer))
-    = cpeRhsE env (cvtLitInteger i mk_integer)
+cpeRhsE env (Lit (LitInteger i _))
+    = cpeRhsE env (cvtLitInteger (getMkIntegerId env) i)
 cpeRhsE _env expr@(Lit {})       = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})        = cpeApp env expr
 
@@ -514,13 +518,13 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: Integer -> Id -> CoreExpr
+cvtLitInteger :: Id -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
 -- represenation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
 -- See Note [Integer literals] in Literal
-cvtLitInteger i mk_integer
+cvtLitInteger mk_integer i
   | cIntegerLibraryType == IntegerGMP
   , inIntRange i       -- Special case for small integers in GMP
     = mkConApp integerGmpSDataCon [Lit (mkMachInt i)]
@@ -1144,22 +1148,31 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
-data CorePrepEnv = CPE (IdEnv Id)       -- Clone local Ids
+data CorePrepEnv = CPE (IdEnv Id) -- Clone local Ids
+                       Id         -- mkIntegerId
 
-emptyCorePrepEnv :: CorePrepEnv
-emptyCorePrepEnv = CPE emptyVarEnv
+mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
+mkInitialCorePrepEnv hsc_env
+    = do mkIntegerId <- liftM tyThingId
+                      $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
+         return $ CPE emptyVarEnv mkIntegerId
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv (CPE env) id id' = CPE (extendVarEnv env id id')
+extendCorePrepEnv (CPE env mkIntegerId) id id'
+    = CPE (extendVarEnv env id id') mkIntegerId
 
 extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
-extendCorePrepEnvList (CPE env) prs = CPE (extendVarEnvList env prs)
+extendCorePrepEnvList (CPE env mkIntegerId) prs
+    = CPE (extendVarEnvList env prs) mkIntegerId
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
-lookupCorePrepEnv (CPE env) id
+lookupCorePrepEnv (CPE env _) id
   = case lookupVarEnv env id of
         Nothing  -> id
         Just id' -> id'
+
+getMkIntegerId :: CorePrepEnv -> Id
+getMkIntegerId (CPE _ mkIntegerId) = mkIntegerId
 
 ------------------------------------------------------------------------------
 -- Cloning binders

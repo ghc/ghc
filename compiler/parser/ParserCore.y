@@ -18,7 +18,7 @@ import OccName
 import TypeRep ( TyThing(..) )
 import Type ( Kind,
               liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
-              argTypeKindTyCon, ubxTupleKindTyCon, mkTyConApp
+              mkTyConApp
             )
 import Kind( mkArrowKind )
 import Name( Name, nameOccName, nameModule, mkExternalName, wiredInNameTyThing_maybe )

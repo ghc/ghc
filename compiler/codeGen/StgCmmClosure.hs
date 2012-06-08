@@ -21,8 +21,8 @@ module StgCmmClosure (
         DynTag,  tagForCon, isSmallFamily,
 	ConTagZ, dataConTagZ,
 
-        isVoidRep, isGcPtrRep, addIdReps, addArgReps,
-	argPrimRep, 
+        idPrimRep, isVoidRep, isGcPtrRep, addIdReps, addArgReps,
+	argPrimRep,
 
         -- * LambdaFormInfo
         LambdaFormInfo,         -- Abstract
@@ -90,12 +90,17 @@ import Outputable
 import Platform
 import Constants
 import DynFlags
+import Util
 
 -----------------------------------------------------------------------------
 --		Representations
 -----------------------------------------------------------------------------
 
 -- Why are these here?
+
+-- NB: this is reliable because by StgCmm no Ids have unboxed tuple type
+idPrimRep :: Id -> PrimRep
+idPrimRep id = typePrimRep (idType id)
 
 addIdReps :: [Id] -> [(PrimRep, Id)]
 addIdReps ids = [(idPrimRep id, id) | id <- ids]
@@ -127,7 +132,7 @@ isGcPtrRep _      = False
 data LambdaFormInfo
   = LFReEntrant		-- Reentrant closure (a function)
 	TopLevelFlag	-- True if top level
-	!Int		-- Arity. Invariant: always > 0
+	!RepArity		-- Arity. Invariant: always > 0
 	!Bool		-- True <=> no fvs
 	ArgDescr	-- Argument descriptor (should really be in ClosureInfo)
 
@@ -188,7 +193,7 @@ data StandardFormInfo
 	-- The code for the thunk just pushes x2..xn on the stack and enters x1.
 	-- There are a few of these (for 1 <= n <= MAX_SPEC_AP_SIZE) pre-compiled
 	-- in the RTS to save space.
-	Int		-- Arity, n
+	RepArity		-- Arity, n
 
 
 ------------------------------------------------------
@@ -231,9 +236,12 @@ might_be_a_function :: Type -> Bool
 -- Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as poss
 might_be_a_function ty
-  = case tyConAppTyCon_maybe (repType ty) of
-	Just tc -> not (isDataTyCon tc)
-	Nothing -> True
+  | UnaryRep rep <- repType ty
+  , Just tc <- tyConAppTyCon_maybe rep
+  , isDataTyCon tc
+  = False
+  | otherwise
+  = True
 
 -------------
 mkConLFInfo :: DataCon -> LambdaFormInfo
@@ -266,7 +274,7 @@ mkLFImported id
   | otherwise
   = mkLFArgument id -- Not sure of exact arity
   where
-    arity = idArity id
+    arity = idRepArity id
 
 ------------
 mkLFBlackHole :: LambdaFormInfo
@@ -309,7 +317,7 @@ tagForCon con
     con_tag  = dataConTagZ con
     fam_size = tyConFamilySize (dataConTyCon con)
 
-tagForArity :: Int -> DynTag
+tagForArity :: RepArity -> DynTag
 tagForArity arity | isSmallFamily arity = arity
                   | otherwise           = 0
 
@@ -458,13 +466,13 @@ data CallMethod
 
   | DirectEntry 	-- Jump directly, with args in regs
 	CLabel 		--   The code label
-	Int 		--   Its arity
+	RepArity 		--   Its arity
 
 getCallMethod :: DynFlags
               -> Name           -- Function being applied
               -> CafInfo        -- Can it refer to CAF's?
 	      -> LambdaFormInfo	-- Its info
-	      -> Int		-- Number of available arguments
+	      -> RepArity		-- Number of available arguments
 	      -> CallMethod
 
 getCallMethod _ _name _ lf_info _n_args
@@ -720,7 +728,7 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
 	LFLetNoEscape 		  -> False
-        LFThunk _ no_fvs _updatable _ _ -> not no_fvs -- to plug space-leaks.
+        LFThunk _ _no_fvs _updatable _ _ -> True
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isStaticClosure :: ClosureInfo -> Bool
@@ -744,10 +752,10 @@ closureReEntrant :: ClosureInfo -> Bool
 closureReEntrant (ClosureInfo { closureLFInfo = LFReEntrant _ _ _ _ }) = True
 closureReEntrant _ = False
 
-closureFunInfo :: ClosureInfo -> Maybe (Int, ArgDescr)
+closureFunInfo :: ClosureInfo -> Maybe (RepArity, ArgDescr)
 closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
 
-lfFunInfo :: LambdaFormInfo ->  Maybe (Int, ArgDescr)
+lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
 lfFunInfo _                                 = Nothing
 

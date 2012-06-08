@@ -503,13 +503,13 @@ mkDictSelId no_unf name clas
 				--   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
 dictSelRule :: Int -> Arity 
-            -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+            -> Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 -- Tries to persuade the argument to look like a constructor
 -- application, using exprIsConApp_maybe, and then selects
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
-dictSelRule val_index n_ty_args id_unf args
+dictSelRule val_index n_ty_args _ id_unf args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
   = Just (con_args !! val_index)
@@ -920,12 +920,12 @@ seqId = pcMiscPrelId seqName ty info
                                 , ru_try   = match_seq_of_cast
                                 }
 
-match_seq_of_cast :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+match_seq_of_cast :: Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
     -- See Note [Built-in RULES for seq]
-match_seq_of_cast _ [Type _, Type res_ty, Cast scrut co, expr]
+match_seq_of_cast _ _ [Type _, Type res_ty, Cast scrut co, expr]
   = Just (Var seqId `mkApps` [Type (pFst (coercionKind co)), Type res_ty,
                               scrut, expr])
-match_seq_of_cast _ _ = Nothing
+match_seq_of_cast _ _ _ = Nothing
 
 ------------------------------------------------
 lazyId :: Id	-- See Note [lazyId magic]

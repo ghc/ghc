@@ -37,7 +37,7 @@ module RnEnv (
 	extendTyVarEnvFVRn,
 
 	checkDupRdrNames, checkShadowedRdrNames,
-        checkDupNames, checkDupAndShadowedNames, 
+        checkDupNames, checkDupAndShadowedNames, checkTupSize,
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
@@ -61,7 +61,8 @@ import NameEnv
 import Avail
 import Module           ( ModuleName, moduleName )
 import UniqFM
-import DataCon		( dataConFieldLabels )
+import DataCon		( dataConFieldLabels, dataConTyCon )
+import TyCon            ( isTupleTyCon, tyConArity ) 
 import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils		( MsgDoc )
 import SrcLoc
@@ -73,6 +74,7 @@ import DynFlags
 import FastString
 import Control.Monad
 import qualified Data.Set as Set
+import Constants	( mAX_TUPLE_SIZE )
 \end{code}
 
 \begin{code}
@@ -234,8 +236,18 @@ lookupTopBndrRn_maybe rdr_name
 lookupExactOcc :: Name -> RnM Name
 -- See Note [Looking up Exact RdrNames]
 lookupExactOcc name
+  | Just thing <- wiredInNameTyThing_maybe name
+  , Just tycon <- case thing of
+                    ATyCon tc   -> Just tc
+                    ADataCon dc -> Just (dataConTyCon dc)
+                    _           -> Nothing
+  , isTupleTyCon tycon
+  = do { checkTupSize (tyConArity tycon)
+       ; return name }
+
   | isExternalName name 
   = return name
+
   | otherwise           
   = do { env <- getGlobalRdrEnv
        ; let -- See Note [Splicing Exact names] 
@@ -258,8 +270,8 @@ lookupExactOcc name
 
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (vcat [ ptext (sLit "Probable cause: you used a unique name (NameU), perhaps via newName,")
-                              , ptext (sLit "in Template Haskell, but did not bind it")
+                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
+                              , ptext (sLit "perhaps via newName, but did not bind it")
                               , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
 
 -----------------------------------------------
@@ -1649,6 +1661,15 @@ opDeclErr :: RdrName -> SDoc
 opDeclErr n 
   = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
        2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
+
+checkTupSize :: Int -> RnM ()
+checkTupSize tup_size
+  | tup_size <= mAX_TUPLE_SIZE 
+  = return ()
+  | otherwise		       
+  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
+		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
 \end{code}
 
 

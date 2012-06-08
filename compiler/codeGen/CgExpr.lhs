@@ -480,7 +480,7 @@ Little helper for primitives that return unboxed tuples.
 newUnboxedTupleRegs :: Type -> FCode ([CgRep], [LocalReg], [ForeignHint])
 newUnboxedTupleRegs res_ty =
    let
-	ty_args = tyConAppArgs (repType res_ty)
+	UbxTupleRep ty_args = repType res_ty
 	(reps,hints) = unzip [ (rep, typeForeignHint ty) | ty <- ty_args,
 					   	    let rep = typeCgRep ty,
 					 	    nonVoidArg rep ]

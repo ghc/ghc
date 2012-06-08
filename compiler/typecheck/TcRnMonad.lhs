@@ -44,6 +44,7 @@ import UniqSupply
 import Unique
 import UniqFM
 import DynFlags
+import Maybes
 import StaticFlags
 import FastString
 import Panic
@@ -185,6 +186,9 @@ initTcPrintErrors       -- Used from the interactive loop only
        -> IO (Messages, Maybe r)
 
 initTcPrintErrors env mod todo = initTc env HsSrcFile False mod todo
+
+initTcForLookup :: HscEnv -> TcM a -> IO a
+initTcForLookup hsc_env = liftM (expectJust "initTcInteractive" . snd) . initTc hsc_env HsSrcFile False iNTERACTIVE
 \end{code}
 
 %************************************************************************

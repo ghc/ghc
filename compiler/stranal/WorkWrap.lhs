@@ -27,7 +27,7 @@ import BasicTypes
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import WwLib
-import Util		( lengthIs, notNull )
+import Util
 import Outputable
 import MonadUtils
 

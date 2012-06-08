@@ -76,6 +76,8 @@ import Bag              ( Bag, emptyBag, consBag )
 import Outputable
 import FastString
 import Maybes
+import Util
+
 import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP

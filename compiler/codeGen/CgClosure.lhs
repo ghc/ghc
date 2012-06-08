@@ -506,9 +506,10 @@ setupUpdate closure_info code
       else do
           tickyPushUpdateFrame
           dflags <- getDynFlags
-          if not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
-              then pushBHUpdateFrame (CmmReg nodeReg) code
-              else pushUpdateFrame   (CmmReg nodeReg) code
+          if blackHoleOnEntry closure_info &&
+             not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+               then pushBHUpdateFrame (CmmReg nodeReg) code
+               else pushUpdateFrame   (CmmReg nodeReg) code
   
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info

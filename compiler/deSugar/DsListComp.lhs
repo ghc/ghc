@@ -33,6 +33,7 @@ import SrcLoc
 import Outputable
 import FastString
 import TcType
+import Util
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''

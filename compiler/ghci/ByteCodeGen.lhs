@@ -271,8 +271,12 @@ collect :: AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
 collect (_, e) = go [] e
   where
     go xs e | Just e' <- bcView e = go xs e'
-    go xs (AnnLam x (_,e))        = go (x:xs) e
-    go xs not_lambda              = (reverse xs, not_lambda)
+    go xs (AnnLam x (_,e)) 
+      | UbxTupleRep _ <- repType (idType x)
+      = unboxedTupleException
+      | otherwise
+      = go (x:xs) e
+    go xs not_lambda = (reverse xs, not_lambda)
 
 schemeR_wrk :: [Id] -> Id -> AnnExpr Id VarSet -> ([Var], AnnExpr' Var VarSet) -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
@@ -486,7 +490,7 @@ schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
         -- no alts: scrut is guaranteed to diverge
 
 schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1, bind2], rhs)])
-   | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
+   | isUnboxedTupleCon dc, UnaryRep rep_ty <- repType (idType bind1), VoidRep <- typePrimRep rep_ty
         -- Convert
         --      case .... of x { (# VoidArg'd-thing, a #) -> ... }
         -- to
@@ -499,12 +503,12 @@ schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1, bind2], rhs)])
    = --trace "automagic mashing of case alts (# VoidArg, a #)" $
      doCase d s p scrut bind2 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
-   | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind2)
+   | isUnboxedTupleCon dc, UnaryRep rep_ty <- repType (idType bind2), VoidRep <- typePrimRep rep_ty
    = --trace "automagic mashing of case alts (# a, VoidArg #)" $
      doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
 schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1], rhs)])
-   | isUnboxedTupleCon dc
+   | isUnboxedTupleCon dc, UnaryRep _ <- repType (idType bind1)
         -- Similarly, convert
         --      case .... of x { (# a #) -> ... }
         -- to
@@ -603,7 +607,8 @@ schemeT d s p app
       -- Detect and extract relevant info for the tagToEnum kludge.
       maybe_is_tagToEnum_call
          = let extract_constr_Names ty
-                 | Just tyc <- tyConAppTyCon_maybe (repType ty),
+                 | UnaryRep rep_ty <- repType ty
+                 , Just tyc <- tyConAppTyCon_maybe rep_ty,
                    isDataTyCon tyc
                    = map (getName . dataConWorkId) (tyConDataCons tyc)
                    -- NOTE: use the worker name, not the source name of
@@ -746,6 +751,9 @@ doCase  :: Word -> Sequel -> BCEnv
         -> Bool  -- True <=> is an unboxed tuple case, don't enter the result
         -> BcM BCInstrList
 doCase d s p (_,scrut) bndr alts is_unboxed_tuple
+  | UbxTupleRep _ <- repType (idType bndr)
+  = unboxedTupleException
+  | otherwise
   = let
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
@@ -785,6 +793,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | null real_bndrs = do
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
+           | any (\bndr -> case repType (idType bndr) of UbxTupleRep _ -> True; _ -> False) bndrs
+           = unboxedTupleException
            -- algebraic alt with some binders
            | otherwise =
              let
@@ -903,7 +913,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
          pargs _ [] = return []
          pargs d (a:az)
-            = let arg_ty = repType (exprType (deAnnotate' a))
+            = let UnaryRep arg_ty = repType (exprType (deAnnotate' a))
 
               in case tyConAppTyCon_maybe arg_ty of
                     -- Don't push the FO; instead push the Addr# it
@@ -1107,13 +1117,11 @@ maybe_getCCallReturnRep fn_ty
    = let (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
          maybe_r_rep_to_go
             = if isSingleton r_reps then Nothing else Just (r_reps !! 1)
-         (r_tycon, r_reps)
-            = case splitTyConApp_maybe (repType r_ty) of
-                      (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
-                      Nothing -> blargh
+         r_reps = case repType r_ty of
+                      UbxTupleRep reps -> map typePrimRep reps
+                      UnaryRep _       -> blargh
          ok = ( ( r_reps `lengthIs` 2 && VoidRep == head r_reps)
                 || r_reps == [VoidRep] )
-              && isUnboxedTupleTyCon r_tycon
               && case maybe_r_rep_to_go of
                     Nothing    -> True
                     Just r_rep -> r_rep /= PtrRep
