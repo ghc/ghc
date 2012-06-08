@@ -144,6 +144,7 @@ endif
 include rules/prof.mk
 include rules/trace.mk
 include rules/make-command.mk
+include rules/pretty_commands.mk
 
 # -----------------------------------------------------------------------------
 # Macros for standard targets

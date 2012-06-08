@@ -55,6 +55,13 @@ $1_$2_MORE_HC_OPTS += -no-user-package-db
 $1_$2_MORE_HC_OPTS += -rtsopts
 endif
 
+# Used by pretty_commands.mk
+label_$1_$2_CC=CC
+label_$1_$2_AS=AS
+label_$1_$2_AR=AR
+label_$1_$2_HC=HC [stage $3]
+label_$1_$2_GHC_PKG=GHC PKG
+
 # Useful later
 $1_$2_SLASH_MODS = $$(subst .,/,$$($1_$2_MODULES))
 
