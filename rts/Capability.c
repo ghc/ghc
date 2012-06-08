@@ -679,18 +679,22 @@ waitForReturnCapability (Capability **pCap, Task *task)
  * yieldCapability
  * ------------------------------------------------------------------------- */
 
-void
-yieldCapability (Capability** pCap, Task *task)
+/* See Note [GC livelock] in Schedule.c for why we have gcAllowed
+   and return the rtsBool */
+rtsBool /* Did we GC? */
+yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
 {
     Capability *cap = *pCap;
 
-    if (pending_sync == SYNC_GC_PAR) {
+    if ((pending_sync == SYNC_GC_PAR) && gcAllowed) {
         traceEventGcStart(cap);
         gcWorkerThread(cap);
         traceEventGcEnd(cap);
         traceSparkCounters(cap);
         // See Note [migrated bound threads 2]
-        if (task->cap == cap) return;
+        if (task->cap == cap) {
+            return rtsTrue;
+        }
     }
 
 	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
@@ -756,7 +760,7 @@ yieldCapability (Capability** pCap, Task *task)
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    return;
+    return rtsFalse;
 }
 
 // Note [migrated bound threads]

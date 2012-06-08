@@ -728,7 +728,7 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
 	LFLetNoEscape 		  -> False
-        LFThunk _ no_fvs _updatable _ _ -> not no_fvs -- to plug space-leaks.
+        LFThunk _ _no_fvs _updatable _ _ -> True
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isStaticClosure :: ClosureInfo -> Bool
