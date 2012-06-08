@@ -379,3 +379,4 @@ test('T5792',normal,run_command,
 test('PolytypeDecomp', normal, compile, [''])
 test('T6011', normal, compile, [''])
 test('T6055', normal, compile, [''])
+test('T6134', normal, compile, [''])
