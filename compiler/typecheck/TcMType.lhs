@@ -1537,12 +1537,15 @@ not converge.  See Trac #5287.
 
 \begin{code}
 validDerivPred :: TyVarSet -> PredType -> Bool
-validDerivPred tv_set ty = case getClassPredTys_maybe ty of
-  Just (_, tys) | let fvs = fvTypes tys
-                -> hasNoDups fvs 
-                && sizeTypes tys == length fvs
-                && all (`elemVarSet` tv_set) fvs
-  _ -> False
+validDerivPred tv_set pred
+  = case classifyPredType pred of
+       ClassPred _ tys -> hasNoDups fvs 
+                       && sizeTypes tys == length fvs
+                       && all (`elemVarSet` tv_set) fvs
+       TuplePred ps -> all (validDerivPred tv_set) ps
+       _            -> True   -- Non-class predicates are ok
+  where
+    fvs = fvType pred
 \end{code}
 
 
