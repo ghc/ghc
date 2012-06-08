@@ -16,7 +16,7 @@ module TcSMonad (
     extendWorkListEq, extendWorkListNonEq, extendWorkListCt, 
     appendWorkListCt, appendWorkListEqs, unionWorkList, selectWorkItem,
 
-    getTcSWorkList, updWorkListTcS, updWorkListTcS_return, keepWanted,
+    getTcSWorkList, updWorkListTcS, updWorkListTcS_return,
     getTcSWorkListTvs, 
     
     getTcSImplics, updTcSImplics, emitTcSImplication, 
@@ -27,17 +27,15 @@ module TcSMonad (
     isWanted, isDerived, 
     isGivenCt, isWantedCt, isDerivedCt, pprFlavorArising,
 
-    isFlexiTcsTv,
+    isFlexiTcsTv, instFlexiTcSHelperTcS,
 
     canRewrite, canSolve,
     mkGivenLoc, ctWantedLoc,
 
-    TcS, runTcS, failTcS, panicTcS, traceTcS, -- Basic functionality 
+    TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality 
     traceFireTcS, bumpStepCountTcS, doWithInert,
     tryTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
-
-    SimplContext(..), isInteractive, performDefaulting,
 
     -- Getting and setting the flattening cache
     getFlatCache, updFlatCache, addToSolved, addSolvedFunEq,
@@ -50,7 +48,7 @@ module TcSMonad (
 
     xCtFlavor, -- Transform a CtEvidence during a step 
     rewriteCtFlavor,          -- Specialized version of xCtFlavor for coercions
-    newWantedEvVar, instDFunConstraints, newKindConstraint,
+    newWantedEvVar, instDFunConstraints,
     newDerived,
     xCtFlavor_cache, rewriteCtFlavor_cache,
     
@@ -59,7 +57,7 @@ module TcSMonad (
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
-    getTcEvBindsMap, getTcSContext, getTcSTyBinds, getTcSTyBindsMap,
+    getTcEvBindsMap, getTcSTyBinds, getTcSTyBindsMap,
 
 
     newFlattenSkolemTy,                         -- Flatten skolems 
@@ -276,11 +274,6 @@ instance Outputable WorkList where
                 , text "WorkList (rest)  = " <+> ppr (wl_rest wl)
                 ]
 
-keepWanted :: Cts -> Cts
-keepWanted = filterBag isWantedCt
-    -- DV: there used to be a note here that read: 
-    -- ``Important: use fold*r*Bag to preserve the order of the evidence variables'' 
-    -- DV: Is this still relevant? 
 
 -- Canonical constraint maps
 data CCanMap a = CCanMap { cts_given   :: UniqFM Cts
@@ -830,8 +823,6 @@ data TcSEnv
       
       tcs_ty_binds :: IORef (TyVarEnv (TcTyVar, TcType)),
           -- Global type bindings
-
-      tcs_context :: SimplContext,
                      
       tcs_untch :: TcsUntouchables,
 
@@ -853,24 +844,6 @@ type TcsUntouchables = (Untouchables,TcTyVarSet)
 \end{code}
 
 \begin{code}
-data SimplContext
-  = SimplInfer SDoc	   -- Inferring type of a let-bound thing
-  | SimplInteractive	   -- Inferring type at GHCi prompt
-  | SimplCheck SDoc	   -- Checking a type signature or RULE rhs
-
-instance Outputable SimplContext where
-  ppr (SimplInfer d)   = ptext (sLit "SimplInfer") <+> d
-  ppr (SimplCheck d)   = ptext (sLit "SimplCheck") <+> d
-  ppr SimplInteractive = ptext (sLit "SimplInteractive")
-
-isInteractive :: SimplContext -> Bool
-isInteractive SimplInteractive = True
-isInteractive _                = False
-
-performDefaulting :: SimplContext -> Bool
-performDefaulting (SimplInfer {})   = False
-performDefaulting SimplInteractive  = True
-performDefaulting (SimplCheck {})   = True
 
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } 
@@ -924,15 +897,11 @@ traceFireTcS depth doc
                 <> brackets (int depth) <+> doc
        ; TcM.dumpTcRn msg }
 
-runTcS :: SimplContext
-       -> Untouchables 	       -- Untouchables
-       -> InertSet             -- Initial inert set
-       -> WorkList             -- Initial work list
-       -> TcS a		       -- What to run
-       -> TcM (a, Bag EvBind)
-runTcS context untouch is wl tcs 
+runTcSWithEvBinds :: EvBindsVar
+                  -> TcS a 
+                  -> TcM a
+runTcSWithEvBinds ev_binds_var tcs
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
-       ; ev_binds_var <- TcM.newTcEvBinds
        ; impl_var <- TcM.newTcRef emptyBag
        ; step_count <- TcM.newTcRef 0
 
@@ -941,7 +910,6 @@ runTcS context untouch is wl tcs
 
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
-                          , tcs_context  = context
                           , tcs_untch    = (untouch, emptyVarSet) -- No Tcs untouchables yet
 			  , tcs_count    = step_count
 			  , tcs_ic_depth = 0
@@ -955,18 +923,27 @@ runTcS context untouch is wl tcs
        ; ty_binds <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
-       ; when debugIsOn $ do {
-             count <- TcM.readTcRef step_count
-           ; when (opt_PprStyle_Debug && count > 0) $
-             TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
-                                <+> int count <+> ppr context)
-         }
+       ; when debugIsOn $ 
+         do { count <- TcM.readTcRef step_count
+            ; when (opt_PprStyle_Debug && count > 0) $
+              TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count ) }
              -- And return
        ; ev_binds <- TcM.getTcEvBinds ev_binds_var
        ; checkForCyclicBinds ev_binds
-       ; return (res, ev_binds) }
+       ; return res }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
+    untouch = NoUntouchables
+    is = emptyInert
+    wl = emptyWorkList
+    
+runTcS :: TcS a		       -- What to run
+       -> TcM (a, Bag EvBind)
+runTcS tcs
+  = do { ev_binds_var <- TcM.newTcEvBinds
+       ; res <- runTcSWithEvBinds ev_binds_var tcs
+       ; ev_binds <- TcM.getTcEvBinds ev_binds_var
+       ; return (res, ev_binds) }
 
 checkForCyclicBinds :: Bag EvBind -> TcM ()
 #ifndef DEBUG
@@ -1001,7 +978,6 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
                    , tcs_untch = (_outer_range, outer_tcs)
                    , tcs_count = count
                    , tcs_ic_depth = idepth
-                   , tcs_context = ctxt
                    , tcs_inerts = inert_var
                    , tcs_worklist = wl_var 
                    , tcs_implics = _impl_var } -> 
@@ -1024,14 +1000,19 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
                                , tcs_untch       = inner_untch
                                , tcs_count       = count
                                , tcs_ic_depth    = idepth+1
-                               , tcs_context     = ctxt 
                                , tcs_inerts      = new_inert_var
                                , tcs_worklist    = wl_var 
                                -- NB: worklist is going to be empty anyway, 
                                -- so reuse the same ref cell
                                , tcs_implics     = new_implics_var
                                }
-       ; thing_inside nest_env } 
+       ; res <- thing_inside nest_env 
+                
+       -- Perform a check that the thing_inside did not cause cycles
+       ; ev_binds <- TcM.getTcEvBinds ref
+       ; checkForCyclicBinds ev_binds
+         
+       ; return res }
 
 recoverTcS :: TcS a -> TcS a -> TcS a
 recoverTcS (TcS recovery_code) (TcS thing_inside)
@@ -1127,8 +1108,6 @@ emitFrozenError fl depth
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
 
-getTcSContext :: TcS SimplContext
-getTcSContext = TcS (return . tcs_context)
 
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds) 
@@ -1232,11 +1211,8 @@ warnTcS loc warn_if doc
   | warn_if   = wrapTcS $ TcM.setCtLoc loc $ TcM.addWarnTc doc
   | otherwise = return ()
 
-getDefaultInfo ::  TcS (SimplContext, [Type], (Bool, Bool))
-getDefaultInfo 
-  = do { ctxt <- getTcSContext
-       ; (tys, flags) <- wrapTcS TcM.tcGetDefaultTys
-       ; return (ctxt, tys, flags) }
+getDefaultInfo ::  TcS ([Type], (Bool, Bool))
+getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
 -- Just get some environments needed for instance looking up and matching
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1279,7 +1255,7 @@ isTouchableMetaTyVar_InRange (untch,untch_tcs) tv
     case tcTyVarDetails tv of 
       MetaTv TcsTv _ -> not (tv `elemVarSet` untch_tcs)
                         -- See Note [Touchable meta type variables] 
-      MetaTv {}      -> inTouchableRange untch tv 
+      MetaTv {}      -> inTouchableRange untch tv && not (tv `elemVarSet` untch_tcs)
       _              -> False 
 
 
@@ -1369,6 +1345,8 @@ instFlexiTcSHelper tvname tvkind
              kind = tvkind 
        ; return (mkTyVarTy (mkTcTyVar name kind (MetaTv TcsTv ref))) }
 
+instFlexiTcSHelperTcS :: Name -> Kind -> TcS TcType
+instFlexiTcSHelperTcS n k = wrapTcS (instFlexiTcSHelper n k)
 
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1435,12 +1413,6 @@ newDerived loc pty
             Just {} -> return Nothing
             _       -> return (Just Derived { ctev_wloc = loc
                                             , ctev_pred = pty }) }
-    
-newKindConstraint :: WantedLoc -> TcTyVar -> Kind -> TcS MaybeNew
--- Create new wanted CoVar that constrains the type to have the specified kind. 
-newKindConstraint loc tv knd
-  = do { ty_k <- wrapTcS (instFlexiTcSHelper (tyVarName tv) knd)
-       ; newWantedEvVar loc (mkTcEqPred (mkTyVarTy tv) ty_k) }
 
 instDFunConstraints :: WantedLoc -> TcThetaType -> TcS [MaybeNew]
 instDFunConstraints wl = mapM (newWantedEvVar wl)
@@ -1593,29 +1565,27 @@ matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Maybe TcType]))
 matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 
         ; instEnvs <- getInstEnvs
---        ; traceTcS "matchClass" $ empty -- text "instEnvs=" <+> ppr instEnvs
         ; case lookupInstEnv instEnvs clas tys of {
-            ([], unifs, _)               -- Nothing matches  
-                -> do { traceTcS "matchClass not matching"
-                                 (vcat [ text "dict" <+> ppr pred, 
-                                         text "unifs" <+> ppr unifs,
-                                         ppr instEnvs ]) 
+            ([], _unifs, _)               -- Nothing matches  
+                -> do { traceTcS "matchClass not matching" $ 
+                        vcat [ text "dict" <+> ppr pred
+                             , ppr instEnvs ]
+                        
                       ; return MatchInstNo  
                       } ;  
 	    ([(ispec, inst_tys)], [], _) -- A single match 
 		-> do	{ let dfun_id = is_dfun ispec
-			; traceTcS "matchClass success"
-				   (vcat [text "dict" <+> ppr pred, 
-				          text "witness" <+> ppr dfun_id
-                                           <+> ppr (idType dfun_id) ])
+			; traceTcS "matchClass success" $
+                          vcat [text "dict" <+> ppr pred, 
+                                text "witness" <+> ppr dfun_id
+                                               <+> ppr (idType dfun_id) ]
 				  -- Record that this dfun is needed
                         ; return $ MatchInstSingle (dfun_id, inst_tys)
                         } ;
-     	    (matches, unifs, _)          -- More than one matches 
-		-> do	{ traceTcS "matchClass multiple matches, deferring choice"
-			           (vcat [text "dict" <+> ppr pred,
-				   	  text "matches" <+> ppr matches,
-				   	  text "unifs" <+> ppr unifs])
+     	    (matches, _unifs, _)          -- More than one matches 
+		-> do	{ traceTcS "matchClass multiple matches, deferring choice" $
+                          vcat [text "dict" <+> ppr pred,
+                                text "matches" <+> ppr matches]
                         ; return MatchInstMany 
 		        }
 	}

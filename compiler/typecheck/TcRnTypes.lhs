@@ -51,7 +51,7 @@ module TcRnTypes(
         Untouchables(..), inTouchableRange, isNoUntouchables,
 
        -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, 
+        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, keepWanted,
         singleCt, extendCts, isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt, 
@@ -917,6 +917,13 @@ ctEvidence = cc_ev
 
 ctPred :: Ct -> PredType 
 ctPred ct = ctEvPred (cc_ev ct)
+
+keepWanted :: Cts -> Cts
+keepWanted = filterBag isWantedCt
+    -- DV: there used to be a note here that read: 
+    -- ``Important: use fold*r*Bag to preserve the order of the evidence variables'' 
+    -- DV: Is this still relevant? 
+
 -- ToDo Check with Dimitrios
 {-
 ctPred (CNonCanonical { cc_ev = fl }) = ctEvPred fl

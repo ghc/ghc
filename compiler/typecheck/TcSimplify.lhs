@@ -24,6 +24,7 @@ import Inst
 import Unify	( niFixTvSubst, niSubstTvSet )
 import Type     ( classifyPredType, PredTree(..) )
 import Var
+import Unique
 import VarSet
 import VarEnv 
 import TcEvidence
@@ -51,32 +52,117 @@ import DynFlags
 *                                                                               *
 *********************************************************************************
 
+
 \begin{code}
+
+
 simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- Simplify top-level constraints
 -- Usually these will be implications,
 -- but when there is nothing to quantify we don't wrap
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds 
-  = simplifyCheck (SimplCheck (ptext (sLit "top level"))) wanteds
+  = do { ev_binds_var <- newTcEvBinds
+                         
+       ; zonked_wanteds <- zonkWC wanteds
+       ; wc_first_go <- runTcSWithEvBinds ev_binds_var $ solveWanteds zonked_wanteds
+       ; cts <- applyTyVarDefaulting wc_first_go 
+                -- See Note [Top-level Defaulting Plan]
+                
+       ; let wc_for_loop = wc_first_go { wc_flat = wc_flat wc_first_go `unionBags` cts }
+                           
+       ; traceTc "simpl_top_loop {" $ text "zonked_wc =" <+> ppr zonked_wanteds
+       ; simpl_top_loop ev_binds_var wc_for_loop }
+    
+  where simpl_top_loop ev_binds_var wc
+          | isEmptyWC wc 
+          = do { traceTc "simpl_top_loop }" empty
+               ; TcRnMonad.getTcEvBinds ev_binds_var }
+          | otherwise
+          = do { wc_residual <- runTcSWithEvBinds ev_binds_var $ solveWanteds wc
+               ; let wc_flat_approximate = approximateWC wc_residual
+               ; (dflt_eqs,_unused_bind) <- runTcS $
+                                            applyDefaultingRules wc_flat_approximate
+                                            -- See Note [Top-level Defaulting Plan]
+               ; if isEmptyBag dflt_eqs then 
+                   do { traceTc "simpl_top_loop }" empty
+                      ; report_and_finish ev_binds_var wc_residual }
+                 else
+                   simpl_top_loop ev_binds_var $ 
+                   wc_residual { wc_flat = wc_flat wc_residual `unionBags` dflt_eqs } }
+
+        report_and_finish ev_binds_var wc_residual 
+          = do { eb1 <- TcRnMonad.getTcEvBinds ev_binds_var
+               ; traceTc "reportUnsolved {" empty
+                   -- See Note [Deferring coercion errors to runtime]
+               ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+               ; eb2 <- reportUnsolved runtimeCoercionErrors wc_residual
+               ; traceTc "reportUnsolved }" empty
+               ; return (eb1 `unionBags` eb2) }
+\end{code}
+
+Note [Top-level Defaulting Plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We have considered two design choices for where/when to apply defaulting.   
+   (i) Do it in SimplCheck mode only /whenever/ you try to solve some 
+       flat constraints, maybe deep inside the context of implications.
+       This used to be the case in GHC 7.4.1.
+   (ii) Do it in a tight loop at simplifyTop, once all other constraint has 
+        finished. This is the current story.
+
+Option (i) had many disadvantages: 
+   a) First it was deep inside the actual solver, 
+   b) Second it was dependent on the context (Infer a type signature, 
+      or Check a type signature, or Interactive) since we did not want 
+      to always start defaulting when inferring (though there is an exception to  
+      this see Note [Default while Inferring])
+   c) It plainly did not work. Consider typecheck/should_compile/DfltProb2.hs:
+          f :: Int -> Bool
+          f x = const True (\y -> let w :: a -> a
+                                      w a = const a (y+1)
+                                  in w y)
+      We will get an implication constraint (for beta the type of y):
+               [untch=beta] forall a. 0 => Num beta
+      which we really cannot default /while solving/ the implication, since beta is
+      untouchable.
+
+Instead our new defaulting story is to pull defaulting out of the solver loop and
+go with option (i), implemented at SimplifyTop. Namely:
+     - First have a go at solving the residual constraint of the whole program
+     - Try to approximate it with a flat constraint
+     - Figure out derived defaulting equations for that flat constraint
+     - Go round the loop again if you did manage to get some equations
+
+Now, that has to do with class defaulting. However there exists type variable /kind/
+defaulting. Again this is done at the top-level and the plan is:
+     - At the top-level, once you had a go at solving the constraint, do 
+       figure out /all/ the touchable unification variables of the wanted contraints.
+     - Apply defaulting to their kinds
+
+More details in Note [DefaultTyVar].
+
+\begin{code}
 
 ------------------
 simplifyAmbiguityCheck :: Name -> WantedConstraints -> TcM (Bag EvBind)
 simplifyAmbiguityCheck name wanteds
-  = simplifyCheck (SimplCheck (ptext (sLit "ambiguity check for") <+> ppr name)) wanteds
+  = traceTc "simplifyAmbiguityCheck" (text "name =" <+> ppr name) >> 
+    simplifyCheck wanteds
  
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
 simplifyInteractive wanteds 
-  = simplifyCheck SimplInteractive wanteds
+  = traceTc "simplifyInteractive" empty >>
+    simplifyTop wanteds 
 
 ------------------
 simplifyDefault :: ThetaType	-- Wanted; has no type variables in it
                 -> TcM ()	-- Succeeds iff the constraint is soluble
 simplifyDefault theta
-  = do { wanted <- newFlatWanteds DefaultOrigin theta
-       ; _ignored_ev_binds <- simplifyCheck (SimplCheck (ptext (sLit "defaults"))) 
-                                            (mkFlatWC wanted)
+  = do { traceTc "simplifyInteractive" empty
+       ; wanted <- newFlatWanteds DefaultOrigin theta
+       ; _ignored_ev_binds <- simplifyCheck (mkFlatWC wanted)
        ; return () }
 \end{code}
 
@@ -105,14 +191,14 @@ simplifyDeriv orig pred tvs theta
 
        ; let subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
              skol_set   = mkVarSet tvs_skols
-	     doc = parens $ ptext (sLit "deriving") <+> parens (ppr pred)
+	     doc = ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
 
-       ; traceTc "simplifyDeriv" (pprTvBndrs tvs $$ ppr theta $$ ppr wanted)
+       ; traceTc "simplifyDeriv" $ 
+         vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
        ; (residual_wanted, _ev_binds1)
-             <- runTcS (SimplInfer doc) NoUntouchables emptyInert emptyWorkList $
-                solveWanteds $ mkFlatWC wanted
+             <- runTcS $ solveWanteds (mkFlatWC wanted)
 
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
                          -- See Note [Exotic derived instance contexts]
@@ -228,14 +314,14 @@ simplifyInfer :: Bool
               -> Bool                  -- Apply monomorphism restriction
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
-              -> WantedConstraints
+              -> (Untouchables, WantedConstraints)
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints
 		      Bool,	    -- The monomorphism restriction did something
 		      		    --   so the results type is not as general as
 				    --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer _top_lvl apply_mr name_taus wanteds
+simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
@@ -258,6 +344,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
              , ptext (sLit "gbl_tvs =") <+> ppr gbl_tvs
              , ptext (sLit "closed =") <+> ppr _top_lvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
+             , ptext (sLit "untch =") <+> ppr untch
              , ptext (sLit "wanted =") <+> ppr zonked_wanteds
              ]
 
@@ -269,7 +356,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; let proto_qtvs = growWanteds gbl_tvs zonked_wanteds $
                           zonked_tau_tvs `minusVarSet` gbl_tvs
              (perhaps_bound, surely_free)
-                        = partitionBag (quantifyMe proto_qtvs) (wc_flat zonked_wanteds)
+                        = partitionBag (quantifyMe proto_qtvs ctPred) (wc_flat zonked_wanteds)
 
        ; traceTc "simplifyInfer proto"  $ vcat
              [ ptext (sLit "zonked_tau_tvs =") <+> ppr zonked_tau_tvs
@@ -277,55 +364,82 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
              , ptext (sLit "surely_fref =") <+> ppr surely_free
              ]
 
-       ; emitFlats surely_free
        ; traceTc "sinf"  $ vcat
              [ ptext (sLit "perhaps_bound =") <+> ppr perhaps_bound
              , ptext (sLit "surely_free   =") <+> ppr surely_free
              ]
-
+             
+       ; emitFlats surely_free      
+         
             -- Step 2 
             -- Now simplify the possibly-bound constraints
-       ; let ctxt = SimplInfer (ppr (map fst name_taus))
-       ; (simpl_results, tc_binds)
-             <- runTcS ctxt NoUntouchables emptyInert emptyWorkList $ 
-                simplifyWithApprox (zonked_wanteds { wc_flat = perhaps_bound })
-
-            -- Fail fast if there is an insoluble constraint,
-            -- unless we are deferring errors to runtime
-       ; when (not runtimeCoercionErrors && insolubleWC simpl_results) $ 
-         do { _ev_binds <- reportUnsolved False simpl_results 
-            ; failM }
-
-            -- Step 3 
-            -- Split again simplified_perhaps_bound, because some unifications 
-            -- may have happened, and emit the free constraints. 
-       ; gbl_tvs        <- tcGetGlobalTyVars
+       ; let wanteds_to_approximate = zonked_wanteds { wc_flat = perhaps_bound }
+             
+       ; traceTc "simplifyWithApprox" $
+         ptext (sLit "wanteds_to_approximate = ") <+> ppr wanteds_to_approximate
+              -- 2.1) First try full-blown solving
+       ; ev_binds_var <- newTcEvBinds
+       ; wanted_transformed 
+             <- runTcSWithEvBinds ev_binds_var $ solveWanteds wanteds_to_approximate
+              -- 2.2) Fail fast if there is an insoluble constraint,
+              -- unless we are deferring errors to runtime
+       ; when (not runtimeCoercionErrors && insolubleWC wanted_transformed) $ 
+         do { _ev_binds <- reportUnsolved False wanted_transformed; failM }
+              -- 2.3) Candidates for quantification are an approximation of wanted_transformed
+       ; let quant_candidates = approximateWC wanted_transformed               
+              -- NB: Already the fixpoint of any unifications that may have happened                                
+              -- NB: We do not do any defaulting when inferring a type, this can lead
+              -- to less polymorphic types, see Note [Default while Inferring]
+                                
+              -- 2.4) Minimize the quantification candidates                             
+       ; (quant_candidates_transformed, _extra_binds)   
+             <- runTcS $ solveWanteds $ WC { wc_flat  = quant_candidates
+                                           , wc_impl  = emptyBag
+                                           , wc_insol = emptyBag }
+              -- 2.5) Final candidates for quantification                
+       ; let final_quant_candidates :: Bag PredType
+             final_quant_candidates = mapBag ctPred $ 
+                                      keepWanted (wc_flat quant_candidates_transformed)
+             -- NB: Already the fixpoint of any unifications that may have happened
+                  
+       ; gbl_tvs        <- tcGetGlobalTyVars -- TODO: can we just use untch instead of gbl_tvs?
        ; zonked_tau_tvs <- zonkTyVarsAndFV zonked_tau_tvs
-       ; zonked_flats <- zonkCts (wc_flat simpl_results)
+       
+       ; traceTc "simplifyWithApprox" $
+         vcat [ ptext (sLit "final_quant_candidates =") <+> ppr final_quant_candidates
+              , ptext (sLit "gbl_tvs=") <+> ppr gbl_tvs
+              , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs ]
+         
        ; let init_tvs 	     = zonked_tau_tvs `minusVarSet` gbl_tvs
-             poly_qtvs       = growWantedEVs gbl_tvs zonked_flats init_tvs
-	     (pbound, pfree) = partitionBag (quantifyMe poly_qtvs) zonked_flats
-
+             poly_qtvs       = growPreds gbl_tvs id final_quant_candidates init_tvs
+             
+             pbound          = filterBag (quantifyMe poly_qtvs id) final_quant_candidates
+             
+       ; traceTc "simplifyWithApprox" $
+         vcat [ ptext (sLit "pbound =") <+> ppr pbound ]
+         
 	     -- Monomorphism restriction
-             mr_qtvs  	     = init_tvs `minusVarSet` constrained_tvs
-             constrained_tvs = tyVarsOfCts zonked_flats
+       ; let mr_qtvs  	     = init_tvs `minusVarSet` constrained_tvs
+             constrained_tvs = tyVarsOfBag tyVarsOfType final_quant_candidates
 	     mr_bites        = apply_mr && not (isEmptyBag pbound)
 
-             (qtvs, (bound, free))
-                | mr_bites  = (mr_qtvs,   (emptyBag, zonked_flats))
-                | otherwise = (poly_qtvs, (pbound,   pfree))
-       ; emitFlats free
+             (qtvs, bound)
+                | mr_bites  = (mr_qtvs,   emptyBag)
+                | otherwise = (poly_qtvs, pbound)
+             
 
        ; if isEmptyVarSet qtvs && isEmptyBag bound
-         then ASSERT( isEmptyBag (wc_insol simpl_results) )
-              do { traceTc "} simplifyInfer/no quantification" empty
-                 ; emitImplications (wc_impl simpl_results)
-                 ; return ([], [], mr_bites, EvBinds tc_binds) }
+         then ASSERT( isEmptyBag (wc_insol wanted_transformed) )
+              do { traceTc "} simplifyInfer/no quantification" empty                   
+                 ; emitWC wanted_transformed
+                 ; return ([], [], mr_bites, TcEvBinds ev_binds_var) }
          else do
 
+       { traceTc "simplifyApprox" $ 
+         ptext (sLit "bound are =") <+> ppr bound 
+         
             -- Step 4, zonk quantified variables 
-       { let minimal_flat_preds = mkMinimalBySCs $ 
-                                  map ctPred $ bagToList bound
+       ; let minimal_flat_preds = mkMinimalBySCs $ bagToList bound
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
@@ -337,32 +451,68 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
             -- Step 5
             -- Minimize `bound' and emit an implication
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
-       ; ev_binds_var <- newTcEvBinds
-       ; mapBagM_ (\(EvBind evar etrm) -> addTcEvBind ev_binds_var evar etrm) 
-           tc_binds
+                                           
        ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
-       ; let implic = Implic { ic_untch    = NoUntouchables
+                 
+       ; let implic = Implic { ic_untch    = untch 
                              , ic_env      = lcl_env
                              , ic_skols    = qtvs_to_return
                              , ic_given    = minimal_bound_ev_vars
-                             , ic_wanted   = simpl_results { wc_flat = bound }
+                             , ic_wanted   = wanted_transformed 
                              , ic_insol    = False
                              , ic_binds    = ev_binds_var
                              , ic_loc      = gloc }
+                      
        ; emitImplication implic
+         
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
              vcat [ ptext (sLit "implic =") <+> ppr implic
                        -- ic_skols, ic_given give rest of result
                   , ptext (sLit "qtvs =") <+> ppr qtvs_to_return
-                  , ptext (sLit "spb =") <+> ppr zonked_flats
+                  , ptext (sLit "spb =") <+> ppr final_quant_candidates
                   , ptext (sLit "bound =") <+> ppr bound ]
-
-
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
+    where 
 \end{code}
+
+
+Note [Note [Default while Inferring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Our current plan is that defaulting only happens at simplifyTop and
+not simplifyInfer.  This may lead to some insoluble deferred constraints
+Example:
+
+instance D g => C g Int b 
+
+constraint inferred = (forall b. 0 => C gamma alpha b) /\ Num alpha
+type inferred       = gamma -> gamma 
+
+Now, if we try to default (alpha := Int) we will be able to refine the implication to 
+  (forall b. 0 => C gamma Int b) 
+which can then be simplified further to 
+  (forall b. 0 => D gamma)
+Finally we /can/ approximate this implication with (D gamma) and infer the quantified
+type:  forall g. D g => g -> g
+
+Instead what will currently happen is that we will get a quantified type 
+(forall g. g -> g) and an implication:
+       forall g. 0 => (forall b. 0 => C g alpha b) /\ Num alpha
+
+which, even if the simplifyTop defaults (alpha := Int) we will still be left with an 
+unsolvable implication:
+       forall g. 0 => (forall b. 0 => D g)
+
+The concrete example would be: 
+       h :: C g a s => g -> a -> ST s a
+       f (x::gamma) = (\_ -> x) (runST (h x (undefined::alpha)) + 1)
+
+But it is quite tedious to do defaulting and resolve the implication constraints and
+we have not observed code breaking because of the lack of defaulting in inference so 
+we don't do it for now.
+
 
 
 Note [Minimize by Superclasses]
@@ -376,56 +526,32 @@ from superclass selection from Ord alpha. This minimization is what
 mkMinimalBySCs does. Then, simplifyInfer uses the minimal constraint
 to check the original wanted.
 
+
 \begin{code}
 
-simplifyWithApprox :: WantedConstraints -> TcS WantedConstraints
--- Post: returns only wanteds (no deriveds)
-simplifyWithApprox wanted
- = do { traceTcS "simplifyApproxLoop" (ppr wanted)
 
-      ; let all_flats = wc_flat wanted `unionBags` keepWanted (wc_insol wanted) 
-      ; implics_from_flats <- solveInteractCts $ bagToList all_flats
-      ; unsolved_implics <- simpl_loop 1 (wc_impl wanted `unionBags` 
-                                               implics_from_flats)
-
-      ; let (residual_implics,floats) = approximateImplications unsolved_implics
-
-      -- Solve extra stuff for real: notice that all the extra unsolved constraints will 
-      -- be in the inerts of the monad, so we are OK
-      ; traceTcS "simplifyApproxLoop" $ text "Calling solve_wanteds!"
-      ; wants_or_ders <- solve_wanteds (WC { wc_flat  = floats -- They are floated so they are not in the evvar cache
-                                           , wc_impl  = residual_implics
-                                           , wc_insol = emptyBag })
-      ; return $ 
-        wants_or_ders { wc_flat = keepWanted (wc_flat wants_or_ders) } }
-
-
-approximateImplications :: Bag Implication -> (Bag Implication, Cts)
--- Extracts any nested constraints that don't mention the skolems
-approximateImplications impls
-  = do_bag (float_implic emptyVarSet) impls
+approximateWC :: WantedConstraints -> Cts
+approximateWC wc = float_wc emptyVarSet wc
   where 
-    do_bag :: forall a b c. (a -> (Bag b, Bag c)) -> Bag a -> (Bag b, Bag c)
-    do_bag f = foldrBag (plus . f) (emptyBag, emptyBag)
-    plus :: forall b c. (Bag b, Bag c) -> (Bag b, Bag c) -> (Bag b, Bag c)
-    plus (a1,b1) (a2,b2) = (a1 `unionBags` a2, b1 `unionBags` b2)
-
-    float_implic :: TyVarSet -> Implication -> (Bag Implication, Cts)
+    float_wc :: TcTyVarSet -> WantedConstraints -> Cts
+    float_wc skols (WC { wc_flat = flat, wc_impl = implic }) = floats1 `unionBags` floats2
+      where floats1 = do_bag (float_flat skols) flat
+            floats2 = do_bag (float_implic skols) implic
+                                 
+    float_implic :: TcTyVarSet -> Implication -> Cts
     float_implic skols imp
-      = (unitBag (imp { ic_wanted = wanted' }), floats)
-      where
-        (wanted', floats) = float_wc (skols `extendVarSetList` ic_skols imp) (ic_wanted imp)
-
-    float_wc skols wc@(WC { wc_flat = flat, wc_impl = implic })
-      = (wc { wc_flat = flat', wc_impl = implic' }, floats1 `unionBags` floats2)
-      where
-        (flat',   floats1) = do_bag (float_flat   skols) flat
-        (implic', floats2) = do_bag (float_implic skols) implic
-
-    float_flat :: TcTyVarSet -> Ct -> (Cts, Cts)
+      = float_wc (skols `extendVarSetList` ic_skols imp) (ic_wanted imp)
+            
+    float_flat :: TcTyVarSet -> Ct -> Cts
     float_flat skols ct
-      | tyVarsOfCt ct `disjointVarSet` skols = (emptyBag, unitBag ct)
-      | otherwise                            = (unitBag ct, emptyBag)
+      | tyVarsOfCt ct `disjointVarSet` skols 
+      , isWantedCt ct = singleCt ct
+      | otherwise = emptyCts
+        
+    do_bag :: (a -> Bag c) -> Bag a -> Bag c
+    do_bag f = foldrBag (unionBags.f) emptyBag
+
+
 \end{code}
 
 \begin{code}
@@ -434,13 +560,10 @@ approximateImplications impls
 -- It's conservative in that if the seed could *possibly*
 -- grow to include a type variable, then it does
 
+
 growWanteds :: TyVarSet -> WantedConstraints -> TyVarSet -> TyVarSet
 growWanteds gbl_tvs wc = fixVarSet (growWC gbl_tvs wc)
 
-growWantedEVs :: TyVarSet -> Cts -> TyVarSet -> TyVarSet
-growWantedEVs gbl_tvs ws tvs
-  | isEmptyBag ws = tvs
-  | otherwise     = fixVarSet (growPreds gbl_tvs ctPred ws) tvs
 
 --------  Helper functions, do not do fixpoint ------------------------
 growWC :: TyVarSet -> WantedConstraints -> TyVarSet -> TyVarSet
@@ -459,6 +582,7 @@ growImplics gbl_tvs implics tvs
                growPreds gbl_tvs evVarPred (listToBag (ic_given implic))
                -- We must grow from givens too; see test IPRun
 
+
 growPreds :: TyVarSet -> (a -> PredType) -> Bag a -> TyVarSet -> TyVarSet
 growPreds gbl_tvs get_pred items tvs
   = foldrBag extend tvs items
@@ -468,13 +592,13 @@ growPreds gbl_tvs get_pred items tvs
 
 --------------------
 quantifyMe :: TyVarSet      -- Quantifying over these
-	   -> Ct
-	   -> Bool	    -- True <=> quantify over this wanted
-quantifyMe qtvs ct
+	   -> (a -> PredType)
+	   -> a -> Bool	    -- True <=> quantify over this wanted
+quantifyMe qtvs toPred ct
   | isIPPred pred = True  -- Note [Inheriting implicit parameters]
   | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
   where
-    pred = ctPred ct
+    pred = toPred ct
 \end{code}
 
 Note [Avoid unecessary constraint simplification]
@@ -483,7 +607,9 @@ When inferring the type of a let-binding, with simplifyInfer,
 try to avoid unnecessariliy simplifying class constraints.
 Doing so aids sharing, but it also helps with delicate 
 situations like
+
    instance C t => C [t] where ..
+
    f :: C [t] => ....
    f x = let g y = ...(constraint C [t])... 
          in ...
@@ -493,6 +619,9 @@ just notice that g isn't quantified over 't' and partition
 the contraints before simplifying.
 
 This only half-works, but then let-generalisation only half-works.
+The example that needs this is:
+
+   typecheck/should_compile/T4361.hs
 
 
 Note [Inheriting implicit parameters]
@@ -553,12 +682,10 @@ simplifyRule :: RuleName
 simplifyRule name lhs_wanted rhs_wanted
   = do { zonked_all <- zonkWC (lhs_wanted `andWC` rhs_wanted)
        ; let doc = ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
-	     untch = NoUntouchables
+             
              	 -- We allow ourselves to unify environment 
-		 -- variables; hence NoUntouchables
-
-       ; (resid_wanted, _) <- runTcS (SimplInfer doc) untch emptyInert emptyWorkList $
-                              solveWanteds zonked_all
+		 -- variables: runTcS runs with NoUntouchables
+       ; (resid_wanted, _) <- runTcS (solveWanteds zonked_all)
 
        ; zonked_lhs <- zonkWC lhs_wanted
 
@@ -576,7 +703,8 @@ simplifyRule name lhs_wanted rhs_wanted
                = True
              
        ; traceTc "simplifyRule" $
-         vcat [ text "zonked_lhs" <+> ppr zonked_lhs 
+         vcat [ doc
+              , text "zonked_lhs" <+> ppr zonked_lhs 
               , text "q_cts"      <+> ppr q_cts ]
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
@@ -591,8 +719,7 @@ simplifyRule name lhs_wanted rhs_wanted
 ***********************************************************************************
 
 \begin{code}
-simplifyCheck :: SimplContext
-	      -> WantedConstraints	-- Wanted
+simplifyCheck :: WantedConstraints	-- Wanted
               -> TcM (Bag EvBind)
 -- Solve a single, top-level implication constraint
 -- e.g. typically one created from a top-level type signature
@@ -606,15 +733,13 @@ simplifyCheck :: SimplContext
 --  an implication constraint for g at all.)
 --
 -- Fails if can't solve something in the input wanteds
-simplifyCheck ctxt wanteds
+simplifyCheck wanteds
   = do { wanteds <- zonkWC wanteds
 
        ; traceTc "simplifyCheck {" (vcat
              [ ptext (sLit "wanted =") <+> ppr wanteds ])
 
-       ; (unsolved, eb1)
-           <- runTcS ctxt NoUntouchables emptyInert emptyWorkList $ 
-              solveWanteds wanteds
+       ; (unsolved, eb1) <- runTcS (solveWanteds wanteds)
 
        ; traceTc "simplifyCheck }" $ ptext (sLit "unsolved =") <+> ppr unsolved
 
@@ -670,13 +795,15 @@ solveWanteds :: WantedConstraints -> TcS WantedConstraints
 -- Returns: residual constraints, plus evidence bindings 
 -- NB: When we are called from TcM there are no inerts to pass down to TcS
 solveWanteds wanted
-  = do { wc_out <- solve_wanteds wanted
+  = do { (_,wc_out) <- solve_wanteds wanted
        ; let wc_ret = wc_out { wc_flat = keepWanted (wc_flat wc_out) } 
                       -- Discard Derived
        ; return wc_ret }
 
 solve_wanteds :: WantedConstraints
-              -> TcS WantedConstraints  -- NB: wc_flats may be wanted *or* derived now
+              -> TcS (TvSubst, WantedConstraints) 
+              -- NB: wc_flats may be wanted *or* derived now
+              -- Returns the flattening substitution as well in case we need to apply it
 solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols }) 
   = do { traceTcS "solveWanteds {" (ppr wanted)
 
@@ -687,7 +814,15 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
                  -- of a waste, but the code is simple, and the program is
                  -- wrong anyway!
 
+                 -- DV: why only keepWanted? We make sure that we never float out
+                 -- whatever constraints can yield equalities, including class 
+                 -- constraints with functional dependencies and hence all the derived
+                 -- that were potentially insoluble will be re-generated.
+                 -- (It would not hurt though to just keep the wanted and the derived)
+                 -- See Note [The HasEqualities Predicate] in Inst.lhs
+         
        ; let all_flats = flats `unionBags` keepWanted insols
+                         
        ; impls_from_flats <- solveInteractCts $ bagToList all_flats
 
        -- solve_wanteds iterates when it is able to float equalities 
@@ -716,9 +851,9 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
                       ]
 
        ; return $ 
-         WC { wc_flat  = mapBag (substCt subst) remaining_unsolved_flats
-            , wc_impl  = mapBag (substImplication subst) unsolved_implics
-            , wc_insol = mapBag (substCt subst) insoluble_flats }
+         (subst, WC { wc_flat  = mapBag (substCt subst) remaining_unsolved_flats
+                    , wc_impl  = mapBag (substImplication subst) unsolved_implics
+                    , wc_insol = mapBag (substCt subst) insoluble_flats })
        }
 
 simpl_loop :: Int
@@ -733,10 +868,11 @@ simpl_loop n implics
        ; inerts <- getTcSInerts
        ; let ((_,unsolved_flats),_) = extractUnsolved inerts
                                       
-       ; improve_eqs <- if not (isEmptyBag implic_eqs)
-                        then return implic_eqs
-                        else applyDefaultingRules unsolved_flats
-
+       ; let improve_eqs = implic_eqs
+             -- NB: improve_eqs used to contain defaulting equations HERE but 
+             -- defaulting now happens only at simplifyTop and not deep inside 
+             -- simpl_loop! See Note [Top-level Defaulting Plan]
+             
        ; traceTcS "solveWanteds: simpl_loop end" $
              vcat [ text "improve_eqs      =" <+> ppr improve_eqs
                   , text "unsolved_flats   =" <+> ppr unsolved_flats
@@ -756,19 +892,36 @@ solveNestedImplications implics
   = return (emptyBag, emptyBag)
   | otherwise 
   = do { inerts <- getTcSInerts
+       ; traceTcS "solveNestedImplications starting, inerts are:" $ ppr inerts
+         
        ; let ((_insoluble_flats, unsolved_flats),thinner_inerts) = extractUnsolved inerts 
-
+       ; traceTcS "solveNestedImplications starting, more info:" $ 
+         vcat [ text "inerts          = " <+> ppr inerts
+              , text "insoluble_flats = " <+> ppr _insoluble_flats
+              , text "unsolved_flats  = " <+> ppr unsolved_flats
+              , text "thinner_inerts  = " <+> ppr thinner_inerts ]
+         
        ; (implic_eqs, unsolved_implics)
            <- doWithInert thinner_inerts $ 
               do { let pushed_givens = givens_from_wanteds unsolved_flats
-                       tcs_untouchables = filterVarSet isFlexiTcsTv $ 
-                                          tyVarsOfCts unsolved_flats
+                       tcs_untouchables 
+                         = foldr (unionVarSet . tyVarsOfCt) emptyVarSet pushed_givens
+                                          -- Typically pushed_givens is very small, consists
+                                          -- only of unsolved equalities, so no inefficiency 
+                                          -- danger.
+                                                                                    
+                                          
                  -- See Note [Preparing inert set for implications]
 	         -- Push the unsolved wanteds inwards, but as givens
                  ; traceTcS "solveWanteds: preparing inerts for implications {" $ 
                    vcat [ppr tcs_untouchables, ppr pushed_givens]
-                 ; impls_from_givens <- solveInteractCts pushed_givens 
+                 ; impls_from_givens <- solveInteractCts pushed_givens
+                                        
                  ; MASSERT (isEmptyBag impls_from_givens)
+                       -- impls_from_givens must be empty, since we are reacting givens
+                       -- with givens, and they can never generate extra implications 
+                       -- from decomposition of ForAll types. (Whereas wanteds can, see
+                       -- TcCanonical, canEq ForAll-ForAll case)
                    
                  ; traceTcS "solveWanteds: } now doing nested implications {" empty
                  ; flatMapBagPairM (solveImplication tcs_untouchables) implics }
@@ -823,9 +976,13 @@ solveImplication tcs_untouchables
        ; MASSERT (isEmptyBag impls_from_givens)
          
          -- Simplify the wanteds
-       ; WC { wc_flat = unsolved_flats
-            , wc_impl = unsolved_implics
-            , wc_insol = insols } <- solve_wanteds wanteds
+       ; (_flat_subst, 
+           WC { wc_flat = unsolved_flats
+              , wc_impl = unsolved_implics
+              , wc_insol = insols }) <- solve_wanteds wanteds
+          -- NB: Not solveWanteds because we need the derived equalities,            
+          -- which may not be solvable (due to touchability) in this implication
+          -- but may become solvable by spontantenous unification outside. 
 
        ; let (res_flat_free, res_flat_bound)
                  = floatEqualities skols givens unsolved_flats
@@ -857,10 +1014,6 @@ floatEqualities skols can_given wantders
   | hasEqualities can_given = (emptyBag, wantders)
           -- Note [Float Equalities out of Implications]
   | otherwise = partitionBag is_floatable wantders
-
--- TODO: Maybe we should try out /not/ floating constraints that contain touchables only, 
--- since they are inert and not going to interact with anything more in a more global scope.
-
   where skol_set = mkVarSet skols
         is_floatable :: Ct -> Bool
         is_floatable ct
@@ -972,42 +1125,121 @@ constraints nonetheless.
 
 Note [Extra TcsTv untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Furthemore, we record the inert set simplifier-generated unification
-variables of the TcsTv kind (such as variables from instance that have
-been applied, or unification flattens). These variables must be passed
-to the implications as extra untouchable variables. Otherwise we have
-the danger of double unifications. Example (from trac ticket #4494):
 
-   (F Int ~ uf)  /\  (forall a. C a => F Int ~ beta) 
+Whenever we are solving a bunch of flat constraints, they may contain 
+the following sorts of 'touchable' unification variables:
+   
+   (i)   Born-touchables in that scope
+ 
+   (ii)  Simplifier-generated unification variables, such as unification 
+         flatten variables
 
-In this example, beta is touchable inside the implication. The first
-solveInteract step leaves 'uf' ununified. Then we move inside the
-implication where a new constraint
+   (iii) Touchables that have been floated out from some nested 
+         implications, see Note [Float Equalities out of Implications]. 
+
+Now, once we are done with solving these flats and have to move inwards to 
+the nested implications (perhaps for a second time), we must consider all the
+extra variables (categories (ii) and (iii) above) as untouchables for the 
+implication. Otherwise we have the danger or double unifications, as well
+as the danger of not ``seing'' some unification. Example (from Trac #4494):
+
+   (F Int ~ uf)  /\  [untch=beta](forall a. C a => F Int ~ beta) 
+
+In this example, beta is touchable inside the implication. The 
+first solveInteract step leaves 'uf' ununified. Then we move inside 
+the implication where a new constraint
        uf  ~  beta  
 emerges. We may spontaneously solve it to get uf := beta, so the whole
 implication disappears but when we pop out again we are left with (F
 Int ~ uf) which will be unified by our final solveCTyFunEqs stage and
 uf will get unified *once more* to (F Int).
 
-The solution is to record the TcsTvs (i.e. the simplifier-generated
-unification variables) that are generated when solving the flats, and
-make them untouchables for the nested implication. In the example
-above uf would become untouchable, so beta would be forced to be
-unified as beta := uf.
-
-NB: A consequence is that every simplifier-generated TcsTv variable
-    that gets floated out of an implication becomes now untouchable
-    next time we go inside that implication to solve any residual
-    constraints. In effect, by floating an equality out of the
-    implication we are committing to have it solved in the outside.
+The solution is to record the unification variables of the flats, 
+and make them untouchables for the nested implication. In the 
+example above uf would become untouchable, so beta would be forced 
+to be unified as beta := uf.
 
 Note [Float Equalities out of Implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-We want to float equalities out of vanilla existentials, but *not* out 
-of GADT pattern matches. 
+For ordinary pattern matches (including existentials) we float 
+equalities out of implications, for instance: 
+     data T where 
+       MkT :: Eq a => a -> T 
+     f x y = case x of MkT _ -> (y::Int)
+We get the implication constraint (x::T) (y::alpha): 
+     forall a. [untouchable=alpha] Eq a => alpha ~ Int
+We want to float out the equality into a scope where alpha is no
+longer untouchable, to solve the implication!  
 
----> TODO Expand in accordance to our discussion
+But we cannot float equalities out of implications whose givens may
+yield or contain equalities:
 
+      data T a where 
+        T1 :: T Int
+        T2 :: T Bool
+        T3 :: T a 
+        
+      h :: T a -> a -> Int
+      
+      f x y = case x of 
+                T1 -> y::Int
+                T2 -> y::Bool
+                T3 -> h x y
+
+We generate constraint, for (x::T alpha) and (y :: beta): 
+   [untouchables = beta] (alpha ~ Int => beta ~ Int)   -- From 1st branch
+   [untouchables = beta] (alpha ~ Bool => beta ~ Bool) -- From 2nd branch
+   (alpha ~ beta)                                      -- From 3rd branch 
+
+If we float the equality (beta ~ Int) outside of the first implication and 
+the equality (beta ~ Bool) out of the second we get an insoluble constraint.
+But if we just leave them inside the implications we unify alpha := beta and
+solve everything.
+
+Principle: 
+    We do not want to float equalities out which may need the given *evidence*
+    to become soluble.
+
+Consequence: classes with functional dependencies don't matter (since there is 
+no evidence for a fundep equality), but equality superclasses do matter (since 
+they carry evidence).
+
+Notice that, due to Note [Extra TcSTv Untouchables], the free unification variables 
+of an equality that is floated out of an implication become effectively untouchables
+for the leftover implication. This is absolutely necessary. Consider the following 
+example. We start with two implications and a class with a functional dependency. 
+
+class C x y | x -> y
+instance C [a] [a]
+      
+(I1)      [untch=beta]forall b. 0 => F Int ~ [beta]
+(I2)      [untch=beta]forall b. 0 => F Int ~ [[alpha]] /\ C beta [b]
+
+We float (F Int ~ [beta]) out of I1, and we float (F Int ~ [[alpha]]) out of I2. 
+They may react to yield that (beta := [alpha]) which can then be pushed inwards 
+the leftover of I2 to get (C [alpha] [a]) which, using the FunDep, will mean that
+(alpha := a). In the end we will have the skolem 'b' escaping in the untouchable
+beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
+
+class C x y | x -> y where 
+ op :: x -> y -> ()
+
+instance C [a] [a]
+
+type family F a :: *
+
+h :: F Int -> ()
+h = undefined
+
+data TEx where 
+  TEx :: a -> TEx 
+
+
+f (x::beta) = 
+    let g1 :: forall b. b -> ()
+        g1 _ = h [x]
+        g2 z = case z of TEx y -> (h [[undefined]], op x [y])
+    in (g1 '3', g2 undefined)
 
 \begin{code}
 
@@ -1106,37 +1338,6 @@ When is it ok to do so?
 *                          Defaulting and disamgiguation                        *
 *                                                                               *
 *********************************************************************************
-
-Basic plan behind applyDefaulting rules: 
- 
- Step 1:  
-    Split wanteds into defaultable groups, `groups' and the rest `rest_wanted' 
-    For each defaultable group, do: 
-      For each possible substitution for [alpha |-> tau] where `alpha' is the 
-      group's variable, do: 
-        1) Make up new TcEvBinds
-        2) Extend TcS with (groupVariable 
-        3) given_inert <- solveOne inert (given : a ~ tau) 
-        4) (final_inert,unsolved) <- solveWanted (given_inert) (group_constraints)
-        5) if unsolved == empty then 
-                 sneakyUnify a |-> tau 
-                 write the evidence bins
-                 return (final_inert ++ group_constraints,[]) 
-                      -- will contain the info (alpha |-> tau)!!
-                 goto next defaultable group 
-           if unsolved <> empty then 
-                 throw away evidence binds
-                 try next substitution 
-     If you've run out of substitutions for this group, too bad, you failed 
-                 return (inert,group) 
-                 goto next defaultable group
- 
- Step 2: 
-   Collect all the (canonical-cts, wanteds) gathered this way. 
-   - Do a solveGiven over the canonical-cts to make sure they are inert 
-------------------------------------------------------------------------------------------
-
-
 \begin{code}
 applyDefaultingRules :: Cts      -- All wanteds
                      -> TcS Cts  -- All wanteds again!
@@ -1148,22 +1349,17 @@ applyDefaultingRules wanteds
   | otherwise
   = do { traceTcS "applyDefaultingRules { " $ 
                   text "wanteds =" <+> ppr wanteds
-       ; untch <- getUntouchables
-       ; tv_cts <- mapM (defaultTyVar untch) $
-                   varSetElems (tyVarsOfCDicts wanteds)
-
-       ; info@(_, default_tys, _) <- getDefaultInfo
-       ; let groups = findDefaultableGroups info untch wanteds
+                  
+       ; info@(default_tys, _) <- getDefaultInfo
+       ; let groups = findDefaultableGroups info wanteds
        ; traceTcS "findDefaultableGroups" $ vcat [ text "groups=" <+> ppr groups
-                                                 , text "untouchables=" <+> ppr  untch 
                                                  , text "info=" <+> ppr info ]
        ; deflt_cts <- mapM (disambigGroup default_tys) groups
 
        ; traceTcS "applyDefaultingRules }" $ 
-                  vcat [ text "Tyvar defaults =" <+> ppr tv_cts
-                       , text "Type defaults =" <+> ppr deflt_cts]
+                  vcat [ text "Type defaults =" <+> ppr deflt_cts]
 
-       ; return (unionManyBags deflt_cts `unionBags` unionManyBags tv_cts) }
+       ; return (unionManyBags deflt_cts) }
 \end{code}
 
 Note [tryTcS in defaulting]
@@ -1192,57 +1388,90 @@ in the cache!
 
 \begin{code}
 ------------------
-defaultTyVar :: TcsUntouchables -> TcTyVar -> TcS Cts
--- defaultTyVar is used on any un-instantiated meta type variables to
--- default the kind of OpenKind and ArgKind etc to *.  This is important to
--- ensure that instance declarations match.  For example consider
---	instance Show (a->b)
---	foo x = show (\_ -> True)
--- Then we'll get a constraint (Show (p ->q)) where p has kind ArgKind, 
--- and that won't match the typeKind (*) in the instance decl.  
--- See test tc217.
---
--- We look only at touchable type variables. No further constraints
--- are going to affect these type variables, so it's time to do it by
--- hand.  However we aren't ready to default them fully to () or
--- whatever, because the type-class defaulting rules have yet to run.
+touchablesOfWC :: WantedConstraints -> TcTyVarSet
+-- See Note [Extra Tcs Untouchables] to see why we carry a TcsUntouchables 
+-- instead of just using the Untouchable range have in our hands.
+touchablesOfWC = go (NoUntouchables, emptyVarSet)
+  where go :: TcsUntouchables -> WantedConstraints -> TcTyVarSet
+        go untch (WC { wc_flat = flats, wc_impl = impls }) 
+          = filterVarSet is_touchable flat_tvs `unionVarSet`
+              foldrBag (unionVarSet . (go_impl $ untch_for_impls untch)) emptyVarSet impls 
+          where is_touchable = isTouchableMetaTyVar_InRange untch
+                flat_tvs = tyVarsOfCts flats
+                untch_for_impls (r,uset) = (r, uset `unionVarSet` flat_tvs)
+        go_impl (_rng,set) implic = go (ic_untch implic,set) (ic_wanted implic)
 
-defaultTyVar untch the_tv 
-  | isTouchableMetaTyVar_InRange untch the_tv
-  , not (k `eqKind` default_k)
-  = tryTcS $ -- Why tryTcS? See Note [tryTcS in defaulting]
+applyTyVarDefaulting :: WantedConstraints -> TcM Cts
+applyTyVarDefaulting wc = runTcS do_dflt >>= (return . fst)
+  where do_dflt = do { tv_cts <- mapM defaultTyVar $ 
+                                 varSetElems (touchablesOfWC wc)
+                     ; return (unionManyBags tv_cts) }
+
+defaultTyVar :: TcTyVar -> TcS Cts
+-- Precondition: a touchable meta-variable
+defaultTyVar the_tv
+  | not (k `eqKind` default_k)
+  -- Why tryTcS? See Note [tryTcS in defaulting]
+  = tryTcS $
     do { let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
-       ; eqv <- TcSMonad.newKindConstraint loc the_tv default_k
-       ; case eqv of
-           Fresh x -> 
-             return $ unitBag $
-             CNonCanonical { cc_ev = x, cc_depth = 0 }
-           Cached _ -> return emptyBag }
-{- DELETEME
-         if isNewEvVar eqv then 
-             return $ unitBag (CNonCanonical { cc_id = evc_the_evvar eqv
-                                             , cc_ev = fl, cc_depth = 0 })
+       ; ty_k <- instFlexiTcSHelperTcS (tyVarName the_tv) default_k
+       ; md <- newDerived loc (mkTcEqPred (mkTyVarTy the_tv) ty_k)
+             -- Why not directly newDerived loc (mkTcEqPred k default_k)? 
+             -- See Note [DefaultTyVar]
+       ; let cts
+              | Just der_ev <- md = [mkNonCanonical der_ev]
+              | otherwise = []
+       
+       ; implics_from_defaulting <- solveInteractCts cts
+       ; MASSERT (isEmptyBag implics_from_defaulting)
+         
+       ; (_,unsolved) <- extractUnsolvedTcS
+       ; if isEmptyBag (keepWanted unsolved) then return (listToBag cts)
          else return emptyBag }
--}
-
-  | otherwise            
-  = return emptyBag	 -- The common case
+  | otherwise = return emptyBag	 -- The common case
   where
     k = tyVarKind the_tv
     default_k = defaultKind k
+\end{code}
+
+Note [DefaultTyVar]
+~~~~~~~~~~~~~~~~~~~
+defaultTyVar is used on any un-instantiated meta type variables to
+default the kind of OpenKind and ArgKind etc to *.  This is important 
+to ensure that instance declarations match.  For example consider
+
+     instance Show (a->b)
+     foo x = show (\_ -> True)
+
+Then we'll get a constraint (Show (p ->q)) where p has kind ArgKind,
+and that won't match the typeKind (*) in the instance decl.  See tests
+tc217 and tc175.
+
+We look only at touchable type variables. No further constraints
+are going to affect these type variables, so it's time to do it by
+hand.  However we aren't ready to default them fully to () or
+whatever, because the type-class defaulting rules have yet to run.
+
+An important point is that if the type variable tv has kind k and the
+default is default_k we do not simply generate [D] (k ~ default_k) because:
+
+   (1) k may be ArgKind and default_k may be * so we will fail
+
+   (2) We need to rewrite all occurrences of the tv to be a type
+       variable with the right kind and we choose to do this by rewriting 
+       the type variable /itself/ by a new variable which does have the 
+       right kind.
+
+\begin{code}
 
 
 ----------------
 findDefaultableGroups 
-    :: ( SimplContext 
-       , [Type]
+    :: ( [Type]
        , (Bool,Bool) )  -- (Overloaded strings, extended default rules)
-    -> TcsUntouchables	-- Untouchable
     -> Cts	-- Unsolved
     -> [[(Ct,TcTyVar)]]
-findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults)) 
-                      untch wanteds
-  | not (performDefaulting ctxt) = []
+findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
   | null default_tys             = []
   | otherwise = filter is_defaultable_group (equivClasses cmp_tv unaries)
   where 
@@ -1264,13 +1493,8 @@ findDefaultableGroups (ctxt, default_tys, (ovl_strings, extended_defaults))
     is_defaultable_group ds@((_,tv):_)
         = let b1 = isTyConableTyVar tv	-- Note [Avoiding spurious errors]
               b2 = not (tv `elemVarSet` bad_tvs)
-              b3 = isTouchableMetaTyVar_InRange untch tv 
               b4 = defaultable_classes [cc_class cc | (cc,_) <- ds]
-          in (b1 && b2 && b3 && b4)
-          {- pprTrace "is_defaultable_group" (vcat [ text "isTyConable   " <+> ppr tv <+> ppr b1 
-                                                   , text "is not in bad " <+> ppr tv <+> ppr b2 
-                                                   , text "is touchable  " <+> ppr tv <+> ppr b3
-                                                   , text "is defaultable" <+> ppr tv <+> ppr b4 ]) -}
+          in (b1 && b2 && b4)
     is_defaultable_group [] = panic "defaultable_group"
 
     defaultable_classes clss 
@@ -1300,8 +1524,8 @@ disambigGroup []  _grp
 disambigGroup (default_ty:default_tys) group
   = do { traceTcS "disambigGroup" (ppr group $$ ppr default_ty)
        ; success <- tryTcS $ -- Why tryTcS? See Note [tryTcS in defaulting]
-                    do { derived_eq <- tryTcS $
-                                       -- I need a new tryTcS because we will call solveInteractCts below!
+                    do { derived_eq <- tryTcS $ 
+                       -- I need a new tryTcS because we will call solveInteractCts below!
                             do { md <- newDerived (ctev_wloc the_fl) 
                                                   (mkTcEqPred (mkTyVarTy the_tv) default_ty)
                                                   -- ctev_wloc because constraint is not Given!
@@ -1309,17 +1533,17 @@ disambigGroup (default_ty:default_tys) group
                                     Nothing   -> return []
                                     Just ctev -> return [ mkNonCanonical ctev ] }
                             
-                       ; traceTcS "disambigGroup (solving) {" 
-                                  (text "trying to solve constraints along with default equations ...")
+                       ; traceTcS "disambigGroup (solving) {" $
+                         text "trying to solve constraints along with default equations ..."
                        ; implics_from_defaulting <- 
                                     solveInteractCts (derived_eq ++ wanteds)
                        ; MASSERT (isEmptyBag implics_from_defaulting)
-                                     -- Ignore implics: I don't think that a defaulting equation can cause
-                                     -- new implications to be emitted. Maybe we have to revisit this.
+                           -- I am not certain if any implications can be generated
+                           -- but I am letting this fail aggressively if this ever happens.
                                      
                        ; (_,unsolved) <- extractUnsolvedTcS 
-                       ; traceTcS "disambigGroup (solving) }"
-                                  (text "disambigGroup unsolved =" <+> ppr (keepWanted unsolved))
+                       ; traceTcS "disambigGroup (solving) }" $
+                         text "disambigGroup unsolved =" <+> ppr (keepWanted unsolved)
                        ; if isEmptyBag (keepWanted unsolved) then -- Don't care about Derived's
                              return (Just $ listToBag derived_eq) 
                          else 
