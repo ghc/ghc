@@ -241,7 +241,9 @@ import Data.Bits
 import Data.List
 import Data.Maybe
 import Foreign.C.Error
+#ifdef mingw32_HOST_OS
 import Foreign.C.String
+#endif
 import Foreign.C.Types
 import System.Posix.Internals
 import System.Posix.Types
