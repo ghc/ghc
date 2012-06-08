@@ -624,12 +624,12 @@ builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
  [rule_IntToInteger   "smallInteger"        smallIntegerName,
   rule_WordToInteger  "wordToInteger"       wordToIntegerName,
+  rule_Int64ToInteger  "int64ToInteger"     int64ToIntegerName,
+  rule_Word64ToInteger "word64ToInteger"    word64ToIntegerName,
   rule_convert        "integerToWord"       integerToWordName       mkWordLitWord,
   rule_convert        "integerToInt"        integerToIntName        mkIntLitInt,
   rule_convert        "integerToWord64"     integerToWord64Name     mkWord64LitWord64,
-  -- TODO: word64ToInteger rule
   rule_convert        "integerToInt64"      integerToInt64Name      mkInt64LitInt64,
-  -- TODO: int64ToInteger rule
   rule_binop          "plusInteger"         plusIntegerName         (+),
   rule_binop          "minusInteger"        minusIntegerName        (-),
   rule_binop          "timesInteger"        timesIntegerName        (*),
@@ -650,7 +650,7 @@ builtinIntegerRules =
   rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
   rule_convert        "floatFromInteger"    floatFromIntegerName    mkFloatLitFloat,
   rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
-  -- TODO: decodeDoubleInteger rule
+  rule_decodeDouble   "decodeDoubleInteger" decodeDoubleIntegerName,
   rule_convert        "doubleFromInteger"   doubleFromIntegerName   mkDoubleLitDouble,
   rule_binop          "gcdInteger"          gcdIntegerName          gcd,
   rule_binop          "lcmInteger"          lcmIntegerName          lcm,
@@ -669,6 +669,12 @@ builtinIntegerRules =
           rule_WordToInteger str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_WordToInteger }
+          rule_Int64ToInteger str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Int64ToInteger }
+          rule_Word64ToInteger str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_Word64ToInteger }
           rule_unop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_unop op }
@@ -693,6 +699,9 @@ builtinIntegerRules =
           rule_encodeFloat str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_Int_encodeFloat op }
+          rule_decodeDouble str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_decodeDouble }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -781,6 +790,32 @@ match_WordToInteger id id_unf [xl]
     _ ->
         panic "match_WordToInteger: Id has the wrong type"
 match_WordToInteger _ _ _ = Nothing
+
+match_Int64ToInteger :: Id
+                     -> IdUnfoldingFun
+                     -> [Expr CoreBndr]
+                     -> Maybe (Expr CoreBndr)
+match_Int64ToInteger id id_unf [xl]
+  | Just (MachInt64 x) <- exprIsLiteral_maybe id_unf xl
+  = case idType id of
+    FunTy _ integerTy ->
+        Just (Lit (LitInteger x integerTy))
+    _ ->
+        panic "match_Int64ToInteger: Id has the wrong type"
+match_Int64ToInteger _ _ _ = Nothing
+
+match_Word64ToInteger :: Id
+                      -> IdUnfoldingFun
+                      -> [Expr CoreBndr]
+                      -> Maybe (Expr CoreBndr)
+match_Word64ToInteger id id_unf [xl]
+  | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
+  = case idType id of
+    FunTy _ integerTy ->
+        Just (Lit (LitInteger x integerTy))
+    _ ->
+        panic "match_Word64ToInteger: Id has the wrong type"
+match_Word64ToInteger _ _ _ = Nothing
 
 match_Integer_convert :: Num a
                       => (a -> Expr CoreBndr)
@@ -892,4 +927,23 @@ match_Integer_Int_encodeFloat mkLit _ id_unf [xl,yl]
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
 match_Integer_Int_encodeFloat _ _ _ _ = Nothing
+
+match_decodeDouble :: Id
+                   -> IdUnfoldingFun
+                   -> [Expr CoreBndr]
+                   -> Maybe (Expr CoreBndr)
+match_decodeDouble fn id_unf [xl]
+  | Just (MachDouble x) <- exprIsLiteral_maybe id_unf xl
+  = case idType fn of
+    FunTy _ (TyConApp _ [integerTy, intHashTy]) ->
+        case decodeFloat (fromRational x :: Double) of
+        (y, z) ->
+            Just $ mkConApp (tupleCon UnboxedTuple 2)
+                            [Type integerTy,
+                             Type intHashTy,
+                             Lit (LitInteger y integerTy),
+                             Lit (MachInt (toInteger z))]
+    _ ->
+        panic "match_decodeDouble: Id has the wrong type"
+match_decodeDouble _ _ _ = Nothing
 \end{code}

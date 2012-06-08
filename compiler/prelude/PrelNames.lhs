@@ -254,6 +254,7 @@ basicKnownKeyNames
         -- Integer
         integerTyConName, mkIntegerName,
         integerToWord64Name, integerToInt64Name,
+        word64ToIntegerName, int64ToIntegerName,
         plusIntegerName, timesIntegerName, smallIntegerName,
         wordToIntegerName,
         integerToWordName, integerToIntName, minusIntegerName,
@@ -264,6 +265,7 @@ basicKnownKeyNames
         quotIntegerName, remIntegerName,
         floatFromIntegerName, doubleFromIntegerName,
         encodeFloatIntegerName, encodeDoubleIntegerName,
+        decodeDoubleIntegerName,
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName,
@@ -840,6 +842,7 @@ negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
 
 integerTyConName, mkIntegerName,
     integerToWord64Name, integerToInt64Name,
+    word64ToIntegerName, int64ToIntegerName,
     plusIntegerName, timesIntegerName, smallIntegerName,
     wordToIntegerName,
     integerToWordName, integerToIntName, minusIntegerName,
@@ -850,6 +853,7 @@ integerTyConName, mkIntegerName,
     quotIntegerName, remIntegerName,
     floatFromIntegerName, doubleFromIntegerName,
     encodeFloatIntegerName, encodeDoubleIntegerName,
+    decodeDoubleIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
@@ -857,6 +861,8 @@ integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           int
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
+word64ToIntegerName   = varQual gHC_INTEGER_TYPE (fsLit "word64ToInteger")   word64ToIntegerIdKey
+int64ToIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "int64ToInteger")    int64ToIntegerIdKey
 plusIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "plusInteger")       plusIntegerIdKey
 timesIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "timesInteger")      timesIntegerIdKey
 smallIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "smallInteger")      smallIntegerIdKey
@@ -882,6 +888,7 @@ floatFromIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "floatFromInteger")     
 doubleFromIntegerName = varQual gHC_INTEGER_TYPE (fsLit "doubleFromInteger")     doubleFromIntegerIdKey
 encodeFloatIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "encodeFloatInteger")  encodeFloatIntegerIdKey
 encodeDoubleIntegerName = varQual gHC_INTEGER_TYPE (fsLit "encodeDoubleInteger") encodeDoubleIntegerIdKey
+decodeDoubleIntegerName = varQual gHC_INTEGER_TYPE (fsLit "decodeDoubleInteger") decodeDoubleIntegerIdKey
 gcdIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "gcdInteger")        gcdIntegerIdKey
 lcmIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "lcmInteger")        lcmIntegerIdKey
 andIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "andInteger")        andIntegerIdKey
@@ -1504,6 +1511,7 @@ runSTRepIdKey                 = mkPreludeMiscIdUnique 45
 mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     integerToWordIdKey, integerToIntIdKey,
     integerToWord64IdKey, integerToInt64IdKey,
+    word64ToIntegerIdKey, int64ToIntegerIdKey,
     plusIntegerIdKey, timesIntegerIdKey, minusIntegerIdKey,
     negateIntegerIdKey,
     eqIntegerIdKey, neqIntegerIdKey, absIntegerIdKey, signumIntegerIdKey,
@@ -1512,6 +1520,7 @@ mkIntegerIdKey, smallIntegerIdKey, wordToIntegerIdKey,
     quotIntegerIdKey, remIntegerIdKey,
     floatFromIntegerIdKey, doubleFromIntegerIdKey,
     encodeFloatIntegerIdKey, encodeDoubleIntegerIdKey,
+    decodeDoubleIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
     shiftLIntegerIdKey, shiftRIntegerIdKey :: Unique
@@ -1551,6 +1560,9 @@ complementIntegerIdKey        = mkPreludeMiscIdUnique 92
 shiftLIntegerIdKey            = mkPreludeMiscIdUnique 93
 shiftRIntegerIdKey            = mkPreludeMiscIdUnique 94
 wordToIntegerIdKey            = mkPreludeMiscIdUnique 95
+word64ToIntegerIdKey          = mkPreludeMiscIdUnique 96
+int64ToIntegerIdKey           = mkPreludeMiscIdUnique 97
+decodeDoubleIntegerIdKey      = mkPreludeMiscIdUnique 98
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 100
