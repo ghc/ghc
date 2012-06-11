@@ -371,8 +371,8 @@ renderWithStyle _ sdoc sty =
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
-showSDocOneLine :: SDoc -> String
-showSDocOneLine d 
+showSDocOneLine :: DynFlags -> SDoc -> String
+showSDocOneLine _ d
  = Pretty.showDocWith PageMode
     (runSDoc d (initSDocContext defaultUserStyle))
 

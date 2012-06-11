@@ -49,6 +49,7 @@ import BasicTypes
 import DataCon
 import Name
 
+import DynFlags
 import HscTypes
 import PrelInfo
 import FamInstEnv( FamInst )
@@ -1269,11 +1270,12 @@ we generate
 
     
 \begin{code}
-gen_Data_binds :: SrcSpan
+gen_Data_binds :: DynFlags
+                -> SrcSpan
 	       -> TyCon 
 	       -> (LHsBinds RdrName,	-- The method bindings
 		   BagDerivStuff)	-- Auxiliary bindings
-gen_Data_binds loc tycon
+gen_Data_binds dflags loc tycon
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
      `unionBags` gcast_binds,
 		-- Auxiliary definitions: the data type and constructors
@@ -1293,7 +1295,7 @@ gen_Data_binds loc tycon
         sig_ty   = nlHsTyVar dataType_RDR
         constrs  = [nlHsVar (mk_constr_name con) | con <- tyConDataCons tycon]
         rhs = nlHsVar mkDataType_RDR 
-              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine (ppr tycon)))
+              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr tycon)))
               `nlHsApp` nlList constrs
 
     genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)

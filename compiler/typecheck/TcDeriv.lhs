@@ -1504,19 +1504,22 @@ genDerivStuff loc fix_env clas name tycon
   = gen_Generic_binds tycon (nameModule name)
 
   | otherwise	                   -- Non-monadic generators
-  = case assocMaybe gen_list (getUnique clas) of
+  = do dflags <- getDynFlags
+       case assocMaybe (gen_list dflags) (getUnique clas) of
         Just gen_fn -> return (gen_fn loc tycon)
         Nothing	    -> pprPanic "genDerivStuff: bad derived class" (ppr clas)
   where
-    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
-    gen_list = [(eqClassKey,            gen_Eq_binds)
+    gen_list :: DynFlags
+             -> [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
+    gen_list dflags
+             = [(eqClassKey,            gen_Eq_binds)
                ,(ordClassKey,           gen_Ord_binds)
                ,(enumClassKey,          gen_Enum_binds)
                ,(boundedClassKey,       gen_Bounded_binds)
                ,(ixClassKey,            gen_Ix_binds)
                ,(showClassKey,          gen_Show_binds fix_env)
                ,(readClassKey,          gen_Read_binds fix_env)
-               ,(dataClassKey,          gen_Data_binds)
+               ,(dataClassKey,          gen_Data_binds dflags)
                ,(functorClassKey,       gen_Functor_binds)
                ,(foldableClassKey,      gen_Foldable_binds)
                ,(traversableClassKey,   gen_Traversable_binds)

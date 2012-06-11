@@ -1159,15 +1159,17 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
 %************************************************************************
 
 \begin{code}
-srcSpanPrimLit :: SrcSpan -> HsExpr Name
-srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDocOneLine (ppr span))))
+srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr Name
+srcSpanPrimLit dflags span
+    = HsLit (HsStringPrim (mkFastString (showSDocOneLine dflags (ppr span))))
 
 mkAssertErrorExpr :: RnM (HsExpr Name)
 -- Return an expression for (assertError "Foo.hs:27")
 mkAssertErrorExpr
-  = getSrcSpanM    			`thenM` \ sloc ->
-    return (HsApp (L sloc (HsVar assertErrorName)) 
-		  (L sloc (srcSpanPrimLit sloc)))
+  = do sloc <- getSrcSpanM
+       dflags <- getDynFlags
+       return (HsApp (L sloc (HsVar assertErrorName))
+                     (L sloc (srcSpanPrimLit dflags sloc)))
 \end{code}
 
 Note [Adding the implicit parameter to 'assert']
