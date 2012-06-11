@@ -388,8 +388,8 @@ showSDocUnqual _ d
 showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (runSDoc d (initSDocContext defaultUserStyle))
 
-showSDocDump :: SDoc -> String
-showSDocDump d 
+showSDocDump :: DynFlags -> SDoc -> String
+showSDocDump _ d
  = Pretty.showDocWith PageMode (runSDoc d (initSDocContext defaultDumpStyle))
 
 showSDocDumpOneLine :: SDoc -> String

@@ -1425,7 +1425,7 @@ completeCall env var cont
       	  pprDefiniteTrace "Inlining done:" (ppr var) stuff
         else stuff
       | otherwise
-      = pprDefiniteTrace ("Inlining done: " ++ showSDocDump (ppr var))
+      = pprDefiniteTrace ("Inlining done: " ++ showSDocDump dflags (ppr var))
            (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                   text "Cont:  " <+> ppr cont])
            stuff

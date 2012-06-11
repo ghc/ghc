@@ -20,17 +20,20 @@ import CoreSyn
 import Rules
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
-import UniqSupply       ( UniqSM, initUs_, MonadUnique(..) )
+import UniqSupply
 import Name
 import MkId             ( voidArgId, realWorldPrimId )
 import Maybes           ( catMaybes, isJust )
 import BasicTypes
 import HscTypes
 import Bag
+import DynFlags
 import Util
 import Outputable
 import FastString
+import State
 
+import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
@@ -561,17 +564,17 @@ Hence, the invariant is this:
 %************************************************************************
 
 \begin{code}
-specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts
+specProgram :: DynFlags -> ModGuts -> CoreM ModGuts
+specProgram dflags guts
   = do { hpt_rules <- getRuleBase
        ; let local_rules = mg_rules guts
              rule_base = extendRuleBaseList hpt_rules (mg_rules guts)
 
              -- Specialise the bindings of this module
-       ; (binds', uds) <- runSpecM (go (mg_binds guts))
+       ; (binds', uds) <- runSpecM dflags (go (mg_binds guts))
 
              -- Specialise imported functions
-       ; (new_rules, spec_binds) <- specImports emptyVarSet rule_base uds
+       ; (new_rules, spec_binds) <- specImports dflags emptyVarSet rule_base uds
 
        ; let final_binds | null spec_binds = binds'
                          | otherwise       = Rec (flattenBinds spec_binds) : binds'
@@ -593,7 +596,8 @@ specProgram guts
                          (bind', uds') <- specBind top_subst bind uds
                          return (bind' ++ binds', uds')
 
-specImports :: VarSet           -- Don't specialise these ones
+specImports :: DynFlags
+            -> VarSet           -- Don't specialise these ones
                                 -- See Note [Avoiding recursive specialisation]
             -> RuleBase         -- Rules from this module and the home package
                                 -- (but not external packages, which can change)
@@ -601,24 +605,25 @@ specImports :: VarSet           -- Don't specialise these ones
             -> CoreM ( [CoreRule]   -- New rules
                      , [CoreBind] ) -- Specialised bindings and floating bindings
 -- See Note [Specialise imported INLINABLE things]
-specImports done rb uds
+specImports dflags done rb uds
   = do { let import_calls = varEnvElts (ud_calls uds)
        ; (rules, spec_binds) <- go rb import_calls
        ; return (rules, wrapDictBinds (ud_binds uds) spec_binds) }
   where
     go _ [] = return ([], [])
     go rb (CIS fn calls_for_fn : other_calls)
-      = do { (rules1, spec_binds1) <- specImport done rb fn (Map.toList calls_for_fn)
+      = do { (rules1, spec_binds1) <- specImport dflags done rb fn (Map.toList calls_for_fn)
            ; (rules2, spec_binds2) <- go (extendRuleBaseList rb rules1) other_calls
            ; return (rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
-specImport :: VarSet                -- Don't specialise these
+specImport :: DynFlags
+           -> VarSet                -- Don't specialise these
                                     -- See Note [Avoiding recursive specialisation]
            -> RuleBase              -- Rules from this module
            -> Id -> [CallInfo]      -- Imported function and calls for it
            -> CoreM ( [CoreRule]    -- New rules
                     , [CoreBind] )  -- Specialised bindings
-specImport done rb fn calls_for_fn
+specImport dflags done rb fn calls_for_fn
   | fn `elemVarSet` done
   = return ([], [])     -- No warning.  This actually happens all the time
                         -- when specialising a recursive function, becuase
@@ -635,7 +640,7 @@ specImport done rb fn calls_for_fn
        ; let full_rb = unionRuleBase rb (eps_rule_base eps)
              rules_for_fn = getRules full_rb fn
 
-       ; (rules1, spec_pairs, uds) <- runSpecM $
+       ; (rules1, spec_pairs, uds) <- runSpecM dflags $
               specCalls emptySubst rules_for_fn calls_for_fn fn rhs
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
              -- After the rules kick in we may get recursion, but
@@ -643,9 +648,9 @@ specImport done rb fn calls_for_fn
              -- See Note [Glom the bindings if imported functions are specialised]
 
               -- Now specialise any cascaded calls
-       ; (rules2, spec_binds2) <- specImports (extendVarSet done fn)
-                                              (extendRuleBaseList rb rules1)
-                                              uds
+       ; (rules2, spec_binds2) <- specImports dflags (extendVarSet done fn)
+                                                     (extendRuleBaseList rb rules1)
+                                                     uds
 
        ; return (rules2 ++ rules1, spec_binds2 ++ spec_binds1) }
 
@@ -1127,10 +1132,11 @@ specCalls subst rules_for_me calls_for_me fn rhs
 
            ; spec_f <- newSpecIdSM fn spec_id_ty
            ; (spec_rhs, rhs_uds) <- specExpr rhs_subst2 (mkLams lam_args body)
+           ; dflags <- getDynFlags
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
-                rule_name = mkFastString ("SPEC " ++ showSDocDump (ppr fn <+> ppr spec_ty_args))
+                rule_name = mkFastString ("SPEC " ++ showSDocDump dflags (ppr fn <+> ppr spec_ty_args))
                 spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]
@@ -1782,11 +1788,39 @@ deleteCallsFor bs calls = delVarEnvList calls bs
 %************************************************************************
 
 \begin{code}
-type SpecM a = UniqSM a
+newtype SpecM a = SpecM (State SpecState a)
 
-runSpecM:: SpecM a -> CoreM a
-runSpecM spec = do { us <- getUniqueSupplyM
-                   ; return (initUs_ us spec) }
+data SpecState = SpecState {
+                     spec_uniq_supply :: UniqSupply,
+                     spec_dflags :: DynFlags
+                 }
+
+instance Monad SpecM where
+    SpecM x >>= f = SpecM $ do y <- x
+                               case f y of
+                                   SpecM z ->
+                                       z
+    return x = SpecM $ return x
+    fail str = SpecM $ fail str
+
+instance MonadUnique SpecM where
+    getUniqueSupplyM
+        = SpecM $ do st <- get
+                     let (us1, us2) = splitUniqSupply $ spec_uniq_supply st
+                     put $ st { spec_uniq_supply = us2 }
+                     return us1
+
+instance HasDynFlags SpecM where
+    getDynFlags = SpecM $ liftM spec_dflags get
+
+runSpecM :: DynFlags -> SpecM a -> CoreM a
+runSpecM dflags (SpecM spec)
+    = do us <- getUniqueSupplyM
+         let initialState = SpecState {
+                                spec_uniq_supply = us,
+                                spec_dflags = dflags
+                            }
+         return $ evalState spec initialState
 
 mapAndCombineSM :: (a -> SpecM (b, UsageDetails)) -> [a] -> SpecM ([b], UsageDetails)
 mapAndCombineSM _ []     = return ([], emptyUDs)

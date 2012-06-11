@@ -79,7 +79,8 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
   ; lf_info  <- mkClosureLFInfo id TopLevel [] upd_flag args
   ; srt_info <- getSRTInfo srt
   ; mod_name <- getModuleName
-  ; let descr         = closureDescription mod_name name
+  ; dflags   <- getDynFlags
+  ; let descr         = closureDescription dflags mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
@@ -288,8 +289,9 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
 	; mod_name <- getModuleName
 	; c_srt <- getSRTInfo srt
+	; dflags <- getDynFlags
 	; let	name  = idName bndr
-		descr = closureDescription mod_name name
+		descr = closureDescription dflags mod_name name
 		fv_details :: [(NonVoid Id, VirtualHpOffset)]
 		(tot_wds, ptr_wds, fv_details)
 		   = mkVirtHeapOffsets (isLFThunk lf_info)
@@ -336,10 +338,11 @@ cgStdThunk bndr _cc _bndr_info _body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     mod_name <- getModuleName
+  ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, payload_w_offsets)
 	    = mkVirtHeapOffsets (isLFThunk lf_info) (addArgReps payload)
 
-	descr = closureDescription mod_name (idName bndr)
+	descr = closureDescription dflags mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds
 				     NoC_SRT	-- No SRT for a std-form closure
@@ -685,13 +688,14 @@ link_caf _is_upd = do
 -- name of the data constructor itself.  Otherwise it is determined by
 -- @closureDescription@ from the let binding information.
 
-closureDescription :: Module		-- Module
+closureDescription :: DynFlags
+           -> Module		-- Module
 		   -> Name		-- Id of closure binding
 		   -> String
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
-closureDescription mod_name name
-  = showSDocDump (char '<' <>
+closureDescription dflags mod_name name
+  = showSDocDump dflags (char '<' <>
 		    (if isExternalName name
 		      then ppr name -- ppr will include the module name prefix
 		      else pprModule mod_name <> char '.' <> ppr name) <>
