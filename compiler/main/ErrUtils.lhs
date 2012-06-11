@@ -247,7 +247,7 @@ dumpSDoc dflags dflag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
-                        hPrintDump handle doc
+                        hPrintDump dflags handle doc
                         hClose handle
 
             -- write the dump to stdout

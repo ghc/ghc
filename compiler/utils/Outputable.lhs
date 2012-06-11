@@ -71,6 +71,7 @@ module Outputable (
         pprDebugAndThen,
     ) where
 
+import {-# SOURCE #-}   DynFlags( DynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
@@ -319,8 +320,8 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
-hPrintDump :: Handle -> SDoc -> IO ()
-hPrintDump h doc = do
+hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
+hPrintDump _ h doc = do
    Pretty.printDoc PageMode h
      (runSDoc better_doc (initSDocContext defaultDumpStyle))
    hFlush h
