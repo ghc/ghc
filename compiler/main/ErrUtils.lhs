@@ -334,15 +334,16 @@ debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg
   = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
 
-prettyPrintGhcErrors :: ExceptionMonad m => m a -> m a
-prettyPrintGhcErrors = ghandle $ \e -> case e of
-                                       PprPanic str doc ->
-                                           pprDebugAndThen panic str doc
-                                       PprSorry str doc ->
-                                           pprDebugAndThen sorry str doc
-                                       PprProgramError str doc ->
-                                           pprDebugAndThen pgmError str doc
-                                       _ ->
-                                           throw e
+prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
+prettyPrintGhcErrors _
+    = ghandle $ \e -> case e of
+                      PprPanic str doc ->
+                          pprDebugAndThen panic str doc
+                      PprSorry str doc ->
+                          pprDebugAndThen sorry str doc
+                      PprProgramError str doc ->
+                          pprDebugAndThen pgmError str doc
+                      _ ->
+                          throw e
 \end{code}
 

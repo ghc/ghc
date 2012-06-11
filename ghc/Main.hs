@@ -167,7 +167,7 @@ main' postLoadMode dflags0 args flagWarnings = do
         -- Leftover ones are presumably files
   (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a args
 
-  GHC.prettyPrintGhcErrors $ do
+  GHC.prettyPrintGhcErrors dflags2 $ do
 
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
