@@ -4,6 +4,10 @@ test('SampleVar001', reqlib('QuickCheck'), compile_and_run, ['-package QuickChec
 test('4876', reqlib('random'), compile_and_run, ['']) # another SampleVar test
 
 test('Chan001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
+
+test('Chan002',      extra_run_opts('100'), compile_and_run, [''])
+test('Chan003',      extra_run_opts('200'), compile_and_run, [''])
+
 test('MVar001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
 test('QSemN001',     reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
 test('QSem001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
