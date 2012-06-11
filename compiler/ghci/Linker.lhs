@@ -238,7 +238,7 @@ filterNameMap mods env
 showLinkerState :: DynFlags -> IO ()
 showLinkerState dflags
   = do pls <- readIORef v_PersistentLinkerState >>= readMVar
-       log_action dflags SevDump noSrcSpan defaultDumpStyle
+       log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
                  (vcat [text "----- Linker state -----",
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
@@ -330,7 +330,7 @@ classifyLdInput dflags f
   | isObjectFilename f = return (Just (Object f))
   | isDynLibFilename f = return (Just (DLLPath f))
   | otherwise          = do
-        log_action dflags SevInfo noSrcSpan defaultUserStyle
+        log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
 

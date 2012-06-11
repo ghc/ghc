@@ -110,7 +110,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
      modBreaks <- mkModBreaks count entries
 
      doIfSet_dyn dflags Opt_D_dump_ticked $
-         log_action dflags SevDump noSrcSpan defaultDumpStyle
+         log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
              (pprLHsBinds binds1)
    
      return (binds1, HpcInfo count hashNo, modBreaks)

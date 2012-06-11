@@ -17,7 +17,7 @@ module DynFlags (
         WarningFlag(..),
         ExtensionFlag(..),
         Language(..),
-        LogAction, FlushOut(..), FlushErr(..),
+        FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         dopt,
@@ -67,6 +67,7 @@ module DynFlags (
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
+        defaultFatalMessager,
         defaultLogAction,
         defaultLogActionHPrintDoc,
         defaultFlushOut,
@@ -965,10 +966,14 @@ defaultDynFlags mySettings =
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
 
-type LogAction = Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
+type FatalMessager = String -> IO ()
+type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
+
+defaultFatalMessager :: FatalMessager
+defaultFatalMessager = hPutStrLn stderr
 
 defaultLogAction :: LogAction
-defaultLogAction severity srcSpan style msg
+defaultLogAction _ severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
       SevDump   -> hPrintDump stdout msg
@@ -1005,7 +1010,7 @@ printInfoForUser = printSevForUser SevInfo
 
 printSevForUser :: Severity -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
 printSevForUser sev dflags unqual doc
-    = log_action dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
+    = log_action dflags dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
 
 {-
 Note [Verbosity levels]

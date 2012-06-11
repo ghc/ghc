@@ -57,7 +57,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
                 { showPass dflags "CmmLint"
                 ; let lints = map (cmmLint (targetPlatform dflags)) flat_abstractC
                 ; case firstJusts lints of
-                        Just err -> do { log_action dflags SevDump noSrcSpan defaultDumpStyle err
+                        Just err -> do { log_action dflags dflags SevDump noSrcSpan defaultDumpStyle err
                                        ; ghcExit dflags 1
                                        }
                         Nothing  -> return ()

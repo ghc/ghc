@@ -429,7 +429,7 @@ ruleCheckPass current_phase pat guts = do
     rb <- getRuleBase
     dflags <- getDynFlags
     liftIO $ Err.showPass dflags "RuleCheck"
-    liftIO $ log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+    liftIO $ log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
                  (ruleCheckProgram current_phase pat rb (mg_binds guts))
     return guts
 

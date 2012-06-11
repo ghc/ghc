@@ -11,7 +11,7 @@ import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
 --import ErrUtils         ( printBagOfErrors )
 import Panic            ( panic )
-import DynFlags         ( defaultLogAction, defaultFlushOut )
+import DynFlags         ( defaultFatalMessager, defaultFlushOut )
 import Bag
 import Exception
 import FastString
@@ -105,7 +105,7 @@ main = do
                      then Just `liftM` openFile "TAGS" openFileMode
                      else return Nothing
 
-  GHC.defaultErrorHandler defaultLogAction defaultFlushOut $
+  GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $
     runGhc (Just ghc_topdir) $ do
       --liftIO $ print "starting up session"
       dflags <- getSessionDynFlags

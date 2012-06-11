@@ -189,7 +189,7 @@ displayLintResults :: DynFlags -> CoreToDo
                    -> IO ()
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
-  = do { log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+  = do { log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
            (vcat [ banner "errors", Err.pprMessageBag errs
                  , ptext (sLit "*** Offending Program ***")
                  , pprCoreBindings binds
@@ -204,7 +204,7 @@ displayLintResults dflags pass warns errs binds
 	-- group.  Only afer a round of simplification are they unravelled.
   , not opt_NoDebugOutput
   , showLintWarnings pass
-  = log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+  = log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
         (banner "warnings" $$ Err.pprMessageBag warns)
 
   | otherwise = return ()

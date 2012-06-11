@@ -79,7 +79,7 @@ main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
    hSetBuffering stderr NoBuffering
-   GHC.defaultErrorHandler defaultLogAction defaultFlushOut $ do
+   GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 

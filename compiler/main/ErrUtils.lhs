@@ -25,7 +25,7 @@ module ErrUtils (
         --  * Messages during compilation
         putMsg, putMsgWith,
         errorMsg,
-        fatalErrorMsg, fatalErrorMsg',
+        fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
         compilationProgressMsg,
         showPass,
         debugTraceMsg,
@@ -165,7 +165,7 @@ pprLocErrMsg (ErrMsg { errMsgSpans     = spans
 printMsgBag :: DynFlags -> Bag ErrMsg -> IO ()
 printMsgBag dflags bag
   = sequence_ [ let style = mkErrStyle unqual
-                in log_action dflags sev s style (d $$ e)
+                in log_action dflags dflags sev s style (d $$ e)
               | ErrMsg { errMsgSpans     = s:_,
                          errMsgShortDoc  = d,
                          errMsgSeverity  = sev,
@@ -201,7 +201,7 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
 dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = log_action dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
+  | otherwise  = log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
@@ -252,7 +252,7 @@ dumpSDoc dflags dflag hdr doc
 
             -- write the dump to stdout
             Nothing
-                 -> log_action dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
+                 -> log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -305,34 +305,37 @@ ifVerbose dflags val act
   | otherwise               = return ()
 
 putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+putMsg dflags msg = log_action dflags dflags SevInfo noSrcSpan defaultUserStyle msg
 
 putMsgWith :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 putMsgWith dflags print_unqual msg
-  = log_action dflags SevInfo noSrcSpan sty msg
+  = log_action dflags dflags SevInfo noSrcSpan sty msg
   where
     sty = mkUserStyle print_unqual AllTheWay
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
-errorMsg dflags msg = log_action dflags SevError noSrcSpan defaultErrStyle msg
+errorMsg dflags msg = log_action dflags dflags SevError noSrcSpan defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
-fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) msg
+fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg
 
-fatalErrorMsg' :: LogAction -> MsgDoc -> IO ()
-fatalErrorMsg' la msg = la SevFatal noSrcSpan defaultErrStyle msg
+fatalErrorMsg' :: LogAction -> DynFlags -> MsgDoc -> IO ()
+fatalErrorMsg' la dflags msg = la dflags SevFatal noSrcSpan defaultErrStyle msg
+
+fatalErrorMsg'' :: FatalMessager -> String -> IO ()
+fatalErrorMsg'' fm msg = fm msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 (log_action dflags SevOutput noSrcSpan defaultUserStyle (text msg))
+  = ifVerbose dflags 1 (log_action dflags dflags SevOutput noSrcSpan defaultUserStyle (text msg))
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
-  = ifVerbose dflags 2 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
+  = ifVerbose dflags 2 (log_action dflags dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg
-  = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
+  = ifVerbose dflags val (log_action dflags dflags SevInfo noSrcSpan defaultDumpStyle msg)
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors _

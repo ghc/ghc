@@ -334,24 +334,24 @@ import Prelude hiding (init)
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
 defaultErrorHandler :: (ExceptionMonad m, MonadIO m)
-                    => LogAction -> FlushOut -> m a -> m a
-defaultErrorHandler la (FlushOut flushOut) inner =
+                    => FatalMessager -> FlushOut -> m a -> m a
+defaultErrorHandler fm (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   ghandle (\exception -> liftIO $ do
            flushOut
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
-                  fatalErrorMsg' la (text (show ioe))
+                  fatalErrorMsg'' fm (show ioe)
                 _ -> case fromException exception of
                      Just UserInterrupt -> exitWith (ExitFailure 1)
                      Just StackOverflow ->
-                         fatalErrorMsg' la (text "stack overflow: use +RTS -K<size> to increase it")
+                         fatalErrorMsg'' fm "stack overflow: use +RTS -K<size> to increase it"
                      _ -> case fromException exception of
                           Just (ex :: ExitCode) -> throw ex
                           _ ->
-                              fatalErrorMsg' la
-                                  (text (show (Panic (show exception))))
+                              fatalErrorMsg'' fm
+                                  (show (Panic (show exception)))
            exitWith (ExitFailure 1)
          ) $
 
@@ -362,7 +362,7 @@ defaultErrorHandler la (FlushOut flushOut) inner =
                 case ge of
                      PhaseFailed _ code -> exitWith code
                      Signal _ -> exitWith (ExitFailure 1)
-                     _ -> do fatalErrorMsg' la (text (show ge))
+                     _ -> do fatalErrorMsg'' fm (show ge)
                              exitWith (ExitFailure 1)
             ) $
   inner
