@@ -15,7 +15,7 @@
         <para>
           A bug in dependency analysis of type declarations in the presence of
           type families (<ulink
-            url="http://hackage.haskell.org/trac/ghc/ticket/5826">#5826</ulink>)
+            url="http://hackage.haskell.org/trac/ghc/ticket/5792">#5792</ulink>)
           has been fixed.
         </para>
       </listitem>
