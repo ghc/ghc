@@ -973,7 +973,7 @@ defaultFatalMessager :: FatalMessager
 defaultFatalMessager = hPutStrLn stderr
 
 defaultLogAction :: LogAction
-defaultLogAction _ severity srcSpan style msg
+defaultLogAction dflags severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
       SevDump   -> hPrintDump stdout msg
@@ -984,11 +984,11 @@ defaultLogAction _ severity srcSpan style msg
                       -- careful (#2302): printErrs prints in UTF-8, whereas
                       -- converting to string first and using hPutStr would
                       -- just emit the low 8 bits of each unicode char.
-    where printSDoc = defaultLogActionHPrintDoc stdout
-          printErrs = defaultLogActionHPrintDoc stderr
+    where printSDoc = defaultLogActionHPrintDoc dflags stdout
+          printErrs = defaultLogActionHPrintDoc dflags stderr
 
-defaultLogActionHPrintDoc :: Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPrintDoc h d sty
+defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
+defaultLogActionHPrintDoc _ h d sty
     = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext sty))
          hFlush h
 
