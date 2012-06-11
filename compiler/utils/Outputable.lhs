@@ -67,7 +67,8 @@ module Outputable (
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
         pprTrace, pprDefiniteTrace, warnPprTrace,
-        trace, pgmError, panic, sorry, panicFastInt, assertPanic
+        trace, pgmError, panic, sorry, panicFastInt, assertPanic,
+        pprDebugAndThen,
     ) where
 
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
@@ -904,7 +905,7 @@ plural _   = char 's'
 
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = pprDebugAndThen panic
+pprPanic    = panicDoc
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"

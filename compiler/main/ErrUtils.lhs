@@ -29,13 +29,17 @@ module ErrUtils (
         compilationProgressMsg,
         showPass,
         debugTraceMsg,
+
+        prettyPrintGhcErrors,
     ) where
 
 #include "HsVersions.h"
 
 import Bag              ( Bag, bagToList, isEmptyBag, emptyBag )
+import Exception
 import Util
 import Outputable
+import Panic
 import FastString
 import SrcLoc
 import DynFlags
@@ -329,5 +333,12 @@ showPass dflags what
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg
   = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
+
+prettyPrintGhcErrors :: ExceptionMonad m => m a -> m a
+prettyPrintGhcErrors = ghandle $ \e -> case e of
+                                       PprPanic str doc ->
+                                           pprDebugAndThen panic str doc
+                                       _ ->
+                                           throw e
 \end{code}
 

@@ -10,6 +10,7 @@ module GHC (
         -- * Initialisation
         defaultErrorHandler,
         defaultCleanupHandler,
+        prettyPrintGhcErrors,
 
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,

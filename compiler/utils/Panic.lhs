@@ -14,6 +14,7 @@ module Panic (
      pgmError,
 
      panic, sorry, panicFastInt, assertPanic, trace,
+     panicDoc,
 
      Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
@@ -22,9 +23,12 @@ module Panic (
 ) where
 #include "HsVersions.h"
 
+import {-# SOURCE #-} Outputable (SDoc)
+
 import Config
 import FastTypes
 import Exception
+
 import Control.Concurrent
 import Data.Dynamic
 #if __GLASGOW_HASKELL__ < 705
@@ -78,6 +82,7 @@ data GhcException
 
   -- | The 'impossible' happened.
   | Panic        String
+  | PprPanic     String SDoc
 
   -- | The user tickled something that's known not to work yet,
   --   but we're not counting it as a bug.
@@ -88,7 +93,7 @@ data GhcException
 
   -- | An error in the user's code, probably.
   | ProgramError String
-  deriving (Typeable, Eq)
+  deriving (Typeable)
 
 instance Exception GhcException
 
@@ -143,6 +148,8 @@ showGhcException exception
         InstallationError str   -> showString str
         Signal n                -> showString "signal: " . shows n
 
+        PprPanic  s _ ->
+            showGhcException (Panic (s ++ "\n<<details unavailable>>"))
         Panic s
          -> showString $
                 "panic! (the 'impossible' happened)\n"
@@ -184,6 +191,9 @@ panic    x = unsafeDupablePerformIO $ do
 #else
 panic    x = throwGhcException (Panic x)
 #endif
+
+panicDoc :: String -> SDoc -> a
+panicDoc x doc = throwGhcException (PprPanic x doc)
 
 sorry    x = throwGhcException (Sorry x)
 pgmError x = throwGhcException (ProgramError x)

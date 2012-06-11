@@ -78,6 +78,7 @@ import Data.Maybe
 main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
+   hSetBuffering stderr NoBuffering
    GHC.defaultErrorHandler defaultLogAction defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
@@ -165,6 +166,8 @@ main' postLoadMode dflags0 args flagWarnings = do
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
   (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a args
+
+  GHC.prettyPrintGhcErrors $ do
 
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
