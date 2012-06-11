@@ -48,6 +48,7 @@ import CLabel
 import PprCmmExpr
 import Cmm
 
+import DynFlags
 import Outputable
 import Platform
 import FastString
@@ -67,8 +68,9 @@ pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pprPl
           separator = space $$ ptext (sLit "-------------------") $$ space
 
 writeCmms :: (PlatformOutputable info, PlatformOutputable g)
-          => Platform -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
-writeCmms platform handle cmms = printForC handle (pprCmms platform cmms)
+          => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
+writeCmms dflags handle cmms = printForC dflags handle (pprCmms platform cmms)
+    where platform = targetPlatform dflags
 
 -----------------------------------------------------------------------------
 

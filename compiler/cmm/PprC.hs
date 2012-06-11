@@ -71,7 +71,7 @@ pprCs dflags cmms
 
 writeCs :: DynFlags -> Handle -> [RawCmmGroup] -> IO ()
 writeCs dflags handle cmms
-  = printForC handle (pprCs dflags cmms)
+  = printForC dflags handle (pprCs dflags cmms)
 
 -- --------------------------------------------------------------------------
 -- Now do some real work

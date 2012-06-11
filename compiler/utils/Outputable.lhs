@@ -340,13 +340,13 @@ printForUserPartWay _ handle d unqual doc
       (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
-printForC :: Handle -> SDoc -> IO ()
-printForC handle doc =
+printForC :: DynFlags -> Handle -> SDoc -> IO ()
+printForC _ handle doc =
   Pretty.printDoc LeftMode handle
     (runSDoc doc (initSDocContext (PprCode CStyle)))
 
-printForAsm :: Handle -> SDoc -> IO ()
-printForAsm handle doc =
+printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
+printForAsm _ handle doc =
   Pretty.printDoc LeftMode handle
     (runSDoc doc (initSDocContext (PprCode AsmStyle)))
 
