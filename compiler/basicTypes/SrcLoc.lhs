@@ -45,6 +45,7 @@ module SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
+        showUserSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -81,6 +82,7 @@ import FastString
 
 import Data.Bits
 import Data.Data
+import System.FilePath
 \end{code}
 
 %************************************************************************
@@ -434,7 +436,7 @@ instance Outputable RealSrcSpan where
     ppr span
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-           pprUserRealSpan True span
+           text (showUserRealSpan True span)
         else
            hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
                  char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
@@ -451,30 +453,30 @@ instance Outputable SrcSpan where
 
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan s) = ftext s
-pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
+pprUserSpan show_path (RealSrcSpan s)   = text (showUserRealSpan show_path s)
 
-pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
-pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , int line, char ':', int start_col
-         , ppUnless (end_col - start_col <= 1)
-                    (char '-' <> int (end_col-1))
+showUserSpan :: Bool -> SrcSpan -> String
+showUserSpan _         (UnhelpfulSpan s) = unpackFS s
+showUserSpan show_path (RealSrcSpan s)   = showUserRealSpan show_path s
+
+showUserRealSpan :: Bool -> RealSrcSpan -> String
+showUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ show line ++ ":" ++ show start_col
+ ++ (if end_col - start_col <= 1 then "" else '-' : show (end_col - 1))
             -- For single-character or point spans, we just
             -- output the starting column number
-         ]
 
+showUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ "(" ++ show sline ++ "," ++ show scol ++ ")"
+ ++ "-"
+ ++ "(" ++ show eline ++ "," ++ show ecol' ++ ")"
+    where ecol' = if ecol == 0 then ecol else ecol - 1
 
-pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , parens (int sline <> char ',' <>  int scol)
-         , char '-'
-         , parens (int eline <> char ',' <>
-                   if ecol == 0 then int ecol else int (ecol-1))
-         ]
-
-pprUserRealSpan show_path (SrcSpanPoint src_path line col)
-  = hcat [ ppWhen show_path $ (pprFastFilePath src_path <> colon)
-         , int line, char ':', int col ]
+showUserRealSpan show_path (SrcSpanPoint src_path line col)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ show line ++ ":" ++ show col
 \end{code}
 
 %************************************************************************
