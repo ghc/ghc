@@ -376,8 +376,8 @@ showSDocOneLine _ d
  = Pretty.showDocWith PageMode
     (runSDoc d (initSDocContext defaultUserStyle))
 
-showSDocForUser :: PrintUnqualified -> SDoc -> String
-showSDocForUser unqual doc
+showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
+showSDocForUser _ unqual doc
  = show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 showSDocUnqual :: SDoc -> String
