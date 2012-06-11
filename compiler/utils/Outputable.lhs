@@ -380,9 +380,9 @@ showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 showSDocForUser _ unqual doc
  = show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
-showSDocUnqual :: SDoc -> String
+showSDocUnqual :: DynFlags -> SDoc -> String
 -- Only used in the gruesome isOperator
-showSDocUnqual d 
+showSDocUnqual _ d
  = show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
