@@ -14,7 +14,7 @@ module Panic (
      pgmError,
 
      panic, sorry, panicFastInt, assertPanic, trace,
-     panicDoc,
+     panicDoc, sorryDoc, pgmErrorDoc,
 
      Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
@@ -87,12 +87,14 @@ data GhcException
   -- | The user tickled something that's known not to work yet,
   --   but we're not counting it as a bug.
   | Sorry        String
+  | PprSorry     String SDoc
 
   -- | An installation problem.
   | InstallationError String
 
   -- | An error in the user's code, probably.
-  | ProgramError String
+  | ProgramError    String
+  | PprProgramError String SDoc
   deriving (Typeable)
 
 instance Exception GhcException
@@ -144,6 +146,8 @@ showGhcException exception
             showString ")"
 
         CmdLineError str        -> showString str
+        PprProgramError str  _  ->
+            showGhcException (ProgramError (str ++ "\n<<details unavailable>>"))
         ProgramError str        -> showString str
         InstallationError str   -> showString str
         Signal n                -> showString "signal: " . shows n
@@ -157,6 +161,8 @@ showGhcException exception
                 ++ s ++ "\n\n"
                 ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n"
 
+        PprSorry  s _ ->
+            showGhcException (Sorry (s ++ "\n<<details unavailable>>"))
         Sorry s
          -> showString $
                 "sorry! (unimplemented feature or known bug)\n"
@@ -192,11 +198,13 @@ panic    x = unsafeDupablePerformIO $ do
 panic    x = throwGhcException (Panic x)
 #endif
 
-panicDoc :: String -> SDoc -> a
-panicDoc x doc = throwGhcException (PprPanic x doc)
-
 sorry    x = throwGhcException (Sorry x)
 pgmError x = throwGhcException (ProgramError x)
+
+panicDoc, sorryDoc, pgmErrorDoc :: String -> SDoc -> a
+panicDoc    x doc = throwGhcException (PprPanic        x doc)
+sorryDoc    x doc = throwGhcException (PprSorry        x doc)
+pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 
 
 -- | Panic while pretending to return an unboxed int.

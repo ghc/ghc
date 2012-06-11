@@ -909,12 +909,12 @@ pprPanic    = panicDoc
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"
-pprSorry    = pprDebugAndThen sorry
+pprSorry    = sorryDoc
 
 
 pprPgmError :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
-pprPgmError = pprDebugAndThen pgmError
+pprPgmError = pgmErrorDoc
 
 
 pprTrace :: String -> SDoc -> a -> a

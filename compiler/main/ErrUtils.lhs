@@ -338,6 +338,10 @@ prettyPrintGhcErrors :: ExceptionMonad m => m a -> m a
 prettyPrintGhcErrors = ghandle $ \e -> case e of
                                        PprPanic str doc ->
                                            pprDebugAndThen panic str doc
+                                       PprSorry str doc ->
+                                           pprDebugAndThen sorry str doc
+                                       PprProgramError str doc ->
+                                           pprDebugAndThen pgmError str doc
                                        _ ->
                                            throw e
 \end{code}
