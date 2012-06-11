@@ -333,8 +333,9 @@ printForUser _ handle unqual doc
   = Pretty.printDoc PageMode handle
       (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
-printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
-printForUserPartWay handle d unqual doc
+printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
+                    -> IO ()
+printForUserPartWay _ handle d unqual doc
   = Pretty.printDoc PageMode handle
       (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
 
