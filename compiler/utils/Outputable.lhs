@@ -364,8 +364,8 @@ showSDoc d =
   Pretty.showDocWith PageMode
     (runSDoc d (initSDocContext defaultUserStyle))
 
-renderWithStyle :: SDoc -> PprStyle -> String
-renderWithStyle sdoc sty =
+renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
+renderWithStyle _ sdoc sty =
   Pretty.render (runSDoc sdoc (initSDocContext sty))
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
