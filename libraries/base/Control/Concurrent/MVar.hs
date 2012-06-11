@@ -124,19 +124,21 @@
 module Control.Concurrent.MVar
         (
           -- * @MVar@s
-          MVar          -- abstract
-        , newEmptyMVar  -- :: IO (MVar a)
-        , newMVar       -- :: a -> IO (MVar a)
-        , takeMVar      -- :: MVar a -> IO a
-        , putMVar       -- :: MVar a -> a -> IO ()
-        , readMVar      -- :: MVar a -> IO a
-        , swapMVar      -- :: MVar a -> a -> IO a
-        , tryTakeMVar   -- :: MVar a -> IO (Maybe a)
-        , tryPutMVar    -- :: MVar a -> a -> IO Bool
-        , isEmptyMVar   -- :: MVar a -> IO Bool
-        , withMVar      -- :: MVar a -> (a -> IO b) -> IO b
-        , modifyMVar_   -- :: MVar a -> (a -> IO a) -> IO ()
-        , modifyMVar    -- :: MVar a -> (a -> IO (a,b)) -> IO b
+          MVar
+        , newEmptyMVar
+        , newMVar
+        , takeMVar
+        , putMVar
+        , readMVar
+        , swapMVar
+        , tryTakeMVar
+        , tryPutMVar
+        , isEmptyMVar
+        , withMVar
+        , modifyMVar_
+        , modifyMVar
+        , modifyMVarMasked_
+        , modifyMVarMasked
 #ifndef __HUGS__
         , mkWeakMVar
         , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
@@ -233,6 +235,31 @@ modifyMVar m io =
   mask $ \restore -> do
     a      <- takeMVar m
     (a',b) <- restore (io a) `onException` putMVar m a
+    putMVar m a'
+    return b
+
+{-|
+  Like 'modifyMVar_', but the @IO@ action in the second argument is executed with
+  asynchronous exceptions masked.
+-}
+{-# INLINE modifyMVarMasked_ #-}
+modifyMVarMasked_ :: MVar a -> (a -> IO a) -> IO ()
+modifyMVarMasked_ m io =
+  mask_ $ do
+    a  <- takeMVar m
+    a' <- io a `onException` putMVar m a
+    putMVar m a'
+
+{-|
+  Like 'modifyMVar', but the @IO@ action in the second argument is executed with
+  asynchronous exceptions masked.
+-}
+{-# INLINE modifyMVarMasked #-}
+modifyMVarMasked :: MVar a -> (a -> IO (a,b)) -> IO b
+modifyMVarMasked m io =
+  mask_ $ do
+    a      <- takeMVar m
+    (a',b) <- io a `onException` putMVar m a
     putMVar m a'
     return b
 
