@@ -1443,7 +1443,7 @@ isSafeModule m = do
 
     let iface' = fromJust iface
 
-        trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
+        trust = showPpr dflags $ getSafeMode $ GHC.mi_trust iface'
         pkgT  = packageTrusted dflags m
         pkg   = if pkgT then "trusted" else "untrusted"
         (good', bad') = tallyPkgs dflags $

@@ -377,12 +377,15 @@ data SafeHaskellMode
    | Sf_SafeInfered
    deriving (Eq)
 
+instance Show SafeHaskellMode where
+    show Sf_None        = "None"
+    show Sf_Unsafe      = "Unsafe"
+    show Sf_Trustworthy = "Trustworthy"
+    show Sf_Safe        = "Safe"
+    show Sf_SafeInfered = "Safe-Infered"
+
 instance Outputable SafeHaskellMode where
-    ppr Sf_None        = ptext $ sLit "None"
-    ppr Sf_Unsafe      = ptext $ sLit "Unsafe"
-    ppr Sf_Trustworthy = ptext $ sLit "Trustworthy"
-    ppr Sf_Safe        = ptext $ sLit "Safe"
-    ppr Sf_SafeInfered = ptext $ sLit "Safe-Infered"
+    ppr = text . show
 
 data ExtensionFlag
    = Opt_Cpp
@@ -1181,7 +1184,7 @@ combineSafeFlags a b | a == Sf_SafeInfered = return b
                      | a == b              = return a
                      | otherwise           = addErr errm >> return (panic errm)
     where errm = "Incompatible Safe Haskell flags! ("
-                    ++ showPpr a ++ ", " ++ showPpr b ++ ")"
+                    ++ show a ++ ", " ++ show b ++ ")"
 
 -- | A list of unsafe flags under Safe Haskell. Tuple elements are:
 --     * name of the flag
@@ -2004,7 +2007,7 @@ languageFlags = [
 -- features can be used.
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
 safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
-    where mkF flag = (showPpr flag, flag, nop)
+    where mkF flag = (show flag, flag, nop)
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]

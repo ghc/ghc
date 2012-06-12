@@ -399,8 +399,8 @@ showSDocDumpOneLine d
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
 
-showPpr :: Outputable a => a -> String
-showPpr = showSDoc . ppr
+showPpr :: Outputable a => DynFlags -> a -> String
+showPpr _ = showSDoc . ppr
 \end{code}
 
 \begin{code}

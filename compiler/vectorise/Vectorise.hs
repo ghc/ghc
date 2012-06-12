@@ -264,10 +264,11 @@ vectTopBinder var inline expr
           Just (vdty, _) 
             | eqType vty vdty -> return ()
             | otherwise       -> 
-              cantVectorise ("Type mismatch in vectorisation pragma for " ++ showSDoc (ppr var)) $
-                (text "Expected type" <+> ppr vty)
-                $$
-                (text "Inferred type" <+> ppr vdty)
+              do dflags <- getDynFlags
+                 cantVectorise ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
+                   (text "Expected type" <+> ppr vty)
+                   $$
+                   (text "Inferred type" <+> ppr vdty)
 
           -- Make the vectorised version of binding's name, and set the unfolding used for inlining
       ; var' <- liftM (`setIdUnfoldingLazily` unfolding) 
@@ -350,9 +351,10 @@ vectTopRhs recFs var expr
   = closedV
   $ do { globalScalar <- isGlobalScalarVar var
        ; vectDecl     <- lookupVectDecl var
+       ; dflags       <- getDynFlags
        ; let isDFun = isDFunId var
 
-       ; traceVt ("vectTopRhs of " ++ showSDoc (ppr var) ++ info globalScalar isDFun vectDecl ++ ":") $ 
+       ; traceVt ("vectTopRhs of " ++ showPpr dflags var ++ info globalScalar isDFun vectDecl ++ ":") $
            ppr expr
 
        ; rhs globalScalar isDFun vectDecl

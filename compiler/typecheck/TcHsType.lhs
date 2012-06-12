@@ -1355,7 +1355,7 @@ tc_hs_kind (HsTupleTy _ kis) =
      tycon = promotedTupleTyCon BoxedTuple (length kis)
 
 -- Argument not kind-shaped
-tc_hs_kind k = panic ("tc_hs_kind: " ++ showPpr k)
+tc_hs_kind k = pprPanic "tc_hs_kind" (ppr k)
 
 -- Special case for kind application
 tc_kind_app :: HsKind Name -> [LHsKind Name] -> TcM Kind

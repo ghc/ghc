@@ -69,6 +69,8 @@ instance Functor VM where
 instance MonadIO VM where
   liftIO = liftDs . liftIO
 
+instance HasDynFlags VM where
+    getDynFlags = liftDs getDynFlags
 
 -- Lifting --------------------------------------------------------------------
 

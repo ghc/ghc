@@ -67,7 +67,8 @@ gen_Generic_binds :: TyCon -> Module
 gen_Generic_binds tc mod = do
         { (metaTyCons, rep0TyInst) <- genGenericRepExtras tc mod
         ; metaInsts                <- genDtMeta (tc, metaTyCons)
-        ; return ( mkBindsRep tc
+        ; dflags <- getDynFlags
+        ; return ( mkBindsRep dflags tc
                  ,           (DerivFamInst rep0TyInst)
                    `consBag` ((mapBag DerivTyCon (metaTyCons2TyCons metaTyCons))
                    `unionBags` metaInsts)) }
@@ -132,7 +133,7 @@ genDtMeta (tc,metaDts) =
 
       let
         safeOverlap = safeLanguageOn dflags
-        (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
+        (dBinds,cBinds,sBinds) = mkBindsMetaD dflags fix_env tc
         
         -- Datatype
         d_metaTycon = metaD metaDts
@@ -234,8 +235,8 @@ type US = Int	-- Local unique supply, just a plain Int
 type Alt = (LPat RdrName, LHsExpr RdrName)
 
 -- Bindings for the Generic instance
-mkBindsRep :: TyCon -> LHsBinds RdrName
-mkBindsRep tycon = 
+mkBindsRep :: DynFlags -> TyCon -> LHsBinds RdrName
+mkBindsRep dflags tycon =
     unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
   `unionBags`
     unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
@@ -247,7 +248,7 @@ mkBindsRep tycon =
 
         -- Recurse over the sum first
         from_alts, to_alts :: [Alt]
-        (from_alts, to_alts) = mkSum (1 :: US) tycon datacons
+        (from_alts, to_alts) = mkSum dflags (1 :: US) tycon datacons
         
 --------------------------------------------------------------------------------
 -- The type instance synonym and synonym
@@ -364,11 +365,11 @@ metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
-mkBindsMetaD :: FixityEnv -> TyCon 
+mkBindsMetaD :: DynFlags -> FixityEnv -> TyCon 
              -> ( LHsBinds RdrName      -- Datatype instance
                 , [LHsBinds RdrName]    -- Constructor instances
                 , [[LHsBinds RdrName]]) -- Selector instances
-mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
+mkBindsMetaD dflags fix_env tycon = (dtBinds, allConBinds, allSelBinds)
       where
         mkBag l = foldr1 unionBags 
                     [ unitBag (L loc (mkFunBind (L loc name) matches)) 
@@ -400,41 +401,42 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
         datacons      = tyConDataCons tycon
         datasels      = map dataConFieldLabels datacons
 
-        dtName_matches     = mkStringLHS . showPpr . nameOccName . tyConName 
+        dtName_matches     = mkStringLHS . showPpr dflags . nameOccName . tyConName 
                            $ tycon
         moduleName_matches = mkStringLHS . moduleNameString . moduleName 
                            . nameModule . tyConName $ tycon
 
-        conName_matches     c = mkStringLHS . showPpr . nameOccName
+        conName_matches     c = mkStringLHS . showPpr dflags . nameOccName
                               . dataConName $ c
         conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
         conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 
-        selName_matches     s = mkStringLHS (showPpr (nameOccName s))
+        selName_matches     s = mkStringLHS (showPpr dflags (nameOccName s))
 
 
 --------------------------------------------------------------------------------
 -- Dealing with sums
 --------------------------------------------------------------------------------
 
-mkSum :: US          -- Base for generating unique names
+mkSum :: DynFlags
+      -> US          -- Base for generating unique names
       -> TyCon       -- The type constructor
       -> [DataCon]   -- The data constructors
       -> ([Alt],     -- Alternatives for the T->Trep "from" function
           [Alt])     -- Alternatives for the Trep->T "to" function
 
 -- Datatype without any constructors
-mkSum _us tycon [] = ([from_alt], [to_alt])
+mkSum dflags _us tycon [] = ([from_alt], [to_alt])
   where
     from_alt = (nlWildPat, mkM1_E (makeError errMsgFrom))
     to_alt   = (mkM1_P nlWildPat, makeError errMsgTo)
                -- These M1s are meta-information for the datatype
     makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
-    errMsgFrom = "No generic representation for empty datatype " ++ showPpr tycon
-    errMsgTo = "No values for empty datatype " ++ showPpr tycon
+    errMsgFrom = "No generic representation for empty datatype " ++ showPpr dflags tycon
+    errMsgTo = "No values for empty datatype " ++ showPpr dflags tycon
 
 -- Datatype with at least one constructor
-mkSum us _tycon datacons =
+mkSum _ us _tycon datacons =
   unzip [ mk1Sum us i (length datacons) d | (d,i) <- zip datacons [1..] ]
 
 -- Build the sum for a particular constructor
