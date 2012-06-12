@@ -130,31 +130,6 @@ main = handleTopExceptions $ do
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
 
-  if not (null files) then do
-    (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
-
-    -- Dump an "interface file" (.haddock file), if requested.
-    case optDumpInterfaceFile flags of
-      Just f -> dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
-      Nothing -> return ()
-
-    -- Render the interfaces.
-    renderStep flags packages ifaces
-
-  else do
-    when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
-      throwE "No input file(s)."
-
-    -- Get packages supplied with --read-interface.
-    packages <- readInterfaceFiles freshNameCache (readIfaceArgs flags)
-
-    -- Render even though there are no input files (usually contents/index).
-    renderStep flags packages []
-
-
-readPackagesAndProcessModules :: [Flag] -> [String]
-                              -> IO ([(DocPaths, InterfaceFile)], [Interface], LinkEnv)
-readPackagesAndProcessModules flags files = do
   libDir <- fmap snd (getGhcDirs flags)
 
   -- Catches all GHC source errors, then prints and re-throws them.
@@ -165,6 +140,33 @@ readPackagesAndProcessModules flags files = do
   -- Initialize GHC.
   withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
 
+    dflags <- getDynFlags
+
+    if not (null files) then do
+      (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
+
+      -- Dump an "interface file" (.haddock file), if requested.
+      case optDumpInterfaceFile flags of
+        Just f -> liftIO $ dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+        Nothing -> return ()
+
+      -- Render the interfaces.
+      liftIO $ renderStep dflags flags packages ifaces
+
+    else do
+      when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
+        throwE "No input file(s)."
+
+      -- Get packages supplied with --read-interface.
+      packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags)
+
+      -- Render even though there are no input files (usually contents/index).
+      liftIO $ renderStep dflags flags packages []
+
+
+readPackagesAndProcessModules :: [Flag] -> [String]
+                              -> Ghc ([(DocPaths, InterfaceFile)], [Interface], LinkEnv)
+readPackagesAndProcessModules flags files = do
     -- Get packages supplied with --read-interface.
     packages <- readInterfaceFiles nameCacheFromGhc (readIfaceArgs flags)
 
@@ -175,19 +177,19 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: [Flag] -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
-renderStep flags pkgs interfaces = do
+renderStep :: DynFlags -> [Flag] -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
+renderStep dflags flags pkgs interfaces = do
   updateHTMLXRefs pkgs
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
     srcMap = Map.fromList [ (ifPackageId if_, x) | ((_, Just x), if_) <- pkgs ]
-  render flags interfaces installedIfaces srcMap
+  render dflags flags interfaces installedIfaces srcMap
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: [Flag] -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
-render flags ifaces installedIfaces srcMap = do
+render :: DynFlags -> [Flag] -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
+render dflags flags ifaces installedIfaces srcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -241,7 +243,7 @@ render flags ifaces installedIfaces srcMap = do
 
   when (Flag_Hoogle `elem` flags) $ do
     let pkgName2 = if pkgName == "main" && title /= [] then title else pkgName
-    ppHoogle pkgName2 pkgVer title prologue visibleIfaces odir
+    ppHoogle dflags pkgName2 pkgVer title prologue visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
     ppLaTeX title pkgStr visibleIfaces odir prologue opt_latex_style

@@ -80,7 +80,7 @@ lexParseRnHaddockModHeader dflags gre safety mbStr = do
             tell ["haddock module header parse failed: " ++ mess]
             return failure
           Right (info, doc) -> return (renameHmi gre info, Just (rename gre doc))
-  return (hmi { hmi_safety = Just $ showPpr safety }, docn)
+  return (hmi { hmi_safety = Just $ showPpr dflags safety }, docn)
   where
     failure = (emptyHaddockModInfo, Nothing)
 
