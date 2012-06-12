@@ -64,7 +64,8 @@ type ErrorMessages   = Bag ErrMsg
 data ErrMsg = ErrMsg {
         errMsgSpans     :: [SrcSpan],
         errMsgContext   :: PrintUnqualified,
-        errMsgShortDoc  :: MsgDoc,
+        errMsgShortDoc  :: MsgDoc,   -- errMsgShort* should always
+        errMsgShortString :: String, -- contain the same text
         errMsgExtraInfo :: MsgDoc,
         errMsgSeverity  :: Severity
         }
@@ -82,7 +83,7 @@ data Severity
   | SevFatal
 
 instance Show ErrMsg where
-    show em = showSDoc (errMsgShortDoc em)
+    show em = errMsgShortString em
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -110,7 +111,8 @@ makeIntoWarning err = err { errMsgSeverity = SevWarning }
 mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> MsgDoc -> SDoc -> ErrMsg
 mk_err_msg _ sev locn print_unqual msg extra 
  = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
-          , errMsgShortDoc = msg, errMsgExtraInfo = extra
+          , errMsgShortDoc = msg , errMsgShortString = showSDoc msg
+          , errMsgExtraInfo = extra
           , errMsgSeverity = sev }
 
 mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
