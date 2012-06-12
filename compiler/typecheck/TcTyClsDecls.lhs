@@ -1168,12 +1168,17 @@ chooseBoxingStrategy arg_ty bang
                                          else return HsStrict }
 	HsNoUnpack -> return HsStrict
 	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
+                       ; let bang = can_unbox HsUnpackFailed arg_ty
+                       ; if omit_prags && bang == HsUnpack
+                            then return HsStrict
+                            else return bang }
             -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
 	    -- See Trac #5252: unpacking means we must not conceal the
 	    --                 representation of the argument type
-                       ; if omit_prags then return HsStrict
-                                       else return (can_unbox HsUnpackFailed arg_ty) }
-	HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
+            -- However: even when OmitInterfacePragmas is on, we still want
+            -- to know if we have HsUnpackFailed, because we omit a
+            -- warning in that case (#3676)
+        HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
 		       	  -- Source code never has shtes
   where
     can_unbox :: HsBang -> TcType -> HsBang
