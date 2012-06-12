@@ -45,7 +45,7 @@ module Outputable (
         showSDoc, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showPpr,
-        showSDocUnqual, showsPrecSDoc,
+        showSDocUnqual,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
@@ -384,9 +384,6 @@ showSDocUnqual :: DynFlags -> SDoc -> String
 -- Only used in the gruesome isOperator
 showSDocUnqual _ d
  = show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
-
-showsPrecSDoc :: Int -> SDoc -> ShowS
-showsPrecSDoc p d = showsPrec p (runSDoc d (initSDocContext defaultUserStyle))
 
 showSDocDump :: DynFlags -> SDoc -> String
 showSDocDump _ d
