@@ -71,7 +71,7 @@ module Outputable (
         pprDebugAndThen,
     ) where
 
-import {-# SOURCE #-}   DynFlags( DynFlags )
+import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
@@ -952,14 +952,6 @@ assertPprPanic file line msg
     doc = sep [ hsep [ text "file", text file
                      , text "line", int line ]
               , msg ]
-
--- tracingDynFlags is a hack, necessary because we need to be able to
--- show SDocs when tracing, but we don't always have DynFlags available.
--- Do not use it if you can help it. It will not reflect options set
--- by the commandline flags, it may hav the wrong target platform, etc.
--- Currently it just panics if you try to use it.
-tracingDynFlags :: DynFlags
-tracingDynFlags = panic "tracingDynFlags used"
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg

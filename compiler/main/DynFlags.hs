@@ -95,12 +95,15 @@ module DynFlags (
         getStgToDo,
 
         -- * Compiler configuration suitable for display to the user
-        compilerInfo
+        compilerInfo,
+
 #ifdef GHCI
 -- Only in stage 2 can we be sure that the RTS
 -- exposes the appropriate runtime boolean
-      , rtsIsProfiled
+        rtsIsProfiled,
 #endif
+        -- ** Only for use in the tracing functions in Outputable
+        tracingDynFlags,
   ) where
 
 #include "HsVersions.h"
@@ -968,6 +971,16 @@ defaultDynFlags mySettings =
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
+
+-- Do not use tracingDynFlags!
+-- tracingDynFlags is a hack, necessary because we need to be able to
+-- show SDocs when tracing, but we don't always have DynFlags available.
+-- Do not use it if you can help it. It will not reflect options set
+-- by the commandline flags, and all fields may be either wrong or
+-- undefined.
+tracingDynFlags :: DynFlags
+tracingDynFlags = defaultDynFlags tracingSettings
+    where tracingSettings = panic "Settings not defined in tracingDynFlags"
 
 type FatalMessager = String -> IO ()
 type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
