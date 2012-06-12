@@ -44,9 +44,6 @@ module RdrName (
 	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual, 
 	isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
-	-- ** Printing
-	showRdrName,
-
 	-- * Local mapping of 'RdrName' to 'Name.Name'
 	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
 	lookupLocalRdrEnv, lookupLocalRdrOcc, elemLocalRdrEnv, inLocalRdrEnvScope, 
@@ -281,9 +278,6 @@ instance OutputableBndr RdrName where
 
     pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
     pprPrefixOcc rdr = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-
-showRdrName :: RdrName -> String
-showRdrName r = showSDoc (ppr r)
 
 instance Eq RdrName where
     (Exact n1) 	  == (Exact n2)    = n1==n2
