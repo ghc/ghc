@@ -133,7 +133,7 @@ stuff before and after core passes, and do Core Lint when necessary.
 
 \begin{code}
 showPass :: DynFlags -> CoreToDo -> IO ()
-showPass dflags pass = Err.showPass dflags (showSDoc (ppr pass))
+showPass dflags pass = Err.showPass dflags (showPpr dflags pass)
 
 endPass :: DynFlags -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 endPass dflags pass binds rules
@@ -181,7 +181,7 @@ lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
 lintPassResult dflags pass binds
   = when (dopt Opt_DoCoreLinting dflags) $
     do { let (warns, errs) = lintCoreBindings binds
-       ; Err.showPass dflags ("Core Linted result of " ++ showSDoc (ppr pass))
+       ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
 
 displayLintResults :: DynFlags -> CoreToDo
