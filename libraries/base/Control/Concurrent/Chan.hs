@@ -45,21 +45,26 @@ import Data.Typeable
 
 #include "Typeable.h"
 
+#define _UPK_(x) {-# UNPACK #-} !(x)
+
 -- A channel is represented by two @MVar@s keeping track of the two ends
 -- of the channel contents,i.e.,  the read- and write ends. Empty @MVar@s
 -- are used to handle consumers trying to read from an empty channel.
 
 -- |'Chan' is an abstract type representing an unbounded FIFO channel.
 data Chan a
- = Chan (MVar (Stream a))
-        (MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
+ = Chan _UPK_(MVar (Stream a))
+        _UPK_(MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
    deriving Eq
 
 INSTANCE_TYPEABLE1(Chan,chanTc,"Chan")
 
 type Stream a = MVar (ChItem a)
 
-data ChItem a = ChItem a (Stream a)
+data ChItem a = ChItem a _UPK_(Stream a)
+  -- benchmarks show that unboxing the MVar here is worthwhile, because
+  -- although it leads to higher allocation, the channel data takes up
+  -- less space and is therefore quicker to GC.
 
 -- See the Concurrent Haskell paper for a diagram explaining the
 -- how the different channel operations proceed.
