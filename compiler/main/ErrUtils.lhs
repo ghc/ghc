@@ -109,9 +109,9 @@ makeIntoWarning err = err { errMsgSeverity = SevWarning }
 -- Collecting up messages for later ordering and printing.
 
 mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> MsgDoc -> SDoc -> ErrMsg
-mk_err_msg _ sev locn print_unqual msg extra 
+mk_err_msg  dflags sev locn print_unqual msg extra
  = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
-          , errMsgShortDoc = msg , errMsgShortString = showSDoc msg
+          , errMsgShortDoc = msg , errMsgShortString = showSDoc dflags msg
           , errMsgExtraInfo = extra
           , errMsgSeverity = sev }
 

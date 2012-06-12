@@ -328,9 +328,10 @@ loadPlugins hsc_env
 loadPlugin :: HscEnv -> ModuleName -> IO Plugin
 loadPlugin hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
+             dflags = hsc_dflags hsc_env
        ; mb_name <- lookupRdrNameInModule hsc_env mod_name plugin_rdr_name
        ; case mb_name of {
-            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep
+            Nothing -> throwGhcException (CmdLineError $ showSDoc dflags $ hsep
                           [ ptext (sLit "The module"), ppr mod_name
                           , ptext (sLit "did not export the plugin name")
                           , ppr plugin_rdr_name ]) ;
@@ -339,7 +340,7 @@ loadPlugin hsc_env mod_name
      do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case mb_plugin of
-            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep
+            Nothing -> throwGhcException (CmdLineError $ showSDoc dflags $ hsep
                           [ ptext (sLit "The value"), ppr name
                           , ptext (sLit "did not have the type")
                           , ppr pluginTyConName, ptext (sLit "as required")])

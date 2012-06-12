@@ -853,10 +853,11 @@ batchMsg hsc_env mb_mod_index recomp mod_summary =
         RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
         RecompForcedByTH -> showMsg "Compiling " " [TH]"
     where
+        dflags = hsc_dflags hsc_env
         showMsg msg reason =
-            compilationProgressMsg (hsc_dflags hsc_env) $
+            compilationProgressMsg dflags $
             (showModuleIndex mb_mod_index ++
-            msg ++ showModMsg (hscTarget (hsc_dflags hsc_env))
+            msg ++ showModMsg dflags (hscTarget dflags)
                               (recompileRequired recomp) mod_summary)
                 ++ reason
 

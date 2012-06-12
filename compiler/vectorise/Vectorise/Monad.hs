@@ -151,7 +151,9 @@ lookupVar v
   = do { mb_res <- lookupVar_maybe v
        ; case mb_res of
            Just x  -> return x
-           Nothing -> dumpVar v
+           Nothing ->
+               do dflags <- getDynFlags
+                  dumpVar dflags v
        }
 
 lookupVar_maybe :: Var -> VM (Maybe (Scope Var (Var, Var)))
@@ -162,12 +164,12 @@ lookupVar_maybe v
           Nothing -> fmap Global <$> (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
       }
 
-dumpVar :: Var -> a
-dumpVar var
+dumpVar :: DynFlags -> Var -> a
+dumpVar dflags var
   | Just _    <- isClassOpId_maybe var
-  = cantVectorise "ClassOpId not vectorised:" (ppr var)
+  = cantVectorise dflags "ClassOpId not vectorised:" (ppr var)
   | otherwise
-  = cantVectorise "Variable not vectorised:" (ppr var)
+  = cantVectorise dflags "Variable not vectorised:" (ppr var)
 
 
 -- Global scalars --------------------------------------------------------------

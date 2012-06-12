@@ -70,9 +70,10 @@ forceLoadTyCon hsc_env con_name = do
     
     mb_con_thing <- lookupTypeHscEnv hsc_env con_name
     case mb_con_thing of
-        Nothing -> throwCmdLineErrorS $ missingTyThingError con_name
+        Nothing -> throwCmdLineErrorS dflags $ missingTyThingError con_name
         Just (ATyCon tycon) -> return tycon
-        Just con_thing -> throwCmdLineErrorS $ wrongTyThingError con_name con_thing
+        Just con_thing -> throwCmdLineErrorS dflags $ wrongTyThingError con_name con_thing
+  where dflags = hsc_dflags hsc_env
 
 -- | Loads the value corresponding to a 'Name' if that value has the given 'Type'. This only provides limited safety
 -- in that it is up to the user to ensure that that type corresponds to the type you try to use the return value at!
@@ -91,7 +92,7 @@ getValueSafely hsc_env val_name expected_type = do
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
     case mb_val_thing of
-        Nothing -> throwCmdLineErrorS $ missingTyThingError val_name
+        Nothing -> throwCmdLineErrorS dflags $ missingTyThingError val_name
         Just (AnId id) -> do
             -- Check the value type in the interface against the type recovered from the type constructor
             -- before finally casting the value to the type we assume corresponds to that constructor
@@ -107,7 +108,8 @@ getValueSafely hsc_env val_name expected_type = do
                 value <- lessUnsafeCoerce (hsc_dflags hsc_env) "getValueSafely" hval
                 return $ Just value
              else return Nothing
-        Just val_thing -> throwCmdLineErrorS $ wrongTyThingError val_name val_thing
+        Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
+  where dflags = hsc_dflags hsc_env
 
 
 -- | Coerce a value as usual, but:
@@ -149,10 +151,9 @@ lookupRdrNameInModule hsc_env mod_name rdr_name = do
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 
-                Nothing -> throwCmdLineErrorS $ hsep [ptext (sLit "Could not determine the exports of the module"), ppr mod_name]
-        err -> throwCmdLineErrorS $ cannotFindModule dflags mod_name err
-  where
-    dflags = hsc_dflags hsc_env
+                Nothing -> throwCmdLineErrorS dflags $ hsep [ptext (sLit "Could not determine the exports of the module"), ppr mod_name]
+        err -> throwCmdLineErrorS dflags $ cannotFindModule dflags mod_name err
+  where dflags = hsc_dflags hsc_env
 
 
 wrongTyThingError :: Name -> TyThing -> SDoc
@@ -161,8 +162,8 @@ wrongTyThingError name got_thing = hsep [ptext (sLit "The name"), ppr name, ptex
 missingTyThingError :: Name -> SDoc
 missingTyThingError name = hsep [ptext (sLit "The name"), ppr name, ptext (sLit "is not in the type environment: are you sure it exists?")]
 
-throwCmdLineErrorS :: SDoc -> IO a
-throwCmdLineErrorS = throwCmdLineError . showSDoc
+throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
+throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags
 
 throwCmdLineError :: String -> IO a
 throwCmdLineError = throwGhcException . CmdLineError

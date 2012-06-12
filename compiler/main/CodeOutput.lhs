@@ -183,11 +183,11 @@ outputForeignStubs dflags mod location stubs
      ForeignStubs h_code c_code -> do
         let
             stub_c_output_d = pprCode CStyle c_code
-            stub_c_output_w = showSDoc stub_c_output_d
+            stub_c_output_w = showSDoc dflags stub_c_output_d
         
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode CStyle h_code
-            stub_h_output_w = showSDoc stub_h_output_d
+            stub_h_output_w = showSDoc dflags stub_h_output_d
         -- in
 
         createDirectoryIfMissing True (takeDirectory stub_h)

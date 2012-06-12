@@ -451,11 +451,12 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        { (spec_unf, unf_pairs) <- specUnfolding spec_co spec_ty (realIdUnfolding poly_id)
 
+       ; dflags <- getDynFlags
        ; let spec_id  = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
              rule =  mkRule False {- Not auto -} is_local_id
-                        (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
+                        (mkFastString ("SPEC " ++ showPpr dflags poly_name))
        			rule_act poly_name
        		        final_bndrs args
        			(mkVarApps (Var spec_id) bndrs)
@@ -463,7 +464,6 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
        ; let spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
 
-       ; dflags <- getDynFlags
        ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
               (warnDs (specOnInline poly_name))
        ; return (Just (spec_pair `consOL` unf_pairs, rule))

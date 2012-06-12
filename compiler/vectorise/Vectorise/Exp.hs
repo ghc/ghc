@@ -48,7 +48,7 @@ import Control.Applicative
 import Data.Maybe
 import Data.List
 import TcRnMonad (doptM)
-import DynFlags (DynFlag(Opt_AvoidVect))
+import DynFlags
 import Util
 
 
@@ -281,7 +281,8 @@ vectExpr (_, AnnLit lit) _
 
 vectExpr e@(_, AnnLam bndr _) vt
   | isId bndr = (\(_, _, ve) -> ve) <$> vectFnExpr True False [] e vt
-  | otherwise = cantVectorise "Unexpected type lambda (vectExpr)" (ppr (deAnnotate e))
+  | otherwise = do dflags <- getDynFlags
+                   cantVectorise dflags "Unexpected type lambda (vectExpr)" (ppr (deAnnotate e))
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
   --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint
@@ -336,7 +337,8 @@ vectExpr (_, AnnCase scrut bndr ty alts)  vt
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
   , isAlgTyCon tycon
   = vectAlgCase tycon ty_args scrut bndr ty alts vt
-  | otherwise = cantVectorise "Can't vectorise expression" (ppr scrut_ty) 
+  | otherwise = do dflags <- getDynFlags
+                   cantVectorise dflags "Can't vectorise expression" (ppr scrut_ty)
   where
     scrut_ty = exprType (deAnnotate scrut)
 
@@ -368,7 +370,8 @@ vectExpr (_, AnnTick tickish expr)  (VITNode _ [vit])
 vectExpr (_, AnnType ty) _
   = liftM vType (vectType ty)
 
-vectExpr e vit = cantVectorise "Can't vectorise expression (vectExpr)" (ppr (deAnnotate e) $$ text ("  " ++ show vit))
+vectExpr e vit = do dflags <- getDynFlags
+                    cantVectorise dflags "Can't vectorise expression (vectExpr)" (ppr (deAnnotate e) $$ text ("  " ++ show vit))
 
 -- |Vectorise an expression that *may* have an outer lambda abstraction.
 --

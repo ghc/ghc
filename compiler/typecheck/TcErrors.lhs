@@ -162,8 +162,9 @@ deferToRuntime ev_binds_var ctxt mk_err_msg ct
   | Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev_id } <- cc_ev ct
   = do { err <- setCtLoc loc $
                 mk_err_msg ctxt ct
+       ; dflags <- getDynFlags
        ; let err_msg = pprLocErrMsg err
-             err_fs  = mkFastString $ showSDoc $ 
+             err_fs  = mkFastString $ showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
 
          -- Create the binding

@@ -69,6 +69,7 @@ import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
 import Pair
+import DynFlags
 import Outputable
 import FastString
 import ListSetOps
@@ -761,14 +762,14 @@ mkPrimOpId prim_op
 -- details of the ccall, type and all.  This means that the interface 
 -- file reader can reconstruct a suitable Id
 
-mkFCallId :: Unique -> ForeignCall -> Type -> Id
-mkFCallId uniq fcall ty
+mkFCallId :: DynFlags -> Unique -> ForeignCall -> Type -> Id
+mkFCallId dflags uniq fcall ty
   = ASSERT( isEmptyVarSet (tyVarsOfType ty) )
     -- A CCallOpId should have no free type variables; 
     -- when doing substitutions won't substitute over it
     mkGlobalId (FCallId fcall) name ty info
   where
-    occ_str = showSDoc (braces (ppr fcall <+> ppr ty))
+    occ_str = showSDoc dflags (braces (ppr fcall <+> ppr ty))
     -- The "occurrence name" of a ccall is the full info about the
     -- ccall; it is encoded, but may have embedded spaces etc!
 

@@ -442,8 +442,8 @@ linkExpr hsc_env span root_ul_bco
         -- All wired-in names are in the base package, which we link
         -- by default, so we can safely ignore them here.
 
-dieWith :: SrcSpan -> MsgDoc -> IO a
-dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage SevFatal span msg)))
+dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
+dieWith dflags span msg = ghcError (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
@@ -460,14 +460,14 @@ checkNonStdWay dflags srcspan = do
     -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
     -- whereas we have __stginit_base_Prelude_.
   if (objectSuf dflags == normalObjectSuffix)
-     then failNonStd srcspan
+     then failNonStd dflags srcspan
      else return True
 
 normalObjectSuffix :: String
 normalObjectSuffix = phaseInputExt StopLn
 
-failNonStd :: SrcSpan -> IO Bool
-failNonStd srcspan = dieWith srcspan $
+failNonStd :: DynFlags -> SrcSpan -> IO Bool
+failNonStd dflags srcspan = dieWith dflags srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
   ptext (sLit "You need to build the program twice: once the normal way, and then") $$
   ptext (sLit "in the desired way using -osuf to set the object file suffix.")
@@ -526,7 +526,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           mb_iface <- initIfaceCheck hsc_env $
                         loadInterface msg mod (ImportByUser False)
           iface <- case mb_iface of
-                    Maybes.Failed err      -> ghcError (ProgramError (showSDoc err))
+                    Maybes.Failed err      -> ghcError (ProgramError (showSDoc dflags err))
                     Maybes.Succeeded iface -> return iface
 
           when (mi_boot iface) $ link_boot_mod_error mod
@@ -554,12 +554,12 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
 
     link_boot_mod_error mod =
-        ghcError (ProgramError (showSDoc (
+        ghcError (ProgramError (showSDoc dflags (
             text "module" <+> ppr mod <+>
             text "cannot be linked; it is only available as a boot module")))
 
     no_obj :: Outputable a => a -> IO b
-    no_obj mod = dieWith span $
+    no_obj mod = dieWith dflags span $
                      ptext (sLit "cannot find object file for module ") <>
                         quotes (ppr mod) $$
                      while_linking_expr
@@ -600,7 +600,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                                  <.> normalObjectSuffix
                 ok <- doesFileExist new_file
                 if (not ok)
-                   then dieWith span $
+                   then dieWith dflags span $
                           ptext (sLit "cannot find normal object file ")
                                 <> quotes (text new_file) $$ while_linking_expr
                    else return (DotO new_file)

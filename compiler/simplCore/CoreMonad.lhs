@@ -147,7 +147,7 @@ endPass dflags pass binds rules
 
 dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
 dumpIfSet dflags dump_me pass extra_info doc
-  = Err.dumpIfSet dflags dump_me (showSDoc (ppr pass <+> extra_info)) doc
+  = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags 
                -> Maybe DynFlag		-- Just df => show details in a file whose
@@ -158,7 +158,7 @@ dumpPassResult :: DynFlags
                -> IO ()
 dumpPassResult dflags mb_flag hdr extra_info binds rules
   | Just dflag <- mb_flag
-  = Err.dumpSDoc dflags dflag (showSDoc hdr) dump_doc
+  = Err.dumpSDoc dflags dflag (showSDoc dflags hdr) dump_doc
 
   | otherwise
   = Err.debugTraceMsg dflags 2 size_doc

@@ -359,8 +359,8 @@ mkCodeStyle = PprCode
 -- Can't make SDoc an instance of Show because SDoc is just a function type
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
-showSDoc :: SDoc -> String
-showSDoc d =
+showSDoc :: DynFlags -> SDoc -> String
+showSDoc _ d =
   Pretty.showDocWith PageMode
     (runSDoc d (initSDocContext defaultUserStyle))
 
@@ -400,7 +400,7 @@ showSDocDebug :: SDoc -> String
 showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
 
 showPpr :: Outputable a => DynFlags -> a -> String
-showPpr _ = showSDoc . ppr
+showPpr dflags = showSDoc dflags . ppr
 \end{code}
 
 \begin{code}
@@ -942,7 +942,7 @@ warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
   = pprDebugAndThen trace str msg x
   where
-    str = showSDoc (hsep [text "WARNING: file", text file <> comma, text "line", int line])
+    str = showSDoc tracingDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
@@ -953,6 +953,14 @@ assertPprPanic file line msg
     doc = sep [ hsep [ text "file", text file
                      , text "line", int line ]
               , msg ]
+
+-- tracingDynFlags is a hack, necessary because we need to be able to
+-- show SDocs when tracing, but we don't always have DynFlags available.
+-- Do not use it if you can help it. It will not reflect options set
+-- by the commandline flags, it may hav the wrong target platform, etc.
+-- Currently it just panics if you try to use it.
+tracingDynFlags :: DynFlags
+tracingDynFlags = panic "tracingDynFlags used"
 
 pprDebugAndThen :: (String -> a) -> String -> SDoc -> a
 pprDebugAndThen cont heading pretty_msg 

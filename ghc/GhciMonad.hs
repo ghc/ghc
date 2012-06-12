@@ -306,18 +306,19 @@ timeIt action
                   a <- action
                   allocs2 <- liftIO $ getAllocations
                   time2   <- liftIO $ getCPUTime
-                  liftIO $ printTimes (fromIntegral (allocs2 - allocs1))
+                  dflags  <- getDynFlags
+                  liftIO $ printTimes dflags (fromIntegral (allocs2 - allocs1))
                                   (time2 - time1)
                   return a
 
 foreign import ccall unsafe "getAllocations" getAllocations :: IO Int64
         -- defined in ghc/rts/Stats.c
 
-printTimes :: Integer -> Integer -> IO ()
-printTimes allocs psecs
+printTimes :: DynFlags -> Integer -> Integer -> IO ()
+printTimes dflags allocs psecs
    = do let secs = (fromIntegral psecs / (10^(12::Integer))) :: Float
             secs_str = showFFloat (Just 2) secs
-        putStrLn (showSDoc (
+        putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
                          text (show allocs) <+> text "bytes")))
 

@@ -820,14 +820,16 @@ dsMcBindStmt pat rhs' bind_op fail_op stmts
     handle_failure pat match fail_op
       | matchCanFail match
         = do { fail_op' <- dsExpr fail_op
-             ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+             ; dflags <- getDynFlags
+             ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
              ; extractMatchResult match (App fail_op' fail_msg) }
       | otherwise
         = extractMatchResult match (error "It can't fail")
 
-    mk_fail_msg :: Located e -> String
-    mk_fail_msg pat = "Pattern match failure in monad comprehension at " ++
-                      showSDoc (ppr (getLoc pat))
+    mk_fail_msg :: DynFlags -> Located e -> String
+    mk_fail_msg dflags pat
+        = "Pattern match failure in monad comprehension at " ++
+          showPpr dflags (getLoc pat)
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs
 --    dsInnerMonadComp quals [a,b,c] ret_op

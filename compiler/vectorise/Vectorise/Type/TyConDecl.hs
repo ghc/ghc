@@ -11,6 +11,7 @@ import Type
 import TyCon
 import DataCon
 import BasicTypes
+import DynFlags
 import Var
 import Name
 import Outputable
@@ -35,7 +36,8 @@ vectTyConDecl tycon name'
       -- Type constructor representing a type class
   | Just cls <- tyConClass_maybe tycon
   = do { unless (null $ classATs cls) $
-           cantVectorise "Associated types are not yet supported" (ppr cls)
+           do dflags <- getDynFlags
+              cantVectorise dflags "Associated types are not yet supported" (ppr cls)
 
            -- vectorise superclass constraint (types)
        ; theta' <- mapM vectType (classSCTheta cls)
@@ -83,7 +85,8 @@ vectTyConDecl tycon name'
        -- Regular algebraic type constructor — for now, Haskell 2011-style only
   | isAlgTyCon tycon
   = do { unless (all isVanillaDataCon (tyConDataCons tycon)) $
-           cantVectorise "Currently only Haskell 2011 datatypes are supported" (ppr tycon)
+           do dflags <- getDynFlags
+              cantVectorise dflags "Currently only Haskell 2011 datatypes are supported" (ppr tycon)
   
            -- vectorise the data constructor of the class tycon
        ; rhs' <- vectAlgTyConRhs tycon (algTyConRhs tycon)
@@ -106,7 +109,8 @@ vectTyConDecl tycon name'
 
   -- some other crazy thing that we don't handle
   | otherwise
-  = cantVectorise "Can't vectorise exotic type constructor" (ppr tycon)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise exotic type constructor" (ppr tycon)
 
 -- |Vectorise a class method.  (Don't enter it into the vectorisation map yet.)
 --
@@ -125,7 +129,8 @@ vectMethod id defMeth ty
 --
 vectAlgTyConRhs :: TyCon -> AlgTyConRhs -> VM AlgTyConRhs
 vectAlgTyConRhs tc (AbstractTyCon {})
-  = cantVectorise "Can't vectorise imported abstract type" (ppr tc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise imported abstract type" (ppr tc)
 vectAlgTyConRhs _tc DataFamilyTyCon
   = return DataFamilyTyCon
 vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
@@ -138,7 +143,8 @@ vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
                             }
        }
 vectAlgTyConRhs tc (NewTyCon {})
-  = cantVectorise noNewtypeErr (ppr tc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags noNewtypeErr (ppr tc)
   where
     noNewtypeErr = "Vectorisation of newtypes not supported yet; please use a 'data' declaration"
 
@@ -147,13 +153,17 @@ vectAlgTyConRhs tc (NewTyCon {})
 vectDataCon :: DataCon -> VM DataCon
 vectDataCon dc
   | not . null $ ex_tvs
-  = cantVectorise "Can't vectorise constructor with existential type variables yet" (ppr dc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise constructor with existential type variables yet" (ppr dc)
   | not . null $ eq_spec
-  = cantVectorise "Can't vectorise constructor with equality context yet" (ppr dc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise constructor with equality context yet" (ppr dc)
   | not . null $ dataConFieldLabels dc
-  = cantVectorise "Can't vectorise constructor with labelled fields yet" (ppr dc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise constructor with labelled fields yet" (ppr dc)
   | not . null $ theta
-  = cantVectorise "Can't vectorise constructor with constraint context yet" (ppr dc)
+  = do dflags <- getDynFlags
+       cantVectorise dflags "Can't vectorise constructor with constraint context yet" (ppr dc)
   | otherwise
   = do { name'   <- mkLocalisedName mkVectDataConOcc name
        ; tycon'  <- vectTyCon tycon

@@ -176,9 +176,9 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ _ _ _ _ (CyclicSCC nodes)
+processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    ghcError (ProgramError (showSDoc $ GHC.cyclicModuleErr nodes))
+    ghcError (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags

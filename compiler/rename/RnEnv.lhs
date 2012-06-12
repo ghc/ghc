@@ -1387,14 +1387,15 @@ unknownNameSuggestErr :: WhereLooking -> RdrName -> RnM SDoc
 unknownNameSuggestErr where_look tried_rdr_name
   = do { local_env <- getLocalRdrEnv
        ; global_env <- getGlobalRdrEnv
+       ; dflags <- getDynFlags
 
        ; let all_possibilities :: [(String, (RdrName, HowInScope))]
              all_possibilities
-                =  [ (showSDoc (ppr r), (r, Left loc))
+                =  [ (showPpr dflags r, (r, Left loc))
                    | (r,loc) <- local_possibilities local_env ]
-                ++ [ (showSDoc (ppr r), rp) | (r,rp) <- global_possibilities global_env ]
+                ++ [ (showPpr dflags r, rp) | (r,rp) <- global_possibilities global_env ]
 
-             suggest = fuzzyLookup (showSDoc (ppr tried_rdr_name)) all_possibilities
+             suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
              perhaps = ptext (sLit "Perhaps you meant")
              extra_err = case suggest of
                            []  -> empty

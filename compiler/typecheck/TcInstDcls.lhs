@@ -1060,14 +1060,15 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; warnMissingMethodOrAT "method" (idName sel_id)
            ; (meth_id, _) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
                                          inst_tys sel_id
+           ; dflags <- getDynFlags
            ; return (meth_id, mkVarBind meth_id $
-                              mkLHsWrap lam_wrapper error_rhs) }
+                              mkLHsWrap lam_wrapper (error_rhs dflags)) }
       where
-        error_rhs    = L loc $ HsApp error_fun error_msg
+        error_rhs dflags = L loc $ HsApp error_fun (error_msg dflags)
         error_fun    = L loc $ wrapId (WpTyApp meth_tau) nO_METHOD_BINDING_ERROR_ID
-        error_msg    = L loc (HsLit (HsStringPrim (mkFastString error_string)))
+        error_msg dflags = L loc (HsLit (HsStringPrim (mkFastString (error_string dflags))))
         meth_tau     = funResultTy (applyTys (idType sel_id) inst_tys)
-        error_string = showSDoc (hcat [ppr loc, text "|", ppr sel_id ])
+        error_string dflags = showSDoc dflags (hcat [ppr loc, text "|", ppr sel_id ])
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
 
     tc_default sig_fn sel_id (DefMeth dm_name) -- A polymorphic default method

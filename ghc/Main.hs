@@ -770,7 +770,7 @@ abiHash strs = do
          r <- findImportedModule hsc_env modname Nothing
          case r of
            Found _ m -> return m
-           _error    -> ghcError $ CmdLineError $ showSDoc $
+           _error    -> ghcError $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
   mods <- mapM find_it (map fst strs)
@@ -785,7 +785,7 @@ abiHash strs = do
   mapM_ (put_ bh . mi_mod_hash) ifaces
   f <- fingerprintBinMem bh
 
-  putStrLn (showSDoc (ppr f))
+  putStrLn (showPpr dflags f)
 
 -- -----------------------------------------------------------------------------
 -- Util

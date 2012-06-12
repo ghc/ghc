@@ -18,6 +18,7 @@ import TypeRep
 import TyCon
 import Var
 import Outputable
+import DynFlags
 import FastString
 import Control.Monad
 
@@ -82,9 +83,10 @@ paDictOfType ty
      where
        noPADictErr = "No PA dictionary for type constructor (did you import 'Data.Array.Parallel'?)"
 
-    paDictOfTyApp _ _ = failure
+    paDictOfTyApp _ _ = do dflags <- getDynFlags
+                           failure dflags
 
-    failure = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
+    failure dflags = cantVectorise dflags "Can't construct PA dictionary for type" (ppr ty)
 
 -- |Produce code that refers to a method of the 'PA' class.
 --
@@ -160,8 +162,9 @@ prDictOfReprType ty
 
 prDictOfReprType' :: Type -> VM CoreExpr
 prDictOfReprType' ty = prDictOfReprType ty `orElseV`
-                       cantVectorise "No PR dictionary for representation type"
-                                     (ppr ty)
+                       do dflags <- getDynFlags
+                          cantVectorise dflags "No PR dictionary for representation type"
+                                        (ppr ty)
 
 -- | Apply a tycon's PR dfun to dictionary arguments (PR or PA) corresponding
 -- to the argument types.
@@ -175,10 +178,12 @@ prDFunApply dfun tys
   = do
       pa <- builtin paTyCon
       pr <- builtin prTyCon 
-      args <- zipWithM (dictionary pa pr) tys tycons
+      dflags <- getDynFlags
+      args <- zipWithM (dictionary dflags pa pr) tys tycons
       return $ Var dfun `mkTyApps` tys `mkApps` args
 
-  | otherwise = invalid
+  | otherwise = do dflags <- getDynFlags
+                   invalid dflags
   where
     -- the dfun's contexts - if its type is (PA a, PR b) => PR (C a b) then
     -- ctxs is Just [PA, PR]
@@ -191,10 +196,10 @@ prDFunApply dfun tys
          $ splitForAllTys
          $ varType dfun
 
-    dictionary pa pr ty tycon
+    dictionary dflags pa pr ty tycon
       | tycon == pa = paDictOfType ty
       | tycon == pr = prDictOfReprType ty
-      | otherwise   = invalid
+      | otherwise   = invalid dflags
 
-    invalid = cantVectorise "Invalid PR dfun type" (ppr (varType dfun) <+> ppr tys)
+    invalid dflags = cantVectorise dflags "Invalid PR dfun type" (ppr (varType dfun) <+> ppr tys)
  

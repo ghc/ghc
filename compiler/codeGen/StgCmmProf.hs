@@ -218,7 +218,8 @@ emitCostCentreDecl cc = do
   ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
                                         $ Module.moduleName
                                         $ cc_mod cc)
-  ; loc <- newStringCLit (showSDoc (ppr (costCentreSrcSpan cc)))
+  ; dflags <- getDynFlags
+  ; loc <- newStringCLit (showPpr dflags (costCentreSrcSpan cc))
            -- XXX should UTF-8 encode
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.

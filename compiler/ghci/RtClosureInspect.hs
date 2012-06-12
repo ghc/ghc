@@ -378,7 +378,7 @@ ppr_termM _ _ t = ppr_termM1 t
 
 ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} = 
-    return$ text$ repPrim (tyConAppTyCon ty) words
+    return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing} = 
     return (char '_' <+> ifPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
@@ -493,33 +493,33 @@ cPprTermBase y =
    ppr_list _ _ = panic "doList"
 
 
-repPrim :: TyCon -> [Word] -> String
-repPrim t = rep where 
+repPrim :: TyCon -> [Word] -> SDoc
+repPrim t = rep where
    rep x
-    | t == charPrimTyCon   = show (build x :: Char)
-    | t == intPrimTyCon    = show (build x :: Int)
-    | t == wordPrimTyCon   = show (build x :: Word)
-    | t == floatPrimTyCon  = show (build x :: Float)
-    | t == doublePrimTyCon = show (build x :: Double)
-    | t == int32PrimTyCon  = show (build x :: Int32)
-    | t == word32PrimTyCon = show (build x :: Word32)
-    | t == int64PrimTyCon  = show (build x :: Int64)
-    | t == word64PrimTyCon = show (build x :: Word64)
-    | t == addrPrimTyCon   = show (nullPtr `plusPtr` build x)
-    | t == stablePtrPrimTyCon  = "<stablePtr>"
-    | t == stableNamePrimTyCon = "<stableName>"
-    | t == statePrimTyCon      = "<statethread>"
-    | t == realWorldTyCon      = "<realworld>"
-    | t == threadIdPrimTyCon   = "<ThreadId>"
-    | t == weakPrimTyCon       = "<Weak>"
-    | t == arrayPrimTyCon      = "<array>"
-    | t == byteArrayPrimTyCon  = "<bytearray>"
-    | t == mutableArrayPrimTyCon = "<mutableArray>"
-    | t == mutableByteArrayPrimTyCon = "<mutableByteArray>"
-    | t == mutVarPrimTyCon= "<mutVar>"
-    | t == mVarPrimTyCon  = "<mVar>"
-    | t == tVarPrimTyCon  = "<tVar>"
-    | otherwise = showSDoc (char '<' <> ppr t <> char '>')
+    | t == charPrimTyCon             = text $ show (build x :: Char)
+    | t == intPrimTyCon              = text $ show (build x :: Int)
+    | t == wordPrimTyCon             = text $ show (build x :: Word)
+    | t == floatPrimTyCon            = text $ show (build x :: Float)
+    | t == doublePrimTyCon           = text $ show (build x :: Double)
+    | t == int32PrimTyCon            = text $ show (build x :: Int32)
+    | t == word32PrimTyCon           = text $ show (build x :: Word32)
+    | t == int64PrimTyCon            = text $ show (build x :: Int64)
+    | t == word64PrimTyCon           = text $ show (build x :: Word64)
+    | t == addrPrimTyCon             = text $ show (nullPtr `plusPtr` build x)
+    | t == stablePtrPrimTyCon        = text "<stablePtr>"
+    | t == stableNamePrimTyCon       = text "<stableName>"
+    | t == statePrimTyCon            = text "<statethread>"
+    | t == realWorldTyCon            = text "<realworld>"
+    | t == threadIdPrimTyCon         = text "<ThreadId>"
+    | t == weakPrimTyCon             = text "<Weak>"
+    | t == arrayPrimTyCon            = text "<array>"
+    | t == byteArrayPrimTyCon        = text "<bytearray>"
+    | t == mutableArrayPrimTyCon     = text "<mutableArray>"
+    | t == mutableByteArrayPrimTyCon = text "<mutableByteArray>"
+    | t == mutVarPrimTyCon           = text "<mutVar>"
+    | t == mVarPrimTyCon             = text "<mVar>"
+    | t == tVarPrimTyCon             = text "<tVar>"
+    | otherwise                      = char '<' <> ppr t <> char '>'
     where build ww = unsafePerformIO $ withArray ww (peek . castPtr) 
 --   This ^^^ relies on the representation of Haskell heap values being 
 --   the same as in a C array. 
@@ -750,7 +750,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
 		       traceTR (text "Nothing" <+> ppr dcname)
-                       let tag = showSDoc (ppr dcname)
+                       let dflags = hsc_dflags hsc_env
+                           tag = showPpr dflags dcname
                        vars     <- replicateM (length$ elems$ ptrs clos) 
                                               (newVar liftedTypeKind)
                        subTerms <- sequence [appArr (go (pred max_depth) tv tv) (ptrs clos) i 

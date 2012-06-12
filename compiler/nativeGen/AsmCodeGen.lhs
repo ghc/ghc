@@ -315,7 +315,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
         count' <- return $! count + 1;
 
         -- force evaulation all this stuff to avoid space leaks
-        {-# SCC "seqString" #-} seqString (showSDoc $ vcat $ map (pprPlatform platform) imports) `seq` return ()
+        {-# SCC "seqString" #-} seqString (showSDoc dflags $ vcat $ map (pprPlatform platform) imports) `seq` return ()
 
         cmmNativeGens dflags ncgImpl
             h us' cmms
@@ -818,8 +818,7 @@ Ideas for other things we could do (put these in Hoopl please!):
 cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  let platform = targetPlatform dflags
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline platform (cmmEliminateDeadBlocks blocks))
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline dflags (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
@@ -897,7 +896,7 @@ cmmStmtConFold stmt
                  return $ case test' of
                    CmmLit (CmmInt 0 _) ->
                      CmmComment (mkFastString ("deleted: " ++
-                                        showSDoc (pprStmt platform stmt)))
+                                        showSDoc dflags (pprStmt platform stmt)))
 
                    CmmLit (CmmInt _ _) -> CmmBranch dest
                    _other -> CmmCondBranch test' dest

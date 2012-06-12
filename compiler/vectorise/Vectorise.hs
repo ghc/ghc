@@ -210,7 +210,8 @@ vectTopBind b@(Rec bs)
            ; if and hasNoVectDecls 
              then return b                              -- all bindings have 'NOVECTORISE'
              else if or hasNoVectDecls 
-             then cantVectorise noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
+             then do dflags <- getDynFlags
+                     cantVectorise dflags noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
              else vectorise                             -- no binding has a 'NOVECTORISE' decl
            }
     noVectoriseErr = "NOVECTORISE must be used on all or no bindings of a recursive group"
@@ -265,7 +266,7 @@ vectTopBinder var inline expr
             | eqType vty vdty -> return ()
             | otherwise       -> 
               do dflags <- getDynFlags
-                 cantVectorise ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
+                 cantVectorise dflags ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
                    (text "Expected type" <+> ppr vty)
                    $$
                    (text "Inferred type" <+> ppr vdty)

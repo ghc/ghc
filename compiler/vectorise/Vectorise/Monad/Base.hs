@@ -84,27 +84,30 @@ liftDs p = VM $ \_ genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
 -- |Throw a `pgmError` saying we can't vectorise something.
 --
-cantVectorise :: String -> SDoc -> a
-cantVectorise s d = pgmError
-                  . showSDoc
+cantVectorise :: DynFlags -> String -> SDoc -> a
+cantVectorise dflags s d = pgmError
+                  . showSDoc dflags
                   $ vcat [text "*** Vectorisation error ***",
                           nest 4 $ sep [text s, nest 4 d]]
 
 -- |Like `fromJust`, but `pgmError` on Nothing.
 --
-maybeCantVectorise :: String -> SDoc -> Maybe a -> a
-maybeCantVectorise s d Nothing  = cantVectorise s d
-maybeCantVectorise _ _ (Just x) = x
+maybeCantVectorise :: DynFlags -> String -> SDoc -> Maybe a -> a
+maybeCantVectorise dflags s d Nothing  = cantVectorise dflags s d
+maybeCantVectorise _ _ _ (Just x) = x
 
 -- |Like `maybeCantVectorise` but in a `Monad`.
 --
-maybeCantVectoriseM :: Monad m => String -> SDoc -> m (Maybe a) -> m a
+maybeCantVectoriseM :: (Monad m, HasDynFlags m)
+                    => String -> SDoc -> m (Maybe a) -> m a
 maybeCantVectoriseM s d p
   = do
       r <- p
       case r of
         Just x  -> return x
-        Nothing -> cantVectorise s d
+        Nothing ->
+            do dflags <- getDynFlags
+               cantVectorise dflags s d
 
 
 -- Debugging ------------------------------------------------------------------

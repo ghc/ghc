@@ -58,7 +58,7 @@ import Constants
 import Util
 import Data.List
 import Outputable
-import FastString	( mkFastString, FastString, fsLit )
+import FastString
 
 ------------------------------------------------------------------------
 --		Call and return sequences
@@ -179,8 +179,8 @@ slow_call fun args reps
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
        call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
-       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (pprPlatform platform fun) ++
-                                        " with pat " ++ showSDoc (ftext rts_fun))
+       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc dflags (pprPlatform platform fun) ++
+                                        " with pat " ++ unpackFS rts_fun)
        emit (mkAssign nodeReg fun <*> call)
   where
     (rts_fun, arity) = slowCallPattern reps

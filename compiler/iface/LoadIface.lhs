@@ -162,8 +162,9 @@ loadUserInterface is_boot doc mod_name
 loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
 loadInterfaceWithException doc mod_name where_from
   = do  { mb_iface <- loadInterface doc mod_name where_from
+        ; dflags <- getDynFlags
         ; case mb_iface of 
-            Failed err      -> ghcError (ProgramError (showSDoc err))
+            Failed err      -> ghcError (ProgramError (showSDoc dflags err))
             Succeeded iface -> return iface }
 
 ------------------

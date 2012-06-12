@@ -182,7 +182,7 @@ srcErrorMessages :: SourceError -> ErrorMessages
 srcErrorMessages (SourceError msgs) = msgs
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
-mkApiErr _ msg = GhcApiError (showSDoc msg)
+mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
 
 throwOneError :: MonadIO m => ErrMsg -> m ab
 throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
@@ -1870,9 +1870,9 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: HscTarget -> Bool -> ModSummary -> String
-showModMsg target recomp mod_summary
-  = showSDoc $
+showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
+showModMsg dflags target recomp mod_summary
+  = showSDoc dflags $
         hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
               char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
               case target of
@@ -1883,7 +1883,7 @@ showModMsg target recomp mod_summary
               char ')']
  where
     mod     = moduleName (ms_mod mod_summary)
-    mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
+    mod_str = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
 %************************************************************************

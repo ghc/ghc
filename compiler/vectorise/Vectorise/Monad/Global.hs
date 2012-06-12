@@ -37,6 +37,7 @@ import CoreSyn
 import Type
 import TyCon
 import DataCon
+import DynFlags
 import NameEnv
 import NameSet
 import Name
@@ -76,7 +77,9 @@ defGlobalVar v v'
            -- check for duplicate vectorisation
        ; currentDef <- readGEnv $ \env -> lookupVarEnv (global_vars env) v
        ; case currentDef of
-           Just old_v' -> cantVectorise "Variable is already vectorised:" $
+           Just old_v' ->
+               do dflags <- getDynFlags
+                  cantVectorise dflags "Variable is already vectorised:" $
                             ppr v <+> moduleOf v old_v'
            Nothing     -> return ()
 
@@ -147,7 +150,9 @@ defTyConName tc nameOfTc' tc'
            -- check for duplicate vectorisation
        ; currentDef <- readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
        ; case currentDef of
-           Just old_tc' -> cantVectorise "Type constructor or class is already vectorised:" $
+           Just old_tc' ->
+               do dflags <- getDynFlags
+                  cantVectorise dflags "Type constructor or class is already vectorised:" $
                             ppr tc <+> moduleOf tc old_tc'
            Nothing     -> return ()
 

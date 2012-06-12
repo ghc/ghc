@@ -8,6 +8,7 @@ import Vectorise.Monad.Global
 import Vectorise.Monad.Base
 import Vectorise.Env
 
+import DynFlags
 import FamInstEnv
 import InstEnv
 import Class
@@ -34,7 +35,9 @@ lookupInst cls tys
   = do { instEnv <- readGEnv global_inst_env
        ; case lookupUniqueInstEnv instEnv cls tys of
            Right (inst, inst_tys) -> return (instanceDFunId inst, inst_tys)
-           Left  err              -> cantVectorise "Vectorise.Monad.InstEnv.lookupInst:" err
+           Left  err              ->
+               do dflags <- getDynFlags
+                  cantVectorise dflags "Vectorise.Monad.InstEnv.lookupInst:" err
        }
 
 -- Look up the representation tycon of a family instance.
@@ -61,6 +64,7 @@ lookupFamInst tycon tys
            [(fam_inst, rep_tys)] -> return ( dataFamInstRepTyCon fam_inst
                                            , rep_tys)
            _other                -> 
-             cantVectorise "VectMonad.lookupFamInst: not found: " 
+             do dflags <- getDynFlags
+                cantVectorise dflags "VectMonad.lookupFamInst: not found: "
                            (ppr $ mkTyConApp tycon tys)
        }

@@ -20,6 +20,7 @@ import OldCmm
 import OldPprCmm
 import CmmNode (wrapRecExp)
 import CmmUtils
+import DynFlags
 import StaticFlags
 
 import UniqFM
@@ -147,46 +148,47 @@ countUses :: UserOfLocalRegs a => a -> UniqFM Int
 countUses a = foldRegsUsed (\m r -> addToUFM m r (count m r + 1)) emptyUFM a
   where count m r = lookupWithDefaultUFM m (0::Int) r
 
-cmmMiniInline :: Platform -> [CmmBasicBlock] -> [CmmBasicBlock]
-cmmMiniInline platform blocks = map do_inline blocks
+cmmMiniInline :: DynFlags -> [CmmBasicBlock] -> [CmmBasicBlock]
+cmmMiniInline dflags blocks = map do_inline blocks
   where do_inline (BasicBlock id stmts)
-          = BasicBlock id (cmmMiniInlineStmts platform (countUses blocks) stmts)
+          = BasicBlock id (cmmMiniInlineStmts dflags (countUses blocks) stmts)
 
-cmmMiniInlineStmts :: Platform -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
-cmmMiniInlineStmts _        _    [] = []
-cmmMiniInlineStmts platform uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
+cmmMiniInlineStmts :: DynFlags -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
+cmmMiniInlineStmts _      _    [] = []
+cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
   | Nothing <- lookupUFM uses u
-  = cmmMiniInlineStmts platform uses stmts
+  = cmmMiniInlineStmts dflags uses stmts
 
         -- used (literal): try to inline at all the use sites
   | Just n <- lookupUFM uses u, isLit expr
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
      case lookForInlineLit u expr stmts of
          (m, stmts')
-             | n == m -> cmmMiniInlineStmts platform (delFromUFM uses u) stmts'
+             | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
              | otherwise ->
-                 stmt : cmmMiniInlineStmts platform (adjustUFM (\x -> x - m) uses u) stmts'
+                 stmt : cmmMiniInlineStmts dflags (adjustUFM (\x -> x - m) uses u) stmts'
 
         -- used (foldable to literal): try to inline at all the use sites
   | Just n <- lookupUFM uses u,
     e@(CmmLit _) <- wrapRecExp foldExp expr
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
      case lookForInlineLit u e stmts of
          (m, stmts')
-             | n == m -> cmmMiniInlineStmts platform (delFromUFM uses u) stmts'
+             | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
              | otherwise ->
-                 stmt : cmmMiniInlineStmts platform (adjustUFM (\x -> x - m) uses u) stmts'
+                 stmt : cmmMiniInlineStmts dflags (adjustUFM (\x -> x - m) uses u) stmts'
 
         -- used once (non-literal): try to inline at the use site
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt platform stmt)) $
-     cmmMiniInlineStmts platform uses stmts'
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
+     cmmMiniInlineStmts dflags uses stmts'
  where
+  platform = targetPlatform dflags
   foldExp (CmmMachOp op args) = cmmMachOpFold platform op args
   foldExp e = e
 

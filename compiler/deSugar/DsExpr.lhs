@@ -765,14 +765,15 @@ handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
 handle_failure pat match fail_op
   | matchCanFail match
   = do { fail_op' <- dsExpr fail_op
-       ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+       ; dflags <- getDynFlags
+       ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
        ; extractMatchResult match (App fail_op' fail_msg) }
   | otherwise
   = extractMatchResult match (error "It can't fail")
 
-mk_fail_msg :: Located e -> String
-mk_fail_msg pat = "Pattern match failure in do expression at " ++ 
-                  showSDoc (ppr (getLoc pat))
+mk_fail_msg :: DynFlags -> Located e -> String
+mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++ 
+                         showPpr dflags (getLoc pat)
 \end{code}
 
 

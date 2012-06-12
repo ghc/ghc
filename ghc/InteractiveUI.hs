@@ -595,7 +595,8 @@ mkPrompt = do
         f [] = empty
 
   st <- getGHCiState
-  return (showSDoc (f (prompt st)))
+  dflags <- getDynFlags
+  return (showSDoc dflags (f (prompt st)))
 
 
 queryQueue :: GHCi (Maybe String)
@@ -1174,7 +1175,8 @@ checkModule m = do
   let modl = GHC.mkModuleName m
   ok <- handleSourceError (\e -> GHC.printException e >> return False) $ do
           r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
-          liftIO $ putStrLn $ showSDoc $
+          dflags <- getDynFlags
+          liftIO $ putStrLn $ showSDoc dflags $
            case GHC.moduleInfo r of
              cm | Just scope <- GHC.modInfoTopLevelScope cm ->
                 let
@@ -1343,9 +1345,9 @@ modulesLoadedMsg ok mods = do
             punctuate comma (map ppr mods)) <> text "."
    case ok of
     Failed ->
-       liftIO $ putStrLn $ showSDoc (text "Failed, modules loaded: " <> mod_commas)
+       liftIO $ putStrLn $ showSDoc dflags (text "Failed, modules loaded: " <> mod_commas)
     Succeeded  ->
-       liftIO $ putStrLn $ showSDoc (text "Ok, modules loaded: " <> mod_commas)
+       liftIO $ putStrLn $ showSDoc dflags (text "Ok, modules loaded: " <> mod_commas)
 
 
 -----------------------------------------------------------------------------
@@ -1860,8 +1862,9 @@ setiCmd str  =
 showOptions :: Bool -> GHCi ()
 showOptions show_all
   = do st <- getGHCiState
+       dflags <- getDynFlags
        let opts = options st
-       liftIO $ putStrLn (showSDoc (
+       liftIO $ putStrLn (showSDoc dflags (
               text "options currently set: " <>
               if null opts
                    then text "none."
@@ -1873,13 +1876,13 @@ showOptions show_all
 showDynFlags :: Bool -> DynFlags -> IO ()
 showDynFlags show_all dflags = do
   showLanguages' show_all dflags
-  putStrLn $ showSDoc $
+  putStrLn $ showSDoc dflags $
      text "GHCi-specific dynamic flag settings:" $$
          nest 2 (vcat (map (setting dopt) ghciFlags))
-  putStrLn $ showSDoc $
+  putStrLn $ showSDoc dflags $
      text "other dynamic, non-language, flag settings:" $$
          nest 2 (vcat (map (setting dopt) others))
-  putStrLn $ showSDoc $
+  putStrLn $ showSDoc dflags $
      text "warning settings:" $$
          nest 2 (vcat (map (setting wopt) DynFlags.fWarningFlags))
   where
@@ -2101,12 +2104,13 @@ showiCmd str = do
 showImports :: GHCi ()
 showImports = do
   st <- getGHCiState
+  dflags <- getDynFlags
   let rem_ctx   = reverse (remembered_ctx st)
       trans_ctx = transient_ctx st
 
       show_one (IIModule star_m)
           = ":module +*" ++ moduleNameString star_m
-      show_one (IIDecl imp) = showSDoc (ppr imp)
+      show_one (IIDecl imp) = showPpr dflags imp
 
       prel_imp
         | any isPreludeImport (rem_ctx ++ trans_ctx) = []
@@ -2176,8 +2180,9 @@ showContext = do
 
 showPackages :: GHCi ()
 showPackages = do
-  pkg_flags <- fmap packageFlags getDynFlags
-  liftIO $ putStrLn $ showSDoc $ vcat $
+  dflags <- getDynFlags
+  let pkg_flags = packageFlags dflags
+  liftIO $ putStrLn $ showSDoc dflags $ vcat $
     text ("active package flags:"++if null pkg_flags then " none" else "")
     : map showFlag pkg_flags
   where showFlag (ExposePackage   p) = text $ "  -package " ++ p
@@ -2195,7 +2200,7 @@ showiLanguages = GHC.getInteractiveDynFlags >>= liftIO . showLanguages' False
 
 showLanguages' :: Bool -> DynFlags -> IO ()
 showLanguages' show_all dflags =
-  putStrLn $ showSDoc $ vcat
+  putStrLn $ showSDoc dflags $ vcat
      [ text "base language is: " <>
          case language dflags of
            Nothing          -> text "Haskell2010"
@@ -2260,26 +2265,27 @@ completeMacro = wrapIdentCompleter $ \w -> do
 
 completeIdentifier = wrapIdentCompleter $ \w -> do
   rdrs <- GHC.getRdrNamesInScope
-  return (filter (w `isPrefixOf`) (map (showSDoc.ppr) rdrs))
+  dflags <- GHC.getSessionDynFlags
+  return (filter (w `isPrefixOf`) (map (showPpr dflags) rdrs))
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags
   let pkg_mods = allExposedModules dflags
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
   return $ filter (w `isPrefixOf`)
-        $ map (showSDoc.ppr) $ loaded_mods ++ pkg_mods
+        $ map (showPpr dflags) $ loaded_mods ++ pkg_mods
 
 completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
+  dflags <- GHC.getSessionDynFlags
   modules <- case m of
     Just '-' -> do
       imports <- GHC.getContext
       return $ map iiModuleName imports
     _ -> do
-      dflags <- GHC.getSessionDynFlags
       let pkg_mods = allExposedModules dflags
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
       return $ loaded_mods ++ pkg_mods
-  return $ filter (w `isPrefixOf`) $ map (showSDoc.ppr) modules
+  return $ filter (w `isPrefixOf`) $ map (showPpr dflags) modules
 
 completeHomeModule = wrapIdentCompleter listHomeModules
 
@@ -2287,8 +2293,9 @@ listHomeModules :: String -> GHCi [String]
 listHomeModules w = do
     g <- GHC.getModuleGraph
     let home_mods = map GHC.ms_mod_name g
+    dflags <- getDynFlags
     return $ sort $ filter (w `isPrefixOf`)
-            $ map (showSDoc.ppr) home_mods
+            $ map (showPpr dflags) home_mods
 
 completeSetOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)

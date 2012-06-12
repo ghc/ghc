@@ -627,7 +627,8 @@ specConstrProgram guts
 %************************************************************************
 
 \begin{code}
-data ScEnv = SCE { sc_size  :: Maybe Int,	-- Size threshold
+data ScEnv = SCE { sc_dflags :: DynFlags,
+                   sc_size  :: Maybe Int,	-- Size threshold
 		   sc_count :: Maybe Int,	-- Max # of specialisations for any one fn
 						-- See Note [Avoiding exponential blowup]
                    sc_force :: Bool,            -- Force specialisation?
@@ -672,7 +673,8 @@ instance Outputable Value where
 ---------------------
 initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
 initScEnv dflags anns
-  = SCE { sc_size = specConstrThreshold dflags,
+  = SCE { sc_dflags = dflags,
+          sc_size = specConstrThreshold dflags,
 	  sc_count = specConstrCount dflags,
           sc_force = False,
 	  sc_subst = emptySubst, 
@@ -1384,7 +1386,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 	      fn_name    = idName fn
 	      fn_loc     = nameSrcSpan fn_name
 	      spec_occ   = mkSpecOcc (nameOccName fn_name)
-	      rule_name  = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
+	      dflags     = sc_dflags env
+	      rule_name  = mkFastString ("SC:" ++ showSDoc dflags (ppr fn <> int rule_number))
 	      spec_name  = mkInternalName spec_uniq spec_occ fn_loc
 --	; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $ 
 --	  return ()

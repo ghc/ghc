@@ -326,7 +326,7 @@ link' dflags batch_attempt_linking hpt
                    return Succeeded
            else do
 
-        compilationProgressMsg dflags $ showSDoc $
+        compilationProgressMsg dflags $ showSDoc dflags $
             (ptext (sLit "Linking") <+> text exe_file <+> text "...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
@@ -1497,7 +1497,7 @@ mkExtraObjToLinkIntoBinary dflags = do
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
 
-   mkExtraObj dflags "c" (showSDoc main)
+   mkExtraObj dflags "c" (showSDoc dflags main)
 
   where
     main
@@ -1528,7 +1528,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
 
    if (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
-     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc (link_opts link_info))
+     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc dflags (link_opts link_info))
      else return []
 
   where

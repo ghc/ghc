@@ -207,12 +207,13 @@ dsFCall fn_id co fcall mDeclHeader = do
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
 
+    dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
                do fcall_uniq <- newUnique
                   let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
-                                    mkFastString (showSDoc (ppr fcall_uniq)) `appendFS`
+                                    mkFastString (showPpr dflags fcall_uniq) `appendFS`
                                     mkFastString "_" `appendFS`
                                     cName
                       fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
@@ -256,7 +257,7 @@ dsFCall fn_id co fcall mDeclHeader = do
     let
         -- Build the worker
         worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-        the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
+        the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
 
@@ -298,8 +299,9 @@ dsPrimCall fn_id co fcall = do
     args <- newSysLocalsDs arg_tys
 
     ccall_uniq <- newUnique
+    dflags <- getDynFlags
     let
-        call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
+        call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
     return ([(fn_id, rhs')], empty, empty)
@@ -403,9 +405,10 @@ dsFExportDynamic :: Id
 dsFExportDynamic id co0 cconv = do
     fe_id <-  newSysLocalDs ty
     mod <- getModuleDs
+    dflags <- getDynFlags
     let
         -- hack: need to get at the name of the C stub we're about to generate.
-        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName fe_id)
+        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
 
     cback <- newSysLocalDs arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
@@ -465,8 +468,8 @@ dsFExportDynamic id co0 cconv = do
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 
-toCName :: Id -> String
-toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
+toCName :: DynFlags -> Id -> String
+toCName dflags i = showSDoc dflags (pprCode CStyle (ppr (idName i)))
 \end{code}
 
 %*

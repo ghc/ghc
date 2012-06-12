@@ -814,9 +814,10 @@ fromListBL bound l = BL (length l) bound l []
 setContext :: GhcMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
+       ; let dflags = hsc_dflags hsc_env
        ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
        ; case all_env_err of
-           Left (mod, err) -> ghcError (formatError mod err)
+           Left (mod, err) -> ghcError (formatError dflags mod err)
            Right all_env -> do {
        ; let old_ic        = hsc_IC hsc_env
              final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env
@@ -824,7 +825,7 @@ setContext imports
          hsc_env{ hsc_IC = old_ic { ic_imports    = imports
                                   , ic_rn_gbl_env = final_rdr_env }}}}
   where
-    formatError mod err = ProgramError . showSDoc $
+    formatError dflags mod err = ProgramError . showSDoc dflags $
       text "Cannot add module" <+> ppr mod <+>
       text "to context:" <+> text err
 
@@ -1009,7 +1010,8 @@ showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- isModuleInterpreted mod_summary
-        return (showModMsg (hscTarget(hsc_dflags hsc_env)) interpreted mod_summary)
+        let dflags = hsc_dflags hsc_env
+        return (showModMsg dflags (hscTarget dflags) interpreted mod_summary)
 
 isModuleInterpreted :: GhcMonad m => ModSummary -> m Bool
 isModuleInterpreted mod_summary = withSession $ \hsc_env ->

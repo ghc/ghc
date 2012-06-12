@@ -590,8 +590,9 @@ guessTarget str Nothing
         if looksLikeModuleName file
            then return (target (TargetModule (mkModuleName file)))
            else do
+        dflags <- getDynFlags
         throwGhcException
-                 (ProgramError (showSDoc $
+                 (ProgramError (showSDoc dflags $
                  text "target" <+> quotes (text file) <+> 
                  text "is not a module name or a source file"))
      where 
@@ -1291,11 +1292,11 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
              Found loc m | modulePackageId m /= this_pkg -> return m
-                         | otherwise -> modNotLoadedError m loc
+                         | otherwise -> modNotLoadedError dflags m loc
              err -> noModError dflags noSrcSpan mod_name err
 
-modNotLoadedError :: Module -> ModLocation -> IO a
-modNotLoadedError m loc = ghcError $ CmdLineError $ showSDoc $
+modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
+modNotLoadedError dflags m loc = ghcError $ CmdLineError $ showSDoc dflags $
    text "module is not loaded:" <+> 
    quotes (ppr (moduleName m)) <+>
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))

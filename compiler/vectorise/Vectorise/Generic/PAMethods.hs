@@ -23,6 +23,7 @@ import OccName
 import Coercion
 import MkId
 
+import DynFlags
 import FastString
 import MonadUtils
 import Control.Monad
@@ -394,8 +395,10 @@ buildToArrPReprs vect_tc repr_co _ pdatas_tc r
      = case ss of
         -- We can't convert data types with no data.
         -- See Note: [Empty PDatas].
-        EmptySum        -> return ([], errorEmptyPDatas el_ty)
-        UnarySum r      -> to_con (errorEmptyPDatas el_ty) r
+        EmptySum        -> do dflags <- getDynFlags
+                              return ([], errorEmptyPDatas dflags el_ty)
+        UnarySum r      -> do dflags <- getDynFlags
+                              to_con (errorEmptyPDatas dflags el_ty) r
 
         Sum{}
          -> do  let psums_tc     = repr_psums_tc ss
@@ -486,7 +489,8 @@ buildFromArrPReprs vect_tc repr_co _ pdatas_tc r
      = case ss of
         -- We can't convert data types with no data.
         -- See Note: [Empty PDatas].
-        EmptySum        -> return (res, errorEmptyPDatas el_ty)
+        EmptySum        -> do dflags <- getDynFlags
+                              return (res, errorEmptyPDatas dflags el_ty)
         UnarySum r      -> from_con res_ty res expr r
 
         Sum {}
@@ -572,9 +576,9 @@ To fix this we'd need to add an Int field to VPDs:Empty1 as well, but that's
 too much hassle and there's no point running a parallel computation on no
 data anyway.
 -}
-errorEmptyPDatas :: Type -> a
-errorEmptyPDatas tc
-    = cantVectorise "Vectorise.PAMethods"
+errorEmptyPDatas :: DynFlags -> Type -> a
+errorEmptyPDatas dflags tc
+    = cantVectorise dflags "Vectorise.PAMethods"
     $ vcat  [ text "Cannot vectorise data type with no parallel data " <> quotes (ppr tc)
             , text "Data types to be vectorised must contain at least one constructor"
             , text "with at least one field." ]
