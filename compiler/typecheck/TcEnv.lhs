@@ -78,7 +78,6 @@ import DynFlags
 import SrcLoc
 import BasicTypes
 import Outputable
-import Unique
 import FastString
 import ListSetOps
 import Util
@@ -736,8 +735,7 @@ mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM
 mkStableIdFromString str sig_ty loc occ_wrapper = do
     uniq <- newUnique
     mod <- getModule
-    let uniq_str = showSDoc (pprUnique uniq) :: String
-        occ = mkVarOcc (str ++ '_' : uniq_str) :: OccName
+    let occ = mkVarOcc (str ++ '_' : show uniq) :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
         id  = mkExportedLocalId gnm sig_ty :: Id
     return id
