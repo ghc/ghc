@@ -392,8 +392,8 @@ showSDocDump :: DynFlags -> SDoc -> String
 showSDocDump _ d
  = Pretty.showDocWith PageMode (runSDoc d (initSDocContext defaultDumpStyle))
 
-showSDocDumpOneLine :: SDoc -> String
-showSDocDumpOneLine d
+showSDocDumpOneLine :: DynFlags -> SDoc -> String
+showSDocDumpOneLine _ d
  = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
 
 showSDocDebug :: DynFlags -> SDoc -> String

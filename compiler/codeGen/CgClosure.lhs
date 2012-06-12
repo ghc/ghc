@@ -81,7 +81,8 @@ cgTopRhsClosure id ccs binder_info upd_flag args body = do
   ; lf_info  <- mkClosureLFInfo id TopLevel [] upd_flag args
   ; srt_info <- getSRTInfo
   ; mod_name <- getModuleName
-  ; let descr         = closureDescription mod_name name
+  ; dflags   <- getDynFlags
+  ; let descr         = closureDescription dflags mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name $ idCafInfo id
     	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
@@ -120,10 +121,11 @@ cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
   {	-- LAY OUT THE OBJECT
     amodes <- getArgAmodes payload
   ; mod_name <- getModuleName
+  ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, amodes_w_offsets) 
 	    = mkVirtHeapOffsets (isLFThunk lf_info) amodes
 
-	descr	     = closureDescription mod_name (idName bndr)
+	descr	     = closureDescription dflags mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds 
 				     NoC_SRT	-- No SRT for a std-form closure
@@ -169,13 +171,14 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; fv_infos <- mapFCs getCgIdInfo reduced_fvs
   ; srt_info <- getSRTInfo
   ; mod_name <- getModuleName
+  ; dflags <- getDynFlags
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
 	(tot_wds, ptr_wds, bind_details) 
 	   = mkVirtHeapOffsets (isLFThunk lf_info) (map add_rep fv_infos)
 
 	add_rep info = (cgIdInfoArgRep info, info)
 
-	descr	     = closureDescription mod_name name
+	descr	     = closureDescription dflags mod_name name
 	closure_info = mkClosureInfo False	-- Not static
 				     bndr lf_info tot_wds ptr_wds
 				     srt_info descr
@@ -613,13 +616,14 @@ name of the data constructor itself.  Otherwise it is determined by
 @closureDescription@ from the let binding information.
 
 \begin{code}
-closureDescription :: Module		-- Module
-		   -> Name		-- Id of closure binding
-		   -> String
+closureDescription :: DynFlags
+                   -> Module    -- Module
+                   -> Name      -- Id of closure binding
+                   -> String
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
-closureDescription mod_name name
-  = showSDocDumpOneLine (char '<' <>
+closureDescription dflags mod_name name
+  = showSDocDumpOneLine dflags (char '<' <>
 		    (if isExternalName name
 		      then ppr name -- ppr will include the module name prefix
 		      else pprModule mod_name <> char '.' <> ppr name) <>
