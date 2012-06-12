@@ -35,10 +35,8 @@ import CLabel
 
 import Unique                ( pprUnique, Uniquable(..) )
 import Platform
-import Pretty
 import FastString
-import qualified Outputable
-import Outputable ( PlatformOutputable, panic )
+import Outputable
 
 import Data.Word
 import Data.Bits
@@ -47,7 +45,7 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> Doc
+pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> SDoc
 pprNatCmmDecl platform (CmmData section dats) =
   pprSectionHeader platform section $$ pprDatas platform dats
 
@@ -65,7 +63,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader platform Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
-        then pprCLabel_asm platform (mkDeadStripPreventer info_lbl) <> char ':'
+        then pprCLabel platform (mkDeadStripPreventer info_lbl) <> char ':'
         else empty) $$
        vcat (map (pprData platform) info) $$
        pprLabel platform info_lbl
@@ -82,23 +80,23 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
          -- so that the linker will not think it is unreferenced and dead-strip
          -- it. That's why the label is called a DeadStripPreventer (_dsp).
                   text "\t.long "
-              <+> pprCLabel_asm platform info_lbl
+              <+> pprCLabel platform info_lbl
               <+> char '-'
-              <+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
+              <+> pprCLabel platform (mkDeadStripPreventer info_lbl)
          else empty)
 
 
-pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
+pprBasicBlock :: Platform -> NatBasicBlock Instr -> SDoc
 pprBasicBlock platform (BasicBlock blockid instrs) =
   pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map (pprInstr platform) instrs)
 
 
 
-pprDatas :: Platform -> CmmStatics -> Doc
+pprDatas :: Platform -> CmmStatics -> SDoc
 pprDatas platform (Statics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: Platform -> CmmStatic -> Doc
+pprData :: Platform -> CmmStatic -> SDoc
 pprData _ (CmmString str)          = pprASCII str
 pprData platform (CmmUninitialised bytes) = ptext (sLit keyword) <> int bytes
     where keyword = case platformOS platform of
@@ -106,30 +104,30 @@ pprData platform (CmmUninitialised bytes) = ptext (sLit keyword) <> int bytes
                     _        -> ".skip "
 pprData platform (CmmStaticLit lit)       = pprDataItem platform lit
 
-pprGloblDecl :: Platform -> CLabel -> Doc
+pprGloblDecl :: Platform -> CLabel -> SDoc
 pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm platform lbl
+  | otherwise = ptext (sLit ".globl ") <> pprCLabel platform lbl
 
-pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
+pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
   | platformOS platform == OSLinux && externallyVisibleCLabel lbl
     = ptext (sLit ".type ") <>
-      pprCLabel_asm platform lbl <> ptext (sLit ", @object")
+      pprCLabel platform lbl <> ptext (sLit ", @object")
 pprTypeAndSizeDecl _ _
   = empty
 
-pprLabel :: Platform -> CLabel -> Doc
+pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl = pprGloblDecl platform lbl
                      $$ pprTypeAndSizeDecl platform lbl
-                     $$ (pprCLabel_asm platform lbl <> char ':')
+                     $$ (pprCLabel platform lbl <> char ':')
 
 
-pprASCII :: [Word8] -> Doc
+pprASCII :: [Word8] -> SDoc
 pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
-       do1 :: Word8 -> Doc
+       do1 :: Word8 -> SDoc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
 
@@ -137,22 +135,22 @@ pprASCII str
 -- pprInstr: print an 'Instr'
 
 instance PlatformOutputable Instr where
-    pprPlatform platform instr = Outputable.docToSDoc $ pprInstr platform instr
+    pprPlatform platform instr = pprInstr platform instr
 
 
-pprReg :: Platform -> Reg -> Doc
+pprReg :: Platform -> Reg -> SDoc
 
 pprReg platform r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no i
       RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
-      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> pprUnique u
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> pprUnique u
+      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> pprUnique u
+      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> pprUnique u
+      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> pprUnique u
   where
-    ppr_reg_no :: Int -> Doc
+    ppr_reg_no :: Int -> SDoc
     ppr_reg_no i =
         case platformOS platform of
         OSDarwin ->
@@ -199,7 +197,7 @@ pprReg platform r
 
 
 
-pprSize :: Size -> Doc
+pprSize :: Size -> SDoc
 pprSize x 
  = ptext (case x of
                 II8        -> sLit "b"
@@ -210,7 +208,7 @@ pprSize x
                 _        -> panic "PPC.Ppr.pprSize: no match")
                 
                 
-pprCond :: Cond -> Doc
+pprCond :: Cond -> SDoc
 pprCond c 
  = ptext (case c of {
                 ALWAYS  -> sLit "";
@@ -221,12 +219,12 @@ pprCond c
                 GU      -> sLit "gt";  LEU   -> sLit "le"; })
 
 
-pprImm :: Platform -> Imm -> Doc
+pprImm :: Platform -> Imm -> SDoc
 
 pprImm _        (ImmInt i)     = int i
 pprImm _        (ImmInteger i) = integer i
-pprImm platform (ImmCLbl l)    = pprCLabel_asm platform l
-pprImm platform (ImmIndex l i) = pprCLabel_asm platform l <> char '+' <> int i
+pprImm platform (ImmCLbl l)    = pprCLabel platform l
+pprImm platform (ImmIndex l i) = pprCLabel platform l <> char '+' <> int i
 pprImm _        (ImmLit s)     = s
 
 pprImm _        (ImmFloat _)  = ptext (sLit "naughty float immediate")
@@ -252,7 +250,7 @@ pprImm platform (HA i)
     else pprImm platform i <> text "@ha"
 
 
-pprAddr :: Platform -> AddrMode -> Doc
+pprAddr :: Platform -> AddrMode -> SDoc
 pprAddr platform (AddrRegReg r1 r2)
   = pprReg platform r1 <+> ptext (sLit ", ") <+> pprReg platform r2
 
@@ -261,7 +259,7 @@ pprAddr platform (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pp
 pprAddr platform (AddrRegImm r1 imm) = hcat [ pprImm platform imm, char '(', pprReg platform r1, char ')' ]
 
 
-pprSectionHeader :: Platform -> Section -> Doc
+pprSectionHeader :: Platform -> Section -> SDoc
 pprSectionHeader platform seg
  = case seg of
         Text                    -> ptext (sLit ".text\n.align 2")
@@ -283,7 +281,7 @@ pprSectionHeader platform seg
     where osDarwin = platformOS platform == OSDarwin
 
 
-pprDataItem :: Platform -> CmmLit -> Doc
+pprDataItem :: Platform -> CmmLit -> SDoc
 pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
@@ -314,7 +312,7 @@ pprDataItem platform lit
                 = panic "PPC.Ppr.pprDataItem: no match"
 
 
-pprInstr :: Platform -> Instr -> Doc
+pprInstr :: Platform -> Instr -> SDoc
 
 pprInstr _ (COMMENT _) = empty -- nuke 'em
 {-
@@ -473,7 +471,7 @@ pprInstr platform (BCC cond blockid) = hcat [
         ptext (sLit "b"),
         pprCond cond,
         char '\t',
-        pprCLabel_asm platform lbl
+        pprCLabel platform lbl
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
 
@@ -485,7 +483,7 @@ pprInstr platform (BCCFAR cond blockid) = vcat [
         ],
         hcat [
             ptext (sLit "\tb\t"),
-            pprCLabel_asm platform lbl
+            pprCLabel platform lbl
         ]
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
@@ -494,7 +492,7 @@ pprInstr platform (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
         char '\t',
         ptext (sLit "b"),
         char '\t',
-        pprCLabel_asm platform lbl
+        pprCLabel platform lbl
     ]
 
 pprInstr platform (MTCTR reg) = hcat [
@@ -509,7 +507,7 @@ pprInstr _ (BCTR _ _) = hcat [
     ]
 pprInstr platform (BL lbl _) = hcat [
         ptext (sLit "\tbl\t"),
-        pprCLabel_asm platform lbl
+        pprCLabel platform lbl
     ]
 pprInstr _ (BCTRL _) = hcat [
         char '\t',
@@ -663,7 +661,7 @@ pprInstr _ LWSYNC = ptext (sLit "\tlwsync")
 -- pprInstr _ _ = panic "pprInstr (ppc)"
 
 
-pprLogic :: Platform -> LitString -> Reg -> Reg -> RI -> Doc
+pprLogic :: Platform -> LitString -> Reg -> Reg -> RI -> SDoc
 pprLogic platform op reg1 reg2 ri = hcat [
         char '\t',
         ptext op,
@@ -679,7 +677,7 @@ pprLogic platform op reg1 reg2 ri = hcat [
     ]
 
 
-pprUnary :: Platform -> LitString -> Reg -> Reg -> Doc
+pprUnary :: Platform -> LitString -> Reg -> Reg -> SDoc
 pprUnary platform op reg1 reg2 = hcat [
         char '\t',
         ptext op,
@@ -690,7 +688,7 @@ pprUnary platform op reg1 reg2 = hcat [
     ]
     
     
-pprBinaryF :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> Doc
+pprBinaryF :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> SDoc
 pprBinaryF platform op sz reg1 reg2 reg3 = hcat [
         char '\t',
         ptext op,
@@ -703,12 +701,12 @@ pprBinaryF platform op sz reg1 reg2 reg3 = hcat [
         pprReg platform reg3
     ]
     
-pprRI :: Platform -> RI -> Doc
+pprRI :: Platform -> RI -> SDoc
 pprRI platform (RIReg r) = pprReg platform r
 pprRI platform (RIImm r) = pprImm platform r
 
 
-pprFSize :: Size -> Doc
+pprFSize :: Size -> SDoc
 pprFSize FF64     = empty
 pprFSize FF32     = char 's'
 pprFSize _        = panic "PPC.Ppr.pprFSize: no match"

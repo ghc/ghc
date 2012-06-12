@@ -36,10 +36,8 @@ import OldCmm
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
 import Platform
-import Pretty
 import FastString
-import qualified Outputable
-import Outputable       (panic, PlatformOutputable)
+import Outputable
 
 import Data.Word
 
@@ -48,7 +46,7 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> Doc
+pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
 pprNatCmmDecl platform (CmmData section dats) =
   pprSectionHeader platform section $$ pprDatas platform dats
 
@@ -66,7 +64,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader platform Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
-        then pprCLabel_asm platform (mkDeadStripPreventer info_lbl) <> char ':'
+        then pprCLabel platform (mkDeadStripPreventer info_lbl) <> char ':'
         else empty) $$
        vcat (map (pprData platform) info) $$
        pprLabel platform info_lbl
@@ -83,32 +81,32 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
          -- so that the linker will not think it is unreferenced and dead-strip
          -- it. That's why the label is called a DeadStripPreventer (_dsp).
                   text "\t.long "
-              <+> pprCLabel_asm platform info_lbl
+              <+> pprCLabel platform info_lbl
               <+> char '-'
-              <+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
+              <+> pprCLabel platform (mkDeadStripPreventer info_lbl)
          else empty) $$
   pprSizeDecl platform info_lbl
 
 -- | Output the ELF .size directive.
-pprSizeDecl :: Platform -> CLabel -> Doc
+pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  | osElfTarget (platformOS platform) =
-    ptext (sLit "\t.size") <+> pprCLabel_asm platform lbl
-    <> ptext (sLit ", .-") <> pprCLabel_asm platform lbl
+    ptext (sLit "\t.size") <+> pprCLabel platform lbl
+    <> ptext (sLit ", .-") <> pprCLabel platform lbl
  | otherwise = empty
 
-pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
+pprBasicBlock :: Platform -> NatBasicBlock Instr -> SDoc
 pprBasicBlock platform (BasicBlock blockid instrs) =
   pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map (pprInstr platform) instrs)
 
 
-pprDatas :: Platform -> (Alignment, CmmStatics) -> Doc
+pprDatas :: Platform -> (Alignment, CmmStatics) -> SDoc
 pprDatas platform (align, (Statics lbl dats))
  = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData platform) dats)
  -- TODO: could remove if align == 1
 
-pprData :: Platform -> CmmStatic -> Doc
+pprData :: Platform -> CmmStatic -> SDoc
 pprData _ (CmmString str)          = pprASCII str
 
 pprData platform (CmmUninitialised bytes)
@@ -117,32 +115,32 @@ pprData platform (CmmUninitialised bytes)
 
 pprData platform (CmmStaticLit lit) = pprDataItem platform lit
 
-pprGloblDecl :: Platform -> CLabel -> Doc
+pprGloblDecl :: Platform -> CLabel -> SDoc
 pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm platform lbl
+  | otherwise = ptext (sLit ".globl ") <> pprCLabel platform lbl
 
-pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
+pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
  | osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
     = ptext (sLit ".type ") <>
-      pprCLabel_asm platform lbl <> ptext (sLit ", @object")
+      pprCLabel platform lbl <> ptext (sLit ", @object")
  | otherwise = empty
 
-pprLabel :: Platform -> CLabel -> Doc
+pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl = pprGloblDecl platform lbl
                      $$ pprTypeAndSizeDecl platform lbl
-                     $$ (pprCLabel_asm platform lbl <> char ':')
+                     $$ (pprCLabel platform lbl <> char ':')
 
 
-pprASCII :: [Word8] -> Doc
+pprASCII :: [Word8] -> SDoc
 pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
-       do1 :: Word8 -> Doc
+       do1 :: Word8 -> SDoc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
-pprAlign :: Platform -> Int -> Doc
+pprAlign :: Platform -> Int -> SDoc
 pprAlign platform bytes
         = ptext (sLit ".align ") <> int alignment
   where
@@ -161,23 +159,23 @@ pprAlign platform bytes
 -- pprInstr: print an 'Instr'
 
 instance PlatformOutputable Instr where
-    pprPlatform platform instr = Outputable.docToSDoc $ pprInstr platform instr
+    pprPlatform platform instr = pprInstr platform instr
 
 
-pprReg :: Platform -> Size -> Reg -> Doc
+pprReg :: Platform -> Size -> Reg -> SDoc
 pprReg platform s r
   = case r of
       RegReal    (RealRegSingle i) ->
           if target32Bit platform then ppr32_reg_no s i
                                   else ppr64_reg_no s i
       RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
-      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
-      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> asmSDoc (pprUnique u)
+      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> pprUnique u
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> pprUnique u
+      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> pprUnique u
+      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> pprUnique u
+      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> pprUnique u
   where
-    ppr32_reg_no :: Size -> Int -> Doc
+    ppr32_reg_no :: Size -> Int -> SDoc
     ppr32_reg_no II8   = ppr32_reg_byte
     ppr32_reg_no II16  = ppr32_reg_word
     ppr32_reg_no _     = ppr32_reg_long
@@ -207,7 +205,7 @@ pprReg platform s r
          _  -> ppr_reg_float i
       })
 
-    ppr64_reg_no :: Size -> Int -> Doc
+    ppr64_reg_no :: Size -> Int -> SDoc
     ppr64_reg_no II8   = ppr64_reg_byte
     ppr64_reg_no II16  = ppr64_reg_word
     ppr64_reg_no II32  = ppr64_reg_long
@@ -280,7 +278,7 @@ ppr_reg_float i = case i of
         38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
         _  -> sLit "very naughty x86 register"
 
-pprSize :: Size -> Doc
+pprSize :: Size -> SDoc
 pprSize x
  = ptext (case x of
                 II8   -> sLit "b"
@@ -292,7 +290,7 @@ pprSize x
                 FF80  -> sLit "t"
                 )
 
-pprSize_x87 :: Size -> Doc
+pprSize_x87 :: Size -> SDoc
 pprSize_x87 x
   = ptext $ case x of
                 FF32  -> sLit "s"
@@ -300,7 +298,7 @@ pprSize_x87 x
                 FF80  -> sLit "t"
                 _     -> panic "X86.Ppr.pprSize_x87"
 
-pprCond :: Cond -> Doc
+pprCond :: Cond -> SDoc
 pprCond c
  = ptext (case c of {
                 GEU     -> sLit "ae";   LU    -> sLit "b";
@@ -314,11 +312,11 @@ pprCond c
                 ALWAYS  -> sLit "mp"})
 
 
-pprImm :: Platform -> Imm -> Doc
+pprImm :: Platform -> Imm -> SDoc
 pprImm _        (ImmInt i)     = int i
 pprImm _        (ImmInteger i) = integer i
-pprImm platform (ImmCLbl l)    = pprCLabel_asm platform l
-pprImm platform (ImmIndex l i) = pprCLabel_asm platform l <> char '+' <> int i
+pprImm platform (ImmCLbl l)    = pprCLabel platform l
+pprImm platform (ImmIndex l i) = pprCLabel platform l <> char '+' <> int i
 pprImm _        (ImmLit s)     = s
 
 pprImm _        (ImmFloat _)  = ptext (sLit "naughty float immediate")
@@ -330,7 +328,7 @@ pprImm platform (ImmConstantDiff a b) = pprImm platform a <> char '-'
 
 
 
-pprAddr :: Platform -> AddrMode -> Doc
+pprAddr :: Platform -> AddrMode -> SDoc
 pprAddr platform (ImmAddr imm off)
   = let pp_imm = pprImm platform imm
     in
@@ -361,7 +359,7 @@ pprAddr platform (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm platform imm
 
 
-pprSectionHeader :: Platform -> Section -> Doc
+pprSectionHeader :: Platform -> Section -> SDoc
 pprSectionHeader platform seg
  = case platformOS platform of
    OSDarwin
@@ -406,7 +404,7 @@ pprSectionHeader platform seg
 
 
 
-pprDataItem :: Platform -> CmmLit -> Doc
+pprDataItem :: Platform -> CmmLit -> SDoc
 pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
@@ -466,7 +464,7 @@ pprDataItem platform lit
 
 
 
-pprInstr :: Platform -> Instr -> Doc
+pprInstr :: Platform -> Instr -> SDoc
 
 pprInstr _ (COMMENT _) = empty -- nuke 'em
 {-
@@ -592,7 +590,7 @@ pprInstr _ (CLTD II64) = ptext (sLit "\tcqto")
 pprInstr platform (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
 
 pprInstr platform (JXX cond blockid)
-  = pprCondInstr (sLit "j") cond (pprCLabel_asm platform lab)
+  = pprCondInstr (sLit "j") cond (pprCLabel platform lab)
   where lab = mkAsmTempLabel (getUnique blockid)
 
 pprInstr platform (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm platform imm)
@@ -862,7 +860,7 @@ pprInstr _ _
 
 
 pprTrigOp :: Platform -> String -> Bool -> CLabel -> CLabel
-          -> Reg -> Reg -> Size -> Doc
+          -> Reg -> Reg -> Size -> SDoc
 pprTrigOp platform
           op -- fsin, fcos or fptan
           isTan -- we need a couple of extra steps if we're doing tan
@@ -878,7 +876,7 @@ pprTrigOp platform
       hcat [gtab, text "fnstsw %ax"] $$
       hcat [gtab, text "test   $0x400,%eax"] $$
       -- If we were in bounds then jump to the end
-      hcat [gtab, text "je     " <> pprCLabel_asm platform l1] $$
+      hcat [gtab, text "je     " <> pprCLabel platform l1] $$
       -- Otherwise we need to shrink the value. Start by
       -- loading pi, doubleing it (by adding it to itself),
       -- and then swapping pi with the value, so the value we
@@ -888,16 +886,16 @@ pprTrigOp platform
       hcat [gtab, text "fxch   %st(1)"] $$
       -- Now we have a loop in which we make the value smaller,
       -- see if it's small enough, and loop if not
-      (pprCLabel_asm platform l2 <> char ':') $$
+      (pprCLabel platform l2 <> char ':') $$
       hcat [gtab, text "fprem1"] $$
       -- My Debian libc uses fstsw here for the tan code, but I can't
       -- see any reason why it should need to be different for tan.
       hcat [gtab, text "fnstsw %ax"] $$
       hcat [gtab, text "test   $0x400,%eax"] $$
-      hcat [gtab, text "jne    " <> pprCLabel_asm platform l2] $$
+      hcat [gtab, text "jne    " <> pprCLabel platform l2] $$
       hcat [gtab, text "fstp   %st(1)"] $$
       hcat [gtab, text op] $$
-      (pprCLabel_asm platform l1 <> char ':') $$
+      (pprCLabel platform l1 <> char ':') $$
       -- Pop the 1.0 tan gave us
       (if isTan then hcat [gtab, text "fstp %st(0)"] else empty) $$
       -- Restore %eax
@@ -908,29 +906,29 @@ pprTrigOp platform
 --------------------------
 
 -- coerce %st(0) to the specified size
-gcoerceto :: Size -> Doc
+gcoerceto :: Size -> SDoc
 gcoerceto FF64 = empty
 gcoerceto FF32 = empty --text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ; "
 gcoerceto _    = panic "X86.Ppr.gcoerceto: no match"
 
-gpush :: Reg -> RegNo -> Doc
+gpush :: Reg -> RegNo -> SDoc
 gpush reg offset
    = hcat [text "fld ", greg reg offset]
 
-gpop :: Reg -> RegNo -> Doc
+gpop :: Reg -> RegNo -> SDoc
 gpop reg offset
    = hcat [text "fstp ", greg reg offset]
 
-greg :: Reg -> RegNo -> Doc
+greg :: Reg -> RegNo -> SDoc
 greg reg offset = text "%st(" <> int (gregno reg - firstfake+offset) <> char ')'
 
-gsemi :: Doc
+gsemi :: SDoc
 gsemi = text " ; "
 
-gtab :: Doc
+gtab :: SDoc
 gtab  = char '\t'
 
-gsp :: Doc
+gsp :: SDoc
 gsp   = char ' '
 
 gregno :: Reg -> RegNo
@@ -938,12 +936,12 @@ gregno (RegReal (RealRegSingle i)) = i
 gregno _           = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 
-pprG :: Platform -> Instr -> Doc -> Doc
+pprG :: Platform -> Instr -> SDoc -> SDoc
 pprG platform fake actual
    = (char '#' <> pprGInstr platform fake) $$ actual
 
 
-pprGInstr :: Platform -> Instr -> Doc
+pprGInstr :: Platform -> Instr -> SDoc
 pprGInstr platform (GMOV src dst)   = pprSizeRegReg platform (sLit "gmov") FF64 src dst
 pprGInstr platform (GLD sz src dst) = pprSizeAddrReg platform (sLit "gld") sz src dst
 pprGInstr platform (GST sz src dst) = pprSizeRegAddr platform (sLit "gst") sz src dst
@@ -973,27 +971,27 @@ pprGInstr platform (GDIV sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gd
 
 pprGInstr _ _ = panic "X86.Ppr.pprGInstr: no match"
 
-pprDollImm :: Platform -> Imm -> Doc
+pprDollImm :: Platform -> Imm -> SDoc
 pprDollImm platform i = ptext (sLit "$") <> pprImm platform i
 
 
-pprOperand :: Platform -> Size -> Operand -> Doc
+pprOperand :: Platform -> Size -> Operand -> SDoc
 pprOperand platform s (OpReg r)   = pprReg platform s r
 pprOperand platform _ (OpImm i)   = pprDollImm platform i
 pprOperand platform _ (OpAddr ea) = pprAddr platform ea
 
 
-pprMnemonic_  :: LitString -> Doc
+pprMnemonic_  :: LitString -> SDoc
 pprMnemonic_ name =
    char '\t' <> ptext name <> space
 
 
-pprMnemonic  :: LitString -> Size -> Doc
+pprMnemonic  :: LitString -> Size -> SDoc
 pprMnemonic name size =
    char '\t' <> ptext name <> pprSize size <> space
 
 
-pprSizeImmOp :: Platform -> LitString -> Size -> Imm -> Operand -> Doc
+pprSizeImmOp :: Platform -> LitString -> Size -> Imm -> Operand -> SDoc
 pprSizeImmOp platform name size imm op1
   = hcat [
         pprMnemonic name size,
@@ -1004,7 +1002,7 @@ pprSizeImmOp platform name size imm op1
     ]
 
 
-pprSizeOp :: Platform -> LitString -> Size -> Operand -> Doc
+pprSizeOp :: Platform -> LitString -> Size -> Operand -> SDoc
 pprSizeOp platform name size op1
   = hcat [
         pprMnemonic name size,
@@ -1012,7 +1010,7 @@ pprSizeOp platform name size op1
     ]
 
 
-pprSizeOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprSizeOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> SDoc
 pprSizeOpOp platform name size op1 op2
   = hcat [
         pprMnemonic name size,
@@ -1022,7 +1020,7 @@ pprSizeOpOp platform name size op1 op2
     ]
 
 
-pprOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> SDoc
 pprOpOp platform name size op1 op2
   = hcat [
         pprMnemonic_ name,
@@ -1032,7 +1030,7 @@ pprOpOp platform name size op1 op2
     ]
 
 
-pprSizeReg :: Platform -> LitString -> Size -> Reg -> Doc
+pprSizeReg :: Platform -> LitString -> Size -> Reg -> SDoc
 pprSizeReg platform name size reg1
   = hcat [
         pprMnemonic name size,
@@ -1040,7 +1038,7 @@ pprSizeReg platform name size reg1
     ]
 
 
-pprSizeRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> SDoc
 pprSizeRegReg platform name size reg1 reg2
   = hcat [
         pprMnemonic name size,
@@ -1050,7 +1048,7 @@ pprSizeRegReg platform name size reg1 reg2
     ]
 
 
-pprRegReg :: Platform -> LitString -> Reg -> Reg -> Doc
+pprRegReg :: Platform -> LitString -> Reg -> Reg -> SDoc
 pprRegReg platform name reg1 reg2
   = hcat [
         pprMnemonic_ name,
@@ -1060,7 +1058,7 @@ pprRegReg platform name reg1 reg2
     ]
 
 
-pprSizeOpReg :: Platform -> LitString -> Size -> Operand -> Reg -> Doc
+pprSizeOpReg :: Platform -> LitString -> Size -> Operand -> Reg -> SDoc
 pprSizeOpReg platform name size op1 reg2
   = hcat [
         pprMnemonic name size,
@@ -1069,7 +1067,7 @@ pprSizeOpReg platform name size op1 reg2
         pprReg platform (archWordSize (target32Bit platform)) reg2
     ]
 
-pprCondRegReg :: Platform -> LitString -> Size -> Cond -> Reg -> Reg -> Doc
+pprCondRegReg :: Platform -> LitString -> Size -> Cond -> Reg -> Reg -> SDoc
 pprCondRegReg platform name size cond reg1 reg2
   = hcat [
         char '\t',
@@ -1081,7 +1079,7 @@ pprCondRegReg platform name size cond reg1 reg2
         pprReg platform size reg2
     ]
 
-pprSizeSizeRegReg :: Platform -> LitString -> Size -> Size -> Reg -> Reg -> Doc
+pprSizeSizeRegReg :: Platform -> LitString -> Size -> Size -> Reg -> Reg -> SDoc
 pprSizeSizeRegReg platform name size1 size2 reg1 reg2
   = hcat [
         char '\t',
@@ -1094,7 +1092,7 @@ pprSizeSizeRegReg platform name size1 size2 reg1 reg2
         pprReg platform size2 reg2
     ]
 
-pprSizeSizeOpReg :: Platform -> LitString -> Size -> Size -> Operand -> Reg -> Doc
+pprSizeSizeOpReg :: Platform -> LitString -> Size -> Size -> Operand -> Reg -> SDoc
 pprSizeSizeOpReg platform name size1 size2 op1 reg2
   = hcat [
         pprMnemonic name size2,
@@ -1103,7 +1101,7 @@ pprSizeSizeOpReg platform name size1 size2 op1 reg2
         pprReg platform size2 reg2
     ]
 
-pprSizeRegRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> SDoc
 pprSizeRegRegReg platform name size reg1 reg2 reg3
   = hcat [
         pprMnemonic name size,
@@ -1115,7 +1113,7 @@ pprSizeRegRegReg platform name size reg1 reg2 reg3
     ]
 
 
-pprSizeAddrReg :: Platform -> LitString -> Size -> AddrMode -> Reg -> Doc
+pprSizeAddrReg :: Platform -> LitString -> Size -> AddrMode -> Reg -> SDoc
 pprSizeAddrReg platform name size op dst
   = hcat [
         pprMnemonic name size,
@@ -1125,7 +1123,7 @@ pprSizeAddrReg platform name size op dst
     ]
 
 
-pprSizeRegAddr :: Platform -> LitString -> Size -> Reg -> AddrMode -> Doc
+pprSizeRegAddr :: Platform -> LitString -> Size -> Reg -> AddrMode -> SDoc
 pprSizeRegAddr platform name size src op
   = hcat [
         pprMnemonic name size,
@@ -1135,7 +1133,7 @@ pprSizeRegAddr platform name size src op
     ]
 
 
-pprShift :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprShift :: Platform -> LitString -> Size -> Operand -> Operand -> SDoc
 pprShift platform name size src dest
   = hcat [
         pprMnemonic name size,
@@ -1145,7 +1143,7 @@ pprShift platform name size src dest
     ]
 
 
-pprSizeOpOpCoerce :: Platform -> LitString -> Size -> Size -> Operand -> Operand -> Doc
+pprSizeOpOpCoerce :: Platform -> LitString -> Size -> Size -> Operand -> Operand -> SDoc
 pprSizeOpOpCoerce platform name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
         pprOperand platform size1 op1,
@@ -1154,7 +1152,7 @@ pprSizeOpOpCoerce platform name size1 size2 op1 op2
     ]
 
 
-pprCondInstr :: LitString -> Cond -> Doc -> Doc
+pprCondInstr :: LitString -> Cond -> SDoc -> SDoc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
 

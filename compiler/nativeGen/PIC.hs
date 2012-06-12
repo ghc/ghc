@@ -77,10 +77,8 @@ import CLabel           ( mkForeignLabel )
 import StaticFlags	( opt_PIC, opt_Static )
 import BasicTypes
 
-import Pretty
-import qualified Outputable
+import Outputable
 
-import Panic            ( panic )
 import DynFlags
 import FastString
 
@@ -421,19 +419,6 @@ picRelative _ _ _
 
 --------------------------------------------------------------------------------
 
--- utility function for pretty-printing asm-labels,
--- copied from PprMach
---
-asmSDoc :: Outputable.SDoc -> Doc
-asmSDoc d 
-	= Outputable.withPprStyleDoc 
-		(Outputable.mkCodeStyle Outputable.AsmStyle) d
-
-pprCLabel_asm :: Platform -> CLabel -> Doc
-pprCLabel_asm platform l
-	= asmSDoc (pprCLabel platform l)
-
-
 needImportedSymbols :: Arch -> OS -> Bool
 needImportedSymbols arch os
 	| os 	== OSDarwin
@@ -468,7 +453,7 @@ gotLabel
 --------------------------------------------------------------------------------
 -- We don't need to declare any offset tables.
 -- However, for PIC on x86, we need a small helper function.
-pprGotDeclaration :: Arch -> OS -> Doc
+pprGotDeclaration :: Arch -> OS -> SDoc
 pprGotDeclaration ArchX86 OSDarwin
 	| opt_PIC
 	= vcat [
@@ -480,7 +465,7 @@ pprGotDeclaration ArchX86 OSDarwin
 		ptext (sLit "\tret") ]
 
 pprGotDeclaration _ OSDarwin
-	= Pretty.empty
+	= empty
 		
 -- pprGotDeclaration
 -- Output whatever needs to be output once per .s file.
@@ -491,7 +476,7 @@ pprGotDeclaration arch os
 	| osElfTarget os
 	, arch	/= ArchPPC_64
 	, not opt_PIC 
-	= Pretty.empty
+	= empty
 
 	| osElfTarget os
 	, arch	/= ArchPPC_64
@@ -511,21 +496,21 @@ pprGotDeclaration _ _
 -- Whenever you change something in this assembler output, make sure
 -- the splitter in driver/split/ghc-split.lprl recognizes the new output
 
-pprImportedSymbol :: Platform -> CLabel -> Doc
+pprImportedSymbol :: Platform -> CLabel -> SDoc
 pprImportedSymbol platform@(Platform { platformArch = ArchPPC, platformOS = OSDarwin }) importedLbl
 	| Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
 	= case opt_PIC of
            False ->
             vcat [
                 ptext (sLit ".symbol_stub"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$stub:"),
-                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
-                    ptext (sLit "\tlis r11,ha16(L") <> pprCLabel_asm platform lbl
+                ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
+                    ptext (sLit "\tlis r11,ha16(L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr)"),
-                    ptext (sLit "\tlwz r12,lo16(L") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\tlwz r12,lo16(L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr)(r11)"),
                     ptext (sLit "\tmtctr r12"),
-                    ptext (sLit "\taddi r11,r11,lo16(L") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\taddi r11,r11,lo16(L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr)"),
                     ptext (sLit "\tbctr")
             ]
@@ -534,32 +519,32 @@ pprImportedSymbol platform@(Platform { platformArch = ArchPPC, platformOS = OSDa
                 ptext (sLit ".section __TEXT,__picsymbolstub1,")
                   <> ptext (sLit "symbol_stubs,pure_instructions,32"),
                 ptext (sLit "\t.align 2"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$stub:"),
-                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
+                ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
                     ptext (sLit "\tmflr r0"),
-                    ptext (sLit "\tbcl 20,31,L0$") <> pprCLabel_asm platform lbl,
-                ptext (sLit "L0$") <> pprCLabel_asm platform lbl <> char ':',
+                    ptext (sLit "\tbcl 20,31,L0$") <> pprCLabel platform lbl,
+                ptext (sLit "L0$") <> pprCLabel platform lbl <> char ':',
                     ptext (sLit "\tmflr r11"),
-                    ptext (sLit "\taddis r11,r11,ha16(L") <> pprCLabel_asm platform lbl
-                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel_asm platform lbl <> char ')',
+                    ptext (sLit "\taddis r11,r11,ha16(L") <> pprCLabel platform lbl
+                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel platform lbl <> char ')',
                     ptext (sLit "\tmtlr r0"),
-                    ptext (sLit "\tlwzu r12,lo16(L") <> pprCLabel_asm platform lbl
-                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\tlwzu r12,lo16(L") <> pprCLabel platform lbl
+                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel platform lbl
                         <> ptext (sLit ")(r11)"),
                     ptext (sLit "\tmtctr r12"),
                     ptext (sLit "\tbctr")
             ]
 	  $+$ vcat [
          	ptext (sLit ".lazy_symbol_pointer"),
-	        ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$lazy_ptr:"),
-		ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
+	        ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$lazy_ptr:"),
+		ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
 	        ptext (sLit "\t.long dyld_stub_binding_helper")]
 
 	| Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
 	= vcat [
 	        ptext (sLit ".non_lazy_symbol_pointer"),
-	        char 'L' <> pprCLabel_asm platform lbl <> ptext (sLit "$non_lazy_ptr:"),
-		ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
+	        char 'L' <> pprCLabel platform lbl <> ptext (sLit "$non_lazy_ptr:"),
+		ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
 		ptext (sLit "\t.long\t0")]
 
 	| otherwise 
@@ -572,13 +557,13 @@ pprImportedSymbol platform@(Platform { platformArch = ArchX86, platformOS = OSDa
            False ->
             vcat [
                 ptext (sLit ".symbol_stub"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$stub:"),
-                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
-                    ptext (sLit "\tjmp *L") <> pprCLabel_asm platform lbl
+                ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
+                    ptext (sLit "\tjmp *L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl
+                ptext (sLit "L") <> pprCLabel platform lbl
                     <> ptext (sLit "$stub_binder:"),
-                    ptext (sLit "\tpushl $L") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\tpushl $L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr"),
                     ptext (sLit "\tjmp dyld_stub_binding_helper")
             ]
@@ -586,16 +571,16 @@ pprImportedSymbol platform@(Platform { platformArch = ArchX86, platformOS = OSDa
             vcat [
                 ptext (sLit ".section __TEXT,__picsymbolstub2,")
                     <> ptext (sLit "symbol_stubs,pure_instructions,25"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$stub:"),
-                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
+                ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
                     ptext (sLit "\tcall ___i686.get_pc_thunk.ax"),
                 ptext (sLit "1:"),
-                    ptext (sLit "\tmovl L") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\tmovl L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr-1b(%eax),%edx"),
                     ptext (sLit "\tjmp *%edx"),
-                ptext (sLit "L") <> pprCLabel_asm platform lbl
+                ptext (sLit "L") <> pprCLabel platform lbl
                     <> ptext (sLit "$stub_binder:"),
-                    ptext (sLit "\tlea L") <> pprCLabel_asm platform lbl
+                    ptext (sLit "\tlea L") <> pprCLabel platform lbl
                         <> ptext (sLit "$lazy_ptr-1b(%eax),%eax"),
                     ptext (sLit "\tpushl %eax"),
                     ptext (sLit "\tjmp dyld_stub_binding_helper")
@@ -603,16 +588,16 @@ pprImportedSymbol platform@(Platform { platformArch = ArchX86, platformOS = OSDa
 	  $+$ vcat [        ptext (sLit ".section __DATA, __la_sym_ptr")
                     <> (if opt_PIC then int 2 else int 3)
                     <> ptext (sLit ",lazy_symbol_pointers"),
-	        ptext (sLit "L") <> pprCLabel_asm platform lbl <> ptext (sLit "$lazy_ptr:"),
-	            ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
-	            ptext (sLit "\t.long L") <> pprCLabel_asm platform lbl
+	        ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$lazy_ptr:"),
+	            ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
+	            ptext (sLit "\t.long L") <> pprCLabel platform lbl
                     <> ptext (sLit "$stub_binder")]
 
 	| Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
 	= vcat [
 	        ptext (sLit ".non_lazy_symbol_pointer"),
-	        char 'L' <> pprCLabel_asm platform lbl <> ptext (sLit "$non_lazy_ptr:"),
-		ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm platform lbl,
+	        char 'L' <> pprCLabel platform lbl <> ptext (sLit "$non_lazy_ptr:"),
+		ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
 		ptext (sLit "\t.long\t0")]
 
 	| otherwise 
@@ -667,8 +652,8 @@ pprImportedSymbol platform importedLbl
 
 	         in vcat [
 	              ptext (sLit ".section \".got2\", \"aw\""),
-	              ptext (sLit ".LC_") <> pprCLabel_asm platform lbl <> char ':',
-	              ptext symbolSize <+> pprCLabel_asm platform lbl ]
+	              ptext (sLit ".LC_") <> pprCLabel platform lbl <> char ':',
+	              ptext symbolSize <+> pprCLabel platform lbl ]
 
 	    -- PLT code stubs are generated automatically by the dynamic linker.
 	    _ -> empty

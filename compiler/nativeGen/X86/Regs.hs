@@ -57,8 +57,7 @@ import RegClass
 import BlockId
 import OldCmm
 import CLabel           ( CLabel )
-import Pretty
-import Outputable       ( panic )
+import Outputable
 import Platform
 import FastTypes
 import FastBool
@@ -128,7 +127,7 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      Doc         -- Simple string
+  | ImmLit      SDoc        -- Simple string
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational

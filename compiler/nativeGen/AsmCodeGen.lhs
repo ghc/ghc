@@ -64,7 +64,6 @@ import Util
 
 import BasicTypes       ( Alignment )
 import Digraph
-import Pretty (Doc)
 import qualified Pretty
 import BufWrite
 import Outputable
@@ -114,7 +113,7 @@ The machine-dependent bits break down as follows:
     machine instructions.
 
   * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
-    a 'Doc').
+    a 'SDoc').
 
   * ["RegAllocInfo"] In the register allocator, we manipulate
     'MRegsState's, which are 'BitSet's, one bit per machine register.
@@ -139,7 +138,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmDecl              :: Platform -> NatCmmDecl statics instr -> Doc,
+    pprNatCmmDecl              :: Platform -> NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
@@ -228,7 +227,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
         -- dump native code
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm "Asm code"
-                (vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) $ concat native)
+                (vcat $ map (pprNatCmmDecl ncgImpl platform) $ concat native)
 
         -- dump global NCG stats for graph coloring allocator
         (case concat $ catMaybes colorStats of
@@ -261,6 +260,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
         -- write out the imports
         Pretty.printDoc Pretty.LeftMode h
+                $ withPprStyleDoc (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat imports)
 
         return  ()
@@ -301,7 +301,8 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
                 <- {-# SCC "cmmNativeGen" #-} cmmNativeGen dflags ncgImpl us cmm count
 
         {-# SCC "pprNativeCode" #-} Pretty.bufLeftRender h
-                $ Pretty.vcat $ map (pprNatCmmDecl ncgImpl platform) native
+                $ withPprStyleDoc (mkCodeStyle AsmStyle)
+                $ vcat $ map (pprNatCmmDecl ncgImpl platform) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'
            -- and then using 'seq' doesn't work, because the let
@@ -368,7 +369,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_native "Native code"
-                (vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) native)
+                (vcat $ map (pprNatCmmDecl ncgImpl platform) native)
 
         -- tag instructions with register liveness information
         let (withLiveness, usLive) =
@@ -406,7 +407,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                 -- dump out what happened during register allocation
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
-                        (vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) alloced)
+                        (vcat $ map (pprNatCmmDecl ncgImpl platform) alloced)
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc_stages "Build/spill stages"
@@ -437,7 +438,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
-                        (vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) alloced)
+                        (vcat $ map (pprNatCmmDecl ncgImpl platform) alloced)
 
                 let mPprStats =
                         if dopt Opt_D_dump_asm_stats dflags
@@ -481,7 +482,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_expanded "Synthetic instructions expanded"
-                (vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) expanded)
+                (vcat $ map (pprNatCmmDecl ncgImpl platform) expanded)
 
         return  ( usAlloc
                 , expanded
@@ -498,17 +499,17 @@ x86fp_kludge (CmmProc info lbl (ListGraph code)) =
 
 -- | Build a doc for all the imports.
 --
-makeImportsDoc :: DynFlags -> [CLabel] -> Pretty.Doc
+makeImportsDoc :: DynFlags -> [CLabel] -> SDoc
 makeImportsDoc dflags imports
  = dyld_stubs imports
-            Pretty.$$
+            $$
             -- On recent versions of Darwin, the linker supports
             -- dead-stripping of code and data on a per-symbol basis.
             -- There's a hack to make this work in PprMach.pprNatCmmDecl.
             (if platformHasSubsectionsViaSymbols (targetPlatform dflags)
-             then Pretty.text ".subsections_via_symbols"
-             else Pretty.empty)
-            Pretty.$$
+             then text ".subsections_via_symbols"
+             else empty)
+            $$
                 -- On recent GNU ELF systems one can mark an object file
                 -- as not requiring an executable stack. If all objects
                 -- linked into a program have this note then the program
@@ -516,23 +517,21 @@ makeImportsDoc dflags imports
                 -- security. GHC generated code does not need an executable
                 -- stack so add the note in:
             (if platformHasGnuNonexecStack (targetPlatform dflags)
-             then Pretty.text ".section .note.GNU-stack,\"\",@progbits"
-             else Pretty.empty)
-            Pretty.$$
+             then text ".section .note.GNU-stack,\"\",@progbits"
+             else empty)
+            $$
                 -- And just because every other compiler does, lets stick in
                 -- an identifier directive: .ident "GHC x.y.z"
             (if platformHasIdentDirective (targetPlatform dflags)
-             then let compilerIdent = Pretty.text "GHC" Pretty.<+>
-                                      Pretty.text cProjectVersion
-                   in Pretty.text ".ident" Pretty.<+>
-                      Pretty.doubleQuotes compilerIdent
-             else Pretty.empty)
+             then let compilerIdent = text "GHC" <+> text cProjectVersion
+                   in text ".ident" <+> doubleQuotes compilerIdent
+             else empty)
 
  where
         -- Generate "symbol stubs" for all external symbols that might
         -- come from a dynamic library.
-        dyld_stubs :: [CLabel] -> Pretty.Doc
-{-      dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
+        dyld_stubs :: [CLabel] -> SDoc
+{-      dyld_stubs imps = vcat $ map pprDyldSymbolStub $
                                     map head $ group $ sort imps-}
 
         platform = targetPlatform dflags
@@ -543,7 +542,7 @@ makeImportsDoc dflags imports
         -- different uniques; so we compare their text versions...
         dyld_stubs imps
                 | needImportedSymbols arch os
-                = Pretty.vcat $
+                = vcat $
                         (pprGotDeclaration arch os :) $
                         map ( pprImportedSymbol platform . fst . head) $
                         groupBy (\(_,a) (_,b) -> a == b) $
@@ -551,7 +550,7 @@ makeImportsDoc dflags imports
                         map doPpr $
                         imps
                 | otherwise
-                = Pretty.empty
+                = empty
 
         doPpr lbl = (lbl, renderWithStyle dflags (pprCLabel platform lbl) astyle)
         astyle = mkCodeStyle AsmStyle

@@ -19,8 +19,7 @@ import OldCmm
 import CLabel
 import BlockId
 
-import Pretty
-import Panic
+import Outputable
 
 -- | An immediate value.
 --	Not all of these are directly representable by the machine. 
@@ -36,7 +35,7 @@ data Imm
 	| ImmCLbl	CLabel	    
 
 	-- Simple string
-	| ImmLit	Doc	    
+	| ImmLit	SDoc
 	| ImmIndex	CLabel Int
 	| ImmFloat	Rational
 	| ImmDouble	Rational
