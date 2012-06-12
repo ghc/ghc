@@ -181,8 +181,8 @@ mkSrcErr = SourceError
 srcErrorMessages :: SourceError -> ErrorMessages
 srcErrorMessages (SourceError msgs) = msgs
 
-mkApiErr :: SDoc -> GhcApiError
-mkApiErr = GhcApiError
+mkApiErr :: DynFlags -> SDoc -> GhcApiError
+mkApiErr _ msg = GhcApiError (showSDoc msg)
 
 throwOneError :: MonadIO m => ErrMsg -> m ab
 throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
@@ -221,11 +221,11 @@ handleSourceError handler act =
   gcatch act (\(e :: SourceError) -> handler e)
 
 -- | An error thrown if the GHC API is used in an incorrect fashion.
-newtype GhcApiError = GhcApiError SDoc
+newtype GhcApiError = GhcApiError String
   deriving Typeable
 
 instance Show GhcApiError where
-  show (GhcApiError msg) = showSDoc msg
+  show (GhcApiError msg) = msg
 
 instance Exception GhcApiError
 

@@ -719,9 +719,11 @@ getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
    case [ ms | ms <- mg, ms_mod_name ms == mod, not (isBootSummary ms) ] of
-     [] -> throw $ mkApiErr (text "Module not part of module graph")
+     [] -> do dflags <- getDynFlags
+              throw $ mkApiErr dflags (text "Module not part of module graph")
      [ms] -> return ms
-     multiple -> throw $ mkApiErr (text "getModSummary is ambiguous: " <+> ppr multiple)
+     multiple -> do dflags <- getDynFlags
+                    throw $ mkApiErr dflags (text "getModSummary is ambiguous: " <+> ppr multiple)
 
 -- | Parse a module.
 --
@@ -1182,7 +1184,8 @@ getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynF
 getModuleSourceAndFlags mod = do
   m <- getModSummary (moduleName mod)
   case ml_hs_file $ ms_location m of
-    Nothing -> throw $ mkApiErr (text "No source available for module " <+> ppr mod)
+    Nothing -> do dflags <- getDynFlags
+                  throw $ mkApiErr dflags (text "No source available for module " <+> ppr mod)
     Just sourceFile -> do
         source <- liftIO $ hGetStringBuffer sourceFile
         return (sourceFile, source, ms_hspp_opts m)
