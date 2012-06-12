@@ -496,9 +496,6 @@ pprLBVarInfo IsOneShotLambda = ptext (sLit "OneShot")
 
 instance Outputable LBVarInfo where
     ppr = pprLBVarInfo
-
-instance Show LBVarInfo where
-    showsPrec p c = showsPrecSDoc p (ppr c)
 \end{code}
 
 

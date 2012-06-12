@@ -237,9 +237,6 @@ instance NamedThing Class where
 instance Outputable Class where
     ppr c = ppr (getName c)
 
-instance Show Class where
-    showsPrec p c = showsPrecSDoc p (ppr c)
-
 instance Outputable DefMeth where
     ppr (DefMeth n)    =  ptext (sLit "Default method") <+> ppr n
     ppr (GenDefMeth n) =  ptext (sLit "Generic default method") <+> ppr n

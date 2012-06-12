@@ -572,9 +572,6 @@ instance Outputable OccInfo where
 		 | otherwise  = char '*'
 	  pp_args | int_cxt   = char '!'
 		  | otherwise = empty
-
-instance Show OccInfo where
-  showsPrec p occ = showsPrecSDoc p (ppr occ)
 \end{code}
 
 %************************************************************************

@@ -470,9 +470,6 @@ instance NamedThing DataCon where
 instance Outputable DataCon where
     ppr con = ppr (dataConName con)
 
-instance Show DataCon where
-    showsPrec p con = showsPrecSDoc p (ppr con)
-
 instance Data.Data DataCon where
     -- don't traverse?
     toConstr _   = abstractConstr "DataCon"

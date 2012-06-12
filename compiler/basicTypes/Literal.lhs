@@ -206,9 +206,6 @@ instance Binary Literal where
 instance Outputable Literal where
     ppr lit = pprLiteral (\d -> d) lit
 
-instance Show Literal where
-    showsPrec p lit = showsPrecSDoc p (ppr lit)
-
 instance Eq Literal where
     a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }

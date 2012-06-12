@@ -80,9 +80,6 @@ instance Ord PrimOp where
 
 instance Outputable PrimOp where
     ppr op = pprPrimOp op
-
-instance Show PrimOp where
-    showsPrec p op = showsPrecSDoc p (pprPrimOp op)
 \end{code}
 
 An @Enum@-derived list would be better; meanwhile... (ToDo)

@@ -963,9 +963,6 @@ instance Outputable AltCon where
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = ptext (sLit "__DEFAULT")
 
-instance Show AltCon where
-  showsPrec p con = showsPrecSDoc p (ppr con)
-
 cmpAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Ordering
 cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
 
