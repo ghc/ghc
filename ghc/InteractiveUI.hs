@@ -961,8 +961,9 @@ info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = handleSourceError GHC.printException $ do
     unqual <- GHC.getPrintUnqual
+    dflags <- getDynFlags
     sdocs  <- mapM infoThing (words s)
-    mapM_ (liftIO . putStrLn . showSDocForUser unqual) sdocs
+    mapM_ (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs
 
 infoThing :: GHC.GhcMonad m => String -> m SDoc
 infoThing str = do
@@ -1589,7 +1590,7 @@ browseModule bang modl exports_only = do
             prettyThings = map (pretty pefas) things
             prettyThings' | bang      = annotate $ zip modNames prettyThings
                           | otherwise = prettyThings
-        liftIO $ putStrLn $ showSDocForUser unqual (vcat prettyThings')
+        liftIO $ putStrLn $ showSDocForUser dflags unqual (vcat prettyThings')
         -- ToDo: modInfoInstances currently throws an exception for
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
