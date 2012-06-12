@@ -64,7 +64,7 @@ getImports :: DynFlags
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (mkPState dflags buf loc) of
-    PFailed span err -> parseError span err
+    PFailed span err -> parseError dflags span err
     POk pst rdr_module -> do
       let _ms@(_warns, errs) = getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
@@ -123,8 +123,8 @@ mkPrelImports this_mod loc implicit_prelude import_decls
       		    	       ideclAs        = Nothing,
       		    	       ideclHiding    = Nothing  }
 
-parseError :: SrcSpan -> MsgDoc -> IO a
-parseError span err = throwOneError $ mkPlainErrMsg span err
+parseError :: DynFlags -> SrcSpan -> MsgDoc -> IO a
+parseError dflags span err = throwOneError $ mkPlainErrMsg dflags span err
 
 --------------------------------------------------------------
 -- Get options
@@ -141,7 +141,8 @@ getOptionsFromFile dflags filename
 	      (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  opts <- fmap getOptions' $ lazyGetToks dflags' filename handle
+                  opts <- fmap (getOptions' dflags)
+                               (lazyGetToks dflags' filename handle)
                   seqList opts $ return opts)
     where -- We don't need to get haddock doc tokens when we're just
           -- getting the options from pragmas, and lazily lexing them
@@ -214,15 +215,16 @@ getOptions :: DynFlags
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> [Located String] -- ^ Parsed options.
 getOptions dflags buf filename
-    = getOptions' (getToks dflags filename buf)
+    = getOptions' dflags (getToks dflags filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
-getOptions' :: [Located Token]      -- Input buffer
+getOptions' :: DynFlags
+            -> [Located Token]      -- Input buffer
             -> [Located String]     -- Options.
-getOptions' toks
+getOptions' dflags toks
     = parseToks toks
     where 
           getToken (L _loc tok) = tok
@@ -252,14 +254,14 @@ getOptions' toks
               = parseLanguage xs
           parseToks _ = []
           parseLanguage (L loc (ITconid fs):rest)
-              = checkExtension (L loc fs) :
+              = checkExtension dflags (L loc fs) :
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError loc
+                  (L loc _):_ -> languagePragParseError dflags loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
-              = languagePragParseError (getLoc tok)
+              = languagePragParseError dflags (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
 
@@ -269,51 +271,51 @@ getOptions' toks
 --
 -- Throws a 'SourceError' if the input list is non-empty claiming that the
 -- input flags are unknown.
-checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
-checkProcessArgsResult flags
+checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
+checkProcessArgsResult dflags flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
-              = mkPlainErrMsg loc $
+              = mkPlainErrMsg dflags loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
 -----------------------------------------------------------------------------
 
-checkExtension :: Located FastString -> Located String
-checkExtension (L l ext)
+checkExtension :: DynFlags -> Located FastString -> Located String
+checkExtension dflags (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
  =  let ext' = unpackFS ext in
     if ext' `elem` supportedLanguagesAndExtensions
     then L l ("-X"++ext')
-    else unsupportedExtnError l ext'
+    else unsupportedExtnError dflags l ext'
 
-languagePragParseError :: SrcSpan -> a
-languagePragParseError loc =
+languagePragParseError :: DynFlags -> SrcSpan -> a
+languagePragParseError dflags loc =
   throw $ mkSrcErr $ unitBag $
-     (mkPlainErrMsg loc $
+     (mkPlainErrMsg dflags loc $
        vcat [ text "Cannot parse LANGUAGE pragma"
             , text "Expecting comma-separated list of language options,"
             , text "each starting with a capital letter"
             , nest 2 (text "E.g. {-# LANGUAGE RecordPuns, Generics #-}") ])
 
-unsupportedExtnError :: SrcSpan -> String -> a
-unsupportedExtnError loc unsup =
+unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
+unsupportedExtnError dflags loc unsup =
   throw $ mkSrcErr $ unitBag $
-    mkPlainErrMsg loc $
+    mkPlainErrMsg dflags loc $
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
      suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
 
 
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
-optionsErrorMsgs unhandled_flags flags_lines _filename
+optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
+optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where	unhandled_flags_lines = [ L l f | f <- unhandled_flags, 
 					  L l f' <- flags_lines, f == f' ]
         mkMsg (L flagSpan flag) = 
-            ErrUtils.mkPlainErrMsg flagSpan $
+            ErrUtils.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 

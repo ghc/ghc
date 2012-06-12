@@ -635,7 +635,7 @@ mkLongErrAt loc msg extra
   = do { traceTc "Adding error:" (mkLocMessage SevError loc (msg $$ extra)) ;
          rdr_env <- getGlobalRdrEnv ;
          dflags <- getDynFlags ;
-         return $ mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra }
+         return $ mkLongErrMsg dflags loc (mkPrintUnqualified dflags rdr_env) msg extra }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
@@ -917,7 +917,7 @@ add_warn_at :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at loc msg extra_info
   = do { rdr_env <- getGlobalRdrEnv ;
          dflags <- getDynFlags ;
-         let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
+         let { warn = mkLongWarnMsg dflags loc (mkPrintUnqualified dflags rdr_env)
                                     msg extra_info } ;
          reportWarning warn }
 

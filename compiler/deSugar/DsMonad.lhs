@@ -361,14 +361,16 @@ putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) 
 warnDs :: SDoc -> DsM ()
 warnDs warn = do { env <- getGblEnv 
                  ; loc <- getSrcSpanDs
-                 ; let msg = mkWarnMsg loc (ds_unqual env)  warn
+                 ; dflags <- getDynFlags
+                 ; let msg = mkWarnMsg dflags loc (ds_unqual env)  warn
                  ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 failWithDs :: SDoc -> DsM a
 failWithDs err 
   = do  { env <- getGblEnv 
         ; loc <- getSrcSpanDs
-        ; let msg = mkErrMsg loc (ds_unqual env) err
+        ; dflags <- getDynFlags
+        ; let msg = mkErrMsg dflags loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ (w,e) -> (w, e `snocBag` msg))
         ; failM }
 

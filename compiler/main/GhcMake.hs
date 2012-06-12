@@ -1021,15 +1021,16 @@ nodeMapElts = Map.elems
 -- were necessary, then the edge would be part of a cycle.
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
-  logWarnings (listToBag (concatMap (check.flattenSCC) sccs))
-  where check ms =
+  dflags <- getDynFlags
+  logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs))
+  where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn i | m <- ms, i <- ms_home_srcimps m,
-                      unLoc i `notElem`  mods_in_this_cycle ]
+           [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
+                             unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: Located ModuleName -> WarnMsg
-        warn (L loc mod) = 
-           mkPlainErrMsg loc
+        warn :: DynFlags -> Located ModuleName -> WarnMsg
+        warn dflags (L loc mod) =
+           mkPlainErrMsg dflags loc
                 (ptext (sLit "Warning: {-# SOURCE #-} unnecessary in import of ")
                  <+> quotes (ppr mod))
 
@@ -1067,6 +1068,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        summs <- loop (concatMap msDeps rootSummaries) root_map
        return summs
      where
+        dflags = hsc_dflags hsc_env
         roots = hsc_targets hsc_env
 
         old_summary_map :: NodeMap ModSummary
@@ -1078,14 +1080,14 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists 
                     then summariseFile hsc_env old_summaries file mb_phase 
                                        obj_allowed maybe_buf
-                    else throwOneError $ mkPlainErrMsg noSrcSpan $
+                    else throwOneError $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map False 
                                            (L rootLoc modl) obj_allowed 
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> packageModErr modl
+                   Nothing -> packageModErr dflags modl
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -1098,7 +1100,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         checkDuplicates root_map 
            | allow_dup_roots = return ()
            | null dup_roots  = return ()
-           | otherwise       = liftIO $ multiRootsErr (head dup_roots)
+           | otherwise       = liftIO $ multiRootsErr dflags (head dup_roots)
            where
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton (nodeMapElts root_map)
@@ -1118,7 +1120,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr summs; return [] }
+                do { multiRootsErr dflags summs; return [] }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map 
                                        is_boot wanted_mod True
@@ -1342,7 +1344,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- It might have been deleted since the Finder last found it
         maybe_t <- modificationTimeIfExists src_fn
         case maybe_t of
-          Nothing -> noHsFileErr loc src_fn
+          Nothing -> noHsFileErr dflags loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
 
@@ -1354,7 +1356,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
         (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
 
         when (mod_name /= wanted_mod) $
-                throwOneError $ mkPlainErrMsg mod_loc $ 
+                throwOneError $ mkPlainErrMsg dflags' mod_loc $
                               text "File name does not match module name:" 
                               $$ text "Saw:" <+> quotes (ppr mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -1402,7 +1404,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 
         (dflags', leftovers, warns)
             <- parseDynamicFilePragma dflags local_opts
-        checkProcessArgsResult leftovers
+        checkProcessArgsResult dflags leftovers
         handleFlagWarnings dflags' warns
 
         let needs_preprocessing
@@ -1426,21 +1428,21 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = throwOneError $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
+  = throwOneError $ mkPlainErrMsg dflags loc $ cannotFindModule dflags wanted_mod err
                                 
-noHsFileErr :: SrcSpan -> String -> IO a
-noHsFileErr loc path
-  = throwOneError $ mkPlainErrMsg loc $ text "Can't find" <+> text path
+noHsFileErr :: DynFlags -> SrcSpan -> String -> IO a
+noHsFileErr dflags loc path
+  = throwOneError $ mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
  
-packageModErr :: ModuleName -> IO a
-packageModErr mod
-  = throwOneError $ mkPlainErrMsg noSrcSpan $
+packageModErr :: DynFlags -> ModuleName -> IO a
+packageModErr dflags mod
+  = throwOneError $ mkPlainErrMsg dflags noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
-multiRootsErr :: [ModSummary] -> IO ()
-multiRootsErr [] = panic "multiRootsErr"
-multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainErrMsg noSrcSpan $
+multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
+multiRootsErr _      [] = panic "multiRootsErr"
+multiRootsErr dflags summs@(summ1:_)
+  = throwOneError $ mkPlainErrMsg dflags noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> 
         text "is defined in multiple files:" <+>
         sep (map text files)

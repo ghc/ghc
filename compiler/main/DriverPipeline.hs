@@ -774,7 +774,7 @@ runPhase (Cpp sf) input_fn dflags0
        (dflags1, unhandled_flags, warns)
            <- io $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
-       io $ checkProcessArgsResult unhandled_flags
+       io $ checkProcessArgsResult dflags1 unhandled_flags
 
        if not (xopt Opt_Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
@@ -791,7 +791,7 @@ runPhase (Cpp sf) input_fn dflags0
             src_opts <- io $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- io $ parseDynamicFilePragma dflags0 src_opts
-            io $ checkProcessArgsResult unhandled_flags
+            io $ checkProcessArgsResult dflags2 unhandled_flags
             unless (dopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
 
@@ -826,7 +826,7 @@ runPhase (HsPp sf) input_fn dflags
             (dflags1, unhandled_flags, warns)
                 <- io $ parseDynamicFilePragma dflags src_opts
             setDynFlags dflags1
-            io $ checkProcessArgsResult unhandled_flags
+            io $ checkProcessArgsResult dflags1 unhandled_flags
             io $ handleFlagWarnings dflags1 warns
 
             return (Hsc sf, output_fn)

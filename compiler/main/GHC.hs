@@ -1198,7 +1198,9 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
-    PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
+    PFailed span err ->
+        do dflags <- getDynFlags
+           throw $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1209,7 +1211,9 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
+    PFailed span err ->
+        do dflags <- getDynFlags
+           throw $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1381,7 +1385,7 @@ parser str dflags filename =
    case unP Parser.parseModule (mkPState dflags buf loc) of
 
      PFailed span err   -> 
-         Left (unitBag (mkPlainErrMsg span err))
+         Left (unitBag (mkPlainErrMsg dflags span err))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in

@@ -107,32 +107,33 @@ makeIntoWarning err = err { errMsgSeverity = SevWarning }
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 
-mk_err_msg :: Severity -> SrcSpan -> PrintUnqualified -> MsgDoc -> SDoc -> ErrMsg
-mk_err_msg sev locn print_unqual msg extra 
+mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> MsgDoc -> SDoc -> ErrMsg
+mk_err_msg _ sev locn print_unqual msg extra 
  = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
           , errMsgShortDoc = msg, errMsgExtraInfo = extra
           , errMsgSeverity = sev }
 
-mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
+mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg
 -- A long (multi-line) error message
-mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg
+mkErrMsg, mkWarnMsg           :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg
 -- A short (one-line) error message
-mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg
+mkPlainErrMsg, mkPlainWarnMsg :: DynFlags -> SrcSpan ->                     MsgDoc            -> ErrMsg
 -- Variant that doesn't care about qualified/unqualified names
 
-mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        msg extra
-mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        msg empty
-mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify msg empty
-mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        msg extra
-mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        msg empty
-mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify msg empty
+mkLongErrMsg   dflags locn unqual msg extra = mk_err_msg dflags SevError   locn unqual        msg extra
+mkErrMsg       dflags locn unqual msg       = mk_err_msg dflags SevError   locn unqual        msg empty
+mkPlainErrMsg  dflags locn        msg       = mk_err_msg dflags SevError   locn alwaysQualify msg empty
+mkLongWarnMsg  dflags locn unqual msg extra = mk_err_msg dflags SevWarning locn unqual        msg extra
+mkWarnMsg      dflags locn unqual msg       = mk_err_msg dflags SevWarning locn unqual        msg empty
+mkPlainWarnMsg dflags locn        msg       = mk_err_msg dflags SevWarning locn alwaysQualify msg empty
 
 ----------------
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
 
-warnIsErrorMsg :: ErrMsg
-warnIsErrorMsg = mkPlainErrMsg noSrcSpan (text "\nFailing due to -Werror.")
+warnIsErrorMsg :: DynFlags -> ErrMsg
+warnIsErrorMsg dflags
+    = mkPlainErrMsg dflags noSrcSpan (text "\nFailing due to -Werror.")
 
 errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
