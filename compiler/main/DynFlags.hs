@@ -448,7 +448,6 @@ data ExtensionFlag
    | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
-   | Opt_DoRec
    | Opt_PostfixOperators
    | Opt_TupleSections
    | Opt_PatternGuards
@@ -2028,9 +2027,9 @@ xFlags = [
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
   ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
-    deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword
+  ( "RecursiveDo",                      Opt_RecursiveDo, nop ),  -- Enables 'mdo' and 'rec'
+  ( "DoRec",                            Opt_RecursiveDo, 
+     deprecatedForExtension "RecursiveDo" ),
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
@@ -2276,7 +2275,7 @@ glasgowExtsFlags = [
            , Opt_RankNTypes
            , Opt_TypeOperators
            , Opt_ExplicitNamespaces
-           , Opt_DoRec
+           , Opt_RecursiveDo
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
