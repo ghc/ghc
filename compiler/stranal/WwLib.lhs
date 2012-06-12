@@ -37,6 +37,7 @@ import UniqSupply
 import Unique
 import Util		( zipWithEqual )
 import Outputable
+import DynFlags
 import FastString
 \end{code}
 
@@ -109,7 +110,8 @@ the unusable strictness-info into the interfaces.
 @mkWwBodies@ is called when doing the worker\/wrapper split inside a module.
 
 \begin{code}
-mkWwBodies :: Type				-- Type of original function
+mkWwBodies :: DynFlags
+       -> Type				-- Type of original function
 	   -> [Demand]				-- Strictness of original function
 	   -> DmdResult				-- Info about function result
 	   -> [Bool]				-- One-shot-ness of the function
@@ -128,10 +130,10 @@ mkWwBodies :: Type				-- Type of original function
 --			  let x = (a,b) in
 --			  E
 
-mkWwBodies fun_ty demands res_info one_shots
+mkWwBodies dflags fun_ty demands res_info one_shots
   = do	{ let arg_info = demands `zip` (one_shots ++ repeat False)
 	; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
-	; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
+	; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr dflags wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
 	; (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
@@ -320,7 +322,8 @@ That's why we carry the TvSubst through mkWWargs
 %************************************************************************
 
 \begin{code}
-mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
+mkWWstr :: DynFlags
+        -> [Var]				-- Wrapper args; have their demand info on them
 						--  *Includes type variables*
         -> UniqSM ([Var],			-- Worker args
 		   CoreExpr -> CoreExpr,	-- Wrapper body, lacking the worker call
@@ -330,12 +333,12 @@ mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
 		   CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function,
 						-- and lacking its lambdas.
 						-- This fn does the reboxing
-mkWWstr []
+mkWWstr _ []
   = return ([], nop_fn, nop_fn)
 
-mkWWstr (arg : args) = do
-    (args1, wrap_fn1, work_fn1) <- mkWWstr_one arg
-    (args2, wrap_fn2, work_fn2) <- mkWWstr args
+mkWWstr dflags (arg : args) = do
+    (args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags arg
+    (args2, wrap_fn2, work_fn2) <- mkWWstr dflags args
     return (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 ----------------------
@@ -344,8 +347,8 @@ mkWWstr (arg : args) = do
 --	  brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --	  brings into scope wrap_arg (via lets)
-mkWWstr_one :: Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-mkWWstr_one arg
+mkWWstr_one :: DynFlags -> Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+mkWWstr_one dflags arg
   | isTyVar arg
   = return ([arg],  nop_fn, nop_fn)
 
@@ -355,7 +358,7 @@ mkWWstr_one arg
 	-- Absent case.  We can't always handle absence for arbitrary
         -- unlifted types, so we need to choose just the cases we can
 	-- (that's what mk_absent_let does)
-      Abs | Just work_fn <- mk_absent_let arg
+      Abs | Just work_fn <- mk_absent_let dflags arg
           -> return ([], nop_fn, work_fn)
 
 	-- Unpack case
@@ -369,7 +372,7 @@ mkWWstr_one arg
 	        unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
 	        rebox_fn       = Let (NonRec arg con_app) 
 	        con_app        = mkProductBox unpk_args (idType arg)
-	      (worker_args, wrap_fn, work_fn) <- mkWWstr unpk_args_w_ds
+	      (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
 	      return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) 
 	  		   -- Don't pass the arg, rebox instead
 
@@ -533,8 +536,8 @@ every primitive type, so the function is partial.
     using a literal will do.]
 
 \begin{code}
-mk_absent_let :: Id -> Maybe (CoreExpr -> CoreExpr)
-mk_absent_let arg 
+mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
+mk_absent_let dflags arg
   | not (isUnLiftedType arg_ty)
   = Just (Let (NonRec arg abs_rhs))
   | Just tc <- tyConAppTyCon_maybe arg_ty
@@ -548,7 +551,7 @@ mk_absent_let arg
   where
     arg_ty  = idType arg
     abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
-    msg     = showSDocDebug (ppr arg <+> ppr (idType arg))
+    msg     = showSDocDebug dflags (ppr arg <+> ppr (idType arg))
 
 mk_seq_case :: Id -> CoreExpr -> CoreExpr
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]

@@ -1244,15 +1244,16 @@ tcIfaceWrapper :: Name -> Type -> IdInfo -> Arity -> IfL Id -> IfL Unfolding
 tcIfaceWrapper name ty info arity get_worker
   = do  { mb_wkr_id <- forkM_maybe doc get_worker
         ; us <- newUniqueSupply
+        ; dflags <- getDynFlags
         ; return (case mb_wkr_id of
                      Nothing     -> noUnfolding
-                     Just wkr_id -> make_inline_rule wkr_id us) }
+                     Just wkr_id -> make_inline_rule dflags wkr_id us) }
   where
     doc = text "Worker for" <+> ppr name
 
-    make_inline_rule wkr_id us 
+    make_inline_rule dflags wkr_id us 
         = mkWwInlineRule wkr_id
-                         (initUs_ us (mkWrapper ty strict_sig) wkr_id) 
+                         (initUs_ us (mkWrapper dflags ty strict_sig) wkr_id) 
                          arity
 
         -- Again we rely here on strictness info always appearing 

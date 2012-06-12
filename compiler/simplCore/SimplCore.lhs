@@ -390,8 +390,8 @@ doCorePass _      CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 doCorePass _      CoreDoStrictness          = {-# SCC "Stranal" #-}
                                               doPassDM dmdAnalPgm
 
-doCorePass _      CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
-                                              doPassU wwTopBinds
+doCorePass dflags CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
+                                              doPassU (wwTopBinds dflags)
 
 doCorePass dflags CoreDoSpecialising        = {-# SCC "Specialise" #-}
                                               specProgram dflags

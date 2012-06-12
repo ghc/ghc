@@ -396,8 +396,8 @@ showSDocDumpOneLine :: SDoc -> String
 showSDocDumpOneLine d
  = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
 
-showSDocDebug :: SDoc -> String
-showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
+showSDocDebug :: DynFlags -> SDoc -> String
+showSDocDebug _ d = show (runSDoc d (initSDocContext PprDebug))
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags = showSDoc dflags . ppr
