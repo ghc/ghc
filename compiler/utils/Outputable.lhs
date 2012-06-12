@@ -920,11 +920,11 @@ pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprDebugAndThen trace str doc x
+   | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
 
 pprDefiniteTrace :: String -> SDoc -> a -> a
 -- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace str doc x = pprDebugAndThen trace str doc x
+pprDefiniteTrace str doc x = pprDebugAndThen tracingDynFlags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
@@ -937,7 +937,7 @@ warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = pprDebugAndThen trace str msg x
+  = pprDebugAndThen tracingDynFlags trace str msg x
   where
     str = showSDoc tracingDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
@@ -945,7 +945,7 @@ assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
 -- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
-  = pprDebugAndThen panic "ASSERT failed!" doc
+  = pprDebugAndThen tracingDynFlags panic "ASSERT failed!" doc
   where
     doc = sep [ hsep [ text "file", text file
                      , text "line", int line ]
@@ -959,8 +959,8 @@ assertPprPanic file line msg
 tracingDynFlags :: DynFlags
 tracingDynFlags = panic "tracingDynFlags used"
 
-pprDebugAndThen :: (String -> a) -> String -> SDoc -> a
-pprDebugAndThen cont heading pretty_msg 
+pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
+pprDebugAndThen _ cont heading pretty_msg
  = cont (show (runSDoc doc (initSDocContext PprDebug)))
  where
      doc = sep [text heading, nest 4 pretty_msg]
