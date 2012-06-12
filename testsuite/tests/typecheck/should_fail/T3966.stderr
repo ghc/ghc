@@ -1,5 +1,5 @@
 
-T3966.hs:6:16: Warning:
+T3966.hs:5:16: Warning:
     Ignoring unusable UNPACK pragma on the first argument of `Foo'
     In the definition of data constructor `Foo'
     In the data declaration for `Foo'
