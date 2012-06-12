@@ -924,9 +924,9 @@ pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
 
-pprDefiniteTrace :: String -> SDoc -> a -> a
+pprDefiniteTrace :: DynFlags -> String -> SDoc -> a -> a
 -- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace str doc x = pprDebugAndThen tracingDynFlags trace str doc x
+pprDefiniteTrace dflags str doc x = pprDebugAndThen dflags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
