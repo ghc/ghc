@@ -27,8 +27,8 @@ import Data.Traversable (mapM)
 import Control.Monad hiding (mapM)
 
 
-renameInterface :: LinkEnv -> Bool -> Interface -> ErrMsgM Interface
-renameInterface renamingEnv warnings iface =
+renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
+renameInterface dflags renamingEnv warnings iface =
 
   -- first create the local env, where every name exported by this module
   -- is mapped to itself, and everything else comes from the global renaming
@@ -57,7 +57,7 @@ renameInterface renamingEnv warnings iface =
       -- representation. TODO: use the Name constants from the GHC API.
 --      strings = filter (`notElem` ["()", "[]", "(->)"])
 --                (map pretty missingNames)
-      strings = map pretty . filter (\n -> not (isSystemName n || isBuiltInSyntax n)) $ missingNames
+      strings = map (pretty dflags) . filter (\n -> not (isSystemName n || isBuiltInSyntax n)) $ missingNames
 
   in do
     -- report things that we couldn't link to. Only do this for non-hidden

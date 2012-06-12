@@ -151,12 +151,12 @@ declATs (TyClD d) | isClassDecl d = map (tcdName . unL) $ tcdATs d
 declATs _ = []
 
 
-pretty :: Outputable a => a -> String
-pretty x = showSDoc (ppr x)
+pretty :: Outputable a => DynFlags -> a -> String
+pretty = showPpr
 
 
-trace_ppr :: Outputable a => a -> b -> b
-trace_ppr x y = trace (pretty x) y
+trace_ppr :: Outputable a => DynFlags -> a -> b -> b
+trace_ppr dflags x y = trace (pretty dflags x) y
 
 
 -------------------------------------------------------------------------------

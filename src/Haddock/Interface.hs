@@ -49,6 +49,7 @@ import System.FilePath
 import Text.Printf
 
 import Digraph
+import DynFlags hiding (verbosity, flags)
 import Exception
 import GHC hiding (verbosity, flags)
 import HscTypes
@@ -83,8 +84,9 @@ processModules verbosity modules flags extIfaces = do
 
   out verbosity verbose "Renaming interfaces..."
   let warnings = Flag_NoWarnings `notElem` flags
+  dflags <- getDynFlags
   let (interfaces'', msgs) =
-         runWriter $ mapM (renameInterface links warnings) interfaces'
+         runWriter $ mapM (renameInterface dflags links warnings) interfaces'
   liftIO $ mapM_ putStrLn msgs
 
   return (interfaces'', homeLinks)

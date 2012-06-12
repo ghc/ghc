@@ -83,7 +83,7 @@ createInterface tm flags modMap instIfaceMap = do
        | OptIgnoreExports `elem` opts = Nothing
        | otherwise = exports0
 
-  liftErrMsg $ warnAboutFilteredDecls mdl decls
+  liftErrMsg $ warnAboutFilteredDecls dflags mdl decls
 
   exportItems <- mkExportItems modMap mdl gre exportedNames decls maps exports
                    instances instIfaceMap dflags
@@ -292,8 +292,8 @@ sortByLoc :: [Located a] -> [Located a]
 sortByLoc = sortBy (comparing getLoc)
 
 
-warnAboutFilteredDecls :: Module -> [LHsDecl Name] -> ErrMsgM ()
-warnAboutFilteredDecls mdl decls = do
+warnAboutFilteredDecls :: DynFlags -> Module -> [LHsDecl Name] -> ErrMsgM ()
+warnAboutFilteredDecls dflags mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
         nub [ unLoc (fid_tycon d) | L _ (InstD (FamInstD { lid_inst = d })) <- decls ]
@@ -305,7 +305,7 @@ warnAboutFilteredDecls mdl decls = do
       ++ "will be filtered out:\n  " ++ concat (intersperse ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
-  let instances = nub [ pretty i | L _ (InstD (ClsInstD { cid_poly_ty = i, cid_fam_insts = ats })) <- decls
+  let instances = nub [ pretty dflags i | L _ (InstD (ClsInstD { cid_poly_ty = i, cid_fam_insts = ats })) <- decls
                                  , not (null ats) ]
 
   unless (null instances) $
@@ -437,7 +437,7 @@ mkExportItems
       case findDecl t of
         [L _ (ValD _)] -> do
           -- Top-level binding without type signature
-          export <- hiValExportItem t doc
+          export <- hiValExportItem dflags t doc
           return [export]
         ds | decl : _ <- filter (not . isValD . unLoc) ds ->
           let declNames = getMainDeclBinder (unL decl)
@@ -454,8 +454,8 @@ mkExportItems
                 Just p <- find isExported (parents t $ unL decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++
-                     pretty (nameOccName t) ++ " is exported separately but " ++
-                     "will be documented under " ++ pretty (nameOccName p) ++
+                     pretty dflags (nameOccName t) ++ " is exported separately but " ++
+                     "will be documented under " ++ pretty dflags (nameOccName p) ++
                      ". Consider exporting it together with its parent(s)" ++
                      " for code clarity." ]
                    return []
@@ -476,7 +476,7 @@ mkExportItems
 
         -- Declaration from another package
         [] -> do
-          mayDecl <- hiDecl t
+          mayDecl <- hiDecl dflags t
           case mayDecl of
             Nothing -> return [ ExportNoDecl t [] ]
             Just decl -> do
@@ -485,7 +485,7 @@ mkExportItems
               case M.lookup (nameModule t) instIfaceMap of
                 Nothing -> do
                    liftErrMsg $ tell
-                      ["Warning: Couldn't find .haddock for export " ++ pretty t]
+                      ["Warning: Couldn't find .haddock for export " ++ pretty dflags t]
                    let subs_ = [ (n, noDocForDecl) | (n, _, _) <- subordinates (unLoc decl) ]
                    return [ mkExportDecl t decl (noDocForDecl, subs_) ]
                 Just iface -> do
@@ -515,19 +515,19 @@ mkExportItems
         mdl = nameModule name
 
 
-hiDecl :: Name -> ErrMsgGhc (Maybe (LHsDecl Name))
-hiDecl t = do
+hiDecl :: DynFlags -> Name -> ErrMsgGhc (Maybe (LHsDecl Name))
+hiDecl dflags t = do
   mayTyThing <- liftGhcToErrMsgGhc $ lookupName t
   case mayTyThing of
     Nothing -> do
-      liftErrMsg $ tell ["Warning: Not found in environment: " ++ pretty t]
+      liftErrMsg $ tell ["Warning: Not found in environment: " ++ pretty dflags t]
       return Nothing
     Just x -> return (Just (tyThingToLHsDecl x))
 
 
-hiValExportItem :: Name -> DocForDecl Name -> ErrMsgGhc (ExportItem Name)
-hiValExportItem name doc = do
-  mayDecl <- hiDecl name
+hiValExportItem :: DynFlags -> Name -> DocForDecl Name -> ErrMsgGhc (ExportItem Name)
+hiValExportItem dflags name doc = do
+  mayDecl <- hiDecl dflags name
   case mayDecl of
     Nothing -> return (ExportNoDecl name [])
     Just decl -> return (ExportDecl decl doc [] [])
@@ -578,8 +578,8 @@ moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap map
           Just iface -> return [ ExportModule (instMod iface) ]
           Nothing -> do
             liftErrMsg $
-              tell ["Warning: " ++ pretty thisMod ++ ": Could not find " ++
-                    "documentation for exported module: " ++ pretty expMod]
+              tell ["Warning: " ++ pretty dflags thisMod ++ ": Could not find " ++
+                    "documentation for exported module: " ++ pretty dflags expMod]
             return []
   where
     m = mkModule packageId expMod
@@ -617,7 +617,7 @@ fullModuleContents dflags gre (docMap, argMap, subMap, declMap) decls =
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =
           -- Top-level binding without type signature.
           let (doc, _) = exportDecl name docMap argMap subMap in
-          fmap Just (hiValExportItem name doc)
+          fmap Just (hiValExportItem dflags name doc)
       | otherwise = return Nothing
     mkExportItem decl
       | name:_ <- getMainDeclBinder (unLoc decl) =
