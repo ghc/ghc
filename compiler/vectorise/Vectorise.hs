@@ -264,7 +264,7 @@ vectTopBinder var inline expr
           Just (vdty, _) 
             | eqType vty vdty -> return ()
             | otherwise       -> 
-              cantVectorise ("Type mismatch in vectorisation pragma for " ++ show var) $
+              cantVectorise ("Type mismatch in vectorisation pragma for " ++ showSDoc (ppr var)) $
                 (text "Expected type" <+> ppr vty)
                 $$
                 (text "Inferred type" <+> ppr vdty)
@@ -352,7 +352,7 @@ vectTopRhs recFs var expr
        ; vectDecl     <- lookupVectDecl var
        ; let isDFun = isDFunId var
 
-       ; traceVt ("vectTopRhs of " ++ show var ++ info globalScalar isDFun vectDecl ++ ":") $ 
+       ; traceVt ("vectTopRhs of " ++ showSDoc (ppr var) ++ info globalScalar isDFun vectDecl ++ ":") $ 
            ppr expr
 
        ; rhs globalScalar isDFun vectDecl

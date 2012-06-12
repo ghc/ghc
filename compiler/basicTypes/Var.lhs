@@ -231,9 +231,6 @@ ppr_id_scope GlobalId              = ptext (sLit "gid")
 ppr_id_scope (LocalId Exported)    = ptext (sLit "lidx")
 ppr_id_scope (LocalId NotExported) = ptext (sLit "lid")
 
-instance Show Var where
-  showsPrec p var = showsPrecSDoc p (ppr var)
-
 instance NamedThing Var where
   getName = varName
 
