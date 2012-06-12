@@ -226,7 +226,10 @@ getDflags (LlvmEnv (_, _, _, d)) = d
 -- | Pretty print a 'CLabel'.
 strCLabel_llvm :: LlvmEnv -> CLabel -> LMString
 strCLabel_llvm env l = {-# SCC "llvm_strCLabel" #-}
-    (fsLit . show . llvmSDoc . pprCLabel (getLlvmPlatform env)) l
+    (fsLit . toString . pprCLabel (getLlvmPlatform env)) l
+    where dflags = getDflags env
+          style = Outp.mkCodeStyle Outp.CStyle
+          toString doc = Outp.renderWithStyle dflags doc style
 
 -- | Create an external definition for a 'CLabel' defined in another module.
 genCmmLabelRef :: LlvmEnv -> CLabel -> LMGlobal

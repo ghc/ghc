@@ -950,7 +950,10 @@ genMachOp_slow env opt op [x, y] = case op of
 
                 else do
                     -- Error. Continue anyway so we can debug the generated ll file.
-                    let cmmToStr = (lines . show . llvmSDoc . PprCmm.pprExpr (getLlvmPlatform env))
+                    let dflags = getDflags env
+                        style = mkCodeStyle CStyle
+                        toString doc = renderWithStyle dflags doc style
+                        cmmToStr = (lines . toString . PprCmm.pprExpr (getLlvmPlatform env))
                     let dx = Comment $ map fsLit $ cmmToStr x
                     let dy = Comment $ map fsLit $ cmmToStr y
                     (v1, s1) <- doExpr (ty vx) $ binOp vx vy
