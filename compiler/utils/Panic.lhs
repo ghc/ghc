@@ -14,7 +14,7 @@ module Panic (
      pgmError,
 
      panic, sorry, panicFastInt, assertPanic, trace,
-     panicDoc, sorryDoc, pgmErrorDoc,
+     panicDoc, sorryDoc, panicDocFastInt, pgmErrorDoc,
 
      Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
@@ -212,6 +212,9 @@ pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 --   producing unboxed ints because they have the wrong kind.
 panicFastInt :: String -> FastInt
 panicFastInt s = case (panic s) of () -> _ILIT(0)
+
+panicDocFastInt :: String -> SDoc -> FastInt
+panicDocFastInt s d = case (panicDoc s d) of () -> _ILIT(0)
 
 
 -- | Throw an failed assertion exception for a given filename and line number.

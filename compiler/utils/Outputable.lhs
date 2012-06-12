@@ -931,10 +931,7 @@ pprDefiniteTrace str doc x = pprDebugAndThen trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg =
-    panicFastInt (show (runSDoc doc (initSDocContext PprDebug)))
-  where
-    doc = text heading <+> pretty_msg
+pprPanicFastInt heading pretty_msg = panicDocFastInt heading pretty_msg
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
