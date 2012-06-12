@@ -236,19 +236,21 @@ data SDocContext = SDC
   { sdocStyle      :: !PprStyle
   , sdocLastColour :: !PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
+  , sdocDynFlags   :: DynFlags
   }
 
-initSDocContext :: PprStyle -> SDocContext
-initSDocContext sty = SDC
+initSDocContext :: DynFlags -> PprStyle -> SDocContext
+initSDocContext dflags sty = SDC
   { sdocStyle = sty
   , sdocLastColour = colReset
+  , sdocDynFlags = dflags
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
-withPprStyleDoc :: PprStyle -> SDoc -> Doc
-withPprStyleDoc sty d = runSDoc d (initSDocContext sty)
+withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
+withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
@@ -321,34 +323,34 @@ ifPprDebug d = SDoc $ \ctx ->
 
 \begin{code}
 hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
-hPrintDump _ h doc = do
+hPrintDump dflags h doc = do
    Pretty.printDoc PageMode h
-     (runSDoc better_doc (initSDocContext defaultDumpStyle))
+     (runSDoc better_doc (initSDocContext dflags defaultDumpStyle))
    hFlush h
  where
    better_doc = doc $$ blankLine
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
-printForUser _ handle unqual doc
+printForUser dflags handle unqual doc
   = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
-printForUserPartWay _ handle d unqual doc
+printForUserPartWay dflags handle d unqual doc
   = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
-printForC _ handle doc =
+printForC dflags handle doc =
   Pretty.printDoc LeftMode handle
-    (runSDoc doc (initSDocContext (PprCode CStyle)))
+    (runSDoc doc (initSDocContext dflags (PprCode CStyle)))
 
 printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
-printForAsm _ handle doc =
+printForAsm dflags handle doc =
   Pretty.printDoc LeftMode handle
-    (runSDoc doc (initSDocContext (PprCode AsmStyle)))
+    (runSDoc doc (initSDocContext dflags (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -360,41 +362,41 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc _ d =
+showSDoc dflags d =
   Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext defaultUserStyle))
+    (runSDoc d (initSDocContext dflags defaultUserStyle))
 
 renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
-renderWithStyle _ sdoc sty =
-  Pretty.render (runSDoc sdoc (initSDocContext sty))
+renderWithStyle dflags sdoc sty =
+  Pretty.render (runSDoc sdoc (initSDocContext dflags sty))
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: DynFlags -> SDoc -> String
-showSDocOneLine _ d
+showSDocOneLine dflags d
  = Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext defaultUserStyle))
+    (runSDoc d (initSDocContext dflags defaultUserStyle))
 
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
-showSDocForUser _ unqual doc
- = show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+showSDocForUser dflags unqual doc
+ = show (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
 
 showSDocUnqual :: DynFlags -> SDoc -> String
 -- Only used in the gruesome isOperator
-showSDocUnqual _ d
- = show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
+showSDocUnqual dflags d
+ = show (runSDoc d (initSDocContext dflags (mkUserStyle neverQualify AllTheWay)))
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump _ d
- = Pretty.showDocWith PageMode (runSDoc d (initSDocContext defaultDumpStyle))
+showSDocDump dflags d
+ = Pretty.showDocWith PageMode (runSDoc d (initSDocContext dflags defaultDumpStyle))
 
 showSDocDumpOneLine :: DynFlags -> SDoc -> String
-showSDocDumpOneLine _ d
- = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
+showSDocDumpOneLine dflags d
+ = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext dflags PprDump))
 
 showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug _ d = show (runSDoc d (initSDocContext PprDebug))
+showSDocDebug dflags d = show (runSDoc d (initSDocContext dflags PprDebug))
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags = showSDoc dflags . ppr
@@ -960,8 +962,8 @@ tracingDynFlags :: DynFlags
 tracingDynFlags = panic "tracingDynFlags used"
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
-pprDebugAndThen _ cont heading pretty_msg
- = cont (show (runSDoc doc (initSDocContext PprDebug)))
+pprDebugAndThen dflags cont heading pretty_msg
+ = cont (show (runSDoc doc (initSDocContext dflags PprDebug)))
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}

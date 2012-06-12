@@ -260,7 +260,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
         -- write out the imports
         Pretty.printDoc Pretty.LeftMode h
-                $ withPprStyleDoc (mkCodeStyle AsmStyle)
+                $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat imports)
 
         return  ()
@@ -301,7 +301,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
                 <- {-# SCC "cmmNativeGen" #-} cmmNativeGen dflags ncgImpl us cmm count
 
         {-# SCC "pprNativeCode" #-} Pretty.bufLeftRender h
-                $ withPprStyleDoc (mkCodeStyle AsmStyle)
+                $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ vcat $ map (pprNatCmmDecl ncgImpl platform) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'

@@ -991,8 +991,8 @@ defaultLogAction dflags severity srcSpan style msg
           printErrs = defaultLogActionHPrintDoc dflags stderr
 
 defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
-defaultLogActionHPrintDoc _ h d sty
-    = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext sty))
+defaultLogActionHPrintDoc dflags h d sty
+    = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext dflags sty))
          hFlush h
 
 newtype FlushOut = FlushOut (IO ())
