@@ -1,3 +1,0 @@
-
-mdofail004.hs:1:12:
-    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
