@@ -11,7 +11,6 @@ module ProfInit (profilingInitCode) where
 import CLabel
 import CostCentre
 import Outputable
-import Platform
 import StaticFlags
 import FastString
 import Module
@@ -22,8 +21,8 @@ import Module
 -- We must produce declarations for the cost-centres defined in this
 -- module;
 
-profilingInitCode :: Platform -> Module -> CollectedCCs -> SDoc
-profilingInitCode _ this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
+profilingInitCode :: Module -> CollectedCCs -> SDoc
+profilingInitCode this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
  | not opt_SccProfilingOn = empty
  | otherwise
  = vcat

@@ -1266,7 +1266,7 @@ hscGenHardCode cgguts mod_summary = do
             <- {-# SCC "CoreToStg" #-}
                myCoreToStg dflags this_mod prepd_binds
 
-        let prof_init = profilingInitCode platform this_mod cost_centre_info
+        let prof_init = profilingInitCode this_mod cost_centre_info
             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
         ------------------  Code generation ------------------

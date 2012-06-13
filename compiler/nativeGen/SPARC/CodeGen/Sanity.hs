@@ -22,17 +22,15 @@ import Instruction
 import OldCmm
 
 import Outputable
-import Platform
 
 
 -- | Enforce intra-block invariants.
 --
-checkBlock :: Platform
-           -> CmmBasicBlock
+checkBlock :: CmmBasicBlock
            -> NatBasicBlock Instr
            -> NatBasicBlock Instr
 
-checkBlock _ cmm block@(BasicBlock _ instrs)
+checkBlock cmm block@(BasicBlock _ instrs)
 	| checkBlockInstrs instrs
 	= block
 	

@@ -61,10 +61,7 @@ cmmTopCodeGen :: RawCmmDecl
               -> NatM [NatCmmDecl CmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
- = do
-      dflags <- getDynFlags
-      let platform = targetPlatform dflags
-      (nat_blocks,statics) <- mapAndUnzipM (basicBlockCodeGen platform) blocks
+ = do (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
 
       let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       let tops = proc : concat statics
@@ -80,12 +77,11 @@ cmmTopCodeGen (CmmData sec dat) = do
 --      are indicated by the NEWBLOCK instruction.  We must split up the
 --      instruction stream into basic blocks again.  Also, we extract
 --      LDATAs here too.
-basicBlockCodeGen :: Platform
-                  -> CmmBasicBlock
+basicBlockCodeGen :: CmmBasicBlock
                   -> NatM ( [NatBasicBlock Instr]
                           , [NatCmmDecl CmmStatics Instr])
 
-basicBlockCodeGen platform cmm@(BasicBlock id stmts) = do
+basicBlockCodeGen cmm@(BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
   let
         (top,other_blocks,statics)
@@ -102,7 +98,7 @@ basicBlockCodeGen platform cmm@(BasicBlock id stmts) = do
 
         -- do intra-block sanity checking
         blocksChecked
-                = map (checkBlock platform cmm)
+                = map (checkBlock cmm)
                 $ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)
