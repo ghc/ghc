@@ -48,7 +48,6 @@ import PprCmmExpr
 import Util
 
 import BasicTypes
-import Platform
 import Compiler.Hoopl
 import Data.List
 import Prelude hiding (succ)
@@ -60,11 +59,11 @@ instance Outputable CmmStackInfo where
     ppr = pprStackInfo
 
 instance Outputable CmmTopInfo where
-    ppr x = sdocWithPlatform $ \platform -> pprTopInfo platform x
+    ppr = pprTopInfo
 
 
 instance Outputable (CmmNode e x) where
-    ppr x = sdocWithPlatform $ \platform -> pprNode platform x
+    ppr = pprNode
 
 instance Outputable Convention where
     ppr = pprConvention
@@ -73,23 +72,23 @@ instance Outputable ForeignConvention where
     ppr = pprForeignConvention
 
 instance Outputable ForeignTarget where
-    ppr x = sdocWithPlatform $ \platform -> pprForeignTarget platform x
+    ppr = pprForeignTarget
 
 
 instance Outputable (Block CmmNode C C) where
-    ppr x = sdocWithPlatform $ \platform -> pprBlock platform x
+    ppr = pprBlock
 instance Outputable (Block CmmNode C O) where
-    ppr x = sdocWithPlatform $ \platform -> pprBlock platform x
+    ppr = pprBlock
 instance Outputable (Block CmmNode O C) where
-    ppr x = sdocWithPlatform $ \platform -> pprBlock platform x
+    ppr = pprBlock
 instance Outputable (Block CmmNode O O) where
-    ppr x = sdocWithPlatform $ \platform -> pprBlock platform x
+    ppr = pprBlock
 
 instance Outputable (Graph CmmNode e x) where
-    ppr x = sdocWithPlatform $ \platform -> pprGraph platform x
+    ppr = pprGraph
 
 instance Outputable CmmGraph where
-    ppr g = sdocWithPlatform $ \platform -> pprCmmGraph platform g
+    ppr = pprCmmGraph
 
 ----------------------------------------------------------
 -- Outputting types Cmm contains
@@ -99,8 +98,8 @@ pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   ptext (sLit "arg_space: ") <> ppr arg_space <+>
   ptext (sLit "updfr_space: ") <> ppr updfr_space
 
-pprTopInfo :: Platform -> CmmTopInfo -> SDoc
-pprTopInfo _ (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
+pprTopInfo :: CmmTopInfo -> SDoc
+pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
   vcat [ptext (sLit "info_tbl: ") <> ppr info_tbl,
         ptext (sLit "stack_info: ") <> ppr stack_info]
 
@@ -108,8 +107,8 @@ pprTopInfo _ (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
 -- Outputting blocks and graphs
 
 pprBlock :: IndexedCO x SDoc SDoc ~ SDoc
-         => Platform -> Block CmmNode e x -> IndexedCO e SDoc SDoc
-pprBlock _ block
+         => Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock block
     = foldBlockNodesB3 ( ($$) . ppr
                        , ($$) . (nest 4) . ppr
                        , ($$) . (nest 4) . ppr
@@ -117,10 +116,10 @@ pprBlock _ block
                        block
                        empty
 
-pprGraph :: Platform -> Graph CmmNode e x -> SDoc
-pprGraph _ GNil = empty
-pprGraph _ (GUnit block) = ppr block
-pprGraph _ (GMany entry body exit)
+pprGraph :: Graph CmmNode e x -> SDoc
+pprGraph GNil = empty
+pprGraph (GUnit block) = ppr block
+pprGraph (GMany entry body exit)
    = text "{"
   $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
   $$ text "}"
@@ -129,8 +128,8 @@ pprGraph _ (GMany entry body exit)
         pprMaybeO NothingO = empty
         pprMaybeO (JustO block) = ppr block
 
-pprCmmGraph :: Platform -> CmmGraph -> SDoc
-pprCmmGraph _ g
+pprCmmGraph :: CmmGraph -> SDoc
+pprCmmGraph g
    = text "{" <> text "offset"
   $$ nest 2 (vcat $ map ppr blocks)
   $$ text "}"
@@ -153,8 +152,8 @@ pprConvention (Private {})          = text "<private-convention>"
 pprForeignConvention :: ForeignConvention -> SDoc
 pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs
 
-pprForeignTarget :: Platform -> ForeignTarget -> SDoc
-pprForeignTarget _ (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
+pprForeignTarget :: ForeignTarget -> SDoc
+pprForeignTarget (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
   where ppr_fc :: ForeignConvention -> SDoc
         ppr_fc (ForeignConvention c args res) =
           doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res
@@ -162,7 +161,7 @@ pprForeignTarget _ (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
         ppr_target t@(CmmLit _) = ppr t
         ppr_target fn'          = parens (ppr fn')
 
-pprForeignTarget _ (PrimTarget op)
+pprForeignTarget (PrimTarget op)
  -- HACK: We're just using a ForeignLabel to get this printed, the label
  --       might not really be foreign.
  = ppr
@@ -170,8 +169,8 @@ pprForeignTarget _ (PrimTarget op)
                          (mkFastString (show op))
                          Nothing ForeignLabelInThisPackage IsFunction))
 
-pprNode :: Platform -> CmmNode e x -> SDoc
-pprNode _ node = pp_node <+> pp_debug
+pprNode :: CmmNode e x -> SDoc
+pprNode node = pp_node <+> pp_debug
   where
     pp_node :: SDoc
     pp_node = case node of
