@@ -375,7 +375,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
-                        $ mapUs (regLiveness platform)
+                        $ mapUs regLiveness
                         $ map natCmmTopToLive native
 
         dumpIfSet_dyn dflags

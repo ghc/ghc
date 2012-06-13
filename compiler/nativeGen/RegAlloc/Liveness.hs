@@ -663,20 +663,19 @@ sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
 --
 regLiveness
         :: (Outputable instr, Instruction instr)
-        => Platform
-        -> LiveCmmDecl statics instr
+        => LiveCmmDecl statics instr
         -> UniqSM (LiveCmmDecl statics instr)
 
-regLiveness _ (CmmData i d)
+regLiveness (CmmData i d)
         = returnUs $ CmmData i d
 
-regLiveness _ (CmmProc info lbl [])
+regLiveness (CmmProc info lbl [])
         | LiveInfo static mFirst _ _    <- info
         = returnUs $ CmmProc
                         (LiveInfo static mFirst (Just mapEmpty) Map.empty)
                         lbl []
 
-regLiveness _ (CmmProc info lbl sccs)
+regLiveness (CmmProc info lbl sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
         = let   (ann_sccs, block_live)  = computeLiveness sccs
 
