@@ -57,19 +57,17 @@ import Numeric ( fromRat )
 
 -----------------------------------------------------------------------------
 
-instance PlatformOutputable CmmExpr where
-    pprPlatform = pprExpr
+instance Outputable CmmExpr where
+    ppr e = sdocWithPlatform $ \platform -> pprExpr platform e
 
 instance Outputable CmmReg where
     ppr e = pprReg e
 
-instance PlatformOutputable CmmLit where
-    pprPlatform = pprLit
+instance Outputable CmmLit where
+    ppr l = sdocWithPlatform $ \platform -> pprLit platform l
 
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
-instance PlatformOutputable LocalReg where
-    pprPlatform _ = ppr
 
 instance Outputable Area where
     ppr e = pprArea e
@@ -147,7 +145,7 @@ pprExpr9 :: Platform -> CmmExpr -> SDoc
 pprExpr9 platform e =
    case e of
         CmmLit    lit       -> pprLit1 platform lit
-        CmmLoad   expr rep  -> ppr rep <> brackets (pprPlatform platform expr)
+        CmmLoad   expr rep  -> ppr rep <> brackets (ppr expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)

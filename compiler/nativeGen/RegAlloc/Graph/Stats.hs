@@ -72,12 +72,12 @@ data RegAllocStats statics instr
 	, raFinal	  :: [NatCmmDecl statics instr] 			-- ^ final code
 	, raSRMs	  :: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
-instance (PlatformOutputable statics, PlatformOutputable instr) => PlatformOutputable (RegAllocStats statics instr) where
+instance (Outputable statics, Outputable instr) => Outputable (RegAllocStats statics instr) where
 
- pprPlatform platform (s@RegAllocStatsStart{})
- 	=  text "#  Start"
+ ppr (s@RegAllocStatsStart{}) = sdocWithPlatform $ \platform ->
+ 	   text "#  Start"
 	$$ text "#  Native code with liveness information."
-	$$ pprPlatform platform (raLiveCmm s)
+	$$ ppr (raLiveCmm s)
 	$$ text ""
 	$$ text "#  Initial register conflict graph."
 	$$ Color.dotGraph 
@@ -88,11 +88,11 @@ instance (PlatformOutputable statics, PlatformOutputable instr) => PlatformOutpu
 		(raGraph s)
 
 
- pprPlatform platform (s@RegAllocStatsSpill{})
- 	=  text "#  Spill"
+ ppr (s@RegAllocStatsSpill{}) =
+ 	   text "#  Spill"
 
 	$$ text "#  Code with liveness information."
-	$$ pprPlatform platform (raCode s)
+	$$ ppr (raCode s)
 	$$ text ""
 
 	$$ (if (not $ isNullUFM $ raCoalesced s)
@@ -106,14 +106,14 @@ instance (PlatformOutputable statics, PlatformOutputable instr) => PlatformOutpu
 	$$ text ""
 
 	$$ text "#  Code with spills inserted."
-	$$ pprPlatform platform (raSpilled s)
+	$$ ppr (raSpilled s)
 
 
- pprPlatform platform (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
- 	=  text "#  Colored"
+ ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) }) = sdocWithPlatform $ \platform ->
+ 	   text "#  Colored"
 
 	$$ text "#  Code with liveness information."
-	$$ pprPlatform platform (raCode s)
+	$$ ppr (raCode s)
 	$$ text ""
 
 	$$ text "#  Register conflict graph (colored)."
@@ -132,19 +132,19 @@ instance (PlatformOutputable statics, PlatformOutputable instr) => PlatformOutpu
 		else empty)
 
 	$$ text "#  Native code after coalescings applied."
-	$$ pprPlatform platform (raCodeCoalesced s)
+	$$ ppr (raCodeCoalesced s)
 	$$ text ""
 
 	$$ text "#  Native code after register allocation."
-	$$ pprPlatform platform (raPatched s)
+	$$ ppr (raPatched s)
 	$$ text ""
 
 	$$ text "#  Clean out unneeded spill/reloads."
-	$$ pprPlatform platform (raSpillClean s)
+	$$ ppr (raSpillClean s)
 	$$ text ""
 
 	$$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
-	$$ pprPlatform platform (raFinal s)
+	$$ ppr (raFinal s)
 	$$ text ""
 	$$  text "#  Score:"
 	$$ (text "#          spills  inserted: " <> int spills)

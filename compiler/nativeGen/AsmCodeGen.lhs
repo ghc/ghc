@@ -150,7 +150,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
 nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 nativeCodeGen dflags h us cmms
  = let platform = targetPlatform dflags
-       nCG' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+       nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -206,7 +206,7 @@ nativeCodeGen dflags h us cmms
                  ArchUnknown ->
                      panic "nativeCodeGen: No NCG for unknown arch"
 
-nativeCodeGen' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
                -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
@@ -274,7 +274,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
               -> NcgImpl statics instr jumpDest
               -> BufHandle
@@ -316,7 +316,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
         count' <- return $! count + 1;
 
         -- force evaulation all this stuff to avoid space leaks
-        {-# SCC "seqString" #-} seqString (showSDoc dflags $ vcat $ map (pprPlatform platform) imports) `seq` return ()
+        {-# SCC "seqString" #-} seqString (showSDoc dflags $ vcat $ map ppr imports) `seq` return ()
 
         cmmNativeGens dflags ncgImpl
             h us' cmms
@@ -332,7 +332,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 --      Dumping the output of each stage along the way.
 --      Global conflict graph and NGC stats
 cmmNativeGen
-        :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+        :: (Outputable statics, Outputable instr, Instruction instr)
     => DynFlags
     -> NcgImpl statics instr jumpDest
         -> UniqSupply
@@ -380,7 +380,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_liveness "Liveness annotations added"
-                (vcat $ map (pprPlatform platform) withLiveness)
+                (vcat $ map ppr withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear) <-
@@ -414,7 +414,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                         (vcat   $ map (\(stage, stats)
                                         -> text "# --------------------------"
                                         $$ text "#  cmm " <> int count <> text " Stage " <> int stage
-                                        $$ pprPlatform platform stats)
+                                        $$ ppr stats)
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =

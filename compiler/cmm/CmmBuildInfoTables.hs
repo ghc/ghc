@@ -228,12 +228,12 @@ data TopSRT = TopSRT { lbl      :: CLabel
                      , rev_elts :: [CLabel]
                      , elt_map  :: Map CLabel Int }
                         -- map: CLabel -> its last entry in the table
-instance PlatformOutputable TopSRT where
-  pprPlatform platform (TopSRT lbl next elts eltmap) =
-    text "TopSRT:" <+> pprPlatform platform lbl
+instance Outputable TopSRT where
+  ppr (TopSRT lbl next elts eltmap) =
+    text "TopSRT:" <+> ppr lbl
                    <+> ppr next
-                   <+> pprPlatform platform elts
-                   <+> pprPlatform platform eltmap
+                   <+> ppr elts
+                   <+> ppr eltmap
 
 emptySRT :: MonadUnique m => m TopSRT
 emptySRT =

@@ -13,7 +13,6 @@
 module Outputable (
         -- * Type classes
         Outputable(..), OutputableBndr(..),
-        PlatformOutputable(..),
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
@@ -57,6 +56,7 @@ module Outputable (
 
         PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
         QualifyName(..),
+        sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
@@ -71,16 +71,16 @@ module Outputable (
         pprDebugAndThen,
     ) where
 
-import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags )
+import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags, targetPlatform )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
 import StaticFlags
 import FastString
 import FastTypes
-import Platform
 import qualified Pretty
 import Util
+import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
@@ -283,6 +283,12 @@ pprSetDepth depth doc = SDoc $ \ctx ->
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
+
+sdocWithDynFlags :: (DynFlags -> SDoc) -> SDoc
+sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
+
+sdocWithPlatform :: (Platform -> SDoc) -> SDoc
+sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 \end{code}
 
 \begin{code}
@@ -599,13 +605,6 @@ class Outputable a where
 
         ppr = pprPrec 0
         pprPrec _ = ppr
-
-class PlatformOutputable a where
-        pprPlatform :: Platform -> a -> SDoc
-        pprPlatformPrec :: Platform -> Rational -> a -> SDoc
-
-        pprPlatform platform = pprPlatformPrec platform 0
-        pprPlatformPrec platform _ = pprPlatform platform
 \end{code}
 
 \begin{code}
@@ -615,8 +614,6 @@ instance Outputable Bool where
 
 instance Outputable Int where
    ppr n = int n
-instance PlatformOutputable Int where
-   pprPlatform _ = ppr
 
 instance Outputable Word16 where
    ppr n = integer $ fromIntegral n
@@ -629,29 +626,19 @@ instance Outputable Word where
 
 instance Outputable () where
    ppr _ = text "()"
-instance PlatformOutputable () where
-   pprPlatform _ _ = text "()"
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
-instance (PlatformOutputable a) => PlatformOutputable [a] where
-    pprPlatform platform xs = brackets (fsep (punctuate comma (map (pprPlatform platform) xs)))
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
-instance (PlatformOutputable a, PlatformOutputable b) => PlatformOutputable (a, b) where
-    pprPlatform platform (x,y)
-     = parens (sep [pprPlatform platform x <> comma, pprPlatform platform y])
 
 instance Outputable a => Outputable (Maybe a) where
   ppr Nothing = ptext (sLit "Nothing")
   ppr (Just x) = ptext (sLit "Just") <+> ppr x
-instance PlatformOutputable a => PlatformOutputable (Maybe a) where
-  pprPlatform _        Nothing  = ptext (sLit "Nothing")
-  pprPlatform platform (Just x) = ptext (sLit "Just") <+> pprPlatform platform x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
   ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
@@ -708,8 +695,6 @@ instance Outputable FastString where
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
-instance (PlatformOutputable key, PlatformOutputable elt) => PlatformOutputable (M.Map key elt) where
-    pprPlatform platform m = pprPlatform platform (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
 \end{code}

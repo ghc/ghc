@@ -70,12 +70,12 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --	for each vreg, the number of times it was written to, read from,
 --	and the number of instructions it was live on entry to (lifetime)
 --
-slurpSpillCostInfo :: (PlatformOutputable instr, Instruction instr)
+slurpSpillCostInfo :: (Outputable instr, Instruction instr)
                    => Platform
                    -> LiveCmmDecl statics instr
                    -> SpillCostInfo
 
-slurpSpillCostInfo platform cmm
+slurpSpillCostInfo _ cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
@@ -104,7 +104,7 @@ slurpSpillCostInfo platform cmm
 
 		| otherwise
 		= pprPanic "RegSpillCost.slurpSpillCostInfo"
-			(text "no liveness information on instruction " <> pprPlatform platform instr)
+			(text "no liveness information on instruction " <> ppr instr)
 
 	countLIs rsLiveEntry (LiveInstr instr (Just live) : lis)
 	 = do

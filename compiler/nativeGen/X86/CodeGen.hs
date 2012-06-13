@@ -401,8 +401,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
             )
 
 iselExpr64 expr
-   = do dflags <- getDynFlags
-        pprPanic "iselExpr64(i386)" (pprPlatform (targetPlatform dflags) expr)
+   = pprPanic "iselExpr64(i386)" (ppr expr)
 
 
 --------------------------------------------------------------------------------
@@ -888,8 +887,7 @@ getRegister' _ (CmmLit lit)
     in
         return (Any size code)
 
-getRegister' _ other = do dflags <- getDynFlags
-                          pprPanic "getRegister(x86)" (pprPlatform (targetPlatform dflags) other)
+getRegister' _ other = pprPanic "getRegister(x86)" (ppr other)
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
@@ -1229,11 +1227,9 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt _ -> condIntCode LU  x y
       MO_U_Le _ -> condIntCode LEU x y
 
-      _other -> do dflags <- getDynFlags
-                   pprPanic "getCondCode(x86,x86_64,sparc)" (pprPlatform (targetPlatform dflags) (CmmMachOp mop [x,y]))
+      _other -> pprPanic "getCondCode(x86,x86_64,sparc)" (ppr (CmmMachOp mop [x,y]))
 
-getCondCode other = do dflags <- getDynFlags
-                       pprPanic "getCondCode(2)(x86,sparc)" (pprPlatform (targetPlatform dflags) other)
+getCondCode other = pprPanic "getCondCode(2)(x86,sparc)" (ppr other)
 
 
 

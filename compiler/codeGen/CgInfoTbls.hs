@@ -45,7 +45,6 @@ import Unique
 import StaticFlags
 
 import Constants
-import DynFlags
 import Util
 import Outputable
 
@@ -168,8 +167,6 @@ is not present in the list (it is always assumed).
 -}
 mkStackLayout :: FCode [Maybe LocalReg]
 mkStackLayout = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
   StackUsage { realSp = real_sp,
                frameSp = frame_sp } <- getStkUsage
   binds <- getLiveStackBindings
@@ -179,7 +176,7 @@ mkStackLayout = do
                     | (offset, b) <- binds]
 
   WARN( not (all (\bind -> fst bind >= 0) rel_binds),
-        pprPlatform platform binds $$ pprPlatform platform rel_binds $$
+        ppr binds $$ ppr rel_binds $$
         ppr frame_size $$ ppr real_sp $$ ppr frame_sp )
     return $ stack_layout rel_binds frame_size
 

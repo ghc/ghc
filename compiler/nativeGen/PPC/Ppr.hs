@@ -134,8 +134,8 @@ pprASCII str
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance PlatformOutputable Instr where
-    pprPlatform platform instr = pprInstr platform instr
+instance Outputable Instr where
+    ppr instr = sdocWithPlatform $ \platform -> pprInstr platform instr
 
 
 pprReg :: Platform -> Reg -> SDoc

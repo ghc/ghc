@@ -78,7 +78,6 @@ cgTopRhsCon id con args
         ; amodes <- getArgAmodes args
 
         ; let
-            platform = targetPlatform dflags
             name          = idName id
             lf_info       = mkConLFInfo con
             closure_label = mkClosureLabel name $ idCafInfo id
@@ -92,7 +91,7 @@ cgTopRhsCon id con args
 
             payload = map get_lit amodes_w_offsets
             get_lit (CmmLit lit, _offset) = lit
-            get_lit other = pprPanic "CgCon.get_lit" (pprPlatform platform other)
+            get_lit other = pprPanic "CgCon.get_lit" (ppr other)
                 -- NB1: amodes_w_offsets is sorted into ptrs first, then non-ptrs
                 -- NB2: all the amodes should be Lits!
 

@@ -127,7 +127,7 @@ import Control.Monad
 
 -- Allocate registers
 regAlloc
-        :: (PlatformOutputable instr, Instruction instr)
+        :: (Outputable instr, Instruction instr)
         => DynFlags
         -> LiveCmmDecl statics instr
         -> UniqSM (NatCmmDecl statics instr, Maybe RegAllocStats)
@@ -170,7 +170,7 @@ regAlloc _ (CmmProc _ _ _)
 --   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-        :: (PlatformOutputable instr, Instruction instr)
+        :: (Outputable instr, Instruction instr)
         => DynFlags
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
@@ -189,7 +189,7 @@ linearRegAlloc dflags first_id block_live sccs
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'
-        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        :: (FR freeRegs, Outputable instr, Instruction instr)
         => Platform
         -> freeRegs
         -> BlockId                      -- ^ the first block
@@ -205,7 +205,7 @@ linearRegAlloc' platform initFreeRegs first_id block_live sccs
         return  (blocks, stats)
 
 
-linearRA_SCCs :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)
               => Platform
               -> BlockId
               -> BlockMap RegSet
@@ -241,7 +241,7 @@ linearRA_SCCs platform first_id block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+process :: (FR freeRegs, Instruction instr, Outputable instr)
         => Platform
         -> BlockId
         -> BlockMap RegSet
@@ -286,7 +286,7 @@ process platform first_id block_live (b@(BasicBlock id _) : blocks)
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        :: (FR freeRegs, Outputable instr, Instruction instr)
         => Platform
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
@@ -321,7 +321,7 @@ initBlock id
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        :: (FR freeRegs, Outputable instr, Instruction instr)
         => Platform
         -> BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
@@ -350,7 +350,7 @@ linearRA platform block_live accInstr accFixups id (instr:instrs)
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        :: (FR freeRegs, Outputable instr, Instruction instr)
         => Platform
         -> BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
@@ -410,11 +410,11 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
                         (uniqSetToList $ liveDieWrite live)
 
 
-raInsn platform _ _ _ instr
-        = pprPanic "raInsn" (text "no match for:" <> pprPlatform platform instr)
+raInsn _ _ _ _ instr
+        = pprPanic "raInsn" (text "no match for:" <> ppr instr)
 
 
-genRaInsn :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
           => Platform
           -> BlockMap RegSet
           -> [instr]
@@ -554,7 +554,7 @@ releaseRegs regs = do
 
 
 saveClobberedTemps
-        :: (PlatformOutputable instr, Instruction instr)
+        :: (Outputable instr, Instruction instr)
         => Platform
         -> [RealReg]            -- real registers clobbered by this instruction
         -> [Reg]                -- registers which are no longer live after this insn
@@ -647,7 +647,7 @@ data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
 --   the list of free registers and free stack slots.
 
 allocateRegsAndSpill
-        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        :: (FR freeRegs, Outputable instr, Instruction instr)
         => Platform
         -> Bool                 -- True <=> reading (load up spilled regs)
         -> [VirtualReg]         -- don't push these out
@@ -692,7 +692,7 @@ allocateRegsAndSpill platform reading keep spills alloc (r:rs)
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
-allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
                         => Platform
                         -> Bool
                         -> [VirtualReg]
@@ -798,7 +798,7 @@ newLocation _ my_reg = InReg my_reg
 
 -- | Load up a spilled temporary if we need to (read from memory).
 loadTemp
-        :: (PlatformOutputable instr, Instruction instr)
+        :: (Outputable instr, Instruction instr)
         => Platform
         -> VirtualReg   -- the temp being loaded
         -> SpillLoc     -- the current location of this temp

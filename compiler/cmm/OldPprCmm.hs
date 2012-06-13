@@ -55,24 +55,24 @@ import Data.List
 
 -----------------------------------------------------------------------------
 
-instance PlatformOutputable instr => PlatformOutputable (ListGraph instr) where
-    pprPlatform platform (ListGraph blocks) = vcat (map (pprPlatform platform) blocks)
+instance Outputable instr => Outputable (ListGraph instr) where
+    ppr (ListGraph blocks) = vcat (map ppr blocks)
 
-instance PlatformOutputable instr => PlatformOutputable (GenBasicBlock instr) where
-    pprPlatform platform b = pprBBlock platform b
+instance Outputable instr => Outputable (GenBasicBlock instr) where
+    ppr = pprBBlock
 
-instance PlatformOutputable CmmStmt where
-    pprPlatform = pprStmt
+instance Outputable CmmStmt where
+    ppr s = sdocWithPlatform $ \platform -> pprStmt platform s
 
-instance PlatformOutputable CmmInfo where
-    pprPlatform = pprInfo
+instance Outputable CmmInfo where
+    ppr i = sdocWithPlatform $ \platform -> pprInfo platform i
 
 
 -- --------------------------------------------------------------------------
-instance PlatformOutputable CmmSafety where
-  pprPlatform _ CmmUnsafe = ptext (sLit "_unsafe_call_")
-  pprPlatform _ CmmInterruptible = ptext (sLit "_interruptible_call_")
-  pprPlatform platform (CmmSafe srt) = pprPlatform platform srt
+instance Outputable CmmSafety where
+  ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
+  ppr CmmInterruptible = ptext (sLit "_interruptible_call_")
+  ppr (CmmSafe srt) = ppr srt
 
 -- --------------------------------------------------------------------------
 -- Info tables. The current pretty printer needs refinement
@@ -89,14 +89,14 @@ pprInfo platform (CmmInfo _gc_target update_frame info_table) =
                 maybe (ptext (sLit "<none>"))
                       (pprUpdateFrame platform)
                       update_frame,
-          pprPlatform platform info_table]
+          ppr info_table]
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
 --      lbl: stmt ; stmt ; ..
-pprBBlock :: PlatformOutputable stmt => Platform -> GenBasicBlock stmt -> SDoc
-pprBBlock platform (BasicBlock ident stmts) =
-    hang (ppr ident <> colon) 4 (vcat (map (pprPlatform platform) stmts))
+pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
+pprBBlock (BasicBlock ident stmts) =
+    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
 
 -- --------------------------------------------------------------------------
 -- Statements. C-- usually, exceptions to this should be obvious.
@@ -111,10 +111,10 @@ pprStmt platform stmt = case stmt of
     CmmComment s -> text "//" <+> ftext s
 
     -- reg = expr;
-    CmmAssign reg expr -> ppr reg <+> equals <+> pprPlatform platform expr <> semi
+    CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
 
     -- rep[lv] = expr;
-    CmmStore lv expr -> rep <> brackets(pprPlatform platform lv) <+> equals <+> pprPlatform platform expr <> semi
+    CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
         where
           rep = ppr ( cmmExprType expr )
 
@@ -132,8 +132,8 @@ pprStmt platform stmt = case stmt of
                  | otherwise    = commafy (map ppr_ar results) <+> equals
                 -- Don't print the hints on a native C-- call
           ppr_ar (CmmHinted ar k) = case cconv of
-                            CmmCallConv -> pprPlatform platform ar
-                            _           -> pprPlatform platform (ar,k)
+                            CmmCallConv -> ppr ar
+                            _           -> ppr (ar,k)
           pp_conv = case cconv of
                       CmmCallConv -> empty
                       _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
@@ -150,7 +150,7 @@ pprStmt platform stmt = case stmt of
                                 Nothing ForeignLabelInThisPackage IsFunction)
 
     CmmBranch ident          -> genBranch ident
-    CmmCondBranch expr ident -> genCondBranch platform expr ident
+    CmmCondBranch expr ident -> genCondBranch expr ident
     CmmJump expr live        -> genJump platform expr live
     CmmReturn                -> genReturn platform
     CmmSwitch arg ids        -> genSwitch platform arg ids
@@ -159,8 +159,6 @@ pprStmt platform stmt = case stmt of
 -- ... is that a good idea? --Isaac Dupree
 instance (Outputable a) => Outputable (CmmHinted a) where
   ppr (CmmHinted a k) = ppr (a, k)
-instance (PlatformOutputable a) => PlatformOutputable (CmmHinted a) where
-  pprPlatform platform (CmmHinted a k) = pprPlatform platform (a, k)
 
 pprUpdateFrame :: Platform -> UpdateFrame -> SDoc
 pprUpdateFrame platform (UpdateFrame expr args) =
@@ -172,7 +170,7 @@ pprUpdateFrame platform (UpdateFrame expr args) =
                     CmmLoad (CmmReg _) _ -> pprExpr platform expr
                     _ -> parens (pprExpr platform expr)
          , space
-         , parens  ( commafy $ map (pprPlatform platform) args ) ]
+         , parens  ( commafy $ map ppr args ) ]
 
 -- --------------------------------------------------------------------------
 -- goto local label. [1], section 6.6
@@ -188,10 +186,10 @@ genBranch ident =
 --
 --     if (expr) { goto lbl; }
 --
-genCondBranch :: Platform -> CmmExpr -> BlockId -> SDoc
-genCondBranch platform expr ident =
+genCondBranch :: CmmExpr -> BlockId -> SDoc
+genCondBranch expr ident =
     hsep [ ptext (sLit "if")
-         , parens(pprPlatform platform expr)
+         , parens (ppr expr)
          , ptext (sLit "goto")
          , ppr ident <> semi ]
 

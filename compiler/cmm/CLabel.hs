@@ -253,22 +253,21 @@ data ForeignLabelSource
 --      The regular Outputable instance only shows the label name, and not its other info.
 --
 pprDebugCLabel :: Platform -> CLabel -> SDoc
-pprDebugCLabel platform lbl
+pprDebugCLabel _ lbl
  = case lbl of
-        IdLabel{}       -> pprPlatform platform lbl <> (parens $ text "IdLabel")
+        IdLabel{}       -> ppr lbl <> (parens $ text "IdLabel")
         CmmLabel pkg _name _info
-         -> pprPlatform platform lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
+         -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
-        RtsLabel{}      -> pprPlatform platform lbl <> (parens $ text "RtsLabel")
+        RtsLabel{}      -> ppr lbl <> (parens $ text "RtsLabel")
 
         ForeignLabel _name mSuffix src funOrData
-         -> pprPlatform platform lbl <> (parens
-                                $ text "ForeignLabel"
+            -> ppr lbl <> (parens $ text "ForeignLabel"
                                 <+> ppr mSuffix
                                 <+> ppr src
                                 <+> ppr funOrData)
 
-        _               -> pprPlatform platform lbl <> (parens $ text "other CLabel)")
+        _               -> ppr lbl <> (parens $ text "other CLabel)")
 
 
 data IdLabelInfo
@@ -922,8 +921,8 @@ Not exporting these Just_info labels reduces the number of symbols
 somewhat.
 -}
 
-instance PlatformOutputable CLabel where
-  pprPlatform = pprCLabel
+instance Outputable CLabel where
+  ppr c = sdocWithPlatform $ \platform -> pprCLabel platform c
 
 pprCLabel :: Platform -> CLabel -> SDoc
 

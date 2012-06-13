@@ -32,7 +32,7 @@ checkBlock :: Platform
            -> NatBasicBlock Instr
            -> NatBasicBlock Instr
 
-checkBlock platform cmm block@(BasicBlock _ instrs)
+checkBlock _ cmm block@(BasicBlock _ instrs)
 	| checkBlockInstrs instrs
 	= block
 	
@@ -40,9 +40,9 @@ checkBlock platform cmm block@(BasicBlock _ instrs)
 	= pprPanic 
 		("SPARC.CodeGen: bad block\n")
 		( vcat	[ text " -- cmm -----------------\n"
-			, pprPlatform platform cmm
+			, ppr cmm
 			, text " -- native code ---------\n"
-			, pprPlatform platform block ])
+			, ppr block ])
 
 
 checkBlockInstrs :: [Instr] -> Bool

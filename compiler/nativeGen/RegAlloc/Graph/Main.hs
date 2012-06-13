@@ -45,7 +45,7 @@ maxSpinCount    = 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-        :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+        :: (Outputable statics, Outputable instr, Instruction instr)
         => DynFlags
         -> UniqFM (UniqSet RealReg)     -- ^ the registers we can use for allocation
         -> UniqSet Int                  -- ^ the set of available spill slots.
@@ -73,8 +73,8 @@ regAlloc dflags regsFree slotsFree code
                 , reverse debug_codeGraphs )
 
 regAlloc_spin :: (Instruction instr,
-                  PlatformOutputable instr,
-                  PlatformOutputable statics)
+                  Outputable instr,
+                  Outputable statics)
               => DynFlags
               -> Int
               -> Color.Triv VirtualReg RegClass RealReg
@@ -329,7 +329,7 @@ graphAddCoalesce _ _
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph
-        :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+        :: (Outputable statics, Outputable instr, Instruction instr)
         => Platform -> Color.Graph VirtualReg RegClass RealReg
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
@@ -352,7 +352,7 @@ patchRegsFromGraph platform graph code
                 | otherwise
                 = pprPanic "patchRegsFromGraph: register mapping failed."
                         (  text "There is no node in the graph for register " <> ppr reg
-                        $$ pprPlatform platform code
+                        $$ ppr code
                         $$ Color.dotGraph
                                 (\_ -> text "white")
                                 (trivColorable platform

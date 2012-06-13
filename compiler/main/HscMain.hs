@@ -1284,7 +1284,7 @@ hscGenHardCode cgguts mod_summary = do
         ------------------  Code output -----------------------
         rawcmms <- {-# SCC "cmmToRawCmm" #-}
                    cmmToRawCmm platform cmms
-        dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
+        dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (ppr rawcmms)
         (_stub_h_exists, stub_c_exists)
             <- {-# SCC "codeOutput" #-}
                codeOutput dflags this_mod location foreign_stubs
@@ -1368,7 +1368,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
     (topSRT, prog) <- foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
     let prog' = map cmmOfZgraph (srtToData topSRT : prog)
-    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
+    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
     return prog'
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
