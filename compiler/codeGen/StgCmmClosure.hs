@@ -87,7 +87,6 @@ import TcType
 import TyCon
 import BasicTypes
 import Outputable
-import Platform
 import Constants
 import DynFlags
 import Util
@@ -773,19 +772,19 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 --   Label generation
 --------------------------------------
 
-staticClosureLabel :: Platform -> ClosureInfo -> CLabel
-staticClosureLabel platform = toClosureLbl platform .  closureInfoLabel
+staticClosureLabel :: ClosureInfo -> CLabel
+staticClosureLabel = toClosureLbl .  closureInfoLabel
 
-closureRednCountsLabel :: Platform -> ClosureInfo -> CLabel
-closureRednCountsLabel platform = toRednCountsLbl platform . closureInfoLabel
+closureRednCountsLabel :: ClosureInfo -> CLabel
+closureRednCountsLabel = toRednCountsLbl . closureInfoLabel
 
-closureSlowEntryLabel :: Platform -> ClosureInfo -> CLabel
-closureSlowEntryLabel platform = toSlowEntryLbl platform . closureInfoLabel
+closureSlowEntryLabel :: ClosureInfo -> CLabel
+closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
 
-closureLocalEntryLabel :: Platform -> ClosureInfo -> CLabel
-closureLocalEntryLabel platform
-  | tablesNextToCode = toInfoLbl  platform . closureInfoLabel
-  | otherwise        = toEntryLbl platform . closureInfoLabel
+closureLocalEntryLabel :: ClosureInfo -> CLabel
+closureLocalEntryLabel
+  | tablesNextToCode = toInfoLbl  . closureInfoLabel
+  | otherwise        = toEntryLbl . closureInfoLabel
 
 mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel id lf_info

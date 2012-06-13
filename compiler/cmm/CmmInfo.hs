@@ -168,7 +168,7 @@ mkInfoTableContents platform
                               , srt_lit, liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
-        slow_entry = CmmLabel (toSlowEntryLbl platform info_lbl)
+        slow_entry = CmmLabel (toSlowEntryLbl info_lbl)
         srt_lit = case srt_label of
                     []          -> mkIntCLit 0
                     (lit:_rest) -> ASSERT( null _rest ) lit

@@ -51,7 +51,6 @@ import Control.Monad
 import Name
 import OptimizationFuel
 import Outputable
-import Platform
 import SMRep
 import UniqSupply
 
@@ -201,8 +200,8 @@ cafLattice = DataflowLattice "live cafs" Map.empty add
   where add _ (OldFact old) (NewFact new) = case old `Map.union` new of
                                               new' -> (changeIf $ Map.size new' > Map.size old, new')
 
-cafTransfers :: Platform -> BwdTransfer CmmNode CAFSet
-cafTransfers platform = mkBTransfer3 first middle last
+cafTransfers :: BwdTransfer CmmNode CAFSet
+cafTransfers = mkBTransfer3 first middle last
   where first  _ live = live
         middle m live = foldExpDeep addCaf m live
         last   l live = foldExpDeep addCaf l (joinOutFacts cafLattice l live)
@@ -211,12 +210,11 @@ cafTransfers platform = mkBTransfer3 first middle last
                CmmLit (CmmLabelOff c _)         -> add c set
                CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                _ -> set
-        add l s = if hasCAF l then Map.insert (toClosureLbl platform l) () s
+        add l s = if hasCAF l then Map.insert (toClosureLbl l) () s
                               else s
 
-cafAnal :: Platform -> CmmGraph -> FuelUniqSM CAFEnv
-cafAnal platform g
-    = liftM snd $ dataflowPassBwd g [] $ analBwd cafLattice (cafTransfers platform)
+cafAnal :: CmmGraph -> FuelUniqSM CAFEnv
+cafAnal g = liftM snd $ dataflowPassBwd g [] $ analBwd cafLattice cafTransfers
 
 -----------------------------------------------------------------------
 -- Building the SRTs
@@ -348,13 +346,13 @@ to_SRT top_srt off len bmp
 --  keep its CAFs live.)
 -- Any procedure referring to a non-static CAF c must keep live
 -- any CAF that is reachable from c.
-localCAFInfo :: Platform -> CAFEnv -> CmmDecl -> Maybe (CLabel, CAFSet)
-localCAFInfo _        _      (CmmData _ _) = Nothing
-localCAFInfo platform cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
+localCAFInfo :: CAFEnv -> CmmDecl -> Maybe (CLabel, CAFSet)
+localCAFInfo _      (CmmData _ _) = Nothing
+localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
     CmmInfoTable { cit_rep = rep } 
       | not (isStaticRep rep) 
-      -> Just (toClosureLbl platform top_l,
+      -> Just (toClosureLbl top_l,
                expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
     _ -> Nothing
 

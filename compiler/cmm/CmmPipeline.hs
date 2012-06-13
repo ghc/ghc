@@ -149,8 +149,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        mapM_ (dump Opt_D_dump_cmmz_split "Post splitting") gs
 
        ------------- More CAFs and foreign calls ------------
-       cafEnv <- run $ cafAnal platform g
-       let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
+       cafEnv <- run $ cafAnal g
+       let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
        gs <- run $ mapM (lowerSafeForeignCalls areaMap) gs
