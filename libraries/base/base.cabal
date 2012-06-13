@@ -84,6 +84,7 @@ Library {
             GHC.IOArray,
             GHC.IOBase,
             GHC.IORef,
+            GHC.IP,
             GHC.Int,
             GHC.List,
             GHC.MVar,
