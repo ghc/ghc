@@ -97,8 +97,7 @@ emitTickyCounter cl_info args
   = ifTicky $
     do	{ dflags <- getDynFlags
         ; mod_name <- getModuleName
-        ; let platform = targetPlatform dflags
-              ticky_ctr_label = closureRednCountsLabel platform cl_info
+        ; let ticky_ctr_label = closureRednCountsLabel cl_info
               arg_descr = map (showTypeCategory . idType) args
               fun_descr mod_name = ppr_for_ticky_name dflags mod_name (closureName cl_info)
 	; fun_descr_lit <- newStringCLit (fun_descr mod_name)

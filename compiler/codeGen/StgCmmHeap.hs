@@ -43,7 +43,6 @@ import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import FastString( mkFastString, fsLit )
 import Constants
-import DynFlags
 import Util
 
 -----------------------------------------------------------
@@ -329,11 +328,7 @@ entryHeapCheck :: ClosureInfo
                -> FCode ()
 
 entryHeapCheck cl_info offset nodeSet arity args code
-  = do dflags <- getDynFlags
-
-       let platform = targetPlatform dflags
-
-           is_thunk = arity == 0
+  = do let is_thunk = arity == 0
            is_fastf = case closureFunInfo cl_info of
                            Just (_, ArgGen _) -> False
                            _otherwise         -> True
@@ -342,7 +337,7 @@ entryHeapCheck cl_info offset nodeSet arity args code
            setN = case nodeSet of
                           Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
                           Nothing -> mkAssign nodeReg $
-                              CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
+                              CmmLit (CmmLabel $ staticClosureLabel cl_info)
 
            {- Thunks:          Set R1 = node, jump GCEnter1
               Function (fast): Set R1 = node, jump GCFun

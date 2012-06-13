@@ -411,9 +411,7 @@ closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
     do  { -- Allocate the global ticky counter,
           -- and establish the ticky-counter
           -- label for this block
-        ; dflags <- getDynFlags
-        ; let platform = targetPlatform dflags
-              ticky_ctr_lbl = closureRednCountsLabel platform cl_info
+          let ticky_ctr_lbl = closureRednCountsLabel cl_info
         ; emitTickyCounter cl_info (map stripNV args)
         ; setTickyCtrLabel ticky_ctr_lbl $ do
 
@@ -470,10 +468,8 @@ mkSlowEntryCode :: ClosureInfo -> [LocalReg] -> FCode ()
 mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
 mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = do dflags <- getDynFlags
-       let platform = targetPlatform dflags
-           slow_lbl = closureSlowEntryLabel  platform cl_info
-           fast_lbl = closureLocalEntryLabel platform cl_info
+  = do let slow_lbl = closureSlowEntryLabel  cl_info
+           fast_lbl = closureLocalEntryLabel cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkDirectJump (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)

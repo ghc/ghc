@@ -51,7 +51,6 @@ import Id
 import Name
 import TyCon		( PrimRep(..) )
 import BasicTypes	( RepArity )
-import DynFlags
 import StaticFlags
 
 import Constants
@@ -405,9 +404,8 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
 emitClosureAndInfoTable ::
   CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable info_tbl conv args body
-  = do { dflags <- getDynFlags
-       ; blks <- getCode body
-       ; let entry_lbl = toEntryLbl (targetPlatform dflags) (cit_lbl info_tbl)
+  = do { blks <- getCode body
+       ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
        ; emitProcWithConvention conv info_tbl entry_lbl args blks
        }
 
