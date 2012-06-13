@@ -18,7 +18,6 @@ import Haddock.GhcUtils
 import GHC hiding (NoLink)
 import Name
 import Bag (emptyBag)
-import BasicTypes ( IPName(..), ipNameName )
 
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
@@ -236,7 +235,7 @@ renameType t = case t of
 
   HsListTy ty -> return . HsListTy =<< renameLType ty
   HsPArrTy ty -> return . HsPArrTy =<< renameLType ty
-  HsIParamTy n ty -> liftM2 HsIParamTy (liftM IPName (rename (ipNameName n))) (renameLType ty)
+  HsIParamTy n ty -> liftM (HsIParamTy n) (renameLType ty)
   HsEqTy ty1 ty2 -> liftM2 HsEqTy (renameLType ty1) (renameLType ty2)
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts

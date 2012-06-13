@@ -20,6 +20,7 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
+import Type(isStrLitTy)
 import Kind ( splitKindFunTys, synTyConResKind )
 import Name
 import Var
@@ -29,6 +30,7 @@ import DataCon
 import BasicTypes ( TupleSort(..) )
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
+import PrelNames (ipClassName)
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc, unLoc )
 import Data.List( partition )
@@ -275,9 +277,10 @@ synifyType _ (TyConApp tc tys)
   | getName tc == listTyConName, [ty] <- tys =
      noLoc $ HsListTy (synifyType WithinType ty)
   -- ditto for implicit parameter tycons
-  | Just ip <- tyConIP_maybe tc
-  , [ty] <- tys
-  = noLoc $ HsIParamTy ip (synifyType WithinType ty)
+  | tyConName tc == ipClassName
+  , [name, ty] <- tys
+  , Just x <- isStrLitTy name
+  = noLoc $ HsIParamTy (HsIPName x) (synifyType WithinType ty)
   -- and equalities
   | tc == eqTyCon
   , [ty1, ty2] <- tys

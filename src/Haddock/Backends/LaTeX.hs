@@ -24,7 +24,6 @@ import GHC
 import OccName
 import Name                 ( nameOccName )
 import RdrName              ( rdrNameOcc )
-import BasicTypes           ( ipNameName )
 import FastString           ( unpackFS, unpackLitString )
 
 import qualified Data.Map as Map
@@ -853,7 +852,7 @@ ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) t
 ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
 ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsIParamTy n ty)   u = brackets (ppDocName (ipNameName n) <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
+ppr_mono_ty _         (HsIParamTy n ty)   u = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
@@ -923,6 +922,8 @@ ppSymName name
 ppVerbOccName :: OccName -> LaTeX
 ppVerbOccName = text . latexFilter . occNameString
 
+ppIPName :: HsIPName -> LaTeX
+ppIPName ip = text $ unpackFS $ hsIPNameFS ip
 
 ppOccName :: OccName -> LaTeX
 ppOccName = text . occNameString

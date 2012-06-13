@@ -14,6 +14,7 @@ module Haddock.Backends.Xhtml.Names (
   ppName, ppDocName, ppLDocName, ppRdrName, ppUncheckedLink,
   ppBinder, ppBinder',
   ppModule, ppModuleRef,
+  ppIPName,
   linkId
 ) where
 
@@ -29,6 +30,7 @@ import qualified Data.List as List
 import GHC
 import Name
 import RdrName
+import FastString (unpackFS)
 
 
 ppOccName :: OccName -> Html
@@ -37,6 +39,9 @@ ppOccName = toHtml . occNameString
 
 ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
+
+ppIPName :: HsIPName -> Html
+ppIPName = toHtml . unpackFS . hsIPNameFS
 
 
 ppUncheckedLink :: Qualification -> (ModuleName, OccName) -> Html

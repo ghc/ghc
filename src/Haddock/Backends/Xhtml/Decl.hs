@@ -33,7 +33,6 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
 import Name
-import BasicTypes            ( ipNameName )
 
 
 -- TODO: use DeclInfo DocName or something
@@ -674,7 +673,7 @@ ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
-ppr_mono_ty _         (HsIParamTy n ty)   u q = brackets (ppDocName q (ipNameName n) <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q)
+ppr_mono_ty _         (HsIParamTy n ty)   u q = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 #if __GLASGOW_HASKELL__ == 612
 ppr_mono_ty _         (HsSpliceTyOut {})  _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
