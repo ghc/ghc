@@ -658,7 +658,8 @@ reservedWordsFM = listToUFM $
          ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
 
-         ( "rec",            ITrec,           bit recBit),
+         ( "rec",            ITrec,           bit arrowsBit .|. 
+                                              bit recursiveDoBit),
          ( "proc",           ITproc,          bit arrowsBit)
      ]
 
@@ -1826,8 +1827,6 @@ inRulePragBit :: Int
 inRulePragBit = 19
 rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
-recBit :: Int
-recBit = 22 -- rec
 alternativeLayoutRuleBit :: Int
 alternativeLayoutRuleBit = 23
 relaxedLayoutBit :: Int
@@ -1937,8 +1936,6 @@ mkPState flags buf loc =
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
                .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
-               .|. recBit                      `setBitIf` xopt Opt_DoRec                    flags
-               .|. recBit                      `setBitIf` xopt Opt_Arrows                   flags
                .|. unicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
                .|. unboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
                .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags

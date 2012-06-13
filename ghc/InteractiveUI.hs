@@ -1475,7 +1475,7 @@ isSafeModule m = do
         False -> liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
-    goodTrust t = t `elem` [Sf_Safe, Sf_SafeInfered, Sf_Trustworthy]
+    goodTrust t = t `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
 
     mname = GHC.moduleNameString $ GHC.moduleName m
 

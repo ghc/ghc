@@ -377,7 +377,7 @@ data SafeHaskellMode
    | Sf_Unsafe
    | Sf_Trustworthy
    | Sf_Safe
-   | Sf_SafeInfered
+   | Sf_SafeInferred
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -455,7 +455,6 @@ data ExtensionFlag
    | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
-   | Opt_DoRec
    | Opt_PostfixOperators
    | Opt_TupleSections
    | Opt_PatternGuards
@@ -957,7 +956,7 @@ defaultDynFlags mySettings =
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
-        safeHaskell = Sf_SafeInfered,
+        safeHaskell = Sf_SafeInferred,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
         pkgTrustOnLoc = noSrcSpan,
@@ -1159,7 +1158,7 @@ safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
 -- | Is the Safe Haskell safe inference mode active
 safeInferOn :: DynFlags -> Bool
-safeInferOn dflags = safeHaskell dflags == Sf_SafeInfered
+safeInferOn dflags = safeHaskell dflags == Sf_SafeInferred
 
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
@@ -1190,12 +1189,12 @@ safeImplicitImpsReq d = safeLanguageOn d
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
-combineSafeFlags a b | a == Sf_SafeInfered = return b
-                     | b == Sf_SafeInfered = return a
-                     | a == Sf_None        = return b
-                     | b == Sf_None        = return a
-                     | a == b              = return a
-                     | otherwise           = addErr errm >> return (panic errm)
+combineSafeFlags a b | a == Sf_SafeInferred = return b
+                     | b == Sf_SafeInferred = return a
+                     | a == Sf_None         = return b
+                     | b == Sf_None         = return a
+                     | a == b               = return a
+                     | otherwise            = addErr errm >> return (panic errm)
     where errm = "Incompatible Safe Haskell flags! ("
                     ++ show a ++ ", " ++ show b ++ ")"
 
@@ -1445,7 +1444,7 @@ safeFlagCheck cmdl dflags =
 
               | otherwise
               -> (dflags' { safeHaskell = Sf_None }, [])
-                -- Have we infered Unsafe?
+                -- Have we inferred Unsafe?
                 -- See Note [HscMain . Safe Haskell Inference]
     where
         -- TODO: Can we do better than this for inference?
@@ -2049,9 +2048,9 @@ xFlags = [
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
   ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
-    deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword
+  ( "RecursiveDo",                      Opt_RecursiveDo, nop ),  -- Enables 'mdo' and 'rec'
+  ( "DoRec",                            Opt_RecursiveDo, 
+     deprecatedForExtension "RecursiveDo" ),
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
@@ -2297,7 +2296,7 @@ glasgowExtsFlags = [
            , Opt_RankNTypes
            , Opt_TypeOperators
            , Opt_ExplicitNamespaces
-           , Opt_DoRec
+           , Opt_RecursiveDo
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures

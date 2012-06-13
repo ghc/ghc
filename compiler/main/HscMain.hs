@@ -447,7 +447,7 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
             return tcg_res'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
-    errSafe t = quotes (pprMod t) <+> text "has been infered as safe!"
+    errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
@@ -928,7 +928,7 @@ hscCheckSafeImports tcg_env = do
               safeHaskell dflags == Sf_None
             -> wipeTrust tcg_env' $ warns dflags (tcg_rules tcg_env')
 
-              -- trustworthy OR safe infered with no RULES
+              -- trustworthy OR safe inferred with no RULES
             | otherwise
             -> return tcg_env'
 
@@ -1050,7 +1050,7 @@ hscCheckSafe' dflags m l = do
                 let trust = getSafeMode $ mi_trust iface'
                     trust_own_pkg = mi_trust_pkg iface'
                     -- check module is trusted
-                    safeM = trust `elem` [Sf_SafeInfered, Sf_Safe, Sf_Trustworthy]
+                    safeM = trust `elem` [Sf_SafeInferred, Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted trust trust_own_pkg m
                     -- pkg trust reqs
@@ -1080,9 +1080,9 @@ hscCheckSafe' dflags m l = do
     -- otherwise we check the package trust flag.
     packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
     packageTrusted _ _ _
-        | not (packageTrustOn dflags)     = True
-    packageTrusted Sf_Safe        False _ = True
-    packageTrusted Sf_SafeInfered False _ = True
+        | not (packageTrustOn dflags)      = True
+    packageTrusted Sf_Safe         False _ = True
+    packageTrusted Sf_SafeInferred False _ = True
     packageTrusted _ _ m
         | isHomePkg m = True
         | otherwise   = trusted $ getPackageDetails (pkgState dflags)
@@ -1131,7 +1131,7 @@ checkPkgTrust dflags pkgs =
 
 -- | Set module to unsafe and wipe trust information.
 --
--- Make sure to call this method to set a module to infered unsafe,
+-- Make sure to call this method to set a module to inferred unsafe,
 -- it should be a central and single failure method.
 wipeTrust :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
 wipeTrust tcg_env whyUnsafe = do
@@ -1147,7 +1147,7 @@ wipeTrust tcg_env whyUnsafe = do
   where
     wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
     pprMod        = ppr $ moduleName $ tcg_mod tcg_env
-    whyUnsafe' df = vcat [ quotes pprMod <+> text "has been infered as unsafe!"
+    whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
                                     (vcat $ pprErrMsgBagWithLoc whyUnsafe)

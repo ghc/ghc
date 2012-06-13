@@ -857,151 +857,202 @@ To disable it, you can use the <option>-XNoTraditionalRecordSyntax</option> flag
 </title>
 
 <para>
-The do-notation of Haskell 98 does not allow <emphasis>recursive bindings</emphasis>,
-that is, the variables bound in a do-expression are visible only in the textually following
-code block. Compare this to a let-expression, where bound variables are visible in the entire binding
-group. It turns out that several applications can benefit from recursive bindings in
-the do-notation.  The <option>-XDoRec</option> flag provides the necessary syntactic support.
-</para>
-<para>
-Here is a simple (albeit contrived) example:
+    The do-notation of Haskell 98 does not allow <emphasis>recursive bindings</emphasis>,
+    that is, the variables bound in a do-expression are visible only in the textually following
+    code block. Compare this to a let-expression, where bound variables are visible in the entire binding
+    group. 
+</para> 
+
+<para> 
+    It turns out that such recursive bindings do indeed make sense for a variety of monads, but
+    not all. In particular, recursion in this sense requires a fixed-point operator for the underlying
+    monad, captured by the <literal>mfix</literal> method of the <literal>MonadFix</literal> class, defined in <literal>Control.Monad.Fix</literal> as follows:
 <programlisting>
-{-# LANGUAGE DoRec #-}
+class Monad m => MonadFix m where
+   mfix :: (a -> m a) -> m a
+</programlisting>
+    Haskell's
+    <literal>Maybe</literal>, <literal>[]</literal> (list), <literal>ST</literal> (both strict and lazy versions),
+    <literal>IO</literal>, and many other monads have <literal>MonadFix</literal> instances. On the negative
+    side, the continuation monad, with the signature <literal>(a -> r) -> r</literal>, does not.
+</para>
+
+<para>
+    For monads that do belong to the <literal>MonadFix</literal> class, GHC provides
+    an extended version of the do-notation that allows recursive bindings.
+    The <option>-XRecursiveDo</option> (language pragma: <literal>RecursiveDo</literal>)
+    provides the necessary syntactic support, introducing the keywords <literal>mdo</literal> and
+    <literal>rec</literal> for higher and lower levels of the notation respectively. Unlike
+    bindings in a <literal>do</literal> expression, those introduced by <literal>mdo</literal> and <literal>rec</literal>
+    are recursively defined, much like in an ordinary let-expression. Due to the new
+    keyword <literal>mdo</literal>, we also call this notation the <emphasis>mdo-notation</emphasis>.
+</para>
+
+<para>
+    Here is a simple (albeit contrived) example:
+<programlisting>
+{-# LANGUAGE RecursiveDo #-}
+justOnes = mdo { xs &lt;- Just (1:xs)
+               ; return (map negate xs) }
+</programlisting>
+or equivalently
+<programlisting>
+{-# LANGUAGE RecursiveDo #-}
 justOnes = do { rec { xs &lt;- Just (1:xs) }
               ; return (map negate xs) }
 </programlisting>
 As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [-1,-1,-1,...</literal>.
 </para>
-<para>
-The background and motivation for recursive do-notation is described in
-<ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>,
-by Levent Erkok, John Launchbury,
-Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania.
-The theory behind monadic value recursion is explained further in Erkok's thesis
-<ulink url="http://sites.google.com/site/leventerkok/erkok-thesis.pdf">Value Recursion in Monadic Computations</ulink>.
-However, note that GHC uses a different syntax than the one described in these documents.
+
+<para> 
+   GHC's implementation the mdo-notation closely follows the original translation as described in the paper
+   <ulink url="https://sites.google.com/site/leventerkok/recdo.pdf">A recursive do for Haskell</ulink>, which
+   in turn is based on the work <ulink url="http://sites.google.com/site/leventerkok/erkok-thesis.pdf">Value Recursion
+   in Monadic Computations</ulink>. Furthermore, GHC extends the syntax described in the former paper
+   with a lower level syntax flagged by the <literal>rec</literal> keyword, as we describe next.
 </para>
 
 <sect3>
-<title>Details of recursive do-notation</title>
+<title>Recursive binding groups</title>
+
 <para>
-The recursive do-notation is enabled with the flag <option>-XDoRec</option> or, equivalently,
-the LANGUAGE pragma <option>DoRec</option>.  It introduces the single new keyword "<literal>rec</literal>",
-which wraps a mutually-recursive group of monadic statements,
-producing a single statement.
-</para>
-<para>Similar to a <literal>let</literal>
-statement, the variables bound in the <literal>rec</literal> are
-visible throughout the <literal>rec</literal> group, and below it.
-For example, compare
+    The flag <option>-XRecursiveDo</option> also introduces a new keyword <literal>rec</literal>, which wraps a
+    mutually-recursive group of monadic statements inside a <literal>do</literal> expression, producing a single statement.
+    Similar to a <literal>let</literal> statement inside a <literal>do</literal>, variables bound in
+    the <literal>rec</literal> are visible throughout the <literal>rec</literal> group, and below it.  For example, compare
 <programlisting>
-do { a &lt;- getChar              do { a &lt;- getChar
-   ; let { r1 = f a r2	           ; rec { r1 &lt;- f a r2
-         ; r2 = g r1 }	                 ; r2 &lt;- g r1 }
-   ; return (r1 ++ r2) }          ; return (r1 ++ r2) }
+    do { a &lt;- getChar            do { a &lt;- getChar
+       ; let { r1 = f a r2          ; rec { r1 &lt;- f a r2
+       ;     ; r2 = g r1 }          ;     ; r2 &lt;- g r1 }
+       ; return (r1 ++ r2) }        ; return (r1 ++ r2) }
 </programlisting>
-In both cases, <literal>r1</literal> and <literal>r2</literal> are
-available both throughout the <literal>let</literal> or <literal>rec</literal> block, and
-in the statements that follow it.  The difference is that <literal>let</literal> is non-monadic,
-while <literal>rec</literal> is monadic.  (In Haskell <literal>let</literal> is
-really <literal>letrec</literal>, of course.)
+    In both cases, <literal>r1</literal> and <literal>r2</literal> are available both throughout
+    the <literal>let</literal> or <literal>rec</literal> block, and in the statements that follow it.
+    The difference is that <literal>let</literal> is non-monadic, while <literal>rec</literal> is monadic.
+    (In Haskell <literal>let</literal> is really <literal>letrec</literal>, of course.)
 </para>
+
 <para>
-The static and dynamic semantics of <literal>rec</literal> can be described as follows:
-<itemizedlist>
-<listitem><para>
-First,
-similar to let-bindings, the <literal>rec</literal> is broken into
-minimal recursive groups, a process known as <emphasis>segmentation</emphasis>.
-For example:
-<programlisting>
-rec { a &lt;- getChar      ===>     a &lt;- getChar
-    ; b &lt;- f a c                 rec { b &lt;- f a c
-    ; c &lt;- f b a                     ; c &lt;- f b a }
-    ; putChar c }                putChar c
-</programlisting>
-The details of segmentation are described in Section 3.2 of
-<ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>.
-Segmentation improves polymorphism, reduces the size of the recursive "knot", and, as the paper
-describes, also has a semantic effect (unless the monad satisfies the right-shrinking law).
-</para></listitem>
-<listitem><para>
-Then each resulting <literal>rec</literal> is desugared, using a call to <literal>Control.Monad.Fix.mfix</literal>.
-For example, the <literal>rec</literal> group in the preceding example is desugared like this:
+    The semantics of <literal>rec</literal> is fairly straightforward. Whenever GHC finds a <literal>rec</literal>
+    group, it will compute its set of bound variables, and will introduce an appropriate call
+    to the underlying monadic value-recursion operator <literal>mfix</literal>, belonging to the
+    <literal>MonadFix</literal> class. Here is an example:
 <programlisting>
 rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\~(b,c) -> do { b &lt;- f a c
     ; c &lt;- f b a }                                        ; c &lt;- f b a
                                                           ; return (b,c) })
 </programlisting>
-In general, the statement <literal>rec <replaceable>ss</replaceable></literal>
-is desugared to the statement
+   As usual, the meta-variables <literal>b</literal>, <literal>c</literal> etc., can be arbitrary patterns.
+   In general, the statement <literal>rec <replaceable>ss</replaceable></literal> is desugared to the statement
 <programlisting>
 <replaceable>vs</replaceable> &lt;- mfix (\~<replaceable>vs</replaceable> -&gt; do { <replaceable>ss</replaceable>; return <replaceable>vs</replaceable> })
 </programlisting>
-where <replaceable>vs</replaceable> is a tuple of the variables bound by <replaceable>ss</replaceable>.
-</para><para>
-The original <literal>rec</literal> typechecks exactly
-when the above desugared version would do so.  For example, this means that
-the variables <replaceable>vs</replaceable> are all monomorphic in the statements
-following the <literal>rec</literal>, because they are bound by a lambda.
+  where <replaceable>vs</replaceable> is a tuple of the variables bound by <replaceable>ss</replaceable>.
 </para>
+
 <para>
-The <literal>mfix</literal> function is defined in the <literal>MonadFix</literal>
-class, in <literal>Control.Monad.Fix</literal>, thus:
+    Note in particular that the translation for a <literal>rec</literal> block only involves wrapping a call
+    to <literal>mfix</literal>: it performs no other analysis on the bindings. The latter is the task
+    for the <literal>mdo</literal> notation, which is described next.
+</para>
+</sect3>
+
+<sect3>
+<title>The <literal>mdo</literal> notation</title>
+
+<para>
+    A <literal>rec</literal>-block tells the compiler where precisely the recursive knot should be tied. It turns out that
+    the placement of the recursive knots can be rather delicate: in particular, we would like the knots to be wrapped
+    around as minimal groups as possible. This process is known as <emphasis>segmentation</emphasis>, and is described
+    in detail in Secton 3.2 of <ulink url="https://sites.google.com/site/leventerkok/recdo.pdf">A recursive do for
+    Haskell</ulink>. Segmentation improves polymorphism and reduces the size of the recursive knot. Most importantly, it avoids
+    unnecessary interference caused by a fundamental issue with the so-called <emphasis>right-shrinking</emphasis>
+    axiom for monadic recursion. In brief, most monads of interest (IO, strict state, etc.) do <emphasis>not</emphasis>
+    have recursion operators that satisfy this axiom, and thus not performing segmentation can cause unnecessary
+    interference, changing the termination behavior of the resulting translation.
+    (Details can be found in Sections 3.1 and 7.2.2 of
+    <ulink url="http://sites.google.com/site/leventerkok/erkok-thesis.pdf">Value Recursion in Monadic Computations</ulink>.)
+</para>
+
+<para>
+    The <literal>mdo</literal>-notation removes the burden of placing explicit <literal>rec</literal> blocks in the code.
+    It automatically identifies minimally dependent recursive groups, treating them as if the user wrapped a
+    <literal>rec</literal> qualified around them. The definition of <emphasis>minimal</emphasis> in this context
+    is syntax oriented: Two bindings are called dependent if the latter one uses a variable defined by the former. Furthermore,
+    if a binding is dependent on another, then all the bindings that textually appear in between them are dependent on each other
+    as well.  A minimally dependent group of bindings is simply a contagious group where none of the textually following
+    bindings depend on it. (Segments in this sense are related to <emphasis>strongly-connected components</emphasis>
+    analysis, with the exception that bindings in a segment cannot be reordered and has to be contagious.)
+</para>
+
+<para>
+    Here is an example <literal>mdo</literal>-expression, and its translation to <literal>rec</literal> blocks:
 <programlisting>
-class Monad m => MonadFix m where
-   mfix :: (a -> m a) -> m a
+mdo { a &lt;- getChar      ===> do { a &lt;- getChar
+    ; b &lt;- f a c                ; rec { b &lt;- f a c
+    ; c &lt;- f b a                ;     ; c &lt;- f b a }
+    ; z &lt;- h a b                ; z &lt;- h a b
+    ; d &lt;- g d e                ; rec { d &lt;- g d e
+    ; e &lt;- g a z                ;     ; e &lt;- g a z }
+    ; putChar c }               ; putChar c }
 </programlisting>
+Note that a given <literal>mdo</literal> expression can cause the creation of multiple <literal>rec</literal> blocks.
+If there are no recursive dependencies, <literal>mdo</literal> will introduce no <literal>rec</literal> blocks. In this
+latter case an <literal>mdo</literal> expression is precisely the same as a <literal>do</literal> expression, as one
+would expect.
 </para>
-</listitem>
-</itemizedlist>
+
+<para>
+    In summary, given an <literal>mdo</literal> expression, GHC first performs segmentation, introducing
+    <literal>rec</literal> blocks to wrap over minimal recursive groups. Then, each resulting
+    <literal>rec</literal> is desugared, using a call to <literal>Control.Monad.Fix.mfix</literal> as described
+    in the previous section. The original <literal>mdo</literal>-expression typechecks exactly when the desugared
+    version would do so.
 </para>
+
 <para>
 Here are some other important points in using the recursive-do notation:
+
 <itemizedlist>
-<listitem><para>
-It is enabled with the flag <literal>-XDoRec</literal>.
-</para></listitem>
-
-<listitem><para>
-If recursive bindings are required for a monad,
-then that monad must be declared an instance of the <literal>MonadFix</literal> class.
-</para></listitem>
-
-<listitem><para>
-The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO.
-Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the instances of the MonadFix class
-for Haskell's internal state monad (strict and lazy, respectively).
-</para></listitem>
-
-<listitem><para>
-Like <literal>let</literal> and <literal>where</literal> bindings,
-name shadowing is not allowed within a <literal>rec</literal>;
-that is, all the names bound in a single <literal>rec</literal> must
-be distinct (Section 3.3 of the paper).
-</para></listitem>
-<listitem><para>
-It supports rebindable syntax (see <xref linkend="rebindable-syntax"/>).
-</para></listitem>
+    <listitem>
+        <para>
+            It is enabled with the flag <literal>-XRecursiveDo</literal>, or the <literal>LANGUAGE RecursiveDo</literal>
+            pragma. (The same flag enables both <literal>mdo</literal>-notation, and the use of <literal>rec</literal>
+            blocks inside <literal>do</literal> expressions.)
+        </para>
+    </listitem>
+    <listitem>
+        <para>
+            <literal>rec</literal> blocks can also be used inside <literal>mdo</literal>-expressions, which will be
+            treated as a single statement. However, it is good style to either use <literal>mdo</literal> or
+            <literal>rec</literal> blocks in a single expression.
+        </para>
+    </listitem>
+    <listitem>
+        <para>
+            If recursive bindings are required for a monad, then that monad must be declared an instance of
+            the <literal>MonadFix</literal> class.
+        </para>
+    </listitem>
+    <listitem>
+        <para>
+            The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO.
+            Furthermore, the <literal>Control.Monad.ST</literal> and <literal>Control.Monad.ST.Lazy</literal>
+            modules provide the instances of the <literal>MonadFix</literal> class for Haskell's internal
+            state monad (strict and lazy, respectively).
+        </para>
+    </listitem>
+    <listitem>
+        <para>
+            Like <literal>let</literal> and <literal>where</literal> bindings, name shadowing is not allowed within
+            an <literal>mdo</literal>-expression or a <literal>rec</literal>-block; that is, all the names bound in
+            a single <literal>rec</literal> must be distinct. (GHC will complain if this is not the case.)
+        </para>
+    </listitem>
 </itemizedlist>
 </para>
 </sect3>
 
-<sect3 id="mdo-notation"> <title> Mdo-notation (deprecated) </title>
-
-<para> GHC used to support the flag <option>-XRecursiveDo</option>,
-which enabled the keyword <literal>mdo</literal>, precisely as described in
-<ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>,
-but this is now deprecated.  Instead of <literal>mdo { Q; e }</literal>, write
-<literal>do { rec Q; e }</literal>.
-</para>
-<para>
-Historical note: The old implementation of the mdo-notation (and most
-of the existing documents) used the name
-<literal>MonadRec</literal> for the class and the corresponding library.
-This name is not supported by GHC.
-</para>
-</sect3>
 
 </sect2>
 
@@ -1469,7 +1520,7 @@ the comprehension being over an arbitrary monad.
 	      functions <literal>(>>=)</literal>,
 	      <literal>(>>)</literal>, and <literal>fail</literal>,
 	      are in scope (not the Prelude
-	      versions).  List comprehensions, mdo (<xref linkend="mdo-notation"/>), and parallel array
+	      versions).  List comprehensions, mdo (<xref linkend="recursive-do-notation"/>), and parallel array
 	      comprehensions, are unaffected.  </para></listitem>
 
 	      <listitem>

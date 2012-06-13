@@ -63,7 +63,7 @@ intsToBitmap size slots{- must be sorted -}
 -- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
 -- just to make the bitmap easier to read).
 --
--- The list of @Int@s /must/ be already sorted.
+-- The list of @Int@s /must/ be already sorted and duplicate-free.
 intsToReverseBitmap :: Int -> [Int] -> Bitmap
 intsToReverseBitmap size slots{- must be sorted -}
   | size <= 0 = []
