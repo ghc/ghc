@@ -14,7 +14,7 @@ This module defines interface types and binders
 -- for details
 
 module IfaceType (
-	IfExtName, IfLclName, IfIPName,
+	IfExtName, IfLclName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoCon(..),
         IfaceTyLit(..),
@@ -37,8 +37,6 @@ module IfaceType (
 
 import Coercion
 import TypeRep hiding( maybeParen )
-import Type (tyConAppTyCon_maybe)
-import IParam (ipFastString)
 import TyCon
 import Id
 import Var
@@ -61,8 +59,6 @@ type IfLclName = FastString	-- A local name in iface syntax
 
 type IfExtName = Name	-- An External or WiredIn Name can appear in IfaceSyn
      	       	 	-- (However Internal or System Names never should)
-
-type IfIPName = FastString -- Represent implicit parameters simply as a string
 
 data IfaceBndr 		-- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
@@ -99,7 +95,6 @@ newtype IfaceTyCon = IfaceTc { ifaceTyConName :: IfExtName }
   -- Coercion constructors
 data IfaceCoCon
   = IfaceCoAx IfExtName
-  | IfaceIPCoAx FastString
   | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
   | IfaceTransCo   | IfaceInstCo
   | IfaceNthCo Int
@@ -253,10 +248,6 @@ ppr_tc_app _         (IfaceTc n) tys
   , Just sort <- tyConTuple_maybe tc
   , tyConArity tc == length tys 
   = tupleParens sort (sep (punctuate comma (map pprIfaceType tys)))
-  | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
-  , Just ip <- tyConIP_maybe tc
-  , [ty] <- tys
-  = parens (ppr ip <> dcolon <> pprIfaceType ty)
 ppr_tc_app ctxt_prec tc tys
   = maybeParen ctxt_prec tYCON_PREC
                (sep [ppr_tc tc, nest 4 (sep (map pprParendIfaceType tys))])
@@ -279,7 +270,6 @@ instance Outputable IfaceTyCon where
 
 instance Outputable IfaceCoCon where
   ppr (IfaceCoAx n)    = ppr n
-  ppr (IfaceIPCoAx ip) = ppr (IPName ip)
   ppr IfaceReflCo      = ptext (sLit "Refl")
   ppr IfaceUnsafeCo    = ptext (sLit "Unsafe")
   ppr IfaceSymCo       = ptext (sLit "Sym")
@@ -386,11 +376,6 @@ coToIfaceType (InstCo co ty)        = IfaceCoConApp IfaceInstCo
                                                     , toIfaceType ty ]
 
 coAxiomToIfaceType :: CoAxiom -> IfaceCoCon
-coAxiomToIfaceType con
-  | Just tc <- tyConAppTyCon_maybe (co_ax_lhs con)
-  , Just ip <- tyConIP_maybe tc
-  = IfaceIPCoAx (ipFastString ip)
-  | otherwise
-  = IfaceCoAx (coAxiomName con)
+coAxiomToIfaceType con = IfaceCoAx (coAxiomName con)
 \end{code}
 

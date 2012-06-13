@@ -16,7 +16,7 @@ module RnTypes (
 	rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsMaybeKind,
 	rnHsSigType, rnLHsInstType, rnConDeclFields,
-        rnIPName, newTyVarNameRn,
+        newTyVarNameRn,
 
 	-- Precence related stuff
 	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -41,7 +41,6 @@ import HsSyn
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import TcRnMonad
-import IfaceEnv         ( newIPName )
 import RdrName
 import PrelNames
 import TysPrim          ( funTyConName )
@@ -50,7 +49,7 @@ import SrcLoc
 import NameSet
 
 import Util
-import BasicTypes	( IPName(..), ipNameName, compareFixity, funTyFixity, negateFixity, 
+import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
 import Outputable
 import FastString
@@ -248,8 +247,7 @@ rnHsTyKi isType doc (HsAppTy ty1 ty2)
 rnHsTyKi isType doc (HsIParamTy n ty)
   = ASSERT( isType )
     do { (ty', fvs) <- rnLHsType doc ty
-       ; n' <- rnIPName n
-       ; return (HsIParamTy n' ty', fvs) }
+       ; return (HsIParamTy n ty', fvs) }
 
 rnHsTyKi isType doc (HsEqTy ty1 ty2) 
   = ASSERT( isType )
@@ -494,9 +492,6 @@ rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVar
 rnContext doc (L loc cxt) 
   = do { (cxt', fvs) <- rnLHsTypes doc cxt
        ; return (L loc cxt', fvs) }
-
-rnIPName :: IPName RdrName -> RnM (IPName Name)
-rnIPName n = newIPName (occNameFS (rdrNameOcc (ipNameName n)))
 \end{code}
 
 

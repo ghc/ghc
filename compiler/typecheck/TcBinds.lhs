@@ -45,6 +45,9 @@ import Util
 import BasicTypes
 import Outputable
 import FastString
+import Type(mkStrLitTy)
+import Class(classTyCon)
+import PrelNames(ipClassName)
 
 import Control.Monad
 
@@ -207,7 +210,9 @@ tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
 tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
-  = do  { (given_ips, ip_binds') <- mapAndUnzipM (wrapLocSndM tc_ip_bind) ip_binds
+  = do  { ipClass <- tcLookupClass ipClassName
+        ; (given_ips, ip_binds') <-
+            mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
 
         -- If the binding binds ?x = E, we  must now 
         -- discharge any ?x constraints in expr_lie
@@ -217,16 +222,28 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 
         ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
   where
-    ips = [ip | L _ (IPBind ip _) <- ip_binds]
+    ips = [ip | L _ (IPBind (Left ip) _) <- ip_binds]
 
         -- I wonder if we should do these one at at time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind (IPBind ip expr) 
+    tc_ip_bind ipClass (IPBind (Left ip) expr)
        = do { ty <- newFlexiTyVarTy openTypeKind
-            ; ip_id <- newIP ip ty
+            ; let p = mkStrLitTy $ hsIPNameFS ip
+            ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcMonoExpr expr ty
-            ; return (ip_id, (IPBind (IPName ip_id) expr')) }
+            ; let d = toDict ipClass p ty `fmap` expr'
+            ; return (ip_id, (IPBind (Right ip_id) d)) }
+    tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
+
+    -- Coerces a `t` into a dictionry for `IP "x" t`.
+    -- co : t -> IP "x" t
+    toDict ipClass x ty =
+      case unwrapNewTyCon_maybe (classTyCon ipClass) of
+        Just (_,_,ax) -> HsWrap $ WpCast $ mkTcSymCo $ mkTcAxInstCo ax [x,ty]
+        Nothing       -> panic "The dictionary for `IP` is not a newtype?"
+
+
 \end{code}
 
 Note [Implicit parameter untouchables]

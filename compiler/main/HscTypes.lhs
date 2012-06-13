@@ -73,7 +73,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        NameCache(..), OrigNameCache, OrigIParamCache,
+        NameCache(..), OrigNameCache,
         IfaceExport,
 
         -- * Warnings
@@ -162,7 +162,6 @@ import Util
 import Control.Monad    ( mplus, guard, liftM, when )
 import Data.Array       ( Array, array )
 import Data.IORef
-import Data.Map         ( Map )
 import Data.Time
 import Data.Word
 import Data.Typeable    ( Typeable )
@@ -1763,17 +1762,12 @@ its binding site, we fix it up.
 data NameCache
  = NameCache {  nsUniqs :: UniqSupply,
                 -- ^ Supply of uniques
-                nsNames :: OrigNameCache,
+                nsNames :: OrigNameCache
                 -- ^ Ensures that one original name gets one unique
-                nsIPs   :: OrigIParamCache
-                -- ^ Ensures that one implicit parameter name gets one unique
    }
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
-
--- | Module-local cache of implicit parameter 'OccName's given 'Name's
-type OrigIParamCache = Map FastString (IPName Name)
 \end{code}
 
 

@@ -86,9 +86,9 @@ dsIPBinds (IPBinds ip_binds ev_binds) body
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
   where
-    ds_ip_bind (L _ (IPBind n e)) body
+    ds_ip_bind (L _ (IPBind ~(Right n) e)) body
       = do e' <- dsLExpr e
-           return (Let (NonRec (ipNameName n) (mkIPBox n e')) body)
+           return (Let (NonRec n e') body)
 
 -------------------------
 ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
@@ -188,7 +188,7 @@ dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)            = return (varToCoreExpr var)   -- See Note [Desugaring vars]
-dsExpr (HsIPVar ip)           = return (mkIPUnbox ip)
+dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
 dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
 

@@ -22,7 +22,7 @@ import TcSMonad
 import TcInteract 
 import Inst
 import Unify	( niFixTvSubst, niSubstTvSet )
-import Type     ( classifyPredType, PredTree(..) )
+import Type     ( classifyPredType, PredTree(..), isIPPred_maybe )
 import Var
 import Unique
 import VarSet
@@ -42,7 +42,7 @@ import Outputable
 import FastString
 import TrieMap () -- DV: for now
 import DynFlags
-
+import Data.Maybe ( mapMaybe )
 \end{code}
 
 
@@ -965,7 +965,8 @@ solveImplication tcs_untouchables
                  , ic_given  = givens
                  , ic_wanted = wanteds
                  , ic_loc    = loc })
-  = nestImplicTcS ev_binds (untch, tcs_untouchables) $
+  = shadowIPs givens $    -- See Note [Shadowing of Implicit Parameters]
+    nestImplicTcS ev_binds (untch, tcs_untouchables) $
     recoverTcS (return (emptyBag, emptyBag)) $
        -- Recover from nested failures.  Even the top level is
        -- just a bunch of implications, so failing at the first one is bad
@@ -1039,6 +1040,31 @@ floatEqualities skols can_given wantders
                                         inner_tvs `unionVarSet` tvs_under_fsks (tyVarKind tv)
           where
             inner_tvs = tvs_under_fsks ty
+
+shadowIPs :: [EvVar] -> TcS a -> TcS a
+shadowIPs gs m
+  | null shadowed = m
+  | otherwise     = do is <- getTcSInerts
+                       doWithInert (purgeShadowed is) m
+  where
+  shadowed  = mapMaybe isIP gs
+
+  isIP g    = do p <- evVarPred_maybe g
+                 (x,_) <- isIPPred_maybe p
+                 return x
+
+  isShadowedCt ct = isShadowedEv (ctEvidence ct)
+  isShadowedEv ev = case isIPPred_maybe (ctEvPred ev) of
+                      Just (x,_) -> x `elem` shadowed
+                      _          -> False
+
+  purgeShadowed is = is { inert_cans = purgeCans (inert_cans is)
+                        , inert_solved = purgeSolved (inert_solved is)
+                        }
+
+  purgeDicts    = snd . partitionCCanMap isShadowedCt
+  purgeCans ics = ics { inert_dicts = purgeDicts (inert_dicts ics) }
+  purgeSolved   = filterSolved (not . isShadowedEv)
 \end{code}
 
 Note [Preparing inert set for implications]
@@ -1241,6 +1267,39 @@ f (x::beta) =
         g2 z = case z of TEx y -> (h [[undefined]], op x [y])
     in (g1 '3', g2 undefined)
 
+Note [Shadowing of Implicit Parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example:
+
+f :: (?x :: Char) => Char
+f = let ?x = 'a' in ?x
+
+The "let ?x = ..." generates an implication constraint of the form:
+
+?x :: Char => ?x :: Char
+
+
+Furthermore, the signature for `f` also generates an implication
+constraint, so we end up with the following nested implication:
+
+?x :: Char => (?x :: Char => ?x :: Char)
+
+Note that the wanted (?x :: Char) constraint may be solved in
+two incompatible ways:  either by using the parameter from the
+signature, or by using the local definition.  Our intention is
+that the local definition should "shadow" the parameter of the
+signature, and we implement this as follows: when we nest implications,
+we remove any implicit parameters in the outer implication, that
+have the same name as givens of the inner implication.
+
+Here is another variation of the example:
+
+f :: (?x :: Int) => Char
+f = let ?x = 'x' in ?x
+
+This program should also be accepted: the two constraints `?x :: Int`
+and `?x :: Char` never exist in the same context, so they don't get to
+interact to cause failure.
 \begin{code}
 
 solveCTyFunEqs :: Cts -> TcS (TvSubst, Cts)

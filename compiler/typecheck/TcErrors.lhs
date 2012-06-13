@@ -255,9 +255,10 @@ tryReporters reporters deflt cts
 mkFlatErr :: ReportErrCtxt -> Ct -> TcM ErrMsg
 -- Context is already set
 mkFlatErr ctxt ct   -- The constraint is always wanted
+  | isIPPred (ctPred ct) = mkIPErr    ctxt [ct]
+  | otherwise
   = case classifyPredType (ctPred ct) of
       ClassPred {}  -> mkDictErr  ctxt [ct]
-      IPPred {}     -> mkIPErr    ctxt [ct]
       IrredPred {}  -> mkIrredErr ctxt [ct]
       EqPred {}     -> mkEqErr1 ctxt ct
       TuplePred {}  -> panic "mkFlat"
@@ -289,9 +290,10 @@ reportFlatErrs ctxt cts
     go [] dicts ips irreds
       = (dicts, ips, irreds)
     go (ct:cts) dicts ips irreds
+      | isIPPred (ctPred ct) = go cts dicts (ct:ips) irreds
+      | otherwise
       = case classifyPredType (ctPred ct) of
           ClassPred {}  -> go cts (ct:dicts) ips irreds
-          IPPred {}     -> go cts dicts (ct:ips) irreds
           IrredPred {}  -> go cts dicts ips (ct:irreds)
           _             -> panic "mkFlat"
     -- TuplePreds should have been expanded away by the constraint

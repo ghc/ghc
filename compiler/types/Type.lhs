@@ -53,14 +53,12 @@ module Type (
 	isDictLikeTy,
         mkEqPred, mkPrimEqPred,
         mkClassPred,
-	mkIPPred,
-        noParenPred, isClassPred, isEqPred, isIPPred,
+        noParenPred, isClassPred, isEqPred, isIPPred, isIPPred_maybe,
         
         -- Deconstructing predicate types
         PredTree(..), predTreePredType, classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
         getEqPredTys, getEqPredTys_maybe,
-        getIPPredTy_maybe,
 
 	-- ** Common type constructors
         funTyCon,
@@ -153,13 +151,11 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, mkBoxedTupleTy )
-import PrelNames	         ( eqTyConKey )
+import PrelNames	         ( eqTyConKey, ipClassName )
 
 -- others
-import {-# SOURCE #-} IParam ( ipTyCon )
 import Unique		( Unique, hasKey )
-import BasicTypes	( Arity, RepArity, IPName(..) )
-import Name		( Name )
+import BasicTypes	( Arity, RepArity )
 import NameSet
 import StaticFlags
 import Util
@@ -169,6 +165,7 @@ import FastString
 import Data.List        ( partition )
 import Maybes		( orElse )
 import Data.Maybe	( isJust )
+import Control.Monad    ( guard )
 
 infixr 3 `mkFunTy`	-- Associates to the right
 \end{code}
@@ -840,7 +837,7 @@ noParenPred :: PredType -> Bool
 --       C a => a -> a
 --       a~b => a -> b
 -- But   (?x::Int) => Int -> Int
-noParenPred p = isClassPred p || isEqPred p
+noParenPred p = not (isIPPred p) && isClassPred p || isEqPred p
 
 isPredTy :: Type -> Bool
 isPredTy ty
@@ -857,9 +854,17 @@ isClassPred ty = case tyConAppTyCon_maybe ty of
 isEqPred ty = case tyConAppTyCon_maybe ty of
     Just tyCon -> tyCon `hasKey` eqTyConKey
     _          -> False
+
 isIPPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon | Just _ <- tyConIP_maybe tyCon -> True
-    _                                          -> False
+    Just tyCon -> tyConName tyCon == ipClassName
+    _          -> False
+
+isIPPred_maybe :: Type -> Maybe (FastString, Type)
+isIPPred_maybe ty =
+  do (tc,[t1,t2]) <- splitTyConApp_maybe ty
+     guard (tyConName tc == ipClassName)
+     x <- isStrLitTy t1
+     return (x,t2)
 \end{code}
 
 Make PredTypes
@@ -880,13 +885,6 @@ mkPrimEqPred ty1  ty2
     TyConApp eqPrimTyCon [k, ty1, ty2]
   where 
     k = typeKind ty1
-\end{code}
-
---------------------- Implicit parameters ---------------------------------
-
-\begin{code}
-mkIPPred :: IPName Name -> Type -> PredType
-mkIPPred ip ty = TyConApp (ipTyCon ip) [ty]
 \end{code}
 
 --------------------- Dictionary types ---------------------------------
@@ -941,14 +939,12 @@ Decomposing PredType
 \begin{code}
 data PredTree = ClassPred Class [Type]
               | EqPred Type Type
-              | IPPred (IPName Name) Type
               | TuplePred [PredType]
               | IrredPred PredType
 
 predTreePredType :: PredTree -> PredType
 predTreePredType (ClassPred clas tys) = mkClassPred clas tys
 predTreePredType (EqPred ty1 ty2)     = mkEqPred ty1 ty2
-predTreePredType (IPPred ip ty)       = mkIPPred ip ty
 predTreePredType (TuplePred tys)      = mkBoxedTupleTy tys
 predTreePredType (IrredPred ty)       = ty
 
@@ -959,9 +955,6 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, tys) | tc `hasKey` eqTyConKey
                    , let [_, ty1, ty2] = tys
                    -> EqPred ty1 ty2
-    Just (tc, tys) | Just ip <- tyConIP_maybe tc
-                   , let [ty] = tys
-                   -> IPPred ip ty
     Just (tc, tys) | isTupleTyCon tc
                    -> TuplePred tys
     _ -> IrredPred ev_ty
@@ -990,11 +983,6 @@ getEqPredTys_maybe ty
   = case splitTyConApp_maybe ty of 
       Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
       _ -> Nothing
-
-getIPPredTy_maybe :: PredType -> Maybe (IPName Name, Type)
-getIPPredTy_maybe ty = case splitTyConApp_maybe ty of 
-        Just (tc, [ty1]) | Just ip <- tyConIP_maybe tc -> Just (ip, ty1)
-        _ -> Nothing
 \end{code}
 
 %************************************************************************

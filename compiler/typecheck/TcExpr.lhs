@@ -63,6 +63,7 @@ import ErrUtils
 import Outputable
 import FastString
 import Control.Monad
+import Class(classTyCon)
 \end{code}
 
 %************************************************************************
@@ -178,15 +179,23 @@ tcExpr (NegApp expr neg_expr) res_ty
 	; expr' <- tcMonoExpr expr res_ty
 	; return (NegApp expr' neg_expr') }
 
-tcExpr (HsIPVar ip) res_ty
-  = do	{ let origin = IPOccOrigin ip
-	 	-- Implicit parameters must have a *tau-type* not a 
-		-- type scheme.  We enforce this by creating a fresh
-		-- type variable as its type.  (Because res_ty may not
-		-- be a tau-type.)
-	; ip_ty <- newFlexiTyVarTy openTypeKind
-	; ip_var <- emitWanted origin (mkIPPred ip ip_ty)
-	; tcWrapResult (HsIPVar (IPName ip_var)) ip_ty res_ty }
+tcExpr (HsIPVar x) res_ty
+  = do { let origin = IPOccOrigin x
+       ; ipClass <- tcLookupClass ipClassName
+           {- Implicit parameters must have a *tau-type* not a.
+              type scheme.  We enforce this by creating a fresh
+              type variable as its type.  (Because res_ty may not
+              be a tau-type.) -}
+       ; ip_ty <- newFlexiTyVarTy openTypeKind
+       ; let ip_name = mkStrLitTy (hsIPNameFS x)
+       ; ip_var <- emitWanted origin (mkClassPred ipClass [ip_name, ip_ty])
+       ; tcWrapResult (fromDict ipClass ip_name ip_ty (HsVar ip_var)) ip_ty res_ty }
+  where
+  -- Coerces a dictionry for `IP "x" t` into `t`.
+  fromDict ipClass x ty =
+    case unwrapNewTyCon_maybe (classTyCon ipClass) of
+      Just (_,_,ax) -> HsWrap $ WpCast $ mkTcAxInstCo ax [x,ty]
+      Nothing       -> panic "The dictionary for `IP` is not a newtype?"
 
 tcExpr (HsLam match) res_ty
   = do	{ (co_fn, match') <- tcMatchLambda match res_ty

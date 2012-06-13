@@ -1762,10 +1762,10 @@ dbinds  :: { Located [LIPBind RdrName] }
 --      | {- empty -}                   { [] }
 
 dbind   :: { LIPBind RdrName }
-dbind   : ipvar '=' exp                 { LL (IPBind (unLoc $1) $3) }
+dbind   : ipvar '=' exp                 { LL (IPBind (Left (unLoc $1)) $3) }
 
-ipvar   :: { Located (IPName RdrName) }
-        : IPDUPVARID            { L1 (IPName (mkUnqual varName (getIPDUPVARID $1))) }
+ipvar   :: { Located HsIPName }
+        : IPDUPVARID            { L1 (HsIPName (getIPDUPVARID $1)) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations

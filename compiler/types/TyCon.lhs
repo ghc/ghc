@@ -64,7 +64,7 @@ module TyCon(
         tyConStupidTheta,
         tyConArity,
         tyConParent,
-        tyConTuple_maybe, tyConClass_maybe, tyConIP_maybe,
+        tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn, synTyConRhs, synTyConType,
         tyConExtName,           -- External name for foreign types
@@ -89,7 +89,6 @@ module TyCon(
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
-import {-# SOURCE #-} IParam  ( ipTyConName )
 
 import Var
 import Class
@@ -514,10 +513,6 @@ data TyConParent
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the current tycon
 
-  -- | Associated type of a implicit parameter.
-  | IPTyCon
-        (IPName Name)
-
   -- | An *associated* type of a class.
   | AssocFamilyTyCon
         Class           -- The class in whose declaration the family is declared
@@ -555,7 +550,6 @@ data TyConParent
 instance Outputable TyConParent where
     ppr NoParentTyCon           = text "No parent"
     ppr (ClassTyCon cls)        = text "Class parent" <+> ppr cls
-    ppr (IPTyCon n)             = text "IP parent" <+> ppr n
     ppr (AssocFamilyTyCon cls)  = text "Class parent (assoc. family)" <+> ppr cls
     ppr (FamInstTyCon _ tc tys) = text "Family parent (family instance)" <+> ppr tc <+> sep (map ppr tys)
 
@@ -564,7 +558,6 @@ okParent :: Name -> TyConParent -> Bool
 okParent _       NoParentTyCon               = True
 okParent tc_name (AssocFamilyTyCon cls)      = tc_name `elem` map tyConName (classATs cls)
 okParent tc_name (ClassTyCon cls)            = tc_name == tyConName (classTyCon cls)
-okParent tc_name (IPTyCon ip)                = tc_name == ipTyConName ip
 okParent _       (FamInstTyCon _ fam_tc tys) = tyConArity fam_tc == length tys
 
 isNoParent :: TyConParent -> Bool
@@ -1408,12 +1401,6 @@ tyConClass_maybe _                                          = Nothing
 tyConTuple_maybe :: TyCon -> Maybe TupleSort
 tyConTuple_maybe (TupleTyCon {tyConTupleSort = sort}) = Just sort
 tyConTuple_maybe _                                    = Nothing
-
--- | If this 'TyCon' is that for implicit parameter, return the IP it is for.
--- Otherwise returns @Nothing@
-tyConIP_maybe :: TyCon -> Maybe (IPName Name)
-tyConIP_maybe (AlgTyCon {algTcParent = IPTyCon ip}) = Just ip
-tyConIP_maybe _                                     = Nothing
 
 ----------------------------------------------------------------------------
 tyConParent :: TyCon -> TyConParent

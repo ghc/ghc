@@ -33,7 +33,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars,
-  newEq, newIP, newDict,
+  newEq, newDict,
 
   newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
@@ -85,7 +85,6 @@ import Var
 -- others:
 import HsSyn		-- HsType
 import TcRnMonad        -- TcType, amongst others
-import IParam
 import Id
 import FunDeps
 import Name
@@ -95,7 +94,6 @@ import DynFlags
 import Util
 import Maybes
 import ListSetOps
-import BasicTypes
 import SrcLoc
 import Outputable
 import FastString
@@ -156,11 +154,6 @@ newEq ty1 ty2
   = do { name <- newName (mkVarOccFS (fsLit "cobox"))
        ; return (mkLocalId name (mkTcEqPred ty1 ty2)) }
 
-newIP :: IPName Name -> TcType -> TcM IpId
-newIP ip ty
-  = do 	{ name <- newName (mkVarOccFS (ipFastString ip))
-        ; return (mkLocalId name (mkIPPred ip ty)) }
-
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys 
   = do { name <- newName (mkDictOcc (getOccName cls))
@@ -169,7 +162,6 @@ newDict cls tys
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
     ClassPred cls _ -> mkDictOcc (getOccName cls)
-    IPPred ip _     -> mkVarOccFS (ipFastString ip)
     EqPred _ _      -> mkVarOccFS (fsLit "cobox")
     TuplePred _     -> mkVarOccFS (fsLit "tup")
     IrredPred _     -> mkVarOccFS (fsLit "irred")
@@ -1186,19 +1178,6 @@ check_pred_ty' dflags _ctxt (EqPred ty1 ty2)
        ; checkValidMonoType ty2
        }
 
-check_pred_ty' _ _ctxt (IPPred _ ty) = checkValidMonoType ty
-	-- Contrary to GHC 7.2 and below, we allow implicit parameters not only
-	-- in type signatures but also in instance decls, superclasses etc
-	-- The reason we didn't allow implicit params in instances is a bit
-	-- subtle:
-	-- If we allowed	instance (?x::Int, Eq a) => Foo [a] where ...
-	-- then when we saw (e :: (?x::Int) => t) it would be unclear how to 
-	-- discharge all the potential usas of the ?x in e.   For example, a
-	-- constraint Foo [Int] might come out of e,and applying the
-	-- instance decl would show up two uses of ?x.
-        --
-        -- Happily this is not an issue in the new constraint solver.
-
 check_pred_ty' dflags ctxt t@(TuplePred ts)
   = do { checkTc (xopt Opt_ConstraintKinds dflags)
                  (predTupleErr (predTreePredType t))
@@ -1759,17 +1738,22 @@ sizeTypes xs = sum (map sizeType tys)
 
 -- Size of a predicate
 --
--- We are considering whether *class* constraints terminate
--- Once we get into an implicit parameter or equality we
--- can't get back to a class constraint, so it's safe
--- to say "size 0".  See Trac #4200.
+-- We are considering whether class constraints terminate.
+-- Equality constraints and constraints for the implicit
+-- parameter class always termiante so it is safe to say "size 0".
+-- (Implicit parameter constraints always terminate because
+-- there are no instances for them---they are only solved by
+-- "local instances" in expressions).
+-- See Trac #4200.
 sizePred :: PredType -> Int
-sizePred ty = go (classifyPredType ty)
+sizePred ty = goClass ty
   where
+    goClass p | isIPPred p = 0
+              | otherwise  = go (classifyPredType p)
+
     go (ClassPred _ tys') = sizeTypes tys'
-    go (IPPred {})        = 0
     go (EqPred {})        = 0
-    go (TuplePred ts)     = sum (map (go . classifyPredType) ts)
+    go (TuplePred ts)     = sum (map goClass ts)
     go (IrredPred ty)     = sizeType ty
 \end{code}
 

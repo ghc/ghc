@@ -106,7 +106,7 @@ noSyntaxTable = []
 -- | A Haskell expression.
 data HsExpr id
   = HsVar     id                        -- ^ variable
-  | HsIPVar   (IPName id)               -- ^ implicit parameter
+  | HsIPVar   HsIPName                  -- ^ implicit parameter
   | HsOverLit (HsOverLit id)            -- ^ Overloaded literals
 
   | HsLit     HsLit                     -- ^ Simple (non-overloaded) literals
