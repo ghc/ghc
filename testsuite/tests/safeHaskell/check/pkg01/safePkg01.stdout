@@ -25,7 +25,7 @@ require own pkg trusted: True
 
 M_SafePkg5
 package dependencies: base* ghc-prim integer-gmp
-trusted: safe-infered
+trusted: safe-inferred
 require own pkg trusted: True
 
 Testing setting trust
