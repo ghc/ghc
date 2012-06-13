@@ -381,11 +381,11 @@ data SafeHaskellMode
    deriving (Eq)
 
 instance Show SafeHaskellMode where
-    show Sf_None        = "None"
-    show Sf_Unsafe      = "Unsafe"
-    show Sf_Trustworthy = "Trustworthy"
-    show Sf_Safe        = "Safe"
-    show Sf_SafeInfered = "Safe-Infered"
+    show Sf_None         = "None"
+    show Sf_Unsafe       = "Unsafe"
+    show Sf_Trustworthy  = "Trustworthy"
+    show Sf_Safe         = "Safe"
+    show Sf_SafeInferred = "Safe-Inferred"
 
 instance Outputable SafeHaskellMode where
     ppr = text . show
