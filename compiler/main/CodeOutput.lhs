@@ -188,7 +188,6 @@ outputForeignStubs dflags mod location stubs
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode CStyle h_code
             stub_h_output_w = showSDoc dflags stub_h_output_d
-        -- in
 
         createDirectoryIfMissing True (takeDirectory stub_h)
 

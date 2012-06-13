@@ -871,7 +871,6 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
-     -- in
 --     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
 --            "\n      bitmap = " ++ show bitmap) $ do
      scrut_code <- schemeE (d + ret_frame_sizeW)
@@ -1025,7 +1024,6 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                           | otherwise
                           = target
 
-     -- in
      (is_static, static_target_addr) <- get_target_info
      let
 
@@ -1061,7 +1059,6 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- is.  See comment in Interpreter.c with the CCALL instruction.
          stk_offset   = trunc16 $ d_after_r - s
 
-     -- in
      -- the only difference in libffi mode is that we prepare a cif
      -- describing the call type by calling libffi, and we attach the
      -- address of this to the CCALL instruction.
@@ -1076,7 +1073,6 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - fromIntegral r_sizeW - s)
                         `snocOL` RETURN_UBX (primRepToCgRep r_rep)
-     --in
          --trace (show (arg1_offW, args_offW  ,  (map cgRepSizeW a_reps) )) $
      return (
          push_args `appOL`
@@ -1326,7 +1322,6 @@ mkMultiBranch maybe_ncons raw_ways = do
                 []         -> nilOL
                 [(_, def)] -> LABEL lbl_default `consOL` def
                 _          -> panic "mkMultiBranch/the_default"
-     -- in
      instrs <- mkTree notd_ways init_lo init_hi
      return (instrs `appOL` the_default)
   where

@@ -59,7 +59,6 @@ cgForeignCall results fcall stg_args live
 
         arg_hints = zipWith CmmHinted
                       arg_exprs (map (typeForeignHint.stgArgType) stg_args)
-  -- in
   emitForeignCall results fcall arg_hints live
 
 

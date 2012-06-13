@@ -105,7 +105,6 @@ basicBlockCodeGen (BasicBlock id stmts) = do
           = (instrs, blocks, CmmData sec dat:statics)
         mkBlocks instr (instrs,blocks,statics)
           = (instr:instrs, blocks, statics)
-  -- in
   return (BasicBlock id top : other_blocks, statics)
 
 stmtsToInstrs :: [CmmStmt] -> NatM InstrBlock
@@ -285,7 +284,6 @@ assignMem_I64Code addrTree valueTree = do
                 -- Big-endian store
                 mov_hi = ST II32 rhi hi_addr
                 mov_lo = ST II32 rlo lo_addr
-        -- in
         return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
 
 
@@ -298,7 +296,6 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = MR r_dst_lo r_src_lo
          mov_hi = MR r_dst_hi r_src_hi
-   -- in
    return (
         vcode `snocOL` mov_lo `snocOL` mov_hi
      )
@@ -333,7 +330,6 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 LIS rhi (ImmInt half3),
                 OR rlo rlo (RIImm $ ImmInt half2)
                 ]
-  -- in
   return (ChildCode64 code rlo)
 
 iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
@@ -347,7 +343,6 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                 code2 `appOL`
                 toOL [ ADDC rlo r1lo r2lo,
                        ADDE rhi r1hi r2hi ]
-   -- in
    return (ChildCode64 code rlo)
 
 iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do

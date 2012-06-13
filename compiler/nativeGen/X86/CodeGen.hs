@@ -130,7 +130,6 @@ basicBlockCodeGen (BasicBlock id stmts) = do
           = (instrs, blocks, CmmData sec dat:statics)
         mkBlocks instr (instrs,blocks,statics)
           = (instr:instrs, blocks, statics)
-  -- in
   return (BasicBlock id top : other_blocks, statics)
 
 
@@ -307,7 +306,6 @@ assignMem_I64Code addrTree valueTree = do
         -- Little-endian store
         mov_lo = MOV II32 (OpReg rlo) (OpAddr addr)
         mov_hi = MOV II32 (OpReg rhi) (OpAddr (fromJust (addrOffset addr 4)))
-  -- in
   return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
 
 
@@ -320,7 +318,6 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
          r_src_hi = getHiVRegFromLo r_src_lo
          mov_lo = MOV II32 (OpReg r_src_lo) (OpReg r_dst_lo)
          mov_hi = MOV II32 (OpReg r_src_hi) (OpReg r_dst_hi)
-   -- in
    return (
         vcode `snocOL` mov_lo `snocOL` mov_hi
      )
@@ -339,7 +336,6 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 MOV II32 (OpImm (ImmInteger r)) (OpReg rlo),
                 MOV II32 (OpImm (ImmInteger q)) (OpReg rhi)
                 ]
-  -- in
   return (ChildCode64 code rlo)
 
 iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
@@ -348,7 +344,6 @@ iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
    let
         mov_lo = MOV II32 (OpAddr addr) (OpReg rlo)
         mov_hi = MOV II32 (OpAddr (fromJust (addrOffset addr 4))) (OpReg rhi)
-   -- in
    return (
             ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi)
                         rlo
@@ -370,7 +365,6 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
                        ADD II32 (OpImm (ImmInteger r)) (OpReg rlo),
                        MOV II32 (OpReg r1hi) (OpReg rhi),
                        ADC II32 (OpImm (ImmInteger q)) (OpReg rhi) ]
-   -- in
    return (ChildCode64 code rlo)
 
 iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
@@ -386,7 +380,6 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
                        ADD II32 (OpReg r2lo) (OpReg rlo),
                        MOV II32 (OpReg r1hi) (OpReg rhi),
                        ADC II32 (OpReg r2hi) (OpReg rhi) ]
-   -- in
    return (ChildCode64 code rlo)
 
 iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
@@ -717,7 +710,6 @@ getRegister' is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                                 -- compare against upper
                            -- eax==0 if high part == sign extended low part
                         ]
-         -- in
          return (Fixed size eax code)
 
     --------------------
@@ -735,7 +727,6 @@ getRegister' is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                code dst
                   = x_code dst `snocOL`
                     instr size (OpImm (litToImm lit)) (OpReg dst)
-          -- in
           return (Any size code)
 
     {- Case2: shift length is complex (non-immediate)
@@ -761,7 +752,6 @@ getRegister' is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
            code = x_code tmp `appOL`
                   y_code ecx `snocOL`
                   instr size (OpReg ecx) (OpReg tmp)
-        -- in
         return (Fixed size tmp code)
 
     --------------------
@@ -810,7 +800,6 @@ getRegister' is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
              result | quotient  = eax
                     | otherwise = edx
 
-           -- in
            return (Fixed size result code)
 
 
@@ -1153,7 +1142,6 @@ loadFloatAmode use_sse2 w addr addr_code = do
                  if use_sse2
                     then MOV size (OpAddr addr) (OpReg dst)
                     else GLD size addr dst
-  -- in
   return (Any (if use_sse2 then size else FF80) code)
 
 
@@ -1282,7 +1270,6 @@ condIntCode' is32Bit cond x y | isOperand is32Bit y = do
     let
         code = x_code `appOL` y_code `snocOL`
                   CMP (cmmTypeSize (cmmExprType x)) y_op (OpReg x_reg)
-    -- in
     return (CondCode False cond code)
 
 -- anything vs anything
@@ -1293,7 +1280,6 @@ condIntCode' _ cond x y = do
         code = y_code `appOL`
                x_code `snocOL`
                   CMP (cmmTypeSize (cmmExprType x)) (OpReg y_reg) x_op
-  -- in
   return (CondCode False cond code)
 
 
@@ -1328,7 +1314,6 @@ condFltCode cond x y
                   CMP (floatSize $ cmmExprWidth x) y_op (OpReg x_reg)
         -- NB(1): we need to use the unsigned comparison operators on the
         -- result of this comparison.
-    -- in
     return (CondCode True (condToUnsigned cond) code)
 
 -- -----------------------------------------------------------------------------
@@ -1766,7 +1751,6 @@ genCCall32' target dest_regs args = do
         delta <- getDeltaNat
         MASSERT (delta == delta0 - tot_arg_size)
 
-        -- in
         -- deal with static vs dynamic call targets
         (callinsns,cconv) <-
           case target of
@@ -1805,7 +1789,6 @@ genCCall32' target dest_regs args = do
                       ++
                       [DELTA delta0]
                    )
-        -- in
         setDeltaNat delta0
 
         let
@@ -1857,7 +1840,6 @@ genCCall32' target dest_regs args = do
             setDeltaNat (delta - 8)
             let
                 r_hi = getHiVRegFromLo r_lo
-            -- in
             return (       code `appOL`
                            toOL [PUSH II32 (OpReg r_hi), DELTA (delta - 4),
                                  PUSH II32 (OpReg r_lo), DELTA (delta - 8),
@@ -2067,7 +2049,6 @@ genCCall64' platform target dest_regs args = do
                   ++
                   [DELTA (delta + real_size)]
                )
-    -- in
     setDeltaNat (delta + real_size)
 
     let
@@ -2318,7 +2299,6 @@ genSwitch expr ids
             code = e_code `appOL` toOL [
                     JMP_TBL op ids ReadOnlyData lbl
                  ]
-        -- in
         return code
 
 generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
@@ -2357,7 +2337,6 @@ condIntReg cond x y = do
                     SETCC cond (OpReg tmp),
                     MOVZxL II8 (OpReg tmp) (OpReg dst)
                   ]
-  -- in
   return (Any II32 code)
 
 
@@ -2373,7 +2352,6 @@ condFltReg is32Bit cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
                     SETCC cond (OpReg tmp),
                     MOVZxL II8 (OpReg tmp) (OpReg dst)
                   ]
-    -- in
     return (Any II32 code)
 
   condFltReg_sse2 = do
@@ -2419,7 +2397,6 @@ condFltReg is32Bit cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
                     AND II8 (OpReg tmp1) (OpReg tmp2),
                     MOVZxL II8 (OpReg tmp2) (OpReg dst)
                   ]
-    -- in
     return (Any II32 code)
 
 
@@ -2498,7 +2475,6 @@ trivialCode' is32Bit width _ (Just revinstr) (CmmLit lit_a) b
        code dst
          = b_code dst `snocOL`
            revinstr (OpImm (litToImm lit_a)) (OpReg dst)
-  -- in
   return (Any (intSize width) code)
 
 trivialCode' _ width instr _ a b
@@ -2528,7 +2504,6 @@ genTrivialCode rep instr a b = do
                 b_code `appOL`
                 a_code dst `snocOL`
                 instr b_op (OpReg dst)
-  -- in
   return (Any rep code)
 
 regClashesWithOp :: Reg -> Operand -> Bool
@@ -2577,7 +2552,6 @@ trivialUFCode size instr x = do
      code dst =
         x_code `snocOL`
         instr x_reg dst
-  -- in
   return (Any size code)
 
 
@@ -2602,7 +2576,6 @@ coerceInt2FP from to x = if_sse2 coerce_sse2 coerce_x87
                              n -> panic $ "coerceInt2FP.sse: unhandled width ("
                                          ++ show n ++ ")"
            code dst = x_code `snocOL` opc (intSize from) x_op dst
-     -- in
      return (Any (floatSize to) code)
         -- works even if the destination rep is <II32
 
@@ -2618,7 +2591,6 @@ coerceFP2Int from to x = if_sse2 coerceFP2Int_sse2 coerceFP2Int_x87
                                            ++ show n ++ ")"
            code dst = x_code `snocOL` opc x_reg dst
         -- ToDo: works for non-II32 reps?
-     -- in
      return (Any (intSize to) code)
 
    coerceFP2Int_sse2 = do
@@ -2628,7 +2600,6 @@ coerceFP2Int from to x = if_sse2 coerceFP2Int_sse2 coerceFP2Int_x87
                                n -> panic $ "coerceFP2Init.sse: unhandled width ("
                                            ++ show n ++ ")"
            code dst = x_code `snocOL` opc (intSize to) x_op dst
-     -- in
      return (Any (intSize to) code)
          -- works even if the destination rep is <II32
 
@@ -2644,7 +2615,6 @@ coerceFP2FP to x = do
                                                  ++ show n ++ ")"
             | otherwise = GDTOF
         code dst = x_code `snocOL` opc x_reg dst
-  -- in
   return (Any (if use_sse2 then floatSize to else FF80) code)
 
 --------------------------------------------------------------------------------
