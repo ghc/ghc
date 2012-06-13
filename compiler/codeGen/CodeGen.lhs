@@ -77,7 +77,7 @@ codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info = do
                 -- initialisation routines; see Note
                 -- [pipeline-split-init].
 
-    dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms (targetPlatform dflags) code_stuff)
+    dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms code_stuff)
     return code_stuff
 
 mkModuleInit

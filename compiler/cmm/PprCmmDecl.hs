@@ -62,15 +62,14 @@ import SMRep
 
 
 pprCmms :: (Outputable info, Outputable g)
-        => Platform -> [GenCmmGroup CmmStatics info g] -> SDoc
-pprCmms _ cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
+        => [GenCmmGroup CmmStatics info g] -> SDoc
+pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext (sLit "-------------------") $$ space
 
 writeCmms :: (Outputable info, Outputable g)
           => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
-writeCmms dflags handle cmms = printForC dflags handle (pprCmms platform cmms)
-    where platform = targetPlatform dflags
+writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
@@ -85,7 +84,7 @@ instance Outputable CmmStatic where
     ppr x = sdocWithPlatform $ \platform -> pprStatic platform x
 
 instance Outputable CmmInfoTable where
-    ppr x = sdocWithPlatform $ \platform -> pprInfoTable platform x
+    ppr = pprInfoTable
 
 
 -----------------------------------------------------------------------------
@@ -120,11 +119,10 @@ pprTop _ (CmmData section ds) =
 -- --------------------------------------------------------------------------
 -- Info tables.
 
-pprInfoTable :: Platform -> CmmInfoTable -> SDoc
-pprInfoTable _ CmmNonInfoTable
+pprInfoTable :: CmmInfoTable -> SDoc
+pprInfoTable CmmNonInfoTable
   = empty
-pprInfoTable _
-             (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
+pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = _srt })  
   = vcat [ ptext (sLit "label:") <+> ppr lbl

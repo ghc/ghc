@@ -1355,11 +1355,10 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
-        platform = targetPlatform dflags
     prog <- StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info
     dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen"
-                  (pprCmms platform prog)
+                  (pprCmms prog)
 
     -- We are building a single SRT for the entire module, so
     -- we must thread it through all the procedures as we cps-convert them.
