@@ -375,7 +375,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
-                        $ mapUs regLiveness
+                        $ mapM regLiveness
                         $ map natCmmTopToLive native
 
         dumpIfSet_dyn dflags
@@ -434,7 +434,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                         = {-# SCC "RegAlloc" #-}
                           initUs usLive
                           $ liftM unzip
-                          $ mapUs (Linear.regAlloc dflags) withLiveness
+                          $ mapM (Linear.regAlloc dflags) withLiveness
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"

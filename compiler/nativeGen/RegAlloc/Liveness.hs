@@ -667,11 +667,11 @@ regLiveness
         -> UniqSM (LiveCmmDecl statics instr)
 
 regLiveness (CmmData i d)
-        = returnUs $ CmmData i d
+        = return $ CmmData i d
 
 regLiveness (CmmProc info lbl [])
         | LiveInfo static mFirst _ _    <- info
-        = returnUs $ CmmProc
+        = return $ CmmProc
                         (LiveInfo static mFirst (Just mapEmpty) Map.empty)
                         lbl []
 
@@ -679,7 +679,7 @@ regLiveness (CmmProc info lbl sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
         = let   (ann_sccs, block_live)  = computeLiveness sccs
 
-          in    returnUs $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
+          in    return $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
                            lbl ann_sccs
 
 

@@ -23,7 +23,7 @@ module UniqSupply (
         lazyThenUs, lazyMapUs,
 
         -- ** Deprecated operations on 'UniqSM'
-        getUniqueUs, getUs, returnUs, thenUs, mapUs
+        getUniqueUs, getUs,
   ) where
 
 import Unique
@@ -188,13 +188,6 @@ getUniqueUs = USM (\us -> case splitUniqSupply us of
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of
                            (us1,us2) -> (uniqsFromSupply us1, us2))
-
-mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-mapUs _ []     = returnUs []
-mapUs f (x:xs)
-  = f x         `thenUs` \ r  ->
-    mapUs f xs  `thenUs` \ rs ->
-    returnUs (r:rs)
 \end{code}
 
 \begin{code}
