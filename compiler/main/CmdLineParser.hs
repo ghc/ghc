@@ -243,5 +243,6 @@ missingArgErr f = Left ("missing argument for flag: " ++ f)
 
 errorsToGhcException :: [Located String] -> GhcException
 errorsToGhcException errs =
-    UsageError $ unlines [ showUserSpan True l ++ ": " ++ e | L l e <- errs ]
+    UsageError $
+        intercalate "\n" [ showUserSpan True l ++ ": " ++ e | L l e <- errs ]
 
