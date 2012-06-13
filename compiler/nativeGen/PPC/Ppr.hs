@@ -63,7 +63,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader platform Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
-        then pprCLabel platform (mkDeadStripPreventer info_lbl) <> char ':'
+        then ppr (mkDeadStripPreventer info_lbl) <> char ':'
         else empty) $$
        vcat (map (pprData platform) info) $$
        pprLabel platform info_lbl
@@ -80,9 +80,9 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
          -- so that the linker will not think it is unreferenced and dead-strip
          -- it. That's why the label is called a DeadStripPreventer (_dsp).
                   text "\t.long "
-              <+> pprCLabel platform info_lbl
+              <+> ppr info_lbl
               <+> char '-'
-              <+> pprCLabel platform (mkDeadStripPreventer info_lbl)
+              <+> ppr (mkDeadStripPreventer info_lbl)
          else empty)
 
 
@@ -104,23 +104,23 @@ pprData platform (CmmUninitialised bytes) = ptext (sLit keyword) <> int bytes
                     _        -> ".skip "
 pprData platform (CmmStaticLit lit)       = pprDataItem platform lit
 
-pprGloblDecl :: Platform -> CLabel -> SDoc
-pprGloblDecl platform lbl
+pprGloblDecl :: CLabel -> SDoc
+pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> pprCLabel platform lbl
+  | otherwise = ptext (sLit ".globl ") <> ppr lbl
 
 pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
   | platformOS platform == OSLinux && externallyVisibleCLabel lbl
     = ptext (sLit ".type ") <>
-      pprCLabel platform lbl <> ptext (sLit ", @object")
+      ppr lbl <> ptext (sLit ", @object")
 pprTypeAndSizeDecl _ _
   = empty
 
 pprLabel :: Platform -> CLabel -> SDoc
-pprLabel platform lbl = pprGloblDecl platform lbl
+pprLabel platform lbl = pprGloblDecl lbl
                      $$ pprTypeAndSizeDecl platform lbl
-                     $$ (pprCLabel platform lbl <> char ':')
+                     $$ (ppr lbl <> char ':')
 
 
 pprASCII :: [Word8] -> SDoc
@@ -223,8 +223,8 @@ pprImm :: Platform -> Imm -> SDoc
 
 pprImm _        (ImmInt i)     = int i
 pprImm _        (ImmInteger i) = integer i
-pprImm platform (ImmCLbl l)    = pprCLabel platform l
-pprImm platform (ImmIndex l i) = pprCLabel platform l <> char '+' <> int i
+pprImm _        (ImmCLbl l)    = ppr l
+pprImm _        (ImmIndex l i) = ppr l <> char '+' <> int i
 pprImm _        (ImmLit s)     = s
 
 pprImm _        (ImmFloat _)  = ptext (sLit "naughty float immediate")
@@ -466,16 +466,16 @@ pprInstr platform (CMPL sz reg ri) = hcat [
                     RIReg _ -> empty
                     RIImm _ -> char 'i'
             ]
-pprInstr platform (BCC cond blockid) = hcat [
+pprInstr _ (BCC cond blockid) = hcat [
         char '\t',
         ptext (sLit "b"),
         pprCond cond,
         char '\t',
-        pprCLabel platform lbl
+        ppr lbl
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
 
-pprInstr platform (BCCFAR cond blockid) = vcat [
+pprInstr _ (BCCFAR cond blockid) = vcat [
         hcat [
             ptext (sLit "\tb"),
             pprCond (condNegate cond),
@@ -483,16 +483,16 @@ pprInstr platform (BCCFAR cond blockid) = vcat [
         ],
         hcat [
             ptext (sLit "\tb\t"),
-            pprCLabel platform lbl
+            ppr lbl
         ]
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
 
-pprInstr platform (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
+pprInstr _ (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
         char '\t',
         ptext (sLit "b"),
         char '\t',
-        pprCLabel platform lbl
+        ppr lbl
     ]
 
 pprInstr platform (MTCTR reg) = hcat [
@@ -505,9 +505,9 @@ pprInstr _ (BCTR _ _) = hcat [
         char '\t',
         ptext (sLit "bctr")
     ]
-pprInstr platform (BL lbl _) = hcat [
+pprInstr _ (BL lbl _) = hcat [
         ptext (sLit "\tbl\t"),
-        pprCLabel platform lbl
+        ppr lbl
     ]
 pprInstr _ (BCTRL _) = hcat [
         char '\t',
