@@ -206,7 +206,7 @@ forkIO action = IO $ \ s ->
   action_plus = catchException action childHandler
 
 {-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-}
--- | This function is deprecated; use 'forkIOWIthUnmask' instead
+-- | This function is deprecated; use 'forkIOWithUnmask' instead
 forkIOUnmasked :: IO () -> IO ThreadId
 forkIOUnmasked io = forkIO (unsafeUnmask io)
 
