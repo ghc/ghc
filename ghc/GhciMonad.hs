@@ -37,7 +37,6 @@ import SrcLoc
 import Module
 import ObjLink
 import Linker
-import StaticFlags
 import qualified MonadUtils
 
 import Exception
@@ -259,7 +258,7 @@ printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUserPartWay dflags stdout opt_PprUserLength unqual doc
+  liftIO $ Outputable.printForUserPartWay dflags stdout (pprUserLength dflags) unqual doc
 
 -- | Run a single Haskell expression
 runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.RunResult)
