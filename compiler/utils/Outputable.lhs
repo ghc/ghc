@@ -238,7 +238,7 @@ data SDocContext = SDC
   { sdocStyle      :: !PprStyle
   , sdocLastColour :: !PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
-  , sdocDynFlags   :: DynFlags
+  , sdocDynFlags   :: !DynFlags
   }
 
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
