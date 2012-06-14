@@ -53,7 +53,7 @@ module TcRnTypes(
        -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, keepWanted,
         singleCt, extendCts, isEmptyCts, isCTyEqCan, isCFunEqCan,
-        isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
+        isCDictCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt, 
         isGivenCt, 
         ctWantedLoc, ctEvidence,
@@ -847,19 +847,11 @@ data Ct
                        -- See Note [WorkList]
     }
 
-  | CIPCan {	-- ?x::tau
-      -- See note [Canonical implicit parameter constraints].
-      cc_ev :: CtEvidence,
-      cc_ip_nm  :: IPName Name,
-      cc_ip_ty  :: TcTauType,          -- Not a Xi! See same not as above
-      cc_depth  :: SubGoalDepth        -- See Note [WorkList]
-    }
-
   | CIrredEvCan {  -- These stand for yet-unknown predicates
       cc_ev :: CtEvidence,
       cc_ty     :: Xi, -- cc_ty is flat hence it may only be of the form (tv xi1 xi2 ... xin)
                        -- Since, if it were a type constructor application, that'd make the
-                       -- whole constraint a CDictCan, CIPCan, or CTyEqCan. And it can't be
+                       -- whole constraint a CDictCan, or CTyEqCan. And it can't be
                        -- a type family application either because it's a Xi type.
       cc_depth :: SubGoalDepth -- See Note [WorkList]
     }
@@ -922,8 +914,6 @@ ctPred (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
   = mkTcEqPred (mkTyVarTy tv) xi
 ctPred (CFunEqCan { cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) 
   = mkTcEqPred (mkTyConApp fn xis1) xi2
-ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi }) 
-  = mkIPPred nm xi
 ctPred (CIrredEvCan { cc_ty = xi }) = xi
 -}
 \end{code}
@@ -960,10 +950,6 @@ isCDictCan_Maybe :: Ct -> Maybe Class
 isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
 isCDictCan_Maybe _              = Nothing
 
-isCIPCan_Maybe :: Ct -> Maybe (IPName Name)
-isCIPCan_Maybe  (CIPCan {cc_ip_nm = nm }) = Just nm
-isCIPCan_Maybe _                = Nothing
-
 isCIrredEvCan :: Ct -> Bool
 isCIrredEvCan (CIrredEvCan {}) = True
 isCIrredEvCan _                = False
@@ -990,7 +976,6 @@ instance Outputable Ct where
                            CFunEqCan {}     -> "CFunEqCan"
                            CNonCanonical {} -> "CNonCanonical"
                            CDictCan {}      -> "CDictCan"
-                           CIPCan {}        -> "CIPCan"
                            CIrredEvCan {}   -> "CIrredEvCan"
 \end{code}
 
@@ -1397,7 +1382,7 @@ data SkolemInfo
 
   | ArrowSkol 	  	-- An arrow form (see TcArrows)
 
-  | IPSkol [IPName Name]  -- Binding site of an implicit parameter
+  | IPSkol [HsIPName]   -- Binding site of an implicit parameter
 
   | RuleSkol RuleName	-- The LHS of a RULE
 
@@ -1465,7 +1450,7 @@ data CtOrigin
 
   | TypeEqOrigin EqOrigin
 
-  | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
+  | IPOccOrigin  HsIPName 	-- Occurrence of an implicit parameter
 
   | LiteralOrigin (HsOverLit Name)	-- Occurrence of a literal
   | NegateOrigin			-- Occurrence of syntactic negation

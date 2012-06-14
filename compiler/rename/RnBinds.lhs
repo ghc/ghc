@@ -35,7 +35,7 @@ import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 import HsSyn
 import TcRnMonad
 import TcEvidence     ( emptyTcEvBinds )
-import RnTypes        ( bindSigTyVarsFV, rnIPName, rnHsSigType, rnLHsType, checkPrecMatch )
+import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch )
 import RnPat
 import RnEnv
 import DynFlags
@@ -220,10 +220,9 @@ rnIPBinds (IPBinds ip_binds _no_dict_binds) = do
     return (IPBinds ip_binds' emptyTcEvBinds, plusFVs fvs_s)
 
 rnIPBind :: IPBind RdrName -> RnM (IPBind Name, FreeVars)
-rnIPBind (IPBind n expr) = do
-    n' <- rnIPName n
+rnIPBind (IPBind ~(Left n) expr) = do
     (expr',fvExpr) <- rnLExpr expr
-    return (IPBind n' expr', fvExpr)
+    return (IPBind (Left n) expr', fvExpr)
 \end{code}
 
 

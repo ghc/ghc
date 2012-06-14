@@ -25,9 +25,6 @@ module MkCore (
         -- * Floats
         FloatBind(..), wrapFloat,
 
-        -- * Constructing/deconstructing implicit parameter boxes
-        mkIPUnbox, mkIPBox,
-
         -- * Constructing/deconstructing equality evidence boxes
         mkEqBox,
         
@@ -62,7 +59,7 @@ module MkCore (
 #include "HsVersions.h"
 
 import Id
-import Var      ( IpId, EvVar, setTyVarUnique )
+import Var      ( EvVar, setTyVarUnique )
 
 import CoreSyn
 import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
@@ -72,8 +69,7 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
-import IParam           ( ipCoAxiom )
-import TcType		( mkSigmaTy, evVarPred )
+import TcType		( mkSigmaTy )
 import Type
 import Coercion
 import TysPrim
@@ -299,21 +295,6 @@ mkStringExprFS str
   where
     chars = unpackFS str
     safeChar c = ord c >= 1 && ord c <= 0x7F
-\end{code}
-
-\begin{code}
-
-mkIPBox :: IPName IpId -> CoreExpr -> CoreExpr
-mkIPBox ipx e = e `Cast` mkSymCo (mkAxInstCo (ipCoAxiom ip) [ty])
-  where x = ipNameName ipx
-        Just (ip, ty) = getIPPredTy_maybe (evVarPred x)
-        -- NB: don't use the DataCon work id because we don't generate code for it
-
-mkIPUnbox :: IPName IpId -> CoreExpr
-mkIPUnbox ipx = Var x `Cast` mkAxInstCo (ipCoAxiom ip) [ty]
-  where x = ipNameName ipx
-        Just (ip, ty) = getIPPredTy_maybe (evVarPred x)
-
 \end{code}
 
 \begin{code}

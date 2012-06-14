@@ -1424,10 +1424,14 @@ reify_tc_app tc tys
     removeKinds _ tys           = tys
 
 reifyPred :: TypeRep.PredType -> TcM TH.Pred
-reifyPred ty = case classifyPredType ty of
+reifyPred ty
+  -- We could reify the implicit paramter as a class but it seems
+  -- nicer to support them properly...
+  | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
+  | otherwise
+   = case classifyPredType ty of
   ClassPred cls tys -> do { tys' <- reifyTypes tys 
                           ; return $ TH.ClassP (reifyName cls) tys' }
-  IPPred _ _        -> noTH (sLit "implicit parameters") (ppr ty)
   EqPred ty1 ty2    -> do { ty1' <- reifyType ty1
                           ; ty2' <- reifyType ty2
                           ; return $ TH.EqualP ty1' ty2'

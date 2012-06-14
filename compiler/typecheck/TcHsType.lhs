@@ -76,6 +76,7 @@ import FastString
 import Util
 
 import Control.Monad ( unless, when, zipWithM )
+import PrelNames(ipClassName)
 \end{code}
 
 
@@ -422,7 +423,10 @@ tc_hs_type ipTy@(HsIParamTy n ty) exp_kind
   = do { ty' <- tc_lhs_type ty 
             (EK liftedTypeKind (ptext (sLit "The type argument of the implicit parameter had")))
        ; checkExpectedKind ipTy constraintKind exp_kind
-       ; return (mkIPPred n ty') }
+       ; ipClass <- tcLookupClass ipClassName
+       ; let n' = mkStrLitTy $ hsIPNameFS n
+       ; return (mkClassPred ipClass [n',ty'])
+       }
 
 tc_hs_type ty@(HsEqTy ty1 ty2) exp_kind 
   = do { (ty1', kind1) <- tc_infer_lhs_type ty1

@@ -2174,6 +2174,11 @@ impliedFlags
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
 
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
+
+    -- An implicit parameter constraint, `?x::Int`, is desugared into
+    -- `IP "x" Int`, which requires a flexible context/instance.
+    , (Opt_ImplicitParams, turnOn, Opt_FlexibleContexts)
+    , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]

@@ -18,6 +18,7 @@ module HsTypes (
         HsQuasiQuote(..),
         HsTyWrapper(..),
         HsTyLit(..),
+        HsIPName(..), hsIPNameFS,
 
         LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
@@ -158,6 +159,24 @@ mkHsWithBndrs :: thing -> HsWithBndrs thing
 mkHsWithBndrs x = HsWB { hswb_cts = x, hswb_kvs = panic "mkHsTyWithBndrs:kvs"
                                      , hswb_tvs = panic "mkHsTyWithBndrs:tvs" }
 
+
+-- | These names are used eary on to store the names of implicit
+-- parameters.  They completely disappear after type-checking.
+newtype HsIPName = HsIPName FastString-- ?x
+  deriving( Eq, Data, Typeable )
+
+hsIPNameFS :: HsIPName -> FastString
+hsIPNameFS (HsIPName n) = n
+
+instance Outputable HsIPName where
+    ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
+
+instance OutputableBndr HsIPName where
+    pprBndr _ n   = ppr n         -- Simple for now
+    pprInfixOcc  n = ppr n
+    pprPrefixOcc n = ppr n
+
+
 data HsTyVarBndr name
   = UserTyVar           -- No explicit kinding
          name           -- See Note [Printing KindedTyVars]
@@ -201,7 +220,7 @@ data HsType name
         -- Parenthesis preserved for the precedence re-arrangement in RnTypes
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
 
-  | HsIParamTy          (IPName name)    -- (?x :: ty)
+  | HsIParamTy          HsIPName         -- (?x :: ty)
                         (LHsType name)   -- Implicit parameters as they occur in contexts
 
   | HsEqTy              (LHsType name)   -- ty1 ~ ty2

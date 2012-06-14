@@ -72,8 +72,6 @@ module TysWiredIn (
         -- * Equality predicates
         eqTyCon_RDR, eqTyCon, eqTyConName, eqBoxDataCon,
 
-        -- * Implicit parameter predicates
-        mkIPName
     ) where
 
 #include "HsVersions.h"
@@ -85,7 +83,6 @@ import PrelNames
 import TysPrim
 
 -- others:
-import Coercion
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
 import Type             ( mkTyConApp )
@@ -95,7 +92,7 @@ import TyCon
 import TypeRep
 import RdrName
 import Name
-import BasicTypes       ( TupleSort(..), tupleSortBoxity, IPName(..), 
+import BasicTypes       ( TupleSort(..), tupleSortBoxity,
                           Arity, RecFlag(..), Boxity(..), HsBang(..) )
 import ForeignCall
 import Unique           ( incrUnique, mkTupleTyConUnique,
@@ -254,9 +251,6 @@ pcTyCon is_enum is_rec name cType tyvars cons
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon = pcDataConWithFixity False
 
-pcDataCon' :: Name -> Unique -> [TyVar] -> [Type] -> TyCon -> DataCon
-pcDataCon' = pcDataConWithFixity' False
-
 pcDataConWithFixity :: Bool -> Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataConWithFixity infx n = pcDataConWithFixity' infx n (incrUnique (nameUnique n))
 -- The Name's unique is the first of two free uniques;
@@ -395,39 +389,6 @@ unboxedPairDataCon :: DataCon
 unboxedPairDataCon = tupleCon   UnboxedTuple 2
 \end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection[TysWiredIn-ImplicitParams]{Special type constructors for implicit parameters}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-mkIPName :: FastString
-         -> Unique -> Unique -> Unique -> Unique
-         -> IPName Name
-mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u = name_ip
-  where
-    name_ip = IPName tycon_name
-
-    tycon_name = mkPrimTyConName ip tycon_u tycon
-    tycon      = mkAlgTyCon tycon_name
-                   (liftedTypeKind `mkArrowKind` constraintKind)
-                   [alphaTyVar]
-                   Nothing
-                   []      -- No stupid theta
-                   (NewTyCon { data_con    = datacon, 
-                               nt_rhs      = mkTyVarTy alphaTyVar,
-                               nt_etad_rhs = ([alphaTyVar], mkTyVarTy alphaTyVar),
-                               nt_co       = mkNewTypeCo co_ax_name tycon [alphaTyVar] (mkTyVarTy alphaTyVar) })
-                   (IPTyCon name_ip)
-                   NonRecursive
-                   False
-
-    datacon_name = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "IPBox") datacon_u datacon
-    datacon      = pcDataCon' datacon_name dc_wrk_u [alphaTyVar] [mkTyVarTy alphaTyVar] tycon
-
-    co_ax_name = mkPrimTyConName ip co_ax_u tycon
-\end{code}
 
 %************************************************************************
 %*									*

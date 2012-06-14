@@ -285,6 +285,9 @@ basicKnownKeyNames
         typeNatMulTyFamName,
         typeNatExpTyFamName,
 
+        -- Implicit parameters
+        ipClassName,
+
         -- Annotation type checking
         toAnnotationWrapperName
 
@@ -348,7 +351,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_IP :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -402,6 +405,7 @@ rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
+gHC_IP          = mkBaseModule (fsLit "GHC.IP")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -1081,6 +1085,12 @@ typeNatAddTyFamName = tcQual  gHC_TYPELITS (fsLit "+")   typeNatAddTyFamNameKey
 typeNatMulTyFamName = tcQual  gHC_TYPELITS (fsLit "*")   typeNatMulTyFamNameKey
 typeNatExpTyFamName = tcQual  gHC_TYPELITS (fsLit "^")   typeNatExpTyFamNameKey
 
+-- Implicit parameters
+ipClassName :: Name
+ipClassName         = clsQual gHC_IP (fsLit "IP")      ipClassNameKey
+
+
+
 -- dotnet interop
 objectTyConName :: Name
 objectTyConName     = tcQual   dOTNET (fsLit "Object") objectTyConKey
@@ -1201,6 +1211,9 @@ typeNatLeqClassNameKey  = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
+
+ipClassNameKey :: Unique
+ipClassNameKey = mkPreludeClassUnique 45
 \end{code}
 
 %************************************************************************

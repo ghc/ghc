@@ -14,7 +14,6 @@ module TcCanonical(
 
 #include "HsVersions.h"
 
-import BasicTypes ( IPName )
 import TcRnTypes
 import TcType
 import Type
@@ -23,7 +22,6 @@ import TcEvidence
 import Class
 import TyCon
 import TypeRep
-import Name ( Name )
 import Var
 import VarEnv
 import Outputable
@@ -199,11 +197,6 @@ canonicalize (CFunEqCan { cc_depth = d
   = {-# SCC "canEqLeafFunEqLeftRec" #-}
     canEqLeafFunEqLeftRec d fl (fn,xis1) xi2
 
-canonicalize (CIPCan { cc_depth = d
-                     , cc_ev = fl
-                     , cc_ip_nm  = nm
-                     , cc_ip_ty  = xi })
-  = canIP d fl nm xi
 canonicalize (CIrredEvCan { cc_ev = fl
                           , cc_depth = d
                           , cc_ty = xi })
@@ -219,7 +212,6 @@ canEvVar d fl pred_classifier
   = case pred_classifier of
       ClassPred cls tys -> canClassNC d fl cls tys 
       EqPred ty1 ty2    -> canEqNC    d fl ty1 ty2 
-      IPPred nm ty      -> canIP      d fl nm ty
       IrredPred ev_ty   -> canIrred   d fl ev_ty
       TuplePred tys     -> canTuple   d fl tys
 \end{code}
@@ -245,43 +237,6 @@ canTuple d fl tys
     add_to_work fl = addToWork $ canEvVar d fl (classifyPredType (ctEvPred fl))
 \end{code}
 
-
-%************************************************************************
-%*                                                                      *
-%*                      Implicit Parameter Canonicalization
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-canIP :: SubGoalDepth -- Depth 
-      -> CtEvidence
-      -> IPName Name -> Type -> TcS StopOrContinue
--- Precondition: EvVar is implicit parameter evidence
-canIP d fl nm ty
-  =    -- Note [Canonical implicit parameter constraints] explains why it's 
-       -- possible in principle to not flatten, but since flattening applies 
-       -- the inert substitution we choose to flatten anyway.
-    do { (xi,co) <- flatten d FMFullFlatten fl (mkIPPred nm ty)
-       ; mb <- rewriteCtFlavor fl xi co 
-       ; case mb of
-            Just new_fl -> let IPPred _ xi_in = classifyPredType xi
-                           in continueWith $ CIPCan { cc_ev = new_fl
-                                                    , cc_ip_nm = nm, cc_ip_ty = xi_in
-                                                    , cc_depth = d }
-            Nothing -> return Stop }
-
-\end{code}
-
-Note [Canonical implicit parameter constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The type in a canonical implicit parameter constraint doesn't need to
-be a xi (type-function-free type) since we can defer the flattening
-until checking this type for equality with another type.  If we
-encounter two IP constraints with the same name, they MUST have the
-same type, and at that point we can generate a flattened equality
-constraint between the types.  (On the other hand, the types in two
-class constraints for the same class MAY be equal, so they need to be
-flattened in the first place to facilitate comparing them.)
 
 %************************************************************************
 %*                                                                      *
@@ -441,7 +396,6 @@ is_improvement_pty ty = go (classifyPredType ty)
     go (EqPred {})         = True 
     go (ClassPred cls _tys) = not $ null fundeps
       where (_,fundeps) = classTvsFds cls
-    go (IPPred {})         = False
     go (TuplePred ts)      = any is_improvement_pty ts
     go (IrredPred {})      = True -- Might have equalities after reduction?
 \end{code}

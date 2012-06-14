@@ -416,10 +416,12 @@ isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
 type LIPBind id = Located (IPBind id)
 
 -- | Implicit parameter bindings.
+{- These bindings start off as (Left "x") in the parser and stay
+that way until after type-checking when they are replaced with
+(Right d), where "d" is the name of the dictionary holding the
+evidene for the implicit parameter. -}
 data IPBind id
-  = IPBind
-        (IPName id)
-        (LHsExpr id)
+  = IPBind (Either HsIPName id) (LHsExpr id)
   deriving (Data, Typeable)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
@@ -427,7 +429,10 @@ instance (OutputableBndr id) => Outputable (HsIPBinds id) where
                         $$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
-  ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
+  ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
+    where name = case lr of
+                   Left ip  -> pprBndr LetBind ip
+                   Right id -> pprBndr LetBind id
 \end{code}
 
 

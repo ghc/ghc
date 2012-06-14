@@ -29,7 +29,6 @@ import PrelNames (singIClassName)
 import Class
 import TyCon
 import Name
-import IParam
 
 import FunDeps
 
@@ -276,9 +275,6 @@ Case 1: In Rewriting Equalities (function rewriteEqLHS)
 Case 2: Functional Dependencies 
     Again, we should prefer, if possible, the inert variables on the RHS
 
-Case 3: IP improvement work
-    We must always rewrite so that the inert type is on the right. 
-
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
 spontaneousSolveStage workItem
@@ -378,14 +374,12 @@ kick_out_rewritable ct is@(IS { inert_cans =
                                    IC { inert_eqs    = eqmap
                                       , inert_eq_tvs = inscope
                                       , inert_dicts  = dictmap
-                                      , inert_ips    = ipmap
                                       , inert_funeqs = funeqmap
                                       , inert_irreds = irreds }
                               , inert_frozen = frozen })
   = ((kicked_out,eqmap), remaining)
   where
-    rest_out = fro_out `andCts` dicts_out 
-                   `andCts` ips_out `andCts` irs_out
+    rest_out = fro_out `andCts` dicts_out `andCts` irs_out
     kicked_out = WorkList { wl_eqs    = []
                           , wl_funeqs = bagToList feqs_out
                           , wl_rest   = bagToList rest_out }
@@ -394,7 +388,6 @@ kick_out_rewritable ct is@(IS { inert_cans =
                                      , inert_eq_tvs = inscope 
                                        -- keep the same, safe and cheap
                                      , inert_dicts = dicts_in
-                                     , inert_ips = ips_in
                                      , inert_funeqs = feqs_in
                                      , inert_irreds = irs_in }
                    , inert_frozen = fro_in } 
@@ -404,8 +397,6 @@ kick_out_rewritable ct is@(IS { inert_cans =
                 -- subsitution into account
     fl = cc_ev ct
     tv = cc_tyvar ct
-                               
-    (ips_out,   ips_in)     = partitionCCanMap rewritable ipmap
 
     (feqs_out,  feqs_in)    = partCtFamHeadMap rewritable funeqmap
     (dicts_out, dicts_in)   = partitionCCanMap rewritable dictmap
@@ -635,6 +626,8 @@ solveWithIdentity d wd tv xi
 *                                                                               *
 *********************************************************************************
 
+Note [
+
 Note [The Solver Invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We always add Givens first.  So you might think that the solver has
@@ -722,7 +715,7 @@ interactWithInertsStage wi
 doInteractWithInert :: Ct -> Ct -> TcS InteractResult
 -- Identical class constraints.
 doInteractWithInert
-  inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyargs = tys1 }) 
+  inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyargs = tys1 })
    workItem@(CDictCan { cc_ev = fl2, cc_class = cls2, cc_tyargs = tys2 })
 
   | cls1 == cls2  
@@ -765,46 +758,6 @@ doInteractWithInert (CIrredEvCan { cc_ev = ifl, cc_ty = ty1 })
            workItem@(CIrredEvCan { cc_ty = ty2 })
   | ty1 `eqType` ty2
   = solveOneFromTheOther "Irred/Irred" ifl workItem
-
--- Two implicit parameter constraints.  If the names are the same,
--- but their types are not, we generate a wanted type equality 
--- that equates the type (this is "improvement").  
--- However, we don't actually need the coercion evidence,
--- so we just generate a fresh coercion variable that isn't used anywhere.
-doInteractWithInert (CIPCan { cc_ev = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 }) 
-           workItem@(CIPCan { cc_ev = wfl, cc_ip_nm = nm2, cc_ip_ty = ty2 })
-  | nm1 == nm2 && isGiven wfl && isGiven ifl
-  = 	-- See Note [Overriding implicit parameters]
-        -- Dump the inert item, override totally with the new one
-	-- Do not require type equality
-	-- For example, given let ?x::Int = 3 in let ?x::Bool = True in ...
-	--              we must *override* the outer one with the inner one
-    irInertConsumed "IP/IP (override inert)"
-
-  | nm1 == nm2 && ty1 `eqType` ty2 
-  = solveOneFromTheOther "IP/IP" ifl workItem 
-
-  | nm1 == nm2
-  =  	-- See Note [When improvement happens]
-    do { mb_eqv <- newWantedEvVar new_wloc (mkEqPred ty2 ty1)
-         -- co :: ty2 ~ ty1, see Note [Efficient orientation]
-       ; cv <- case mb_eqv of
-                 Fresh eqv  -> 
-                   do { updWorkListTcS $ extendWorkListEq $ 
-                        CNonCanonical { cc_ev = eqv
-                                      , cc_depth = cc_depth workItem }
-                      ; return (ctEvTerm eqv) }
-                 Cached eqv -> return eqv
-       ; case wfl of
-            Wanted { ctev_evar = ev_id } ->
-              let ip_co = mkTcTyConAppCo (ipTyCon nm1) [evTermCoercion cv]
-              in do { setEvBind ev_id $
-                      mkEvCast (ctEvTerm ifl) (mkTcSymCo ip_co)
-                    ; irWorkItemConsumed "IP/IP (solved by rewriting)" }
-            _ -> pprPanic "Unexpected IP constraint" (ppr workItem) }
-  where 
-    new_wloc | isGiven wfl = getWantedLoc ifl
-             | otherwise   = getWantedLoc wfl
 
 doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_depth = d1 }) 
@@ -872,6 +825,65 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
 doInteractWithInert _ _ = irKeepGoing "NOP"
 
 \end{code}
+
+
+Note [Shadowing of Implicit Parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the following example:
+
+f :: (?x :: Char) => Char
+f = let ?x = 'a' in ?x
+
+The "let ?x = ..." generates an implication constraint of the form:
+
+?x :: Char => ?x :: Char
+
+Furthermore, the signature for `f` also generates an implication
+constraint, so we end up with the following nested implication:
+
+?x :: Char => (?x :: Char => ?x :: Char)
+
+Note that the wanted (?x :: Char) constraint may be solved in
+two incompatible ways:  either by using the parameter from the
+signature, or by using the local definition.  Our intention is
+that the local definition should "shadow" the parameter of the
+signature, and we implement this as follows: when we add a new
+given implicit parameter to the inert set, it replaces any existing
+givens for the same implicit parameter.
+
+This works for the normal cases but it has an odd side effect
+in some pathological programs like this:
+
+-- This is accepted, the second parameter shadows
+f1 :: (?x :: Int, ?x :: Char) => Char
+f1 = ?x
+
+-- This is rejected, the second parameter shadows
+f2 :: (?x :: Int, ?x :: Char) => Int
+f2 = ?x
+
+Both of these are actually wrong:  when we try to use either one,
+we'll get two incompatible wnated constraints (?x :: Int, ?x :: Char),
+which would lead to an error.
+
+I can think of two ways to fix this:
+
+  1. Simply disallow multiple constratits for the same implicit
+    parameter---this is never useful, and it can be detected completely
+    syntactically.
+
+  2. Move the shadowing machinery to the location where we nest
+     implications, and add some code here that will produce an
+     error if we get multiple givens for the same implicit parameter.
+
+
+
+
+
+
+
+
 
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

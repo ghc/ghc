@@ -359,7 +359,7 @@ zonkLocalBinds env (HsValBinds vb@(ValBindsOut binds sigs))
 zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds))
   = mappM (wrapLocM zonk_ip_bind) binds	`thenM` \ new_binds ->
     let
-	env1 = extendIdZonkEnv env [ipNameName n | L _ (IPBind n _) <- new_binds]
+	env1 = extendIdZonkEnv env [ n | L _ (IPBind (Right n) _) <- new_binds]
     in
     zonkTcEvBinds env1 dict_binds 	`thenM` \ (env2, new_dict_binds) -> 
     returnM (env2, HsIPBinds (IPBinds new_binds new_dict_binds))
@@ -539,8 +539,8 @@ zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
 zonkExpr env (HsVar id)
   = returnM (HsVar (zonkIdOcc env id))
 
-zonkExpr env (HsIPVar id)
-  = returnM (HsIPVar (mapIPName (zonkIdOcc env) id))
+zonkExpr _ (HsIPVar id)
+  = returnM (HsIPVar id)
 
 zonkExpr env (HsLit (HsRat f ty))
   = zonkTcTypeToType env ty	   `thenM` \ new_ty  ->
@@ -862,8 +862,9 @@ zonkRecFields env (HsRecFields flds dd)
 	   ; return (fld { hsRecFieldId = new_id, hsRecFieldArg = new_expr }) }
 
 -------------------------------------------------------------------------
-mapIPNameTc :: (a -> TcM b) -> IPName a -> TcM (IPName b)
-mapIPNameTc f (IPName n) = f n  `thenM` \ r -> returnM (IPName r)
+mapIPNameTc :: (a -> TcM b) -> Either HsIPName a -> TcM (Either HsIPName b)
+mapIPNameTc _ (Left x)  = returnM (Left x)
+mapIPNameTc f (Right x) = f x  `thenM` \ r -> returnM (Right r)
 \end{code}
 
 
