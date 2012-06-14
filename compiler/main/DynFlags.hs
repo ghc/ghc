@@ -308,6 +308,9 @@ data DynFlag
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors
 
+   -- output style opts
+   | Opt_PprCaseAsLet
+
    -- temporary flags
    | Opt_RunCPS
    | Opt_RunCPSZ
@@ -1788,6 +1791,8 @@ dynamic_flags = [
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
   , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
  ]
+ ++ map (mkFlag turnOn  "d"    setDynFlag  ) dFlags
+ ++ map (mkFlag turnOff "dno-" unSetDynFlag) dFlags
  ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
  ++ map (mkFlag turnOn  "f"    setWarningFlag  ) fWarningFlags
@@ -1907,6 +1912,11 @@ fWarningFlags = [
   ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
   ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
   ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ) ]
+
+-- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
+dFlags :: [FlagSpec DynFlag]
+dFlags = [
+  ( "ppr-case-as-let",                  Opt_PprCaseAsLet, nop ) ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]

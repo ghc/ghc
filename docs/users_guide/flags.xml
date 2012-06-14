@@ -2724,7 +2724,7 @@
           <row>
             <entry><option>-dppr-case-as-let</option></entry>
             <entry>Print single alternative case expressions as strict lets.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

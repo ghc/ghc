@@ -28,7 +28,6 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprCols,
-	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
         opt_NoDebugOutput,
 
@@ -249,10 +248,6 @@ opt_SuppressTypeSignatures
 opt_SuppressUniques :: Bool
 opt_SuppressUniques
 	=  lookUp  (fsLit "-dsuppress-uniques")
-
--- | Display case expressions with a single alternative as strict let bindings
-opt_PprCaseAsLet :: Bool
-opt_PprCaseAsLet	= lookUp   (fsLit "-dppr-case-as-let")
 
 -- | Set the maximum width of the dumps
 --   If GHC's command line options are bad then the options parser uses the

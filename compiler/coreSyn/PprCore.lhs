@@ -23,6 +23,7 @@ import DataCon
 import TyCon
 import Type
 import Coercion
+import DynFlags
 import StaticFlags
 import BasicTypes
 import Util
@@ -153,31 +154,30 @@ ppr_expr add_par expr@(App {})
     }
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
-  | opt_PprCaseAsLet
-  = add_par $
-    sep [sep    [ ptext (sLit "let")
-                        <+> char '{'
-                        <+> ppr_case_pat con args
-                        <+> ptext (sLit "~")
-                        <+> ppr_bndr var
-                , ptext (sLit "<-")
-                        <+> ppr_expr id expr
-                , char '}'
-                        <+> ptext (sLit "in")
-                ]
-        , pprCoreExpr rhs
-        ]
-
-  | otherwise
-  = add_par $
-    sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
-              ifPprDebug (braces (ppr ty)),
-              sep [ptext (sLit "of") <+> ppr_bndr var,
-                   char '{' <+> ppr_case_pat con args <+> arrow]
-          ],
-         pprCoreExpr rhs,
-         char '}'
-    ]
+  = sdocWithDynFlags $ \dflags ->
+    if dopt Opt_PprCaseAsLet dflags
+    then add_par $
+         sep [sep    [ ptext (sLit "let")
+                             <+> char '{'
+                             <+> ppr_case_pat con args
+                             <+> ptext (sLit "~")
+                             <+> ppr_bndr var
+                     , ptext (sLit "<-")
+                             <+> ppr_expr id expr
+                     , char '}'
+                             <+> ptext (sLit "in")
+                     ]
+             , pprCoreExpr rhs
+             ]
+    else add_par $
+         sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
+                   ifPprDebug (braces (ppr ty)),
+                   sep [ptext (sLit "of") <+> ppr_bndr var,
+                        char '{' <+> ppr_case_pat con args <+> arrow]
+               ],
+              pprCoreExpr rhs,
+              char '}'
+         ]
   where
     ppr_bndr = pprBndr CaseBind
 
