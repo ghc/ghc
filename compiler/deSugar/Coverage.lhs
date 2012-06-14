@@ -82,7 +82,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                    (TTE
                       { fileName     = mkFastString orig_file2
                       , declPath     = []
-                      , dflags       = dflags
+                      , tte_dflags   = dflags
                       , exports      = exports
                       , inScope      = emptyVarSet
                       , blackList    = Map.fromList
@@ -867,7 +867,7 @@ data TickTransState = TT { tickBoxCount:: Int
 
 data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
-                        , dflags       :: DynFlags
+                        , tte_dflags   :: DynFlags
                         , exports      :: NameSet
                         , declPath     :: [String]
                         , inScope      :: VarSet
@@ -1018,7 +1018,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
 
         cc = mkUserCC (mkFastString cc_name) (this_mod env) pos (mkCostCentreUnique c)
 
-        count = countEntries && dopt Opt_ProfCountEntries (dflags env)
+        count = countEntries && dopt Opt_ProfCountEntries (tte_dflags env)
 
         tickish
           | opt_Hpc            = HpcTick (this_mod env) c
