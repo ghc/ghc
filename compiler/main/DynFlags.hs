@@ -611,6 +611,9 @@ data DynFlags = DynFlags {
   haddockOptions        :: Maybe String,
   ghciScripts           :: [String],
 
+  -- Output style options
+  pprUserLength         :: Int,
+
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
 
@@ -967,6 +970,7 @@ defaultDynFlags mySettings =
         log_action = defaultLogAction,
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
+        pprUserLength = 5,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
@@ -1608,6 +1612,9 @@ dynamic_flags = [
         ------- Include/Import Paths ----------------------------------------
   , Flag "I"              (Prefix    addIncludePath)
   , Flag "i"              (OptPrefix addImportPath)
+
+        ------ Output style options -----------------------------------------
+  , Flag "dppr-user-length" (intSuffix (\n d -> d{ pprUserLength = n }))
 
         ------ Debugging ----------------------------------------------------
   , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))

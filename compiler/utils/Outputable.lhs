@@ -71,7 +71,8 @@ module Outputable (
         pprDebugAndThen,
     ) where
 
-import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags, targetPlatform )
+import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags,
+                                  targetPlatform, pprUserLength )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
@@ -195,16 +196,17 @@ defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
                  |  otherwise          = PprDump
 
 -- | Style for printing error messages
-mkErrStyle :: PrintUnqualified -> PprStyle
-mkErrStyle qual = mkUserStyle qual (PartWay opt_PprUserLength)
+mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
+mkErrStyle dflags qual = mkUserStyle qual (PartWay (pprUserLength dflags))
 
-defaultErrStyle :: PprStyle
+defaultErrStyle :: DynFlags -> PprStyle
 -- Default style for error messages
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
-defaultErrStyle
-  | opt_PprStyle_Debug   = mkUserStyle alwaysQualify AllTheWay
-  | otherwise            = mkUserStyle alwaysQualify (PartWay opt_PprUserLength)
+defaultErrStyle dflags = mkUserStyle alwaysQualify depth
+    where depth = if opt_PprStyle_Debug
+                  then AllTheWay
+                  else PartWay (pprUserLength dflags)
 
 mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth

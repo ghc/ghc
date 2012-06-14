@@ -146,7 +146,8 @@ printBagOfErrors dflags bag_of_errors
 
 pprErrMsgBag :: Bag ErrMsg -> [SDoc]
 pprErrMsgBag bag
-  = [ let style = mkErrStyle unqual
+  = [ sdocWithDynFlags $ \dflags ->
+      let style = mkErrStyle dflags unqual
       in withPprStyle style (d $$ e)
     | ErrMsg { errMsgShortDoc  = d,
                errMsgExtraInfo = e,
@@ -161,13 +162,14 @@ pprLocErrMsg (ErrMsg { errMsgSpans     = spans
                      , errMsgExtraInfo = e
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
-  = withPprStyle (mkErrStyle unqual) (mkLocMessage sev s (d $$ e))
+  = sdocWithDynFlags $ \dflags ->
+    withPprStyle (mkErrStyle dflags unqual) (mkLocMessage sev s (d $$ e))
   where
     (s : _) = spans   -- Should be non-empty
 
 printMsgBag :: DynFlags -> Bag ErrMsg -> IO ()
 printMsgBag dflags bag
-  = sequence_ [ let style = mkErrStyle unqual
+  = sequence_ [ let style = mkErrStyle dflags unqual
                 in log_action dflags dflags sev s style (d $$ e)
               | ErrMsg { errMsgSpans     = s:_,
                          errMsgShortDoc  = d,
@@ -317,13 +319,15 @@ putMsgWith dflags print_unqual msg
     sty = mkUserStyle print_unqual AllTheWay
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
-errorMsg dflags msg = log_action dflags dflags SevError noSrcSpan defaultErrStyle msg
+errorMsg dflags msg =
+    log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg
 
 fatalErrorMsg' :: LogAction -> DynFlags -> MsgDoc -> IO ()
-fatalErrorMsg' la dflags msg = la dflags SevFatal noSrcSpan defaultErrStyle msg
+fatalErrorMsg' la dflags msg =
+    la dflags SevFatal noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg

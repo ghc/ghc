@@ -27,7 +27,6 @@ module StaticFlags (
 	WayName(..), Way(..), v_Ways, isRTSWay, mkBuildTag,
 
 	-- Output style options
-	opt_PprUserLength,
 	opt_PprCols,
 	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
@@ -275,9 +274,6 @@ opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")
 opt_TraceLevel :: Int
 opt_TraceLevel = lookup_def_int "-dtrace-level" 1  	-- Standard level is 1
 	       	 			    	        -- Less verbose is 0
-
-opt_PprUserLength   :: Int
-opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 opt_Fuel            :: Int
 opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound

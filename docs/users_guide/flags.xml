@@ -2712,7 +2712,7 @@
           <row>
             <entry><option>-dppr-user-length</option></entry>
             <entry>Set the depth for printing expressions in error msgs</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
