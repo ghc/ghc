@@ -202,6 +202,7 @@ typedef struct _GCStats {
   StgDouble wall_seconds;
 } GCStats;
 void getGCStats (GCStats *s);
+rtsBool getGCStatsEnabled (void);
 
 // These don't change over execution, so do them elsewhere
 //  StgDouble init_cpu_seconds;
