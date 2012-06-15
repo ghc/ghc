@@ -113,3 +113,4 @@ test('T5363',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
      compile_and_run, [''])
 
+test('profinline001', extra_ways(['prof']), compile_and_run, [''])
