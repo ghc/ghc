@@ -84,6 +84,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                       , declPath     = []
                       , tte_dflags   = dflags
                       , exports      = exports
+                      , inlines      = emptyVarSet
                       , inScope      = emptyVarSet
                       , blackList    = Map.fromList
                                           [ (getSrcSpan (tyConName tyCon),())
@@ -231,6 +232,7 @@ addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                                        abs_exports = abs_exports })) = do
   withEnv add_exports $ do
+  withEnv add_inlines $ do
   binds' <- addTickLHsBinds binds
   return $ L pos $ bind { abs_binds = binds' }
  where
@@ -245,9 +247,24 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , idName pid `elemNameSet` (exports env) ] }
 
+   add_inlines env =
+     env{ inlines = inlines env `extendVarSetList`
+                      [ mid
+                      | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
+                      , isAnyInlinePragma (idInlinePragma pid) ] }
+
+
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
+  density <- getDensity
+
+  inline_ids <- liftM inlines getEnv
+  let inline   = isAnyInlinePragma (idInlinePragma id)
+                 || id `elemVarSet` inline_ids
+
+  -- See Note [inline sccs]
+  if inline && opt_SccProfilingOn then return (L pos funBind) else do
 
   (fvs, (MatchGroup matches' ty)) <-
         getFreeVars $
@@ -255,7 +272,6 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
         addTickMatchGroup False (fun_matches funBind)
 
   blackListed <- isBlackListed pos
-  density <- getDensity
   exported_names <- liftM exports getEnv
 
   -- We don't want to generate code for blacklisted positions
@@ -264,8 +280,6 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let simple = isSimplePatBind funBind
       toplev = null decl_path
       exported = idName id `elemNameSet` exported_names
-      inline   = {- pprTrace "inline" (ppr id <+> ppr (idInlinePragma id)) $ -}
-                 isAnyInlinePragma (idInlinePragma id)
 
   tick <- if not blackListed &&
                shouldTickBind density toplev exported simple inline
@@ -320,6 +334,21 @@ bindTick density name pos fvs = do
   --
   allocATickBox box_label count_entries top_only pos fvs
 
+
+-- Note [inline sccs]
+--
+-- It should be reasonable to add ticks to INLINE functions; however
+-- currently this tickles a bug later on because the SCCfinal pass
+-- does not look inside unfoldings to find CostCentres.  It would be
+-- difficult to fix that, because SCCfinal currently works on STG and
+-- not Core (and since it also generates CostCentres for CAFs,
+-- changing this would be difficult too).
+--
+-- Another reason not to add ticks to INLINE functions is that this
+-- sometimes handy for avoiding adding a tick to a particular function
+-- (see #6131)
+--
+-- So for now we do not add any ticks to INLINE functions at all.
 
 -- -----------------------------------------------------------------------------
 -- Decorate an LHsExpr with ticks
@@ -869,6 +898,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
                         , tte_dflags   :: DynFlags
                         , exports      :: NameSet
+                        , inlines      :: VarSet
                         , declPath     :: [String]
                         , inScope      :: VarSet
                         , blackList    :: Map SrcSpan ()

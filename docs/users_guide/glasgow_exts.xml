@@ -975,14 +975,59 @@ rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\~(b,c) -> do { b &lt;- f a c
 </para>
 
 <para>
-    The <literal>mdo</literal>-notation removes the burden of placing explicit <literal>rec</literal> blocks in the code.
-    It automatically identifies minimally dependent recursive groups, treating them as if the user wrapped a
-    <literal>rec</literal> qualified around them. The definition of <emphasis>minimal</emphasis> in this context
-    is syntax oriented: Two bindings are called dependent if the latter one uses a variable defined by the former. Furthermore,
-    if a binding is dependent on another, then all the bindings that textually appear in between them are dependent on each other
-    as well.  A minimally dependent group of bindings is simply a contagious group where none of the textually following
-    bindings depend on it. (Segments in this sense are related to <emphasis>strongly-connected components</emphasis>
-    analysis, with the exception that bindings in a segment cannot be reordered and has to be contagious.)
+    The <literal>mdo</literal> notation removes the burden of placing
+    explicit <literal>rec</literal> blocks in the code.  Unlike an
+    ordinary <literal>do</literal> expression, in which variables bound by
+    statements are only in scope for later statements, variables bound in
+    an <literal>mdo</literal> expression are in scope for all statements
+    of the expression.  The compiler then automatically identifies minimal
+    mutually recursively dependent segments of statements, treating them as
+    if the user had wrapped a <literal>rec</literal> qualifier around them.
+</para>
+
+<para>
+   The definition is syntactic:
+</para>
+<itemizedlist>
+   <listitem>
+       <para>
+         A generator <replaceable>g</replaceable>
+         <emphasis>depends</emphasis> on a textually following generator
+         <replaceable>g'</replaceable>, if
+       </para>
+       <itemizedlist>
+         <listitem>
+           <para>
+             <replaceable>g'</replaceable> defines a variable that
+             is used by <replaceable>g</replaceable>, or
+           </para>
+         </listitem>
+         <listitem>
+           <para>
+           <replaceable>g'</replaceable> textually appears between
+           <replaceable>g</replaceable> and
+           <replaceable>g''</replaceable>, where <replaceable>g</replaceable>
+           depends on <replaceable>g''</replaceable>.
+           </para>
+         </listitem>
+       </itemizedlist>
+   </listitem>
+   <listitem>
+       <para>
+         A <emphasis>segment</emphasis> of a given
+         <literal>mdo</literal>-expression is a minimal sequence of generators
+         such that no generator of the sequence depends on an outside
+         generator. As a special case, although it is not a generator,
+         the final expression in an <literal>mdo</literal>-expression is
+         considered to form a segment by itself.
+       </para>
+   </listitem>
+</itemizedlist>
+<para>
+   Segments in this sense are
+   related to <emphasis>strongly-connected components</emphasis> analysis,
+   with the exception that bindings in a segment cannot be reordered and
+   must be contiguous.
 </para>
 
 <para>

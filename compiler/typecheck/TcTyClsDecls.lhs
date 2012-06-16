@@ -1177,7 +1177,7 @@ chooseBoxingStrategy arg_ty bang
 	    --                 representation of the argument type
             -- However: even when OmitInterfacePragmas is on, we still want
             -- to know if we have HsUnpackFailed, because we omit a
-            -- warning in that case (#3676)
+            -- warning in that case (#3966)
         HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
 		       	  -- Source code never has shtes
   where
