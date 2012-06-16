@@ -540,6 +540,7 @@ typedef struct _RtsSymbolVal {
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp__fstat64))    \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp__wsopen))     \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetFileAttributesA))          \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetFileInformationByHandle))  \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetFileType))                 \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetLastError))                \
