@@ -102,7 +102,6 @@ import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
 import GHC.IO           ( IO(..) )
-import GHC.Ptr          ( Ptr(..) )
 
 #if __GLASGOW_HASKELL__ >= 701
 import Foreign.Safe
