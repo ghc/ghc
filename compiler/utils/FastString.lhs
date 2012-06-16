@@ -3,10 +3,6 @@
 %
 \begin{code}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -fno-warn-unused-imports #-}
--- XXX GHC 6.9 seems to be confused by unpackCString# being used only in
---     a RULE
-
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
