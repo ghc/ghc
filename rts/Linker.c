@@ -74,7 +74,7 @@
     (   defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
         defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
         defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
-        defined(kfreebsdgnu_HOST_OS) )
+        defined(kfreebsdgnu_HOST_OS) || defined(gnu_HOST_OS))
 /* Don't use mmap on powerpc_HOST_ARCH as mmap doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
@@ -90,7 +90,7 @@
 
 #endif
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
