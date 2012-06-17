@@ -627,7 +627,7 @@ endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 WINDRES = $(INPLACE_MINGW)/bin/windres
 else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
-WINDRES = $(INPLACE_MINGW)/bin/x86_64-w64-mingw32-windres
+WINDRES = $(INPLACE_MINGW)/bin/windres
 endif
 
 #-----------------------------------------------------------------------------
@@ -637,7 +637,7 @@ HaveLibMingwEx	= @HaveLibMingwEx@
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DLLTOOL			= inplace/mingw/bin/dlltool.exe
 else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
-DLLTOOL			= inplace/mingw/bin/x86_64-w64-mingw32-dlltool.exe
+DLLTOOL			= inplace/mingw/bin/dlltool.exe
 endif
 
 #-----------------------------------------------------------------------------
@@ -771,7 +771,7 @@ endif
 REAL_SHELL     = $(SHELL)
 
 ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
-STRIP_CMD      = $(TOP)/inplace/mingw/bin/x86_64-w64-mingw32-strip.exe
+STRIP_CMD      = $(TOP)/inplace/mingw/bin/strip.exe
 else
 STRIP_CMD      = strip
 endif

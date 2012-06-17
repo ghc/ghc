@@ -25,6 +25,10 @@
 // On both GNU libc and FreeBSD, _ISOC99_SOURCE is implied by
 // _XOPEN_SOURCE==600, but on Solaris it is an error to omit it.
 #define _ISOC99_SOURCE
+// Defining __USE_MINGW_ANSI_STDIO is the most portable way to tell
+// mingw that we want to use the standard %lld style format specifiers,
+// rather than the Windows %I64d style
+#define __USE_MINGW_ANSI_STDIO 1
 #endif
 
 #if defined(darwin_HOST_OS)

@@ -363,18 +363,13 @@ AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES
     then
-        if test "$HostArch" = "x86_64"
-        then
-            mingw_bin_prefix=x86_64-w64-mingw32-
-        else
-            mingw_bin_prefix=
-        fi
-        SettingsCCompilerCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}gcc.exe"
+        mingw_bin_prefix=mingw/bin/
+        SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
-        SettingsArCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}ar.exe"
+        SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
-        SettingsDllWrapCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}dllwrap.exe"
-        SettingsWindresCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}windres.exe"
+        SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
+        SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"

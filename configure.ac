@@ -315,25 +315,24 @@ then
             PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
             AC_MSG_NOTICE([In-tree mingw tree created])
         fi
-        mingwbin="$hardtop/inplace/mingw/bin/"
     else
         # NB. If you update the tarballs to a new version of gcc, don't
         # forget to tweak the paths in driver/gcc/gcc.c.
         if ! test -d inplace/mingw ||
-             test inplace/mingw -ot ghc-tarballs/mingw64/mingw-w64-bin_*.zip
+             test inplace/mingw -ot ghc-tarballs/mingw64/*.tar.bz2
         then
             AC_MSG_NOTICE([Making in-tree mingw tree])
             rm -rf inplace/mingw
             mkdir inplace/mingw
             (
                 cd inplace/mingw &&
-                unzip ../../ghc-tarballs/mingw64/mingw-w64-bin_*.zip
+                tar -jxf ../../ghc-tarballs/mingw64/*.tar.bz2
             )
             AC_MSG_NOTICE([In-tree mingw tree created])
         fi
-        mingwbin="$hardtop/inplace/mingw/bin/x86_64-w64-mingw32-"
     fi
 
+    mingwbin="$hardtop/inplace/mingw/bin/"
     CC="${mingwbin}gcc.exe"
     LD="${mingwbin}ld.exe"
     NM="${mingwbin}nm.exe"
