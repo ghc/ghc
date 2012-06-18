@@ -49,7 +49,6 @@ import Linker
 import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
-import StaticFlags
 import Util
 
 -- Haskell Libraries
@@ -389,8 +388,9 @@ withGhcAppData right left = do
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
+  dflags <- getDynFlags
   let
-   read_dot_files = not opt_IgnoreDotGhci
+   read_dot_files = not (dopt Opt_IgnoreDotGhci dflags)
 
    current_dir = return (Just ".ghci")
 
@@ -431,7 +431,6 @@ runGHCi paths maybe_exprs = do
 
   setGHCContextFromGHCiState
 
-  dflags <- getDynFlags
   when (read_dot_files) $ do
     mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ] ++ map (return . Just ) (ghciScripts dflags)
     mcfgs <- liftIO $ mapM canonicalizePath' (catMaybes mcfgs0)

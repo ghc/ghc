@@ -489,7 +489,7 @@
           <row>
             <entry><option>-ignore-dot-ghci</option></entry>
             <entry>Disable reading of <filename>.ghci</filename> files</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

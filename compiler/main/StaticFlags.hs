@@ -76,7 +76,6 @@ module StaticFlags (
 	opt_Static,
 
 	-- misc opts
-	opt_IgnoreDotGhci,
 	opt_ErrorSpans,
 	opt_GranMacros,
 	opt_HiVersion,
@@ -194,9 +193,6 @@ unpacked_opts =
    expandAts ('@':fname) = words (unsafePerformIO (readFile fname))
    expandAts l = [l]
 -}
-
-opt_IgnoreDotGhci :: Bool
-opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 
 -- debugging options
 -- | Suppress all that is suppressable in core dumps.

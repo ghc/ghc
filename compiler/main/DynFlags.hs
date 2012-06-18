@@ -303,6 +303,7 @@ data DynFlag
    | Opt_BuildingCabalPackage
    | Opt_SSE2
    | Opt_SSE4_2
+   | Opt_IgnoreDotGhci
    | Opt_GhciSandbox
    | Opt_GhciHistory
    | Opt_HelpfulErrors
@@ -1798,6 +1799,8 @@ dynamic_flags = [
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
   , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
  ]
+ ++ map (mkFlag turnOn  ""     setDynFlag  ) negatableFlags
+ ++ map (mkFlag turnOff "no-"  unSetDynFlag) negatableFlags
  ++ map (mkFlag turnOn  "d"    setDynFlag  ) dFlags
  ++ map (mkFlag turnOff "dno-" unSetDynFlag) dFlags
  ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
@@ -1919,6 +1922,11 @@ fWarningFlags = [
   ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
   ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
   ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ) ]
+
+-- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
+negatableFlags :: [FlagSpec DynFlag]
+negatableFlags = [
+  ( "ignore-dot-ghci",                  Opt_IgnoreDotGhci, nop ) ]
 
 -- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
 dFlags :: [FlagSpec DynFlag]
