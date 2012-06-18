@@ -38,7 +38,6 @@ import DynFlags
 import UniqFM
 import UniqSupply
 import CostCentre
-import StaticFlags
 import Panic
 import Binary
 import SrcLoc

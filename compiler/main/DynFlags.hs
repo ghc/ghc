@@ -269,6 +269,7 @@ data DynFlag
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
    | Opt_RegLiveness                    -- Use the STG Reg liveness information (hidden flag)
+   | Opt_IrrefutableTuples
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -1975,6 +1976,7 @@ fFlags = [
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
   ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
   ( "regs-liveness",                    Opt_RegLiveness, nop), -- hidden flag
+  ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),

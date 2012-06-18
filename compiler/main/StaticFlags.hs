@@ -48,7 +48,6 @@ module StaticFlags (
 
 	-- language opts
 	opt_DictsStrict,
-	opt_IrrefutableTuples,
 	opt_Parallel,
 
 	-- optimisation opts
@@ -265,9 +264,6 @@ opt_Hpc				= lookUp (fsLit "-fhpc")
 -- language opts
 opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
-
-opt_IrrefutableTuples :: Bool
-opt_IrrefutableTuples		= lookUp  (fsLit "-firrefutable-tuples")
 
 opt_Parallel :: Bool
 opt_Parallel			= lookUp  (fsLit "-fparallel")

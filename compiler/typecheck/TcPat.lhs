@@ -469,6 +469,8 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
 	; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
+	; dflags <- getDynFlags
+
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
@@ -477,7 +479,7 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
                                      -- pat_ty /= pat_ty iff coi /= IdCo
               unmangled_result = TuplePat pats' boxity pat_ty'
 	      possibly_mangled_result
-	        | opt_IrrefutableTuples && 
+	        | dopt Opt_IrrefutableTuples dflags &&
                   isBoxed boxity            = LazyPat (noLoc unmangled_result)
 	        | otherwise		    = unmangled_result
 
