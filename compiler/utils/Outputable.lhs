@@ -72,7 +72,7 @@ module Outputable (
     ) where
 
 import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags,
-                                  targetPlatform, pprUserLength )
+                                  targetPlatform, pprUserLength, pprCols )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
@@ -332,7 +332,7 @@ ifPprDebug d = SDoc $ \ctx ->
 \begin{code}
 hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
 hPrintDump dflags h doc = do
-   Pretty.printDoc PageMode h
+   Pretty.printDoc PageMode (pprCols dflags) h
      (runSDoc better_doc (initSDocContext dflags defaultDumpStyle))
    hFlush h
  where
@@ -340,24 +340,24 @@ hPrintDump dflags h doc = do
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
-  = Pretty.printDoc PageMode handle
+  = Pretty.printDoc PageMode (pprCols dflags) handle
       (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
-  = Pretty.printDoc PageMode handle
+  = Pretty.printDoc PageMode (pprCols dflags) handle
       (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
-  Pretty.printDoc LeftMode handle
+  Pretty.printDoc LeftMode (pprCols dflags) handle
     (runSDoc doc (initSDocContext dflags (PprCode CStyle)))
 
 printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
 printForAsm dflags handle doc =
-  Pretty.printDoc LeftMode handle
+  Pretty.printDoc LeftMode (pprCols dflags) handle
     (runSDoc doc (initSDocContext dflags (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc

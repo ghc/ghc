@@ -27,7 +27,6 @@ module StaticFlags (
 	WayName(..), Way(..), v_Ways, isRTSWay, mkBuildTag,
 
 	-- Output style options
-	opt_PprCols,
 	opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
@@ -248,19 +247,6 @@ opt_SuppressTypeSignatures
 opt_SuppressUniques :: Bool
 opt_SuppressUniques
 	=  lookUp  (fsLit "-dsuppress-uniques")
-
--- | Set the maximum width of the dumps
---   If GHC's command line options are bad then the options parser uses the
---   pretty printer display the error message. In this case the staticFlags
---   won't be initialized yet, so we must check for this case explicitly
---   and return the default value.
-opt_PprCols :: Int
-opt_PprCols
- = unsafePerformIO
- $ do	ready <- readIORef v_opt_C_ready
-	if (not ready)
-		then return 100
-		else return $ lookup_def_int "-dppr-cols" 100
 
 
 opt_PprStyle_Debug  :: Bool

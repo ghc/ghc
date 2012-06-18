@@ -1002,13 +1002,10 @@ spaces n | n <=# _ILIT(0) = ""
 \end{code}
 
 \begin{code}
-pprCols :: Int
-pprCols = opt_PprCols
-
-printDoc :: Mode -> Handle -> Doc -> IO ()
-printDoc LeftMode hdl doc
+printDoc :: Mode -> Int -> Handle -> Doc -> IO ()
+printDoc LeftMode _ hdl doc
   = do { printLeftRender hdl doc; hFlush hdl }
-printDoc mode hdl doc
+printDoc mode pprCols hdl doc
   = do { fullRender mode pprCols 1.5 put done doc ;
          hFlush hdl }
   where

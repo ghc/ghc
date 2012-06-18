@@ -2718,7 +2718,7 @@
           <row>
             <entry><option>-dppr-colsNNN</option></entry>
             <entry>Set the width of debugging output. For example <option>-dppr-cols200</option></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

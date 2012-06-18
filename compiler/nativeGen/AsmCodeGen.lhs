@@ -259,7 +259,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
                                 $ Linear.pprStats (concat native) stats)
 
         -- write out the imports
-        Pretty.printDoc Pretty.LeftMode h
+        Pretty.printDoc Pretty.LeftMode (pprCols dflags) h
                 $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat imports)
 

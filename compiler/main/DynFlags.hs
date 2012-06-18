@@ -616,6 +616,7 @@ data DynFlags = DynFlags {
 
   -- Output style options
   pprUserLength         :: Int,
+  pprCols               :: Int,
   traceLevel            :: Int, -- Standard level is 1. Less verbose is 0.
 
   -- | what kind of {-# SCC #-} to add automatically
@@ -975,6 +976,7 @@ defaultDynFlags mySettings =
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
         pprUserLength = 5,
+        pprCols = 100,
         traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
@@ -1013,7 +1015,8 @@ defaultLogAction dflags severity srcSpan style msg
 
 defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
 defaultLogActionHPrintDoc dflags h d sty
-    = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext dflags sty))
+    = do let doc = runSDoc d (initSDocContext dflags sty)
+         Pretty.printDoc Pretty.PageMode (pprCols dflags) h doc
          hFlush h
 
 newtype FlushOut = FlushOut (IO ())
@@ -1620,6 +1623,7 @@ dynamic_flags = [
 
         ------ Output style options -----------------------------------------
   , Flag "dppr-user-length" (intSuffix (\n d -> d{ pprUserLength = n }))
+  , Flag "dppr-cols"        (intSuffix (\n d -> d{ pprCols = n }))
   , Flag "dtrace-level"     (intSuffix (\n d -> d{ traceLevel = n }))
 
         ------ Debugging ----------------------------------------------------
