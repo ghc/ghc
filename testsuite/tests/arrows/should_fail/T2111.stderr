@@ -1,7 +1,4 @@
 
-T2111.hs:1:16:
-    Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
-
 T2111.hs:6:23:
     The arrow command
       undefined -< x

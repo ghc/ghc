@@ -111,3 +111,5 @@ test('T5424',
      extra_clean(['T5424a.hi', 'T5424a.o']),
      multimod_compile,
      ['T5424', '-v0 -O0'])
+
+test('FloatEq', normal, compile, [''])

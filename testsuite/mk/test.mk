@@ -27,7 +27,7 @@ CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
 # TEST_HC_OPTS is passed to every invocation of TEST_HC 
 # in nested Makefiles
-TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-conf -rtsopts $(EXTRA_HC_OPTS)
+TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
 
 RUNTEST_OPTS =
 

@@ -110,7 +110,7 @@ Roman.foo2 :: GHC.Types.Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=False, Expandable=True,
-         Guidance=IF_ARGS [] 10 110}]
+         Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = GHC.Types.I# 6
 
 Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
@@ -119,7 +119,7 @@ Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, WorkFree=False, Expandable=True,
-         Guidance=IF_ARGS [] 10 110}]
+         Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 
 Roman.foo :: GHC.Types.Int -> GHC.Types.Int

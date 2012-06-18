@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DoRec #-}
+{-# LANGUAGE RecordWildCards, RecursiveDo #-}
 
 module TT where
 

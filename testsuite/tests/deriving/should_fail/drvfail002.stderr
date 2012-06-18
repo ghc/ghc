@@ -1,6 +1,9 @@
 
-drvfail002.hs:16:10:
-    Ambiguous constraint `X T c'
-        At least one of the forall'd type variables mentioned by the constraint
-        must be reachable from the type after the '=>'
-    In the instance declaration for `Show T'
+drvfail002.hs:19:23:
+    No instance for (X T c)
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      add an instance declaration for (X T c)
+      or use a standalone 'deriving instance' declaration,
+           so you can specify the instance context yourself
+    When deriving the instance for (Show S)

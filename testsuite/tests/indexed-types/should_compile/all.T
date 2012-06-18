@@ -188,3 +188,10 @@ test('T5955',
      extra_clean(['T5955.o', 'T5955.hi', 'T5955a.o', 'T5955a.hi']),
      run_command,
      ['$MAKE -s --no-print-directory T5955'])
+
+test('T6152',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T6152'])
+
+test('T6088', normal, compile, [''])
