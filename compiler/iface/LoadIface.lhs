@@ -34,6 +34,7 @@ import HscTypes
 import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
 
+import Constants
 import PrelNames
 import PrelInfo
 import MkId     ( seqId )
@@ -50,7 +51,6 @@ import ErrUtils
 import Finder
 import UniqFM
 import SrcLoc
-import StaticFlags
 import Outputable
 import BinIface
 import Panic
@@ -658,7 +658,7 @@ pprModIface iface
                 <+> (if mi_orphan iface then ptext (sLit "[orphan module]") else empty)
                 <+> (if mi_finsts iface then ptext (sLit "[family instance module]") else empty)
                 <+> (if mi_hpc    iface then ptext (sLit "[hpc]") else empty)
-                <+> integer opt_HiVersion
+                <+> integer hiVersion
         , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
         , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))

@@ -77,7 +77,6 @@ module StaticFlags (
 	-- misc opts
 	opt_ErrorSpans,
 	opt_GranMacros,
-	opt_HiVersion,
 	opt_HistorySize,
         opt_Unregisterised,
 	v_Ld_inputs,
@@ -282,9 +281,6 @@ opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_GranMacros :: Bool
 opt_GranMacros			= lookUp  (fsLit "-fgransim")
-
-opt_HiVersion :: Integer
-opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20

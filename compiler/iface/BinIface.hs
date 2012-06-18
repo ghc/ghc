@@ -122,7 +122,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
 
     -- Check the interface file version and ways.
     check_ver  <- get bh
-    let our_ver = show opt_HiVersion
+    let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
@@ -172,7 +172,7 @@ writeBinIface dflags hi_path mod_iface = do
         else Binary.put_ bh (0 :: Word64)
 
     -- The version and way descriptor go next
-    put_ bh (show opt_HiVersion)
+    put_ bh (show hiVersion)
     let way_descr = getWayDescr dflags
     put_  bh way_descr
 
