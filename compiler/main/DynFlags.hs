@@ -616,6 +616,7 @@ data DynFlags = DynFlags {
 
   -- Output style options
   pprUserLength         :: Int,
+  traceLevel            :: Int, -- Standard level is 1. Less verbose is 0.
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
@@ -974,6 +975,7 @@ defaultDynFlags mySettings =
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
         pprUserLength = 5,
+        traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
@@ -1618,6 +1620,7 @@ dynamic_flags = [
 
         ------ Output style options -----------------------------------------
   , Flag "dppr-user-length" (intSuffix (\n d -> d{ pprUserLength = n }))
+  , Flag "dtrace-level"     (intSuffix (\n d -> d{ traceLevel = n }))
 
         ------ Debugging ----------------------------------------------------
   , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))

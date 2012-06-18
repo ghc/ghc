@@ -34,7 +34,6 @@ import TcRnMonad
 import ErrUtils
 import Outputable
 import DynFlags
-import StaticFlags
 
 import Control.Monad
 
@@ -125,10 +124,9 @@ emitVt herald doc
 --
 traceVt :: String -> SDoc -> VM () 
 traceVt herald doc
-  | 1 <= opt_TraceLevel = liftDs $
-                            traceOptIf Opt_D_dump_vt_trace $
-                              hang (text herald) 2 doc
-  | otherwise           = return ()
+  = do dflags <- getDynFlags
+       when (1 <= traceLevel dflags) $
+           liftDs $ traceOptIf Opt_D_dump_vt_trace $ hang (text herald) 2 doc
 
 -- |Dump the given program conditionally.
 --

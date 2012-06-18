@@ -28,7 +28,7 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprCols,
-	opt_PprStyle_Debug, opt_TraceLevel,
+	opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
 	-- Suppressing boring aspects of core dumps
@@ -265,10 +265,6 @@ opt_PprCols
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")
-
-opt_TraceLevel :: Int
-opt_TraceLevel = lookup_def_int "-dtrace-level" 1  	-- Standard level is 1
-	       	 			    	        -- Less verbose is 0
 
 opt_Fuel            :: Int
 opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound

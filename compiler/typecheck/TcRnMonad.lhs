@@ -432,9 +432,9 @@ traceTc = traceTcN 1
 
 traceTcN :: Int -> String -> SDoc -> TcRn ()
 traceTcN level herald doc
-  | level <= opt_TraceLevel = traceOptTcRn Opt_D_dump_tc_trace $
-                              hang (text herald) 2 doc
-  | otherwise               = return ()
+    = do dflags <- getDynFlags
+         when (level <= traceLevel dflags) $
+             traceOptTcRn Opt_D_dump_tc_trace $ hang (text herald) 2 doc
 
 traceRn, traceSplice :: SDoc -> TcRn ()
 traceRn      = traceOptTcRn Opt_D_dump_rn_trace
