@@ -779,7 +779,7 @@ abiHash strs = do
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
 
   bh <- openBinMem (3*1024) -- just less than a block
-  put_ bh opt_HiVersion
+  put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
   mapM_ (put_ bh . mi_mod_hash) ifaces

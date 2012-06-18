@@ -36,7 +36,6 @@ import TcUnify
 import TcHsType
 import TysWiredIn
 import TcEvidence
-import StaticFlags
 import TyCon
 import DataCon
 import PrelNames
