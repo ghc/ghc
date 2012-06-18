@@ -61,7 +61,8 @@ changeBindPr anns mb_replacement b e = do
         [ReplaceWith replace_string] -> do
                 e' <- changeExpr anns (Just replace_string) e
                 return (b, e')
-        _ -> error $ "Too many change_anns on one binder:" ++ showSDoc (ppr b)
+        _ -> do dflags <- getDynFlags
+                error ("Too many change_anns on one binder:" ++ showPpr dflags b)
 
 changeExpr :: UniqFM [ReplaceWith] -> Maybe String -> CoreExpr -> CoreM CoreExpr
 changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in case e of
