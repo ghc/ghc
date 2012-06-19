@@ -83,7 +83,7 @@ executable haddock
   if !flag(in-ghc-tree)
     build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
-    base >= 4.3 && < 4.6,
+    base >= 4.3 && < 4.7,
     filepath,
     directory,
     pretty,
@@ -145,7 +145,7 @@ library
   if !flag(in-ghc-tree)
     build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
-    base >= 4.3 && < 4.6,
+    base >= 4.3 && < 4.7,
     filepath,
     directory,
     pretty,
