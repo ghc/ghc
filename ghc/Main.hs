@@ -30,6 +30,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg )
 
 -- Various other random stuff that we need
 import Config
+import Constants
 import HscTypes
 import Packages         ( dumpPackages )
 import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
