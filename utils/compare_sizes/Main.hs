@@ -27,7 +27,6 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import Numeric
-import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.FilePath

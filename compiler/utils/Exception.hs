@@ -6,12 +6,10 @@ module Exception
     )
     where
 
-import Prelude hiding (catch)
-
 import Control.Exception
 
 catchIO :: IO a -> (IOException -> IO a) -> IO a
-catchIO = catch
+catchIO = Control.Exception.catch
 
 handleIO :: (IOException -> IO a) -> IO a -> IO a
 handleIO = flip catchIO
@@ -75,7 +73,7 @@ class Monad m => ExceptionMonad m where
       return r
 
 instance ExceptionMonad IO where
-  gcatch    = catch
+  gcatch    = Control.Exception.catch
   gmask f   = mask (\x -> f x)
   gblock    = block
   gunblock  = unblock
