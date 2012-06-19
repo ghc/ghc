@@ -141,7 +141,7 @@ module Prelude (
     FilePath,
     readFile, writeFile, appendFile, readIO, readLn,
     -- ** Exception handling in the I\/O monad
-    IOError, ioError, userError, catch
+    IOError, ioError, userError,
 
   ) where
 

@@ -78,15 +78,13 @@ module System.IO.Error (
     ioError,                    -- :: IOError -> IO a
 
     catchIOError,               -- :: IO a -> (IOError -> IO a) -> IO a
-    catch,                      -- :: IO a -> (IOError -> IO a) -> IO a
     tryIOError,                 -- :: IO a -> IO (Either IOError a)
-    try,                        -- :: IO a -> IO (Either IOError a)
 
     modifyIOError,              -- :: (IOError -> IOError) -> IO a -> IO a
   ) where
 
 #ifndef __HUGS__
-import qualified Control.Exception.Base as New (catch)
+import Control.Exception.Base
 #endif
 
 #ifndef __HUGS__
@@ -140,16 +138,6 @@ tryIOError     :: IO a -> IO (Either IOError a)
 tryIOError f   =  catch (do r <- f
                             return (Right r))
                         (return . Left)
-
-#ifndef __NHC__
-{-# DEPRECATED try "Please use the new exceptions variant, Control.Exception.try" #-}
--- | The 'try' function is deprecated. Please use the new exceptions
--- variant, 'Control.Exception.try' from "Control.Exception", instead.
-try            :: IO a -> IO (Either IOError a)
-try f          =  catch (do r <- f
-                            return (Right r))
-                        (return . Left)
-#endif
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 -- -----------------------------------------------------------------------------
@@ -467,12 +455,6 @@ annotateIOError (NHC.PatternError loc) msg' _ _ =
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
 catchIOError :: IO a -> (IOError -> IO a) -> IO a
-catchIOError = New.catch
-
-{-# DEPRECATED catch "Please use the new exceptions variant, Control.Exception.catch" #-}
--- | The 'catch' function is deprecated. Please use the new exceptions
--- variant, 'Control.Exception.catch' from "Control.Exception", instead.
-catch :: IO a -> (IOError -> IO a) -> IO a
-catch = New.catch
+catchIOError = catch
 #endif /* !__HUGS__ */
 
