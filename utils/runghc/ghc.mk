@@ -15,6 +15,7 @@ utils/runghc_dist-install_USES_CABAL = YES
 utils/runghc_dist-install_PROG    = runghc$(exeext)
 utils/runghc_dist-install_SHELL_WRAPPER = YES
 utils/runghc_dist-install_INSTALL_SHELL_WRAPPER = YES
+utils/runghc_dist-install_INSTALL_SHELL_WRAPPER_NAME = runghc-$(ProjectVersion)
 utils/runghc_dist-install_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
 
 ifneq "$(BINDIST)" "YES"
@@ -35,5 +36,7 @@ else
 install_runhaskell:
 	$(call removeFiles,"$(DESTDIR)$(bindir)/runhaskell")
 	$(LN_S) runghc "$(DESTDIR)$(bindir)/runhaskell"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/runghc")
+	$(LN_S) runghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/runghc"
 endif
 

@@ -922,6 +922,11 @@ extern HsInt64 getAllocations( void )
 
 /* EZY: I'm not convinced I got all the casting right. */
 
+extern rtsBool getGCStatsEnabled( void )
+{
+    return RtsFlags.GcFlags.giveStats != NO_GC_STATS;
+}
+
 extern void getGCStats( GCStats *s )
 {
     nat total_collections = 0;
