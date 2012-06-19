@@ -31,7 +31,8 @@ import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, minusInteger#, timesInteger#,
-    quotRemInteger#, quotInteger#, remInteger#, divModInteger#,
+    quotRemInteger#, quotInteger#, remInteger#,
+    divModInteger#, divInteger#, modInteger#,
     gcdInteger#, gcdIntegerInt#, gcdInt#, divExactInteger#,
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
@@ -232,6 +233,29 @@ quotInteger (J# sa a) (S# b)
     case quotInteger# sa a sb b' of (# sq, q #) -> J# sq q }
 quotInteger (J# sa a) (J# sb b)
   = case quotInteger# sa a sb b of (# sg, g #) -> J# sg g
+
+{-# NOINLINE modInteger #-}
+modInteger :: Integer -> Integer -> Integer
+modInteger a@(S# INT_MINBOUND) b = modInteger (toBig a) b
+modInteger (S# a) (S# b) = S# (modInt# a b)
+modInteger ia@(S# _) ib@(J# _ _) = modInteger (toBig ia) ib
+modInteger (J# sa a) (S# b)
+  = case int2Integer# b of { (# sb, b' #) ->
+    case modInteger# sa a sb b' of { (# sr, r #) ->
+    S# (integer2Int# sr r) }}
+modInteger (J# sa a) (J# sb b)
+  = case modInteger# sa a sb b of (# sr, r #) -> J# sr r
+
+{-# NOINLINE divInteger #-}
+divInteger :: Integer -> Integer -> Integer
+divInteger a@(S# INT_MINBOUND) b = divInteger (toBig a) b
+divInteger (S# a) (S# b) = S# (divInt# a b)
+divInteger ia@(S# _) ib@(J# _ _) = divInteger (toBig ia) ib
+divInteger (J# sa a) (S# b)
+  = case int2Integer# b of { (# sb, b' #) ->
+    case divInteger# sa a sb b' of (# sq, q #) -> J# sq q }
+divInteger (J# sa a) (J# sb b)
+  = case divInteger# sa a sb b of (# sg, g #) -> J# sg g
 \end{code}
 
 

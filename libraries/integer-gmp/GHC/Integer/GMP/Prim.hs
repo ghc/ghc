@@ -16,6 +16,8 @@ module GHC.Integer.GMP.Prim (
     quotInteger#,
     remInteger#,
     divModInteger#,
+    divInteger#,
+    modInteger#,
     divExactInteger#,
 
     gcdInteger#,
@@ -101,6 +103,10 @@ foreign import prim "integer_cmm_remIntegerzh" remInteger#
 --
 foreign import prim "integer_cmm_divModIntegerzh" divModInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray#, Int#, ByteArray# #)
+foreign import prim "integer_cmm_divIntegerzh" divInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+foreign import prim "integer_cmm_modIntegerzh" modInteger#
+  :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
 
 -- | Divisor is guaranteed to be a factor of dividend.
 --
