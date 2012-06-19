@@ -368,6 +368,12 @@ instance  Integral Integer where
     _ `rem` 0 = divZeroError
     n `rem`  d = n `remInteger`  d
 
+    _ `div` 0 = divZeroError
+    n `div` d = n `divInteger` d
+
+    _ `mov` 0 = divZeroError
+    n `mov`  d = n `movInteger`  d
+
     _ `divMod` 0 = divZeroError
     a `divMod` b = case a `divModInteger` b of
                    (# x, y #) -> (x, y)
