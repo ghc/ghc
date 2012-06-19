@@ -84,3 +84,4 @@ newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 -- The type constructor is special in that GHC pretends that it
 -- has kind (? -> ? -> Fact) rather than (* -> * -> *)
 data (~) a b = Eq# ((~#) a b)
+

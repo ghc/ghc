@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 {-# OPTIONS_HADDOCK hide #-}
@@ -284,4 +284,28 @@ deriving instance Eq Fixity
 deriving instance Ord Arity
 deriving instance Ord Associativity
 deriving instance Ord Fixity
+
+------------------------------------------------------------------------
+-- These don't really belong here, but we don't have a better place to
+-- put them
+
+divInt# :: Int# -> Int# -> Int#
+x# `divInt#` y#
+        -- Be careful NOT to overflow if we do any additional arithmetic
+        -- on the arguments...  the following  previous version of this
+        -- code has problems with overflow:
+--    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
+--    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
+    =      if (x# ># 0#) && (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
+      else if (x# <# 0#) && (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
+      else x# `quotInt#` y#
+
+modInt# :: Int# -> Int# -> Int#
+x# `modInt#` y#
+    = if (x# ># 0#) && (y# <# 0#) ||
+         (x# <# 0#) && (y# ># 0#)
+      then if r# /=# 0# then r# +# y# else 0#
+      else r#
+    where
+    !r# = x# `remInt#` y#
 
