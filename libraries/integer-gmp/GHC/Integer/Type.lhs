@@ -22,7 +22,7 @@ import GHC.Prim (
     int2Word#, int2Double#, int2Float#, word2Int#,
     -- Operations on Int# that we use for operations on S#
     quotInt#, remInt#, negateInt#,
-    (==#), (/=#), (<=#), (>=#), (<#), (>#), (*#), (-#), (+#),
+    (==#), (/=#), (<=#), (>=#), (<#), (>#), (*#), (-#),
     mulIntMayOflo#, addIntC#, subIntC#,
     and#, or#, xor#
  )
@@ -188,21 +188,6 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
       -- NB. don't inline these.  See quotRemInteger above.
       !d = i `divInt#` j
       !m = i `modInt#` j
-
-      -- XXX Copied from GHC.Base
-      divInt# :: Int# -> Int# -> Int#
-      x# `divInt#` y#
-       =      if (x# ># 0#) && (y# <# 0#) then ((x# -# 1#) `quotInt#` y#) -# 1#
-         else if (x# <# 0#) && (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
-         else x# `quotInt#` y#
-
-      modInt# :: Int# -> Int# -> Int#
-      x# `modInt#` y#
-       = if ((x# ># 0#) && (y# <# 0#)) ||
-            ((x# <# 0#) && (y# ># 0#))
-         then if r# /=# 0# then r# +# y# else 0#
-         else r#
-          where !r# = x# `remInt#` y#
 
 divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
