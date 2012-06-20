@@ -170,7 +170,6 @@ isStaticFlag f =
     "fscc-profiling",
     "fdicts-strict",
     "fspec-inline-join-points",
-    "fgransim",
     "fno-hi-version-check",
     "dno-black-holing",
     "fno-state-hack",

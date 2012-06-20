@@ -310,6 +310,7 @@ data DynFlag
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors
    | Opt_Parallel
+   | Opt_GranMacros
 
    -- output style opts
    | Opt_PprCaseAsLet
@@ -1987,6 +1988,7 @@ fFlags = [
   ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
   ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
   ( "parallel",                         Opt_Parallel, nop ),
+  ( "gransim",                          Opt_GranMacros, nop ),
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),

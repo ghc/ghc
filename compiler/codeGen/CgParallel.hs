@@ -16,11 +16,13 @@ module CgParallel(
 
 import CgMonad
 import CgCallConv
+import DynFlags
 import Id
 import OldCmm
-import StaticFlags
 import Outputable
 import SMRep
+
+import Control.Monad
 
 staticParHdr :: [CmmLit]
 -- Parallel header words in a static closure
@@ -37,8 +39,8 @@ staticGranHdr = []
 doGranAllocate :: CmmExpr -> Code
 -- macro DO_GRAN_ALLOCATE
 doGranAllocate _hp
-  | not opt_GranMacros = nopC
-  | otherwise          = panic "doGranAllocate"
+  = do dflags <- getDynFlags
+       when (dopt Opt_GranMacros dflags) $ panic "doGranAllocate"
 
 
 
@@ -48,11 +50,11 @@ granFetchAndReschedule :: [(Id,GlobalReg)]  -- Live registers
                        -> Code
 -- Emit code for simulating a fetch and then reschedule.
 granFetchAndReschedule regs node_reqd
-  | opt_GranMacros && (node `elem` map snd regs || node_reqd)
-  = do { fetch
-       ; reschedule liveness node_reqd }
-  | otherwise
-  = nopC
+  = do dflags <- getDynFlags
+       when (dopt Opt_GranMacros dflags &&
+             (node `elem` map snd regs || node_reqd)) $
+           do fetch
+              reschedule liveness node_reqd
   where
     liveness = mkRegLiveness regs 0 0
 
@@ -87,8 +89,8 @@ granYield :: [(Id,GlobalReg)]   -- Live registers
           -> Code
 
 granYield regs node_reqd
-  | opt_GranMacros && node_reqd = yield liveness
-  | otherwise                   = nopC
+  = do dflags <- getDynFlags
+       when (dopt Opt_GranMacros dflags && node_reqd) $ yield liveness
   where
      liveness = mkRegLiveness regs 0 0
 
