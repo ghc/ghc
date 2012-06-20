@@ -499,12 +499,6 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-read-dot-ghci</option></entry>
-            <entry>Enable reading of <filename>.ghci</filename> files</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-          <row>
             <entry><option>-fbreak-on-exception</option></entry>
             <entry><link linkend="ghci-debugger-exceptions">Break on any exception thrown</link></entry>
             <entry>dynamic</entry>

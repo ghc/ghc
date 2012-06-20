@@ -3125,17 +3125,6 @@ warning settings:
       </varlistentry>
       <varlistentry>
 	<term>
-          <option>-read-dot-ghci</option>
-          <indexterm><primary><option>-read-dot-ghci</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Read <filename>./.ghci</filename> and the other
-          startup files (see above).  This is normally the
-	  default, but the <option>-read-dot-ghci</option> option may
-	  be used to override a previous
-	  <option>-ignore-dot-ghci</option> option.</para>
-	</listitem>
-	<term>
          <option>-ghci-script</option>
          <indexterm><primary><option>-ghci-script</option></primary></indexterm>
     </term>
