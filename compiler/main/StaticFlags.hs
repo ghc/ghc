@@ -48,7 +48,6 @@ module StaticFlags (
 
 	-- language opts
 	opt_DictsStrict,
-	opt_Parallel,
 
 	-- optimisation opts
 	opt_NoStateHack,
@@ -263,9 +262,6 @@ opt_Hpc				= lookUp (fsLit "-fhpc")
 -- language opts
 opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
-
-opt_Parallel :: Bool
-opt_Parallel			= lookUp  (fsLit "-fparallel")
 
 opt_SimpleListLiterals :: Bool
 opt_SimpleListLiterals	        = lookUp  (fsLit "-fsimple-list-literals")
