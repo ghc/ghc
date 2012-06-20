@@ -81,7 +81,7 @@ instance Outputable CmmStatics where
     ppr x = sdocWithPlatform $ \platform -> pprStatics platform x
 
 instance Outputable CmmStatic where
-    ppr x = sdocWithPlatform $ \platform -> pprStatic platform x
+    ppr = pprStatic
 
 instance Outputable CmmInfoTable where
     ppr = pprInfoTable
@@ -153,9 +153,9 @@ pprStatics :: Platform -> CmmStatics -> SDoc
 pprStatics platform (Statics lbl ds)
     = vcat ((pprCLabel platform lbl <> colon) : map ppr ds)
 
-pprStatic :: Platform -> CmmStatic -> SDoc
-pprStatic platform s = case s of
-    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit platform lit <> semi
+pprStatic :: CmmStatic -> SDoc
+pprStatic s = case s of
+    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 

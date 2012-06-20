@@ -39,7 +39,6 @@ module PprCmmExpr
 where
 
 import CmmExpr
-import CLabel
 
 import Outputable
 import Platform
@@ -57,7 +56,7 @@ instance Outputable CmmReg where
     ppr e = pprReg e
 
 instance Outputable CmmLit where
-    ppr l = sdocWithPlatform $ \platform -> pprLit platform l
+    ppr l = pprLit l
 
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
@@ -79,7 +78,7 @@ pprExpr platform e
                 pprExpr platform (CmmMachOp (MO_Add rep)
                            [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
                 where rep = typeWidth (cmmRegType reg)
-        CmmLit lit -> pprLit platform lit
+        CmmLit lit -> pprLit lit
         _other     -> pprExpr1 platform e
 
 -- Here's the precedence table from CmmParse.y:
@@ -137,7 +136,7 @@ infixMachOp8 _             = Nothing
 pprExpr9 :: Platform -> CmmExpr -> SDoc
 pprExpr9 platform e =
    case e of
-        CmmLit    lit       -> pprLit1 platform lit
+        CmmLit    lit       -> pprLit1 lit
         CmmLoad   expr rep  -> ppr rep <> brackets (ppr expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
@@ -186,24 +185,24 @@ infixMachOp mop
 --  To minimise line noise we adopt the convention that if the literal
 --  has the natural machine word size, we do not append the type
 --
-pprLit :: Platform -> CmmLit -> SDoc
-pprLit platform lit = case lit of
+pprLit :: CmmLit -> SDoc
+pprLit lit = case lit of
     CmmInt i rep ->
         hcat [ (if i < 0 then parens else id)(integer i)
              , ppUnless (rep == wordWidth) $
                space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
-    CmmLabel clbl      -> pprCLabel platform clbl
-    CmmLabelOff clbl i -> pprCLabel platform clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel platform clbl1 <> char '-'
-                                  <> pprCLabel platform clbl2 <> ppr_offset i
+    CmmLabel clbl      -> ppr clbl
+    CmmLabelOff clbl i -> ppr clbl <> ppr_offset i
+    CmmLabelDiffOff clbl1 clbl2 i -> ppr clbl1 <> char '-'
+                                  <> ppr clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"
 
-pprLit1 :: Platform -> CmmLit -> SDoc
-pprLit1 platform lit@(CmmLabelOff {}) = parens (pprLit platform lit)
-pprLit1 platform lit                  = pprLit platform lit
+pprLit1 :: CmmLit -> SDoc
+pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
+pprLit1 lit                  = pprLit lit
 
 ppr_offset :: Int -> SDoc
 ppr_offset i
