@@ -3,7 +3,6 @@
 
 import Control.Exception
 import Data.Int
-import Prelude hiding (catch)
 
 main :: IO ()
 main = do print ((minBound :: Int) `div` (-1))   `myCatch` print

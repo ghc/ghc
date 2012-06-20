@@ -3,7 +3,6 @@
 import System.IO.Unsafe
 import GHC.Conc
 import Control.Exception
-import Prelude hiding (catch)
 
 f :: Int
 f = (1 +) . unsafePerformIO $ do

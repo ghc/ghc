@@ -7,7 +7,6 @@ import System.Environment
 import Control.Monad
 import GHC.Conc
 import Data.IORef
-import Prelude hiding (catch)
 
 main = do
   r <- newIORef 0

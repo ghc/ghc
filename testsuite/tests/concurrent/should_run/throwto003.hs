@@ -2,7 +2,6 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import Prelude hiding (catch)
 
 main = do
   m <- newMVar 1

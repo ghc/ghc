@@ -1,6 +1,5 @@
 import Control.Exception
 import Control.Concurrent
-import Prelude hiding (catch)
 
 main = do
   m1 <- newEmptyMVar

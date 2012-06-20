@@ -1,7 +1,6 @@
 import Control.Exception
 import Control.Concurrent
 import Text.Printf
-import Prelude hiding(catch)
 
 -- Test combinations of nesting mask/uninterruptibleMask with
 -- forkIO/forkIOUnmask
