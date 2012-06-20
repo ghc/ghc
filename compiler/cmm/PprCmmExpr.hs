@@ -32,13 +32,6 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PprCmmExpr
     ( pprExpr, pprLit
     , pprExpr9 {-only to import in OldPprCmm. When it dies, remove the export -}
@@ -82,12 +75,12 @@ instance Outputable GlobalReg where
 pprExpr :: Platform -> CmmExpr -> SDoc
 pprExpr platform e
     = case e of
-        CmmRegOff reg i -> 
-		pprExpr platform (CmmMachOp (MO_Add rep)
-			   [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-		where rep = typeWidth (cmmRegType reg)
-	CmmLit lit -> pprLit platform lit
-	_other     -> pprExpr1 platform e
+        CmmRegOff reg i ->
+                pprExpr platform (CmmMachOp (MO_Add rep)
+                           [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
+                where rep = typeWidth (cmmRegType reg)
+        CmmLit lit -> pprLit platform lit
+        _other     -> pprExpr1 platform e
 
 -- Here's the precedence table from CmmParse.y:
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
@@ -149,7 +142,7 @@ pprExpr9 platform e =
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
-	CmmMachOp mop args  -> genMachOp platform mop args
+        CmmMachOp mop args  -> genMachOp platform mop args
 
 genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
 genMachOp platform mop args
@@ -167,7 +160,7 @@ genMachOp platform mop args
 
    | isJust (infixMachOp1 mop)
    || isJust (infixMachOp7 mop)
-   || isJust (infixMachOp8 mop)	 = parens (pprExpr platform (CmmMachOp mop args))
+   || isJust (infixMachOp8 mop)  = parens (pprExpr platform (CmmMachOp mop args))
 
    | otherwise = char '%' <> ppr_op <> parens (commafy (map (pprExpr platform) args))
         where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
@@ -180,7 +173,7 @@ genMachOp platform mop args
 --
 infixMachOp :: MachOp -> Maybe SDoc
 infixMachOp mop
-	= case mop of
+        = case mop of
             MO_And    _ -> Just $ char '&'
             MO_Or     _ -> Just $ char '|'
             MO_Xor    _ -> Just $ char '^'
@@ -203,7 +196,7 @@ pprLit platform lit = case lit of
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
     CmmLabel clbl      -> pprCLabel platform clbl
     CmmLabelOff clbl i -> pprCLabel platform clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel platform clbl1 <> char '-'  
+    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel platform clbl1 <> char '-'
                                   <> pprCLabel platform clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"
@@ -222,7 +215,7 @@ ppr_offset i
 -- Registers, whether local (temps) or global
 --
 pprReg :: CmmReg -> SDoc
-pprReg r 
+pprReg r
     = case r of
         CmmLocal  local  -> pprLocalReg  local
         CmmGlobal global -> pprGlobalReg global
@@ -231,17 +224,17 @@ pprReg r
 -- We only print the type of the local reg if it isn't wordRep
 --
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq rep) 
+pprLocalReg (LocalReg uniq rep)
 --   = ppr rep <> char '_' <> ppr uniq
 -- Temp Jan08
-   = char '_' <> ppr uniq <> 
-       (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08		-- sigh
+   = char '_' <> ppr uniq <>
+       (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08               -- sigh
                     then dcolon <> ptr <> ppr rep
                     else dcolon <> ptr <> ppr rep)
    where
      ptr = empty
-	 --if isGcPtrType rep
-	 --      then doubleQuotes (text "ptr")
+         --if isGcPtrType rep
+         --      then doubleQuotes (text "ptr")
          --      else empty
 
 -- Stack areas
@@ -256,7 +249,7 @@ pprAreaId (Young id) = hcat [ text "young<", ppr id, text ">" ]
 -- needs to be kept in syn with CmmExpr.hs.GlobalReg
 --
 pprGlobalReg :: GlobalReg -> SDoc
-pprGlobalReg gr 
+pprGlobalReg gr
     = case gr of
         VanillaReg n _ -> char 'R' <> int n
 -- Temp Jan08
