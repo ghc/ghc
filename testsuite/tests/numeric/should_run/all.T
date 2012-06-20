@@ -57,4 +57,5 @@ test('4383', normal, compile_and_run, [''])
 test('add2', normal, compile_and_run, ['-fobject-code'])
 test('mul2', normal, compile_and_run, ['-fobject-code'])
 test('quotRem2', normal, compile_and_run, ['-fobject-code'])
+test('T5863', normal, compile_and_run, [''])
 
