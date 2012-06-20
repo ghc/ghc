@@ -360,7 +360,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_opt_cmm "Optimised Cmm"
-                (pprCmmGroup platform [opt_cmm])
+                (pprCmmGroup [opt_cmm])
 
         -- generate native code from cmm
         let ((native, lastMinuteImports), usGen) =

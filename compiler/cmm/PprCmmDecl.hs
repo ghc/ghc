@@ -75,7 +75,7 @@ writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
-    ppr t = sdocWithPlatform $ \platform -> pprTop platform t
+    ppr t = pprTop t
 
 instance Outputable CmmStatics where
     ppr x = sdocWithPlatform $ \platform -> pprStatics platform x
@@ -90,19 +90,19 @@ instance Outputable CmmInfoTable where
 -----------------------------------------------------------------------------
 
 pprCmmGroup :: (Outputable d, Outputable info, Outputable g)
-            => Platform -> GenCmmGroup d info g -> SDoc
-pprCmmGroup platform tops
-    = vcat $ intersperse blankLine $ map (pprTop platform) tops
+            => GenCmmGroup d info g -> SDoc
+pprCmmGroup tops
+    = vcat $ intersperse blankLine $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
 pprTop :: (Outputable d, Outputable info, Outputable i)
-       => Platform -> GenCmmDecl d info i -> SDoc
+       => GenCmmDecl d info i -> SDoc
 
-pprTop platform (CmmProc info lbl graph)
+pprTop (CmmProc info lbl graph)
 
-  = vcat [ pprCLabel platform lbl <> lparen <> rparen
+  = vcat [ ppr lbl <> lparen <> rparen
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
@@ -112,7 +112,7 @@ pprTop platform (CmmProc info lbl graph)
 --
 --      section "data" { ... }
 --
-pprTop _ (CmmData section ds) =
+pprTop (CmmData section ds) =
     (hang (pprSection section <+> lbrace) 4 (ppr ds))
     $$ rbrace
 
