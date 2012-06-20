@@ -2013,10 +2013,13 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
           [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
           [ "-D__SSE4_2__=1" | sse4_2 ]
 
+    backend_defs <- getBackendDefs dflags
+
     cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs
+                    ++ map SysTools.Option backend_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option cc_opts
                     ++ map SysTools.Option sse_defs
@@ -2034,6 +2037,14 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
                        , SysTools.Option     "-o"
                        , SysTools.FileOption "" output_fn
                        ])
+
+getBackendDefs :: DynFlags -> IO [String]
+getBackendDefs dflags | hscTarget dflags == HscLlvm = do
+    llvmVer <- figureLlvmVersion dflags
+    return [ "-D__GLASGOW_HASKELL_LLVM__="++show llvmVer ]
+
+getBackendDefs _ =
+    return []
 
 hsSourceCppOpts :: [String]
 -- Default CPP defines in Haskell source
