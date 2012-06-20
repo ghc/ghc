@@ -891,11 +891,10 @@ cmmStmtConFold stmt
         CmmCondBranch test dest
            -> do test' <- cmmExprConFold DataReference test
                  dflags <- getDynFlags
-                 let platform = targetPlatform dflags
                  return $ case test' of
                    CmmLit (CmmInt 0 _) ->
                      CmmComment (mkFastString ("deleted: " ++
-                                        showSDoc dflags (pprStmt platform stmt)))
+                                        showSDoc dflags (pprStmt stmt)))
 
                    CmmLit (CmmInt _ _) -> CmmBranch dest
                    _other -> CmmCondBranch test' dest

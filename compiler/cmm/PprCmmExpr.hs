@@ -41,7 +41,6 @@ where
 import CmmExpr
 
 import Outputable
-import Platform
 import FastString
 
 import Data.Maybe
@@ -50,7 +49,7 @@ import Numeric ( fromRat )
 -----------------------------------------------------------------------------
 
 instance Outputable CmmExpr where
-    ppr e = sdocWithPlatform $ \platform -> pprExpr platform e
+    ppr e = pprExpr e
 
 instance Outputable CmmReg where
     ppr e = pprReg e
@@ -71,15 +70,15 @@ instance Outputable GlobalReg where
 -- Expressions
 --
 
-pprExpr :: Platform -> CmmExpr -> SDoc
-pprExpr platform e
+pprExpr :: CmmExpr -> SDoc
+pprExpr e
     = case e of
         CmmRegOff reg i ->
-                pprExpr platform (CmmMachOp (MO_Add rep)
+                pprExpr (CmmMachOp (MO_Add rep)
                            [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
                 where rep = typeWidth (cmmRegType reg)
         CmmLit lit -> pprLit lit
-        _other     -> pprExpr1 platform e
+        _other     -> pprExpr1 e
 
 -- Here's the precedence table from CmmParse.y:
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
@@ -95,10 +94,10 @@ pprExpr platform e
 -- a default conservative behaviour.
 
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
-pprExpr1, pprExpr7, pprExpr8 :: Platform -> CmmExpr -> SDoc
-pprExpr1 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
-   = pprExpr7 platform x <+> doc <+> pprExpr7 platform y
-pprExpr1 platform e = pprExpr7 platform e
+pprExpr1, pprExpr7, pprExpr8 :: CmmExpr -> SDoc
+pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
+   = pprExpr7 x <+> doc <+> pprExpr7 y
+pprExpr1 e = pprExpr7 e
 
 infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
@@ -113,55 +112,55 @@ infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
 
 -- %left '-' '+'
-pprExpr7 platform (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
-   = pprExpr7 platform (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
-pprExpr7 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
-   = pprExpr7 platform x <+> doc <+> pprExpr8 platform y
-pprExpr7 platform e = pprExpr8 platform e
+pprExpr7 (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
+   = pprExpr7 (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
+pprExpr7 (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
+   = pprExpr7 x <+> doc <+> pprExpr8 y
+pprExpr7 e = pprExpr8 e
 
 infixMachOp7 (MO_Add _)  = Just (char '+')
 infixMachOp7 (MO_Sub _)  = Just (char '-')
 infixMachOp7 _           = Nothing
 
 -- %left '/' '*' '%'
-pprExpr8 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp8 op
-   = pprExpr8 platform x <+> doc <+> pprExpr9 platform y
-pprExpr8 platform e = pprExpr9 platform e
+pprExpr8 (CmmMachOp op [x,y]) | Just doc <- infixMachOp8 op
+   = pprExpr8 x <+> doc <+> pprExpr9 y
+pprExpr8 e = pprExpr9 e
 
 infixMachOp8 (MO_U_Quot _) = Just (char '/')
 infixMachOp8 (MO_Mul _)    = Just (char '*')
 infixMachOp8 (MO_U_Rem _)  = Just (char '%')
 infixMachOp8 _             = Nothing
 
-pprExpr9 :: Platform -> CmmExpr -> SDoc
-pprExpr9 platform e =
+pprExpr9 :: CmmExpr -> SDoc
+pprExpr9 e =
    case e of
         CmmLit    lit       -> pprLit1 lit
         CmmLoad   expr rep  -> ppr rep <> brackets (ppr expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
-        CmmMachOp mop args  -> genMachOp platform mop args
+        CmmMachOp mop args  -> genMachOp mop args
 
-genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
-genMachOp platform mop args
+genMachOp :: MachOp -> [CmmExpr] -> SDoc
+genMachOp mop args
    | Just doc <- infixMachOp mop = case args of
         -- dyadic
-        [x,y] -> pprExpr9 platform x <+> doc <+> pprExpr9 platform y
+        [x,y] -> pprExpr9 x <+> doc <+> pprExpr9 y
 
         -- unary
-        [x]   -> doc <> pprExpr9 platform x
+        [x]   -> doc <> pprExpr9 x
 
         _     -> pprTrace "PprCmm.genMachOp: machop with strange number of args"
                           (pprMachOp mop <+>
-                            parens (hcat $ punctuate comma (map (pprExpr platform) args)))
+                            parens (hcat $ punctuate comma (map pprExpr args)))
                           empty
 
    | isJust (infixMachOp1 mop)
    || isJust (infixMachOp7 mop)
-   || isJust (infixMachOp8 mop)  = parens (pprExpr platform (CmmMachOp mop args))
+   || isJust (infixMachOp8 mop)  = parens (pprExpr (CmmMachOp mop args))
 
-   | otherwise = char '%' <> ppr_op <> parens (commafy (map (pprExpr platform) args))
+   | otherwise = char '%' <> ppr_op <> parens (commafy (map pprExpr args))
         where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
                                  (show mop))
                 -- replace spaces in (show mop) with underscores,

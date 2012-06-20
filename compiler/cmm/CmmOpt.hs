@@ -163,7 +163,7 @@ cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) 
         -- used (literal): try to inline at all the use sites
   | Just n <- lookupUFM uses u, isLit expr
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt stmt)) $
      case lookForInlineLit u expr stmts of
          (m, stmts')
              | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
@@ -174,7 +174,7 @@ cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) 
   | Just n <- lookupUFM uses u,
     e@(CmmLit _) <- wrapRecExp foldExp expr
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt stmt)) $
      case lookForInlineLit u e stmts of
          (m, stmts')
              | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
@@ -185,7 +185,7 @@ cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) 
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt stmt)) $
      cmmMiniInlineStmts dflags uses stmts'
  where
   platform = targetPlatform dflags

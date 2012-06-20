@@ -48,7 +48,6 @@ import PprCmmExpr
 import BasicTypes
 import ForeignCall
 import Outputable
-import Platform
 import FastString
 
 import Data.List
@@ -62,10 +61,10 @@ instance Outputable instr => Outputable (GenBasicBlock instr) where
     ppr = pprBBlock
 
 instance Outputable CmmStmt where
-    ppr s = sdocWithPlatform $ \platform -> pprStmt platform s
+    ppr s = pprStmt s
 
 instance Outputable CmmInfo where
-    ppr i = sdocWithPlatform $ \platform -> pprInfo platform i
+    ppr i = pprInfo i
 
 
 -- --------------------------------------------------------------------------
@@ -81,14 +80,12 @@ instance Outputable CmmSafety where
 -- For ideas on how to refine it, they used to be printed in the
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
-pprInfo :: Platform -> CmmInfo -> SDoc
-pprInfo platform (CmmInfo _gc_target update_frame info_table) =
+pprInfo :: CmmInfo -> SDoc
+pprInfo (CmmInfo _gc_target update_frame info_table) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>"))
-                      (pprUpdateFrame platform)
-                      update_frame,
+                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
           ppr info_table]
 
 -- --------------------------------------------------------------------------
@@ -101,8 +98,8 @@ pprBBlock (BasicBlock ident stmts) =
 -- --------------------------------------------------------------------------
 -- Statements. C-- usually, exceptions to this should be obvious.
 --
-pprStmt :: Platform -> CmmStmt -> SDoc
-pprStmt platform stmt = case stmt of
+pprStmt :: CmmStmt -> SDoc
+pprStmt stmt = case stmt of
 
     -- ;
     CmmNop -> semi
@@ -122,7 +119,7 @@ pprStmt platform stmt = case stmt of
     -- ToDo ppr volatile
     CmmCall (CmmCallee fn cconv) results args ret ->
         sep  [ pp_lhs <+> pp_conv
-             , nest 2 (pprExpr9 platform fn <>
+             , nest 2 (pprExpr9 fn <>
                        parens (commafy (map ppr_ar args)))
              , case ret of CmmMayReturn -> empty
                            CmmNeverReturns -> ptext $ sLit (" never returns")
@@ -140,8 +137,7 @@ pprStmt platform stmt = case stmt of
 
     -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
     CmmCall (CmmPrim op _) results args ret ->
-        pprStmt platform (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
-                                  results args ret)
+        pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv) results args ret)
         where
           -- HACK: A CallishMachOp doesn't really correspond to a ForeignLabel, but we
           --       use one to get the label printed.
@@ -151,24 +147,24 @@ pprStmt platform stmt = case stmt of
 
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch expr ident
-    CmmJump expr live        -> genJump platform expr live
-    CmmReturn                -> genReturn platform
-    CmmSwitch arg ids        -> genSwitch platform arg ids
+    CmmJump expr live        -> genJump expr live
+    CmmReturn                -> genReturn
+    CmmSwitch arg ids        -> genSwitch arg ids
 
 -- Just look like a tuple, since it was a tuple before
 -- ... is that a good idea? --Isaac Dupree
 instance (Outputable a) => Outputable (CmmHinted a) where
   ppr (CmmHinted a k) = ppr (a, k)
 
-pprUpdateFrame :: Platform -> UpdateFrame -> SDoc
-pprUpdateFrame platform (UpdateFrame expr args) =
+pprUpdateFrame :: UpdateFrame -> SDoc
+pprUpdateFrame (UpdateFrame expr args) =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
-                then pprExpr platform expr
+                then pprExpr expr
                 else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr platform expr
-                    _ -> parens (pprExpr platform expr)
+                    CmmLoad (CmmReg _) _ -> pprExpr expr
+                    _ -> parens (pprExpr expr)
          , space
          , parens  ( commafy $ map ppr args ) ]
 
@@ -198,15 +194,15 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: Platform -> CmmExpr -> Maybe [GlobalReg] -> SDoc
-genJump platform expr live =
+genJump :: CmmExpr -> Maybe [GlobalReg] -> SDoc
+genJump expr live =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
-                then pprExpr platform expr
+                then pprExpr expr
                 else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr platform expr
-                    _                    -> parens (pprExpr platform expr)
+                    CmmLoad (CmmReg _) _ -> pprExpr expr
+                    _                    -> parens (pprExpr expr)
          , semi <+> ptext (sLit "// ")
          , maybe empty ppr live]
 
@@ -215,9 +211,8 @@ genJump platform expr live =
 --
 --     return (a, b, c);
 --
-genReturn :: Platform -> SDoc
-genReturn _ =
-    hcat [ ptext (sLit "return") , semi ]
+genReturn :: SDoc
+genReturn = hcat [ ptext (sLit "return") , semi ]
 
 -- --------------------------------------------------------------------------
 -- Tabled jump to local label
@@ -226,8 +221,8 @@ genReturn _ =
 --
 --      switch [0 .. n] (expr) { case ... ; }
 --
-genSwitch :: Platform -> CmmExpr -> [Maybe BlockId] -> SDoc
-genSwitch platform expr maybe_ids
+genSwitch :: CmmExpr -> [Maybe BlockId] -> SDoc
+genSwitch expr maybe_ids
 
     = let pairs = groupBy snds (zip [0 .. ] maybe_ids )
 
@@ -235,8 +230,8 @@ genSwitch platform expr maybe_ids
                     , int (length maybe_ids - 1)
                     , ptext (sLit "] ")
                     , if isTrivialCmmExpr expr
-                        then pprExpr platform expr
-                        else parens (pprExpr platform expr)
+                        then pprExpr expr
+                        else parens (pprExpr expr)
                     , ptext (sLit " {")
                     ])
             4 (vcat ( map caseify pairs )) $$ rbrace
