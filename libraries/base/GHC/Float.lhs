@@ -636,20 +636,21 @@ formatRealFloat fmt decs x
 
 roundTo :: Int -> Int -> [Int] -> (Int,[Int])
 roundTo base d is =
-  case f d is of
+  case f d True is of
     x@(0,_) -> x
     (1,xs)  -> (1, 1:xs)
     _       -> error "roundTo: bad Value"
  where
-  b2 = base `div` 2
+  b2 = base `quot` 2
 
-  f n []     = (0, replicate n 0)
-  f 0 (x:_)  = (if x >= b2 then 1 else 0, [])
-  f n (i:xs)
+  f n _ []     = (0, replicate n 0)
+  f 0 e (x:xs) | x == b2 && e && all (== 0) xs = (0, [])   -- Round to even when at exactly half the base
+               | otherwise = (if x >= b2 then 1 else 0, [])
+  f n _ (i:xs)
      | i' == base = (1,0:ds)
      | otherwise  = (0,i':ds)
       where
-       (c,ds) = f (n-1) xs
+       (c,ds) = f (n-1) (even i) xs
        i'     = c + i
 
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
