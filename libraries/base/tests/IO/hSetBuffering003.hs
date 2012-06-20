@@ -2,6 +2,7 @@
 module Main(main) where
 
 import System.IO
+import System.IO.Error
 
 queryBuffering :: String -> Handle -> IO ()
 queryBuffering handle_nm handle = do
@@ -23,7 +24,7 @@ main = do
   hSetBuffering stdin (BlockBuffering Nothing)
   queryBuffering "stdin" stdin
   let bmo = BlockBuffering (Just (-3))
-  hSetBuffering stdin bmo `catch` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stdin " ++ showParen True (showsPrec 9 bmo) [])
+  hSetBuffering stdin bmo `catchIOError` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stdin " ++ showParen True (showsPrec 9 bmo) [])
 
   putChar '\n'
 
@@ -42,7 +43,7 @@ main = do
   queryBuffering "stdout" stdout
   hPutStr stdout "Hello stdout 5"
   let bmo = BlockBuffering (Just (-3))
-  hSetBuffering stdout bmo `catch` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stdout " ++ showParen True (showsPrec 9 bmo) [])
+  hSetBuffering stdout bmo `catchIOError` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stdout " ++ showParen True (showsPrec 9 bmo) [])
 
   putChar '\n'
 
@@ -61,7 +62,7 @@ main = do
   queryBuffering "stderr" stderr
   hPutStr stderr "Hello stderr 5"
   let bmo = BlockBuffering (Just (-3))
-  hSetBuffering stderr bmo `catch` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stderr " ++ showParen True (showsPrec 9 bmo) [])
+  hSetBuffering stderr bmo `catchIOError` \ _ -> putStrLn ("Caught illegal op: hSetBuffering stderr " ++ showParen True (showsPrec 9 bmo) [])
 
   ls  <- hGetContents stdin
   ls' <- putLine ls

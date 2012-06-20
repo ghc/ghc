@@ -5,4 +5,4 @@ import System.IO.Error
 
 main = do
   h <- openFile "hSeek004.out" AppendMode
-  try (hSeek h AbsoluteSeek 0) >>= print
+  tryIOError (hSeek h AbsoluteSeek 0) >>= print

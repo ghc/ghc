@@ -18,5 +18,5 @@ test file bufmode = do
   h <- openFile file ReadMode
   hSetEncoding h utf8
   hSetBuffering h bufmode
-  e <- try $ forever $ hGetChar h >>= putChar
+  e <- tryIOError $ forever $ hGetChar h >>= putChar
   print (e :: Either IOError ())

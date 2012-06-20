@@ -12,8 +12,6 @@ import GHC.IO.Encoding (TextEncoding, mkTextEncoding)
 import Data.Char
 import Data.Word
 
-import Prelude hiding (catch)
-
 
 decode :: TextEncoding -> [Word8] -> IO String
 decode enc xs = withArrayLen xs (\sz p -> peekCStringLen enc (castPtr p, sz)) `catch` \e -> return (show (e :: IOException))

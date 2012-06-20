@@ -4,15 +4,16 @@ module Main(main) where
 import Control.Monad
 import System.Directory ( removeFile, doesFileExist )
 import System.IO
+import System.IO.Error
 
 main = do
-  hFlush stdin `catch` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
+  hFlush stdin `catchIOError` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
   putStr "Hello,"
   hFlush stdout
   putStr "Hello - "
   hFlush stderr
   hdl <- openFile "hFlush001.hs" ReadMode
-  hFlush hdl `catch` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
+  hFlush hdl `catchIOError` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"
   hClose hdl
   remove
   hdl <- openFile "hFlush001.out" WriteMode

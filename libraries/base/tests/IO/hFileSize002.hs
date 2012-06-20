@@ -4,9 +4,10 @@ module Main(main) where
 import Control.Monad
 import System.Directory ( removeFile, doesFileExist )
 import System.IO
+import System.IO.Error
 
 main = do
-  sz <- hFileSize stdin `catch` (\ _ -> return (-1))
+  sz <- hFileSize stdin `catchIOError` (\ _ -> return (-1))
   print sz
   let fn = "hFileSize002.out"
   f <- doesFileExist fn

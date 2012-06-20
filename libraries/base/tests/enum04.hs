@@ -1,6 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 import Control.Exception
-import Prelude hiding (catch)
 
 -- enumFrom on basic numeric types should be strict
 -- (possibly a bug in the Haskell Report: it specifies that

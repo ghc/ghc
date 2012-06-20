@@ -19,5 +19,5 @@ test file enc_name = do
   h <- openFile file ReadMode
   enc <- mkTextEncoding enc_name
   hSetEncoding h enc
-  e <- try $ forever $ hGetChar h >>= putChar
+  e <- tryIOError $ forever $ hGetChar h >>= putChar
   print (e :: Either IOError ())

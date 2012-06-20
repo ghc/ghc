@@ -6,8 +6,9 @@
 -- However, we don't believe that this is the right behaviour.
 
 import System.IO
+import System.IO.Error
 
-main = catch loop (\e -> print e)
+main = catchIOError loop (\e -> print e)
 
 loop = do 
   hSetBuffering stdin LineBuffering

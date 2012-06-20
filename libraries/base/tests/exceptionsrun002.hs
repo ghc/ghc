@@ -1,9 +1,8 @@
 module Main where
 
 import qualified Control.Exception as Exception
-import System.IO.Error (mkIOError)
+import System.IO.Error (mkIOError, catchIOError)
 import Data.IORef
-import Prelude
 
 safeCatch :: IO () -> IO ()
 safeCatch f = Exception.catch f
@@ -79,7 +78,7 @@ bindCatcher = MkNamed ">>" (>>)
 
 preludeCatchCatcher :: Named Catcher
 preludeCatchCatcher = MkNamed "Prelude.catch"
- (\f cc -> Prelude.catch (f >> (return ())) (const cc))
+ (\f cc -> catchIOError (f >> (return ())) (const cc))
 
 ceCatchCatcher :: Named Catcher
 ceCatchCatcher = MkNamed "Exception.catch"

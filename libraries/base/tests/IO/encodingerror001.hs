@@ -20,7 +20,7 @@ main = do
      checkedPutStr "Hello αβγ\n" -- we should write at least the "Hello "
 
 checkedPutStr str = do
-  r <- try $ putStr str
+  r <- tryIOError $ putStr str
   case r of
     Right _ -> return ()
     Left  e -> printf "Caught %s while trying to write %s\n"
