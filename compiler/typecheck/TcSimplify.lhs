@@ -332,10 +332,10 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
        ; return (qtvs, [], False, emptyTcEvBinds) }
 
   | otherwise
-  = do { zonked_wanteds <- zonkWC wanteds
+  = do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
        ; gbl_tvs        <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
-       ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+       ; zonked_wanteds <- zonkWC wanteds
 
        ; traceTc "simplifyInfer {"  $ vcat
              [ ptext (sLit "names =") <+> ppr (map fst name_taus)
@@ -348,55 +348,42 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
              , ptext (sLit "wanted =") <+> ppr zonked_wanteds
              ]
 
-             -- Step 1
-             -- Make a guess at the quantified type variables
-	     -- Then split the constraints on the baisis of those tyvars
-	     -- to avoid unnecessarily simplifying a class constraint
-	     -- See Note [Avoid unecessary constraint simplification]
-       ; let proto_qtvs = growWanteds gbl_tvs zonked_wanteds $
-                          zonked_tau_tvs `minusVarSet` gbl_tvs
-             (perhaps_bound, surely_free)
-                        = partitionBag (quantifyMe proto_qtvs ctPred) (wc_flat zonked_wanteds)
+              -- Historical note: Before step 2 we used to have a
+              -- HORRIBLE HACK described in Note [Avoid unecessary
+              -- constraint simplification] but, as described in Trac
+              -- #4361, we have taken in out now.  That's why we start
+              -- with step 2!
 
-       ; traceTc "simplifyInfer proto"  $ vcat
-             [ ptext (sLit "zonked_tau_tvs =") <+> ppr zonked_tau_tvs
-             , ptext (sLit "proto_qtvs =") <+> ppr proto_qtvs
-             , ptext (sLit "surely_fref =") <+> ppr surely_free
-             ]
+              -- Step 2) First try full-blown solving 
 
-       ; traceTc "sinf"  $ vcat
-             [ ptext (sLit "perhaps_bound =") <+> ppr perhaps_bound
-             , ptext (sLit "surely_free   =") <+> ppr surely_free
-             ]
-             
-       ; emitFlats surely_free      
-         
-            -- Step 2 
-            -- Now simplify the possibly-bound constraints
-       ; let wanteds_to_approximate = zonked_wanteds { wc_flat = perhaps_bound }
-             
-       ; traceTc "simplifyWithApprox" $
-         ptext (sLit "wanteds_to_approximate = ") <+> ppr wanteds_to_approximate
-              -- 2.1) First try full-blown solving
+              -- NB: we must gather up all the bindings from doing
+              -- this solving; hence (runTcSWithEvBinds ev_binds_var).
+              -- And note that since there are nested implications,
+              -- calling solveWanteds will side-effect their evidence
+              -- bindings, so we can't just revert to the input
+              -- constraint.
        ; ev_binds_var <- newTcEvBinds
-       ; wanted_transformed 
-             <- runTcSWithEvBinds ev_binds_var $ solveWanteds wanteds_to_approximate
-              -- 2.2) Fail fast if there is an insoluble constraint,
+       ; wanted_transformed <- runTcSWithEvBinds ev_binds_var $ 
+                               solveWanteds zonked_wanteds
+
+              -- Step 3) Fail fast if there is an insoluble constraint,
               -- unless we are deferring errors to runtime
        ; when (not runtimeCoercionErrors && insolubleWC wanted_transformed) $ 
          do { _ev_binds <- reportUnsolved False wanted_transformed; failM }
-              -- 2.3) Candidates for quantification are an approximation of wanted_transformed
+
+              -- Step 4) Candidates for quantification are an approximation of wanted_transformed
        ; let quant_candidates = approximateWC wanted_transformed               
               -- NB: Already the fixpoint of any unifications that may have happened                                
               -- NB: We do not do any defaulting when inferring a type, this can lead
               -- to less polymorphic types, see Note [Default while Inferring]
                                 
-              -- 2.4) Minimize the quantification candidates                             
+              -- Step 5) Minimize the quantification candidates                             
        ; (quant_candidates_transformed, _extra_binds)   
              <- runTcS $ solveWanteds $ WC { wc_flat  = quant_candidates
                                            , wc_impl  = emptyBag
                                            , wc_insol = emptyBag }
-              -- 2.5) Final candidates for quantification                
+
+              -- Step 6) Final candidates for quantification                
        ; let final_quant_candidates :: Bag PredType
              final_quant_candidates = mapBag ctPred $ 
                                       keepWanted (wc_flat quant_candidates_transformed)
@@ -448,13 +435,10 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
 
        ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
 
-            -- Step 5
-            -- Minimize `bound' and emit an implication
+            -- Step 7) Emit an implication
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
-                                           
        ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
-                 
        ; let implic = Implic { ic_untch    = untch 
                              , ic_env      = lcl_env
                              , ic_skols    = qtvs_to_return
@@ -463,7 +447,6 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
                              , ic_insol    = False
                              , ic_binds    = ev_binds_var
                              , ic_loc      = gloc }
-                      
        ; emitImplication implic
          
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
@@ -555,34 +538,6 @@ approximateWC wc = float_wc emptyVarSet wc
 \end{code}
 
 \begin{code}
--- (growX gbls wanted tvs) grows a seed 'tvs' against the 
--- X-constraint 'wanted', nuking the 'gbls' at each stage
--- It's conservative in that if the seed could *possibly*
--- grow to include a type variable, then it does
-
-
-growWanteds :: TyVarSet -> WantedConstraints -> TyVarSet -> TyVarSet
-growWanteds gbl_tvs wc = fixVarSet (growWC gbl_tvs wc)
-
-
---------  Helper functions, do not do fixpoint ------------------------
-growWC :: TyVarSet -> WantedConstraints -> TyVarSet -> TyVarSet
-growWC gbl_tvs wc = growImplics gbl_tvs             (wc_impl wc) .
-                    growPreds   gbl_tvs ctPred (wc_flat wc) .
-                    growPreds   gbl_tvs ctPred (wc_insol wc)
-
-growImplics :: TyVarSet -> Bag Implication -> TyVarSet -> TyVarSet
-growImplics gbl_tvs implics tvs
-  = foldrBag grow_implic tvs implics
-  where
-    grow_implic implic tvs
-      = grow tvs `delVarSetList` ic_skols implic
-      where
-        grow = growWC gbl_tvs (ic_wanted implic) .
-               growPreds gbl_tvs evVarPred (listToBag (ic_given implic))
-               -- We must grow from givens too; see test IPRun
-
-
 growPreds :: TyVarSet -> (a -> PredType) -> Bag a -> TyVarSet -> TyVarSet
 growPreds gbl_tvs get_pred items tvs
   = foldrBag extend tvs items
@@ -603,8 +558,12 @@ quantifyMe qtvs toPred ct
 
 Note [Avoid unecessary constraint simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -------- NB NB NB (Jun 12) ------------- 
+    This note not longer applies; see the notes with Trac #4361.
+    But I'm leaving it in here so we remember the issue.)
+    ----------------------------------------
 When inferring the type of a let-binding, with simplifyInfer,
-try to avoid unnecessariliy simplifying class constraints.
+try to avoid unnecessarily simplifying class constraints.
 Doing so aids sharing, but it also helps with delicate 
 situations like
 
@@ -619,9 +578,6 @@ just notice that g isn't quantified over 't' and partition
 the contraints before simplifying.
 
 This only half-works, but then let-generalisation only half-works.
-The example that needs this is:
-
-   typecheck/should_compile/T4361.hs
 
 
 Note [Inheriting implicit parameters]
