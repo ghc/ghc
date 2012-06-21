@@ -103,12 +103,8 @@ static_flags :: [Flag IO]
 -- flags further down the list with the same prefix.
 
 static_flags = [
-        ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt)
-  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
-
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf))
+    Flag "prof"           (NoArg (addWay WayProf))
   , Flag "eventlog"       (NoArg (addWay WayEventLog))
   , Flag "parallel"       (NoArg (addWay WayPar))
   , Flag "gransim"        (NoArg (addWay WayGran))
@@ -123,9 +119,6 @@ static_flags = [
 
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"                  (PassFlag addOpt)
-  , Flag "dppr-cols"                   (AnySuffix addOpt)
-  , Flag "dppr-user-length"            (AnySuffix addOpt)
-  , Flag "dppr-case-as-let"            (PassFlag addOpt)
   , Flag "dsuppress-all"               (PassFlag addOpt)
   , Flag "dsuppress-uniques"           (PassFlag addOpt)
   , Flag "dsuppress-coercions"         (PassFlag addOpt)
@@ -135,7 +128,6 @@ static_flags = [
   , Flag "dsuppress-var-kinds"         (PassFlag addOpt)
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
   , Flag "dopt-fuel"                   (AnySuffix addOpt)
-  , Flag "dtrace-level"                (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
   , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
@@ -178,9 +170,6 @@ isStaticFlag f =
     "fscc-profiling",
     "fdicts-strict",
     "fspec-inline-join-points",
-    "firrefutable-tuples",
-    "fparallel",
-    "fgransim",
     "fno-hi-version-check",
     "dno-black-holing",
     "fno-state-hack",

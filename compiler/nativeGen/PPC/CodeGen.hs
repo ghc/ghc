@@ -353,8 +353,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
 iselExpr64 expr
-   = do dflags <- getDynFlags
-        pprPanic "iselExpr64(powerpc)" (pprExpr (targetPlatform dflags) expr)
+   = pprPanic "iselExpr64(powerpc)" (pprExpr expr)
 
 
 
@@ -570,7 +569,7 @@ getRegister' _ (CmmLit lit)
           ]
     in return (Any (cmmTypeSize rep) code)
 
-getRegister' dflags other = pprPanic "getRegister(ppc)" (pprExpr (targetPlatform dflags) other)
+getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
 
     -- extend?Rep: wrap integer expression of type rep
     -- in a conversion to II32

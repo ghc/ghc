@@ -32,13 +32,6 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PprCmmDecl
     ( writeCmms, pprCmms, pprCmmGroup, pprSection, pprStatic
     )
@@ -75,13 +68,13 @@ writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
-    ppr t = sdocWithPlatform $ \platform -> pprTop platform t
+    ppr t = pprTop t
 
 instance Outputable CmmStatics where
     ppr x = sdocWithPlatform $ \platform -> pprStatics platform x
 
 instance Outputable CmmStatic where
-    ppr x = sdocWithPlatform $ \platform -> pprStatic platform x
+    ppr = pprStatic
 
 instance Outputable CmmInfoTable where
     ppr = pprInfoTable
@@ -90,19 +83,19 @@ instance Outputable CmmInfoTable where
 -----------------------------------------------------------------------------
 
 pprCmmGroup :: (Outputable d, Outputable info, Outputable g)
-            => Platform -> GenCmmGroup d info g -> SDoc
-pprCmmGroup platform tops
-    = vcat $ intersperse blankLine $ map (pprTop platform) tops
+            => GenCmmGroup d info g -> SDoc
+pprCmmGroup tops
+    = vcat $ intersperse blankLine $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
 pprTop :: (Outputable d, Outputable info, Outputable i)
-       => Platform -> GenCmmDecl d info i -> SDoc
+       => GenCmmDecl d info i -> SDoc
 
-pprTop platform (CmmProc info lbl graph)
+pprTop (CmmProc info lbl graph)
 
-  = vcat [ pprCLabel platform lbl <> lparen <> rparen
+  = vcat [ ppr lbl <> lparen <> rparen
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
@@ -112,7 +105,7 @@ pprTop platform (CmmProc info lbl graph)
 --
 --      section "data" { ... }
 --
-pprTop _ (CmmData section ds) =
+pprTop (CmmData section ds) =
     (hang (pprSection section <+> lbrace) 4 (ppr ds))
     $$ rbrace
 
@@ -124,11 +117,11 @@ pprInfoTable CmmNonInfoTable
   = empty
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
-                           , cit_srt = _srt })  
+                           , cit_srt = _srt })
   = vcat [ ptext (sLit "label:") <+> ppr lbl
          , ptext (sLit "rep:") <> ppr rep
          , case prof_info of
-	     NoProfilingInfo -> empty
+             NoProfilingInfo -> empty
              ProfilingInfo ct cd -> vcat [ ptext (sLit "type:") <+> pprWord8String ct
                                          , ptext (sLit "desc: ") <> pprWord8String cd ] ]
 
@@ -153,9 +146,9 @@ pprStatics :: Platform -> CmmStatics -> SDoc
 pprStatics platform (Statics lbl ds)
     = vcat ((pprCLabel platform lbl <> colon) : map ppr ds)
 
-pprStatic :: Platform -> CmmStatic -> SDoc
-pprStatic platform s = case s of
-    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit platform lit <> semi
+pprStatic :: CmmStatic -> SDoc
+pprStatic s = case s of
+    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 

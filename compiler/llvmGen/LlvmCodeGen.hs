@@ -134,7 +134,7 @@ cmmLlvmGen dflags us env cmm = do
                     fixStgRegisters cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm"
-        (pprCmmGroup (targetPlatform dflags) [fixed_cmm])
+        (pprCmmGroup [fixed_cmm])
 
     -- generate llvm code from cmm
     let ((env', llvmBC), usGen) = {-# SCC "llvm_proc_gen" #-}

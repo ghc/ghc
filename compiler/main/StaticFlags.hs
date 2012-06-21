@@ -48,7 +48,6 @@ module StaticFlags (
 
 	-- language opts
 	opt_DictsStrict,
-	opt_Parallel,
 
 	-- optimisation opts
 	opt_NoStateHack,
@@ -76,7 +75,6 @@ module StaticFlags (
 
 	-- misc opts
 	opt_ErrorSpans,
-	opt_GranMacros,
 	opt_HistorySize,
         opt_Unregisterised,
 	v_Ld_inputs,
@@ -264,9 +262,6 @@ opt_Hpc				= lookUp (fsLit "-fhpc")
 opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
 
-opt_Parallel :: Bool
-opt_Parallel			= lookUp  (fsLit "-fparallel")
-
 opt_SimpleListLiterals :: Bool
 opt_SimpleListLiterals	        = lookUp  (fsLit "-fsimple-list-literals")
 
@@ -278,9 +273,6 @@ opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_MaxWorkerArgs :: Int
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
-
-opt_GranMacros :: Bool
-opt_GranMacros			= lookUp  (fsLit "-fgransim")
 
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20

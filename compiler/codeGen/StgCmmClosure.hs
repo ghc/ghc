@@ -474,8 +474,8 @@ getCallMethod :: DynFlags
 	      -> RepArity		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod _ _name _ lf_info _n_args
-  | nodeMustPointToIt lf_info && opt_Parallel
+getCallMethod dflags _name _ lf_info _n_args
+  | nodeMustPointToIt lf_info && dopt Opt_Parallel dflags
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.

@@ -197,6 +197,12 @@
 #define W_TO_INT(x) (x)
 #endif
 
+#if SIZEOF_LONG == 4 && SIZEOF_W == 8
+#define W_TO_LONG(x) %lobits32(x)
+#elif SIZEOF_LONG == SIZEOF_W
+#define W_TO_LONG(x) (x)
+#endif
+
 /* -----------------------------------------------------------------------------
    Heap/stack access, and adjusting the heap/stack pointers.
    -------------------------------------------------------------------------- */
