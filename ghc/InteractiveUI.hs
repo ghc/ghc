@@ -450,6 +450,8 @@ runGHCi paths maybe_exprs = do
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
 
+  installInteractivePrint (interactivePrint dflags) (isJust maybe_exprs)
+
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
   is_tty <- liftIO (hIsTerminalDevice stdin)
@@ -606,6 +608,18 @@ queryQueue = do
     []   -> return Nothing
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
+
+-- Reconfigurable pretty-printing Ticket #5461
+installInteractivePrint :: Maybe String -> Bool -> GHCi ()
+installInteractivePrint Nothing _  = return ()
+installInteractivePrint (Just ipFun) exprmode = do
+  ok <- trySuccess $ do
+                (name:_) <- GHC.parseName ipFun
+                dflags <- getDynFlags
+                GHC.setInteractiveDynFlags (setInteractivePrintName name dflags)
+                return Succeeded
+
+  when (failed ok && exprmode) $ liftIO (exitWith (ExitFailure 1))
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
@@ -1975,6 +1989,7 @@ newDynFlags interactive_only minus_opts = do
               packageFlags idflags1 /= packageFlags idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
       GHC.setInteractiveDynFlags idflags1
+      installInteractivePrint (interactivePrint idflags1) False
 
       dflags0 <- getDynFlags
       when (not interactive_only) $ do

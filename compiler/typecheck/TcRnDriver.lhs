@@ -1325,6 +1325,7 @@ tcUserStmt :: LStmt RdrName -> TcM (PlanResult, FixityEnv)
 tcUserStmt (L loc (ExprStmt expr _ _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
+        ; dynFlags <- getDynFlags
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
         ; let fresh_it  = itName uniq loc
@@ -1345,7 +1346,8 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                                            (HsVar bindIOName) noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+              interPrintName = maybe printName id (interactivePrintName dynFlags)
+              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 
         -- The plans are:

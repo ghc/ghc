@@ -80,6 +80,8 @@ module DynFlags (
         setPackageName,
         doingTickyProfiling,
 
+        setInteractivePrintName,        -- Name -> DynFlags -> DynFlags
+
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
@@ -109,6 +111,7 @@ module DynFlags (
 #include "HsVersions.h"
 
 import Platform
+import Name
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
@@ -626,7 +629,10 @@ data DynFlags = DynFlags {
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
 
-  llvmVersion           :: IORef (Int)
+  llvmVersion           :: IORef (Int),
+
+  interactivePrint      :: Maybe String,
+  interactivePrintName  :: Maybe Name
  }
 
 class HasDynFlags m where
@@ -983,7 +989,9 @@ defaultDynFlags mySettings =
         pprCols = 100,
         traceLevel = 1,
         profAuto = NoProfAuto,
-        llvmVersion = panic "defaultDynFlags: No llvmVersion"
+        llvmVersion = panic "defaultDynFlags: No llvmVersion",
+        interactivePrint = Nothing,
+        interactivePrintName = Nothing
       }
 
 -- Do not use tracingDynFlags!
@@ -1245,7 +1253,8 @@ setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptP,
-         addCmdlineFramework, addHaddockOpts, addGhciScript
+         addCmdlineFramework, addHaddockOpts, addGhciScript, 
+         setInteractivePrint
    :: String -> DynFlags -> DynFlags
 setOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
@@ -1318,6 +1327,11 @@ addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
 addHaddockOpts f d = d{ haddockOptions = Just f}
 
 addGhciScript f d = d{ ghciScripts = f : ghciScripts d}
+
+setInteractivePrint f d = d{ interactivePrint = Just f}
+
+setInteractivePrintName :: Name -> DynFlags -> DynFlags
+setInteractivePrintName f d = d{ interactivePrintName = Just f}
 
 -- -----------------------------------------------------------------------------
 -- Command-line options
@@ -1610,7 +1624,7 @@ dynamic_flags = [
   , Flag "haddock-opts"   (hasArg addHaddockOpts)
   , Flag "hpcdir"         (SepArg setOptHpcDir)
   , Flag "ghci-script"    (hasArg addGhciScript)
-
+  , Flag "interactive-print" (hasArg setInteractivePrint)
         ------- recompilation checker --------------------------------------
   , Flag "recomp"         (NoArg (do unSetDynFlag Opt_ForceRecomp
                                      deprecate "Use -fno-force-recomp instead"))
