@@ -6,6 +6,7 @@ The deriving code for the Generic class
 (equivalent to the code in TcGenDeriv, for other classes)
 
 \begin{code}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -14,8 +15,10 @@ The deriving code for the Generic class
 -- for details
 
 
-module TcGenGenerics (canDoGenerics, gen_Generic_binds) where
-
+module TcGenGenerics (canDoGenerics, canDoGenerics1,
+                      GenericKind(..),
+                      MetaTyCons, genGenericMetaTyCons,
+                      gen_Generic_binds, get_gen1_constrained_tys) where
 
 import DynFlags
 import HsSyn
@@ -40,10 +43,14 @@ import HscTypes
 import BuildTyCl
 import SrcLoc
 import Bag
+import VarSet (elemVarSet)
 import Outputable 
 import FastString
 import UniqSupply
 import Util
+
+import Control.Monad (mplus)
+import qualified State as S
 
 #include "HsVersions.h"
 \end{code}
@@ -62,19 +69,14 @@ For the generic representation we need to generate:
 \end{itemize}
 
 \begin{code}
-gen_Generic_binds :: TyCon -> Module
-                 -> TcM (LHsBinds RdrName, BagDerivStuff)
-gen_Generic_binds tc mod = do
-        { (metaTyCons, rep0TyInst) <- genGenericRepExtras tc mod
-        ; metaInsts                <- genDtMeta (tc, metaTyCons)
-        ; dflags <- getDynFlags
-        ; return ( mkBindsRep dflags tc
-                 ,           (DerivFamInst rep0TyInst)
-                   `consBag` ((mapBag DerivTyCon (metaTyCons2TyCons metaTyCons))
-                   `unionBags` metaInsts)) }
+gen_Generic_binds :: GenericKind -> TyCon -> MetaTyCons -> Module
+                 -> TcM (LHsBinds RdrName, FamInst)
+gen_Generic_binds gk tc metaTyCons mod = do
+  repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
+  return (mkBindsRep gk tc, repTyInsts)
 
-genGenericRepExtras :: TyCon -> Module -> TcM (MetaTyCons, FamInst)
-genGenericRepExtras tc mod =
+genGenericMetaTyCons :: TyCon -> Module -> TcM (MetaTyCons, BagDerivStuff)
+genGenericMetaTyCons tc mod =
   do  uniqS <- newUniqueSupply
       let
         -- Uniques for everyone
@@ -110,14 +112,13 @@ genGenericRepExtras tc mod =
                          | s_namesC <- s_names ]
 
           metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
-  
-      rep0_tycon <- tc_mkRepTyCon tc metaDts mod
-      
-      -- pprTrace "rep0" (ppr rep0_tycon) $
-      return (metaDts, rep0_tycon)
 
-genDtMeta :: (TyCon, MetaTyCons) -> TcM BagDerivStuff
-genDtMeta (tc,metaDts) =
+      -- pprTrace "rep0" (ppr rep0_tycon) $
+      (,) metaDts `fmap` metaTyConsToDerivStuff tc metaDts
+
+-- both the tycon declarations and related instances
+metaTyConsToDerivStuff :: TyCon -> MetaTyCons -> TcM BagDerivStuff
+metaTyConsToDerivStuff tc metaDts =
   do  loc <- getSrcSpanM
       dflags <- getDynFlags
       dClas <- tcLookupClass datatypeClassName
@@ -133,7 +134,7 @@ genDtMeta (tc,metaDts) =
 
       let
         safeOverlap = safeLanguageOn dflags
-        (dBinds,cBinds,sBinds) = mkBindsMetaD dflags fix_env tc
+        (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         
         -- Datatype
         d_metaTycon = metaD metaDts
@@ -173,7 +174,8 @@ genDtMeta (tc,metaDts) =
           ASSERT (and (zipWith (>=) (map length l1) (map length l2)))
             [ zip x1 x2 | (x1,x2) <- zip l1 l2 ]
         
-      return (listToBag (d_mkInst : c_mkInst ++ concat s_mkInst))
+      return $ mapBag DerivTyCon (metaTyCons2TyCons metaDts)
+               `unionBags` listToBag (d_mkInst : c_mkInst ++ concat s_mkInst)
 \end{code}
 
 %************************************************************************
@@ -183,25 +185,47 @@ genDtMeta (tc,metaDts) =
 %************************************************************************
 
 \begin{code}
-canDoGenerics :: TyCon -> Maybe SDoc
+get_gen1_constrained_tys :: TyVar -> [Type] -> [Type]
+-- called by TcDeriv.inferConstraints; generates a list of types, each of which
+-- must be a Functor in order for the Generic1 instance to work.
+get_gen1_constrained_tys argVar =
+  concatMap $ argTyFold argVar $ ArgTyAlg {
+    ata_rec0 = const [],
+    ata_par1 = [], ata_rec1 = const [],
+    ata_comp = (:)}
+
+
+
+canDoGenerics :: TyCon -> [Type] -> Maybe SDoc
 -- Called on source-code data types, to see if we should generate
 -- generic functions for them.
 -- Nothing == yes
 -- Just s  == no, because of `s`
 
-canDoGenerics tycon
-  =  mergeErrors (
+canDoGenerics tc tc_args
+  = mergeErrors (
           -- We do not support datatypes with context
-              (if (not (null (tyConStupidTheta tycon)))
-                then (Just (ppr tycon <+> text "must not have a datatype context"))
-                else Nothing)
-          -- We don't like type families
-            : (if (isFamilyTyCon tycon)
-                then (Just (ppr tycon <+> text "must not be a family instance"))
-                else Nothing)
+              (if (not (null (tyConStupidTheta tc)))
+                then (Just (tc_name <+> text "must not have a datatype context"))
+                else Nothing) :
+          -- The type should not be instantiated (see #5939)
+          -- Data family indices can be instantiated; the `tc_args` here are the
+          -- representation tycon args
+              (if (all isTyVarTy tc_args)
+                then Nothing
+                else Just (tc_name <+> text "must not be instantiated;" <+>
+                           text "try deriving `" <> tc_name <+> tc_tys <>
+                           text "' instead"))
           -- See comment below
-            : (map bad_con (tyConDataCons tycon)))
+            : (map bad_con (tyConDataCons tc)))
   where
+    -- The tc can be a representation tycon. When we want to display it to the
+    -- user (in an error message) we should print its parent
+    (tc_name, tc_tys) = case tyConParent tc of
+        FamInstTyCon _ ptc tys -> (ppr ptc, hsep (map ppr
+                                            (tys ++ drop (length tys) tc_args)))
+        _                      -> (ppr tc, hsep (map ppr tc_args))
+
         -- If any of the constructor has an unboxed type as argument,
         -- then we can't build the embedding-projection pair, because
         -- it relies on instantiating *polymorphic* sum and product types
@@ -215,13 +239,109 @@ canDoGenerics tycon
 	-- Nor can we do the job if it's an existential data constructor,
 	-- Nor if the args are polymorphic types (I don't think)
     bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
-    
-    mergeErrors :: [Maybe SDoc] -> Maybe SDoc
-    mergeErrors []           = Nothing
-    mergeErrors ((Just s):t) = case mergeErrors t of
-                                 Nothing -> Just s
-                                 Just s' -> Just (s <> text ", and" $$ s')
-    mergeErrors (Nothing :t) = mergeErrors t
+
+mergeErrors :: [Maybe SDoc] -> Maybe SDoc
+mergeErrors []           = Nothing
+mergeErrors ((Just s):t) = case mergeErrors t of
+  Nothing -> Just s
+  Just s' -> Just (s <> text ", and" $$ s')
+mergeErrors (Nothing :t) = mergeErrors t
+
+canDoGenerics1 :: TyCon -> [Type] -> Maybe SDoc
+-- Called on source-code data types, to see if we should generate
+-- generic functions for them.
+-- Nothing == yes
+-- Just s  == no, because of `s`
+
+-- (derived from TcDeriv.cond_functorOK; also checks canDoGenerics)
+
+-- OK for Generic1/Rep1
+-- Currently: (a) at least one argument
+--            (b) don't use argument contravariantly
+--            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
+--            (d) no "stupid context" on data type
+--            (e) not instantiated (except for data family indices)
+canDoGenerics1 tc tc_args = canDoGenerics tc tc_args
+                              `mplus` S.evalState (canDoGenerics1_w tc) []
+
+-- the state is which tycons we have entered; it avoids divergence when we
+-- recur (robust against mutual recursion)
+canDoGenerics1_w :: TyCon -> S.State [Name] (Maybe SDoc)
+canDoGenerics1_w rep_tc
+  | null tc_tvs
+  = return $ Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
+          <+> ptext (sLit "must have some type parameters"))
+
+  | not (null bad_stupid_theta)
+  = return $ Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
+          <+> ptext (sLit "must not have a class context") <+> pprTheta bad_stupid_theta)
+
+  | otherwise
+  = (mergeErrors . concat) `fmap` mapM check_con data_cons
+  where
+    tc_tvs            = tyConTyVars rep_tc
+    Just (_, last_tv) = snocView tc_tvs
+    bad_stupid_theta  = filter is_bad (tyConStupidTheta rep_tc)
+    is_bad pred       = last_tv `elemVarSet` tyVarsOfType pred
+
+    data_cons = tyConDataCons rep_tc
+    check_con con = case check_vanilla con of
+      j@(Just _) -> return [j]
+      Nothing -> mapM snd $ foldDataConArgs (ft_check con) con
+
+    bad :: DataCon -> SDoc -> SDoc
+    bad con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
+
+    check_vanilla :: DataCon -> Maybe SDoc
+    check_vanilla con | isVanillaDataCon con = Nothing
+    		      | otherwise	     = Just (bad con existential)
+
+    -- the Bool is if the parameter occurs in the type
+    ft_check :: DataCon -> FFoldType (Bool, S.State [Name] (Maybe SDoc))
+    ft_check con = FT { ft_triv = bmzero, ft_var = (True, return Nothing)
+                      , ft_co_var = (True, return $ Just $ bad con covariant)
+                        -- NB foldDataConArgs caters to Functor/Foldable/etc,
+                        -- which treat applications of functions and tuples
+                        -- specially. But we just treat them like normal
+                        -- applications, so we must compensate with extra logic
+                        -- to ensure that the variable only occurs as the last
+                        -- argument.
+	      	      , ft_fun = \x y -> if fst x then (True, return $ Just $ bad con wrong_arg)
+                                         else x `bmplus` y
+                      , ft_tup = \_ xs ->
+                          if not (null xs) && any fst (init xs)
+                          then (True, return $ Just $ bad con wrong_arg)
+                          else foldr bmplus bmzero xs
+                      , ft_ty_app = \ty x -> bmplus x $ (,) False $
+                          if fst x then representable ty else return Nothing
+                      , ft_bad_app = (True, return $ Just $ bad con wrong_arg)
+                      , ft_forall = \_ -> id }
+
+    bmzero = (False, return Nothing)
+    bmplus (b1, m1) (b2, m2) = (b1 || b2, m1 >>= maybe m2 (return . Just))
+
+    representable :: Type -> S.State [Name] (Maybe SDoc)
+    representable ty = case tcSplitTyConApp_maybe ty of
+      Nothing -> return Nothing
+      -- if it's a type constructor, it has to be representable
+      Just (tc, tc_args) -> do
+        let n = tyConName tc
+        s <- S.get
+        -- internally assume that recursive occurrences are OK
+        if n `elem` s then return Nothing else do
+          S.put (n : s)
+          fmap {-maybe-} (\_ -> bad_app tc) -- don't give the message, just name what wasn't representable
+            `fmap` {-state-} case canDoGenerics tc tc_args of
+              j@(Just _) -> return j
+              -- only check Generic1 if it passes Generic
+              Nothing -> canDoGenerics1_w tc
+
+    existential = (ptext . sLit) "must not have existential arguments"
+    covariant   = (ptext . sLit) "must not use the last type parameter in a function argument"
+    wrong_arg   = (ptext . sLit) "must use the last type parameter only as the last argument of a data type, newtype, or (->)"
+    bad_app tc  = (ptext . sLit) "must not apply type constructors that cannot be represented with `Rep1' (such as `" <> ppr (tyConName tc)
+                  <> (ptext . sLit) "') to arguments that involve the last type parameter"
+
 \end{code}
 
 %************************************************************************
@@ -234,91 +354,212 @@ canDoGenerics tycon
 type US = Int	-- Local unique supply, just a plain Int
 type Alt = (LPat RdrName, LHsExpr RdrName)
 
+-- GenericKind serves to mark if a datatype derives Generic (Gen0) or
+-- Generic1 (Gen1).
+data GenericKind = Gen0 | Gen1
+
+-- as above, but with a payload of the TyCon's name for "the" parameter
+data GenericKind_ = Gen0_ | Gen1_ TyVar
+
+-- as above, but using a single datacon's name for "the" parameter
+data GenericKind_DC = Gen0_DC | Gen1_DC TyVar
+
+forgetArgVar :: GenericKind_DC -> GenericKind
+forgetArgVar Gen0_DC   = Gen0
+forgetArgVar Gen1_DC{} = Gen1
+
+-- When working only within a single datacon, "the" parameter's name should
+-- match that datacon's name for it.
+gk2gkDC :: GenericKind_ -> DataCon -> GenericKind_DC
+gk2gkDC Gen0_   _ = Gen0_DC
+gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
+
+
+
 -- Bindings for the Generic instance
-mkBindsRep :: DynFlags -> TyCon -> LHsBinds RdrName
-mkBindsRep dflags tycon =
-    unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
+mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
+mkBindsRep gk tycon = 
+    unitBag (L loc (mkFunBind (L loc from01_RDR) from_matches))
   `unionBags`
-    unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
+    unitBag (L loc (mkFunBind (L loc to01_RDR) to_matches))
       where
         from_matches  = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
         datacons      = tyConDataCons tycon
 
+        (from01_RDR, to01_RDR) = case gk of
+                                   Gen0 -> (from_RDR,  to_RDR)
+                                   Gen1 -> (from1_RDR, to1_RDR)
+
         -- Recurse over the sum first
         from_alts, to_alts :: [Alt]
-        (from_alts, to_alts) = mkSum dflags (1 :: US) tycon datacons
+        (from_alts, to_alts) = mkSum gk_ (1 :: US) tycon datacons
+          where gk_ = case gk of
+                  Gen0 -> Gen0_
+                  Gen1 -> ASSERT (length tyvars >= 1)
+                          Gen1_ (last tyvars)
+                    where tyvars = tyConTyVars tycon
         
 --------------------------------------------------------------------------------
--- The type instance synonym and synonym
+-- The type synonym instance and synonym
 --       type instance Rep (D a b) = Rep_D a b
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepTyCon :: TyCon            -- The type to generate representation for
+tc_mkRepFamInsts ::  GenericKind     -- Gen0 or Gen1
+               -> TyCon           -- The type to generate representation for
                -> MetaTyCons      -- Metadata datatypes to refer to
                -> Module          -- Used as the location of the new RepTy
                -> TcM FamInst     -- Generated representation0 coercion
-tc_mkRepTyCon tycon metaDts mod = 
--- Consider the example input tycon `D`, where data D a b = D_ a
-  do { -- `rep0` = GHC.Generics.Rep (type family)
-       rep0 <- tcLookupTyCon repTyConName
+tc_mkRepFamInsts gk tycon metaDts mod = 
+       -- Consider the example input tycon `D`, where data D a b = D_ a
+       -- Also consider `R:DInt`, where { data family D x y :: * -> *
+       --                               ; data instance D Int a b = D_ a }
+  do { -- `rep` = GHC.Generics.Rep or GHC.Generics.Rep1 (type family)
+       rep <- case gk of
+         Gen0 -> tcLookupTyCon repTyConName
+         Gen1 -> tcLookupTyCon rep1TyConName
 
      ; let -- `tyvars` = [a,b]
-           tyvars     = tyConTyVars tycon
+           (tyvars, gk_) = case gk of
+             Gen0 -> (all_tyvars, Gen0_)
+             Gen1 -> ASSERT (not $ null all_tyvars)
+                     (init all_tyvars, Gen1_ $ last all_tyvars)
+             where all_tyvars = tyConTyVars tycon
+
            tyvar_args = mkTyVarTys tyvars
 
-           -- `appT` = D a b
-           appT = [mkTyConApp tycon tyvar_args]
+           appT = case tyConFamInst_maybe tycon of
+                     -- `appT` = D Int a b (data families case)
+                     Just (famtycon, apps) ->
+                       -- `fam` = D
+                       -- `apps` = [Int, a]
+                       let allApps = apps ++
+                                     drop (length apps + length tyvars
+                                           - tyConArity famtycon) tyvar_args
+                       in [mkTyConApp famtycon allApps]
+                     -- `appT` = D a b (normal case)
+                     Nothing -> [mkTyConApp tycon tyvar_args]
 
-       -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; rep0Ty <- tc_mkRepTy tycon tyvar_args metaDts
+       -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
+     ; repTy <- tc_mkRepTy gk_ tycon metaDts
     
        -- `rep_name` is a name we generate for the synonym
-     ; rep_name <- newGlobalBinder mod (mkGenR (nameOccName (tyConName tycon)))
-                     (nameSrcSpan (tyConName tycon))
+     ; rep_name <- let mkGen = case gk of Gen0 -> mkGenR; Gen1 -> mkGen1R
+                   in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
+                        (nameSrcSpan (tyConName tycon))
 
-     ; return $ mkSynFamInst rep_name tyvars rep0 appT rep0Ty
+     ; return $ mkSynFamInst rep_name tyvars rep appT repTy
      }
-
-
 
 --------------------------------------------------------------------------------
 -- Type representation
 --------------------------------------------------------------------------------
 
-tc_mkRepTy :: -- The type to generate representation for, and instantiating types
-               TyCon -> [Type]    
+-- | See documentation of 'argTyFold'; that function uses the fields of this
+-- type to interpret the structure of a type when that type is considered as an
+-- argument to a constructor that is being represented with 'Rep1'.
+data ArgTyAlg a = ArgTyAlg
+  { ata_rec0 :: (Type -> a)
+  , ata_par1 :: a, ata_rec1 :: (Type -> a)
+  , ata_comp :: (Type -> a -> a)
+  }
+
+-- | @argTyFold@ implements a generalised and safer variant of the @arg@
+-- function from Figure 3 in <http://dreixel.net/research/pdf/gdmh.pdf>. @arg@
+-- is conceptually equivalent to:
+--
+-- > arg t = case t of
+-- >   _ | isTyVar t         -> if (t == argVar) then Par1 else Par0 t
+-- >   App f [t'] |
+--       representable1 f &&
+--       t' == argVar        -> Rec1 f
+-- >   App f [t'] |
+--       representable1 f &&
+--       t' has tyvars       -> f :.: (arg t')
+-- >   _                     -> Rec0 t
+--
+-- where @argVar@ is the last type variable in the data type declaration we are
+-- finding the representation for.
+--
+-- @argTyFold@ is more general than @arg@ because it uses 'ArgTyAlg' to
+-- abstract out the concrete invocations of @Par0@, @Rec0@, @Par1@, @Rec1@, and
+-- @:.:@.
+--
+-- @argTyFold@ is safer than @arg@ because @arg@ would lead to a GHC panic for
+-- some data types. The problematic case is when @t@ is an application of a
+-- non-representable type @f@ to @argVar@: @App f [argVar]@ is caught by the
+-- @_@ pattern, and ends up represented as @Rec0 t@. This type occurs /free/ in
+-- the RHS of the eventual @Rep1@ instance, which is therefore ill-formed. Some
+-- representable1 checks have been relaxed, and others were moved to
+-- @canDoGenerics1@.
+argTyFold :: forall a. TyVar -> ArgTyAlg a -> Type -> a
+argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
+                            ata_par1 = mkPar1, ata_rec1 = mkRec1,
+                            ata_comp = mkComp}) =
+  -- mkRec0 is the default; use it if there is no interesting structure
+  -- (e.g. occurrences of parameters or recursive occurrences)
+  \t -> maybe (mkRec0 t) id $ go t where
+  go :: Type -> -- type to fold through
+        Maybe a -- the result (e.g. representation type), unless it's trivial
+  go t = isParam `mplus` isApp where
+
+    isParam = do -- handles parameters
+      t' <- getTyVar_maybe t
+      Just $ if t' == argVar then mkPar1 -- moreover, it is "the" parameter
+             else mkRec0 t -- NB mkRec0 instead of the conventional mkPar0
+
+    isApp = do -- handles applications
+      (phi, beta) <- tcSplitAppTy_maybe t
+
+      let interesting = argVar `elemVarSet` exactTyVarsOfType beta
+
+      -- Does it have no interesting structure to represent?
+      if not interesting then Nothing
+        else -- Is the argument the parameter? Special case for mkRec1.
+          if Just argVar == getTyVar_maybe beta then Just $ mkRec1 phi
+            else mkComp phi `fmap` go beta -- It must be a composition.
+
+
+tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
+               GenericKind_
+              -- The type to generate representation for
+            -> TyCon
                -- Metadata datatypes to refer to
             -> MetaTyCons 
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy tycon ty_args metaDts = 
+tc_mkRepTy gk_ tycon metaDts = 
   do
     d1    <- tcLookupTyCon d1TyConName
     c1    <- tcLookupTyCon c1TyConName
     s1    <- tcLookupTyCon s1TyConName
     nS1   <- tcLookupTyCon noSelTyConName
     rec0  <- tcLookupTyCon rec0TyConName
-    par0  <- tcLookupTyCon par0TyConName
+    rec1  <- tcLookupTyCon rec1TyConName
+    par1  <- tcLookupTyCon par1TyConName
     u1    <- tcLookupTyCon u1TyConName
     v1    <- tcLookupTyCon v1TyConName
     plus  <- tcLookupTyCon sumTyConName
     times <- tcLookupTyCon prodTyConName
+    comp  <- tcLookupTyCon compTyConName
     
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
+        mkComp a b = mkTyConApp comp  [a,b]
         mkRec0 a   = mkTyConApp rec0  [a]
-        mkPar0 a   = mkTyConApp par0  [a]
+        mkRec1 a   = mkTyConApp rec1  [a]
+        mkPar1     = mkTyConTy  par1
         mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
-        mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a ty_args) 
+        mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a $ mkTyVarTys $ tyConTyVars tycon)
                                                  (null (dataConFieldLabels a))]
         -- This field has no label
         mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
         -- This field has a  label
         mkS False d a = mkTyConApp s1 [d, a]
         
+        -- Sums and products are done in the same way for both Rep and Rep1
         sumP [] = mkTyConTy v1
         sumP l  = ASSERT (length metaCTyCons == length l)
                     foldBal mkSum' [ mkC i d a
@@ -334,12 +575,21 @@ tc_mkRepTy tycon ty_args metaDts =
                                          | (d,t) <- zip (metaSTyCons !! i) l ]
         
         arg :: Type -> Type -> Bool -> Type
-        arg d t b = mkS b d (recOrPar t (getTyVar_maybe t))
-        -- Argument is not a type variable, use Rec0
-        recOrPar t Nothing  = mkRec0 t
-        -- Argument is a type variable, use Par0
-        recOrPar t (Just _) = mkPar0 t
+        arg d t b = mkS b d $ case gk_ of 
+            -- Here we previously used Par0 if t was a type variable, but we
+            -- realized that we can't always guarantee that we are wrapping-up
+            -- all type variables in Par0. So we decided to stop using Par0
+            -- altogether, and use Rec0 all the time.
+                      Gen0_        -> mkRec0 t
+                      Gen1_ argVar -> argPar argVar t
+          where
+            -- Builds argument represention for Rep1 (more complicated due to
+            -- the presence of composition).
+            argPar argVar = argTyFold argVar $ ArgTyAlg
+              {ata_rec0 = mkRec0, ata_par1 = mkPar1,
+               ata_rec1 = mkRec1, ata_comp = mkComp}
         
+       
         metaDTyCon  = mkTyConTy (metaD metaDts)
         metaCTyCons = map mkTyConTy (metaC metaDts)
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
@@ -365,11 +615,11 @@ metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
-mkBindsMetaD :: DynFlags -> FixityEnv -> TyCon 
+mkBindsMetaD :: FixityEnv -> TyCon 
              -> ( LHsBinds RdrName      -- Datatype instance
                 , [LHsBinds RdrName]    -- Constructor instances
                 , [[LHsBinds RdrName]]) -- Selector instances
-mkBindsMetaD dflags fix_env tycon = (dtBinds, allConBinds, allSelBinds)
+mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
       where
         mkBag l = foldr1 unionBags 
                     [ unitBag (L loc (mkFunBind (L loc name) matches)) 
@@ -401,24 +651,28 @@ mkBindsMetaD dflags fix_env tycon = (dtBinds, allConBinds, allSelBinds)
         datacons      = tyConDataCons tycon
         datasels      = map dataConFieldLabels datacons
 
-        dtName_matches     = mkStringLHS . showPpr dflags . nameOccName . tyConName 
-                           $ tycon
+        tyConName_user = case tyConFamInst_maybe tycon of
+                           Just (ptycon, _) -> tyConName ptycon
+                           Nothing          -> tyConName tycon
+
+        dtName_matches     = mkStringLHS . occNameString . nameOccName
+                           $ tyConName_user
         moduleName_matches = mkStringLHS . moduleNameString . moduleName 
                            . nameModule . tyConName $ tycon
 
-        conName_matches     c = mkStringLHS . showPpr dflags . nameOccName
+        conName_matches     c = mkStringLHS . occNameString . nameOccName
                               . dataConName $ c
         conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
         conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 
-        selName_matches     s = mkStringLHS (showPpr dflags (nameOccName s))
+        selName_matches     s = mkStringLHS (occNameString (nameOccName s))
 
 
 --------------------------------------------------------------------------------
 -- Dealing with sums
 --------------------------------------------------------------------------------
 
-mkSum :: DynFlags
+mkSum :: GenericKind_ -- Generic or Generic1?
       -> US          -- Base for generating unique names
       -> TyCon       -- The type constructor
       -> [DataCon]   -- The data constructors
@@ -426,42 +680,62 @@ mkSum :: DynFlags
           [Alt])     -- Alternatives for the Trep->T "to" function
 
 -- Datatype without any constructors
-mkSum dflags _us tycon [] = ([from_alt], [to_alt])
+mkSum _ _ tycon [] = ([from_alt], [to_alt])
   where
     from_alt = (nlWildPat, mkM1_E (makeError errMsgFrom))
     to_alt   = (mkM1_P nlWildPat, makeError errMsgTo)
                -- These M1s are meta-information for the datatype
     makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
-    errMsgFrom = "No generic representation for empty datatype " ++ showPpr dflags tycon
-    errMsgTo = "No values for empty datatype " ++ showPpr dflags tycon
+    tyConStr   = occNameString (nameOccName (tyConName tycon))
+    errMsgFrom = "No generic representation for empty datatype " ++ tyConStr
+    errMsgTo   = "No values for empty datatype " ++ tyConStr
 
 -- Datatype with at least one constructor
-mkSum _ us _tycon datacons =
-  unzip [ mk1Sum us i (length datacons) d | (d,i) <- zip datacons [1..] ]
+mkSum gk_ us _ datacons =
+  -- switch the payload of gk_ to be datacon-centric instead of tycon-centric
+ unzip [ mk1Sum (gk2gkDC gk_ d) us i (length datacons) d
+           | (d,i) <- zip datacons [1..] ]
 
 -- Build the sum for a particular constructor
-mk1Sum :: US        -- Base for generating unique names
+mk1Sum :: GenericKind_DC -- Generic or Generic1?
+       -> US        -- Base for generating unique names
        -> Int       -- The index of this constructor
        -> Int       -- Total number of constructors
        -> DataCon   -- The data constructor
        -> (Alt,     -- Alternative for the T->Trep "from" function
            Alt)     -- Alternative for the Trep->T "to" function
-mk1Sum us i n datacon = (from_alt, to_alt)
+mk1Sum gk_ us i n datacon = (from_alt, to_alt)
   where
-    n_args = dataConSourceArity datacon	-- Existentials already excluded
+    gk = forgetArgVar gk_
 
-    datacon_vars = map mkGenericLocal [us .. us+n_args-1]
+    -- Existentials already excluded
+    argTys = dataConOrigArgTys datacon
+    n_args = dataConSourceArity datacon
+
+    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) argTys
+    datacon_vars = map fst datacon_varTys
     us'          = us + n_args
 
     datacon_rdr  = getRdrName datacon
-    app_exp      = nlHsVarApps datacon_rdr datacon_vars
     
     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
-    from_alt_rhs = mkM1_E (genLR_E i n (mkProd_E us' datacon_vars))
+    from_alt_rhs = mkM1_E (genLR_E i n (mkProd_E gk_ us' datacon_varTys))
     
-    to_alt     = (mkM1_P (genLR_P i n (mkProd_P us' datacon_vars)), to_alt_rhs)
+    to_alt     = (mkM1_P (genLR_P i n (mkProd_P gk us' datacon_vars)), to_alt_rhs)
                  -- These M1s are meta-information for the datatype
-    to_alt_rhs = app_exp
+    to_alt_rhs = case gk_ of
+      Gen0_DC        -> nlHsVarApps datacon_rdr datacon_vars
+      Gen1_DC argVar -> nlHsApps datacon_rdr $ map argTo datacon_varTys
+        where
+          argTo (var, ty) = converter ty `nlHsApp` nlHsVar var where
+            converter = argTyFold argVar $ ArgTyAlg
+              {ata_rec0 = const $ nlHsVar unK1_RDR,
+               ata_par1 = nlHsVar unPar1_RDR,
+               ata_rec1 = const $ nlHsVar unRec1_RDR,
+               ata_comp = \_ cnv -> (nlHsVar fmap_RDR `nlHsApp` cnv)
+                                    `nlHsCompose` nlHsVar unComp1_RDR}
+
+
 
 -- Generates the L1/R1 sum pattern
 genLR_P :: Int -> Int -> LPat RdrName -> LPat RdrName
@@ -486,34 +760,47 @@ genLR_E i n e
 --------------------------------------------------------------------------------
 
 -- Build a product expression
-mkProd_E :: US	            -- Base for unique names
-	 -> [RdrName]       -- List of variables matched on the lhs
+mkProd_E :: GenericKind_DC      -- Generic or Generic1?
+         -> US	            -- Base for unique names
+         -> [(RdrName, Type)] -- List of variables matched on the lhs and their types
 	 -> LHsExpr RdrName -- Resulting product expression
-mkProd_E _ []   = mkM1_E (nlHsVar u1DataCon_RDR)
-mkProd_E _ vars = mkM1_E (foldBal prod appVars)
-                   -- These M1s are meta-information for the constructor
+mkProd_E _   _ []     = mkM1_E (nlHsVar u1DataCon_RDR)
+mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
+                     -- These M1s are meta-information for the constructor
   where
-    appVars = map wrapArg_E vars
+    appVars = map (wrapArg_E gk_) varTys
     prod a b = prodDataCon_RDR `nlHsApps` [a,b]
 
-wrapArg_E :: RdrName -> LHsExpr RdrName
-wrapArg_E v = mkM1_E (k1DataCon_RDR `nlHsVarApps` [v])
-              -- This M1 is meta-information for the selector
+wrapArg_E :: GenericKind_DC -> (RdrName, Type) -> LHsExpr RdrName
+wrapArg_E Gen0_DC          (var, _)  = mkM1_E (k1DataCon_RDR `nlHsVarApps` [var])
+                         -- This M1 is meta-information for the selector
+wrapArg_E (Gen1_DC argVar) (var, ty) = mkM1_E $ converter ty `nlHsApp` nlHsVar var
+                         -- This M1 is meta-information for the selector
+  where converter = argTyFold argVar $ ArgTyAlg
+          {ata_rec0 = const $ nlHsVar k1DataCon_RDR,
+           ata_par1 = nlHsVar par1DataCon_RDR,
+           ata_rec1 = const $ nlHsVar rec1DataCon_RDR,
+           ata_comp = \_ cnv -> nlHsVar comp1DataCon_RDR `nlHsCompose`
+                                  (nlHsVar fmap_RDR `nlHsApp` cnv)}
+
+
 
 -- Build a product pattern
-mkProd_P :: US		        -- Base for unique names
+mkProd_P :: GenericKind   -- Gen0 or Gen1
+         -> US		        -- Base for unique names
 	       -> [RdrName]     -- List of variables to match
 	       -> LPat RdrName  -- Resulting product pattern
-mkProd_P _ []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
-mkProd_P _ vars = mkM1_P (foldBal prod appVars)
-                   -- These M1s are meta-information for the constructor
+mkProd_P _  _ []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
+mkProd_P gk _ vars = mkM1_P (foldBal prod appVars)
+                     -- These M1s are meta-information for the constructor
   where
-    appVars = map wrapArg_P vars
+    appVars = map (wrapArg_P gk) vars
     prod a b = prodDataCon_RDR `nlConPat` [a,b]
-    
-wrapArg_P :: RdrName -> LPat RdrName
-wrapArg_P v = mkM1_P (k1DataCon_RDR `nlConVarPat` [v])
-              -- This M1 is meta-information for the selector
+
+wrapArg_P :: GenericKind -> RdrName -> LPat RdrName
+wrapArg_P Gen0 v = mkM1_P (k1DataCon_RDR `nlConVarPat` [v])
+                   -- This M1 is meta-information for the selector
+wrapArg_P Gen1 v = m1DataCon_RDR `nlConVarPat` [v]
 
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
@@ -523,6 +810,9 @@ mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 
 mkM1_P :: LPat RdrName -> LPat RdrName
 mkM1_P p = m1DataCon_RDR `nlConPat` [p]
+
+nlHsCompose :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
+nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 -- | Variant of foldr1 for producing balanced lists
 foldBal :: (a -> a -> a) -> [a] -> a

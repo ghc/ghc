@@ -63,7 +63,7 @@ module OccName (
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGenRCo, mkGenC, mkGenS,
+ 	mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
@@ -575,7 +575,7 @@ isDerivedOccName occ =
 mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
   	mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
  	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGenRCo,
+ 	mkGenD, mkGenR, mkGen1R, mkGenRCo,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
@@ -618,6 +618,7 @@ mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
                    (occNameString occ)
 
 mkGenR   = mk_simple_deriv tcName "Rep_"
+mkGen1R  = mk_simple_deriv tcName "Rep1_"
 mkGenRCo = mk_simple_deriv tcName "CoRep_"
 
 -- data T = MkT ... deriving( Data ) needs defintions for 
