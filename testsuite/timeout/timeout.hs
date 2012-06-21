@@ -1,8 +1,6 @@
 {-# OPTIONS -cpp #-}
 module Main where
 
-import Prelude hiding (catch)
-
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
 import Control.Monad
