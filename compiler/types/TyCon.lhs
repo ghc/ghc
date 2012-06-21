@@ -156,8 +156,6 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 
 * Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
 
-* Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
-
 * The user does not see any "equivalent types" as he did with type
   synonym families.  He just sees constructors with types
         T1 :: T Int
