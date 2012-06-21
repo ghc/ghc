@@ -25,8 +25,6 @@ import GHC.Magic ()
 import GHC.Prim
 import GHC.Tuple
 import GHC.Types
--- For defining instances for the generic deriving mechanism
-import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 
 
 infix  4  ==, /=, <, <=, >=, >
@@ -272,20 +270,6 @@ not False               =  True
 
 
 ------------------------------------------------------------------------
--- Generic deriving
-------------------------------------------------------------------------
-
--- We need instances for some basic datatypes, but some of those use Int,
--- so we have to put the instances here
-deriving instance Eq Arity
-deriving instance Eq Associativity
-deriving instance Eq Fixity
-
-deriving instance Ord Arity
-deriving instance Ord Associativity
-deriving instance Ord Fixity
-
-------------------------------------------------------------------------
 -- These don't really belong here, but we don't have a better place to
 -- put them
 
@@ -308,4 +292,3 @@ x# `modInt#` y#
       else r#
     where
     !r# = x# `remInt#` y#
-
