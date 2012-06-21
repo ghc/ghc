@@ -17,7 +17,8 @@ upLinSolvRing :: LinSolvRing a => a -> ()
 upLinSolvRing = undefined
 
 moduloBasisx :: (LinSolvRing (Pol a), CommutativeRing a) => Pol a -> ()
-moduloBasisx p = let x = upLinSolvRing p
+moduloBasisx p = let x :: ()
+                     x = upLinSolvRing p
                  in ()
 
   -- This is very delicate!  The contraint (LinSolvRing (Pol a))
