@@ -73,8 +73,6 @@ import GHC.Show
 import GHC.Base
 import GHC.Err
 import GHC.Arr
--- For defining instances for the generic deriving mechanism
-import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 \end{code}
 
 
@@ -689,12 +687,4 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
 
 readp :: Read a => ReadP a
 readp = readPrec_to_P readPrec minPrec
-\end{code}
-
-Instances for types of the generic deriving mechanism.
-
-\begin{code}
-deriving instance Read Arity
-deriving instance Read Associativity
-deriving instance Read Fixity
 \end{code}

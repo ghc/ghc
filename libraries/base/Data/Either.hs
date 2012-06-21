@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -35,7 +35,6 @@ import GHC.Read
 #endif
 
 import Data.Typeable
-import GHC.Generics (Generic)
 
 #ifdef __GLASGOW_HASKELL__
 {-
@@ -54,7 +53,7 @@ used to hold an error value and the 'Right' constructor is used to
 hold a correct value (mnemonic: \"right\" also means \"correct\").
 -}
 data  Either a b  =  Left a | Right b
-  deriving (Eq, Ord, Read, Show, Generic)
+  deriving (Eq, Ord, Read, Show)
 
 instance Functor (Either a) where
     fmap _ (Left x) = Left x

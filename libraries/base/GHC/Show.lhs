@@ -55,8 +55,6 @@ import GHC.Base
 import GHC.Num
 import Data.Maybe
 import GHC.List ((!!), foldr1, break)
--- For defining instances for the generic deriving mechanism
-import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 \end{code}
 
 
@@ -455,14 +453,6 @@ itos n# cs
                           case chr# (ord# '0'# +# r) of
                           c# ->
                               itos' q (C# c# : cs')
-\end{code}
-
-Instances for types of the generic deriving mechanism.
-
-\begin{code}
-deriving instance Show Arity
-deriving instance Show Associativity
-deriving instance Show Fixity
 \end{code}
 
 

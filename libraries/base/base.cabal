@@ -58,6 +58,7 @@ Library {
             GHC.Float.RealFracMethods,
             GHC.Foreign,
             GHC.ForeignPtr,
+            GHC.Generics,
             GHC.GHCi,
             GHC.Handle,
             GHC.IO,
