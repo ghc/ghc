@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies  #-}
 
 module CanDoRep0 where
 
@@ -21,3 +22,6 @@ data D a = D0 | D1 { d11 :: a, d12 :: (D a) }
 
 data (:*:) a b = a :*: b
   deriving Generic
+
+data family F a
+data instance F Int = FInt deriving Generic

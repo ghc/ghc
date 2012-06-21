@@ -48,12 +48,9 @@ T5095.hs:9:11:
                 Eq j, Eq k, Eq l, Eq m, Eq n, Eq o) =>
                Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
         -- Defined in `GHC.Classes'
-      instance Eq GHC.Generics.Arity -- Defined in `GHC.Classes'
-      instance Eq GHC.Generics.Associativity -- Defined in `GHC.Classes'
       instance Eq Bool -- Defined in `GHC.Classes'
       instance Eq Char -- Defined in `GHC.Classes'
       instance Eq Double -- Defined in `GHC.Classes'
-      instance Eq GHC.Generics.Fixity -- Defined in `GHC.Classes'
       instance Eq Float -- Defined in `GHC.Classes'
       instance Eq Int -- Defined in `GHC.Classes'
       instance Eq Ordering -- Defined in `GHC.Classes'
