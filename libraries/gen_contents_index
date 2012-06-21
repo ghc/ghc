@@ -2,13 +2,35 @@
 
 set -e
 
+USAGE="Usage: $0 [--inplace] [--verbose] [--help]"
+INPLACE=
+VERBOSE=
+
 HADDOCK_ARGS=
 
 [ -d dist-haddock ] || mkdir dist-haddock
 cd dist-haddock
 
-case $* in
---inplace)
+while [ "$#" -ne "0" ]
+do
+    case "$1" in
+    --inplace)
+        INPLACE=yes
+        ;;
+    --verbose)
+        VERBOSE=yes
+        ;;
+    --help)
+        echo "$USAGE"
+        exit 0
+        ;;
+    esac
+
+    shift
+done
+
+if [ -n "$INPLACE" ]
+then
     HADDOCK=../../inplace/bin/haddock
     for REPO in `grep '^libraries/[^ ]*  *- ' ../../packages | sed -e 's#libraries/##' -e 's/ .*//'`
     do
@@ -35,8 +57,7 @@ case $* in
             fi
         done
     done
-    ;;
-*)
+else
     HADDOCK=../../../../../../bin/haddock
     # We don't want the GHC API to swamp the index
     HADDOCK_FILES=`ls -1 ../*/*.haddock | grep -v '/ghc\.haddock' | sort`
@@ -46,11 +67,13 @@ case $* in
         HADDOCK_ARG="--read-interface=${NAME_VERSION},$HADDOCK_FILE"
         HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
     done
-    ;;
-esac
+fi
 
 # Now create the combined contents and index pages
-echo $HADDOCK_ARGS
+if [ -n "$VERBOSE" ]
+then
+    echo $HADDOCK_ARGS
+fi
 $HADDOCK --gen-index --gen-contents -o . \
          -t "Haskell Hierarchical Libraries" \
          -p "../prologue.txt" \
