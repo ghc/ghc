@@ -11,7 +11,6 @@ module ListSetOps (
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
-        mkLookupFun, findInList, assocElts,
 
         -- Duplicate handling
         hasNoDups, runs, removeDups, findDupsEq,
@@ -66,14 +65,11 @@ Inefficient finite maps based on association lists and equality.
 -- A finite mapping based on equality and association lists
 type Assoc a b = [(a,b)]
 
-assocElts         :: Assoc a b -> [(a,b)]
 assoc             :: (Eq a) => String -> Assoc a b -> a -> b
 assocDefault      :: (Eq a) => b -> Assoc a b -> a -> b
 assocUsing        :: (a -> a -> Bool) -> String -> Assoc a b -> a -> b
 assocMaybe        :: (Eq a) => Assoc a b -> a -> Maybe b
 assocDefaultUsing :: (a -> a -> Bool) -> b -> Assoc a b -> a -> b
-
-assocElts xs  = xs
 
 assocDefaultUsing _  deflt []             _   = deflt
 assocDefaultUsing eq deflt ((k,v) : rest) key
@@ -90,30 +86,6 @@ assocMaybe alist key
     lookup []             = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
 \end{code}
-
-
-@mkLookupFun eq alist@ is a function which looks up
-its argument in the association list @alist@, returning a Maybe type.
-@mkLookupFunDef@ is similar except that it is given a value to return
-on failure.
-
-\begin{code}
-mkLookupFun :: (key -> key -> Bool)     -- Equality predicate
-            -> [(key,val)]              -- The assoc list
-            -> key                      -- The key
-            -> Maybe val                -- The corresponding value
-
-mkLookupFun eq alist s
-  = case [a | (s',a) <- alist, s' `eq` s] of
-      []    -> Nothing
-      (a:_) -> Just a
-
-findInList :: (a -> Bool) -> [a] -> Maybe a
-findInList _ [] = Nothing
-findInList p (x:xs) | p x       = Just x
-                    | otherwise = findInList p xs
-\end{code}
-
 
 %************************************************************************
 %*                                                                      *
