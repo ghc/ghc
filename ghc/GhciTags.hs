@@ -17,7 +17,6 @@ import Exception
 import GHC
 import GhciMonad
 import Outputable
-import Util
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
@@ -25,7 +24,9 @@ import Name (nameOccName)
 import OccName (pprOccName)
 import MonadUtils
 
+import Data.Function
 import Data.Maybe
+import Data.Ord
 import Panic
 import Data.List
 import Control.Monad
@@ -132,13 +133,13 @@ tagInfo dflags unqual exported kind name loc
 collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
 -- ctags style with the Ex exresion being just the line number, Vim et al
 collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
-  let tags = unlines $ sortLe (<=) $ map showCTag tagInfos
+  let tags = unlines $ sort $ map showCTag tagInfos
   tryIO (writeFile file tags)
 
 -- ctags style with the Ex exresion being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
-  let tags = unlines $ sortLe (<=) $ map showCTag $concat tagInfoGroups
+  let tags = unlines $ sort $ map showCTag $concat tagInfoGroups
   tryIO (writeFile file tags)
 
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
@@ -155,16 +156,14 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
 
 makeTagGroupsWithSrcInfo :: [TagInfo] -> IO [[TagInfo]]
 makeTagGroupsWithSrcInfo tagInfos = do
-  let byFile op ti0 ti1 = tagFile ti0 `op` tagFile ti1
-      groups = groupBy (byFile (==)) $ sortLe (byFile (<=)) tagInfos
+  let groups = groupBy ((==) `on` tagFile) $ sortBy (comparing tagFile) tagInfos
   mapM addTagSrcInfo groups
 
   where
     addTagSrcInfo [] = ghcError (CmdLineError "empty tag file group??")
     addTagSrcInfo group@(tagInfo:_) = do
       file <- readFile $tagFile tagInfo
-      let byLine ti0 ti1 = tagLine ti0 <= tagLine ti1
-          sortedGroup = sortLe byLine group
+      let sortedGroup = sortBy (comparing tagLine) group
       return $ perFile sortedGroup 1 0 $ lines file
 
     perFile allTags@(tag:tags) cnt pos allLs@(l:ls)
