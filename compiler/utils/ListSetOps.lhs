@@ -11,7 +11,6 @@ module ListSetOps (
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
-        emptyAssoc, unitAssoc, mapAssoc, plusAssoc_C, extendAssoc_C,
         mkLookupFun, findInList, assocElts,
 
         -- Duplicate handling
@@ -67,21 +66,13 @@ Inefficient finite maps based on association lists and equality.
 -- A finite mapping based on equality and association lists
 type Assoc a b = [(a,b)]
 
-emptyAssoc        :: Assoc a b
-unitAssoc         :: a -> b -> Assoc a b
 assocElts         :: Assoc a b -> [(a,b)]
 assoc             :: (Eq a) => String -> Assoc a b -> a -> b
 assocDefault      :: (Eq a) => b -> Assoc a b -> a -> b
 assocUsing        :: (a -> a -> Bool) -> String -> Assoc a b -> a -> b
 assocMaybe        :: (Eq a) => Assoc a b -> a -> Maybe b
 assocDefaultUsing :: (a -> a -> Bool) -> b -> Assoc a b -> a -> b
-mapAssoc          :: (b -> c) -> Assoc a b -> Assoc a c
-extendAssoc_C     :: (Eq a) => (b -> b -> b) -> Assoc a b -> (a,b)     -> Assoc a b
-plusAssoc_C       :: (Eq a) => (b -> b -> b) -> Assoc a b -> Assoc a b -> Assoc a b
-        -- combining fn takes (old->new->result)
 
-emptyAssoc    = []
-unitAssoc a b = [(a,b)]
 assocElts xs  = xs
 
 assocDefaultUsing _  deflt []             _   = deflt
@@ -98,19 +89,6 @@ assocMaybe alist key
   where
     lookup []             = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
-
-mapAssoc f alist = [(key, f val) | (key,val) <- alist]
-
-plusAssoc_C _       []  new = new -- Shortcut for common case
-plusAssoc_C combine old new = foldl (extendAssoc_C combine) old new
-
-extendAssoc_C combine old_list (new_key, new_val)
-  = go old_list
-  where
-    go [] = [(new_key, new_val)]
-    go ((old_key, old_val) : old_list)
-     | new_key == old_key = ((old_key, old_val `combine` new_val) : old_list)
-     | otherwise          = (old_key, old_val) : go old_list
 \end{code}
 
 
