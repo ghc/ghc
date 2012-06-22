@@ -113,10 +113,9 @@ equivClasses :: (a -> a -> Ordering) -- Comparison
 
 equivClasses _         []  = []
 equivClasses _   stuff@[_] = [stuff]
-equivClasses cmp items     = runs eq (sortLe le items)
+equivClasses cmp items     = runs eq (sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
-    le a b = case cmp a b of { LT -> True; EQ -> True; GT -> False }
 \end{code}
 
 The first cases in @equivClasses@ above are just to cut to the point

@@ -79,6 +79,8 @@ import FastString
 import Outputable
 
 import Data.Char
+import Data.List
+import Data.Ord
 import Data.Word
 import Data.Maybe
 
@@ -574,13 +576,10 @@ mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag
     label_branches join_lbl branches	$ \ branches ->
     assignTemp' tag_expr		$ \tag_expr' -> 
     
-    mk_switch tag_expr' (sortLe le branches) mb_deflt 
+    mk_switch tag_expr' (sortBy (comparing fst) branches) mb_deflt 
 	      lo_tag hi_tag via_C
 	  -- Sort the branches before calling mk_switch
     <*> mkLabel join_lbl
-
-  where
-    (t1,_) `le` (t2,_) = t1 <= t2
 
 mk_switch :: CmmExpr -> [(ConTagZ, BlockId)]
 	  -> Maybe BlockId 
@@ -731,10 +730,8 @@ mkCmmLitSwitch scrut  branches deflt
     withFreshLabel "switch join" 	$ \ join_lbl ->
     label_code join_lbl deflt		$ \ deflt ->
     label_branches join_lbl branches	$ \ branches ->
-    mk_lit_switch scrut' deflt (sortLe le branches)
+    mk_lit_switch scrut' deflt (sortBy (comparing fst) branches)
     <*> mkLabel join_lbl
-  where
-    le (t1,_) (t2,_) = t1 <= t2
 
 mk_lit_switch :: CmmExpr -> BlockId 
  	      -> [(Literal,BlockId)]
