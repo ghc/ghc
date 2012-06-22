@@ -1305,7 +1305,7 @@ mkMultiBranch maybe_ncons raw_ways = do
              -- shouldn't happen?
 
          mkTree [val] range_lo range_hi
-            | range_lo `eqAlt` range_hi
+            | range_lo == range_hi
             = return (snd val)
             | null defaults -- Note [CASEFAIL]
             = do lbl <- getLabelBc
@@ -1386,14 +1386,6 @@ mkMultiBranch maybe_ncons raw_ways = do
                  Just n  -> (0, fromIntegral n - 1)
                  Nothing -> (minBound, maxBound)
 
-         (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
-         (DiscrW w1) `eqAlt` (DiscrW w2) = w1 == w2
-         (DiscrF f1) `eqAlt` (DiscrF f2) = f1 == f2
-         (DiscrD d1) `eqAlt` (DiscrD d2) = d1 == d2
-         (DiscrP i1) `eqAlt` (DiscrP i2) = i1 == i2
-         NoDiscr     `eqAlt` NoDiscr     = True
-         _           `eqAlt` _           = False
-
          (DiscrI i1) `leAlt` (DiscrI i2) = i1 <= i2
          (DiscrW w1) `leAlt` (DiscrW w2) = w1 <= w2
          (DiscrF f1) `leAlt` (DiscrF f2) = f1 <= f2
@@ -1431,6 +1423,7 @@ data Discr
    | DiscrD Double
    | DiscrP Word16
    | NoDiscr
+    deriving Eq
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i
