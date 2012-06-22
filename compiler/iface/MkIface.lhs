@@ -111,6 +111,7 @@ import Data.Function
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Ord
 import Data.IORef
 import System.Directory
 import System.FilePath
@@ -278,9 +279,9 @@ mkIface_ hsc_env maybe_old_fingerprint
         
                         -- Sort these lexicographically, so that
                         -- the result is stable across compilations
-                        mi_insts       = sortLe le_inst iface_insts,
-                        mi_fam_insts   = sortLe le_fam_inst iface_fam_insts,
-                        mi_rules       = sortLe le_rule iface_rules,
+                        mi_insts       = sortBy cmp_inst     iface_insts,
+                        mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
+                        mi_rules       = sortBy cmp_rule     iface_rules,
 
                         mi_vect_info   = iface_vect_info,
 
@@ -348,14 +349,11 @@ mkIface_ hsc_env maybe_old_fingerprint
 
         ; return (errs_and_warns, Just (final_iface, no_change_at_all)) }}
   where
-     r1 `le_rule`     r2 = ifRuleName      r1    <=    ifRuleName      r2
-     i1 `le_inst`     i2 = ifDFun          i1 `le_occ` ifDFun          i2  
-     i1 `le_fam_inst` i2 = ifFamInstTcName i1 `le_occ` ifFamInstTcName i2
-
-     le_occ :: Name -> Name -> Bool
-        -- Compare lexicographically by OccName, *not* by unique, because 
-        -- the latter is not stable across compilations
-     le_occ n1 n2 = nameOccName n1 <= nameOccName n2
+     cmp_rule     = comparing ifRuleName
+     -- Compare these lexicographically by OccName, *not* by unique,
+     -- because the latter is not stable across compilations:
+     cmp_inst     = comparing (nameOccName . ifDFun)
+     cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
      dflags = hsc_dflags hsc_env
 
