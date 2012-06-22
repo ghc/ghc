@@ -433,7 +433,13 @@ mkExportItems
 
     declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
     declWith t =
-      let (doc, subs) = exportDecl t docMap argMap subMap in
+      let mdl = nameModule t
+          (doc, subs)
+            | mdl == thisMod =
+                exportDecl t docMap argMap subMap
+            | Just iface <- M.lookup mdl modMap =
+                exportDecl t (ifaceDocMap iface) (ifaceArgMap iface) (ifaceSubMap iface)
+            | otherwise = (noDocForDecl, []) in
       case findDecl t of
         [L _ (ValD _)] -> do
           -- Top-level binding without type signature
