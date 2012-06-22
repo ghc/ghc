@@ -95,9 +95,10 @@ import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 
-import Util		( split, sortLe )
+import Util ( split )
 import ListSetOps	( runs )
-import Data.List	( intersperse )
+import Data.List
+import Data.Ord
 import Data.Dynamic
 import Data.IORef
 import Data.Map (Map)
@@ -581,9 +582,8 @@ pprTickGroup :: [(Tick, Int)] -> SDoc
 pprTickGroup group@((tick1,_):_)
   = hang (int (sum [n | (_,n) <- group]) <+> text (tickString tick1))
        2 (vcat [ int n <+> pprTickCts tick  
-               | (tick,n) <- sortLe le group])
-  where
-    le (_,n1) (_,n2) = n2 <= n1   -- We want largest first
+                                    -- flip as we want largest first
+               | (tick,n) <- sortBy (flip (comparing snd)) group])
 pprTickGroup [] = panic "pprTickGroup"
 \end{code}
 
