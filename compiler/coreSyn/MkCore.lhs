@@ -100,7 +100,7 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 \begin{code}
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids) 
--- into order: Kind, then Type, then Id
+-- into order: Type, then Kind, then Id
 sortQuantVars = sortLe le
   where
     v1 `le` v2 = case (is_tv v1, is_tv v2) of
