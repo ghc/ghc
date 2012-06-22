@@ -46,7 +46,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, minWith,
+        sortWith, minWith,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -472,102 +472,11 @@ isn'tIn msg x ys
 
 %************************************************************************
 %*                                                                      *
-\subsubsection[Utils-Carsten-mergesort]{A mergesort from Carsten}
+\subsubsection{Sort utils}
 %*                                                                      *
 %************************************************************************
 
-\begin{display}
-Date: Mon, 3 May 93 20:45:23 +0200
-From: Carsten Kehler Holst <kehler@cs.chalmers.se>
-To: partain@dcs.gla.ac.uk
-Subject: natural merge sort beats quick sort [ and it is prettier ]
-
-Here is a piece of Haskell code that I'm rather fond of. See it as an
-attempt to get rid of the ridiculous quick-sort routine. groupUpdown is
-quite useful by itself I think it was John's idea originally though I
-believe the lazy version is due to me [surprisingly complicated].
-gamma [used to be called] is called gamma because I got inspired by
-the Gamma calculus. It is not very close to the calculus but does
-behave less sequentially than both foldr and foldl. One could imagine
-a version of gamma that took a unit element as well thereby avoiding
-the problem with empty lists.
-
-I've tried this code against
-
-   1) insertion sort - as provided by haskell
-   2) the normal implementation of quick sort
-   3) a deforested version of quick sort due to Jan Sparud
-   4) a super-optimized-quick-sort of Lennart's
-
-If the list is partially sorted both merge sort and in particular
-natural merge sort wins. If the list is random [ average length of
-rising subsequences = approx 2 ] mergesort still wins and natural
-merge sort is marginally beaten by Lennart's soqs. The space
-consumption of merge sort is a bit worse than Lennart's quick sort
-approx a factor of 2. And a lot worse if Sparud's bug-fix [see his
-fpca article ] isn't used because of groupUpdown.
-
-have fun
-Carsten
-\end{display}
-
 \begin{code}
-groupUpdown :: (a -> a -> Bool) -> [a] -> [[a]]
--- Given a <= function, groupUpdown finds maximal contiguous up-runs
--- or down-runs in the input list.
--- It's stable, in the sense that it never re-orders equal elements
---
--- Date: Mon, 12 Feb 1996 15:09:41 +0000
--- From: Andy Gill <andy@dcs.gla.ac.uk>
--- Here is a `better' definition of groupUpdown.
-
-groupUpdown _ []     = []
-groupUpdown p (x:xs) = group' xs x x (x :)
-  where
-    group' []     _     _     s  = [s []]
-    group' (x:xs) x_min x_max s
-        |      x_max `p` x  = group' xs x_min x     (s . (x :))
-        | not (x_min `p` x) = group' xs x     x_max ((x :) . s)
-        | otherwise         = s [] : group' xs x x (x :)
-        -- NB: the 'not' is essential for stablity
-        --     x `p` x_min would reverse equal elements
-
-generalMerge :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-generalMerge _ xs [] = xs
-generalMerge _ [] ys = ys
-generalMerge p (x:xs) (y:ys) | x `p` y   = x : generalMerge p xs     (y:ys)
-                             | otherwise = y : generalMerge p (x:xs) ys
-
--- gamma is now called balancedFold
-
-balancedFold :: (a -> a -> a) -> [a] -> a
-balancedFold _ [] = error "can't reduce an empty list using balancedFold"
-balancedFold _ [x] = x
-balancedFold f l  = balancedFold f (balancedFold' f l)
-
-balancedFold' :: (a -> a -> a) -> [a] -> [a]
-balancedFold' f (x:y:xs) = f x y : balancedFold' f xs
-balancedFold' _ xs = xs
-
-generalNaturalMergeSort :: (a -> a -> Bool) -> [a] -> [a]
-generalNaturalMergeSort _ [] = []
-generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . groupUpdown p) xs
-
-#if NOT_USED
-generalMergeSort p [] = []
-generalMergeSort p xs = (balancedFold (generalMerge p) . map (: [])) xs
-
-mergeSort, naturalMergeSort :: Ord a => [a] -> [a]
-
-mergeSort = generalMergeSort (<=)
-naturalMergeSort = generalNaturalMergeSort (<=)
-
-mergeSortLe le = generalMergeSort le
-#endif
-
-sortLe :: (a->a->Bool) -> [a] -> [a]
-sortLe le = generalNaturalMergeSort le
-
 sortWith :: Ord b => (a->b) -> [a] -> [a]
 sortWith get_key xs = sortBy (comparing get_key) xs
 
