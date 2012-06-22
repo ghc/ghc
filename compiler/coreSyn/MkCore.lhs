@@ -86,6 +86,8 @@ import Pair
 import Constants
 
 import Data.Char        ( ord )
+import Data.List
+import Data.Ord
 import Data.Word
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
@@ -101,19 +103,14 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids) 
 -- into order: Type, then Kind, then Id
-sortQuantVars = sortLe le
+sortQuantVars = sortBy (comparing withCategory)
   where
-    v1 `le` v2 = case (is_tv v1, is_tv v2) of
-                   (True, False)  -> True
-                   (False, True)  -> False
-                   (True, True)   ->
-                     case (is_kv v1, is_kv v2) of
-                       (True, False) -> True
-                       (False, True) -> False
-                       _             -> v1 <= v2  -- Same family
-                   (False, False) -> v1 <= v2
-    is_tv v = isTyVar v
-    is_kv v = isKindVar v
+    withCategory v = (category v, v)
+    category :: Var -> Int
+    category v
+     | isTyVar   v = 1
+     | isKindVar v = 2
+     | otherwise   = 3
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "CoreSyn#let_app_invariant")
