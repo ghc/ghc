@@ -875,7 +875,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         bitmap_size' :: Int
         bitmap_size' = fromIntegral bitmap_size
         bitmap = intsToReverseBitmap bitmap_size'{-size-}
-                        (sortLe (<=) (filter (< bitmap_size') rel_slots))
+                        (sort (filter (< bitmap_size') rel_slots))
           where
           binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset

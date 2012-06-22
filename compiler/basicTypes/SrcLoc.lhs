@@ -82,6 +82,8 @@ import FastString
 
 import Data.Bits
 import Data.Data
+import Data.List
+import Data.Ord
 import System.FilePath
 \end{code}
 
@@ -176,9 +178,7 @@ instance Ord RealSrcLoc where
   compare = cmpRealSrcLoc
 
 sortLocated :: [Located a] -> [Located a]
-sortLocated things = sortLe le things
-  where
-    le (L l1 _) (L l2 _) = l1 <= l2
+sortLocated things = sortBy (comparing getLoc) things
 
 cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2

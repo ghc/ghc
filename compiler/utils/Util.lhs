@@ -569,9 +569,7 @@ sortLe :: (a->a->Bool) -> [a] -> [a]
 sortLe le = generalNaturalMergeSort le
 
 sortWith :: Ord b => (a->b) -> [a] -> [a]
-sortWith get_key xs = sortLe le xs
-  where
-    x `le` y = get_key x < get_key y
+sortWith get_key xs = sortBy (comparing get_key) xs
 
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = ASSERT( not (null xs) )

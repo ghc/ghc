@@ -315,7 +315,7 @@ procpointSRT top_srt top_table entries =
     return (top, srt)
   where
     ints = map (expectJust "constructSRT" . flip Map.lookup top_table) entries
-    sorted_ints = sortLe (<=) ints
+    sorted_ints = sort ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = P.last bitmap_entries + 1
