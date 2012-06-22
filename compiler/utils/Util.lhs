@@ -46,7 +46,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, minWith, on,
+        sortLe, sortWith, minWith,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -581,10 +581,6 @@ sortWith get_key xs = sortLe le xs
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = ASSERT( not (null xs) )
                      head (sortWith get_key xs)
-
-on :: (a -> a -> c) -> (b -> a) -> b -> b -> c
-on cmp sel = \x y -> sel x `cmp` sel y
-
 \end{code}
 
 %************************************************************************

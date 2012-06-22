@@ -26,6 +26,7 @@ import SrcLoc
 import Outputable
 import FastString
 import Control.Monad
+import Data.Function
 
 #include "HsVersions.h"
 \end{code}

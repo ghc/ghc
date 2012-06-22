@@ -98,6 +98,7 @@ import Maybes		( firstJusts )
 import Panic
 
 import Control.Monad    ( liftM3 )
+import Data.Function
 import Data.Maybe       ( listToMaybe )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )

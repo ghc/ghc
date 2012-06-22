@@ -56,6 +56,7 @@ import Util
 import FastString
 
 import Control.Monad
+import Data.Function
 import Data.List        ( sortBy )
 import Data.IORef       ( readIORef, writeIORef )
 \end{code}

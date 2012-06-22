@@ -107,6 +107,7 @@ import Bag
 import Exception
 
 import Control.Monad
+import Data.Function
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
