@@ -310,12 +310,7 @@ zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
--- We want to write this, but with GHC 6.4 we get a warning, so it
--- doesn't validate:
--- zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
--- so we write this instead:
-zipLazy (x:xs) zs = let y : ys = zs
-                    in (x,y) : zipLazy xs ys
+zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 \end{code}
 
 
