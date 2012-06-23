@@ -112,7 +112,7 @@ test('T4801',
                                                      12000000)),
       # expected value: 10290952 (windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 20835240, 15)),
+          compiler_stats_range_field('max_bytes_used', 17629176, 10)),
       # expected value: 20486256 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('max_bytes_used', 20000000,
