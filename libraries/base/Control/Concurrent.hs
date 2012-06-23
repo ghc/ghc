@@ -6,6 +6,9 @@
            , ScopedTypeVariables
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-deprecations #-}
+-- kludge for the Control.Concurrent.QSem, Control.Concurrent.QSemN
+-- and Control.Concurrent.SampleVar imports.
 
 -----------------------------------------------------------------------------
 -- |
@@ -229,6 +232,8 @@ forkFinally action and_then =
 max_buff_size :: Int
 max_buff_size = 1
 
+{-# DEPRECATED mergeIO "Control.Concurrent.mergeIO will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
+{-# DEPRECATED nmergeIO "Control.Concurrent.nmergeIO will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
 mergeIO :: [a] -> [a] -> IO [a]
 nmergeIO :: [[a]] -> IO [a]
 

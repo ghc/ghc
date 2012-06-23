@@ -19,6 +19,7 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.SampleVar
+        {-# DEPRECATED "Control.Concurrent.SampleVar will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
        (
          -- * Sample Variables
          SampleVar,         -- :: type _ =

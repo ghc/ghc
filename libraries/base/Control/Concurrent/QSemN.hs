@@ -20,6 +20,7 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSemN
+        {-# DEPRECATED "Control.Concurrent.QSemN will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
         (  -- * General Quantity Semaphores
           QSemN,        -- abstract
           newQSemN,     -- :: Int   -> IO QSemN

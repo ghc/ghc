@@ -19,6 +19,7 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSem
+        {-# DEPRECATED "Control.Concurrent.QSem will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
         ( -- * Simple Quantity Semaphores
           QSem,         -- abstract
           newQSem,      -- :: Int  -> IO QSem
