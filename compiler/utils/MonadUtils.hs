@@ -16,8 +16,6 @@ module MonadUtils
         , MonadFix(..)
         , MonadIO(..)
 	
-  	, ID, runID
-        
         , liftIO1, liftIO2, liftIO3, liftIO4
 
         , zipWith3M        
@@ -31,8 +29,6 @@ module MonadUtils
         , foldlM, foldlM_, foldrM
         , maybeMapM
         ) where
-
-import Outputable 
 
 -------------------------------------------------------------------------------
 -- Detection of available libraries
@@ -53,20 +49,6 @@ import Control.Monad.Trans
 #endif
 import Control.Monad
 import Control.Monad.Fix
-
--------------------------------------------------------------------------------
--- The ID monad
--------------------------------------------------------------------------------
-
-newtype ID a = ID a
-instance Monad ID where
-  return x     = ID x
-  (ID x) >>= f = f x
-  _ >> y       = y
-  fail s       = panic s
-
-runID :: ID a -> a
-runID (ID x) = x
 
 -------------------------------------------------------------------------------
 -- MTL
