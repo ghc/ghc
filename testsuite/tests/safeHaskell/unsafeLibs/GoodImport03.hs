@@ -17,9 +17,6 @@ import Control.Category
 import Control.Concurrent
 import Control.Concurrent.Chan
 import Control.Concurrent.MVar
-import Control.Concurrent.QSem
-import Control.Concurrent.QSemN
-import Control.Concurrent.SampleVar
 
 import Control.Exception
 import Control.Exception.Base
