@@ -499,8 +499,8 @@ runClang dflags args = do
         runSomething dflags "Clang (Assembler)" clang args
     )
     (\(err :: SomeException) -> do
-        putMsg dflags $ text $ "Error running clang! you need clang installed"
-                            ++ " to use the LLVM backend"
+        errorMsg dflags $ text $ "Error running clang! you need clang installed"
+                              ++ " to use the LLVM backend"
         throw err
     )
 
@@ -538,7 +538,7 @@ figureLlvmVersion dflags = do
                 debugTraceMsg dflags 2
                     (text "Error (figuring out LLVM version):" <+>
                      text (show err))
-                putMsg dflags $ vcat
+                errorMsg dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
                           text "Make sure you have installed LLVM"]
