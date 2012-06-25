@@ -9,4 +9,5 @@ test('5054', reqlib('hmatrix'), compile, ['-package hmatrix'])
 test('5054_2', reqlib('hmatrix'), compile, ['-package hmatrix'])
 test('5486', normal, compile, [''])
 test('5681', normal, compile, [''])
+test('6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vector -package primitive'])
 
