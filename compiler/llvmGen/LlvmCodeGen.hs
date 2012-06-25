@@ -68,11 +68,11 @@ llvmCodeGen dflags h us cmms
         writeIORef (llvmVersion dflags) ver
         when (ver < minSupportLlvmVersion) $
             errorMsg dflags (text "You are using an old version of LLVM that"
-                             <> text "isn't supported anymore!"
+                             <> text " isn't supported anymore!"
                              $+$ text "We will try though...")
         when (ver > maxSupportLlvmVersion) $
             putMsg dflags (text "You are using a new version of LLVM that"
-                           <> text "hasn't been tested yet!"
+                           <> text " hasn't been tested yet!"
                            $+$ text "We will try though...")
         return ver
 
