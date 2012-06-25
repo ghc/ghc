@@ -21,12 +21,14 @@ import Debugger
 
 -- The GHC interface
 import DynFlags
+import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
-import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs )
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs, hsc_IC, 
+                  setInteractivePrintName )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, exposed, exposedModules, pkgIdMap )
@@ -615,8 +617,8 @@ installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
                 (name:_) <- GHC.parseName ipFun
-                dflags <- getDynFlags
-                GHC.setInteractiveDynFlags (setInteractivePrintName name dflags)
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
+                                      in he{hsc_IC = new_ic})
                 return Succeeded
 
   when (failed ok && exprmode) $ liftIO (exitWith (ExitFailure 1))

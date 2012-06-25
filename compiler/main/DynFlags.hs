@@ -80,8 +80,6 @@ module DynFlags (
         setPackageName,
         doingTickyProfiling,
 
-        setInteractivePrintName,        -- Name -> DynFlags -> DynFlags
-
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
@@ -111,7 +109,6 @@ module DynFlags (
 #include "HsVersions.h"
 
 import Platform
-import Name
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
@@ -629,10 +626,9 @@ data DynFlags = DynFlags {
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
 
-  llvmVersion           :: IORef (Int),
-
   interactivePrint      :: Maybe String,
-  interactivePrintName  :: Maybe Name
+
+  llvmVersion           :: IORef (Int)
  }
 
 class HasDynFlags m where
@@ -990,8 +986,7 @@ defaultDynFlags mySettings =
         traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion",
-        interactivePrint = Nothing,
-        interactivePrintName = Nothing
+        interactivePrint = Nothing
       }
 
 -- Do not use tracingDynFlags!
@@ -1329,9 +1324,6 @@ addHaddockOpts f d = d{ haddockOptions = Just f}
 addGhciScript f d = d{ ghciScripts = f : ghciScripts d}
 
 setInteractivePrint f d = d{ interactivePrint = Just f}
-
-setInteractivePrintName :: Name -> DynFlags -> DynFlags
-setInteractivePrintName f d = d{ interactivePrintName = Just f}
 
 -- -----------------------------------------------------------------------------
 -- Command-line options

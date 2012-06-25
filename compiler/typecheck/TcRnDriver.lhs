@@ -1325,9 +1325,9 @@ tcUserStmt :: LStmt RdrName -> TcM (PlanResult, FixityEnv)
 tcUserStmt (L loc (ExprStmt expr _ _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
-        ; dynFlags <- getDynFlags
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
+        ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
               matches   = [mkMatch [] rn_expr emptyLocalBinds]
               -- [it = expr]
@@ -1346,7 +1346,6 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                                            (HsVar bindIOName) noSyntaxExpr
 
               -- [; print it]
-              interPrintName = maybe printName id (interactivePrintName dynFlags)
               print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 

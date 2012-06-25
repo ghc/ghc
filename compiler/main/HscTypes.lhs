@@ -44,6 +44,7 @@ module HscTypes (
         InteractiveContext(..), emptyInteractiveContext,
         icPrintUnqual, icInScopeTTs, icPlusGblRdrEnv,
         extendInteractiveContext, substInteractiveContext,
+        setInteractivePrintName,
         InteractiveImport(..),
         mkPrintUnqualified, pprModulePrefix,
 
@@ -136,7 +137,7 @@ import Annotations
 import Class
 import TyCon
 import DataCon
-import PrelNames        ( gHC_PRIM, ioTyConName )
+import PrelNames        ( gHC_PRIM, ioTyConName, printName )
 import Packages hiding  ( Version(..) )
 import DynFlags
 import DriverPhases
@@ -943,6 +944,10 @@ data InteractiveContext
 
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
+         
+         ic_int_print  :: Name,
+             -- ^ The function that is used for printing results
+             -- of expressions in ghci and -e mode.
 
 #ifdef GHCI
           ic_resume :: [Resume],
@@ -986,6 +991,8 @@ emptyInteractiveContext dflags
                          ic_sys_vars   = [],
                          ic_instances  = ([],[]),
                          ic_fix_env    = emptyNameEnv,
+                         -- System.IO.print by default
+                         ic_int_print  = printName,
 #ifdef GHCI
                          ic_resume     = [],
 #endif
@@ -1019,6 +1026,9 @@ extendInteractiveContext ictxt new_tythings
     shadowed _         = False
 
     new_names = [ nameOccName (getName id) | AnId id <- new_tythings ]
+
+setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
+setInteractivePrintName ic n = ic{ic_int_print = n}
 
     -- ToDo: should not add Ids to the gbl env here
 
@@ -1090,7 +1100,7 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
-\begin{code}
+    \begin{code}
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
