@@ -809,7 +809,7 @@ match_Word64ToInteger :: Id
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
 match_Word64ToInteger id id_unf [xl]
-  | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
+  | Just (MachWord64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
