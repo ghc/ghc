@@ -83,7 +83,13 @@ module DynFlags (
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
+        parseDynamicFlagsFull,
+
+        -- ** Available DynFlags
         allFlags,
+        flagsAll,
+        flagsDynamic,
+        flagsPackage,
 
         supportedLanguagesAndExtensions,
 
@@ -1392,31 +1398,39 @@ getStgToDo dflags
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
 
+
 -- | Parse dynamic flags from a list of command line arguments.  Returns the
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
-parseDynamicFlagsCmdLine :: Monad m =>
-                     DynFlags -> [Located String]
-                  -> m (DynFlags, [Located String], [Located String])
-                     -- ^ Updated 'DynFlags', left-over arguments, and
-                     -- list of warnings.
-parseDynamicFlagsCmdLine dflags args = parseDynamicFlags dflags args True
+parseDynamicFlagsCmdLine :: Monad m => DynFlags -> [Located String]
+                         -> m (DynFlags, [Located String], [Located String])
+                            -- ^ Updated 'DynFlags', left-over arguments, and
+                            -- list of warnings.
+parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
+
 
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
-parseDynamicFilePragma :: Monad m =>
-                     DynFlags -> [Located String]
-                  -> m (DynFlags, [Located String], [Located String])
-                     -- ^ Updated 'DynFlags', left-over arguments, and
-                     -- list of warnings.
-parseDynamicFilePragma dflags args = parseDynamicFlags dflags args False
+parseDynamicFilePragma :: Monad m => DynFlags -> [Located String]
+                       -> m (DynFlags, [Located String], [Located String])
+                          -- ^ Updated 'DynFlags', left-over arguments, and
+                          -- list of warnings.
+parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
 
-parseDynamicFlags :: Monad m =>
-                      DynFlags -> [Located String] -> Bool
+
+-- | Parses the dynamically set flags for GHC. This is the most general form of
+-- the dynamic flag parser that the other methods simply wrap. It allows
+-- saying which flags are valid flags and indicating if we are parsing
+-- arguments from the command line or from a file pragma.
+parseDynamicFlagsFull :: Monad m
+                  => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
+                  -> Bool                          -- ^ are the arguments from the command line?
+                  -> DynFlags                      -- ^ current dynamic flags
+                  -> [Located String]              -- ^ arguments to parse
                   -> m (DynFlags, [Located String], [Located String])
-parseDynamicFlags dflags0 args cmdline = do
+parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   -- XXX Legacy support code
   -- We used to accept things like
   --     optdep-f  -optdepdepend
@@ -1429,12 +1443,8 @@ parseDynamicFlags dflags0 args cmdline = do
       f xs = xs
       args' = f args
 
-      -- Note: -ignore-package (package_flags) must precede -i* (dynamic_flags)
-      flag_spec | cmdline   = package_flags ++ dynamic_flags
-                | otherwise = dynamic_flags
-
   let ((leftover, errs, warns), dflags1)
-          = runCmdLine (processArgs flag_spec args') dflags0
+          = runCmdLine (processArgs activeFlags args') dflags0
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   -- check for disabled flags in safe haskell
@@ -1442,8 +1452,12 @@ parseDynamicFlags dflags0 args cmdline = do
 
   return (dflags2, leftover, sh_warns ++ warns)
 
+
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
+--
+-- The bool is to indicate if we are parsing command line flags (false means
+-- file pragma). This allows us to generate better warnings.
 safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
 safeFlagCheck _  dflags | not (safeLanguageOn dflags || safeInferOn dflags)
                         = (dflags, [])
@@ -1489,6 +1503,8 @@ safeFlagCheck cmdl dflags =
 %*                                                                      *
 %********************************************************************* -}
 
+-- | All dynamic flags option strings. These are the user facing strings for
+-- enabling and disabling options.
 allFlags :: [String]
 allFlags = map ('-':) $
            [ flagName flag | flag <- dynamic_flags ++ package_flags, ok (flagOptKind flag) ] ++
@@ -1501,6 +1517,23 @@ allFlags = map ('-':) $
           fflags0 = [ name | (name, _, _) <- fFlags ]
           fflags1 = [ name | (name, _, _) <- fWarningFlags ]
           fflags2 = [ name | (name, _, _) <- fLangFlags ]
+
+{-
+ - Below we export user facing symbols for GHC dynamic flags for use with the
+ - GHC API.
+ -}
+
+-- All dynamic flags present in GHC.
+flagsAll :: [Flag (CmdLineP DynFlags)]
+flagsAll     = package_flags ++ dynamic_flags
+
+-- All dynamic flags, minus package flags, present in GHC.
+flagsDynamic :: [Flag (CmdLineP DynFlags)]
+flagsDynamic = dynamic_flags
+
+-- ALl package flags present in GHC.
+flagsPackage :: [Flag (CmdLineP DynFlags)]
+flagsPackage = package_flags
 
 --------------- The main flags themselves ------------------
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
