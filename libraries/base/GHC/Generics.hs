@@ -80,7 +80,8 @@ data P
 type Rec0  = K1 R
 -- | Type synonym for encoding parameters (other than the last)
 type Par0  = K1 P
-{-# DEPRECATED Par0, P "These are no longer used; use Rec0 and R instead" #-}
+{-# DEPRECATED Par0 "Par0 is no longer used; use Rec0 instead" #-}
+{-# DEPRECATED P "P is no longer used; use R instead" #-}
 
 -- | Tag for M1: datatype
 data D
