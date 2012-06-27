@@ -39,6 +39,8 @@ import "integer-gmp" __gmpn_gcd_1;
 import "integer-gmp" __gmpn_cmp;
 import "integer-gmp" __gmpz_tdiv_q;
 import "integer-gmp" __gmpz_tdiv_r;
+import "integer-gmp" __gmpz_fdiv_q;
+import "integer-gmp" __gmpz_fdiv_r;
 import "integer-gmp" __gmpz_tdiv_qr;
 import "integer-gmp" __gmpz_fdiv_qr;
 import "integer-gmp" __gmpz_divexact;
