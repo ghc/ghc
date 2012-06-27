@@ -65,7 +65,7 @@ module Id (
         hasNoBinding,
 
 	-- ** Evidence variables
-	DictId, isDictId, isEvVar,
+	DictId, isDictId, dfunNSilent, isEvVar,
 
 	-- ** Inline pragma stuff
 	idInlinePragma, setInlinePragma, modifyInlinePragma,
@@ -341,6 +341,11 @@ isPrimOpId id = case Var.idDetails id of
 isDFunId id = case Var.idDetails id of
                         DFunId {} -> True
                         _         -> False
+
+dfunNSilent :: Id -> Int
+dfunNSilent id = case Var.idDetails id of
+                   DFunId ns _ -> ns
+                   _ -> pprPanic "dfunSilent: not a dfun:" (ppr id)
 
 isPrimOpId_maybe id = case Var.idDetails id of
                         PrimOpId op -> Just op

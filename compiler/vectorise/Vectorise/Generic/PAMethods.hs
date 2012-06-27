@@ -68,21 +68,12 @@ type PAInstanceBuilder
 
 buildPAScAndMethods :: VM [(String, PAInstanceBuilder)]
 buildPAScAndMethods
- = return [ ("PR",            buildPRDict)
-          , ("toPRepr",       buildToPRepr)
+ = return [ ("toPRepr",       buildToPRepr)
           , ("fromPRepr",     buildFromPRepr)
           , ("toArrPRepr",    buildToArrPRepr)
           , ("fromArrPRepr",  buildFromArrPRepr)
           , ("toArrPReprs",   buildToArrPReprs)
           , ("fromArrPReprs", buildFromArrPReprs)]
-
-
-buildPRDict :: PAInstanceBuilder
-buildPRDict vect_tc prepr_ax _ _ _
-  = prDictOfPReprInstTyCon inst_ty prepr_ax arg_tys
-  where
-    arg_tys = mkTyVarTys (tyConTyVars vect_tc)
-    inst_ty = mkTyConApp vect_tc arg_tys
 
 
 -- buildToPRepr ---------------------------------------------------------------

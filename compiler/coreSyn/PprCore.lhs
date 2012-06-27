@@ -430,6 +430,10 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
             -- blowup in the size of the printout!
+
+instance Outputable e => Outputable (DFunArg e) where
+  ppr (DFunPolyArg e) = braces (ppr e)
+  ppr (DFunLamArg i)  = char '<' <> int i <> char '>'
 \end{code}
 
 -----------------------------------------------------

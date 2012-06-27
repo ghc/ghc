@@ -155,8 +155,15 @@ pprInstance ispec
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
-  = ptext (sLit "instance") <+> ppr flag <+> pprSigmaType (idType dfun)
-        -- Print without the for-all, which the programmer doesn't write
+  = getPprStyle $ \ sty ->
+    let theta_to_print
+          | debugStyle sty = theta
+          | otherwise = drop (dfunNSilent dfun) theta
+    in ptext (sLit "instance") <+> ppr flag
+       <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
+  where
+    (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
+       -- Print without the for-all, which the programmer doesn't write
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)

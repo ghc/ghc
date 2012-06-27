@@ -39,6 +39,7 @@ import TcEnv
 import TcHsType
 import TcUnify
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
+import CoreSyn    ( DFunArg(..) )
 import Type
 import TcEvidence
 import TyCon
@@ -49,7 +50,7 @@ import VarEnv
 import VarSet     ( mkVarSet, subVarSet, varSetElems )
 import Pair
 import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
+import CoreSyn    ( Expr(Var), CoreExpr )
 import PrelNames  ( typeableClassNames )
 
 import Bag
@@ -731,13 +732,13 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      -- See Note [Subtle interaction of recursion and overlap]
                      -- and Note [Binding when looking up instances]
        ; let (clas, inst_tys) = tcSplitDFunHead inst_head
-             (class_tyvars, sc_theta, sc_sels, op_items) = classBigSig clas
+             (class_tyvars, sc_theta, _, op_items) = classBigSig clas
              sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys) sc_theta
+
        ; dfun_ev_vars <- newEvVars dfun_theta
 
-       ; (sc_args, sc_binds)
-             <- mapAndUnzipM (tcSuperClass inst_tyvars dfun_ev_vars)
-                              (sc_sels `zip` sc_theta')
+       ; (sc_binds, sc_ev_vars, sc_dfun_args) 
+            <- tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta'
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
@@ -770,20 +771,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
              con_app_tys  = wrapId (mkWpTyApps inst_tys)
                                    (dataConWrapId dict_constr)
-             con_app_scs  = mkHsWrap (mkWpEvApps (map mk_sc_ev_term sc_args)) con_app_tys
+             con_app_scs  = mkHsWrap (mkWpEvApps (map EvId sc_ev_vars)) con_app_tys
              con_app_args = foldl mk_app con_app_scs $
                             map (wrapId arg_wrapper) meth_ids
 
              mk_app :: HsExpr Id -> HsExpr Id -> HsExpr Id
              mk_app fun arg = HsApp (L loc fun) (L loc arg)
 
-             mk_sc_ev_term :: EvVar -> EvTerm
-             mk_sc_ev_term sc
-               | null inst_tv_tys
-               , null dfun_ev_vars = EvId sc
-               | otherwise         = EvDFunApp sc inst_tv_tys (map EvId dfun_ev_vars)
-
-             inst_tv_tys    = mkTyVarTys inst_tyvars
+             inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
                 -- Do not inline the dfun; instead give it a magic DFunFunfolding
@@ -796,9 +791,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty dfun_args
                           `setInlinePragma` dfunInlinePragma
 
-             dfun_args :: [CoreExpr]
-             dfun_args = map varToCoreExpr sc_args ++
-                         map Var           meth_ids
+             dfun_args :: [DFunArg CoreExpr]
+             dfun_args = sc_dfun_args ++ map (DFunPolyArg . Var) meth_ids
 
              export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id_w_fun
                           , abe_mono = self_dict, abe_prags = noSpecPrags }
@@ -806,12 +800,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
-                                  , abs_ev_binds = emptyTcEvBinds
+                                  , abs_ev_binds = sc_binds
                                   , abs_binds = unitBag dict_bind }
 
        ; return (unitBag (L loc main_bind) `unionBags`
-                 listToBag meth_binds      `unionBags`
-                 unionManyBags sc_binds)
+                 listToBag meth_binds)
        }
  where
    dfun_ty   = idType dfun_id
@@ -819,6 +812,31 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
    loc       = getSrcSpan dfun_id
 
 ------------------------------
+tcSuperClasses :: DFunId -> [TcTyVar] -> [EvVar] -> TcThetaType
+               -> TcM (TcEvBinds, [EvVar], [DFunArg CoreExpr])
+-- See Note [Silent superclass arguments]
+tcSuperClasses dfun_id inst_tyvars dfun_ev_vars sc_theta
+  = do {   -- Check that all superclasses can be deduced from
+           -- the originally-specified dfun arguments
+       ; (sc_binds, sc_evs) <- checkConstraints InstSkol inst_tyvars orig_ev_vars $
+                               emitWanteds ScOrigin sc_theta
+
+       ; if null inst_tyvars && null dfun_ev_vars 
+         then return (sc_binds,       sc_evs,      map (DFunPolyArg . Var) sc_evs)
+         else return (emptyTcEvBinds, sc_lam_args, sc_dfun_args) }
+  where
+    n_silent     = dfunNSilent dfun_id
+    n_tv_args    = length inst_tyvars
+    orig_ev_vars = drop n_silent dfun_ev_vars
+
+    (sc_lam_args, sc_dfun_args) = unzip (map (find n_tv_args dfun_ev_vars) sc_theta)
+    find _ [] pred 
+      = pprPanic "tcInstDecl2" (ppr dfun_id $$ ppr (idType dfun_id) $$ ppr pred)
+    find i (ev:evs) pred 
+      | pred `eqPred` evVarPred ev = (ev, DFunLamArg i)
+      | otherwise                  = find (i+1) evs pred
+
+----------------------
 mkMethIds :: HsSigFun -> Class -> [TcTyVar] -> [EvVar] 
           -> [TcType] -> Id -> TcM (TcId, TcSigInfo)
 mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
@@ -875,33 +893,6 @@ misplacedInstSig name hs_ty
          , ptext (sLit "(Use -XInstanceSigs to allow this)") ]
 
 ------------------------------
-tcSuperClass :: [TcTyVar] -> [EvVar]
-             -> (Id, PredType)
-             -> TcM (TcId, LHsBinds TcId)
-
--- Build a top level decl like
---      sc_op = /\a \d. let sc = ... in
---                      sc
--- and return sc_op, that binding
-
-tcSuperClass tyvars ev_vars (sc_sel, sc_pred)
-  = do { (ev_binds, sc_dict)
-             <- newImplication InstSkol tyvars ev_vars $
-                emitWanted ScOrigin sc_pred
-
-       ; uniq <- newUnique
-       ; let sc_op_ty   = mkForAllTys tyvars $ mkPiTypes ev_vars (varType sc_dict)
-             sc_op_name = mkDerivedInternalName mkClassOpAuxOcc uniq
-                                                (getName sc_sel)
-             sc_op_id   = mkLocalId sc_op_name sc_op_ty
-             sc_op_bind = mkVarBind sc_op_id (L noSrcSpan $ wrapId sc_wrapper sc_dict)
-             sc_wrapper = mkWpTyLams tyvars
-                          <.> mkWpLams ev_vars
-                          <.> mkWpLet ev_binds
-
-       ; return (sc_op_id, unitBag sc_op_bind) }
-
-------------------------------
 tcSpecInstPrags :: DFunId -> InstBindings Name
                 -> TcM ([Located TcSpecPrag], PragFun)
 tcSpecInstPrags _ (NewTypeDerived {})
@@ -913,8 +904,17 @@ tcSpecInstPrags dfun_id (VanillaInst binds uprags _)
        ; return (spec_inst_prags, mkPragFun uprags binds) }
 \end{code}
 
-Note [Superclass loop avoidance]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Silent superclass arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Trac #3731, #4809, #5751, #5913, #6117, which all
+describe somewhat more complicated situations, but ones
+encountered in practice.  
+
+      THE PROBLEM
+
+The problem is that it is all too easy to create a class whose
+superclass is bottom when it should not be.
+
 Consider the following (extreme) situation:
         class C a => D a where ...
         instance D [a] => D [a] where ...
@@ -929,10 +929,51 @@ argument:
        dfun :: forall a. D [a] -> D [a]
        dfun = \d::D [a] -> MkD (scsel d) ..
 
-Rather, we want to get it by finding an instance for (C [a]).  We
-achieve this by
-    not making the superclasses of a "wanted"
-    available for solving wanted constraints.
+Otherwise if we later encounter a situation where
+we have a [Wanted] dw::D [a] we might solve it thus:
+     dw := dfun dw
+Which is all fine except that now ** the superclass C is bottom **!
+
+      THE SOLUTION
+
+Our solution to this problem "silent superclass arguments".  We pass
+to each dfun some ``silent superclass arguments’’, which are the
+immediate superclasses of the dictionary we are trying to
+construct. In our example:
+       dfun :: forall a. C [a] -> D [a] -> D [a]
+       dfun = \(dc::C [a]) (dd::D [a]) -> DOrd dc ...
+Notice teh extra (dc :: C [a]) argument compared to the previous version.
+
+This gives us:
+
+     -----------------------------------------------------------
+     DFun Superclass Invariant
+     ~~~~~~~~~~~~~~~~~~~~~~~~
+     In the body of a DFun, every superclass argument to the
+     returned dictionary is
+       either   * one of the arguments of the DFun,
+       or       * constant, bound at top level
+     -----------------------------------------------------------
+
+This net effect is that it is safe to treat a dfun application as
+wrapping a dictionary constructor around its arguments (in particular,
+a dfun never picks superclasses from the arguments under the
+dictionary constructor). No superclass is hidden inside a dfun
+application.
+
+The extra arguments required to satisfy the DFun Superclass Invariant
+always come first, and are called the "silent" arguments.  DFun types
+are built (only) by MkId.mkDictFunId, so that is where we decide
+what silent arguments are to be added.
+
+In our example, if we had  [Wanted] dw :: D [a] we would get via the instance:
+    dw := dfun d1 d2
+    [Wanted] (d1 :: C [a])
+    [Wanted] (d2 :: D [a])
+
+And now, though we *can* solve: 
+     d2 := dw
+That's fine; and we solve d1:C[a] separately.
 
 Test case SCLoop tests this fix.
 
@@ -980,7 +1021,7 @@ tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
   = addErrCtxt (spec_ctxt prag) $
     do  { let name = idName dfun_id
         ; (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
-        ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys
+        ; let (_, spec_dfun_ty) = mkDictFunTy tyvars theta clas tys
 
         ; co_fn <- tcSubType (SpecPragOrigin name) SpecInstCtxt
                              (idType dfun_id) spec_dfun_ty

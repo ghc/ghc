@@ -40,13 +40,13 @@ lookupInst cls tys
                   cantVectorise dflags "Vectorise.Monad.InstEnv.lookupInst:" err
        }
 
--- Look up the representation tycon of a family instance.
+-- Look up a family instance.
 --
 -- The match must be unique - ie, match exactly one instance - but the 
 -- type arguments used for matching may be more specific than those of 
 -- the family instance declaration.
 --
--- Return the instance tycon and its type instance.  For example, if we have
+-- Return the family instance and its type instance.  For example, if we have
 --
 --  lookupFamInst 'T' '[Int]' yields (':R42T', 'Int')
 --
@@ -56,13 +56,12 @@ lookupInst cls tys
 --
 -- which implies that :R42T was declared as 'data instance T [a]'.
 --
-lookupFamInst :: TyCon -> [Type] -> VM (TyCon, [Type])
+lookupFamInst :: TyCon -> [Type] -> VM (FamInst, [Type])
 lookupFamInst tycon tys
   = ASSERT( isFamilyTyCon tycon )
     do { instEnv <- readGEnv global_fam_inst_env
        ; case lookupFamInstEnv instEnv tycon tys of
-           [(fam_inst, rep_tys)] -> return ( dataFamInstRepTyCon fam_inst
-                                           , rep_tys)
+           [(fam_inst, rep_tys)] -> return ( fam_inst, rep_tys)
            _other                -> 
              do dflags <- getDynFlags
                 cantVectorise dflags "VectMonad.lookupFamInst: not found: "
