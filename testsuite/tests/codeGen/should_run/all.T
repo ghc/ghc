@@ -92,4 +92,4 @@ test('5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
 
 test('6146', normal, compile_and_run, [''])
-
+test('T5900', normal, compile_and_run, [''])
