@@ -118,7 +118,7 @@ import Demand
 import Name
 import Module
 import Class
-import PrimOp
+import {-# SOURCE #-} PrimOp (PrimOp)
 import ForeignCall
 import Maybes
 import SrcLoc

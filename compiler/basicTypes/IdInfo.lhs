@@ -75,7 +75,7 @@ module IdInfo (
 import CoreSyn
 
 import Class
-import PrimOp
+import {-# SOURCE #-} PrimOp (PrimOp)
 import Name
 import VarSet
 import BasicTypes
