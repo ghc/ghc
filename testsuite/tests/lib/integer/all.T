@@ -8,4 +8,8 @@ test('fromToInteger',
      extra_clean(['fromToInteger.simpl']),
      run_command,
      ['$MAKE -s --no-print-directory fromToInteger'])
+test('IntegerConversionRules',
+     extra_clean(['IntegerConversionRules.simpl']),
+     run_command,
+     ['$MAKE -s --no-print-directory IntegerConversionRules'])
 
