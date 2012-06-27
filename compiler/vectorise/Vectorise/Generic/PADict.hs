@@ -27,7 +27,7 @@ import FastString
 --  The PA dictionary holds fns that convert values to and from their vectorised representations.
 --
 -- @Recall the definition:
---    class class PR (PRepr a) => PA a where
+--    class PR (PRepr a) => PA a where
 --      toPRepr      :: a -> PRepr a
 --      fromPRepr    :: PRepr a -> a
 --      toArrPRepr   :: PData a -> PData (PRepr a)
