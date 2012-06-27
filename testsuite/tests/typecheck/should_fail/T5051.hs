@@ -31,3 +31,4 @@ foo x = x >= x
 -- This is terribly confusing: the use of (>=) means we need Ord [a],
 -- and if we have Ord a (which we do) we should be done.
 -- A very good reason for not having silent parameters!
+-- But, alas, we need them!

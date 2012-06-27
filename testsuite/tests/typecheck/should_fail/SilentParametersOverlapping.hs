@@ -15,5 +15,5 @@ instance {- silent: C [(a,b)] => -} B [(a,b)] where
   b x = c [(undefined,undefined)]
   -- We get wanted: C [(gamma, delta)], 
   -- and gamma,delta are unconstrained
-  -- But we can apply the C [a] instance without difficulty
-  --  (except in the old days when we had silent dfun parameters)
+  -- We can apply the C [a] instance without difficulty, but
+  --  that fails due to silent dfun parameters
