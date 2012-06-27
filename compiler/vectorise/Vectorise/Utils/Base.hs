@@ -21,6 +21,8 @@ module Vectorise.Utils.Base
   , pdataReprTyConExact
   , pdatasReprTyConExact
   , pdataUnwrapScrut
+  
+  , preprSynTyCon
 ) where
 
 import Vectorise.Monad
@@ -29,6 +31,7 @@ import Vectorise.Builtins
 
 import CoreSyn
 import CoreUtils
+import FamInstEnv
 import Coercion
 import Type
 import TyCon
@@ -200,7 +203,11 @@ unwrapNewTypeBodyOfPDatasWrap e ty
 -- a set of distinct type variables.
 -- 
 pdataReprTyCon :: Type -> VM (TyCon, [Type])
-pdataReprTyCon ty = builtin pdataTyCon >>= (`lookupFamInst` [ty])
+pdataReprTyCon ty 
+  = do 
+    { (famInst, tys) <- builtin pdataTyCon >>= (`lookupFamInst` [ty])
+    ; return (dataFamInstRepTyCon famInst, tys)
+    }
 
 -- |Get the representation tycon of the 'PData' data family for a given type constructor.
 --
@@ -225,7 +232,7 @@ pdatasReprTyConExact tycon
   = do {   -- look up the representation tycon; if there is a match at all, it will be be exact
        ;   -- (i.e.,' _tys' will be distinct type variables)
        ; (ptycon, _tys) <- pdatasReprTyCon (tycon `mkTyConApp` mkTyVarTys (tyConTyVars tycon))
-       ; return ptycon
+       ; return $ dataFamInstRepTyCon ptycon
        }
   where
     pdatasReprTyCon ty = builtin pdatasTyCon >>= (`lookupFamInst` [ty])
@@ -240,3 +247,11 @@ pdataUnwrapScrut (ve, le)
        }
   where
     ty = exprType ve
+
+
+-- 'PRepr' representation types ----------------------------------------------
+
+-- |Get the representation tycon of the 'PRepr' type family for a given type.
+--
+preprSynTyCon :: Type -> VM (FamInst, [Type])
+preprSynTyCon ty = builtin preprTyCon >>= (`lookupFamInst` [ty])
