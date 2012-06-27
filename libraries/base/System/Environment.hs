@@ -17,10 +17,11 @@
 
 module System.Environment
     (
-      getArgs,       -- :: IO [String]
-      getProgName,   -- :: IO String
-      getEnv,        -- :: String -> IO String
-      lookupEnv,     -- :: String -> IO (Maybe String)
+      getArgs,            -- :: IO [String]
+      getProgName,        -- :: IO String
+      getExecutablePath,  -- :: IO FilePath
+      getEnv,             -- :: String -> IO String
+      lookupEnv,          -- :: String -> IO (Maybe String)
 #ifndef __NHC__
       withArgs,
       withProgName,
@@ -60,6 +61,8 @@ import System
   , getEnv
   )
 #endif
+
+import System.Environment.ExecutablePath
 
 #ifdef mingw32_HOST_OS
 # if defined(i386_HOST_ARCH)

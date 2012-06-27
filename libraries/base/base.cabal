@@ -216,6 +216,7 @@ Library {
         Control.Monad.ST.Imp
         Control.Monad.ST.Lazy.Imp
         Foreign.ForeignPtr.Imp
+        System.Environment.ExecutablePath
     c-sources:
         cbits/PrelIOUtils.c
         cbits/WCsubst.c
