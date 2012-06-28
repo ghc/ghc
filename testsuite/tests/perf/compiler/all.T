@@ -30,9 +30,10 @@ test('T1969',
                                   # hence 15% range.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
-                                                      270000000)),
+                                                      280000000)),
                                     # expected value: 215582916 (x86/Windows)
                                     #                 221667908 (x86/OS X)
+                                    #                 274932264 (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 420000000,
                                                       580000000)),
@@ -124,9 +125,9 @@ test('T4801',
 
 test('T3064',
      [# expect_broken( 3064 ),
-      # expected value: 9 (x86/Linux 30-03-2011):
+      # expected value: 14 (x86/Linux 28-06-2012):
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 10, 14)),
+          compiler_stats_range_field('peak_megabytes_allocated', 14, 10)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),
