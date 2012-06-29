@@ -41,7 +41,6 @@ import Trace.Hpc.Mix
 import Trace.Hpc.Util
 
 import BreakArray
-import Data.HashTable   ( hashString )
 import Data.Map (Map)
 import qualified Data.Map as Map
 \end{code}
