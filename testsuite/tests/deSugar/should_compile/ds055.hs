@@ -7,7 +7,6 @@
 module Foo where
 
    import Data.Data
-   import Data.HashTable
 
    data Item = forall a. (Data a) => Leaf Bool a
              | forall a. (Data a) => Branch Bool a Int Int
