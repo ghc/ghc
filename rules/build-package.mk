@@ -70,7 +70,7 @@ $(call package-config,$1,$2,$3)
 ifeq "$3" "0"
 $1_$2_WAYS = v
 else
-$1_$2_WAYS = $$(GhcLibWays)
+$1_$2_WAYS = $$(filter-out $$($1_$2_EXCLUDED_WAYS),$$(GhcLibWays))
 endif
 
 # We must use a different dependency file if $(GhcLibWays) changes, so

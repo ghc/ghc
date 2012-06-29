@@ -423,6 +423,14 @@ compiler_stage1_SplitObjs = NO
 compiler_stage2_SplitObjs = NO
 compiler_stage3_SplitObjs = NO
 
+ifeq "$(TargetOS_CPP)" "mingw32"
+# There are too many symbols to make a Windows DLL for the ghc package,
+# so we don't build it the dyn way; see trac #5987
+compiler_stage1_EXCLUDED_WAYS := dyn
+compiler_stage2_EXCLUDED_WAYS := dyn
+compiler_stage3_EXCLUDED_WAYS := dyn
+endif
+
 # if stage is set to something other than "1" or "", disable stage 1
 ifneq "$(filter-out 1,$(stage))" ""
 compiler_stage1_NOT_NEEDED = YES
