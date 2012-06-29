@@ -336,6 +336,7 @@ then
     CC="${mingwbin}gcc.exe"
     LD="${mingwbin}ld.exe"
     NM="${mingwbin}nm.exe"
+    OBJDUMP="${mingwbin}objdump.exe"
     fp_prog_ar="${mingwbin}ar.exe"
 
     if ! test -d inplace/perl ||
@@ -445,6 +446,12 @@ dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
+
+dnl ** Which objdump to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([OBJDUMP], [objdump], [objdump])
+ObjdumpCmd="$OBJDUMP"
+AC_SUBST([ObjdumpCmd])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
