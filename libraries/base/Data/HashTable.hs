@@ -19,7 +19,9 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.HashTable (
+module Data.HashTable
+      {-# DEPRECATED "Data.HashTable will be removed in GHC 7.8. Please use an alternative, e.g. the hashtables package, instead." #-}
+      (
         -- * Basic hash table operations
         HashTable, new, newHint, insert, delete, lookup, update,
         -- * Converting to and from lists
