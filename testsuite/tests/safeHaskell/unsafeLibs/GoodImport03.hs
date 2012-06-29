@@ -36,7 +36,6 @@ import Data.Fixed
 import Data.Foldable
 import Data.Function
 import Data.Functor
-import Data.HashTable
 import Data.IORef
 import Data.Int
 import Data.Ix
