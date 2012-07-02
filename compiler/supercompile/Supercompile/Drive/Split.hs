@@ -336,7 +336,7 @@ generaliseSplit opt ctxt_ids split_from deeds (heap, named_k, focus) = optimiseS
 --       x = case y of _ -> 2
 --   in x + 2
 --
--- After splitting:
+-- After splitting, we might want to drive this child term:
 --   let x = 2
 --   in x + 2
 -- 
@@ -736,6 +736,51 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         -- To deal with the more general case, we have to identify strongly-connected-components in the
         -- graph of heap Bracketed things. This is well-motivated because SCCs must be either pushed
         -- or residualised as a group.
+        --
+        -- Note [Greatest fixed point]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- You are probably thinking that this is all an awful workaround for the fact that I'm not using a greatest fixed point. This is true.
+        -- However, although GFP would work perfectly in the example above, it is difficult to get right in general because we don't know exactly how
+        -- to grow the set of "always residualise" bindings/frames on each iteration. Consider:
+        --
+        --  let x = e1
+        --      y = e2[x]
+        --  in \z -> e3[y]
+        --
+        -- After optimistic GFP inlining we get:
+        --
+        --  \z -> let x = e1
+        --            y = e2[x]
+        --        in e3[y]
+        --
+        -- But now we've duplicated computation! We can see this because the post-inlining entered info for the non-value bindings x and y is
+        -- both \infty. However, we can't on the next iteration just mark both x and y as "always residualise" because then we won't get the optimal code i.e.
+        --
+        --  let y = let x = e1
+        --          in e2[x]
+        --  in \z -> e3[y]
+        --
+        -- It seems really hard to work out a minimal set of things to add to the "always residualise" set every time. One promising approach is to:
+        --  1. Construct a graph from the heap/stack/context to split with these nodes:
+        --     a) x for (x |-> d) in heap: outgoing edges go to the update frames/heap bindings binding the free variables of d
+        --     b) i for i in [1..length(stack)]: outgoing edges go to the update frames/heap bindings binding the free variables of stack_i
+        --  2. Mark all the nodes in the graph with \infty occurrence that are *not* heap-bound value nodes
+        --  3. Remove any marks that are strictly dominated by other marks along ALL of their incoming edges
+        --
+        -- The problem with this scheme is that the mark-removal can lead to ambiguity if more than one thing in a SCC is marked.  Consider:
+        --
+        --  let x = e1[y]
+        --      y = e2[x]
+        --      a = e3[x]
+        --      b = e4[x]
+        --  in (a, b)
+        --
+        -- In the first iteration, both a and b will be marked "always residualise" since the marks on x and y will be dominated by those on a and b.
+        -- On the next iteration, both x and y will be marked again (they will both be trial-inlined into both the a and b bindings) and we have the
+        -- choice of unmarking either of them but not both.
+        --
+        -- In this case the right thing to do is unmark "y" and leave "x" marked since unmarking "x" will just lead to it being residualised on the
+        -- next iteration anyway, but unmarking "y" will allow it to be inlined into the x binding.
         inlineHeapWithKey :: (Deeds -> a                 -> (Deeds, EnteredEnv, b))
                           ->  Deeds -> M.Map (Out Var) a -> (Deeds, EnteredEnv, M.Map (Out Var) b)
         inlineHeapWithKey f deeds b = (deeds', overall_entered', b')
