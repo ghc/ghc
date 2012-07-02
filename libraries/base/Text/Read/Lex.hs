@@ -44,7 +44,7 @@ import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
 import GHC.Real( Integral, Rational, (%), fromIntegral,
                  toInteger, (^) )
 import GHC.List
-import GHC.Enum( maxBound )
+import GHC.Enum( minBound, maxBound )
 #else
 import Prelude hiding ( lex )
 import Data.Char( chr, ord, isSpace, isAlpha, isAlphaNum )
@@ -96,6 +96,12 @@ numberToInteger _ = Nothing
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
 numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
+    -- if exp is out of integer bounds,
+    -- then the number is definitely out of range
+    | exp > fromIntegral (maxBound :: Int) ||
+      exp < fromIntegral (minBound :: Int)
+    = Nothing
+    | otherwise
     = let mFirstDigit = case dropWhile (0 ==) iPart of
                         iPart'@(_ : _) -> Just (length iPart')
                         [] -> case mFPart of

@@ -118,4 +118,4 @@ test('4006', if_msys(expect_fail), compile_and_run, [''])
 
 test('5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
-
+test('T7034', normal, compile_and_run, [''])
