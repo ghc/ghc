@@ -262,6 +262,15 @@ void traceSparkCounters_ (Capability *cap,
                           SparkCounters counters,
                           StgWord remaining);
 
+void traceTaskCreate_ (Task       *task,
+                       Capability *cap);
+
+void traceTaskMigrate_ (Task       *task,
+                        Capability *cap,
+                        Capability *new_cap);
+
+void traceTaskDelete_ (Task       *task);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -289,6 +298,9 @@ INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceWallClockTime_() /* nothing */
 #define traceOSProcessInfo_() /* nothing */
 #define traceSparkCounters_(cap, counters, remaining) /* nothing */
+#define traceTaskCreate_(taskID, cap) /* nothing */
+#define traceTaskMigrate_(taskID, cap, new_cap) /* nothing */
+#define traceTaskDelete_(taskID) /* nothing */
 
 #endif /* TRACING */
 
@@ -415,6 +427,12 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_SPARK_FIZZLE(cap)
 #define dtraceSparkGc(cap)                              \
     HASKELLEVENT_SPARK_GC(cap)
+#define dtraceTaskCreate(taskID, cap)                   \
+    HASKELLEVENT_TASK_CREATE(taskID, cap)
+#define dtraceTaskMigrate(taskID, cap, new_cap)         \
+    HASKELLEVENT_TASK_MIGRATE(taskID, cap, new_cap)
+#define dtraceTaskDelete(taskID)                        \
+    HASKELLEVENT_TASK_DELETE(taskID)
 
 #else /* !defined(DTRACE) */
 
@@ -464,6 +482,9 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceSparkSteal(cap, victim_cap)               /* nothing */
 #define dtraceSparkFizzle(cap)                          /* nothing */
 #define dtraceSparkGc(cap)                              /* nothing */
+#define dtraceTaskCreate(taskID, cap)                   /* nothing */
+#define dtraceTaskMigrate(taskID, cap, new_cap)         /* nothing */
+#define dtraceTaskDelete(taskID)                        /* nothing */
 
 #endif
 
@@ -820,6 +841,47 @@ INLINE_HEADER void traceEventSparkGC(Capability *cap STG_UNUSED)
 {
     traceSparkEvent(cap, EVENT_SPARK_GC);
     dtraceSparkGc((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceTaskCreate(Task       *task STG_UNUSED,
+                                   Capability *cap  STG_UNUSED)
+{
+    ASSERT(task->cap == cap);
+    // TODO: asserting task->cap == NULL would be much stronger
+    // (the intention being that the task structure is just created and empty)
+    // but would require large changes of traceTaskCreate calls.
+    ASSERT(cap != NULL);
+    // A new task gets associated with a cap. We also record
+    // the kernel thread id of the task, which should never change.
+    if (RTS_UNLIKELY(TRACE_sched)) {
+        traceTaskCreate_(task, cap);
+    }
+    dtraceTaskCreate(serialisableTaskId(task), (EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceTaskMigrate(Task       *task    STG_UNUSED,
+                                    Capability *cap     STG_UNUSED,
+                                    Capability *new_cap STG_UNUSED)
+{
+    ASSERT(task->cap == cap);
+    ASSERT(cap != NULL);
+    ASSERT(cap != new_cap);
+    ASSERT(new_cap != NULL);
+    // A task migrates from a cap to another.
+    if (RTS_UNLIKELY(TRACE_sched)) {
+        traceTaskMigrate_(task, cap, new_cap);
+    }
+    dtraceTaskMigrate(serialisableTaskId(task), (EventCapNo)cap->no,
+                                                (EventCapNo)new_cap->no);
+}
+
+INLINE_HEADER void traceTaskDelete(Task *task STG_UNUSED)
+{
+    ASSERT(task->cap != NULL);
+    if (RTS_UNLIKELY(TRACE_sched)) {
+        traceTaskDelete_(task);
+    }
+    dtraceTaskDelete(serialisableTaskId(task));
 }
 
 #include "EndPrivate.h"

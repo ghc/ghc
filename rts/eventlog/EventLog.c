@@ -102,6 +102,9 @@ char *EventDesc[] = {
   [EVENT_SPARK_STEAL]         = "Spark steal",
   [EVENT_SPARK_FIZZLE]        = "Spark fizzle",
   [EVENT_SPARK_GC]            = "Spark GC",
+  [EVENT_TASK_CREATE]         = "Task create",
+  [EVENT_TASK_MIGRATE]        = "Task migrate",
+  [EVENT_TASK_DELETE]         = "Task delete",
 };
 
 // Event type. 
@@ -177,6 +180,15 @@ static inline void postCapsetID(EventsBuf *eb, EventCapsetID id)
 
 static inline void postCapsetType(EventsBuf *eb, EventCapsetType type)
 { postWord16(eb,type); }
+
+static inline void postOSProcessId(EventsBuf *eb, pid_t pid)
+{ postWord32(eb, pid); }
+
+static inline void postKernelThreadId(EventsBuf *eb, EventKernelThreadId tid)
+{ postWord64(eb, tid); }
+
+static inline void postTaskId(EventsBuf *eb, EventTaskId tUniq)
+{ postWord64(eb, tUniq); }
 
 static inline void postPayloadSize(EventsBuf *eb, EventPayloadSize size)
 { postWord16(eb,size); }
@@ -391,6 +403,20 @@ initEventLogging(void)
                                + sizeof(StgWord64) * 3
                                + sizeof(StgWord32)
                                + sizeof(StgWord64) * 2;
+            break;
+
+        case EVENT_TASK_CREATE:   // (taskId, cap, tid)
+            eventTypes[t].size =
+                sizeof(EventTaskId) + sizeof(EventCapNo) + sizeof(EventKernelThreadId);
+            break;
+
+        case EVENT_TASK_MIGRATE:   // (taskId, cap, new_cap)
+            eventTypes[t].size =
+                sizeof(EventTaskId) + sizeof(EventCapNo) + sizeof(EventCapNo);
+            break;
+
+        case EVENT_TASK_DELETE:   // (taskId)
+            eventTypes[t].size = sizeof(EventTaskId);
             break;
 
         case EVENT_BLOCK_MARKER:
@@ -699,7 +725,7 @@ void postCapsetEvent (EventTypeNum tag,
     case EVENT_OSPROCESS_PID:   // (capset, pid)
     case EVENT_OSPROCESS_PPID:  // (capset, parent_pid)
     {
-        postWord32(&eventBuf, info);
+        postOSProcessId(&eventBuf, info);
         break;
     }
     default:
@@ -912,6 +938,62 @@ void postEventGcStats  (Capability    *cap,
     postWord32(eb, par_n_threads);
     postWord64(eb, par_max_copied);
     postWord64(eb, par_tot_copied);
+}
+
+void postTaskCreateEvent (EventTaskId taskId,
+                          EventCapNo capno,
+                          EventKernelThreadId tid)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, EVENT_TASK_CREATE)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    postEventHeader(&eventBuf, EVENT_TASK_CREATE);
+    /* EVENT_TASK_CREATE (taskID, cap, tid) */
+    postTaskId(&eventBuf, taskId);
+    postCapNo(&eventBuf, capno);
+    postKernelThreadId(&eventBuf, tid);
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postTaskMigrateEvent (EventTaskId taskId,
+                           EventCapNo capno,
+                           EventCapNo new_capno)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, EVENT_TASK_MIGRATE)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    postEventHeader(&eventBuf, EVENT_TASK_MIGRATE);
+    /* EVENT_TASK_MIGRATE (taskID, cap, new_cap) */
+    postTaskId(&eventBuf, taskId);
+    postCapNo(&eventBuf, capno);
+    postCapNo(&eventBuf, new_capno);
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postTaskDeleteEvent (EventTaskId taskId)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, EVENT_TASK_DELETE)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    postEventHeader(&eventBuf, EVENT_TASK_DELETE);
+    /* EVENT_TASK_DELETE (taskID) */
+    postTaskId(&eventBuf, taskId);
+
+    RELEASE_LOCK(&eventBufMutex);
 }
 
 void
