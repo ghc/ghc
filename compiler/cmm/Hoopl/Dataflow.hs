@@ -260,7 +260,7 @@ analyzeFwd FwdPass { fp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpoint_anal Fwd lattice do_block entries blockmap f
+         = fixpointAnal Fwd lattice do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
@@ -303,7 +303,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpoint_anal Fwd lattice do_block entries blockmap f
+         = fixpointAnal Fwd lattice do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
@@ -345,7 +345,7 @@ analyzeBwd BwdPass { bp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpoint_anal Bwd lattice do_block entries blockmap f
+         = fixpointAnal Bwd lattice do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
            do_block b fb = mapSingleton (entryLabel b) (block b fb)
@@ -499,12 +499,14 @@ effects.)
 -}
 
 -----------------------------------------------------------------------------
---      fixpoint (analysis only)
+--      fixpoint
 -----------------------------------------------------------------------------
 
 data Direction = Fwd | Bwd
 
-fixpoint_anal :: forall n f. NonLocal n
+-- | fixpointing for analysis-only
+--
+fixpointAnal :: forall n f. NonLocal n
  => Direction
  -> DataflowLattice f
  -> (Block n C C -> Fact C f -> Fact C f)
@@ -512,33 +514,18 @@ fixpoint_anal :: forall n f. NonLocal n
  -> LabelMap (Block n C C)
  -> Fact C f -> FactBase f
 
-fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
+fixpointAnal direction DataflowLattice{ fact_bot = bot, fact_join = join }
               do_block entries blockmap init_fbase
   = loop start init_fbase
   where
-    blocks = forwardBlockList entries blockmap
-    n = length blocks
-
-    ordered_blocks = case direction of
-                        Fwd -> blocks
-                        Bwd -> reverse blocks
-
-    block_arr = {-# SCC "block_arr" #-} listArray (0,n-1) ordered_blocks
-
-    start = {-# SCC "start" #-} [0 .. n-1]
-
-    -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
-    dep_blocks :: LabelMap [Int]
-    dep_blocks = {-# SCC "dep_blocks" #-} mapFromListWith (++)
-                        [ (l, [ix])
-                        | (b,ix) <- zip ordered_blocks [0..]
-                        , l <- case direction of
-                                 Fwd -> [entryLabel b]
-                                 Bwd -> successors b
-                        ]
+    blocks     = sortBlocks direction entries blockmap
+    n          = length blocks
+    block_arr  = {-# SCC "block_arr" #-} listArray (0,n-1) blocks
+    start      = {-# SCC "start" #-} [0..n-1]
+    dep_blocks = {-# SCC "dep_blocks" #-} mkDepBlocks direction blocks
 
     loop
-       :: [Int]      -- blocks still to analyse
+       :: IntHeap      -- blocks still to analyse
        -> FactBase f  -- current factbase (increases monotonically)
        -> FactBase f
 
@@ -550,7 +537,7 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
                out_facts = {-# SCC "do_block" #-} do_block blk fbase
 
                !(todo', fbase') = {-# SCC "mapFoldWithKey" #-}
-                     mapFoldWithKey (updateFact bot join dep_blocks)
+                     mapFoldWithKey (updateFact join dep_blocks)
                                     (todo,fbase) out_facts
            in
            -- trace ("analysing: " ++ show (entryLabel blk)) $
@@ -561,40 +548,8 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
            loop todo' fbase'
 
 
-
------------------------------------------------------------------------------
---      fixpoint: finding fixed points
------------------------------------------------------------------------------
-
--- Shared by fixpoint and fixpoint_anal:
+-- | fixpointing for combined analysis/rewriting
 --
-updateFact :: f -> JoinFun f -> LabelMap [Int]
-           -> Label -> f       -- out fact
-           -> ([Int], FactBase f)
-           -> ([Int], FactBase f)
-
-updateFact bot fact_join dep_blocks lbl new_fact (todo, fbase)
-  = case lookupFact lbl fbase of
-      Nothing       -> let !z = mapInsert lbl new_fact fbase in (changed, z)
-                           -- Note [no old fact]
-      Just old_fact ->
-        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-          (NoChange, _) -> (todo, fbase)
-          (_,        f) -> let !z = mapInsert lbl f fbase in (changed, z)
-  where
-     changed = foldr insertIntHeap todo $
-                 mapFindWithDefault [] lbl dep_blocks
-
-{-
-Note [no old fact]
-
-We know that the new_fact is >= _|_, so we don't need to join.  However,
-if the new fact is also _|_, and we have already analysed its block,
-we don't need to record a change.  So there's a tradeoff here.  It turns
-out that always recording a change is faster.
--}
-
-
 fixpoint :: forall n f. NonLocal n
  => Direction
  -> DataflowLattice f
@@ -615,24 +570,11 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
     -- for which we have facts and which are *not* in
     -- the blocks of the graph
   where
-    blocks               = forwardBlockList entries blockmap
-    ordered_blocks       = case direction of
-                             Fwd -> blocks
-                             Bwd -> reverse blocks
-    block_arr            = listArray (0,n-1) ordered_blocks
-
-    start = [0 .. n-1]
-    n = length blocks
-
-    -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
-    dep_blocks :: LabelMap [Int]
-    dep_blocks = mapFromListWith (++)
-                        [ (l, [ix])
-                        | (b,ix) <- zip ordered_blocks [0..]
-                        , l <- case direction of
-                                 Fwd -> [entryLabel b]
-                                 Bwd -> successors b
-                        ]
+    blocks     = sortBlocks direction entries blockmap
+    n          = length blocks
+    block_arr  = {-# SCC "block_arr" #-} listArray (0,n-1) blocks
+    start      = {-# SCC "start" #-} [0..n-1]
+    dep_blocks = {-# SCC "dep_blocks" #-} mkDepBlocks direction blocks
 
     loop
        :: IntHeap
@@ -647,7 +589,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
            -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let !(todo', fbase') =
-                  mapFoldWithKey (updateFact bot join dep_blocks)
+                  mapFoldWithKey (updateFact join dep_blocks)
                                  (todo,fbase) out_facts
 
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
@@ -727,6 +669,62 @@ we'll propagate (x=4) to L4, and nuke the otherwise-good rewriting of L4.
 * All of this only applies for *forward* ixpoints.  For the backward
   case we must treat every block as reachable; it might finish with a
   'return', and therefore have no successors, for example.
+-}
+
+
+-----------------------------------------------------------------------------
+--  Pieces that are shared by fixpoint and fixpoint_anal
+-----------------------------------------------------------------------------
+
+-- | Sort the blocks into the right order for analysis.
+sortBlocks :: NonLocal n => Direction -> [Label] -> LabelMap (Block n C C)
+           -> [Block n C C]
+sortBlocks direction entries blockmap
+   = case direction of Fwd -> fwd
+                       Bwd -> reverse fwd
+  where fwd = forwardBlockList entries blockmap
+
+-- | construct a mapping from L -> block indices.  If the fact for L
+-- changes, re-analyse the given blocks.
+mkDepBlocks :: NonLocal n => Direction -> [Block n C C] -> LabelMap [Int]
+mkDepBlocks Fwd blocks = go blocks 0 mapEmpty
+  where go []     !_  m = m
+        go (b:bs) !n m = go bs (n+1) $! mapInsert (entryLabel b) [n] m
+mkDepBlocks Bwd blocks = go blocks 0 mapEmpty
+  where go []     !_ m = m
+        go (b:bs) !n m = go bs (n+1) $! go' (successors b) m
+            where go' [] m = m
+                  go' (l:ls) m = go' ls (mapInsertWith (++) l [n] m)
+
+
+-- | After some new facts have been generated by analysing a block, we
+-- fold this function over them to generate (a) a list of block
+-- indices to (re-)analyse, and (b) the new FactBase.
+--
+updateFact :: JoinFun f -> LabelMap [Int]
+           -> Label -> f       -- out fact
+           -> (IntHeap, FactBase f)
+           -> (IntHeap, FactBase f)
+
+updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
+  = case lookupFact lbl fbase of
+      Nothing       -> let !z = mapInsert lbl new_fact fbase in (changed, z)
+                           -- Note [no old fact]
+      Just old_fact ->
+        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
+          (NoChange, _) -> (todo, fbase)
+          (_,        f) -> let !z = mapInsert lbl f fbase in (changed, z)
+  where
+     changed = foldr insertIntHeap todo $
+                 mapFindWithDefault [] lbl dep_blocks
+
+{-
+Note [no old fact]
+
+We know that the new_fact is >= _|_, so we don't need to join.  However,
+if the new fact is also _|_, and we have already analysed its block,
+we don't need to record a change.  So there's a tradeoff here.  It turns
+out that always recording a change is faster.
 -}
 
 -----------------------------------------------------------------------------
