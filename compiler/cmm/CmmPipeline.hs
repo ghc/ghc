@@ -65,13 +65,13 @@ cmmPipeline hsc_env topSRT prog =
      --
      showPass dflags "CPSZ"
 
-     (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) prog
+     (cafEnvs, tops) <- {-# SCC "tops" #-} liftM unzip $ mapM (cpsTop hsc_env) prog
      -- tops :: [[(CmmDecl,CAFSet]]  (one list per group)
 
-     let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
+     let topCAFEnv = {-# SCC "topCAFEnv" #-} mkTopCAFInfo (concat cafEnvs)
 
      -- folding over the groups
-     (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
+     (topSRT, tops) <- {-# SCC "toTops" #-} foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
 
      let cmms :: CmmGroup
          cmms = reverse (concat tops)
@@ -116,6 +116,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                          run $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
+       g <- {-# SCC "sink" #-} run $ cmmSink g
+       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+
 --       ----------- Sink and inline assignments -------------------
 --       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
 --            rewriteAssignments platform g
@@ -131,7 +134,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ------------- More CAFs ------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform g
-       let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
+       let localCAFs = {-# SCC "localCAFs" #-} catMaybes $ map (localCAFInfo platform cafEnv) gs
        mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES

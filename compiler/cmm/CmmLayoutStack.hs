@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards, GADTs #-}
 module CmmLayoutStack (
-       cmmLayoutStack, setInfoTableStackMap
+       cmmLayoutStack, setInfoTableStackMap, cmmSink
   ) where
 
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX
@@ -32,7 +32,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
-import Data.List (nub)
+import Data.List (nub, partition)
 import Control.Monad (liftM)
 
 #include "HsVersions.h"
@@ -973,3 +973,73 @@ insertReloads stackmap =
 
 stackSlotRegs :: StackMap -> [(LocalReg, StackLoc)]
 stackSlotRegs sm = eltsUFM (sm_regs sm)
+
+-- -----------------------------------------------------------------------------
+
+-- If we do this *before* stack layout, we might be able to avoid
+-- saving some things across calls/procpoints.
+--
+-- *but*, that will invalidate the liveness analysis, and we'll have
+-- to re-do it.
+
+cmmSink :: CmmGraph -> FuelUniqSM CmmGraph
+cmmSink graph = do
+  let liveness = cmmLiveness graph
+  return $ cmmSink' liveness graph
+
+cmmSink' :: BlockEnv CmmLive -> CmmGraph -> CmmGraph
+cmmSink' liveness graph
+  = ofBlockList (g_entry graph) $ sink mapEmpty $ postorderDfs graph
+  where
+
+  sink :: BlockEnv [(LocalReg, CmmExpr)] -> [CmmBlock] -> [CmmBlock]
+  sink _ [] = []
+  sink sunk (b:bs) =
+    pprTrace "sink" (ppr l) $
+    blockJoin first final_middle last : sink sunk' bs
+    where
+      l = entryLabel b
+      (first, middle, last) = blockSplit b
+      (middle', assigs) = walk (blockToList middle) emptyBlock
+                               (mapFindWithDefault [] l sunk)
+
+      (dropped_last, assigs') = partition (`conflictsWithLast` last) assigs
+
+      final_middle = foldl blockSnoc middle' (toNodes dropped_last)
+
+      sunk' = mapUnion sunk $
+                 mapFromList [ (l, filt assigs' (getLive l))
+                             | l <- successors last ]
+           where
+               getLive l = mapFindWithDefault Set.empty l liveness
+               filt as live = [ (r,e) | (r,e) <- as, r `Set.member` live ]
+
+
+walk :: [CmmNode O O] -> Block CmmNode O O -> [(LocalReg, CmmExpr)]
+     -> (Block CmmNode O O, [(LocalReg, CmmExpr)])
+
+walk []     acc as = (acc, as)
+walk (n:ns) acc as
+  | Just a <- collect_it  = walk ns acc (a:as)
+  | otherwise             = walk ns (foldr (flip blockSnoc) acc (n:drop_nodes)) as'
+  where
+    collect_it = case n of
+                   CmmAssign (CmmLocal r) e@(CmmReg (CmmGlobal _)) -> Just (r,e)
+--                   CmmAssign (CmmLocal r) e@(CmmLoad addr _) |
+--                      foldRegsUsed (\b r -> False) True addr -> Just (r,e)
+                   _ -> Nothing
+
+    drop_nodes = toNodes dropped
+    (dropped, as') = partition should_drop as
+       where should_drop a = a `conflicts` n
+
+toNodes as = [ CmmAssign (CmmLocal r) rhs | (r,rhs) <- as ]
+
+-- We only sink "r = G" assignments right now, so conflicts is very simple:
+(r, rhs) `conflicts` CmmAssign reg  _  | reg `regUsedIn` rhs = True
+--(r, CmmLoad _ _) `conflicts` CmmStore _ _ = True
+(r, _)   `conflicts` node
+  = foldRegsUsed (\b r' -> r == r' || b) False node
+
+(r, _) `conflictsWithLast` node
+  = foldRegsUsed (\b r' -> r == r' || b) False node
