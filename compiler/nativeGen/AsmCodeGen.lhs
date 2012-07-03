@@ -857,7 +857,12 @@ cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
   let platform = targetPlatform dflags
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline platform (cmmEliminateDeadBlocks blocks))
+
+  let reachable_blocks | dopt Opt_TryNewCodeGen dflags = blocks
+                       | otherwise = cmmEliminateDeadBlocks blocks
+      -- The new codegen path has already eliminated unreachable blocks by now
+
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline platform reachable_blocks)
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
