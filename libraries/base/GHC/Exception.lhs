@@ -182,6 +182,7 @@ data ArithException
   | LossOfPrecision
   | DivideByZero
   | Denormal
+  | RatioZeroDenominator
   deriving (Eq, Ord, Typeable)
 
 instance Exception ArithException
@@ -192,5 +193,6 @@ instance Show ArithException where
   showsPrec _ LossOfPrecision = showString "loss of precision"
   showsPrec _ DivideByZero    = showString "divide by zero"
   showsPrec _ Denormal        = showString "denormal"
+  showsPrec _ RatioZeroDenominator = showString "Ratio has zero denominator"
 
 \end{code}

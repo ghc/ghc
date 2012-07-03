@@ -27,6 +27,7 @@ module GHC.Err
        (
          absentErr                 -- :: a
        , divZeroError              -- :: a
+       , ratioZeroDenominatorError -- :: a
        , overflowError             -- :: a
 
        , error                     -- :: String -> a
@@ -81,6 +82,10 @@ in the libraries before the Exception type has been defined yet.
 {-# NOINLINE divZeroError #-}
 divZeroError :: a
 divZeroError = throw DivideByZero
+
+{-# NOINLINE ratioZeroDenominatorError #-}
+ratioZeroDenominatorError :: a
+ratioZeroDenominatorError = throw RatioZeroDenominator
 
 {-# NOINLINE overflowError #-}
 overflowError :: a

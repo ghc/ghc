@@ -92,7 +92,7 @@ their greatest common divisor.
 \begin{code}
 reduce ::  (Integral a) => a -> a -> Ratio a
 {-# SPECIALISE reduce :: Integer -> Integer -> Rational #-}
-reduce _ 0              =  error "Ratio.%: zero denominator"
+reduce _ 0              =  ratioZeroDenominatorError
 reduce x y              =  (x `quot` d) :% (y `quot` d)
                            where d = gcd x y
 \end{code}
@@ -412,7 +412,7 @@ instance  (Integral a)  => Num (Ratio a)  where
 instance  (Integral a)  => Fractional (Ratio a)  where
     {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')   =  (x*y') % (y*x')
-    recip (0:%_)        = error "Ratio.%: zero denominator"
+    recip (0:%_)        = ratioZeroDenominatorError
     recip (x:%y)
         | x < 0         = negate y :% negate x
         | otherwise     = y :% x
@@ -628,7 +628,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
     | e > 0     = (n ^ e) :% (d ^ e)
     | e == 0    = 1 :% 1
     | n > 0     = (d ^ (negate e)) :% (n ^ (negate e))
-    | n == 0    = error "Ratio.%: zero denominator"
+    | n == 0    = ratioZeroDenominatorError
     | otherwise = let nn = d ^ (negate e)
                       dd = (negate n) ^ (negate e)
                   in if even e then (nn :% dd) else (negate nn :% dd)
