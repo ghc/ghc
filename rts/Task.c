@@ -389,7 +389,10 @@ workerTaskStop (Task *task)
 #endif
 
 #ifdef DEBUG
-
+// We don't replace this function with serialisableTaskId,
+// because debug prints as pointers are more readable than random
+// 64-bit intergers (especially on 32-bit architectures)
+// and because we want to use this function also for non-treaded RTS.
 static void *taskId(Task *task)
 {
 #ifdef THREADED_RTS

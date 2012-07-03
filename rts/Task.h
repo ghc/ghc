@@ -159,7 +159,6 @@ isBoundTask (Task *task)
     return (task->incall->tso != NULL);
 }
 
-
 // Linked list of all tasks.
 //
 extern Task *all_tasks;
@@ -272,6 +271,44 @@ setMyTask (Task *task)
     setThreadLocalVar(&currentTaskKey,task);
 #else
     my_task = task;
+#endif
+}
+
+// Tasks are identified by their OS thread ID, which can be serialised
+// to StgWord64, as defined below.
+typedef StgWord64 TaskId;
+
+// Get a unique serialisable representation for a task id.
+//
+// It's only unique within the process. For example if they are emitted in a
+// log file then it is suitable to work out which log entries are releated.
+//
+// This is needed because OSThreadId is an opaque type
+// and in practice on some platforms it is a pointer type.
+//
+#if defined(THREADED_RTS)
+INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
+#if defined(freebsd_HOST_OS) || defined(darwin_HOST_OS)
+    // Here OSThreadId is a pthread_t and pthread_t is a pointer, but within
+    // the process we can still use that pointer value as a unique id.
+    return (TaskId) taskID
+#else
+    // On Windows, Linux and others it's an integral type to start with.
+    return taskID;
+#endif
+}
+#endif
+
+//
+// Get a serialisable Id for the Task's OS thread
+// Needed mainly for logging since the OSThreadId is an opaque type
+INLINE_HEADER TaskId
+serialisableTaskId (Task *task STG_UNUSED)
+{
+#if defined(THREADED_RTS)
+    return serialiseTaskId(task->id);
+#else
+    return 1;
 #endif
 }
 

@@ -10,9 +10,9 @@
 #define _WIN32_WINNT 0x0500
 
 #include "Rts.h"
+#include <windows.h>
 #if defined(THREADED_RTS)
 #include "RtsUtils.h"
-#include <windows.h>
 
 /* For reasons not yet clear, the entire contents of process.h is protected 
  * by __STRICT_ANSI__ not being defined.
@@ -314,3 +314,9 @@ nat getNumberOfProcessors (void)
 }
 
 #endif /* !defined(THREADED_RTS) */
+
+KernelThreadId kernelThreadId (void)
+{
+    DWORD tid = GetCurrentThreadId();
+    return tid;
+}
