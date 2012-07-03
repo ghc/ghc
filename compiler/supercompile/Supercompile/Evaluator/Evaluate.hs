@@ -212,21 +212,6 @@ step' normalising ei_state = {-# SCC "step'" #-}
     go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) ((,) True) $ force  deeds h k (annedTag anned_x) (annee anned_x)
     go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   ((,) True) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
 
-    lookupHeap :: PureHeap -> Out Var -> Maybe (HowBound, Superinlinable, In AnnedTerm)
-    lookupHeap h x' = do
-        hb <- M.lookup x' h
-        in_e <- heapBindingTerm hb
-        -- We have to check this here (not just when preparing unfoldings) because
-        -- we would like to also exclude local recursive loops, not just top-level ones
-        case shouldExposeUnfolding x' of
-            Right super  -> return (howBound hb, super, in_e)
-            Left why_not
-              -- EXPERIMENT: claim that anything bound *internally* is superinlinable so we don't end up
-              -- with as many stupid manifest beta reductions
-              -- | how_bound == InternallyBound -> return (howBound hb, True, in_e)
-              | otherwise -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
-                             fail why_not
-
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
     -- FIXME: look inside unfoldings
@@ -245,30 +230,46 @@ step' normalising ei_state = {-# SCC "step'" #-}
       | otherwise = do
         -- NB: it doesn't matter if the thing we look up is superinlinable because we'll actually only need to check then when we come to
         -- look it up as a *value*. In any case, the vast majority of SUPERINLINABLE things will be values, so we'll never get here.
-        (how_bound, _, in_e) <- lookupHeap h x'
+        hb <- M.lookup x' h
+        in_e <- heapBindingTerm hb
         -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
-        if (how_bound == InternallyBound)
-         then return ()
-         else trace ("force non-internal: " ++ show x') $ fail "force"
-        -- Avoid creating consecutive update frames: implements "stack squeezing" to maintain stack invariants
-        -- NB: suprisingly this is not broken, even if there are cycles in the heap:
-        --     <x |-> y, y |-> x | x |>
-        -- --> <         y |-> x | y | update x>
-        -- --> <         y |-> x | x | update x>
-        --     The reason is that squeezing adds a heap binding that just points into an update frame bound thing,
-        --     and once a binder is on the stack it won't be turned into a heap binder until we have got a value,
-        --     so inlining the squeezed heap binding will either just get us stuck immediately or get to a value
-        --
-        -- NB: squeezing will discard any flag marking x' as superinlinable. However, I think this is totally OK:
-        -- the update frame already on the stack (which is preserved by squeezing) contains the name by which the *user*
-        -- tried to access the function, and it is in keeping with the rest of GHC (where the inlinability you see is
-        -- based on the label you wrote in your own code) that that is the relevant flag.
-        return $ normalise $ case (case k of Tagged tg_y  (Update y') `Car`                               _ -> Just (Uncast,          Tagged tg_y y')
-                                             Tagged tg_co (CastIt co) `Car` Tagged tg_y (Update y') `Car` _ -> Just (CastBy co tg_co, Tagged tg_y y')
-                                             _ -> Nothing) of
-            Nothing                        -> (deeds, Heap (M.delete x' h)                        ids, Tagged tg (Update x') `Car` k, in_e)
-            Just (cast_by, Tagged tg_y y') -> (deeds, Heap (M.insert x' (internallyBound in_e) h) ids,                             k, in_e)
-              where in_e = mkVarCastBy tg_y y' cast_by
+        if (howBound hb == InternallyBound)
+         -- Avoid creating consecutive update frames: implements "stack squeezing" to maintain stack invariants
+         -- NB: suprisingly this is not broken, even if there are cycles in the heap:
+         --     <x |-> y, y |-> x | x |>
+         -- --> <         y |-> x | y | update x>
+         -- --> <         y |-> x | x | update x>
+         --     The reason is that squeezing adds a heap binding that just points into an update frame bound thing,
+         --     and once a binder is on the stack it won't be turned into a heap binder until we have got a value,
+         --     so inlining the squeezed heap binding will either just get us stuck immediately or get to a value
+         --
+         -- NB: squeezing will discard any flag marking x' as superinlinable. However, I think this is totally OK:
+         -- the update frame already on the stack (which is preserved by squeezing) contains the name by which the *user*
+         -- tried to access the function, and it is in keeping with the rest of GHC (where the inlinability you see is
+         -- based on the label you wrote in your own code) that that is the relevant flag.
+         then return $ normalise $ case (case k of Tagged tg_y  (Update y') `Car`                               _ -> Just (Uncast,          Tagged tg_y y')
+                                                   Tagged tg_co (CastIt co) `Car` Tagged tg_y (Update y') `Car` _ -> Just (CastBy co tg_co, Tagged tg_y y')
+                                                   _ -> Nothing) of
+                  Nothing                        -> (deeds, Heap (M.delete x' h)                            ids, Tagged tg (Update x') `Car` k, in_e)
+                  Just (cast_by, Tagged tg_y y') -> (deeds, Heap (M.insert x' (internallyBound in_e_ref) h) ids,                             k, in_e)
+                    where in_e_ref = mkVarCastBy tg_y y' cast_by
+         -- We want to get at the values of non-internal bindings, but since we can't create updates we can
+         -- only do so if they are already values. This is perhaps weird, but continuing using unwind' is exactly the right thing to do
+         else do
+            anned_a <- termToAnswer ids in_e
+            -- We have to deal with any leading cast because unwind' can't deal with them
+            let (deeds', cast_by, k') = case k of Tagged tg_co (CastIt co) `Car` k -> (deeds `releaseDeeds` 1, CastBy co tg_co, k)
+                                                  _                                -> (deeds,                  Uncast,          k)
+            (deeds', anned_a', in_e_ref) <- claimAnswerDuplicateDeeds ids (deeds' `releaseDeeds` 1) anned_a tg x' cast_by -- NB: one deed for the variable
+            -- Unfortunately, the stack top might look like (cast, update, cast) so even after eliminating the leading cast
+            -- we need to get rid of any leading "update" that unwind' won't deal with
+            let (mb_update, k'') = peelValueStack k'
+            (deeds', h', referring_x', anned_a', in_e_ref') <- return $ case mb_update of
+              Nothing                        -> (deeds', Heap h                                          ids, x',                     anned_a',         in_e_ref)
+              Just (Tagged tg_y y', cast_by) -> (deeds', Heap (M.insert y' (internallyBound in_e_ref) h) ids, y', castAnnedAnswer ids anned_a' cast_by, mkVarCastBy tg_y y' cast_by)
+                -- NB: needn't claim deeds for the y |-> in_e update above because it is paid for by the cast+update deeds in mb_update
+                -- TODO: I feel like there is a lot of duplicate code between here, unwind and stack squeezing
+            unwind' deeds' h' k'' (Just referring_x') (annedTag anned_a') (extract anned_a') in_e_ref'
 
     -- TODO: this function totally ignores deeds
     trimUnreachable :: Int   -- Number of value arguments needed before evaluation bottoms out
@@ -310,16 +311,20 @@ step' normalising ei_state = {-# SCC "step'" #-}
       let (mb_update, k') = peelValueStack k
           anned_a = annedAnswer tg_a a
           in_e = annedAnswerToInAnnedTerm ids anned_a
-      -- The idea here is that we have deeds for the heap and the "meaning" bit a but not the code to "reference" in_e,
+      -- The idea here is that we have deeds for the heap and the "meaning" bit a but not the code to "reference" in_e_ref,
       -- but that the deeds required for the reference code are <= (deeds required by the meaning + extra deeds released into the main supply if any)
-      (deeds, heap, mb_x, anned_a, in_e) <- case mb_update of
+      (deeds, heap, mb_x, anned_a, in_e_ref) <- case mb_update of
         Nothing                         -> return (deeds, heap, Nothing, anned_a, in_e)
-        Just (Tagged tg_x' x', cast_by)
-          | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
-          | otherwise -> do
-            deeds' <- claimDeeds (deeds `releaseDeeds` 1) (answerSize' a) -- NB: releases one deed for the update frame
-            return (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, Just x', castAnnedAnswer ids anned_a cast_by, mkVarCastBy tg_x' x' cast_by)
-      unwind' deeds heap k' mb_x (annedTag anned_a) (extract anned_a) in_e
+        Just (Tagged tg_x' x', cast_by) -> do
+            (deeds', anned_a', in_e_ref) <- claimAnswerDuplicateDeeds ids (deeds `releaseDeeds` 1) anned_a tg_x' x' cast_by -- NB: releases one deed for the update frame
+            return (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, Just x', anned_a', in_e_ref)
+      unwind' deeds heap k' mb_x (annedTag anned_a) (extract anned_a) in_e_ref
+
+    claimAnswerDuplicateDeeds ids deeds anned_a tg_x' x' cast_by
+      | normalising, dUPLICATE_VALUES_EVALUATOR = Nothing -- If duplicating values, we ensure normalisation by not executing updates
+      | otherwise = do
+        deeds <- claimDeeds deeds (annedSize anned_a)
+        return (deeds, castAnnedAnswer ids anned_a cast_by, mkVarCastBy tg_x' x' cast_by)
 
     unwind' deeds heap@(Heap h ids) k mb_x' tg_a a@(mb_co, (rn, v)) in_e = case k of
      Loco _ -> Nothing
@@ -335,8 +340,10 @@ step' normalising ei_state = {-# SCC "step'" #-}
         Update x'                      -> pprPanic "unwind': stack update invariant violation" (ppr x')    -- Stack squeezing ensures that there are no (update, cast, update) sequences
       where
         -- Should check this is not Nothing before using the "meaning" a
-        mb_super = case mb_x' of
+        checkShouldExposeUnfolding = case mb_x' of
                      Nothing -> Just False
+                     -- We have to check this here (not just when preparing unfoldings) because
+                     -- we would like to also exclude local recursive loops, not just top-level ones
                      Just x' -> case shouldExposeUnfolding x' of
                        Right super  -> Just super
                        Left why_not -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
@@ -349,7 +356,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
           -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
           | normalising, isJust mb_x', not dUPLICATE_VALUES_EVALUATOR = Nothing
           | otherwise = do
-            super <- mb_super
+            super <- checkShouldExposeUnfolding
             s' <- fmap normalise it
             -- NB: you might think it would be OK to inline even when *normalising*, as long as the inlining
             -- makes the term strictly smaller. This is very tempting, but we would have to check that the size
@@ -439,6 +446,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                       (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
                       e_arg = annedTerm tg_a (annedTerm tg_kf (Var x') `Cast` mkSymCo ids arg_co')
 
+        -- TODO: use checkShouldExposeUnfolding
         scrutinise :: Deeds -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
         scrutinise deeds_init wild' _ty' (rn_alts, alts)
            -- Literals are easy -- we can make the simplifying assumption that the types of literals are
@@ -513,6 +521,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
         -- NB: this actually duplicates the answer "a" into the answers field of the PrimApply, even if that "a" is update-bound
         -- This isn't perhaps in the spirit of the rest of the evaluator, but it probably doesn't matter at all in practice.
+        -- TODO: use checkShouldExposeUnfolding?
         primop :: Deeds -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> [In AnnedTerm] -> Maybe UnnormalisedState
         primop deeds tg_kf pop tys' anned_as [] = do
             guard eVALUATE_PRIMOPS -- NB: this is not faithful to paper 1 because we still turn primop expressions into
