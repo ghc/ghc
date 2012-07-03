@@ -218,9 +218,10 @@ matchTerm' rn2 _    (Cast e_l co_l)            _    (Cast e_r co_r)            =
 matchTerm' _ _ _ _ _ = fail "matchTerm"
 
 matchValue :: RnEnv2 -> Tag -> AnnedValue -> Tag -> AnnedValue -> Match [MatchLR]
-matchValue rn2 _    (Indirect x_l)               _    (Indirect x_r)               = matchVar rn2 x_l x_r
-matchValue rn2 _    (Indirect x_l)               tg_r v_r                          = matchVarL rn2 x_l (annedTerm tg_r (Value v_r))
-matchValue rn2 tg_l v_l                          _    (Indirect x_r)               = matchVarR rn2 (annedTerm tg_l (Value v_l)) x_r
+-- TODO: value instance matching (need to check for a solitary update at stack top..)
+--matchValue rn2 _    (Indirect x_l)               _    (Indirect x_r)               = matchVar rn2 x_l x_r
+--matchValue rn2 _    (Indirect x_l)               tg_r v_r                          = matchVarL rn2 x_l (annedTerm tg_r (Value v_r))
+--matchValue rn2 tg_l v_l                          _    (Indirect x_r)               = matchVarR rn2 (annedTerm tg_l (Value v_l)) x_r
 matchValue rn2 _    (TyLambda a_l e_l)           _    (TyLambda a_r e_r)           = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchTerm rn2 e_l e_r
 matchValue rn2 _    (Lambda x_l e_l)             _    (Lambda x_r e_r)             = matchIdCoVarBndr True rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
 matchValue rn2 _    (Data dc_l tys_l cos_l xs_l) _    (Data dc_r tys_r cos_r xs_r) = guard "matchValue: datacon" (dc_l == dc_r) >> liftM3 app3 (matchList (matchType rn2) tys_l tys_r) (matchList (matchCoercion rn2) cos_l cos_r) (matchList (matchVar rn2) xs_l xs_r)

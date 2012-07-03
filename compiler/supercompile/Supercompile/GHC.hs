@@ -209,7 +209,6 @@ termToCoreExpr = term
         S.LetRec xes e      -> Let (Rec (map (second term) xes)) (term e)
         S.Cast e co         -> Cast (term e) co
     
-    value (S.Indirect x)         = Var x
     value (S.Literal l)          = Lit l
     value (S.Coercion co)        = Coercion co
     value (S.TyLambda a e)       = Lam a (term e)

@@ -654,9 +654,10 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
             memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
                      = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
     
-                     | (_, _, Loco _, qa) <- state -- NB: not safe to use reduced_state!
-                     , Answer (_, (_, v)) <- annee qa
-                     = case v of Indirect _ -> Skip; _ -> if eAGER_SPLIT_VALUES then Skip else CheckAndRemember
+                     | (_, _, k, qa) <- state -- NB: not safe to use reduced_state!
+                     , Just mb_update <- isTrivialValueStack_maybe k
+                     , Answer _ <- annee qa
+                     = if isJust mb_update || eAGER_SPLIT_VALUES then Skip else CheckAndRemember
     
                      | otherwise
                      = if state_did_reduce || eAGER_SPLIT_VALUES then CheckAndRemember else Skip

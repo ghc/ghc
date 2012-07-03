@@ -320,7 +320,6 @@ mkRename rec = (term, alternatives, value, value')
     
     value ids rn = rec (value' ids) rn
     value' ids rn v = case v of
-      Indirect x -> Indirect (renameId rn x)
       TyLambda x e -> TyLambda x' (term ids' rn' e)
         where (ids', rn', x') = renameNonRecBinder ids rn x
       Lambda x e -> Lambda x' (term ids' rn' e)

@@ -72,7 +72,6 @@ mkTagger rec = term
       where tag = tag_rec ids e
 
     value ids e v = fmap Value $ case v of
-        Indirect x         -> tag $ \_ -> Indirect x
         TyLambda x e       -> tag $ \ids -> TyLambda x (term ids e)
         Lambda x e         -> tag $ \ids -> Lambda x (term ids e)
         Data dc tys cos xs -> rec (dataConTag dc) $ replace e (Data dc tys cos xs)
@@ -114,8 +113,7 @@ mkDetag rec = (term, term', alternatives, value, value')
         Cast e co         -> Cast (term e) co
 
     value = rec value'
-    value' (Indirect x)         = Indirect x
-    value' (TyLambda x e)       = TyLambda x (term e)
+    value' (TyLambda a e)       = TyLambda a (term e)
     value' (Lambda x e)         = Lambda x (term e)
     value' (Data dc tys cos xs) = Data dc tys cos xs
     value' (Literal l)          = Literal l

@@ -197,8 +197,7 @@ showValueGroup (root, group) = go emptyVarSet noPrec root
     go shown prec x = case lookupVarEnv group x of
       Just v | not (x `elemVarSet` shown)  -- Break loops in recursive structures
              , let shown' = shown `extendVarSet` x
-             -> case v of Indirect y         -> go shown' prec y
-                          Data dc tys cos ys -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction co | co <- cos] ++ [PrettyFunction (\prec -> go shown' prec y) | y <- ys])
+             -> case v of Data dc tys cos ys -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction co | co <- cos] ++ [PrettyFunction (\prec -> go shown' prec y) | y <- ys])
                           _ -> pprPrec prec v
       _ -> pprPrec prec x
 
@@ -259,7 +258,6 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
     -- be literalTags/dataConTags that occur multiple times in *all* tagged terms to
     -- the same annotation.
     go_value' ann v = case v of
-        Indirect _    -> (Nothing,        IM.empty)
         Literal l     -> (Just (show l),  IM.empty)
         Coercion _    -> (Nothing,        IM.empty)
         TyLambda _ e  -> (Nothing,        go_term ann e)
@@ -439,13 +437,19 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 -- (for some non-HM-typeable programs).
 eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
 eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
-  (_, Heap h ids, Loco _, anned_qa)
-    | Answer (a_cast, (rn, v)) <- extract anned_qa
-    , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
-                                       CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
+  (_, Heap h ids, k, anned_qa)
+    | Just mb_update <- isTrivialValueStack_maybe k
+    , Answer (a_cast, (rn, v)) <- extract anned_qa
+    , let accessor_e1 = case mb_update of
+            Nothing               -> accessor_e0
+            Just (_, Uncast)      -> accessor_e0
+            Just (_, CastBy co _) -> accessor_e0 `cast` mkSymCo ids co
+          accessor_e2 = case a_cast of
+            Uncast      -> accessor_e1
+            CastBy co _ -> accessor_e1 `cast` mkSymCo ids co
           mb_res@(~(Just (_, x, _))) = case v of
-             Lambda   x e_body -> Just (accessor_e1 `app`   x',           x, e_body)
-             TyLambda a e_body -> Just (accessor_e1 `tyApp` mkTyVarTy x', a, e_body)
+             Lambda   x e_body -> Just (accessor_e2 `app`   x',           x, e_body)
+             TyLambda a e_body -> Just (accessor_e2 `tyApp` mkTyVarTy x', a, e_body)
              _                 -> Nothing
           (ids', rn', x') = renameNonRecBinder ids rn x
     , Just (accessor_e2, _, e_body) <- mb_res
@@ -644,14 +648,20 @@ speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M
                           -- Then we got a residual let-binding for "add", and the two h-functions
                           -- corresponding to each component of the tuple were lambda-abstracted
                           -- over "add"!
-                          | Just cast_by <- stackToCast k
+                          | Just (cast_by, mb_update) <- isTrivialStack_maybe k
+                          -- TODO: might it not be cleaner to speculate the term with an Update frame for x' bunged on the end
+                          -- of the stack? In this case, I could be asurred that mb_update is Just
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
                                 -- NB: this "fmap" is safe for a rather delicate reason -- the renaming returned by annedQAToInAnnedTerm
                                 -- is an identity renaming that includes at least all of the variables in the input InScopeSet, *IN THE CASE
                                 -- THAT YOU PASS AN ANSWER*. This is just barely sufficient for our purposes due to the fact that "reduce" never
                                 -- returns an Answer with a cast pending on the stack -- it only returns such a Question.
                                 in_e' = fmap (castAnnedTerm cast_by) $ annedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa)) qa
-                          -> (((hist, forbidden, ids), (stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure)), speculateManyMap parents' h_unspeculated)
+                                h_speculated_ok'' = case mb_update of
+                                  Nothing                           -> M.insert x' (internallyBound in_e') h_speculated_ok
+                                  Just (Tagged tg_y' y', y_cast_by) -> M.insert x' (internallyBound (mkVarCastBy tg_y' y' y_cast_by)) $
+                                                                       M.insert y' (internallyBound in_e') h_speculated_ok
+                          -> (((hist, forbidden, ids), (stats `mappend` extra_stats, deeds, h_speculated_ok'', h_speculated_failure)), speculateManyMap parents' h_unspeculated)
                         _ -> (no_change, speculation_failure Nothing)
                   where state = normalise (deeds, Heap h_speculated_ok ids, Loco False, in_e)
                         -- NB: try to avoid dead bindings in the state using 'gc' before the termination test so

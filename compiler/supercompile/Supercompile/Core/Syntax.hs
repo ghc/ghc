@@ -139,11 +139,9 @@ type TaggedAlt = AltF Tagged
 type AltF ann = (AltCon, ann (TermF ann))
 
 -- FIXME: I should probably implement a correct operational semantics for TyLambdas!
--- FIXME: I can probably eliminate Indirect without too much bother
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be CoVars
-                | Literal Literal | Coercion Coercion
+data ValueF ann = Literal Literal | Coercion Coercion
                 | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) -- NB: might bind a CoVar
                 | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
                                                       -- NB: not a newtype DataCon
@@ -202,7 +200,6 @@ instance (Functor ann, OutputableLambdas1 ann) => Outputable (ValueF ann) where
 
 instance (Functor ann, OutputableLambdas1 ann) => OutputableLambdas (ValueF ann) where
     pprPrecLam v = case v of
-        Indirect x         -> ([], \prec -> text "!" <> pPrintPrec prec x)
         TyLambda x e       -> (x:xs, ppr_prec)
           where (xs, ppr_prec) = pprPrecLam1 e
         Lambda x e         -> (x:xs, ppr_prec)
@@ -260,8 +257,7 @@ castByCo (CastBy co _) = Just co
 
 
 valueType :: Copointed ann => ValueF ann -> Type
-valueType (Indirect x)        = idType x
-valueType (TyLambda x e)      = x `mkForAllTy` termType e
+valueType (TyLambda a e)      = mkForAllTy a (termType e)
 valueType (Lambda x e)        = idType x `mkFunTy` termType e
 valueType (Data dc as cos xs) = ((idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map coercionType cos) `applyFunTys` map idType xs
 valueType (Literal l)         = literalType l
@@ -335,7 +331,6 @@ reflect (I e) = case e of
   where
     reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
     reflectValue v = case v of
-        Indirect x         -> Indirect x
         TyLambda x e       -> TyLambda x (reflect e)
         Lambda x e         -> Lambda x (reflect e)
         Data dc tys cos xs -> Data dc tys cos xs

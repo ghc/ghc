@@ -171,16 +171,13 @@ mkEnteredEnv ent = mapVarEnv (const ent)
 -- This fixed point ensures we bind those h-functions that have as free variables any h-functions we are about to bind.
 
 
-qaScruts :: Anned QA -> [Out Var]
-qaScruts qa = case annee qa of Question x' -> [x']; Answer _ -> []
-
 {-# INLINE split #-}
 split :: MonadStatics m
       => State
       -> (State -> m (Deeds, Out FVedTerm))
       -> m (ResidTags, Deeds, Out FVedTerm)
 split (deeds, Heap h ids, k, qa) opt
-  = generaliseSplit opt ctxt_ids0 (IS.empty, emptyVarSet) deeds (Heap h ids, nameStack k, \ids -> (qaScruts qa, splitQA ctxt_ids1 ids (annedTag qa) (annee qa)))
+  = generaliseSplit opt ctxt_ids0 (IS.empty, emptyVarSet) deeds (Heap h ids, nameStack k, \ids -> (Just qa, splitQA ctxt_ids1 ids (annedTag qa) (annee qa)))
   where (ctxt_ids0, ctxt_ids1) = splitUniqSupply splitterUniqSupply
 
 {-# INLINE instanceSplit #-}
@@ -188,7 +185,12 @@ instanceSplit :: MonadStatics m
               => (Deeds, Heap, Stack, Out FVedTerm)
               -> (State -> m (Deeds, Out FVedTerm))
               -> m (ResidTags, Deeds, Out FVedTerm)
-instanceSplit (deeds, heap, k, focus) opt = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (heap, nameStack k, \_ -> ([], noneBracketed' IM.empty focus)) -- FIXME: residualised tags? FIXME: scrutinee identity?
+instanceSplit (deeds, heap, k, focus) opt = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (heap, nameStack k, \_ -> (Nothing, noneBracketed' IM.empty focus)) -- FIXME: residualised tags? FIXME: scrutinee identity?
+-- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
+--  < H | v | >
+-- and:
+--  < H, H' | v | update f >
+-- Since ideally instance splitting the second state should allow us to drive H' with the value binding f |-> v. A similar argument applies to questions in focus.
 
 nameStack :: Stack -> NamedStack
 nameStack = snd . trainCarMapAccumL (\i kf -> (i + 1, (i, kf))) 0
@@ -240,7 +242,7 @@ generalise gen (deeds, Heap h ids, k, qa) = do
     pprTrace "generalise: (gen_kfs, gen_xs')" (ppr (gen_kfs, gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
-    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed' (qaType qa) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, Loco False, annedQAToInAnnedTerm ids qa))))
+    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (Just qa, oneBracketed' (qaType qa) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, Loco False, annedQAToInAnnedTerm ids qa))))
 
 {-# INLINE generaliseSplit #-}
 generaliseSplit :: MonadStatics m
@@ -248,7 +250,7 @@ generaliseSplit :: MonadStatics m
                 -> UniqSupply
                 -> (IS.IntSet, Out VarSet)
                 -> Deeds
-                -> (Heap, NamedStack, InScopeSet -> ([Out Var], Bracketed (Entered, UnnormalisedState)))
+                -> (Heap, NamedStack, InScopeSet -> (Maybe (Anned QA), Bracketed (Entered, UnnormalisedState)))
                 -> m (ResidTags, Deeds, Out FVedTerm)
 generaliseSplit opt ctxt_ids split_from deeds (heap, named_k, focus) = optimiseSplit opt deeds'' bracketeds_heap bracketed_focus
   where -- After we complete cheapification, the in-scope-set will not change at all, so we can poke it into the focus
@@ -411,8 +413,8 @@ noneBracketed' tgs a = TailsUnknown (Shell { shellExtraTags = tgs, shellExtraFvs
 oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> Bracketed (Entered, UnnormalisedState)
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
-  , Just cast_by <- stackToCast k
-  , Just anned_a <- termToAnswer ids in_e
+  , Just (cast_by, Nothing) <- isTrivialStack_maybe k -- NB: this might find a cast even when we have an answer in the context since the state is unnormalised
+  , Just anned_a <- termToAnswer ids in_e -- FIXME: deal with updates arriving from isTrivialStack_maybe (but eager value splitting is on the way out)
   = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
     modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
     splitAnswer ctxt_ids ids (annedToTagged (castAnnedAnswer ids anned_a cast_by))
@@ -602,11 +604,11 @@ type NamedStack = Train (Int, Tagged StackFrame) Generalised
 splitt :: UniqSupply
        -> (IS.IntSet, Out VarSet)
        -> Deeds
-       -> (Heap, NamedStack, ([Out Var], Bracketed (Entered, UnnormalisedState))) -- ^ The thing to split, and the Deeds we have available to do it
+       -> (Heap, NamedStack, (Maybe (Anned QA), Bracketed (Entered, UnnormalisedState))) -- ^ The thing to split, and the Deeds we have available to do it
        -> (Deeds,                              -- The Deeds still available after splitting
            M.Map (Out Var) (RBracketed State), -- The residual "let" bindings
            RBracketed State)                   -- The residual "let" body
-splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed_qa))
+splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (mb_anned_qa, bracketed_qa))
     = {-# SCC "splitt'" #-} snd $ split_step split_fp
       -- Once we have the correct fixed point, go back and grab the associated information computed in the process
       -- of obtaining the fixed point. That is what we are interested in, not the fixed point itselF!
@@ -636,6 +638,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         -- for any variable in the resid_xs set, as we're not going to inline it to continue.
         --
         -- NB: do NOT normalise at this stage because in transitiveInline we assume that State heaps are droppable!
+        scruts = case fmap annee mb_anned_qa of Just (Question x') -> [x']; _ -> []
         (deeds1a, bracketeds_updated, bracketed_focus)
           = pushStack ctxt_ids0 ids deeds scruts (fmapCars (\(i, kf) -> (need_not_resid_kf i kf, kf)) named_k) bracketed_qa
             
@@ -864,7 +867,14 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
        -- Inline phantom/unfolding stuff verbatim: there is no work duplication issue (the caller would not have created the bindings unless they were safe-for-duplication)
       | otherwise
       = hb
-    h_cheap_and_phantom = M.map extract_cheap_hb h
+    h_cheap_and_phantom0 = M.map extract_cheap_hb h
+    h_cheap_and_phantom | (_, Tagged _ (Update x')) `Car` _ <- named_k -- NB: by normalisation, there can't be a cast before the update
+                        , Just anned_qa <- mb_anned_qa
+                        , Right anned_a <- caseAnnedQA anned_qa
+                        , let in_e@(_, e) = annedAnswerToInAnnedTerm ids anned_a
+                        = M.insert x' ((internallyBound in_e) { howBound = howToBindCheap e }) h_cheap_and_phantom0
+                        | otherwise
+                        = h_cheap_and_phantom0
 
 howToBindCheap :: AnnedTerm -> HowBound
 howToBindCheap e
@@ -877,7 +887,6 @@ howToBindCheap e
                      | otherwise                  -> LambdaBound
     Literal _  -> InternallyBound -- No allocation duplication since GHC will float them (and common them up, if necessary)
     Coercion _ -> InternallyBound -- Not allocated at all
-    Indirect _ -> InternallyBound -- Always eliminated by GHC
    -- GHC is unlikely to get anything useful from seeing the definition of cheap non-values, so we'll have them as unfoldings
   | otherwise = LambdaBound
 

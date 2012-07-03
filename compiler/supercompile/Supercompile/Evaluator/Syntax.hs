@@ -102,13 +102,18 @@ toAnnedTerm :: UniqSupply -> Term -> AnnedTerm
 toAnnedTerm tag_ids = tagFVedTerm tag_ids . reflect
 
 
+mkVarCastBy :: Tag -> Out Var -> CastBy -> In AnnedTerm
+mkVarCastBy tg_y y' cast_by = (mkIdentityRenaming (castByFreeVars cast_by `extendVarSet` y'), cast_by `castAnnedTerm` annedTerm tg_y (Var y'))
+
+
 -- NB: the way tags are laid out in an Answer is rather "funny". Unlike most other uses of CastBy,
 -- the tag in the CastBy (if present) should be wrapped around the *uncast* value, NOT around the
 -- *cast* value.
 --
 -- This means that if we want correct tag propagation we have to be very careful when we use an
 -- existing CastBy in the construction of an Answer.
-type Answer = Coerced (In (ValueF Anned))
+type AnswerF f = Coerced (In (ValueF f))
+type Answer = AnswerF Anned
 
 answerSize' :: Answer -> Size
 answerSize' = annedTermSize' . answerToAnnedTerm' emptyInScopeSet
@@ -124,8 +129,10 @@ termToAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) 
         _       -> Nothing
     _ -> Nothing
 
-data QA = Question (Out Id)
-        | Answer   Answer
+data QAF f = Question (Out Id)
+           | Answer   (AnswerF f)
+
+type QA = QAF Anned
 
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
@@ -161,6 +168,7 @@ answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
     CastBy co tg -> Cast (annedTerm tg e') co
   where e' = Value $ renameAnnedValue' iss rn v
 
+-- TODO: callers are probably wrong for deeds
 castAnnedAnswer :: InScopeSet -> Anned Answer -> Out CastBy -> Anned Answer
 castAnnedAnswer _   anned_a Uncast           = anned_a
 castAnnedAnswer iss anned_a (CastBy co' tg') = snd $ castTaggedAnswer iss (annedToTagged anned_a) (co', tg')
@@ -272,6 +280,11 @@ instance Outputable Heap where
     pprPrec prec (Heap h _) = pprPrec prec h
 
 
+-- INVARIANT: no adjacent frames in the patterns:
+--  Cast, Cast
+--  Update, Update
+--  Update, Cast, Update
+-- NB: Cast, Update, Cast *is* allowed
 type Stack = Train (Tagged StackFrame) Generalised
 data StackFrame = TyApply (Out Type)
                 | CoApply (Out NormalCo)
@@ -398,10 +411,20 @@ releaseStateDeed :: State -> Deeds
 releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize a) h) k
 
 
-stackToCast :: Stack -> Maybe CastBy
-stackToCast (Loco _)                             = Just Uncast
-stackToCast (Tagged tg (CastIt co) `Car` Loco _) = Just (CastBy co tg)
-stackToCast _                                    = Nothing
+-- This is used instead of isTrivialValueStack_maybe in a few places that expect to have both questions and answers in the focus
+isTrivialStack_maybe :: Stack -> Maybe (CastBy, Maybe (Tagged Var, CastBy))
+isTrivialStack_maybe (Tagged tg (CastIt co) `Car` k) = fmap ((,) (CastBy co tg)) $ isTrivialValueStack_maybe k
+isTrivialStack_maybe k                               = fmap ((,) Uncast)         $ isTrivialValueStack_maybe k
+
+isTrivialValueStack_maybe :: Stack -> Maybe (Maybe (Tagged Var, CastBy))
+isTrivialValueStack_maybe k = case peelValueStack k of
+    (mb_peeled, Loco _) -> Just mb_peeled
+    _                   -> Nothing
+
+peelValueStack :: Stack -> (Maybe (Tagged Var, CastBy), Stack)
+peelValueStack (Tagged x_tg (Update x) `Car` Tagged co_tg (CastIt co) `Car` k) = (Just (Tagged x_tg x, CastBy co co_tg), k)
+peelValueStack (Tagged x_tg (Update x) `Car` k)                                = (Just (Tagged x_tg x, Uncast), k)
+peelValueStack k                                                               = (Nothing, k)
 
 
 -- Unlifted bindings are irritating. They mean that the PureHeap has an implicit order that we need to carefully

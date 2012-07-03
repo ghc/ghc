@@ -49,7 +49,6 @@ mkSize rec = (term, term', alternatives, value, value')
     
     value = rec value'
     value' v = 1 + case v of
-        Indirect _   -> 0
         TyLambda _ e -> term e
         Lambda _ e   -> term e
         Data _ _ _ _ -> 0

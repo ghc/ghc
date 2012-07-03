@@ -275,7 +275,8 @@ msgGeneraliseTerm rn2 e_l e_r = msgPend rn2 x (PendingTerm e_l e_r)
 
     getVar_maybe e = case extract e of
       Var x              -> Just x
-      Value (Indirect x) -> Just x -- Because we sneakily reuse msgGeneraliseTerm for values as well
+      -- TODO: value generalisation (need to check for update frames at stack top)
+      --Value (Indirect x) -> Just x -- Because we sneakily reuse msgGeneraliseTerm for values as well
       _                  -> Nothing
 
 zapVarExtraInfo :: Var -> Var
@@ -735,13 +736,13 @@ msgTerm' rn2 _    (Cast e_l co_l)            _    (Cast e_r co_r)            = l
 msgTerm' _ _ _ _ _ = fail "msgTerm"
 
 msgValue :: RnEnv2 -> Tag -> AnnedValue -> Tag -> AnnedValue -> MSG AnnedValue
-msgValue rn2 tg_l v_l tg_r v_r = msgValue' rn2 v_l v_r `mplus` do
+msgValue rn2 tg_l v_l tg_r v_r = msgValue' rn2 v_l v_r {- `mplus` do
     guardFloatable "msgValue" annedValueFreeVars' rn2 v_l v_r
     -- NB: values are always cheap, so no floatability check
-    liftM Indirect $ msgGeneraliseTerm rn2 (fmap Value $ annedValue tg_l v_l) (fmap Value $ annedValue tg_r v_r)
+    liftM Indirect $ msgGeneraliseTerm rn2 (fmap Value $ annedValue tg_l v_l) (fmap Value $ annedValue tg_r v_r) -}
+    -- TODO: value generalisation (need to check for update frames at stack top)
 
 msgValue' :: RnEnv2 -> AnnedValue -> AnnedValue -> MSG AnnedValue
-msgValue' rn2 (Indirect x_l)               (Indirect x_r)               = liftM Indirect $ msgVar rn2 x_l x_r
 msgValue' rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = msgTyVarBndr TyLambda rn2 a_l a_r $ \rn2 ->                     msgTerm rn2 e_l e_r
 msgValue' rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = msgIdCoVarBndr Lambda rn2 x_l x_r $ \rn2 -> msgLoseWorkSharing (msgTerm rn2 e_l e_r)
 msgValue' rn2 (Data dc_l tys_l cos_l xs_l) (Data dc_r tys_r cos_r xs_r) = guard "msgValue: datacon" (dc_l == dc_r) >> liftM3 (Data dc_r) (zipWithEqualM (msgType rn2) tys_l tys_r) (zipWithEqualM (msgCoercion rn2) cos_l cos_r) (zipWithEqualM (msgVar rn2) xs_l xs_r)

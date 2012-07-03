@@ -187,10 +187,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
         Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 `Car` k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
-        Cast e co        
-          | isReflCo co' -> go (deeds `releaseDeeds` 1, heap,                                                                                       k, (rn, e))
-          | otherwise    -> go (deeds,                  heap,    Tagged tg (CastIt co')                                                       `Car` k, (rn, e))
-          where co' = renameCoercion ids rn co
+        Cast e co        -> go (deeds', heap,                                                                                         k', (rn, e))
+          where (deeds', k') = appendCast deeds ids tg (renameCoercion ids rn co) k
         Let x e1 e2
           | isUnLiftedType (idType x) -> go (deeds,                  Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) `Car` k, in_e1)
           | otherwise                 -> go (deeds `releaseDeeds` 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                          k, (rn', e2))
@@ -199,22 +197,20 @@ step' normalising ei_state = {-# SCC "step'" #-}
           where (ids', rn', xes') = renameBounds ids rn xes
       where tg = annedTag e
 
+    appendCast deeds ids tg co' k
+      | isReflCo final_co' = (deeds' `releaseDeeds` 1,                              k')
+      | otherwise          = (deeds',                  Tagged tg (CastIt final_co') `Car` k')
+      where
+        -- Maintain the invariant that there are no adjacent casts in the stack
+        (deeds', final_co', k') = case k of
+          Tagged _old_tg (CastIt old_co') `Car` k' -> (deeds `releaseDeeds` 1, mkTransCo ids co' old_co', k')
+          _                                        -> (deeds,                  co',                       k)
+
     -- TODO: in all the code below, I'm no longer sure whether we preserve deeds or not. In particular, the CastBy cases
     -- are a worry. But since the deeds stuff is probably on the way out I'm not trying to fix it right now.
 
     go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) ((,) True) $ force  deeds h k (annedTag anned_x) (annee anned_x)
     go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   ((,) True) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
-
-    prepareAnswer :: Deeds
-                  -> Out Var -- ^ Name to which the value is bound
-                  -> Answer  -- ^ Bound value, which we have *exactly* 1 deed for already that is not recorded in the Deeds itself
-                  -> Maybe (Deeds, Answer) -- Outgoing deeds have that 1 latent deed included in them, and we have claimed deeds for the outgoing value
-    prepareAnswer deeds x' a
-      | dUPLICATE_VALUES_EVALUATOR     = fmap (flip (,) a) $ claimDeeds (deeds `releaseDeeds` 1) (answerSize' a)
-       -- Avoid creating indirections to indirections: implements indirection compression
-       -- FIXME: for cast things as well?
-      | (Uncast, (_, Indirect _)) <- a = return (deeds, a)
-      | otherwise                      = return (deeds, (Uncast, (mkIdentityRenaming (unitVarSet x'), Indirect x')))
 
     lookupHeap :: PureHeap -> Out Var -> Maybe (HowBound, Superinlinable, In AnnedTerm)
     lookupHeap h x' = do
@@ -231,28 +227,17 @@ step' normalising ei_state = {-# SCC "step'" #-}
               | otherwise -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
                              fail why_not
 
-    -- We have not yet claimed deeds for the result of this function
-    lookupAnswer :: Heap -> Out Var -> Maybe (Superinlinable, Anned Answer)
-    lookupAnswer (Heap h ids) x' = do
-        (_how_bound, super, in_e) <- lookupHeap h x'
-        fmap ((,) super) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
-    
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
     -- FIXME: look inside unfoldings
     force :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Maybe State
     force deeds (Heap h ids) k tg x'
-      -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
-      | not (dUPLICATE_VALUES_EVALUATOR && normalising)
-      , Just (_super, anned_a) <- lookupAnswer (Heap h ids) x'
-        -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
-        -- FIXME: I'm going to assume that we are using indirections so a force doesn't actualy duplicate any values, so we can ignore the superinlinability
-      = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return $ normalise (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
       -- Try to trim the stack if the Id is guaranteed to bottom out after a certain number of arguments
       -- This is really amazingly important because so many case branches bottom out in at least one branch,
       -- and we can save supercompiling big case nests if we trim them out eagerly.
       --
       -- The supercompiled size of Bernouilli decreased from 19193 to 16173 with this change.
+      -- FIXME: do this another way? (with freevars)
       | Just (ds, res_d) <- fmap splitStrictSig $ idStrictness_maybe x'
       , isBotRes res_d
       , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
@@ -265,12 +250,25 @@ step' normalising ei_state = {-# SCC "step'" #-}
         if (how_bound == InternallyBound)
          then return ()
          else trace ("force non-internal: " ++ show x') $ fail "force"
-        return $ normalise $ case k of
-             -- Avoid creating consecutive update frames: implements "stack squeezing"
-             -- FIXME: squeeze through casts as well?
-             -- FIXME: can discard superinlinability of x'
-            kf `Car` _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                             k, in_e)
-            _                                  -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') `Car` k, in_e)
+        -- Avoid creating consecutive update frames: implements "stack squeezing" to maintain stack invariants
+        -- NB: suprisingly this is not broken, even if there are cycles in the heap:
+        --     <x |-> y, y |-> x | x |>
+        -- --> <         y |-> x | y | update x>
+        -- --> <         y |-> x | x | update x>
+        --     The reason is that squeezing adds a heap binding that just points into an update frame bound thing,
+        --     and once a binder is on the stack it won't be turned into a heap binder until we have got a value,
+        --     so inlining the squeezed heap binding will either just get us stuck immediately or get to a value
+        --
+        -- NB: squeezing will discard any flag marking x' as superinlinable. However, I think this is totally OK:
+        -- the update frame already on the stack (which is preserved by squeezing) contains the name by which the *user*
+        -- tried to access the function, and it is in keeping with the rest of GHC (where the inlinability you see is
+        -- based on the label you wrote in your own code) that that is the relevant flag.
+        return $ normalise $ case (case k of Tagged tg_y  (Update y') `Car`                               _ -> Just (Uncast,          Tagged tg_y y')
+                                             Tagged tg_co (CastIt co) `Car` Tagged tg_y (Update y') `Car` _ -> Just (CastBy co tg_co, Tagged tg_y y')
+                                             _ -> Nothing) of
+            Nothing                        -> (deeds, Heap (M.delete x' h)                        ids, Tagged tg (Update x') `Car` k, in_e)
+            Just (cast_by, Tagged tg_y y') -> (deeds, Heap (M.insert x' (internallyBound in_e) h) ids,                             k, in_e)
+              where in_e = mkVarCastBy tg_y y' cast_by
 
     -- TODO: this function totally ignores deeds
     trimUnreachable :: Int   -- Number of value arguments needed before evaluation bottoms out
@@ -287,6 +285,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
         go _ _       (Loco _)                           = Nothing
         go _ _       (Tagged _ (CastIt _) `Car` Loco _) = Nothing
         -- Got some non-trivial stack that is unreachable due to bottomness: kill it
+        -- FIXME: still need to bind any Updates in the trimmed stack!! (Don't forget to check for updates on the 2 lines above too)
         go 0 hole_ty k@(Tagged cast_tg _ `Car` _) = Just $
           trainFoldl' (\(!hole_ty,    !h) (Tagged tg kf) -> (stackFrameType' kf hole_ty, case kf of Update x' -> M.insert x' (internallyBound (renamedTerm (annedTerm tg (Var x')))) h; _ -> h))
                       (\(!overall_ty, !h) gen -> (h, (if hole_ty `eqType` overall_ty then id else (Tagged cast_tg (CastIt (mkUnsafeCo hole_ty overall_ty)) `Car`)) $ Loco gen)) (hole_ty, M.empty) k
@@ -305,44 +304,53 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe State
-    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> case tagee kf of
-        TyApply ty'                    ->                  tyApply    (deeds `releaseDeeds` 1)          h k tg_v a ty'
-        CoApply co'                    ->                  coApply    (deeds `releaseDeeds` 1)          h k tg_v a co'
-        Apply x2'                      ->                  apply      deeds                    (tag kf) h k tg_v a x2'
-        Scrutinise x' ty' in_alts      -> fmap normalise $ scrutinise (deeds `releaseDeeds` 1)          h k tg_v a x' ty' in_alts
-        PrimApply pop tys' in_vs in_es -> fmap normalise $ primop     deeds                    (tag kf) h k tg_v pop tys' in_vs a in_es
-        StrictLet x' in_e2             -> fmap normalise $ strictLet  (deeds `releaseDeeds` 1)          h k tg_v a x' in_e2
-        CastIt co'                     -> fmap normalise $ cast       deeds                    (tag kf) h k tg_v a co'
-        Update x'
+    unwind deeds heap@(Heap h ids) k tg_a a = do
+      -- Peel off any (update, cast) at the beginning of the stack
+      -- In order to proceed further, we're certainly going to have to do the update (if any)
+      let (mb_update, k') = peelValueStack k
+          anned_a = annedAnswer tg_a a
+          in_e = annedAnswerToInAnnedTerm ids anned_a
+      -- The idea here is that we have deeds for the heap and the "meaning" bit a but not the code to "reference" in_e,
+      -- but that the deeds required for the reference code are <= (deeds required by the meaning + extra deeds released into the main supply if any)
+      (deeds, heap, mb_x, anned_a, in_e) <- case mb_update of
+        Nothing                         -> return (deeds, heap, Nothing, anned_a, in_e)
+        Just (Tagged tg_x' x', cast_by)
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
-          | otherwise                               -> fmap normalise $ update deeds h k tg_v x' a
-      where
-        -- When derereferencing an indirection, it is important that the resulting value is not stored anywhere. The reasons are:
-        --  1) That would cause allocation to be duplicated if we residualised immediately afterwards, because the value would still be in the heap
-        --  2) It would cause a violation of the deeds invariant because *syntax* would be duplicate
-        --  3) It feels a bit weird because it might turn phantom stuff into real stuff
-        --
-        -- Indirections do not change the deeds story much (at all). You have to pay a deed per indirection, which is released
-        -- whenever the indirection dies in the process of evaluation (e.g. in the function position of an application). The deeds
-        -- that the indirection "points to" are not affected by any of this. The exception is if we *retain* any subcomponent
-        -- of the dereferenced thing - in this case we have to be sure to claim some deeds for that subcomponent. For example, if we
-        -- dereference to get a lambda in our function application we had better claim deeds for the body.
-        dereference' :: Heap -> Superinlinable -> Answer -> (Superinlinable, Answer)
-        dereference' h@(Heap _ ids) _ (mb_co, (rn, Indirect x)) | Just (super, anned_a) <- lookupAnswer h (renameId rn x) = dereference' h super (annee (castAnnedAnswer ids anned_a mb_co))
-        dereference' _ super a = (super, a)
+          | otherwise -> do
+            deeds' <- claimDeeds (deeds `releaseDeeds` 1) (answerSize' a) -- NB: releases one deed for the update frame
+            return (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, Just x', castAnnedAnswer ids anned_a cast_by, mkVarCastBy tg_x' x' cast_by)
+      unwind' deeds heap k' mb_x (annedTag anned_a) (extract anned_a) in_e
 
-        dereference h = snd . dereference' h False
-    
+    unwind' deeds heap@(Heap h ids) k mb_x' tg_a a@(mb_co, (rn, v)) in_e = case k of
+     Loco _ -> Nothing
+     Car kf k -> case tagee kf of
+        TyApply ty'                    ->                  tyApply    (deeds `releaseDeeds` 1)          ty'
+        CoApply co'                    ->                  coApply    (deeds `releaseDeeds` 1)          co'
+        Apply x2'                      ->                  apply      deeds                    (tag kf) x2'
+        Scrutinise x' ty' in_alts      -> fmap normalise $ scrutinise (deeds `releaseDeeds` 1)          x' ty' in_alts
+        PrimApply pop tys' in_vs in_es -> fmap normalise $ primop     deeds                    (tag kf) pop tys' in_vs in_es
+        StrictLet x' in_e2             -> fmap normalise $ strictLet  (deeds `releaseDeeds` 1)          x' in_e2
+        CastIt co' | Nothing <- mb_x'  -> fmap normalise $ cast       deeds                    (tag kf) co'
+                   | otherwise         -> pprPanic "unwind': stack cast invariant violation"   (ppr mb_x') -- Stack squeezing ensures that there are no (update, cast, cast) sequences
+        Update x'                      -> pprPanic "unwind': stack update invariant violation" (ppr x')    -- Stack squeezing ensures that there are no (update, cast, update) sequences
+      where
+        -- Should check this is not Nothing before using the "meaning" a
+        mb_super = case mb_x' of
+                     Nothing -> Just False
+                     Just x' -> case shouldExposeUnfolding x' of
+                       Right super  -> Just super
+                       Left why_not -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
+                                       fail why_not
+
         -- NB: assumes that ei_state has the same size as what we would return from "step" if the dereferencing fails.
         -- At the time of writing, this invariant holds (since turning terms into equivalent stack frames doesn't change size)
-        dereferenceLambdaish :: Heap -> ContextSummary -> Answer
-                             -> (Answer -> Maybe UnnormalisedState)
-                             -> Maybe State
-        dereferenceLambdaish h@(Heap _ ids) k_summary a@(_, (_, v)) kont
-          | normalising, not dUPLICATE_VALUES_EVALUATOR, Indirect _ <- v = Nothing -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
+        checkLambdaish :: Maybe UnnormalisedState -> Maybe State
+        checkLambdaish it
+          -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
+          | normalising, isJust mb_x', not dUPLICATE_VALUES_EVALUATOR = Nothing
           | otherwise = do
-            let (super, a') = dereference' h False a -- NB: inline lambdas are *not* superinlinable because we don't duplicate anything by beta-reducing
-            s' <- fmap normalise $ kont a'
+            super <- mb_super
+            s' <- fmap normalise it
             -- NB: you might think it would be OK to inline even when *normalising*, as long as the inlining
             -- makes the term strictly smaller. This is very tempting, but we would have to check that the size
             -- measure decreased by the inlining is the same as the size measure needed to prove normalisation of
@@ -360,6 +368,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
             --
             -- Perhaps if we had deep normalisation + GC we could get these results by penalising heap allocation heavily?
             -- If so we must remember to do it for heap bindings *and* letrecs.
+            let k_summary = summariseContext h k
             guard $ case () of
               _ -- If the lambda is marked SUPERINLINABLE, always inline it
                 | super
@@ -370,7 +379,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 -- However, this is important so that speculation is able to turn partial applications into explicit values
                 | (_, _, k, qa) <- s'
                 , Answer _ <- annee qa
-                , Just _ <- stackToCast k
+                , nullTrain k -- NB: no need to check for a trailing cast since in a normalised state that will be folded into the answer
                 -> True
                 -- If the result is actually smaller, accept it (this catches manifest values)
                 -- NB: garbage collect before comparison in case we inlined an internallyBound thing
@@ -379,28 +388,30 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 | stateSize (gc s') <= either (stateSize . gc) unnormalisedStateSize ei_state
                 -> True
                 -- It might still be OK to get larger if GHC's inlining heuristics say we should
-                | Indirect x' <- v
-                , ghcHeuristics x' (annedTerm tg_v (answerToAnnedTerm' ids a')) k_summary -- NB: the tag is irrelevant
+                | Just x' <- mb_x'
+                , ghcHeuristics x' (annedTerm tg_a (answerToAnnedTerm' ids a)) k_summary -- NB: the tag is irrelevant
                 -> True
                 -- Otherwise, we don't want to beta-reduce
                 | otherwise
                 -> pprTrace "Unwanted:" (ppr (answerToAnnedTerm' ids a)) False
-            (case v of Indirect x' -> pprTrace "Inlining" (ppr x'); _ -> id) $
+            (case mb_x' of Just x' -> pprTrace "Inlining" (ppr x'); Nothing -> id) $
               return s'
 
-        tyApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Type -> Maybe State
-        tyApply deeds heap@(Heap h ids) k tg_a a ty' = dereferenceLambdaish heap (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
-            TyLambda x e_body <- return e
-            fmap (\deeds -> (deeds, heap, case mb_co of Uncast -> k; CastBy co' _tg_co -> Tagged tg_a (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
+        tyApply :: Deeds -> Out Type -> Maybe State
+        tyApply deeds ty' = checkLambdaish $ do
+            TyLambda x e_body <- return v
+            fmap (\deeds -> let (deeds', k') = case mb_co of Uncast            -> (deeds, k)
+                                                             CastBy co' _tg_co -> appendCast deeds ids tg_a (co' `mk_inst` ty') k
+                            in (deeds', heap, k', (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
-        coApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Coercion -> Maybe State
-        coApply deeds heap@(Heap h ids) k tg_a a apply_co' = dereferenceLambdaish heap (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
-            Lambda x e_body <- return e
+        coApply :: Deeds -> Out Coercion -> Maybe State
+        coApply deeds apply_co' = checkLambdaish $ do
+            Lambda x e_body <- return v
             flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
-                Uncast            -> (deeds, heap, k,                                    (insertCoercionSubst rn x apply_co', e_body))
-                CastBy co' _tg_co -> (deeds, heap, Tagged tg_a (CastIt res_co') `Car` k, (insertCoercionSubst rn x cast_apply_co', e_body))
+                Uncast            -> (deeds,  heap, k,  (insertCoercionSubst rn x apply_co',      e_body))
+                CastBy co' _tg_co -> (deeds', heap, k', (insertCoercionSubst rn x cast_apply_co', e_body))
                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
                         -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
                         --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
@@ -411,34 +422,37 @@ step' normalising ei_state = {-# SCC "step'" #-}
                         cast_apply_co' = arg_from_co' `mk_trans` apply_co' `mk_trans` mk_sym arg_to_co'
                         mk_trans = mkTransCo ids
                         mk_sym = mkSymCo ids
+                        -- Maintain the no-adjacent-casts invariant
+                        (deeds', k') = appendCast deeds ids tg_a res_co' k
 
-        apply :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Out Var -> Maybe State
-        apply deeds tg_kf (Heap h ids) k tg_a a x' = dereferenceLambdaish (Heap h ids) (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
-            Lambda x e_body <- return e
+        apply :: Deeds -> Tag -> Out Var -> Maybe State
+        apply deeds tg_kf x' = checkLambdaish $ do
+            Lambda x e_body <- return v
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                              claimDeeds (deeds `releaseDeeds` 1 `releaseDeeds` answerSize' a) (annedSize e_body)
-              CastBy co' _tg_co -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_a (CastIt res_co') `Car` k, (rn', e_body))) $
+              CastBy co' _tg_co -> fmap (\deeds -> let (deeds', k') = appendCast deeds ids tg_a res_co' k
+                                                   in (deeds', Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', k', (rn', e_body))) $
                                         claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
                       (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
                       e_arg = annedTerm tg_a (annedTerm tg_kf (Var x') `Cast` mkSymCo ids arg_co')
 
-        scrutinise :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
-        scrutinise deeds0 (Heap h0 ids) k tg_a a wild' _ty' (rn_alts, alts)
+        scrutinise :: Deeds -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
+        scrutinise deeds_init wild' _ty' (rn_alts, alts)
            -- Literals are easy -- we can make the simplifying assumption that the types of literals are
            -- always simple TyCons without any universally quantified type variables.
-          | Literal l <- v_deref
-          , case mb_co_deref_kind of Nothing -> True; Just (_, _, Pair from_ty' to_ty') -> from_ty' `eqType` to_ty' -- NB: should never see refl here!
+          | Literal l <- v
+          , case mb_co_kind of Nothing -> True; Just (_, _, Pair from_ty' to_ty') -> from_ty' `eqType` to_ty' -- NB: should never see refl here!
           , (deeds2, alt_e):_ <- [(deeds1 `releaseDeeds` annedAltsSize rest, (rn_alts, alt_e)) | ((LiteralAlt alt_l, alt_e), rest) <- bagContexts alts, alt_l == l]
           = Just (deeds2, Heap h1 ids, k, alt_e)
           
            -- Data is a big stinking mess! I hate you, KPush rule.
-          | Data dc tys cos xs <- v_deref
+          | Data dc tys cos xs <- v
            -- a) Ensure that the coercion on the data (if any) lets us do the reduction, and determine
            --    the appropriate coercions to use (if any) on each value argument to the DataCon
-          , Just mb_dc_cos <- case mb_co_deref_kind of
+          , Just mb_dc_cos <- case mb_co_kind of
                                     Nothing -> return Nothing
                                     Just (co', tg_co, Pair from_ty' to_ty') -> do
                                       (from_tc, _from_tc_arg_tys') <- splitTyConApp_maybe from_ty'
@@ -463,9 +477,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
           , (deeds3, h', ids', alt_e):_ <- [ res
                                            | ((DataAlt alt_dc alt_as alt_qs alt_xs, alt_e), rest) <- bagContexts alts
                                            , alt_dc == dc
-                                           , let tys' = map (renameType ids rn_v_deref) tys
-                                                 cos' = map (renameCoercion ids rn_v_deref) cos
-                                                 xs' = map (renameId rn_v_deref) xs
+                                           , let tys' = map (renameType ids rn) tys
+                                                 cos' = map (renameCoercion ids rn) cos
+                                                 xs' = map (renameId rn) xs
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
                                                  deeds2 = deeds1 `releaseDeeds` annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
@@ -487,42 +501,39 @@ step' normalising ei_state = {-# SCC "step'" #-}
            -- This can legitimately occur, e.g. when supercompiling (if x then (case x of False -> 1) else 2)
           | otherwise
           = Nothing
-          where (mb_co_deref, (rn_v_deref, v_deref)) = dereference (Heap h0 ids) a
-                mb_co_deref_kind = case mb_co_deref of
-                                     Uncast          -> Nothing
-                                     CastBy co tg_co -> Just (co, tg_co, coercionKind co)
-                (deeds1, h1) | isDeadBinder wild' = (deeds0 `releaseDeeds` answerSize' a, h0)
-                             | otherwise          = (deeds0,                              M.insert wild' wild_hb h0)
-                               where wild_hb = internallyBound $ annedAnswerToInAnnedTerm ids (annedAnswer tg_a a)
-                               -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
+          where mb_co_kind = case mb_co of
+                               Uncast          -> Nothing
+                               CastBy co tg_co -> Just (co, tg_co, coercionKind co)
+                deeds0 = deeds_init `releaseDeeds` answerSize' a
+                (deeds1, h1) | isDeadBinder wild' = (deeds0,                         h)
+                             | otherwise          = (deeds0', M.insert wild' wild_hb h)
+                               where wild_hb = internallyBound in_e
+                                     Just deeds0' = claimDeeds deeds0 (annedTermSize (snd in_e))
+                                     -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
-        primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
-        primop deeds tg_kf heap@(Heap _ ids) k tg_a pop tys' anned_as a [] = do
+        -- NB: this actually duplicates the answer "a" into the answers field of the PrimApply, even if that "a" is update-bound
+        -- This isn't perhaps in the spirit of the rest of the evaluator, but it probably doesn't matter at all in practice.
+        primop :: Deeds -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> [In AnnedTerm] -> Maybe UnnormalisedState
+        primop deeds tg_kf pop tys' anned_as [] = do
             guard eVALUATE_PRIMOPS -- NB: this is not faithful to paper 1 because we still turn primop expressions into
                                    -- stack frames.. this is bad because it will impede good specilations (without smart generalisation)
-            let as' = map (dereference h) $ map annee anned_as ++ [a]
-                tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
-            a' <- evaluatePrim ids tg_kf' pop tys' as'
+            let tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
+            a' <- evaluatePrim ids tg_kf' pop tys' (map annee anned_as ++ [a])
             deeds <- claimDeeds (deeds `releaseDeeds` (sum (map annedSize anned_as) + answerSize' a + 1)) (annedSize a') -- I don't think this can ever fail
             return (deeds, heap, k, annedAnswerToInAnnedTerm ids a')
-        primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
-            (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) `Car` k, in_e)
+        primop deeds tg_kf pop tys' anned_as in_es = case in_es of
+            (in_e:in_es) -> Just (deeds, heap, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) `Car` k, in_e)
             []           -> Nothing
 
-        strictLet :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
-        strictLet deeds (Heap h ids) k tg_a a x' in_e2 = Just (deeds, Heap (M.insert x' (internallyBound (annedAnswerToInAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, in_e2)
+        strictLet :: Deeds -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
+        strictLet deeds x' in_e2 = Just (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, k, in_e2)
+          where Just deeds' = claimDeeds (deeds `releaseDeeds` answerSize' a) (annedTermSize (snd in_e))
 
-        cast :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Coercion -> Maybe UnnormalisedState
-        cast deeds tg_kf (Heap h ids) k tg_a ans co' = Just (deeds', Heap h ids, k, annedAnswerToInAnnedTerm ids ans')
-          where (mb_dumped_tg, ans') = castTaggedAnswer ids (Tagged tg_a ans) (co', tg_kf)
+        -- NB: this function will only be called if mb_update == Nothing, which is essential for correctness
+        cast :: Deeds -> Tag -> Coercion -> Maybe UnnormalisedState
+        cast deeds tg_kf co' = Just (deeds', Heap h ids, k, annedAnswerToInAnnedTerm ids a')
+          where (mb_dumped_tg, a') = castTaggedAnswer ids (Tagged tg_a a) (co', tg_kf)
                 deeds' = case mb_dumped_tg of Just _ -> deeds `releaseDeeds` 1; Nothing -> deeds
-
-        update :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Answer -> Maybe UnnormalisedState
-        update deeds (Heap h ids) k tg_a x' a = do
-            (deeds', prepared_in_v) <- case prepareAnswer deeds x' a of
-                Nothing                      -> pprTrace "update-deeds:" (pPrint x') Nothing
-                Just (deeds', prepared_in_v) -> Just (deeds', prepared_in_v)
-            return (deeds', Heap (M.insert x' (internallyBound (annedAnswerToInAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, annedAnswerToInAnnedTerm ids (annedAnswer tg_a prepared_in_v))
 
 
 -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.

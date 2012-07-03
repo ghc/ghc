@@ -665,6 +665,8 @@ supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
 (hFunctionsUniqSupply:anfUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply
 
 
+infixr 5 `Car`
+
 data Train a b = Car a (Train a b) | Loco b
 
 instance (Outputable a, Outputable b) => Outputable (Train a b) where
