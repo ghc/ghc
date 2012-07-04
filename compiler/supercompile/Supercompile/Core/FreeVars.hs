@@ -71,7 +71,7 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
     term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecBinderFreeVars x (alternatives alts)
     term' (Let x e1 e2)      = term e1 `unionVarSet` nonRecBinderFreeVars x (term e2)
-    term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idFreeVars xs)) `delVarSetList` xs
+    term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idBndrFreeVars xs)) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     

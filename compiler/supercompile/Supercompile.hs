@@ -151,7 +151,7 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     go new_fvs all_fvs all_xwhy_nots all_xes
       | isEmptyVarSet added_fvs = pprTrace "termUnfoldings" (vcat [hang (text why_not <> text ":") 2 (vcat (map ppr xs)) | (why_not, xs) <- groups snd fst all_xwhy_nots]) $
                                   all_xes
-      | otherwise               = go (unionVarSets (map (S.termFreeVars . snd) added_xes)) (all_fvs `unionVarSet` added_fvs)
+      | otherwise               = go (unionVarSets (map (\(x, e) -> S.idBndrFreeVars x `unionVarSet` S.termFreeVars e) added_xes)) (all_fvs `unionVarSet` added_fvs)
                                      (added_xwhy_nots ++ all_xwhy_nots) (added_xes ++ all_xes)
       where added_fvs = new_fvs `minusVarSet` all_fvs
             (added_xwhy_nots, added_xes)

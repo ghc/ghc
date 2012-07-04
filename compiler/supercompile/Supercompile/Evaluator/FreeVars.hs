@@ -51,7 +51,7 @@ stackFrameOpenFreeVars kf = case kf of
     Scrutinise x' ty in_alts -> (emptyVarSet, (nonRecBinderFreeVars x' (inFreeVars annedAltsFreeVars in_alts)) `unionVarSet` tyVarsOfType ty)
     PrimApply _ tys as in_es -> (emptyVarSet, unionVarSets (map tyVarsOfType tys) `unionVarSet` unionVarSets (map annedFreeVars as) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
     StrictLet x' in_e2       -> (emptyVarSet, nonRecBinderFreeVars x' (inFreeVars annedTermFreeVars in_e2))
-    Update x'                -> (unitVarSet x', varBndrFreeVars x')
+    Update x'                -> (unitVarSet x', idBndrFreeVars x')
     CastIt co'               -> (emptyVarSet, tyCoVarsOfCo co')
 
 
@@ -71,7 +71,7 @@ pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
         InternallyBound -> (bvs_internal `extendVarSet` x', bvs_lambda, bvs_let)
         LambdaBound     -> (bvs_internal, bvs_lambda `extendVarSet` x', bvs_let)
         LetBound        -> (bvs_internal, bvs_lambda, bvs_let `extendVarSet` x'),
-        fvs `unionVarSet` heapBindingFreeVars hb)
+        fvs `unionVarSet` varBndrFreeVars x' `unionVarSet` heapBindingFreeVars hb)
     
     stackOpenFreeVars' :: Stack -> FreeVars -> (BoundVars, FreeVars)
     stackOpenFreeVars' k fvs = case stackOpenFreeVars k of (k_bvs, k_fvs) -> (k_bvs, fvs `unionVarSet` k_fvs)
