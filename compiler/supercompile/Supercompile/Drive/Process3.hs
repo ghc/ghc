@@ -455,10 +455,11 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
         --
         -- This problem doesn't occur without type generalisation because the h functions mentioned freely by the fulfilments/
         -- partial fulfilments (latent on the stack) at the time we made the promise we are rolling back to can *only* mention
-        -- promises that we have already made!
+        -- promises that we already made at that time!
         --
         -- WITH type generalisation we go and modify those existing fulfilments to point into the portion of the stack which
         -- is in danger of rollback.
+        -- (A similar problem would occur if we messed about with previous fulfilments when we detected a MSG opportunity.)
         --
         -- A formalisation of this idea is below:
         --
