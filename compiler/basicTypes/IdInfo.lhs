@@ -23,6 +23,7 @@ module IdInfo (
 	IdInfo,		-- Abstract
 	vanillaIdInfo, noCafIdInfo,
 	seqIdInfo, megaSeqIdInfo,
+        isShortableIdInfo,
 
 	-- ** Zapping various forms of Info
 	zapLamInfo, zapDemandInfo, zapFragileInfo,
@@ -304,6 +305,15 @@ vanillaIdInfo
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
 	-- Used for built-in type Ids in MkId.
+
+isShortableIdInfo :: IdInfo -> Bool
+-- True if there is no user-attached IdInfo on exported_id,
+-- so we can safely discard it
+-- See Note [Messing up the exported Id's IdInfo]
+isShortableIdInfo info
+  =  isEmptySpecInfo (specInfo info)
+  && isDefaultInlinePragma (inlinePragInfo info)
+  && not (isStableUnfolding (unfoldingInfo info))
 \end{code}
 
 
