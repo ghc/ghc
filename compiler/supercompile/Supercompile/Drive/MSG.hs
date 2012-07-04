@@ -439,7 +439,7 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
   --     ones are only matched against heap-bound ones, and we don't have any generalisation flag to check on update frames.
   , let k_r_bvs = stackBoundVars k_r
         heap_non_instantiating x_r = case M.lookup x_r h_r of
-                         Nothing | x_r `elemVarSet` k_r_bvs -> True -- Instantiating with an update-frame bound thing is *probably* OK
+                         Nothing | x_r `elemVarSet` k_r_bvs -> False -- Instantiating with an update-frame bound thing is *not* OK, especially since this might be a leading update frame with a value in the focus!
                          Just hb_r -> isJust (heapBindingLambdaBoundness hb_r)
                          _ -> panic "msgMatch: variable unbound on right" -- (ppr rn_l_inv $$ ppr x_r $$ pPrintFullState fullStatePrettiness (maxBound, heap, k, qa) $$ ppr (h_l, rn_l, k_l) $$ ppr (h_r, rn_r, k_r))
   -- NB: just because we have (x_l, hb_l) in the heap *DOESN'T MEAN* there is a x/x_r corresponding to this x_l because we might have:
