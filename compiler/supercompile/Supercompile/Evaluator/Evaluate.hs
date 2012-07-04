@@ -24,6 +24,7 @@ import TyCon
 import Type
 import PrelRules
 import Id
+import IdInfo (isShortableIdInfo)
 import DataCon
 import Pair
 import BasicTypes
@@ -662,8 +663,24 @@ gc _state@(deeds0, Heap h ids, k, in_e)
               | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x')
               | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
     
+    -- NB: doing this is cool yet also dangerous at the same time. What if we have:
+    --  {-# NOINLINE foo #-}
+    --  foo = \x -> e
+    --
+    --  root = case foo 100 of \Delta
+    --
+    -- After normalisation + GCing (including dropping dead update frames) we will basically get:
+    --  case (\x -> e) 100 of \Delta
+    --
+    -- So this is really bad because we have lost the NOINLINE information!
+    -- Of course, this is also sometimes cool because it turns non-normalising beta-reductions into manifestly normalising ones.
+    --
+    -- My compromise is to allow dumping only those binders with "shortable" IdInfo, where shortability
+    -- is a notion stolen from GHCs simplifier.
+    --
+    -- TODO: perhaps this same check should be applied in the Update frame compressor, though that would destroy some stack invariants
     pruneLiveStack :: Deeds -> Stack -> FreeVars -> (Deeds, Stack)
-    pruneLiveStack init_deeds k live = trainFoldr (\kf (deeds, k_live) -> if (case tagee kf of Update x' -> x' `elemVarSet` live; _ -> True)
+    pruneLiveStack init_deeds k live = trainFoldr (\kf (deeds, k_live) -> if (case tagee kf of Update x' | isShortableIdInfo (idInfo x') -> x' `elemVarSet` live; _ -> True)
                                                                           then (deeds, kf `Car` k_live)
                                                                           else (deeds `releaseStackFrameDeeds` kf, k_live))
                                                   (\gen deeds -> (deeds, Loco gen)) init_deeds k
