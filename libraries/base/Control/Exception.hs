@@ -164,6 +164,9 @@ import System (ExitCode())
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)
 
+instance Functor Handler where
+     fmap f (Handler h) = Handler (fmap f . h)
+
 {- |
 Sometimes you want to catch two different sorts of exception. You could
 do something like
