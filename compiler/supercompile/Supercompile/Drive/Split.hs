@@ -870,7 +870,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (mb_anned_qa, brac
     h_cheap_and_phantom0 = M.map extract_cheap_hb h
     h_cheap_and_phantom | (_, Tagged _ (Update x')) `Car` _ <- named_k -- NB: by normalisation, there can't be a cast before the update
                         , Just anned_qa <- mb_anned_qa
-                        , Right anned_a <- caseAnnedQA anned_qa
+                        , Right anned_a <- caseAnnedQA anned_qa -- FIXME: having a question here might also be legit
                         , let in_e@(_, e) = annedAnswerToInAnnedTerm ids anned_a
                         = M.insert x' ((internallyBound in_e) { howBound = howToBindCheap e }) h_cheap_and_phantom0
                         | otherwise
