@@ -2,51 +2,44 @@
 % (c) The University of Glasgow, 2006
 %
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- | Package manipulation
 module Packages (
-	module PackageConfig,
+        module PackageConfig,
 
-	-- * The PackageConfigMap
-	PackageConfigMap, emptyPackageConfigMap, lookupPackage,
-	extendPackageConfigMap,	dumpPackages,
+        -- * The PackageConfigMap
+        PackageConfigMap, emptyPackageConfigMap, lookupPackage,
+        extendPackageConfigMap, dumpPackages,
 
-	-- * Reading the package config, and processing cmdline args
-	PackageState(..),
-	initPackages,
-	getPackageDetails,
-	lookupModuleInAllPackages, lookupModuleWithSuggestions,
+        -- * Reading the package config, and processing cmdline args
+        PackageState(..),
+        initPackages,
+        getPackageDetails,
+        lookupModuleInAllPackages, lookupModuleWithSuggestions,
 
-	-- * Inspecting the set of packages in scope
-	getPackageIncludePath,
-	getPackageLibraryPath,
-	getPackageLinkOpts,
-	getPackageExtraCcOpts,
-	getPackageFrameworkPath,
-	getPackageFrameworks,
-	getPreloadPackagesAnd,
+        -- * Inspecting the set of packages in scope
+        getPackageIncludePath,
+        getPackageLibraryPath,
+        getPackageLinkOpts,
+        getPackageExtraCcOpts,
+        getPackageFrameworkPath,
+        getPackageFrameworks,
+        getPreloadPackagesAnd,
 
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
 
-	-- * Utils
-	isDllName
+        -- * Utils
+        isDllName
     )
 where
 
 #include "HsVersions.h"
 
-import PackageConfig	
+import PackageConfig
 import DynFlags
 import StaticFlags
-import Config		( cProjectVersion )
-import Name		( Name, nameModule_maybe )
+import Config           ( cProjectVersion )
+import Name             ( Name, nameModule_maybe )
 import UniqFM
 import Module
 import Util
@@ -66,6 +59,7 @@ import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
+import Data.Char (isSpace)
 import Data.List as List
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -81,12 +75,12 @@ import qualified Data.Set as Set
 --
 -- The package state is computed by 'initPackages', and kept in DynFlags.
 --
---   * @-package <pkg>@ causes @<pkg>@ to become exposed, and all other packages 
---	with the same name to become hidden.
--- 
+--   * @-package <pkg>@ causes @<pkg>@ to become exposed, and all other packages
+--      with the same name to become hidden.
+--
 --   * @-hide-package <pkg>@ causes @<pkg>@ to become hidden.
--- 
---   * Let @exposedPackages@ be the set of packages thus exposed.  
+--
+--   * Let @exposedPackages@ be the set of packages thus exposed.
 --     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
 --     their dependencies.
 --
@@ -107,28 +101,28 @@ import qualified Data.Set as Set
 
 -- Notes on DLLs
 -- ~~~~~~~~~~~~~
--- When compiling module A, which imports module B, we need to 
--- know whether B will be in the same DLL as A.  
--- 	If it's in the same DLL, we refer to B_f_closure
--- 	If it isn't, we refer to _imp__B_f_closure
+-- When compiling module A, which imports module B, we need to
+-- know whether B will be in the same DLL as A.
+--      If it's in the same DLL, we refer to B_f_closure
+--      If it isn't, we refer to _imp__B_f_closure
 -- When compiling A, we record in B's Module value whether it's
 -- in a different DLL, by setting the DLL flag.
 
 data PackageState = PackageState {
-  pkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
-	-- The exposed flags are adjusted according to -package and
-	-- -hide-package flags, and -ignore-package removes packages.
+  pkgIdMap              :: PackageConfigMap, -- PackageId   -> PackageConfig
+        -- The exposed flags are adjusted according to -package and
+        -- -hide-package flags, and -ignore-package removes packages.
 
   preloadPackages      :: [PackageId],
-	-- The packages we're going to link in eagerly.  This list
-	-- should be in reverse dependency order; that is, a package
-	-- is always mentioned before the packages it depends on.
+        -- The packages we're going to link in eagerly.  This list
+        -- should be in reverse dependency order; that is, a package
+        -- is always mentioned before the packages it depends on.
 
-  moduleToPkgConfAll 	:: UniqFM [(PackageConfig,Bool)], -- ModuleEnv mapping
-	-- Derived from pkgIdMap.	
-	-- Maps Module to (pkgconf,exposed), where pkgconf is the
-	-- PackageConfig for the package containing the module, and
-	-- exposed is True if the package exposes that module.
+  moduleToPkgConfAll    :: UniqFM [(PackageConfig,Bool)], -- ModuleEnv mapping
+        -- Derived from pkgIdMap.
+        -- Maps Module to (pkgconf,exposed), where pkgconf is the
+        -- PackageConfig for the package containing the module, and
+        -- exposed is True if the package exposes that module.
 
   installedPackageIdMap :: InstalledPackageIdMap
   }
@@ -149,7 +143,7 @@ lookupPackage = lookupUFM
 
 extendPackageConfigMap
    :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
-extendPackageConfigMap pkg_map new_pkgs 
+extendPackageConfigMap pkg_map new_pkgs
   = foldl add pkg_map new_pkgs
   where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
 
@@ -159,10 +153,10 @@ getPackageDetails :: PackageState -> PackageId -> PackageConfig
 getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdMap ps) pid)
 
 -- ----------------------------------------------------------------------------
--- Loading the package config files and building up the package state
+-- Loading the package db files and building up the package state
 
 -- | Call this after 'DynFlags.parseDynFlags'.  It reads the package
--- configuration files, and sets up various internal tables of package
+-- database files, and sets up various internal tables of package
 -- information, according to the package-related flags on the
 -- command-line (@-package@, @-hide-package@ etc.)
 --
@@ -175,14 +169,14 @@ getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdM
 -- 'pkgState' in 'DynFlags' and return a list of packages to
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [PackageId])
-initPackages dflags = do 
+initPackages dflags = do
   pkg_db <- case pkgDatabase dflags of
                 Nothing -> readPackageConfigs dflags
                 Just db -> return $ setBatchPackageFlags dflags db
-  (pkg_state, preload, this_pkg)       
+  (pkg_state, preload, this_pkg)
         <- mkPackageState dflags pkg_db [] (thisPackage dflags)
   return (dflags{ pkgDatabase = Just pkg_db,
-		  pkgState = pkg_state,
+                  pkgState = pkg_state,
                   thisPackage = this_pkg },
           preload)
 
@@ -191,66 +185,61 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO [PackageConfig]
 readPackageConfigs dflags = do
-   e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
-   system_pkgconfs <- getSystemPackageConfigs dflags
+  let system_conf_refs = [UserPkgConf, GlobalPkgConf]
 
-   let pkgconfs = case e_pkg_path of
-		    Left _   -> system_pkgconfs
-		    Right path
-		     | last cs == "" -> init cs ++ system_pkgconfs
-		     | otherwise     -> cs
-		     where cs = parseSearchPath path
-		     -- if the path ends in a separator (eg. "/foo/bar:")
-		     -- the we tack on the system paths.
+  e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
+  let base_conf_refs = case e_pkg_path of
+        Left _ -> system_conf_refs
+        Right path
+         | null (last cs)
+         -> map PkgConfFile (init cs) ++ system_conf_refs
+         | otherwise
+         -> map PkgConfFile cs
+         where cs = parseSearchPath path
+         -- if the path ends in a separator (eg. "/foo/bar:")
+         -- then we tack on the system paths.
 
-   pkgs <- mapM (readPackageConfig dflags)
-                (pkgconfs ++ reverse (extraPkgConfs dflags))
-                -- later packages shadow earlier ones.  extraPkgConfs
-                -- is in the opposite order to the flags on the
-                -- command line.
+  let conf_refs = reverse (extraPkgConfs dflags base_conf_refs)
+  -- later packages shadow earlier ones.  extraPkgConfs
+  -- is in the opposite order to the flags on the
+  -- command line.
+  confs <- liftM catMaybes $ mapM (resolvePackageConfig dflags) conf_refs
 
-   return (concat pkgs)
+  liftM concat $ mapM (readPackageConfig dflags) confs
 
-
-getSystemPackageConfigs :: DynFlags -> IO [FilePath]
-getSystemPackageConfigs dflags = do
-	-- System one always comes first
-   let system_pkgconf = systemPackageConfig dflags
-
-	-- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
-	-- unless the -no-user-package-conf flag was given.
-   user_pkgconf <- do
-      if not (dopt Opt_ReadUserPackageConf dflags) then return [] else do
-      appdir <- getAppUserDataDirectory "ghc"
-      let 
-     	 dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
-         pkgconf = dir </> "package.conf.d"
-      --
-      exist <- doesDirectoryExist pkgconf
-      if exist then return [pkgconf] else return []
-    `catchIO` (\_ -> return [])
-
-   return (system_pkgconf : user_pkgconf)
+resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
+resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
+resolvePackageConfig _ UserPkgConf = handleIO (\_ -> return Nothing) $ do
+  appdir <- getAppUserDataDirectory "ghc"
+  let dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+      pkgconf = dir </> "package.conf.d"
+  exist <- doesDirectoryExist pkgconf
+  return $ if exist then Just pkgconf else Nothing
+resolvePackageConfig _ (PkgConfFile name) = return $ Just name
 
 readPackageConfig :: DynFlags -> FilePath -> IO [PackageConfig]
 readPackageConfig dflags conf_file = do
   isdir <- doesDirectoryExist conf_file
 
-  proto_pkg_configs <- 
+  proto_pkg_configs <-
     if isdir
        then do let filename = conf_file </> "package.cache"
                debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
                conf <- readBinPackageDB filename
                return (map installedPackageInfoToPackageConfig conf)
 
-       else do 
+       else do
             isfile <- doesFileExist conf_file
             when (not isfile) $
-              ghcError $ InstallationError $ 
+              ghcError $ InstallationError $
                 "can't find a package database at " ++ conf_file
             debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
             str <- readFile conf_file
-            return (map installedPackageInfoToPackageConfig $ read str)
+            case reads str of
+                [(configs, rest)]
+                    | all isSpace rest -> return (map installedPackageInfoToPackageConfig configs)
+                _ -> ghcError $ InstallationError $
+                        "invalid package database file " ++ conf_file
 
   let
       top_dir = topDir dflags
@@ -293,7 +282,7 @@ mungePackagePaths top_dir pkgroot pkg =
       haddockInterfaces = munge_paths (haddockInterfaces pkg),
       haddockHTMLs = munge_urls (haddockHTMLs pkg)
     }
-  where 
+  where
     munge_paths = map munge_path
     munge_urls  = map munge_url
 
@@ -329,56 +318,57 @@ mungePackagePaths top_dir pkgroot pkg =
 -- (-package, -hide-package, -ignore-package).
 
 applyPackageFlag
-   :: UnusablePackages
+   :: DynFlags
+   -> UnusablePackages
    -> [PackageConfig]           -- Initial database
    -> PackageFlag               -- flag to apply
    -> IO [PackageConfig]        -- new database
 
-applyPackageFlag unusable pkgs flag =
+applyPackageFlag dflags unusable pkgs flag =
   case flag of
     ExposePackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
-         Left ps         -> packageFlagErr flag ps
+         Left ps         -> packageFlagErr dflags flag ps
          Right (p:ps,qs) -> return (p':ps')
-    	  where p' = p {exposed=True}
-    	        ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
+          where p' = p {exposed=True}
+                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
          _ -> panic "applyPackageFlag"
 
     ExposePackageId str ->
        case selectPackages (matchingId str) pkgs unusable of
-         Left ps         -> packageFlagErr flag ps
+         Left ps         -> packageFlagErr dflags flag ps
          Right (p:ps,qs) -> return (p':ps')
-    	  where p' = p {exposed=True}
-    	        ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
+          where p' = p {exposed=True}
+                ps' = hideAll (pkgName (sourcePackageId p)) (ps++qs)
          _ -> panic "applyPackageFlag"
 
     HidePackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
-         Left ps       -> packageFlagErr flag ps
+         Left ps       -> packageFlagErr dflags flag ps
          Right (ps,qs) -> return (map hide ps ++ qs)
-    	  where hide p = p {exposed=False}
+          where hide p = p {exposed=False}
 
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
-         Left ps       -> packageFlagErr flag ps
+         Left ps       -> packageFlagErr dflags flag ps
          Right (ps,qs) -> return (map trust ps ++ qs)
-    	  where trust p = p {trusted=True}
+          where trust p = p {trusted=True}
 
     DistrustPackage str ->
        case selectPackages (matchingStr str) pkgs unusable of
-         Left ps       -> packageFlagErr flag ps
+         Left ps       -> packageFlagErr dflags flag ps
          Right (ps,qs) -> return (map distrust ps ++ qs)
-    	  where distrust p = p {trusted=False}
+          where distrust p = p {trusted=False}
 
     _ -> panic "applyPackageFlag"
 
    where
-	-- When a package is requested to be exposed, we hide all other
-	-- packages with the same name.
-	hideAll name ps = map maybe_hide ps
-	  where maybe_hide p
+        -- When a package is requested to be exposed, we hide all other
+        -- packages with the same name.
+        hideAll name ps = map maybe_hide ps
+          where maybe_hide p
                    | pkgName (sourcePackageId p) == name = p {exposed=False}
                    | otherwise                           = p
 
@@ -401,8 +391,8 @@ selectPackages matches pkgs unusable
 -- version, or just the name if it is unambiguous.
 matchingStr :: String -> PackageConfig -> Bool
 matchingStr str p
-	=  str == display (sourcePackageId p)
-	|| str == display (pkgName (sourcePackageId p))
+        =  str == display (sourcePackageId p)
+        || str == display (pkgName (sourcePackageId p))
 
 matchingId :: String -> PackageConfig -> Bool
 matchingId str p =  InstalledPackageId str == installedPackageId p
@@ -413,20 +403,21 @@ sortByVersion = sortBy (flip (comparing (pkgVersion.sourcePackageId)))
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
 
-packageFlagErr :: PackageFlag
+packageFlagErr :: DynFlags
+               -> PackageFlag
                -> [(PackageConfig, UnusablePackageReason)]
                -> IO a
 
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
-packageFlagErr (ExposePackage pkg) [] | is_dph_package pkg
-  = ghcError (CmdLineError (showSDoc $ dph_err))
+packageFlagErr dflags (ExposePackage pkg) [] | is_dph_package pkg
+  = ghcError (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
                   $$ text "To install it: \"cabal install dph\"."
         is_dph_package pkg = "dph" `isPrefixOf` pkg
-  
-packageFlagErr flag reasons = ghcError (CmdLineError (showSDoc $ err))
-  where err = text "cannot satisfy " <> ppr_flag <> 
+
+packageFlagErr dflags flag reasons = ghcError (CmdLineError (showSDoc dflags $ err))
+  where err = text "cannot satisfy " <> ppr_flag <>
                 (if null reasons then empty else text ": ") $$
               nest 4 (ppr_reasons $$
                       text "(use -v for more information)")
@@ -452,20 +443,20 @@ packageFlagErr flag reasons = ghcError (CmdLineError (showSDoc $ err))
 hideOldPackages :: DynFlags -> [PackageConfig] -> IO [PackageConfig]
 hideOldPackages dflags pkgs = mapM maybe_hide pkgs
   where maybe_hide p
-	   | not (exposed p) = return p
-	   | (p' : _) <- later_versions = do
-		debugTraceMsg dflags 2 $
-		   (ptext (sLit "hiding package") <+> pprSPkg p <+>
-		    ptext (sLit "to avoid conflict with later version") <+>
-		    pprSPkg p')
-		return (p {exposed=False})
-	   | otherwise = return p
-	  where myname = pkgName (sourcePackageId p)
-		myversion = pkgVersion (sourcePackageId p)
-		later_versions = [ p | p <- pkgs, exposed p,
-				    let pkg = sourcePackageId p,
-				    pkgName pkg == myname,
-				    pkgVersion pkg > myversion ]
+           | not (exposed p) = return p
+           | (p' : _) <- later_versions = do
+                debugTraceMsg dflags 2 $
+                   (ptext (sLit "hiding package") <+> pprSPkg p <+>
+                    ptext (sLit "to avoid conflict with later version") <+>
+                    pprSPkg p')
+                return (p {exposed=False})
+           | otherwise = return p
+          where myname = pkgName (sourcePackageId p)
+                myversion = pkgVersion (sourcePackageId p)
+                later_versions = [ p | p <- pkgs, exposed p,
+                                       let pkg = sourcePackageId p,
+                                       pkgName pkg == myname,
+                                       pkgVersion pkg > myversion ]
 
 -- -----------------------------------------------------------------------------
 -- Wired-in packages
@@ -494,43 +485,43 @@ findWiredInPackages dflags pkgs = do
         matches :: PackageConfig -> String -> Bool
         pc `matches` pid = display (pkgName (sourcePackageId pc)) == pid
 
-	-- find which package corresponds to each wired-in package
-	-- delete any other packages with the same name
-	-- update the package and any dependencies to point to the new
-	-- one.
+        -- find which package corresponds to each wired-in package
+        -- delete any other packages with the same name
+        -- update the package and any dependencies to point to the new
+        -- one.
         --
         -- When choosing which package to map to a wired-in package
         -- name, we prefer exposed packages, and pick the latest
         -- version.  To override the default choice, -hide-package
         -- could be used to hide newer versions.
         --
-	findWiredInPackage :: [PackageConfig] -> String
-			   -> IO (Maybe InstalledPackageId)
-	findWiredInPackage pkgs wired_pkg =
+        findWiredInPackage :: [PackageConfig] -> String
+                           -> IO (Maybe InstalledPackageId)
+        findWiredInPackage pkgs wired_pkg =
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ] in
-	   case all_ps of
-		[]   -> notfound
-		many -> pick (head (sortByVersion many))
+           case all_ps of
+                []   -> notfound
+                many -> pick (head (sortByVersion many))
           where
                 notfound = do
-			  debugTraceMsg dflags 2 $
-			    ptext (sLit "wired-in package ")
-				 <> text wired_pkg
-				 <> ptext (sLit " not found.")
-			  return Nothing
-		pick :: InstalledPackageInfo_ ModuleName
+                          debugTraceMsg dflags 2 $
+                            ptext (sLit "wired-in package ")
+                                 <> text wired_pkg
+                                 <> ptext (sLit " not found.")
+                          return Nothing
+                pick :: InstalledPackageInfo_ ModuleName
                      -> IO (Maybe InstalledPackageId)
                 pick pkg = do
                         debugTraceMsg dflags 2 $
-			    ptext (sLit "wired-in package ")
-				 <> text wired_pkg
-				 <> ptext (sLit " mapped to ")
-				 <> pprIPkg pkg
-			return (Just (installedPackageId pkg))
+                            ptext (sLit "wired-in package ")
+                                 <> text wired_pkg
+                                 <> ptext (sLit " mapped to ")
+                                 <> pprIPkg pkg
+                        return (Just (installedPackageId pkg))
 
 
   mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_pkgids
-  let 
+  let
         wired_in_ids = catMaybes mb_wired_in_ids
 
         -- this is old: we used to assume that if there were
@@ -541,13 +532,13 @@ findWiredInPackages dflags pkgs = do
         -- wrappers that depend on this one.  e.g. base-4.0 is the
         -- latest, base-3.0 is a compat wrapper depending on base-4.0.
         {-
- 	deleteOtherWiredInPackages pkgs = filterOut bad pkgs
- 	  where bad p = any (p `matches`) wired_in_pkgids
+        deleteOtherWiredInPackages pkgs = filterOut bad pkgs
+          where bad p = any (p `matches`) wired_in_pkgids
                       && package p `notElem` map fst wired_in_ids
         -}
 
-	updateWiredInDependencies pkgs = map upd_pkg pkgs
-	  where upd_pkg p
+        updateWiredInDependencies pkgs = map upd_pkg pkgs
+          where upd_pkg p
                   | installedPackageId p `elem` wired_in_ids
                   = p { sourcePackageId = (sourcePackageId p){ pkgVersion = Version [] [] } }
                   | otherwise
@@ -650,9 +641,9 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
      case partition (matchingStr str) pkgs of
          (ps, _) -> [ (installedPackageId p, IgnoredWithFlag)
                     | p <- ps ]
-    	-- missing package is not an error for -ignore-package,
-    	-- because a common usage is to -ignore-package P as
-    	-- a preventative measure just in case P exists.
+        -- missing package is not an error for -ignore-package,
+        -- because a common usage is to -ignore-package P as
+        -- a preventative measure just in case P exists.
   doit _ = panic "ignorePackages"
 
 -- -----------------------------------------------------------------------------
@@ -665,7 +656,7 @@ depClosure index ipids = closure Map.empty ipids
    closure set [] = Map.keys set
    closure set (ipid : ipids)
      | ipid `Map.member` set = closure set ipids
-     | Just p <- Map.lookup ipid index = closure (Map.insert ipid p set) 
+     | Just p <- Map.lookup ipid index = closure (Map.insert ipid p set)
                                                  (depends p ++ ipids)
      | otherwise = closure set ipids
 
@@ -688,7 +679,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 {-
    Plan.
 
-   1. P = transitive closure of packages selected by -package-id 
+   1. P = transitive closure of packages selected by -package-id
 
    2. Apply shadowing.  When there are multiple packages with the same
       sourcePackageId,
@@ -746,7 +737,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
       ipid_selected = depClosure ipid_map [ InstalledPackageId i
                                           | ExposePackageId i <- flags ]
-      
+
       (ignore_flags, other_flags) = partition is_ignore flags
       is_ignore IgnorePackage{} = True
       is_ignore _ = False
@@ -765,7 +756,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   -- Modify the package database according to the command-line flags
   -- (-package, -hide-package, -ignore-package, -hide-all-packages).
   --
-  pkgs1 <- foldM (applyPackageFlag unusable) pkgs0_unique other_flags
+  pkgs1 <- foldM (applyPackageFlag dflags unusable) pkgs0_unique other_flags
   let pkgs2 = filter (not . (`Map.member` unusable) . installedPackageId) pkgs1
 
   -- Here we build up a set of the packages mentioned in -package
@@ -776,7 +767,9 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   --
   let preload1 = [ installedPackageId p | f <- flags, p <- get_exposed f ]
 
-      get_exposed (ExposePackage   s) = filter (matchingStr s) pkgs2
+      get_exposed (ExposePackage   s)
+         = take 1 $ sortByVersion (filter (matchingStr s) pkgs2)
+         --  -package P means "the latest version of P" (#7030)
       get_exposed (ExposePackageId s) = filter (matchingId  s) pkgs2
       get_exposed _                   = []
 
@@ -793,7 +786,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 
       lookupIPID ipid@(InstalledPackageId str)
          | Just pid <- Map.lookup ipid ipid_map = return pid
-         | otherwise                            = missingPackageErr str
+         | otherwise                            = missingPackageErr dflags str
 
   preload2 <- mapM lookupIPID preload1
 
@@ -808,9 +801,9 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       -- set up preloaded package when we are just building it
       preload3 = nub $ filter (/= this_package)
                      $ (basicLinkedPackages ++ preload2)
- 
+
   -- Close the preload packages with their dependencies
-  dep_preload <- closeDeps pkg_db ipid_map (zip preload3 (repeat Nothing))
+  dep_preload <- closeDeps dflags pkg_db ipid_map (zip preload3 (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let pstate = PackageState{ preloadPackages     = dep_preload,
@@ -820,7 +813,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
                            }
 
   return (pstate, new_dep_preload, this_package)
-  
+
 
 -- -----------------------------------------------------------------------------
 -- Make the mapping from module to package info
@@ -831,15 +824,15 @@ mkModuleMap
 mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
   where
         pkgids = map packageConfigId (eltsUFM pkg_db)
-        
-	extend_modmap pkgid modmap =
-		addListToUFM_C (++) modmap 
-		   ([(m, [(pkg, True)])  | m <- exposed_mods] ++
-		    [(m, [(pkg, False)]) | m <- hidden_mods])
-	  where
-		pkg = expectJust "mkModuleMap" (lookupPackage pkg_db pkgid)
-	        exposed_mods = exposedModules pkg
-	        hidden_mods  = hiddenModules pkg
+
+        extend_modmap pkgid modmap =
+                addListToUFM_C (++) modmap
+                   ([(m, [(pkg, True)])  | m <- exposed_mods] ++
+                    [(m, [(pkg, False)]) | m <- hidden_mods])
+          where
+                pkg = expectJust "mkModuleMap" (lookupPackage pkg_db pkgid)
+                exposed_mods = exposedModules pkg
+                hidden_mods  = hiddenModules pkg
 
 pprSPkg :: PackageConfig -> SDoc
 pprSPkg p = text (display (sourcePackageId p))
@@ -863,7 +856,7 @@ getPackageIncludePath :: DynFlags -> [PackageId] -> IO [String]
 getPackageIncludePath dflags pkgs =
   collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
 
-collectIncludeDirs :: [PackageConfig] -> [FilePath] 
+collectIncludeDirs :: [PackageConfig] -> [FilePath]
 collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
@@ -876,14 +869,14 @@ collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
 -- | Find all the link options in these and the preload packages
 getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
-getPackageLinkOpts dflags pkgs = 
+getPackageLinkOpts dflags pkgs =
   collectLinkOpts dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
 collectLinkOpts :: DynFlags -> [PackageConfig] -> [String]
 collectLinkOpts dflags ps = concat (map all_opts ps)
   where
-      	libs p     = packageHsLibs dflags p ++ extraLibraries p
-	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
+        libs p     = packageHsLibs dflags p ++ extraLibraries p
+        all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
@@ -895,7 +888,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         -- we leave out the _dyn, because it is superfluous
 
         -- debug RTS includes support for -eventlog
-        ways2 | WayDebug `elem` map wayName ways1 
+        ways2 | WayDebug `elem` map wayName ways1
               = filter ((/= WayEventLog) . wayName) ways1
               | otherwise
               = ways1
@@ -903,14 +896,14 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
         rts_tag = mkBuildTag ways2
 
-	mkDynName | opt_Static = id
-		  | otherwise = (++ ("-ghc" ++ cProjectVersion))
+        mkDynName | opt_Static = id
+                  | otherwise = (++ ("-ghc" ++ cProjectVersion))
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
         addSuffix other_lib      = other_lib ++ (expandTag tag)
 
         expandTag t | null t = ""
-		    | otherwise = '_':t
+                    | otherwise = '_':t
 
 -- | Find all the C-compiler options in these and the preload packages
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
@@ -933,7 +926,7 @@ getPackageFrameworks dflags pkgs = do
 -- -----------------------------------------------------------------------------
 -- Package Utils
 
--- | Takes a 'Module', and if the module is in a package returns 
+-- | Takes a 'Module', and if the module is in a package returns
 -- @(pkgconf, exposed)@ where pkgconf is the PackageConfig for that package,
 -- and exposed is @True@ if the package exposes the module.
 lookupModuleInAllPackages :: DynFlags -> ModuleName -> [(PackageConfig,Bool)]
@@ -968,28 +961,31 @@ lookupModuleWithSuggestions dflags m
 -- 'PackageConfig's
 getPreloadPackagesAnd :: DynFlags -> [PackageId] -> IO [PackageConfig]
 getPreloadPackagesAnd dflags pkgids =
-  let 
+  let
       state   = pkgState dflags
       pkg_map = pkgIdMap state
       ipid_map = installedPackageIdMap state
       preload = preloadPackages state
       pairs = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr (foldM (add_package pkg_map ipid_map) preload pairs)
+  all_pkgs <- throwErr dflags (foldM (add_package pkg_map ipid_map) preload pairs)
   return (map (getPackageDetails state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
-closeDeps :: PackageConfigMap
+closeDeps :: DynFlags
+          -> PackageConfigMap
           -> Map InstalledPackageId PackageId
           -> [(PackageId, Maybe PackageId)]
           -> IO [PackageId]
-closeDeps pkg_map ipid_map ps = throwErr (closeDepsErr pkg_map ipid_map ps)
+closeDeps dflags pkg_map ipid_map ps
+    = throwErr dflags (closeDepsErr pkg_map ipid_map ps)
 
-throwErr :: MaybeErr MsgDoc a -> IO a
-throwErr m = case m of
-		Failed e    -> ghcError (CmdLineError (showSDoc e))
-		Succeeded r -> return r
+throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
+throwErr dflags m
+              = case m of
+                Failed e    -> ghcError (CmdLineError (showSDoc dflags e))
+                Succeeded r -> return r
 
 closeDepsErr :: PackageConfigMap
              -> Map InstalledPackageId PackageId
@@ -998,21 +994,21 @@ closeDepsErr :: PackageConfigMap
 closeDepsErr pkg_map ipid_map ps = foldM (add_package pkg_map ipid_map) [] ps
 
 -- internal helper
-add_package :: PackageConfigMap 
+add_package :: PackageConfigMap
             -> Map InstalledPackageId PackageId
             -> [PackageId]
             -> (PackageId,Maybe PackageId)
             -> MaybeErr MsgDoc [PackageId]
 add_package pkg_db ipid_map ps (p, mb_parent)
-  | p `elem` ps = return ps	-- Check if we've already added this package
+  | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
       case lookupPackage pkg_db p of
-        Nothing -> Failed (missingPackageMsg (packageIdString p) <> 
+        Nothing -> Failed (missingPackageMsg (packageIdString p) <>
                            missingDependencyMsg mb_parent)
         Just pkg -> do
-    	   -- Add the package's dependents also
-    	   ps' <- foldM add_package_ipid ps (depends pkg)
-    	   return (p : ps')
+           -- Add the package's dependents also
+           ps' <- foldM add_package_ipid ps (depends pkg)
+           return (p : ps')
           where
             add_package_ipid ps ipid@(InstalledPackageId str)
               | Just pid <- Map.lookup ipid ipid_map
@@ -1020,8 +1016,9 @@ add_package pkg_db ipid_map ps (p, mb_parent)
               | otherwise
               = Failed (missingPackageMsg str <> missingDependencyMsg mb_parent)
 
-missingPackageErr :: String -> IO a
-missingPackageErr p = ghcError (CmdLineError (showSDoc (missingPackageMsg p)))
+missingPackageErr :: DynFlags -> String -> IO a
+missingPackageErr dflags p
+    = ghcError (CmdLineError (showSDoc dflags (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc
 missingPackageMsg p = ptext (sLit "unknown package:") <+> text p
@@ -1049,9 +1046,9 @@ isDllName this_pkg name
 -- | Show package info on console, if verbosity is >= 3
 dumpPackages :: DynFlags -> IO ()
 dumpPackages dflags
-  = do  let pkg_map = pkgIdMap (pkgState dflags)
-	putMsg dflags $
-              vcat (map (text . showInstalledPackageInfo
-                              . packageConfigToInstalledPackageInfo)
-                        (eltsUFM pkg_map))
+  = do let pkg_map = pkgIdMap (pkgState dflags)
+       putMsg dflags $
+             vcat (map (text . showInstalledPackageInfo
+                             . packageConfigToInstalledPackageInfo)
+                       (eltsUFM pkg_map))
 \end{code}

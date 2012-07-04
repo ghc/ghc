@@ -50,12 +50,11 @@ import RnEnv
 import RnTypes
 import DynFlags
 import PrelNames
-import Constants	( mAX_TUPLE_SIZE )
 import Name
 import NameSet
 import RdrName
 import BasicTypes
-import Util		( notNull )
+import Util
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc
@@ -162,6 +161,10 @@ matchNameMaker ctxt = LamMk report_unused
                       StmtCtxt GhciStmt -> False
                       _                 -> True
 
+rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
+rnHsSigCps sig 
+  = CpsRn (rnHsBndrSig PatCtx sig)
+
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside -> 
@@ -232,11 +235,9 @@ rnPats :: HsMatchContext Name -- for error messages
 rnPats ctxt pats thing_inside
   = do	{ envs_before <- getRdrEnvs
 
-	  -- (0) bring into scope all of the type variables bound by the patterns
 	  -- (1) rename the patterns, bringing into scope all of the term variables
 	  -- (2) then do the thing inside.
-	; bindPatSigTyVarsFV (collectSigTysFromPats pats)     $ 
-	  unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
+	; unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
         { -- Check for duplicated and shadowed names 
 	  -- Must do this *after* renaming the patterns
 	  -- See Note [Collect binders only after renaming] in HsUtils
@@ -310,15 +311,10 @@ rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
-rnPatAndThen mk (SigPatIn pat ty)
-  = do { patsigs <- liftCps (xoptM Opt_ScopedTypeVariables)
-       ; if patsigs
-         then do { pat' <- rnLPatAndThen mk pat
-                 ; ty' <- liftCpsFV (rnHsTypeFVs PatCtx ty)
-		 ; return (SigPatIn pat' ty') }
-         else do { liftCps (addErr (patSigErr ty))
-                 ; rnPatAndThen mk (unLoc pat) } }
-
+rnPatAndThen mk (SigPatIn pat sig)
+  = do { pat' <- rnLPatAndThen mk pat
+       ; sig' <- rnHsSigCps sig
+       ; return (SigPatIn pat' sig') }
        
 rnPatAndThen mk (LitPat lit)
   | HsString s <- lit
@@ -505,7 +501,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
       = do { addErr (badDotDot ctxt); return [] }
-    rn_dotdot (Just n) (Just con) flds -- ".." on record con/pat
+    rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM	-- Rather approximate
            ; dd_flag <- xoptM Opt_RecordWildCards
@@ -529,11 +525,11 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
                    where
                      rdr = mkRdrUnqual (nameOccName fld)
 
-                 dot_dot_gres = [ gre 
+                 dot_dot_gres = [ head gres
                                 | fld <- con_fields
                                 , not (fld `elem` present_flds)
-                                , let gres@(gre:_) = lookupGRE_Name rdr_env fld
-                                , not (null gres)
+                                , let gres = lookupGRE_Name rdr_env fld
+                                , not (null gres)  -- Check field is in scope
                                 , case ctxt of
                                     HsRecFieldCon {} -> arg_in_scope fld
                                     _other           -> True ] 
@@ -629,15 +625,6 @@ rnOverLit lit@(OverLit {ol_val=val})
 %************************************************************************
 
 \begin{code}
-checkTupSize :: Int -> RnM ()
-checkTupSize tup_size
-  | tup_size <= mAX_TUPLE_SIZE 
-  = return ()
-  | otherwise		       
-  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
-		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
-		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
-
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)

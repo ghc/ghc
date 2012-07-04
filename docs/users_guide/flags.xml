@@ -489,19 +489,13 @@
           <row>
             <entry><option>-ignore-dot-ghci</option></entry>
             <entry>Disable reading of <filename>.ghci</filename> files</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-ghci-script</option></entry>
-            <entry>Load the given additional <filename>.ghci</filename> file</entry>
-            <entry>static</entry>
-            <entry>-</entry>
-          </row>
-          <row>
-            <entry><option>-read-dot-ghci</option></entry>
-            <entry>Enable reading of <filename>.ghci</filename> files</entry>
-            <entry>static</entry>
+            <entry>Read additional <filename>.ghci</filename> files</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -594,14 +588,38 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-package-conf</option> <replaceable>file</replaceable></entry>
-            <entry>Load more packages from <replaceable>file</replaceable></entry>
+            <entry><option>-package-db</option> <replaceable>file</replaceable></entry>
+            <entry>Add <replaceable>file</replaceable> to the package db stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-no-user-package-conf</option></entry>
-            <entry>Don't load the user's package config file.</entry>
+            <entry><option>-clear-package-db</option></entry>
+            <entry>Clear the package db stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-no-global-package-db</option></entry>
+            <entry>Remove the global package db from the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-global-package-db</option></entry>
+            <entry>Add the global package db to the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-no-user-package-db</option></entry>
+            <entry>Remove the user's package db from the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-user-package-db</option></entry>
+            <entry>Add the user's package db to the stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>
@@ -810,13 +828,14 @@
           </row>
           <row>
             <entry><option>-XDataKinds</option></entry>
-            <entry>Enable <link linkend="kind-polymorphism-and-promotion">datatype promotion</link>.</entry>
+            <entry>Enable <link linkend="promotion">datatype promotion</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoDataKinds</option></entry>
           </row>
           <row>
             <entry><option>-XPolyKinds</option></entry>
-            <entry>Enable <link linkend="kind-polymorphism-and-promotion">kind polymorphism</link>.</entry>
+            <entry>Enable <link linkend="kind-polymorphism">kind polymorphism</link>.
+                   Implies <option>-XKindSignatures</option>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoPolyKinds</option></entry>
           </row>
@@ -981,14 +1000,14 @@
             <entry><option>-XNoTypeOperators</option></entry>
           </row>
           <row>
-            <entry><option>-XDoRec</option></entry>
-            <entry>Enable <link linkend="recursive-do-notation">recursive do notation</link>.</entry>
+            <entry><option>-XExplicitNamespaces</option></entry>
+            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of entries in imports and exports.</entry>
             <entry>dynamic</entry>
-            <entry><option>-XNoDoRec</option></entry>
+            <entry><option>-XNoExplicitNamespaces</option></entry>
           </row>
           <row>
             <entry><option>-XRecursiveDo</option></entry>
-            <entry>Enable <link linkend="mdo-notation">recursive do (mdo) notation</link>. This is deprecated; please use <link linkend="recursive-do-notation">recursive do notation</link> instead.</entry>
+            <entry>Enable <link linkend="recursive-do-notation">recursive do (mdo) notation</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoRecursiveDo</option></entry>
           </row>
@@ -1502,6 +1521,20 @@
           </row>
 
           <row>
+            <entry><option>-fvectorise</option></entry>
+            <entry>Enable vectorisation of nested data parallelism</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-vectorise</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-favoid-vect</option></entry>
+            <entry>Enable vectorisation avoidance (EXPERIMENTAL)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-avoid-vect</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fexcess-precision</option></entry>
             <entry>Enable excess intermediate precision</entry>
             <entry>dynamic</entry>
@@ -1548,15 +1581,6 @@
             <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 200)</entry>
             <entry>static</entry>
             <entry><option>-fno-liberate-case-threshold</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-fllvm-tbaa</option></entry>
-            <entry>Turn on Typed Based Alias Analysis information in the LLVM
-              backend. This enables more accurate and alias information in the LLVM
-              backend for better optimisation. (default: enabled)</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-llvm-tbaa</option></entry>
           </row>
 
           <row>
@@ -1610,23 +1634,6 @@
             <entry>Don't generate interface pragmas</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-omit-interface-pragmas</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-freg-liveness</option></entry>
-            <entry>Track STG register liveness to avoid saving and restoring
-              dead registers, as well as freeing the dead ones for use in
-              intermediate code. (LLVM backend only, default: enabled).
-              
-              Traditionally GHC has reserved a set of machine registers for the
-              exclusive use of storing a stack pointer, heap pointer and
-              general purpose function argument registers (these are the so
-              called STG registers). This optimisation tracks the liveness of
-              the machine registers the STG registers are mapped to so that the
-              machine register can be used for other purposes when the STG
-              register are dead.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-reg-liveness</option></entry>
           </row>
 
           <row>
@@ -2699,19 +2706,19 @@
           <row>
             <entry><option>-dppr-user-length</option></entry>
             <entry>Set the depth for printing expressions in error msgs</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dppr-colsNNN</option></entry>
             <entry>Set the width of debugging output. For example <option>-dppr-cols200</option></entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-dppr-case-as-let</option></entry>
             <entry>Print single alternative case expressions as strict lets.</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

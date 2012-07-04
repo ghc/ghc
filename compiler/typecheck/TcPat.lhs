@@ -36,7 +36,6 @@ import TcUnify
 import TcHsType
 import TysWiredIn
 import TcEvidence
-import StaticFlags
 import TyCon
 import DataCon
 import PrelNames
@@ -138,12 +137,11 @@ data TcSigInfo
   = TcSigInfo {
         sig_id     :: TcId,         --  *Polymorphic* binder for this value...
 
-        sig_scoped :: [Name],	    -- Scoped type variables
-		-- 1-1 correspondence with a prefix of sig_tvs
-		-- However, may be fewer than sig_tvs; 
-		-- see Note [More instantiated than scoped]
-        sig_tvs    :: [TcTyVar],    -- Instantiated type variables
-                                    -- See Note [Instantiate sig]
+        sig_tvs    :: [(Maybe Name, TcTyVar)],    
+                           -- Instantiated type and kind variables
+                           -- Just n <=> this skolem is lexically in scope with name n
+                           -- See Note [Kind vars in sig_tvs]
+                     	   -- See Note [More instantiated than scoped] in TcBinds
 
         sig_theta  :: TcThetaType,  -- Instantiated theta
 
@@ -155,8 +153,19 @@ data TcSigInfo
 
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
-        = ppr id <+> ptext (sLit "::") <+> ppr tyvars <+> pprThetaArrowTy theta <+> ppr tau
+        = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
+                                     , ppr (map fst tyvars) ]
 \end{code}
+
+Note [Kind vars in sig_tvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With kind polymorphism a signature like
+  f :: forall f a. f a -> f a
+may actuallly give rise to 
+  f :: forall k. forall (f::k -> *) (a:k). f a -> f a
+So the sig_tvs will be [k,f,a], but only f,a are scoped.
+So the scoped ones are not necessarily the *inital* ones!
+
 
 Note [sig_tau may be polymorphic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,12 +251,14 @@ newNoSigLetBndr (LetGblBndr prags) name ty
 ----------
 addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
 addInlinePrags poly_id prags
-  = tc_inl inl_sigs
+  = do { traceTc "addInlinePrags" (ppr poly_id $$ ppr prags) 
+       ; tc_inl inl_sigs }
   where
     inl_sigs = filter isInlineLSig prags
     tc_inl [] = return poly_id
     tc_inl (L loc (InlineSig _ prag) : other_inls)
        = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
+            ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag) 
             ; return (poly_id `setInlinePragma` prag) }
     tc_inl _ = panic "tc_inl"
 
@@ -264,32 +275,7 @@ warnPrags id bad_sigs herald
 -----------------
 mkLocalBinder :: Name -> TcType -> TcM TcId
 mkLocalBinder name ty
-  = do { checkUnboxedTuple ty $ 
-            ptext (sLit "The variable") <+> quotes (ppr name)
-       ; return (Id.mkLocalId name ty) }
-
-checkUnboxedTuple :: TcType -> SDoc -> TcM ()
--- Check for an unboxed tuple type
---      f = (# True, False #)
--- Zonk first just in case it's hidden inside a meta type variable
--- (This shows up as a (more obscure) kind error 
---  in the 'otherwise' case of tcMonoBinds.)
-checkUnboxedTuple ty what
-  = do { zonked_ty <- zonkTcTypeCarefully ty
-       ; checkTc (not (isUnboxedTupleType zonked_ty))
-                 (unboxedTupleErr what zonked_ty) }
-
--------------------
-{- Only needed if we re-add Method constraints 
-bindInstsOfPatId :: TcId -> TcM a -> TcM (a, TcEvBinds)
-bindInstsOfPatId id thing_inside
-  | not (isOverloadedTy (idType id))
-  = do { res <- thing_inside; return (res, emptyTcEvBinds) }
-  | otherwise
-  = do	{ (res, lie) <- captureConstraints thing_inside
-	; binds <- bindLocalMethods lie [id]
-	; return (res, binds) }
--}
+  = return (Id.mkLocalId name ty)
 \end{code}
 
 Note [Polymorphism and pattern bindings]
@@ -413,9 +399,7 @@ tc_pat _ p@(QuasiQuotePat _) _ _
   = pprPanic "Should never see QuasiQuotePat in type checker" (ppr p)
 
 tc_pat _ (WildPat _) pat_ty thing_inside
-  = do	{ checkUnboxedTuple pat_ty $
-               ptext (sLit "A wild-card pattern")
-        ; res <- thing_inside 
+  = do	{ res <- thing_inside 
 	; return (WildPat pat_ty, res) }
 
 tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
@@ -431,11 +415,9 @@ tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
 	    -- If you fix it, don't forget the bindInstsOfPatIds!
 	; return (mkHsWrapPatCo co (AsPat (L nm_loc bndr_id) pat') pat_ty, res) }
 
-tc_pat penv vpat@(ViewPat expr pat _) overall_pat_ty thing_inside 
-  = do	{ checkUnboxedTuple overall_pat_ty $
-               ptext (sLit "The view pattern") <+> ppr vpat
-
-	 -- Morally, expr must have type `forall a1...aN. OPT' -> B` 
+tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside 
+  = do	{
+         -- Morally, expr must have type `forall a1...aN. OPT' -> B` 
          -- where overall_pat_ty is an instance of OPT'.
          -- Here, we infer a rho type for it,
          -- which replaces the leading foralls and constraints
@@ -486,6 +468,8 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc) pat_ty
 	; (pats', res) <- tc_lpats penv pats arg_tys thing_inside
 
+	; dflags <- getDynFlags
+
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
@@ -494,7 +478,7 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
                                      -- pat_ty /= pat_ty iff coi /= IdCo
               unmangled_result = TuplePat pats' boxity pat_ty'
 	      possibly_mangled_result
-	        | opt_IrrefutableTuples && 
+	        | dopt Opt_IrrefutableTuples dflags &&
                   isBoxed boxity            = LazyPat (noLoc unmangled_result)
 	        | otherwise		    = unmangled_result
 
@@ -1060,9 +1044,4 @@ lazyUnliftedPatErr pat
   = failWithTc $
     hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types:"))
        2 (ppr pat)
-
-unboxedTupleErr :: SDoc -> Type -> SDoc
-unboxedTupleErr what ty
-  = hang (what <+> ptext (sLit "cannot have an unboxed tuple type:"))
-       2 (ppr ty)
 \end{code}

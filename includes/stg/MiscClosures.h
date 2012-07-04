@@ -126,6 +126,7 @@ RTS_ENTRY(stg_AP_STACK_NOUPD);
 RTS_ENTRY(stg_dummy_ret);
 RTS_ENTRY(stg_raise);
 RTS_ENTRY(stg_raise_ret);
+RTS_ENTRY(stg_atomically);
 RTS_ENTRY(stg_TVAR_WATCH_QUEUE);
 RTS_ENTRY(stg_INVARIANT_CHECK_QUEUE);
 RTS_ENTRY(stg_ATOMIC_INVARIANT);
@@ -425,6 +426,7 @@ RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
 RTS_FUN_DECL(stg_threadStatuszh);
 
 RTS_FUN_DECL(stg_mkWeakzh);
+RTS_FUN_DECL(stg_mkWeakNoFinalizzerzh);
 RTS_FUN_DECL(stg_mkWeakForeignzh);
 RTS_FUN_DECL(stg_mkWeakForeignEnvzh);
 RTS_FUN_DECL(stg_finalizzeWeakzh);

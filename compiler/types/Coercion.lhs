@@ -30,7 +30,7 @@ module Coercion (
 	-- ** Constructing coercions
         mkReflCo, mkCoVarCo, 
         mkAxInstCo, mkAxInstRHS,
-        mkPiCo, mkPiCos,
+        mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkNthCo,
 	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo,
@@ -404,7 +404,7 @@ ppr_co p (AppCo co1 co2)       = maybeParen p TyConPrec $
                                  pprCo co1 <+> ppr_co TyConPrec co2
 ppr_co p co@(ForAllCo {})      = ppr_forall_co p co
 ppr_co _ (CoVarCo cv)          = parenSymOcc (getOccName cv) (ppr cv)
-ppr_co p (AxiomInstCo con cos) = pprTypeNameApp p ppr_co (getName con) cos
+ppr_co p (AxiomInstCo con cos) = angleBrackets (pprTypeNameApp p ppr_co (getName con) cos)
 
 ppr_co p (TransCo co1 co2) = maybeParen p FunPrec $
                              ppr_co FunPrec co1
@@ -441,7 +441,8 @@ ppr_forall_co p ty
 \begin{code}
 pprCoAxiom :: CoAxiom -> SDoc
 pprCoAxiom ax
-  = sep [ ptext (sLit "axiom") <+> ppr ax <+> ppr (co_ax_tvs ax)
+  = sep [ ptext (sLit "axiom") <+> 
+            sep [ ppr ax, nest 2 (pprTvBndrs (co_ax_tvs ax)) ]
         , nest 2 (dcolon <+> pprEqPred (Pair (co_ax_lhs ax) (co_ax_rhs ax))) ]
 \end{code}
 
@@ -504,7 +505,7 @@ coVarKind cv
 -- | Makes a coercion type from two types: the types whose equality 
 -- is proven by the relevant 'Coercion'
 mkCoercionType :: Type -> Type -> Type
-mkCoercionType = curry mkPrimEqType
+mkCoercionType = mkPrimEqPred
 
 isReflCo :: Coercion -> Bool
 isReflCo (Refl {}) = True
@@ -671,6 +672,18 @@ mkPiCos vs co = foldr mkPiCo co vs
 mkPiCo  :: Var -> Coercion -> Coercion
 mkPiCo v co | isTyVar v = mkForAllCo v co
             | otherwise = mkFunCo (mkReflCo (varType v)) co
+
+mkCoCast :: Coercion -> Coercion -> Coercion
+-- (mkCoCast (c :: s1 ~# t1) (g :: (s1 ~# t1) ~# (s2 ~# t2)
+mkCoCast c g
+  = mkSymCo g1 `mkTransCo` c `mkTransCo` g2
+  where
+       -- g  :: (s1 ~# s2) ~# (t1 ~#  t2)
+       -- g1 :: s1 ~# t1
+       -- g2 :: s2 ~# t2
+    [_reflk, g1, g2] = decomposeCo 3 g
+            -- Remember, (~#) :: forall k. k -> k -> *
+            -- so it takes *three* arguments, not two
 \end{code}
 
 %************************************************************************
@@ -950,6 +963,7 @@ ty_co_subst subst ty
     go (ForAllTy v ty)   = mkForAllCo v' $! (ty_co_subst subst' ty)
                          where
                            (subst', v') = liftCoSubstTyVarBndr subst v
+    go ty@(LitTy {})     = mkReflCo ty
 
 liftCoSubstTyVar :: LiftCoSubst -> TyVar -> Maybe Coercion
 liftCoSubstTyVar (LCS _ cenv) tv = lookupVarEnv cenv tv 

@@ -13,8 +13,12 @@
 
 module Constants (module Constants) where
 
+import Config
+
 #include "ghc_boot_platform.h"
 
 #include "../includes/HaskellConstants.hs"
 
+hiVersion :: Integer
+hiVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 \end{code}

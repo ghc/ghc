@@ -13,7 +13,6 @@
 module Outputable (
         -- * Type classes
         Outputable(..), OutputableBndr(..),
-        PlatformOutputable(..),
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
@@ -23,7 +22,8 @@ module Outputable (
         char,
         text, ftext, ptext,
         int, intWithCommas, integer, float, double, rational,
-        parens, cparen, brackets, braces, quotes, quote, doubleQuotes, angleBrackets,
+        parens, cparen, brackets, braces, quotes, quote, 
+        doubleQuotes, angleBrackets, paBrackets,
         semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
         blankLine,
@@ -38,13 +38,13 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        printSDoc, printErrs, printOutput, hPrintDump, printDump,
+        hPrintDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showPpr,
-        showSDocUnqual, showsPrecSDoc,
+        showSDocUnqual,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
@@ -56,6 +56,7 @@ module Outputable (
 
         PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
         QualifyName(..),
+        sdocWithDynFlags, sdocWithPlatform,
         getPprStyle, withPprStyle, withPprStyleDoc,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
@@ -66,18 +67,21 @@ module Outputable (
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
         pprTrace, pprDefiniteTrace, warnPprTrace,
-        trace, pgmError, panic, sorry, panicFastInt, assertPanic
+        trace, pgmError, panic, sorry, panicFastInt, assertPanic,
+        pprDebugAndThen,
     ) where
 
+import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags,
+                                  targetPlatform, pprUserLength, pprCols )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
 
 import StaticFlags
 import FastString
 import FastTypes
-import Platform
 import qualified Pretty
-import Util             ( snocView )
+import Util
+import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
@@ -87,7 +91,7 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
-import System.IO        ( Handle, stderr, stdout, hFlush )
+import System.IO        ( Handle, hFlush )
 import System.FilePath
 
 
@@ -192,16 +196,17 @@ defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
                  |  otherwise          = PprDump
 
 -- | Style for printing error messages
-mkErrStyle :: PrintUnqualified -> PprStyle
-mkErrStyle qual = mkUserStyle qual (PartWay opt_PprUserLength)
+mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
+mkErrStyle dflags qual = mkUserStyle qual (PartWay (pprUserLength dflags))
 
-defaultErrStyle :: PprStyle
+defaultErrStyle :: DynFlags -> PprStyle
 -- Default style for error messages
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
-defaultErrStyle
-  | opt_PprStyle_Debug   = mkUserStyle alwaysQualify AllTheWay
-  | otherwise            = mkUserStyle alwaysQualify (PartWay opt_PprUserLength)
+defaultErrStyle dflags = mkUserStyle alwaysQualify depth
+    where depth = if opt_PprStyle_Debug
+                  then AllTheWay
+                  else PartWay (pprUserLength dflags)
 
 mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
@@ -233,19 +238,21 @@ data SDocContext = SDC
   { sdocStyle      :: !PprStyle
   , sdocLastColour :: !PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
+  , sdocDynFlags   :: !DynFlags
   }
 
-initSDocContext :: PprStyle -> SDocContext
-initSDocContext sty = SDC
+initSDocContext :: DynFlags -> PprStyle -> SDocContext
+initSDocContext dflags sty = SDC
   { sdocStyle = sty
   , sdocLastColour = colReset
+  , sdocDynFlags = dflags
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
-withPprStyleDoc :: PprStyle -> SDoc -> Doc
-withPprStyleDoc sty d = runSDoc d (initSDocContext sty)
+withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
+withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
@@ -278,6 +285,12 @@ pprSetDepth depth doc = SDoc $ \ctx ->
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
+
+sdocWithDynFlags :: (DynFlags -> SDoc) -> SDoc
+sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
+
+sdocWithPlatform :: (Platform -> SDoc) -> SDoc
+sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 \end{code}
 
 \begin{code}
@@ -317,53 +330,35 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
--- Unused [7/02 sof]
-printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext sty))
-  hFlush stdout
-
--- I'm not sure whether the direct-IO approach of Pretty.printDoc
--- above is better or worse than the put-big-string approach here
-printErrs :: SDoc -> PprStyle -> IO ()
-printErrs doc sty = do
-  Pretty.printDoc PageMode stderr (runSDoc doc (initSDocContext sty))
-  hFlush stderr
-
-printOutput :: Doc -> IO ()
-printOutput doc = Pretty.printDoc PageMode stdout doc
-
-printDump :: SDoc -> IO ()
-printDump doc = hPrintDump stdout doc
-
-hPrintDump :: Handle -> SDoc -> IO ()
-hPrintDump h doc = do
-   Pretty.printDoc PageMode h
-     (runSDoc better_doc (initSDocContext defaultDumpStyle))
+hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
+hPrintDump dflags h doc = do
+   Pretty.printDoc PageMode (pprCols dflags) h
+     (runSDoc better_doc (initSDocContext dflags defaultDumpStyle))
    hFlush h
  where
    better_doc = doc $$ blankLine
 
-printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
-printForUser handle unqual doc
-  = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
+printForUser dflags handle unqual doc
+  = Pretty.printDoc PageMode (pprCols dflags) handle
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
 
-printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
-printForUserPartWay handle d unqual doc
-  = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
+printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
+                    -> IO ()
+printForUserPartWay dflags handle d unqual doc
+  = Pretty.printDoc PageMode (pprCols dflags) handle
+      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
-printForC :: Handle -> SDoc -> IO ()
-printForC handle doc =
-  Pretty.printDoc LeftMode handle
-    (runSDoc doc (initSDocContext (PprCode CStyle)))
+printForC :: DynFlags -> Handle -> SDoc -> IO ()
+printForC dflags handle doc =
+  Pretty.printDoc LeftMode (pprCols dflags) handle
+    (runSDoc doc (initSDocContext dflags (PprCode CStyle)))
 
-printForAsm :: Handle -> SDoc -> IO ()
-printForAsm handle doc =
-  Pretty.printDoc LeftMode handle
-    (runSDoc doc (initSDocContext (PprCode AsmStyle)))
+printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
+printForAsm dflags handle doc =
+  Pretty.printDoc LeftMode (pprCols dflags) handle
+    (runSDoc doc (initSDocContext dflags (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -374,48 +369,45 @@ mkCodeStyle = PprCode
 -- Can't make SDoc an instance of Show because SDoc is just a function type
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
-showSDoc :: SDoc -> String
-showSDoc d =
+showSDoc :: DynFlags -> SDoc -> String
+showSDoc dflags d =
   Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext defaultUserStyle))
+    (runSDoc d (initSDocContext dflags defaultUserStyle))
 
-renderWithStyle :: SDoc -> PprStyle -> String
-renderWithStyle sdoc sty =
-  Pretty.render (runSDoc sdoc (initSDocContext sty))
+renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
+renderWithStyle dflags sdoc sty =
+  Pretty.render (runSDoc sdoc (initSDocContext dflags sty))
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
-showSDocOneLine :: SDoc -> String
-showSDocOneLine d =
-  Pretty.showDocWith PageMode
-    (runSDoc d (initSDocContext defaultUserStyle))
+showSDocOneLine :: DynFlags -> SDoc -> String
+showSDocOneLine dflags d
+ = Pretty.showDocWith PageMode
+    (runSDoc d (initSDocContext dflags defaultUserStyle))
 
-showSDocForUser :: PrintUnqualified -> SDoc -> String
-showSDocForUser unqual doc =
-  show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
+showSDocForUser dflags unqual doc
+ = show (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
 
-showSDocUnqual :: SDoc -> String
+showSDocUnqual :: DynFlags -> SDoc -> String
 -- Only used in the gruesome isOperator
-showSDocUnqual d =
-  show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
+showSDocUnqual dflags d
+ = show (runSDoc d (initSDocContext dflags (mkUserStyle neverQualify AllTheWay)))
 
-showsPrecSDoc :: Int -> SDoc -> ShowS
-showsPrecSDoc p d = showsPrec p (runSDoc d (initSDocContext defaultUserStyle))
+showSDocDump :: DynFlags -> SDoc -> String
+showSDocDump dflags d
+ = Pretty.showDocWith PageMode (runSDoc d (initSDocContext dflags defaultDumpStyle))
 
-showSDocDump :: SDoc -> String
-showSDocDump d =
-  Pretty.showDocWith PageMode (runSDoc d (initSDocContext PprDump))
+showSDocDumpOneLine :: DynFlags -> SDoc -> String
+showSDocDumpOneLine dflags d
+ = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext dflags PprDump))
 
-showSDocDumpOneLine :: SDoc -> String
-showSDocDumpOneLine d =
-  Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
+showSDocDebug :: DynFlags -> SDoc -> String
+showSDocDebug dflags d = show (runSDoc d (initSDocContext dflags PprDebug))
 
-showSDocDebug :: SDoc -> String
-showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
-
-showPpr :: Outputable a => a -> String
-showPpr = showSDoc . ppr
+showPpr :: Outputable a => DynFlags -> a -> String
+showPpr dflags = showSDoc dflags . ppr
 \end{code}
 
 \begin{code}
@@ -444,27 +436,31 @@ float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
 
-parens, braces, brackets, quotes, quote, doubleQuotes, angleBrackets :: SDoc -> SDoc
+parens, braces, brackets, quotes, quote, 
+        paBrackets, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
-parens d       = SDoc $ Pretty.parens . runSDoc d
-braces d       = SDoc $ Pretty.braces . runSDoc d
-brackets d     = SDoc $ Pretty.brackets . runSDoc d
-quote d        = SDoc $ Pretty.quote . runSDoc d
-doubleQuotes d = SDoc $ Pretty.doubleQuotes . runSDoc d
+parens d        = SDoc $ Pretty.parens . runSDoc d
+braces d        = SDoc $ Pretty.braces . runSDoc d
+brackets d      = SDoc $ Pretty.brackets . runSDoc d
+quote d         = SDoc $ Pretty.quote . runSDoc d
+doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
+paBrackets d    = ptext (sLit "[:") <> d <> ptext (sLit ":]")
 
 cparen :: Bool -> SDoc -> SDoc
 
 cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
--- but it omits them if the thing ends in a single quote
+-- but it omits them if the thing begins or ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d = SDoc $ \sty ->
-           let pp_d = runSDoc d sty in
-           case snocView (show pp_d) of
-             Just (_, '\'') -> pp_d
-             _other         -> Pretty.quotes pp_d
+           let pp_d = runSDoc d sty
+               str  = show pp_d
+           in case (str, snocView str) of
+             (_, Just (_, '\'')) -> pp_d
+             ('\'' : _, _)       -> pp_d
+             _other              -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
 darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
@@ -611,13 +607,6 @@ class Outputable a where
 
         ppr = pprPrec 0
         pprPrec _ = ppr
-
-class PlatformOutputable a where
-        pprPlatform :: Platform -> a -> SDoc
-        pprPlatformPrec :: Platform -> Rational -> a -> SDoc
-
-        pprPlatform platform = pprPlatformPrec platform 0
-        pprPlatformPrec platform _ = pprPlatform platform
 \end{code}
 
 \begin{code}
@@ -627,8 +616,6 @@ instance Outputable Bool where
 
 instance Outputable Int where
    ppr n = int n
-instance PlatformOutputable Int where
-   pprPlatform _ = ppr
 
 instance Outputable Word16 where
    ppr n = integer $ fromIntegral n
@@ -641,29 +628,19 @@ instance Outputable Word where
 
 instance Outputable () where
    ppr _ = text "()"
-instance PlatformOutputable () where
-   pprPlatform _ _ = text "()"
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
-instance (PlatformOutputable a) => PlatformOutputable [a] where
-    pprPlatform platform xs = brackets (fsep (punctuate comma (map (pprPlatform platform) xs)))
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
-instance (PlatformOutputable a, PlatformOutputable b) => PlatformOutputable (a, b) where
-    pprPlatform platform (x,y)
-     = parens (sep [pprPlatform platform x <> comma, pprPlatform platform y])
 
 instance Outputable a => Outputable (Maybe a) where
   ppr Nothing = ptext (sLit "Nothing")
   ppr (Just x) = ptext (sLit "Just") <+> ppr x
-instance PlatformOutputable a => PlatformOutputable (Maybe a) where
-  pprPlatform _        Nothing  = ptext (sLit "Nothing")
-  pprPlatform platform (Just x) = ptext (sLit "Just") <+> pprPlatform platform x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
   ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
@@ -720,8 +697,6 @@ instance Outputable FastString where
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
-instance (PlatformOutputable key, PlatformOutputable elt) => PlatformOutputable (M.Map key elt) where
-    pprPlatform platform m = pprPlatform platform (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
 instance (PlatformOutputable elt) => PlatformOutputable (Set.Set elt) where
@@ -920,62 +895,57 @@ plural _   = char 's'
 
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = pprAndThen panic
+pprPanic    = panicDoc
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"
-pprSorry    = pprAndThen sorry
+pprSorry    = sorryDoc
 
 
 pprPgmError :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
-pprPgmError = pprAndThen pgmError
+pprPgmError = pgmErrorDoc
 
 
 pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprAndThen trace str doc x
+   | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
 
-pprDefiniteTrace :: String -> SDoc -> a -> a
+pprDefiniteTrace :: DynFlags -> String -> SDoc -> a -> a
 -- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace str doc x = pprAndThen trace str doc x
+pprDefiniteTrace dflags str doc x = pprDebugAndThen dflags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg =
-    panicFastInt (show (runSDoc doc (initSDocContext PprDebug)))
+pprPanicFastInt heading pretty_msg = panicDocFastInt heading pretty_msg
+
+warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
+-- ^ Just warn about an assertion failure, recording the given file and line number.
+-- Should typically be accessed with the WARN macros
+warnPprTrace _     _     _     _    x | not debugIsOn     = x
+warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
+warnPprTrace False _file _line _msg x = x
+warnPprTrace True   file  line  msg x
+  = pprDebugAndThen tracingDynFlags trace str msg x
   where
-    doc = text heading <+> pretty_msg
-
-
-pprAndThen :: (String -> a) -> String -> SDoc -> a
-pprAndThen cont heading pretty_msg =
-  cont (show (runSDoc doc (initSDocContext PprDebug)))
- where
-     doc = sep [text heading, nest 4 pretty_msg]
+    str = showSDoc tracingDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
 -- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
-  = panic (show (runSDoc doc (initSDocContext PprDebug)))
+  = pprDebugAndThen tracingDynFlags panic "ASSERT failed!" doc
   where
-    doc = sep [hsep[text "ASSERT failed! file",
-                           text file,
-                           text "line", int line],
-                    msg]
+    doc = sep [ hsep [ text "file", text file
+                     , text "line", int line ]
+              , msg ]
 
-warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
--- ^ Just warn about an assertion failure, recording the given file and line number.
--- Should typically be accessed with the WARN macros
-warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
-warnPprTrace False _file _line _msg x = x
-warnPprTrace True   file  line  msg x
-  = trace (show (runSDoc doc (initSDocContext defaultDumpStyle))) x
-  where
-    doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
-               msg]
+pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
+pprDebugAndThen dflags cont heading pretty_msg
+ = cont (show (runSDoc doc (initSDocContext dflags PprDebug)))
+ where
+     doc = sep [text heading, nest 4 pretty_msg]
 \end{code}
 

@@ -143,25 +143,13 @@ typedef struct Task_ {
     // So that we can detect when a finalizer illegally calls back into Haskell
     rtsBool running_finalizers;
 
-    // Stats that we collect about this task
-    // ToDo: we probably want to put this in a separate TaskStats
-    // structure, so we can share it between multiple Tasks.  We don't
-    // really want separate stats for each call in a nested chain of
-    // foreign->haskell->foreign->haskell calls, but we'll get a
-    // separate Task for each of the haskell calls.
-    Time       elapsedtimestart;
-    Time       muttimestart;
-    Time       mut_time;
-    Time       mut_etime;
-    Time       gc_time;
-    Time       gc_etime;
-
     // Links tasks on the returning_tasks queue of a Capability, and
     // on spare_workers.
     struct Task_ *next;
 
     // Links tasks on the all_tasks list
-    struct Task_ *all_link;
+    struct Task_ *all_next;
+    struct Task_ *all_prev;
 
 } Task;
 
@@ -201,15 +189,6 @@ void boundTaskExiting (Task *task);
 void workerTaskStop (Task *task);
 #endif
 
-// Record the time spent in this Task.
-// This is called by workerTaskStop() but not by boundTaskExiting(),
-// because it would impose an extra overhead on call-in.
-//
-void taskTimeStamp (Task *task);
-
-// The current Task has finished a GC, record the amount of time spent.
-void taskDoneGC (Task *task, Time cpu_time, Time elapsed_time);
-
 // Put the task back on the free list, mark it stopped.  Used by
 // forkProcess().
 //
@@ -239,6 +218,11 @@ void interruptWorkerTask (Task *task);
 // Capability array is moved/resized.
 //
 void updateCapabilityRefs (void);
+
+// For stats
+extern nat taskCount;
+extern nat workerCount;
+extern nat peakWorkerCount;
 
 // -----------------------------------------------------------------------------
 // INLINE functions... private from here on down:

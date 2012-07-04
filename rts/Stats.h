@@ -13,15 +13,24 @@
 
 #include "BeginPrivate.h"
 
+#if defined(mingw32_HOST_OS)
+/* On Win64, if we say "printf" then gcc thinks we are going to use
+   MS format specifiers like %I64d rather than %llu */
+#define PRINTF gnu_printf
+#else
+/* However, on OS X, "gnu_printf" isn't recognised */
+#define PRINTF printf
+#endif
+
 struct gc_thread_;
 
 void      stat_startInit(void);
 void      stat_endInit(void);
 
-void      stat_startGC(struct gc_thread_ *gct);
-void      stat_endGC  (struct gc_thread_ *gct, lnat alloc, lnat live, 
-		       lnat copied, nat gen,
-                       lnat max_copied, lnat avg_copied, lnat slop);
+void      stat_startGC(Capability *cap, struct gc_thread_ *gct);
+void      stat_endGC  (Capability *cap, struct gc_thread_ *gct,
+                       lnat alloc, lnat live, lnat copied, lnat slop, nat gen,
+                       nat n_gc_threads, lnat par_max_copied, lnat par_tot_copied);
 
 void stat_gcWorkerThreadStart (struct gc_thread_ *gct);
 void stat_gcWorkerThreadDone  (struct gc_thread_ *gct);
@@ -64,7 +73,7 @@ Time stat_getElapsedTime(void);
 
 /* Only exported for Papi.c */
 void statsPrintf( char *s, ... ) 
-    GNUC3_ATTRIBUTE(format (printf, 1, 2));
+    GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
 
 #include "EndPrivate.h"
 

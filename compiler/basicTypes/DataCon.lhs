@@ -31,7 +31,7 @@ module DataCon (
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
-	dataConSourceArity, dataConRepArity,
+	dataConSourceArity, dataConRepArity, dataConRepRepArity,
 	dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
 	dataConRepStrictness,
@@ -53,6 +53,7 @@ module DataCon (
 
 import Type
 import TypeRep( Type(..) )  -- Used in promoteType
+import PrelNames( liftedTypeKindTyConKey )
 import Kind
 import Unify
 import Coercion
@@ -469,9 +470,6 @@ instance NamedThing DataCon where
 instance Outputable DataCon where
     ppr con = ppr (dataConName con)
 
-instance Show DataCon where
-    showsPrec p con = showsPrecSDoc p (ppr con)
-
 instance Data.Data DataCon where
     -- don't traverse?
     toConstr _   = abstractConstr "DataCon"
@@ -562,7 +560,7 @@ mkDataCon name declared_infix
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
-eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
+eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
 
 mk_pred_strict_mark :: PredType -> HsBang
 mk_pred_strict_mark pred 
@@ -691,8 +689,13 @@ dataConSourceArity dc = length (dcOrigArgTys dc)
 -- | Gives the number of actual fields in the /representation/ of the 
 -- data constructor. This may be more than appear in the source code;
 -- the extra ones are the existentially quantified dictionaries
-dataConRepArity :: DataCon -> Int
+dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
+
+-- | The number of fields in the /representation/ of the constructor
+-- AFTER taking into account the unpacking of any unboxed tuple fields
+dataConRepRepArity :: DataCon -> RepArity
+dataConRepRepArity dc = typeRepArity (dataConRepArity dc) (dataConRepType dc)
 
 -- | Return whether there are any argument types for this 'DataCon's original source type
 isNullarySrcDataCon :: DataCon -> Bool
@@ -983,12 +986,12 @@ These two 'buildPromoted..' functions are here because
 \begin{code}
 buildPromotedTyCon :: TyCon -> TyCon
 buildPromotedTyCon tc
-  = mkPromotedTyCon tc tySuperKind
+  = mkPromotedTyCon tc (promoteKind (tyConKind tc))
 
 buildPromotedDataCon :: DataCon -> TyCon
 buildPromotedDataCon dc 
   = ASSERT ( isPromotableType ty )
-    mkPromotedDataTyCon dc (getName dc) (getUnique dc) kind arity
+    mkPromotedDataCon dc (getName dc) (getUnique dc) kind arity
   where 
     ty    = dataConUserType dc
     kind  = promoteType ty
@@ -1028,7 +1031,9 @@ isPromotableType ty
 -- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
 isPromotableTyCon :: TyCon -> Maybe Int
 isPromotableTyCon tc
-  | all isLiftedTypeKind (res:args) = Just $ length args
+  | isDataTyCon tc  -- Only *data* types can be promoted, not newtypes
+    		    -- not synonyms, not type families
+  , all isLiftedTypeKind (res:args) = Just $ length args
   | otherwise                       = Nothing
   where
     (args, res) = splitKindFunTys (tyConKind tc)
@@ -1040,7 +1045,7 @@ promoteType ty
   = mkForAllTys kvs (go rho)
   where
     (tvs, rho) = splitForAllTys ty
-    kvs = [ mkKindVar (tyVarName tv) tySuperKind | tv <- tvs ]
+    kvs = [ mkKindVar (tyVarName tv) superKind | tv <- tvs ]
     env = zipVarEnv tvs kvs
 
     go (TyConApp tc tys) = mkTyConApp (buildPromotedTyCon tc) (map go tys)
@@ -1048,4 +1053,12 @@ promoteType ty
     go (TyVarTy tv)      | Just kv <- lookupVarEnv env tv 
                          = TyVarTy kv
     go _ = panic "promoteType"  -- Argument did not satisfy isPromotableType
+
+promoteKind :: Kind -> SuperKind
+-- Promote the kind of a type constructor
+-- from (* -> * -> *) to (BOX -> BOX -> BOX) 
+promoteKind (TyConApp tc []) 
+  | tc `hasKey` liftedTypeKindTyConKey = superKind
+promoteKind (FunTy arg res) = FunTy (promoteKind arg) (promoteKind res)
+promoteKind k = pprPanic "promoteKind" (ppr k)
 \end{code}

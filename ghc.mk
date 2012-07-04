@@ -16,7 +16,6 @@
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * docs/Makefile
 #     * docs/docbook-cheat-sheet/Makefile
-#     * docs/ext-core/Makefile
 #     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
 #     * docs/vh/Makefile
@@ -55,7 +54,7 @@
 #           o register each package into inplace/lib/package.conf
 #     * build libffi
 #     * With bootstrapping compiler:
-#	    o Build libraries/{filepath,hpc,extensible-exceptions,Cabal}
+#	    o Build libraries/{filepath,hpc,Cabal}
 #           o Build compiler (stage 1)
 #     * With stage 1:
 #           o Build libraries/*
@@ -145,6 +144,7 @@ endif
 include rules/prof.mk
 include rules/trace.mk
 include rules/make-command.mk
+include rules/pretty_commands.mk
 
 # -----------------------------------------------------------------------------
 # Macros for standard targets
@@ -310,7 +310,7 @@ endif
 # They do not say "this package will be built"; see $(PACKAGES_xx) for that
 
 # Packages that are built but not installed
-PKGS_THAT_ARE_INTREE_ONLY := haskeline mtl terminfo utf8-string xhtml
+PKGS_THAT_ARE_INTREE_ONLY := haskeline transformers terminfo utf8-string xhtml
 
 PKGS_THAT_ARE_DPH := \
     dph/dph-base \
@@ -334,7 +334,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc extensible-exceptions binary bin-package-db hoopl
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -399,8 +399,8 @@ endif
 $(eval $(call addPackage,base))
 $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
-$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,deepseq))
+$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
@@ -411,7 +411,6 @@ $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
 $(eval $(call addPackage,directory))
 $(eval $(call addPackage,process))
-$(eval $(call addPackage,extensible-exceptions))
 $(eval $(call addPackage,haskell98))
 $(eval $(call addPackage,haskell2010))
 $(eval $(call addPackage,hpc))
@@ -421,7 +420,7 @@ $(eval $(call addPackage,Cabal/Cabal))
 $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,hoopl))
-$(eval $(call addPackage,mtl))
+$(eval $(call addPackage,transformers))
 $(eval $(call addPackage,utf8-string))
 $(eval $(call addPackage,xhtml))
 $(eval $(call addPackage,terminfo,($$(Windows),NO)))
@@ -440,7 +439,7 @@ $(eval $(call extra-packages))
 #
 # Ideally we should use the correct dependencies here to allow more
 # parallelism, but we don't know the dependencies until we've
-# generated the pacakge-data.mk files.
+# generated the package-data.mk files.
 define fixed_pkg_dep
 libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
 fixed_pkg_prev:=libraries/$1/$2/package-data.mk
@@ -529,6 +528,18 @@ $(error Unknown integer library: $(INTEGER_LIBRARY))
 endif
 endif
 
+# ----------------------------------------
+# Workarounds for problems building DLLs on Windows
+
+ifeq "$(TargetOS_CPP)" "mingw32"
+# We don't build the GHC package the dyn way on Windows, so
+# we can't build these packages the dyn way either. See trac #5987
+libraries/dph/dph-lifted-base_dist-install_EXCLUDED_WAYS := dyn
+libraries/dph/dph-lifted-boxed_dist-install_EXCLUDED_WAYS := dyn
+libraries/dph/dph-lifted-copy_dist-install_EXCLUDED_WAYS := dyn
+libraries/dph/dph-lifted-vseg_dist-install_EXCLUDED_WAYS := dyn
+endif
+
 # ----------------------------------------------
 # Checking packages with 'cabal check'
 
@@ -561,7 +572,6 @@ endif
 
 BUILD_DIRS += \
    docs/users_guide \
-   docs/ext-core \
    docs/man \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)
@@ -802,7 +812,8 @@ install_libs: $(INSTALL_LIBS)
 		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
 		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
 		  *.dll) \
-		    $(call INSTALL_DATA,-s $(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
+		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ; \
+		    $(STRIP_CMD) "$(DESTDIR)$(ghclibdir)"/$$i ;; \
 		  *.so) \
 		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
 		  *.dylib) \
@@ -900,7 +911,7 @@ install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
-	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
                    CROSS_COMPILE="$(CrossCompilePrefix)"              \
@@ -1031,9 +1042,9 @@ ifeq "$(mingw32_TARGET_OS)" "1"
 endif
 
 ifeq "$(mingw32_TARGET_OS)" "1"
-DOCDIR_TO_PUBLISH = bindisttest/"install dir"/doc
+DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/doc
 else
-DOCDIR_TO_PUBLISH = bindisttest/"install dir"/share/doc/ghc
+DOCDIR_TO_PUBLISH = $(BIN_DIST_INST_DIR)/share/doc/ghc
 endif
 
 .PHONY: publish-docs
@@ -1237,7 +1248,7 @@ distclean : clean
 	$(call removeFiles,libraries/process/include/HsProcessConfig.h)
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
 	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
-	$(call removeTrees,utils/ghc-pwd/dist)
+	$(call removeTrees,utils/ghc-pwd/dist-boot)
 	$(call removeTrees,inplace)
 	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 

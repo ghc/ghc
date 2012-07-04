@@ -34,14 +34,14 @@ driver/ghci_dist_PROG    = ghci$(exeext)
 driver/ghci_dist_INSTALL = YES
 driver/ghci_dist_OTHER_OBJS = driver/ghci/ghci.res
 
-$(eval $(call build-prog,driver/ghci,dist,0))
+$(eval $(call build-prog,driver/ghci,dist,1))
 
 driver/ghci_dist_PROG_VER = ghci-$(ProjectVersion)$(exeext)
 
 INSTALL_BINS += driver/ghci/dist/build/tmp/$(driver/ghci_dist_PROG_VER)
 
 driver/ghci/ghci.res : driver/ghci/ghci.rc driver/ghci/ghci.ico
-	$(INPLACE_MINGW)/bin/windres --preprocessor="$(CPP) -xc -DRC_INVOKED" -o driver/ghci/ghci.res -i driver/ghci/ghci.rc -O coff
+	"$(WINDRES)" --preprocessor="$(CPP) -xc -DRC_INVOKED" -o driver/ghci/ghci.res -i driver/ghci/ghci.rc -O coff
 
 driver/ghci/dist/build/tmp/$(driver/ghci_dist_PROG_VER) : driver/ghci/dist/build/tmp/$(driver/ghci_dist_PROG)
 	"$(CP)" $< $@

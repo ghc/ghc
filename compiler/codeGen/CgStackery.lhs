@@ -43,6 +43,7 @@ import OrdList
 import Outputable
 
 import Control.Monad
+import Data.List
 \end{code}
 
 %************************************************************************
@@ -333,7 +334,7 @@ Explicitly free some stack space.
 freeStackSlots :: [VirtualSpOffset] -> Code
 freeStackSlots extra_free
   = do	{ stk_usg <- getStkUsage
-	; let all_free = addFreeSlots (freeStk stk_usg) (sortLe (<=) extra_free)
+	; let all_free = addFreeSlots (freeStk stk_usg) (sort extra_free)
 	; let (new_vsp, new_free) = trim (virtSp stk_usg) all_free
 	; setStkUsage (stk_usg { virtSp = new_vsp, freeStk = new_free }) }
 

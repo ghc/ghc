@@ -25,7 +25,6 @@ module TcTyDecls(
 
 import TypeRep
 import HsSyn
-import RnHsSyn
 import Class
 import Type
 import HscTypes
@@ -62,7 +61,7 @@ We check for type synonym and class cycles on the *source* code.
 Main reasons:
 
   a) Otherwise we'd need a special function to extract type-synonym tycons
-        from a type, whereas we have extractHsTyNames already
+     from a type, whereas we already have the free vars pinned on the decl
 
   b) If we checked for type synonym loops after building the TyCon, we
         can't do a hoistForAllTys on the type synonym rhs, (else we fall into
@@ -110,12 +109,9 @@ synTyConsOfType ty
 
 \begin{code}
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
-mkSynEdges syn_decls = [ (ldecl, unLoc (tcdLName decl),
-                                 mk_syn_edges (tcdSynRhs decl))
-                       | ldecl@(L _ decl) <- syn_decls ]
-  where
-    mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs),
-                              not (isTyVarName tc) ]
+mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
+                       | ldecl@(L _ (TyDecl { tcdLName = L _ name
+                                            , tcdFVs = fvs })) <- syn_decls ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
@@ -237,7 +233,8 @@ calcClassCycles cls
       | otherwise
       = flip (foldr (expandType seen path)) tys
 
-    expandType _    _    (TyVarTy _)      = id
+    expandType _    _    (TyVarTy {})     = id
+    expandType _    _    (LitTy {})       = id
     expandType seen path (AppTy t1 t2)    = expandType seen path t1 . expandType seen path t2
     expandType seen path (FunTy t1 t2)    = expandType seen path t1 . expandType seen path t2
     expandType seen path (ForAllTy _tv t) = expandType seen path t
@@ -472,7 +469,8 @@ tcTyConsOfType ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go ty | Just ty' <- tcView ty = go ty'
-     go (TyVarTy _)                = emptyNameEnv
+     go (TyVarTy {})               = emptyNameEnv
+     go (LitTy {})                 = emptyNameEnv
      go (TyConApp tc tys)          = go_tc tc tys
      go (AppTy a b)                = go a `plusNameEnv` go b
      go (FunTy a b)                = go a `plusNameEnv` go b

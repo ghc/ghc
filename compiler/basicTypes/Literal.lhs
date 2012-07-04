@@ -7,13 +7,6 @@
 \begin{code}
 {-# LANGUAGE DeriveDataTypeable #-}
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Literal
         (
         -- * Main data type
@@ -52,9 +45,7 @@ module Literal
 import TysPrim
 import PrelNames
 import Type
-import TypeRep
 import TyCon
-import Var
 import Outputable
 import FastTypes
 import FastString
@@ -62,6 +53,8 @@ import BasicTypes
 import Binary
 import Constants
 import UniqFM
+import Util
+
 import Data.Int
 import Data.Ratio
 import Data.Word
@@ -120,32 +113,27 @@ data Literal
                                 --    @stdcall@ labels. @Just x@ => @\<x\>@ will
                                 --    be appended to label name when emitting assembly.
 
-  | LitInteger Integer Id	--  ^ Integer literals
-    	       	       		-- See Note [Integer literals]
+  | LitInteger Integer Type --  ^ Integer literals
+                            -- See Note [Integer literals]
   deriving (Data, Typeable)
 \end{code}
 
 Note [Integer literals]
 ~~~~~~~~~~~~~~~~~~~~~~~
 An Integer literal is represented using, well, an Integer, to make it
-easier to write RULEs for them. 
+easier to write RULEs for them. They also contain the Integer type, so
+that e.g. literalType can return the right Type for them.
 
- * The Id is for mkInteger, which we use when finally creating the core.
+They only get converted into real Core,
+    mkInteger [c1, c2, .., cn]
+during the CorePrep phase, although TidyPgm looks ahead at what the
+core will be, so that it can see whether it involves CAFs.
 
- * They only get converted into real Core,
-      mkInteger [c1, c2, .., cn]
-   during the CorePrep phase.
-
- * When we initally build an Integer literal, notably when
-   deserialising it from an interface file (see the Binary instance
-   below), we don't have convenient access to the mkInteger Id.  So we
-   just use an error thunk, and fill in the real Id when we do tcIfaceLit
-   in TcIface.
-
- * When looking for CAF-hood (in TidyPgm), we must take account of the
-   CAF-hood of the mk_integer field in LitInteger; see TidyPgm.cafRefsL.
-   Indeed this is the only reason we put the mk_integer field in the 
-   literal -- otherwise we could just look it up in CorePrep.
+When we initally build an Integer literal, notably when
+deserialising it from an interface file (see the Binary instance
+below), we don't have convenient access to the mkInteger Id.  So we
+just use an error thunk, and fill in the real Id when we do tcIfaceLit
+in TcIface.
 
 
 Binary instance
@@ -203,16 +191,13 @@ instance Binary Literal where
                     return (MachLabel aj mb fod)
               _ -> do
                     i <- get bh
+                    -- See Note [Integer literals]
                     return $ mkLitInteger i (panic "Evaluated the place holder for mkInteger")
-		    	   -- See Note [Integer literals] in Literal
 \end{code}
 
 \begin{code}
 instance Outputable Literal where
     ppr lit = pprLiteral (\d -> d) lit
-
-instance Show Literal where
-    showsPrec p lit = showsPrecSDoc p (ppr lit)
 
 instance Eq Literal where
     a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
@@ -265,7 +250,7 @@ mkMachChar = MachChar
 mkMachString :: String -> Literal
 mkMachString s = MachStr (mkFastString s) -- stored UTF-8 encoded
 
-mkLitInteger :: Integer -> Id -> Literal
+mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger = LitInteger
 
 inIntRange, inWordRange :: Integer -> Bool
@@ -389,12 +374,7 @@ literalType (MachWord64  _) = word64PrimTy
 literalType (MachFloat _)   = floatPrimTy
 literalType (MachDouble _)  = doublePrimTy
 literalType (MachLabel _ _ _) = addrPrimTy
-literalType (LitInteger _ mk_integer_id)
-      -- We really mean idType, rather than varType, but importing Id
-      -- causes a module import loop
-    = case varType mk_integer_id of
-        FunTy _ (FunTy _ integerTy) -> integerTy
-        _ -> panic "literalType: mkIntegerId has the wrong type"
+literalType (LitInteger _ t) = t
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primtive

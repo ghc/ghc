@@ -29,9 +29,9 @@
    ------------------------------------------------------------------------- */
 
 #if x86_64_TARGET_ARCH
-#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n;
+#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n
 #else   
-#define OFFSET_FIELD(n) StgInt n;
+#define OFFSET_FIELD(n) StgInt n
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -77,7 +77,7 @@ typedef struct {
 /* The type flags provide quick access to certain properties of a closure. */
 
 #define _HNF (1<<0)  /* head normal form?    */
-#define _BTM (1<<1)  /* bitmap-style layout? */
+#define _BTM (1<<1)  /* uses info->layout.bitmap */
 #define _NS  (1<<2)  /* non-sparkable        */
 #define _STA (1<<3)  /* static?              */
 #define _THU (1<<4)  /* thunk?               */
@@ -196,7 +196,7 @@ typedef union {
 #ifndef TABLES_NEXT_TO_CODE
     StgLargeBitmap* large_bitmap; /* pointer to large bitmap structure */
 #else
-    OFFSET_FIELD( large_bitmap_offset );  /* offset from info table to large bitmap structure */
+    OFFSET_FIELD(large_bitmap_offset);  /* offset from info table to large bitmap structure */
 #endif
     
     StgWord selector_offset;	  /* used in THUNK_SELECTORs */
@@ -255,12 +255,12 @@ typedef struct StgInfoTable_ {
    -------------------------------------------------------------------------- */
 
 typedef struct StgFunInfoExtraRev_ {
-    OFFSET_FIELD ( slow_apply_offset ); /* apply to args on the stack */
+    OFFSET_FIELD(slow_apply_offset); /* apply to args on the stack */
     union { 
 	StgWord bitmap;
-	OFFSET_FIELD ( bitmap_offset );	/* arg ptr/nonptr bitmap */
+	OFFSET_FIELD(bitmap_offset);	/* arg ptr/nonptr bitmap */
     } b;
-    OFFSET_FIELD ( srt_offset ); /* pointer to the SRT table */
+    OFFSET_FIELD(srt_offset);   /* pointer to the SRT table */
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
 } StgFunInfoExtraRev;
@@ -299,7 +299,7 @@ extern StgWord stg_arg_bitmaps[];
 
 typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD( srt_offset );	/* offset to the SRT table */
+    OFFSET_FIELD(srt_offset);	/* offset to the SRT table */
     StgInfoTable i;
 #else
     StgInfoTable i;
@@ -321,7 +321,7 @@ typedef struct StgThunkInfoTable_ {
     StgInfoTable i;
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD( srt_offset );	/* offset to the SRT table */
+    OFFSET_FIELD(srt_offset);	/* offset to the SRT table */
 #else
     StgSRT         *srt;	/* pointer to the SRT table */
 #endif
@@ -340,8 +340,8 @@ typedef struct StgConInfoTable_ {
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(con_desc) // the name of the data constructor 
-                           // as: Package:Module.Name
+    OFFSET_FIELD(con_desc); // the name of the data constructor 
+                            // as: Package:Module.Name
 #else
     char *con_desc;
 #endif

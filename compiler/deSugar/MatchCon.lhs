@@ -26,12 +26,13 @@ import TcType
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
-import Util	( all2, takeList, zipEqual )
+import Util
 import ListSetOps ( runs )
 import Id
 import NameEnv
 import SrcLoc
 import Outputable
+import Control.Monad(liftM)
 \end{code}
 
 We are confronted with the first column of patterns in a set of
@@ -131,18 +132,20 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats
     match_group arg_vars arg_eqn_prs
-      = do { let (wraps, eqns') = unzip (map shift arg_eqn_prs)
-    	         group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
+      = do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
+    	   ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
     	   ; match_result <- match (group_arg_vars ++ vars) ty eqns'
     	   ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
 
     shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds, 
 					           pat_binds = bind, pat_args = args
 					} : pats }))
-      = ( wrapBinds (tvs `zip` tvs1) 
-	  . wrapBinds (ds  `zip` dicts1)
-	  . mkCoreLets (dsTcEvBinds bind)
-	, eqn { eqn_pats = conArgPats arg_tys args ++ pats }) 
+      = do ds_bind <- dsTcEvBinds bind
+           return ( wrapBinds (tvs `zip` tvs1)
+                  . wrapBinds (ds  `zip` dicts1)
+                  . mkCoreLets ds_bind
+                  , eqn { eqn_pats = conArgPats arg_tys args ++ pats }
+                  )
     shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
 
     -- Choose the right arg_vars in the right order for this group

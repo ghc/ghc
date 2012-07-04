@@ -48,7 +48,6 @@ import PprCmmExpr
 import Util
 
 import BasicTypes
-import Platform
 import Compiler.Hoopl
 import Data.List
 import Prelude hiding (succ)
@@ -59,12 +58,12 @@ import Prelude hiding (succ)
 instance Outputable CmmStackInfo where
     ppr = pprStackInfo
 
-instance PlatformOutputable CmmTopInfo where
-    pprPlatform = pprTopInfo
+instance Outputable CmmTopInfo where
+    ppr = pprTopInfo
 
 
-instance PlatformOutputable (CmmNode e x) where
-    pprPlatform = pprNode
+instance Outputable (CmmNode e x) where
+    ppr = pprNode
 
 instance Outputable Convention where
     ppr = pprConvention
@@ -72,24 +71,24 @@ instance Outputable Convention where
 instance Outputable ForeignConvention where
     ppr = pprForeignConvention
 
-instance PlatformOutputable ForeignTarget where
-    pprPlatform = pprForeignTarget
+instance Outputable ForeignTarget where
+    ppr = pprForeignTarget
 
 
-instance PlatformOutputable (Block CmmNode C C) where
-    pprPlatform = pprBlock
-instance PlatformOutputable (Block CmmNode C O) where
-    pprPlatform = pprBlock
-instance PlatformOutputable (Block CmmNode O C) where
-    pprPlatform = pprBlock
-instance PlatformOutputable (Block CmmNode O O) where
-    pprPlatform = pprBlock
+instance Outputable (Block CmmNode C C) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode C O) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode O C) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode O O) where
+    ppr = pprBlock
 
-instance PlatformOutputable (Graph CmmNode e x) where
-    pprPlatform = pprGraph
+instance Outputable (Graph CmmNode e x) where
+    ppr = pprGraph
 
-instance PlatformOutputable CmmGraph where
-    pprPlatform platform = pprCmmGraph platform
+instance Outputable CmmGraph where
+    ppr = pprCmmGraph
 
 ----------------------------------------------------------
 -- Outputting types Cmm contains
@@ -99,40 +98,40 @@ pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   ptext (sLit "arg_space: ") <> ppr arg_space <+>
   ptext (sLit "updfr_space: ") <> ppr updfr_space
 
-pprTopInfo :: Platform -> CmmTopInfo -> SDoc
-pprTopInfo platform (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
-  vcat [ptext (sLit "info_tbl: ") <> pprPlatform platform info_tbl,
+pprTopInfo :: CmmTopInfo -> SDoc
+pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
+  vcat [ptext (sLit "info_tbl: ") <> ppr info_tbl,
         ptext (sLit "stack_info: ") <> ppr stack_info]
 
 ----------------------------------------------------------
 -- Outputting blocks and graphs
 
 pprBlock :: IndexedCO x SDoc SDoc ~ SDoc
-         => Platform -> Block CmmNode e x -> IndexedCO e SDoc SDoc
-pprBlock platform block
-    = foldBlockNodesB3 ( ($$) . pprPlatform platform
-                       , ($$) . (nest 4) . pprPlatform platform
-                       , ($$) . (nest 4) . pprPlatform platform
+         => Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock block
+    = foldBlockNodesB3 ( ($$) . ppr
+                       , ($$) . (nest 4) . ppr
+                       , ($$) . (nest 4) . ppr
                        )
                        block
                        empty
 
-pprGraph :: Platform -> Graph CmmNode e x -> SDoc
-pprGraph _ GNil = empty
-pprGraph platform (GUnit block) = pprPlatform platform block
-pprGraph platform (GMany entry body exit)
+pprGraph :: Graph CmmNode e x -> SDoc
+pprGraph GNil = empty
+pprGraph (GUnit block) = ppr block
+pprGraph (GMany entry body exit)
    = text "{"
-  $$ nest 2 (pprMaybeO entry $$ (vcat $ map (pprPlatform platform) $ bodyToBlockList body) $$ pprMaybeO exit)
+  $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
   $$ text "}"
-  where pprMaybeO :: PlatformOutputable (Block CmmNode e x)
+  where pprMaybeO :: Outputable (Block CmmNode e x)
                   => MaybeO ex (Block CmmNode e x) -> SDoc
         pprMaybeO NothingO = empty
-        pprMaybeO (JustO block) = pprPlatform platform block
+        pprMaybeO (JustO block) = ppr block
 
-pprCmmGraph :: Platform -> CmmGraph -> SDoc
-pprCmmGraph platform g
+pprCmmGraph :: CmmGraph -> SDoc
+pprCmmGraph g
    = text "{" <> text "offset"
-  $$ nest 2 (vcat $ map (pprPlatform platform) blocks)
+  $$ nest 2 (vcat $ map ppr blocks)
   $$ text "}"
   where blocks = postorderDfs g
 
@@ -151,25 +150,25 @@ pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
 pprForeignConvention :: ForeignConvention -> SDoc
 pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs
 
-pprForeignTarget :: Platform -> ForeignTarget -> SDoc
-pprForeignTarget platform (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
+pprForeignTarget :: ForeignTarget -> SDoc
+pprForeignTarget (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
   where ppr_fc :: ForeignConvention -> SDoc
         ppr_fc (ForeignConvention c args res) =
           doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res
         ppr_target :: CmmExpr -> SDoc
-        ppr_target t@(CmmLit _) = pprPlatform platform t
-        ppr_target fn'          = parens (pprPlatform platform fn')
+        ppr_target t@(CmmLit _) = ppr t
+        ppr_target fn'          = parens (ppr fn')
 
-pprForeignTarget platform (PrimTarget op)
+pprForeignTarget (PrimTarget op)
  -- HACK: We're just using a ForeignLabel to get this printed, the label
  --       might not really be foreign.
- = pprPlatform platform
+ = ppr
                (CmmLabel (mkForeignLabel
                          (mkFastString (show op))
                          Nothing ForeignLabelInThisPackage IsFunction))
 
-pprNode :: Platform -> CmmNode e x -> SDoc
-pprNode platform node = pp_node <+> pp_debug
+pprNode :: CmmNode e x -> SDoc
+pprNode node = pp_node <+> pp_debug
   where
     pp_node :: SDoc
     pp_node = case node of
@@ -180,10 +179,10 @@ pprNode platform node = pp_node <+> pp_debug
       CmmComment s -> text "//" <+> ftext s
 
       -- reg = expr;
-      CmmAssign reg expr -> ppr reg <+> equals <+> pprPlatform platform expr <> semi
+      CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
 
       -- rep[lv] = expr;
-      CmmStore lv expr -> rep <> brackets(pprPlatform platform lv) <+> equals <+> pprPlatform platform expr <> semi
+      CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
           where
             rep = ppr ( cmmExprType expr )
 
@@ -193,7 +192,7 @@ pprNode platform node = pp_node <+> pp_debug
           hsep [ ppUnless (null results) $
                     parens (commafy $ map ppr results) <+> equals,
                  ptext $ sLit "call",
-                 pprPlatform platform target <> parens (commafy $ map (pprPlatform platform) args) <> semi]
+                 ppr target <> parens (commafy $ map ppr args) <> semi]
 
       -- goto label;
       CmmBranch ident -> ptext (sLit "goto") <+> ppr ident <> semi
@@ -201,7 +200,7 @@ pprNode platform node = pp_node <+> pp_debug
       -- if (expr) goto t; else goto f;
       CmmCondBranch expr t f ->
           hsep [ ptext (sLit "if")
-               , parens(pprPlatform platform expr)
+               , parens(ppr expr)
                , ptext (sLit "goto")
                , ppr t <> semi
                , ptext (sLit "else goto")
@@ -213,8 +212,8 @@ pprNode platform node = pp_node <+> pp_debug
                      , int (length maybe_ids - 1)
                      , ptext (sLit "] ")
                      , if isTrivialCmmExpr expr
-                       then pprPlatform platform expr
-                       else parens (pprPlatform platform expr)
+                       then ppr expr
+                       else parens (ppr expr)
                      , ptext (sLit " {")
                      ])
              4 (vcat ( map caseify pairs )) $$ rbrace
@@ -235,15 +234,15 @@ pprNode platform node = pp_node <+> pp_debug
                                                      <+> parens (ppr res)
                , ptext (sLit " with update frame") <+> ppr updfr_off
                , semi ]
-          where pprFun f@(CmmLit _) = pprPlatform platform f
-                pprFun f = parens (pprPlatform platform f)
+          where pprFun f@(CmmLit _) = ppr f
+                pprFun f = parens (ppr f)
 
       CmmForeignCall {tgt=t, res=rs, args=as, succ=s, updfr=u, intrbl=i} ->
           hcat $ if i then [ptext (sLit "interruptible"), space] else [] ++
                [ ptext (sLit "foreign call"), space
-               , pprPlatform platform t, ptext (sLit "(...)"), space
+               , ppr t, ptext (sLit "(...)"), space
                , ptext (sLit "returns to") <+> ppr s
-                    <+> ptext (sLit "args:") <+> parens (pprPlatform platform as)
+                    <+> ptext (sLit "args:") <+> parens (ppr as)
                     <+> ptext (sLit "ress:") <+> parens (ppr rs)
                , ptext (sLit " with update frame") <+> ppr u
                , semi ]

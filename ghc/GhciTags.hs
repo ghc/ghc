@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSp
--- for details
-
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module GhciTags (
   createCTagsWithLineNumbersCmd,
@@ -24,7 +17,6 @@ import Exception
 import GHC
 import GhciMonad
 import Outputable
-import Util
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
@@ -32,7 +24,9 @@ import Name (nameOccName)
 import OccName (pprOccName)
 import MonadUtils
 
+import Data.Function
 import Data.Maybe
+import Data.Ord
 import Panic
 import Data.List
 import Control.Monad
@@ -65,12 +59,12 @@ ghciCreateTagsFile kind file = do
   createTagsFile kind file
 
 -- ToDo: 
--- 	- remove restriction that all modules must be interpreted
---	  (problem: we don't know source locations for entities unless
---	  we compiled the module.
+--      - remove restriction that all modules must be interpreted
+--        (problem: we don't know source locations for entities unless
+--        we compiled the module.
 --
---	- extract createTagsFile so it can be used from the command-line
---	  (probably need to fix first problem before this is useful).
+--      - extract createTagsFile so it can be used from the command-line
+--        (probably need to fix first problem before this is useful).
 --
 createTagsFile :: TagsKind -> FilePath -> GHCi ()
 createTagsFile tagskind tagsFile = do
@@ -93,12 +87,13 @@ listModuleTags m = do
   case mbModInfo of
     Nothing -> return []
     Just mInfo -> do
+       dflags <- getDynFlags
        mb_print_unqual <- GHC.mkPrintUnqualifiedForModule mInfo
        let unqual = fromMaybe GHC.alwaysQualify mb_print_unqual
        let names = fromMaybe [] $GHC.modInfoTopLevelScope mInfo
        let localNames = filter ((m==) . nameModule) names
        mbTyThings <- mapM GHC.lookupName localNames
-       return $! [ tagInfo unqual exported kind name realLoc
+       return $! [ tagInfo dflags unqual exported kind name realLoc
                      | tyThing <- catMaybes mbTyThings
                      , let name = getName tyThing
                      , let exported = GHC.modInfoIsExportedName mInfo name
@@ -126,24 +121,25 @@ data TagInfo = TagInfo
 
 
 -- get tag info, for later translation into Vim or Emacs style
-tagInfo :: PrintUnqualified -> Bool -> Char -> Name -> RealSrcLoc -> TagInfo
-tagInfo unqual exported kind name loc
+tagInfo :: DynFlags -> PrintUnqualified -> Bool -> Char -> Name -> RealSrcLoc
+        -> TagInfo
+tagInfo dflags unqual exported kind name loc
     = TagInfo exported kind
-        (showSDocForUser unqual $ pprOccName (nameOccName name))
-        (showSDocForUser unqual $ ftext (srcLocFile loc))
+        (showSDocForUser dflags unqual $ pprOccName (nameOccName name))
+        (showSDocForUser dflags unqual $ ftext (srcLocFile loc))
         (srcLocLine loc) (srcLocCol loc) Nothing
 
 
 collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
 -- ctags style with the Ex exresion being just the line number, Vim et al
 collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
-  let tags = unlines $ sortLe (<=) $ map showCTag tagInfos
+  let tags = unlines $ sort $ map showCTag tagInfos
   tryIO (writeFile file tags)
 
 -- ctags style with the Ex exresion being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
-  let tags = unlines $ sortLe (<=) $ map showCTag $concat tagInfoGroups
+  let tags = unlines $ sort $ map showCTag $concat tagInfoGroups
   tryIO (writeFile file tags)
 
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
@@ -160,16 +156,14 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
 
 makeTagGroupsWithSrcInfo :: [TagInfo] -> IO [[TagInfo]]
 makeTagGroupsWithSrcInfo tagInfos = do
-  let byFile op ti0 ti1 = tagFile ti0 `op` tagFile ti1
-      groups = groupBy (byFile (==)) $ sortLe (byFile (<=)) tagInfos
+  let groups = groupBy ((==) `on` tagFile) $ sortBy (comparing tagFile) tagInfos
   mapM addTagSrcInfo groups
 
   where
     addTagSrcInfo [] = ghcError (CmdLineError "empty tag file group??")
     addTagSrcInfo group@(tagInfo:_) = do
       file <- readFile $tagFile tagInfo
-      let byLine ti0 ti1 = tagLine ti0 <= tagLine ti1
-          sortedGroup = sortLe byLine group
+      let sortedGroup = sortBy (comparing tagLine) group
       return $ perFile sortedGroup 1 0 $ lines file
 
     perFile allTags@(tag:tags) cnt pos allLs@(l:ls)

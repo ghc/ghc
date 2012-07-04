@@ -313,7 +313,7 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 
   while (bitmap != 0) {
       if ((bitmap & 1) != 0) {
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(COMPILING_WINDOWS_DLL)
 	  // Special-case to handle references to closures hiding out in DLLs, since
 	  // double indirections required to get at those. The code generator knows
 	  // which is which when generating the SRT, so it stores the (indirect)
@@ -322,8 +322,8 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 	  // 
 	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
 	  // closure that's fixed at link-time, and no extra magic is required.
-	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      evacuate( (StgClosure**) ((unsigned long) (*srt) & ~0x1));
+	  if ( (lnat)(*srt) & 0x1 ) {
+	      evacuate( (StgClosure**) ((lnat) (*srt) & ~0x1));
 	  } else {
 	      evacuate(p);
 	  }

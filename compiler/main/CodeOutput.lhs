@@ -17,7 +17,6 @@ import Finder           ( mkStubPaths )
 import PprC		( writeCs )
 import OldCmmLint       ( cmmLint )
 import Packages
-import Util
 import OldCmm           ( RawCmmGroup )
 import HscTypes
 import DynFlags
@@ -26,10 +25,11 @@ import SysTools
 import Stream           (Stream)
 import qualified Stream
 
-import ErrUtils         ( dumpIfSet_dyn, showPass, ghcExit )
+import ErrUtils
 import Outputable
 import Module
 import Maybes           ( firstJusts )
+import SrcLoc
 
 import Control.Exception
 import Control.Monad
@@ -65,7 +65,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
               do_lint cmm = do
                 { showPass dflags "CmmLint"
                 ; case cmmLint (targetPlatform dflags) cmm of
-			Just err -> do { printDump err
+                        Just err -> do { log_action dflags dflags SevDump noSrcSpan defaultDumpStyle err
 				       ; ghcExit dflags 1
 				       }
 			Nothing  -> return ()
@@ -201,14 +201,13 @@ outputForeignStubs dflags mod location stubs
      ForeignStubs h_code c_code -> do
         let
             stub_c_output_d = pprCode CStyle c_code
-            stub_c_output_w = showSDoc stub_c_output_d
+            stub_c_output_w = showSDoc dflags stub_c_output_d
         
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode CStyle h_code
-            stub_h_output_w = showSDoc stub_h_output_d
-        -- in
+            stub_h_output_w = showSDoc dflags stub_h_output_d
 
-        createDirectoryHierarchy (takeDirectory stub_h)
+        createDirectoryIfMissing True (takeDirectory stub_h)
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d

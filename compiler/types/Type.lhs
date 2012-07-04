@@ -27,7 +27,7 @@ module Type (
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe,
 
-	mkAppTy, mkAppTys, splitAppTy, splitAppTys, 
+	mkAppTy, mkAppTys, mkNakedAppTys, splitAppTy, splitAppTys, 
 	splitAppTy_maybe, repSplitAppTy_maybe,
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, 
@@ -41,6 +41,9 @@ module Type (
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
         mkPiKinds, mkPiType, mkPiTypes,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
+
+        mkNumLitTy, isNumLitTy,
+        mkStrLitTy, isStrLitTy,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -48,21 +51,20 @@ module Type (
 	-- Pred types
         mkFamilyTyConApp,
 	isDictLikeTy,
-        mkEqPred, mkClassPred,
-	mkIPPred,
-        noParenPred, isClassPred, isEqPred, isIPPred,
-        mkPrimEqType,
-
+        mkEqPred, mkPrimEqPred,
+        mkClassPred,
+        noParenPred, isClassPred, isEqPred, isIPPred, isIPPred_maybe,
+        
         -- Deconstructing predicate types
         PredTree(..), predTreePredType, classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
         getEqPredTys, getEqPredTys_maybe,
-        getIPPredTy_maybe,
 
 	-- ** Common type constructors
         funTyCon,
 
         -- ** Predicates on types
+        isTypeVar, isKindVar,
         isTyVarTy, isFunTy, isDictTy, isPredTy, isKindTy,
 
 	-- (Lifting and boxity)
@@ -78,18 +80,16 @@ module Type (
         
         -- ** Common Kinds and SuperKinds
         anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
-        argTypeKind, ubxTupleKind, constraintKind,
-        tySuperKind, 
+        constraintKind, superKind, 
 
         -- ** Common Kind type constructors
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
-        argTypeKindTyCon, ubxTupleKindTyCon, constraintKindTyCon,
-        anyKindTyCon,
+        constraintKindTyCon, anyKindTyCon,
 
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes,
 	expandTypeSynonyms, 
-	typeSize, varSetElemsKvsFirst, sortQuantVars,
+	typeSize, varSetElemsKvsFirst, 
 
 	-- * Type comparison
         eqType, eqTypeX, eqTypes, cmpType, cmpTypes, 
@@ -101,12 +101,10 @@ module Type (
         -- * Other views onto Types
         coreView, tcView, 
 
-        repType, deepRepType,
+        UnaryType, RepType(..), flattenRepType, repType,
 
 	-- * Type representation for the code generator
-	PrimRep(..),
-
-	typePrimRep,
+	typePrimRep, typeRepArity,
 
 	-- * Main type substitution data types
 	TvSubstEnv,	-- Representation widely visible
@@ -130,7 +128,8 @@ module Type (
         substKiWith, substKisWith,
 
 	-- * Pretty-printing
-	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
+	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, 
+        pprTvBndr, pprTvBndrs, pprForAll, pprSigmaType,
 	pprEqPred, pprTheta, pprThetaArrowTy, pprClassPred, 
         pprKind, pprParendKind, pprSourceTyCon,
     ) where
@@ -152,21 +151,21 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, mkBoxedTupleTy )
-import PrelNames	         ( eqTyConKey )
+import PrelNames	         ( eqTyConKey, ipClassName )
 
 -- others
-import {-# SOURCE #-} IParam ( ipTyCon )
 import Unique		( Unique, hasKey )
-import BasicTypes	( IPName(..) )
-import Name		( Name )
+import BasicTypes	( Arity, RepArity )
 import NameSet
 import StaticFlags
 import Util
 import Outputable
 import FastString
 
+import Data.List        ( partition )
 import Maybes		( orElse )
 import Data.Maybe	( isJust )
+import Control.Monad    ( guard )
 
 infixr 3 `mkFunTy`	-- Associates to the right
 \end{code}
@@ -277,8 +276,9 @@ expandTypeSynonyms ty
       = go (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
       | otherwise
       = TyConApp tc (map go tys)
+    go (LitTy l)       = LitTy l
     go (TyVarTy tv)    = TyVarTy tv
-    go (AppTy t1 t2)   = AppTy (go t1) (go t2)
+    go (AppTy t1 t2)   = mkAppTy (go t1) (go t2)
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
     go (ForAllTy tv t) = ForAllTy tv (go t)
 \end{code}
@@ -324,11 +324,8 @@ invariant: use it.
 \begin{code}
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
-mkAppTy orig_ty1 orig_ty2
-  = mk_app orig_ty1
-  where
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
-    mk_app _                 = AppTy orig_ty1 orig_ty2
+mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
+mkAppTy ty1               ty2 = AppTy ty1 ty2
 	-- Note that the TyConApp could be an 
 	-- under-saturated type synonym.  GHC allows that; e.g.
 	--	type Foo k = k a -> k a
@@ -339,18 +336,14 @@ mkAppTy orig_ty1 orig_ty2
 	-- but once the type synonyms are expanded all is well
 
 mkAppTys :: Type -> [Type] -> Type
-mkAppTys orig_ty1 []	    = orig_ty1
-	-- This check for an empty list of type arguments
-	-- avoids the needless loss of a type synonym constructor.
-	-- For example: mkAppTys Rational []
-	--   returns to (Ratio Integer), which has needlessly lost
-	--   the Rational part.
-mkAppTys orig_ty1 orig_tys2
-  = mk_app orig_ty1
-  where
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-				-- mkTyConApp: see notes with mkAppTy
-    mk_app _                 = foldl AppTy orig_ty1 orig_tys2
+mkAppTys ty1                []	 = ty1
+mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
+mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
+
+mkNakedAppTys :: Type -> [Type] -> Type
+mkNakedAppTys ty1           []	 = ty1
+mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
+mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -399,6 +392,27 @@ splitAppTys ty = split ty ty []
     split _       (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
+
+\end{code}
+
+
+                      LitTy
+                      ~~~~~
+
+\begin{code}
+mkNumLitTy :: Integer -> Type
+mkNumLitTy n = LitTy (NumTyLit n)
+
+isNumLitTy :: Type -> Maybe Integer
+isNumLitTy (LitTy (NumTyLit n)) = Just n
+isNumLitTy _                    = Nothing
+
+mkStrLitTy :: FastString -> Type
+mkStrLitTy s = LitTy (StrTyLit s)
+
+isStrLitTy :: Type -> Maybe FastString
+isStrLitTy (LitTy (StrTyLit s)) = Just s
+isStrLitTy _                    = Nothing
 
 \end{code}
 
@@ -478,6 +492,16 @@ funArgTy ty                = pprPanic "funArgTy" (ppr ty)
 				~~~~~~~~
 
 \begin{code}
+-- | A key function: builds a 'TyConApp' or 'FunTy' as apppropriate to 
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | isFunTyCon tycon, [ty1,ty2] <- tys
+  = FunTy ty1 ty2
+
+  | otherwise
+  = TyConApp tycon tys
+
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
 -- including functions are returned as Just ..
@@ -585,7 +609,27 @@ newtype at outermost level; and bale out if we see it again.
 		Representation types
 		~~~~~~~~~~~~~~~~~~~~
 
+Note [Nullary unboxed tuple]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We represent the nullary unboxed tuple as the unary (but void) type State# RealWorld.
+The reason for this is that the ReprArity is never less than the Arity (as it would
+otherwise be for a function type like (# #) -> Int).
+
+As a result, ReprArity is always strictly positive if Arity is. This is important
+because it allows us to distinguish at runtime between a thunk and a function
+ takes a nullary unboxed tuple as an argument!
+
 \begin{code}
+type UnaryType = Type
+
+data RepType = UbxTupleRep [UnaryType] -- INVARIANT: never an empty list (see Note [Nullary unboxed tuple])
+             | UnaryRep UnaryType
+
+flattenRepType :: RepType -> [UnaryType]
+flattenRepType (UbxTupleRep tys) = tys
+flattenRepType (UnaryRep ty)     = [ty]
+
 -- | Looks through:
 --
 --	1. For-alls
@@ -594,11 +638,11 @@ newtype at outermost level; and bale out if we see it again.
 --	4. All newtypes, including recursive ones, but not newtype families
 --
 -- It's useful in the back end of the compiler.
-repType :: Type -> Type
+repType :: Type -> RepType
 repType ty
   = go emptyNameSet ty
   where
-    go :: NameSet -> Type -> Type
+    go :: NameSet -> Type -> RepType
     go rec_nts ty    	  		-- Expand predicates and synonyms
       | Just ty' <- coreView ty
       = go rec_nts ty'
@@ -610,30 +654,12 @@ repType ty
       | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
       = go rec_nts' ty'
 
-    go _ ty = ty
+      | isUnboxedTupleTyCon tc
+      = if null tys
+         then UnaryRep realWorldStatePrimTy -- See Note [Nullary unboxed tuple]
+         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) tys)
 
-deepRepType :: Type -> Type
--- Same as repType, but looks recursively
-deepRepType ty
-  = go emptyNameSet ty
-  where
-    go rec_nts ty    	  		-- Expand predicates and synonyms
-      | Just ty' <- coreView ty
-      = go rec_nts ty'
-
-    go rec_nts (ForAllTy _ ty)		-- Drop foralls
-	= go rec_nts ty
-
-    go rec_nts (TyConApp tc tys)	-- Expand newtypes
-      | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
-      = go rec_nts' ty'
-
-      -- Apply recursively; this is the "deep" bit
-    go rec_nts (TyConApp tc tys) = TyConApp tc (map (go rec_nts) tys)
-    go rec_nts (AppTy ty1 ty2)   = mkAppTy (go rec_nts ty1) (go rec_nts ty2)
-    go rec_nts (FunTy ty1 ty2)   = FunTy   (go rec_nts ty1) (go rec_nts ty2)
-
-    go _ ty = ty
+    go _ ty = UnaryRep ty
 
 carefullySplitNewType_maybe :: NameSet -> TyCon -> [Type] -> Maybe (NameSet,Type)
 -- Return the representation of a newtype, unless 
@@ -653,15 +679,23 @@ carefullySplitNewType_maybe rec_nts tc tys
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
 
--- | Discovers the primitive representation of a more abstract 'Type'
--- Only applied to types of values
-typePrimRep :: Type -> PrimRep
-typePrimRep ty = case repType ty of
-		   TyConApp tc _ -> tyConPrimRep tc
-		   FunTy _ _	 -> PtrRep
-		   AppTy _ _	 -> PtrRep	-- See Note [AppTy rep] 
-		   TyVarTy _	 -> PtrRep
-		   _             -> pprPanic "typePrimRep" (ppr ty)
+-- | Discovers the primitive representation of a more abstract 'UnaryType'
+typePrimRep :: UnaryType -> PrimRep
+typePrimRep ty
+  = case repType ty of
+      UbxTupleRep _ -> pprPanic "typePrimRep: UbxTupleRep" (ppr ty)
+      UnaryRep rep -> case rep of
+        TyConApp tc _ -> tyConPrimRep tc
+        FunTy _ _     -> PtrRep
+        AppTy _ _     -> PtrRep      -- See Note [AppTy rep] 
+        TyVarTy _     -> PtrRep
+        _             -> pprPanic "typePrimRep: UnaryRep" (ppr ty)
+
+typeRepArity :: Arity -> Type -> RepArity
+typeRepArity 0 _ = 0
+typeRepArity n ty = case repType ty of
+  UnaryRep (FunTy ty1 ty2) -> length (flattenRepType (repType ty1)) + typeRepArity (n - 1) ty2
+  _                        -> pprPanic "typeRepArity: arity greater than type can handle" (ppr (n, ty))
 \end{code}
 
 Note [AppTy rep]
@@ -689,8 +723,8 @@ mkPiKinds :: [TyVar] -> Kind -> Kind
 -- returns forall k1 k2. (k1 -> *) -> k2
 mkPiKinds [] res = res
 mkPiKinds (tv:tvs) res 
-  | isKiVar tv = ForAllTy tv          (mkPiKinds tvs res)
-  | otherwise  = FunTy (tyVarKind tv) (mkPiKinds tvs res)
+  | isKindVar tv = ForAllTy tv          (mkPiKinds tvs res)
+  | otherwise    = FunTy (tyVarKind tv) (mkPiKinds tvs res)
 
 mkPiType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or a forall type, depending
@@ -803,7 +837,7 @@ noParenPred :: PredType -> Bool
 --       C a => a -> a
 --       a~b => a -> b
 -- But   (?x::Int) => Int -> Int
-noParenPred p = isClassPred p || isEqPred p
+noParenPred p = not (isIPPred p) && isClassPred p || isEqPred p
 
 isPredTy :: Type -> Bool
 isPredTy ty
@@ -820,9 +854,17 @@ isClassPred ty = case tyConAppTyCon_maybe ty of
 isEqPred ty = case tyConAppTyCon_maybe ty of
     Just tyCon -> tyCon `hasKey` eqTyConKey
     _          -> False
+
 isIPPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon | Just _ <- tyConIP_maybe tyCon -> True
-    _                                          -> False
+    Just tyCon -> tyConName tyCon == ipClassName
+    _          -> False
+
+isIPPred_maybe :: Type -> Maybe (FastString, Type)
+isIPPred_maybe ty =
+  do (tc,[t1,t2]) <- splitTyConApp_maybe ty
+     guard (tyConName tc == ipClassName)
+     x <- isStrLitTy t1
+     return (x,t2)
 \end{code}
 
 Make PredTypes
@@ -830,28 +872,19 @@ Make PredTypes
 --------------------- Equality types ---------------------------------
 \begin{code}
 -- | Creates a type equality predicate
-mkEqPred :: (Type, Type) -> PredType
-mkEqPred (ty1, ty2)
-  -- IA0_TODO: The caller should give the kind.
-  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+mkEqPred :: Type -> Type -> PredType
+mkEqPred ty1 ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
     TyConApp eqTyCon [k, ty1, ty2]
-  where k = defaultKind (typeKind ty1)
---  where k = typeKind ty1
+  where 
+    k = typeKind ty1
 
-mkPrimEqType :: (Type, Type) -> Type
-mkPrimEqType (ty1, ty2)
-  -- IA0_TODO: The caller should give the kind.
-  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+mkPrimEqPred :: Type -> Type -> Type
+mkPrimEqPred ty1  ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
     TyConApp eqPrimTyCon [k, ty1, ty2]
-  where k = defaultKind (typeKind ty1)
---  where k = typeKind ty1
-\end{code}
-
---------------------- Implicit parameters ---------------------------------
-
-\begin{code}
-mkIPPred :: IPName Name -> Type -> PredType
-mkIPPred ip ty = TyConApp (ipTyCon ip) [ty]
+  where 
+    k = typeKind ty1
 \end{code}
 
 --------------------- Dictionary types ---------------------------------
@@ -906,14 +939,12 @@ Decomposing PredType
 \begin{code}
 data PredTree = ClassPred Class [Type]
               | EqPred Type Type
-              | IPPred (IPName Name) Type
               | TuplePred [PredType]
               | IrredPred PredType
 
 predTreePredType :: PredTree -> PredType
 predTreePredType (ClassPred clas tys) = mkClassPred clas tys
-predTreePredType (EqPred ty1 ty2)     = mkEqPred (ty1, ty2)
-predTreePredType (IPPred ip ty)       = mkIPPred ip ty
+predTreePredType (EqPred ty1 ty2)     = mkEqPred ty1 ty2
 predTreePredType (TuplePred tys)      = mkBoxedTupleTy tys
 predTreePredType (IrredPred ty)       = ty
 
@@ -924,9 +955,6 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, tys) | tc `hasKey` eqTyConKey
                    , let [_, ty1, ty2] = tys
                    -> EqPred ty1 ty2
-    Just (tc, tys) | Just ip <- tyConIP_maybe tc
-                   , let [ty] = tys
-                   -> IPPred ip ty
     Just (tc, tys) | isTupleTyCon tc
                    -> TuplePred tys
     _ -> IrredPred ev_ty
@@ -944,19 +972,17 @@ getClassPredTys_maybe ty = case splitTyConApp_maybe ty of
         _ -> Nothing
 
 getEqPredTys :: PredType -> (Type, Type)
-getEqPredTys ty = case getEqPredTys_maybe ty of
-        Just (ty1, ty2) -> (ty1, ty2)
-        Nothing         -> pprPanic "getEqPredTys" (ppr ty)
+getEqPredTys ty 
+  = case splitTyConApp_maybe ty of 
+      Just (tc, (_ : ty1 : ty2 : tys)) -> ASSERT( tc `hasKey` eqTyConKey && null tys )
+                                          (ty1, ty2)
+      _ -> pprPanic "getEqPredTys" (ppr ty)
 
 getEqPredTys_maybe :: PredType -> Maybe (Type, Type)
-getEqPredTys_maybe ty = case splitTyConApp_maybe ty of 
-        Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
-        _ -> Nothing
-
-getIPPredTy_maybe :: PredType -> Maybe (IPName Name, Type)
-getIPPredTy_maybe ty = case splitTyConApp_maybe ty of 
-        Just (tc, [ty1]) | Just ip <- tyConIP_maybe tc -> Just (ip, ty1)
-        _ -> Nothing
+getEqPredTys_maybe ty 
+  = case splitTyConApp_maybe ty of 
+      Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
+      _ -> Nothing
 \end{code}
 
 %************************************************************************
@@ -967,7 +993,8 @@ getIPPredTy_maybe ty = case splitTyConApp_maybe ty of
 
 \begin{code}
 typeSize :: Type -> Int
-typeSize (TyVarTy _)     = 1
+typeSize (LitTy {})      = 1
+typeSize (TyVarTy {})    = 1
 typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
@@ -975,23 +1002,10 @@ typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
 
 varSetElemsKvsFirst :: VarSet -> [TyVar]
 -- {k1,a,k2,b} --> [k1,k2,a,b]
-varSetElemsKvsFirst set = uncurry (++) $ partitionKiTyVars (varSetElems set)
-
-sortQuantVars :: [Var] -> [Var]
--- Sort the variables so the true kind then type variables come first
-sortQuantVars = sortLe le
+varSetElemsKvsFirst set 
+  = kvs ++ tvs
   where
-    v1 `le` v2 = case (is_tv v1, is_tv v2) of
-                   (True, False)  -> True
-                   (False, True)  -> False
-                   (True, True)   ->
-                     case (is_kv v1, is_kv v2) of
-                       (True, False) -> True
-                       (False, True) -> False
-                       _             -> v1 <= v2  -- Same family
-                   (False, False) -> v1 <= v2
-    is_tv v = isTyVar v
-    is_kv v = isSuperKind (tyVarKind v)
+    (kvs, tvs) = partition isKindVar (varSetElems set)
 \end{code}
 
 
@@ -1124,6 +1138,7 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 
 \begin{code}
 seqType :: Type -> ()
+seqType (LitTy n)         = n `seq` ()
 seqType (TyVarTy tv) 	  = tv `seq` ()
 seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
@@ -1197,20 +1212,27 @@ cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
+cmpTypeX _   (LitTy l1)          (LitTy l2)          = compare l1 l2
 
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < LitTy < TyConApp < ForAllTy < PredTy
 cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
 
 cmpTypeX _ (FunTy _ _)    (TyVarTy _)    = GT
 cmpTypeX _ (FunTy _ _)    (AppTy _ _)    = GT
 
+cmpTypeX _ (LitTy _)      (TyVarTy _)    = GT
+cmpTypeX _ (LitTy _)      (AppTy _ _)    = GT
+cmpTypeX _ (LitTy _)      (FunTy _ _)    = GT
+
 cmpTypeX _ (TyConApp _ _) (TyVarTy _)    = GT
 cmpTypeX _ (TyConApp _ _) (AppTy _ _)    = GT
 cmpTypeX _ (TyConApp _ _) (FunTy _ _)    = GT
+cmpTypeX _ (TyConApp _ _) (LitTy _)      = GT
 
 cmpTypeX _ (ForAllTy _ _) (TyVarTy _)    = GT
 cmpTypeX _ (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTypeX _ (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTypeX _ (ForAllTy _ _) (LitTy _)      = GT
 cmpTypeX _ (ForAllTy _ _) (TyConApp _ _) = GT
 
 cmpTypeX _ _              _              = LT
@@ -1450,6 +1472,7 @@ subst_ty :: TvSubst -> Type -> Type
 subst_ty subst ty
    = go ty
   where
+    go (LitTy n)         = n `seq` LitTy n
     go (TyVarTy tv)      = substTyVar subst tv
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
@@ -1543,24 +1566,32 @@ type SimpleKind = Kind
 \begin{code}
 typeKind :: Type -> Kind
 typeKind (TyConApp tc tys)
-  | isPromotedTypeTyCon tc
-  = ASSERT( tyConArity tc == length tys ) tySuperKind
+  | isPromotedTyCon tc
+  = ASSERT( tyConArity tc == length tys ) superKind
   | otherwise
   = kindAppResult (tyConKind tc) tys
 
 typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
+typeKind (LitTy l)            = typeLiteralKind l
 typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
-typeKind (FunTy _arg res)
+typeKind _ty@(FunTy _arg res)
     -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*), 
     --              not unliftedTypKind (#)
     -- The only things that can be after a function arrow are
     --   (a) types (of kind openTypeKind or its sub-kinds)
     --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
     | isSuperKind k         = k
-    | otherwise             = ASSERT( isSubOpenTypeKind k ) liftedTypeKind
+    | otherwise             = ASSERT2( isSubOpenTypeKind k, ppr _ty $$ ppr k ) liftedTypeKind
     where
       k = typeKind res
+
+
+typeLiteralKind :: TyLit -> Kind
+typeLiteralKind l =
+  case l of
+    NumTyLit _ -> typeNatKind
+    StrTyLit _ -> typeStringKind
 
 \end{code}
 

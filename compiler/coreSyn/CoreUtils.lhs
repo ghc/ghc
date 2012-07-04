@@ -15,13 +15,14 @@ module CoreUtils (
         mkAltExpr,
 
         -- * Taking expressions apart
-        findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
+        findDefault, findAlt, isDefaultAlt,
+        mergeAlts, trimConArgs, filterAlts,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects,
+        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
 
@@ -69,7 +70,7 @@ import Util
 import Pair
 import Data.Word
 import Data.Bits
-import Data.List ( mapAccumL )
+import Data.List
 \end{code}
 
 
@@ -186,15 +187,7 @@ mkCast (Coercion e_co) co
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
-  = Coercion new_co
-  where
-       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
-       -- g1 :: s1 ~# t1
-       -- g2 :: s2 ~# t2
-       new_co = mkSymCo g1 `mkTransCo` e_co `mkTransCo` g2
-       [_reflk, g1, g2] = decomposeCo 3 co
-            -- Remember, (~#) :: forall k. k -> k -> *
-            -- so it takes *three* arguments, not two
+  = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
   = ASSERT(let { Pair  from_ty  _to_ty  = coercionKind co;
@@ -342,18 +335,18 @@ This makes it easy to find, though it makes matching marginally harder.
 
 \begin{code}
 -- | Extract the default case alternative
-findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
+findDefault :: [(AltCon, [a], b)] -> ([(AltCon, [a], b)], Maybe b)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts                        =                     (alts, Nothing)
 
-isDefaultAlt :: CoreAlt -> Bool
+isDefaultAlt :: (AltCon, a, b) -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
 isDefaultAlt _               = False
 
 
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
-findAlt :: AltCon -> [CoreAlt] -> Maybe CoreAlt
+findAlt :: AltCon -> [(AltCon, a, b)] -> Maybe (AltCon, a, b)
     -- A "Nothing" result *is* legitmiate
     -- See Note [Unreachable code]
 findAlt con alts
@@ -369,7 +362,7 @@ findAlt con alts
           GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
 
 ---------------------------------
-mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
+mergeAlts :: [(AltCon, a, b)] -> [(AltCon, a, b)] -> [(AltCon, a, b)]
 -- ^ Merge alternatives preserving order; alternatives in
 -- the first argument shadow ones in the second
 mergeAlts [] as2 = as2
@@ -394,6 +387,88 @@ trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
 trimConArgs DEFAULT      args = ASSERT( null args ) []
 trimConArgs (LitAlt _)   args = ASSERT( null args ) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
+\end{code}
+
+\begin{code}
+filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have to manufacture a new AltCon
+           -> Type                 -- ^ Type of scrutinee (used to prune possibilities)
+           -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
+           -> [(AltCon, [Var], a)] -- ^ Alternatives
+           -> ([AltCon], Bool, [(AltCon, [Var], a)])
+             -- Returns:
+             --  1. Constructors that will never be encountered by the 
+             --     *default* case (if any).  A superset of imposs_cons
+             --  2. Whether we managed to refine the default alternative into a specific constructor (for statistics only)
+             --  3. The new alternatives, trimmed by
+             --        a) remove imposs_cons
+             --        b) remove constructors which can't match because of GADTs
+             --      and with the DEFAULT expanded to a DataAlt if there is exactly
+             --      remaining constructor that can match
+             --
+             -- NB: the final list of alternatives may be empty:
+             -- This is a tricky corner case.  If the data type has no constructors,
+             -- which GHC allows, or if the imposs_cons covers all constructors (after taking 
+             -- account of GADTs), then no alternatives can match.
+             --
+             -- If callers need to preserve the invariant that there is always at least one branch
+             -- in a "case" statement then they will need to manually add a dummy case branch that just
+             -- calls "error" or similar.
+filterAlts us ty imposs_cons alts = (imposs_deflt_cons, refined_deflt, merged_alts)
+  where
+    (alts_wo_default, maybe_deflt) = findDefault alts
+    alt_cons = [con | (con,_,_) <- alts_wo_default]
+    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+      -- "imposs_deflt_cons" are handled 
+      --   EITHER by the context, 
+      --   OR by a non-DEFAULT branch in this case expression.
+
+    trimmed_alts = filterOut impossible_alt alts_wo_default
+    merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
+      -- We need the mergeAlts in case the new default_alt 
+      -- has turned into a constructor alternative.
+      -- The merge keeps the inner DEFAULT at the front, if there is one
+      -- and interleaves the alternatives in the right order
+
+    (refined_deflt, maybe_deflt') = case maybe_deflt of
+      Just deflt_rhs -> case mb_tc_app of
+        Just (tycon, inst_tys)
+          |     -- This branch handles the case where we are 
+                -- scrutinisng an algebraic data type
+            isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
+          , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
+                                        --      case x of { DEFAULT -> e }
+                                        -- and we don't want to fill in a default for them!
+          , Just all_cons <- tyConDataCons_maybe tycon
+          , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
+                impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+          -> case filterOut impossible all_cons of
+               -- Eliminate the default alternative
+               -- altogether if it can't match:
+               []    -> (False, Nothing)
+               -- It matches exactly one constructor, so fill it in:
+               [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
+                 where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
+               _     -> (False, Just (DEFAULT, [], deflt_rhs))
+
+          | debugIsOn, isAlgTyCon tycon
+          , null (tyConDataCons tycon)
+          , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
+                -- Check for no data constructors
+                -- This can legitimately happen for abstract types and type families,
+                -- so don't report that
+          -> pprTrace "prepareDefault" (ppr tycon)
+             (False, Just (DEFAULT, [], deflt_rhs))
+
+        _ -> (False, Just (DEFAULT, [], deflt_rhs))
+      Nothing -> (False, Nothing)
+  
+    mb_tc_app = splitTyConApp_maybe ty
+    Just (_, inst_tys) = mb_tc_app
+
+    impossible_alt :: (AltCon, a, b) -> Bool
+    impossible_alt (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
+    impossible_alt _                   = False
 \end{code}
 
 Note [Unreachable code]
@@ -556,6 +631,68 @@ dupAppSize = 8   -- Size of term we are prepared to duplicate
              exprIsCheap, exprIsExpandable
 %*                                                                      *
 %************************************************************************
+
+Note [exprIsWorkFree]
+~~~~~~~~~~~~~~~~~~~~~
+exprIsWorkFree is used when deciding whether to inline something; we
+don't inline it if doing so might duplicate work, by peeling off a
+complete copy of the expression.  Here we do not want even to
+duplicate a primop (Trac #5623):
+   eg   let x = a #+ b in x +# x
+   we do not want to inline/duplicate x
+
+Previously we were a bit more liberal, which led to the primop-duplicating
+problem.  However, being more conservative did lead to a big regression in
+one nofib benchmark, wheel-sieve1.  The situation looks like this:
+
+   let noFactor_sZ3 :: GHC.Types.Int -> GHC.Types.Bool
+       noFactor_sZ3 = case s_adJ of _ { GHC.Types.I# x_aRs ->
+         case GHC.Prim.<=# x_aRs 2 of _ {
+           GHC.Types.False -> notDivBy ps_adM qs_adN;
+           GHC.Types.True -> lvl_r2Eb }}
+       go = \x. ...(noFactor (I# y))....(go x')...
+
+The function 'noFactor' is heap-allocated and then called.  Turns out
+that 'notDivBy' is strict in its THIRD arg, but that is invisible to
+the caller of noFactor, which therefore cannot do w/w and
+heap-allocates noFactor's argument.  At the moment (May 12) we are just
+going to put up with this, because the previous more aggressive inlining 
+(which treated 'noFactor' as work-free) was duplicating primops, which 
+in turn was making inner loops of array calculations runs slow (#5623)
+
+\begin{code}
+exprIsWorkFree :: CoreExpr -> Bool
+-- See Note [exprIsWorkFree]
+exprIsWorkFree e = go 0 e
+  where    -- n is the number of value arguments
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Case scrut _ _ alts)        = foldl (&&) (exprIsWorkFree scrut) 
+                                              [ go n rhs | (_,_,rhs) <- alts ]
+         -- See Note [Case expressions are work-free]
+    go _ (Let {})                     = False
+    go n (Var v)                      = n==0 || n < idArity v
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
+                    | otherwise      = go n e
+    go n (App f e)  | isRuntimeArg e = exprIsWorkFree e && go (n+1) f
+                    | otherwise      = go n f
+\end{code}
+
+Note [Case expressions are work-free]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Are case-expressions work-free?  Consider
+    let v = case x of (p,q) -> p
+        go = \y -> ...case v of ...
+Should we inline 'v' at its use site inside the loop?  At the moment
+we do.  I experimented with saying that case are *not* work-free, but
+that increased allocation slightly.  It's a fairly small effect, and at
+the moment we go for the slightly more aggressive version which treats
+(case x of ....) as work-free if the alterantives are.
+
 
 Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
 ~~~~~~~~~~~~~~~~~~   in CoreUnfold.lhs
@@ -791,7 +928,7 @@ expr_ok primop_ok other_expr
 app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
-      DFunId new_type ->  not new_type
+      DFunId _ new_type ->  not new_type
          -- DFuns terminate, unless the dict is implemented 
          -- with a newtype in which case they may not
 
@@ -1213,10 +1350,11 @@ eqExprX id_unfolding_fun env e1 e2
         (bs2,rs2) = unzip ps2
         env' = rnBndrs2 env bs1 bs2
 
-    go env (Case e1 b1 _ a1) (Case e2 b2 _ a2)
-      =  go env e1 e2
-      && eqTypeX env (idType b1) (idType b2)
-      && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
+    go env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
+      | null a1   -- See Note [Empty case alternatives] in TrieMap
+      = null a2 && go env e1 e2 && eqTypeX env t1 t2
+      | otherwise
+      =  go env e1 e2 && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
 
     go _ _ _ = False
 
@@ -1246,50 +1384,9 @@ locallyBoundR rn_env v = inRnEnvR rn_env v
 %************************************************************************
 
 \begin{code}
-coreBindsSize :: [CoreBind] -> Int
-coreBindsSize bs = foldr ((+) . bindSize) 0 bs
-
-exprSize :: CoreExpr -> Int
--- ^ A measure of the size of the expressions, strictly greater than 0
--- It also forces the expression pretty drastically as a side effect
--- Counts *leaves*, not internal nodes. Types and coercions are not counted.
-exprSize (Var v)         = v `seq` 1
-exprSize (Lit lit)       = lit `seq` 1
-exprSize (App f a)       = exprSize f + exprSize a
-exprSize (Lam b e)       = varSize b + exprSize e
-exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
-exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
-exprSize (Tick n e)      = tickSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
-exprSize (Coercion co)   = seqCo co `seq` 1
-
-tickSize :: Tickish Id -> Int
-tickSize (ProfNote cc _ _) = cc `seq` 1
-tickSize _ = 1 -- the rest are strict
-
-varSize :: Var -> Int
-varSize b  | isTyVar b = 1
-           | otherwise = seqType (idType b)             `seq`
-                         megaSeqIdInfo (idInfo b)       `seq`
-                         1
-
-varsSize :: [Var] -> Int
-varsSize = sum . map varSize
-
-bindSize :: CoreBind -> Int
-bindSize (NonRec b e) = varSize b + exprSize e
-bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
-
-pairSize :: (Var, CoreExpr) -> Int
-pairSize (b,e) = varSize b + exprSize e
-
-altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
-\end{code}
-
-\begin{code}
-data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
+data CoreStats = CS { cs_tm :: Int    -- Terms
+                    , cs_ty :: Int    -- Types
+                    , cs_co :: Int }  -- Coercions
 
 
 instance Outputable CoreStats where 
@@ -1344,6 +1441,54 @@ tyStats ty = zeroCS { cs_ty = typeSize ty }
 coStats :: Coercion -> CoreStats
 coStats co = zeroCS { cs_co = coercionSize co }
 \end{code}
+
+
+\begin{code}
+coreBindsSize :: [CoreBind] -> Int
+-- We use coreBindStats for user printout
+-- but this one is a quick and dirty basis for
+-- the simplifier's tick limit
+coreBindsSize bs = foldr ((+) . bindSize) 0 bs
+
+exprSize :: CoreExpr -> Int
+-- ^ A measure of the size of the expressions, strictly greater than 0
+-- It also forces the expression pretty drastically as a side effect
+-- Counts *leaves*, not internal nodes. Types and coercions are not counted.
+exprSize (Var v)         = v `seq` 1
+exprSize (Lit lit)       = lit `seq` 1
+exprSize (App f a)       = exprSize f + exprSize a
+exprSize (Lam b e)       = varSize b + exprSize e
+exprSize (Let b e)       = bindSize b + exprSize e
+exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
+exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
+exprSize (Tick n e)      = tickSize n + exprSize e
+exprSize (Type t)        = seqType t `seq` 1
+exprSize (Coercion co)   = seqCo co `seq` 1
+
+tickSize :: Tickish Id -> Int
+tickSize (ProfNote cc _ _) = cc `seq` 1
+tickSize _ = 1 -- the rest are strict
+
+varSize :: Var -> Int
+varSize b  | isTyVar b = 1
+           | otherwise = seqType (idType b)             `seq`
+                         megaSeqIdInfo (idInfo b)       `seq`
+                         1
+
+varsSize :: [Var] -> Int
+varsSize = sum . map varSize
+
+bindSize :: CoreBind -> Int
+bindSize (NonRec b e) = varSize b + exprSize e
+bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
+
+pairSize :: (Var, CoreExpr) -> Int
+pairSize (b,e) = varSize b + exprSize e
+
+altSize :: CoreAlt -> Int
+altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
+\end{code}
+
 
 %************************************************************************
 %*                                                                      *

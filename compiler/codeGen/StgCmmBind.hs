@@ -79,9 +79,10 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
   ; lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
   ; has_srt <- getSRTInfo srt
   ; mod_name <- getModuleName
-  ; let descr         = closureDescription mod_name name
+  ; dflags   <- getDynFlags
+  ; let descr         = closureDescription dflags mod_name name
         closure_info  = mkClosureInfo True id lf_info 0 0 descr
-	closure_label = mkLocalClosureLabel name (idCafInfo id)
+        closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
         caffy         = idCafInfo id
         info_tbl      = mkCmmInfo closure_info -- XXX short-cut
@@ -285,9 +286,10 @@ mkRhsClosure bndr cc _ fvs upd_flag args body
 	-- MAKE CLOSURE INFO FOR THIS CLOSURE
 	; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
 	; mod_name <- getModuleName
+        ; dflags <- getDynFlags
         ; let   name  = idName bndr
-		descr = closureDescription mod_name name
-		fv_details :: [(NonVoid Id, VirtualHpOffset)]
+                descr = closureDescription dflags mod_name name
+                fv_details :: [(NonVoid Id, VirtualHpOffset)]
 		(tot_wds, ptr_wds, fv_details)
 		   = mkVirtHeapOffsets (isLFThunk lf_info)
 				       (addIdReps (map stripNV reduced_fvs))
@@ -333,10 +335,11 @@ cgStdThunk bndr _cc _bndr_info _body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     mod_name <- getModuleName
+  ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, payload_w_offsets)
 	    = mkVirtHeapOffsets (isLFThunk lf_info) (addArgReps payload)
 
-	descr = closureDescription mod_name (idName bndr)
+	descr = closureDescription dflags mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds
                                      descr
@@ -404,9 +407,7 @@ closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
     do  { -- Allocate the global ticky counter,
           -- and establish the ticky-counter
           -- label for this block
-        ; dflags <- getDynFlags
-        ; let platform = targetPlatform dflags
-              ticky_ctr_lbl = closureRednCountsLabel platform cl_info
+          let ticky_ctr_lbl = closureRednCountsLabel cl_info
         ; emitTickyCounter cl_info (map stripNV args)
         ; setTickyCtrLabel ticky_ctr_lbl $ do
 
@@ -463,10 +464,8 @@ mkSlowEntryCode :: ClosureInfo -> [LocalReg] -> FCode ()
 mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
 mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = do dflags <- getDynFlags
-       let platform = targetPlatform dflags
-           slow_lbl = closureSlowEntryLabel  platform cl_info
-           fast_lbl = closureLocalEntryLabel platform cl_info
+  = do let slow_lbl = closureSlowEntryLabel  cl_info
+           fast_lbl = closureLocalEntryLabel cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkDirectJump (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
@@ -561,12 +560,15 @@ setupUpdate closure_info node body
       then do tickyUpdateFrameOmitted; body
       else do
           tickyPushUpdateFrame
-          --dflags <- getDynFlags
-          let es = [CmmReg (CmmLocal node), mkLblExpr mkUpdInfoLabel]
-          --if not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
-          --  then pushUpdateFrame es body -- XXX black hole
-          --  else pushUpdateFrame es body
-          pushUpdateFrame es body
+          dflags <- getDynFlags
+          let
+              bh = blackHoleOnEntry closure_info &&
+                   not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+
+              lbl | bh        = mkBHUpdInfoLabel
+                  | otherwise = mkUpdInfoLabel
+
+          pushUpdateFrame [CmmReg (CmmLocal node), mkLblExpr lbl] body
 
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
@@ -575,7 +577,7 @@ setupUpdate closure_info node body
 	  then do	-- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf True
 		; pushUpdateFrame [CmmReg (CmmLocal upd_closure),
-                                     mkLblExpr mkUpdInfoLabel] body } -- XXX black hole
+                                   mkLblExpr mkBHUpdInfoLabel] body }
 	  else do {tickyUpdateFrameOmitted; body}
     }
 
@@ -679,13 +681,14 @@ link_caf _is_upd = do
 -- name of the data constructor itself.  Otherwise it is determined by
 -- @closureDescription@ from the let binding information.
 
-closureDescription :: Module		-- Module
+closureDescription :: DynFlags
+           -> Module		-- Module
 		   -> Name		-- Id of closure binding
 		   -> String
 	-- Not called for StgRhsCon which have global info tables built in
 	-- CgConTbls.lhs with a description generated from the data constructor
-closureDescription mod_name name
-  = showSDocDump (char '<' <>
+closureDescription dflags mod_name name
+  = showSDocDump dflags (char '<' <>
 		    (if isExternalName name
 		      then ppr name -- ppr will include the module name prefix
 		      else pprModule mod_name <> char '.' <> ppr name) <>

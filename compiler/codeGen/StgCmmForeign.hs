@@ -58,7 +58,9 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
-                   StaticTarget lbl mPkgId
+                   StaticTarget _   _      False ->
+                       panic "cgForeignCall: unexpected FFI value import"
+                   StaticTarget lbl mPkgId True
                      -> let labelSource
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage
@@ -390,5 +392,6 @@ add_shim arg_ty expr
 
   | otherwise = expr
   where
-    tycon = tyConAppTyCon (repType arg_ty)
+    UnaryRep rep_ty = repType arg_ty
+    tycon           = tyConAppTyCon rep_ty
         -- should be a tycon app, since this is a foreign call

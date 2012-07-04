@@ -90,7 +90,8 @@ lnat     countNurseryBlocks   ( void );
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-lnat    calcAllocated  (rtsBool count_nurseries);
+lnat    updateNurseriesStats (void);
+lnat    countLargeAllocated  (void);
 lnat    countOccupied  (bdescr *bd);
 lnat    calcNeeded     (void);
 

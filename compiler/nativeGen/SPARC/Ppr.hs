@@ -45,17 +45,15 @@ import OldPprCmm()
 import CLabel
 
 import Unique		( Uniquable(..), pprUnique )
-import qualified Outputable
-import Outputable (PlatformOutputable, panic)
+import Outputable
 import Platform
-import Pretty
 import FastString
 import Data.Word
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> Doc
+pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> SDoc
 pprNatCmmDecl platform (CmmData section dats) =
   pprSectionHeader section $$ pprDatas platform dats
 
@@ -72,7 +70,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
-        then pprCLabel_asm platform (mkDeadStripPreventer info_lbl) <> char ':'
+        then pprCLabel platform (mkDeadStripPreventer info_lbl) <> char ':'
         else empty) $$
        vcat (map (pprData platform) info) $$
        pprLabel platform info_lbl
@@ -89,70 +87,70 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
          -- so that the linker will not think it is unreferenced and dead-strip
          -- it. That's why the label is called a DeadStripPreventer (_dsp).
                   text "\t.long "
-              <+> pprCLabel_asm platform info_lbl
+              <+> pprCLabel platform info_lbl
               <+> char '-'
-              <+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
+              <+> pprCLabel platform (mkDeadStripPreventer info_lbl)
          else empty)
 
 
-pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
+pprBasicBlock :: Platform -> NatBasicBlock Instr -> SDoc
 pprBasicBlock platform (BasicBlock blockid instrs) =
   pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map (pprInstr platform) instrs)
 
 
-pprDatas :: Platform -> CmmStatics -> Doc
+pprDatas :: Platform -> CmmStatics -> SDoc
 pprDatas platform (Statics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: Platform -> CmmStatic -> Doc
+pprData :: Platform -> CmmStatic -> SDoc
 pprData _        (CmmString str)          = pprASCII str
 pprData _        (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
 pprData platform (CmmStaticLit lit)       = pprDataItem platform lit
 
-pprGloblDecl :: Platform -> CLabel -> Doc
+pprGloblDecl :: Platform -> CLabel -> SDoc
 pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".global ") <> pprCLabel_asm platform lbl
+  | otherwise = ptext (sLit ".global ") <> pprCLabel platform lbl
 
-pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
+pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
  | platformOS platform == OSLinux && externallyVisibleCLabel lbl
     = ptext (sLit ".type ") <>
-      pprCLabel_asm platform lbl <> ptext (sLit ", @object")
+      pprCLabel platform lbl <> ptext (sLit ", @object")
  | otherwise = empty
 
-pprLabel :: Platform -> CLabel -> Doc
+pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl = pprGloblDecl platform lbl
                      $$ pprTypeAndSizeDecl platform lbl
-                     $$ (pprCLabel_asm platform lbl <> char ':')
+                     $$ (pprCLabel platform lbl <> char ':')
 
 
-pprASCII :: [Word8] -> Doc
+pprASCII :: [Word8] -> SDoc
 pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
-       do1 :: Word8 -> Doc
+       do1 :: Word8 -> SDoc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance PlatformOutputable Instr where
-    pprPlatform platform instr = Outputable.docToSDoc $ pprInstr platform instr
+instance Outputable Instr where
+    ppr instr = sdocWithPlatform $ \platform -> pprInstr platform instr
 
 
 -- | Pretty print a register.
-pprReg :: Reg -> Doc
+pprReg :: Reg -> SDoc
 pprReg reg
  = case reg of
  	RegVirtual vr
 	 -> case vr of
-		VirtualRegI  u	-> text "%vI_"  <> asmSDoc (pprUnique u)
-		VirtualRegHi u	-> text "%vHi_" <> asmSDoc (pprUnique u)
-		VirtualRegF  u	-> text "%vF_"  <> asmSDoc (pprUnique u)
-		VirtualRegD  u	-> text "%vD_"  <> asmSDoc (pprUnique u)
-                VirtualRegSSE u -> text "%vSSE_" <> asmSDoc (pprUnique u)
+                VirtualRegI   u -> text "%vI_"  <> pprUnique u
+                VirtualRegHi  u -> text "%vHi_" <> pprUnique u
+                VirtualRegF   u -> text "%vF_"  <> pprUnique u
+                VirtualRegD   u -> text "%vD_"  <> pprUnique u
+                VirtualRegSSE u -> text "%vSSE_" <> pprUnique u
 
 	RegReal rr
 	 -> case rr of
@@ -170,7 +168,7 @@ pprReg reg
 --	The definition has been unfolded so we get a jump-table in the
 --	object code. This function is called quite a lot when emitting the asm file..
 --
-pprReg_ofRegNo :: Int -> Doc
+pprReg_ofRegNo :: Int -> SDoc
 pprReg_ofRegNo i
  = ptext
     (case i of {
@@ -210,7 +208,7 @@ pprReg_ofRegNo i
 
 
 -- | Pretty print a size for an instruction suffix.
-pprSize :: Size -> Doc
+pprSize :: Size -> SDoc
 pprSize x 
  = ptext 
     (case x of
@@ -225,7 +223,7 @@ pprSize x
 
 -- | Pretty print a size for an instruction suffix.
 --	eg LD is 32bit on sparc, but LDD is 64 bit.
-pprStSize :: Size -> Doc
+pprStSize :: Size -> SDoc
 pprStSize x 
  = ptext 
     (case x of
@@ -239,7 +237,7 @@ pprStSize x
 
 		
 -- | Pretty print a condition code.
-pprCond :: Cond -> Doc
+pprCond :: Cond -> SDoc
 pprCond c 
  = ptext 
     (case c of 
@@ -262,7 +260,7 @@ pprCond c
 
 
 -- | Pretty print an address mode.
-pprAddr :: Platform -> AddrMode -> Doc
+pprAddr :: Platform -> AddrMode -> SDoc
 pprAddr platform am
  = case am of
  	AddrRegReg r1 (RegReal (RealRegSingle 0))
@@ -290,13 +288,13 @@ pprAddr platform am
 
 
 -- | Pretty print an immediate value.
-pprImm :: Platform -> Imm -> Doc
+pprImm :: Platform -> Imm -> SDoc
 pprImm platform imm
  = case imm of
  	ImmInt i	-> int i
 	ImmInteger i	-> integer i
-	ImmCLbl l	-> pprCLabel_asm platform l
-	ImmIndex l i	-> pprCLabel_asm platform l <> char '+' <> int i
+	ImmCLbl l	-> pprCLabel platform l
+	ImmIndex l i	-> pprCLabel platform l <> char '+' <> int i
 	ImmLit s	-> s
 
 	ImmConstantSum a b	
@@ -321,7 +319,7 @@ pprImm platform imm
 --	On SPARC all the data sections must be at least 8 byte aligned
 --	incase we store doubles in them.
 --
-pprSectionHeader :: Section -> Doc
+pprSectionHeader :: Section -> SDoc
 pprSectionHeader seg
  = case seg of
  	Text			-> ptext (sLit ".text\n\t.align 4")
@@ -334,7 +332,7 @@ pprSectionHeader seg
 
 
 -- | Pretty print a data item.
-pprDataItem :: Platform -> CmmLit -> Doc
+pprDataItem :: Platform -> CmmLit -> SDoc
 pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
@@ -357,7 +355,7 @@ pprDataItem platform lit
 
 
 -- | Pretty print an instruction.
-pprInstr :: Platform -> Instr -> Doc
+pprInstr :: Platform -> Instr -> SDoc
 
 -- nuke comments.
 pprInstr _        (COMMENT _) 
@@ -527,7 +525,7 @@ pprInstr platform (BI cond b blockid)
 	ptext (sLit "\tb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm platform (mkAsmTempLabel (getUnique blockid))
+	pprCLabel platform (mkAsmTempLabel (getUnique blockid))
     ]
 
 pprInstr platform (BF cond b blockid)
@@ -535,7 +533,7 @@ pprInstr platform (BF cond b blockid)
 	ptext (sLit "\tfb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm platform (mkAsmTempLabel (getUnique blockid))
+	pprCLabel platform (mkAsmTempLabel (getUnique blockid))
     ]
 
 pprInstr platform (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr platform addr)
@@ -549,13 +547,13 @@ pprInstr _        (CALL (Right reg) n _)
 
 
 -- | Pretty print a RI
-pprRI :: Platform -> RI -> Doc
+pprRI :: Platform -> RI -> SDoc
 pprRI _        (RIReg r) = pprReg r
 pprRI platform (RIImm r) = pprImm platform r
 
 
 -- | Pretty print a two reg instruction.
-pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> SDoc
 pprSizeRegReg name size reg1 reg2
   = hcat [
     	char '\t',
@@ -572,7 +570,7 @@ pprSizeRegReg name size reg1 reg2
 
 
 -- | Pretty print a three reg instruction.
-pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> SDoc
 pprSizeRegRegReg name size reg1 reg2 reg3
   = hcat [
     	char '\t',
@@ -590,7 +588,7 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 
 -- | Pretty print an instruction of two regs and a ri.
-pprRegRIReg :: Platform -> LitString -> Bool -> Reg -> RI -> Reg -> Doc
+pprRegRIReg :: Platform -> LitString -> Bool -> Reg -> RI -> Reg -> SDoc
 pprRegRIReg platform name b reg1 ri reg2
   = hcat [
 	char '\t',
@@ -604,7 +602,7 @@ pprRegRIReg platform name b reg1 ri reg2
     ]
 
 {-
-pprRIReg :: LitString -> Bool -> RI -> Reg -> Doc
+pprRIReg :: LitString -> Bool -> RI -> Reg -> SDoc
 pprRIReg name b ri reg1
   = hcat [
 	char '\t',
@@ -617,18 +615,18 @@ pprRIReg name b ri reg1
 -}
 
 {-
-pp_ld_lbracket :: Doc
+pp_ld_lbracket :: SDoc
 pp_ld_lbracket    = ptext (sLit "\tld\t[")
 -}
 
-pp_rbracket_comma :: Doc
+pp_rbracket_comma :: SDoc
 pp_rbracket_comma = text "],"
 
 
-pp_comma_lbracket :: Doc
+pp_comma_lbracket :: SDoc
 pp_comma_lbracket = text ",["
 
 
-pp_comma_a :: Doc
+pp_comma_a :: SDoc
 pp_comma_a	  = text ",a"
 

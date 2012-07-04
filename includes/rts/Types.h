@@ -14,8 +14,10 @@
 #ifndef RTS_TYPES_H
 #define RTS_TYPES_H
 
-typedef unsigned int  nat;           /* at least 32 bits (like int) */
-typedef unsigned long lnat;          /* at least 32 bits            */
+#include <stddef.h>
+
+typedef unsigned int    nat;           /* at least 32 bits (like int) */
+typedef          size_t lnat;          /* at least 32 bits            */
 
 /* ullong (64|128-bit) type: only include if needed (not ANSI) */
 #if defined(__GNUC__) 

@@ -210,7 +210,8 @@ vectTopBind b@(Rec bs)
            ; if and hasNoVectDecls 
              then return b                              -- all bindings have 'NOVECTORISE'
              else if or hasNoVectDecls 
-             then cantVectorise noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
+             then do dflags <- getDynFlags
+                     cantVectorise dflags noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
              else vectorise                             -- no binding has a 'NOVECTORISE' decl
            }
     noVectoriseErr = "NOVECTORISE must be used on all or no bindings of a recursive group"
@@ -264,10 +265,11 @@ vectTopBinder var inline expr
           Just (vdty, _) 
             | eqType vty vdty -> return ()
             | otherwise       -> 
-              cantVectorise ("Type mismatch in vectorisation pragma for " ++ show var) $
-                (text "Expected type" <+> ppr vty)
-                $$
-                (text "Inferred type" <+> ppr vdty)
+              do dflags <- getDynFlags
+                 cantVectorise dflags ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
+                   (text "Expected type" <+> ppr vty)
+                   $$
+                   (text "Inferred type" <+> ppr vdty)
 
           -- Make the vectorised version of binding's name, and set the unfolding used for inlining
       ; var' <- liftM (`setIdUnfoldingLazily` unfolding) 
@@ -350,9 +352,10 @@ vectTopRhs recFs var expr
   = closedV
   $ do { globalScalar <- isGlobalScalarVar var
        ; vectDecl     <- lookupVectDecl var
+       ; dflags       <- getDynFlags
        ; let isDFun = isDFunId var
 
-       ; traceVt ("vectTopRhs of " ++ show var ++ info globalScalar isDFun vectDecl ++ ":") $ 
+       ; traceVt ("vectTopRhs of " ++ showPpr dflags var ++ info globalScalar isDFun vectDecl ++ ":") $
            ppr expr
 
        ; rhs globalScalar isDFun vectDecl
@@ -361,18 +364,18 @@ vectTopRhs recFs var expr
     rhs _globalScalar _isDFun (Just (_, expr'))               -- Case (1)
       = return (inlineMe, False, expr')
     rhs True          False   Nothing                         -- Case (2)
-      = do { expr' <- vectScalarFun True recFs expr
+      = do { expr' <- vectScalarFun expr
            ; return (inlineMe, True, vectorised expr')
            }
     rhs True          True    Nothing                         -- Case (3)
-      = do { expr' <- vectScalarDFun var recFs
+      = do { expr' <- vectScalarDFun var
            ; return (DontInline, True, expr')
            }
     rhs False         False   Nothing                         -- Case (4) — not a dfun
       = do { let exprFvs = freeVars expr
            ; (inline, isScalar, vexpr) 
                <- inBind var $
-                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs exprFvs
+                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs exprFvs Nothing
            ; return (inline, isScalar, vectorised vexpr)
            }
     rhs False         True    Nothing                         -- Case (4) — is a dfun

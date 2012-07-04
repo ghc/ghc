@@ -32,13 +32,6 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PprCmmExpr
     ( pprExpr, pprLit
     , pprExpr9 {-only to import in OldPprCmm. When it dies, remove the export -}
@@ -46,10 +39,8 @@ module PprCmmExpr
 where
 
 import CmmExpr
-import CLabel
 
 import Outputable
-import Platform
 import FastString
 
 import Data.Maybe
@@ -57,19 +48,17 @@ import Numeric ( fromRat )
 
 -----------------------------------------------------------------------------
 
-instance PlatformOutputable CmmExpr where
-    pprPlatform = pprExpr
+instance Outputable CmmExpr where
+    ppr e = pprExpr e
 
 instance Outputable CmmReg where
     ppr e = pprReg e
 
-instance PlatformOutputable CmmLit where
-    pprPlatform = pprLit
+instance Outputable CmmLit where
+    ppr l = pprLit l
 
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
-instance PlatformOutputable LocalReg where
-    pprPlatform _ = ppr
 
 instance Outputable Area where
     ppr e = pprArea e
@@ -81,15 +70,15 @@ instance Outputable GlobalReg where
 -- Expressions
 --
 
-pprExpr :: Platform -> CmmExpr -> SDoc
-pprExpr platform e
+pprExpr :: CmmExpr -> SDoc
+pprExpr e
     = case e of
-        CmmRegOff reg i -> 
-		pprExpr platform (CmmMachOp (MO_Add rep)
-			   [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-		where rep = typeWidth (cmmRegType reg)
-	CmmLit lit -> pprLit platform lit
-	_other     -> pprExpr1 platform e
+        CmmRegOff reg i ->
+                pprExpr (CmmMachOp (MO_Add rep)
+                           [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
+                where rep = typeWidth (cmmRegType reg)
+        CmmLit lit -> pprLit lit
+        _other     -> pprExpr1 e
 
 -- Here's the precedence table from CmmParse.y:
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
@@ -105,10 +94,10 @@ pprExpr platform e
 -- a default conservative behaviour.
 
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
-pprExpr1, pprExpr7, pprExpr8 :: Platform -> CmmExpr -> SDoc
-pprExpr1 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
-   = pprExpr7 platform x <+> doc <+> pprExpr7 platform y
-pprExpr1 platform e = pprExpr7 platform e
+pprExpr1, pprExpr7, pprExpr8 :: CmmExpr -> SDoc
+pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
+   = pprExpr7 x <+> doc <+> pprExpr7 y
+pprExpr1 e = pprExpr7 e
 
 infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
 
@@ -123,55 +112,55 @@ infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
 
 -- %left '-' '+'
-pprExpr7 platform (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
-   = pprExpr7 platform (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
-pprExpr7 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
-   = pprExpr7 platform x <+> doc <+> pprExpr8 platform y
-pprExpr7 platform e = pprExpr8 platform e
+pprExpr7 (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
+   = pprExpr7 (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
+pprExpr7 (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
+   = pprExpr7 x <+> doc <+> pprExpr8 y
+pprExpr7 e = pprExpr8 e
 
 infixMachOp7 (MO_Add _)  = Just (char '+')
 infixMachOp7 (MO_Sub _)  = Just (char '-')
 infixMachOp7 _           = Nothing
 
 -- %left '/' '*' '%'
-pprExpr8 platform (CmmMachOp op [x,y]) | Just doc <- infixMachOp8 op
-   = pprExpr8 platform x <+> doc <+> pprExpr9 platform y
-pprExpr8 platform e = pprExpr9 platform e
+pprExpr8 (CmmMachOp op [x,y]) | Just doc <- infixMachOp8 op
+   = pprExpr8 x <+> doc <+> pprExpr9 y
+pprExpr8 e = pprExpr9 e
 
 infixMachOp8 (MO_U_Quot _) = Just (char '/')
 infixMachOp8 (MO_Mul _)    = Just (char '*')
 infixMachOp8 (MO_U_Rem _)  = Just (char '%')
 infixMachOp8 _             = Nothing
 
-pprExpr9 :: Platform -> CmmExpr -> SDoc
-pprExpr9 platform e =
+pprExpr9 :: CmmExpr -> SDoc
+pprExpr9 e =
    case e of
-        CmmLit    lit       -> pprLit1 platform lit
-        CmmLoad   expr rep  -> ppr rep <> brackets (pprPlatform platform expr)
+        CmmLit    lit       -> pprLit1 lit
+        CmmLoad   expr rep  -> ppr rep <> brackets (ppr expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
-	CmmMachOp mop args  -> genMachOp platform mop args
+        CmmMachOp mop args  -> genMachOp mop args
 
-genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
-genMachOp platform mop args
+genMachOp :: MachOp -> [CmmExpr] -> SDoc
+genMachOp mop args
    | Just doc <- infixMachOp mop = case args of
         -- dyadic
-        [x,y] -> pprExpr9 platform x <+> doc <+> pprExpr9 platform y
+        [x,y] -> pprExpr9 x <+> doc <+> pprExpr9 y
 
         -- unary
-        [x]   -> doc <> pprExpr9 platform x
+        [x]   -> doc <> pprExpr9 x
 
         _     -> pprTrace "PprCmm.genMachOp: machop with strange number of args"
                           (pprMachOp mop <+>
-                            parens (hcat $ punctuate comma (map (pprExpr platform) args)))
+                            parens (hcat $ punctuate comma (map pprExpr args)))
                           empty
 
    | isJust (infixMachOp1 mop)
    || isJust (infixMachOp7 mop)
-   || isJust (infixMachOp8 mop)	 = parens (pprExpr platform (CmmMachOp mop args))
+   || isJust (infixMachOp8 mop)  = parens (pprExpr (CmmMachOp mop args))
 
-   | otherwise = char '%' <> ppr_op <> parens (commafy (map (pprExpr platform) args))
+   | otherwise = char '%' <> ppr_op <> parens (commafy (map pprExpr args))
         where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
                                  (show mop))
                 -- replace spaces in (show mop) with underscores,
@@ -182,7 +171,7 @@ genMachOp platform mop args
 --
 infixMachOp :: MachOp -> Maybe SDoc
 infixMachOp mop
-	= case mop of
+        = case mop of
             MO_And    _ -> Just $ char '&'
             MO_Or     _ -> Just $ char '|'
             MO_Xor    _ -> Just $ char '^'
@@ -195,24 +184,24 @@ infixMachOp mop
 --  To minimise line noise we adopt the convention that if the literal
 --  has the natural machine word size, we do not append the type
 --
-pprLit :: Platform -> CmmLit -> SDoc
-pprLit platform lit = case lit of
+pprLit :: CmmLit -> SDoc
+pprLit lit = case lit of
     CmmInt i rep ->
         hcat [ (if i < 0 then parens else id)(integer i)
              , ppUnless (rep == wordWidth) $
                space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
-    CmmLabel clbl      -> pprCLabel platform clbl
-    CmmLabelOff clbl i -> pprCLabel platform clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel platform clbl1 <> char '-'  
-                                  <> pprCLabel platform clbl2 <> ppr_offset i
+    CmmLabel clbl      -> ppr clbl
+    CmmLabelOff clbl i -> ppr clbl <> ppr_offset i
+    CmmLabelDiffOff clbl1 clbl2 i -> ppr clbl1 <> char '-'
+                                  <> ppr clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"
 
-pprLit1 :: Platform -> CmmLit -> SDoc
-pprLit1 platform lit@(CmmLabelOff {}) = parens (pprLit platform lit)
-pprLit1 platform lit                  = pprLit platform lit
+pprLit1 :: CmmLit -> SDoc
+pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
+pprLit1 lit                  = pprLit lit
 
 ppr_offset :: Int -> SDoc
 ppr_offset i
@@ -224,7 +213,7 @@ ppr_offset i
 -- Registers, whether local (temps) or global
 --
 pprReg :: CmmReg -> SDoc
-pprReg r 
+pprReg r
     = case r of
         CmmLocal  local  -> pprLocalReg  local
         CmmGlobal global -> pprGlobalReg global
@@ -233,17 +222,17 @@ pprReg r
 -- We only print the type of the local reg if it isn't wordRep
 --
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq rep) 
+pprLocalReg (LocalReg uniq rep)
 --   = ppr rep <> char '_' <> ppr uniq
 -- Temp Jan08
-   = char '_' <> ppr uniq <> 
-       (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08		-- sigh
+   = char '_' <> ppr uniq <>
+       (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08               -- sigh
                     then dcolon <> ptr <> ppr rep
                     else dcolon <> ptr <> ppr rep)
    where
      ptr = empty
-	 --if isGcPtrType rep
-	 --      then doubleQuotes (text "ptr")
+         --if isGcPtrType rep
+         --      then doubleQuotes (text "ptr")
          --      else empty
 
 -- Stack areas
@@ -254,7 +243,7 @@ pprArea (Young id) = hcat [ text "young<", ppr id, text ">" ]
 -- needs to be kept in syn with CmmExpr.hs.GlobalReg
 --
 pprGlobalReg :: GlobalReg -> SDoc
-pprGlobalReg gr 
+pprGlobalReg gr
     = case gr of
         VanillaReg n _ -> char 'R' <> int n
 -- Temp Jan08

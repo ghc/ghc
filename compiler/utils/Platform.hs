@@ -7,6 +7,7 @@ module Platform (
         OS(..),
         ArmISA(..),
         ArmISAExt(..),
+        ArmABI(..),
 
         target32Bit,
         osElfTarget
@@ -41,7 +42,9 @@ data Arch
         | ArchSPARC
         | ArchARM
           { armISA    :: ArmISA
-          , armISAExt :: [ArmISAExt] }
+          , armISAExt :: [ArmISAExt]
+          , armABI    :: ArmABI
+          }
         deriving (Read, Show, Eq)
 
 
@@ -58,9 +61,10 @@ data OS
         | OSOpenBSD
         | OSNetBSD
         | OSKFreeBSD
+        | OSHaiku
         deriving (Read, Show, Eq)
 
--- | ARM Instruction Set Architecture and Extensions
+-- | ARM Instruction Set Architecture, Extensions and ABI
 --
 data ArmISA
     = ARMv5
@@ -76,6 +80,11 @@ data ArmISAExt
     | IWMMX2
     deriving (Read, Show, Eq)
 
+data ArmABI
+    = SOFT
+    | SOFTFP
+    | HARD
+    deriving (Read, Show, Eq)
 
 target32Bit :: Platform -> Bool
 target32Bit p = platformWordSize p == 4
@@ -91,6 +100,7 @@ osElfTarget OSSolaris2  = True
 osElfTarget OSDarwin    = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
+osElfTarget OSHaiku     = True
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for

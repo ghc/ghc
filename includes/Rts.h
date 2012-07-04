@@ -17,6 +17,13 @@
 extern "C" {
 #endif
 
+/* We include windows.h very early, as on Win64 the CONTEXT type has
+   fields "R8", "R9" and "R10", which goes bad if we've already
+   #define'd those names for our own purposes (in stg/Regs.h) */
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
+
 #ifndef IN_STG_CODE
 #define IN_STG_CODE 0
 #endif
@@ -136,23 +143,8 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define USED_IF_NOT_THREADS
 #endif
 
-/*
- * Getting printf formats right for platform-dependent typedefs
- */
-#if SIZEOF_LONG == 8
-#define FMT_Word64 "lu"
-#define FMT_Int64  "ld"
-#else
-#if defined(mingw32_HOST_OS)
-/* mingw doesn't understand %llu/%lld - it treats them as 32-bit
-   rather than 64-bit */
-#define FMT_Word64 "I64u"
-#define FMT_Int64  "I64d"
-#else
-#define FMT_Word64 "llu"
-#define FMT_Int64  "lld"
-#endif
-#endif
+#define FMT_SizeT    "zu"
+#define FMT_HexSizeT "zx"
 
 /* -----------------------------------------------------------------------------
    Time values in the RTS

@@ -91,7 +91,7 @@
 
 /*
  * The C backend likes to refer to labels by just mentioning their
- * names.  Howevver, when a symbol is declared as a variable in C, the
+ * names.  However, when a symbol is declared as a variable in C, the
  * C compiler will implicitly dereference it when it occurs in source.
  * So we must subvert this behaviour for .hc files by declaring
  * variables as arrays, which eliminates the implicit dereference.
@@ -257,7 +257,7 @@ typedef StgFunPtr       F_;
 INLINE_HEADER void     ASSIGN_FLT (W_ [], StgFloat);
 INLINE_HEADER StgFloat    PK_FLT     (W_ []);
 
-#if ALIGNMENT_FLOAT <= ALIGNMENT_LONG
+#if ALIGNMENT_FLOAT <= ALIGNMENT_VOID_P
 
 INLINE_HEADER void     ASSIGN_FLT(W_ p_dest[], StgFloat src) { *(StgFloat *)p_dest = src; }
 INLINE_HEADER StgFloat PK_FLT    (W_ p_src[])                { return *(StgFloat *)p_src; }
@@ -278,9 +278,9 @@ INLINE_HEADER StgFloat PK_FLT(W_ p_src[])
     return(y.f);
 }
 
-#endif /* ALIGNMENT_FLOAT > ALIGNMENT_LONG */
+#endif /* ALIGNMENT_FLOAT > ALIGNMENT_VOID_P */
 
-#if ALIGNMENT_DOUBLE <= ALIGNMENT_LONG
+#if ALIGNMENT_DOUBLE <= ALIGNMENT_VOID_P
 
 INLINE_HEADER void     ASSIGN_DBL (W_ [], StgDouble);
 INLINE_HEADER StgDouble   PK_DBL     (W_ []);
@@ -288,7 +288,7 @@ INLINE_HEADER StgDouble   PK_DBL     (W_ []);
 INLINE_HEADER void      ASSIGN_DBL(W_ p_dest[], StgDouble src) { *(StgDouble *)p_dest = src; }
 INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDouble *)p_src; }
 
-#else /* ALIGNMENT_DOUBLE > ALIGNMENT_LONG */
+#else /* ALIGNMENT_DOUBLE > ALIGNMENT_VOID_P */
 
 /* Sparc uses two floating point registers to hold a double.  We can
  * write ASSIGN_DBL and PK_DBL by directly accessing the registers

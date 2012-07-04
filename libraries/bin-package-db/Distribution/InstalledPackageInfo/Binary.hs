@@ -136,7 +136,8 @@ instance Binary License where
   put PublicDomain         = do putWord8 5
   put AllRightsReserved    = do putWord8 6
   put OtherLicense         = do putWord8 7
-  put (UnknownLicense str) = do putWord8 8; put str
+  put (Apache v)           = do putWord8 8; put v
+  put (UnknownLicense str) = do putWord8 9; put str
 
   get = do
     n <- getWord8
@@ -149,6 +150,7 @@ instance Binary License where
       5 -> return PublicDomain
       6 -> return AllRightsReserved
       7 -> return OtherLicense
+      8 -> do v <- get; return (Apache v)
       _ -> do str <- get; return (UnknownLicense str)
 
 instance Binary Version where

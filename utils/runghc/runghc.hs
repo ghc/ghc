@@ -32,6 +32,16 @@ import Foreign
 import Foreign.C.String
 #endif
 
+#if defined(mingw32_HOST_OS)
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+#endif
+
 main :: IO ()
 main = do
     args <- getArgs
@@ -157,7 +167,7 @@ getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
           _ | ret < size -> fmap Just $ peekCWString buf
             | otherwise  -> try_size (size * 2)
 
-foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getExecPath = return Nothing

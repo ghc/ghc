@@ -33,7 +33,7 @@ module HsUtils(
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
-  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
+  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg, 
 
   -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
@@ -66,10 +66,9 @@ module HsUtils(
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
-  collectSigTysFromPats, collectSigTysFromPat,
 
   hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
-  hsForeignDeclsBinders, hsGroupBinders,
+  hsForeignDeclsBinders, hsGroupBinders, hsFamInstBinders,
   
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -94,9 +93,8 @@ import SrcLoc
 import FastString
 import Util
 import Bag
-
+import Outputable
 import Data.Either
-import Data.Maybe
 \end{code}
 
 
@@ -218,7 +216,8 @@ mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL id
 mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
 emptyTransStmt :: StmtLR idL idR
-emptyTransStmt = TransStmt { trS_form = undefined, trS_stmts = [], trS_bndrs = [] 
+emptyTransStmt = TransStmt { trS_form = panic "emptyTransStmt: form"
+                           , trS_stmts = [], trS_bndrs = [] 
                            , trS_by = Nothing, trS_using = noLoc noSyntaxExpr
                            , trS_ret = noSyntaxExpr, trS_bind = noSyntaxExpr
                            , trS_fmap = noSyntaxExpr }
@@ -267,8 +266,9 @@ mkHsString :: String -> HsLit
 mkHsString s = HsString (mkFastString s)
 
 -------------
-userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
-userHsTyVarBndrs bndrs = [ L loc (UserTyVar v placeHolderKind) | L loc v <- bndrs ]
+userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
+-- Caller sets location
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
 \end{code}
 
 
@@ -536,8 +536,8 @@ collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
 collectStmtBinders (ExprStmt {})        = []
 collectStmtBinders (LastStmt {})        = []
-collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
-                                        $ concatMap fst xs
+collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
+                                        $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 
@@ -622,9 +622,10 @@ hsTyClDeclsBinders :: [[LTyClDecl Name]] -> [Located (InstDecl Name)] -> [Name]
 -- We need to look at instance declarations too, 
 -- because their associated types may bind data constructors
 hsTyClDeclsBinders tycl_decls inst_decls
-  = [n | d <- instDeclFamInsts inst_decls ++ concat tycl_decls
-       , L _ n <- hsLTyClDeclBinders d]
+  = map unLoc (concatMap (concatMap hsLTyClDeclBinders) tycl_decls ++
+               concatMap (hsInstDeclBinders . unLoc) inst_decls)
 
+-------------------
 hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
 -- The first one is guaranteed to be the name of the decl. For record fields
@@ -632,24 +633,37 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- occurence.  We use the equality to filter out duplicate field names
 hsLTyClDeclBinders (L _ d) = hsTyClDeclBinders d
 
+-------------------
 hsTyClDeclBinders :: Eq name => TyClDecl name -> [Located name]
 hsTyClDeclBinders (TyFamily    {tcdLName = name}) = [name]
 hsTyClDeclBinders (ForeignType {tcdLName = name}) = [name]
 
-hsTyClDeclBinders (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
+hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
+                             , tcdATs = ats, tcdATDefs = fam_insts })
   = cls_name : 
-    concatMap hsLTyClDeclBinders ats ++ [n | L _ (TypeSig ns _) <- sigs, n <- ns]
+    concatMap hsLTyClDeclBinders ats ++ 
+    concatMap (hsFamInstBinders . unLoc) fam_insts ++
+    [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
-hsTyClDeclBinders (TySynonym   {tcdLName = name, tcdTyPats = mb_pats }) 
-  | isJust mb_pats = []
-  | otherwise      = [name]
+hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn }) 
+  = name : hsTyDefnBinders defn
+
+-------------------
+hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
+hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
+hsInstDeclBinders (FamInstD { lid_inst = fi }) = hsFamInstBinders fi
+
+-------------------
+hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]
+hsFamInstBinders (FamInstDecl { fid_defn = defn }) = hsTyDefnBinders defn
+
+-------------------
+hsTyDefnBinders :: Eq name => HsTyDefn name -> [Located name]
+hsTyDefnBinders (TySynonym {})              = []
+hsTyDefnBinders (TyData { td_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
-hsTyClDeclBinders (TyData {tcdLName = tc_name, tcdCons = cons, tcdTyPats = mb_pats })
-  | isJust mb_pats = hsConDeclsBinders cons
-  | otherwise      = tc_name : hsConDeclsBinders cons
-  -- See Note [Binders in family instances]
-
+-------------------
 hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
   -- See hsTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
@@ -698,8 +712,7 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (LetStmt binds)      = hs_local_binds binds
     hs_stmt (ExprStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet
-    hs_stmt (ParStmt xs _ _ _)   = hs_lstmts $ concatMap fst xs
-    
+    hs_stmt (ParStmt xs _ _)     = hs_lstmts [s | ParStmtBlock ss _ _ <- xs, s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
     
@@ -751,35 +764,4 @@ lPatImplicits = hs_lpat
                                                     , let pat = hsRecFieldArg fld
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSets` hs_lpat p2
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Collecting type signatures from patterns
-%*									*
-%************************************************************************
-
-\begin{code}
-collectSigTysFromPats :: [InPat name] -> [LHsType name]
-collectSigTysFromPats pats = foldr collect_sig_lpat [] pats
-
-collectSigTysFromPat :: InPat name -> [LHsType name]
-collectSigTysFromPat pat = collect_sig_lpat pat []
-
-collect_sig_lpat :: InPat name -> [LHsType name] -> [LHsType name]
-collect_sig_lpat pat acc = collect_sig_pat (unLoc pat) acc
-
-collect_sig_pat :: Pat name -> [LHsType name] -> [LHsType name]
-collect_sig_pat (SigPatIn pat ty)  	acc = collect_sig_lpat pat (ty:acc)
-
-collect_sig_pat (LazyPat pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (BangPat pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (AsPat _ pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (ParPat  pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (ListPat pats _)    acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (PArrPat pats _)    acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (TuplePat pats _ _) acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (ConPatIn _ ps)     acc = foldr collect_sig_lpat acc (hsConPatArgs ps)
-collect_sig_pat _                   acc = acc       -- Literals, vars, wildcard
 \end{code}

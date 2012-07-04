@@ -4,6 +4,7 @@ for various bits of the RTS.  They are linked
 in instead of the defaults.
 */
 
+#include "../rts/PosixSource.h"
 #include "Rts.h"
 
 #include "HsFFI.h"
@@ -31,8 +32,8 @@ defaultsHook (void)
 }
 
 void
-StackOverflowHook (unsigned long stack_size)    /* in bytes */
+StackOverflowHook (lnat stack_size)    /* in bytes */
 {
-    fprintf(stderr, "GHC stack-space overflow: current limit is %ld bytes.\nUse the `-K<size>' option to increase it.\n", stack_size);
+    fprintf(stderr, "GHC stack-space overflow: current limit is %zu bytes.\nUse the `-K<size>' option to increase it.\n", (size_t)stack_size);
 }
 

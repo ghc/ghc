@@ -243,6 +243,6 @@ missingArgErr f = Left ("missing argument for flag: " ++ f)
 
 errorsToGhcException :: [Located String] -> GhcException
 errorsToGhcException errs =
-    let errors = vcat [ ppr l <> text ": " <> text e | L l e <- errs ]
-    in UsageError (renderWithStyle errors cmdlineParserStyle)
+    UsageError $
+        intercalate "\n" [ showUserSpan True l ++ ": " ++ e | L l e <- errs ]
 

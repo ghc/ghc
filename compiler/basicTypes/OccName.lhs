@@ -54,6 +54,7 @@ module OccName (
 	mkTupleOcc, 
 	setOccNameSpace,
         demoteOccName,
+        HasOccName(..),
 
 	-- ** Derived 'OccName's
         isDerivedOccName,
@@ -62,7 +63,7 @@ module OccName (
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGenRCo, mkGenC, mkGenS,
+ 	mkGenD, mkGenR, mkGen1R, mkGenRCo, mkGenC, mkGenS,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
@@ -334,6 +335,11 @@ demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
+
+{- | Other names in the compiler add aditional information to an OccName.
+This class provides a consistent way to access the underlying OccName. -}
+class HasOccName name where
+  occName :: name -> OccName
 \end{code}
 
 
@@ -492,7 +498,7 @@ isDataSymOcc _                    = False
 -- it is a data constructor or variable or whatever)
 isSymOcc :: OccName -> Bool
 isSymOcc (OccName DataName s)  = isLexConSym s
-isSymOcc (OccName TcClsName s) = isLexConSym s
+isSymOcc (OccName TcClsName s) = isLexConSym s || isLexVarSym s
 isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc (OccName TvName s)    = isLexSym s
 -- Pretty inefficient!
@@ -569,7 +575,7 @@ isDerivedOccName occ =
 mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
   	mkDerivedTyConOcc, mkClassDataConOcc, mkDictOcc,
  	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGenRCo,
+ 	mkGenD, mkGenR, mkGen1R, mkGenRCo,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
@@ -612,6 +618,7 @@ mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
                    (occNameString occ)
 
 mkGenR   = mk_simple_deriv tcName "Rep_"
+mkGen1R  = mk_simple_deriv tcName "Rep1_"
 mkGenRCo = mk_simple_deriv tcName "CoRep_"
 
 -- data T = MkT ... deriving( Data ) needs defintions for 

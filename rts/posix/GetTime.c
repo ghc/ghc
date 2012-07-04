@@ -11,21 +11,10 @@
 
 #include "Rts.h"
 #include "GetTime.h"
-
-#ifdef HAVE_TIME_H
-# include <time.h>
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-# include <sys/time.h>
-#endif
+#include "Clock.h"
 
 #if HAVE_SYS_RESOURCE_H
 # include <sys/resource.h>
-#endif
-
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
 #endif
 
 #ifdef HAVE_SYS_TIMES_H
@@ -43,6 +32,21 @@
 #if defined(HAVE_GETTIMEOFDAY) && defined(HAVE_GETRUSAGE) && !irix_HOST_OS
 // we'll implement getProcessCPUTime() and getProcessElapsedTime()
 // separately, using getrusage() and gettimeofday() respectively
+
+#ifdef darwin_HOST_OS
+static uint64_t timer_scaling_factor_numer = 0;
+static uint64_t timer_scaling_factor_denom = 0;
+#endif
+
+void initializeTimer()
+{
+#ifdef darwin_HOST_OS
+    mach_timebase_info_data_t info;
+    (void) mach_timebase_info(&info);
+    timer_scaling_factor_numer = (uint64_t)info.numer;
+    timer_scaling_factor_denom = (uint64_t)info.denom;
+#endif
+}
 
 Time getProcessCPUTime(void)
 {
@@ -75,11 +79,29 @@ Time getProcessCPUTime(void)
     }
 }
 
+StgWord64 getMonotonicNSec(void)
+{
+#ifdef HAVE_CLOCK_GETTIME
+    struct timespec ts;
+
+    clock_gettime(CLOCK_ID, &ts);
+    return (StgWord64)ts.tv_sec * 1000000000 +
+           (StgWord64)ts.tv_nsec;
+#elif defined(darwin_HOST_OS)
+    uint64_t time = mach_absolute_time();
+    return (time * timer_scaling_factor_numer) / timer_scaling_factor_denom;
+#else
+    struct timeval tv;
+
+    gettimeofday(&tv, (struct timezone *) NULL);
+    return (StgWord64)tv.tv_sec * 1000000000 +
+           (StgWord64)tv.tv_usec * 1000;
+#endif
+}
+
 Time getProcessElapsedTime(void)
 {
-    struct timeval tv;
-    gettimeofday(&tv, (struct timezone *) NULL);
-    return SecondsToTime(tv.tv_sec) + USToTime(tv.tv_usec);
+    return NSToTime(getMonotonicNSec());
 }
 
 void getProcessTimes(Time *user, Time *elapsed)

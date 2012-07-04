@@ -146,10 +146,10 @@ data StableLoc
                 -- be saved, so it makes sense to treat treat them as
                 -- having a stable location
 
-instance PlatformOutputable CgIdInfo where
-  pprPlatform platform (CgIdInfo id _ vol stb _ _)
+instance Outputable CgIdInfo where
+  ppr (CgIdInfo id _ vol stb _ _)
     -- TODO, pretty pring the tag info
-    = ppr id <+> ptext (sLit "-->") <+> vcat [ppr vol, pprPlatform platform stb]
+    = ppr id <+> ptext (sLit "-->") <+> vcat [ppr vol, ppr stb]
 
 instance Outputable VolatileLoc where
   ppr NoVolatileLoc = empty
@@ -157,12 +157,12 @@ instance Outputable VolatileLoc where
   ppr (VirHpLoc v)   = ptext (sLit "vh")  <+> ppr v
   ppr (VirNodeLoc v) = ptext (sLit "vn")  <+> ppr v
 
-instance PlatformOutputable StableLoc where
-  pprPlatform _        NoStableLoc   = empty
-  pprPlatform _        VoidLoc       = ptext (sLit "void")
-  pprPlatform _        (VirStkLoc v) = ptext (sLit "vs")    <+> ppr v
-  pprPlatform _        (VirStkLNE v) = ptext (sLit "lne")   <+> ppr v
-  pprPlatform platform (StableLoc a) = ptext (sLit "amode") <+> pprPlatform platform a
+instance Outputable StableLoc where
+  ppr NoStableLoc   = empty
+  ppr VoidLoc       = ptext (sLit "void")
+  ppr (VirStkLoc v) = ptext (sLit "vs")    <+> ppr v
+  ppr (VirStkLNE v) = ptext (sLit "lne")   <+> ppr v
+  ppr (StableLoc a) = ptext (sLit "amode") <+> ppr a
 \end{code}
 
 %************************************************************************
@@ -411,15 +411,12 @@ getArgAmode (StgLitArg lit)
   = do  { cmm_lit <- cgLit lit
         ; return (typeCgRep (literalType lit), CmmLit cmm_lit) }
 
-getArgAmode (StgTypeArg _) = panic "getArgAmode: type arg"
-
 getArgAmodes :: [StgArg] -> FCode [(CgRep, CmmExpr)]
 getArgAmodes [] = returnFC []
 getArgAmodes (atom:atoms)
-  | isStgTypeArg atom = getArgAmodes atoms
-  | otherwise         = do { amode  <- getArgAmode  atom 
-                           ; amodes <- getArgAmodes atoms
-                           ; return ( amode : amodes ) }
+  = do { amode  <- getArgAmode  atom 
+       ; amodes <- getArgAmodes atoms
+       ; return ( amode : amodes ) }
 \end{code}
 
 %************************************************************************

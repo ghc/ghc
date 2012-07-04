@@ -102,7 +102,7 @@ import LeaveCriticalSection;
             } else {                                                    \
                 jump %ENTRY_CODE(Sp(0));                                \
             }                                                           \
-	} else {                                                        \
+        } else {                                                        \
             R1 = HeapOverflow;                                          \
             goto sched;                                                 \
         }                                                               \
@@ -676,13 +676,11 @@ INFO_TABLE_RET( stg_block_async, RET_SMALL, W_ unused )
     W_ len, errC;
 
     ares = Sp(1);
-    len = StgAsyncIOResult_len(ares);
-    errC = StgAsyncIOResult_errCode(ares);
+    len = TO_W_(StgAsyncIOResult_len(ares));
+    errC = TO_W_(StgAsyncIOResult_errCode(ares));
     foreign "C" free(ares "ptr");
-    R1 = len;
-    Sp_adj(1);
-    Sp(0) = errC;
-    jump %ENTRY_CODE(Sp(1));
+    Sp_adj(2);
+    RET_NN(len, errC);
 }
 
 stg_block_async

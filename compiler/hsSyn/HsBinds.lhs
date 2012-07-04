@@ -34,13 +34,13 @@ import NameSet
 import BasicTypes
 import Outputable	
 import SrcLoc
-import Util
 import Var
 import Bag
 import FastString
 
 import Data.Data hiding ( Fixity )
-import Data.List ( intersect )
+import Data.List
+import Data.Ord
 \end{code}
 
 %************************************************************************
@@ -175,12 +175,12 @@ data HsBindLR idL idR
         --  of this last construct.)
 
 data ABExport id
-  = ABE { abe_poly  :: id
+  = ABE { abe_poly  :: id           -- Any INLINE pragmas is attached to this Id
         , abe_mono  :: id
-        , abe_wrap  :: HsWrapper  -- See Note [AbsBinds wrappers]
+        , abe_wrap  :: HsWrapper    -- See Note [AbsBinds wrappers]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
-        , abe_prags :: TcSpecPrags }
-  deriving (Data, Typeable)
+        , abe_prags :: TcSpecPrags  -- SPECIALISE pragmas
+  } deriving (Data, Typeable)
 
 placeHolderNames :: NameSet
 -- Used for the NameSet in FunBind and PatBind prior to the renamer
@@ -267,7 +267,7 @@ pprLHsBindsForUser binds sigs
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
             [(loc, ppr bind) | L loc bind <- bagToList binds]
 
-    sort_by_loc decls = sortLe (\(l1,_) (l2,_) -> l1 <= l2) decls
+    sort_by_loc decls = sortBy (comparing fst) decls
 
 pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 -- Print a bunch of declarations
@@ -368,16 +368,13 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
-  = sep [ptext (sLit "AbsBinds"),
-         brackets (interpp'SP tyvars),
-         brackets (interpp'SP dictvars),
-         brackets (sep (punctuate comma (map ppr exports)))]
-    $$
-    nest 2 ( vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
-                        -- Print type signatures
-             $$ pprLHsBinds val_binds )
-    $$
-    ifPprDebug (ppr ev_binds)
+  = hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars) 
+                                  <+> brackets (interpp'SP dictvars))
+       2 $ braces $ vcat 
+    [ ptext (sLit "Exports:") <+> brackets (sep (punctuate comma (map ppr exports)))
+    , ptext (sLit "Exported types:") <+> vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
+    , ptext (sLit "Binds:") <+> pprLHsBinds val_binds
+    , ifPprDebug (ptext (sLit "Evidence:") <+> ppr ev_binds) ]
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
@@ -419,10 +416,12 @@ isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
 type LIPBind id = Located (IPBind id)
 
 -- | Implicit parameter bindings.
+{- These bindings start off as (Left "x") in the parser and stay
+that way until after type-checking when they are replaced with
+(Right d), where "d" is the name of the dictionary holding the
+evidene for the implicit parameter. -}
 data IPBind id
-  = IPBind
-        (IPName id)
-        (LHsExpr id)
+  = IPBind (Either HsIPName id) (LHsExpr id)
   deriving (Data, Typeable)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
@@ -430,7 +429,10 @@ instance (OutputableBndr id) => Outputable (HsIPBinds id) where
                         $$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
-  ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
+  ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
+    where name = case lr of
+                   Left ip  -> pprBndr LetBind ip
+                   Right id -> pprBndr LetBind id
 \end{code}
 
 

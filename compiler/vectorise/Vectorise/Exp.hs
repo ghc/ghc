@@ -33,7 +33,6 @@ import TyCon
 import TcType
 import Type
 import PrelNames
-import NameSet
 import Var
 import VarEnv
 import VarSet
@@ -48,45 +47,248 @@ import Control.Monad
 import Control.Applicative
 import Data.Maybe
 import Data.List
+import TcRnMonad (doptM)
+import DynFlags
+import Util
 
+
+-- Main entry point to vectorise expressions -----------------------------------
 
 -- |Vectorise a polymorphic expression.
 --
-vectPolyExpr :: Bool    -- ^ When vectorising the RHS of a binding: is that binding a loop breaker?
-             -> [Var]                     
-             -> CoreExprWithFVs
+-- If not yet available, precompute vectorisation avoidance information before vectorising.  If
+-- the vectorisation avoidance optimisation is enabled, also use the vectorisation avoidance
+-- information to encapsulated subexpression that do not need to be vectorised.
+--
+vectPolyExpr :: Bool -> [Var] -> CoreExprWithFVs -> Maybe VITree
              -> VM (Inline, Bool, VExpr)
-vectPolyExpr loop_breaker recFns (_, AnnTick tickish expr)
- = do { (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker recFns expr
-      ; return (inline, isScalarFn, vTick tickish expr')
-      }
-vectPolyExpr loop_breaker recFns expr
- = do { arity <- polyArity tvs
-      ; polyAbstract tvs $ \args -> do
-      { (inline, isScalarFn, mono') <- vectFnExpr False loop_breaker recFns mono
-      ; return (addInlineArity inline arity, isScalarFn, mapVect (mkLams $ tvs ++ args) mono')
-      } }
+  -- precompute vectorisation avoidance information (and possibly encapsulated subexpressions)
+vectPolyExpr loop_breaker recFns expr Nothing
+  = do
+    { vectAvoidance <- liftDs $ doptM Opt_AvoidVect
+    ; vi <- vectAvoidInfo expr  
+    ; (expr', vi') <- 
+        if vectAvoidance
+        then do 
+             { (expr', vi') <- encapsulateScalars vi expr
+             ; traceVt "vectPolyExpr encapsulated:" (ppr $ deAnnotate expr')
+             ; return (expr', vi')
+             }
+        else return (expr, vi)
+    ; vectPolyExpr loop_breaker recFns expr' (Just vi')
+    }
+
+  -- traverse through ticks
+vectPolyExpr loop_breaker recFns (_, AnnTick tickish expr) (Just (VITNode _ [vit])) 
+  = do 
+    { (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker recFns expr (Just vit)
+    ; return (inline, isScalarFn, vTick tickish expr')
+    }
+
+  -- collect and vectorise type abstractions; then, descent into the body
+vectPolyExpr loop_breaker recFns expr (Just vit)
+  = do 
+    { let (tvs, mono) = collectAnnTypeBinders expr
+          vit'        = stripLevels (length tvs) vit
+    ; arity <- polyArity tvs
+    ; polyAbstract tvs $ \args ->
+        do 
+        { (inline, isScalarFn, mono') <- vectFnExpr False loop_breaker recFns mono vit'
+        ; return (addInlineArity inline arity, isScalarFn, mapVect (mkLams $ tvs ++ args) mono')
+        }
+    }
   where
-    (tvs, mono) = collectAnnTypeBinders expr
+    stripLevels 0 vit               = vit
+    stripLevels n (VITNode _ [vit]) = stripLevels (n - 1) vit
+    stripLevels _ vit               = pprPanic "vectPolyExpr: stripLevels:" (text (show vit))
+
+-- Encapsulate every purely sequential subexpression of a (potentially) parallel expression into a
+-- into a lambda abstraction over all its free variables followed by the corresponding application
+-- to those variables.  We can, then, avoid the vectorisation of the ensapsulated subexpressions.
+--
+-- Preconditions:
+--
+-- * All free variables and the result type must be /simple/ types.
+-- * The expression is sufficientlt complex (top warrant special treatment).  For now, that is
+--   every expression that is not constant and contains at least one operation.
+--  
+encapsulateScalars :: VITree -> CoreExprWithFVs -> VM (CoreExprWithFVs, VITree)
+encapsulateScalars  vit ce@(_, AnnType _ty) 
+  = return (ce, vit)
+      
+encapsulateScalars  vit ce@(_, AnnVar _v)  
+  = return (ce, vit)
+  
+encapsulateScalars vit ce@(_, AnnLit _)
+  = return (ce, vit) 
+
+encapsulateScalars (VITNode vi [vit]) (fvs, AnnTick tck expr)
+  = do { (extExpr, vit') <- encapsulateScalars vit expr
+       ; return ((fvs, AnnTick tck extExpr), VITNode vi [vit'])
+       }
+
+encapsulateScalars _ (_fvs, AnnTick _tck _expr)
+  = panic "encapsulateScalar AnnTick doesn't match up"
+  
+encapsulateScalars (VITNode vi [vit]) ce@(fvs, AnnLam bndr expr) 
+  = do { varsS <- varsSimple fvs 
+       ; case (vi, varsS) of
+           (VISimple, True) -> do { let (e', vit') = liftSimple vit ce
+                                  ; return (e', vit') 
+                                  }
+           _                -> do { (extExpr, vit') <- encapsulateScalars vit expr
+                                  ; return ((fvs, AnnLam bndr extExpr), VITNode vi [vit'])
+                                  }
+       }
+
+encapsulateScalars _ (_fvs, AnnLam _bndr _expr) 
+  = panic "encapsulateScalars AnnLam doesn't match up"
+
+encapsulateScalars vt@(VITNode vi [vit1, vit2]) ce@(fvs, AnnApp ce1 ce2) 
+  = do { varsS <- varsSimple fvs 
+       ; case (vi, varsS) of
+           (VISimple, True) -> do { let (e', vt') = liftSimple vt ce
+                                  -- ; checkTreeAnnM vt' e'
+                                  -- ; traceVt "Passed checkTree test!!" (ppr $ deAnnotate e')
+                                  ; return (e', vt')
+                                  }
+           _                -> do { (etaCe1, vit1') <- encapsulateScalars vit1 ce1
+                                  ; (etaCe2, vit2') <- encapsulateScalars vit2 ce2
+                                  ; return ((fvs, AnnApp etaCe1 etaCe2), VITNode vi [vit1', vit2'])
+                                  }
+       }
+
+encapsulateScalars _  (_fvs, AnnApp _ce1 _ce2)                           
+  = panic "encapsulateScalars AnnApp doesn't match up"
+  
+encapsulateScalars vt@(VITNode vi (scrutVit : altVits)) ce@(fvs, AnnCase scrut bndr ty alts) 
+  = do { varsS <- varsSimple fvs 
+       ; case (vi, varsS) of
+           (VISimple, True) -> return $ liftSimple vt ce
+           _                -> do { (extScrut, scrutVit') <- encapsulateScalars scrutVit scrut
+                                  ; extAltsVits  <- zipWithM expAlt altVits alts
+                                  ; let (extAlts, altVits') = unzip extAltsVits
+                                  ; return ((fvs, AnnCase extScrut bndr ty extAlts), VITNode vi (scrutVit': altVits'))
+                                  }
+       }
+  where
+    expAlt vt (con, bndrs, expr) 
+      = do { (extExpr, vt') <- encapsulateScalars vt expr
+           ; return ((con, bndrs, extExpr), vt')
+           }
+           
+encapsulateScalars _ (_fvs, AnnCase _scrut _bndr _ty _alts) 
+  = panic "encapsulateScalars AnnCase doesn't match up"
+  
+encapsulateScalars vt@(VITNode vi [vt1, vt2]) ce@(fvs, AnnLet (AnnNonRec bndr expr1) expr2) 
+  = do { varsS <- varsSimple fvs 
+       ; case (vi, varsS) of
+           (VISimple, True) -> return $ liftSimple vt ce
+           _                -> do { (extExpr1, vt1') <- encapsulateScalars vt1 expr1
+                                  ; (extExpr2, vt2') <- encapsulateScalars vt2 expr2
+                                  ; return ((fvs, AnnLet (AnnNonRec bndr extExpr1) extExpr2), VITNode vi [vt1', vt2'])
+                                  }
+       }
+
+encapsulateScalars _ (_fvs, AnnLet (AnnNonRec _bndr _expr1) _expr2)       
+  = panic "encapsulateScalars AnnLet nonrec doesn't match up"
+         
+encapsulateScalars vt@(VITNode vi (vtB : vtBnds)) ce@(fvs, AnnLet (AnnRec bndngs) expr) 
+  = do { varsS <- varsSimple fvs 
+       ; case (vi, varsS) of 
+           (VISimple, True) -> return $ liftSimple vt ce
+           _                -> do { extBndsVts <- zipWithM expBndg vtBnds bndngs
+                                  ; let (extBnds, vtBnds') = unzip extBndsVts
+                                  ; (extExpr, vtB') <- encapsulateScalars vtB expr
+                                  ; let vt' = VITNode vi (vtB':vtBnds')
+                                  ; return ((fvs, AnnLet (AnnRec extBnds) extExpr), vt')
+                                  }
+       }                            
+    where
+      expBndg vit (bndr, expr) 
+        = do { (extExpr, vit') <- encapsulateScalars vit expr
+             ; return  ((bndr, extExpr), vit')
+             }
+       
+encapsulateScalars _ (_fvs, AnnLet (AnnRec _) _expr2)       
+  = panic "encapsulateScalars AnnLet rec doesn't match up"
+
+encapsulateScalars (VITNode vi [vit]) (fvs, AnnCast expr coercion)
+  = do { (extExpr, vit') <- encapsulateScalars  vit expr
+       ; return ((fvs, AnnCast extExpr coercion), VITNode vi [vit'])
+       }
+       
+encapsulateScalars  _ (_fvs, AnnCast _expr _coercion) 
+  = panic "encapsulateScalars AnnCast rec doesn't match up"
+    
+encapsulateScalars _ _  
+  = panic "encapsulateScalars case not handled"
+
+-- Lambda-lift the given expression and apply it to the abstracted free variables.
+--
+-- If the expression is a case expression scrutinising anything but a primitive type, then lift
+-- each alternative individually.
+--
+liftSimple :: VITree -> CoreExprWithFVs -> (CoreExprWithFVs, VITree)
+liftSimple (VITNode vi (scrutVit : altVits)) (fvs, AnnCase expr bndr t alts) 
+  | Just (c,_) <- splitTyConApp_maybe (exprType $ deAnnotate $ expr),  
+    (not $ elem c [boolTyCon, intTyCon, doubleTyCon, floatTyCon])   -- FIXME: shouldn't be hardcoded
+     = ((fvs, AnnCase expr bndr t alts'), VITNode vi (scrutVit : altVits'))      
+  where 
+    (alts', altVits') = unzip $ map (\(ac,bndrs, (alt, avi)) -> ((ac,bndrs,alt), avi)) $ 
+                        zipWith  (\(ac, bndrs, aex) -> \altVi -> (ac, bndrs, liftSimple altVi aex)) alts altVits
+          
+liftSimple viTree ae@(fvs, _annEx) 
+  = (mkAnnApps (mkAnnLams ae vars) vars, viTree')
+  where
+    mkViTreeLams (VITNode _ vits) [] = VITNode VIEncaps vits
+    mkViTreeLams vi (_:vs) = VITNode VIEncaps [mkViTreeLams vi vs]
+
+    mkViTreeApps vi []      = vi
+    mkViTreeApps vi (_:vs)  = VITNode VISimple [mkViTreeApps vi vs, VITNode VISimple []]
+    
+    vars    = varSetElems fvs
+    viTree' = mkViTreeApps (mkViTreeLams viTree vars) vars
+    
+    mkAnnLam :: bndr -> AnnExpr bndr VarSet -> AnnExpr' bndr VarSet
+    mkAnnLam bndr ce = AnnLam bndr ce         
+      
+    mkAnnLams:: CoreExprWithFVs -> [Var] -> CoreExprWithFVs
+    mkAnnLams (fv, aex') []     = (fv, aex')  -- fv should be empty. check!
+    mkAnnLams (fv, aex') (v:vs) = mkAnnLams (delVarSet fv v, (mkAnnLam v ((delVarSet fv v), aex'))) vs
+      
+    mkAnnApp :: (AnnExpr bndr VarSet) -> Var -> (AnnExpr' bndr VarSet)
+    mkAnnApp aex v = AnnApp aex (unitVarSet v, (AnnVar v))
+      
+    mkAnnApps:: CoreExprWithFVs -> [Var] -> CoreExprWithFVs
+    mkAnnApps (fv, aex') [] = (fv, aex')
+    mkAnnApps ae (v:vs) = 
+      let
+        (fv, aex') = mkAnnApps ae vs
+      in (extendVarSet fv v, mkAnnApp (fv, aex') v)
 
 -- |Vectorise an expression.
 --
-vectExpr :: CoreExprWithFVs -> VM VExpr
-
-vectExpr (_, AnnVar v) 
+vectExpr :: CoreExprWithFVs -> VITree -> VM VExpr
+-- vectExpr e vi | not (checkTree vi (deAnnotate e))
+--   = pprPanic "vectExpr" (ppr $ deAnnotate e)
+ 
+vectExpr (_, AnnVar v)  _ 
   = vectVar v
 
-vectExpr (_, AnnLit lit) 
+vectExpr (_, AnnLit lit) _
   = vectConst $ Lit lit
 
-vectExpr e@(_, AnnLam bndr _)
-  | isId bndr = (\(_, _, ve) -> ve) <$> vectFnExpr True False [] e
+vectExpr e@(_, AnnLam bndr _) vt
+  | isId bndr = (\(_, _, ve) -> ve) <$> vectFnExpr True False [] e vt
+  | otherwise = do dflags <- getDynFlags
+                   cantVectorise dflags "Unexpected type lambda (vectExpr)" (ppr (deAnnotate e))
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
   --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint
   --   happy.
 -- FIXME: can't be do this with a VECTORISE pragma on 'pAT_ERROR_ID' now?
-vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)
+vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)  _
   | v == pAT_ERROR_ID
   = do { (vty, lty) <- vectAndLiftType ty
        ; return (mkCoreApps (Var v) [Type vty, err'], mkCoreApps (Var v) [Type lty, err'])
@@ -96,13 +298,13 @@ vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)
 
   -- type application (handle multiple consecutive type applications simultaneously to ensure the
   -- PA dictionaries are put at the right places)
-vectExpr e@(_, AnnApp _ arg)
+vectExpr e@(_, AnnApp _ arg) (VITNode _ [_, _])
   | isAnnTypeArg arg
   = vectPolyApp e
     
   -- 'Int', 'Float', or 'Double' literal
   -- FIXME: this needs to be generalised
-vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
+vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit)) _
   | Just con <- isDataConId_maybe v
   , is_special_con con
   = do
@@ -113,17 +315,17 @@ vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
     is_special_con con = con `elem` [intDataCon, floatDataCon, doubleDataCon]
 
   -- value application (dictionary or user value)
-vectExpr e@(_, AnnApp fn arg)
+vectExpr e@(_, AnnApp fn arg) (VITNode _ [vit1, vit2]) 
   | isPredTy arg_ty   -- dictionary application (whose result is not a dictionary)
   = vectPolyApp e
   | otherwise         -- user value
   = do {   -- vectorise the types
-       ; varg_ty <- vectType arg_ty
+       ; varg_ty <- vectType arg_ty 
        ; vres_ty <- vectType res_ty
 
            -- vectorise the function and argument expression
-       ; vfn  <- vectExpr fn
-       ; varg <- vectExpr arg
+       ; vfn  <- vectExpr fn  vit1
+       ; varg <- vectExpr arg vit2
 
            -- the vectorised function is a closure; apply it to the vectorised argument
        ; mkClosureApp varg_ty vres_ty vfn varg
@@ -131,42 +333,45 @@ vectExpr e@(_, AnnApp fn arg)
   where
     (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
 
-vectExpr (_, AnnCase scrut bndr ty alts)
+vectExpr (_, AnnCase scrut bndr ty alts)  vt
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
   , isAlgTyCon tycon
-  = vectAlgCase tycon ty_args scrut bndr ty alts
-  | otherwise = cantVectorise "Can't vectorise expression" (ppr scrut_ty) 
+  = vectAlgCase tycon ty_args scrut bndr ty alts vt
+  | otherwise = do dflags <- getDynFlags
+                   cantVectorise dflags "Can't vectorise expression" (ppr scrut_ty)
   where
     scrut_ty = exprType (deAnnotate scrut)
 
-vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
+vectExpr (_, AnnLet (AnnNonRec bndr rhs) body) (VITNode _ [vt1, vt2]) 
   = do
-      vrhs <- localV . inBind bndr . liftM (\(_,_,z)->z) $ vectPolyExpr False [] rhs
-      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
+      vrhs <- localV . inBind bndr . liftM (\(_,_,z)->z) $ vectPolyExpr False [] rhs (Just vt1)
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body vt2)
       return $ vLet (vNonRec vbndr vrhs) vbody
 
-vectExpr (_, AnnLet (AnnRec bs) body)
+vectExpr (_, AnnLet (AnnRec bs) body) (VITNode _ (vtB : vtBnds))
   = do
       (vbndrs, (vrhss, vbody)) <- vectBndrsIn bndrs
                                 $ liftM2 (,)
-                                  (zipWithM vect_rhs bndrs rhss)
-                                  (vectExpr body)
+                                  (zipWith3M vect_rhs bndrs rhss vtBnds)
+                                  (vectExpr body vtB)
       return $ vLet (vRec vbndrs vrhss) vbody
   where
     (bndrs, rhss) = unzip bs
 
-    vect_rhs bndr rhs = localV
-                      . inBind bndr
-                      . liftM (\(_,_,z)->z)
-                      $ vectPolyExpr (isStrongLoopBreaker $ idOccInfo bndr) [] rhs
+    vect_rhs bndr rhs vt = localV
+                         . inBind bndr
+                         . liftM (\(_,_,z)->z)
+                         $ vectPolyExpr (isStrongLoopBreaker $ idOccInfo bndr) [] rhs (Just vt)
+    zipWith3M f xs ys zs = zipWithM (\x -> \(y,z) -> (f x y z)) xs (zip ys zs)
 
-vectExpr (_, AnnTick tickish expr)
-  = liftM (vTick tickish) (vectExpr expr)
+vectExpr (_, AnnTick tickish expr)  (VITNode _ [vit])
+  = liftM (vTick tickish) (vectExpr expr vit)
 
-vectExpr (_, AnnType ty)
+vectExpr (_, AnnType ty) _
   = liftM vType (vectType ty)
 
-vectExpr e = cantVectorise "Can't vectorise expression (vectExpr)" (ppr $ deAnnotate e)
+vectExpr e vit = do dflags <- getDynFlags
+                    cantVectorise dflags "Can't vectorise expression (vectExpr)" (ppr (deAnnotate e) $$ text ("  " ++ show vit))
 
 -- |Vectorise an expression that *may* have an outer lambda abstraction.
 --
@@ -179,23 +384,26 @@ vectFnExpr :: Bool             -- ^ If we process the RHS of a binding, whether 
            -> Bool             -- ^ Whether the binding is a loop breaker
            -> [Var]            -- ^ Names of function in same recursive binding group
            -> CoreExprWithFVs  -- ^ Expression to vectorise; must have an outer `AnnLam`
+           -> VITree
            -> VM (Inline, Bool, VExpr)
-vectFnExpr inline loop_breaker recFns expr@(_fvs, AnnLam bndr body)
+-- vectFnExpr _ _ _ e vi | not (checkTree vi (deAnnotate e))
+--   = pprPanic "vectFnExpr" (ppr $ deAnnotate e)
+vectFnExpr inline loop_breaker recFns expr@(_fvs, AnnLam bndr body) vt@(VITNode _ [vt'])
       -- predicate abstraction: leave as a normal abstraction, but vectorise the predicate type
   | isId bndr
     && isPredTy (idType bndr)
   = do { vBndr <- vectBndr bndr
-       ; (inline, isScalarFn, vbody) <- vectFnExpr inline loop_breaker recFns body
+       ; (inline, isScalarFn, vbody) <- vectFnExpr inline loop_breaker recFns body vt'
        ; return (inline, isScalarFn, mapVect (mkLams [vectorised vBndr]) vbody)
        }
       -- non-predicate abstraction: vectorise (try to vectorise as a scalar computation)
   | isId bndr
-  = mark DontInline True (vectScalarFun False recFns (deAnnotate expr))
+  = mark DontInline True (vectScalarFunMaybe (deAnnotate expr) vt)
     `orElseV` 
-    mark inlineMe False (vectLam inline loop_breaker expr)
-vectFnExpr _ _ _  e 
+    mark inlineMe False (vectLam inline loop_breaker expr vt)
+vectFnExpr _ _ _  e vt
       -- not an abstraction: vectorise as a vanilla expression
-  = mark DontInline False $ vectExpr e
+  = mark DontInline False $ vectExpr e vt
 
 mark :: Inline -> Bool -> VM a -> VM (Inline, Bool, a)
 mark b isScalarFn p = do { x <- p; return (b, isScalarFn, x) }
@@ -315,127 +523,35 @@ vectDictExpr (Coercion coe)
 -- |Vectorise an expression of functional type, where all arguments and the result are of primitive
 -- types (i.e., 'Int', 'Float', 'Double' etc., which have instances of the 'Scalar' type class) and
 -- which does not contain any subcomputations that involve parallel arrays.  Such functionals do not
--- requires the full blown vectorisation transformation; instead, they can be lifted by application
+-- require the full blown vectorisation transformation; instead, they can be lifted by application
 -- of a member of the zipWith family (i.e., 'map', 'zipWith', zipWith3', etc.)
 --
 -- Dictionary functions are also scalar functions (as dictionaries themselves are not vectorised,
 -- instead they become dictionaries of vectorised methods).  We treat them differently, though see
 -- "Note [Scalar dfuns]" in 'Vectorise'.
 --
-vectScalarFun :: Bool       -- ^ Was the function marked as scalar by the user?
-              -> [Var]      -- ^ Functions names in same recursive binding group
-              -> CoreExpr   -- ^ Expression to be vectorised
-              -> VM VExpr
-vectScalarFun forceScalar recFns expr
- = do { gscalarVars  <- globalScalarVars
-      ; scalarTyCons <- globalScalarTyCons
-      ; let scalarVars = gscalarVars `extendVarSetList` recFns
-            (arg_tys, res_ty) = splitFunTys (exprType expr)
-      ; MASSERT( not $ null arg_tys )
-      ; onlyIfV (ptext (sLit "not a scalar function"))
-                (forceScalar                                 -- user asserts the functions is scalar
-                 ||
-                 all is_primitive_ty arg_tys                 -- check whether the function is scalar
-                  && is_primitive_ty res_ty
-                  && is_scalar scalarVars (is_scalar_ty scalarTyCons) expr
-                  && uses scalarVars expr
-                  && length arg_tys <= mAX_DPH_SCALAR_ARGS)
-        $ mkScalarFun arg_tys res_ty expr
-      }
-  where
-    -- !!!FIXME: We would like to allow scalar functions with arguments and results that can be
-    --           any 'scalarTyCons', but can't at the moment, as those argument and result types
-    --           need to be members of the 'Scalar' class (that in its current form would better
-    --           be called 'Primitive'). *ALSO* the hardcoded list of types is ugly!
-    is_primitive_ty ty
-      | isPredTy ty               -- dictionaries never get into the environment
-      = True
-      | Just (tycon, _) <- splitTyConApp_maybe ty
-      = tyConName tycon `elem` [boolTyConName, intTyConName, word8TyConName, doubleTyConName]
-      | otherwise 
-      = False
+vectScalarFunMaybe :: CoreExpr   -- ^ Expression to be vectorised
+                   -> VITree     -- ^ Vectorisation information
+                   -> VM VExpr
+vectScalarFunMaybe expr  (VITNode VIEncaps _) = vectScalarFun expr
+vectScalarFunMaybe _expr _                    = noV $ ptext (sLit "not a scalar function")
 
-    is_scalar_ty scalarTyCons ty 
-      | isPredTy ty               -- dictionaries never get into the environment
-      = True
-      | Just (tycon, _) <- splitTyConApp_maybe ty
-      = tyConName tycon `elemNameSet` scalarTyCons
-      | otherwise 
-      = False
-
-    -- Checks whether an expression contain a non-scalar subexpression. 
-    --
-    -- Precodition: The variables in the first argument are scalar.
-    --
-    -- In case of a recursive binding group, we /assume/ that all bindings are scalar (by adding
-    -- them to the list of scalar variables) and then check them.  If one of them turns out not to
-    -- be scalar, the entire group is regarded as not being scalar.
-    --
-    -- The second argument is a predicate that checks whether a type is scalar.
-    --
-    is_scalar :: VarSet -> (Type -> Bool) -> CoreExpr -> Bool
-    is_scalar scalars  _isScalarTC (Var v)         = v `elemVarSet` scalars
-    is_scalar _scalars _isScalarTC (Lit _)         = True
-    is_scalar scalars  isScalarTC  e@(App e1 e2) 
-      | maybe_parr_ty (exprType e)                  = False
-      | otherwise                                   = is_scalar scalars isScalarTC e1 && 
-                                                      is_scalar scalars isScalarTC e2
-    is_scalar scalars  isScalarTC  (Lam var body)  
-      | maybe_parr_ty (varType var)                 = False
-      | otherwise                                   = is_scalar (scalars `extendVarSet` var)
-                                                               isScalarTC body
-    is_scalar scalars  isScalarTC  (Let bind body) = bindsAreScalar && 
-                                                     is_scalar scalars' isScalarTC body
-      where
-        (bindsAreScalar, scalars') = is_scalar_bind scalars isScalarTC bind
-    is_scalar scalars  isScalarTC  (Case e var ty alts)
-      | isScalarTC ty                  = is_scalar scalars' isScalarTC e && 
-                                         all (is_scalar_alt scalars' isScalarTC) alts
-      | otherwise                      = False
-      where
-        scalars' = scalars `extendVarSet` var
-    is_scalar scalars  isScalarTC  (Cast e _coe)   = is_scalar scalars isScalarTC e
-    is_scalar scalars  isScalarTC  (Tick _ e   )   = is_scalar scalars isScalarTC e
-    is_scalar _scalars _isScalarTC (Type {})       = True
-    is_scalar _scalars _isScalarTC (Coercion {})   = True
-
-    -- Result: (<is this binding group scalar>, scalars ++ variables bound in this group)
-    is_scalar_bind scalars isScalarTCs (NonRec var e) = (is_scalar scalars isScalarTCs e, 
-                                                         scalars `extendVarSet` var)
-    is_scalar_bind scalars isScalarTCs (Rec bnds)     = (all (is_scalar scalars' isScalarTCs) es,
-                                                         scalars')
-      where
-        (vars, es) = unzip bnds
-        scalars'   = scalars `extendVarSetList` vars
-
-    is_scalar_alt scalars isScalarTCs (_, vars, e) = is_scalar (scalars `extendVarSetList ` vars)
-                                                               isScalarTCs e
-
-    -- Checks whether the type might be a parallel array type.  In particular, if the outermost
-    -- constructor is a type family, we conservatively assume that it may be a parallel array type.
-    maybe_parr_ty :: Type -> Bool
-    maybe_parr_ty ty 
-      | Just ty'        <- coreView ty            = maybe_parr_ty ty'
-      | Just (tyCon, _) <- splitTyConApp_maybe ty = isPArrTyCon tyCon || isSynFamilyTyCon tyCon 
-    maybe_parr_ty _                               = False
-
-    -- FIXME: I'm not convinced that this reasoning is (always) sound.  If the identify functions
-    --        is called by some other function that is otherwise scalar, it would be very bad
-    --        that just this call to the identity makes it not be scalar.
-    -- A scalar function has to actually compute something. Without the check,
-    -- we would treat (\(x :: Int) -> x) as a scalar function and lift it to
-    -- (map (\x -> x)) which is very bad. Normal lifting transforms it to
-    -- (\n# x -> x) which is what we want.
-    uses funs (Var v)       = v `elemVarSet` funs 
-    uses funs (App e1 e2)   = uses funs e1 || uses funs e2
-    uses funs (Lam b body)  = uses (funs `extendVarSet` b) body
-    uses funs (Let (NonRec _b letExpr) body) 
-                            = uses funs letExpr || uses funs  body
-    uses funs (Case e _eId _ty alts) 
-                            = uses funs e || any (uses_alt funs) alts
-    uses _ _                = False
-
-    uses_alt funs (_, _bs, e) = uses funs e 
+-- |Vectorise an expression of functional type by lifting it by an application of a member of the
+-- zipWith family (i.e., 'map', 'zipWith', zipWith3', etc.)  This is only a valid strategy if the
+-- function does not contain parallel subcomputations and has only 'Scalar' types in its result and
+-- arguments — this is a predcondition for calling this function.
+--
+-- Dictionary functions are also scalar functions (as dictionaries themselves are not vectorised,
+-- instead they become dictionaries of vectorised methods).  We treat them differently, though see
+-- "Note [Scalar dfuns]" in 'Vectorise'.
+--
+vectScalarFun :: CoreExpr -> VM VExpr
+vectScalarFun expr 
+  = do 
+    { traceVt "vectScalarFun" (ppr expr) 
+    ; let (arg_tys, res_ty) = splitFunTys (exprType expr)
+    ; mkScalarFun arg_tys res_ty expr
+    }
 
 -- Generate code for a scalar function by generating a scalar closure.  If the function is a
 -- dictionary function, vectorise it as dictionary code.
@@ -492,9 +608,8 @@ mkScalarFun arg_tys res_ty expr
 --   the application of the unvectorised dfun, to enable the dictionary selection rules to fire.
 --
 vectScalarDFun :: Var        -- ^ Original dfun
-               -> [Var]      -- ^ Functions names in same recursive binding group
                -> VM CoreExpr
-vectScalarDFun var recFns
+vectScalarDFun var
   = do {   -- bring the type variables into scope
        ; mapM_ defLocalTyVar tvs
 
@@ -510,7 +625,7 @@ vectScalarDFun var recFns
              dict           = Var var `mkTyApps` (mkTyVarTys tvs) `mkVarApps` thetaVars
              scsOps         = map (\selId -> varToCoreExpr selId `mkTyApps` tys `mkApps` [dict])
                                   selIds
-       ; vScsOps <- mapM (\e -> vectorised <$> vectScalarFun True recFns e) scsOps
+       ; vScsOps <- mapM (\e -> vectorised <$> vectScalarFun e) scsOps
 
            -- vectorised applications of the class-dictionary data constructor
        ; Just vDataCon <- lookupDataCon dataCon
@@ -552,7 +667,7 @@ unVectDict ty e
                                        Nothing  -> panic "Vectorise.Exp.unVectDict: no class"
     selIds                         = classAllSelIds cls
 
--- |Vectorise an 'n'-ary lambda abstraction by building a set of 'n' explicit closures.
+-- Vectorise an 'n'-ary lambda abstraction by building a set of 'n' explicit closures.
 --
 -- All non-dictionary free variables go into the closure's environment, whereas the dictionary
 -- variables are passed explicit (as conventional arguments) into the body during closure
@@ -561,8 +676,9 @@ unVectDict ty e
 vectLam :: Bool             -- ^ When the RHS of a binding, whether that binding should be inlined.
         -> Bool             -- ^ Whether the binding is a loop breaker.
         -> CoreExprWithFVs  -- ^ Body of abstraction.
+        -> VITree
         -> VM VExpr
-vectLam inline loop_breaker expr@(fvs, AnnLam _ _)
+vectLam inline loop_breaker expr@(fvs, AnnLam _ _)  vi
  = do { let (bndrs, body) = collectAnnValBinders expr
 
           -- grab the in-scope type variables
@@ -590,13 +706,18 @@ vectLam inline loop_breaker expr@(fvs, AnnLam _ _)
         . hoistPolyVExpr tyvars vfvs_dict' (maybe_inline arity)
         $ do {   -- generate the vectorised body of the lambda abstraction
              ; lc              <- builtin liftingContext
-             ; (vbndrs, vbody) <- vectBndrsIn (fvs_nondict ++ bndrs) (vectExpr body)
+             ;  let viBody = stripLams expr vi
+             -- ; checkTreeAnnM vi expr
+             ; (vbndrs, vbody) <- vectBndrsIn (fvs_nondict ++ bndrs) (vectExpr body viBody)
 
              ; vbody' <- break_loop lc res_ty vbody
              ; return $ vLams lc vbndrs vbody'
              }
       }
   where
+    stripLams  (_, AnnLam _ e)  (VITNode _ [vt]) = stripLams e vt
+    stripLams _ vi = vi
+    
     maybe_inline n | inline    = Inline n
                    | otherwise = DontInline
 
@@ -614,10 +735,11 @@ vectLam inline loop_breaker expr@(fvs, AnnLam _ _)
                             (LitAlt (mkMachInt 0), [], empty)])
            }
       | otherwise = return (ve, le)
-vectLam _ _ _ = panic "vectLam"
+vectLam _ _ _ _ = panic "vectLam"
 
--- | Vectorise an algebraic case expression.
---   We convert
+-- Vectorise an algebraic case expression.
+--
+-- We convert
 --
 --   case e :: t of v { ... }
 --
@@ -632,31 +754,31 @@ vectLam _ _ _ = panic "vectLam"
 --
 
 -- FIXME: this is too lazy
-vectAlgCase :: TyCon -> [Type] -> CoreExprWithFVs -> Var -> Type
-            -> [(AltCon, [Var], CoreExprWithFVs)]
+vectAlgCase :: TyCon -> [Type] -> CoreExprWithFVs-> Var -> Type  
+            -> [(AltCon, [Var], CoreExprWithFVs)]  -> VITree
             -> VM VExpr
-vectAlgCase _tycon _ty_args scrut bndr ty [(DEFAULT, [], body)]
+vectAlgCase _tycon _ty_args scrut bndr ty [(DEFAULT, [], body)] (VITNode _ (scrutVit : [altVit]))
   = do
-      vscrut         <- vectExpr scrut
+      vscrut         <- vectExpr scrut scrutVit
       (vty, lty)     <- vectAndLiftType ty
-      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body altVit)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
-vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt _, [], body)]
+vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt _, [], body)] (VITNode _ (scrutVit : [altVit]))
   = do
-      vscrut         <- vectExpr scrut
+      vscrut         <- vectExpr scrut scrutVit
       (vty, lty)     <- vectAndLiftType ty
-      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body altVit)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
-vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
+vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)] (VITNode _ (scrutVit : [altVit]))
   = do
       (vty, lty) <- vectAndLiftType ty
-      vexpr      <- vectExpr scrut
+      vexpr      <- vectExpr scrut scrutVit
       (vbndr, (vbndrs, (vect_body, lift_body)))
          <- vect_scrut_bndr
           . vectBndrsIn bndrs
-          $ vectExpr body
+          $ vectExpr body altVit
       let (vect_bndrs, lift_bndrs) = unzip vbndrs
       (vscrut, lscrut, pdata_dc) <- pdataUnwrapScrut (vVar vbndr)
       vect_dc <- maybeV dataConErr (lookupDataCon dc)
@@ -674,7 +796,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
       
     dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
 
-vectAlgCase tycon _ty_args scrut bndr ty alts
+vectAlgCase tycon _ty_args scrut bndr ty alts (VITNode _ (scrutVit : altVits))
   = do
       vect_tc     <- maybeV tyConErr (lookupTyCon tycon)
       (vty, lty)  <- vectAndLiftType ty
@@ -685,10 +807,10 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
       let sel = Var sel_bndr
 
       (vbndr, valts) <- vect_scrut_bndr
-                      $ mapM (proc_alt arity sel vty lty) alts'
+                      $ mapM (proc_alt arity sel vty lty) (zip alts' altVits)
       let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
 
-      vexpr <- vectExpr scrut
+      vexpr <- vectExpr scrut scrutVit
       (vect_scrut, lift_scrut, pdata_dc) <- pdataUnwrapScrut (vVar vbndr)
 
       let (vect_bodies, lift_bodies) = unzip vbodies
@@ -720,7 +842,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
     cmp _             DEFAULT       = GT
     cmp _             _             = panic "vectAlgCase/cmp"
 
-    proc_alt arity sel _ lty (DataAlt dc, bndrs, body)
+    proc_alt arity sel _ lty ((DataAlt dc, bndrs, body),  vi)
       = do
           vect_dc <- maybeV dataConErr (lookupDataCon dc)
           let ntag = dataConTagZ vect_dc
@@ -738,7 +860,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
                  binds    <- mapM (pack_var (Var lc) sel_tags tag)
                            . filter isLocalId
                            $ varSetElems fvs
-                 (ve, le) <- vectExpr body
+                 (ve, le) <- vectExpr body vi
                  return (ve, Case (elems `App` sel) lc lty
                              [(DEFAULT, [], (mkLets (concat binds) le))])
                  -- empty    <- emptyPD vty
@@ -769,4 +891,216 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
                 return [(NonRec lv' expr)]
 
             _ -> return []
+            
+vectAlgCase tycon _ty_args _scrut _bndr _ty _alts (VITNode _ _)
+  = pprPanic "vectAlgCase (mismatched node information)" (ppr tycon)
 
+
+-- Support to compute information for vectorisation avoidance ------------------
+
+-- Annotation for Core AST nodes that describes how they should be handled during vectorisation
+-- and especially if vectorisation of the corresponding computation can be avoided.
+--
+data VectAvoidInfo = VIParr       -- tree contains parallel computations
+                   | VISimple     -- result type is scalar & no parallel subcomputation
+                   | VIComplex    -- any result type, no parallel subcomputation
+                   | VIEncaps     -- tree encapsulated by 'liftSimple'
+                   deriving (Eq, Show)
+
+-- Instead of integrating the vectorisation avoidance information into Core expression, we keep
+-- them in a separate tree (that structurally mirrors the Core expression that it annotates).
+--
+data VITree = VITNode VectAvoidInfo [VITree] 
+            deriving (Show)
+
+-- Is any of the tree nodes a 'VIPArr' node?
+--
+anyVIPArr :: [VITree] -> Bool
+anyVIPArr = or . (map (\(VITNode vi _) -> vi == VIParr))
+
+-- Compute Core annotations to determine for which subexpressions we can avoid vectorisation
+--
+-- FIXME: free scalar vars don't actually need to be passed through, since encapsulations makes sure,
+--        that there are no free variables in encapsulated lambda expressions     
+vectAvoidInfo :: CoreExprWithFVs -> VM VITree
+vectAvoidInfo ce@(_, AnnVar v) 
+  = do { vi <- vectAvoidInfoType $ exprType $ deAnnotate ce
+       ; viTrace ce vi [] 
+       ; traceVt "vectAvoidInfo AnnVar" ((ppr v) <+> (ppr $ exprType $ deAnnotate ce))
+       ; return $ VITNode vi []
+       }
+
+vectAvoidInfo ce@(_, AnnLit _)     
+  = do { vi <- vectAvoidInfoType $ exprType $ deAnnotate ce  
+       ; viTrace ce vi [] 
+       ; traceVt "vectAvoidInfo AnnLit" (ppr $ exprType $ deAnnotate ce)       
+       ; return $ VITNode vi []
+       }
+
+vectAvoidInfo ce@(_, AnnApp e1 e2)  
+  = do { vt1  <- vectAvoidInfo e1  
+       ; vt2  <- vectAvoidInfo e2  
+       ; vi <- if anyVIPArr [vt1, vt2] 
+                    then return VIParr
+                    else vectAvoidInfoType $ exprType $ deAnnotate ce
+       ; viTrace ce vi [vt1, vt2]                     
+       ; return $ VITNode vi [vt1, vt2]
+       }
+
+vectAvoidInfo ce@(_, AnnLam _var body) 
+  = do { vt@(VITNode vi _) <- vectAvoidInfo body  
+       ; viTrace ce vi [vt]
+       ; let resultVI | vi == VIParr = VIParr
+                      | otherwise    = VIComplex
+       ; return $ VITNode resultVI [vt]
+       }
+
+vectAvoidInfo ce@(_, AnnLet (AnnNonRec _var expr) body)  
+  = do { vtE <- vectAvoidInfo expr 
+       ; vtB <- vectAvoidInfo body 
+       ; vi <- if anyVIPArr [vtE, vtB] 
+                 then return VIParr
+                 else vectAvoidInfoType $ exprType $ deAnnotate ce
+       ; viTrace ce vi [vtE, vtB]                                          
+       ; return $ VITNode vi [vtE, vtB]
+       }
+
+vectAvoidInfo ce@(_, AnnLet (AnnRec bnds) body)  
+  = do { let (_, exprs) = unzip bnds
+       ; vtBnds <- mapM (\e -> vectAvoidInfo e) exprs
+       ; if (anyVIPArr vtBnds)
+            then do { vtBnds' <- mapM (\e -> vectAvoidInfo e) exprs    
+                    ; vtB <- vectAvoidInfo body 
+                    ; return (VITNode VIParr (vtB: vtBnds'))
+                    }
+            else do { vtB@(VITNode vib _)  <- vectAvoidInfo body 
+                    ; ni <- if (vib == VIParr) 
+                               then return VIParr
+                               else vectAvoidInfoType $ exprType $ deAnnotate ce
+                    ; viTrace ce ni (vtB : vtBnds)                                        
+                    ; return $ VITNode ni (vtB : vtBnds)
+                    }
+       }
+
+vectAvoidInfo ce@(_, AnnCase expr _var _ty alts) 
+  = do { vtExpr <- vectAvoidInfo expr 
+       ; vtAlts <- mapM (\(_, _, e) -> vectAvoidInfo e) alts
+       ; ni <- if anyVIPArr (vtExpr : vtAlts)
+                 then return VIParr
+                 else vectAvoidInfoType $ exprType $ deAnnotate ce
+       ; viTrace ce ni (vtExpr  : vtAlts)
+       ; return $ VITNode ni (vtExpr: vtAlts)
+       }
+
+vectAvoidInfo (_, AnnCast expr _)       
+  = do { vt@(VITNode vi _) <- vectAvoidInfo expr 
+       ; return $ VITNode vi [vt]
+       }
+
+vectAvoidInfo (_, AnnTick _ expr)       
+  = do { vt@(VITNode vi _) <- vectAvoidInfo expr 
+       ; return $ VITNode vi [vt]
+       }
+
+vectAvoidInfo (_, AnnType {})  
+  = return $ VITNode VISimple []
+
+vectAvoidInfo (_, AnnCoercion {}) 
+  = return $ VITNode VISimple []
+
+-- Compute vectorisation avoidance information for a type.
+--
+vectAvoidInfoType :: Type -> VM VectAvoidInfo   
+vectAvoidInfoType ty 
+  | maybeParrTy ty = return VIParr
+  | otherwise      
+  = do { sType <- isSimpleType ty
+       ; if sType 
+           then return VISimple
+           else return VIComplex
+       }
+
+-- Checks whether the type might be a parallel array type.  In particular, if the outermost
+-- constructor is a type family, we conservatively assume that it may be a parallel array type.
+--
+maybeParrTy :: Type -> Bool
+maybeParrTy ty 
+    | Just ty'         <- coreView ty            = maybeParrTy ty'
+    | Just (tyCon, ts) <- splitTyConApp_maybe ty = isPArrTyCon tyCon || isSynFamilyTyCon tyCon  
+                                                 || or (map maybeParrTy ts)
+maybeParrTy _  = False               
+
+-- FIXME: This should not be hardcoded.
+isSimpleType :: Type -> VM Bool
+isSimpleType ty 
+  | Just (c, _cs) <- splitTyConApp_maybe ty 
+  = return $ (tyConName c) `elem` [boolTyConName, intTyConName, word8TyConName, doubleTyConName, floatTyConName]
+{-
+    = do { globals <- globalScalarTyCons
+          ; traceVt ("isSimpleType " ++ (show (elemNameSet (tyConName c) globals ))) (ppr c)  
+          ; return (elemNameSet (tyConName c) globals ) 
+          } 
+  -}
+  | Nothing <- splitTyConApp_maybe ty
+    = return False
+isSimpleType ty 
+  = pprPanic "Vectorise.Exp.isSimpleType not handled" (ppr ty)
+
+varsSimple :: VarSet -> VM Bool
+varsSimple vs 
+  = do { varTypes <- mapM isSimpleType $ map varType $  varSetElems vs
+       ; return $ and varTypes
+       }
+
+viTrace :: CoreExprWithFVs -> VectAvoidInfo -> [VITree] -> VM ()
+viTrace ce vi vTs
+  = traceVt ("vitrace " ++ (show vi) ++ "[" ++ (concat $ map (\(VITNode vi _) -> show vi ++ " ") vTs) ++"]") 
+            (ppr $ deAnnotate ce)
+
+
+{-
+---- Sanity check  of the tree, for debugging only
+checkTree :: VITree -> CoreExpr -> Bool
+checkTree  (VITNode _ []) (Type _ty) 
+  = True
+      
+checkTree  (VITNode _ [])  (Var _v)  
+  = True
+  
+checkTree  (VITNode _ [])  (Lit _)
+  = True
+         
+checkTree (VITNode _ [vit]) (Tick _ expr)
+  = checkTree vit expr
+  
+checkTree (VITNode _ [vit]) (Lam _ expr) 
+  = checkTree vit expr
+  
+checkTree (VITNode _ [vit1, vit2])  (App ce1 ce2) 
+  = (checkTree vit1 ce1) && (checkTree vit2 ce2) 
+        
+checkTree (VITNode _ (scrutVit : altVits)) (Case scrut _ _ alts) 
+  = (checkTree scrutVit scrut) && (and $ zipWith checkAlt altVits alts)
+  where
+    checkAlt vt (_, _, expr) = checkTree vt expr
+    
+checkTree (VITNode _ [vt1, vt2]) (Let (NonRec _ expr1) expr2) 
+  = (checkTree vt1 expr1) && (checkTree vt2 expr2) 
+
+checkTree (VITNode _ (vtB : vtBnds))  (Let (Rec bndngs) expr) 
+  = (and $ zipWith checkBndr vtBnds bndngs) && 
+    (checkTree vtB expr)
+ where 
+   checkBndr vt (_, e) = checkTree vt e
+              
+checkTree (VITNode _ [vit]) (Cast expr _)
+  = checkTree vit expr
+
+checkTree _ _ = False
+
+checkTreeAnnM:: VITree -> CoreExprWithFVs -> VM ()
+checkTreeAnnM vi e =  
+  if not (checkTree vi $ deAnnotate e)
+    then error ("checkTreeAnnM : \n " ++ show vi)
+    else return ()
+-}

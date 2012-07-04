@@ -43,8 +43,6 @@ import Name
 import ErrUtils
 import Outputable
 
-import System.IO
-
 
 -- |Run a vectorisation computation.
 --
@@ -69,7 +67,9 @@ initV hsc_env guts info thing_inside
        ; return res
        }
   where
-    dumpIfVtTrace = dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_vt_trace
+    dflags = hsc_dflags hsc_env
+
+    dumpIfVtTrace = dumpIfSet_dyn dflags Opt_D_dump_vt_trace
     
     bindsToIds (NonRec v _)   = [v]
     bindsToIds (Rec    binds) = map fst binds
@@ -100,7 +100,7 @@ initV hsc_env guts info thing_inside
                Yes genv _ x -> return $ Just (new_info genv, x)
                No reason    -> do { unqual <- mkPrintUnqualifiedDs
                                   ; liftIO $ 
-                                      printForUser stderr unqual $ 
+                                      printInfoForUser dflags unqual $ 
                                         mkDumpDoc "Warning: vectorisation failure:" reason
                                   ; return Nothing
                                   }
@@ -151,7 +151,9 @@ lookupVar v
   = do { mb_res <- lookupVar_maybe v
        ; case mb_res of
            Just x  -> return x
-           Nothing -> dumpVar v
+           Nothing ->
+               do dflags <- getDynFlags
+                  dumpVar dflags v
        }
 
 lookupVar_maybe :: Var -> VM (Maybe (Scope Var (Var, Var)))
@@ -162,12 +164,12 @@ lookupVar_maybe v
           Nothing -> fmap Global <$> (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
       }
 
-dumpVar :: Var -> a
-dumpVar var
+dumpVar :: DynFlags -> Var -> a
+dumpVar dflags var
   | Just _    <- isClassOpId_maybe var
-  = cantVectorise "ClassOpId not vectorised:" (ppr var)
+  = cantVectorise dflags "ClassOpId not vectorised:" (ppr var)
   | otherwise
-  = cantVectorise "Variable not vectorised:" (ppr var)
+  = cantVectorise dflags "Variable not vectorised:" (ppr var)
 
 
 -- Global scalars --------------------------------------------------------------

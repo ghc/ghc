@@ -170,8 +170,9 @@ emitCostCentreDecl cc = do
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.
                 -- Hence don't emit the package name in the module here.
+  ; dflags <- getDynFlags
   ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
-                   showSDoc (ppr (costCentreSrcSpan cc))
+                   showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
      lits = [ zero,   	-- StgInt ccID,

@@ -1,11 +1,3 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Syntax where
 
 import Data.List
@@ -25,17 +17,17 @@ data Entry
                    name  :: String,      -- name in prog text
                    ty    :: Ty,          -- type
                    cat   :: Category,    -- category
-		   desc  :: String,      -- description
+                   desc  :: String,      -- description
                    opts  :: [Option] }   -- default overrides
     | PseudoOpSpec { name  :: String,      -- name in prog text
                      ty    :: Ty,          -- type
-		     desc  :: String,      -- description
+                     desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
     | PrimTypeSpec { ty    :: Ty,      -- name in prog text
-		     desc  :: String,      -- description
+                     desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
-    | Section { title :: String,	 -- section title
-		desc  :: String }        -- description
+    | Section { title :: String,         -- section title
+                desc  :: String }        -- description
     deriving Show
 
 is_primop :: Entry -> Bool
@@ -89,7 +81,7 @@ myseqAll []      x = x
 sanityTop :: Info -> ()
 sanityTop (Info defs entries)
    = let opt_names = map get_attrib_name defs
-	 primops = filter is_primop entries
+         primops = filter is_primop entries
      in  
      if   length opt_names /= length (nub opt_names)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")

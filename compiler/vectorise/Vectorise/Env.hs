@@ -30,6 +30,9 @@ import NameSet
 import Name
 import NameEnv
 import FastString
+import TysPrim
+import TysWiredIn
+
 
 import Data.Maybe
 
@@ -158,11 +161,13 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
                                         --   single variable to be able to obtain the type without
                                         --   inference — see also 'TcBinds.tcVect'
     scalar_vars   = [var              | Vect     var   Nothing                   <- vectDecls] ++
-                    [var              | VectInst var                             <- vectDecls]
+                    [var              | VectInst var                             <- vectDecls] ++ 
+                    [dataConWrapId doubleDataCon, dataConWrapId floatDataCon, dataConWrapId intDataCon] -- TODO: fix this hack
     novects       = [var              | NoVect   var                             <- vectDecls]
     scalar_tycons = [tyConName tycon  | VectType True tycon Nothing              <- vectDecls] ++
                     [tyConName tycon  | VectType _    tycon (Just tycon')        <- vectDecls
-                                      , tycon == tycon']
+                                      , tycon == tycon']  ++ 
+                                      map tyConName [doublePrimTyCon, intPrimTyCon, floatPrimTyCon]  -- TODO: fix this hack
                       -- - for 'VectType True tycon Nothing', we checked that the type does not
                       --   contain arrays (or type variables that could be instatiated to arrays)
                       -- - for 'VectType _ tycon (Just tycon')', where the two tycons are the same,

@@ -24,16 +24,46 @@ module NameEnv (
 	foldNameEnv, filterNameEnv,
 	plusNameEnv, plusNameEnv_C, alterNameEnv,
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
-	elemNameEnv, mapNameEnv
+	elemNameEnv, mapNameEnv,
+
+        -- ** Dependency analysis
+        depAnal
     ) where
 
 #include "HsVersions.h"
 
+import Digraph
 import Name
 import Unique
 import UniqFM
 import Maybes
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Name environment}
+%*									*
+%************************************************************************
+
+\begin{code}
+depAnal :: (node -> [Name])      -- Defs 
+        -> (node -> [Name])      -- Uses
+        -> [node]
+        -> [SCC node]
+-- Peform dependency analysis on a group of definitions,
+-- where each definition may define more than one Name
+--
+-- The get_defs and get_uses functions are called only once per node
+depAnal get_defs get_uses nodes
+  = stronglyConnCompFromEdgedVertices (map mk_node keyed_nodes)
+  where
+    keyed_nodes = nodes `zip` [(1::Int)..]
+    mk_node (node, key) = (node, key, mapCatMaybes (lookupNameEnv key_map) (get_uses node))
+
+    key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
+    key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]                        
+\end{code}
+
 
 %************************************************************************
 %*									*

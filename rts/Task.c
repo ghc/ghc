@@ -26,7 +26,12 @@
 // Task lists and global counters.
 // Locks required: all_tasks_mutex.
 Task *all_tasks = NULL;
-static nat taskCount;
+
+nat taskCount;
+nat workerCount;
+nat currentWorkerCount;
+nat peakWorkerCount;
+
 static int tasksInitialized = 0;
 
 static void   freeTask  (Task *task);
@@ -64,8 +69,11 @@ void
 initTaskManager (void)
 {
     if (!tasksInitialized) {
-	taskCount = 0;
-	tasksInitialized = 1;
+        taskCount = 0;
+        workerCount = 0;
+        currentWorkerCount = 0;
+        peakWorkerCount = 0;
+        tasksInitialized = 1;
 #if defined(THREADED_RTS)
 #if !defined(MYTASK_USE_TLV)
 	newThreadLocalKey(&currentTaskKey);
@@ -87,7 +95,7 @@ freeTaskManager (void)
     ACQUIRE_LOCK(&all_tasks_mutex);
 
     for (task = all_tasks; task != NULL; task = next) {
-        next = task->all_link;
+        next = task->all_next;
         if (task->stopped) {
             freeTask(task);
         } else {
@@ -164,9 +172,6 @@ freeTask (Task *task)
 static Task*
 newTask (rtsBool worker)
 {
-#if defined(THREADED_RTS)
-    Time currentElapsedTime, currentUserTime;
-#endif
     Task *task;
 
 #define ROUND_TO_CACHE_LINE(x) ((((x)+63) / 64) * 64)
@@ -186,26 +191,25 @@ newTask (rtsBool worker)
     task->wakeup = rtsFalse;
 #endif
 
-#if defined(THREADED_RTS)
-    currentUserTime = getThreadCPUTime();
-    currentElapsedTime = getProcessElapsedTime();
-    task->mut_time = 0;
-    task->mut_etime = 0;
-    task->gc_time = 0;
-    task->gc_etime = 0;
-    task->muttimestart = currentUserTime;
-    task->elapsedtimestart = currentElapsedTime;
-#endif
-
     task->next = NULL;
 
     ACQUIRE_LOCK(&all_tasks_mutex);
 
-    task->all_link = all_tasks;
+    task->all_prev = NULL;
+    task->all_next = all_tasks;
+    if (all_tasks != NULL) {
+        all_tasks->all_prev = task;
+    }
     all_tasks = task;
 
     taskCount++;
-
+    if (worker) {
+        workerCount++;
+        currentWorkerCount++;
+        if (currentWorkerCount > peakWorkerCount) {
+            peakWorkerCount = currentWorkerCount;
+        }
+    }
     RELEASE_LOCK(&all_tasks_mutex);
 
     return task;
@@ -314,14 +318,15 @@ discardTasksExcept (Task *keep)
     // Wipe the task list, except the current Task.
     ACQUIRE_LOCK(&all_tasks_mutex);
     for (task = all_tasks; task != NULL; task=next) {
-        next = task->all_link;
+        next = task->all_next;
         if (task != keep) {
-            debugTrace(DEBUG_sched, "discarding task %ld", (long)TASK_ID(task));
+            debugTrace(DEBUG_sched, "discarding task %" FMT_SizeT "", (size_t)TASK_ID(task));
             freeTask(task);
         }
     }
     all_tasks = keep;
-    keep->all_link = NULL;
+    keep->all_next = NULL;
+    keep->all_prev = NULL;
     RELEASE_LOCK(&all_tasks_mutex);
 }
 
@@ -337,7 +342,7 @@ void updateCapabilityRefs (void)
 
     ACQUIRE_LOCK(&all_tasks_mutex);
 
-    for (task = all_tasks; task != NULL; task=task->all_link) {
+    for (task = all_tasks; task != NULL; task=task->all_next) {
         if (task->cap != NULL) {
             task->cap = &capabilities[task->cap->no];
         }
@@ -353,34 +358,6 @@ void updateCapabilityRefs (void)
 }
 
 
-void
-taskTimeStamp (Task *task USED_IF_THREADS)
-{
-#if defined(THREADED_RTS)
-    Time currentElapsedTime, currentUserTime;
-
-    currentUserTime = getThreadCPUTime();
-    currentElapsedTime = getProcessElapsedTime();
-
-    task->mut_time =
-	currentUserTime - task->muttimestart - task->gc_time;
-    task->mut_etime = 
-        currentElapsedTime - task->elapsedtimestart - task->gc_etime;
-
-    if (task->gc_time   < 0) { task->gc_time   = 0; }
-    if (task->gc_etime  < 0) { task->gc_etime  = 0; }
-    if (task->mut_time  < 0) { task->mut_time  = 0; }
-    if (task->mut_etime < 0) { task->mut_etime = 0; }
-#endif
-}
-
-void
-taskDoneGC (Task *task, Time cpu_time, Time elapsed_time)
-{
-    task->gc_time  += cpu_time;
-    task->gc_etime += elapsed_time;
-}
-
 #if defined(THREADED_RTS)
 
 void
@@ -391,9 +368,22 @@ workerTaskStop (Task *task)
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
 
-    task->cap = NULL;
-    taskTimeStamp(task);
-    task->stopped = rtsTrue;
+    ACQUIRE_LOCK(&all_tasks_mutex);
+
+    if (task->all_prev) {
+        task->all_prev->all_next = task->all_next;
+    } else {
+        all_tasks = task->all_next;
+    }
+    if (task->all_next) {
+        task->all_next->all_prev = task->all_prev;
+    }
+
+    currentWorkerCount--;
+
+    RELEASE_LOCK(&all_tasks_mutex);
+
+    freeTask(task);
 }
 
 #endif
@@ -403,7 +393,7 @@ workerTaskStop (Task *task)
 static void *taskId(Task *task)
 {
 #ifdef THREADED_RTS
-    return (void *)task->id;
+    return (void *)(size_t)task->id;
 #else
     return (void *)task;
 #endif
@@ -491,7 +481,7 @@ void
 printAllTasks(void)
 {
     Task *task;
-    for (task = all_tasks; task != NULL; task = task->all_link) {
+    for (task = all_tasks; task != NULL; task = task->all_next) {
 	debugBelch("task %p is %s, ", taskId(task), task->stopped ? "stopped" : "alive");
 	if (!task->stopped) {
 	    if (task->cap) {

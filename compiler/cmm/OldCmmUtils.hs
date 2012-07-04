@@ -96,3 +96,4 @@ maybeAssignTemp uniques e
     | hasNoGlobalRegs e = (uniques, [], e)
     | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
     where local = CmmLocal (LocalReg (head uniques) (cmmExprType e))
+

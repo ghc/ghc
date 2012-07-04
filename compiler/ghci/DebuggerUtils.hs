@@ -3,6 +3,7 @@ module DebuggerUtils (
   ) where
 
 import ByteCodeItbls
+import DynFlags
 import FastString
 import TcRnTypes
 import TcRnMonad
@@ -45,7 +46,8 @@ dataConInfoPtrToName x = do
        occFS = mkFastStringByteList occ
        occName = mkOccNameFS OccName.dataName occFS
        modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
-   return (Left$ showSDoc$ ppr modName <> dot <> ppr occName ) 
+   dflags <- getDynFlags
+   return (Left $ showSDoc dflags $ ppr modName <> dot <> ppr occName)
     `recoverM` (Right `fmap` lookupOrig modName occName)
 
    where

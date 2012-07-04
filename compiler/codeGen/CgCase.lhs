@@ -520,7 +520,6 @@ cgAlgAlts gc_flag cc_slot alt_type alts
 
             branches = [(dataConTagZ con, blks)
                        | (DataAlt con, blks) <- alts]
-       -- in
        return (branches, mb_deflt)
 
 

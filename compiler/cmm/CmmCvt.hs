@@ -33,7 +33,7 @@ get_hints (ForeignTarget _ (ForeignConvention _ _ hints)) Results   = hints
 get_hints (PrimTarget _) _vd = repeat NoHint
 
 cmm_target :: ForeignTarget -> Old.CmmCallTarget
-cmm_target (PrimTarget op) = Old.CmmPrim op
+cmm_target (PrimTarget op) = Old.CmmPrim op Nothing
 cmm_target (ForeignTarget e (ForeignConvention cc _ _)) = Old.CmmCallee e cc
 
 ofZgraph :: CmmGraph -> Old.ListGraph Old.CmmStmt

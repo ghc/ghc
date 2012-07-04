@@ -79,6 +79,8 @@ import FastString
 import Outputable
 
 import Data.Char
+import Data.List
+import Data.Ord
 import Data.Word
 import Data.Maybe
 
@@ -458,7 +460,7 @@ newUnboxedTupleRegs res_ty
 	; ASSERT( regs `equalLength` reps )
 	  return (regs, map primRepForeignHint reps) }
   where
-    ty_args = tyConAppArgs (repType res_ty)
+    UbxTupleRep ty_args = repType res_ty
     reps = [ rep
 	   | ty <- ty_args
     	   , let rep = typePrimRep ty
@@ -573,15 +575,12 @@ mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag = do
     branches_lbls <- label_branches join_lbl branches
     tag_expr'     <- assignTemp' tag_expr
     
-    emit =<< mk_switch tag_expr' (sortLe le branches_lbls) mb_deflt_lbl
+    emit =<< mk_switch tag_expr' (sortBy (comparing fst) branches) mb_deflt_lbl
                 lo_tag hi_tag via_C
 
           -- Sort the branches before calling mk_switch
 
     emitLabel join_lbl
-
-  where
-    (t1,_) `le` (t2,_) = t1 <= t2
 
 mk_switch :: CmmExpr -> [(ConTagZ, BlockId)]
 	  -> Maybe BlockId 
@@ -736,10 +735,9 @@ emitCmmLitSwitch scrut  branches deflt = do
     join_lbl <- newLabelC
     deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
-    emit =<< mk_lit_switch scrut' deflt_lbl (sortLe le branches_lbls)
+    emit =<< mk_lit_switch scrut' deflt_lbl
+               (sortBy (comparing fst) branches_lbls)
     emitLabel join_lbl
-  where
-    le (t1,_) (t2,_) = t1 <= t2
 
 mk_lit_switch :: CmmExpr -> BlockId 
  	      -> [(Literal,BlockId)]

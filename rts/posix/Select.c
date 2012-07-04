@@ -2,7 +2,10 @@
  *
  * (c) The GHC Team 1995-2002
  *
- * Support for concurrent non-blocking I/O and thread waiting.
+ * Support for concurrent non-blocking I/O and thread waiting in the
+ * non-threaded RTS.  In the threded RTS, this file is not used at
+ * all, instead we use the IO manager thread implemented in Haskell in
+ * the base package.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -17,6 +20,7 @@
 #include "Select.h"
 #include "AwaitEvent.h"
 #include "Stats.h"
+#include "GetTime.h"
 
 # ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
@@ -26,34 +30,46 @@
 #  include <sys/types.h>
 # endif
 
-# ifdef HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# endif
-
 #include <errno.h>
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
+#include "Clock.h"
 
 #if !defined(THREADED_RTS)
 
-/* 
- * The threaded RTS uses an IO-manager thread in Haskell instead (see GHC.Conc) 
- */
+// The target time for a threadDelay is stored in a one-word quantity
+// in the TSO (tso->block_info.target).  On a 32-bit machine we
+// therefore can't afford to use nanosecond resolution because it
+// would overflow too quickly, so instead we use millisecond
+// resolution.
 
-#define LowResTimeToTime(t) (USToTime((t) * 10000))
+#if SIZEOF_VOID_P == 4
+#define LowResTimeToTime(t)          (USToTime((t) * 1000))
+#define TimeToLowResTimeRoundDown(t) (TimeToUS(t) / 1000)
+#define TimeToLowResTimeRoundUp(t)   ((TimeToUS(t) + 1000-1) / 1000)
+#else
+#define LowResTimeToTime(t) (t)
+#define TimeToLowResTimeRoundDown(t) (t)
+#define TimeToLowResTimeRoundUp(t)   (t)
+#endif
 
 /*
  * Return the time since the program started, in LowResTime,
  * rounded down.
- *
- * This is only used by posix/Select.c.  It should probably go away.
  */
-LowResTime getourtimeofday(void)
+static LowResTime getLowResTimeOfDay(void)
 {
-  return TimeToUS(stat_getElapsedTime()) / 10000;
+    return TimeToLowResTimeRoundDown(getProcessElapsedTime());
+}
+
+/*
+ * For a given microsecond delay, return the target time in LowResTime.
+ */
+LowResTime getDelayTarget (HsInt us)
+{
+    // round up the target time, because we never want to sleep *less*
+    // than the desired amount.
+    return TimeToLowResTimeRoundUp(getProcessElapsedTime() + USToTime(us));
 }
 
 /* There's a clever trick here to avoid problems when the time wraps
@@ -136,7 +152,7 @@ awaitEvent(rtsBool wait)
      */
     do {
 
-      now = getourtimeofday();
+      now = getLowResTimeOfDay();
       if (wakeUpSleepingThreads(now)) {
 	  return;
       }
@@ -196,10 +212,19 @@ awaitEvent(rtsBool wait)
           ptv = NULL;
       }
 
-      /* Check for any interesting events */
-      
-      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
-	  if (errno != EINTR) {
+      while (1) { // repeat the select on EINTR
+
+          // Disable the timer signal while blocked in
+          // select(), to conserve power. (#1623, #5991)
+          if (wait) stopTimer();
+
+          numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv);
+
+          if (wait) startTimer();
+
+          if (numFound >= 0) break;
+
+          if (errno != EINTR) {
 	    /* Handle bad file descriptors by unblocking all the
 	       waiting threads. Why? Because a thread might have been
 	       a bit naughty and closed a file descriptor while another
@@ -218,12 +243,12 @@ awaitEvent(rtsBool wait)
 	       the RTS won't loop.
 	    */
 	    if ( errno == EBADF ) {
-	      unblock_all = rtsTrue;
-	      break;
+                unblock_all = rtsTrue;
+                break;
 	    } else {
- 	      perror("select");
-	      barf("select failed");
-	    }
+                sysErrorBelch("select");
+                stg_exit(EXIT_FAILURE);
+            }
 	  }
 
 	  /* We got a signal; could be one of ours.  If so, we need
@@ -246,8 +271,8 @@ awaitEvent(rtsBool wait)
 	  
 	  /* check for threads that need waking up 
 	   */
-          wakeUpSleepingThreads(getourtimeofday());
-	  
+          wakeUpSleepingThreads(getLowResTimeOfDay());
+
 	  /* If new runnable threads have arrived, stop waiting for
 	   * I/O and run them.
 	   */

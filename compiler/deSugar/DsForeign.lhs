@@ -11,6 +11,8 @@ module DsForeign ( dsForeigns ) where
 #include "HsVersions.h"
 import TcRnMonad        -- temp
 
+import TypeRep
+
 import CoreSyn
 
 import DsCCall
@@ -45,6 +47,8 @@ import Config
 import Constants
 import OrdList
 import Pair
+import Util
+
 import Data.Maybe
 import Data.List
 \end{code}
@@ -125,8 +129,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety header spec) = do
-    (ids, h, c) <- dsCImport id co spec cconv safety header
+dsFImport id co (CImport cconv safety mHeader spec) = do
+    (ids, h, c) <- dsCImport id co spec cconv safety mHeader
     return (ids, h, c)
 
 dsCImport :: Id
@@ -134,7 +138,7 @@ dsCImport :: Id
           -> CImportSpec
           -> CCallConv
           -> Safety
-          -> FastString -- header
+          -> Maybe Header
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
@@ -154,8 +158,8 @@ dsCImport id co (CLabel cid) cconv _ _ = do
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co (CFunction target) cconv safety header
-  = dsFCall id co (CCall (CCallSpec target cconv safety)) header
+dsCImport id co (CFunction target) cconv safety mHeader
+  = dsFCall id co (CCall (CCallSpec target cconv safety)) mHeader
 dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
@@ -182,9 +186,9 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
-dsFCall :: Id -> Coercion -> ForeignCall -> FastString
+dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id co fcall headerFilename = do
+dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -203,37 +207,47 @@ dsFCall fn_id co fcall headerFilename = do
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
 
+    dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget cName mPackageId) CApiConv safety) ->
+              CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
                do fcall_uniq <- newUnique
                   let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
-                                    mkFastString (showSDoc (ppr fcall_uniq)) `appendFS`
+                                    mkFastString (showPpr dflags fcall_uniq) `appendFS`
                                     mkFastString "_" `appendFS`
                                     cName
-                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId) CApiConv safety)
-                      c = include
+                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
+                      c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
-                      include
-                       | nullFS headerFilename = empty
-                       | otherwise = text "#include <" <> ftext headerFilename <> text ">"
+                      includes = vcat [ text "#include <" <> ftext h <> text ">"
+                                      | Header h <- nub headers ]
                       fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
                        | isVoidRes =                   cCall
                        | otherwise = text "return" <+> cCall
-                      cCall = ppr cName <> parens argVals
+                      cCall = if isFun
+                              then ppr cName <> parens argVals
+                              else if null arg_tys
+                                    then ppr cName
+                                    else panic "dsFCall: Unexpected arguments to FFI value import"
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty
                       isVoidRes = raw_res_ty `eqType` unitTy
-                      cResType | isVoidRes = text "void"
-                               | otherwise = showStgType raw_res_ty
+                      (mHeader, cResType)
+                       | isVoidRes = (Nothing, text "void")
+                       | otherwise = toCType raw_res_ty
                       pprCconv = ccallConvAttribute CApiConv
-                      argTypes
-                       | null arg_tys = text "void"
-                       | otherwise = hsep $ punctuate comma
-                                         [ showStgType t <+> char 'a' <> int n
-                                         | (t, n) <- zip arg_tys [1..] ]
+                      mHeadersArgTypeList
+                          = [ (header, cType <+> char 'a' <> int n)
+                            | (t, n) <- zip arg_tys [1..]
+                            , let (header, cType) = toCType t ]
+                      (mHeaders, argTypeList) = unzip mHeadersArgTypeList
+                      argTypes = if null argTypeList
+                                 then text "void"
+                                 else hsep $ punctuate comma argTypeList
+                      mHeaders' = mDeclHeader : mHeader : mHeaders
+                      headers = catMaybes mHeaders'
                       argVals = hsep $ punctuate comma
                                     [ char 'a' <> int n
                                     | (_, n) <- zip arg_tys [1..] ]
@@ -243,7 +257,7 @@ dsFCall fn_id co fcall headerFilename = do
     let
         -- Build the worker
         worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-        the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
+        the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
 
@@ -285,8 +299,9 @@ dsPrimCall fn_id co fcall = do
     args <- newSysLocalsDs arg_tys
 
     ccall_uniq <- newUnique
+    dflags <- getDynFlags
     let
-        call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
+        call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
     return ([(fn_id, rhs')], empty, empty)
@@ -390,9 +405,10 @@ dsFExportDynamic :: Id
 dsFExportDynamic id co0 cconv = do
     fe_id <-  newSysLocalDs ty
     mod <- getModuleDs
+    dflags <- getDynFlags
     let
         -- hack: need to get at the name of the C stub we're about to generate.
-        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName fe_id)
+        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
 
     cback <- newSysLocalDs arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
@@ -452,8 +468,8 @@ dsFExportDynamic id co0 cconv = do
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 
-toCName :: Id -> String
-toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
+toCName :: DynFlags -> Id -> String
+toCName dflags i = showSDoc dflags (pprCode CStyle (ppr (idName i)))
 \end{code}
 
 %*
@@ -667,21 +683,64 @@ showStgType t = text "Hs" <> text (showFFIType t)
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName (typeTyCon t))
 
+toCType :: Type -> (Maybe Header, SDoc)
+toCType = f False
+    where f voidOK t
+           -- First, if we have (Ptr t) of (FunPtr t), then we need to
+           -- convert t to a C type and put a * after it. If we don't
+           -- know a type for t, then "void" is fine, though.
+           | Just (ptr, [t']) <- splitTyConApp_maybe t
+           , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
+              = case f True t' of
+                (mh, cType') ->
+                    (mh, cType' <> char '*')
+           -- Otherwise, if we have a type constructor application, then
+           -- see if there is a C type associated with that constructor.
+           -- Note that we aren't looking through type synonyms or
+           -- anything, as it may be the synonym that is annotated.
+           | TyConApp tycon _ <- t
+           , Just (CType mHeader cType) <- tyConCType_maybe tycon
+              = (mHeader, ftext cType)
+           -- If we don't know a C type for this type, then try looking
+           -- through one layer of type synonym etc.
+           | Just t' <- coreView t
+              = f voidOK t'
+           -- Otherwise we don't know the C type. If we are allowing
+           -- void then return that; otherwise something has gone wrong.
+           | voidOK = (Nothing, ptext (sLit "void"))
+           | otherwise
+              = pprPanic "toCType" (ppr t)
+
 typeTyCon :: Type -> TyCon
-typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of
-                 Just (tc,_) -> tc
-                 Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
+typeTyCon ty
+  | UnaryRep rep_ty <- repType ty
+  , Just (tc, _) <- tcSplitTyConApp_maybe rep_ty
+  = tc
+  | otherwise
+  = pprPanic "DsForeign.typeTyCon" (ppr ty)
 
 insertRetAddr :: DynFlags -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
               -> [(SDoc, SDoc, Type, CmmType)]
 insertRetAddr dflags CCallConv args
-    = case platformArch (targetPlatform dflags) of
-      ArchX86_64 ->
-          -- On x86_64 we insert the return address after the 6th
-          -- integer argument, because this is the point at which we
-          -- need to flush a register argument to the stack (See
-          -- rts/Adjustor.c for details).
+    = case platformArch platform of
+      ArchX86_64
+       | platformOS platform == OSMinGW32 ->
+          -- On other Windows x86_64 we insert the return address
+          -- after the 4th argument, because this is the point
+          -- at which we need to flush a register argument to the stack
+          -- (See rts/Adjustor.c for details).
+          let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
+                        -> [(SDoc, SDoc, Type, CmmType)]
+              go 4 args = ret_addr_arg : args
+              go n (arg:args) = arg : go (n+1) args
+              go _ [] = []
+          in go 0 args
+       | otherwise ->
+          -- On other x86_64 platforms we insert the return address
+          -- after the 6th integer argument, because this is the point
+          -- at which we need to flush a register argument to the stack
+          -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
               go 6 args = ret_addr_arg : args
@@ -692,6 +751,7 @@ insertRetAddr dflags CCallConv args
           in go 0 args
       _ ->
           ret_addr_arg : args
+    where platform = targetPlatform dflags
 insertRetAddr _ _ args = args
 
 ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
@@ -700,7 +760,7 @@ ret_addr_arg = (text "original_return_addr", text "void*", undefined,
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).
-getPrimTyOf :: Type -> Type
+getPrimTyOf :: Type -> UnaryType
 getPrimTyOf ty
   | isBoolTy rep_ty = intPrimTy
   -- Except for Bool, the types we are interested in have a single constructor
@@ -713,7 +773,7 @@ getPrimTyOf ty
         prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
-        rep_ty = repType ty
+        UnaryRep rep_ty = repType ty
 
 -- represent a primitive type as a Char, for building a string that
 -- described the foreign function type.  The types are size-dependent,

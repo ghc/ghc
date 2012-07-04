@@ -31,7 +31,7 @@ char *mkString(const char *fmt, ...) {
     va_end(argp);
 
     if (i < 0) {
-        die("snprintf 0 failed: errno %d: %s\n", errno, strerror(errno));
+        die("vsnprintf 0 failed: errno %d: %s\n", errno, strerror(errno));
     }
 
     p = malloc(i + 1);
@@ -42,8 +42,8 @@ char *mkString(const char *fmt, ...) {
     va_start(argp, fmt);
     j = vsnprintf(p, i + 1, fmt, argp);
     va_end(argp);
-    if (i < 0) {
-        die("snprintf with %d failed: errno %d: %s\n",
+    if (j < 0) {
+        die("vsnprintf with %d failed: errno %d: %s\n",
             i + 1, errno, strerror(errno));
     }
 

@@ -34,7 +34,9 @@ extra-libraries:
 			      , "dl"
 #endif
 #ifdef mingw32_HOST_OS
-			      ,"wsock32"	/* for the linker */
+			      ,"wsock32"    /* for the linker */
+			      ,"gdi32"      /* for the linker */
+			      ,"winmm"      /* for the linker */
 #endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */
@@ -65,7 +67,7 @@ ld-options:
          , "-u", "_ghczmprim_GHCziTypes_Fzh_static_info"
          , "-u", "_ghczmprim_GHCziTypes_Dzh_static_info"
          , "-u", "_base_GHCziPtr_Ptr_static_info"
-         , "-u", "_base_GHCziWord_Wzh_static_info"
+         , "-u", "_ghczmprim_GHCziTypes_Wzh_static_info"
          , "-u", "_base_GHCziInt_I8zh_static_info"
          , "-u", "_base_GHCziInt_I16zh_static_info"
          , "-u", "_base_GHCziInt_I32zh_static_info"
@@ -104,7 +106,7 @@ ld-options:
          , "-u", "ghczmprim_GHCziTypes_Fzh_static_info"
          , "-u", "ghczmprim_GHCziTypes_Dzh_static_info"
          , "-u", "base_GHCziPtr_Ptr_static_info"
-         , "-u", "base_GHCziWord_Wzh_static_info"
+         , "-u", "ghczmprim_GHCziTypes_Wzh_static_info"
          , "-u", "base_GHCziInt_I8zh_static_info"
          , "-u", "base_GHCziInt_I16zh_static_info"
          , "-u", "base_GHCziInt_I32zh_static_info"

@@ -8,77 +8,70 @@
    -- When the earliest compiler we want to boostrap with is
    -- GHC 7.2, we can make RealSrcLoc properly abstract
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
 module SrcLoc (
-	-- * SrcLoc
-	RealSrcLoc,			-- Abstract
-	SrcLoc(..),
+        -- * SrcLoc
+        RealSrcLoc,             -- Abstract
+        SrcLoc(..),
 
         -- ** Constructing SrcLoc
-	mkSrcLoc, mkRealSrcLoc, mkGeneralSrcLoc,
+        mkSrcLoc, mkRealSrcLoc, mkGeneralSrcLoc,
 
-	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
-	generatedSrcLoc,	-- Code generated within the compiler
-	interactiveSrcLoc,	-- Code from an interactive session
+        noSrcLoc,               -- "I'm sorry, I haven't a clue"
+        generatedSrcLoc,        -- Code generated within the compiler
+        interactiveSrcLoc,      -- Code from an interactive session
 
         advanceSrcLoc,
 
-	-- ** Unsafely deconstructing SrcLoc
-	-- These are dubious exports, because they crash on some inputs
-	srcLocFile,		-- return the file name part
-	srcLocLine,		-- return the line part
-	srcLocCol,		-- return the column part
-	
+        -- ** Unsafely deconstructing SrcLoc
+        -- These are dubious exports, because they crash on some inputs
+        srcLocFile,             -- return the file name part
+        srcLocLine,             -- return the line part
+        srcLocCol,              -- return the column part
+
         -- * SrcSpan
-	RealSrcSpan,		-- Abstract
-	SrcSpan(..),
+        RealSrcSpan,            -- Abstract
+        SrcSpan(..),
 
         -- ** Constructing SrcSpan
-	mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
-	noSrcSpan, 
-	wiredInSrcSpan,		-- Something wired into the compiler
-	srcLocSpan, realSrcLocSpan,
-	combineSrcSpans,
-	
-	-- ** Deconstructing SrcSpan
-	srcSpanStart, srcSpanEnd,
-	realSrcSpanStart, realSrcSpanEnd,
-	srcSpanFileName_maybe,
+        mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
+        noSrcSpan,
+        wiredInSrcSpan,         -- Something wired into the compiler
+        srcLocSpan, realSrcLocSpan,
+        combineSrcSpans,
 
-	-- ** Unsafely deconstructing SrcSpan
-	-- These are dubious exports, because they crash on some inputs
-	srcSpanFile, 
-        srcSpanStartLine, srcSpanEndLine, 
+        -- ** Deconstructing SrcSpan
+        srcSpanStart, srcSpanEnd,
+        realSrcSpanStart, realSrcSpanEnd,
+        srcSpanFileName_maybe,
+        showUserSpan,
+
+        -- ** Unsafely deconstructing SrcSpan
+        -- These are dubious exports, because they crash on some inputs
+        srcSpanFile,
+        srcSpanStartLine, srcSpanEndLine,
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Predicates on SrcSpan
         isGoodSrcSpan, isOneLineSpan,
 
         -- * Located
-	Located, 
-	RealLocated, 
-	GenLocated(..), 
-	
-	-- ** Constructing Located
-	noLoc,
+        Located,
+        RealLocated,
+        GenLocated(..),
+
+        -- ** Constructing Located
+        noLoc,
         mkGeneralLocated,
-	
-	-- ** Deconstructing Located
-	getLoc, unLoc, 
-	
-	-- ** Combining and comparing Located values
-	eqLocated, cmpLocated, combineLocs, addCLoc,
-        leftmost_smallest, leftmost_largest, rightmost, 
-        spans, isSubspanOf
+
+        -- ** Deconstructing Located
+        getLoc, unLoc,
+
+        -- ** Combining and comparing Located values
+        eqLocated, cmpLocated, combineLocs, addCLoc,
+        leftmost_smallest, leftmost_largest, rightmost,
+        spans, isSubspanOf, sortLocated
     ) where
 
 #include "Typeable.h"
@@ -89,12 +82,15 @@ import FastString
 
 import Data.Bits
 import Data.Data
+import Data.List
+import Data.Ord
+import System.FilePath
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcLoc-SrcLocations]{Source-location information}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 We keep information about the {\em definition} point for each entity;
@@ -102,20 +98,20 @@ this is the obvious stuff:
 \begin{code}
 -- | Represents a single point within a file
 data RealSrcLoc
-  = SrcLoc	FastString	-- A precise location (file name)
-		{-# UNPACK #-} !Int		-- line number, begins at 1
-		{-# UNPACK #-} !Int		-- column number, begins at 1
+  = SrcLoc      FastString              -- A precise location (file name)
+                {-# UNPACK #-} !Int     -- line number, begins at 1
+                {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving Show
 
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
-  | UnhelpfulLoc FastString	-- Just a general indication
+  | UnhelpfulLoc FastString     -- Just a general indication
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcLoc-access-fns]{Access functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -127,13 +123,13 @@ mkRealSrcLoc x line col = SrcLoc x line col
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
-noSrcLoc	  = UnhelpfulLoc (fsLit "<no location info>")
+noSrcLoc          = UnhelpfulLoc (fsLit "<no location info>")
 generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
 interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive session>")
 
 -- | Creates a "bad" 'SrcLoc' that has no detailed information about its location
 mkGeneralSrcLoc :: FastString -> SrcLoc
-mkGeneralSrcLoc = UnhelpfulLoc 
+mkGeneralSrcLoc = UnhelpfulLoc
 
 -- | Gives the filename of the 'RealSrcLoc'
 srcLocFile :: RealSrcLoc -> FastString
@@ -158,9 +154,9 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcLoc-instances]{Instance declarations for various names}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -181,6 +177,9 @@ instance Ord SrcLoc where
 instance Ord RealSrcLoc where
   compare = cmpRealSrcLoc
 
+sortLocated :: [Located a] -> [Located a]
+sortLocated things = sortBy (comparing getLoc) things
+
 cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
 cmpSrcLoc (UnhelpfulLoc _)  (RealSrcLoc _)    = GT
@@ -195,7 +194,7 @@ instance Outputable RealSrcLoc where
     ppr (SrcLoc src_path src_line src_col)
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-            hcat [ pprFastFilePath src_path, char ':', 
+            hcat [ pprFastFilePath src_path, char ':',
                    int src_line,
                    char ':', int src_col
                  ]
@@ -221,9 +220,9 @@ instance Data SrcSpan where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcSpan]{Source Spans}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -238,33 +237,33 @@ span.  That is, a span of (1,1)-(1,2) is one character long, and a
 span of (1,1)-(1,1) is zero characters long.
 -}
 data RealSrcSpan
-  = SrcSpanOneLine 		-- a common case: a single line
-	{ srcSpanFile     :: !FastString,
-	  srcSpanLine     :: {-# UNPACK #-} !Int,
-	  srcSpanSCol     :: {-# UNPACK #-} !Int,
-	  srcSpanECol     :: {-# UNPACK #-} !Int
-	}
+  = SrcSpanOneLine              -- a common case: a single line
+        { srcSpanFile     :: !FastString,
+          srcSpanLine     :: {-# UNPACK #-} !Int,
+          srcSpanSCol     :: {-# UNPACK #-} !Int,
+          srcSpanECol     :: {-# UNPACK #-} !Int
+        }
 
   | SrcSpanMultiLine
-	{ srcSpanFile	  :: !FastString,
-	  srcSpanSLine    :: {-# UNPACK #-} !Int,
-	  srcSpanSCol	  :: {-# UNPACK #-} !Int,
-	  srcSpanELine    :: {-# UNPACK #-} !Int,
-	  srcSpanECol     :: {-# UNPACK #-} !Int
-	}
+        { srcSpanFile     :: !FastString,
+          srcSpanSLine    :: {-# UNPACK #-} !Int,
+          srcSpanSCol     :: {-# UNPACK #-} !Int,
+          srcSpanELine    :: {-# UNPACK #-} !Int,
+          srcSpanECol     :: {-# UNPACK #-} !Int
+        }
 
   | SrcSpanPoint
-	{ srcSpanFile	  :: !FastString,
-	  srcSpanLine	  :: {-# UNPACK #-} !Int,
-	  srcSpanCol      :: {-# UNPACK #-} !Int
-	}
+        { srcSpanFile     :: !FastString,
+          srcSpanLine     :: {-# UNPACK #-} !Int,
+          srcSpanCol      :: {-# UNPACK #-} !Int
+        }
   deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
                                 -- derive Show for Token
 
 data SrcSpan =
     RealSrcSpan !RealSrcSpan
-  | UnhelpfulSpan !FastString	-- Just a general indication
-				-- also used to indicate an empty span
+  | UnhelpfulSpan !FastString   -- Just a general indication
+                                -- also used to indicate an empty span
 
   deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
                                 -- derive Show for Token
@@ -290,15 +289,15 @@ realSrcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan
 mkRealSrcSpan loc1 loc2
   | line1 == line2 = if col1 == col2
-			then SrcSpanPoint file line1 col1
-			else SrcSpanOneLine file line1 col1 col2
+                        then SrcSpanPoint file line1 col1
+                        else SrcSpanOneLine file line1 col1 col2
   | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
   where
-	line1 = srcLocLine loc1
-	line2 = srcLocLine loc2
-	col1 = srcLocCol loc1
-	col2 = srcLocCol loc2
-	file = srcLocFile loc1
+        line1 = srcLocLine loc1
+        line2 = srcLocLine loc2
+        col1 = srcLocCol loc1
+        col2 = srcLocCol loc2
+        file = srcLocFile loc1
 
 -- | Create a 'SrcSpan' between two points in a file
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
@@ -309,33 +308,33 @@ mkSrcSpan (RealSrcLoc loc1) (RealSrcLoc loc2)
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
-combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
-combineSrcSpans	(UnhelpfulSpan _) r = r -- this seems more useful
-combineSrcSpans	l (UnhelpfulSpan _) = l
-combineSrcSpans	(RealSrcSpan span1) (RealSrcSpan span2)
+combineSrcSpans :: SrcSpan -> SrcSpan -> SrcSpan
+combineSrcSpans (UnhelpfulSpan _) r = r -- this seems more useful
+combineSrcSpans l (UnhelpfulSpan _) = l
+combineSrcSpans (RealSrcSpan span1) (RealSrcSpan span2)
     = RealSrcSpan (combineRealSrcSpans span1 span2)
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
 combineRealSrcSpans :: RealSrcSpan -> RealSrcSpan -> RealSrcSpan
 combineRealSrcSpans span1 span2
- = if line_start == line_end 
+ = if line_start == line_end
    then if col_start == col_end
         then SrcSpanPoint     file line_start col_start
         else SrcSpanOneLine   file line_start col_start col_end
    else      SrcSpanMultiLine file line_start col_start line_end col_end
   where
     (line_start, col_start) = min (srcSpanStartLine span1, srcSpanStartCol span1)
-    		 	          (srcSpanStartLine span2, srcSpanStartCol span2)
+                                  (srcSpanStartLine span2, srcSpanStartCol span2)
     (line_end, col_end)     = max (srcSpanEndLine span1, srcSpanEndCol span1)
-    		  	          (srcSpanEndLine span2, srcSpanEndCol span2)
+                                  (srcSpanEndLine span2, srcSpanEndCol span2)
     file = srcSpanFile span1
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcSpan-predicates]{Predicates}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -353,9 +352,9 @@ isOneLineSpan (UnhelpfulSpan _) = False
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcSpan-unsafe-access-fns]{Unsafe access functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -384,9 +383,9 @@ srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcSpan-access-fns]{Access functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -419,17 +418,17 @@ srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[SrcSpan-instances]{Instances}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 
 -- We want to order SrcSpans first by the start point, then by the end point.
 instance Ord SrcSpan where
-  a `compare` b = 
-     (srcSpanStart a `compare` srcSpanStart b) `thenCmp` 
+  a `compare` b =
+     (srcSpanStart a `compare` srcSpanStart b) `thenCmp`
      (srcSpanEnd   a `compare` srcSpanEnd   b)
 
 
@@ -437,7 +436,7 @@ instance Outputable RealSrcSpan where
     ppr span
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-           pprUserRealSpan True span
+           text (showUserRealSpan True span)
         else
            hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
                  char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
@@ -454,36 +453,36 @@ instance Outputable SrcSpan where
 
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan s) = ftext s
-pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
+pprUserSpan show_path (RealSrcSpan s)   = text (showUserRealSpan show_path s)
 
-pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
-pprUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-         , int line, char ':', int start_col
-         , ppUnless (end_col - start_col <= 1)
-                    (char '-' <> int (end_col-1)) 
-	    -- For single-character or point spans, we just 
-	    -- output the starting column number
-         ]
-	  
+showUserSpan :: Bool -> SrcSpan -> String
+showUserSpan _         (UnhelpfulSpan s) = unpackFS s
+showUserSpan show_path (RealSrcSpan s)   = showUserRealSpan show_path s
 
-pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
-  = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
-	 , parens (int sline <> char ',' <>  int scol)
-	 , char '-'
-	 , parens (int eline <> char ',' <>  
-	   	   if ecol == 0 then int ecol else int (ecol-1))
-	 ]
+showUserRealSpan :: Bool -> RealSrcSpan -> String
+showUserRealSpan show_path (SrcSpanOneLine src_path line start_col end_col)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ show line ++ ":" ++ show start_col
+ ++ (if end_col - start_col <= 1 then "" else '-' : show (end_col - 1))
+            -- For single-character or point spans, we just
+            -- output the starting column number
 
-pprUserRealSpan show_path (SrcSpanPoint src_path line col)
-  = hcat [ ppWhen show_path $ (pprFastFilePath src_path <> colon)
-         , int line, char ':', int col ]
+showUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ "(" ++ show sline ++ "," ++ show scol ++ ")"
+ ++ "-"
+ ++ "(" ++ show eline ++ "," ++ show ecol' ++ ")"
+    where ecol' = if ecol == 0 then ecol else ecol - 1
+
+showUserRealSpan show_path (SrcSpanPoint src_path line col)
+  = (if show_path then normalise (unpackFS src_path) ++ ":" else "")
+ ++ show line ++ ":" ++ show col
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Located]{Attaching SrcSpans to things}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -538,16 +537,16 @@ instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Ordering SrcSpans for InteractiveUI}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 -- | Alternative strategies for ordering 'SrcSpan's
 leftmost_smallest, leftmost_largest, rightmost :: SrcSpan -> SrcSpan -> Ordering
 rightmost            = flip compare
-leftmost_smallest    = compare 
+leftmost_smallest    = compare
 leftmost_largest a b = (srcSpanStart a `compare` srcSpanStart b)
                                 `thenCmp`
                        (srcSpanEnd b `compare` srcSpanEnd a)
@@ -562,7 +561,7 @@ spans (RealSrcSpan span) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcS
 isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other
             -> SrcSpan -- ^ The span it may be enclosed by
             -> Bool
-isSubspanOf src parent 
+isSubspanOf src parent
     | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
     | otherwise = srcSpanStart parent <= srcSpanStart src &&
                   srcSpanEnd parent   >= srcSpanEnd src

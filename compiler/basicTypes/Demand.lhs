@@ -305,9 +305,6 @@ newtype StrictSig = StrictSig DmdType
 instance Outputable StrictSig where
    ppr (StrictSig ty) = ppr ty
 
-instance Show StrictSig where
-   show (StrictSig ty) = showSDoc (ppr ty)
-
 mkStrictSig :: DmdType -> StrictSig
 mkStrictSig dmd_ty = StrictSig dmd_ty
 

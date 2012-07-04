@@ -6,6 +6,7 @@ import SrcLoc (SrcSpan)
 
 data Severity
   = SevOutput
+  | SevDump
   | SevInfo
   | SevWarning
   | SevError

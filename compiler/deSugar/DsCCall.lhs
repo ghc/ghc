@@ -48,7 +48,9 @@ import Literal
 import PrelNames
 import VarSet
 import Constants
+import DynFlags
 import Outputable
+import Util
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -97,13 +99,14 @@ dsCCall lbl args may_gc result_ty
   = do (unboxed_args, arg_wrappers) <- mapAndUnzipM unboxArg args
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
+       dflags <- getDynFlags
        let
-           target = StaticTarget lbl Nothing
+           target = StaticTarget lbl Nothing True
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
-           the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
+           the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
-mkFCall :: Unique -> ForeignCall 
+mkFCall :: DynFlags -> Unique -> ForeignCall 
 	-> [CoreExpr] 	-- Args
 	-> Type 	-- Result type
 	-> CoreExpr
@@ -116,14 +119,14 @@ mkFCall :: Unique -> ForeignCall
 -- Here we build a ccall thus
 --	(ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
 --			a b s x c
-mkFCall uniq the_fcall val_args res_ty
+mkFCall dflags uniq the_fcall val_args res_ty
   = mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
     body_ty = (mkFunTys arg_tys res_ty)
     tyvars  = varSetElems (tyVarsOfType body_ty)
     ty 	    = mkForAllTys tyvars body_ty
-    the_fcall_id = mkFCallId uniq the_fcall ty
+    the_fcall_id = mkFCallId dflags uniq the_fcall ty
 \end{code}
 
 \begin{code}

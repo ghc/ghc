@@ -160,6 +160,58 @@ foreign import ccall interruptible
           handle <literal>ERROR_OPERATION_ABORTED</literal>.
         </para>
       </sect2>
+
+      <sect2 id="ffi-capi">
+        <title>The CAPI calling convention</title>
+        <para>
+          The <literal>CAPI</literal> extension allows a calling
+          convention of <literal>capi</literal> to be used in foreign
+          declarations, e.g.
+
+<programlisting>
+foreign import capi "header.h f" f :: CInt -> IO CInt
+</programlisting>
+
+          Rather than generating code to call <literal>f</literal>
+          according to the platform's ABI, we instead call
+          <literal>f</literal> using the C API defined in the header
+          <literal>header.h</literal>. Thus <literal>f</literal> can be
+          called even if it may be defined as a CPP
+          <literal>#define</literal> rather than a proper function.
+        </para>
+
+        <para>
+          When using <literal>capi</literal>, it is also possible to
+          import values, rather than functions. For example,
+
+<programlisting>
+foreign import capi "pi.h value pi" c_pi :: CDouble
+</programlisting>
+
+          will work regardless of whether <literal>pi</literal> is
+          defined as
+<programlisting>
+const double pi = 3.14;
+</programlisting>
+          or with
+<programlisting>
+#define pi 3.14
+</programlisting>
+        </para>
+
+        <para>
+          In order to tell GHC the C type that a Haskell type
+          corresponds to when it is used with the CAPI, a
+          <literal>CTYPE</literal> pragma can be used on the type
+          definition. The header which defines the type can optionally
+          also be specified. The syntax looks like:
+
+<programlisting>
+data    {-# CTYPE "unistd.h" "useconds_t" #-} T = ...
+newtype {-# CTYPE            "useconds_t" #-} T = ...
+</programlisting>
+        </para>
+      </sect2>
   </sect1>
 
   <sect1 id="ffi-ghc">

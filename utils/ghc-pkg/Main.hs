@@ -69,6 +69,16 @@ import qualified System.Info(os)
 import System.Console.Terminfo as Terminfo
 #endif
 
+#ifdef mingw32_HOST_OS
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+#endif
+
 -- -----------------------------------------------------------------------------
 -- Entry point
 
@@ -119,11 +129,13 @@ flags = [
         "use the current user's package database",
   Option [] ["global"] (NoArg FlagGlobal)
         "use the global package database",
-  Option ['f'] ["package-conf"] (ReqArg FlagConfig "FILE")
-        "use the specified package config file",
-  Option [] ["global-conf"] (ReqArg FlagGlobalConfig "FILE")
-        "location of the global package config",
-  Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
+  Option ['f'] ["package-db"] (ReqArg FlagConfig "FILE/DIR")
+        "use the specified package database",
+  Option [] ["package-conf"] (ReqArg FlagConfig "FILE/DIR")
+        "use the specified package database (DEPRECATED)",
+  Option [] ["global-package-db"] (ReqArg FlagGlobalConfig "DIR")
+        "location of the global package database",
+  Option [] ["no-user-package-db"] (NoArg FlagNoUserDb)
         "never read the user package database",
   Option [] ["force"] (NoArg FlagForce)
          "ignore missing dependencies, directories, and libraries",
@@ -177,8 +189,8 @@ usageHeader prog = substProg prog $
   "  $p init {path}\n" ++
   "    Create and initialise a package database at the location {path}.\n" ++
   "    Packages can be registered in the new database using the register\n" ++
-  "    command with --package-conf={path}.  To use the new database with GHC,\n" ++
-  "    use GHC's -package-conf flag.\n" ++
+  "    command with --package-db={path}.  To use the new database with GHC,\n" ++
+  "    use GHC's -package-db flag.\n" ++
   "\n" ++
   "  $p register {filename | -}\n" ++
   "    Register the package using the specified installed package\n" ++
@@ -247,7 +259,7 @@ usageHeader prog = substProg prog $
   "    Regenerate the package database cache.  This command should only be\n" ++
   "    necessary if you added a package to the database by dropping a file\n" ++
   "    into the database directory manually.  By default, the global DB\n" ++
-  "    is recached; to recache a different DB use --user or --package-conf\n" ++
+  "    is recached; to recache a different DB use --user or --package-db\n" ++
   "    as appropriate.\n" ++
   "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
@@ -257,13 +269,13 @@ usageHeader prog = substProg prog $
   "  When asked to modify a database (register, unregister, update,\n"++
   "  hide, expose, and also check), ghc-pkg modifies the global database by\n"++
   "  default.  Specifying --user causes it to act on the user database,\n"++
-  "  or --package-conf can be used to act on another database\n"++
+  "  or --package-db can be used to act on another database\n"++
   "  entirely. When multiple of these options are given, the rightmost\n"++
   "  one is used as the database to act upon.\n"++
   "\n"++
   "  Commands that query the package database (list, tree, latest, describe,\n"++
   "  field) operate on the list of databases specified by the flags\n"++
-  "  --user, --global, and --package-conf.  If none of these flags are\n"++
+  "  --user, --global, and --package-db.  If none of these flags are\n"++
   "  given, the default is --global --user.\n"++
   "\n" ++
   " The following optional flags are also accepted:\n"
@@ -471,9 +483,9 @@ getPkgDatabases :: Verbosity
 getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
-  -- location is passed to the binary using the --global-config flag by the
+  -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
-  let err_msg = "missing --global-conf option, location of global package.conf unknown\n"
+  let err_msg = "missing --global-package-db option, location of global package database unknown\n"
   global_conf <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
         [] -> do mb_dir <- getLibDir
@@ -611,7 +623,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
                 Right tcache
                   | tcache >= tdir -> do
                      when (verbosity > Normal) $
-                        putStrLn ("using cache: " ++ cache)
+                        infoLn ("using cache: " ++ cache)
                      pkgs <- myReadBinPackageDB cache
                      let pkgs' = map convertPackageInfoIn pkgs
                      mkPackageDB pkgs'
@@ -649,7 +661,7 @@ myReadBinPackageDB filepath = do
 
 parseMultiPackageConf :: Verbosity -> FilePath -> IO [InstalledPackageInfo]
 parseMultiPackageConf verbosity file = do
-  when (verbosity > Normal) $ putStrLn ("reading package database: " ++ file)
+  when (verbosity > Normal) $ infoLn ("reading package database: " ++ file)
   str <- readUTF8File file
   let pkgs = map convertPackageInfoIn $ read str
   Exception.evaluate pkgs
@@ -658,7 +670,7 @@ parseMultiPackageConf verbosity file = do
   
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
-  when (verbosity > Normal) $ putStrLn ("reading package config: " ++ file)
+  when (verbosity > Normal) $ infoLn ("reading package config: " ++ file)
   readUTF8File file >>= fmap fst . parsePackageInfo
 
 cachefilename :: FilePath
@@ -767,13 +779,13 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
     case input of
       "-" -> do
         when (verbosity >= Normal) $
-            putStr "Reading package info from stdin ... "
+            info "Reading package info from stdin ... "
         -- fix the encoding to UTF-8, since this is an interchange format
         hSetEncoding stdin utf8
         getContents
       f   -> do
         when (verbosity >= Normal) $
-            putStr ("Reading package info from " ++ show f ++ " ... ")
+            info ("Reading package info from " ++ show f ++ " ... ")
         readUTF8File f
 
   expanded <- if expand_env_vars then expandEnvVars s force
@@ -781,7 +793,7 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
 
   (pkg, ws) <- parsePackageInfo expanded
   when (verbosity >= Normal) $
-      putStrLn "done."
+      infoLn "done."
 
   -- report any warnings from the parse phase
   _ <- reportValidateErrors [] ws
@@ -795,7 +807,7 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
   let truncated_stack = dropWhile ((/= to_modify).location) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
-  validatePackageConfig pkg_expanded truncated_stack auto_ghci_libs update force
+  validatePackageConfig pkg_expanded verbosity truncated_stack auto_ghci_libs update force
   let 
      removes = [ RemovePackage p
                | p <- packages db_to_operate_on,
@@ -850,11 +862,11 @@ changeDBDir verbosity cmds db = do
  where
   do_cmd (RemovePackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
-    when (verbosity > Normal) $ putStrLn ("removing " ++ file)
+    when (verbosity > Normal) $ infoLn ("removing " ++ file)
     removeFileSafe file
   do_cmd (AddPackage p) = do
     let file = location db </> display (installedPackageId p) <.> "conf"
-    when (verbosity > Normal) $ putStrLn ("writing " ++ file)
+    when (verbosity > Normal) $ infoLn ("writing " ++ file)
     writeFileUtf8Atomic file (showInstalledPackageInfo p)
   do_cmd (ModifyPackage p) = 
     do_cmd (AddPackage p)
@@ -863,7 +875,7 @@ updateDBCache :: Verbosity -> PackageDB -> IO ()
 updateDBCache verbosity db = do
   let filename = location db </> cachefilename
   when (verbosity > Normal) $
-      putStrLn ("writing cache " ++ filename)
+      infoLn ("writing cache " ++ filename)
   writeBinaryFileAtomic filename (map convertPackageInfoOut (packages db))
     `catchIO` \e ->
       if isPermissionError e
@@ -1144,7 +1156,7 @@ describeField verbosity my_flags pkgarg fields expand_pkgroot = do
             Nothing -> die ("unknown field: " ++ f)
             Just fn -> do fns <- toFields fs
                           return (fn:fns)
-        selectFields fns info = mapM_ (\fn->putStrLn (fn info)) fns
+        selectFields fns pinfo = mapM_ (\fn->putStrLn (fn pinfo)) fns
 
 toField :: String -> Maybe (InstalledPackageInfo -> String)
 -- backwards compatibility:
@@ -1181,7 +1193,7 @@ checkConsistency verbosity my_flags = do
   let pkgs = allPackagesInStack db_stack
 
       checkPackage p = do
-         (_,es,ws) <- runValidate $ checkPackageConfig p db_stack False True
+         (_,es,ws) <- runValidate $ checkPackageConfig p verbosity db_stack False True
          if null es
             then do when (not simple_output) $ do
                       _ <- reportValidateErrors [] ws "" Nothing
@@ -1259,7 +1271,7 @@ convertPackageInfoIn
 writeNewConfig :: Verbosity -> FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig verbosity filename ipis = do
   when (verbosity >= Normal) $
-      hPutStr stdout "Writing new package config file... "
+      info "Writing new package config file... "
   createDirectoryIfMissing True $ takeDirectory filename
   let shown = concat $ intersperse ",\n "
                      $ map (show . convertPackageInfoOut) ipis
@@ -1270,7 +1282,7 @@ writeNewConfig verbosity filename ipis = do
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
   when (verbosity >= Normal) $
-      hPutStrLn stdout "done."
+      infoLn "done."
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
@@ -1321,22 +1333,24 @@ reportValidateErrors es ws prefix mb_force = do
              err = prefix ++ s
 
 validatePackageConfig :: InstalledPackageInfo
+                      -> Verbosity
                       -> PackageDBStack
                       -> Bool   -- auto-ghc-libs
                       -> Bool   -- update, or check
                       -> Force
                       -> IO ()
-validatePackageConfig pkg db_stack auto_ghci_libs update force = do
-  (_,es,ws) <- runValidate $ checkPackageConfig pkg db_stack auto_ghci_libs update
+validatePackageConfig pkg verbosity db_stack auto_ghci_libs update force = do
+  (_,es,ws) <- runValidate $ checkPackageConfig pkg verbosity db_stack auto_ghci_libs update
   ok <- reportValidateErrors es ws (display (sourcePackageId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
+                      -> Verbosity
                       -> PackageDBStack
                       -> Bool   -- auto-ghc-libs
                       -> Bool   -- update, or check
                       -> Validate ()
-checkPackageConfig pkg db_stack auto_ghci_libs update = do
+checkPackageConfig pkg verbosity db_stack auto_ghci_libs update = do
   checkInstalledPackageId pkg db_stack update
   checkPackageId pkg
   checkDuplicates db_stack pkg update
@@ -1349,7 +1363,7 @@ checkPackageConfig pkg db_stack auto_ghci_libs update = do
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
   mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
   checkModules pkg
-  mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
+  mapM_ (checkHSLib verbosity (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
@@ -1449,14 +1463,14 @@ checkDuplicateDepends deps
   where
        dups = [ p | (p:_:_) <- group (sort deps) ]
 
-checkHSLib :: [String] -> Bool -> String -> Validate ()
-checkHSLib dirs auto_ghci_libs lib = do
+checkHSLib :: Verbosity -> [String] -> Bool -> String -> Validate ()
+checkHSLib verbosity dirs auto_ghci_libs lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
   m <- liftIO $ doesFileExistOnPath batch_lib_file dirs
   case m of
     Nothing -> verror ForceFiles ("cannot find " ++ batch_lib_file ++
                                    " on library path")
-    Just dir -> liftIO $ checkGHCiLib dir batch_lib_file lib auto_ghci_libs
+    Just dir -> liftIO $ checkGHCiLib verbosity dir batch_lib_file lib auto_ghci_libs
 
 doesFileExistOnPath :: String -> [FilePath] -> IO (Maybe FilePath)
 doesFileExistOnPath file path = go path
@@ -1479,9 +1493,9 @@ checkModules pkg = do
       when (isNothing m) $
          verror ForceFiles ("file " ++ file ++ " is missing")
 
-checkGHCiLib :: String -> String -> String -> Bool -> IO ()
-checkGHCiLib batch_lib_dir batch_lib_file lib auto_build
-  | auto_build = autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
+checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
+checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build
+  | auto_build = autoBuildGHCiLib verbosity batch_lib_dir batch_lib_file ghci_lib_file
   | otherwise  = return ()
  where
     ghci_lib_file = lib <.> "o"
@@ -1489,11 +1503,12 @@ checkGHCiLib batch_lib_dir batch_lib_file lib auto_build
 -- automatically build the GHCi version of a batch lib,
 -- using ld --whole-archive.
 
-autoBuildGHCiLib :: String -> String -> String -> IO ()
-autoBuildGHCiLib dir batch_file ghci_file = do
+autoBuildGHCiLib :: Verbosity -> String -> String -> String -> IO ()
+autoBuildGHCiLib verbosity dir batch_file ghci_file = do
   let ghci_lib_file  = dir ++ '/':ghci_file
       batch_lib_file = dir ++ '/':batch_file
-  hPutStr stderr ("building GHCi library " ++ ghci_lib_file ++ "...")
+  when (verbosity >= Normal) $
+    info ("building GHCi library " ++ ghci_lib_file ++ "...")
 #if defined(darwin_HOST_OS)
   r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"-all_load",batch_lib_file]
 #elif defined(mingw32_HOST_OS)
@@ -1503,7 +1518,8 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   r <- rawSystem "ld" ["-r","-x","-o",ghci_lib_file,"--whole-archive",batch_lib_file]
 #endif
   when (r /= ExitSuccess) $ exitWith r
-  hPutStrLn stderr (" done.")
+  when (verbosity >= Normal) $
+    infoLn (" done.")
 
 -- -----------------------------------------------------------------------------
 -- Searching for modules
@@ -1582,9 +1598,8 @@ die = dieWith 1
 
 dieWith :: Int -> String -> IO a
 dieWith ec s = do
-  hFlush stdout
   prog <- getProgramName
-  hPutStrLn stderr (prog ++ ": " ++ s)
+  reportError (prog ++ ": " ++ s)
   exitWith (ExitFailure ec)
 
 dieOrForceAll :: Force -> String -> IO ()
@@ -1593,6 +1608,13 @@ dieOrForceAll _other s   = dieForcible s
 
 warn :: String -> IO ()
 warn = reportError
+
+-- send info messages to stdout
+infoLn :: String -> IO ()
+infoLn = putStrLn
+
+info :: String -> IO ()
+info = putStr
 
 ignoreError :: String -> IO ()
 ignoreError s = reportError (s ++ " (ignoring)")
@@ -1640,7 +1662,7 @@ getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
           _ | ret < size -> fmap Just $ peekCWString buf
             | otherwise  -> try_size (size * 2)
 
-foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getLibDir :: IO (Maybe String)

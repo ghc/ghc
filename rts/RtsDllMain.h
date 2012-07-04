@@ -6,7 +6,7 @@
 #endif
 
 /* I'd be mildly surprised if this wasn't defined, but still. */
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(COMPILING_WINDOWS_DLL)
 BOOL
 WINAPI
 DllMain ( HINSTANCE hInstance

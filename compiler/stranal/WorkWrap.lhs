@@ -24,10 +24,11 @@ import IdInfo
 import Demand
 import UniqSupply
 import BasicTypes
+import DynFlags
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import WwLib
-import Util		( lengthIs, notNull )
+import Util
 import Outputable
 import MonadUtils
 
@@ -61,11 +62,11 @@ info for exported values).
 \end{enumerate}
 
 \begin{code}
-wwTopBinds :: UniqSupply -> CoreProgram -> CoreProgram
+wwTopBinds :: DynFlags -> UniqSupply -> CoreProgram -> CoreProgram
 
-wwTopBinds us top_binds
+wwTopBinds dflags us top_binds
   = initUs_ us $ do
-    top_binds' <- mapM wwBind top_binds
+    top_binds' <- mapM (wwBind dflags) top_binds
     return (concat top_binds')
 \end{code}
 
@@ -79,23 +80,24 @@ wwTopBinds us top_binds
 turn.  Non-recursive case first, then recursive...
 
 \begin{code}
-wwBind	:: CoreBind
+wwBind  :: DynFlags
+        -> CoreBind
 	-> UniqSM [CoreBind]	-- returns a WwBinding intermediate form;
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
-wwBind (NonRec binder rhs) = do
-    new_rhs <- wwExpr rhs
-    new_pairs <- tryWW NonRecursive binder new_rhs
+wwBind dflags (NonRec binder rhs) = do
+    new_rhs <- wwExpr dflags rhs
+    new_pairs <- tryWW dflags NonRecursive binder new_rhs
     return [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
-wwBind (Rec pairs)
+wwBind dflags (Rec pairs)
   = return . Rec <$> concatMapM do_one pairs
   where
-    do_one (binder, rhs) = do new_rhs <- wwExpr rhs
-                              tryWW Recursive binder new_rhs
+    do_one (binder, rhs) = do new_rhs <- wwExpr dflags rhs
+                              tryWW dflags Recursive binder new_rhs
 \end{code}
 
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -104,36 +106,36 @@ matching by looking for strict arguments of the correct type.
 @wwExpr@ is a version that just returns the ``Plain'' Tree.
 
 \begin{code}
-wwExpr :: CoreExpr -> UniqSM CoreExpr
+wwExpr :: DynFlags -> CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type {}) = return e
-wwExpr e@(Coercion {}) = return e
-wwExpr e@(Lit  {}) = return e
-wwExpr e@(Var  {}) = return e
+wwExpr _      e@(Type {}) = return e
+wwExpr _      e@(Coercion {}) = return e
+wwExpr _      e@(Lit  {}) = return e
+wwExpr _      e@(Var  {}) = return e
 
-wwExpr (Lam binder expr)
-  = Lam binder <$> wwExpr expr
+wwExpr dflags (Lam binder expr)
+  = Lam binder <$> wwExpr dflags expr
 
-wwExpr (App f a)
-  = App <$> wwExpr f <*> wwExpr a
+wwExpr dflags (App f a)
+  = App <$> wwExpr dflags f <*> wwExpr dflags a
 
-wwExpr (Tick note expr)
-  = Tick note <$> wwExpr expr
+wwExpr dflags (Tick note expr)
+  = Tick note <$> wwExpr dflags expr
 
-wwExpr (Cast expr co) = do
-    new_expr <- wwExpr expr
+wwExpr dflags (Cast expr co) = do
+    new_expr <- wwExpr dflags expr
     return (Cast new_expr co)
 
-wwExpr (Let bind expr)
-  = mkLets <$> wwBind bind <*> wwExpr expr
+wwExpr dflags (Let bind expr)
+  = mkLets <$> wwBind dflags bind <*> wwExpr dflags expr
 
-wwExpr (Case expr binder ty alts) = do
-    new_expr <- wwExpr expr
+wwExpr dflags (Case expr binder ty alts) = do
+    new_expr <- wwExpr dflags expr
     new_alts <- mapM ww_alt alts
     return (Case new_expr binder ty new_alts)
   where
     ww_alt (con, binders, rhs) = do
-        new_rhs <- wwExpr rhs
+        new_rhs <- wwExpr dflags rhs
         return (con, binders, new_rhs)
 \end{code}
 
@@ -237,7 +239,8 @@ so that it becomes active in an importing module at the same time that
 it appears in the first place in the defining module.
 
 \begin{code}
-tryWW	:: RecFlag
+tryWW   :: DynFlags
+        -> RecFlag
 	-> Id				-- The fn binder
 	-> CoreExpr			-- The bound rhs; its innards
 					--   are already ww'd
@@ -246,7 +249,7 @@ tryWW	:: RecFlag
 					-- the orig "wrapper" lives on);
 					-- if two, then a worker and a
 					-- wrapper.
-tryWW is_rec fn_id rhs
+tryWW dflags is_rec fn_id rhs
   | isNeverActive inline_act
 	-- No point in worker/wrappering if the thing is never inlined!
 	-- Because the no-inline prag will prevent the wrapper ever
@@ -259,11 +262,11 @@ tryWW is_rec fn_id rhs
   	-- See Note [Thunk splitting]
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
     checkSize new_fn_id rhs $ 
-    splitThunk new_fn_id rhs
+    splitThunk dflags new_fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
   = checkSize new_fn_id rhs $
-    splitFun new_fn_id fn_info wrap_dmds res_info rhs
+    splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
@@ -312,13 +315,13 @@ checkSize fn_id rhs thing_inside
     inline_rule = mkInlineUnfolding Nothing rhs
 
 ---------------------
-splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
+splitFun :: DynFlags -> Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
          -> UniqSM [(Id, CoreExpr)]
-splitFun fn_id fn_info wrap_dmds res_info rhs
+splitFun dflags fn_id fn_info wrap_dmds res_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
     (do {
 	-- The arity should match the signature
-      (work_demands, wrap_fn, work_fn) <- mkWwBodies fun_ty wrap_dmds res_info one_shots
+      (work_demands, wrap_fn, work_fn) <- mkWwBodies dflags fun_ty wrap_dmds res_info one_shots
     ; work_uniq <- getUniqueM
     ; let
 	work_rhs = work_fn rhs
@@ -439,9 +442,9 @@ then the splitting will go deeper too.
 --     -->  x = let x = e in
 --              case x of (a,b) -> let x = (a,b)  in x
 
-splitThunk :: Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk fn_id rhs = do
-    (_, wrap_fn, work_fn) <- mkWWstr [fn_id]
+splitThunk :: DynFlags -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
+splitThunk dflags fn_id rhs = do
+    (_, wrap_fn, work_fn) <- mkWWstr dflags [fn_id]
     return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
 \end{code}
 
@@ -501,12 +504,13 @@ unboxed thing to f, and have it reboxed in the error cases....]
 the function and the name of its worker, and we want to make its body (the wrapper).
 
 \begin{code}
-mkWrapper :: Type		-- Wrapper type
+mkWrapper :: DynFlags
+          -> Type		-- Wrapper type
 	  -> StrictSig		-- Wrapper strictness info
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
-mkWrapper fun_ty (StrictSig (DmdType _ demands res_info)) = do
-    (_, wrap_fn, _) <- mkWwBodies fun_ty demands res_info noOneShotInfo
+mkWrapper dflags fun_ty (StrictSig (DmdType _ demands res_info)) = do
+    (_, wrap_fn, _) <- mkWwBodies dflags fun_ty demands res_info noOneShotInfo
     return wrap_fn
 
 noOneShotInfo :: [Bool]

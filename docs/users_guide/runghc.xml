@@ -32,7 +32,7 @@ runghc [runghc flags] [GHC flags] module [program args]
     with a dash then you need to prefix it with
     <literal>--ghc-arg=</literal> or runghc will think that it is the
     program to run, e.g.
-    <literal>runghc -package-conf --ghc-arg=foo.conf Main.hs</literal>.
+    <literal>runghc -package-db --ghc-arg=foo.conf Main.hs</literal>.
     </para>
 
   </sect1>

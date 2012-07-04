@@ -41,8 +41,8 @@ module Id (
 	mkWorkerId, mkWiredInIdName,
 
 	-- ** Taking an Id apart
-	idName, idType, idUnique, idInfo, idDetails,
-	idPrimRep, recordSelectorFieldLabel,
+	idName, idType, idUnique, idInfo, idDetails, idRepArity,
+	recordSelectorFieldLabel,
 
 	-- ** Modifying an Id
 	setIdName, setIdUnique, Id.setIdType, 
@@ -65,7 +65,7 @@ module Id (
         hasNoBinding,
 
 	-- ** Evidence variables
-	DictId, isDictId, isEvVar,
+	DictId, isDictId, dfunNSilent, isEvVar,
 
 	-- ** Inline pragma stuff
 	idInlinePragma, setInlinePragma, modifyInlinePragma,
@@ -118,7 +118,7 @@ import Demand
 import Name
 import Module
 import Class
-import PrimOp
+import {-# SOURCE #-} PrimOp (PrimOp)
 import ForeignCall
 import Maybes
 import SrcLoc
@@ -126,7 +126,7 @@ import Outputable
 import Unique
 import UniqSupply
 import FastString
-import Util( count )
+import Util
 import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
@@ -157,9 +157,6 @@ idUnique  = Var.varUnique
 
 idType   :: Id -> Kind
 idType    = Var.varType
-
-idPrimRep :: Id -> PrimRep
-idPrimRep id = typePrimRep (idType id)
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
@@ -345,6 +342,11 @@ isDFunId id = case Var.idDetails id of
                         DFunId {} -> True
                         _         -> False
 
+dfunNSilent :: Id -> Int
+dfunNSilent id = case Var.idDetails id of
+                   DFunId ns _ -> ns
+                   _ -> pprPanic "dfunSilent: not a dfun:" (ppr id)
+
 isPrimOpId_maybe id = case Var.idDetails id of
                         PrimOpId op -> Just op
                         _           -> Nothing
@@ -461,6 +463,9 @@ idArity id = arityInfo (idInfo id)
 
 setIdArity :: Id -> Arity -> Id
 setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
+
+idRepArity :: Id -> RepArity
+idRepArity x = typeRepArity (idArity x) (idType x)
 
 -- | Returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool

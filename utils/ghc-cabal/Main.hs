@@ -19,6 +19,7 @@ import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 
+import Control.Monad
 import Data.List
 import Data.Maybe
 import System.IO
@@ -184,36 +185,20 @@ doInstall ghc ghcpkg strip topdir directory distDir
                             htmldir   = toPathTemplate "$docdir"
                         }
                 progs = withPrograms lbi
-                ghcProg = ConfiguredProgram {
-                              programId = programName ghcProgram,
-                              programVersion = Nothing,
-                              programDefaultArgs = ["-B" ++ topdir],
-                              programOverrideArgs = [],
-                              programLocation = UserSpecified ghc
-                          }
                 ghcpkgconf = topdir </> "package.conf.d"
-                ghcPkgProg = ConfiguredProgram {
-                                 programId = programName ghcPkgProgram,
-                                 programVersion = Nothing,
-                                 programDefaultArgs = ["--global-conf",
-                                                       ghcpkgconf]
-                                               ++ if not (null myDestDir)
-                                                  then ["--force"]
-                                                  else [],
-                                 programOverrideArgs = [],
-                                 programLocation = UserSpecified ghcpkg
-                             }
-                stripProg = ConfiguredProgram {
-                              programId = programName stripProgram,
-                              programVersion = Nothing,
-                              programDefaultArgs = [],
-                              programOverrideArgs = [],
-                              programLocation = UserSpecified strip
-                          }
-                progs' = updateProgram ghcProg
-                       $ updateProgram ghcPkgProg
-                       $ updateProgram stripProg
-                         progs
+                ghcProgram' = ghcProgram {
+                    programPostConf = \_ _ -> return ["-B" ++ topdir],
+                    programFindLocation = \_ -> return (Just ghc) }
+                ghcPkgProgram' = ghcPkgProgram {
+                    programPostConf = \_ _ -> return $ ["--global-package-db", ghcpkgconf]
+                                                    ++ ["--force" | not (null myDestDir) ],
+                    programFindLocation = \_ -> return (Just ghcpkg) }
+                stripProgram' = stripProgram {
+                    programFindLocation = \_ -> return (Just strip) }
+                configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
+
+            progs' <- configurePrograms [ghcProgram', ghcPkgProgram', stripProgram'] progs
+            let Just ghcPkgProg = lookupProgram ghcPkgProgram' progs'
             instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
             let mlc = libraryConfig lbi
@@ -404,4 +389,3 @@ generate config_args distdir directory
       | otherwise     = return ("\'" ++ s ++ "\'")
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"
-

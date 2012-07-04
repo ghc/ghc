@@ -33,6 +33,8 @@ import Outputable
 import FastString
 import StaticFlags
 
+import Control.Monad
+
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
 
@@ -402,12 +404,14 @@ emitPrimOp res WriteByteArrayOp_Word16    args _ = doWriteByteArrayOp (Just mo_W
 emitPrimOp res WriteByteArrayOp_Word32    args _ = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
 emitPrimOp res WriteByteArrayOp_Word64    args _ = doWriteByteArrayOp Nothing b64  res args
 
--- Copying byte arrays
+-- Copying and setting byte arrays
 
 emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] live =
     doCopyByteArrayOp src src_off dst dst_off n live
 emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] live =
     doCopyMutableByteArrayOp src src_off dst dst_off n live
+emitPrimOp [] SetByteArrayOp [ba,off,len,c] live =
+    doSetByteArrayOp ba off len c live
 
 -- Population count
 emitPrimOp [res] PopCnt8Op [w] live = emitPopCntCall res w W8 live
@@ -430,7 +434,7 @@ emitPrimOp [res] op args live
    = do vols <- getVolatileRegs live
         emitForeignCall' PlayRisky
            [CmmHinted res NoHint]
-           (CmmPrim prim)
+           (CmmPrim prim Nothing)
            [CmmHinted a NoHint | a<-args]  -- ToDo: hints?
            (Just vols)
            NoC_SRT -- No SRT b/c we do PlayRisky
@@ -440,9 +444,167 @@ emitPrimOp [res] op args live
    = let stmt = CmmAssign (CmmLocal res) (CmmMachOp mop args) in
      stmtC stmt
 
+emitPrimOp [res_q, res_r] IntQuotRemOp [arg_x, arg_y] _
+    = let genericImpl
+              = [CmmAssign (CmmLocal res_q)
+                           (CmmMachOp (MO_S_Quot wordWidth) [arg_x, arg_y]),
+                 CmmAssign (CmmLocal res_r)
+                           (CmmMachOp (MO_S_Rem  wordWidth) [arg_x, arg_y])]
+          stmt = CmmCall (CmmPrim (MO_S_QuotRem wordWidth) (Just genericImpl))
+                         [CmmHinted res_q NoHint,
+                          CmmHinted res_r NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      in stmtC stmt
+emitPrimOp [res_q, res_r] WordQuotRemOp [arg_x, arg_y] _
+    = let genericImpl
+              = [CmmAssign (CmmLocal res_q)
+                           (CmmMachOp (MO_U_Quot wordWidth) [arg_x, arg_y]),
+                 CmmAssign (CmmLocal res_r)
+                           (CmmMachOp (MO_U_Rem  wordWidth) [arg_x, arg_y])]
+          stmt = CmmCall (CmmPrim (MO_U_QuotRem wordWidth) (Just genericImpl))
+                         [CmmHinted res_q NoHint,
+                          CmmHinted res_r NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      in stmtC stmt
+emitPrimOp [res_q, res_r] WordQuotRem2Op [arg_x_high, arg_x_low, arg_y] _
+    = do let ty = cmmExprType arg_x_high
+             shl   x i = CmmMachOp (MO_Shl   wordWidth) [x, i]
+             shr   x i = CmmMachOp (MO_U_Shr wordWidth) [x, i]
+             or    x y = CmmMachOp (MO_Or    wordWidth) [x, y]
+             ge    x y = CmmMachOp (MO_U_Ge  wordWidth) [x, y]
+             ne    x y = CmmMachOp (MO_Ne    wordWidth) [x, y]
+             minus x y = CmmMachOp (MO_Sub   wordWidth) [x, y]
+             times x y = CmmMachOp (MO_Mul   wordWidth) [x, y]
+             zero   = lit 0
+             one    = lit 1
+             negone = lit (fromIntegral (widthInBits wordWidth) - 1)
+             lit i = CmmLit (CmmInt i wordWidth)
+             f :: Int -> CmmExpr -> CmmExpr -> CmmExpr -> FCode [CmmStmt]
+             f 0 acc high _ = return [CmmAssign (CmmLocal res_q) acc,
+                                      CmmAssign (CmmLocal res_r) high]
+             f i acc high low =
+                 do roverflowedBit <- newLocalReg ty
+                    rhigh'         <- newLocalReg ty
+                    rhigh''        <- newLocalReg ty
+                    rlow'          <- newLocalReg ty
+                    risge          <- newLocalReg ty
+                    racc'          <- newLocalReg ty
+                    let high'         = CmmReg (CmmLocal rhigh')
+                        isge          = CmmReg (CmmLocal risge)
+                        overflowedBit = CmmReg (CmmLocal roverflowedBit)
+                    let this = [CmmAssign (CmmLocal roverflowedBit)
+                                          (shr high negone),
+                                CmmAssign (CmmLocal rhigh')
+                                          (or (shl high one) (shr low negone)),
+                                CmmAssign (CmmLocal rlow')
+                                          (shl low one),
+                                CmmAssign (CmmLocal risge)
+                                          (or (overflowedBit `ne` zero)
+                                              (high' `ge` arg_y)),
+                                CmmAssign (CmmLocal rhigh'')
+                                          (high' `minus` (arg_y `times` isge)),
+                                CmmAssign (CmmLocal racc')
+                                          (or (shl acc one) isge)]
+                    rest <- f (i - 1) (CmmReg (CmmLocal racc'))
+                                      (CmmReg (CmmLocal rhigh''))
+                                      (CmmReg (CmmLocal rlow'))
+                    return (this ++ rest)
+         genericImpl <- f (widthInBits wordWidth) zero arg_x_high arg_x_low
+         let stmt = CmmCall (CmmPrim (MO_U_QuotRem2 wordWidth) (Just genericImpl))
+                            [CmmHinted res_q NoHint,
+                             CmmHinted res_r NoHint]
+                            [CmmHinted arg_x_high NoHint,
+                             CmmHinted arg_x_low NoHint,
+                             CmmHinted arg_y NoHint]
+                            CmmMayReturn
+         stmtC stmt
+
+emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
+ = do r1 <- newLocalReg (cmmExprType arg_x)
+      r2 <- newLocalReg (cmmExprType arg_x)
+      -- This generic implementation is very simple and slow. We might
+      -- well be able to do better, but for now this at least works.
+      let genericImpl
+           = [CmmAssign (CmmLocal r1)
+                  (add (bottomHalf arg_x) (bottomHalf arg_y)),
+              CmmAssign (CmmLocal r2)
+                  (add (topHalf (CmmReg (CmmLocal r1)))
+                       (add (topHalf arg_x) (topHalf arg_y))),
+              CmmAssign (CmmLocal res_h)
+                  (topHalf (CmmReg (CmmLocal r2))),
+              CmmAssign (CmmLocal res_l)
+                  (or (toTopHalf (CmmReg (CmmLocal r2)))
+                      (bottomHalf (CmmReg (CmmLocal r1))))]
+               where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
+                     toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
+                     bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
+                     add x y = CmmMachOp (MO_Add wordWidth) [x, y]
+                     or x y = CmmMachOp (MO_Or wordWidth) [x, y]
+                     hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
+                                          wordWidth)
+                     hwm = CmmLit (CmmInt halfWordMask wordWidth)
+          stmt = CmmCall (CmmPrim (MO_Add2 wordWidth) (Just genericImpl))
+                         [CmmHinted res_h NoHint,
+                          CmmHinted res_l NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      stmtC stmt
+emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
+ = do let t = cmmExprType arg_x
+      xlyl <- liftM CmmLocal $ newLocalReg t
+      xlyh <- liftM CmmLocal $ newLocalReg t
+      xhyl <- liftM CmmLocal $ newLocalReg t
+      r    <- liftM CmmLocal $ newLocalReg t
+      -- This generic implementation is very simple and slow. We might
+      -- well be able to do better, but for now this at least works.
+      let genericImpl
+           = [CmmAssign xlyl
+                  (mul (bottomHalf arg_x) (bottomHalf arg_y)),
+              CmmAssign xlyh
+                  (mul (bottomHalf arg_x) (topHalf arg_y)),
+              CmmAssign xhyl
+                  (mul (topHalf arg_x) (bottomHalf arg_y)),
+              CmmAssign r
+                  (sum [topHalf    (CmmReg xlyl),
+                        bottomHalf (CmmReg xhyl),
+                        bottomHalf (CmmReg xlyh)]),
+              CmmAssign (CmmLocal res_l)
+                  (or (bottomHalf (CmmReg xlyl))
+                      (toTopHalf (CmmReg r))),
+              CmmAssign (CmmLocal res_h)
+                  (sum [mul (topHalf arg_x) (topHalf arg_y),
+                        topHalf (CmmReg xhyl),
+                        topHalf (CmmReg xlyh),
+                        topHalf (CmmReg r)])]
+               where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
+                     toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
+                     bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
+                     add x y = CmmMachOp (MO_Add wordWidth) [x, y]
+                     sum = foldl1 add
+                     mul x y = CmmMachOp (MO_Mul wordWidth) [x, y]
+                     or x y = CmmMachOp (MO_Or wordWidth) [x, y]
+                     hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
+                                          wordWidth)
+                     hwm = CmmLit (CmmInt halfWordMask wordWidth)
+          stmt = CmmCall (CmmPrim (MO_U_Mul2 wordWidth) (Just genericImpl))
+                         [CmmHinted res_h NoHint,
+                          CmmHinted res_l NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      stmtC stmt
+
 emitPrimOp _ op _ _
  = pprPanic "emitPrimOp: can't translate PrimOp" (ppr op)
 
+newLocalReg :: CmmType -> FCode LocalReg
+newLocalReg t = do u <- newUnique
+                   return $ LocalReg u t
 
 -- These PrimOps are NOPs in Cmm
 
@@ -748,6 +910,18 @@ emitCopyByteArray copy src src_off dst dst_off n live = do
     copy src dst dst_p src_p n live
 
 -- ----------------------------------------------------------------------------
+-- Setting byte arrays
+
+-- | Takes a 'MutableByteArray#', an offset into the array, a length,
+-- and a byte, and sets each of the selected bytes in the array to the
+-- character.
+doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                 -> StgLiveVars -> Code
+doSetByteArrayOp ba off len c live
+    = do p <- assignTemp $ cmmOffsetExpr (cmmOffsetB ba arrWordsHdrSize) off
+         emitMemsetCall p c len (CmmLit (mkIntCLit 1)) live
+
+-- ----------------------------------------------------------------------------
 -- Copying pointer arrays
 
 -- EZY: This code has an unusually high amount of assignTemp calls, seen
@@ -889,7 +1063,7 @@ emitMemcpyCall dst src n align live = do
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
         [{-no results-}]
-        (CmmPrim MO_Memcpy)
+        (CmmPrim MO_Memcpy Nothing)
         [ (CmmHinted dst AddrHint)
         , (CmmHinted src AddrHint)
         , (CmmHinted n NoHint)
@@ -906,7 +1080,7 @@ emitMemmoveCall dst src n align live = do
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
         [{-no results-}]
-        (CmmPrim MO_Memmove)
+        (CmmPrim MO_Memmove Nothing)
         [ (CmmHinted dst AddrHint)
         , (CmmHinted src AddrHint)
         , (CmmHinted n NoHint)
@@ -924,7 +1098,7 @@ emitMemsetCall dst c n align live = do
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
         [{-no results-}]
-        (CmmPrim MO_Memset)
+        (CmmPrim MO_Memset Nothing)
         [ (CmmHinted dst AddrHint)
         , (CmmHinted c NoHint)
         , (CmmHinted n NoHint)
@@ -956,7 +1130,7 @@ emitPopCntCall res x width live = do
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
         [CmmHinted res NoHint]
-        (CmmPrim (MO_PopCnt width))
+        (CmmPrim (MO_PopCnt width) Nothing)
         [(CmmHinted x NoHint)]
         (Just vols)
         NoC_SRT -- No SRT b/c we do PlayRisky

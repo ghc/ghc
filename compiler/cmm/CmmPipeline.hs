@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 -- Norman likes local bindings
--- If this module lives on I'd like to get rid of this flag in due course
+-- If this module lives on I'd like to get rid of this extension in due course
 
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
@@ -76,7 +76,7 @@ cmmPipeline hsc_env topSRT prog =
      let cmms :: CmmGroup
          cmms = reverse (concat tops)
 
-     dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
+     dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
 
      return (topSRT, cmms)
 
@@ -127,7 +127,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        ------------- Split into separate procedures ------------
        procPointMap  <- {-# SCC "procPointAnalysis" #-} run $
                         procPointAnalysis procPoints g
-       dumpWith dflags ppr Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
+       dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
        gs <- {-# SCC "splitAtProcPoints" #-} run $
              splitAtProcPoints l callPPs procPoints procPointMap (CmmProc h l g)
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
@@ -135,7 +135,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        ------------- More CAFs ------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform g
        let localCAFs = {-# SCC "localCAFs" #-} catMaybes $ map (localCAFInfo platform cafEnv) gs
-       mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
+       mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
        gs <- {-# SCC "setInfoTableStackMap" #-}
@@ -161,7 +161,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
         dump = dumpGraph dflags
 
         dumps flag name
-           = mapM_ (dumpWith dflags (pprPlatform platform) flag name)
+           = mapM_ (dumpWith dflags flag name)
 
         -- Runs a required transformation/analysis
         run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
@@ -173,7 +173,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
   when (dopt Opt_DoCmmLinting dflags) $ do_lint g
-  dumpWith dflags (pprPlatform (targetPlatform dflags)) flag name g
+  dumpWith dflags flag name g
  where
   do_lint g = case cmmLintGraph (targetPlatform dflags) g of
                  Just err -> do { printDump err
@@ -181,14 +181,14 @@ dumpGraph dflags flag name g = do
                                 }
                  Nothing  -> return ()
 
-dumpWith :: DynFlags -> (a -> SDoc) -> DynFlag -> String -> a -> IO ()
-dumpWith dflags pprFun flag txt g = do
+dumpWith :: Outputable a => DynFlags -> DynFlag -> String -> a -> IO ()
+dumpWith dflags flag txt g = do
          -- ToDo: No easy way of say "dump all the cmmz, *and* split
          -- them into files."  Also, -ddump-cmmz doesn't play nicely
          -- with -ddump-to-file, since the headers get omitted.
-   dumpIfSet_dyn dflags flag txt (pprFun g)
+   dumpIfSet_dyn dflags flag txt (ppr g)
    when (not (dopt flag dflags)) $
-      dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (pprFun g)
+      dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
 
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined

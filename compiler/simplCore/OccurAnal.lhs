@@ -44,7 +44,7 @@ import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique
 import UniqFM
-import Util             ( mapAndUnzip, filterOut, fstOf3 )
+import Util
 import Bag
 import Outputable
 import FastString
@@ -79,6 +79,14 @@ occurAnalysePgm this_mod active_rule imp_rules vects binds
                             (rulesFreeVars imp_rules `unionVarSet` vectsFreeVars vects)
     -- The RULES and VECTORISE declarations keep things alive!
 
+    -- Note [Preventing loops due to imported functions rules]
+    imp_rules_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
+                            [ mapVarEnv (const maps_to) (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
+                            | imp_rule <- imp_rules
+                            , let maps_to = exprFreeIds (ru_rhs imp_rule)
+                                             `delVarSetList` ru_bndrs imp_rule
+                            , arg <- ru_args imp_rule ]
+
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
         = (initial_uds, [])
@@ -86,7 +94,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects binds
         = (final_usage, bind' ++ binds')
         where
            (bs_usage, binds')   = go env binds
-           (final_usage, bind') = occAnalBind env env bind bs_usage
+           (final_usage, bind') = occAnalBind env env imp_rules_edges bind bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
         -- Do occurrence analysis, and discard occurence info returned
@@ -110,12 +118,13 @@ Bindings
 \begin{code}
 occAnalBind :: OccEnv 		-- The incoming OccEnv
 	    -> OccEnv		-- Same, but trimmed by (binderOf bind)
+            -> IdEnv IdSet      -- Mapping from FVs of imported RULE LHSs to RHS FVs
             -> CoreBind
             -> UsageDetails             -- Usage details of scope
             -> (UsageDetails,           -- Of the whole let(rec)
                 [CoreBind])
 
-occAnalBind env _ (NonRec binder rhs) body_usage
+occAnalBind env _ imp_rules_edges (NonRec binder rhs) body_usage
   | isTyVar binder	-- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
@@ -123,15 +132,17 @@ occAnalBind env _ (NonRec binder rhs) body_usage
   = (body_usage, [])
 
   | otherwise                   -- It's mentioned in the body
-  = (body_usage' +++ rhs_usage3, [NonRec tagged_binder rhs'])
+  = (body_usage' +++ rhs_usage4, [NonRec tagged_binder rhs'])
   where
     (body_usage', tagged_binder) = tagBinder body_usage binder
     (rhs_usage1, rhs')           = occAnalRhs env (Just tagged_binder) rhs
     rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
     rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
        -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
+    rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $ lookupVarEnv imp_rules_edges binder
+       -- See Note [Preventing loops due to imported functions rules]
 
-occAnalBind _ env (Rec pairs) body_usage
+occAnalBind _ env imp_rules_edges (Rec pairs) body_usage
   = foldr occAnalRec (body_usage, []) sccs
 	-- For a recursive group, we 
 	--	* occ-analyse all the RHSs
@@ -144,7 +155,7 @@ occAnalBind _ env (Rec pairs) body_usage
     sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompFromEdgedVerticesR nodes
 
     nodes :: [Node Details]
-    nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env bndr_set) pairs
+    nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env imp_rules_edges bndr_set) pairs
 \end{code}
 
 Note [Dead code]
@@ -404,6 +415,87 @@ It's up the programmer not to write silly rules like
      RULE f x = f x
 and the example above is just a more complicated version. 
 
+Note [Preventing loops due to imported functions rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+  import GHC.Base (foldr)
+  
+  {-# RULES "filterList" forall p. foldr (filterFB (:) p) [] = filter p #-}
+  filter p xs = build (\c n -> foldr (filterFB c p) n xs)
+  filterFB c p = ...
+
+  f = filter p xs
+
+Note that filter is not a loop-breaker, so what happens is:
+  f =          filter p xs
+    = {inline} build (\c n -> foldr (filterFB c p) n xs)
+    = {inline} foldr (filterFB (:) p) [] xs
+    = {RULE}   filter p xs
+
+We are in an infinite loop.
+
+A more elaborate example (that I actually saw in practice when I went to
+mark GHC.List.filter as INLINABLE) is as follows. Say I have this module:
+  {-# LANGUAGE Rank2Types #-}
+  module GHCList where
+  
+  import Prelude hiding (filter)
+  import GHC.Base (build)
+  
+  {-# INLINABLE filter #-}
+  filter :: (a -> Bool) -> [a] -> [a]
+  filter p [] = []
+  filter p (x:xs) = if p x then x : filter p xs else filter p xs
+  
+  {-# NOINLINE [0] filterFB #-}
+  filterFB :: (a -> b -> b) -> (a -> Bool) -> a -> b -> b
+  filterFB c p x r | p x       = x `c` r
+                   | otherwise = r
+  
+  {-# RULES
+  "filter"     [~1] forall p xs.  filter p xs = build (\c n -> foldr
+  (filterFB c p) n xs)
+  "filterList" [1]  forall p.     foldr (filterFB (:) p) [] = filter p
+   #-}
+
+Then (because RULES are applied inside INLINABLE unfoldings, but inlinings
+are not), the unfolding given to "filter" in the interface file will be:
+  filter p []     = []
+  filter p (x:xs) = if p x then x : build (\c n -> foldr (filterFB c p) n xs)
+                           else     build (\c n -> foldr (filterFB c p) n xs
+
+Note that because this unfolding does not mention "filter", filter is not
+marked as a strong loop breaker. Therefore at a use site in another module:
+  filter p xs
+    = {inline}
+      case xs of []     -> []
+                 (x:xs) -> if p x then x : build (\c n -> foldr (filterFB c p) n xs)
+                                  else     build (\c n -> foldr (filterFB c p) n xs)
+
+  build (\c n -> foldr (filterFB c p) n xs)
+    = {inline} foldr (filterFB (:) p) [] xs
+    = {RULE}   filter p xs
+
+And we are in an infinite loop again, except that this time the loop is producing an
+infinitely large *term* (an unrolling of filter) and so the simplifier finally
+dies with "ticks exhausted"
+
+Because of this problem, we make a small change in the occurrence analyser
+designed to mark functions like "filter" as strong loop breakers on the basis that:
+  1. The RHS of filter mentions the local function "filterFB"
+  2. We have a rule which mentions "filterFB" on the LHS and "filter" on the RHS
+
+So for each RULE for an *imported* function we are going to add
+dependency edges between the *local* FVS of the rule LHS and the
+*local* FVS of the rule RHS. We don't do anything special for RULES on
+local functions because the standard occurrence analysis stuff is
+pretty good at getting loop-breakerness correct there.
+
+It is important to note that even with this extra hack we aren't always going to get
+things right. For example, it might be that the rule LHS mentions an imported Id,
+and another module has a RULE that can rewrite that imported Id to one of our local
+Ids.
+
 Note [Specialising imported functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BUT for *automatically-generated* rules, the programmer can't be
@@ -566,8 +658,8 @@ instance Outputable Details where
                   , ptext (sLit "rule =") <+> ppr (nd_active_rule_fvs nd)
 	     ])
 
-makeNode :: OccEnv -> VarSet -> (Var, CoreExpr) -> Node Details
-makeNode env bndr_set (bndr, rhs)
+makeNode :: OccEnv -> IdEnv IdSet -> VarSet -> (Var, CoreExpr) -> Node Details
+makeNode env imp_rules_edges bndr_set (bndr, rhs)
   = (details, varUnique bndr, keysUFM node_fvs)
   where
     details = ND { nd_bndr = bndr
@@ -591,7 +683,9 @@ makeNode env bndr_set (bndr, rhs)
     is_active = occ_rule_act env :: Activation -> Bool
     rules = filterOut isBuiltinRule (idCoreRules bndr)
     rules_w_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_fvs = [ (ru_act rule, fvs)
+    rules_w_fvs = maybe id (\ids -> ((AlwaysActive, ids):)) (lookupVarEnv imp_rules_edges bndr)
+                   -- See Note [Preventing loops due to imported functions rules]
+                  [ (ru_act rule, fvs)
                   | rule <- rules
                   , let fvs = exprFreeVars (ru_rhs rule)
 		    	      `delVarSetList` ru_bndrs rule
@@ -1158,7 +1252,7 @@ occAnal env (Case scrut bndr ty alts)
   = case occ_anal_scrut scrut alts     of { (scrut_usage, scrut') ->
     case mapAndUnzip occ_anal_alt alts of { (alts_usage_s, alts')   ->
     let
-        alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
+        alts_usage  = foldr combineAltsUsageDetails emptyDetails alts_usage_s
         (alts_usage1, tagged_bndr) = tag_case_bndr alts_usage bndr
         total_usage = scrut_usage +++ alts_usage1
     in
@@ -1191,7 +1285,7 @@ occAnal env (Case scrut bndr ty alts)
 
 occAnal env (Let bind body)
   = case occAnal env_body body                    of { (body_usage, body') ->
-    case occAnalBind env env_body bind body_usage of { (final_usage, new_binds) ->
+    case occAnalBind env env_body emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
   where
     env_body = trimOccEnv env (bindersOf bind)

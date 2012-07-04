@@ -31,7 +31,7 @@ import Id		( isOneShotBndr, idType )
 import Var
 import Type		( isUnLiftedType )
 import VarSet
-import Util		( zipEqual, zipWithEqual, count )
+import Util
 import UniqFM
 import Outputable
 \end{code}
@@ -354,19 +354,27 @@ For @Case@, the possible ``drop points'' for the \tr{to_drop}
 bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
 
+Floating case expressions inward was added to fix Trac #5658: strict bindings
+not floated in. In particular, this change allows array indexing operations,
+which have a single DEFAULT alternative without any binders, to be floated
+inward. SIMD primops for unpacking SIMD vectors into an unboxed tuple of unboxed
+scalars also need to be floated inward, but unpacks have a single non-DEFAULT
+alternative that binds the elements of the tuple. We now therefore also support
+floating in cases with a single alternative that may bind values.
+
 \begin{code}
-fiExpr to_drop (_, AnnCase scrut case_bndr _ [(DEFAULT,[],rhs)])
+fiExpr to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
   | isUnLiftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
   = wrapFloats shared_binds $
     fiExpr (case_float : rhs_binds) rhs
   where
-    case_float = FB (unitVarSet case_bndr) scrut_fvs 
-                    (FloatCase scrut' case_bndr DEFAULT [])
+    case_float = FB (mkVarSet (case_bndr : alt_bndrs)) scrut_fvs 
+                    (FloatCase scrut' case_bndr con alt_bndrs)
     scrut' = fiExpr scrut_binds scrut
     [shared_binds, scrut_binds, rhs_binds]
        = sepBindsByDropPoint False [freeVarsOf scrut, rhs_fvs] to_drop
-    rhs_fvs   = freeVarsOf rhs `delVarSet` case_bndr
+    rhs_fvs   = freeVarsOf rhs `delVarSetList` (case_bndr : alt_bndrs)
     scrut_fvs = freeVarsOf scrut
 
 fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)

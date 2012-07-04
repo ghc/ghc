@@ -83,10 +83,11 @@ emitWanteds :: CtOrigin -> TcThetaType -> TcM [EvVar]
 emitWanteds origin theta = mapM (emitWanted origin) theta
 
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
-emitWanted origin pred = do { loc <- getCtLoc origin
-                            ; ev  <- newWantedEvVar pred
-                            ; emitFlat (mkNonCanonical ev (Wanted loc))
-                            ; return ev }
+emitWanted origin pred 
+  = do { loc <- getCtLoc origin
+       ; ev  <- newWantedEvVar pred
+       ; emitFlat (mkNonCanonical (Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev }))
+       ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
 -- Used when Name is the wired-in name for a wired-in class method,
@@ -152,8 +153,7 @@ deeplySkolemise
 deeplySkolemise ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
   = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
-       ; tvs1 <- tcInstSkolTyVars tvs
-       ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs1)
+       ; (subst, tvs1) <- tcInstSkolTyVars tvs
        ; ev_vars1 <- newEvVars (substTheta subst theta)
        ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise (substTy subst ty')
        ; return ( mkWpLams ids1
@@ -219,7 +219,7 @@ instCallConstraints _ [] = return idHsWrapper
 
 instCallConstraints origin (pred : preds)
   | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred (ty1, ty2))
+  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred ty1 ty2)
         ; co <- unifyType ty1 ty2
 	; co_fn <- instCallConstraints origin preds
         ; return (co_fn <.> WpEvApp (EvCoercion co)) }
@@ -475,25 +475,28 @@ traceDFuns ispecs
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
 funDepErr ispec ispecs
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Functional dependencies conflict between instance declarations:"))
-	       2 (pprInstances (ispec:ispecs)))
+  = addClsInstsErr (ptext (sLit "Functional dependencies conflict between instance declarations:"))
+                    (ispec : ispecs)
+
 dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Duplicate instance declarations:"))
-	       2 (pprInstances [ispec, dup_ispec]))
+  = addClsInstsErr (ptext (sLit "Duplicate instance declarations:"))
+	            [ispec, dup_ispec]
+
 overlappingInstErr :: ClsInst -> ClsInst -> TcRn ()
 overlappingInstErr ispec dup_ispec
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Overlapping instance declarations:"))
-	       2 (pprInstances [ispec, dup_ispec]))
+  = addClsInstsErr (ptext (sLit "Overlapping instance declarations:")) 
+                    [ispec, dup_ispec]
 
-addDictLoc :: ClsInst -> TcRn a -> TcRn a
-addDictLoc ispec thing_inside
-  = setSrcSpan (mkSrcSpan loc loc) thing_inside
-  where
-   loc = getSrcLoc ispec
+addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
+addClsInstsErr herald ispecs
+  = setSrcSpan (getSrcSpan (head sorted)) $
+    addErr (hang herald 2 (pprInstances sorted))
+ where
+   sorted = sortWith getSrcLoc ispecs
+   -- The sortWith just arranges that instances are dislayed in order
+   -- of source location, which reduced wobbling in error messages,
+   -- and is better for users
 \end{code}
 
 %************************************************************************
@@ -513,22 +516,20 @@ hasEqualities :: [EvVar] -> Bool
 hasEqualities givens = any (has_eq . evVarPred) givens
   where
     has_eq = has_eq' . classifyPredType
-
+    
+    -- See Note [Float Equalities out of Implications] in TcSimplify
     has_eq' (EqPred {})          = True
-    has_eq' (IPPred {})          = False
     has_eq' (ClassPred cls _tys) = any has_eq (classSCTheta cls)
     has_eq' (TuplePred ts)       = any has_eq ts
     has_eq' (IrredPred _)        = True -- Might have equalities in it after reduction?
 
 ---------------- Getting free tyvars -------------------------
-
 tyVarsOfCt :: Ct -> TcTyVarSet
 tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOfType xi) tv
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
-tyVarsOfCt (CIPCan { cc_ip_ty = ty })                   = tyVarsOfType ty
 tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
-tyVarsOfCt (CNonCanonical { cc_id = ev })               = tyVarsOfEvVar ev
+tyVarsOfCt (CNonCanonical { cc_ev = fl })           = tyVarsOfType (ctEvPred fl)
 
 tyVarsOfCDict :: Ct -> TcTyVarSet 
 tyVarsOfCDict (CDictCan { cc_tyargs = tys }) = tyVarsOfTypes tys
@@ -562,21 +563,29 @@ tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
 ---------------- Tidying -------------------------
 
 tidyCt :: TidyEnv -> Ct -> Ct
+-- Used only in error reporting
 -- Also converts it to non-canonical
 tidyCt env ct 
-  = CNonCanonical { cc_id     = tidyEvVar env (cc_id ct)
-                  , cc_flavor = tidyFlavor env (cc_flavor ct)
+  = CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
                   , cc_depth  = cc_depth ct } 
+  where 
+    tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
+     -- NB: we do not tidy the ctev_evtm/var field because we don't 
+     --     show it in error messages
+    tidy_flavor env ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
+      = ctev { ctev_gloc = tidyGivenLoc env gloc
+             , ctev_pred = tidyType env pred }
+    tidy_flavor env ctev@(Wanted { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
+    tidy_flavor env ctev@(Derived { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
 
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
-tidyFlavor :: TidyEnv -> CtFlavor -> CtFlavor
-tidyFlavor env (Given loc gk) = Given (tidyGivenLoc env loc) gk
-tidyFlavor _   fl          = fl
-
 tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
-tidyGivenLoc env (CtLoc skol span ctxt) = CtLoc (tidySkolemInfo env skol) span ctxt
+tidyGivenLoc env (CtLoc skol span ctxt) 
+  = CtLoc (tidySkolemInfo env skol) span ctxt
 
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
 tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
@@ -592,17 +601,20 @@ tidySkolemInfo env (UnifyForAllSkol skol_tvs ty)
 tidySkolemInfo _   info            = info
 
 ---------------- Substitution -------------------------
+-- This is used only in TcSimpify, for substituations that are *also* 
+-- reflected in the unification variables.  So we don't substitute
+-- in the evidence.
+
 substCt :: TvSubst -> Ct -> Ct 
 -- Conservatively converts it to non-canonical:
 -- Postcondition: if the constraint does not get rewritten
 substCt subst ct
-  | ev <- cc_id ct, pty <- evVarPred (cc_id ct) 
+  | pty <- ctPred ct
   , sty <- substTy subst pty 
   = if sty `eqType` pty then 
-        ct { cc_flavor = substFlavor subst (cc_flavor ct) }
+        ct { cc_ev = substFlavor subst (cc_ev ct) }
     else 
-        CNonCanonical { cc_id  = setVarType ev sty 
-                      , cc_flavor = substFlavor subst (cc_flavor ct)
+        CNonCanonical { cc_ev = substFlavor subst (cc_ev ct)
                       , cc_depth  = cc_depth ct }
 
 substWC :: TvSubst -> WantedConstraints -> WantedConstraints
@@ -626,12 +638,20 @@ substImplication subst implic@(Implic { ic_skols = tvs
 substEvVar :: TvSubst -> EvVar -> EvVar
 substEvVar subst var = setVarType var (substTy subst (varType var))
 
-substFlavor :: TvSubst -> CtFlavor -> CtFlavor
-substFlavor subst (Given loc gk) = Given (substGivenLoc subst loc) gk
-substFlavor _     fl             = fl
+substFlavor :: TvSubst -> CtEvidence -> CtEvidence
+substFlavor subst ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
+  = ctev { ctev_gloc = substGivenLoc subst gloc
+          , ctev_pred = substTy subst pred }
+
+substFlavor subst ctev@(Wanted { ctev_pred = pred })
+  = ctev  { ctev_pred = substTy subst pred }
+
+substFlavor subst ctev@(Derived { ctev_pred = pty })
+  = ctev { ctev_pred = substTy subst pty }
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
-substGivenLoc subst (CtLoc skol span ctxt) = CtLoc (substSkolemInfo subst skol) span ctxt
+substGivenLoc subst (CtLoc skol span ctxt) 
+  = CtLoc (substSkolemInfo subst skol) span ctxt
 
 substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
 substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)

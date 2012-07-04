@@ -14,13 +14,12 @@
 #include "RtsUtils.h"
 
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
 
 typedef struct {
-    dev_t device;
-    ino_t inode;
+    StgWord64 device;
+    StgWord64 inode;
     int   readers; // >0 : readers,  <0 : writers
 } Lock;
 
@@ -45,8 +44,8 @@ static int cmpLocks(StgWord w1, StgWord w2)
 static int hashLock(HashTable *table, StgWord w)
 {
     Lock *l = (Lock *)w;
-    // Just xor the dev_t with the ino_t, hope this is good enough.
-    return hashWord(table, (StgWord)l->inode ^ (StgWord)l->device);
+    // Just xor all 32-bit words of inode and device, hope this is good enough.
+    return hashWord(table, l->inode ^ (l->inode >> 32) ^ l->device ^ (l->device >> 32));
 }
 
 void
@@ -76,7 +75,7 @@ freeFileLocking(void)
 }
 
 int
-lockFile(int fd, dev_t dev, ino_t ino, int for_writing)
+lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
 {
     Lock key, *lock;
 

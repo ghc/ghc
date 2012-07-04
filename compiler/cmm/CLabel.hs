@@ -252,23 +252,22 @@ data ForeignLabelSource
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
 --      The regular Outputable instance only shows the label name, and not its other info.
 --
-pprDebugCLabel :: Platform -> CLabel -> SDoc
-pprDebugCLabel platform lbl
+pprDebugCLabel :: CLabel -> SDoc
+pprDebugCLabel lbl
  = case lbl of
-        IdLabel{}       -> pprPlatform platform lbl <> (parens $ text "IdLabel")
+        IdLabel{}       -> ppr lbl <> (parens $ text "IdLabel")
         CmmLabel pkg _name _info
-         -> pprPlatform platform lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
+         -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
-        RtsLabel{}      -> pprPlatform platform lbl <> (parens $ text "RtsLabel")
+        RtsLabel{}      -> ppr lbl <> (parens $ text "RtsLabel")
 
         ForeignLabel _name mSuffix src funOrData
-         -> pprPlatform platform lbl <> (parens
-                                $ text "ForeignLabel"
+            -> ppr lbl <> (parens $ text "ForeignLabel"
                                 <+> ppr mSuffix
                                 <+> ppr src
                                 <+> ppr funOrData)
 
-        _               -> pprPlatform platform lbl <> (parens $ text "other CLabel)")
+        _               -> ppr lbl <> (parens $ text "other CLabel)")
 
 
 data IdLabelInfo
@@ -534,38 +533,38 @@ mkPlainModuleInitLabel mod      = PlainModuleInitLabel mod
 -- -----------------------------------------------------------------------------
 -- Convert between different kinds of label
 
-toClosureLbl :: Platform -> CLabel -> CLabel
-toClosureLbl _ (IdLabel n c _) = IdLabel n c Closure
-toClosureLbl platform l = pprPanic "toClosureLbl" (pprCLabel platform l)
+toClosureLbl :: CLabel -> CLabel
+toClosureLbl (IdLabel n c _) = IdLabel n c Closure
+toClosureLbl l = pprPanic "toClosureLbl" (ppr l)
 
-toSlowEntryLbl :: Platform -> CLabel -> CLabel
-toSlowEntryLbl _ (IdLabel n c _) = IdLabel n c Slow
-toSlowEntryLbl platform l = pprPanic "toSlowEntryLbl" (pprCLabel platform l)
+toSlowEntryLbl :: CLabel -> CLabel
+toSlowEntryLbl (IdLabel n c _) = IdLabel n c Slow
+toSlowEntryLbl l = pprPanic "toSlowEntryLbl" (ppr l)
 
-toRednCountsLbl :: Platform -> CLabel -> CLabel
-toRednCountsLbl _ (IdLabel n c _) = IdLabel n c RednCounts
-toRednCountsLbl platform l = pprPanic "toRednCountsLbl" (pprCLabel platform l)
+toRednCountsLbl :: CLabel -> CLabel
+toRednCountsLbl (IdLabel n c _) = IdLabel n c RednCounts
+toRednCountsLbl l = pprPanic "toRednCountsLbl" (ppr l)
 
-toEntryLbl :: Platform -> CLabel -> CLabel
-toEntryLbl _ (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
-toEntryLbl _ (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
-toEntryLbl _ (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
-toEntryLbl _ (IdLabel n c _)               = IdLabel n c Entry
-toEntryLbl _ (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
-toEntryLbl _ (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
-toEntryLbl _ (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
-toEntryLbl platform l = pprPanic "toEntryLbl" (pprCLabel platform l)
+toEntryLbl :: CLabel -> CLabel
+toEntryLbl (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
+toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
+toEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
+toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
+toEntryLbl (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
+toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
+toEntryLbl (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
+toEntryLbl l = pprPanic "toEntryLbl" (ppr l)
 
-toInfoLbl :: Platform -> CLabel -> CLabel
-toInfoLbl _ (IdLabel n c Entry)          = IdLabel n c InfoTable
-toInfoLbl _ (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
-toInfoLbl _ (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
-toInfoLbl _ (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
-toInfoLbl _ (IdLabel n c _)              = IdLabel n c InfoTable
-toInfoLbl _ (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
-toInfoLbl _ (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
-toInfoLbl _ (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
-toInfoLbl platform l = pprPanic "CLabel.toInfoLbl" (pprCLabel platform l)
+toInfoLbl :: CLabel -> CLabel
+toInfoLbl (IdLabel n c Entry)          = IdLabel n c InfoTable
+toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
+toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
+toInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
+toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
+toInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
+toInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
+toInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
+toInfoLbl l = pprPanic "CLabel.toInfoLbl" (ppr l)
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel refer to a CAF?
@@ -922,8 +921,8 @@ Not exporting these Just_info labels reduces the number of symbols
 somewhat.
 -}
 
-instance PlatformOutputable CLabel where
-  pprPlatform = pprCLabel
+instance Outputable CLabel where
+  ppr c = sdocWithPlatform $ \platform -> pprCLabel platform c
 
 pprCLabel :: Platform -> CLabel -> SDoc
 
@@ -1106,35 +1105,35 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl
  = if platformOS platform == OSDarwin
    then if platformArch platform == ArchX86_64
         then case dllInfo of
-             CodeStub        -> char 'L' <> pprCLabel platform lbl <> text "$stub"
-             SymbolPtr       -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
-             GotSymbolPtr    -> pprCLabel platform lbl <> text "@GOTPCREL"
-             GotSymbolOffset -> pprCLabel platform lbl
+             CodeStub        -> char 'L' <> ppr lbl <> text "$stub"
+             SymbolPtr       -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+             GotSymbolPtr    -> ppr lbl <> text "@GOTPCREL"
+             GotSymbolOffset -> ppr lbl
         else case dllInfo of
-             CodeStub  -> char 'L' <> pprCLabel platform lbl <> text "$stub"
-             SymbolPtr -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
+             CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
+             SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
              _         -> panic "pprDynamicLinkerAsmLabel"
 
    else if osElfTarget (platformOS platform)
         then if platformArch platform == ArchPPC
              then case dllInfo of
-                  CodeStub  -> pprCLabel platform lbl <> text "@plt"
-                  SymbolPtr -> text ".LC_" <> pprCLabel platform lbl
+                  CodeStub  -> ppr lbl <> text "@plt"
+                  SymbolPtr -> text ".LC_" <> ppr lbl
                   _         -> panic "pprDynamicLinkerAsmLabel"
              else if platformArch platform == ArchX86_64
                   then case dllInfo of
-                       CodeStub        -> pprCLabel platform lbl <> text "@plt"
-                       GotSymbolPtr    -> pprCLabel platform lbl <> text "@gotpcrel"
-                       GotSymbolOffset -> pprCLabel platform lbl
-                       SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
+                       CodeStub        -> ppr lbl <> text "@plt"
+                       GotSymbolPtr    -> ppr lbl <> text "@gotpcrel"
+                       GotSymbolOffset -> ppr lbl
+                       SymbolPtr       -> text ".LC_" <> ppr lbl
         else case dllInfo of
-             CodeStub        -> pprCLabel platform lbl <> text "@plt"
-             SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
-             GotSymbolPtr    -> pprCLabel platform lbl <> text "@got"
-             GotSymbolOffset -> pprCLabel platform lbl <> text "@gotoff"
+             CodeStub        -> ppr lbl <> text "@plt"
+             SymbolPtr       -> text ".LC_" <> ppr lbl
+             GotSymbolPtr    -> ppr lbl <> text "@got"
+             GotSymbolOffset -> ppr lbl <> text "@gotoff"
    else if platformOS platform == OSMinGW32
         then case dllInfo of
-             SymbolPtr -> text "__imp_" <> pprCLabel platform lbl
+             SymbolPtr -> text "__imp_" <> ppr lbl
              _         -> panic "pprDynamicLinkerAsmLabel"
    else panic "pprDynamicLinkerAsmLabel"
 

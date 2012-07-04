@@ -20,7 +20,7 @@ import Bitmap
 
 import Outputable
 
-import Util
+import Data.List
 \end{code}
 
 \begin{code}
@@ -148,7 +148,7 @@ constructSRT table (SRTEntries entries)
   where
     ints = map (expectJust "constructSRT" . lookupVarEnv table)
                 (varSetElems entries)
-    sorted_ints = sortLe (<=) ints
+    sorted_ints = sort ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = last bitmap_entries + 1

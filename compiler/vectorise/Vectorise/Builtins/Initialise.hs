@@ -95,7 +95,7 @@ initBuiltins
       ; applyVar         <- externalVar   (fsLit "$:")
       ; liftedApplyVar   <- externalVar   (fsLit "liftedApply")
       ; closures         <- mapM externalVar (numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
-      ; let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
+      ; let closureCtrFuns = listArray (1, mAX_DPH_SCALAR_ARGS) closures
 
           -- Types and functions for selectors
       ; sel_tys          <- mapM externalType (numbered "Sel"  2 mAX_DPH_SUM)

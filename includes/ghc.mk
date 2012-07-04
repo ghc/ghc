@@ -37,21 +37,12 @@ ifeq "$(GhcUnregisterised)" "YES"
 includes_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
 endif
 
-ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
-includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
-endif
-
 includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
 endif
-
-# The fptools configure script creates the configuration header file and puts it
-# in fptools/mk/config.h. We copy it down to here (without any PACKAGE_FOO
-# definitions to avoid clashes), prepending some make variables specifying cpp
-# platform variables.
 
 ifneq "$(BINDIST)" "YES"
 
@@ -67,8 +58,24 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
-#	Turn '#define PACKAGE_FOO "blah"' into '/* #undef PACKAGE_FOO */'.
+#
+#	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
+#	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
+#
 	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$,\1/* #undef \2 */,' mk/config.h >> $@
+#
+#	Tack on some extra config information from the build system
+#
+ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
+	@echo >> $@
+	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
+endif
+#
+ifeq "$(CC_LLVM_BACKEND)" "1"
+	@echo >> $@
+	@echo "#define llvm_CC_FLAVOR 1" >> $@
+endif
+#
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $@
 	@echo "Done."
 
@@ -105,10 +112,6 @@ endif
 	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR  1" >> $@
 	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
 	@echo "#define HOST_VENDOR  \"$(TargetVendor_CPP)\"" >> $@
-ifeq "$(CC_LLVM_BACKEND)" "1"
-	@echo >> $@
-	@echo "#define llvm_CC_FLAVOR 1" >> $@
-endif
 	@echo >> $@
 	@echo "/* These TARGET macros are for backwards compatibily... DO NOT USE! */" >> $@
 	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@

@@ -17,7 +17,6 @@ import PprCmm ()
 import BlockId
 import FastString
 import CLabel
-import Platform
 import Outputable
 import Constants
 
@@ -31,31 +30,25 @@ import Data.Maybe
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: (PlatformOutputable d, PlatformOutputable h)
-        => Platform -> GenCmmGroup d h CmmGraph -> Maybe SDoc
-cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
+cmmLint :: (Outputable d, Outputable h)
+        => GenCmmGroup d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint tops = runCmmLint (mapM_ lintCmmDecl) tops
 
-cmmLintDecl :: (PlatformOutputable d, PlatformOutputable h)
-           => Platform -> GenCmmDecl d h CmmGraph -> Maybe SDoc
-cmmLintDecl platform top = runCmmLint platform lintCmmDecl top
+cmmLintGraph :: CmmGraph -> Maybe SDoc
+cmmLintGraph g = runCmmLint lintCmmGraph g
 
-cmmLintGraph :: Platform -> CmmGraph -> Maybe SDoc
-cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
-
-runCmmLint :: PlatformOutputable a
-           => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
-runCmmLint platform l p =
-   case unCL (l p) platform of
-   Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
-                           nest 2 err,
-                           ptext $ sLit ("Program was:"),
-                           nest 2 (pprPlatform platform p)])
-   Right _  -> Nothing
+runCmmLint :: Outputable a => (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint l p =
+   case unCL (l p) of
+     Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
+                             nest 2 err,
+                             ptext $ sLit ("Program was:"),
+                             nest 2 (ppr p)])
+     Right _  -> Nothing
 
 lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
 lintCmmDecl (CmmProc _ lbl g)
-  = addLintInfo (\platform -> text "in proc " <> pprCLabel platform lbl) $
-        lintCmmGraph g
+  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph g
 lintCmmDecl (CmmData {})
   = return ()
 
@@ -165,10 +158,8 @@ lintCmmLast labels node = case node of
             erep <- lintCmmExpr e
             if (erep `cmmEqType_ignoring_ptrhood` bWord)
               then return ()
-              else cmmLintErr (\platform ->
-                               text "switch scrutinee is not a word: " <>
-                               pprPlatform platform e <>
-                               text " :: " <> ppr erep)
+              else cmmLintErr (text "switch scrutinee is not a word: " <>
+                               ppr e <> text " :: " <> ppr erep)
 
   CmmCall { cml_target = target, cml_cont = cont } -> do
           _ <- lintCmmExpr target
@@ -193,15 +184,15 @@ checkCond :: CmmExpr -> CmmLint ()
 checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth = return () -- constant values
 checkCond expr
-    = cmmLintErr (\platform -> hang (text "expression is not a conditional:") 2
-                         (pprPlatform platform expr))
+    = cmmLintErr (hang (text "expression is not a conditional:") 2
+                         (ppr expr))
 
 -- -----------------------------------------------------------------------------
 -- CmmLint monad
 
 -- just a basic error monad:
 
-newtype CmmLint a = CmmLint { unCL :: Platform -> Either SDoc a }
+newtype CmmLint a = CmmLint { unCL :: Either SDoc a }
 
 instance Monad CmmLint where
   CmmLint m >>= k = CmmLint $ \p -> case m p of
@@ -209,10 +200,10 @@ instance Monad CmmLint where
                                       Right a -> unCL (k a) p
   return a = CmmLint (\_ -> Right a)
 
-cmmLintErr :: (Platform -> SDoc) -> CmmLint a
+cmmLintErr :: SDoc -> CmmLint a
 cmmLintErr msg = CmmLint (\p -> Left (msg p))
 
-addLintInfo :: (Platform -> SDoc) -> CmmLint a -> CmmLint a
+addLintInfo :: SDoc -> CmmLint a -> CmmLint a
 addLintInfo info thing = CmmLint $ \p ->
    case unCL thing p of
         Left err -> Left (hang (info p) 2 err)
@@ -220,20 +211,20 @@ addLintInfo info thing = CmmLint $ \p ->
 
 cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
-     = cmmLintErr (\platform -> text "in MachOp application: " $$
-                                        nest 2 (pprPlatform platform expr) $$
-                                        (text "op is expecting: " <+> ppr opExpectsRep) $$
-                                        (text "arguments provide: " <+> ppr argsRep))
+     = cmmLintErr (text "in MachOp application: " $$
+                   nest 2 (ppr  expr) $$
+                      (text "op is expecting: " <+> ppr opExpectsRep) $$
+                      (text "arguments provide: " <+> ppr argsRep))
 
 cmmLintAssignErr :: CmmNode e x -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty
-  = cmmLintErr (\platform -> text "in assignment: " $$
-               nest 2 (vcat [pprPlatform platform stmt,
-                                text "Reg ty:" <+> ppr r_ty,
-                                text "Rhs ty:" <+> ppr e_ty]))
+  = cmmLintErr (text "in assignment: " $$
+                nest 2 (vcat [ppr stmt,
+                              text "Reg ty:" <+> ppr r_ty,
+                              text "Rhs ty:" <+> ppr e_ty]))
 
 
 cmmLintDubiousWordOffset :: CmmExpr -> CmmLint a
 cmmLintDubiousWordOffset expr
-   = cmmLintErr (\platform -> text "offset is not a multiple of words: " $$
-                              nest 2 (pprPlatform platform expr))
+   = cmmLintErr (text "offset is not a multiple of words: " $$
+                 nest 2 (ppr expr))

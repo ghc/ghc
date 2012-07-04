@@ -62,8 +62,7 @@ static void real_main(void)
 	Capability *cap = rts_lock();
         rts_evalLazyIO(&cap,progmain_closure, NULL);
 	status = rts_getSchedStatus(cap);
-	taskTimeStamp(myTask());
-	rts_unlock(cap);
+        rts_unlock(cap);
     }
 
     /* check the status of the entire Haskell computation */
@@ -109,11 +108,11 @@ int hs_main (int argc, char *argv[],     // program args
     progmain_closure = main_closure;
     rtsconfig = rts_config;
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
     BEGIN_CATCH
 #endif
     real_main();
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
     END_CATCH
 #endif
 }

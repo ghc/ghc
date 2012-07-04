@@ -40,6 +40,9 @@ void postSchedEvent(Capability *cap, EventTypeNum tag,
  */
 void postEvent(Capability *cap, EventTypeNum tag);
 
+void postEventAtTimestamp (Capability *cap, EventTimestamp ts, 
+                           EventTypeNum tag);
+
 void postMsg(char *msg, va_list ap);
 
 void postUserMsg(Capability *cap, char *msg, va_list ap);
@@ -47,6 +50,12 @@ void postUserMsg(Capability *cap, char *msg, va_list ap);
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
 void postEventStartup(EventCapNo n_caps);
+
+/*
+ * Post an event relating to a capability itself (create/delete/etc)
+ */
+void postCapEvent (EventTypeNum  tag,
+                   EventCapNo    capno);
 
 /*
  * Post an event that is associated with a capability set
@@ -90,6 +99,31 @@ void postSparkCountersEvent (Capability *cap,
 void postThreadLabel(Capability    *cap,
                      EventThreadID  id,
                      char          *label);
+
+/*
+ * Various GC and heap events
+ */
+void postHeapEvent (Capability    *cap,
+                    EventTypeNum   tag,
+                    EventCapsetID  heap_capset,
+                    lnat           info1);
+
+void postEventHeapInfo (EventCapsetID heap_capset,
+                        nat           gens,
+                        lnat          maxHeapSize,
+                        lnat          allocAreaSize,
+                        lnat          mblockSize,
+                        lnat          blockSize);
+
+void postEventGcStats  (Capability    *cap,
+                        EventCapsetID  heap_capset,
+                        nat            gen,
+                        lnat           copied,
+                        lnat           slop,
+                        lnat           fragmentation,
+                        nat            par_n_threads,
+                        lnat           par_max_copied,
+                        lnat           par_tot_copied);
 
 #else /* !TRACING */
 

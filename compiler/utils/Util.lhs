@@ -19,7 +19,7 @@ module Util (
         unzipWith,
 
         mapFst, mapSnd,
-        mapAndUnzip, mapAndUnzip3,
+        mapAndUnzip, mapAndUnzip3, mapAccumL2,
         nOfThem, filterOut, partitionWith, splitEithers,
 
         foldl1', foldl2, count, all2,
@@ -35,6 +35,7 @@ module Util (
         -- * Tuples
         fstOf3, sndOf3, thirdOf3,
         firstM, first3M,
+        third3,
         uncurry3,
 
         -- * List operations controlled by another list
@@ -45,7 +46,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, minWith, on,
+        sortWith, minWith,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -74,7 +75,6 @@ module Util (
         maybeRead, maybeReadFuzzy,
 
         -- * IO-ish utilities
-        createDirectoryHierarchy,
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
@@ -92,7 +92,10 @@ module Util (
         abstractConstr, abstractDataType, mkNoRepType,
 
         -- * Utils for printing C code
-        charToC
+        charToC,
+
+        -- * Hashing
+        hashString,
     ) where
 
 #include "HsVersions.h"
@@ -109,13 +112,13 @@ import Data.List        hiding (group)
 import FastTypes
 #endif
 
-import Control.Monad    ( unless, liftM )
+import Control.Monad    ( liftM )
 import System.IO.Error as IO ( isDoesNotExistError )
-import System.Directory ( doesDirectoryExist, createDirectory,
-                          getModificationTime )
+import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
 
 import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit )
+import Data.Int
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
 import Data.Bits
@@ -226,6 +229,9 @@ fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thirdOf3    (_,_,c) =  c
 
+third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
+third3 f (a, b, c) = (a, b, f c)
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
 \end{code}
@@ -308,12 +314,7 @@ zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
--- We want to write this, but with GHC 6.4 we get a warning, so it
--- doesn't validate:
--- zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
--- so we write this instead:
-zipLazy (x:xs) zs = let y : ys = zs
-                    in (x,y) : zipLazy xs ys
+zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 \end{code}
 
 
@@ -355,6 +356,12 @@ mapAndUnzip3 f (x:xs)
         (rs1, rs2, rs3) = mapAndUnzip3 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3)
+
+mapAccumL2 :: (s1 -> s2 -> a -> (s1, s2, b)) -> s1 -> s2 -> [a] -> (s1, s2, [b])
+mapAccumL2 f s1 s2 xs = (s1', s2', ys)
+  where ((s1', s2'), ys) = mapAccumL (\(s1, s2) x -> case f s1 s2 x of
+                                                       (s1', s2', y) -> ((s1', s2'), y))
+                                     (s1, s2) xs
 \end{code}
 
 \begin{code}
@@ -469,114 +476,17 @@ isn'tIn msg x ys
 
 %************************************************************************
 %*                                                                      *
-\subsubsection[Utils-Carsten-mergesort]{A mergesort from Carsten}
+\subsubsection{Sort utils}
 %*                                                                      *
 %************************************************************************
 
-\begin{display}
-Date: Mon, 3 May 93 20:45:23 +0200
-From: Carsten Kehler Holst <kehler@cs.chalmers.se>
-To: partain@dcs.gla.ac.uk
-Subject: natural merge sort beats quick sort [ and it is prettier ]
-
-Here is a piece of Haskell code that I'm rather fond of. See it as an
-attempt to get rid of the ridiculous quick-sort routine. groupUpdown is
-quite useful by itself I think it was John's idea originally though I
-believe the lazy version is due to me [surprisingly complicated].
-gamma [used to be called] is called gamma because I got inspired by
-the Gamma calculus. It is not very close to the calculus but does
-behave less sequentially than both foldr and foldl. One could imagine
-a version of gamma that took a unit element as well thereby avoiding
-the problem with empty lists.
-
-I've tried this code against
-
-   1) insertion sort - as provided by haskell
-   2) the normal implementation of quick sort
-   3) a deforested version of quick sort due to Jan Sparud
-   4) a super-optimized-quick-sort of Lennart's
-
-If the list is partially sorted both merge sort and in particular
-natural merge sort wins. If the list is random [ average length of
-rising subsequences = approx 2 ] mergesort still wins and natural
-merge sort is marginally beaten by Lennart's soqs. The space
-consumption of merge sort is a bit worse than Lennart's quick sort
-approx a factor of 2. And a lot worse if Sparud's bug-fix [see his
-fpca article ] isn't used because of groupUpdown.
-
-have fun
-Carsten
-\end{display}
-
 \begin{code}
-groupUpdown :: (a -> a -> Bool) -> [a] -> [[a]]
--- Given a <= function, groupUpdown finds maximal contiguous up-runs
--- or down-runs in the input list.
--- It's stable, in the sense that it never re-orders equal elements
---
--- Date: Mon, 12 Feb 1996 15:09:41 +0000
--- From: Andy Gill <andy@dcs.gla.ac.uk>
--- Here is a `better' definition of groupUpdown.
-
-groupUpdown _ []     = []
-groupUpdown p (x:xs) = group' xs x x (x :)
-  where
-    group' []     _     _     s  = [s []]
-    group' (x:xs) x_min x_max s
-        |      x_max `p` x  = group' xs x_min x     (s . (x :))
-        | not (x_min `p` x) = group' xs x     x_max ((x :) . s)
-        | otherwise         = s [] : group' xs x x (x :)
-        -- NB: the 'not' is essential for stablity
-        --     x `p` x_min would reverse equal elements
-
-generalMerge :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-generalMerge _ xs [] = xs
-generalMerge _ [] ys = ys
-generalMerge p (x:xs) (y:ys) | x `p` y   = x : generalMerge p xs     (y:ys)
-                             | otherwise = y : generalMerge p (x:xs) ys
-
--- gamma is now called balancedFold
-
-balancedFold :: (a -> a -> a) -> [a] -> a
-balancedFold _ [] = error "can't reduce an empty list using balancedFold"
-balancedFold _ [x] = x
-balancedFold f l  = balancedFold f (balancedFold' f l)
-
-balancedFold' :: (a -> a -> a) -> [a] -> [a]
-balancedFold' f (x:y:xs) = f x y : balancedFold' f xs
-balancedFold' _ xs = xs
-
-generalNaturalMergeSort :: (a -> a -> Bool) -> [a] -> [a]
-generalNaturalMergeSort _ [] = []
-generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . groupUpdown p) xs
-
-#if NOT_USED
-generalMergeSort p [] = []
-generalMergeSort p xs = (balancedFold (generalMerge p) . map (: [])) xs
-
-mergeSort, naturalMergeSort :: Ord a => [a] -> [a]
-
-mergeSort = generalMergeSort (<=)
-naturalMergeSort = generalNaturalMergeSort (<=)
-
-mergeSortLe le = generalMergeSort le
-#endif
-
-sortLe :: (a->a->Bool) -> [a] -> [a]
-sortLe le = generalNaturalMergeSort le
-
 sortWith :: Ord b => (a->b) -> [a] -> [a]
-sortWith get_key xs = sortLe le xs
-  where
-    x `le` y = get_key x < get_key y
+sortWith get_key xs = sortBy (comparing get_key) xs
 
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = ASSERT( not (null xs) )
                      head (sortWith get_key xs)
-
-on :: (a -> a -> c) -> (b -> a) -> b -> b -> c
-on cmp sel = \x y -> sel x `cmp` sel y
-
 \end{code}
 
 %************************************************************************
@@ -1018,16 +928,6 @@ maybeReadFuzzy str = case reads str of
                          Nothing
 
 -----------------------------------------------------------------------------
--- Create a hierarchy of directories
-
-createDirectoryHierarchy :: FilePath -> IO ()
-createDirectoryHierarchy dir | isDrive dir = return () -- XXX Hack
-createDirectoryHierarchy dir = do
-  b <- doesDirectoryExist dir
-  unless b $ do createDirectoryHierarchy (takeDirectory dir)
-                createDirectory dir
-
------------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.
 --
 doesDirNameExist :: FilePath -> IO Bool
@@ -1151,5 +1051,72 @@ charToC w =
                          chr (ord '0' + ord c `div` 64),
                          chr (ord '0' + ord c `div` 8 `mod` 8),
                          chr (ord '0' + ord c         `mod` 8)]
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[Utils-Hashing]{Utils for hashing}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- | A sample hash function for Strings.  We keep multiplying by the
+-- golden ratio and adding.  The implementation is:
+--
+-- > hashString = foldl' f golden
+-- >   where f m c = fromIntegral (ord c) * magic + hashInt32 m
+-- >         magic = 0xdeadbeef
+--
+-- Where hashInt32 works just as hashInt shown above.
+--
+-- Knuth argues that repeated multiplication by the golden ratio
+-- will minimize gaps in the hash space, and thus it's a good choice
+-- for combining together multiple keys to form one.
+--
+-- Here we know that individual characters c are often small, and this
+-- produces frequent collisions if we use ord c alone.  A
+-- particular problem are the shorter low ASCII and ISO-8859-1
+-- character strings.  We pre-multiply by a magic twiddle factor to
+-- obtain a good distribution.  In fact, given the following test:
+--
+-- > testp :: Int32 -> Int
+-- > testp k = (n - ) . length . group . sort . map hs . take n $ ls
+-- >   where ls = [] : [c : l | l <- ls, c <- ['\0'..'\xff']]
+-- >         hs = foldl' f golden
+-- >         f m c = fromIntegral (ord c) * k + hashInt32 m
+-- >         n = 100000
+--
+-- We discover that testp magic = 0.
+hashString :: String -> Int32
+hashString = foldl' f golden
+   where f m c = fromIntegral (ord c) * magic + hashInt32 m
+         magic = 0xdeadbeef
+
+golden :: Int32
+golden = 1013904242 -- = round ((sqrt 5 - 1) * 2^32) :: Int32
+-- was -1640531527 = round ((sqrt 5 - 1) * 2^31) :: Int32
+-- but that has bad mulHi properties (even adding 2^32 to get its inverse)
+-- Whereas the above works well and contains no hash duplications for
+-- [-32767..65536]
+
+-- | A sample (and useful) hash function for Int32,
+-- implemented by extracting the uppermost 32 bits of the 64-bit
+-- result of multiplying by a 33-bit constant.  The constant is from
+-- Knuth, derived from the golden ratio:
+--
+-- > golden = round ((sqrt 5 - 1) * 2^32)
+--
+-- We get good key uniqueness on small inputs
+-- (a problem with previous versions):
+--  (length $ group $ sort $ map hashInt32 [-32767..65536]) == 65536 + 32768
+--
+hashInt32 :: Int32 -> Int32
+hashInt32 x = mulHi x golden + x
+
+-- hi 32 bits of a x-bit * 32 bit -> 64-bit multiply
+mulHi :: Int32 -> Int32 -> Int32
+mulHi a b = fromIntegral (r `shiftR` 32)
+   where r :: Int64
+         r = fromIntegral a * fromIntegral b
 \end{code}
 

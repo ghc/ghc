@@ -197,6 +197,12 @@
 #define W_TO_INT(x) (x)
 #endif
 
+#if SIZEOF_LONG == 4 && SIZEOF_W == 8
+#define W_TO_LONG(x) %lobits32(x)
+#elif SIZEOF_LONG == SIZEOF_W
+#define W_TO_LONG(x) (x)
+#endif
+
 /* -----------------------------------------------------------------------------
    Heap/stack access, and adjusting the heap/stack pointers.
    -------------------------------------------------------------------------- */
@@ -383,7 +389,7 @@
 // allocate() - this includes many of the primops.
 #define MAYBE_GC(liveness,reentry)			\
     if (bdescr_link(CurrentNursery) == NULL || \
-        generation_n_new_large_words(W_[g0]) >= CLong[large_alloc_lim]) {   \
+        generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim])) {   \
 	R9  = liveness;					\
         R10 = reentry;					\
         HpAlloc = 0;					\

@@ -49,6 +49,7 @@ module CoreSyn (
 
         -- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
+        DFunArg(..), dfunArgExprs,
 
 	-- ** Constructing 'Unfolding's
 	noUnfolding, evaldUnfolding, mkOtherCon,
@@ -221,7 +222,8 @@ These data types are the heart of the compiler
 --    This is one of the more complicated elements of the Core language, 
 --    and comes with a number of restrictions:
 --    
---    1. The list of alternatives is non-empty
+--    1. The list of alternatives may be empty; 
+--       See Note [Empty case alternatives]
 --
 --    2. The 'DEFAULT' case alternative must be first in the list, 
 --       if it occurs at all.
@@ -338,10 +340,58 @@ Note [CoreSyn let goal]
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
 
-
 Note [Type let]
 ~~~~~~~~~~~~~~~
 See #type_let#
+
+Note [Empty case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The alternatives of a case expression should be exhaustive.  A case expression
+can have empty alternatives if (and only if) the scrutinee is bound to raise
+an exception or diverge.  So:
+   Case (error Int "Hello") b Bool []
+is fine, and has type Bool.  This is one reason we need a type on 
+the case expression: if the alternatives are empty we can't get the type
+from the alternatives!  I'll write this
+   case (error Int "Hello") of Bool {}
+with the return type just before the alterantives.
+
+Here's another example:
+  data T
+  f :: T -> Bool
+  f = \(x:t). case x of Bool {}
+Since T has no data constructors, the case alterantives are of course
+empty.  However note that 'x' is not bound to a visbily-bottom value;
+it's the *type* that tells us it's going to diverge.  Its a bit of a
+degnerate situation but we do NOT want to replace
+   case x of Bool {}   -->   error Bool "Inaccessible case"
+because x might raise an exception, and *that*'s what we want to see!
+(Trac #6067 is an example.) To preserve semantics we'd have to say
+   x `seq` error Bool "Inaccessible case"   
+ but the 'seq' is just a case, so we are back to square 1.  Or I suppose
+we could say
+   x |> UnsafeCoerce T Bool
+but that loses all trace of the fact that this originated with an empty
+set of alternatives.
+
+We can use the empty-alternative construct to coerce error values from
+one type to another.  For example
+
+    f :: Int -> Int
+    f n = error "urk"
+   
+    g :: Int -> (# Char, Bool #)
+    g x = case f x of { 0 -> ..., n -> ... }
+
+Then if we inline f in g's RHS we get
+    case (error Int "urk") of (# Char, Bool #) { ... }
+and we can discard the alternatives since the scrutinee is bottom to give
+    case (error Int "urk") of (# Char, Bool #) {}
+
+This is nicer than using an unsafe coerce between Int ~ (# Char,Bool #),
+if for no other reason that we don't need to instantiate the (~) at an 
+unboxed type.
+
 
 %************************************************************************
 %*									*
@@ -490,7 +540,7 @@ data CoreRule
 	ru_fn    :: Name,       -- ^ As above
 	ru_nargs :: Int,	-- ^ Number of arguments that 'ru_try' consumes,
 				-- if it fires, including type arguments
-	ru_try  :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+	ru_try  :: Id -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 		-- ^ This function does the rewrite.  It given too many
 		-- arguments, it simply discards them; the returned 'CoreExpr'
 		-- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
@@ -586,7 +636,7 @@ data Unfolding
 
         DataCon 	-- The dictionary data constructor (possibly a newtype datacon)
 
-        [CoreExpr]      -- Specification of superclasses and methods, in positional order
+        [DFunArg CoreExpr]  -- Specification of superclasses and methods, in positional order
 
   | CoreUnfolding {		-- An unfolding for an Id with no pragma, 
                                 -- or perhaps a NOINLINE pragma
@@ -600,7 +650,7 @@ data Unfolding
 		      			--	a `seq` on this variable
         uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
                                         --      Cached version of exprIsConLike
-	uf_is_cheap   :: Bool,		-- True <=> doesn't waste (much) work to expand 
+	uf_is_work_free :: Bool,		-- True <=> doesn't waste (much) work to expand 
                                         --          inside an inlining
 					-- 	Cached version of exprIsCheap
 	uf_expandable :: Bool,		-- True <=> can expand in RULE matching
@@ -618,10 +668,25 @@ data Unfolding
   --  uf_is_value: 'exprIsHNF' template (cached); it is ok to discard a 'seq' on
   --     this variable
   --
-  --  uf_is_cheap:  Does this waste only a little work if we expand it inside an inlining?
-  --     Basically this is a cached version of 'exprIsCheap'
+  --  uf_is_work_free:  Does this waste only a little work if we expand it inside an inlining?
+  --     Basically this is a cached version of 'exprIsWorkFree'
   --
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
+
+------------------------------------------------
+data DFunArg e   -- Given (df a b d1 d2 d3)
+  = DFunPolyArg  e      -- Arg is (e a b d1 d2 d3)
+  | DFunLamArg   Int    -- Arg is one of [a,b,d1,d2,d3], zero indexed
+  deriving( Functor )
+
+  -- 'e' is often CoreExpr, which are usually variables, but can
+  -- be trivial expressions instead (e.g. a type application).
+
+dfunArgExprs :: [DFunArg e] -> [e]
+dfunArgExprs []                    = []
+dfunArgExprs (DFunPolyArg  e : as) = e : dfunArgExprs as
+dfunArgExprs (DFunLamArg {}  : as) = dfunArgExprs as
+
 
 ------------------------------------------------
 data UnfoldingSource
@@ -738,7 +803,7 @@ mkOtherCon = OtherCon
 
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top, 
-		uf_is_value = b1, uf_is_cheap = b2, 
+		uf_is_value = b1, uf_is_work_free = b2, 
 	   	uf_expandable = b3, uf_is_conlike = b4,
                 uf_arity = a, uf_guidance = g})
   = seqExpr e `seq` top `seq` b1 `seq` a `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
@@ -801,8 +866,8 @@ isConLikeUnfolding _                                        = False
 
 -- | Is the thing we will unfold into certainly cheap?
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding { uf_is_cheap = is_cheap }) = is_cheap
-isCheapUnfolding _                                          = False
+isCheapUnfolding (CoreUnfolding { uf_is_work_free = is_wf }) = is_wf
+isCheapUnfolding _                                           = False
 
 isExpandableUnfolding :: Unfolding -> Bool
 isExpandableUnfolding (CoreUnfolding { uf_expandable = is_expable }) = is_expable
@@ -914,13 +979,10 @@ instance Outputable AltCon where
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = ptext (sLit "__DEFAULT")
 
-instance Show AltCon where
-  showsPrec p con = showsPrecSDoc p (ppr con)
-
-cmpAlt :: Alt b -> Alt b -> Ordering
+cmpAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Ordering
 cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
 
-ltAlt :: Alt b -> Alt b -> Bool
+ltAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering

@@ -91,7 +91,8 @@ emitTickyCounter :: ClosureInfo -> [Id] -> Int -> Code
 emitTickyCounter cl_info args on_stk
   = ifTicky $
     do	{ mod_name <- getModuleName
-	; fun_descr_lit <- newStringCLit (fun_descr mod_name)
+	; dflags <- getDynFlags
+	; fun_descr_lit <- newStringCLit (fun_descr dflags mod_name)
 	; arg_descr_lit <- newStringCLit arg_descr
 	; emitDataLits ticky_ctr_label 	-- Must match layout of StgEntCounter
 -- krc: note that all the fields are I32 now; some were I16 before, 
@@ -110,15 +111,15 @@ emitTickyCounter cl_info args on_stk
     name = closureName cl_info
     ticky_ctr_label = mkRednCountsLabel name NoCafRefs
     arg_descr = map (showTypeCategory . idType) args
-    fun_descr mod_name = ppr_for_ticky_name mod_name name
+    fun_descr dflags mod_name = ppr_for_ticky_name dflags mod_name name
 
 -- When printing the name of a thing in a ticky file, we want to
 -- give the module name even for *local* things.   We print
 -- just "x (M)" rather that "M.x" to distinguish them from the global kind.
-ppr_for_ticky_name :: Module -> Name -> String
-ppr_for_ticky_name mod_name name
-  | isInternalName name = showSDocDebug (ppr name <+> (parens (ppr mod_name)))
-  | otherwise	        = showSDocDebug (ppr name)
+ppr_for_ticky_name :: DynFlags -> Module -> Name -> String
+ppr_for_ticky_name dflags mod_name name
+  | isInternalName name = showSDocDebug dflags (ppr name <+> (parens (ppr mod_name)))
+  | otherwise           = showSDocDebug dflags (ppr name)
 
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames

@@ -43,6 +43,7 @@ import StgSyn
 import PrimOp
 import Outputable
 import StaticFlags
+import Util
 
 import Control.Monad
 import Data.Maybe

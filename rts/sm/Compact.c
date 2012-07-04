@@ -979,7 +979,7 @@ compact(StgClosure *static_objects)
     {
 	Task *task;
         InCall *incall;
-	for (task = all_tasks; task != NULL; task = task->all_link) {
+        for (task = all_tasks; task != NULL; task = task->all_next) {
             for (incall = task->incall; incall != NULL; 
                  incall = incall->prev_stack) {
                 if (incall->tso) {

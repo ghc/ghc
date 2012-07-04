@@ -68,7 +68,9 @@ import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it
 import Coercion         ( isCoVar )
 import CoreSubst	( Subst, emptySubst, extendInScope, substBndr, substRecBndrs,
-			  extendIdSubst, extendSubstWithVar, cloneBndr, cloneRecIdBndrs, substTy, substCo )
+			  extendIdSubst, extendSubstWithVar, cloneBndr, 
+                          cloneRecIdBndrs, substTy, substCo )
+import MkCore           ( sortQuantVars ) 
 import Id
 import IdInfo
 import Var
@@ -78,8 +80,7 @@ import Literal		( litIsTrivial )
 import Demand		( StrictSig, increaseStrictSigArity )
 import Name		( getOccName, mkSystemVarName )
 import OccName		( occNameString )
-import Type		( isUnLiftedType, Type, sortQuantVars, mkPiTypes )
-import Kind		( kiVarsOfKinds )
+import Type		( isUnLiftedType, Type, mkPiTypes )
 import BasicTypes	( Arity )
 import UniqSupply
 import Util
@@ -419,7 +420,10 @@ the inner loop.
 Things to note
  * We can't float a case to top level
  * It's worth doing this float even if we don't float
-   the case outside a value lambda
+   the case outside a value lambda.  Example
+     case x of { 
+       MkT y -> (case y of I# w2 -> ..., case y of I# w2 -> ...)
+   If we floated the cases out we could eliminate one of them.
  * We only do this with a single-alternative case
 
 Note [Check the output scrutinee for okForSpec]
@@ -814,7 +818,7 @@ lvlLamBndrs lvl bndrs
 \end{code}
 
 \begin{code}
-  -- Destintion level is the max Id level of the expression
+  -- Destination level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
 destLevel :: LevelEnv -> VarSet -> Bool -> Maybe (Arity, StrictSig) -> Level
 destLevel env fvs is_function mb_bot
@@ -826,6 +830,7 @@ destLevel env fvs is_function mb_bot
   , countFreeIds fvs <= n_args
   = tOP_LEVEL	-- Send functions to top level; see
 		-- the comments with isFunction
+
   | otherwise = maxFvLevel isId env fvs  -- Max over Ids only; the tyvars
     	      		   	    	 -- will be abstracted
 
@@ -997,9 +1002,9 @@ abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- whose level is greater than the destination level
 	-- These are the ones we are going to abstract out
 abstractVars dest_lvl (LE { le_lvl_env = lvl_env, le_env = id_env }) fvs
-  = map zap $ uniq $ sortQuantVars  -- IA0_NOTE: centralizing sorting on variables
+  = map zap $ uniq $ sortQuantVars
 	[var | fv <- varSetElems fvs
-	     , var <- absVarsOf id_env fv
+	     , var <- varSetElems (absVarsOf id_env fv)
 	     , abstract_me var ]
 	-- NB: it's important to call abstract_me only on the OutIds the
 	-- come from absVarsOf (not on fv, which is an InId)
@@ -1022,7 +1027,7 @@ abstractVars dest_lvl (LE { le_lvl_env = lvl_env, le_env = id_env }) fvs
 		     setIdInfo v vanillaIdInfo
 	  | otherwise = v
 
-absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
+absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> VarSet
 	-- If f is free in the expression, and f maps to poly_f a b c in the
 	-- current substitution, then we must report a b c as candidate type
 	-- variables
@@ -1030,20 +1035,16 @@ absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
 	-- Also, if x::a is an abstracted variable, then so is a; that is,
 	-- we must look in x's type. What's more, if a mentions kind variables,
 	-- we must also return those.
-	-- 
-	-- And similarly if x is a coercion variable.
 absVarsOf id_env v 
-  | isId v    = [av2 | av1 <- lookup_avs v
-		     , av2 <- add_tyvars av1]
-  | otherwise = ASSERT( isTyVar v ) [v]
+  | isId v, Just (abs_vars, _) <- lookupVarEnv id_env v
+  = foldr (unionVarSet . close) emptyVarSet abs_vars
+  | otherwise
+  = close v
   where
-    lookup_avs v = case lookupVarEnv id_env v of
-			Just (abs_vars, _) -> abs_vars
-			Nothing	           -> [v]
-
-    add_tyvars v = v : (varSetElems tyvars ++ varSetElems kivars)
-    tyvars = varTypeTyVars v
-    kivars = kiVarsOfKinds (map tyVarKind (varSetElems tyvars))
+    close :: Var -> VarSet  -- Result include the input variable itself
+    close v = foldVarSet (unionVarSet . close)
+                         (unitVarSet v)
+                         (varTypeTyVars v)
 \end{code}
 
 \begin{code}

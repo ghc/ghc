@@ -43,7 +43,7 @@ import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import FastString( mkFastString, fsLit )
 import Constants
-import DynFlags
+import Util
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects
@@ -331,11 +331,7 @@ entryHeapCheck :: ClosureInfo
                -> FCode ()
 
 entryHeapCheck cl_info offset nodeSet arity args code
-  = do dflags <- getDynFlags
-
-       let platform = targetPlatform dflags
-
-           is_thunk = arity == 0
+  = do let is_thunk = arity == 0
            is_fastf = case closureFunInfo cl_info of
                            Just (_, ArgGen _) -> False
                            _otherwise         -> True
@@ -345,7 +341,7 @@ entryHeapCheck cl_info offset nodeSet arity args code
                           Just n  -> mkNop -- No need to assign R1, it already
                                            -- points to the closure
                           Nothing -> mkAssign nodeReg $
-                              CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
+                              CmmLit (CmmLabel $ staticClosureLabel cl_info)
 
            {- Thunks:          jump GCEnter1
               Function (fast): Set R1 = node, jump GCFun

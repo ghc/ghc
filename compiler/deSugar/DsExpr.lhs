@@ -32,6 +32,7 @@ import HsSyn
 --     needs to see source types
 import TcType
 import TcEvidence
+import TcRnMonad
 import Type
 import CoreSyn
 import CoreUtils
@@ -79,14 +80,15 @@ dsValBinds (ValBindsIn  _     _) _    = panic "dsValBinds ValBindsIn"
 -------------------------
 dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ip_binds ev_binds) body
-  = do  { let inner = mkCoreLets (dsTcEvBinds ev_binds) body
+  = do  { ds_binds <- dsTcEvBinds ev_binds
+        ; let inner = mkCoreLets ds_binds body
                 -- The dict bindings may not be in 
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
   where
-    ds_ip_bind (L _ (IPBind n e)) body
+    ds_ip_bind (L _ (IPBind ~(Right n) e)) body
       = do e' <- dsLExpr e
-           return (Let (NonRec (ipNameName n) (mkIPBox n e')) body)
+           return (Let (NonRec n e') body)
 
 -------------------------
 ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
@@ -131,7 +133,8 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body bind -> dsStrictBind (unLoc bind) body) 
                             body1 binds 
-       ; return (mkCoreLets (dsTcEvBinds ev_binds) body2) }
+       ; ds_binds <- dsTcEvBinds ev_binds
+       ; return (mkCoreLets ds_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn 
                       , fun_tick = tick, fun_infix = inf }) body
@@ -152,7 +155,7 @@ dsStrictBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar upat
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
-       ; return (scrungleMatch var rhs result) }
+       ; return (bindNonRec var rhs result) }
 
 dsStrictBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
@@ -161,37 +164,12 @@ strictMatchOnly :: HsBind Id -> Bool
 strictMatchOnly (AbsBinds { abs_binds = binds })
   = anyBag (strictMatchOnly . unLoc) binds
 strictMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = ty })
-  =  isUnboxedTupleType ty 
+  =  isUnLiftedType ty 
   || isBangLPat lpat   
   || any (isUnLiftedType . idType) (collectPatBinders lpat)
 strictMatchOnly (FunBind { fun_id = L _ id })
   = isUnLiftedType (idType id)
 strictMatchOnly _ = False -- I hope!  Checked immediately by caller in fact
-
-scrungleMatch :: Id -> CoreExpr -> CoreExpr -> CoreExpr
--- Returns something like (let var = scrut in body)
--- but if var is an unboxed-tuple type, it inlines it in a fragile way
--- Special case to handle unboxed tuple patterns; they can't appear nested
--- The idea is that 
---      case e of (# p1, p2 #) -> rhs
--- should desugar to
---      case e of (# x1, x2 #) -> ... match p1, p2 ...
--- NOT
---      let x = e in case x of ....
---
--- But there may be a big 
---      let fail = ... in case e of ...
--- wrapping the whole case, which complicates matters slightly
--- It all seems a bit fragile.  Test is dsrun013.
-
-scrungleMatch var scrut body
-  | isUnboxedTupleType (idType var) = scrungle body
-  | otherwise                       = bindNonRec var scrut body
-  where
-    scrungle (Case (Var x) bndr ty alts)
-                    | x == var = Case scrut bndr ty alts
-    scrungle (Let binds body)  = Let binds (scrungle body)
-    scrungle other = panic ("scrungleMatch: tuple pattern:\n" ++ showSDoc (ppr other))
 
 \end{code}
 
@@ -210,14 +188,14 @@ dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)            = return (varToCoreExpr var)   -- See Note [Desugaring vars]
-dsExpr (HsIPVar ip)           = return (mkIPUnbox ip)
+dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
 dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
 
 dsExpr (HsWrap co_fn e)
   = do { e' <- dsExpr e
-       ; let wrapped_e = dsHsWrapper co_fn e'
-       ; warn_id <- woptDs Opt_WarnIdentities
+       ; wrapped_e <- dsHsWrapper co_fn e'
+       ; warn_id <- woptM Opt_WarnIdentities
        ; when warn_id $ warnAboutIdentities e' wrapped_e
        ; return wrapped_e }
 
@@ -309,7 +287,7 @@ dsExpr (ExplicitTuple tup_args boxity)
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
     mod_name <- getModuleDs
-    count <- doptDs Opt_ProfCountEntries
+    count <- doptM Opt_ProfCountEntries
     uniq <- newUnique
     Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
 
@@ -324,7 +302,7 @@ dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty))
   | otherwise
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
-       ; return (scrungleMatch discrim_var core_discrim matching_code) }
+       ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
@@ -787,14 +765,15 @@ handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
 handle_failure pat match fail_op
   | matchCanFail match
   = do { fail_op' <- dsExpr fail_op
-       ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+       ; dflags <- getDynFlags
+       ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
        ; extractMatchResult match (App fail_op' fail_msg) }
   | otherwise
   = extractMatchResult match (error "It can't fail")
 
-mk_fail_msg :: Located e -> String
-mk_fail_msg pat = "Pattern match failure in do expression at " ++ 
-                  showSDoc (ppr (getLoc pat))
+mk_fail_msg :: DynFlags -> Located e -> String
+mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++ 
+                         showPpr dflags (getLoc pat)
 \end{code}
 
 
@@ -841,13 +820,13 @@ warnDiscardedDoBindings :: LHsExpr Id -> Type -> DsM ()
 warnDiscardedDoBindings rhs rhs_ty
   | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
   = do {  -- Warn about discarding non-() things in 'monadic' binding
-       ; warn_unused <- woptDs Opt_WarnUnusedDoBind
+       ; warn_unused <- woptM Opt_WarnUnusedDoBind
        ; if warn_unused && not (isUnitTy elt_ty)
          then warnDs (unusedMonadBind rhs elt_ty)
          else 
          -- Warn about discarding m a things in 'monadic' binding of the same type,
          -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
-    do { warn_wrong <- woptDs Opt_WarnWrongDoBind
+    do { warn_wrong <- woptM Opt_WarnWrongDoBind
        ; case tcSplitAppTy_maybe elt_ty of
            Just (elt_m_ty, _) | warn_wrong, m_ty `eqType` elt_m_ty
                               -> warnDs (wrongMonadBind rhs elt_ty)

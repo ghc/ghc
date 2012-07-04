@@ -24,7 +24,8 @@ module SimplUtils (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
         isSimplified,
-	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
+	contIsDupable, contResultType, contInputType,
+        contIsTrivial, contArgs, dropArgs, 
 	pushSimplifiedArgs, countValArgs, countArgs, addArgTo,
 	mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, 
@@ -38,12 +39,12 @@ module SimplUtils (
 
 import SimplEnv
 import CoreMonad        ( SimplifierMode(..), Tick(..) )
+import MkCore           ( sortQuantVars )
 import DynFlags
 import StaticFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
-import DataCon	( dataConCannotMatch, dataConWorkId )
 import CoreFVs
 import CoreUtils
 import CoreArity
@@ -54,8 +55,8 @@ import Var
 import Demand
 import SimplMonad
 import Type	hiding( substTy )
-import Coercion hiding( substCo )
-import TyCon
+import Coercion hiding( substCo, substTy )
+import DataCon          ( dataConWorkId )
 import VarSet
 import BasicTypes
 import Util
@@ -64,7 +65,7 @@ import Outputable
 import FastString
 import Pair
 
-import Data.List
+import Control.Monad    ( when )
 \end{code}
 
 
@@ -96,7 +97,8 @@ Key points:
 
 \begin{code}
 data SimplCont	
-  = Stop		-- An empty context, or hole, []     
+  = Stop		-- An empty context, or <hole>
+        OutType         -- Type of the <hole>
 	CallCtxt	-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
@@ -104,41 +106,43 @@ data SimplCont
 			--     This is an argument of a function that has RULES
 			--     Inlining the call might allow the rule to fire
 
-  | CoerceIt 		-- C `cast` co
+  | CoerceIt 		-- <hole> `cast` co
 	OutCoercion		-- The coercion simplified
 				-- Invariant: never an identity coercion
 	SimplCont
 
-  | ApplyTo  		-- C arg
+  | ApplyTo  		-- <hole> arg
 	DupFlag			-- See Note [DupFlag invariants]
 	InExpr StaticEnv	-- The argument and its static env
 	SimplCont
 
-  | Select   		-- case C of alts
+  | Select   		-- case <hole> of alts
 	DupFlag 	        -- See Note [DupFlag invariants]
-	InId [InAlt] StaticEnv	-- The case binder, alts, and subst-env
+	InId [InAlt] StaticEnv	-- The case binder, alts type, alts, and subst-env
 	SimplCont
 
   -- The two strict forms have no DupFlag, because we never duplicate them
-  | StrictBind 		-- (\x* \xs. e) C
-	InId [InBndr]		-- let x* = [] in e 	
+  | StrictBind 		        -- (\x* \xs. e) <hole>
+	InId [InBndr]		-- let x* = <hole> in e 	
 	InExpr StaticEnv	--	is a special case 
 	SimplCont	
 
-  | StrictArg 		-- f e1 ..en C
+  | StrictArg 		-- f e1 ..en <hole>
  	ArgInfo		-- Specifies f, e1..en, Whether f has rules, etc
 			--     plus strictness flags for *further* args
         CallCtxt        -- Whether *this* argument position is interesting
 	SimplCont		
 
   | TickIt
-        (Tickish Id)    -- Tick tickish []
+        (Tickish Id)    -- Tick tickish <hole>
         SimplCont
 
 data ArgInfo
   = ArgInfo {
-        ai_fun   :: Id,		-- The function
+        ai_fun   :: OutId,	-- The function
 	ai_args  :: [OutExpr],	-- ...applied to these args (which are in *reverse* order)
+        ai_type  :: OutType,    -- Type of (f a1 ... an)
+
 	ai_rules :: [CoreRule],	-- Rules for this function
 
 	ai_encl :: Bool,	-- Flag saying whether this function 
@@ -154,16 +158,17 @@ data ArgInfo
     }
 
 addArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addArgTo ai arg = ai { ai_args = arg : ai_args ai }
+addArgTo ai arg = ai { ai_args = arg : ai_args ai
+                     , ai_type = applyTypeToArg (ai_type ai) arg  }
 
 instance Outputable SimplCont where
-  ppr (Stop interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
+  ppr (Stop ty interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
   ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
-					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
+				       	  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
+				         (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
   ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
 
@@ -193,14 +198,14 @@ the following invariants hold
 
 \begin{code}
 -------------------
-mkBoringStop :: SimplCont
-mkBoringStop = Stop BoringCtxt
+mkBoringStop :: OutType -> SimplCont
+mkBoringStop ty = Stop ty BoringCtxt
 
-mkRhsStop :: SimplCont	-- See Note [RHS of lets] in CoreUnfold
-mkRhsStop = Stop (ArgCtxt False)
+mkRhsStop :: OutType -> SimplCont	-- See Note [RHS of lets] in CoreUnfold
+mkRhsStop ty = Stop ty (ArgCtxt False)
 
-mkLazyArgStop :: CallCtxt -> SimplCont
-mkLazyArgStop cci = Stop cci
+mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
+mkLazyArgStop ty cci = Stop ty cci
 
 -------------------
 contIsRhsOrArg :: SimplCont -> Bool
@@ -226,28 +231,28 @@ contIsTrivial (CoerceIt _ cont)           = contIsTrivial cont
 contIsTrivial _                           = False
 
 -------------------
-contResultType :: SimplEnv -> OutType -> SimplCont -> OutType
-contResultType env ty cont
-  = go cont ty
-  where
-    subst_ty se ty = SimplEnv.substTy (se `setInScope` env) ty
-    subst_co se co = SimplEnv.substCo (se `setInScope` env) co
+contResultType :: SimplCont -> OutType
+contResultType (Stop ty _)            = ty
+contResultType (CoerceIt _ k)         = contResultType k
+contResultType (StrictBind _ _ _ _ k) = contResultType k
+contResultType (StrictArg _ _ k)      = contResultType k
+contResultType (Select _ _ _ _ k)     = contResultType k
+contResultType (ApplyTo _ _ _ k)      = contResultType k
+contResultType (TickIt _ k)           = contResultType k
 
-    go (Stop {})                      ty = ty
-    go (CoerceIt co cont)             _  = go cont (pSnd (coercionKind co))
-    go (StrictBind _ bs body se cont) _  = go cont (subst_ty se (exprType (mkLams bs body)))
-    go (StrictArg ai _ cont)          _  = go cont (funResultTy (argInfoResultTy ai))
-    go (Select _ _ alts se cont)      _  = go cont (subst_ty se (coreAltsType alts))
-    go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
-    go (TickIt _ cont)                ty = go cont ty
+contInputType :: SimplCont -> OutType
+contInputType (Stop ty _)             = ty
+contInputType (CoerceIt co _)         = pFst (coercionKind co)
+contInputType (Select d b _ se _)     = perhapsSubstTy d se (idType b)
+contInputType (StrictBind b _ _ se _) = substTy se (idType b)
+contInputType (StrictArg ai _ _)      = funArgTy (ai_type ai)
+contInputType (ApplyTo d e se k)      = mkFunTy (perhapsSubstTy d se (exprType e)) (contInputType k)
+contInputType (TickIt _ k)            = contInputType k
 
-    apply_to_arg ty (Type ty_arg)     se = applyTy ty (subst_ty se ty_arg)
-    apply_to_arg ty (Coercion co_arg) se = applyCo ty (subst_co se co_arg)
-    apply_to_arg ty _                 _  = funResultTy ty
-
-argInfoResultTy :: ArgInfo -> OutType
-argInfoResultTy (ArgInfo { ai_fun = fun, ai_args = args })
-  = foldr (\arg fn_ty -> applyTypeToArg fn_ty arg) (idType fun) args
+perhapsSubstTy :: DupFlag -> SimplEnv -> InType -> OutType
+perhapsSubstTy dup_flag se ty 
+  | isSimplified dup_flag = ty
+  | otherwise             = substTy se ty
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -343,7 +348,7 @@ interestingCallContext cont
 
     interesting (StrictArg _ cci _) = cci
     interesting (StrictBind {})	    = BoringCtxt
-    interesting (Stop cci)   	    = cci
+    interesting (Stop _ cci)  	    = cci
     interesting (TickIt _ cci)      = interesting cci
     interesting (CoerceIt _ cont)   = interesting cont
 	-- If this call is the arg of a strict function, the context
@@ -371,16 +376,19 @@ mkArgInfo :: Id
 
 mkArgInfo fun rules n_val_args call_cont
   | n_val_args < idArity fun		-- Note [Unsaturated functions]
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
-            , ai_encl = False
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+            , ai_rules = rules, ai_encl = False
 	    , ai_strs = vanilla_stricts 
 	    , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+            , ai_rules = rules
             , ai_encl = interestingArgContext rules call_cont
-	    , ai_strs  = add_type_str (idType fun) arg_stricts
+	    , ai_strs  = add_type_str fun_ty arg_stricts
 	    , ai_discs = arg_discounts }
   where
+    fun_ty = idType fun
+
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
@@ -466,7 +474,7 @@ interestingArgContext rules call_cont
     go (StrictArg _ cci _) = interesting cci
     go (StrictBind {})	   = False	-- ??
     go (CoerceIt _ c)	   = go c
-    go (Stop cci)          = interesting cci
+    go (Stop _ cci)        = interesting cci
     go (TickIt _ c)        = go c
 
     interesting (ArgCtxt rules) = rules
@@ -1171,9 +1179,11 @@ findArity dflags bndr rhs old_arity
       | cur_arity <= old_arity = cur_arity	
       | new_arity == cur_arity = cur_arity
       | otherwise = ASSERT( new_arity < cur_arity )
+#ifdef DEBUG
                     pprTrace "Exciting arity" 
                        (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
                              , ppr rhs])
+#endif
                     go new_arity
       where
         new_arity = exprEtaExpandArity dflags cheap_app rhs
@@ -1494,97 +1504,19 @@ of the inner case y, which give us nowhere to go!
 
 \begin{code}
 prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
-prepareAlts scrut case_bndr' alts
-  = do	{ let (alts_wo_default, maybe_deflt) = findDefault alts
-	      alt_cons = [con | (con,_,_) <- alts_wo_default]
-	      imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
-		-- "imposs_deflt_cons" are handled 
-		--   EITHER by the context, 
-		--   OR by a non-DEFAULT branch in this case expression.
-
-	; default_alts <- prepareDefault case_bndr' mb_tc_app 
-					 imposs_deflt_cons maybe_deflt
-
-	; let trimmed_alts = filterOut impossible_alt alts_wo_default
-	      merged_alts  = mergeAlts trimmed_alts default_alts
-		-- We need the mergeAlts in case the new default_alt 
-		-- has turned into a constructor alternative.
-		-- The merge keeps the inner DEFAULT at the front, if there is one
-		-- and interleaves the alternatives in the right order
-
-	; return (imposs_deflt_cons, merged_alts) }
+-- The returned alternatives can be empty, none are possible
+prepareAlts scrut case_bndr' alts = do
+    us <- getUniquesM
+    -- Case binder is needed just for its type. Note that as an
+    --   OutId, it has maximum information; this is important.
+    --   Test simpl013 is an example
+    let (imposs_deflt_cons, refined_deflt, alts') = filterAlts us (varType case_bndr') imposs_cons alts
+    when refined_deflt $ tick (FillInCaseDefault case_bndr')
+    return (imposs_deflt_cons, alts')
   where
-    mb_tc_app = splitTyConApp_maybe (idType case_bndr')
-    Just (_, inst_tys) = mb_tc_app 
-
     imposs_cons = case scrut of
 		    Var v -> otherCons (idUnfolding v)
 		    _     -> []
-
-    impossible_alt :: CoreAlt -> Bool
-    impossible_alt (con, _, _) | con `elem` imposs_cons = True
-    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
-    impossible_alt _                   = False
-
-
-prepareDefault :: OutId		-- Case binder; need just for its type. Note that as an
-				--   OutId, it has maximum information; this is important.
-				--   Test simpl013 is an example
-	       -> Maybe (TyCon, [Type])	-- Type of scrutinee, decomposed
-	       -> [AltCon]	-- These cons can't happen when matching the default
-	       -> Maybe InExpr	-- Rhs
-	       -> SimplM [InAlt]	-- Still unsimplified
-					-- We use a list because it's what mergeAlts expects,
-
---------- Fill in known constructor -----------
-prepareDefault case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
-  | 	-- This branch handles the case where we are 
-	-- scrutinisng an algebraic data type
-    isAlgTyCon tycon		-- It's a data type, tuple, or unboxed tuples.  
-  , not (isNewTyCon tycon)	-- We can have a newtype, if we are just doing an eval:
-				-- 	case x of { DEFAULT -> e }
-				-- and we don't want to fill in a default for them!
-  , Just all_cons <- tyConDataCons_maybe tycon
-  , not (null all_cons)	
-	-- This is a tricky corner case.  If the data type has no constructors,
-	-- which GHC allows, then the case expression will have at most a default
-	-- alternative.  We don't want to eliminate that alternative, because the
-	-- invariant is that there's always one alternative.  It's more convenient
-	-- to leave	
-	--	case x of { DEFAULT -> e }     
-	-- as it is, rather than transform it to
-	--	error "case cant match"
-	-- which would be quite legitmate.  But it's a really obscure corner, and
-	-- not worth wasting code on.
-  , let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
-	impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
-  = case filterOut impossible all_cons of
-	[]    -> return []	-- Eliminate the default alternative
-				-- altogether if it can't match
-
-	[con] -> 	-- It matches exactly one constructor, so fill it in
-		 do { tick (FillInCaseDefault case_bndr)
-                    ; us <- getUniquesM
-                    ; let (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
-                    ; return [(DataAlt con, ex_tvs ++ arg_ids, deflt_rhs)] }
-
-	_ -> return [(DEFAULT, [], deflt_rhs)]
-
-  | debugIsOn, isAlgTyCon tycon
-  , null (tyConDataCons tycon)
-  , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
-	-- Check for no data constructors
-        -- This can legitimately happen for abstract types and type families,
-        -- so don't report that
-  = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon)
-        $ return [(DEFAULT, [], deflt_rhs)]
-
---------- Catch-all cases -----------
-prepareDefault _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
-  = return [(DEFAULT, [], deflt_rhs)]
-
-prepareDefault _case_bndr _bndr_ty _imposs_cons Nothing
-  = return []	-- No default branch
 \end{code}
 
 
@@ -1665,14 +1597,14 @@ and similarly in cascade for all the join points!
 mkCase, mkCase1, mkCase2 
    :: DynFlags 
    -> OutExpr -> OutId
-   -> [OutAlt]		-- Alternatives in standard (increasing) order
+   -> OutType -> [OutAlt]		-- Alternatives in standard (increasing) order
    -> SimplM OutExpr
 
 --------------------------------------------------
 --	1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
+mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
   | dopt Opt_CaseMerge dflags
   , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
   , inner_scrut_var == outer_bndr
@@ -1698,7 +1630,7 @@ mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
 		-- When we merge, we must ensure that e1 takes 
 		-- precedence over e2 as the value for A!  
 
-	; mkCase1 dflags scrut outer_bndr merged_alts
+	; mkCase1 dflags scrut outer_bndr alts_ty merged_alts
 	}
     	-- Warning: don't call mkCase recursively!
     	-- Firstly, there's no point, because inner alts have already had
@@ -1706,13 +1638,13 @@ mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
     	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
     	-- in munge_rhs may put a case into the DEFAULT branch!
 
-mkCase dflags scrut bndr alts = mkCase1 dflags scrut bndr alts
+mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
 
 --------------------------------------------------
 --	2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr alts	-- Identity case
+mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (re_cast scrut rhs1) }
@@ -1741,32 +1673,30 @@ mkCase1 _dflags scrut case_bndr alts	-- Identity case
 	-- 
 	-- Don't worry about nested casts, because the simplifier combines them
 
-    ((_,_,rhs1):_) = alts
-
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
 --------------------------------------------------
 --	3. Merge Identical Alternatives
 --------------------------------------------------
-mkCase1 dflags scrut case_bndr ((_con1,bndrs1,rhs1) : con_alts)
+mkCase1 dflags scrut case_bndr alts_ty ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1			-- Remember the default 
   , length filtered_alts < length con_alts	-- alternative comes first
 	-- Also Note [Dead binders]
   = do	{ tick (AltMerge case_bndr)
-	; mkCase2 dflags scrut case_bndr alts' }
+	; mkCase2 dflags scrut case_bndr alts_ty alts' }
   where
     alts' = (DEFAULT, [], rhs1) : filtered_alts
     filtered_alts	  = filter keep con_alts
     keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
 
-mkCase1 dflags scrut bndr alts = mkCase2 dflags scrut bndr alts
+mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase2 _dflags scrut bndr alts 
-  = return (Case scrut bndr (coreAltsType alts) alts)
+mkCase2 _dflags scrut bndr alts_ty alts 
+  = return (Case scrut bndr alts_ty alts)
 \end{code}
 
 Note [Dead binders]

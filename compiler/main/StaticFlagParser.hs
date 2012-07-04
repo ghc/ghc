@@ -9,7 +9,11 @@
 --
 -----------------------------------------------------------------------------
 
-module StaticFlagParser (parseStaticFlags) where
+module StaticFlagParser (
+        parseStaticFlags,
+        parseStaticFlagsFull,
+        flagsStatic
+    ) where
 
 #include "HsVersions.h"
 
@@ -46,11 +50,18 @@ import Data.List
 -- XXX: can we add an auto-generated list of static flags here?
 --
 parseStaticFlags :: [Located String] -> IO ([Located String], [Located String])
-parseStaticFlags args = do
+parseStaticFlags = parseStaticFlagsFull flagsStatic
+
+-- | Parse GHC's static flags as @parseStaticFlags@ does. However it also
+-- takes a list of available static flags, such that certain flags can be
+-- enabled or disabled through this argument.
+parseStaticFlagsFull :: [Flag IO] -> [Located String]
+                     -> IO ([Located String], [Located String])
+parseStaticFlagsFull flagsAvailable args = do
   ready <- readIORef v_opt_C_ready
   when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
-  (leftover, errs, warns1) <- processArgs static_flags args
+  (leftover, errs, warns1) <- processArgs flagsAvailable args
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
     -- deal with the way flags: the way (eg. prof) gives rise to
@@ -62,8 +73,10 @@ parseStaticFlags args = do
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
                   | otherwise = []
 
+    -- as these are GHC generated flags, we parse them with all static flags
+    -- in scope, regardless of what availableFlags are passed in.
   (more_leftover, errs, warns2) <-
-      processArgs static_flags (unreg_flags ++ way_flags')
+      processArgs flagsStatic (unreg_flags ++ way_flags')
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -88,7 +101,7 @@ parseStaticFlags args = do
   return (excess_prec ++ cg_flags ++ more_leftover ++ leftover,
           warns1 ++ warns2)
 
-static_flags :: [Flag IO]
+flagsStatic :: [Flag IO]
 -- All the static flags should appear in this list.  It describes how each
 -- static flag should be processed.  Two main purposes:
 -- (a) if a command-line flag doesn't appear in the list, GHC can complain
@@ -102,13 +115,9 @@ static_flags :: [Flag IO]
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
 -- flags further down the list with the same prefix.
 
-static_flags = [
-        ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt)
-  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
-
+flagsStatic = [
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf))
+    Flag "prof"           (NoArg (addWay WayProf))
   , Flag "eventlog"       (NoArg (addWay WayEventLog))
   , Flag "parallel"       (NoArg (addWay WayPar))
   , Flag "gransim"        (NoArg (addWay WayGran))
@@ -123,9 +132,6 @@ static_flags = [
 
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"                  (PassFlag addOpt)
-  , Flag "dppr-cols"                   (AnySuffix addOpt)
-  , Flag "dppr-user-length"            (AnySuffix addOpt)
-  , Flag "dppr-case-as-let"            (PassFlag addOpt)
   , Flag "dsuppress-all"               (PassFlag addOpt)
   , Flag "dsuppress-uniques"           (PassFlag addOpt)
   , Flag "dsuppress-coercions"         (PassFlag addOpt)
@@ -135,7 +141,6 @@ static_flags = [
   , Flag "dsuppress-var-kinds"         (PassFlag addOpt)
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
   , Flag "dopt-fuel"                   (AnySuffix addOpt)
-  , Flag "dtrace-level"                (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
   , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
@@ -178,9 +183,6 @@ isStaticFlag f =
     "fscc-profiling",
     "fdicts-strict",
     "fspec-inline-join-points",
-    "firrefutable-tuples",
-    "fparallel",
-    "fgransim",
     "fno-hi-version-check",
     "dno-black-holing",
     "fno-state-hack",

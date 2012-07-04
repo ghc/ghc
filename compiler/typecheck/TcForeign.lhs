@@ -48,6 +48,7 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
+import Util
 
 import Control.Monad
 \end{code}
@@ -122,15 +123,10 @@ normaliseFfiType' env ty0 = go [] ty0
                                                   panic "normaliseFfiType': Got more GREs than expected"
                                       _ ->
                                           return False
-                  when (not newtypeOK) $
-                     -- later: stop_here
-                    addWarnTc (ptext (sLit "newtype") <+> quotes (ppr tc) <+>
-                               ptext (sLit "is used in an FFI declaration,") $$
-                               ptext (sLit "but its constructor is not in scope.") $$
-                               ptext (sLit "This will become an error in GHC 7.6.1."))
-
-                  let nt_co = mkAxInstCo (newTyConCo tc) tys
-                  add_co nt_co rec_nts' nt_rhs
+                  if newtypeOK
+                      then do let nt_co = mkAxInstCo (newTyConCo tc) tys
+                              add_co nt_co rec_nts' nt_rhs
+                      else children_only
 
         | isFamilyTyCon tc              -- Expand open tycons
         , (co, ty) <- normaliseTcApp env tc tys
@@ -138,11 +134,7 @@ normaliseFfiType' env ty0 = go [] ty0
         = add_co co rec_nts ty
 
         | otherwise
-        = return (mkReflCo ty, ty)
-            -- If we have reached an ordinary (non-newtype) type constructor,
-            -- we are done.  Note that we don't need to normalise the arguments,
-            -- because whether an FFI type is legal or not depends only on
-            -- the top-level type constructor (e.g. "Ptr a" is valid for all a).
+        = children_only
         where
           tc_key = getUnique tc
           children_only = do xs <- mapM (go rec_nts) tys
@@ -166,8 +158,8 @@ normaliseFfiType' env ty0 = go [] ty0
       = do (coi,nty1) <- go rec_nts ty1
            return (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 
-    go _ ty@(TyVarTy _)
-      = return (Refl ty, ty)
+    go _ ty@(TyVarTy {}) = return (Refl ty, ty)
+    go _ ty@(LitTy {})   = return (Refl ty, ty)
 
     add_co co rec_nts ty
         = do (co', ty') <- go rec_nts ty
@@ -212,46 +204,46 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 \begin{code}
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ (CLabel _))
+tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
   = ASSERT( null arg_tys )
-    do { checkCg checkCOrAsmOrLlvmOrInterp
-       ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
-       ; return idecl }      -- NB check res_ty not sig_ty!
-                             --    In case sig_ty is (forall a. ForeignPtr a)
+    do checkCg checkCOrAsmOrLlvmOrInterp
+       -- NB check res_ty not sig_ty!
+       --    In case sig_ty is (forall a. ForeignPtr a)
+       check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
+       cconv' <- checkCConv cconv
+       return (CImport cconv' safety mh l)
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ CWrapper) = do
+tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh CWrapper) = do
         -- Foreign wrapper (former f.e.d.)
-        -- The type must be of the form ft -> IO (FunPtr ft), where ft is a
-        -- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
-        -- as ft -> IO Addr is accepted, too.  The use of the latter two forms
-        -- is DEPRECATED, though.
+        -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
+        -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
+        -- The use of the latter form is DEPRECATED, though.
     checkCg checkCOrAsmOrLlvmOrInterp
-    checkCConv cconv
+    cconv' <- checkCConv cconv
     case arg_tys of
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
-                        checkForeignRes mustBeIO checkSafe isFFIDynResultTy    res_ty
-                                 -- ToDo: Why are res1_ty and res_ty not equal?
+                        checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
-    return idecl
+    return (CImport cconv' safety mh CWrapper)
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction target))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction target))
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrLlvmOrInterp
-      checkCConv cconv
-      case arg_tys of           -- The first arg must be Ptr, FunPtr, or Addr
+      cconv' <- checkCConv cconv
+      case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                -> do
           check False (illegalForeignTyErr empty sig_ty)
-          return idecl
         (arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          check (isFFIDynArgumentTy arg1_ty)
+          let curried_res_ty = foldr FunTy res_ty arg_tys
+          check (isFFIDynTy curried_res_ty arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-          return idecl
+      return $ CImport cconv' safety mh (CFunction target)
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
       check (xopt Opt_GHCForeignImportPrim dflags)
@@ -266,19 +258,24 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       return idecl
   | otherwise = do              -- Normal foreign import
       checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
-      checkCConv cconv
+      cconv' <- checkCConv cconv
       checkCTarget target
       dflags <- getDynFlags
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
-      return idecl
+      case target of
+          StaticTarget _ _ False
+           | not (null arg_tys) ->
+              addErrTc (text "`value' imports cannot have function types")
+          _ -> return ()
+      return $ CImport cconv' safety mh (CFunction target)
 
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
-checkCTarget (StaticTarget str _) = do
+checkCTarget (StaticTarget str _ _) = do
     checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
 
@@ -319,7 +316,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
 
     (norm_co, norm_sig_ty) <- normaliseFfiType sig_ty
 
-    tcCheckFEType norm_sig_ty spec
+    spec' <- tcCheckFEType norm_sig_ty spec
 
            -- we're exporting a function, but at a type possibly more
            -- constrained than its declared/inferred type. Hence the need
@@ -331,20 +328,21 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
     id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
-    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec)
+    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec')
 tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------
 
 \begin{code}
-tcCheckFEType :: Type -> ForeignExport -> TcM ()
+tcCheckFEType :: Type -> ForeignExport -> TcM ForeignExport
 tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
     checkCg checkCOrAsmOrLlvm
     check (isCLabelString str) (badCName str)
-    checkCConv cconv
+    cconv' <- checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
+    return (CExport (CExportStatic str cconv'))
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.
@@ -453,15 +451,19 @@ checkCg check = do
 Calling conventions
 
 \begin{code}
-checkCConv :: CCallConv -> TcM ()
-checkCConv CCallConv    = return ()
-checkCConv CApiConv     = return ()
+checkCConv :: CCallConv -> TcM CCallConv
+checkCConv CCallConv    = return CCallConv
+checkCConv CApiConv     = return CApiConv
 checkCConv StdCallConv  = do dflags <- getDynFlags
                              let platform = targetPlatform dflags
-                             unless (platformArch platform == ArchX86) $
-                                 -- This is a warning, not an error. see #3336
-                                 addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
-checkCConv PrimCallConv = addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
+                             if platformArch platform == ArchX86
+                                 then return StdCallConv
+                                 else do -- This is a warning, not an error. see #3336
+                                         when (wopt Opt_WarnUnsupportedCallingConventions dflags) $
+                                             addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
+                                         return CCallConv
+checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
+                             return PrimCallConv
 checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
 \end{code}
 

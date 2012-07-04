@@ -16,6 +16,7 @@ module X86.Regs (
         spRel,
         argRegs,
         allArgRegs,
+        allIntArgRegs,
         callClobberedRegs,
         allMachRegNos,
         classOfRealReg,
@@ -56,8 +57,7 @@ import RegClass
 import BlockId
 import OldCmm
 import CLabel           ( CLabel )
-import Pretty
-import Outputable       ( panic )
+import Outputable
 import Platform
 import FastTypes
 import FastBool
@@ -127,7 +127,7 @@ data Imm
   = ImmInt      Int
   | ImmInteger  Integer     -- Sigh.
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      Doc         -- Simple string
+  | ImmLit      SDoc        -- Simple string
   | ImmIndex    CLabel Int
   | ImmFloat    Rational
   | ImmDouble   Rational
@@ -378,9 +378,6 @@ xmm13 = regSingle 37
 xmm14 = regSingle 38
 xmm15 = regSingle 39
 
-allFPArgRegs :: [Reg]
-allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
-
 ripRel :: Displacement -> AddrMode
 ripRel imm      = AddrBaseIndex EABaseRip EAIndexNone imm
 
@@ -406,7 +403,9 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
-allArgRegs              :: [Reg]
+allArgRegs              :: [(Reg, Reg)]
+allIntArgRegs           :: [Reg]
+allFPArgRegs            :: [Reg]
 callClobberedRegs       :: [Reg]
 
 #if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
@@ -625,16 +624,28 @@ globalRegMaybe _                        = Nothing
 
 --
 
-#if   i386_TARGET_ARCH
-allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
+#if defined(mingw32_HOST_OS) && x86_64_TARGET_ARCH
 
-#elif x86_64_TARGET_ARCH
-allArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
+allArgRegs = zip (map regSingle [rcx,rdx,r8,r9])
+                 (map regSingle [firstxmm ..])
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this platform"
+allFPArgRegs = panic "X86.Regs.allFPArgRegs: not defined for this platform"
 
 #else
-allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
-#endif
 
+allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
+
+# if   i386_TARGET_ARCH
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
+# elif x86_64_TARGET_ARCH
+allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
+# else
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this arch"
+# endif
+
+allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
+
+#endif
 
 -- | these are the regs which we cannot assume stay alive over a C call.
 
@@ -661,8 +672,10 @@ callClobberedRegs
 freeReg _               = 0#
 globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
 
-allArgRegs              = panic "X86.Regs.globalRegMaybe: not defined"
-callClobberedRegs       = panic "X86.Regs.globalRegMaybe: not defined"
+allArgRegs              = panic "X86.Regs.allArgRegs: not defined"
+allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
+allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
+callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
 
 
 #endif

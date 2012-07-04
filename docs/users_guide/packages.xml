@@ -408,35 +408,89 @@ _ZCMain_main_closure
       see GHC's package table by running GHC with the <option>-v</option>
       flag.</para>
 
-    <para>Package databases may overlap: for example, packages in the
-      user database will override (<emphasis>shadow</emphasis>) those
-      of the same name and version in the global database.</para>
+    <para>Package databases may overlap, and they are arranged in a stack
+      structure. Packages closer to the top of the stack will override
+      (<emphasis>shadow</emphasis>) those below them. By default, the stack
+      contains just the global and the user's package databases, in that
+      order.</para>
 
-    <para>You can control the loading of package databases using the following
-      GHC options:</para>
+    <para>You can control GHC's package database stack using the following
+      options:</para>
 
     <variablelist>
       <varlistentry>
         <term>
-          <option>-package-conf <replaceable>file</replaceable></option>
-          <indexterm><primary><option>-package-conf</option></primary></indexterm>
+          <option>-package-db <replaceable>file</replaceable></option>
+          <indexterm><primary><option>-package-db</option></primary></indexterm>
         </term>
         <listitem>
-          <para>Read in the package configuration file
-            <replaceable>file</replaceable> in addition to the system
-            default file and the user's local file.  Packages in additional
-            files read this way will override those in the global and user
-            databases.</para>
+          <para>Add the package database <replaceable>file</replaceable> on top
+              of the current stack. Packages in additional databases read this
+              way will override those in the initial stack and those in
+              previously specified databases.</para>
         </listitem>
       </varlistentry>
 
       <varlistentry>
-        <term><option>-no-user-package-conf</option>
-          <indexterm><primary><option>-no-user-package-conf</option></primary>
+        <term><option>-no-global-package-db</option>
+          <indexterm><primary><option>-no-global-package-db</option></primary>
           </indexterm>
         </term>
         <listitem>
-          <para>Prevent loading of the user's local package database.</para>
+          <para>Remove the global package database from the package database
+              stack.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-no-user-package-db</option>
+          <indexterm><primary><option>-no-user-package-db</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>Prevent loading of the user's local package database in the
+              initial stack.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-clear-package-db</option>
+          <indexterm><primary><option>-clear-package-db</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+            <para>Reset the current package database stack. This option removes
+                every previously specified package database (including those
+                read from the <literal>GHC_PACKAGE_PATH</literal> environment
+                variable) from the package database stack.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-global-package-db</option>
+          <indexterm><primary><option>-global-package-db</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>Add the global package database on top of the current stack.
+            This option can be used after
+            <literal>-no-global-package-db</literal> to specify the position in
+            the stack where the global package database should be
+            loaded.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-user-package-db</option>
+          <indexterm><primary><option>-user-package-db</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>Add the user's package database on top of the current stack.
+            This option can be used after
+            <literal>-no-user-package-db</literal> to specify the position in
+            the stack where the user's package database should be
+            loaded.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -456,11 +510,13 @@ _ZCMain_main_closure
         packages.</para>
 
       <para>If <literal>GHC_PACKAGE_PATH</literal> ends in a separator, then
-        the default user and system package databases are appended, in that
-        order. e.g. to augment the usual set of packages with a database of
-        your own, you could say (on Unix):
-<screen>
-$ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
+        the default package database stack (i.e. the user and global
+        package databases, in that order) is appended. For example, to augment
+        the usual set of packages with a database of your own, you could say
+        (on Unix):
+
+        <screen> $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
+
         (use <literal>;</literal> instead of <literal>:</literal> on
         Windows).</para>
 
@@ -601,12 +657,12 @@ haskell98-1.0.1.0
       <literal>ghc-pkg</literal> knows about can be modified using the
       <literal>GHC_PACKAGE_PATH</literal> environment variable (see <xref
         linkend="ghc-package-path" />, and using
-        <literal>--package-conf</literal> options on the
+        <literal>--package-db</literal> options on the
         <literal>ghc-pkg</literal> command line.</para>
 
     <para>When asked to modify a database, <literal>ghc-pkg</literal> modifies
       the global database by default.  Specifying <option>--user</option>
-      causes it to act on the user database, or <option>--package-conf</option>
+      causes it to act on the user database, or <option>--package-db</option>
       can be used to act on another database entirely.  When multiple of these
       options are given, the rightmost one is used as the database to act
       upon.</para>
@@ -614,7 +670,7 @@ haskell98-1.0.1.0
    <para>Commands that query the package database (list, latest,
      describe, field, dot) operate on the list of databases specified by
      the flags <option>--user</option>, <option>--global</option>, and
-     <option>--package-conf</option>.  If none of these flags are
+     <option>--package-db</option>.  If none of these flags are
      given, the default is <option>--global</option>
      <option>--user</option>.</para>
 
@@ -888,8 +944,8 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
           </indexterm>
         </term>
         <term>
-          <option>-package-conf</option> <replaceable>file</replaceable>
-          <indexterm><primary><option>-package-conf</option></primary>
+          <option>-package-db</option> <replaceable>file</replaceable>
+          <indexterm><primary><option>-package-db</option></primary>
           </indexterm>
         </term>
         <listitem>
@@ -898,7 +954,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
             also be the database modified by a <literal>register</literal>,
             <literal>unregister</literal>, <literal>expose</literal> or
             <literal>hide</literal> command, unless it is overridden by a later
-            <option>--package-conf</option>, <option>--user</option> or
+            <option>--package-db</option>, <option>--user</option> or
             <option>--global</option> option.</para>
         </listitem>
       </varlistentry>

@@ -73,7 +73,7 @@ module CmmUtils(
 #include "HsVersions.h"
 
 import TyCon	( PrimRep(..) )
-import Type	( Type, typePrimRep )
+import Type	( UnaryType, typePrimRep )
 
 import SMRep
 import Cmm
@@ -84,6 +84,7 @@ import OptimizationFuel as F
 import Unique
 import UniqSupply
 import Constants( wORD_SIZE, tAG_MASK )
+import Util
 
 import Data.Word
 import Data.Maybe
@@ -108,7 +109,7 @@ primRepCmmType AddrRep    = bWord
 primRepCmmType FloatRep   = f32
 primRepCmmType DoubleRep  = f64
 
-typeCmmType :: Type -> CmmType
+typeCmmType :: UnaryType -> CmmType
 typeCmmType ty = primRepCmmType (typePrimRep ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
@@ -122,7 +123,7 @@ primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep	= NoHint
 primRepForeignHint DoubleRep	= NoHint
 
-typeForeignHint :: Type -> ForeignHint
+typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep
 
 ---------------------------------------------------

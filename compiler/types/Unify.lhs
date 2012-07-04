@@ -156,9 +156,6 @@ match :: MatchEnv	-- For the most part this is pushed downwards
 			--	in-scope set of the RnEnv2
       -> Type -> Type	-- Template and target respectively
       -> Maybe TvSubstEnv
--- This matcher works on core types; that is, it ignores PredTypes
--- Watch out if newtypes become transparent agin!
--- 	this matcher must respect newtypes
 
 match menv subst ty1 ty2 | Just ty1' <- coreView ty1 = match menv subst ty1' ty2
 			 | Just ty2' <- coreView ty2 = match menv subst ty1 ty2'
@@ -201,6 +198,8 @@ match menv subst (AppTy ty1a ty1b) ty2
 	-- 'repSplit' used because the tcView stuff is done above
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
+
+match _ subst (LitTy x) (LitTy y) | x == y  = return subst
 
 match _ _ _ _
   = Nothing
@@ -342,6 +341,8 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 	| Just (f1, a1) <- repSplitAppTy_maybe ty1
 	= cant_match f1 f2 || cant_match a1 a2
 
+    cant_match (LitTy x) (LitTy y) = x /= y
+
     cant_match _ _ = False      -- Safe!
 
 -- Things we could add;
@@ -456,6 +457,8 @@ unify subst ty1 (AppTy ty2a ty2b)
   = do	{ subst' <- unify subst ty1a ty2a
         ; unify subst' ty1b ty2b }
 
+unify subst (LitTy x) (LitTy y) | x == y = return subst
+
 unify _ ty1 ty2 = failWith (misMatch ty1 ty2)
 	-- ForAlls??
 
@@ -513,36 +516,29 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
   = uUnrefined subst tv1 ty' ty'
 
   | otherwise
-  -- So both are unrefined; next, see if the kinds force the direction
-  = case (k1_sub_k2, k2_sub_k1) of
-        (True,  True)  -> choose subst
-        (True,  False) -> bindTv subst tv2 ty1
-        (False, True)  -> bindTv subst tv1 ty2
-        (False, False) -> do
-            { subst' <- unify subst k1 k2
-            ; choose subst' }
-  where subst_kind = mkTvSubst (mkInScopeSet (tyVarsOfTypes [k1,k2])) subst
-        k1 = substTy subst_kind (tyVarKind tv1)
-        k2 = substTy subst_kind (tyVarKind tv2)
-        k1_sub_k2 = k1 `isSubKind` k2
-        k2_sub_k1 = k2 `isSubKind` k1
-        ty1 = TyVarTy tv1
-        bind subst tv ty = return $ extendVarEnv subst tv ty
-        choose subst = do
-             { b1 <- tvBindFlag tv1
-             ; b2 <- tvBindFlag tv2
-             ; case (b1, b2) of
-                 (BindMe, _)         -> bind subst tv1 ty2
-                 (Skolem, Skolem)    -> failWith (misMatch ty1 ty2)
-                 (Skolem, _)         -> bind subst tv2 ty1 }
+
+  = do {   -- So both are unrefined; unify the kinds
+       ; subst' <- unify subst (tyVarKind tv1) (tyVarKind tv2)
+
+           -- And then bind one or the other, 
+           -- depending on which is bindable
+	   -- NB: unlike TcUnify we do not have an elaborate sub-kinding 
+	   --     story.  That is relevant only during type inference, and
+           --     (I very much hope) is not relevant here.
+       ; b1 <- tvBindFlag tv1
+       ; b2 <- tvBindFlag tv2
+       ; let ty1 = TyVarTy tv1
+       ; case (b1, b2) of
+           (Skolem, Skolem) -> failWith (misMatch ty1 ty2)
+           (BindMe, _)      -> return (extendVarEnv subst' tv1 ty2)
+           (_, BindMe)      -> return (extendVarEnv subst' tv2 ty1) }
 
 uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')
   = failWith (occursCheck tv1 ty2)	-- Occurs check
-  | not (k2 `isSubKind` k1)
-  = failWith (kindMisMatch tv1 ty2)	-- Kind check
   | otherwise
-  = bindTv subst tv1 ty2		-- Bind tyvar to the synonym if poss
+  = do { subst' <- unify subst k1 k2
+       ; bindTv subst' tv1 ty2 }	-- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1
     k2 = typeKind ty2'
@@ -622,13 +618,6 @@ lengthMisMatch :: [Type] -> [Type] -> SDoc
 lengthMisMatch tys1 tys2
   = sep [ptext (sLit "Can't match unequal length lists"), 
 	 nest 2 (ppr tys1), nest 2 (ppr tys2) ]
-
-kindMisMatch :: TyVar -> Type -> SDoc
-kindMisMatch tv1 t2
-  = vcat [ptext (sLit "Can't match kinds") <+> quotes (ppr (tyVarKind tv1)) <+> 
-	    ptext (sLit "and") <+> quotes (ppr (typeKind t2)),
-	  ptext (sLit "when matching") <+> quotes (ppr tv1) <+> 
-		ptext (sLit "with") <+> quotes (ppr t2)]
 
 occursCheck :: TyVar -> Type -> SDoc
 occursCheck tv ty

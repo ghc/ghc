@@ -52,8 +52,7 @@ import StgSyn
 import Id
 import Name
 import TyCon		( PrimRep(..) )
-import BasicTypes	( Arity )
-import DynFlags
+import BasicTypes	( RepArity )
 import StaticFlags
 import Module
 
@@ -61,7 +60,7 @@ import Constants
 import Util
 import Data.List
 import Outputable
-import FastString	( mkFastString, FastString, fsLit )
+import FastString
 
 ------------------------------------------------------------------------
 --		Call and return sequences
@@ -166,7 +165,7 @@ adjustHpBackwards
 --          call f() return to Nothing updfr_off: 32
 
 
-directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
+directCall :: CLabel -> RepArity -> [StgArg] -> FCode ()
 -- (directCall f n args)
 -- calls f(arg1, ..., argn), and applies the result to the remaining args
 -- The function f has arity n, and there are guaranteed at least n args
@@ -182,27 +181,24 @@ slowCall fun stg_args
   = do  { dflags <- getDynFlags
         ; argsreps <- getArgRepsAmodes stg_args
         ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
-        ; let platform = targetPlatform dflags
         ; call <- getCode $ direct_call "slow_call"
                        (mkRtsApFastLabel rts_fun) arity argsreps
         ; emitComment $ mkFastString ("slow_call for " ++
-                                      showSDoc (pprPlatform platform fun) ++
-                                      " with pat " ++ showSDoc (ftext rts_fun))
+                                      showSDoc dflags (ppr fun) ++
+                                      " with pat " ++ unpackFS rts_fun)
         ; emit (mkAssign nodeReg fun <*> call)
         }
 
 
 --------------
-direct_call :: String -> CLabel -> Arity -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
+direct_call :: String -> CLabel -> RepArity -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
 direct_call caller lbl arity args
   | debugIsOn && arity > length args  -- Too few args
   = do -- Caller should ensure that there enough args!
-       dflags <- getDynFlags
-       let platform = targetPlatform dflags
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>
-            pprPlatform platform lbl <+> ppr (length args) <+>
-            pprPlatform platform (map snd args) <+> ppr (map fst args)
+            ppr lbl <+> ppr (length args) <+>
+            ppr (map snd args) <+> ppr (map fst args)
 
   | null rest_args  -- Precisely the right number of arguments
   = emitCall (NativeDirectCall, NativeReturn) target (nonVArgs args)
@@ -289,7 +285,7 @@ slowArgs args -- careful: reps contains voids (V), but args does not
 
 
 -- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [ArgRep] -> (FastString, Arity)
+slowCallPattern :: [ArgRep] -> (FastString, RepArity)
 -- Returns the generic apply function and arity
 slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
 slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)
@@ -532,9 +528,8 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
 emitClosureAndInfoTable ::
   CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable info_tbl conv args body
-  = do { dflags <- getDynFlags
-       ; blks <- getCode body
-       ; let entry_lbl = toEntryLbl (targetPlatform dflags) (cit_lbl info_tbl)
+  = do { blks <- getCode body
+       ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
        ; emitProcWithConvention conv info_tbl entry_lbl args blks
        }
 

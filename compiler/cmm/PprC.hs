@@ -71,7 +71,7 @@ pprCs dflags cmms
 
 writeCs :: DynFlags -> Handle -> [RawCmmGroup] -> IO ()
 writeCs dflags handle cmms
-  = printForC handle (pprCs dflags cmms)
+  = printForC dflags handle (pprCs dflags cmms)
 
 -- --------------------------------------------------------------------------
 -- Now do some real work
@@ -203,9 +203,6 @@ pprStmt platform stmt = case stmt of
                         pprCFunType (pprCLabel platform lbl) cconv results args <>
                         noreturn_attr <> semi
 
-        fun_proto lbl = ptext (sLit ";EF_(") <>
-                         pprCLabel platform lbl <> char ')' <> semi
-
         noreturn_attr = case ret of
                           CmmNeverReturns -> text "__attribute__ ((noreturn))"
                           CmmMayReturn    -> empty
@@ -226,30 +223,45 @@ pprStmt platform stmt = case stmt of
                     let myCall = pprCall platform (pprCLabel platform lbl) cconv results args
                     in (real_fun_proto lbl, myCall)
                 | not (isMathFun lbl) ->
-                    let myCall = braces (
-                                     pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
-                                  $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
-                                  $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
-                                 )
-                    in (fun_proto lbl, myCall)
+                    pprForeignCall platform (pprCLabel platform lbl) cconv results args
               _ ->
                    (empty {- no proto -},
                     pprCall platform cast_fn cconv results args <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim op) results args _ret ->
-        pprCall platform ppr_fn CCallConv results args'
-        where
-        ppr_fn = pprCallishMachOp_for_C op
-        -- The mem primops carry an extra alignment arg, must drop it.
-        -- We could maybe emit an alignment directive using this info.
-        args'  | op == MO_Memcpy || op == MO_Memset || op == MO_Memmove = init args
-               | otherwise = args
+    CmmCall (CmmPrim _ (Just stmts)) _ _ _ ->
+        vcat $ map (pprStmt platform) stmts
+
+    CmmCall (CmmPrim op _) results args _ret ->
+        proto $$ fn_call
+      where
+        cconv = CCallConv
+        fn = pprCallishMachOp_for_C op
+        (proto, fn_call)
+          -- The mem primops carry an extra alignment arg, must drop it.
+          -- We could maybe emit an alignment directive using this info.
+          -- We also need to cast mem primops to prevent conflicts with GCC
+          -- builtins (see bug #5967).
+          | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
+          = pprForeignCall platform fn cconv results (init args)
+          | otherwise
+          = (empty, pprCall platform fn cconv results args)
 
     CmmBranch ident          -> pprBranch ident
     CmmCondBranch expr ident -> pprCondBranch platform expr ident
     CmmJump lbl _            -> mkJMP_(pprExpr platform lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch platform arg ids
+
+pprForeignCall :: Platform -> SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> (SDoc, SDoc)
+pprForeignCall platform fn cconv results args = (proto, fn_call)
+  where
+    fn_call = braces (
+                 pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
+              $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
+              $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
+             )
+    cast_fn = parens (parens (pprCFunType (char '*') cconv results args) <> fn)
+    proto = ptext (sLit ";EF_(") <> fn <> char ')' <> semi
 
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
@@ -658,7 +670,14 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
 
-        MO_Touch -> panic $ "pprCallishMachOp_for_C: MO_Touch not supported!"
+        MO_S_QuotRem  {} -> unsupported
+        MO_U_QuotRem  {} -> unsupported
+        MO_U_QuotRem2 {} -> unsupported
+        MO_Add2       {} -> unsupported
+        MO_U_Mul2     {} -> unsupported
+        MO_Touch         -> unsupported
+    where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
+                            ++ " not supported!")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines
@@ -926,12 +945,18 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _)     = mapM_ (te_temp.hintlessCmm) rs >>
-                                  mapM_ (te_Expr.hintlessCmm) es
+te_Stmt (CmmCall target rs es _) = do te_Target target
+                                      mapM_ (te_temp.hintlessCmm) rs
+                                      mapM_ (te_Expr.hintlessCmm) es
 te_Stmt (CmmCondBranch e _)     = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e
 te_Stmt (CmmJump e _)           = te_Expr e
 te_Stmt _                       = return ()
+
+te_Target :: CmmCallTarget -> TE ()
+te_Target (CmmCallee {})           = return ()
+te_Target (CmmPrim _ Nothing)      = return ()
+te_Target (CmmPrim _ (Just stmts)) = mapM_ te_Stmt stmts
 
 te_Expr :: CmmExpr -> TE ()
 te_Expr (CmmLit lit)            = te_Lit lit
@@ -1092,10 +1117,11 @@ pprHexVal w rep
         -- times values are unsigned.  This also helps eliminate occasional
         -- warnings about integer overflow from gcc.
 
-        -- on 32-bit platforms, add "ULL" to 64-bit literals
-      repsuffix W64 | wORD_SIZE == 4 = ptext (sLit "ULL")
-        -- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
-      repsuffix W64 | cINT_SIZE == 4 = ptext (sLit "UL")
+      repsuffix W64
+       | cINT_SIZE       == 8 = char 'U'
+       | cLONG_SIZE      == 8 = ptext (sLit "UL")
+       | cLONG_LONG_SIZE == 8 = ptext (sLit "ULL")
+       | otherwise            = panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
       go 0 = empty

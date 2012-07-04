@@ -131,8 +131,8 @@ data Pat id
                     (SyntaxExpr id)     -- Name of '-' (see RnEnv.lookupSyntaxName)
 
         ------------ Pattern type signatures ---------------
-  | SigPatIn        (LPat id)           -- Pattern with a type signature
-                    (LHsType id)
+  | SigPatIn        (LPat id)                   -- Pattern with a type signature
+                    (HsWithBndrs (LHsType id))  -- Signature can bind both kind and type vars
 
   | SigPatOut       (LPat id)           -- Pattern with a type signature
                     Type
@@ -246,7 +246,7 @@ pprPat (AsPat name pat)   = hcat [ppr name, char '@', pprParendLPat pat]
 pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)         = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
-pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
+pprPat (PArrPat pats _)     = paBrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens (boxityNormalTupleSort bx) (interpp'SP pats)
 
 pprPat (ConPatIn con details) = pprUserCon con details
@@ -292,11 +292,6 @@ instance (OutputableBndr id, Outputable arg)
   ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
-
--- add parallel array brackets around a document
---
-pabrackets   :: SDoc -> SDoc
-pabrackets p  = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 

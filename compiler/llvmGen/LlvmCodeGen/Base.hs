@@ -9,7 +9,8 @@ module LlvmCodeGen.Base (
         LlvmCmmDecl, LlvmBasicBlock,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, defaultLlvmVersion,
+        LlvmVersion, defaultLlvmVersion, minSupportLlvmVersion,
+        maxSupportLlvmVersion,
 
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
         funLookup, funInsert, getLlvmVer, setLlvmVer, getLlvmPlatform,
@@ -144,7 +145,13 @@ type LlvmVersion = Int
 
 -- | The LLVM Version we assume if we don't know
 defaultLlvmVersion :: LlvmVersion
-defaultLlvmVersion = 28
+defaultLlvmVersion = 30
+
+minSupportLlvmVersion :: LlvmVersion
+minSupportLlvmVersion = 28
+
+maxSupportLlvmVersion :: LlvmVersion
+maxSupportLlvmVersion = 31
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -226,7 +233,10 @@ getDflags (LlvmEnv (_, _, _, d)) = d
 -- | Pretty print a 'CLabel'.
 strCLabel_llvm :: LlvmEnv -> CLabel -> LMString
 strCLabel_llvm env l = {-# SCC "llvm_strCLabel" #-}
-    (fsLit . show . llvmSDoc . pprCLabel (getLlvmPlatform env)) l
+    (fsLit . toString . pprCLabel (getLlvmPlatform env)) l
+    where dflags = getDflags env
+          style = Outp.mkCodeStyle Outp.CStyle
+          toString doc = Outp.renderWithStyle dflags doc style
 
 -- | Create an external definition for a 'CLabel' defined in another module.
 genCmmLabelRef :: LlvmEnv -> CLabel -> LMGlobal

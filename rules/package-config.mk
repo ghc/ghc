@@ -34,10 +34,10 @@ $1_$2_HC_MK_DEPEND = $$($1_$2_HC)
 # on cygwin we get a dep on c:/ghc/..., and make gets confused by the :
 $1_$2_HC_MK_DEPEND_DEP =
 $1_$2_HC_DEP =
-$1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
-$1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
+$1_$2_HC_PKGCONF = -$(GHC_PACKAGE_DB_FLAG) $$(BOOTSTRAPPING_CONF)
+$1_$2_GHC_PKG_OPTS = --$(GHC_PACKAGE_DB_FLAG)=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
-$1_$2_MORE_HC_OPTS += -no-user-package-conf
+$1_$2_MORE_HC_OPTS += -no-user-$(GHC_PACKAGE_DB_FLAG)
 $1_$2_MORE_HC_OPTS += -rtsopts
 else
 $1_$2_HC_PKGCONF = 
@@ -51,9 +51,16 @@ $1_$2_GHC_PKG_OPTS =
 $1_$2_HC_MK_DEPEND = $$(GHC_STAGE1)
 $1_$2_HC_MK_DEPEND_DEP = $$($1_$2_HC_MK_DEPEND)
 $1_$2_HC_DEP = $$($1_$2_HC)
-$1_$2_MORE_HC_OPTS += -no-user-package-conf
+$1_$2_MORE_HC_OPTS += -no-user-package-db
 $1_$2_MORE_HC_OPTS += -rtsopts
 endif
+
+# Used by pretty_commands.mk
+label_$1_$2_CC=CC
+label_$1_$2_AS=AS
+label_$1_$2_AR=AR
+label_$1_$2_HC=HC [stage $3]
+label_$1_$2_GHC_PKG=GHC PKG
 
 # Useful later
 $1_$2_SLASH_MODS = $$(subst .,/,$$($1_$2_MODULES))

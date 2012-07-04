@@ -267,9 +267,6 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
        copyBytes new old sz 
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
-   when False $ -- disabled
-      hPutStrLn stderr ("Binary: expanding to size: " ++ show sz')
-   return ()
 expandBin (BinIO _ _ _) _ = return ()
 -- no need to expand a file, we'll assume they expand by themselves.
 

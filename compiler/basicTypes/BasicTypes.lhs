@@ -26,7 +26,7 @@ types that
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
-	Arity,
+	Arity, RepArity,
 	
 	Alignment,
 
@@ -38,8 +38,6 @@ module BasicTypes(
 	defaultFixity, maxPrecedence, 
 	negateFixity, funTyFixity,
 	compareFixity,
-
-	IPName(..), ipNameName, mapIPName,
 
 	RecFlag(..), isRec, isNonRec, boolToRecFlag,
 
@@ -101,7 +99,18 @@ import Data.Function (on)
 %************************************************************************
 
 \begin{code}
+-- | The number of value arguments that can be applied to a value before it does
+-- "real work". So:
+--  fib 100     has arity 0
+--  \x -> fib x has arity 1
 type Arity = Int
+
+-- | The number of represented arguments that can be applied to a value before it does
+-- "real work". So:
+--  fib 100                    has representation arity 0
+--  \x -> fib x                has representation arity 1
+--  \(# x, y #) -> fib (x + y) has representation arity 2
+type RepArity = Int
 \end{code}
 
 %************************************************************************
@@ -163,32 +172,6 @@ instance Outputable WarningTxt where
     ppr (WarningTxt    ws) = doubleQuotes (vcat (map ftext ws))
     ppr (DeprecatedTxt ds) = text "Deprecated:" <+>
                              doubleQuotes (vcat (map ftext ds))
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Implicit parameter identity}
-%*									*
-%************************************************************************
-
-The @IPName@ type is here because it is used in TypeRep (i.e. very
-early in the hierarchy), but also in HsSyn.
-
-\begin{code}
-newtype IPName name = IPName name	-- ?x
-  deriving( Eq, Data, Typeable )
-
-instance Functor IPName where
-    fmap = mapIPName
-
-ipNameName :: IPName name -> name
-ipNameName (IPName n) = n
-
-mapIPName :: (a->b) -> IPName a -> IPName b
-mapIPName f (IPName n) = IPName (f n)
-
-instance Outputable name => Outputable (IPName name) where
-    ppr (IPName n) = char '?' <> ppr n -- Ordinary implicit parameters
 \end{code}
 
 %************************************************************************
@@ -561,9 +544,6 @@ instance Outputable OccInfo where
 		 | otherwise  = char '*'
 	  pp_args | int_cxt   = char '!'
 		  | otherwise = empty
-
-instance Show OccInfo where
-  showsPrec p occ = showsPrecSDoc p (ppr occ)
 \end{code}
 
 %************************************************************************

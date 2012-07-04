@@ -43,29 +43,40 @@ provider HaskellEvent {
   probe stop__thread (EventCapNo, EventThreadID, EventThreadStatus, EventThreadID);
   probe thread__runnable (EventCapNo, EventThreadID);
   probe migrate__thread (EventCapNo, EventThreadID, EventCapNo);
-  probe shutdown (EventCapNo);
   probe thread_wakeup (EventCapNo, EventThreadID, EventCapNo);
+  probe create__spark__thread (EventCapNo, EventThreadID);
+  probe thread__label (EventCapNo, EventThreadID, char *);
+
+  /* GC and heap events */
   probe gc__start (EventCapNo);
   probe gc__end (EventCapNo);
   probe request__seq__gc (EventCapNo);
   probe request__par__gc (EventCapNo);
-  probe create__spark__thread (EventCapNo, EventThreadID);
-  probe thread__label (EventCapNo, EventThreadID, char *);
-
-  /* other events */
-/* This one doesn't seem to be used at all at the moment: */
-/*  probe log__msg (char *); */
-  probe startup (EventCapNo);
-  /* we don't need EVENT_BLOCK_MARKER with dtrace */
-  probe user__msg (EventCapNo, char *);
   probe gc__idle (EventCapNo);
   probe gc__work (EventCapNo);
   probe gc__done (EventCapNo);
+  probe gc__sync (EventCapNo);
+/* FIXME: leads to a validate failure on OS X (Lion)
+  probe gc__stats (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord);
+  probe heap__info (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord);
+  probe heap__allocated (EventCapNo, CapsetID, StgWord64);
+  probe heap__size (CapsetID, StgWord);
+  probe heap__live (CapsetID, StgWord);
+ */
+  /* capability events */
+  probe startup (EventCapNo);
+  probe cap__create (EventCapNo);
+  probe cap__delete (EventCapNo);
+  probe cap__enable (EventCapNo);
+  probe cap__disable (EventCapNo);
+
+  /* capset info events */
   probe capset__create(EventCapsetID, EventCapsetType);
   probe capset__delete(EventCapsetID);
   probe capset__assign__cap(EventCapsetID, EventCapNo);
   probe capset__remove__cap(EventCapsetID, EventCapNo);
 
+  /* spark events */
   probe spark__counters(EventCapNo,
                         StgWord, StgWord, StgWord,
                         StgWord, StgWord, StgWord,
@@ -78,4 +89,10 @@ provider HaskellEvent {
   probe spark__steal    (EventCapNo, EventCapNo);
   probe spark__fizzle   (EventCapNo);
   probe spark__gc       (EventCapNo);
+
+  /* other events */
+/* This one doesn't seem to be used at all at the moment: */
+/*  probe log__msg (char *); */
+  /* we don't need EVENT_BLOCK_MARKER with dtrace */
+  probe user__msg (EventCapNo, char *);
 };

@@ -79,6 +79,16 @@ import System.Process
 import Control.Concurrent
 import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
+
+#ifdef mingw32_HOST_OS
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+#endif
 \end{code}
 
 How GHC finds its files
@@ -489,8 +499,8 @@ runClang dflags args = do
         runSomething dflags "Clang (Assembler)" clang args
     )
     (\(err :: SomeException) -> do
-        putMsg dflags $ text $ "Error running clang! you need clang installed"
-                            ++ " to use the LLVM backend"
+        errorMsg dflags $ text $ "Error running clang! you need clang installed"
+                              ++ " to use the LLVM backend"
         throw err
     )
 
@@ -528,7 +538,7 @@ figureLlvmVersion dflags = do
                 debugTraceMsg dflags 2
                     (text "Error (figuring out LLVM version):" <+>
                      text (show err))
-                putMsg dflags $ vcat
+                errorMsg dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
                           text "Make sure you have installed LLVM"]
@@ -841,10 +851,10 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
               msg <- readChan chan
               case msg of
                 BuildMsg msg -> do
-                  log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+                  log_action dflags dflags SevInfo noSrcSpan defaultUserStyle msg
                   loop chan hProcess t p exitcode
                 BuildError loc msg -> do
-                  log_action dflags SevError (mkSrcSpan loc loc) defaultUserStyle msg
+                  log_action dflags dflags SevError (mkSrcSpan loc loc) defaultUserStyle msg
                   loop chan hProcess t p exitcode
                 EOF ->
                   loop chan hProcess (t-1) p exitcode
@@ -922,7 +932,8 @@ traceCmd dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
         ; showPass dflags phase_name
         ; debugTraceMsg dflags 3 (text cmd_line)
-        ; hFlush stderr
+        ; case flushErr dflags of
+              FlushErr io -> io
 
            -- And run it!
         ; action `catchIO` handle_exn verb
@@ -970,7 +981,7 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
         where fail = panic ("can't decompose ghc.exe path: " ++ show s)
               lower = map toLower
 
-foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getBaseDir = return Nothing

@@ -19,7 +19,7 @@
  * only in here please.
  */
 
-/* 
+/*
  * Defining NO_REGS causes no global registers to be used.  NO_REGS is
  * typically defined by GHC, via a command-line option passed to gcc,
  * when the -funregisterised flag is given.
@@ -55,7 +55,7 @@
 
 /* ----------------------------------------------------------------------------
    Caller saves and callee-saves regs.
-   
+
    Caller-saves regs have to be saved around C-calls made from STG
    land, so this file defines CALLER_SAVES_<reg> for each <reg> that
    is designated caller-saves in that machine's C calling convention.
@@ -91,21 +91,21 @@
 #ifndef not_doing_dynamic_linking
 #define REG_Base    ebx
 #endif
-#define REG_Sp	    ebp
+#define REG_Sp      ebp
 
 #ifndef STOLEN_X86_REGS
 #define STOLEN_X86_REGS 4
 #endif
 
 #if STOLEN_X86_REGS >= 3
-# define REG_R1	    esi
+# define REG_R1     esi
 #endif
 
 #if STOLEN_X86_REGS >= 4
 # define REG_Hp     edi
 #endif
 
-#define MAX_REAL_VANILLA_REG 1	/* always, since it defines the entry conv */
+#define MAX_REAL_VANILLA_REG 1  /* always, since it defines the entry conv */
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
@@ -115,22 +115,22 @@
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
 
-  %rax		caller-saves, don't steal this one
-  %rbx		YES
+  %rax          caller-saves, don't steal this one
+  %rbx          YES
   %rcx          arg reg, caller-saves
-  %rdx		arg reg, caller-saves
-  %rsi		arg reg, caller-saves
-  %rdi		arg reg, caller-saves
-  %rbp		YES (our *prime* register)
-  %rsp		(unavailable - stack pointer)
+  %rdx          arg reg, caller-saves
+  %rsi          arg reg, caller-saves
+  %rdi          arg reg, caller-saves
+  %rbp          YES (our *prime* register)
+  %rsp          (unavailable - stack pointer)
   %r8           arg reg, caller-saves
-  %r9		arg reg, caller-saves
+  %r9           arg reg, caller-saves
   %r10          caller-saves
-  %r11		caller-saves
-  %r12		YES
-  %r13		YES
-  %r14		YES
-  %r15		YES
+  %r11          caller-saves
+  %r12          YES
+  %r13          YES
+  %r14          YES
+  %r15          YES
 
   %xmm0-7       arg regs, caller-saves
   %xmm8-15      caller-saves
@@ -164,8 +164,10 @@
 #define REG_D1    xmm5
 #define REG_D2    xmm6
 
+#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
 #define CALLER_SAVES_R4
+#endif
 #define CALLER_SAVES_R5
 #define CALLER_SAVES_R6
 
@@ -175,7 +177,9 @@
 #define CALLER_SAVES_F4
 
 #define CALLER_SAVES_D1
+#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_D2
+#endif
 
 #define MAX_REAL_VANILLA_REG 6
 #define MAX_REAL_FLOAT_REG   4
@@ -187,30 +191,30 @@
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping
 
-   0		system glue?	(caller-save, volatile)
-   1		SP		(callee-save, non-volatile)
+   0            system glue?    (caller-save, volatile)
+   1            SP              (callee-save, non-volatile)
    2            AIX, powerpc64-linux:
                     RTOC        (a strange special case)
-                darwin:         
+                darwin:
                                 (caller-save, volatile)
                 powerpc32-linux:
                                 reserved for use by system
-                    
-   3-10		args/return	(caller-save, volatile)
-   11,12	system glue?	(caller-save, volatile)
+
+   3-10         args/return     (caller-save, volatile)
+   11,12        system glue?    (caller-save, volatile)
    13           on 64-bit:      reserved for thread state pointer
                 on 32-bit:      (callee-save, non-volatile)
-   14-31			(callee-save, non-volatile)
-   
-   f0				(caller-save, volatile)
-   f1-f13	args/return	(caller-save, volatile)
-   f14-f31			(callee-save, non-volatile)
-   
+   14-31                        (callee-save, non-volatile)
+
+   f0                           (caller-save, volatile)
+   f1-f13       args/return     (caller-save, volatile)
+   f14-f31                      (callee-save, non-volatile)
+
    \tr{14}--\tr{31} are wonderful callee-save registers on all ppc OSes.
    \tr{0}--\tr{12} are caller-save registers.
-   
+
    \tr{%f14}--\tr{%f31} are callee-save floating-point registers.
-   
+
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
@@ -218,41 +222,41 @@
 
 #define REG(x) __asm__(#x)
 
-#define REG_R1		r14
-#define REG_R2    	r15
-#define REG_R3    	r16
-#define REG_R4    	r17
-#define REG_R5    	r18
-#define REG_R6    	r19
-#define REG_R7    	r20
-#define REG_R8    	r21
+#define REG_R1          r14
+#define REG_R2          r15
+#define REG_R3          r16
+#define REG_R4          r17
+#define REG_R5          r18
+#define REG_R6          r19
+#define REG_R7          r20
+#define REG_R8          r21
 
 #if darwin_REGS
 
-#define REG_F1		f14
-#define REG_F2		f15
-#define REG_F3		f16
-#define REG_F4		f17
+#define REG_F1          f14
+#define REG_F2          f15
+#define REG_F3          f16
+#define REG_F4          f17
 
-#define REG_D1		f18
-#define REG_D2		f19
+#define REG_D1          f18
+#define REG_D2          f19
 
 #else
 
-#define REG_F1		fr14
-#define REG_F2		fr15
-#define REG_F3		fr16
-#define REG_F4		fr17
+#define REG_F1          fr14
+#define REG_F2          fr15
+#define REG_F3          fr16
+#define REG_F4          fr17
 
-#define REG_D1		fr18
-#define REG_D2		fr19
+#define REG_D1          fr18
+#define REG_D2          fr19
 
 #endif
 
-#define REG_Sp    	r22
-#define REG_SpLim    	r24
+#define REG_Sp          r22
+#define REG_SpLim       r24
 
-#define REG_Hp	    	r25
+#define REG_Hp          r25
 
 #define REG_Base        r27
 
@@ -269,46 +273,46 @@
    Threaded World, we essentially ``shut down'' the register-window
    mechanism---the window doesn't move at all while in this World.  It
    *does* move, of course, if we call out to arbitrary~C...
-   
+
    The %i, %l, and %o registers (8 each) are the input, local, and
    output registers visible in one register window.  The 8 %g (global)
    registers are visible all the time.
-   
+
       zero: always zero
    scratch: volatile across C-fn calls. used by linker.
        app: usable by application
     system: reserved for system
- 
+
      alloc: allocated to in the register allocator, intra-closure only
-   
+
                 GHC usage     v8 ABI        v9 ABI
    Global
-     %g0	zero        zero          zero
-     %g1	alloc       scratch       scrach
-     %g2	alloc       app           app
-     %g3	alloc       app           app
-     %g4	alloc       app           scratch
-     %g5                    system        scratch    
+     %g0        zero        zero          zero
+     %g1        alloc       scratch       scrach
+     %g2        alloc       app           app
+     %g3        alloc       app           app
+     %g4        alloc       app           scratch
+     %g5                    system        scratch
      %g6                    system        system
      %g7                    system        system
 
    Output: can be zapped by callee
-     %o0-o5	alloc       caller saves
+     %o0-o5     alloc       caller saves
      %o6                    C stack ptr
      %o7                    C ret addr
-   
+
    Local: maintained by register windowing mechanism
-     %l0	alloc        
-     %l1	R1
-     %l2	R2
-     %l3	R3
-     %l4	R4
-     %l5	R5
-     %l6	alloc
-     %l7	alloc
+     %l0        alloc
+     %l1        R1
+     %l2        R2
+     %l3        R3
+     %l4        R4
+     %l5        R5
+     %l6        alloc
+     %l7        alloc
 
    Input
-     %i0	Sp
+     %i0        Sp
      %i1        Base
      %i2        SpLim
      %i3        Hp
@@ -316,11 +320,11 @@
      %i5        R6
      %i6                    C frame ptr
      %i7                    C ret addr
-     
+
    The paired nature of the floating point registers causes complications for
    the native code generator.  For convenience, we pretend that the first 22
    fp regs %f0 .. %f21 are actually 11 double regs, and the remaining 10 are
-   float (single) regs.  The NCG acts accordingly.  That means that the 
+   float (single) regs.  The NCG acts accordingly.  That means that the
    following FP assignment is rather fragile, and should only be changed
    with extreme care.  The current scheme is:
 
@@ -362,42 +366,33 @@
 #define CALLER_SAVES_D1
 #define CALLER_SAVES_D2
 
-#define REG_R1	    	l1
-#define REG_R2    	l2
-#define REG_R3    	l3
-#define REG_R4    	l4
-#define REG_R5    	l5
-#define REG_R6    	i5
+#define REG_R1          l1
+#define REG_R2          l2
+#define REG_R3          l3
+#define REG_R4          l4
+#define REG_R5          l5
+#define REG_R6          i5
 
-#define REG_F1	    	f22
-#define REG_F2	    	f23
-#define REG_F3	    	f24
-#define REG_F4	    	f25
+#define REG_F1          f22
+#define REG_F2          f23
+#define REG_F3          f24
+#define REG_F4          f25
 
-/* for each of the double arg regs, 
+/* for each of the double arg regs,
    Dn_2 is the high half. */
-   
-#define REG_D1	    	f2
-#define REG_D1_2	f3
 
-#define REG_D2	    	f4
-#define REG_D2_2	f5
+#define REG_D1          f2
+#define REG_D1_2        f3
 
-#define REG_Sp    	i0
-#define REG_SpLim    	i2
+#define REG_D2          f4
+#define REG_D2_2        f5
 
-#define REG_Hp	    	i3
+#define REG_Sp          i0
+#define REG_SpLim       i2
 
-#define REG_Base	i1
+#define REG_Hp          i3
 
-/*
-#define NCG_SpillTmp_I1	g1
-#define NCG_SpillTmp_I2	g2
-#define NCG_SpillTmp_F1	f26
-#define NCG_SpillTmp_F2 f27
-#define NCG_SpillTmp_D1	f6
-#define NCG_SpillTmp_D2	f8
-*/
+#define REG_Base        i1
 
 #define NCG_FirstFloatReg f22
 
@@ -545,7 +540,7 @@
  * optimise certain code paths using this predicate).
  */
 #if MAX_REAL_VANILLA_REG < 2
-#define NO_ARG_REGS 
+#define NO_ARG_REGS
 #else
 #undef NO_ARG_REGS
 #endif

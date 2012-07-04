@@ -14,13 +14,16 @@
 module RnEnv ( 
 	newTopSrcBinder, 
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
-	lookupLocatedOccRn, lookupOccRn, lookupLocalOccRn_maybe, lookupPromotedOccRn,
+	lookupLocatedOccRn, lookupOccRn, 
+        lookupLocalOccRn_maybe, 
+        lookupTypeOccRn, lookupKindOccRn, 
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
-	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
+	HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndrOcc, greRdrName,
+	lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
+        greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
@@ -31,16 +34,14 @@ module RnEnv (
 	MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
 	addLocalFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
-	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	extendTyVarEnvFVRn,
 
-	checkDupRdrNames, checkDupAndShadowedRdrNames,
-        checkDupNames, checkDupAndShadowedNames, 
+	checkDupRdrNames, checkShadowedRdrNames,
+        checkDupNames, checkDupAndShadowedNames, checkTupSize,
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
 	dataTcOccs, unknownNameErr, kindSigErr, dataKindsErr, perhapsForallMsg,
-
         HsDocContext(..), docOfHsDocContext
     ) where
 
@@ -49,7 +50,6 @@ module RnEnv (
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
 import IfaceEnv
 import HsSyn
-import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
 import HscTypes
 import TcEnv		( tcLookupDataCon, tcLookupField, isBrackStage )
@@ -61,7 +61,8 @@ import NameEnv
 import Avail
 import Module           ( ModuleName, moduleName )
 import UniqFM
-import DataCon		( dataConFieldLabels )
+import DataCon		( dataConFieldLabels, dataConTyCon )
+import TyCon            ( isTupleTyCon, tyConArity ) 
 import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils		( MsgDoc )
 import SrcLoc
@@ -74,6 +75,7 @@ import FastString
 import Control.Monad
 import Data.List
 import qualified Data.Set as Set
+import Constants	( mAX_TUPLE_SIZE )
 \end{code}
 
 \begin{code}
@@ -235,15 +237,43 @@ lookupTopBndrRn_maybe rdr_name
 lookupExactOcc :: Name -> RnM Name
 -- See Note [Looking up Exact RdrNames]
 lookupExactOcc name
+  | Just thing <- wiredInNameTyThing_maybe name
+  , Just tycon <- case thing of
+                    ATyCon tc   -> Just tc
+                    ADataCon dc -> Just (dataConTyCon dc)
+                    _           -> Nothing
+  , isTupleTyCon tycon
+  = do { checkTupSize (tyConArity tycon)
+       ; return name }
+
   | isExternalName name 
   = return name
+
   | otherwise           
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_Name env name
+       ; let -- See Note [Splicing Exact names] 
+             main_occ =  nameOccName name
+             demoted_occs = case demoteOccName main_occ of
+                              Just occ -> [occ]
+                              Nothing  -> []
+             gres = [ gre | occ <- main_occ : demoted_occs
+                          , gre <- lookupGlobalRdrEnv env occ
+	                  , gre_name gre == name ]
        ; case gres of
-           []    -> return name
+           []    -> -- See Note [Splicing Exact names]
+                    do { lcl_env <- getLocalRdrEnv
+                       ; unless (name `inLocalRdrEnvScope` lcl_env)
+                                (addErr exact_nm_err)
+                       ; return name }
+   
            [gre] -> return (gre_name gre)
            _     -> pprPanic "lookupExactOcc" (ppr name $$ ppr gres) }
+
+  where
+    exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
+                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
+                              , ptext (sLit "perhaps via newName, but did not bind it")
+                              , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
 
 -----------------------------------------------
 lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
@@ -270,6 +300,16 @@ lookupInstDeclBndr cls what rdr
        ; lookupSubBndrOcc (ParentIs cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
+
+
+-----------------------------------------------
+lookupFamInstName :: Maybe Name -> Located RdrName -> RnM (Located Name)
+-- Used for TyData and TySynonym family instances only, 
+-- See Note [Family instance binders]
+lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f RnBinds.rnMethodBind
+  = wrapLocM (lookupInstDeclBndr cls (ptext (sLit "associated type"))) tc_rdr
+lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
+  = lookupLocatedOccRn tc_rdr 
 
 -----------------------------------------------
 lookupConstructorFields :: Name -> RnM [Name]
@@ -374,6 +414,40 @@ lookupSubBndrGREs env parent rdr_name
     parent_is _ _                               = False
 \end{code}
 
+Note [Family instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data family F a
+  data instance F T = X1 | X2
+
+The 'data instance' decl has an *occurrence* of F (and T), and *binds*
+X1 and X2.  (This is unlike a normal data type declaration which would
+bind F too.)  So we want an AvailTC F [X1,X2].
+
+Now consider a similar pair:
+  class C a where
+    data G a
+  instance C S where
+    data G S = Y1 | Y2
+
+The 'data G S' *binds* Y1 and Y2, and has an *occurrence* of G.
+
+But there is a small complication: in an instance decl, we don't use
+qualified names on the LHS; instead we use the class to disambiguate.
+Thus:
+  module M where
+    import Blib( G )
+    class C a where
+      data G a
+    instance C S where
+      data G S = Y1 | Y2
+Even though there are two G's in scope (M.G and Blib.G), the occurence
+of 'G' in the 'instance C S' decl is unambiguous, becuase C has only
+one associated type called G. This is exactly what happens for methods,
+and it is only consistent to do the same thing for types. That's the
+role of the function lookupTcdName; the (Maybe Name) give the class of
+the encloseing instance decl, if any.
+
 Note [Looking up Exact RdrNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Exact RdrNames are generated by Template Haskell.  See Note [Binders
@@ -384,6 +458,7 @@ positions for constructors, TyCons etc.  For example
     [d| data T = MkT Int |]
 when we splice in and Convert to HsSyn RdrName, we'll get
     data (Exact (system Name "T")) = (Exact (system Name "MkT")) ...
+These System names are generated by Convert.thRdrName
 
 But, constructors and the like need External Names, not System Names!
 So we do the following
@@ -394,7 +469,7 @@ So we do the following
 
  * When looking up an occurrence of an Exact name, done in
    RnEnv.lookupExactOcc, we find the Name with the right unique in the
-   GlobalRdrEnv, and use the on from the envt -- it will be an
+   GlobalRdrEnv, and use the one from the envt -- it will be an
    External Name in the case of the data type/constructor above.
 
  * Exact names are also use for purely local binders generated
@@ -406,6 +481,28 @@ So we do the following
    will find the Name is not in the GlobalRdrEnv, so we just use
    the Exact supplied Name.
 
+Note [Splicing Exact names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the splice $(do { x <- newName "x"; return (VarE x) })
+This will generate a (HsExpr RdrName) term that mentions the 
+Exact RdrName "x_56" (or whatever), but does not bind it.  So
+when looking such Exact names we want to check that it's in scope,
+otherwise the type checker will get confused.  To do this we need to
+keep track of all the Names in scope, and the LocalRdrEnv does just that;
+we consult it with RdrName.inLocalRdrEnvScope.
+
+There is another wrinkle.  With TH and -XDataKinds, consider
+   $( [d| data Nat = Zero 
+          data T = MkT (Proxy 'Zero)  |] )
+After splicing, but before renaming we get this:
+   data Nat_77{tc} = Zero_78{d}
+   data T_79{tc} = MkT_80{d} (Proxy 'Zero_78{tc})  |] )
+THe occurrence of 'Zero in the data type for T has the right unique,
+but it has a TcClsName name-space in its OccName.  (This is set by
+the ctxt_ns argument of Convert.thRdrName.)  When we check that is 
+in scope in the GlobalRdrEnv, we need to look up the DataName namespace
+too.  (An alternative would be to make the GlobalRdrEnv also have
+a Name -> GRE mapping.)
 
 Note [Usage for sub-bndrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -452,25 +549,38 @@ lookupOccRn rdr_name = do
   opt_name <- lookupOccRn_maybe rdr_name
   maybe (unboundName WL_Any rdr_name) return opt_name
 
+lookupKindOccRn :: RdrName -> RnM Name
+-- Looking up a name occurring in a kind
+lookupKindOccRn rdr_name
+  = do { mb_name <- lookupOccRn_maybe rdr_name
+       ; case mb_name of
+           Just name -> return name
+           Nothing -> unboundName WL_Any rdr_name  }
+
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
-lookupPromotedOccRn :: RdrName -> RnM Name
+lookupTypeOccRn :: RdrName -> RnM Name
 -- see Note [Demotion] 
-lookupPromotedOccRn rdr_name 
+lookupTypeOccRn rdr_name 
   = do { mb_name <- lookupOccRn_maybe rdr_name 
        ; case mb_name of {
              Just name -> return name ;
-             Nothing   -> 
+             Nothing   -> lookup_demoted rdr_name } }
 
-    do { -- Maybe it's the name of a *data* constructor
-         data_kinds <- xoptM Opt_DataKinds
-       ; mb_demoted_name <- case demoteRdrName rdr_name of
-                              Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
-                              Nothing          -> return Nothing
+lookup_demoted :: RdrName -> RnM Name
+lookup_demoted rdr_name
+  | Just demoted_rdr <- demoteRdrName rdr_name
+    -- Maybe it's the name of a *data* constructor
+  = do { data_kinds <- xoptM Opt_DataKinds
+       ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
        ; case mb_demoted_name of
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
              | data_kinds -> return demoted_name
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }
+ 
+  | otherwise
+  = unboundName WL_Any rdr_name 
+
   where 
     suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
@@ -591,28 +701,111 @@ lookupGreRn_help rdr_name lookup
                         ; return (Just gre) }
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; return (Just (head gres)) } }
+\end{code}
 
+%*********************************************************
+%*							*
+		Deprecations
+%*							*
+%*********************************************************
+
+Note [Handling of deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* We report deprecations at each *occurrence* of the deprecated thing
+  (see Trac #5867)
+
+* We do not report deprectations for locally-definded names. For a
+  start, we may be exporting a deprecated thing. Also we may use a
+  deprecated thing in the defn of another deprecated things.  We may
+  even use a deprecated thing in the defn of a non-deprecated thing,
+  when changing a module's interface.
+
+* addUsedRdrNames: we do not report deprecations for sub-binders:
+     - the ".." completion for records
+     - the ".." in an export item 'T(..)'
+     - the things exported by a module export 'module M'
+
+\begin{code}
 addUsedRdrName :: GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
 addUsedRdrName gre rdr
-  | isLocalGRE gre = return ()
+  | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
+                                -- See Note [Handling of deprecations]
   | otherwise      = do { env <- getGblEnv
-       			; updMutVar (tcg_used_rdrnames env)
+       			; warnIfDeprecated gre
+                        ; updMutVar (tcg_used_rdrnames env)
 		                    (\s -> Set.insert rdr s) }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
 -- We don't check for imported-ness here, because it's inconvenient
 -- and not stritly necessary.
+-- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
 addUsedRdrNames rdrs
   = do { env <- getGblEnv
        ; updMutVar (tcg_used_rdrnames env)
 	 	   (\s -> foldr Set.insert s rdrs) }
 
-------------------------------
---	GHCi support
-------------------------------
+warnIfDeprecated :: GlobalRdrElt -> RnM ()
+warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+  = do { dflags <- getDynFlags
+       ; when (wopt Opt_WarnWarningsDeprecations dflags) $
+         do { iface <- loadInterfaceForName doc name
+            ; case lookupImpDeprec iface gre of
+                Just txt -> addWarn (mk_msg txt) 
+                Nothing  -> return () } }
+  where
+    mk_msg txt = sep [ sep [ ptext (sLit "In the use of")
+                             <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
+                             <+> quotes (ppr name)
+                           , parens imp_msg <> colon ]
+                     , ppr txt ]
 
+    name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    imp_mod  = importSpecModule imp_spec
+    imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+    extra | imp_mod == moduleName name_mod = empty
+          | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
+
+    doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
+
+warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
+
+lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
+lookupImpDeprec iface gre
+  = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
+    case gre_par gre of                      -- or its parent, is warn'd
+       ParentIs p -> mi_warn_fn iface p 
+       NoParent   -> Nothing
+\end{code}
+
+Note [Used names with interface not loaded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's (just) possible to to find a used
+Name whose interface hasn't been loaded:
+
+a) It might be a WiredInName; in that case we may not load
+   its interface (although we could).
+
+b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
+   These are seen as "used" by the renamer (if -XRebindableSyntax)
+   is on), but the typechecker may discard their uses
+   if in fact the in-scope fromRational is GHC.Read.fromRational,
+   (see tcPat.tcOverloadedLit), and the typechecker sees that the type
+   is fixed, say, to GHC.Base.Float (see Inst.lookupSimpleInst).
+   In that obscure case it won't force the interface in.
+
+In both cases we simply don't permit deprecations;
+this is, after all, wired-in stuff.
+
+
+%*********************************************************
+%*							*
+		GHCi support
+%*							*
+%*********************************************************
+
+\begin{code}
 -- A qualified name on the command line can refer to any module at all: we
 -- try to load the interface if we don't already have it.
 lookupQualifiedName :: RdrName -> RnM (Maybe Name)
@@ -657,13 +850,36 @@ We don't want to say 'f' is out of scope; instead, we want to
 return the imported 'f', so that later on the reanamer will
 correctly report "misplaced type sig".
 
+Note [Signatures for top level things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
+
+* The NameSet says what is bound in this group of bindings.
+  We can't use isLocalGRE from the GlobalRdrEnv, because of this:
+       f x = x
+       $( ...some TH splice... )
+       f :: Int -> Int
+  When we encounter the signature for 'f', the binding for 'f'
+  will be in the GlobalRdrEnv, and will be a LocalDef. Yet the
+  signature is mis-placed
+
+* The Bool says whether the signature is ok for a class method
+  or record selector.  Consider
+      infix 3 `f`          -- Yes, ok
+      f :: C a => a -> a   -- No, not ok
+      class C a where
+        f :: a -> a
+
 \begin{code}
 data HsSigCtxt 
-  = HsBootCtxt		     -- Top level of a hs-boot file
-  | TopSigCtxt		     -- At top level
+  = TopSigCtxt NameSet Bool  -- At top level, binding these names
+                             -- See Note [Signatures for top level things]
+                             -- Bool <=> ok to give sig for
+                             --          class method or record selctor
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name	     -- Class decl for this class
   | InstDeclCtxt  Name	     -- Intsance decl for this class
+  | HsBootCtxt		     -- Top level of a hs-boot file
 
 lookupSigOccRn :: HsSigCtxt
 	       -> Sig RdrName
@@ -695,11 +911,11 @@ lookupBindGroupOcc ctxt what rdr_name
 
   | otherwise
   = case ctxt of 
-      HsBootCtxt       -> lookup_top		    
-      TopSigCtxt       -> lookup_top
-      LocalBindCtxt ns -> lookup_group ns
-      ClsDeclCtxt  cls -> lookup_cls_op cls
-      InstDeclCtxt cls -> lookup_cls_op cls
+      HsBootCtxt            -> lookup_top (const True)       True
+      TopSigCtxt ns meth_ok -> lookup_top (`elemNameSet` ns) meth_ok
+      LocalBindCtxt ns 	    -> lookup_group ns
+      ClsDeclCtxt  cls 	    -> lookup_cls_op cls
+      InstDeclCtxt cls 	    -> lookup_cls_op cls
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv 
@@ -713,21 +929,22 @@ lookupBindGroupOcc ctxt what rdr_name
       where
         doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
-    lookup_top
+    lookup_top keep_me meth_ok
       = do { env <- getGlobalRdrEnv 
-           ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-           ; case filter isLocalGRE gres of
-               [] | null gres -> bale_out_with empty
-                  | otherwise -> bale_out_with (bad_msg (ptext (sLit "an imported value")))
+           ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+           ; case filter (keep_me . gre_name) all_gres of
+               [] | null all_gres -> bale_out_with empty
+                  | otherwise -> bale_out_with local_msg
                (gre:_) 
-                  | ParentIs {} <- gre_par gre
-		  -> bale_out_with (bad_msg (ptext (sLit "a record selector or class method")))
+                  | ParentIs {} <- gre_par gre 
+                  , not meth_ok
+		  -> bale_out_with sub_msg
 		  | otherwise
                   -> return (Right (gre_name gre)) }
 
-    lookup_group bound_names
-      = do { mb_name <- lookupOccRn_maybe rdr_name
-           ; case mb_name of
+    lookup_group bound_names  -- Look in the local envt (not top level)
+      = do { local_env <- getLocalRdrEnv
+           ; case lookupLocalRdrEnv local_env rdr_name of
                Just n  
                  | n `elemNameSet` bound_names -> return (Right n)
                  | otherwise                   -> bale_out_with local_msg
@@ -742,44 +959,77 @@ lookupBindGroupOcc ctxt what rdr_name
     local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
   			   <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
 
-    bad_msg thing = parens $ ptext (sLit "You cannot give a") <+> what
-    			  <+> ptext (sLit "for") <+> thing
+    sub_msg = parens $ ptext (sLit "You cannot give a") <+> what
+     	               <+> ptext (sLit "for a record selector or class method")
 
 
 ---------------
-lookupLocalDataTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
--- GHC extension: look up both the tycon and data con 
--- for con-like things.  Used for top-level fixity signatures
--- Complain if neither is in scope
-lookupLocalDataTcNames bndr_set what rdr_name
-  | Just n <- isExact_maybe rdr_name	
-	-- Special case for (:), which doesn't get into the GlobalRdrEnv
-  = do { n' <- lookupExactOcc n; return [n'] }	-- For this we don't need to try the tycon too
-  | otherwise
-  = do	{ mb_gres <- mapM (lookupBindGroupOcc (LocalBindCtxt bndr_set) what)
-			  (dataTcOccs rdr_name)
-	; let (errs, names) = splitEithers mb_gres
-	; when (null names) (addErr (head errs))	-- Bleat about one only
-	; return names }
+lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [Name]
+-- GHC extension: look up both the tycon and data con or variable.
+-- Used for top-level fixity signatures and deprecations. 
+-- Complain if neither is in scope.
+-- See Note [Fixity signature lookup]
+lookupLocalTcNames ctxt what rdr_name
+  = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
+       ; let (errs, names) = splitEithers mb_gres
+       ; when (null names) $ addErr (head errs) -- Bleat about one only
+       ; return names }
+  where
+    lookup = lookupBindGroupOcc ctxt what
 
 dataTcOccs :: RdrName -> [RdrName]
--- If the input is a data constructor, return both it and a type
--- constructor.  This is useful when we aren't sure which we are
--- looking at.
+-- Return both the given name and the same name promoted to the TcClsName
+-- namespace.  This is useful when we aren't sure which we are looking at.
 dataTcOccs rdr_name
-  | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
-  | otherwise 	  	      = [rdr_name]
-  where    
-    occ 	= rdrNameOcc rdr_name
+  | Just n <- isExact_maybe rdr_name	
+  , not (isBuiltInSyntax n)   -- See Note [dataTcOccs and Exact Names]
+  = [rdr_name] 
+  | isDataOcc occ || isVarOcc occ
+  = [rdr_name, rdr_name_tc]
+  | otherwise
+  = [rdr_name]
+  where
+    occ = rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
 \end{code}
 
+Note [dataTcOccs and Exact Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Exact RdrNames can occur in code generated by Template Haskell, and generally
+those references are, well, exact, so it's wrong to return the TyClsName too.
+But there is an awkward exception for built-in syntax. Example in GHCi
+   :info []
+This parses as the Exact RdrName for nilDataCon, but we also want
+the list type constructor.
+
+Note that setRdrNameSpace on an Exact name requires the Name to be External,
+which it always is for built in syntax.
 
 %*********************************************************
 %*							*
 		Fixities
 %*							*
 %*********************************************************
+
+Note [Fixity signature lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A fixity declaration like
+
+    infixr 2 ?
+
+can refer to a value-level operator, e.g.:
+
+    (?) :: String -> String -> String
+
+or a type-level operator, like:
+
+    data (?) a b = A a | B b
+
+so we extend the lookup of the reader name '?' to the TcClsName namespace, as
+well as the original namespace.
+
+The extended lookup is also used in other places, like resolution of
+deprecation declarations, and lookup of names in GHCi.
 
 \begin{code}
 --------------------------------
@@ -983,7 +1233,8 @@ bindLocatedLocalsRn :: [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
 bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
-  = do { checkDupAndShadowedRdrNames rdr_names_w_loc
+  = do { checkDupRdrNames rdr_names_w_loc
+       ; checkShadowedRdrNames rdr_names_w_loc
 
 	-- Make fresh Names and extend the environment
        ; names <- newLocalBndrsRn rdr_names_w_loc
@@ -1018,42 +1269,6 @@ bindLocatedLocalsFV rdr_names enclosed_scope
     return (thing, delFVs names fvs)
 
 -------------------------------------
-bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
-  -- Find the type variables in the pattern type 
-  -- signatures that must be brought into scope
-bindPatSigTyVars tys thing_inside
-  = do 	{ scoped_tyvars <- xoptM Opt_ScopedTypeVariables
-	; if not scoped_tyvars then 
-		thing_inside []
-	  else 
-    do 	{ name_env <- getLocalRdrEnv
-	; let locd_tvs  = [ tv | ty <- tys
-			       , tv <- extractHsTyRdrTyVars ty
-			       , not (unLoc tv `elemLocalRdrEnv` name_env) ]
-	      nubbed_tvs = nubBy eqLocated locd_tvs
-		-- The 'nub' is important.  For example:
-		--	f (x :: t) (y :: t) = ....
-		-- We don't want to complain about binding t twice!
-
-	; bindLocatedLocalsRn nubbed_tvs thing_inside }}
-
-bindPatSigTyVarsFV :: [LHsType RdrName]
-		   -> RnM (a, FreeVars)
-	  	   -> RnM (a, FreeVars)
-bindPatSigTyVarsFV tys thing_inside
-  = bindPatSigTyVars tys	$ \ tvs ->
-    thing_inside		`thenM` \ (result,fvs) ->
-    return (result, fvs `delListFromNameSet` tvs)
-
-bindSigTyVarsFV :: [Name]
-		-> RnM (a, FreeVars)
-	  	-> RnM (a, FreeVars)
-bindSigTyVarsFV tvs thing_inside
-  = do	{ scoped_tyvars <- xoptM Opt_ScopedTypeVariables
-	; if not scoped_tyvars then 
-		thing_inside 
-	  else
-		bindLocalNamesFV tvs thing_inside }
 
 extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 	-- This function is used only in rnSourceDecl on InstDecl
@@ -1077,11 +1292,10 @@ checkDupNames names
 		-- See Note [Binders in Template Haskell] in Convert
 
 ---------------------
-checkDupAndShadowedRdrNames :: [Located RdrName] -> RnM ()
-checkDupAndShadowedRdrNames loc_rdr_names
-  = do	{ checkDupRdrNames loc_rdr_names
-	; envs <- getRdrEnvs
-	; checkShadowedOccs envs loc_occs }
+checkShadowedRdrNames :: [Located RdrName] -> RnM ()
+checkShadowedRdrNames loc_rdr_names
+  = do { envs <- getRdrEnvs
+       ; checkShadowedOccs envs loc_occs }
   where
     loc_occs = [(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names]
 
@@ -1148,24 +1362,19 @@ unboundName wl rdr = unboundNameX wl rdr empty
 unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
   = do  { show_helpful_errors <- doptM Opt_HelpfulErrors
-        ; let err = unknownNameErr rdr_name $$ extra
+        ; let what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
+              err = unknownNameErr what rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
           else do { suggestions <- unknownNameSuggestErr where_look rdr_name
                   ; addErr (err $$ suggestions) }
 
-        ; env <- getGlobalRdrEnv;
-	; traceRn (vcat [unknownNameErr rdr_name, 
-			 ptext (sLit "Global envt is:"),
-			 nest 3 (pprGlobalRdrEnv env)])
-
         ; return (mkUnboundName rdr_name) }
 
-unknownNameErr :: RdrName -> SDoc
-unknownNameErr rdr_name
+unknownNameErr :: SDoc -> RdrName -> SDoc
+unknownNameErr what rdr_name
   = vcat [ hang (ptext (sLit "Not in scope:")) 
-	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-			  <+> quotes (ppr rdr_name))
+	      2 (what <+> quotes (ppr rdr_name))
 	 , extra ]
   where
     extra | rdr_name == forall_tv_RDR = perhapsForallMsg
@@ -1179,14 +1388,15 @@ unknownNameSuggestErr :: WhereLooking -> RdrName -> RnM SDoc
 unknownNameSuggestErr where_look tried_rdr_name
   = do { local_env <- getLocalRdrEnv
        ; global_env <- getGlobalRdrEnv
+       ; dflags <- getDynFlags
 
        ; let all_possibilities :: [(String, (RdrName, HowInScope))]
              all_possibilities
-                =  [ (showSDoc (ppr r), (r, Left loc))
+                =  [ (showPpr dflags r, (r, Left loc))
                    | (r,loc) <- local_possibilities local_env ]
-                ++ [ (showSDoc (ppr r), rp) | (r,rp) <- global_possibilities global_env ]
+                ++ [ (showPpr dflags r, rp) | (r,rp) <- global_possibilities global_env ]
 
-             suggest = fuzzyLookup (showSDoc (ppr tried_rdr_name)) all_possibilities
+             suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
              perhaps = ptext (sLit "Perhaps you meant")
              extra_err = case suggest of
                            []  -> empty
@@ -1220,7 +1430,7 @@ unknownNameSuggestErr where_look tried_rdr_name
       | tried_is_qual = []
       | not local_ok  = []
       | otherwise     = [ (mkRdrUnqual occ, nameSrcSpan name)
-                      	| name <- occEnvElts env
+                      	| name <- localRdrEnvElts env
                       	, let occ = nameOccName name
                       	, correct_name_space occ]
 
@@ -1432,7 +1642,7 @@ dupNamesErr get_loc names
   where
     locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
-    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sortLe (<=) locs))
+    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sort locs))
 
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing
@@ -1453,6 +1663,15 @@ opDeclErr :: RdrName -> SDoc
 opDeclErr n 
   = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
        2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
+
+checkTupSize :: Int -> RnM ()
+checkTupSize tup_size
+  | tup_size <= mAX_TUPLE_SIZE 
+  = return ()
+  | otherwise		       
+  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
+		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
 \end{code}
 
 
@@ -1484,8 +1703,10 @@ data HsDocContext
   | SpliceTypeCtx (LHsType RdrName)
   | ClassInstanceCtx
   | VectDeclCtx (Located RdrName)
+  | GenericCtx SDoc   -- Maybe we want to use this more!
 
 docOfHsDocContext :: HsDocContext -> SDoc
+docOfHsDocContext (GenericCtx doc) = doc
 docOfHsDocContext (TypeSigCtx doc) = text "In the type signature for" <+> doc
 docOfHsDocContext PatCtx = text "In a pattern type-signature"
 docOfHsDocContext SpecInstSigCtx = text "In a SPECIALISE instance pragma"
@@ -1505,5 +1726,4 @@ docOfHsDocContext GHCiCtx = ptext (sLit "In GHCi input")
 docOfHsDocContext (SpliceTypeCtx hs_ty) = ptext (sLit "In the spliced type") <+> ppr hs_ty
 docOfHsDocContext ClassInstanceCtx = ptext (sLit "TcSplice.reifyInstances")
 docOfHsDocContext (VectDeclCtx tycon) = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
-
 \end{code}

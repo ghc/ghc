@@ -34,6 +34,7 @@ import Outputable
 import DynFlags
 import FastString
 import SrcLoc
+import Util
 
 
 stgMassageForProfiling

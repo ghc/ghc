@@ -19,7 +19,6 @@ import TcHsSyn
 import CoreSyn
 import MkCore
 
-import TcEvidence
 import DsMonad          -- the monadery used in the desugarer
 import DsUtils
 
@@ -34,6 +33,7 @@ import SrcLoc
 import Outputable
 import FastString
 import TcType
+import Util
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -71,15 +71,15 @@ dsListComp lquals res_ty = do
     -- mix of possibly a single element in length, so we do this to leave the possibility open
     isParallelComp = any isParallelStmt
 
-    isParallelStmt (ParStmt _ _ _ _) = True
-    isParallelStmt _                 = False
+    isParallelStmt (ParStmt {}) = True
+    isParallelStmt _            = False
 
 
 -- This function lets you desugar a inner list comprehension and a list of the binders
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
-dsInnerListComp :: ([LStmt Id], [Id]) -> DsM (CoreExpr, Type)
-dsInnerListComp (stmts, bndrs)
+dsInnerListComp :: (ParStmtBlock Id Id) -> DsM (CoreExpr, Type)
+dsInnerListComp (ParStmtBlock stmts bndrs _)
   = do { expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTup bndrs)])
                             (mkListTy bndrs_tuple_type)
        ; return (expr, bndrs_tuple_type) }
@@ -98,7 +98,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
         to_bndrs_tup_ty = mkBigCoreTupTy to_bndrs_tys
 
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr, from_tup_ty) <- dsInnerListComp (stmts, from_bndrs)
+    (expr, from_tup_ty) <- dsInnerListComp (ParStmtBlock stmts from_bndrs noSyntaxExpr)
 
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
@@ -233,7 +233,7 @@ deListComp (BindStmt pat list1 _ _ : quals) core_list2 = do -- rule A' above
     core_list1 <- dsLExpr list1
     deBindComp pat core_list1 quals core_list2
 
-deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
+deListComp (ParStmt stmtss_w_bndrs _ _ : quals) list
   = do { exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
        ; let (exps, qual_tys) = unzip exps_and_qual_tys
 
@@ -243,7 +243,7 @@ deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
        ; deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps))
                     quals list }
   where
-        bndrs_s = map snd stmtss_w_bndrs
+        bndrs_s = [bs | ParStmtBlock _ bs _ <- stmtss_w_bndrs]
 
         -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
         pat  = mkBigLHsPatTup pats
@@ -473,7 +473,7 @@ dsPArrComp :: [Stmt Id]
             -> DsM CoreExpr
 
 -- Special case for parallel comprehension
-dsPArrComp (ParStmt qss _ _ _ : quals) = dePArrParComp qss quals
+dsPArrComp (ParStmt qss _ _ : quals) = dePArrParComp qss quals
 
 -- Special case for simple generators:
 --
@@ -590,7 +590,7 @@ dePArrComp (LetStmt ds : qs) pa cea = do
 -- singeltons qualifier lists, which we already special case in the caller.
 -- So, encountering one here is a bug.
 --
-dePArrComp (ParStmt _ _ _ _ : _) _ _ =
+dePArrComp (ParStmt {} : _) _ _ =
   panic "DsListComp.dePArrComp: malformed comprehension AST: ParStmt"
 dePArrComp (TransStmt {} : _) _ _ = panic "DsListComp.dePArrComp: TransStmt"
 dePArrComp (RecStmt   {} : _) _ _ = panic "DsListComp.dePArrComp: RecStmt"
@@ -601,7 +601,7 @@ dePArrComp (RecStmt   {} : _) _ _ = panic "DsListComp.dePArrComp: RecStmt"
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrParComp :: [([LStmt Id], [Id])] -> [Stmt Id] -> DsM CoreExpr
+dePArrParComp :: [ParStmtBlock Id Id] -> [Stmt Id] -> DsM CoreExpr
 dePArrParComp qss quals = do
     (pQss, ceQss) <- deParStmt qss
     dePArrComp quals pQss ceQss
@@ -609,13 +609,13 @@ dePArrParComp qss quals = do
     deParStmt []             =
       -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
-    deParStmt ((qs, xs):qss) = do        -- first statement
+    deParStmt (ParStmtBlock qs xs _:qss) = do        -- first statement
       let res_expr = mkLHsVarTuple xs
       cqs <- dsPArrComp (map unLoc qs ++ [mkLastStmt res_expr])
       parStmts qss (mkLHsVarPatTup xs) cqs
     ---
     parStmts []             pa cea = return (pa, cea)
-    parStmts ((qs, xs):qss) pa cea = do  -- subsequent statements (zip'ed)
+    parStmts (ParStmtBlock qs xs _:qss) pa cea = do  -- subsequent statements (zip'ed)
       zipP <- dsDPHBuiltin zipPVar
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
           ty'cea   = parrElemType cea
@@ -763,12 +763,12 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
 --   mzip :: forall a b. m a -> m b -> m (a,b)
 -- NB: we need a polymorphic mzip because we call it several times
 
-dsMcStmt (ParStmt pairs mzip_op bind_op return_op) stmts_rest
- = do  { exps_w_tys  <- mapM ds_inner pairs   -- Pairs (exp :: m ty, ty)
+dsMcStmt (ParStmt blocks mzip_op bind_op) stmts_rest
+ = do  { exps_w_tys  <- mapM ds_inner blocks   -- Pairs (exp :: m ty, ty)
        ; mzip_op'    <- dsExpr mzip_op
 
        ; let -- The pattern variables
-             pats = map (mkBigLHsVarPatTup . snd) pairs
+             pats = [ mkBigLHsVarPatTup bs | ParStmtBlock _ bs _ <- blocks]
              -- Pattern with tuples of variables
              -- [v1,v2,v3]  =>  (v1, (v2, v3))
              pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats
@@ -779,11 +779,9 @@ dsMcStmt (ParStmt pairs mzip_op bind_op return_op) stmts_rest
 
        ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
   where
-    ds_inner (stmts, bndrs) = do { exp <- dsInnerMonadComp stmts bndrs mono_ret_op
-                                 ; return (exp, tup_ty) }
-       where
-         mono_ret_op = HsWrap (WpTyApp tup_ty) return_op
-         tup_ty      = mkBigCoreVarTupTy bndrs
+    ds_inner (ParStmtBlock stmts bndrs return_op) 
+       = do { exp <- dsInnerMonadComp stmts bndrs return_op
+            ; return (exp, mkBigCoreVarTupTy bndrs) }
 
 dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 
@@ -822,14 +820,16 @@ dsMcBindStmt pat rhs' bind_op fail_op stmts
     handle_failure pat match fail_op
       | matchCanFail match
         = do { fail_op' <- dsExpr fail_op
-             ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+             ; dflags <- getDynFlags
+             ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
              ; extractMatchResult match (App fail_op' fail_msg) }
       | otherwise
         = extractMatchResult match (error "It can't fail")
 
-    mk_fail_msg :: Located e -> String
-    mk_fail_msg pat = "Pattern match failure in monad comprehension at " ++
-                      showSDoc (ppr (getLoc pat))
+    mk_fail_msg :: DynFlags -> Located e -> String
+    mk_fail_msg dflags pat
+        = "Pattern match failure in monad comprehension at " ++
+          showPpr dflags (getLoc pat)
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs
 --    dsInnerMonadComp quals [a,b,c] ret_op

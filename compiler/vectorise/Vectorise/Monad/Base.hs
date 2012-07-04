@@ -34,10 +34,8 @@ import TcRnMonad
 import ErrUtils
 import Outputable
 import DynFlags
-import StaticFlags
 
 import Control.Monad
-import System.IO (stderr)
 
 
 -- The Vectorisation Monad ----------------------------------------------------
@@ -70,6 +68,8 @@ instance Functor VM where
 instance MonadIO VM where
   liftIO = liftDs . liftIO
 
+instance HasDynFlags VM where
+    getDynFlags = liftDs getDynFlags
 
 -- Lifting --------------------------------------------------------------------
 
@@ -83,27 +83,30 @@ liftDs p = VM $ \_ genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
 -- |Throw a `pgmError` saying we can't vectorise something.
 --
-cantVectorise :: String -> SDoc -> a
-cantVectorise s d = pgmError
-                  . showSDoc
+cantVectorise :: DynFlags -> String -> SDoc -> a
+cantVectorise dflags s d = pgmError
+                  . showSDoc dflags
                   $ vcat [text "*** Vectorisation error ***",
                           nest 4 $ sep [text s, nest 4 d]]
 
 -- |Like `fromJust`, but `pgmError` on Nothing.
 --
-maybeCantVectorise :: String -> SDoc -> Maybe a -> a
-maybeCantVectorise s d Nothing  = cantVectorise s d
-maybeCantVectorise _ _ (Just x) = x
+maybeCantVectorise :: DynFlags -> String -> SDoc -> Maybe a -> a
+maybeCantVectorise dflags s d Nothing  = cantVectorise dflags s d
+maybeCantVectorise _ _ _ (Just x) = x
 
 -- |Like `maybeCantVectorise` but in a `Monad`.
 --
-maybeCantVectoriseM :: Monad m => String -> SDoc -> m (Maybe a) -> m a
+maybeCantVectoriseM :: (Monad m, HasDynFlags m)
+                    => String -> SDoc -> m (Maybe a) -> m a
 maybeCantVectoriseM s d p
   = do
       r <- p
       case r of
         Just x  -> return x
-        Nothing -> cantVectorise s d
+        Nothing ->
+            do dflags <- getDynFlags
+               cantVectorise dflags s d
 
 
 -- Debugging ------------------------------------------------------------------
@@ -112,18 +115,18 @@ maybeCantVectoriseM s d p
 --
 emitVt :: String -> SDoc -> VM () 
 emitVt herald doc
-  = liftDs $
-      liftIO . printForUser stderr alwaysQualify $
+  = liftDs $ do
+      dflags <- getDynFlags
+      liftIO . printInfoForUser dflags alwaysQualify $
         hang (text herald) 2 doc
 
 -- |Output a trace message if -ddump-vt-trace is active.
 --
 traceVt :: String -> SDoc -> VM () 
 traceVt herald doc
-  | 1 <= opt_TraceLevel = liftDs $
-                            traceOptIf Opt_D_dump_vt_trace $
-                              hang (text herald) 2 doc
-  | otherwise           = return ()
+  = do dflags <- getDynFlags
+       when (1 <= traceLevel dflags) $
+           liftDs $ traceOptIf Opt_D_dump_vt_trace $ hang (text herald) 2 doc
 
 -- |Dump the given program conditionally.
 --
@@ -140,7 +143,8 @@ dumpOptVt flag header doc
 dumpVt :: String -> SDoc -> VM ()
 dumpVt header doc 
   = do { unqual <- liftDs mkPrintUnqualifiedDs
-       ; liftIO $ printForUser stderr unqual (mkDumpDoc header doc)
+       ; dflags <- liftDs getDynFlags
+       ; liftIO $ printInfoForUser dflags unqual (mkDumpDoc header doc)
        }
 
 
@@ -185,8 +189,9 @@ tryErrV (VM p) = VM $ \bi genv lenv ->
     case r of
       Yes genv' lenv' x -> return (Yes genv' lenv' (Just x))
       No reason         -> do { unqual <- mkPrintUnqualifiedDs
+                              ; dflags <- getDynFlags
                               ; liftIO $ 
-                                  printForUser stderr unqual $ 
+                                  printInfoForUser dflags unqual $
                                     text "Warning: vectorisation failure:" <+> reason
                               ; return (Yes genv  lenv  Nothing)
                               }

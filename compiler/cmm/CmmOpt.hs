@@ -20,6 +20,7 @@ import OldCmm
 import OldPprCmm
 import CmmNode (wrapRecExp)
 import CmmUtils
+import DynFlags
 import StaticFlags
 
 import UniqFM
@@ -61,7 +62,8 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
                 stmt m (CmmStore e1 e2) = expr (expr m e1) e2
                 stmt m (CmmCall c _ as _) = f (actuals m as) c
                     where f m (CmmCallee e _) = expr m e
-                          f m (CmmPrim _) = m
+                          f m (CmmPrim _ Nothing) = m
+                          f m (CmmPrim _ (Just stmts)) = foldl' stmt m stmts
                 stmt m (CmmBranch b) = b:m
                 stmt m (CmmCondBranch e b) = b:(expr m e)
                 stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
@@ -146,42 +148,43 @@ countUses :: UserOfLocalRegs a => a -> UniqFM Int
 countUses a = foldRegsUsed (\m r -> addToUFM_C (+) m r 1) emptyUFM a
   where count m r = lookupWithDefaultUFM m (0::Int) r
 
-cmmMiniInline :: Platform -> [CmmBasicBlock] -> [CmmBasicBlock]
-cmmMiniInline platform blocks = map do_inline blocks
+cmmMiniInline :: DynFlags -> [CmmBasicBlock] -> [CmmBasicBlock]
+cmmMiniInline dflags blocks = map do_inline blocks
   where do_inline (BasicBlock id stmts)
-          = BasicBlock id (cmmMiniInlineStmts platform (countUses blocks) stmts)
+          = BasicBlock id (cmmMiniInlineStmts dflags (countUses blocks) stmts)
 
-cmmMiniInlineStmts :: Platform -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
-cmmMiniInlineStmts _        _    [] = []
-cmmMiniInlineStmts platform uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
+cmmMiniInlineStmts :: DynFlags -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
+cmmMiniInlineStmts _      _    [] = []
+cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
   | 0 <- lookupWithDefaultUFM uses 0 u
-  = cmmMiniInlineStmts platform uses stmts
+  = cmmMiniInlineStmts uses stmts
 
         -- used (foldable to small thing): try to inline at all the use sites
   | Just n <- lookupUFM uses u,
     e <- wrapRecExp foldExp expr,
     isTiny e
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt platform stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
      case lookForInlineMany u e stmts of
          (m, stmts')
-             | n == m -> cmmMiniInlineStmts platform (delFromUFM uses u) stmts'
+             | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
              | otherwise ->
-                 stmt : cmmMiniInlineStmts platform (adjustUFM (\x -> x - m) uses u) stmts'
+                 stmt : cmmMiniInlineStmts dflags (adjustUFM (\x -> x - m) uses u) stmts'
 
         -- used once (non-literal): try to inline at the use site
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt platform stmt)) $
-     cmmMiniInlineStmts platform uses stmts'
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt stmt)) $
+     cmmMiniInlineStmts dflags uses stmts'
  where
   isTiny (CmmLit _) = True
   isTiny (CmmReg (CmmGlobal _)) = True
          -- not CmmLocal: that might invalidate the usage analysis results
   isTiny _ = False
 
+  platform = targetPlatform dflags
   foldExp (CmmMachOp op args) = cmmMachOpFold platform op args
   foldExp e = e
 
@@ -272,7 +275,7 @@ inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e
 inlineStmt u a (CmmCall target regs es ret)
    = CmmCall (infn target) regs es' ret
    where infn (CmmCallee fn cconv) = CmmCallee (inlineExpr u a fn) cconv
-         infn (CmmPrim p) = CmmPrim p
+         infn (CmmPrim p mStmts) = CmmPrim p (fmap (map (inlineStmt u a)) mStmts)
          es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d

@@ -71,6 +71,7 @@ import FastTypes
 import FastString
 import Outputable
 -- import StaticFlags
+import Util
 
 #if defined(__GLASGOW_HASKELL__)
 --just for implementing a fast [0,61) -> Char function
@@ -178,9 +179,6 @@ instance Uniquable FastString where
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
-
-instance Uniquable n => Uniquable (IPName n) where
-  getUnique (IPName n) = getUnique n
 \end{code}
 
 
@@ -222,33 +220,26 @@ instance Uniquable Unique where
 
 We do sometimes make strings with @Uniques@ in them:
 \begin{code}
+showUnique :: Unique -> String
+showUnique uniq
+  = case unpkUnique uniq of
+      (tag, u) -> finish_show tag u (iToBase62 u)
+
+finish_show :: Char -> Int -> String -> String
+finish_show 't' u _pp_u | u < 26
+  = -- Special case to make v common tyvars, t1, t2, ...
+    -- come out as a, b, ... (shorter, easier to read)
+    [chr (ord 'a' + u)]
+finish_show tag _ pp_u = tag : pp_u
+
 pprUnique :: Unique -> SDoc
-pprUnique uniq
---   | opt_SuppressUniques
---  = empty	-- Used exclusively to suppress uniques so you 
---  | otherwise	-- can compare output easily
-  = case unpkUnique uniq of
-      (tag, u) -> finish_ppr tag u (text (iToBase62 u))
-
-#ifdef UNUSED
-pprUnique10 :: Unique -> SDoc
-pprUnique10 uniq	-- in base-10, dudes
-  = case unpkUnique uniq of
-      (tag, u) -> finish_ppr tag u (int u)
-#endif
-
-finish_ppr :: Char -> Int -> SDoc -> SDoc
-finish_ppr 't' u _pp_u | u < 26
-  =	-- Special case to make v common tyvars, t1, t2, ...
-	-- come out as a, b, ... (shorter, easier to read)
-    char (chr (ord 'a' + u))
-finish_ppr tag _ pp_u = char tag <> pp_u
+pprUnique u = text (showUnique u)
 
 instance Outputable Unique where
-    ppr u = pprUnique u
+    ppr = pprUnique
 
 instance Show Unique where
-    showsPrec p uniq = showsPrecSDoc p (pprUnique uniq)
+    show uniq = showUnique uniq
 \end{code}
 
 %************************************************************************

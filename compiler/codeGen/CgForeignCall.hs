@@ -59,7 +59,6 @@ cgForeignCall results fcall stg_args live
 
         arg_hints = zipWith CmmHinted
                       arg_exprs (map (typeForeignHint.stgArgType) stg_args)
-  -- in
   emitForeignCall results fcall arg_hints live
 
 
@@ -78,9 +77,11 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   where
       (call_args, cmm_target)
         = case target of
+           StaticTarget _   _      False ->
+               panic "emitForeignCall: unexpected FFI value import"
            -- If the packageId is Nothing then the label is taken to be in the
            --   package currently being compiled.
-           StaticTarget lbl mPkgId
+           StaticTarget lbl mPkgId True
             -> let labelSource
                         = case mPkgId of
                                 Nothing         -> ForeignLabelInThisPackage
@@ -309,4 +310,5 @@ shimForeignCallArg arg expr
   | otherwise = expr
   where
         -- should be a tycon app, since this is a foreign call
-        tycon = tyConAppTyCon (repType (stgArgType arg))
+        UnaryRep rep_ty = repType (stgArgType arg)
+        tycon           = tyConAppTyCon rep_ty

@@ -54,7 +54,6 @@ libraries/Cabal                 -           packages/Cabal.git                  
 libraries/containers            -           packages/containers.git             git
 libraries/deepseq               -           packages/deepseq.git                git
 libraries/directory             -           packages/directory.git              git
-libraries/extensible-exceptions -           packages/extensible-exceptions.git  git
 libraries/filepath              -           packages/filepath.git               git
 libraries/ghc-prim              -           packages/ghc-prim.git               git
 libraries/haskeline             -           packages/haskeline.git              git
@@ -64,13 +63,13 @@ libraries/hoopl                 -           packages/hoopl.git                  
 libraries/hpc                   -           packages/hpc.git                    git
 libraries/integer-gmp           -           packages/integer-gmp.git            git
 libraries/integer-simple        -           packages/integer-simple.git         git
-libraries/mtl                   -           packages/mtl.git                    git
 libraries/old-locale            -           packages/old-locale.git             git
 libraries/old-time              -           packages/old-time.git               git
 libraries/pretty                -           packages/pretty.git                 git
 libraries/process               -           packages/process.git                git
 libraries/template-haskell      -           packages/template-haskell.git       git
 libraries/terminfo              -           packages/terminfo.git               git
+libraries/transformers          -           packages/transformers.git           git
 libraries/unix                  -           packages/unix.git                   git
 libraries/utf8-string           -           packages/utf8-string.git            git
 libraries/Win32                 -           packages/Win32.git                  git

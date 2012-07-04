@@ -28,7 +28,9 @@ module FunDeps (
 import Name
 import Var
 import Class
+import Id( idType )
 import Type
+import TcType( tcSplitDFunTy )
 import Unify
 import InstEnv
 import VarSet
@@ -208,7 +210,7 @@ Finally, the position parameters will help us rewrite the wanted constraint ``on
 type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
 
 data Equation 
-   = FDEqn { fd_qtvs :: TyVarSet		-- Instantiate these to fresh unification vars
+   = FDEqn { fd_qtvs :: [TyVar]   		-- Instantiate these type and kind vars to fresh unification vars
            , fd_eqs  :: [FDEq]			--   and then make these equal
            , fd_pred1, fd_pred2 :: Pred_Loc }	-- The Equation arose from
 	     	       		   	    	-- combining these two constraints
@@ -216,6 +218,10 @@ data Equation
 data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
                  , fd_ty_left  :: Type
                  , fd_ty_right :: Type }
+
+instance Outputable FDEq where
+  ppr (FDEq { fd_pos = p, fd_ty_left = tyl, fd_ty_right = tyr })
+    = parens (int p <> comma <+> ppr tyl <> comma <+> ppr tyr)
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -282,7 +288,7 @@ improveFromAnother pred1@(ty1, _) pred2@(ty2, _)
   | Just (cls1, tys1) <- getClassPredTys_maybe ty1
   , Just (cls2, tys2) <- getClassPredTys_maybe ty2
   , tys1 `lengthAtLeast` 2 && cls1 == cls2
-  = [ FDEqn { fd_qtvs = emptyVarSet, fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2 }
+  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2 }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
     , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
@@ -299,7 +305,7 @@ improveFromAnother _ _ = []
 
 pprEquation :: Equation -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs }) 
-  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
+  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
 	  nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
 
 improveFromInstEnv :: (InstEnv,InstEnv)
@@ -316,7 +322,7 @@ improveFromInstEnv inst_env pred@(ty, _)
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
-  = [ FDEqn { fd_qtvs = qtvs, fd_eqs = eqs, fd_pred1 = p_inst, fd_pred2=pred }
+  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs, fd_pred1 = p_inst, fd_pred2=pred }
     | fd <- cls_fds		-- Iterate through the fundeps first,
 				-- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
@@ -324,25 +330,27 @@ improveFromInstEnv inst_env pred@(ty, _)
 		-- Remember that instanceCantMatch treats both argumnents
 		-- symmetrically, so it's ok to trim the rough_tcs,
 		-- rather than trimming each inst_tcs in turn
-    , ispec@(ClsInst { is_tvs = qtvs, is_tys = tys_inst,
-		 	is_tcs = inst_tcs }) <- instances
-    , not (instanceCantMatch inst_tcs trimmed_tcs)
-    , let p_inst = (mkClassPred cls tys_inst,
+    , ispec <- instances
+    , (meta_tvs, eqs) <- checkClsFD fd cls_tvs ispec 
+                                    emptyVarSet tys trimmed_tcs -- NB: orientation
+    , let p_inst = (mkClassPred cls (is_tys ispec),
 		    sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)	
 		        , ptext (sLit "in the instance declaration")
 			  <+> pprNameDefnLoc (getName ispec)])
-    , (qtvs, eqs) <- checkClsFD qtvs fd cls_tvs tys_inst tys -- NB: orientation
-    , not (null eqs)
     ]
 improveFromInstEnv _ _ = []
 
 
-checkClsFD :: TyVarSet 			-- Quantified type variables; see note below
-	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class
-	   -> [Type] -> [Type]
-	   -> [(TyVarSet, [FDEq])]
+checkClsFD :: FunDep TyVar -> [TyVar] 	          -- One functional dependency from the class
+           -> ClsInst                             -- An instance template
+           -> TyVarSet -> [Type] -> [Maybe Name]  -- Arguments of this (C tys) predicate
+                                                  -- TyVarSet are extra tyvars that can be instantiated
+	   -> [([TyVar], [FDEq])]
 
-checkClsFD qtvs fd clas_tvs tys1 tys2
+checkClsFD fd clas_tvs 
+           (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst, is_dfun = dfun })
+           extra_qtvs tys_actual rough_tcs_actual
+
 -- 'qtvs' are the quantified type variables, the ones which an be instantiated 
 -- to make the types match.  For example, given
 --	class C a b | a->b where ...
@@ -351,8 +359,8 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- and an Inst of form (C (Maybe t1) t2), 
 -- then we will call checkClsFD with
 --
---	qtvs = {x}, tys1 = [Maybe x,  Tree x]
---		    tys2 = [Maybe t1, t2]
+--	is_qtvs = {x}, is_tys = [Maybe x,  Tree x]
+--		       tys_actual = [Maybe t1, t2]
 --
 -- We can instantiate x to t1, and then we want to force
 -- 	(Tree x) [t1/x]  ~   t2
@@ -364,10 +372,14 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- This function is also used by InstEnv.badFunDeps, which needs to *unify*
 -- For the one-sided matching case, the qtvs are just from the template,
 -- so we get matching
---
-  = ASSERT2( length tys1 == length tys2     && 
-	     length tys1 == length clas_tvs 
-	    , ppr tys1 <+> ppr tys2 )
+
+  | instanceCantMatch rough_tcs_inst rough_tcs_actual
+  = []		-- Filter out ones that can't possibly match, 
+
+  | otherwise
+  = ASSERT2( length tys_inst == length tys_actual     && 
+	     length tys_inst == length clas_tvs 
+	    , ppr tys_inst <+> ppr tys_actual )
 
     case tcUnifyTys bind_fn ltys1 ltys2 of
 	Nothing  -> []
@@ -387,8 +399,11 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
                         -- so we would produce no FDs, which is clearly wrong. 
                   -> [] 
 
+                  | null fdeqs
+                  -> []
+
                   | otherwise
-                  -> [(qtvs', fdeqs)]
+                  -> [(meta_tvs, fdeqs)]
 		  	-- We could avoid this substTy stuff by producing the eqn
 		  	-- (qtvs, ls1++rs1, ls2++rs2)
 		  	-- which will re-do the ls1/ls2 unification when the equation is
@@ -405,8 +420,10 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
                         -- eqType again, since we know for sure that /at least one/ 
                         -- equation in there is useful)
 
-		    qtvs' = filterVarSet (`notElemTvSubst` subst) qtvs
-		        -- qtvs' are the quantified type variables
+                    (dfun_tvs, _, _, _) = tcSplitDFunTy (idType dfun)
+		    meta_tvs = [ setVarType tv (substTy subst (varType tv))
+                               | tv <- dfun_tvs, tv `notElemTvSubst` subst ]
+		        -- meta_tvs are the quantified type variables
 		        -- that have not been substituted out
 		        --	
 		        -- Eg. 	class C a b | a -> b
@@ -414,12 +431,21 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 		        -- Given constraint C Int z
 		        -- we generate the equation
 		        --	({y}, [y], z)
+                        --
+                        -- But note (a) we get them from the dfun_id, so they are *in order*
+                        --              because the kind variables may be mentioned in the
+                        --              type variabes' kinds
+                        --          (b) we must apply 'subst' to the kinds, in case we have
+                        --              matched out a kind variable, but not a type variable
+                        --              whose kind mentions that kind variable!
+                        --          Trac #6015, #6068
   where
-    bind_fn tv | tv `elemVarSet` qtvs = BindMe
-	       | otherwise	      = Skolem
+    bind_fn tv | tv `elemVarSet` qtvs       = BindMe
+               | tv `elemVarSet` extra_qtvs = BindMe
+	       | otherwise	            = Skolem
 
-    (ltys1, rtys1) = instFD         fd clas_tvs tys1
-    (ltys2, irs2)  = instFD_WithPos fd clas_tvs tys2
+    (ltys1, rtys1) = instFD         fd clas_tvs tys_inst
+    (ltys2, irs2)  = instFD_WithPos fd clas_tvs tys_actual
 \end{code}
 
 
@@ -525,13 +551,8 @@ badFunDeps cls_insts clas ins_tv_set ins_tys
   = nubBy eq_inst $
     [ ispec | fd <- fds,	-- fds is often empty, so do this first!
 	      let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
-	      ispec@(ClsInst { is_tcs = inst_tcs, is_tvs = tvs, 
-				is_tys = tys }) <- cls_insts,
-		-- Filter out ones that can't possibly match, 
-		-- based on the head of the fundep
-	      not (instanceCantMatch inst_tcs trimmed_tcs),	
-	      notNull (checkClsFD (tvs `unionVarSet` ins_tv_set) 
-				   fd clas_tvs tys ins_tys)
+	      ispec <- cls_insts,
+	      notNull (checkClsFD fd clas_tvs ispec ins_tv_set ins_tys trimmed_tcs)
     ]
   where
     (clas_tvs, fds) = classTvsFds clas

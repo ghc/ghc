@@ -8,8 +8,8 @@ The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
 module InstEnv (
-        DFunId, OverlapFlag(..),
-        ClsInst(..), pprInstance, pprInstanceHdr, pprInstances, 
+        DFunId, OverlapFlag(..), InstMatch, ClsInstLookupResult,
+        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances, 
         instanceHead, mkLocalInstance, mkImportedInstance,
         instanceDFunId, setInstanceDFunId, instanceRoughTcs,
 
@@ -32,9 +32,9 @@ import Outputable
 import ErrUtils
 import BasicTypes
 import UniqFM
+import Util
 import Id
 import FastString
-
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
 \end{code}
@@ -122,7 +122,8 @@ instanceDFunId = is_dfun
 
 setInstanceDFunId :: ClsInst -> DFunId -> ClsInst
 setInstanceDFunId ispec dfun
-   = ASSERT( idType dfun `eqType` idType (is_dfun ispec) )
+   = ASSERT2( idType dfun `eqType` idType (is_dfun ispec)
+            , ppr dfun $$ ppr (idType dfun) $$ ppr (is_dfun ispec) $$ ppr (idType (is_dfun ispec)) )
         -- We need to create the cached fields afresh from
         -- the new dfun id.  In particular, the is_tvs in
         -- the ClsInst must match those in the dfun!
@@ -153,13 +154,16 @@ pprInstance ispec
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
-pprInstanceHdr ispec@(ClsInst { is_flag = flag })
-  = ptext (sLit "instance") <+> ppr flag
-       <+> sep [pprThetaArrowTy theta, ppr res_ty]
+pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
+  = getPprStyle $ \ sty ->
+    let theta_to_print
+          | debugStyle sty = theta
+          | otherwise = drop (dfunNSilent dfun) theta
+    in ptext (sLit "instance") <+> ppr flag
+       <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
   where
-    dfun = is_dfun ispec
     (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
-        -- Print without the for-all, which the programmer doesn't write
+       -- Print without the for-all, which the programmer doesn't write
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
@@ -427,23 +431,30 @@ the env is kept ordered, the first match must be the only one.  The
 thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
-type InstTypes = [Either TyVar Type]
-        -- Right ty     => Instantiate with this type
-        -- Left tv      => Instantiate with any type of this tyvar's kind
+type DFunInstType = Maybe Type
+        -- Just ty   => Instantiate with this type
+        -- Nothing   => Instantiate with any type of this tyvar's kind
+        -- See Note [DFunInstType: instantiating types]
 
-type InstMatch = (ClsInst, InstTypes)
+type InstMatch = (ClsInst, [DFunInstType])
+
+type ClsInstLookupResult 
+     = ( [InstMatch]     -- Successful matches
+       , [ClsInst]       -- These don't match but do unify
+       , Bool)           -- True if error condition caused by
+                         -- SafeHaskell condition.
 \end{code}
 
-Note [InstTypes: instantiating types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [DFunInstType: instantiating types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A successful match is an ClsInst, together with the types at which
         the dfun_id in the ClsInst should be instantiated
 The instantiating types are (Either TyVar Type)s because the dfun
 might have some tyvars that *only* appear in arguments
         dfun :: forall a b. C a b, Ord b => D [a]
 When we match this against D [ty], we return the instantiating types
-        [Right ty, Left b]
-where the 'Left b' indicates that 'b' can be freely instantiated.  
+        [Just ty, Nothing]
+where the 'Nothing' indicates that 'b' can be freely instantiated.  
 (The caller instantiates it to a flexi type variable, which will 
  presumably later become fixed via functional dependencies.)
 
@@ -462,12 +473,9 @@ lookupUniqueInstEnv instEnv cls tys
              | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
                                     (ppr $ mkTyConApp (classTyCon cls) tys)
              where
-               inst_tys'  = [ty | Right ty <- inst_tys]
-               noFlexiVar = all isRight inst_tys
+               inst_tys'  = [ty | Just ty <- inst_tys]
+               noFlexiVar = all isJust inst_tys
       _other -> Left $ ptext (sLit "instance not found") <+> (ppr $ mkTyConApp (classTyCon cls) tys)
-  where
-    isRight (Left  _) = False
-    isRight (Right _) = True
 
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> Class -> [Type]  -- What we are looking for
@@ -526,21 +534,18 @@ lookupInstEnv' ie cls tys
             Nothing  -> find ms us        rest
 
     ----------------
-    lookup_tv :: TvSubst -> TyVar -> Either TyVar Type  
-        -- See Note [InstTypes: instantiating types]
+    lookup_tv :: TvSubst -> TyVar -> DFunInstType
+        -- See Note [DFunInstType: instantiating types]
     lookup_tv subst tv = case lookupTyVar subst tv of
-                                Just ty -> Right ty
-                                Nothing -> Left tv
+                                Just ty -> Just ty
+                                Nothing -> Nothing
 
 ---------------
 -- This is the common way to call this function.
 lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
-                   -> Class -> [Type]   -- What we are looking for
-                   -> ([InstMatch],     -- Successful matches
-                       [ClsInst],      -- These don't match but do unify
-                       Bool)            -- True if error condition caused by
-                                        -- SafeHaskell condition.
-
+              -> Class -> [Type]   -- What we are looking for
+              -> ClsInstLookupResult
+ 
 lookupInstEnv (pkg_ie, home_ie) cls tys
   = (safe_matches, all_unifs, safe_fail)
   where

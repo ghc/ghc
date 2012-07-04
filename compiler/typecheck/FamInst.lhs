@@ -24,12 +24,11 @@ import TyCon
 import DynFlags
 import Name
 import Module
-import SrcLoc
 import Outputable
 import UniqFM
+import VarSet
 import FastString
-import VarSet   ( varSetElems )
-import Util( filterOut )
+import Util
 import Maybes
 import Control.Monad
 import Data.Map (Map)
@@ -83,6 +82,9 @@ instance Eq ModulePair where
 
 instance Ord ModulePair where
   mp1 `compare` mp2 = canon mp1 `compare` canon mp2
+
+instance Outputable ModulePair where
+  ppr (ModulePair m1 m2) = angleBrackets (ppr m1 <> comma <+> ppr m2)
 
 -- Sets of module pairs
 --
@@ -174,11 +176,12 @@ tcLookupFamInst tycon tys
   = return Nothing
   | otherwise
   = do { instEnv <- tcGetFamInstEnvs
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ ppr instEnv)
-       ; case lookupFamInstEnv instEnv tycon tys of
-	   []                      -> return Nothing
+       ; let mb_match = lookupFamInstEnv instEnv tycon tys 
+       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ ppr mb_match $$ ppr instEnv)
+       ; case mb_match of
+	   [] -> return Nothing
 	   ((fam_inst, rep_tys):_) 
-             -> return $ Just (fam_inst, rep_tys)
+              -> return $ Just (fam_inst, rep_tys)
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -251,30 +254,28 @@ addLocalFamInst :: (FamInstEnv,[FamInst]) -> FamInst -> TcM (FamInstEnv, [FamIns
 addLocalFamInst (home_fie, my_fis) fam_inst 
         -- home_fie includes home package and this module
         -- my_fies is just the ones from this module
-  = do { isGHCi <- getIsGHCi
+  = do { traceTc "addLocalFamInst" (ppr fam_inst)
+       ; isGHCi <- getIsGHCi
  
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
-      ; let (home_fie', my_fis') 
-              | isGHCi    = (deleteFromFamInstEnv home_fie fam_inst, 
-                             filterOut (identicalFamInst fam_inst) my_fis)
-              | otherwise = (home_fie, my_fis)
+       ; let (home_fie', my_fis') 
+               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst 
+                             , filterOut (identicalFamInst fam_inst) my_fis)
+               | otherwise = (home_fie, my_fis)
 
            -- Load imported instances, so that we report
            -- overlaps correctly
        ; eps <- getEps
-       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars fam_inst))
        ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
-             conflicts  = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
              home_fie'' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls
-       ;  traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
-       ; case conflicts of
-            []      ->  return (home_fie'', fam_inst : my_fis')
-            dup : _ ->  do { conflictInstErr fam_inst (fst dup)
-                           ; return (home_fie, my_fis) }
-      }
+       ; no_conflict <- checkForConflicts inst_envs fam_inst
+       ; if no_conflict then
+            return (home_fie'', fam_inst : my_fis')
+         else 
+            return (home_fie,   my_fis) }
 \end{code}
 
 %************************************************************************
@@ -287,8 +288,8 @@ Check whether a single family instance conflicts with those in two instance
 environments (one for the EPS and one for the HPT).
 
 \begin{code}
-checkForConflicts :: FamInstEnvs -> FamInst -> TcM ()
-checkForConflicts inst_envs famInst
+checkForConflicts :: FamInstEnvs -> FamInst -> TcM Bool
+checkForConflicts inst_envs fam_inst
   = do { 	-- To instantiate the family instance type, extend the instance
 		-- envt with completely fresh template variables
 		-- This is important because the template variables must
@@ -297,23 +298,28 @@ checkForConflicts inst_envs famInst
 		-- We use tcInstSkolType because we don't want to allocate
 		-- fresh *meta* type variables.  
 
-       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars famInst))
-       ; let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
-       ; unless (null conflicts) $
-	   conflictInstErr famInst (fst (head conflicts))
-       }
+       ; (_, skol_tvs) <- tcInstSkolTyVars (coAxiomTyVars (famInstAxiom fam_inst))
+       ; let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
+             no_conflicts = null conflicts
+       ; traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
+       ; unless no_conflicts $
+	   conflictInstErr fam_inst (fst (head conflicts))
+       ; return no_conflicts }
 
 conflictInstErr :: FamInst -> FamInst -> TcRn ()
 conflictInstErr famInst conflictingFamInst
-  = addFamInstLoc famInst $
-    addErr (hang (ptext (sLit "Conflicting family instance declarations:"))
-	       2 (pprFamInsts [famInst, conflictingFamInst]))
+  = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
+                   [famInst, conflictingFamInst]
 
-addFamInstLoc :: FamInst -> TcRn a -> TcRn a
-addFamInstLoc famInst thing_inside
-  = setSrcSpan (mkSrcSpan loc loc) thing_inside
-  where
-    loc = getSrcLoc famInst
+addFamInstsErr :: SDoc -> [FamInst] -> TcRn ()
+addFamInstsErr herald insts
+  = setSrcSpan (getSrcSpan (head sorted)) $
+    addErr (hang herald 2 (pprFamInsts sorted))
+ where
+   sorted = sortWith getSrcLoc insts
+   -- The sortWith just arranges that instances are dislayed in order
+   -- of source location, which reduced wobbling in error messages,
+   -- and is better for users
 
 tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env

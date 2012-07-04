@@ -1,11 +1,14 @@
 #include "Main.h"
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
+#include <stdlib.h>
 #include "Defines.h"
 #include "Dimensions.h"
 #include "HpFile.h"
 #include "Shade.h"
 #include "PsFile.h"
+#include "Utilities.h"
 
 /* own stuff */
 #include "Key.h"
@@ -36,7 +39,19 @@ void Key(void)
     }
 }
 
-
+static void
+escape(char *result, const char *name)
+{
+    while (*name != '\0')
+    {
+        if (*name == '\\')
+        {
+            *result++ = '\\';
+        }
+        *result++ = *name++;
+    }
+    *result = '\0';
+}
 
 static void
 KeyEntry(floatish centreline, char *name, floatish colour)
@@ -65,5 +80,9 @@ KeyEntry(floatish centreline, char *name, floatish colour)
     fprintf(psfp, "HE%d setfont\n", NORMAL_FONT);
     fprintf(psfp, "%f %f moveto\n", kstart + (floatish) KEY_BOX_WIDTH + 2 * borderspace, namebase);
 
-    fprintf(psfp, "(%s) show\n", name); 
+    // escape backslashes in 'name'
+    char *escaped_name = (char*) xmalloc(strlen(name) * 2 + 1);
+    escape(escaped_name, name);
+    fprintf(psfp, "(%s) show\n", escaped_name);
+    free(escaped_name);
 }

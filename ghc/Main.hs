@@ -30,6 +30,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg )
 
 -- Various other random stuff that we need
 import Config
+import Constants
 import HscTypes
 import Packages         ( dumpPackages )
 import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
@@ -78,7 +79,8 @@ import Data.Maybe
 main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
-   GHC.defaultErrorHandler defaultLogAction $ do
+   hSetBuffering stderr NoBuffering
+   GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 
@@ -155,6 +157,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
       -- turn on -fimplicit-import-qualified for GHCi now, so that it
       -- can be overriden from the command-line
+      -- XXX: this should really be in the interactive DynFlags, but
+      -- we don't set that until later in interactiveUI
       dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
                | otherwise                 = dflags1
@@ -163,6 +167,8 @@ main' postLoadMode dflags0 args flagWarnings = do
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
   (dflags2, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags1a args
+
+  GHC.prettyPrintGhcErrors dflags2 $ do
 
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
@@ -253,6 +259,10 @@ partition_args (arg:args) srcs objs
 
        - module names (not forgetting hierarchical module names),
 
+       - things beginning with '-' are flags that were not recognised by
+         the flag parser, and we want them to generate errors later in
+         checkOptions, so we class them as source files (#5921)
+
        - and finally we consider everything not containing a '.' to be
          a comp manager input, as shorthand for a .hs or .lhs filename.
 
@@ -262,6 +272,7 @@ partition_args (arg:args) srcs objs
 looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m
                       || looksLikeModuleName m
+                      || "-" `isPrefixOf` m
                       || '.' `notElem` m
 
 -- -----------------------------------------------------------------------------
@@ -760,7 +771,7 @@ abiHash strs = do
          r <- findImportedModule hsc_env modname Nothing
          case r of
            Found _ m -> return m
-           _error    -> ghcError $ CmdLineError $ showSDoc $
+           _error    -> ghcError $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
   mods <- mapM find_it (map fst strs)
@@ -769,13 +780,13 @@ abiHash strs = do
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
 
   bh <- openBinMem (3*1024) -- just less than a block
-  put_ bh opt_HiVersion
+  put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
   mapM_ (put_ bh . mi_mod_hash) ifaces
   f <- fingerprintBinMem bh
 
-  putStrLn (showSDoc (ppr f))
+  putStrLn (showPpr dflags f)
 
 -- -----------------------------------------------------------------------------
 -- Util

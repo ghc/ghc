@@ -188,6 +188,7 @@ data Instr
         | SUB         Size Operand Operand
 
         | MUL         Size Operand Operand
+        | MUL2        Size Operand              -- %edx:%eax = operand * %rax
         | IMUL        Size Operand Operand      -- signed int mul
         | IMUL2       Size Operand              -- %edx:%eax = operand * %eax
 
@@ -332,6 +333,7 @@ x86_regUsageOfInstr instr
     IMUL   _ src dst    -> usageRM src dst
     IMUL2  _ src       -> mkRU (eax:use_R src []) [eax,edx]
     MUL    _ src dst    -> usageRM src dst
+    MUL2   _ src        -> mkRU (eax:use_R src []) [eax,edx]
     DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     IDIV   _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
     AND    _ src dst    -> usageRM src dst
@@ -473,6 +475,7 @@ x86_patchRegsOfInstr instr env
     IMUL sz src dst     -> patch2 (IMUL sz) src dst
     IMUL2 sz src        -> patch1 (IMUL2 sz) src
     MUL sz src dst      -> patch2 (MUL sz) src dst
+    MUL2 sz src         -> patch1 (MUL2 sz) src
     IDIV sz op          -> patch1 (IDIV sz) op
     DIV sz op           -> patch1 (DIV sz) op
     AND  sz src dst     -> patch2 (AND  sz) src dst

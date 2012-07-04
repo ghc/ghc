@@ -24,7 +24,7 @@
 #include "Itimer.h"
 #include "Proftimer.h"
 #include "Schedule.h"
-#include "Select.h"
+#include "Clock.h"
 
 /* As recommended in the autoconf manual */
 # ifdef TIME_WITH_SYS_TIME
@@ -123,21 +123,14 @@ initTicker (Time interval, TickProc handle_tick)
 #if defined(USE_TIMER_CREATE)
     {
         struct sigevent ev;
-        clockid_t clock;
 
         // Keep programs like valgrind happy
-	memset(&ev, 0, sizeof(ev));
+        memset(&ev, 0, sizeof(ev));
 
         ev.sigev_notify = SIGEV_SIGNAL;
         ev.sigev_signo  = ITIMER_SIGNAL;
 
-#if defined(CLOCK_MONOTONIC)
-        clock = CLOCK_MONOTONIC;
-#else
-        clock = CLOCK_REALTIME;
-#endif
-
-        if (timer_create(clock, &ev, &timer) != 0) {
+        if (timer_create(CLOCK_ID, &ev, &timer) != 0) {
             sysErrorBelch("timer_create");
             stg_exit(EXIT_FAILURE);
         }

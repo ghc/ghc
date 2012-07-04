@@ -97,7 +97,11 @@ void initTracing (void)
     // -Dg turns on gc tracing too
     TRACE_gc =
         RtsFlags.TraceFlags.gc ||
-        RtsFlags.DebugFlags.gc;
+        RtsFlags.DebugFlags.gc ||
+        RtsFlags.DebugFlags.scheduler;
+    if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
+        RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+    }
 
     TRACE_spark_sampled =
         RtsFlags.TraceFlags.sparks_sampled;
@@ -199,40 +203,37 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     tracePreface();
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %lu\n", 
+        debugBelch("cap %d: created thread %" FMT_SizeT "\n", 
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %lu (%s)\n", 
+        debugBelch("cap %d: running thread %" FMT_SizeT " (%s)\n", 
                    cap->no, (lnat)tso->id, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %lu appended to run queue\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " appended to run queue\n", 
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %lu migrating to cap %d\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " migrating to cap %d\n", 
                    cap->no, (lnat)tso->id, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
-        debugBelch("cap %d: waking up thread %lu on cap %d\n", 
+        debugBelch("cap %d: waking up thread %" FMT_SizeT " on cap %d\n", 
                    cap->no, (lnat)tso->id, (int)info1);
         break;
         
     case EVENT_STOP_THREAD:     // (cap, thread, status)
         if (info1 == 6 + BlockedOnBlackHole) {
-            debugBelch("cap %d: thread %lu stopped (blocked on black hole owned by thread %lu)\n",
+            debugBelch("cap %d: thread %" FMT_SizeT " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (lnat)tso->id, (long)info2);
         } else {
-            debugBelch("cap %d: thread %lu stopped (%s)\n",
+            debugBelch("cap %d: thread %" FMT_SizeT " stopped (%s)\n",
                        cap->no, (lnat)tso->id, thread_stop_reasons[info1]);
         }
         break;
-    case EVENT_SHUTDOWN:        // (cap)
-        debugBelch("cap %d: shutting down\n", cap->no);
-        break;
     default:
-        debugBelch("cap %d: thread %lu: event %d\n\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT ": event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
         break;
     }
@@ -282,6 +283,9 @@ static void traceGcEvent_stderr (Capability *cap, EventTypeNum tag)
       case EVENT_GC_DONE:         // (cap)
           debugBelch("cap %d: GC done\n", cap->no);
           break;
+      case EVENT_GC_GLOBAL_SYNC:  // (cap)
+          debugBelch("cap %d: all caps stopped for GC\n", cap->no);
+          break;
       default:
           barf("traceGcEvent: unknown event tag %d", tag);
           break;
@@ -304,9 +308,77 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
     }
 }
 
-void traceCapsetEvent_ (EventTypeNum tag,
-                        CapsetID capset,
-                        StgWord info)
+void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceGcEvent_stderr(cap, tag);
+    } else
+#endif
+    {
+        /* assuming nullary events and explicitly inserting a timestamp */
+        postEventAtTimestamp(cap, ts, tag);
+    }
+}
+
+void traceHeapEvent_ (Capability   *cap,
+                      EventTypeNum  tag,
+                      CapsetID      heap_capset,
+                      lnat          info1)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postHeapEvent(cap, tag, heap_capset, info1);
+    }
+}
+
+void traceEventHeapInfo_ (CapsetID    heap_capset,
+                          nat         gens,
+                          lnat        maxHeapSize,
+                          lnat        allocAreaSize,
+                          lnat        mblockSize,
+                          lnat        blockSize)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventHeapInfo(heap_capset, gens,
+                          maxHeapSize, allocAreaSize,
+                          mblockSize, blockSize);
+    }
+}
+
+void traceEventGcStats_  (Capability *cap,
+                          CapsetID    heap_capset,
+                          nat         gen,
+                          lnat        copied,
+                          lnat        slop,
+                          lnat        fragmentation,
+                          nat         par_n_threads,
+                          lnat        par_max_copied,
+                          lnat        par_tot_copied)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventGcStats(cap, heap_capset, gen,
+                         copied, slop, fragmentation,
+                         par_n_threads, par_max_copied, par_tot_copied);
+    }
+}
+
+void traceCapEvent (Capability   *cap,
+                    EventTypeNum  tag)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
@@ -314,18 +386,54 @@ void traceCapsetEvent_ (EventTypeNum tag,
 
         tracePreface();
         switch (tag) {
+        case EVENT_CAP_CREATE:   // (cap)
+            debugBelch("cap %d: initialised\n", cap->no);
+            break;
+        case EVENT_CAP_DELETE:   // (cap)
+            debugBelch("cap %d: shutting down\n", cap->no);
+            break;
+        case EVENT_CAP_ENABLE:   // (cap)
+            debugBelch("cap %d: enabling capability\n", cap->no);
+            break;
+        case EVENT_CAP_DISABLE:  // (cap)
+            debugBelch("cap %d: disabling capability\n", cap->no);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postCapEvent(tag, (EventCapNo)cap->no);
+        }
+    }
+}
+
+void traceCapsetEvent (EventTypeNum tag,
+                       CapsetID     capset,
+                       StgWord      info)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_sched)
+        // When events go to stderr, it is annoying to see the capset
+        // events every time, so we only emit them with -Ds.
+    {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %lu of type %d\n", (lnat)capset, (int)info);
+            debugBelch("created capset %" FMT_SizeT " of type %d\n", (lnat)capset, (int)info);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
-            debugBelch("deleted capset %lu\n", (lnat)capset);
+            debugBelch("deleted capset %" FMT_SizeT "\n", (lnat)capset);
             break;
         case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
-            debugBelch("assigned cap %lu to capset %lu\n",
+            debugBelch("assigned cap %" FMT_SizeT " to capset %" FMT_SizeT "\n",
                        (lnat)info, (lnat)capset);
             break;
         case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
-            debugBelch("removed cap %lu from capset %lu\n",
+            debugBelch("removed cap %" FMT_SizeT " from capset %" FMT_SizeT "\n",
                        (lnat)info, (lnat)capset);
             break;
         }
@@ -562,7 +670,7 @@ void traceThreadLabel_(Capability *cap,
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         ACQUIRE_LOCK(&trace_utx);
         tracePreface();
-        debugBelch("cap %d: thread %lu has label %s\n",
+        debugBelch("cap %d: thread %" FMT_SizeT " has label %s\n",
                    cap->no, (lnat)tso->id, label);
         RELEASE_LOCK(&trace_utx);
     } else

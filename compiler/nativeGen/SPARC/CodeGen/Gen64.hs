@@ -201,8 +201,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
 
 
 iselExpr64 expr
-   = do dflags <- getDynFlags
-        pprPanic "iselExpr64(sparc)" (pprPlatform (targetPlatform dflags) expr)
+   = pprPanic "iselExpr64(sparc)" (ppr expr)
 
 
 

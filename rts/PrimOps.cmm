@@ -35,7 +35,7 @@ import base_ControlziExceptionziBase_nestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import ghczmprim_GHCziTypes_False_closure;
-#if !defined(mingw32_HOST_OS)
+#if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import sm_mutex;
 #endif
 
@@ -384,13 +384,9 @@ stg_mkWeakzh
 {
   /* R1 = key
      R2 = value
-     R3 = finalizer (or NULL)
+     R3 = finalizer (or stg_NO_FINALIZER_closure)
   */
   W_ w;
-
-  if (R3 == NULL) {
-    R3 = stg_NO_FINALIZER_closure;
-  }
 
   ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh );
 
@@ -414,6 +410,16 @@ stg_mkWeakzh
   IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
 
   RET_P(w);
+}
+
+stg_mkWeakNoFinalizzerzh
+{
+  /* R1 = key
+     R2 = value
+   */
+  R3 = stg_NO_FINALIZER_closure;
+
+  jump stg_mkWeakzh;
 }
 
 stg_mkWeakForeignEnvzh
@@ -659,6 +665,11 @@ stg_forkOnzh
 
 stg_yieldzh
 {
+  // when we yield to the scheduler, we have to tell it to put the
+  // current thread to the back of the queue by setting the
+  // context_switch flag.  If we don't do this, it will run the same
+  // thread again.
+  Capability_context_switch(MyCapability()) = 1 :: CInt;
   jump stg_yield_noregs;
 }
 
@@ -930,6 +941,16 @@ stg_atomicallyzh
 
   /* Apply R1 to the realworld token */
   jump stg_ap_v_fast;
+}
+
+// A closure representing "atomically x".  This is used when a thread
+// inside a transaction receives an asynchronous exception; see #5866.
+// It is somewhat similar to the stg_raise closure.
+//
+INFO_TABLE(stg_atomically,1,0,THUNK_1_0,"atomically","atomically")
+{
+  R1 = StgThunk_payload(R1,0);
+  jump stg_atomicallyzh;
 }
 
 
@@ -1828,11 +1849,7 @@ stg_delayzh
 #else
 
 
-    W_ time;
-    (time) = foreign "C" getourtimeofday() [R1];
-    // getourtimeofday() returns a value in units of 10ms
-    // R1 is in microseconds, we need to (/ 10000), rounding up
-    target = time + 1 + (R1 + 10000-1) / 10000;
+    (target) = foreign "C" getDelayTarget(R1) [R1];
 
     StgTSO_block_info(CurrentTSO) = target;
 

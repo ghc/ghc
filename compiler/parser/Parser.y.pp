@@ -38,9 +38,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataC
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 import Type             ( funTyCon )
-import ForeignCall      ( Safety(..), CExportSpec(..), CLabelString,
-                          CCallConv(..), CCallTarget(..), defaultCCallConv
-                        )
+import ForeignCall
 import OccName          ( varName, dataName, tcClsName, tvName )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
@@ -269,6 +267,7 @@ incorrect.
  '{-# VECTORISE'          { L _ ITvect_prag }
  '{-# VECTORISE_SCALAR'   { L _ ITvect_scalar_prag }
  '{-# NOVECTORISE'        { L _ ITnovect_prag }
+ '{-# CTYPE'              { L _ ITctype }
  '#-}'                                          { L _ ITclose_prag }
 
  '..'           { L _ ITdotdot }                        -- reserved symbols
@@ -351,6 +350,7 @@ TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
+TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { L _ ITeof }
@@ -465,27 +465,29 @@ exp_doc :: { LIE RdrName }
         : docsection    { L1 (case (unLoc $1) of (n, doc) -> IEGroup n doc) }
         | docnamed      { L1 (IEDocNamed ((fst . unLoc) $1)) } 
         | docnext       { L1 (IEDoc (unLoc $1)) }       
-                       
+
+
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { LIE RdrName }
-        :  qvar                         { L1 (IEVar (unLoc $1)) }
-        |  oqtycon                      { L1 (IEThingAbs (unLoc $1)) }
-        |  oqtycon '(' '..' ')'         { LL (IEThingAll (unLoc $1)) }
-        |  oqtycon '(' ')'              { LL (IEThingWith (unLoc $1) []) }
-        |  oqtycon '(' qcnames ')'      { LL (IEThingWith (unLoc $1) (reverse $3)) }
+        : qcname_ext export_subspec     { LL (mkModuleImpExp (unLoc $1)
+                                                             (unLoc $2)) }
         |  'module' modid               { LL (IEModuleContents (unLoc $2)) }
 
-qcnames :: { [RdrName] }
+export_subspec :: { Located ImpExpSubSpec }
+        : {- empty -}                   { L0 ImpExpAbs }
+        | '(' '..' ')'                  { LL ImpExpAll }
+        | '(' ')'                       { LL (ImpExpList []) }
+        | '(' qcnames ')'               { LL (ImpExpList (reverse $2)) }
+
+qcnames :: { [RdrName] }     -- A reversed list
         :  qcnames ',' qcname_ext       { unLoc $3 : $1 }
         |  qcname_ext                   { [unLoc $1]  }
 
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
         :  qcname                       { $1 }
-        |  'type' qcon                  { sL (comb2 $1 $2) 
-                                             (setRdrNameSpace (unLoc $2) 
-                                                              tcClsName)  }
+        |  'type' qcname                {% mkTypeImpExp (LL (unLoc $2)) }
 
 -- Cannot pull into qcname_ext, as qcname is also used in expression.
 qcname  :: { Located RdrName }  -- Variable or data constructor
@@ -618,7 +620,7 @@ ty_decl :: { LTyClDecl RdrName }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared 
-                {% mkTySynonym (comb2 $1 $4) False $2 $4 }
+                {% mkTySynonym (comb2 $1 $4) $2 $4 }
 
            -- type family declarations
         | 'type' 'family' type opt_kind_sig 
@@ -627,18 +629,18 @@ ty_decl :: { LTyClDecl RdrName }
                 {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
           -- ordinary data type or newtype declaration
-        | data_or_newtype tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) False $2 
-                            Nothing (reverse (unLoc $3)) (unLoc $4) }
+        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+                {% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) $2 $3 
+                            Nothing (reverse (unLoc $4)) (unLoc $5) }
                                    -- We need the location on tycl_hdr in case 
                                    -- constrs and deriving are both empty
 
           -- ordinary GADT declaration
-        | data_or_newtype tycl_hdr opt_kind_sig 
+        | data_or_newtype capi_ctype tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) False $2 
-                            (unLoc $3) (unLoc $4) (unLoc $5) }
+                {% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) $2 $3 
+                            (unLoc $4) (unLoc $5) (unLoc $6) }
                                    -- We need the location on tycl_hdr in case 
                                    -- constrs and deriving are both empty
 
@@ -648,29 +650,30 @@ ty_decl :: { LTyClDecl RdrName }
 
 inst_decl :: { LInstDecl RdrName }
         : 'instance' inst_type where_inst
-                 { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
-                   in L (comb3 $1 $2 $3) (ClsInstDecl $2 binds sigs ats) }
+                 { let (binds, sigs, _, ats, _) = cvBindsAndSigs (unLoc $3)
+                   in L (comb3 $1 $2 $3) (ClsInstD { cid_poly_ty = $2, cid_binds = binds
+                                                   , cid_sigs = sigs, cid_fam_insts = ats }) }
 
            -- type instance declarations
         | 'type' 'instance' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% do { L loc d <- mkTySynonym (comb2 $1 $5) True $3 $5
-                      ; return (L loc (FamInstDecl d)) } }
+                {% do { L loc d <- mkFamInstSynonym (comb2 $1 $5) $3 $5
+                      ; return (L loc (FamInstD { lid_inst = d })) } }
 
           -- data/newtype instance declaration
         | data_or_newtype 'instance' tycl_hdr constrs deriving
-                {% do { L loc d <- mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
+                {% do { L loc d <- mkFamInstData (comb4 $1 $3 $4 $5) (unLoc $1) Nothing $3
                                       Nothing (reverse (unLoc $4)) (unLoc $5)
-                      ; return (L loc (FamInstDecl d)) } }
+                      ; return (L loc (FamInstD { lid_inst = d })) } }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% do { L loc d <- mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
+                {% do { L loc d <- mkFamInstData (comb4 $1 $3 $5 $6) (unLoc $1) Nothing $3
                                             (unLoc $4) (unLoc $5) (unLoc $6)
-                      ; return (L loc (FamInstDecl d)) } }
+                      ; return (L loc (FamInstD { lid_inst = d })) } }
         
 -- Associated type family declarations
 --
@@ -681,43 +684,45 @@ inst_decl :: { LInstDecl RdrName }
 --   declarations without a kind signature cause parsing conflicts with empty
 --   data declarations. 
 --
-at_decl_cls :: { LTyClDecl RdrName }
-           -- type family declarations
+at_decl_cls :: { LHsDecl RdrName }
+           -- family declarations
         : 'type' type opt_kind_sig
                 -- Note the use of type for the head; this allows
-                -- infix type constructors to be declared
-                {% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
+                -- infix type constructors to be declared.
+                {% do { L loc decl <- mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3)
+                      ; return (L loc (TyClD decl)) } }
+
+        | 'data' type opt_kind_sig
+                {% do { L loc decl <- mkTyFamily (comb3 $1 $2 $3) DataFamily $2 (unLoc $3)
+                      ; return (L loc (TyClD decl)) } }
 
            -- default type instance
         | 'type' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
-
-          -- data/newtype family declaration
-        | 'data' type opt_kind_sig
-                {% mkTyFamily (comb3 $1 $2 $3) DataFamily $2 (unLoc $3) }
+                {% do { L loc fid <- mkFamInstSynonym (comb2 $1 $4) $2 $4
+                      ; return (L loc (InstD (FamInstD { lid_inst = fid }))) } }
 
 -- Associated type instances
 --
-at_decl_inst :: { LTyClDecl RdrName }
+at_decl_inst :: { LFamInstDecl RdrName }
            -- type instance declarations
         : 'type' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
+                {% mkFamInstSynonym (comb2 $1 $4) $2 $4 }
 
         -- data/newtype instance declaration
-        | data_or_newtype tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) True $2 
-                            Nothing (reverse (unLoc $3)) (unLoc $4) }
+        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+                {% mkFamInstData (comb4 $1 $3 $4 $5) (unLoc $1) $2 $3 
+                                 Nothing (reverse (unLoc $4)) (unLoc $5) }
 
         -- GADT instance declaration
-        | data_or_newtype tycl_hdr opt_kind_sig 
+        | data_or_newtype capi_ctype tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) True $2 
-                            (unLoc $3) (unLoc $4) (unLoc $5) }
+                {% mkFamInstData (comb4 $1 $3 $5 $6) (unLoc $1) $2 $3 
+                                 (unLoc $4) (unLoc $5) (unLoc $6) }
 
 data_or_newtype :: { Located NewOrData }
         : 'data'        { L1 DataType }
@@ -738,6 +743,11 @@ tycl_hdr :: { Located (Maybe (LHsContext RdrName), LHsType RdrName) }
         : context '=>' type             { LL (Just $1, $3) }
         | type                          { L1 (Nothing, $1) }
 
+capi_ctype :: { Maybe CType }
+capi_ctype : '{-# CTYPE' STRING STRING '#-}' { Just (CType (Just (Header (getSTRING $2))) (getSTRING $3)) }
+           | '{-# CTYPE'        STRING '#-}' { Just (CType Nothing                        (getSTRING $2)) }
+           |                                 { Nothing }
+
 -----------------------------------------------------------------------------
 -- Stand-alone deriving
 
@@ -751,7 +761,7 @@ stand_alone_deriving :: { LDerivDecl RdrName }
 -- Declaration in class bodies
 --
 decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_cls  : at_decl_cls                 { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+decl_cls  : at_decl_cls                 { LL (unitOL $1) }
           | decl                        { $1 }
 
           -- A 'default' signature used with the generic-programming extension
@@ -782,7 +792,7 @@ where_cls :: { Located (OrdList (LHsDecl RdrName)) }    -- Reversed
 -- Declarations in instance bodies
 --
 decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_inst  : at_decl_inst               { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+decl_inst  : at_decl_inst               { LL (unitOL (L1 (InstD (FamInstD { lid_inst = unLoc $1 })))) }
            | decl                       { $1 }
 
 decls_inst :: { Located (OrdList (LHsDecl RdrName)) }   -- Reversed
@@ -867,7 +877,7 @@ rule_var_list :: { [RuleBndr RdrName] }
 
 rule_var :: { RuleBndr RdrName }
         : varid                                 { RuleBndr $1 }
-        | '(' varid '::' ctype ')'              { RuleBndrSig $2 $4 }
+        | '(' varid '::' ctype ')'              { RuleBndrSig $2 (mkHsWithBndrs $4) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations (c.f. rules)
@@ -1044,6 +1054,9 @@ typedoc :: { LHsType RdrName }
         | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
         | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
         | btype '~'      btype           { LL $ HsEqTy $1 $3 }
+                                        -- see Note [Promotion]
+        | btype SIMPLEQUOTE qconop type     { LL $ mkHsOpTy $1 $3 $4 }
+        | btype SIMPLEQUOTE varop  type     { LL $ mkHsOpTy $1 $3 $4 }
 
 btype :: { LHsType RdrName }
         : btype atype                   { LL $ HsAppTy $1 $2 }
@@ -1072,6 +1085,8 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
         | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
         | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
+        | INTEGER            {% mkTyLit $ LL $ HsNumTy $ getINTEGER $1 }
+        | STRING             {% mkTyLit $ LL $ HsStrTy $ getSTRING  $1 }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1097,8 +1112,8 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
-        : tyvar                         { L1 (UserTyVar (unLoc $1) placeHolderKind) }
-        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) $4 placeHolderKind) }
+        : tyvar                         { L1 (UserTyVar (unLoc $1)) }
+        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) $4) }
 
 fds :: { Located [Located (FunDep RdrName)] }
         : {- empty -}                   { noLoc [] }
@@ -1131,6 +1146,7 @@ akind :: { LHsKind RdrName }
         : '*'                    { L1 $ HsTyVar (nameRdrName liftedTypeKindTyConName) }
         | '(' kind ')'           { LL $ HsParTy $2 }
         | pkind                  { $1 }
+        | tyvar                  { L1 $ HsTyVar (unLoc $1) }
 
 pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
         : qtycon                          { L1 $ HsTyVar $ unLoc $1 }
@@ -1349,6 +1365,10 @@ quasiquote :: { Located (HsQuasiQuote RdrName) }
                                 ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkUnqual varName quoter }
                             in L1 (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
+        | TH_QQUASIQUOTE  { let { loc = getLoc $1
+                                ; ITqQuasiQuote (qual, quoter, quote, quoteSpan) = unLoc $1
+                                ; quoterId = mkQual varName (qual, quoter) }
+                            in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { LHsExpr RdrName }
         : infixexp '::' sigtype         { LL $ ExprWithTySig $1 $3 }
@@ -1562,7 +1582,8 @@ flattenedpquals :: { Located [LStmt RdrName] }
                     -- We just had one thing in our "parallel" list so 
                     -- we simply return that thing directly
                     
-                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss] noSyntaxExpr noSyntaxExpr noSyntaxExpr]
+                    qss -> L1 [L1 $ ParStmt [ParStmtBlock qs undefined noSyntaxExpr | qs <- qss] 
+                                            noSyntaxExpr noSyntaxExpr]
                     -- We actually found some actual parallel lists so
                     -- we wrap them into as a ParStmt
                 }
@@ -1741,10 +1762,10 @@ dbinds  :: { Located [LIPBind RdrName] }
 --      | {- empty -}                   { [] }
 
 dbind   :: { LIPBind RdrName }
-dbind   : ipvar '=' exp                 { LL (IPBind (unLoc $1) $3) }
+dbind   : ipvar '=' exp                 { LL (IPBind (Left (unLoc $1)) $3) }
 
-ipvar   :: { Located (IPName RdrName) }
-        : IPDUPVARID            { L1 (IPName (mkUnqual varName (getIPDUPVARID $1))) }
+ipvar   :: { Located HsIPName }
+        : IPDUPVARID            { L1 (HsIPName (getIPDUPVARID $1)) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
@@ -1829,10 +1850,16 @@ tycon   :: { Located RdrName }  -- Unqualified
 
 qtyconsym :: { Located RdrName }
         : QCONSYM                       { L1 $! mkQual tcClsName (getQCONSYM $1) }
+        | QVARSYM                       { L1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym                      { $1 }
 
+-- Does not include "!", because that is used for strictness marks
+--               or ".", because that separates the quantified type vars from the rest
 tyconsym :: { Located RdrName }
         : CONSYM                        { L1 $! mkUnqual tcClsName (getCONSYM $1) }
+        | VARSYM                        { L1 $! mkUnqual tcClsName (getVARSYM $1) }
+        | '*'                           { L1 $! mkUnqual tcClsName (fsLit "*")    }
+
 
 -----------------------------------------------------------------------------
 -- Operators
@@ -1866,11 +1893,9 @@ qvaropm :: { Located RdrName }
 
 tyvar   :: { Located RdrName }
 tyvar   : tyvarid               { $1 }
-        | '(' tyvarsym ')'      { LL (unLoc $2) }
 
 tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       { LL (unLoc $2) }
-        | tyvarsym              { $1 }
         | '.'                   {% parseErrorSDoc (getLoc $1) 
                                       (vcat [ptext (sLit "Illegal symbol '.' in type"), 
                                              ptext (sLit "Perhaps you intended -XRankNTypes or similar flag"),
@@ -1883,12 +1908,6 @@ tyvarid :: { Located RdrName }
         | 'unsafe'              { L1 $! mkUnqual tvName (fsLit "unsafe") }
         | 'safe'                { L1 $! mkUnqual tvName (fsLit "safe") }
         | 'interruptible'       { L1 $! mkUnqual tvName (fsLit "interruptible") }
-
-tyvarsym :: { Located RdrName }
--- Does not include "!", because that is used for strictness marks
---               or ".", because that separates the quantified type vars from the rest
---               or "*", because that's used for kinds
-tyvarsym : VARSYM               { L1 $! mkUnqual tvName (getVARSYM $1) }
 
 -----------------------------------------------------------------------------
 -- Variables 

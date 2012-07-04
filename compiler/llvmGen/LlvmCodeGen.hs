@@ -27,6 +27,7 @@ import UniqSupply
 import Util
 import SysTools ( figureLlvmVersion )
 
+import Control.Monad ( when )
 import Data.IORef ( writeIORef )
 import Data.Maybe ( fromMaybe )
 import System.IO
@@ -48,18 +49,32 @@ llvmCodeGen dflags h us cmms
             in (d,env')
     in do
         showPass dflags "LlVM CodeGen"
-        dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" $ docToSDoc pprLlvmHeader
+        dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" pprLlvmHeader
         bufh <- newBufHandle h
-        Prt.bufLeftRender bufh $ pprLlvmHeader
-        ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
-        -- cache llvm version for later use
-        writeIORef (llvmVersion dflags) ver
+        Prt.bufLeftRender bufh $ withPprStyleDoc dflags (mkCodeStyle CStyle) pprLlvmHeader
+        ver  <- getLlvmVersion
         env' <- {-# SCC "llvm_datas_gen" #-}
                 cmmDataLlvmGens dflags bufh (setLlvmVer ver env) cdata []
         {-# SCC "llvm_procs_gen" #-}
              cmmProcLlvmGens dflags bufh us env' cmm 1 []
         bFlush bufh
         return  ()
+
+  where
+    -- | Handle setting up the LLVM version.
+    getLlvmVersion = do
+        ver <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
+        -- cache llvm version for later use
+        writeIORef (llvmVersion dflags) ver
+        when (ver < minSupportLlvmVersion) $
+            errorMsg dflags (text "You are using an old version of LLVM that"
+                             <> text " isn't supported anymore!"
+                             $+$ text "We will try though...")
+        when (ver > maxSupportLlvmVersion) $
+            putMsg dflags (text "You are using a new version of LLVM that"
+                           <> text " hasn't been tested yet!"
+                           $+$ text "We will try though...")
+        return ver
 
 
 -- -----------------------------------------------------------------------------
@@ -72,11 +87,11 @@ cmmDataLlvmGens dflags h env [] lmdata
   = let (env', lmdata') = {-# SCC "llvm_resolve" #-}
                           resolveLlvmDatas env lmdata
         lmdoc = {-# SCC "llvm_data_ppr" #-}
-                Prt.vcat $ map pprLlvmData lmdata'
+                vcat $ map pprLlvmData lmdata'
     in do
-        dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" $ docToSDoc lmdoc
+        dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" lmdoc
         {-# SCC "llvm_data_out" #-}
-            Prt.bufLeftRender h lmdoc
+            Prt.bufLeftRender h $ withPprStyleDoc dflags (mkCodeStyle CStyle) lmdoc
         return env'
 
 cmmDataLlvmGens dflags h env (cmm:cmms) lmdata
@@ -100,7 +115,7 @@ cmmProcLlvmGens :: DynFlags -> BufHandle -> UniqSupply -> LlvmEnv -> [RawCmmDecl
 cmmProcLlvmGens _ _ _ _ [] _ []
   = return ()
 
-cmmProcLlvmGens _ h _ _ [] _ ivars
+cmmProcLlvmGens dflags h _ _ [] _ ivars
   = let ivars' = concat ivars
         cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
         ty     = (LMArray (length ivars') i8Ptr)
@@ -108,6 +123,7 @@ cmmProcLlvmGens _ h _ _ [] _ ivars
         lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
                   (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
     in Prt.bufLeftRender h $ {-# SCC "llvm_used_ppr" #-}
+                             withPprStyleDoc dflags (mkCodeStyle CStyle) $
                              pprLlvmData ([lmUsed], [])
 
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
@@ -119,7 +135,8 @@ cmmProcLlvmGens dflags h us env ((CmmProc _ _ (ListGraph [])) : cmms) count ivar
 cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars = do
     (us', env', llvm) <- cmmLlvmGen dflags us (clearVars env) cmm
     let (docs, ivar) = mapAndUnzip (pprLlvmCmmDecl env' count) llvm
-    Prt.bufLeftRender h $ {-# SCC "llvm_proc_ppr" #-} Prt.vcat docs
+    Prt.bufLeftRender h $ {-# SCC "llvm_proc_ppr" #-}
+                          withPprStyleDoc dflags (mkCodeStyle CStyle) $ vcat docs
     cmmProcLlvmGens dflags h us' env' cmms (count + 2) (ivar ++ ivars)
 
 
@@ -132,14 +149,14 @@ cmmLlvmGen dflags us env cmm = do
                     fixStgRegisters cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm"
-        (pprCmmGroup (targetPlatform dflags) [fixed_cmm])
+        (pprCmmGroup [fixed_cmm])
 
     -- generate llvm code from cmm
     let ((env', llvmBC), usGen) = {-# SCC "llvm_proc_gen" #-}
                                   initUs us $ genLlvmProc env fixed_cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code"
-        (vcat $ map (docToSDoc . fst . pprLlvmCmmDecl env' 0) llvmBC)
+        (vcat $ map (fst . pprLlvmCmmDecl env' 0) llvmBC)
 
     return (usGen, env', llvmBC)
 
