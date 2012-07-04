@@ -749,7 +749,7 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
                 
     info = noCafIdInfo
-           `setSpecInfo`          mkSpecInfo (primOpRules prim_op name)
+           `setSpecInfo`          mkSpecInfo (primOpRules name prim_op)
            `setArityInfo`         arity
            `setStrictnessInfo` Just strict_sig
 
