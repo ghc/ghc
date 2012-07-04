@@ -119,7 +119,8 @@ test('T5113',
       if_wordsize(64,
           stats_num_field('bytes allocated', 8000000,
                                              9000000)),
-      only_ways(['normal'])
+      only_ways(['normal'],
+      expect_broken(7046)
       ],
      compile_and_run,
      ['-O'])
