@@ -338,7 +338,7 @@ entryHeapCheck cl_info offset nodeSet arity args code
 
            args' = map (CmmReg . CmmLocal) args
            setN = case nodeSet of
-                          Just n  -> mkNop -- No need to assign R1, it already
+                          Just _  -> mkNop -- No need to assign R1, it already
                                            -- points to the closure
                           Nothing -> mkAssign nodeReg $
                               CmmLit (CmmLabel $ staticClosureLabel cl_info)

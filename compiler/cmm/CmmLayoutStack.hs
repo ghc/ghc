@@ -1033,13 +1033,16 @@ walk (n:ns) acc as
     (dropped, as') = partition should_drop as
        where should_drop a = a `conflicts` n
 
+toNodes :: [(LocalReg,CmmExpr)] -> [CmmNode O O]
 toNodes as = [ CmmAssign (CmmLocal r) rhs | (r,rhs) <- as ]
 
 -- We only sink "r = G" assignments right now, so conflicts is very simple:
-(r, rhs) `conflicts` CmmAssign reg  _  | reg `regUsedIn` rhs = True
+conflicts :: (LocalReg,CmmExpr) -> CmmNode O O -> Bool
+(_, rhs) `conflicts` CmmAssign reg  _  | reg `regUsedIn` rhs = True
 --(r, CmmLoad _ _) `conflicts` CmmStore _ _ = True
 (r, _)   `conflicts` node
   = foldRegsUsed (\b r' -> r == r' || b) False node
 
+conflictsWithLast :: (LocalReg,CmmExpr) -> CmmNode O C -> Bool
 (r, _) `conflictsWithLast` node
   = foldRegsUsed (\b r' -> r == r' || b) False node

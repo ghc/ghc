@@ -12,28 +12,22 @@ module CmmPipeline (
 import CLabel
 import Cmm
 import CmmLint
-import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
-import CmmRewriteAssignments
 import CmmContFlowOpt
 import OptimizationFuel
 import CmmLayoutStack
-import Hoopl
-import CmmUtils
 
 import DynFlags
 import ErrUtils
 import HscTypes
 import Data.Maybe
 import Control.Monad
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Outputable
-import StaticFlags
+
+import qualified Data.Set as Set
+import Data.Map (Map)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -133,8 +127,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
        ------------- More CAFs ------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform g
-       let localCAFs = {-# SCC "localCAFs" #-} catMaybes $ map (localCAFInfo platform cafEnv) gs
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
+       let localCAFs = {-# SCC "localCAFs" #-} catMaybes $ map (localCAFInfo cafEnv) gs
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
@@ -155,7 +149,6 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
               -- localCAFs :: [ (CLabel, CAFSet) ] -- statics filtered out(?)
 
   where dflags = hsc_dflags hsc_env
-        platform = targetPlatform dflags
         mbpprTrace x y z | dopt Opt_D_dump_cmmz dflags = pprTrace x y z
                          | otherwise = z
         dump = dumpGraph dflags
@@ -165,9 +158,6 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
         -- Runs a required transformation/analysis
         run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
-        -- Runs an optional transformation/analysis (and should
-        -- thus be subject to optimization fuel)
-        runOptimization = runFuelIO (hsc_OptFuel hsc_env)
 
 
 dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
@@ -175,8 +165,8 @@ dumpGraph dflags flag name g = do
   when (dopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
-  do_lint g = case cmmLintGraph (targetPlatform dflags) g of
-                 Just err -> do { printDump err
+  do_lint g = case cmmLintGraph g of
+                 Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }
                  Nothing  -> return ()

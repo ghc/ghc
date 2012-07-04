@@ -28,11 +28,9 @@ import qualified Stream
 import ErrUtils
 import Outputable
 import Module
-import Maybes           ( firstJusts )
 import SrcLoc
 
 import Control.Exception
-import Control.Monad
 import System.Directory
 import System.FilePath
 import System.IO

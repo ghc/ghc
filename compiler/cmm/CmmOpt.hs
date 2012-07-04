@@ -146,7 +146,6 @@ To inline _smi:
 
 countUses :: UserOfLocalRegs a => a -> UniqFM Int
 countUses a = foldRegsUsed (\m r -> addToUFM_C (+) m r 1) emptyUFM a
-  where count m r = lookupWithDefaultUFM m (0::Int) r
 
 cmmMiniInline :: DynFlags -> [CmmBasicBlock] -> [CmmBasicBlock]
 cmmMiniInline dflags blocks = map do_inline blocks
@@ -158,14 +157,14 @@ cmmMiniInlineStmts _      _    [] = []
 cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
   | 0 <- lookupWithDefaultUFM uses 0 u
-  = cmmMiniInlineStmts uses stmts
+  = cmmMiniInlineStmts dflags uses stmts
 
         -- used (foldable to small thing): try to inline at all the use sites
   | Just n <- lookupUFM uses u,
     e <- wrapRecExp foldExp expr,
     isTiny e
   =
-     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
+     ncgDebugTrace ("nativeGen: inlining " ++ showSDoc dflags (pprStmt stmt)) $
      case lookForInlineMany u e stmts of
          (m, stmts')
              | n == m -> cmmMiniInlineStmts dflags (delFromUFM uses u) stmts'
@@ -256,6 +255,7 @@ okToInline _ _ = True
 -- changed is not one we were relying on.  I don't know how much of a
 -- performance hit this is (we have to create a regset for every
 -- instruction.) -- EZY
+okToSkip :: CmmStmt -> Unique -> CmmExpr -> RegSet -> Bool
 okToSkip stmt u expr regset
    = case stmt of
          CmmNop -> True

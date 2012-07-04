@@ -121,7 +121,6 @@ import SimplStg         ( stg2stg )
 import CodeGen          ( codeGen )
 import qualified OldCmm as Old
 import qualified Cmm as New
-import PprCmm           ( pprCmms )
 import CmmParse         ( parseCmmFile )
 import CmmBuildInfoTables
 import CmmPipeline
@@ -151,7 +150,6 @@ import Exception
 import qualified Stream
 import Stream (Stream)
 
-import CLabel
 import Util
 
 import Data.List

@@ -23,28 +23,20 @@ where
 #include "HsVersions.h"
 
 -- These should not be imported here!
-import StgCmmForeign
 import StgCmmUtils
 
-import Constants
 import Digraph
 import qualified Prelude as P
 import Prelude hiding (succ)
-import Util
 
 import BlockId
 import Bitmap
 import CLabel
 import Cmm
 import CmmUtils
-import Module
-import FastString
-import ForeignCall
 import IdInfo
 import Data.List
 import Maybes
-import MkGraph as M
-import Control.Monad
 import Name
 import OptimizationFuel
 import Outputable
@@ -57,8 +49,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified FiniteMap as Map
 
+foldSet :: (a -> b -> b) -> b -> Set a -> b
 #if __GLASGOW_HASKELL__ < 704
 foldSet = Set.fold
 #else
@@ -106,7 +98,7 @@ cafTransfers = mkBTransfer3 first middle last
         add l s = if hasCAF l then Set.insert (toClosureLbl l) s
                               else s
 
-cafAnal :: Platform -> CmmGraph -> CAFEnv
+cafAnal :: CmmGraph -> CAFEnv
 cafAnal g = dataflowAnalBwd g [] $ analBwd cafLattice cafTransfers
 
 -----------------------------------------------------------------------

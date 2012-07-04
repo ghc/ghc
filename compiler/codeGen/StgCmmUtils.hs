@@ -575,8 +575,8 @@ mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag = do
     branches_lbls <- label_branches join_lbl branches
     tag_expr'     <- assignTemp' tag_expr
     
-    emit =<< mk_switch tag_expr' (sortBy (comparing fst) branches) mb_deflt_lbl
-                lo_tag hi_tag via_C
+    emit =<< mk_switch tag_expr' (sortBy (comparing fst) branches_lbls)
+                mb_deflt_lbl lo_tag hi_tag via_C
 
           -- Sort the branches before calling mk_switch
 

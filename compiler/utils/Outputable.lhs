@@ -699,8 +699,6 @@ instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
-instance (PlatformOutputable elt) => PlatformOutputable (Set.Set elt) where
-    pprPlatform platform m = pprPlatform platform (Set.toList m)
 \end{code}
 
 %************************************************************************

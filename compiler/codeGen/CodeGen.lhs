@@ -30,7 +30,7 @@ import CgHpc
 
 import CLabel
 import OldCmm
-import OldPprCmm
+import OldPprCmm ()
 
 import StgSyn
 import PrelNames
@@ -46,6 +46,7 @@ import Module
 import ErrUtils
 import Panic
 import Outputable
+import Util
 
 import OrdList
 import Stream (Stream, liftIO)

@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 {-# LANGUAGE GADTs #-}
 module CmmLint (
-    cmmLint, cmmLintDecl, cmmLintGraph
+    cmmLint, cmmLintGraph
   ) where
 
 import Hoopl
@@ -31,7 +31,7 @@ import Data.Maybe
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-        => GenCmmGroup d h (ListGraph CmmStmt) -> Maybe SDoc
+        => GenCmmGroup d h CmmGraph -> Maybe SDoc
 cmmLint tops = runCmmLint (mapM_ lintCmmDecl) tops
 
 cmmLintGraph :: CmmGraph -> Maybe SDoc
@@ -62,7 +62,7 @@ lintCmmGraph g = mapM_ (lintCmmBlock labels) blocks
 
 lintCmmBlock :: BlockSet -> CmmBlock -> CmmLint ()
 lintCmmBlock labels block
-  = addLintInfo (\_ -> text "in basic block " <> ppr (entryLabel block)) $ do
+  = addLintInfo (text "in basic block " <> ppr (entryLabel block)) $ do
         let (_, middle, last) = blockSplit block
         mapM_ lintCmmMiddle (blockToList middle)
         lintCmmLast labels last
@@ -172,7 +172,7 @@ lintCmmLast labels node = case node of
  where
   checkTarget id
      | setMember id labels = return ()
-     | otherwise = cmmLintErr (\_ -> text "Branch to nonexistent id" <+> ppr id)
+     | otherwise = cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
 
 lintTarget :: ForeignTarget -> CmmLint ()
@@ -195,18 +195,18 @@ checkCond expr
 newtype CmmLint a = CmmLint { unCL :: Either SDoc a }
 
 instance Monad CmmLint where
-  CmmLint m >>= k = CmmLint $ \p -> case m p of
-                                      Left e -> Left e
-                                      Right a -> unCL (k a) p
-  return a = CmmLint (\_ -> Right a)
+  CmmLint m >>= k = CmmLint $ case m of
+                                Left e -> Left e
+                                Right a -> unCL (k a)
+  return a = CmmLint (Right a)
 
 cmmLintErr :: SDoc -> CmmLint a
-cmmLintErr msg = CmmLint (\p -> Left (msg p))
+cmmLintErr msg = CmmLint (Left msg)
 
 addLintInfo :: SDoc -> CmmLint a -> CmmLint a
-addLintInfo info thing = CmmLint $ \p ->
-   case unCL thing p of
-        Left err -> Left (hang (info p) 2 err)
+addLintInfo info thing = CmmLint $
+   case unCL thing of
+        Left err -> Left (hang info 2 err)
         Right a  -> Right a
 
 cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a

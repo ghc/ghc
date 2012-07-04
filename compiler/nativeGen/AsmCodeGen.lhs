@@ -274,7 +274,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
         split_marker = CmmProc Nothing mkSplitMarkerLabel (ListGraph [])
 
 
-cmmNativeGenStream :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
+cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
               -> NcgImpl statics instr jumpDest
               -> BufHandle
