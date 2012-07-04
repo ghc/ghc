@@ -518,14 +518,16 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                 ; fulfillM res }, s { scpMemoState = ms' })
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
-        in case fmap (\(exact, (p, mr)) -> case mr of
-                       RightIsInstance heap_inst rn_lr k_inst -> (exact, do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                                                            ; stuff <- instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt
-                                                                            ; insertTagsM stuff })
+        in case fmap (\(exact, (p, mr)) -> (exact, case mr of
+                       RightIsInstance heap_inst rn_lr k_inst -> do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                                                    ; stuff <- instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt
+                                                                    ; insertTagsM stuff }
                          where
                           -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                           Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
-                       RightGivesTypeGen rn_l s rn_r -> error "FIXME: RightGivesTypeGen unimplemented") $
+                        -- FIXME: in rare cases (i.e when rollback is off OR when the state we are type-genning against is on the stack)
+                        -- then this codepath could also overwrite the fulfilment for the old state to call into the generalised version:
+                       RightGivesTypeGen _rn_l s rn_r -> trace "typegen" $ do { (deeds, e') <- memo_opt s; return (deeds, renameFVedTerm (case s of (_, Heap _ ids, _, _) -> ids) rn_r e') })) $
                      bestChoice [ (p, mr)
                                 | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
                                 , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
