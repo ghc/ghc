@@ -13,8 +13,8 @@ f = rnf
 {-
 We're hoping that the output will include something like:
 
-  \ (ds_dvm :: (GHC.Types.Float, GHC.Types.Float)) ->
-    case ds_dvm of _ { (x_aux, y_auy) ->
-    case x_aux of _ { GHC.Types.F# ipv_svw ->
-    case y_auy of _ { GHC.Types.F# ipv_svx -> GHC.Unit.() } } }
+  \ (ds_afa :: (GHC.Types.Float, GHC.Types.Float)) ->
+    case ds_afa of _ { (x_afd, y_afe) ->
+    case x_afd of _ { GHC.Types.F# ipv_afm ->
+    T4138_A.$fNFDataFloat_$crnf y_afe } }
 -}

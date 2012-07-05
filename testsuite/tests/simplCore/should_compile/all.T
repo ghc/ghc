@@ -144,7 +144,6 @@ test('T5776',
      run_command,
      ['$MAKE -s --no-print-directory T5776'])
 test('T4138',
-     [extra_clean(['T4138_A.hi', 'T4138_A.o', 'T4138.simpl']),
-      expect_broken(4138)],
+     extra_clean(['T4138_A.hi', 'T4138_A.o', 'T4138.simpl']),
      run_command,
      ['$MAKE -s --no-print-directory T4138'])
