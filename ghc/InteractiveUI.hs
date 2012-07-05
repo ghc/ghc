@@ -209,7 +209,8 @@ helpText =
   "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
   "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
-  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
+  "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
+  "                               precedence, ::<cmd> is always a builtin command)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
   "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
@@ -908,12 +909,9 @@ lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
   macros <- readIORef macros_ref
   let{ (str, cmds) = case str' of
-      ':' : rest -> (rest, builtin_commands)
-      _ -> (str', builtin_commands ++ macros) }
+      ':' : rest -> (rest, builtin_commands) -- "::" selects a builtin command
+      _ -> (str', macros ++ builtin_commands) } -- otherwise prefer macros
   -- look for exact match first, then the first prefix match
-  -- We consider builtin commands first: since new macros are appended
-  -- on the *end* of the macros list, this is consistent with the view
-  -- that things defined earlier should take precedence. See also #3858
   return $ case [ c | c <- cmds, str == cmdName c ] of
            c:_ -> Just c
            [] -> case [ c | c@(s,_,_) <- cmds, str `isPrefixOf` s ] of
@@ -1142,8 +1140,8 @@ defineMacro overwrite s = do
   handleSourceError (\e -> GHC.printException e) $
    do
     hv <- GHC.compileExpr new_expr
-    liftIO (writeIORef macros_ref --
-            (filtered ++ [(macro_name, lift . runMacro hv, noCompletion)]))
+    liftIO (writeIORef macros_ref -- later defined macros have precedence
+            ((macro_name, lift . runMacro hv, noCompletion) : filtered))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
