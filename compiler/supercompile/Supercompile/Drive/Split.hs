@@ -413,11 +413,18 @@ noneBracketed' tgs a = TailsUnknown (Shell { shellExtraTags = tgs, shellExtraFvs
 oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> Bracketed (Entered, UnnormalisedState)
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
-  , Just (cast_by, Nothing) <- isTrivialStack_maybe k -- NB: this might find a cast even when we have an answer in the context since the state is unnormalised
-  , Just anned_a <- termToAnswer ids in_e -- FIXME: deal with updates arriving from isTrivialStack_maybe (but eager value splitting is on the way out)
-  = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
-    modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
-    splitAnswer ctxt_ids ids (annedToTagged (castAnnedAnswer ids anned_a cast_by))
+  , Just (cast_by, mb_update) <- isTrivialStack_maybe k -- NB: this might find a cast even when we have an answer in the context since the state is unnormalised
+  , Just anned_a0 <- termToAnswer ids in_e -- NB: I could push extra heap into the bracketed_a1 using the mb_update if it is Just, but I don't think I usually need to
+  , let anned_a1 = castAnnedAnswer ids anned_a0 cast_by
+        bracketed_a1 = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
+                       modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
+                       splitAnswer ctxt_ids ids (annedToTagged anned_a1)
+  = case mb_update of
+      Nothing                          -> bracketed_a1
+      Just (Tagged tg_x' x', cast_by') -> zipBracketeds (TailsUnknown shell [Hole { holeBvs = [x'], holeFiller = bracketed_a1 }])
+        where shell = case cast_by' of
+                CastBy co co_tg -> Shell { shellExtraTags = oneResidTag tg_x' `plusResidTags` oneResidTag co_tg, shellExtraFvs = tyCoVarsOfCo co, shellWrapper = \[e'] -> letRec [(x', e')] (var x' `cast` co) }
+                Uncast          -> Shell { shellExtraTags = oneResidTag tg_x',                                   shellExtraFvs = emptyVarSet,     shellWrapper = \[e'] -> letRec [(x', e')] (var x') }
   | otherwise
   = oneBracketed' ty (ent, (emptyDeeds, Heap h ids, k, in_e))
 
