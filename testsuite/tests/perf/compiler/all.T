@@ -68,13 +68,10 @@ test('T3294',
                                    # expected value: 17725476 (x86/OS X)
 				   #                 14593500 (Windows)
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 26000000,
-                                                     37000000)),
-                                   # expected value: 32 478 408 (amd64/Linux)
-                                   # (but varies a lot, depending on when
-                                   # we GC relative to the peak).
-                                   # (MCB: consistently reaching ~35 375 912 for
-                                   # me lately on amd64/Darwin)
+          compiler_stats_range_field('max_bytes_used', 25753192, 15)),
+                                   # Improved with the new codegen merge,
+                                   # because we now do stg->cmm->NCG for one
+                                   # top-level binding at a time.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 650000000,
                                                       750000000)),
