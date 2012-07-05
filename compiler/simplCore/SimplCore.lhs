@@ -36,7 +36,7 @@ import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
-import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma )
+import BasicTypes       ( CompilerPhase(..) )
 import VarSet
 import VarEnv
 import LiberateCase     ( liberateCase )
