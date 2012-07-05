@@ -448,15 +448,6 @@ otherwise               =  True
 --
 type String = [Char]
 
-{-# RULES
-"x# `eqChar#` x#" forall x#. x# `eqChar#` x# = True
-"x# `neChar#` x#" forall x#. x# `neChar#` x# = False
-"x# `gtChar#` x#" forall x#. x# `gtChar#` x# = False
-"x# `geChar#` x#" forall x#. x# `geChar#` x# = True
-"x# `leChar#` x#" forall x#. x# `leChar#` x# = True
-"x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
-  #-}
-
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
 
@@ -684,65 +675,6 @@ x# `divModInt#` y#
  | (x# <# 0#) && (y# ># 0#) = case (x# +# 1#) `quotRemInt#` y# of
                               (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
  | otherwise                = x# `quotRemInt#` y#
-
-{-# RULES
-"x# +# 0#" forall x#. x# +# 0# = x#
-"0# +# x#" forall x#. 0# +# x# = x#
-"x# -# 0#" forall x#. x# -# 0# = x#
-"x# -# x#" forall x#. x# -# x# = 0#
-"x# *# 0#" forall x#. x# *# 0# = 0#
-"0# *# x#" forall x#. 0# *# x# = 0#
-"x# *# 1#" forall x#. x# *# 1# = x#
-"1# *# x#" forall x#. 1# *# x# = x#
-  #-}
-
-{-# RULES
-"x# ># x#"  forall x#. x# >#  x# = False
-"x# >=# x#" forall x#. x# >=# x# = True
-"x# ==# x#" forall x#. x# ==# x# = True
-"x# /=# x#" forall x#. x# /=# x# = False
-"x# <# x#"  forall x#. x# <#  x# = False
-"x# <=# x#" forall x#. x# <=# x# = True
-  #-}
-
-{-# RULES
-"plusFloat x 0.0"   forall x#. plusFloat#  x#   0.0# = x#
-"plusFloat 0.0 x"   forall x#. plusFloat#  0.0# x#   = x#
-"minusFloat x 0.0"  forall x#. minusFloat# x#   0.0# = x#
-"timesFloat x 1.0"  forall x#. timesFloat# x#   1.0# = x#
-"timesFloat 1.0 x"  forall x#. timesFloat# 1.0# x#   = x#
-"divideFloat x 1.0" forall x#. divideFloat# x#  1.0# = x#
-  #-}
-
-{-# RULES
-"plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
-"plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
-"minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
-"timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
-"timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
-"divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
-  #-}
-
-{-
-We'd like to have more rules, but for example:
-
-This gives wrong answer (0) for NaN - NaN (should be NaN):
-    "minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
-
-This gives wrong answer (0) for 0 * NaN (should be NaN):
-    "timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
-
-This gives wrong answer (0) for NaN * 0 (should be NaN):
-    "timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
-
-These are tested by num014.
-
-Similarly for Float (#5178):
-
-"minusFloat x x"    forall x#. minusFloat# x#   x#   = 0.0#
-"timesFloat0.0 x"   forall x#. timesFloat# 0.0# x#   = 0.0#
-"timesFloat x 0.0"  forall x#. timesFloat# x#   0.0# = 0.0#
--}
 
 -- Wrappers for the shift operations.  The uncheckedShift# family are
 -- undefined when the amount being shifted by is greater than the size
