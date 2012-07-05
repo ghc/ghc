@@ -17,7 +17,6 @@ import CmmLive
 import CmmProcPoint
 import SMRep
 import Hoopl hiding ((<*>), mkLast, mkMiddle)
-import OptimizationFuel
 import Constants
 import UniqSupply
 import Maybes
@@ -105,7 +104,7 @@ instance Outputable StackMap where
 
 
 cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph
-               -> FuelUniqSM (CmmGraph, BlockEnv StackMap)
+               -> UniqSM (CmmGraph, BlockEnv StackMap)
 cmmLayoutStack procpoints entry_args
                graph0@(CmmGraph { g_entry = entry })
   = do
@@ -114,12 +113,12 @@ cmmLayoutStack procpoints entry_args
     pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
 
-    (final_stackmaps, final_high_sp, new_blocks) <- liftUniq $
+    (final_stackmaps, final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
             layout procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
-    new_blocks' <- liftUniq $ mapM lowerSafeForeignCall new_blocks
+    new_blocks' <- mapM lowerSafeForeignCall new_blocks
 
     pprTrace ("Sp HWM") (ppr final_high_sp) $
        return (ofBlockList entry new_blocks', final_stackmaps)
@@ -248,7 +247,7 @@ collectContInfo blocks
 -- Updating the StackMap from middle nodes
 
 -- Look for loads from stack slots, and update the StackMap.  This is
--- purelyu for optimisation reasons, so that we can avoid saving a
+-- purely for optimisation reasons, so that we can avoid saving a
 -- variable back to a different stack slot if it is already on the
 -- stack.
 --
@@ -361,6 +360,7 @@ handleLastNode procpoints liveness cont_info stackmaps
            = setupStackFrame lbl liveness cml_ret_off cml_ret_args stack0
 
 
+     -- For other last nodes (branches), if any of the targets is a
      -- proc point, we have to set up the stack to match what the proc
      -- point is expecting.
      --
@@ -701,7 +701,7 @@ manifestSp stackmaps stack0 sp0 sp_high
 
     final_block   = blockJoin first final_middle final_last
 
-    fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id)) fixup_blocks
+    fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
 
 
 getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
@@ -982,7 +982,7 @@ stackSlotRegs sm = eltsUFM (sm_regs sm)
 -- *but*, that will invalidate the liveness analysis, and we'll have
 -- to re-do it.
 
-cmmSink :: CmmGraph -> FuelUniqSM CmmGraph
+cmmSink :: CmmGraph -> UniqSM CmmGraph
 cmmSink graph = do
   let liveness = cmmLiveness graph
   return $ cmmSink' liveness graph

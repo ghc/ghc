@@ -137,18 +137,6 @@ pprStmt stmt = case stmt of
 instance (Outputable a) => Outputable (CmmHinted a) where
   ppr (CmmHinted a k) = ppr (a, k)
 
-pprUpdateFrame :: UpdateFrame -> SDoc
-pprUpdateFrame (UpdateFrame expr args) =
-    hcat [ ptext (sLit "jump")
-         , space
-         , if isTrivialCmmExpr expr
-                then pprExpr expr
-                else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr
-                    _ -> parens (pprExpr expr)
-         , space
-         , parens  ( commafy $ map ppr args ) ]
-
 -- --------------------------------------------------------------------------
 -- goto local label. [1], section 6.6
 --

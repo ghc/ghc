@@ -16,9 +16,9 @@ import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
 import CmmContFlowOpt
-import OptimizationFuel
 import CmmLayoutStack
 
+import UniqSupply
 import DynFlags
 import ErrUtils
 import HscTypes
@@ -65,7 +65,7 @@ cmmPipeline hsc_env topSRT prog =
      let topCAFEnv = {-# SCC "topCAFEnv" #-} mkTopCAFInfo (concat cafEnvs)
 
      -- folding over the groups
-     (topSRT, tops) <- {-# SCC "toTops" #-} foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
+     (topSRT, tops) <- {-# SCC "toTops" #-} foldM (toTops topCAFEnv) (topSRT, []) tops
 
      let cmms :: CmmGroup
          cmms = reverse (concat tops)
@@ -101,17 +101,17 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ----------- Proc points -------------------
        let callPPs = {-# SCC "callProcPoints" #-} callProcPoints g
-       procPoints <- {-# SCC "minimalProcPointSet" #-} run $
+       procPoints <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                      minimalProcPointSet (targetPlatform dflags) callPPs g
 
        ----------- Layout the stack and manifest Sp ---------------
        -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
        (g, stackmaps) <- {-# SCC "layoutStack" #-}
-                         run $ cmmLayoutStack procPoints entry_off g
+                         runUniqSM $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
-       g <- {-# SCC "sink" #-} run $ cmmSink g
-       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+--       g <- {-# SCC "sink" #-} runUniqSM $ cmmSink g
+--       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
 
 --       ----------- Sink and inline assignments -------------------
 --       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
@@ -119,10 +119,10 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 --       dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ------------- Split into separate procedures ------------
-       procPointMap  <- {-# SCC "procPointAnalysis" #-} run $
+       procPointMap  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
                         procPointAnalysis procPoints g
        dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
-       gs <- {-# SCC "splitAtProcPoints" #-} run $
+       gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
              splitAtProcPoints l callPPs procPoints procPointMap (CmmProc h l g)
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
@@ -156,8 +156,10 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
         dumps flag name
            = mapM_ (dumpWith dflags flag name)
 
-        -- Runs a required transformation/analysis
-        run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
+runUniqSM :: UniqSM a -> IO a
+runUniqSM m = do
+  us <- mkSplitUniqSupply 'u'
+  return (initUs_ us m)
 
 
 dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
@@ -183,11 +185,11 @@ dumpWith dflags flag txt g = do
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined
 -- in non-static closures, we can build the SRTs.
-toTops :: HscEnv -> Map CLabel CAFSet -> (TopSRT, [[CmmDecl]])
-                 -> [(CAFSet, CmmDecl)] -> IO (TopSRT, [[CmmDecl]])
-toTops hsc_env topCAFEnv (topSRT, tops) gs =
+toTops :: Map CLabel CAFSet -> (TopSRT, [[CmmDecl]])
+       -> [(CAFSet, CmmDecl)] -> IO (TopSRT, [[CmmDecl]])
+toTops topCAFEnv (topSRT, tops) gs =
   do let setSRT (topSRT, rst) g =
            do (topSRT, gs) <- setInfoTableSRT topCAFEnv topSRT g
               return (topSRT, gs : rst)
-     (topSRT, gs') <- runFuelIO (hsc_OptFuel hsc_env) $ foldM setSRT (topSRT, []) gs
+     (topSRT, gs') <- runUniqSM $ foldM setSRT (topSRT, []) gs
      return (topSRT, concat gs' : tops)

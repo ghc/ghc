@@ -20,7 +20,6 @@ import Hoopl hiding (ChangeFlag)
 import Data.Bits
 import qualified Data.List as List
 import Data.Word
-import FastString
 import Outputable
 import UniqFM
 
@@ -95,7 +94,7 @@ hash_block block =
         hash_lst m h = hash_node m + h `shiftL` 1
 
         hash_node :: CmmNode O x -> Word32
-        hash_node (CmmComment (FastString u _ _ _ _)) = 0 -- don't care
+        hash_node (CmmComment _) = 0 -- don't care
         hash_node (CmmAssign r e) = hash_reg r + hash_e e
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
@@ -148,7 +147,7 @@ lookupBid subst bid = case mapLookup bid subst of
 --
 eqMiddleWith :: (BlockId -> BlockId -> Bool)
              -> CmmNode O O -> CmmNode O O -> Bool
-eqMiddleWith eqBid (CmmComment _) (CmmComment _) = True
+eqMiddleWith _ (CmmComment _) (CmmComment _) = True
 eqMiddleWith eqBid (CmmAssign r1 e1) (CmmAssign r2 e2)
   = r1 == r2 && eqExprWith eqBid e1 e2
 eqMiddleWith eqBid (CmmStore l1 r1) (CmmStore l2 r2)

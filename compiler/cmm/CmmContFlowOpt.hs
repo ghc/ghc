@@ -97,7 +97,7 @@ blockConcat g@CmmGraph { g_entry = entry_id }
      maybe_concat :: CmmBlock
                   -> (BlockEnv CmmBlock, BlockEnv BlockId)
                   -> (BlockEnv CmmBlock, BlockEnv BlockId)
-     maybe_concat block unchanged@(blocks, shortcut_map)
+     maybe_concat block (blocks, shortcut_map)
         | CmmBranch b' <- last
         , Just blk' <- mapLookup b' blocks
         , shouldConcatWith b' blk'

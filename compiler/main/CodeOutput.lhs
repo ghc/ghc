@@ -14,7 +14,7 @@ import LlvmCodeGen ( llvmCodeGen )
 import UniqSupply       ( mkSplitUniqSupply )
 
 import Finder           ( mkStubPaths )
-import PprC		( writeCs )
+import PprC             ( writeCs )
 import OldCmmLint       ( cmmLint )
 import Packages
 import OldCmm           ( RawCmmGroup )
@@ -45,9 +45,9 @@ import System.IO
 \begin{code}
 codeOutput :: DynFlags
            -> Module
-	   -> ModLocation
-	   -> ForeignStubs
-	   -> [PackageId]
+           -> ModLocation
+           -> ForeignStubs
+           -> [PackageId]
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
 
@@ -64,16 +64,16 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
                 { showPass dflags "CmmLint"
                 ; case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { log_action dflags dflags SevDump noSrcSpan defaultDumpStyle err
-				       ; ghcExit dflags 1
-				       }
-			Nothing  -> return ()
+                                       ; ghcExit dflags 1
+                                       }
+                        Nothing  -> return ()
                 ; return cmm
                 }
 
-	; showPass dflags "CodeOutput"
-	; let filenm = hscOutName dflags 
-	; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-	; case hscTarget dflags of {
+        ; showPass dflags "CodeOutput"
+        ; let filenm = hscOutName dflags 
+        ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
+        ; case hscTarget dflags of {
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
@@ -127,7 +127,7 @@ outputC dflags filenm cmm_stream packages
 
        doOutput filenm $ \ h -> do
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-	  hPutStr h cc_injects
+          hPutStr h cc_injects
           writeCs dflags h rawcmms
 \end{code}
 
@@ -256,4 +256,3 @@ outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
 \end{code}
-

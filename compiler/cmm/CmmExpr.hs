@@ -32,7 +32,6 @@ import BlockId
 import CLabel
 import Unique
 
-import Data.Map (Map)
 import Data.Set (Set)
 import qualified Data.Set as Set
 

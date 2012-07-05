@@ -1,3 +1,14 @@
+--
+-- Copyright (c) 2010, João Dias, Simon Marlow, Simon Peyton Jones,
+-- and Norman Ramsey
+--
+-- Modifications copyright (c) The University of Glasgow 2012
+--
+-- This module is a specialised and optimised version of
+-- Compiler.Hoopl.Dataflow in the hoopl package.  In particular it is
+-- specialised to the UniqSM monad.
+--
+
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, MultiParamTypeClasses #-}
 #if __GLASGOW_HASKELL__ >= 703
 {-# OPTIONS_GHC -fprof-auto-top #-}
@@ -23,78 +34,64 @@ module Hoopl.Dataflow
   )
 where
 
-import OptimizationFuel
+import UniqSupply
 
 import Data.Maybe
 import Data.Array
 
-import Compiler.Hoopl.Collections
-import Compiler.Hoopl.Fuel
-import Compiler.Hoopl.Graph hiding (Graph) -- hiding so we can redefine
-                                           -- and include definition in paper
-import qualified Compiler.Hoopl.GraphUtil as U
-import Compiler.Hoopl.Label
-import Compiler.Hoopl.Dataflow (JoinFun)
-import Compiler.Hoopl.Util
-
-import Compiler.Hoopl.Dataflow (
-    DataflowLattice(..), OldFact(..), NewFact(..), Fact
-  , ChangeFlag(..), mkFactBase
-  , FwdPass(..), FwdRewrite(..), FwdTransfer(..), mkFRewrite,  getFRewrite3, mkFTransfer, mkFTransfer3
-  , wrapFR, wrapFR2
-  , BwdPass(..), BwdRewrite(..),  BwdTransfer(..), mkBTransfer, mkBTransfer3, getBTransfer3
+import Compiler.Hoopl hiding
+   ( mkBRewrite3, mkFRewrite3, noFwdRewrite, noBwdRewrite
+   , analyzeAndRewriteBwd, analyzeAndRewriteFwd
+   )
+import Compiler.Hoopl.Internals
+  ( wrapFR, wrapFR2
   , wrapBR, wrapBR2
-  , mkBRewrite,  getBRewrite3
+  , splice
   )
 
--- import Debug.Trace
 
-noRewrite :: a -> b -> FuelUniqSM (Maybe c)
+-- -----------------------------------------------------------------------------
+
+noRewrite :: a -> b -> UniqSM (Maybe c)
 noRewrite _ _ = return Nothing
 
-noFwdRewrite :: FwdRewrite FuelUniqSM n f
+noFwdRewrite :: FwdRewrite UniqSM n f
 noFwdRewrite = FwdRewrite3 (noRewrite, noRewrite, noRewrite)
 
 -- | Functions passed to 'mkFRewrite3' should not be aware of the fuel supply.
 -- The result returned by 'mkFRewrite3' respects fuel.
 mkFRewrite3 :: forall n f.
-               (n C O -> f -> FuelUniqSM (Maybe (Graph n C O)))
-            -> (n O O -> f -> FuelUniqSM (Maybe (Graph n O O)))
-            -> (n O C -> f -> FuelUniqSM (Maybe (Graph n O C)))
-            -> FwdRewrite FuelUniqSM n f
+               (n C O -> f -> UniqSM (Maybe (Graph n C O)))
+            -> (n O O -> f -> UniqSM (Maybe (Graph n O O)))
+            -> (n O C -> f -> UniqSM (Maybe (Graph n O C)))
+            -> FwdRewrite UniqSM n f
 mkFRewrite3 f m l = FwdRewrite3 (lift f, lift m, lift l)
-  where lift :: forall t t1 a. (t -> t1 -> FuelUniqSM (Maybe a))
-                             -> t -> t1 -> FuelUniqSM (Maybe (a, FwdRewrite FuelUniqSM n f))
+  where lift :: forall t t1 a. (t -> t1 -> UniqSM (Maybe a))
+                             -> t -> t1 -> UniqSM (Maybe (a, FwdRewrite UniqSM n f))
         {-# INLINE lift #-}
         lift rw node fact = do
              a <- rw node fact
              case a of
                Nothing -> return Nothing
-               Just a  -> do f <- getFuel
-                             if f == 0
-                                then return Nothing
-                                else setFuel (f-1) >> return (Just (a,noFwdRewrite))
+               Just a  -> return (Just (a,noFwdRewrite))
 
-noBwdRewrite :: BwdRewrite FuelUniqSM n f
+noBwdRewrite :: BwdRewrite UniqSM n f
 noBwdRewrite = BwdRewrite3 (noRewrite, noRewrite, noRewrite)
 
 mkBRewrite3 :: forall n f.
-               (n C O -> f          -> FuelUniqSM (Maybe (Graph n C O)))
-            -> (n O O -> f          -> FuelUniqSM (Maybe (Graph n O O)))
-            -> (n O C -> FactBase f -> FuelUniqSM (Maybe (Graph n O C)))
-            -> BwdRewrite FuelUniqSM n f
+               (n C O -> f          -> UniqSM (Maybe (Graph n C O)))
+            -> (n O O -> f          -> UniqSM (Maybe (Graph n O O)))
+            -> (n O C -> FactBase f -> UniqSM (Maybe (Graph n O C)))
+            -> BwdRewrite UniqSM n f
 mkBRewrite3 f m l = BwdRewrite3 (lift f, lift m, lift l)
-  where lift :: forall t t1 a. (t -> t1 -> FuelUniqSM (Maybe a))
-                             -> t -> t1 -> FuelUniqSM (Maybe (a, BwdRewrite FuelUniqSM n f))
+  where lift :: forall t t1 a. (t -> t1 -> UniqSM (Maybe a))
+                             -> t -> t1 -> UniqSM (Maybe (a, BwdRewrite UniqSM n f))
         {-# INLINE lift #-}
         lift rw node fact = do
              a <- rw node fact
              case a of
                Nothing -> return Nothing
-               Just a  -> do f <- getFuel
-                             if f == 0
-                                then return Nothing
-                                else setFuel (f-1) >> return (Just (a,noBwdRewrite))
+               Just a  -> return (Just (a,noBwdRewrite))
 
 -----------------------------------------------------------------------------
 --              Analyze and rewrite forward: the interface
@@ -104,10 +101,10 @@ mkBRewrite3 f m l = BwdRewrite3 (lift f, lift m, lift l)
 --   be no other entry point, or all goes horribly wrong...
 analyzeAndRewriteFwd
    :: forall n f e x .  NonLocal n =>
-      FwdPass FuelUniqSM n f
+      FwdPass UniqSM n f
    -> MaybeC e [Label]
    -> Graph n  e x -> Fact e f
-   -> FuelUniqSM (Graph n e x, FactBase f, MaybeO x f)
+   -> UniqSM (Graph n e x, FactBase f, MaybeO x f)
 analyzeAndRewriteFwd pass entries g f =
   do (rg, fout) <- arfGraph pass (fmap targetLabels entries) g f
      let (g', fb) = normalizeGraph rg
@@ -128,8 +125,8 @@ distinguishedExitFact g f = maybe g
 type Entries e = MaybeC e [Label]
 
 arfGraph :: forall n f e x .  NonLocal n =>
-            FwdPass FuelUniqSM n f ->
-            Entries e -> Graph n e x -> Fact e f -> FuelUniqSM (DG f n e x, Fact x f)
+            FwdPass UniqSM n f ->
+            Entries e -> Graph n e x -> Fact e f -> UniqSM (DG f n e x, Fact x f)
 arfGraph pass@FwdPass { fp_lattice = lattice,
                         fp_transfer = transfer,
                         fp_rewrite  = rewrite } entries g in_fact = graph g in_fact
@@ -138,32 +135,32 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
     type ARF  thing = forall e x . thing e x -> f        -> m (DG f n e x, Fact x f)
     type ARFX thing = forall e x . thing e x -> Fact e f -> m (DG f n e x, Fact x f)
     -}
-    graph ::              Graph n e x -> Fact e f -> FuelUniqSM (DG f n e x, Fact x f)
+    graph ::              Graph n e x -> Fact e f -> UniqSM (DG f n e x, Fact x f)
     block :: forall e x .
-             Block n e x -> f -> FuelUniqSM (DG f n e x, Fact x f)
+             Block n e x -> f -> UniqSM (DG f n e x, Fact x f)
 
     body  :: [Label] -> LabelMap (Block n C C)
-          -> Fact C f -> FuelUniqSM (DG f n C C, Fact C f)
+          -> Fact C f -> UniqSM (DG f n C C, Fact C f)
                     -- Outgoing factbase is restricted to Labels *not* in
                     -- in the Body; the facts for Labels *in*
                     -- the Body are in the 'DG f n C C'
 
     cat :: forall e a x f1 f2 f3.
-           (f1 -> FuelUniqSM (DG f n e a, f2))
-        -> (f2 -> FuelUniqSM (DG f n a x, f3))
-        -> (f1 -> FuelUniqSM (DG f n e x, f3))
+           (f1 -> UniqSM (DG f n e a, f2))
+        -> (f2 -> UniqSM (DG f n a x, f3))
+        -> (f1 -> UniqSM (DG f n e x, f3))
 
     graph GNil            f = return (dgnil, f)
     graph (GUnit blk)     f = block blk f
     graph (GMany e bdy x) f = ((e `ebcat` bdy) `cat` exit x) f
      where
-      ebcat :: MaybeO e (Block n O C) -> Body n -> Fact e f -> FuelUniqSM (DG f n e C, Fact C f)
-      exit  :: MaybeO x (Block n C O)           -> Fact C f -> FuelUniqSM (DG f n C x, Fact x f)
+      ebcat :: MaybeO e (Block n O C) -> Body n -> Fact e f -> UniqSM (DG f n e C, Fact C f)
+      exit  :: MaybeO x (Block n C O)           -> Fact C f -> UniqSM (DG f n C x, Fact x f)
       exit (JustO blk) f = arfx block blk f
       exit NothingO    f = return (dgnilC, f)
       ebcat entry bdy f = c entries entry f
        where c :: MaybeC e [Label] -> MaybeO e (Block n O C)
-                -> Fact e f -> FuelUniqSM (DG f n e C, Fact C f)
+                -> Fact e f -> UniqSM (DG f n e C, Fact C f)
              c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
              c (JustC entries) NothingO f = body entries bdy f
              c _ _ _ = error "bogus GADT pattern match failure"
@@ -181,7 +178,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
 
     {-# INLINE node #-}
     node :: forall e x . (ShapeLifter e x)
-         => n e x -> f -> FuelUniqSM (DG f n e x, Fact x f)
+         => n e x -> f -> UniqSM (DG f n e x, Fact x f)
     node n f
      = do { grw <- frewrite rewrite n f
           ; case grw of
@@ -201,8 +198,8 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
                        ; return (g, f2) }
 
     arfx :: forall x .
-            (Block n C x ->        f -> FuelUniqSM (DG f n C x, Fact x f))
-         -> (Block n C x -> Fact C f -> FuelUniqSM (DG f n C x, Fact x f))
+            (Block n C x ->        f -> UniqSM (DG f n C x, Fact x f))
+         -> (Block n C x -> Fact C f -> UniqSM (DG f n C x, Fact x f))
     arfx arf thing fb = 
       arf thing $ fromJust $ lookupFact (entryLabel thing) $ joinInFacts lattice fb
      -- joinInFacts adds debugging information
@@ -216,7 +213,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
       where
         lattice = fp_lattice pass
         do_block :: forall x . Block n C x -> FactBase f
-                 -> FuelUniqSM (DG f n C x, Fact x f)
+                 -> UniqSM (DG f n C x, Fact x f)
         do_block b fb = block b entryFact
           where entryFact = getFact lattice (entryLabel b) fb
 
@@ -243,7 +240,7 @@ forwardBlockList entries blks = postorder_dfs_from blks entries
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwd
    :: forall n f e .  NonLocal n =>
-      FwdPass FuelUniqSM n f
+      FwdPass UniqSM n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact e f
    -> FactBase f
@@ -286,7 +283,7 @@ analyzeFwd FwdPass { fp_lattice = lattice,
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwdBlocks
    :: forall n f e .  NonLocal n =>
-      FwdPass FuelUniqSM n f
+      FwdPass UniqSM n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact e f
    -> FactBase f
@@ -315,6 +312,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
     block (BlockCO n _)   f = ftr n f
     block (BlockCC l _ n) f = (ftr l `cat` ltr n) f
     block (BlockOC   _ n) f = ltr n f
+    block _               _ = error "analyzeFwdBlocks"
 
     {-# INLINE cat #-}
     cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
@@ -328,7 +326,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
 --   be no other entry point, or all goes horribly wrong...
 analyzeBwd
    :: forall n f e .  NonLocal n =>
-      BwdPass FuelUniqSM n f
+      BwdPass UniqSM n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact C f
    -> FactBase f
@@ -375,9 +373,9 @@ analyzeBwd BwdPass { bp_lattice = lattice,
 --   quite understand the implications of possible other exits
 analyzeAndRewriteBwd
    :: NonLocal n
-   => BwdPass FuelUniqSM n f
+   => BwdPass UniqSM n f
    -> MaybeC e [Label] -> Graph n e x -> Fact x f
-   -> FuelUniqSM (Graph n e x, FactBase f, MaybeO e f)
+   -> UniqSM (Graph n e x, FactBase f, MaybeO e f)
 analyzeAndRewriteBwd pass entries g f =
   do (rg, fout) <- arbGraph pass (fmap targetLabels entries) g f
      let (g', fb) = normalizeGraph rg
@@ -398,8 +396,8 @@ distinguishedEntryFact g f = maybe g
 
 arbGraph :: forall n f e x .
             NonLocal n =>
-            BwdPass FuelUniqSM n f ->
-            Entries e -> Graph n e x -> Fact x f -> FuelUniqSM (DG f n e x, Fact e f)
+            BwdPass UniqSM n f ->
+            Entries e -> Graph n e x -> Fact x f -> UniqSM (DG f n e x, Fact e f)
 arbGraph pass@BwdPass { bp_lattice  = lattice,
                         bp_transfer = transfer,
                         bp_rewrite  = rewrite } entries g in_fact = graph g in_fact
@@ -408,27 +406,27 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
     type ARB  thing = forall e x . thing e x -> Fact x f -> m (DG f n e x, f)
     type ARBX thing = forall e x . thing e x -> Fact x f -> m (DG f n e x, Fact e f)
     -}
-    graph ::              Graph n e x -> Fact x f -> FuelUniqSM (DG f n e x, Fact e f)
-    block :: forall e x . Block n e x -> Fact x f -> FuelUniqSM (DG f n e x, f)
-    body  :: [Label] -> Body n -> Fact C f -> FuelUniqSM (DG f n C C, Fact C f)
+    graph ::              Graph n e x -> Fact x f -> UniqSM (DG f n e x, Fact e f)
+    block :: forall e x . Block n e x -> Fact x f -> UniqSM (DG f n e x, f)
+    body  :: [Label] -> Body n -> Fact C f -> UniqSM (DG f n C C, Fact C f)
     node  :: forall e x . (ShapeLifter e x) 
-             => n e x       -> Fact x f -> FuelUniqSM (DG f n e x, f)
+             => n e x       -> Fact x f -> UniqSM (DG f n e x, f)
     cat :: forall e a x info info' info''.
-           (info' -> FuelUniqSM (DG f n e a, info''))
-        -> (info  -> FuelUniqSM (DG f n a x, info'))
-        -> (info  -> FuelUniqSM (DG f n e x, info''))
+           (info' -> UniqSM (DG f n e a, info''))
+        -> (info  -> UniqSM (DG f n a x, info'))
+        -> (info  -> UniqSM (DG f n e x, info''))
 
     graph GNil            f = return (dgnil, f)
     graph (GUnit blk)     f = block blk f
     graph (GMany e bdy x) f = ((e `ebcat` bdy) `cat` exit x) f
      where
-      ebcat :: MaybeO e (Block n O C) -> Body n -> Fact C f -> FuelUniqSM (DG f n e C, Fact e f)
-      exit  :: MaybeO x (Block n C O)           -> Fact x f -> FuelUniqSM (DG f n C x, Fact C f)
+      ebcat :: MaybeO e (Block n O C) -> Body n -> Fact C f -> UniqSM (DG f n e C, Fact e f)
+      exit  :: MaybeO x (Block n C O)           -> Fact x f -> UniqSM (DG f n C x, Fact C f)
       exit (JustO blk) f = arbx block blk f
       exit NothingO    f = return (dgnilC, f)
       ebcat entry bdy f = c entries entry f
        where c :: MaybeC e [Label] -> MaybeO e (Block n O C)
-                -> Fact C f -> FuelUniqSM (DG f n e C, Fact e f)
+                -> Fact C f -> UniqSM (DG f n e C, Fact e f)
              c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
              c (JustC entries) NothingO f = body entries bdy f
              c _ _ _ = error "bogus GADT pattern match failure"
@@ -464,8 +462,8 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                        ; return (g, f1) }
 
     arbx :: forall x .
-            (Block n C x -> Fact x f -> FuelUniqSM (DG f n C x, f))
-         -> (Block n C x -> Fact x f -> FuelUniqSM (DG f n C x, Fact C f))
+            (Block n C x -> Fact x f -> UniqSM (DG f n C x, f))
+         -> (Block n C x -> Fact x f -> UniqSM (DG f n C x, Fact C f))
 
     arbx arb thing f = do { (rg, f) <- arb thing f
                           ; let fb = joinInFacts (bp_lattice pass) $
@@ -479,7 +477,7 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
     body entries blockmap init_fbase
       = fixpoint Bwd (bp_lattice pass) do_block entries blockmap init_fbase
       where
-        do_block :: forall x. Block n C x -> Fact x f -> FuelUniqSM (DG f n C x, LabelMap f)
+        do_block :: forall x. Block n C x -> Fact x f -> UniqSM (DG f n C x, LabelMap f)
         do_block b f = do (g, f) <- block b f
                           return (g, mapSingleton (entryLabel b) f)
 
@@ -514,7 +512,7 @@ fixpointAnal :: forall n f. NonLocal n
  -> LabelMap (Block n C C)
  -> Fact C f -> FactBase f
 
-fixpointAnal direction DataflowLattice{ fact_bot = bot, fact_join = join }
+fixpointAnal direction DataflowLattice{ fact_bot = _, fact_join = join }
               do_block entries blockmap init_fbase
   = loop start init_fbase
   where
@@ -553,12 +551,12 @@ fixpointAnal direction DataflowLattice{ fact_bot = bot, fact_join = join }
 fixpoint :: forall n f. NonLocal n
  => Direction
  -> DataflowLattice f
- -> (Block n C C -> Fact C f -> FuelUniqSM (DG f n C C, Fact C f))
+ -> (Block n C C -> Fact C f -> UniqSM (DG f n C C, Fact C f))
  -> [Label]
  -> LabelMap (Block n C C)
- -> (Fact C f -> FuelUniqSM (DG f n C C, Fact C f))
+ -> (Fact C f -> UniqSM (DG f n C C, Fact C f))
 
-fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
+fixpoint direction DataflowLattice{ fact_bot = _, fact_join = join }
          do_block entries blockmap init_fbase
   = do
         -- trace ("fixpoint: " ++ show (case direction of Fwd -> True; Bwd -> False) ++ " " ++ show (mapKeys blockmap) ++ show entries ++ " " ++ show (mapKeys init_fbase)) $ return()
@@ -580,7 +578,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
        :: IntHeap
        -> FactBase f  -- current factbase (increases monotonically)
        -> LabelMap (DBlock f n C C)  -- transformed graph
-       -> FuelUniqSM (FactBase f, LabelMap (DBlock f n C C))
+       -> UniqSM (FactBase f, LabelMap (DBlock f n C C))
 
     loop [] fbase newblocks = return (fbase, newblocks)
     loop (ix:todo) fbase !newblocks = do
@@ -732,7 +730,6 @@ out that always recording a change is faster.
 --          TOTALLY internal to Hoopl; each block is decorated with a fact
 -----------------------------------------------------------------------------
 
-type Graph = Graph' Block
 type DG f  = Graph' (DBlock f)
 data DBlock f n e x = DBlock f (Block n e x) -- ^ block decorated with fact
 
@@ -754,7 +751,7 @@ normalizeGraph :: forall n f e x .
                  -- A Graph together with the facts for that graph
                  -- The domains of the two maps should be identical
 
-normalizeGraph g = (graphMapBlocks dropFact g, facts g)
+normalizeGraph g = (mapGraphBlocks dropFact g, facts g)
     where dropFact :: DBlock t t1 t2 t3 -> Block t1 t2 t3
           dropFact (DBlock _ b) = b
           facts :: DG f n e x -> FactBase f
@@ -774,9 +771,9 @@ normalizeGraph g = (graphMapBlocks dropFact g, facts g)
 dgnil  = GNil
 dgnilC = GMany NothingO emptyBody NothingO
 
-dgSplice = U.splice fzCat
+dgSplice = splice fzCat
   where fzCat :: DBlock f n e O -> DBlock t n O x -> DBlock f n e x
-        fzCat (DBlock f b1) (DBlock _ b2) = DBlock f $! b1 `U.cat` b2
+        fzCat (DBlock f b1) (DBlock _ b2) = DBlock f $! b1 `blockAppend` b2
         -- NB. strictness, this function is hammered.
 
 ----------------------------------------------------------------

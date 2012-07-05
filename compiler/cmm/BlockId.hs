@@ -15,7 +15,7 @@ import Outputable
 import Unique
 
 import Compiler.Hoopl as Hoopl hiding (Unique)
-import Compiler.Hoopl.GHC (uniqueToInt, uniqueToLbl, lblToUnique)
+import Compiler.Hoopl.Internals (uniqueToLbl)
 
 ----------------------------------------------------------------
 --- Block Ids, their environments, and their sets

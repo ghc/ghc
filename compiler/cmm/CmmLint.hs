@@ -16,7 +16,6 @@ import CmmUtils
 import PprCmm ()
 import BlockId
 import FastString
-import CLabel
 import Outputable
 import Constants
 

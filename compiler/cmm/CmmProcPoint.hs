@@ -13,19 +13,14 @@ import Prelude hiding (last, unzip, succ, zip)
 import BlockId
 import CLabel
 import Cmm
+import PprCmm ()
 import CmmUtils
-import CmmContFlowOpt
 import CmmInfo
-import CmmLive
-import Constants
 import Data.List (sortBy)
 import Maybes
-import MkGraph
 import Control.Monad
-import OptimizationFuel
 import Outputable
 import Platform
-import UniqSet
 import UniqSupply
 
 import Hoopl
@@ -106,7 +101,7 @@ instance Outputable Status where
 --------------------------------------------------
 -- Proc point analysis
 
-procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
+procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 procPointAnalysis procPoints g =
@@ -156,13 +151,13 @@ callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
                       _ -> set
 
 minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
-                    -> FuelUniqSM ProcPointSet
+                    -> UniqSM ProcPointSet
 -- Given the set of successors of calls (which must be proc-points)
 -- figure out the minimal set of necessary proc-points
 minimalProcPointSet platform callProcPoints g
   = extendPPSet platform g (postorderDfs g) callProcPoints
 
-extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelUniqSM ProcPointSet
+extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
 extendPPSet platform g blocks procPoints =
     do env <- procPointAnalysis procPoints g
        -- pprTrace "extensPPSet" (ppr env) $ return ()
@@ -212,10 +207,9 @@ extendPPSet platform g blocks procPoints =
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
-                     CmmDecl -> FuelUniqSM [CmmDecl]
+                     CmmDecl -> UniqSM [CmmDecl]
 splitAtProcPoints entry_label callPPs procPoints procMap
-                  (CmmProc (TopInfo {info_tbl=info_tbl,
-                                     stack_info=stack_info})
+                  (CmmProc (TopInfo {info_tbl=info_tbl})
                            top_l g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
      let addBlock b graphEnv =

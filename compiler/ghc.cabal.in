@@ -194,7 +194,6 @@ Library
         OldCmmLint
         OldCmmUtils
         OldPprCmm
-        OptimizationFuel
         PprBase
         PprC
         PprCmm

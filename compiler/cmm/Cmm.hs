@@ -32,9 +32,9 @@ module Cmm (
 import CLabel
 import BlockId
 import CmmNode
-import OptimizationFuel as F
 import SMRep
 import CmmExpr
+import UniqSupply
 import Compiler.Hoopl
 
 import Data.Word        ( Word8 )
@@ -93,9 +93,9 @@ data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
 type CmmBlock = Block CmmNode C C
 
 type CmmReplGraph e x = GenCmmReplGraph CmmNode e x
-type GenCmmReplGraph n e x = FuelUniqSM (Maybe (Graph n e x))
-type CmmFwdRewrite f = FwdRewrite FuelUniqSM CmmNode f
-type CmmBwdRewrite f = BwdRewrite FuelUniqSM CmmNode f
+type GenCmmReplGraph n e x = UniqSM (Maybe (Graph n e x))
+type CmmFwdRewrite f = FwdRewrite UniqSM CmmNode f
+type CmmBwdRewrite f = BwdRewrite UniqSM CmmNode f
 
 -----------------------------------------------------------------------------
 --     Info Tables

@@ -9,7 +9,7 @@
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
-        UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
+        CmmInfoTable(..), ClosureTypeInfo(..),
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
 
         cmmMapGraph, cmmTopMapGraph,
@@ -45,17 +45,6 @@ import ForeignCall
 -- Local labels must be unique within an entire compilation unit, not
 -- just a single top-level item, because local labels map one-to-one
 -- with assembly-language labels.
-
------------------------------------------------------------------------------
---     Info Tables
------------------------------------------------------------------------------
-
--- | A frame that is to be pushed before entry to the function.
--- Used to handle 'update' frames.
-data UpdateFrame
-  = UpdateFrame
-        CmmExpr    -- Frame header.  Behaves like the target of a 'jump'.
-        [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
 
 -----------------------------------------------------------------------------
 --  Cmm, CmmDecl, CmmBasicBlock

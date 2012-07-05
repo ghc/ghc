@@ -11,11 +11,10 @@ module CmmLive
     )
 where
 
+import UniqSupply
 import BlockId
 import Cmm
 import CmmUtils
-import Control.Monad
-import OptimizationFuel
 import PprCmmExpr ()
 
 import Hoopl
@@ -81,7 +80,7 @@ xferLive = mkBTransfer3 fst mid lst
 -- Removing assignments to dead variables
 -----------------------------------------------------------------------------
 
-removeDeadAssignments :: CmmGraph -> FuelUniqSM (CmmGraph, BlockEnv CmmLive)
+removeDeadAssignments :: CmmGraph -> UniqSM (CmmGraph, BlockEnv CmmLive)
 removeDeadAssignments g =
    dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
    where rewrites = mkBRewrite3 nothing middle nothing

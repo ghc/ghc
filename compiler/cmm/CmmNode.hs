@@ -400,5 +400,5 @@ mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
 mapSuccessors f (CmmBranch bid)        = CmmBranch (f bid)
 mapSuccessors f (CmmCondBranch p y n)  = CmmCondBranch p (f y) (f n)
 mapSuccessors f (CmmSwitch e arms)     = CmmSwitch e (map (fmap f) arms)
-mapSuccessors f n = n
+mapSuccessors _ n = n
 

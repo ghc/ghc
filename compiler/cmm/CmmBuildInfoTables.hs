@@ -38,7 +38,6 @@ import IdInfo
 import Data.List
 import Maybes
 import Name
-import OptimizationFuel
 import Outputable
 import SMRep
 import UniqSupply
@@ -149,7 +148,7 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
 buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
-             FuelUniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+             UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
   do let liftCAF lbl z = -- get CAFs for functions without static closures
            case Map.lookup lbl topCAFMap of Just cafs -> z `Set.union` cafs
@@ -192,7 +191,7 @@ buildSRTs topSRT topCAFMap cafs =
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
 procpointSRT :: CLabel -> Map CLabel Int -> [CLabel] ->
-                FuelUniqSM (Maybe CmmDecl, C_SRT)
+                UniqSM (Maybe CmmDecl, C_SRT)
 procpointSRT _ _ [] =
  return (Nothing, NoC_SRT)
 procpointSRT top_srt top_table entries =
@@ -210,7 +209,7 @@ maxBmpSize :: Int
 maxBmpSize = widthInBits wordWidth `div` 2
 
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
-to_SRT :: CLabel -> Int -> Int -> Bitmap -> FuelUniqSM (Maybe CmmDecl, C_SRT)
+to_SRT :: CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
 to_SRT top_srt off len bmp
   | len > maxBmpSize || bmp == [fromIntegral srt_escape]
   = do id <- getUniqueM
@@ -276,12 +275,12 @@ bundleCAFs _ t = (Set.empty, t)
 
 -- Construct the SRTs for the given procedure.
 setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmDecl) ->
-                   FuelUniqSM (TopSRT, [CmmDecl])
+                   UniqSM (TopSRT, [CmmDecl])
 setInfoTableSRT topCAFMap topSRT (cafs, t) =
   setSRT cafs topCAFMap topSRT t
 
 setSRT :: CAFSet -> Map CLabel CAFSet -> TopSRT ->
-          CmmDecl -> FuelUniqSM (TopSRT, [CmmDecl])
+          CmmDecl -> UniqSM (TopSRT, [CmmDecl])
 setSRT cafs topCAFMap topSRT t =
   do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs
      let t' = updInfo id (const srt) t

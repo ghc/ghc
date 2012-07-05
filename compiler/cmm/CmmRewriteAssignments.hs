@@ -18,10 +18,9 @@ module CmmRewriteAssignments
 import Cmm
 import CmmUtils
 import CmmOpt
-import OptimizationFuel
 import StgCmmUtils
 
-import Control.Monad
+import UniqSupply
 import Platform
 import UniqFM
 import Unique
@@ -29,12 +28,13 @@ import BlockId
 
 import Hoopl
 import Data.Maybe
+import Control.Monad
 import Prelude hiding (succ, zip)
 
 ----------------------------------------------------------------
 --- Main function
 
-rewriteAssignments :: Platform -> CmmGraph -> FuelUniqSM CmmGraph
+rewriteAssignments :: Platform -> CmmGraph -> UniqSM CmmGraph
 rewriteAssignments platform g = do
   -- Because we need to act on forwards and backwards information, we
   -- first perform usage analysis and bake this information into the
@@ -213,7 +213,7 @@ usageTransfer = mkBTransfer3 first middle last
           increaseUsage f r = addToUFM_C combine f r SingleUse
             where combine _ _ = ManyUse
 
-usageRewrite :: BwdRewrite FuelUniqSM (WithRegUsage CmmNode) UsageMap
+usageRewrite :: BwdRewrite UniqSM (WithRegUsage CmmNode) UsageMap
 usageRewrite = mkBRewrite3 first middle last
     where first  _ _ = return Nothing
           middle :: Monad m => WithRegUsage CmmNode O O -> UsageMap -> m (Maybe (Graph (WithRegUsage CmmNode) O O))
@@ -226,7 +226,7 @@ usageRewrite = mkBRewrite3 first middle last
           last   _ _ = return Nothing
 
 type CmmGraphWithRegUsage = GenCmmGraph (WithRegUsage CmmNode)
-annotateUsage :: CmmGraph -> FuelUniqSM (CmmGraphWithRegUsage)
+annotateUsage :: CmmGraph -> UniqSM (CmmGraphWithRegUsage)
 annotateUsage vanilla_g =
     let g = modifyGraph liftRegUsage vanilla_g
     in liftM fst $ dataflowPassBwd g [(g_entry g, fact_bot usageLattice)] $
@@ -524,7 +524,7 @@ assignmentTransfer = mkFTransfer3 (flip const) middleAssignment ((mkFactBase ass
 -- values from the assignment map, due to reassignment of the local
 -- register.)  This is probably not locally sound.
 
-assignmentRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) AssignmentMap
+assignmentRewrite :: FwdRewrite UniqSM (WithRegUsage CmmNode) AssignmentMap
 assignmentRewrite = mkFRewrite3 first middle last
     where
         first _ _ = return Nothing
@@ -605,7 +605,7 @@ assignmentRewrite = mkFRewrite3 first middle last
 -- in literals, which we can inline more aggressively, and inlining
 -- gives us opportunities for more folding.  However, we don't need any
 -- facts to do MachOp folding.
-machOpFoldRewrite :: Platform -> FwdRewrite FuelUniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite :: Platform -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
 machOpFoldRewrite platform = mkFRewrite3 first middle last
   where first _ _ = return Nothing
         middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O

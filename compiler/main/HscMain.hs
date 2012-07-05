@@ -125,7 +125,6 @@ import CmmParse         ( parseCmmFile )
 import CmmBuildInfoTables
 import CmmPipeline
 import CmmInfo
-import OptimizationFuel ( initOptFuelState )
 import CmmCvt
 import CodeOutput
 import NameEnv          ( emptyNameEnv )
@@ -175,7 +174,6 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyUFM
     mlc_var <- newIORef emptyModuleEnv
-    optFuel <- initOptFuelState
     return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
                      hsc_mod_graph    = [],
@@ -185,7 +183,6 @@ newHscEnv dflags = do
                      hsc_NC           = nc_var,
                      hsc_FC           = fc_var,
                      hsc_MLC          = mlc_var,
-                     hsc_OptFuel      = optFuel,
                      hsc_type_env_var = Nothing }
 
 

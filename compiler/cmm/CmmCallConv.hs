@@ -53,7 +53,6 @@ assignArgumentsPos conv arg_ty reps = assignments
                ([_], PrimOpReturn)     -> allRegs
                (_,   PrimOpReturn)     -> getRegsWithNode
                (_,   Slow)             -> noRegs
-               _ -> pprPanic "Unknown calling convention" (ppr conv)
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
       -- (even if there are still available registers for args of a different type).

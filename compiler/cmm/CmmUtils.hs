@@ -80,7 +80,6 @@ import Cmm
 import BlockId
 import CLabel
 import Outputable
-import OptimizationFuel as F
 import Unique
 import UniqSupply
 import Constants( wORD_SIZE, tAG_MASK )
@@ -89,7 +88,6 @@ import Util
 import Data.Word
 import Data.Maybe
 import Data.Bits
-import Control.Monad
 import Hoopl
 
 ---------------------------------------------------
@@ -431,10 +429,10 @@ mapGraphNodes :: ( CmmNode C O -> CmmNode C O
                  , CmmNode O C -> CmmNode O C)
               -> CmmGraph -> CmmGraph
 mapGraphNodes funs@(mf,_,_) g =
-  ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (blockMapNodes3 funs) $ toBlockMap g
+  ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (mapBlock3' funs) $ toBlockMap g
 
 mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGraph
-mapGraphNodes1 f g = modifyGraph (graphMapBlocks (blockMapNodes f)) g
+mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 
 foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
@@ -447,21 +445,21 @@ postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g
 -- Running dataflow analysis and/or rewrites
 
 -- Constructing forward and backward analysis-only pass
-analFwd    :: DataflowLattice f -> FwdTransfer n f -> FwdPass FuelUniqSM n f
-analBwd    :: DataflowLattice f -> BwdTransfer n f -> BwdPass FuelUniqSM n f
+analFwd    :: DataflowLattice f -> FwdTransfer n f -> FwdPass UniqSM n f
+analBwd    :: DataflowLattice f -> BwdTransfer n f -> BwdPass UniqSM n f
 
 analFwd lat xfer = analRewFwd lat xfer noFwdRewrite
 analBwd lat xfer = analRewBwd lat xfer noBwdRewrite
 
 -- Constructing forward and backward analysis + rewrite pass
 analRewFwd :: DataflowLattice f -> FwdTransfer n f
-           -> FwdRewrite FuelUniqSM n f
-           -> FwdPass FuelUniqSM n f
+           -> FwdRewrite UniqSM n f
+           -> FwdPass UniqSM n f
 
 analRewBwd :: DataflowLattice f
            -> BwdTransfer n f
-           -> BwdRewrite FuelUniqSM n f
-           -> BwdPass FuelUniqSM n f
+           -> BwdRewrite UniqSM n f
+           -> BwdPass UniqSM n f
 
 analRewFwd lat xfer rew = FwdPass {fp_lattice = lat, fp_transfer = xfer, fp_rewrite = rew}
 analRewBwd lat xfer rew = BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewrite = rew}
@@ -469,23 +467,23 @@ analRewBwd lat xfer rew = BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewr
 -- Running forward and backward dataflow analysis + optional rewrite
 dataflowPassFwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
-                -> FwdPass FuelUniqSM n f
-                -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+                -> FwdPass UniqSM n f
+                -> UniqSM (GenCmmGraph n, BlockEnv f)
 dataflowPassFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
   (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
   return (CmmGraph {g_entry=entry, g_graph=graph}, facts)
 
 dataflowAnalFwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
-                -> FwdPass FuelUniqSM n f
+                -> FwdPass UniqSM n f
                 -> BlockEnv f
 dataflowAnalFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd =
   analyzeFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
 
 dataflowAnalFwdBlocks :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
-                -> FwdPass FuelUniqSM n f
-                -> FuelUniqSM (BlockEnv f)
+                -> FwdPass UniqSM n f
+                -> UniqSM (BlockEnv f)
 dataflowAnalFwdBlocks (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
 --  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
 --  return facts
@@ -493,15 +491,15 @@ dataflowAnalFwdBlocks (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
 
 dataflowAnalBwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
-                -> BwdPass FuelUniqSM n f
+                -> BwdPass UniqSM n f
                 -> BlockEnv f
 dataflowAnalBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd =
   analyzeBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
 
 dataflowPassBwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
-                -> BwdPass FuelUniqSM n f
-                -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+                -> BwdPass UniqSM n f
+                -> UniqSM (GenCmmGraph n, BlockEnv f)
 dataflowPassBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd = do
   (graph, facts, NothingO) <- analyzeAndRewriteBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
   return (CmmGraph {g_entry=entry, g_graph=graph}, facts)

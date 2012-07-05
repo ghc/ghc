@@ -572,7 +572,7 @@ cgAltRhss gc_plan retry_lbl bndr alts
 	   ; return con }
 
 maybeAltHeapCheck :: GcPlan -> Maybe BlockId -> FCode a -> FCode a
-maybeAltHeapCheck NoGcInAlts      mlbl code = code
+maybeAltHeapCheck NoGcInAlts      _    code = code
 maybeAltHeapCheck (GcInAlts regs) mlbl code =
   case mlbl of
      Nothing -> altHeapCheck regs code

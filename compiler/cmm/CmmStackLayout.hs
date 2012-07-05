@@ -35,7 +35,6 @@ import CmmProcPoint
 import Maybes
 import MkGraph (stackStubExpr)
 import Control.Monad
-import OptimizationFuel
 import Outputable
 import SMRep (ByteOff)
 
