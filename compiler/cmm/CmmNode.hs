@@ -206,10 +206,6 @@ instance NonLocal CmmNode where
   successors (CmmForeignCall {succ=l}) = [l]
 
 
-instance HooplNode CmmNode where
-  mkBranchNode label = CmmBranch label
-  mkLabelNode label  = CmmEntry label
-
 --------------------------------------------------
 -- Various helper types
 
