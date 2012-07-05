@@ -54,7 +54,7 @@ traceSC _ = id
 
 
 rnBndr2' :: RnEnv2 -> Var -> Var -> MSG (RnEnv2, Var)
-rnBndr2' rn2 x_l x_r = MSG $ \_ s -> Right (s, rnBndr2'' (uniqAway (msgInScopeSet s)) rn2 x_l x_r)
+rnBndr2' rn2 x_l x_r = MSG $ \_ s -> Right (s, rnBndr2'' (msgInScopeSet s) rn2 x_l x_r)
   -- The uniqAway is 1/2 of the story to ensure we don't get clashes between new rigid binders and the new common heap binders
   --
   -- (We don't want to inadvertently have {x} in both InScopeSets and an occurrence (\y -> x) where RnEnv2 makes y rename to x by pure chance.
@@ -64,13 +64,12 @@ rnBndr2' rn2 x_l x_r = MSG $ \_ s -> Right (s, rnBndr2'' (uniqAway (msgInScopeSe
 -- FIXME: rigid variable occurrences do not get correct type/info.
 -- This probably dosent' matter for internal binders since the supercompiler's normal renaming mechanism
 -- will propagate binding-site info down to the use sites, but it matters a TON for the stack binders!
-rnBndr2'' :: (Var -> Var)
-          -> RnEnv2 -> Var -> Var -> (RnEnv2, Var)
-rnBndr2'' f rn2 x_l x_r = (rn2', x')
+rnBndr2'' :: InScopeSet -> RnEnv2 -> Var -> Var -> (RnEnv2, Var)
+rnBndr2'' extra_iss rn2 x_l x_r = (rn2', x')
   where rn2' = rn2 { envL     = extendVarEnv (envL rn2) x_l x'
                    , envR     = extendVarEnv (envR rn2) x_r x'
                    , in_scope = extendInScopeSet (in_scope rn2) x' }
-        x' = f (uniqAway (in_scope rn2) x_r)
+        x' = uniqAway (extra_iss `unionInScope` in_scope rn2) x_r
 
 
 {-
@@ -159,14 +158,14 @@ msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
 msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
     Right x                       -> Right (s0, x)
     Left (mb_eq, binderise, mk_s) -> res
-      where -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
-            x1 = uniqAway (rnInScopeSet rn2) x0
-            -- The use of s here is necessary to ensure we only allocate a given common var once
-            x2 | Just eq <- mb_eq
-               , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
-               = eq
-               | otherwise
-               = uniqAway (msgInScopeSet s0) x1
+      where -- The use of s here is necessary to ensure we only allocate a given common var once
+            extra_iss | Just eq <- mb_eq
+                      , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
+                      = emptyInScopeSet
+                      | otherwise
+                      = msgInScopeSet s0
+            -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
+            x1 = uniqAway (rnInScopeSet rn2 `unionInScope` extra_iss) x0
             -- We *don't* need to uniqAway with the set of common variables (in e) because the msgInScopeSet
             -- was initialized to contain them all.
 
@@ -174,9 +173,9 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
             -- in the state even as we are binderising it. This is important since the variable's IdInfo might mention itself,
             -- as x_l and x_r will in fact be bound by the top-level letrec.
             s1 = mk_s x
-            s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x2, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
+            s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x1, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
                       msgPending = (x, pending) : msgPending s1 }
-            res = unMSG (binderise x2) (e { msgLostWorkSharing = False }) s2 -- This thing will be bound in the top letrec, outside any lambdas
+            res = unMSG (binderise x1) (e { msgLostWorkSharing = False }) s2 -- This thing will be bound in the top letrec, outside any lambdas
             Right (_, x) = res
   where
     lookupUpdatePending :: MSGState
@@ -947,7 +946,7 @@ msgECFrame commons init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r))
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2,  \rn2 -> msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r)
     go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2,  \rn2 -> liftM CastIt $ msgCoercion rn2 co_l' co_r')
     go (Update x_l')                         (Update x_r')                         = return (init_rn2', \rn2 -> liftM Update $ msgIdCoVarBndrExtras rn2 x' x_l' x_r')
-      where (init_rn2', x') = rnBndr2'' (if x_l' == x_r' && x_r' `elemInScopeSet` commons then const x_r' else uniqAway commons) init_rn2 x_l' x_r'
+      where (init_rn2', x') = rnBndr2'' (if x_l' == x_r' && x_r' `elemInScopeSet` commons then emptyInScopeSet else commons) init_rn2 x_l' x_r'
     go _ _ = Left "msgECFrame"
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
