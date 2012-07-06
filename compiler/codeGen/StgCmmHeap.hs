@@ -45,6 +45,8 @@ import FastString( mkFastString, fsLit )
 import Constants
 import Util
 
+import Control.Monad (when)
+
 -----------------------------------------------------------
 --              Initialise dynamic heap objects
 -----------------------------------------------------------
@@ -491,20 +493,15 @@ do_checks :: Bool       -- Should we check the stack?
           -> FCode ()
 do_checks checkStack alloc do_gc = do
   gc_id <- newLabelC
-  hp_check <- if alloc == 0
-                 then return mkNop
-                 else do
-                   ifthen <- mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
-                   return (mkAssign hpReg bump_hp <*> ifthen)
 
-  if checkStack
-     then emit =<< mkCmmIfThenElse sp_oflo (mkBranch gc_id) hp_check
-     else emit hp_check
+  when checkStack $
+     emit =<< mkCmmIfGoto sp_oflo gc_id
 
-  emit $ mkComment (mkFastString "outOfLine should follow:")
+  when (alloc /= 0) $ do
+     emitAssign hpReg bump_hp
+     emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
 
   emitOutOfLine gc_id $
-     mkComment (mkFastString "outOfLine here") <*>
      do_gc -- this is expected to jump back somewhere
 
                 -- Test for stack pointer exhaustion, then

@@ -29,7 +29,8 @@ module StgCmmMonad (
 	getCmm, cgStmtsToBlocks,
 	getCodeR, getCode, getHeapUsage,
 
-        mkCmmIfThenElse, mkCmmIfThen, mkCall, mkCmmCall, mkSafeCall,
+        mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
+        mkCall, mkCmmCall, mkSafeCall,
 
         forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
 
@@ -675,6 +676,11 @@ mkCmmIfThenElse e tbranch fbranch = do
   return $ mkCbranch e tid fid <*>
             mkLabel tid <*> tbranch <*> mkBranch endif <*>
             mkLabel fid <*> fbranch <*> mkLabel endif
+
+mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
+mkCmmIfGoto e tid = do
+  endif <- newLabelC
+  return $ mkCbranch e tid endif <*> mkLabel endif
 
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
 mkCmmIfThen e tbranch = do
