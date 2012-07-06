@@ -118,7 +118,6 @@ import Platform
 import Data.Maybe
 import Data.List
 import Control.Monad
-import Debug.Trace
 
 #include "../includes/stg/MachRegs.h"
 
