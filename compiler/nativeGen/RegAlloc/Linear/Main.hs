@@ -385,7 +385,7 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
         Just (src,dst)  | src `elementOfUniqSet` (liveDieRead live),
                           isVirtualReg dst,
                           not (dst `elemUFM` assig),
-                          Just (InReg _) <- (lookupUFM assig src) -> do
+                          isRealReg src || isInReg src assig -> do
            case src of
               (RegReal rr) -> setAssigR (addToUFM assig dst (InReg rr))
                 -- if src is a fixed reg, then we just map dest to this
@@ -412,6 +412,11 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
 
 raInsn _ _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)
+
+
+isInReg :: Reg -> RegMap Loc -> Bool
+isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
+                  | otherwise = False
 
 
 genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
