@@ -173,8 +173,8 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
 
     block (BMiddle n)     f = node n f
     block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BHead h n)     f = (block h  `cat` node n) f
-    block (BTail n t)     f = (node  n  `cat` block t) f
+    block (BSnoc h n)     f = (block h  `cat` node n) f
+    block (BCons n t)     f = (node  n  `cat` block t) f
 
     {-# INLINE node #-}
     node :: forall e x . (ShapeLifter e x)
@@ -272,8 +272,8 @@ analyzeFwd FwdPass { fp_lattice = lattice,
 
     block (BMiddle n)     f = mtr n f
     block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BHead h n)     f = (block h  `cat` mtr n) f
-    block (BTail n t)     f = (mtr  n   `cat` block t) f
+    block (BSnoc h n)     f = (block h  `cat` mtr n) f
+    block (BCons n t)     f = (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
     cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
@@ -357,8 +357,8 @@ analyzeBwd BwdPass { bp_lattice = lattice,
 
     block (BMiddle n)     f = mtr n f
     block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BHead h n)     f = (block h  `cat` mtr n) f
-    block (BTail n t)     f = (mtr  n   `cat` block t) f
+    block (BSnoc h n)     f = (block h  `cat` mtr n) f
+    block (BCons n t)     f = (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
     cat :: forall f1 f2 f3 . (f2 -> f3) -> (f1 -> f2) -> (f1 -> f3)
@@ -439,8 +439,8 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
 
     block (BMiddle n)     f = node n f
     block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BHead h n)     f = (block h  `cat` node n) f
-    block (BTail n t)     f = (node  n  `cat` block t) f
+    block (BSnoc h n)     f = (block h  `cat` node n) f
+    block (BCons n t)     f = (node  n  `cat` block t) f
 
     {-# INLINE node #-}
     node n f
