@@ -15,7 +15,7 @@ import Outputable
 import Unique
 
 import Compiler.Hoopl as Hoopl hiding (Unique)
-import Compiler.Hoopl.Internals (uniqueToLbl)
+import Compiler.Hoopl.Internals (uniqueToLbl, lblToUnique)
 
 ----------------------------------------------------------------
 --- Block Ids, their environments, and their sets
@@ -30,6 +30,12 @@ compilation unit in which it appears.
 -}
 
 type BlockId = Hoopl.Label
+
+instance Uniquable BlockId where
+  getUnique label = getUnique (lblToUnique label)
+
+instance Outputable BlockId where
+  ppr label = ppr (getUnique label)
 
 mkBlockId :: Unique -> BlockId
 mkBlockId unique = uniqueToLbl $ intToUnique $ getKey unique
