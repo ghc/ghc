@@ -118,6 +118,7 @@ import Platform
 import Data.Maybe
 import Data.List
 import Control.Monad
+import Debug.Trace
 
 #include "../includes/stg/MachRegs.h"
 
@@ -293,7 +294,7 @@ processBlock
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
 processBlock platform block_live (BasicBlock id instrs)
- = do   initBlock id
+ = do   initBlock id block_live
         (instrs', fixups)
                 <- linearRA platform block_live [] [] id instrs
         return  $ BasicBlock id instrs' : fixups
@@ -301,16 +302,22 @@ processBlock platform block_live (BasicBlock id instrs)
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
-initBlock :: FR freeRegs => BlockId -> RegM freeRegs ()
-initBlock id
+initBlock :: FR freeRegs => BlockId -> BlockMap RegSet -> RegM freeRegs ()
+initBlock id block_live
  = do   block_assig     <- getBlockAssigR
         case mapLookup id block_assig of
-                -- no prior info about this block: assume everything is
-                -- free and the assignment is empty.
+                -- no prior info about this block: we must consider
+                -- any fixed regs to be allocated, but we can ignore
+                -- virtual regs (presumably this is part of a loop,
+                -- and we'll iterate again).  The assignment begins
+                -- empty.
                 Nothing
                  -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-
-                        setFreeRegsR    frInitFreeRegs
+                        case mapLookup id block_live of
+                          Nothing ->
+                            setFreeRegsR    frInitFreeRegs
+                          Just live ->
+                            setFreeRegsR $ foldr frAllocateReg frInitFreeRegs [ r | RegReal r <- uniqSetToList live ]
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
@@ -446,7 +453,7 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
     -- debugging
 {-    freeregs <- getFreeRegsR
     assig    <- getAssigR
-    pprTrace "genRaInsn"
+    pprDebugAndThen (defaultDynFlags Settings{ sTargetPlatform=platform }) trace "genRaInsn"
         (ppr instr
                 $$ text "r_dying      = " <+> ppr r_dying
                 $$ text "w_dying      = " <+> ppr w_dying

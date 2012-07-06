@@ -287,7 +287,7 @@ data Instr
         --  | POPA
 
         -- Jumping around.
-        | JMP         Operand
+        | JMP         Operand [Reg] -- including live Regs at the call
         | JXX         Cond BlockId  -- includes unconditional branches
         | JXX_GBL     Cond Imm      -- non-local version of JXX
         -- Table jump
@@ -357,7 +357,7 @@ x86_regUsageOfInstr instr
     SETCC  _ op         -> mkRU [] (def_W op)
     JXX    _ _          -> mkRU [] []
     JXX_GBL _ _         -> mkRU [] []
-    JMP     op          -> mkRUR (use_R op [])
+    JMP     op regs     -> mkRUR (use_R op regs)
     JMP_TBL op _ _ _    -> mkRUR (use_R op [])
     CALL (Left _)  params   -> mkRU params callClobberedRegs
     CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
@@ -492,7 +492,7 @@ x86_patchRegsOfInstr instr env
     PUSH sz op          -> patch1 (PUSH sz) op
     POP  sz op          -> patch1 (POP  sz) op
     SETCC cond op       -> patch1 (SETCC cond) op
-    JMP op              -> patch1 JMP op
+    JMP op regs         -> JMP (patchOp op) regs
     JMP_TBL op ids s lbl-> JMP_TBL (patchOp op) ids s lbl
 
     GMOV src dst        -> GMOV (env src) (env dst)
@@ -759,7 +759,7 @@ i386_insert_ffrees blocks
      = BasicBlock id (foldr p [] insns)
      where p insn r = case insn of
                         CALL _ _ -> GFREE : insn : r
-                        JMP _    -> GFREE : insn : r
+                        JMP _ _  -> GFREE : insn : r
                         JXX_GBL _ _ -> panic "i386_insert_ffrees: cannot handle JXX_GBL"
                         _        -> insn : r
 
@@ -800,9 +800,9 @@ getJumpDestBlockId (DestBlockId bid) = Just bid
 getJumpDestBlockId _                 = Nothing
 
 canShortcut :: Instr -> Maybe JumpDest
-canShortcut (JXX ALWAYS id)    = Just (DestBlockId id)
-canShortcut (JMP (OpImm imm))  = Just (DestImm imm)
-canShortcut _                  = Nothing
+canShortcut (JXX ALWAYS id)      = Just (DestBlockId id)
+canShortcut (JMP (OpImm imm) _)  = Just (DestImm imm)
+canShortcut _                    = Nothing
 
 
 -- This helper shortcuts a sequence of branches.
