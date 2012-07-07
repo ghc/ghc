@@ -646,6 +646,11 @@ allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
 allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
 callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
 
+instrClobberedRegs :: [RealReg]
+instrClobberedRegs = panic "X86.Regs.instrClobberedRegs: not defined for this arch"
+
+allHaskellArgRegs :: [Reg]
+allHaskellArgRegs = panic "X86.Regs.allHaskellArgRegs: not defined for this arch"
 
 #endif
 
