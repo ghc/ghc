@@ -943,6 +943,9 @@ data InteractiveContext
              -- ^ The function that is used for printing results
              -- of expressions in ghci and -e mode.
 
+         ic_default :: Maybe [Type],
+             -- ^ The current default types, set by a 'default' declaration
+
 #ifdef GHCI
           ic_resume :: [Resume],
              -- ^ The stack of breakpoint contexts
@@ -987,6 +990,7 @@ emptyInteractiveContext dflags
                          ic_fix_env    = emptyNameEnv,
                          -- System.IO.print by default
                          ic_int_print  = printName,
+                         ic_default    = Nothing,
 #ifdef GHCI
                          ic_resume     = [],
 #endif

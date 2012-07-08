@@ -794,7 +794,7 @@ enqueueCommands cmds = do
 -- rather than a stmt.
 declPrefixes :: [String]
 declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving ",
-                "foreign "]
+                "foreign ", "default ", "default("]
 
 -- | Entry point to execute some haskell code from user
 runStmt :: String -> SingleStep -> GHCi Bool
