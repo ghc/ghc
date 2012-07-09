@@ -1,8 +1,11 @@
 -- !!! Testing the Prelude's Enum instances.
+{-# LANGUAGE CPP #-}
 module Main(main) where
 
 import Control.Exception
+#if __GLASGOW_HASKELL__ < 705
 import Prelude hiding (catch)
+#endif
 import Data.Char
 import Data.Ratio
 
