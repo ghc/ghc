@@ -149,10 +149,10 @@ cgTopRhs :: Id -> StgRhs -> FCode CgIdInfo
 cgTopRhs bndr (StgRhsCon _cc con args)
   = forkStatics (cgTopRhsCon bndr con args)
 
-cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
+cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag _srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
     setSRTLabel (mkSRTLabel (idName bndr) (idCafInfo bndr)) $
-    forkStatics (cgTopRhsClosure bndr cc bi upd_flag srt args body)
+    forkStatics (cgTopRhsClosure bndr cc bi upd_flag args body)
 
 
 ---------------------------------------------------------------
