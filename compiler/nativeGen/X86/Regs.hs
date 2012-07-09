@@ -471,6 +471,11 @@ callClobberedRegs       :: [Reg]
 freeReg esp = fastBool False  --        %esp is the C stack pointer
 #endif
 
+#if i386_TARGET_ARCH
+freeReg esi = fastBool False -- Note [esi/edi not allocatable]
+freeReg edi = fastBool False
+#endif
+
 #if x86_64_TARGET_ARCH
 freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 #endif
@@ -662,4 +667,16 @@ allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
      in  map RealRegSingle $ filter isFree allMachRegNos
 
+{-
+Note [esi/edi not allocatable]
 
+%esi is mapped to R1, so %esi would normally be allocatable while it
+is not being used for R1.  However, %esi has no 8-bit version on x86,
+and the linear register allocator is not sophisticated enough to
+handle this irregularity (we need more RegClasses).  The
+graph-colouring allocator also cannot handle this - it was designed
+with more flexibility in mind, but the current implementation is
+restricted to the same set of classes as the linear allocator.
+
+Hence, on x86 esi and edi are treated as not allocatable.
+-}
