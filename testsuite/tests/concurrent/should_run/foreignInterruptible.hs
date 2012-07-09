@@ -1,10 +1,11 @@
-{-# LANGUAGE ForeignFunctionInterface,InterruptibleFFI #-}
-{-# OPTIONS -cpp #-}
+{-# LANGUAGE CPP,ForeignFunctionInterface,InterruptibleFFI #-}
 module Main where
 
 import Control.Concurrent
 import Control.Exception
+#if __GLASGOW_HASKELL__ < 705
 import Prelude hiding (catch)
+#endif
 import Foreign
 import System.IO
 
