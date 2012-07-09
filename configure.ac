@@ -447,11 +447,16 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
-dnl ** Which objdump to use?
-dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([OBJDUMP], [objdump], [objdump])
-ObjdumpCmd="$OBJDUMP"
-AC_SUBST([ObjdumpCmd])
+# Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
+case $HostOS_CPP in
+cygwin32|mingw32)
+    dnl ** Which objdump to use?
+    dnl --------------------------------------------------------------
+    FP_ARG_WITH_PATH_GNU_PROG([OBJDUMP], [objdump], [objdump])
+    ObjdumpCmd="$OBJDUMP"
+    AC_SUBST([ObjdumpCmd])
+    ;;
+esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
