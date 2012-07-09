@@ -177,7 +177,7 @@ replaceLabels env g
      txnode (CmmBranch bid)         = CmmBranch (lookup bid)
      txnode (CmmCondBranch p t f)   = mkCmmCondBranch (exp p) (lookup t) (lookup f)
      txnode (CmmSwitch e arms)      = CmmSwitch (exp e) (map (liftM lookup) arms)
-     txnode (CmmCall t k a res r)   = CmmCall (exp t) (liftM lookup k) a res r
+     txnode (CmmCall t k rg a res r) = CmmCall (exp t) (liftM lookup k) rg a res r
      txnode fc@CmmForeignCall{}     = fc{ args = map exp (args fc)
                                         , succ = lookup (succ fc) }
      txnode other                   = mapExpDeep exp other

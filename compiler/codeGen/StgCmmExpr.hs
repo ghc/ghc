@@ -632,17 +632,15 @@ cgTailCall fun_id fun_info args = do
       	-- A direct function call (possibly with some left-over arguments)
       	DirectEntry lbl arity -> do
 		{ tickyDirectCall arity args
- 		; if node_points then
-                    do emitComment $ mkFastString "directEntry"
-                       emitAssign nodeReg fun
-                       directCall lbl arity args
-                  else do emitComment $ mkFastString "directEntry else"
-                          directCall lbl arity args }
+                ; if node_points
+                     then directCall NativeNodeCall   lbl arity (fun_arg:args)
+                     else directCall NativeDirectCall lbl arity args }
 
 	JumpToIt {} -> panic "cgTailCall"	-- ???
 
   where
-    fun_name 	= idName            fun_id
+    fun_arg     = StgVarArg fun_id
+    fun_name    = idName            fun_id
     fun         = idInfoToAmode     fun_info
     lf_info     = cgIdInfoLF        fun_info
     node_points = nodeMustPointToIt lf_info
@@ -693,13 +691,13 @@ emitEnter fun = do
        ; lcall <- newLabelC
        ; let area = Young lret
        ; let (off, copyin) = copyInOflow NativeReturn area res_regs
-             (outArgs, copyout) = copyOutOflow NativeNodeCall Call area
+             (outArgs, regs, copyout) = copyOutOflow NativeNodeCall Call area
                                           [fun] updfr_off (0,[])
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
        ; let entry = entryCode (closureInfoPtr (CmmReg nodeReg))
-             the_call = toCall entry (Just lret) updfr_off off outArgs
+             the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; emit $
            copyout <*>
            mkCbranch (cmmIsTagged (CmmReg nodeReg)) lret lcall <*>

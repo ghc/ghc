@@ -438,7 +438,7 @@ overlaps (_, o, w) (_, o', w') =
     in (s' < o) && (s < o) -- Not LTE, because [ I32  ][ I32  ] is OK
 
 lastAssignment :: WithRegUsage CmmNode O C -> AssignmentMap -> [(Label, AssignmentMap)]
-lastAssignment (Plain (CmmCall _ (Just k) _ _ _)) assign = [(k, invalidateVolatile k assign)]
+lastAssignment (Plain (CmmCall _ (Just k) _ _ _ _)) assign = [(k, invalidateVolatile k assign)]
 lastAssignment (Plain (CmmForeignCall {succ=k}))  assign = [(k, invalidateVolatile k assign)]
 lastAssignment l assign = map (\id -> (id, deleteSinks l assign)) $ successors l
 

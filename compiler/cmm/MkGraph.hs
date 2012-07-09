@@ -294,7 +294,7 @@ data Transfer = Call | Jump | Ret deriving Eq
 copyOutOflow :: Convention -> Transfer -> Area -> [CmmActual]
              -> UpdFrameOffset
              -> (ByteOff, [(CmmExpr,ByteOff)]) -- extra stack stuff
-             -> (Int, CmmAGraph)
+             -> (Int, [GlobalReg], CmmAGraph)
 
 -- Generate code to move the actual parameters into the locations
 -- required by the calling convention.  This includes a store for the
@@ -307,10 +307,12 @@ copyOutOflow :: Convention -> Transfer -> Area -> [CmmActual]
 -- of the other parameters.
 copyOutOflow conv transfer area actuals updfr_off
   (extra_stack_off, extra_stack_stuff)
-  = foldr co (init_offset, mkNop) (args' ++ stack_params)
+  = foldr co (init_offset, [], mkNop) (args' ++ stack_params)
   where 
-    co (v, RegisterParam r) (n, ms) = (n, mkAssign (CmmGlobal r) v <*> ms)
-    co (v, StackParam off)  (n, ms) = (max n off, mkStore (CmmStackSlot area off) v <*> ms)
+    co (v, RegisterParam r) (n, rs, ms)
+       = (n, r:rs, mkAssign (CmmGlobal r) v <*> ms)
+    co (v, StackParam off)  (n, rs, ms)
+       = (max n off, rs, mkStore (CmmStackSlot area off) v <*> ms)
 
     stack_params = [ (e, StackParam (off + init_offset))
                    | (e,off) <- extra_stack_stuff ]
@@ -341,7 +343,7 @@ mkCallEntry conv formals = copyInOflow conv Old formals
 
 lastWithArgs :: Transfer -> Area -> Convention -> [CmmActual]
              -> UpdFrameOffset
-             -> (ByteOff -> CmmAGraph)
+             -> (ByteOff -> [GlobalReg] -> CmmAGraph)
              -> CmmAGraph
 lastWithArgs transfer area conv actuals updfr_off last =
   lastWithArgsAndExtraStack transfer area conv actuals
@@ -349,18 +351,21 @@ lastWithArgs transfer area conv actuals updfr_off last =
 
 lastWithArgsAndExtraStack :: Transfer -> Area -> Convention -> [CmmActual]
              -> UpdFrameOffset -> (ByteOff, [(CmmExpr,ByteOff)])
-             -> (ByteOff -> CmmAGraph)
+             -> (ByteOff -> [GlobalReg] -> CmmAGraph)
              -> CmmAGraph
 lastWithArgsAndExtraStack transfer area conv actuals updfr_off
                           extra_stack last =
-  let (outArgs, copies) = copyOutOflow conv transfer area actuals
-                             updfr_off extra_stack in
-  copies <*> last outArgs
+  copies <*> last outArgs regs
+ where
+  (outArgs, regs, copies) = copyOutOflow conv transfer area actuals
+                               updfr_off extra_stack
+
 
 noExtraStack :: (ByteOff, [(CmmExpr,ByteOff)])
 noExtraStack = (0,[])
 
-toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff -> ByteOff
+toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff
+       -> ByteOff -> [GlobalReg]
        -> CmmAGraph
-toCall e cont updfr_off res_space arg_space =
-  mkLast $ CmmCall e cont arg_space res_space updfr_off
+toCall e cont updfr_off res_space arg_space regs =
+  mkLast $ CmmCall e cont regs arg_space res_space updfr_off

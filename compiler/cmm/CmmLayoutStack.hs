@@ -894,15 +894,16 @@ lowerSafeForeignCall block
         --       so we use a jump, not a branch.
         succLbl = CmmLit (CmmLabel (infoTblLbl succ))
 
-        (ret_args, copyout) = copyOutOflow NativeReturn Jump (Young succ)
+        (ret_args, regs, copyout) = copyOutOflow NativeReturn Jump (Young succ)
                                            (map (CmmReg . CmmLocal) res)
                                            updfr (0, [])
 
-        jump = CmmCall { cml_target   = succLbl
-                       , cml_cont     = Just succ
-                       , cml_args     = widthInBytes wordWidth
-                       , cml_ret_args = ret_args
-                       , cml_ret_off  = updfr }
+        jump = CmmCall { cml_target    = succLbl
+                       , cml_cont      = Just succ
+                       , cml_args_regs = regs
+                       , cml_args      = widthInBytes wordWidth
+                       , cml_ret_args  = ret_args
+                       , cml_ret_off   = updfr }
 
     graph' <- lgraphOfAGraph $ suspend <*>
                                midCall <*>

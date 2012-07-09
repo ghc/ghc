@@ -165,14 +165,14 @@ adjustHpBackwards
 --          call f() return to Nothing updfr_off: 32
 
 
-directCall :: CLabel -> RepArity -> [StgArg] -> FCode ()
+directCall :: Convention -> CLabel -> RepArity -> [StgArg] -> FCode ()
 -- (directCall f n args)
 -- calls f(arg1, ..., argn), and applies the result to the remaining args
 -- The function f has arity n, and there are guaranteed at least n args
 -- Both arity and args include void args
-directCall lbl arity stg_args 
+directCall conv lbl arity stg_args
   = do  { argreps <- getArgRepsAmodes stg_args
-        ; direct_call "directCall" lbl arity argreps }
+        ; direct_call "directCall" conv lbl arity argreps }
 
 
 slowCall :: CmmExpr -> [StgArg] -> FCode ()
@@ -181,19 +181,21 @@ slowCall fun stg_args
   = do  { dflags <- getDynFlags
         ; argsreps <- getArgRepsAmodes stg_args
         ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
-        ; call <- getCode $ direct_call "slow_call"
-                       (mkRtsApFastLabel rts_fun) arity argsreps
+        ; direct_call "slow_call" NativeNodeCall
+                 (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
         ; emitComment $ mkFastString ("slow_call for " ++
                                       showSDoc dflags (ppr fun) ++
                                       " with pat " ++ unpackFS rts_fun)
-        ; emit (mkAssign nodeReg fun <*> call)
         }
 
 
 --------------
-direct_call :: String -> CLabel -> RepArity -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
-direct_call caller lbl arity args
-  | debugIsOn && arity > length args  -- Too few args
+direct_call :: String
+            -> Convention     -- e.g. NativeNodeCall or NativeDirectCall
+            -> CLabel -> RepArity
+            -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
+direct_call caller call_conv lbl arity args
+  | debugIsOn && real_arity > length args  -- Too few args
   = do -- Caller should ensure that there enough args!
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>
@@ -201,15 +203,18 @@ direct_call caller lbl arity args
             ppr (map snd args) <+> ppr (map fst args)
 
   | null rest_args  -- Precisely the right number of arguments
-  = emitCall (NativeDirectCall, NativeReturn) target (nonVArgs args)
+  = emitCall (call_conv, NativeReturn) target (nonVArgs args)
 
   | otherwise       -- Note [over-saturated calls]
-  = emitCallWithExtraStack (NativeDirectCall, NativeReturn)
+  = emitCallWithExtraStack (call_conv, NativeReturn)
                            target (nonVArgs fast_args) (mkStkOffsets stack_args)
   where
     target = CmmLit (CmmLabel lbl)
-    (fast_args, rest_args) = splitAt arity args
+    (fast_args, rest_args) = splitAt real_arity args
     stack_args = slowArgs rest_args
+    real_arity = case call_conv of
+                   NativeNodeCall -> arity+1
+                   _              -> arity
 
 
 -- When constructing calls, it is easier to keep the ArgReps and the

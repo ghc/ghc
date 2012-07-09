@@ -102,7 +102,7 @@ ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
                               | otherwise -> [Old.CmmCondBranch expr tid, Old.CmmBranch fid]
                             CmmSwitch arg ids -> [Old.CmmSwitch arg ids]
                             -- ToDo: STG Live
-                            CmmCall e _ _ _ _ -> [Old.CmmJump e Nothing]
+                            CmmCall e _ r _ _ _ -> [Old.CmmJump e (Just r)]
                             CmmForeignCall {} -> panic "ofZgraph: CmmForeignCall"
                           tail_of bid = case foldBlockNodesB3 (first, middle, last) block () of
                                           Old.BasicBlock _ stmts -> stmts

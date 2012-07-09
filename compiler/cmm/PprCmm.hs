@@ -227,9 +227,9 @@ pprNode node = pp_node <+> pp_debug
                                      , ptext (sLit ": goto")
                                      , ppr (head [ id | Just id <- ids]) <> semi ]
 
-      CmmCall tgt k out res updfr_off ->
+      CmmCall tgt k regs out res updfr_off ->
           hcat [ ptext (sLit "call"), space
-               , pprFun tgt, ptext (sLit "(...)"), space
+               , pprFun tgt, parens (interpp'SP regs), space
                , ptext (sLit "returns to") <+> ppr k <+> parens (ppr out)
                                                      <+> parens (ppr res)
                , ptext (sLit " with update frame") <+> ppr updfr_off

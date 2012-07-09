@@ -245,7 +245,8 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      let add_jump_block (env, bs) (pp, l) =
            do bid <- liftM mkBlockId getUniqueM
               let b = blockJoin (CmmEntry bid) emptyBlock jump
-                  jump = CmmCall (CmmLit (CmmLabel l)) Nothing 0 0 0
+                  jump = CmmCall (CmmLit (CmmLabel l)) Nothing [{-XXX-}] 0 0 0
+                  -- XXX: No regs are live at the call
               return (mapInsert pp bid env, b : bs)
 
          add_jumps newGraphEnv (ppId, blockEnv) =
@@ -286,7 +287,8 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                -> CmmProc (TopInfo {info_tbl=CmmNonInfoTable, stack_info=stack_info})
                           lbl (replacePPIds g)
             where
-             stack_info = panic "No StackInfo"
+             stack_info = StackInfo 0 Nothing -- panic "No StackInfo"
+                          -- cannot use panic, this is printed by -ddump-cmmz
 
          -- References to procpoint IDs can now be replaced with the
          -- infotable's label

@@ -87,14 +87,14 @@ data CmmNode e x where
           -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
           -- (CmmStackSlot (Young b) _).
 
--- ToDO: add this:
---       cml_args_regs :: [GlobalReg],
--- It says which GlobalRegs are live for the parameters at the
--- moment of the call.  Later stages can use this to give liveness
--- everywhere, which in turn guides register allocation.
--- It is the companion of cml_args; cml_args says which stack words
--- hold parameters, while cml_arg_regs says which global regs hold parameters.
--- But do note [Register parameter passing]
+      cml_args_regs :: [GlobalReg],
+          -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are passed
+          -- to the call.  This is essential information for the
+          -- native code generator's register allocator; without
+          -- knowing which GlobalRegs are live it has to assume that
+          -- they are all live.  This list should only include
+          -- GlobalRegs that are mapped to real machine registers on
+          -- the target platform.
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -189,7 +189,7 @@ instance Eq (CmmNode e x) where
   (CmmBranch a)                == (CmmBranch a')                  = a==a'
   (CmmCondBranch a b c)        == (CmmCondBranch a' b' c')        = a==a' && b==b' && c==c'
   (CmmSwitch a b)              == (CmmSwitch a' b')               = a==a' && b==b'
-  (CmmCall a b c d e)          == (CmmCall a' b' c' d' e')        = a==a' && b==b' && c==c' && d==d' && e==e'
+  (CmmCall a b c d e f)          == (CmmCall a' b' c' d' e' f')   = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
   (CmmForeignCall a b c d e f) == (CmmForeignCall a' b' c' d' e' f') = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
   _                            == _                               = False
 
@@ -301,7 +301,7 @@ mapExp f   (CmmUnsafeForeignCall tgt fs as)      = CmmUnsafeForeignCall (mapFore
 mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
 mapExp f   (CmmSwitch e tbl)                     = CmmSwitch (f e) tbl
-mapExp f   (CmmCall tgt mb_id o i s)             = CmmCall (f tgt) mb_id o i s
+mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
 mapExp f   (CmmForeignCall tgt fs as succ updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ updfr intrbl
 
 mapExpDeep :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
@@ -327,7 +327,7 @@ mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap`
 mapExpM _ (CmmBranch _)             = Nothing
 mapExpM f (CmmCondBranch e ti fi)   = (\x -> CmmCondBranch x ti fi) `fmap` f e
 mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
-mapExpM f (CmmCall tgt mb_id o i s) = (\x -> CmmCall x mb_id o i s) `fmap` f tgt
+mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
