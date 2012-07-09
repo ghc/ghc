@@ -157,9 +157,13 @@ callContinuation_maybe _ = Nothing
 
 okToDuplicate :: CmmBlock -> Bool
 okToDuplicate block
-  = case blockSplit block of (_, m, _) -> isEmptyBlock m
-  -- cheap and cheerful; we might expand this in the future to
-  -- e.g. spot blocks that represent a single instruction or two
+  = case blockSplit block of
+      (_, m, CmmBranch _) -> isEmptyBlock m
+      -- cheap and cheerful; we might expand this in the future to
+      -- e.g. spot blocks that represent a single instruction or two.
+      -- Be careful: a CmmCall can be more than one instruction, it
+      -- has a CmmExpr inside it.
+      _otherwise -> False
 
 ------------------------------------------------------------------------
 -- Map over the CmmGraph, replacing each label with its mapping in the
