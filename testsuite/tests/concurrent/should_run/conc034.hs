@@ -1,10 +1,13 @@
+{-# LANGUAGE CPP #-}
 import Control.Concurrent
 import Control.Exception
 import Foreign
 
 import System.IO (hFlush,stdout)
 
+#if __GLASGOW_HASKELL__ < 705
 import Prelude hiding (catch)
+#endif
 
 -- !!! Try to get two threads into a knot depending on each other.
 

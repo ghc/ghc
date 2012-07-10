@@ -45,3 +45,14 @@ fromToInteger:
 	-grep integerToWord fromToInteger.simpl
 	-grep wordToInteger fromToInteger.simpl
 
+.PHONY: IntegerConversionRules
+IntegerConversionRules:
+	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -ddump-simpl > $@.simpl
+	-grep -q smallInteger      $@.simpl && echo "smallInteger present"
+	-grep -q doubleFromInteger $@.simpl && echo "doubleFromInteger present"
+	-grep -q int2Double        $@.simpl || echo "int2Double absent"
+	-grep -q floatFromInteger  $@.simpl && echo "floatFromInteger present"
+	-grep -q int2Float         $@.simpl || echo "int2Float absent"
+	-grep -q integerToWord     $@.simpl && echo "integerToWord present"
+	-grep -q int2Word          $@.simpl || echo "int2Word absent"
+

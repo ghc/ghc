@@ -14,3 +14,4 @@ tcfail181.hs:17:9:
     In the expression: foo
     In the expression: foo {bar = return True}
     In an equation for `wog': wog x = foo {bar = return True}
+

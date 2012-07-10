@@ -1181,3 +1181,16 @@ tests/profiling/should_run/scc003
 tests/profiling/should_run/scc004
 tests/th/TH_spliceE5_prof
 
+tests/codeGen/should_run/6146
+tests/codeGen/should_run/setByteArray
+tests/generics/GFunctor/GFunctor1
+tests/generics/GMap/GMap1
+tests/numeric/should_run/T5863
+tests/numeric/should_run/quotRem2
+tests/perf/compiler/T6048.comp.stats
+tests/profiling/should_run/profinline001
+tests/rts/5993
+tests/rts/T6006
+tests/simplCore/should_run/T5915
+tests/simplCore/should_run/T5920
+tests/simplCore/should_run/T5997

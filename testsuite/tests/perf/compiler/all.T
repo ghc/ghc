@@ -30,9 +30,10 @@ test('T1969',
                                   # hence 15% range.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
-                                                      270000000)),
+                                                      280000000)),
                                     # expected value: 215582916 (x86/Windows)
                                     #                 221667908 (x86/OS X)
+                                    #                 274932264 (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 420000000,
                                                       580000000)),
@@ -67,13 +68,10 @@ test('T3294',
                                    # expected value: 17725476 (x86/OS X)
 				   #                 14593500 (Windows)
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 26000000,
-                                                     37000000)),
-                                   # expected value: 32 478 408 (amd64/Linux)
-                                   # (but varies a lot, depending on when
-                                   # we GC relative to the peak).
-                                   # (MCB: consistently reaching ~35 375 912 for
-                                   # me lately on amd64/Darwin)
+          compiler_stats_range_field('max_bytes_used', 25753192, 15)),
+                                   # Improved with the new codegen merge,
+                                   # because we now do stg->cmm->NCG for one
+                                   # top-level binding at a time.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 650000000,
                                                       750000000)),
@@ -112,7 +110,7 @@ test('T4801',
                                                      12000000)),
       # expected value: 10290952 (windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 20835240, 15)),
+          compiler_stats_range_field('max_bytes_used', 17629176, 10)),
       # expected value: 20486256 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('max_bytes_used', 20000000,
@@ -124,9 +122,9 @@ test('T4801',
 
 test('T3064',
      [# expect_broken( 3064 ),
-      # expected value: 9 (x86/Linux 30-03-2011):
+      # expected value: 14 (x86/Linux 28-06-2012):
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 10, 14)),
+          compiler_stats_range_field('peak_megabytes_allocated', 14, 10)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),

@@ -47,3 +47,10 @@ T5423:
 
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
+
+.PHONY: T7037
+T7037:
+	$(RM) 7037.o 7037.hi 7037$(exeext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) T7037.hs -v0
+	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
+	./T7037_main
