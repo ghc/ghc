@@ -35,7 +35,7 @@ type RangeQ         = Q Range
 type StrictTypeQ    = Q StrictType
 type VarStrictTypeQ = Q VarStrictType
 type FieldExpQ      = Q FieldExp
-type InlineSpecQ    = Q InlineSpec
+type RuleBndrQ      = Q RuleBndr
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -371,24 +371,35 @@ infixRD prec nm = return (InfixD (Fixity prec InfixR) nm)
 infixND :: Int -> Name -> DecQ
 infixND prec nm = return (InfixD (Fixity prec InfixN) nm)
 
-pragInlD :: Name -> InlineSpecQ -> DecQ
-pragInlD n ispec 
-  = do
-      ispec1 <- ispec 
-      return $ PragmaD (InlineP n ispec1)
+pragInlD :: Name -> Inline -> RuleMatch -> Phases -> DecQ
+pragInlD name inline rm phases
+  = return $ PragmaD $ InlineP name inline rm phases
 
-pragSpecD :: Name -> TypeQ -> DecQ
-pragSpecD n ty
+pragSpecD :: Name -> TypeQ -> Phases -> DecQ
+pragSpecD n ty phases
   = do
       ty1    <- ty
-      return $ PragmaD (SpecialiseP n ty1 Nothing)
+      return $ PragmaD $ SpecialiseP n ty1 Nothing phases
 
-pragSpecInlD :: Name -> TypeQ -> InlineSpecQ -> DecQ
-pragSpecInlD n ty ispec 
+pragSpecInlD :: Name -> TypeQ -> Inline -> Phases -> DecQ
+pragSpecInlD n ty inline phases
   = do
       ty1    <- ty
-      ispec1 <- ispec
-      return $ PragmaD (SpecialiseP n ty1 (Just ispec1))
+      return $ PragmaD $ SpecialiseP n ty1 (Just inline) phases
+
+pragSpecInstD :: TypeQ -> DecQ
+pragSpecInstD ty
+  = do
+      ty1    <- ty
+      return $ PragmaD $ SpecialiseInstP ty1
+
+pragRuleD :: String -> [RuleBndrQ] -> ExpQ -> ExpQ -> Phases -> DecQ
+pragRuleD n bndrs lhs rhs phases
+  = do
+      bndrs1 <- sequence bndrs
+      lhs1   <- lhs
+      rhs1   <- rhs
+      return $ PragmaD $ RuleP n bndrs1 lhs1 rhs1 phases
 
 familyNoKindD :: FamFlavour -> Name -> [TyVarBndr] -> DecQ
 familyNoKindD flav tc tvs = return $ FamilyD flav tc tvs Nothing
@@ -576,17 +587,6 @@ safe = Safe
 interruptible = Interruptible
 
 -------------------------------------------------------------------------------
--- *   InlineSpec
-
-inlineSpecNoPhase :: Inline -> Bool -> InlineSpecQ
-inlineSpecNoPhase inline conlike
-  = return $ InlineSpec inline conlike Nothing
-
-inlineSpecPhase :: Inline -> Bool -> Bool -> Int -> InlineSpecQ
-inlineSpecPhase inline conlike beforeFrom phase
-  = return $ InlineSpec inline conlike (Just (beforeFrom, phase))
-
--------------------------------------------------------------------------------
 -- *   FunDep
 
 funDep :: [Name] -> [Name] -> FunDep
@@ -598,6 +598,14 @@ funDep = FunDep
 typeFam, dataFam :: FamFlavour
 typeFam = TypeFam
 dataFam = DataFam
+
+-------------------------------------------------------------------------------
+-- *   RuleBndr
+ruleVar :: Name -> RuleBndrQ
+ruleVar = return . RuleVar
+
+typedRuleVar :: Name -> TypeQ -> RuleBndrQ
+typedRuleVar n ty = ty >>= return . TypedRuleVar n
 
 --------------------------------------------------------------
 -- * Useful helper function

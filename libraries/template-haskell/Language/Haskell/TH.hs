@@ -51,7 +51,8 @@ module Language.Haskell.TH(
     -- ** Declarations
 	Dec(..), Con(..), Clause(..), 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	Inline(..), InlineSpec(..), FunDep(..), FamFlavour(..),
+	Inline(..), RuleMatch(..), Phases(..), RuleBndr(..),
+	FunDep(..), FamFlavour(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
@@ -64,7 +65,7 @@ module Language.Haskell.TH(
     -- ** Abbreviations
         InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ, MatchQ, ClauseQ,
         BodyQ, GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
-        InlineSpecQ,
+        RuleBndrQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -119,9 +120,8 @@ module Language.Haskell.TH(
     -- **** Foreign Function Interface (FFI)
     cCall, stdCall, unsafe, safe, forImpD,
     -- **** Pragmas
-    -- | Just inline supported so far
-    inlineSpecNoPhase, inlineSpecPhase,
-    pragInlD, pragSpecD,
+    ruleVar, typedRuleVar,
+    pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD,
 
 	-- * Pretty-printer
     Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType

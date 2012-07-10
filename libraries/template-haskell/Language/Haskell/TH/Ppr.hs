@@ -342,38 +342,52 @@ instance Ppr Foreign where
 
 ------------------------------
 instance Ppr Pragma where
-    ppr (InlineP n (InlineSpec inline conlike activation))
+    ppr (InlineP n inline rm phases)
        = text "{-#"
      <+> ppr inline
-     <+> (if conlike then text "CONLIKE" else empty)
-     <+> ppr_activation activation 
+     <+> ppr rm
+     <+> ppr phases
      <+> ppr n
      <+> text "#-}"
-    ppr (SpecialiseP n ty Nothing)
-       = sep [ text "{-# SPECIALISE" 
-             , ppr n <+> text "::"
-             , ppr ty
-             , text "#-}"
-             ]
-    ppr (SpecialiseP n ty (Just (InlineSpec inline _conlike activation)))
-       = sep [ text "{-# SPECIALISE" <+> 
-               ppr inline <+> ppr_activation activation
-             , ppr n <+> text "::"
-             , ppr ty
-             , text "#-}"
-             ]
-      where
-
-ppr_activation :: Maybe (Bool, Int) -> Doc
-ppr_activation (Just (beforeFrom, i))
-  = brackets $ (if beforeFrom then empty else char '~') <+> int i
-ppr_activation Nothing = empty
+    ppr (SpecialiseP n ty inline phases)
+       =   text "{-# SPECIALISE"
+       <+> maybe empty ppr inline
+       <+> ppr phases
+       <+> sep [ ppr n <+> text "::"
+               , nest 2 $ ppr ty ]
+       <+> text "#-}"
+    ppr (SpecialiseInstP inst)
+       = text "{-# SPECIALISE instance" <+> ppr inst <+> text "#-}"
+    ppr (RuleP n bndrs lhs rhs phases)
+       = sep [ text "{-# RULES" <+> pprString n <+> ppr phases
+             , nest 4 $ ppr_forall <+> ppr lhs
+             , nest 4 $ char '=' <+> ppr rhs <+> text "#-}" ]
+      where ppr_forall | null bndrs =   empty
+                       | otherwise  =   text "forall"
+                                    <+> fsep (map ppr bndrs)
+                                    <+> char '.'
 
 ------------------------------
 instance Ppr Inline where
     ppr NoInline  = text "NOINLINE"
     ppr Inline    = text "INLINE"
     ppr Inlinable = text "INLINABLE"
+
+------------------------------
+instance Ppr RuleMatch where
+    ppr ConLike = text "CONLIKE"
+    ppr FunLike = empty
+
+------------------------------
+instance Ppr Phases where
+    ppr AllPhases       = empty
+    ppr (FromPhase i)   = brackets $ int i
+    ppr (BeforePhase i) = brackets $ char '~' <> int i
+
+------------------------------
+instance Ppr RuleBndr where
+    ppr (RuleVar n)         = ppr n
+    ppr (TypedRuleVar n ty) = parens $ ppr n <+> text "::" <+> ppr ty
 
 ------------------------------
 instance Ppr Clause where

@@ -1189,8 +1189,10 @@ data Callconv = CCall | StdCall
 data Safety = Unsafe | Safe | Interruptible
         deriving( Show, Eq, Data, Typeable )
 
-data Pragma = InlineP     Name InlineSpec
-            | SpecialiseP Name Type (Maybe InlineSpec)
+data Pragma = InlineP         Name Inline RuleMatch Phases
+            | SpecialiseP     Name Type (Maybe Inline) Phases
+            | SpecialiseInstP Type
+            | RuleP           String [RuleBndr] Exp Exp Phases
         deriving( Show, Eq, Data, Typeable )
 
 data Inline = NoInline
@@ -1198,11 +1200,18 @@ data Inline = NoInline
             | Inlinable
             deriving (Show, Eq, Data, Typeable)
 
-data InlineSpec 
-  = InlineSpec Inline
-               Bool                 -- False: fun-like; True: constructor-like
-               (Maybe (Bool, Int))  -- False: before phase; True: from phase
-  deriving( Show, Eq, Data, Typeable )
+data RuleMatch = ConLike
+               | FunLike
+               deriving (Show, Eq, Data, Typeable)
+
+data Phases = AllPhases
+            | FromPhase Int
+            | BeforePhase Int
+            deriving (Show, Eq, Data, Typeable)
+
+data RuleBndr = RuleVar Name
+              | TypedRuleVar Name Type
+              deriving (Show, Eq, Data, Typeable)
 
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
