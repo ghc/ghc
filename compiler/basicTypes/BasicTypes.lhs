@@ -71,7 +71,7 @@ module BasicTypes(
         Activation(..), isActive, isActiveIn,
         isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
-        InlineSpec(..), 
+        InlineSpec(..), isEmptyInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
         neverInlinePragma, dfunInlinePragma, 
 	isDefaultInlinePragma, 
