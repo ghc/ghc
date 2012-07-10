@@ -65,6 +65,7 @@ data GHCiState = GHCiState
         progname       :: String,
         args           :: [String],
         prompt         :: String,
+        def_prompt     :: String,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
@@ -75,6 +76,8 @@ data GHCiState = GHCiState
                 -- tickarrays caches the TickArray for loaded modules,
                 -- so that we don't rebuild it each time the user sets
                 -- a breakpoint.
+        -- available ghci commands
+        ghci_commands  :: [Command],
         -- ":" at the GHCi prompt repeats the last command, so we
         -- remember is here:
         last_command   :: Maybe Command,
@@ -97,7 +100,11 @@ data GHCiState = GHCiState
              -- :load, :reload, and :add.  In between it may be modified
              -- by :module.
 
-        ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
+        ghc_e :: Bool, -- True if this is 'ghc -e' (or runghc)
+
+        -- help text to display to a user
+        short_help :: String,
+        long_help  :: String
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]

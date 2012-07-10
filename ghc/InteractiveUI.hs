@@ -9,7 +9,13 @@
 --
 -----------------------------------------------------------------------------
 
-module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
+module InteractiveUI (
+        interactiveUI,
+        GhciSettings(..),
+        defaultGhciSettings,
+        ghciCommands,
+        ghciWelcomeMsg
+    ) where
 
 #include "HsVersions.h"
 
@@ -99,6 +105,22 @@ import GHC.TopHandler ( topHandler )
 
 -----------------------------------------------------------------------------
 
+data GhciSettings = GhciSettings {
+        availableCommands :: [Command],
+        shortHelpText     :: String,
+        fullHelpText      :: String,
+        defPrompt         :: String
+    }
+
+defaultGhciSettings :: GhciSettings
+defaultGhciSettings =
+    GhciSettings {
+        availableCommands = ghciCommands,
+        shortHelpText     = defShortHelpText,
+        fullHelpText      = defFullHelpText,
+        defPrompt         = default_prompt
+    }
+
 ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": http://www.haskell.org/ghc/  :? for help"
@@ -108,8 +130,8 @@ cmdName (n,_,_) = n
 
 GLOBAL_VAR(macros_ref, [], [Command])
 
-builtin_commands :: [Command]
-builtin_commands = [
+ghciCommands :: [Command]
+ghciCommands = [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
@@ -192,11 +214,11 @@ keepGoingPaths a str
           Right args -> a args
       return False
 
-shortHelpText :: String
-shortHelpText = "use :? for help.\n"
+defShortHelpText :: String
+defShortHelpText = "use :? for help.\n"
 
-helpText :: String
-helpText =
+defFullHelpText :: String
+defFullHelpText =
   " Commands available from the prompt:\n" ++
   "\n" ++
   "   <statement>                 evaluate/run <statement>\n" ++
@@ -311,9 +333,9 @@ default_stop = ""
 default_args :: [String]
 default_args = []
 
-interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
+interactiveUI :: GhciSettings -> [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
-interactiveUI srcs maybe_exprs = do
+interactiveUI config srcs maybe_exprs = do
    -- although GHCi compiles with -prof, it is not usable: the byte-code
    -- compiler and interpreter don't work with profiling.  So we check for
    -- this up front and emit a helpful error message (#2197)
@@ -364,7 +386,8 @@ interactiveUI srcs maybe_exprs = do
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname       = default_progname,
                    GhciMonad.args = default_args,
-                   prompt         = default_prompt,
+                   prompt         = defPrompt config,
+                   def_prompt     = defPrompt config,
                    stop           = default_stop,
                    editor         = default_editor,
                    options        = [],
@@ -372,11 +395,14 @@ interactiveUI srcs maybe_exprs = do
                    break_ctr      = 0,
                    breaks         = [],
                    tickarrays     = emptyModuleEnv,
+                   ghci_commands  = availableCommands config,
                    last_command   = Nothing,
                    cmdqueue       = [],
                    remembered_ctx = [],
                    transient_ctx  = [],
-                   ghc_e          = isJust maybe_exprs
+                   ghc_e          = isJust maybe_exprs,
+                   short_help     = shortHelpText config,
+                   long_help      = fullHelpText config
                  }
 
    return ()
@@ -876,15 +902,16 @@ specialCommand ('!':str) = lift $ shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
   maybe_cmd <- lift $ lookupCommand cmd
+  htxt <- lift $ short_help `fmap` getGHCiState
   case maybe_cmd of
     GotCommand (_,f,_) -> f (dropWhile isSpace rest)
     BadCommand ->
       do liftIO $ hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n"
-                           ++ shortHelpText)
+                           ++ htxt)
          return False
     NoLastCommand ->
       do liftIO $ hPutStr stdout ("there is no last command to perform\n"
-                           ++ shortHelpText)
+                           ++ htxt)
          return False
 
 shellEscape :: String -> GHCi Bool
@@ -897,20 +924,21 @@ lookupCommand "" = do
       Just c -> return $ GotCommand c
       Nothing -> return NoLastCommand
 lookupCommand str = do
-  mc <- liftIO $ lookupCommand' str
+  mc <- lookupCommand' str
   st <- getGHCiState
   setGHCiState st{ last_command = mc }
   return $ case mc of
            Just c -> GotCommand c
            Nothing -> BadCommand
 
-lookupCommand' :: String -> IO (Maybe Command)
+lookupCommand' :: String -> GHCi (Maybe Command)
 lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
-  macros <- readIORef macros_ref
+  macros    <- liftIO $ readIORef macros_ref
+  ghci_cmds <- ghci_commands `fmap` getGHCiState
   let{ (str, cmds) = case str' of
-      ':' : rest -> (rest, builtin_commands) -- "::" selects a builtin command
-      _ -> (str', macros ++ builtin_commands) } -- otherwise prefer macros
+      ':' : rest -> (rest, ghci_cmds) -- "::" selects a builtin command
+      _ -> (str', ghci_cmds ++ macros) } -- otherwise prefer macros
   -- look for exact match first, then the first prefix match
   return $ case [ c | c <- cmds, str == cmdName c ] of
            c:_ -> Just c
@@ -967,7 +995,9 @@ withSandboxOnly cmd this = do
 -- :help
 
 help :: String -> GHCi ()
-help _ = liftIO (putStr helpText)
+help _ = do
+    txt <- long_help `fmap` getGHCiState
+    liftIO $ putStr txt
 
 -----------------------------------------------------------------------------
 -- :info
@@ -1858,7 +1888,7 @@ setCmd str
         case toArgs rest of
             Right [prog] -> setProg prog
             _ -> liftIO (hPutStrLn stderr "syntax: :set prog <progname>")
-    Right ("prompt", rest) -> setPrompt $ dropWhile isSpace rest
+    Right ("prompt", rest) -> setPrompt $ Just $ dropWhile isSpace rest
     Right ("editor", rest) -> setEditor $ dropWhile isSpace rest
     Right ("stop",   rest) -> setStop   $ dropWhile isSpace rest
     _ -> case toArgs str of
@@ -1922,7 +1952,7 @@ showDynFlags show_all dflags = do
                 ]
 
 setArgs, setOptions :: [String] -> GHCi ()
-setProg, setEditor, setStop, setPrompt :: String -> GHCi ()
+setProg, setEditor, setStop :: String -> GHCi ()
 
 setArgs args = do
   st <- getGHCiState
@@ -1953,7 +1983,12 @@ setStop cmd = do
   st <- getGHCiState
   setGHCiState st{ stop = cmd }
 
-setPrompt value = do
+setPrompt :: Maybe String -> GHCi ()
+setPrompt Nothing = do
+    st <- getGHCiState
+    setGHCiState ( st { prompt = def_prompt st } )
+
+setPrompt (Just value) = do
   st <- getGHCiState
   if null value
       then liftIO $ hPutStrLn stderr $ "syntax: :set prompt <prompt>, currently \"" ++ prompt st ++ "\""
@@ -2027,7 +2062,7 @@ unsetOptions str
          defaulters =
            [ ("args"  , setArgs default_args)
            , ("prog"  , setProg default_progname)
-           , ("prompt", setPrompt default_prompt)
+           , ("prompt", setPrompt Nothing)
            , ("editor", liftIO findEditor >>= setEditor)
            , ("stop"  , setStop default_stop)
            ]
@@ -2260,15 +2295,16 @@ ghciCompleteWord line@(left,_) = case firstWord of
     (firstWord,rest) = break isSpace $ dropWhile isSpace $ reverse left
     lookupCompletion ('!':_) = return completeFilename
     lookupCompletion c = do
-        maybe_cmd <- liftIO $ lookupCommand' c
+        maybe_cmd <- lookupCommand' c
         case maybe_cmd of
             Just (_,_,f) -> return f
             Nothing -> return completeFilename
 
 completeCmd = wrapCompleter " " $ \w -> do
   macros <- liftIO $ readIORef macros_ref
+  cmds   <- ghci_commands `fmap` getGHCiState
   let macro_names = map (':':) . map cmdName $ macros
-  let command_names = map (':':) . map cmdName $ builtin_commands
+  let command_names = map (':':) . map cmdName $ cmds
   let{ candidates = case w of
       ':' : ':' : _ -> map (':':) command_names
       _ -> nub $ macro_names ++ command_names }

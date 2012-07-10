@@ -24,7 +24,7 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
-import InteractiveUI    ( interactiveUI, ghciWelcomeMsg )
+import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 
@@ -217,16 +217,17 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> interactiveUI srcs Nothing
-       DoEval exprs           -> interactiveUI srcs $ Just $ reverse exprs
+       DoInteractive          -> ghciUI srcs Nothing
+       DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
 
   liftIO $ dumpFinalStats dflags3
 
+ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
-interactiveUI :: b -> c -> Ghc ()
-interactiveUI _ _ =
-  ghcError (CmdLineError "not built for interactive use")
+ghciUI _ _ = ghcError (CmdLineError "not built for interactive use")
+#else
+ghciUI     = interactiveUI defaultGhciSettings
 #endif
 
 -- -----------------------------------------------------------------------------
