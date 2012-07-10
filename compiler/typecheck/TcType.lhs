@@ -66,7 +66,6 @@ module TcType (
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
   isSynFamilyTyConApp,
   isPredTy, isTyVarClassPred,
-  shallowPredTypePredTree,
   
   ---------------------------------
   -- Misc type manipulators
@@ -1079,24 +1078,6 @@ pickyEqType ty1 ty2
 Deconstructors and tests on predicate types
 
 \begin{code}
--- | Like 'classifyPredType' but doesn't look through type synonyms.
--- Used to check that programs only use "simple" contexts without any
--- synonyms in them.
-shallowPredTypePredTree :: PredType -> PredTree
-shallowPredTypePredTree ev_ty
-  | TyConApp tc tys <- ev_ty
-  = case () of
-      () | Just clas <- tyConClass_maybe tc
-         -> ClassPred clas tys
-      () | tc `hasKey` eqTyConKey
-         , let [_, ty1, ty2] = tys
-         -> EqPred ty1 ty2
-      () | isTupleTyCon tc
-         -> TuplePred tys
-      _ -> IrredPred ev_ty
-  | otherwise
-  = IrredPred ev_ty
-
 isTyVarClassPred :: PredType -> Bool
 isTyVarClassPred ty = case getClassPredTys_maybe ty of
     Just (_, tys) -> all isTyVarTy tys
