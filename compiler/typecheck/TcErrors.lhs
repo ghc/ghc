@@ -79,7 +79,10 @@ reportUnsolved runtimeCoercionErrors wanted
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
              free_tvs = tyVarsOfWC wanted
              err_ctxt = CEC { cec_encl  = []
-                            , cec_insol = errs_so_far
+                            , cec_insol = errs_so_far || insolubleWC wanted
+                                          -- Don't report ambiguity errors if
+                                          -- there are any other solid errors 
+                                          -- to report
                             , cec_extra = empty
                             , cec_tidy  = tidy_env
                             , cec_defer = defer }
@@ -236,6 +239,7 @@ mkReporter mk_err = mapM_ (\ct -> do { err <- setCtFlavorLoc (cc_ev ct) $
                                      ; reportError err })
 
 tryReporters :: [(String, Ct -> PredTree -> Bool, Reporter)] -> Reporter -> Reporter
+-- Use the first reporter in the list whose predicate says True
 tryReporters reporters deflt cts
   = do { traceTc "tryReporters {" (ppr cts) 
        ; go reporters cts
