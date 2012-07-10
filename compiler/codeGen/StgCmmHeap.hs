@@ -33,7 +33,7 @@ import StgCmmEnv
 
 import MkGraph
 
-import Hoopl hiding ((<*>), mkBranch)
+import Hoopl
 import SMRep
 import Cmm
 import CmmUtils

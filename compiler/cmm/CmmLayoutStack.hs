@@ -16,7 +16,7 @@ import ForeignCall
 import CmmLive
 import CmmProcPoint
 import SMRep
-import Hoopl hiding ((<*>), mkLast, mkMiddle)
+import Hoopl
 import Constants
 import UniqSupply
 import Maybes

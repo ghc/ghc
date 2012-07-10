@@ -27,6 +27,7 @@ import Unique
 import BlockId
 
 import Hoopl
+import Compiler.Hoopl ((<*>), mkMiddle, mkLast)
 import Data.Maybe
 import Control.Monad
 import Prelude hiding (succ, zip)

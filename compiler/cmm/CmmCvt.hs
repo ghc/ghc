@@ -12,7 +12,7 @@ import CmmUtils
 import qualified OldCmm as Old
 import OldPprCmm ()
 
-import Hoopl hiding ((<*>), mkLabel, mkBranch)
+import Hoopl
 import Data.Maybe
 import Maybes
 import Outputable

@@ -7,7 +7,8 @@ module Hoopl (
   ) where
 
 import Compiler.Hoopl hiding
-  ( Unique,
+  ( (<*>), mkLabel, mkBranch, mkMiddle, mkLast, -- clashes with our MkGraph
+    Unique,
     FwdTransfer(..), FwdRewrite(..), FwdPass(..),
     BwdTransfer(..), BwdRewrite(..), BwdPass(..),
     noFwdRewrite, noBwdRewrite,
