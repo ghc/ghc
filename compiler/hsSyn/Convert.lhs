@@ -157,8 +157,7 @@ cvtDec (TH.InfixD fx nm)
        ; returnL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
-  = do { prag' <- cvtPragmaD prag
-       ; returnL $ Hs.SigD prag' }
+  = cvtPragmaD prag
 
 cvtDec (TySynD tc tvs rhs)
   = do	{ (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
@@ -410,38 +409,69 @@ cvt_conv TH.StdCall = StdCallConv
 --              Pragmas
 ------------------------------------------
 
-cvtPragmaD :: Pragma -> CvtM (Sig RdrName)
-cvtPragmaD (InlineP nm ispec)
-  = do { nm'    <- vNameL nm
-       ; return $ InlineSig nm' (cvtInlineSpec (Just ispec)) }
+cvtPragmaD :: Pragma -> CvtM (LHsDecl RdrName)
+cvtPragmaD (InlineP nm inline rm phases)
+  = do { nm' <- vNameL nm
+       ; let dflt = dfltActivation inline
+       ; let ip   = InlinePragma { inl_inline = cvtInline inline
+                                 , inl_rule   = cvtRuleMatch rm
+                                 , inl_act    = cvtPhases phases dflt
+                                 , inl_sat    = Nothing }
+       ; returnL $ Hs.SigD $ InlineSig nm' ip }
 
-cvtPragmaD (SpecialiseP nm ty opt_ispec)
+cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameL nm
        ; ty' <- cvtType ty
-       ; return $ SpecSig nm' ty' (cvtInlineSpec opt_ispec) }
+       ; let (inline', dflt) = case inline of
+               Just inline1 -> (cvtInline inline1, dfltActivation inline1)
+               Nothing      -> (EmptyInlineSpec,   AlwaysActive)
+       ; let ip = InlinePragma { inl_inline = inline'
+                               , inl_rule   = Hs.FunLike
+                               , inl_act    = cvtPhases phases dflt
+                               , inl_sat    = Nothing }
+       ; returnL $ Hs.SigD $ SpecSig nm' ty' ip }
 
-cvtInlineSpec :: Maybe TH.InlineSpec -> Hs.InlinePragma
-cvtInlineSpec Nothing
-  = defaultInlinePragma
-cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation))
-  = InlinePragma { inl_act = opt_activation', inl_rule = matchinfo
-                 , inl_inline = inl_spec, inl_sat = Nothing }
-  where
-    matchinfo       = cvtRuleMatchInfo conlike
-    opt_activation' = cvtActivation opt_activation
+cvtPragmaD (SpecialiseInstP ty)
+  = do { ty' <- cvtType ty
+       ; returnL $ Hs.SigD $ SpecInstSig ty' }
 
-    cvtRuleMatchInfo False = FunLike
-    cvtRuleMatchInfo True  = ConLike
+cvtPragmaD (RuleP nm bndrs lhs rhs phases)
+  = do { let nm' = mkFastString nm
+       ; let act = cvtPhases phases AlwaysActive
+       ; bndrs' <- mapM cvtRuleBndr bndrs
+       ; lhs'   <- cvtl lhs
+       ; rhs'   <- cvtl rhs
+       ; returnL $ Hs.RuleD $ HsRule nm' act bndrs'
+                                     lhs' placeHolderNames
+                                     rhs' placeHolderNames
+       }
 
-    inl_spec = case inline of
-                 TH.NoInline  -> Hs.NoInline
-                 TH.Inline    -> Hs.Inline
-                 TH.Inlinable -> Hs.Inlinable
+dfltActivation :: TH.Inline -> Activation
+dfltActivation TH.NoInline = NeverActive
+dfltActivation _           = AlwaysActive
 
-    cvtActivation Nothing | inline == TH.NoInline = NeverActive
-                          | otherwise             = AlwaysActive
-    cvtActivation (Just (False, phase)) = ActiveBefore phase
-    cvtActivation (Just (True , phase)) = ActiveAfter  phase
+cvtInline :: TH.Inline -> Hs.InlineSpec
+cvtInline TH.NoInline  = Hs.NoInline
+cvtInline TH.Inline    = Hs.Inline
+cvtInline TH.Inlinable = Hs.Inlinable
+
+cvtRuleMatch :: TH.RuleMatch -> RuleMatchInfo
+cvtRuleMatch TH.ConLike = Hs.ConLike
+cvtRuleMatch TH.FunLike = Hs.FunLike
+
+cvtPhases :: TH.Phases -> Activation -> Activation
+cvtPhases AllPhases       dflt = dflt
+cvtPhases (FromPhase i)   _    = ActiveAfter i
+cvtPhases (BeforePhase i) _    = ActiveBefore i
+
+cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.RuleBndr RdrName)
+cvtRuleBndr (RuleVar n)
+  = do { n' <- vNameL n
+       ; return $ Hs.RuleBndr n' }
+cvtRuleBndr (TypedRuleVar n ty)
+  = do { n'  <- vNameL n
+       ; ty' <- cvtType ty
+       ; return $ Hs.RuleBndrSig n' $ mkHsWithBndrs ty' }
 
 ---------------------------------------------------
 --		Declarations
