@@ -90,6 +90,7 @@ import FunDeps
 import Name
 import VarSet
 import ErrUtils
+import PrelNames
 import DynFlags
 import Util
 import Maybes
@@ -97,7 +98,6 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import FastString
-import Unique( Unique )
 import Bag
 
 import Control.Monad
@@ -270,7 +270,7 @@ newSigTyVar name kind
        ; ref <- newMutVar Flexi
        ; let name' = setNameUnique name uniq
                       -- Use the same OccName so that the tidy-er
-                      -- doesn't rename 'a' to 'a0' etc
+                      -- doesn't gratuitously rename 'a' to 'a0' etc
        ; return (mkTcTyVar name' kind (MetaTv SigTv ref)) }
 \end{code}
 
@@ -835,6 +835,23 @@ This might not necessarily show up in kind checking.
 
 	
 \begin{code}
+check_kind :: UserTypeCtxt -> TcType -> TcM ()
+-- Check that the type's kind is acceptable for the context
+check_kind ctxt ty
+  | TySynCtxt {} <- ctxt
+  = do { ck <- xoptM Opt_ConstraintKinds
+       ; unless ck $
+         checkTc (not (returnsConstraintKind actual_kind)) 
+                 (constraintSynErr actual_kind) }
+
+  | Just k <- expectedKindInCtxt ctxt
+  = checkTc (tcIsSubKind actual_kind k) (kindErr actual_kind)
+
+  | otherwise
+  = return ()   -- Any kind will do
+  where
+    actual_kind = typeKind ty
+
 -- Depending on the context, we might accept any kind (for instance, in a TH
 -- splice), or only certain kinds (like in type signatures).
 expectedKindInCtxt :: UserTypeCtxt -> Maybe Kind
@@ -854,7 +871,6 @@ checkValidType ctxt ty
        ; rank2_flag      <- xoptM Opt_Rank2Types
        ; rankn_flag      <- xoptM Opt_RankNTypes
        ; polycomp        <- xoptM Opt_PolymorphicComponents
-       ; constraintKinds <- xoptM Opt_ConstraintKinds
        ; let gen_rank :: Rank -> Rank
              gen_rank r | rankn_flag = ArbitraryRank
 	                | rank2_flag = r2
@@ -892,25 +908,13 @@ checkValidType ctxt ty
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
-	     actual_kind = typeKind ty
-
-             kind_ok = case expectedKindInCtxt ctxt of
-                         Nothing -> True
-                         Just k  -> tcIsSubKind actual_kind k
-
 	-- Check the internal validity of the type itself
        ; check_type rank ty
 
 	-- Check that the thing has kind Type, and is lifted if necessary
 	-- Do this second, because we can't usefully take the kind of an 
 	-- ill-formed type such as (a~Int)
-       ; checkTc kind_ok (kindErr actual_kind)
-
-        -- Check that the thing does not have kind Constraint,
-        -- if -XConstraintKinds isn't enabled
-       ; unless constraintKinds $
-         checkTc (not (isConstraintKind actual_kind)) (predTupleErr ty)
-       }
+       ; check_kind ctxt ty }
 
 checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type MustBeMonoType ty
@@ -1091,7 +1095,7 @@ unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]
 ubxArgTyErr     ty = sep [ptext (sLit "Illegal unboxed tuple type as function argument:"), ppr ty]
 
 kindErr :: Kind -> SDoc
-kindErr kind       = sep [ptext (sLit "Expecting an ordinary type, but found a type of kind"), ppr kind]
+kindErr kind = sep [ptext (sLit "Expecting an ordinary type, but found a type of kind"), ppr kind]
 \end{code}
 
 Note [Liberal type synonyms]
@@ -1147,10 +1151,38 @@ check_valid_theta ctxt theta = do
 
 -------------------------
 check_pred_ty :: DynFlags -> UserTypeCtxt -> PredType -> TcM ()
-check_pred_ty dflags ctxt pred = check_pred_ty' dflags ctxt (shallowPredTypePredTree pred)
+-- Check the validity of a predicate in a signature
+-- We look through any type synonyms; any constraint kinded
+-- type synonyms have been checked at their definition site
 
-check_pred_ty' :: DynFlags -> UserTypeCtxt -> PredTree -> TcM ()
-check_pred_ty' dflags ctxt (ClassPred cls tys)
+check_pred_ty dflags ctxt pred
+  | Just (tc,tys) <- tcSplitTyConApp_maybe pred
+  = case () of 
+      _ | Just cls <- tyConClass_maybe tc
+        -> check_class_pred dflags ctxt cls tys
+
+        | tc `hasKey` eqTyConKey
+        , let [_, ty1, ty2] = tys
+        -> check_eq_pred dflags ctxt ty1 ty2
+
+        | isTupleTyCon tc
+        -> check_tuple_pred dflags ctxt pred tys
+  
+        | otherwise   -- X t1 t2, where X is presumably a
+                      -- type/data family returning ConstraintKind
+        -> check_irred_pred dflags ctxt pred tys
+
+  | (TyVarTy _, arg_tys) <- tcSplitAppTys pred
+  = check_irred_pred dflags ctxt pred arg_tys
+
+  | otherwise
+  = badPred pred
+
+badPred :: PredType -> TcM ()
+badPred pred = failWithTc (ptext (sLit "Malformed predicate") <+> quotes (ppr pred))
+
+check_class_pred :: DynFlags -> UserTypeCtxt -> Class -> [TcType] -> TcM ()
+check_class_pred dflags ctxt cls tys
   = do {	-- Class predicates are valid in all contexts
        ; checkTc (arity == n_tys) arity_err
 
@@ -1167,7 +1199,8 @@ check_pred_ty' dflags ctxt (ClassPred cls tys)
     how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
 
 
-check_pred_ty' dflags _ctxt (EqPred ty1 ty2)
+check_eq_pred :: DynFlags -> UserTypeCtxt -> TcType -> TcType -> TcM ()
+check_eq_pred dflags _ctxt ty1 ty2
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
        ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags) 
@@ -1178,14 +1211,19 @@ check_pred_ty' dflags _ctxt (EqPred ty1 ty2)
        ; checkValidMonoType ty2
        }
 
-check_pred_ty' dflags ctxt t@(TuplePred ts)
+check_tuple_pred :: DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
+check_tuple_pred dflags ctxt pred ts
   = do { checkTc (xopt Opt_ConstraintKinds dflags)
-                 (predTupleErr (predTreePredType t))
+                 (predTupleErr pred)
        ; mapM_ (check_pred_ty dflags ctxt) ts }
-    -- This case will not normally be executed because without -XConstraintKinds
-    -- tuple types are only kind-checked as *
+    -- This case will not normally be executed because 
+    -- without -XConstraintKinds tuple types are only kind-checked as *
 
-check_pred_ty' dflags ctxt (IrredPred pred)
+check_irred_pred :: DynFlags -> UserTypeCtxt -> PredType -> [TcType] -> TcM ()
+check_irred_pred dflags ctxt pred arg_tys
+    -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
+    -- But X is not a synonym; that's been expanded already
+    --
     -- Allowing irreducible predicates in class superclasses is somewhat dangerous
     -- because we can write:
     --
@@ -1199,21 +1237,13 @@ check_pred_ty' dflags ctxt (IrredPred pred)
     --
     -- It is equally dangerous to allow them in instance heads because in that case the
     -- Paterson conditions may not detect duplication of a type variable or size change.
-    --
-    -- In both cases it's OK if the predicate is actually a synonym, though.
-    -- We'll also allow it if
-  = do checkTc (xopt Opt_ConstraintKinds dflags)
-               (predIrredErr pred)
-       case tcView pred of
-         Just pred' -> 
-           -- Synonym: just look through
-           check_pred_ty dflags ctxt pred'
-         Nothing
-           | xopt Opt_UndecidableInstances dflags -> return ()
-           | otherwise -> do
-             -- Make sure it is OK to have an irred pred in this context
-             checkTc (case ctxt of ClassSCCtxt _ -> False; InstDeclCtxt -> False; _ -> True)
-                     (predIrredBadCtxtErr pred)
+  = do { checkTc (xopt Opt_ConstraintKinds dflags)
+                 (predIrredErr pred)
+       ; mapM_ checkValidMonoType arg_tys
+       ; unless (xopt Opt_UndecidableInstances dflags) $
+                 -- Make sure it is OK to have an irred pred in this context
+         checkTc (case ctxt of ClassSCCtxt _ -> False; InstDeclCtxt -> False; _ -> True)
+                 (predIrredBadCtxtErr pred) }
 
 -------------------------
 check_class_pred_tys :: DynFlags -> UserTypeCtxt -> [KindOrType] -> Bool
@@ -1409,15 +1439,20 @@ eqPredTyErr, predTyVarErr, predTupleErr, predIrredErr, predIrredBadCtxtErr :: Pr
 eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pred
 		    $$
 		    parens (ptext (sLit "Use -XGADTs or -XTypeFamilies to permit this"))
-predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
-			  nest 2 (ptext (sLit "in the constraint:") <+> pprType pred)]
-predTupleErr pred  = ptext (sLit "Illegal tuple constraint") <+> pprType pred $$
-                     parens (ptext (sLit "Use -XConstraintKinds to permit this"))
-predIrredErr pred  = ptext (sLit "Illegal irreducible constraint") <+> pprType pred $$
-                     parens (ptext (sLit "Use -XConstraintKinds to permit this"))
-predIrredBadCtxtErr pred = ptext (sLit "Illegal irreducible constraint") <+> pprType pred $$
-                           ptext (sLit "in superclass/instance head context") <+>
-                           parens (ptext (sLit "Use -XUndecidableInstances to permit this"))
+predTyVarErr pred  = hang (ptext (sLit "Non type-variable argument"))
+			2 (ptext (sLit "in the constraint:") <+> pprType pred)
+predTupleErr pred  = hang (ptext (sLit "Illegal tuple constraint:") <+> pprType pred)
+                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+predIrredErr pred  = hang (ptext (sLit "Illegal constraint:") <+> pprType pred)
+                        2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+predIrredBadCtxtErr pred = hang (ptext (sLit "Illegal constraint") <+> quotes (pprType pred)
+                                 <+> ptext (sLit "in a superclass/instance context")) 
+                               2 (parens (ptext (sLit "Use -XUndecidableInstances to permit this")))
+
+constraintSynErr :: Type -> SDoc
+constraintSynErr kind = hang (ptext (sLit "Illegal constraint synonym of kind:") <+> quotes (ppr kind))
+                           2 (parens (ptext (sLit "Use -XConstraintKinds to permit this")))
+
 dupPredWarn :: [[PredType]] -> SDoc
 dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprType (map head dups)
 
@@ -1600,19 +1635,30 @@ checkInstTermination tys theta
    fvs  = fvTypes tys
    size = sizeTypes tys
    check pred 
-      | not (null (fvType pred \\ fvs)) 
-      = addErrTc (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
+      | not (null bad_tvs)
+      = addErrTc (predUndecErr pred (nomoreMsg bad_tvs) $$ parens undecidableMsg)
       | sizePred pred >= size
       = addErrTc (predUndecErr pred smallerMsg $$ parens undecidableMsg)
       | otherwise
       = return ()
+      where
+        bad_tvs = filterOut isKindVar (fvType pred \\ fvs)
+             -- Rightly or wrongly, we only check for
+             -- excessive occurrences of *type* variables.
+             -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
 
 predUndecErr :: PredType -> SDoc -> SDoc
 predUndecErr pred msg = sep [msg,
 			nest 2 (ptext (sLit "in the constraint:") <+> pprType pred)]
 
-nomoreMsg, smallerMsg, undecidableMsg :: SDoc
-nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")
+nomoreMsg :: [TcTyVar] -> SDoc
+nomoreMsg tvs 
+  = sep [ ptext (sLit "Variable") <+> plural tvs <+> quotes (pprWithCommas ppr tvs) 
+        , (if isSingleton tvs then ptext (sLit "occurs")
+                                  else ptext (sLit "occur"))
+          <+> ptext (sLit "more often than in the instance head") ]
+
+smallerMsg, undecidableMsg :: SDoc
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
 undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 \end{code}
@@ -1659,14 +1705,18 @@ checkFamInstRhs lhsTys famInsts
    check (tc, tys)
       | not (all isTyFamFree tys)
       = Just (famInstUndecErr famInst nestedMsg $$ parens undecidableMsg)
-      | not (null (fvTypes tys \\ fvs))
-      = Just (famInstUndecErr famInst nomoreVarMsg $$ parens undecidableMsg)
+      | not (null bad_tvs)
+      = Just (famInstUndecErr famInst (nomoreMsg bad_tvs) $$ parens undecidableMsg)
       | size <= sizeTypes tys
       = Just (famInstUndecErr famInst smallerAppMsg $$ parens undecidableMsg)
       | otherwise
       = Nothing
       where
         famInst = TyConApp tc tys
+        bad_tvs = filterOut isKindVar (fvTypes tys \\ fvs)
+             -- Rightly or wrongly, we only check for
+             -- excessive occurrences of *type* variables.
+             -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
 
 -- Ensure that no type family instances occur in a type.
 --
@@ -1694,9 +1744,8 @@ famInstUndecErr ty msg
          nest 2 (ptext (sLit "in the type family application:") <+> 
                  pprType ty)]
 
-nestedMsg, nomoreVarMsg, smallerAppMsg :: SDoc
+nestedMsg, smallerAppMsg :: SDoc
 nestedMsg     = ptext (sLit "Nested type family application")
-nomoreVarMsg  = ptext (sLit "Variable occurs more often than in instance head")
 smallerAppMsg = ptext (sLit "Application is no smaller than the instance head")
 \end{code}
 
