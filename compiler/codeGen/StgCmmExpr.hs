@@ -609,7 +609,8 @@ cgIdApp fun_id args
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ()
 cgLneJump blk_id lne_regs args	-- Join point; discard sequel
-  = do	{ cmm_args <- getNonVoidArgAmodes args
+  = do  { adjustHpBackwards -- always do this before a tail-call
+        ; cmm_args <- getNonVoidArgAmodes args
         ; emitMultiAssign lne_regs cmm_args
         ; emit (mkBranch blk_id) }
     
