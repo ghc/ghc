@@ -140,7 +140,9 @@ data LHsTyVarBndrs name
 mkHsQTvs :: [LHsTyVarBndr RdrName] -> LHsTyVarBndrs RdrName
 -- Just at RdrName because in the Name variant we should know just
 -- what the kind-variable binders are; and we don't
-mkHsQTvs tvs = HsQTvs { hsq_kvs = panic "mkHsQTvs", hsq_tvs = tvs }
+-- We put an empty list (rather than a panic) for the kind vars so 
+-- that the pretty printer works ok on them.
+mkHsQTvs tvs = HsQTvs { hsq_kvs = [], hsq_tvs = tvs }
 
 emptyHsQTvs :: LHsTyVarBndrs name   -- Use only when you know there are no kind binders
 emptyHsQTvs =  HsQTvs { hsq_kvs = [], hsq_tvs = [] }
@@ -521,7 +523,8 @@ instance Outputable HsTyLit where
     ppr = ppr_tylit
 
 instance (OutputableBndr name) => Outputable (LHsTyVarBndrs name) where
-    ppr qtvs = interppSP (hsQTvBndrs qtvs)
+    ppr (HsQTvs { hsq_kvs = kvs, hsq_tvs = tvs }) 
+      = sep [ ifPprDebug $ braces (interppSP kvs), interppSP tvs ]
 
 instance (OutputableBndr name) => Outputable (HsTyVarBndr name) where
     ppr (UserTyVar name)        = ppr name

@@ -435,7 +435,13 @@ data TyClDecl name
 
   | -- | @type/data declaration
     TyDecl { tcdLName  :: Located name            -- ^ Type constructor
-           , tcdTyVars :: LHsTyVarBndrs name
+           , tcdTyVars :: LHsTyVarBndrs name      -- ^ Type variables; for an assoicated type
+                                                  --   these include outer binders
+                                                  -- Eg  class T a where
+                                                  --       type F a :: *
+                                                  --       type F a = a -> a
+                                                  -- Here the type decl for 'f' includes 'a' 
+                                                  -- in its tcdTyVars
            , tcdTyDefn :: HsTyDefn name
            , tcdFVs    :: NameSet }
 
@@ -811,6 +817,7 @@ data FamInstDecl name
   = FamInstDecl
        { fid_tycon :: Located name
        , fid_pats  :: HsWithBndrs [LHsType name]  -- ^ Type patterns (with kind and type bndrs)
+                                                  -- See Note [Family instance declaration binders]
        , fid_defn  :: HsTyDefn name               -- Type or data family instance
        , fid_fvs   :: NameSet  } 
   deriving( Typeable, Data )
