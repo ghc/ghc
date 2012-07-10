@@ -72,7 +72,9 @@ import Outputable
 
 import Data.Char
 import Data.Word
+import Data.List
 import Data.Maybe
+import Data.Ord
 
 -------------------------------------------------------------------------
 --
@@ -527,12 +529,10 @@ emitSwitch tag_expr branches mb_deflt lo_tag hi_tag
         ; let via_C | HscC <- hscTarget dflags = True
                     | otherwise                = False
 
-        ; stmts <- mk_switch tag_expr (sortLe le branches)
+        ; stmts <- mk_switch tag_expr (sortBy (comparing fst) branches)
                         mb_deflt_id lo_tag hi_tag via_C
         ; emitCgStmts stmts
         }
-  where
-    (t1,_) `le` (t2,_) = t1 <= t2
 
 
 mk_switch :: CmmExpr -> [(ConTagZ, CgStmts)]
@@ -699,10 +699,8 @@ emitLitSwitch _     []       deflt = emitCgStmts deflt
 emitLitSwitch scrut branches deflt_blk
   = do  { scrut' <- assignTemp scrut
         ; deflt_blk_id <- forkCgStmts deflt_blk
-        ; blk <- mk_lit_switch scrut' deflt_blk_id (sortLe le branches)
+        ; blk <- mk_lit_switch scrut' deflt_blk_id (sortBy (comparing fst) branches)
         ; emitCgStmts blk }
-  where
-    le (t1,_) (t2,_) = t1 <= t2
 
 mk_lit_switch :: CmmExpr -> BlockId
               -> [(Literal,CgStmts)]

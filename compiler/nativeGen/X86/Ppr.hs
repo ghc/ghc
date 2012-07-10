@@ -595,9 +595,9 @@ pprInstr platform (JXX cond blockid)
 
 pprInstr platform (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm platform imm)
 
-pprInstr platform (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm platform imm)
-pprInstr platform (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform (archWordSize (target32Bit platform)) op)
-pprInstr platform (JMP_TBL op _ _ _)  = pprInstr platform (JMP op)
+pprInstr platform (JMP (OpImm imm) _) = (<>) (ptext (sLit "\tjmp ")) (pprImm platform imm)
+pprInstr platform (JMP op _)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform (archWordSize (target32Bit platform)) op)
+pprInstr platform (JMP_TBL op _ _ _)  = pprInstr platform (JMP op [])
 pprInstr platform (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm platform imm)
 pprInstr platform (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg platform (archWordSize (target32Bit platform)) reg)
 

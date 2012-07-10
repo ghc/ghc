@@ -493,6 +493,9 @@ getIsGHCi = do { mod <- getModule; return (mod == iNTERACTIVE) }
 getGHCiMonad :: TcRn Name
 getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
 
+getInteractivePrintName :: TcRn Name
+getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
+
 tcIsHsBoot :: TcRn Bool
 tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
 

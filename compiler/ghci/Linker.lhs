@@ -287,7 +287,7 @@ reallyInitDynLinker dflags =
           -- (a) initialise the C dynamic linker
         ; initObjLinker
 
-          -- (b) Load packages from the command-line
+          -- (b) Load packages from the command-line (Note [preload packages])
         ; pls <- linkPackages' dflags (preloadPackages (pkgState dflags)) pls0
 
           -- (c) Link libraries from the command-line
@@ -324,6 +324,32 @@ reallyInitDynLinker dflags =
 
         ; return pls
         }}
+
+
+{- Note [preload packages]
+
+Why do we need to preload packages from the command line?  This is an
+explanation copied from #2437:
+
+I tried to implement the suggestion from #3560, thinking it would be
+easy, but there are two reasons we link in packages eagerly when they
+are mentioned on the command line:
+
+  * So that you can link in extra object files or libraries that
+    depend on the packages. e.g. ghc -package foo -lbar where bar is a
+    C library that depends on something in foo. So we could link in
+    foo eagerly if and only if there are extra C libs or objects to
+    link in, but....
+
+  * Haskell code can depend on a C function exported by a package, and
+    the normal dependency tracking that TH uses can't know about these
+    dependencies. The test ghcilink004 relies on this, for example.
+
+I conclude that we need two -package flags: one that says "this is a
+package I want to make available", and one that says "this is a
+package I want to link in eagerly". Would that be too complicated for
+users?
+-}
 
 classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
 classifyLdInput dflags f

@@ -109,7 +109,7 @@ takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily (iBox n), s1)
 
 \begin{code}
 -- | A monad which just gives the ability to obtain 'Unique's
-newtype UniqSM result = USM { unUSM :: UniqSupply -> (result, UniqSupply) }
+newtype UniqSM result = USM { unUSM :: UniqSupply -> (# result, UniqSupply #) }
 
 instance Monad UniqSM where
   return = returnUs
@@ -118,21 +118,21 @@ instance Monad UniqSM where
 
 instance Functor UniqSM where
     fmap f (USM x) = USM (\us -> case x us of
-                                 (r, us') -> (f r, us'))
+                                 (# r, us' #) -> (# f r, us' #))
 
 instance Applicative UniqSM where
     pure = returnUs
     (USM f) <*> (USM x) = USM $ \us -> case f us of
-                            (ff, us')  -> case x us' of
-                              (xx, us'') -> (ff xx, us'')
+                            (# ff, us' #)  -> case x us' of
+                              (# xx, us'' #) -> (# ff xx, us'' #)
 
 -- | Run the 'UniqSM' action, returning the final 'UniqSupply'
 initUs :: UniqSupply -> UniqSM a -> (a, UniqSupply)
-initUs init_us m = case unUSM m init_us of { (r,us) -> (r,us) }
+initUs init_us m = case unUSM m init_us of { (# r, us #) -> (r,us) }
 
 -- | Run the 'UniqSM' action, discarding the final 'UniqSupply'
 initUs_ :: UniqSupply -> UniqSM a -> a
-initUs_ init_us m = case unUSM m init_us of { (r, _) -> r }
+initUs_ init_us m = case unUSM m init_us of { (# r, _ #) -> r }
 
 {-# INLINE thenUs #-}
 {-# INLINE lazyThenUs #-}
@@ -142,27 +142,30 @@ initUs_ init_us m = case unUSM m init_us of { (r, _) -> r }
 
 @thenUs@ is where we split the @UniqSupply@.
 \begin{code}
+liftUSM :: UniqSM a -> UniqSupply -> (a, UniqSupply)
+liftUSM (USM m) us = case m us of (# a, us' #) -> (a, us')
+
 instance MonadFix UniqSM where
-    mfix m = USM (\us -> let (r,us') = unUSM (m r) us in (r,us'))
+    mfix m = USM (\us -> let (r,us') = liftUSM (m r) us in (# r,us' #))
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs (USM expr) cont
   = USM (\us -> case (expr us) of
-                   (result, us') -> unUSM (cont result) us')
+                   (# result, us' #) -> unUSM (cont result) us')
 
 lazyThenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-lazyThenUs (USM expr) cont
-  = USM (\us -> let (result, us') = expr us in unUSM (cont result) us')
+lazyThenUs expr cont
+  = USM (\us -> let (result, us') = liftUSM expr us in unUSM (cont result) us')
 
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
 thenUs_ (USM expr) (USM cont)
-  = USM (\us -> case (expr us) of { (_, us') -> cont us' })
+  = USM (\us -> case (expr us) of { (# _, us' #) -> cont us' })
 
 returnUs :: a -> UniqSM a
-returnUs result = USM (\us -> (result, us))
+returnUs result = USM (\us -> (# result, us #))
 
 getUs :: UniqSM UniqSupply
-getUs = USM (\us -> splitUniqSupply us)
+getUs = USM (\us -> case splitUniqSupply us of (us1,us2) -> (# us1, us2 #))
 
 -- | A monad for generating unique identifiers
 class Monad m => MonadUnique m where
@@ -177,17 +180,17 @@ class Monad m => MonadUnique m where
     getUniquesM = liftM uniqsFromSupply getUniqueSupplyM
 
 instance MonadUnique UniqSM where
-    getUniqueSupplyM = USM (\us -> splitUniqSupply us)
+    getUniqueSupplyM = getUs
     getUniqueM  = getUniqueUs
     getUniquesM = getUniquesUs
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us -> case splitUniqSupply us of
-                          (us1,us2) -> (uniqFromSupply us1, us2))
+                          (us1,us2) -> (# uniqFromSupply us1, us2 #))
 
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of
-                           (us1,us2) -> (uniqsFromSupply us1, us2))
+                           (us1,us2) -> (# uniqsFromSupply us1, us2 #))
 \end{code}
 
 \begin{code}

@@ -9,9 +9,7 @@
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
-
-        CmmInfo(..), CmmInfoTable(..), ClosureTypeInfo(..), UpdateFrame(..),
-
+        CmmInfoTable(..), ClosureTypeInfo(..),
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
 
         cmmMapGraph, cmmTopMapGraph,
@@ -49,24 +47,6 @@ import ForeignCall
 -- with assembly-language labels.
 
 -----------------------------------------------------------------------------
---     Info Tables
------------------------------------------------------------------------------
-
-data CmmInfo
-  = CmmInfo
-        (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
-                            -- JD: NOT USED BY NEW CODE GEN
-        (Maybe UpdateFrame) -- Update frame
-        CmmInfoTable        -- Info table
-
--- | A frame that is to be pushed before entry to the function.
--- Used to handle 'update' frames.
-data UpdateFrame
-  = UpdateFrame
-        CmmExpr    -- Frame header.  Behaves like the target of a 'jump'.
-        [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
-
------------------------------------------------------------------------------
 --  Cmm, CmmDecl, CmmBasicBlock
 -----------------------------------------------------------------------------
 
@@ -85,8 +65,8 @@ data UpdateFrame
 newtype ListGraph i = ListGraph [GenBasicBlock i]
 
 -- | Cmm with the info table as a data type
-type CmmGroup = GenCmmGroup CmmStatics CmmInfo (ListGraph CmmStmt)
-type CmmDecl = GenCmmDecl CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmGroup = GenCmmGroup CmmStatics CmmInfoTable (ListGraph CmmStmt)
+type CmmDecl = GenCmmDecl CmmStatics CmmInfoTable (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
 -- table label. If we are building without tables-next-to-code there will be no statics
@@ -225,15 +205,8 @@ instance UserOfLocalRegs CmmCallTarget where
     foldRegsUsed f set (CmmCallee e _)    = foldRegsUsed f set e
     foldRegsUsed f set (CmmPrim _ mStmts) = foldRegsUsed f set mStmts
 
-instance UserOfSlots CmmCallTarget where
-    foldSlotsUsed f set (CmmCallee e _) = foldSlotsUsed f set e
-    foldSlotsUsed _ set (CmmPrim {})    = set
-
 instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
     foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
-
-instance UserOfSlots a => UserOfSlots (CmmHinted a) where
-    foldSlotsUsed f set a = foldSlotsUsed f set (hintlessCmm a)
 
 instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmHinted a) where
     foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)

@@ -96,7 +96,7 @@ mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr)
 mkSimpleUnfolding :: CoreExpr -> Unfolding
 mkSimpleUnfolding = mkUnfolding InlineRhs False False
 
-mkDFunUnfolding :: Type -> [CoreExpr] -> Unfolding
+mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
   = DFunUnfolding dfun_nargs data_con ops
   where

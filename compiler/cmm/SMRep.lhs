@@ -21,6 +21,7 @@ module SMRep (
 	StgWord, StgHalfWord, 
 	hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
 	WordOff, ByteOff,
+        roundUpToWords,
 
         -- * Closure repesentation
         SMRep(..),	-- CmmInfo sees the rep; no one else does
@@ -57,6 +58,7 @@ import FastString
 
 import Data.Char( ord )
 import Data.Word
+import Data.Bits
 \end{code}
 
 
@@ -69,6 +71,9 @@ import Data.Word
 \begin{code}
 type WordOff = Int	-- Word offset, or word count
 type ByteOff = Int	-- Byte offset, or byte count
+
+roundUpToWords :: ByteOff -> ByteOff
+roundUpToWords n = (n + (wORD_SIZE - 1)) .&. (complement (wORD_SIZE - 1))
 \end{code}
 
 StgWord is a type representing an StgWord on the target platform.
@@ -92,6 +97,7 @@ hALF_WORD_SIZE_IN_BITS = 32
 #error unknown SIZEOF_HSWORD
 #endif
 \end{code}
+
 
 %************************************************************************
 %*									*

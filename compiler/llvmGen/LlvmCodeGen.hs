@@ -27,6 +27,7 @@ import UniqSupply
 import Util
 import SysTools ( figureLlvmVersion )
 
+import Control.Monad ( when )
 import Data.IORef ( writeIORef )
 import Data.Maybe ( fromMaybe )
 import System.IO
@@ -51,15 +52,29 @@ llvmCodeGen dflags h us cmms
         dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" pprLlvmHeader
         bufh <- newBufHandle h
         Prt.bufLeftRender bufh $ withPprStyleDoc dflags (mkCodeStyle CStyle) pprLlvmHeader
-        ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
-        -- cache llvm version for later use
-        writeIORef (llvmVersion dflags) ver
+        ver  <- getLlvmVersion
         env' <- {-# SCC "llvm_datas_gen" #-}
                 cmmDataLlvmGens dflags bufh (setLlvmVer ver env) cdata []
         {-# SCC "llvm_procs_gen" #-}
              cmmProcLlvmGens dflags bufh us env' cmm 1 []
         bFlush bufh
         return  ()
+
+  where
+    -- | Handle setting up the LLVM version.
+    getLlvmVersion = do
+        ver <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
+        -- cache llvm version for later use
+        writeIORef (llvmVersion dflags) ver
+        when (ver < minSupportLlvmVersion) $
+            errorMsg dflags (text "You are using an old version of LLVM that"
+                             <> text " isn't supported anymore!"
+                             $+$ text "We will try though...")
+        when (ver > maxSupportLlvmVersion) $
+            putMsg dflags (text "You are using a new version of LLVM that"
+                           <> text " hasn't been tested yet!"
+                           $+$ text "We will try though...")
+        return ver
 
 
 -- -----------------------------------------------------------------------------

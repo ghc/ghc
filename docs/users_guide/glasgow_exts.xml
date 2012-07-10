@@ -3339,8 +3339,9 @@ then writing the data type instance by hand.
 </listitem>
 
 <listitem><para> With <option>-XDeriveGeneric</option>, you can derive
-instances of  the class <literal>Generic</literal>, defined in
-<literal>GHC.Generics</literal>. You can use these to define generic functions,
+instances of the classes <literal>Generic</literal> and
+<literal>Generic1</literal>, defined in <literal>GHC.Generics</literal>.
+You can use these to define generic functions,
 as described in <xref linkend="generic-programming"/>.
 </para></listitem>
 
@@ -9884,8 +9885,9 @@ data (:*:) f g p = f p :*: g p
 </para>
 
 <para>
-The <literal>Generic</literal> class mediates between user-defined datatypes
-and their internal representation as a sum-of-products:
+The <literal>Generic</literal> and <literal>Generic1</literal> classes mediate
+between user-defined datatypes and their internal representation as a
+sum-of-products:
 
 <programlisting>
 class Generic a where
@@ -9895,9 +9897,17 @@ class Generic a where
   from  :: a -> (Rep a) x
   -- Convert from the representation to the datatype
   to    :: (Rep a) x -> a
+
+class Generic1 f where
+  type Rep1 f :: * -> *
+
+  from1  :: f a -> Rep1 f a
+  to1    :: Rep1 f a -> f a
 </programlisting>
 
-Instances of this class can be derived by GHC with the
+<literal>Generic1</literal> is used for functions that can only be defined over
+type containers, such as <literal>map</literal>.
+Instances of these classes can be derived by GHC with the
 <option>-XDeriveGeneric</option> (<xref linkend="deriving-typeable"/>), and are
 necessary to be able to define generic instances automatically.
 </para>
@@ -9912,7 +9922,7 @@ instance Generic (UserTree a) where
   type Rep (UserTree a) =
     M1 D D1UserTree (
           M1 C C1_0UserTree (
-                M1 S NoSelector (K1 P a)
+                M1 S NoSelector (K1 R a)
             :*: M1 S NoSelector (K1 R (UserTree a))
             :*: M1 S NoSelector (K1 R (UserTree a)))
       :+: M1 C C1_1UserTree U1)
@@ -10007,17 +10017,20 @@ instance (Serialize a) => Serialize (UserTree a)
 
 The default method for <literal>put</literal> is then used, corresponding to the
 generic implementation of serialization.
+
+For more examples of generic functions please refer to the
+<ulink url="http://hackage.haskell.org/package/generic-deriving">generic-deriving</ulink>
+package on Hackage.
 </para>
 </sect2>
-
 
 <sect2>
 <title>More information</title>
 
 <para>
-For more detail please refer to the
-<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
-or the original paper:
+For more details please refer to the
+<ulink url="http://www.haskell.org/haskellwiki/GHC.Generics">HaskellWiki
+page</ulink> or the original paper:
 </para>
 
 <itemizedlist>
@@ -10032,12 +10045,6 @@ Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
 </listitem>
 </itemizedlist>
 
-<emphasis>Note</emphasis>: the current support for generic programming in GHC
-is preliminary. In particular, we only allow deriving instances for the
-<literal>Generic</literal> class. Support for deriving
-<literal>Generic1</literal> (and thus enabling generic functions of kind
-<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
-later stage.
 </sect2>
 
 </sect1>

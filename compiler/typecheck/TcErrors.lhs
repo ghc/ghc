@@ -680,6 +680,9 @@ mkDictErr ctxt cts
 
        -- Report definite no-instance errors, 
        -- or (iff there are none) overlap errors
+       -- But we report only one of them (hence 'head') becuase they all
+       -- have the same source-location origin, to try avoid a cascade
+       -- of error from one location
        ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
        ; mkErrorReport ctxt err }
   where

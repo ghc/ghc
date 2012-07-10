@@ -24,32 +24,6 @@ More notes (June 11)
 * Check in ClosureInfo:
      -- NB: Results here should line up with the results of SMRep.rtsClosureType
 
-* Possible refactoring: Nuke AGraph in favour of 
-      mkIfThenElse :: Expr -> Graph -> Graph -> FCode Graph
-  or even
-      mkIfThenElse :: HasUniques m => Expr -> Graph -> Graph -> m Graph
-  (Remmber that the .cmm file parser must use this function)
-
-  or parameterise FCode over its envt; the CgState part seem useful for both
-
-* "Remove redundant reloads" in CmmSpillReload should be redundant; since
-  insertLateReloads is now gone, every reload is reloading a live variable.
-  Test and nuke.
-
-* Stack layout is very like register assignment: find non-conflicting assigments.
-  In particular we can use colouring or linear scan (etc).
-
-  We'd fine-grain interference (on a word by word basis) to get maximum overlap.
-  But that may make very big interference graphs.  So linear scan might be
-  more attactive.
-
-  NB: linear scan does on-the-fly live range splitting.
-
-* When stubbing dead slots be careful not to write into an area that
-  overlaps with an area that's in use.  So stubbing needs to *follow* 
-  stack layout.
-
-
 More notes (May 11)
 ~~~~~~~~~~~~~~~~~~~
 In CmmNode, consider spliting CmmCall into two: call and jump
@@ -58,80 +32,15 @@ Notes on new codegen (Aug 10)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Things to do:
- - We insert spills for variables before the stack check! This is the reason for
-   some fishy code in StgCmmHeap.entryHeapCheck where we are doing some strange
-	things to fix up the stack pointer before GC calls/jumps.
-
-	The reason spills are inserted before the sp check is that at the entry to a
-	function we always store the parameters passed in registers to local variables.
-	The spill pass simply inserts spills at variable definitions. We instead should
-	sink the spills so that we can avoid spilling them on branches that never
-	reload them.
-
-	This will fix the spill before stack check problem but only really as a side
-	effect. A 'real fix' probably requires making the spiller know about sp checks.
-
-   EZY: I don't understand this comment. David Terei, can you clarify?
-
  - Proc points pass all arguments on the stack, adding more code and
    slowing down things a lot. We either need to fix this or even better
    would be to get rid of proc points.
-
- - CmmInfo.cmmToRawCmm uses Old.Cmm, so it is called after converting Cmm.Cmm to
-   Old.Cmm. We should abstract it to work on both representations, it needs only to
-   convert a CmmInfoTable to [CmmStatic].
-
- - The MkGraph currenty uses a different semantics for <*> than Hoopl. Maybe
-   we could convert codeGen/StgCmm* clients to the Hoopl's semantics?
-   It's all deeply unsatisfactory.
-
- - Improve performance of Hoopl.
-
-   A nofib comparison of -fasm vs -fnewcodegen nofib compilation parameters
-   (using the same ghc-cmm branch +libraries compiled by the old codegenerator)
-   is at http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.oldghchoopl.txt
-   - the code produced is 10.9% slower, the compilation is +118% slower!
-
-   The same comparison with ghc-head with zip representation is at
-   http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.oldghczip.txt
-   - the code produced is 11.7% slower, the compilation is +78% slower.
-
-   When compiling nofib, ghc-cmm + libraries compiled with -fnew-codegen
-   is 23.7% slower (http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.hooplghcoldgen.txt).
-   When compiling nofib, ghc-head + libraries compiled with -fnew-codegen
-   is 31.4% slower (http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.zipghcoldgen.txt).
-
-   So we generate a bit better code, but it takes us longer!
-
-   EZY: Also importantly, Hoopl uses dramatically more memory than the
-   old code generator.
-
- - Are all blockToNodeList and blockOfNodeList really needed? Maybe we could
-   splice blocks instead?
-
-   In the CmmContFlowOpt.blockConcat, using Dataflow seems too clumsy. Still,
-   a block catenation function would be probably nicer than blockToNodeList
-   / blockOfNodeList combo.
-
- - lowerSafeForeignCall seems too lowlevel. Just use Dataflow. After that
-   delete splitEntrySeq from HooplUtils.
-
- - manifestSP seems to touch a lot of the graph representation. It is
-   also slow for CmmSwitch nodes O(block_nodes * switch_statements).
-   Maybe rewrite manifestSP to use Dataflow?
 
  - Sort out Label, LabelMap, LabelSet versus BlockId, BlockEnv, BlockSet
    dichotomy. Mostly this means global replace, but we also need to make
    Label an instance of Outputable (probably in the Outputable module).
 
    EZY: We should use Label, since that's the terminology Hoopl uses.
-
- - NB that CmmProcPoint line 283 has a hack that works around a GADT-related
-   bug in 6.10.
-
- - SDM (2010-02-26) can we remove the Foreign constructor from Convention?
-   Reason: we never generate code for a function with the Foreign
-   calling convention, and the code for calling foreign calls is generated
 
  - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
    EZY (2011-04-16): The mini-inliner has been generalized and ported,
@@ -146,99 +55,24 @@ Things to do:
 	new native codegen, much in the way that we lower calling conventions.
 	Might need to be a bit sophisticated about aliasing.
 
- - Question: currently we lift procpoints to become separate
-   CmmProcs.  Do we still want to do this?
-    
-   NB: and advantage of continuing to do this is that
-   we can do common-proc elimination!
-
  - Move to new Cmm rep:
      * Make native CG consume New Cmm; 
      * Convert Old Cmm->New Cmm to keep old path alive
      * Produce New Cmm when reading in .cmm files
 
- - Consider module names
-
  - Top-level SRT threading is a bit ugly
 
- - Add type/newtype for CmmModule = [CmmGroup]    -- A module
-                        CmmGroup  = [CmmTop]      -- A .o file
-                        CmmTop    = Proc | Data   -- A procedure or data
-
- - This is a *change*: currently a CmmGroup is one function's-worth of code
-   regardless of SplitObjs.   Question: can we *always* generate M.o if there
-   is just one element in the list (rather than M/M1.o, M/M2.o etc)
-
-   One SRT per group.
-
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
-
- - Pull out Areas into its own module
-   Parameterise AreaMap (note there are type synonyms in CmmStackLayout!)
-   Add ByteWidth = Int
-   type SubArea    = (Area, ByteOff, ByteWidth) 
-   ByteOff should not be defined in SMRep -- that is too high up the hierarchy
-   
- - SMRep should not be imported by any module in cmm/!  Make it so.
-	-- ByteOff etc   ==>  CmmExpr
-        -- rET_SMALL etc ==> CmmInfo
-   Check that there are no other imports from codeGen in cmm/
-
- - If you eliminate a label by branch chain elimination,
-   what happens if there's an Area associated with that label?
-
- - Think about a non-flattened representation?
-
- - LastCall: 
-    * Use record fields for LastCall!
-    * cml_ret_off should be a ByteOff
-    * Split into 
-         LastCall (which has a successor) and
-         LastJump (which does not, includes return?)
-	   - does not have cml_cont, cml_ret_args, cml_ret_off
-	 LastForeignCall 
-           - safe! 
-           - expands into save/MidForeignCall/restore/goto
-	   - like any LastCall, target of the call gets an info table
-
- - JD: remind self of what goes wrong if you turn off the 
-   liveness of the update frame
 
  - Garbage-collect http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
    moving good stuff into 
    http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
-
-
- - We believe that all of CmmProcPoint.addProcPointProtocols is dead.  What
-   goes wrong if we simply never call it?
-
- - Something fishy in CmmStackLayout.hs
-   * In particular, 'getAreaSize' returns an AreaMap, but we *know* the width of
-	LocalRegs, so it'd be better to return FiniteMap AreaId ByteWidth
-   * setSuccSPs looks fishy.  Rather than lookin in procPoints, it could
-	just lookup the block in areaSize which, after all, has a binding
-	for precisely successors of calls.  All other blocks (including proc
-        points that are not successors of a call, we think) can be treated
-        uniformly: zero-size Area, and use inSP.
-
 
  - Currently AsmCodeGen top level calls AsmCodeGen.cmmToCmm, which is a small
    C-- optimiser.  It has quite a lot of boilerplate folding code in AsmCodeGen
    (cmmBlockConFold, cmmStmtConFold, cmmExprConFold), before calling out to
    CmmOpt.  ToDo: see what optimisations are being done; and do them before
    AsmCodeGen.
-
- - Modularise the CPS pipeline; instead of ...; A;B;C; ...
-                                use  ..; ABC; ....
-
- - Most of HscMain.tryNewCodeGen does not belong in HscMain.  Instead
-	if new_cg then
-             StgCmm.codeGen
-             processCmm  [including generating "raw" cmm]
-        else
-             CodeGen.codeGen
-             cmmToRawCmm
-
 
  - If we stick CAF and stack liveness info on a LastCall node (not LastRet/Jump)
    then all CAF and stack liveness stuff be completed before we split
@@ -312,9 +146,6 @@ ClosureInfo.lhs
 	Modules in cmm/
 ----------------------------------------------------
 
--------- Testing stuff ------------
-DynFlags: -frun-cpsz
-
 -------- Moribund stuff ------------
 OldCmm.hs      Definition of flowgraph of old representation
                Imports some data types from (new) Cmm
@@ -356,93 +187,6 @@ PprC.hs	            Pretty print Cmm in C syntax
 
 CLabel.hs           CLabel
 BlockId.hs          BlockId, BlockEnv, BlockSet
-
-----------------------------------------------------
-      Top-level structure
-----------------------------------------------------
-
-* New codgen called in HscMain.hscGenHardCode, by calling HscMain.tryNewCodeGen, 
-  enabled by -fnew-codegen (Opt_TryNewCodeGen)
-
-  THEN it calls CmmInfo.cmmToRawCmm to lay out the details of info tables
-      type Cmm    = GenCmm CmmStatic CmmInfo     (ListGraph CmmStmt)
-      type RawCmm = GenCmm CmmStatic [CmmStatic] (ListGraph CmmStmt)
-
-* HscMain.tryNewCodeGen
-    - STG->Cmm:         StgCmm.codeGen (new codegen)
-    - Optimize and CPS: CmmPipeline.cmmPipeline
-    - Convert:          CmmCvt.cmmOfZgraph (convert to old rep) very self contained
-
-* StgCmm.hs  The new STG -> Cmm conversion code generator
-  Lots of modules StgCmmXXX
-
-
-----------------------------------------------------
-      CmmPipeline.cmmPipeline   The new pipeline
-----------------------------------------------------
-
-CmmPipeline.cmmPipeline:
-   1. Do control flow optimization
-   2. Do cpsTop for each procedures separately
-   3. Build SRT representation; this spans multiple procedures
-        (unless split-objs)
-   4. Do control flow optimization on all resulting procedures
-
-cpsTop:
-  * CmmCommonBlockElim.elimCommonBlocks:
-	eliminate common blocks 
-
-  * CmmProcPoint.minimalProcPointSet
-	identify proc-points
-        no change to graph
-
-  * CmmProcPoint.addProcPointProtocols
-	something to do with the MA optimisation
-        probably entirely unnecessary
-
-  * Spill and reload:
-     - CmmSpillReload.dualLivenessWithInsertion
-       insert spills/reloads across 
-	   LastCalls, and 
-	   Branches to proc-points
-     Now sink those reloads (and other instructions):
-     - CmmSpillReload.rewriteAssignments
-     - CmmSpillReload.removeDeadAssignmentsAndReloads
-
-  * CmmStackLayout.stubSlotsOnDeath
-	debug only: zero out dead slots when they die
-
-  * Stack layout
-     - CmmStackLayout.lifeSlotAnal: 
-       find which sub-areas are live on entry to each block
-
-     - CmmStackLayout.layout
-       Lay out the stack, returning an AreaMap
-         type AreaMap = FiniteMap Area ByteOff
-          -- Byte offset of the oldest byte of the Area, 
-          -- relative to the oldest byte of the Old Area
-
-     - CmmStackLayout.manifestSP
-       Manifest the stack pointer
-
-   * Split into separate procedures
-
-      - CmmProcPoint.procPointAnalysis
-        Given set of proc points (computed earlier by
-           CmmProcPoint.minimalProcPointSet) find which blocks 
-           are reachable from each
-	Each block should be reachable from *one* proc point, so 
-	  the blocks reachable from P are the internal nodes of 
-	  the final procedure P
-        NB: if we the earlier analysis had produced too few proc-points 
-            we should nevertheless be fine by code duplication; but
-	    that is not implemented
-
-      - CmmProcPoint.splitAtProcPoints
-	Using this info, split into separate procedures
-
-      - CmmBuildInfoTables.setInfoTableStackMap
-	Attach stack maps to each info table
 
 
 ----------------------------------------------------
@@ -539,116 +283,3 @@ a dominator analysis, using the Dataflow Engine.
 * DECIDED: we can generate SRTs based on the final Cmm program
   without knowledge of how it is generated.
 
-----------------------------------------------------
-		Foreign calls
-----------------------------------------------------
-
-See Note [Foreign calls] in CmmNode!  This explains that a safe
-foreign call must do this:
-  save thread state
-  push info table (on thread stack) to describe frame
-  make call (via C stack)
-  pop info table
-  restore thread state
-and explains why this expansion must be done late in the day.
-
-Hence, 
-  - Every foreign call is represented as a middle node
-
-  - *Unsafe* foreign calls are simply "fat machine instructions"
-      and are passed along to the native code generator
-
-  - *Safe* foreign calls are "lowered" to unsafe calls by wrapping
-      them in the above save/restore sequence. This step is done
-      very late in the pipeline, just before handing to the native
-      code gen.   
-  
-      This lowering is done by BuildInfoTables.lowerSafeForeignCalls
-
-
-NEW PLAN for foreign calls:
-  - Unsafe foreign calls remain as a middle node (fat machine instruction)
-    Even the parameter passing is not lowered (just as machine instrs
-    get arguments).
-
-  - Initially, safe foreign calls appear as LastCalls with 
-	
-
-----------------------------------------------------
-		Cmm representations
-----------------------------------------------------
-
-* CmmDecl.hs
-     The type [GenCmm d h g] represents a whole module, 
-	** one list element per .o file **
-	Without SplitObjs, the list has exactly one element
-
-     newtype GenCmm d h g = Cmm [GenCmmTop d h g]  -- A whole .o file
-     data GenCmmTop d h g
-         = CmmProc h g           -- One procedure, graph d
-         | CmmData <stuff> [d]   -- Initialised data, items d
-
-  Old and new piplines use different representations
-  	(CmmCvt.hs converts between the two)
-
-
--------------
-OLD BACK END representations (OldCmm.hs):  
-      type Cmm = GenCmm CmmStatic CmmInfo (ListGraph CmmStmt)
-				-- A whole module
-      newtype ListGraph i = ListGraph [GenBasicBlock i]
-
-      data CmmStmt = Assign | Store | Return etc -- OLD BACK END ONLY
-
-
-   Once the info tables are laid out, we replace CmmInfo with [CmmStatic]
-      type RawCmm    = GenCmm CmmStatic [CmmStatic] (ListGraph CmmStmt)
-   which represents the info tables as data, that should 
-   immediately precede the code
-  
--------------
-NEW BACK END representations 
-* Uses Hoopl library, a zero-boot package
-* CmmNode defines a node of a flow graph.
-* Cmm defines CmmGraph, CmmTop, Cmm
-   - CmmGraph is a closed/closed graph + an entry node.
-
-       data CmmGraph = CmmGraph { g_entry :: BlockId
-                                , g_graph :: Graph CmmNode C C }
-
-   - CmmTop is a top level chunk, specialization of GenCmmTop from CmmDecl.hs
-       with CmmGraph as a flow graph.
-   - Cmm is a collection of CmmTops.
-
-       type Cmm          = GenCmm    CmmStatic CmmTopInfo CmmGraph
-       type CmmTop       = GenCmmTop CmmStatic CmmTopInfo CmmGraph
-
-   - CmmTop uses CmmTopInfo, which is a CmmInfoTable and CmmStackInfo
-
-       data CmmTopInfo   = TopInfo {info_tbl :: CmmInfoTable, stack_info :: CmmStackInfo}
-
-   - CmmStackInfo
-
-       data CmmStackInfo = StackInfo {arg_space :: ByteOff, updfr_space :: Maybe ByteOff}
-
-         * arg_space = SP offset on entry
-         * updfr_space space = SP offset on exit
-       Once the staci is manifested, we could drom CmmStackInfo, ie. get
-         GenCmm CmmStatic CmmInfoTable CmmGraph, but we do not do that currently.
-
-
-* MkGraph.hs: smart constructors for Cmm.hs
-  Beware, the CmmAGraph defined here does not use AGraph from Hoopl,
-  as CmmAGraph can be opened or closed at exit, See the notes in that module.
-
--------------
-* SHARED stuff
-  CmmDecl.hs - GenCmm and GenCmmTop types
-  CmmExpr.hs - defines the Cmm expression types
-             - CmmExpr, CmmReg, CmmLit, LocalReg, GlobalReg
-             - Area, AreaId etc     (separate module?)
-  CmmType.hs - CmmType, Width etc   (saparate module?)
-  CmmMachOp.hs - MachOp and CallishMachOp types
-
-  BlockId.hs defines  BlockId, BlockEnv, BlockSet
--------------

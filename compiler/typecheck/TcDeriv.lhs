@@ -62,6 +62,7 @@ import FastString
 import Bag
 
 import Control.Monad
+import Data.List
 \end{code}
 
 %************************************************************************
@@ -1413,7 +1414,7 @@ inferInstanceContexts oflag infer_specs
 		-- Claim: the result instance declaration is guaranteed valid
 		-- Hence no need to call:
 		--   checkValidInstance tyvars theta clas inst_tys
-	   ; return (sortLe (\p1 p2 -> cmpType p1 p2 /= GT) theta) }	-- Canonicalise before returning the solution
+	   ; return (sortBy cmpType theta) }	-- Canonicalise before returning the solution
       where
         the_pred = mkClassPred clas inst_tys
 

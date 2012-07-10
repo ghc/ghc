@@ -129,10 +129,12 @@ flags = [
         "use the current user's package database",
   Option [] ["global"] (NoArg FlagGlobal)
         "use the global package database",
-  Option ['f'] ["package-db", "package-conf"] (ReqArg FlagConfig "FILE")
-        "use the specified package config file",
-  Option [] ["global-package-db"] (ReqArg FlagGlobalConfig "FILE")
-        "location of the global package config",
+  Option ['f'] ["package-db"] (ReqArg FlagConfig "FILE/DIR")
+        "use the specified package database",
+  Option [] ["package-conf"] (ReqArg FlagConfig "FILE/DIR")
+        "use the specified package database (DEPRECATED)",
+  Option [] ["global-package-db"] (ReqArg FlagGlobalConfig "DIR")
+        "location of the global package database",
   Option [] ["no-user-package-db"] (NoArg FlagNoUserDb)
         "never read the user package database",
   Option [] ["force"] (NoArg FlagForce)

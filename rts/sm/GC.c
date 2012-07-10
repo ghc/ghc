@@ -629,7 +629,16 @@ GarbageCollect (rtsBool force_major_gc,
   }
 
   // Reset the nursery: make the blocks empty
-  allocated += clearNurseries();
+  if (n_gc_threads == 1) {
+      for (n = 0; n < n_capabilities; n++) {
+          allocated += clearNursery(&capabilities[n]);
+      }
+  } else {
+      gct->allocated = clearNursery(cap);
+      for (n = 0; n < n_capabilities; n++) {
+          allocated += gc_threads[n]->allocated;
+      }
+  }
 
   resize_nursery();
 
@@ -1094,6 +1103,8 @@ gcWorkerThread (Capability *cap)
 
     scavenge_until_all_done();
     
+    gct->allocated = clearNursery(cap);
+
 #ifdef THREADED_RTS
     // Now that the whole heap is marked, we discard any sparks that
     // were found to be unreachable.  The main GC thread is currently
@@ -1477,6 +1488,7 @@ init_gc_thread (gc_thread *t)
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;
+    t->allocated = 0;
     t->copied = 0;
     t->scanned = 0;
     t->any_work = 0;

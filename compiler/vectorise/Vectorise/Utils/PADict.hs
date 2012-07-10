@@ -12,6 +12,7 @@ import Vectorise.Utils.Base
 
 import CoreSyn
 import CoreUtils
+import FamInstEnv
 import Coercion
 import Type
 import TypeRep
@@ -66,25 +67,35 @@ paDictOfType ty
     -- for type variables, look up the dfun and apply to the PA dictionaries
     -- of the type arguments
     paDictOfTyApp (TyVarTy tv) ty_args
-     = do dfun <- maybeCantVectoriseM "No PA dictionary for type variable"
+      = do 
+        { dfun <- maybeCantVectoriseM "No PA dictionary for type variable"
                                       (ppr tv <+> text "in" <+> ppr ty)
                 $ lookupTyVarPA tv
-          dicts <- mapM paDictOfType ty_args
-          return $ dfun `mkTyApps` ty_args `mkApps` dicts
+        ; dicts <- mapM paDictOfType ty_args
+        ; return $ dfun `mkTyApps` ty_args `mkApps` dicts
+        }
 
     -- for tycons, we also need to apply the dfun to the PR dictionary of
     -- the representation type if the tycon is polymorphic
     paDictOfTyApp (TyConApp tc []) ty_args
-     = do
-         dfun <- maybeCantVectoriseM noPADictErr (ppr tc <+> text "in" <+> ppr ty)
+      = do 
+        { dfun <- maybeCantVectoriseM noPADictErr (ppr tc <+> text "in" <+> ppr ty)
                 $ lookupTyConPA tc
-         dicts <- mapM paDictOfType ty_args
-         return $ Var dfun `mkTyApps` ty_args `mkApps` dicts
-     where
-       noPADictErr = "No PA dictionary for type constructor (did you import 'Data.Array.Parallel'?)"
+        ; super <- super_dict tc ty_args
+        ; dicts <- mapM paDictOfType ty_args
+        ; return $ Var dfun `mkTyApps` ty_args `mkApps` super `mkApps` dicts
+        }
+      where
+        noPADictErr = "No PA dictionary for type constructor (did you import 'Data.Array.Parallel'?)"
 
-    paDictOfTyApp _ _ = do dflags <- getDynFlags
-                           failure dflags
+        super_dict _     []      = return []
+        super_dict tycon ty_args
+          = do
+            { pr <- prDictOfPReprInst (TyConApp tycon ty_args)
+            ; return [pr]
+            }
+    
+    paDictOfTyApp _ _ = getDynFlags >>= failure
 
     failure dflags = cantVectorise dflags "Can't construct PA dictionary for type" (ppr ty)
 
@@ -96,11 +107,21 @@ paMethod _ query ty
   = liftM Var $ builtin (query tycon)
 paMethod method _ ty
   = do
-      fn   <- builtin method
-      dict <- paDictOfType ty
-      return $ mkApps (Var fn) [Type ty, dict]
+    { fn   <- builtin method
+    ; dict <- paDictOfType ty
+    ; return $ mkApps (Var fn) [Type ty, dict]
+    }
 
--- | Given a type @ty@, its PRepr synonym tycon and its type arguments,
+-- |Given a type @ty@, return the PR dictionary for @PRepr ty@.
+--
+prDictOfPReprInst :: Type -> VM CoreExpr
+prDictOfPReprInst ty
+  = do
+    { (prepr_fam, prepr_args) <- preprSynTyCon ty
+    ; prDictOfPReprInstTyCon ty (famInstAxiom prepr_fam) prepr_args
+    }
+
+-- |Given a type @ty@, its PRepr synonym tycon and its type arguments,
 -- return the PR @PRepr ty@. Suppose we have:
 --
 -- > type instance PRepr (T a1 ... an) = t

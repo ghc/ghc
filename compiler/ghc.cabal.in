@@ -185,16 +185,15 @@ Library
         CmmOpt
         CmmParse
         CmmProcPoint
-        CmmSpillReload
         CmmRewriteAssignments
-        CmmStackLayout
         CmmType
         CmmUtils
+        CmmLayoutStack
         MkGraph
         OldCmm
+        OldCmmLint
         OldCmmUtils
         OldPprCmm
-        OptimizationFuel
         PprBase
         PprC
         PprCmm
@@ -440,6 +439,7 @@ Library
         Pretty
         Serialized
         State
+        Stream
         StringBuffer
         UniqFM
         UniqSet
@@ -473,6 +473,8 @@ Library
         Vectorise.Env
         Vectorise.Exp
         Vectorise
+        Hoopl.Dataflow
+        Hoopl
 
     Exposed-Modules:
             AsmCodeGen

@@ -47,7 +47,7 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
-import Util        ( sortLe, minWith, count )
+import Util        ( minWith, count )
 import Outputable
 import Maybes      ( expectJust )
 import MonadUtils  ( allM )
@@ -59,7 +59,8 @@ import Control.Monad.ST
 -- std interfaces
 import Data.Maybe
 import Data.Array
-import Data.List   ( (\\) )
+import Data.List hiding (transpose)
+import Data.Ord
 import Data.Array.ST
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -140,8 +141,7 @@ reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_verte
     max_v           = length nodes - 1
     bounds          = (0, max_v) :: (Vertex, Vertex)
 
-    sorted_nodes    = let n1 `le` n2 = (key_extractor n1 `compare` key_extractor n2) /= GT
-                      in sortLe le nodes
+    sorted_nodes    = sortBy (comparing key_extractor) nodes
     numbered_nodes  = zipWith (,) [0..] sorted_nodes
 
     key_map         = array bounds [(i, key_extractor node) | (i, node) <- numbered_nodes]

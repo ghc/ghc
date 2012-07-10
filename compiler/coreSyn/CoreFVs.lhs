@@ -442,7 +442,7 @@ stableUnfoldingVars fv_cand unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
          | isStableSource src -> Just (exprSomeFreeVars fv_cand rhs)
-      DFunUnfolding _ _ args  -> Just (exprsSomeFreeVars fv_cand args)
+      DFunUnfolding _ _ args  -> Just (exprsSomeFreeVars fv_cand (dfunArgExprs args))
       _other                  -> Nothing
 \end{code}
 

@@ -7,7 +7,8 @@
 
 module CmmCallConv (
   ParamLocation(..),
-  assignArgumentsPos
+  assignArgumentsPos,
+  globalArgRegs
 ) where
 
 #include "HsVersions.h"
@@ -53,7 +54,6 @@ assignArgumentsPos conv arg_ty reps = assignments
                ([_], PrimOpReturn)     -> allRegs
                (_,   PrimOpReturn)     -> getRegsWithNode
                (_,   Slow)             -> noRegs
-               _ -> pprPanic "Unknown calling convention" (ppr conv)
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
       -- (even if there are still available registers for args of a different type).
@@ -130,18 +130,25 @@ getRegsWithNode =
   (intRegs, map FloatReg  floatRegNos, map DoubleReg doubleRegNos, map LongReg longRegNos)
     where intRegs = map VanillaReg vanillaRegNos
 
-allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
-allVanillaRegNos = regList mAX_Vanilla_REG
-allFloatRegNos	 = regList mAX_Float_REG
-allDoubleRegNos	 = regList mAX_Double_REG
-allLongRegNos	   = regList mAX_Long_REG
+allFloatRegs, allDoubleRegs, allLongRegs :: [GlobalReg]
+allVanillaRegs :: [VGcPtr -> GlobalReg]
+
+allVanillaRegs = map VanillaReg $ regList mAX_Vanilla_REG
+allFloatRegs   = map FloatReg   $ regList mAX_Float_REG
+allDoubleRegs  = map DoubleReg  $ regList mAX_Double_REG
+allLongRegs    = map LongReg    $ regList mAX_Long_REG
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
 
 allRegs :: AvailRegs
-allRegs = (map VanillaReg allVanillaRegNos, map FloatReg allFloatRegNos,
-           map DoubleReg  allDoubleRegNos,  map LongReg  allLongRegNos)
+allRegs  = (allVanillaRegs, allFloatRegs, allDoubleRegs, allLongRegs)
 
 noRegs :: AvailRegs
-noRegs    = ([], [], [], [])
+noRegs  = ([], [], [], [])
+
+globalArgRegs :: [GlobalReg]
+globalArgRegs = map ($VGcPtr) allVanillaRegs ++
+                allFloatRegs ++
+                allDoubleRegs ++
+                allLongRegs

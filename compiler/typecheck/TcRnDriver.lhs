@@ -82,6 +82,7 @@ import TcType   ( orphNamesOfDFunHead )
 import Inst     ( tcGetInstEnvs )
 import Data.List ( sortBy )
 import Data.IORef ( readIORef )
+import Data.Ord
 
 #ifdef GHCI
 import TcType   ( isUnitTy, isTauTy )
@@ -1326,6 +1327,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
+        ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
               matches   = [mkMatch [] rn_expr emptyLocalBinds]
               -- [it = expr]
@@ -1344,7 +1346,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                                            (HsVar bindIOName) noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
+              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 
         -- The plans are:
@@ -1879,17 +1881,15 @@ ppr_fam_insts fam_insts =
 ppr_sigs :: [Var] -> SDoc
 ppr_sigs ids
         -- Print type signatures; sort by OccName
-  = vcat (map ppr_sig (sortLe le_sig ids))
+  = vcat (map ppr_sig (sortBy (comparing getOccName) ids))
   where
-    le_sig id1 id2 = getOccName id1 <= getOccName id2
     ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
 ppr_tydecls :: [TyCon] -> SDoc
 ppr_tydecls tycons
         -- Print type constructor info; sort by OccName
-  = vcat (map ppr_tycon (sortLe le_sig tycons))
+  = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
   where
-    le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
     ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
 
 ppr_rules :: [CoreRule] -> SDoc

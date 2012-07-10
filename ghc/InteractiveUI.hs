@@ -21,12 +21,14 @@ import Debugger
 
 -- The GHC interface
 import DynFlags
+import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
-import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs )
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs, hsc_IC, 
+                  setInteractivePrintName )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, exposed, exposedModules, pkgIdMap )
@@ -62,6 +64,7 @@ import Control.Monad.IO.Class
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
+import Data.Function
 import Data.IORef ( IORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
@@ -206,7 +209,8 @@ helpText =
   "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
   "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
-  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
+  "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
+  "                               precedence, ::<cmd> is always a builtin command)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
   "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
@@ -449,6 +453,8 @@ runGHCi paths maybe_exprs = do
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
 
+  installInteractivePrint (interactivePrint dflags) (isJust maybe_exprs)
+
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
   is_tty <- liftIO (hIsTerminalDevice stdin)
@@ -605,6 +611,18 @@ queryQueue = do
     []   -> return Nothing
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
+
+-- Reconfigurable pretty-printing Ticket #5461
+installInteractivePrint :: Maybe String -> Bool -> GHCi ()
+installInteractivePrint Nothing _  = return ()
+installInteractivePrint (Just ipFun) exprmode = do
+  ok <- trySuccess $ do
+                (name:_) <- GHC.parseName ipFun
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
+                                      in he{hsc_IC = new_ic})
+                return Succeeded
+
+  when (failed ok && exprmode) $ liftIO (exitWith (ExitFailure 1))
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
@@ -891,12 +909,9 @@ lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
   macros <- readIORef macros_ref
   let{ (str, cmds) = case str' of
-      ':' : rest -> (rest, builtin_commands)
-      _ -> (str', builtin_commands ++ macros) }
+      ':' : rest -> (rest, builtin_commands) -- "::" selects a builtin command
+      _ -> (str', macros ++ builtin_commands) } -- otherwise prefer macros
   -- look for exact match first, then the first prefix match
-  -- We consider builtin commands first: since new macros are appended
-  -- on the *end* of the macros list, this is consistent with the view
-  -- that things defined earlier should take precedence. See also #3858
   return $ case [ c | c <- cmds, str == cmdName c ] of
            c:_ -> Just c
            [] -> case [ c | c@(s,_,_) <- cmds, str `isPrefixOf` s ] of
@@ -989,12 +1004,12 @@ filterOutChildren get_thing xs
 pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
 pprInfo pefas (thing, fixity, insts)
   =  pprTyThingInContextLoc pefas thing
-  $$ show_fixity fixity
+  $$ show_fixity
   $$ vcat (map GHC.pprInstance insts)
   where
-    show_fixity fix
-        | fix == GHC.defaultFixity = empty
-        | otherwise                = ppr fix <+> pprInfixName (GHC.getName thing)
+    show_fixity
+        | fixity == GHC.defaultFixity = empty
+        | otherwise                   = ppr fixity <+> pprInfixName (GHC.getName thing)
 
 -----------------------------------------------------------------------------
 -- :main
@@ -1125,8 +1140,8 @@ defineMacro overwrite s = do
   handleSourceError (\e -> GHC.printException e) $
    do
     hv <- GHC.compileExpr new_expr
-    liftIO (writeIORef macros_ref --
-            (filtered ++ [(macro_name, lift . runMacro hv, noCompletion)]))
+    liftIO (writeIORef macros_ref -- later defined macros have precedence
+            ((macro_name, lift . runMacro hv, noCompletion) : filtered))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -1974,6 +1989,7 @@ newDynFlags interactive_only minus_opts = do
               packageFlags idflags1 /= packageFlags idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
       GHC.setInteractiveDynFlags idflags1
+      installInteractivePrint (interactivePrint idflags1) False
 
       dflags0 <- getDynFlags
       when (not interactive_only) $ do
@@ -2151,11 +2167,11 @@ showBindings = do
     pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
     pprTT pefas (thing, fixity, _insts) =
         pprTyThing pefas thing
-        $$ show_fixity fixity
+        $$ show_fixity
       where
-        show_fixity fix
-            | fix == GHC.defaultFixity  = empty
-            | otherwise                 = ppr fix <+> ppr (GHC.getName thing)
+        show_fixity
+            | fixity == GHC.defaultFixity  = empty
+            | otherwise                    = ppr fixity <+> ppr (GHC.getName thing)
 
 
 printTyThing :: TyThing -> GHCi ()

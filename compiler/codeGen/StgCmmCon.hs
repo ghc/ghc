@@ -92,6 +92,7 @@ cgTopRhsCon id con args
                              info_tbl
                              dontCareCCS                -- Because it's static data
                              caffy                      -- Has CAF refs
+                             False                      -- no SRT
                              payload
 
                 -- BUILD THE OBJECT

@@ -66,6 +66,7 @@ import Module
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
+import Data.Ord
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -875,7 +876,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         bitmap_size' :: Int
         bitmap_size' = fromIntegral bitmap_size
         bitmap = intsToReverseBitmap bitmap_size'{-size-}
-                        (sortLe (<=) (filter (< bitmap_size') rel_slots))
+                        (sort (filter (< bitmap_size') rel_slots))
           where
           binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
@@ -1305,7 +1306,7 @@ mkMultiBranch maybe_ncons raw_ways = do
              -- shouldn't happen?
 
          mkTree [val] range_lo range_hi
-            | range_lo `eqAlt` range_hi
+            | range_lo == range_hi
             = return (snd val)
             | null defaults -- Note [CASEFAIL]
             = do lbl <- getLabelBc
@@ -1349,9 +1350,7 @@ mkMultiBranch maybe_ncons raw_ways = do
      return (instrs `appOL` the_default)
   where
          (defaults, not_defaults) = partition (isNoDiscr.fst) raw_ways
-         notd_ways = sortLe
-                        (\w1 w2 -> leAlt (fst w1) (fst w2))
-                        not_defaults
+         notd_ways = sortBy (comparing fst) not_defaults
 
          testLT (DiscrI i) fail_label = TESTLT_I i fail_label
          testLT (DiscrW i) fail_label = TESTLT_W i fail_label
@@ -1386,22 +1385,6 @@ mkMultiBranch maybe_ncons raw_ways = do
                  Just n  -> (0, fromIntegral n - 1)
                  Nothing -> (minBound, maxBound)
 
-         (DiscrI i1) `eqAlt` (DiscrI i2) = i1 == i2
-         (DiscrW w1) `eqAlt` (DiscrW w2) = w1 == w2
-         (DiscrF f1) `eqAlt` (DiscrF f2) = f1 == f2
-         (DiscrD d1) `eqAlt` (DiscrD d2) = d1 == d2
-         (DiscrP i1) `eqAlt` (DiscrP i2) = i1 == i2
-         NoDiscr     `eqAlt` NoDiscr     = True
-         _           `eqAlt` _           = False
-
-         (DiscrI i1) `leAlt` (DiscrI i2) = i1 <= i2
-         (DiscrW w1) `leAlt` (DiscrW w2) = w1 <= w2
-         (DiscrF f1) `leAlt` (DiscrF f2) = f1 <= f2
-         (DiscrD d1) `leAlt` (DiscrD d2) = d1 <= d2
-         (DiscrP i1) `leAlt` (DiscrP i2) = i1 <= i2
-         NoDiscr     `leAlt` NoDiscr     = True
-         _           `leAlt` _           = False
-
          isNoDiscr NoDiscr = True
          isNoDiscr _       = False
 
@@ -1431,6 +1414,7 @@ data Discr
    | DiscrD Double
    | DiscrP Word16
    | NoDiscr
+    deriving (Eq, Ord)
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i

@@ -73,6 +73,7 @@ import ListSetOps	( removeDups )
 import DynFlags
 import FastString
 import Control.Monad
+import Data.List
 import qualified Data.Set as Set
 import Constants	( mAX_TUPLE_SIZE )
 \end{code}
@@ -1641,7 +1642,7 @@ dupNamesErr get_loc names
   where
     locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
-    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sortLe (<=) locs))
+    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sort locs))
 
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing

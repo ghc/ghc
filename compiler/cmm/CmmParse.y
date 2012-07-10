@@ -230,35 +230,31 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals_without_hints maybe_gc_block maybe_frame '{' body '}'
-		{ do ((entry_ret_label, info, live, formals, gc_block, frame), stmts) <-
+        : info maybe_formals_without_hints '{' body '}'
+                { do ((entry_ret_label, info, live, formals), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (entry_ret_label, info, live) <- $1;
 		         formals <- sequence $2;
-		         gc_block <- $3;
-		         frame <- $4;
-		         $6;
-		         return (entry_ret_label, info, live, formals, gc_block, frame) }
+                         $4;
+                         return (entry_ret_label, info, live, formals) }
 		     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitInfoTableAndCode entry_ret_label (CmmInfo gc_block frame info) formals blks) }
+                     code (emitInfoTableAndCode entry_ret_label info formals blks) }
 
 	| info maybe_formals_without_hints ';'
 		{ do (entry_ret_label, info, live) <- $1;
 		     formals <- sequence $2;
-		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
+                     code (emitInfoTableAndCode entry_ret_label info formals []) }
 
-	| NAME maybe_formals_without_hints maybe_gc_block maybe_frame '{' body '}'
+        | NAME maybe_formals_without_hints '{' body '}'
 		{% withThisPackage $ \pkg ->
 		   do	newFunctionName $1 pkg
-		   	((formals, gc_block, frame), stmts) <-
+                        (formals, stmts) <-
 			 	getCgStmtsEC' $ loopDecls $ do {
 		          		formals <- sequence $2;
-		          		gc_block <- $3;
-			  		frame <- $4;
-		          		$6;
-		          		return (formals, gc_block, frame) }
+                                        $4;
+                                        return formals }
 			blks <- code (cgStmtsToBlocks stmts)
-			code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkCmmCodeLabel pkg $1) formals blks) }
+                        code (emitProc CmmNonInfoTable (mkCmmCodeLabel pkg $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
@@ -599,18 +595,7 @@ formals_without_hints :: { [ExtFCode LocalReg] }
 formal_without_hint :: { ExtFCode LocalReg }
 	: type NAME		{ newLocal $1 $2 }
 
-maybe_frame :: { ExtFCode (Maybe UpdateFrame) }
-	: {- empty -}			{ return Nothing }
-	| 'jump' expr '(' exprs0 ')'	{ do { target <- $2;
-					       args <- sequence $4;
-					       return $ Just (UpdateFrame target args) } }
-
-maybe_gc_block :: { ExtFCode (Maybe BlockId) }
-	: {- empty -}			{ return Nothing }
-	| 'goto' NAME
-		{ do l <- lookupLabel $2; return (Just l) }
-
-type	:: { CmmType }
+type    :: { CmmType }
 	: 'bits8'		{ b8 }
 	| typenot8		{ $1 }
 
@@ -1073,7 +1058,8 @@ parseCmmFile dflags filename = do
         let msg = mkPlainErrMsg dflags span err
         return ((emptyBag, unitBag msg), Nothing)
     POk pst code -> do
-        cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
+        st <- initC
+        let (cmm,_) = runC dflags no_module st (getCmm (unEC code initEnv [] >> return ()))
         let ms = getMessages pst
         if (errorsFound dflags ms)
          then return (ms, Nothing)

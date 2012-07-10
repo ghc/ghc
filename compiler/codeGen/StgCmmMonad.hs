@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 -----------------------------------------------------------------------------
 --
 -- Monad for Stg to C-- code generation
@@ -16,16 +17,22 @@
 module StgCmmMonad (
 	FCode,	-- type
 
-	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
+        initC, runC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
 	returnFC, fixC, fixC_, nopC, whenC, 
 	newUnique, newUniqSupply, 
 
+        newLabelC, emitLabel,
+
 	emit, emitDecl, emitProc, emitProcWithConvention, emitSimpleProc,
+        emitOutOfLine, emitAssign, emitStore, emitComment,
 
 	getCmm, cgStmtsToBlocks,
 	getCodeR, getCode, getHeapUsage,
 
-	forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
+        mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
+        mkCall, mkCmmCall, mkSafeCall,
+
+        forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
 
 	ConTagZ,
 
@@ -69,12 +76,12 @@ import VarEnv
 import OrdList
 import Unique
 import UniqSupply
-import FastString(sLit)
+import FastString
 import Outputable
 
 import Control.Monad
 import Data.List
-import Prelude hiding( sequence )
+import Prelude hiding( sequence, succ )
 import qualified Prelude( sequence )
 
 infixr 9 `thenC`	-- Right-associative!
@@ -95,12 +102,12 @@ instance Monad FCode where
 {-# INLINE thenFC #-}
 {-# INLINE returnFC #-}
 
-initC :: DynFlags -> Module -> FCode a -> IO a
-initC dflags mod (FCode code)
-  = do	{ uniqs <- mkSplitUniqSupply 'c'
-	; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-	      (res, _) -> return res
-	}
+initC :: IO CgState
+initC  = do { uniqs <- mkSplitUniqSupply 'c'
+            ; return (initCgState uniqs) }
+
+runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
+runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
 
 returnFC :: a -> FCode a
 returnFC val = FCode (\_info_down state -> (val, state))
@@ -270,6 +277,8 @@ data HeapUsage =
 
 type VirtualHpOffset = WordOff
 
+
+
 initCgState :: UniqSupply -> CgState
 initCgState uniqs
   = MkCgState { cgs_stmts      = mkNop, cgs_tops = nilOL,
@@ -307,7 +316,6 @@ initHpUsage = HeapUsage { virtHp = 0, realHp = 0 }
 
 maxHpHw :: HeapUsage -> VirtualHpOffset -> HeapUsage
 hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
-
 
 --------------------------------------------------------
 -- Operators for getting and setting the state and "info_down".
@@ -591,6 +599,33 @@ getHeapUsage fcode
 -- ----------------------------------------------------------------------------
 -- Combinators for emitting code
 
+emitCgStmt :: CgStmt -> FCode ()
+emitCgStmt stmt
+  = do  { state <- getState
+        ; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
+        }
+
+emitLabel :: BlockId -> FCode ()
+emitLabel id = emitCgStmt (CgLabel id)
+
+emitComment :: FastString -> FCode ()
+#if 0 /* def DEBUG */
+emitComment s = emitCgStmt (CgStmt (CmmComment s))
+#else
+emitComment _ = return ()
+#endif
+
+emitAssign :: CmmReg  -> CmmExpr -> FCode ()
+emitAssign l r = emitCgStmt (CgStmt (CmmAssign l r))
+
+emitStore :: CmmExpr  -> CmmExpr -> FCode ()
+emitStore l r = emitCgStmt (CgStmt (CmmStore l r))
+
+
+newLabelC :: FCode BlockId
+newLabelC = do { u <- newUnique
+               ; return $ mkBlockId u }
+
 emit :: CmmAGraph -> FCode ()
 emit ag
   = do	{ state <- getState
@@ -600,6 +635,9 @@ emitDecl :: CmmDecl -> FCode ()
 emitDecl decl
   = do 	{ state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
+
+emitOutOfLine :: BlockId -> CmmAGraph -> FCode ()
+emitOutOfLine l stmts = emitCgStmt (CgFork l stmts)
 
 emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> [CmmFormal] ->
                           CmmAGraph -> FCode ()
@@ -629,6 +667,60 @@ getCmm code
 	; setState $ state2 { cgs_tops = cgs_tops state1 } 
         ; return (fromOL (cgs_tops state2)) }
 
+
+mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> FCode CmmAGraph
+mkCmmIfThenElse e tbranch fbranch = do
+  endif <- newLabelC
+  tid   <- newLabelC
+  fid   <- newLabelC
+  return $ mkCbranch e tid fid <*>
+            mkLabel tid <*> tbranch <*> mkBranch endif <*>
+            mkLabel fid <*> fbranch <*> mkLabel endif
+
+mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
+mkCmmIfGoto e tid = do
+  endif <- newLabelC
+  return $ mkCbranch e tid endif <*> mkLabel endif
+
+mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
+mkCmmIfThen e tbranch = do
+  endif <- newLabelC
+  tid <- newLabelC
+  return $ mkCbranch e tid endif <*>
+         mkLabel tid <*> tbranch <*> mkLabel endif
+
+
+mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
+       -> UpdFrameOffset -> (ByteOff,[(CmmExpr,ByteOff)]) -> FCode CmmAGraph
+mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
+  k <- newLabelC
+  let area = Young k
+      (off, copyin) = copyInOflow retConv area results
+      copyout = mkCallReturnsTo f callConv actuals k off updfr_off extra_stack
+  return (copyout <*> mkLabel k <*> copyin)
+
+mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset
+          -> FCode CmmAGraph
+mkCmmCall f results actuals updfr_off
+   = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off (0,[])
+
+
+mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
+           -> UpdFrameOffset -> Bool
+           -> FCode CmmAGraph
+mkSafeCall   t fs as upd i = do
+  k <- newLabelC
+  let (_off, copyout) = copyInOflow NativeReturn (Young k) fs
+    -- see Note [safe foreign call convention]
+  return
+     (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
+                  (CmmLit (CmmBlock k))
+      <*> mkLast (CmmForeignCall { tgt=t, res=fs, args=as, succ=k
+                                 , updfr=upd, intrbl=i })
+      <*> mkLabel k
+      <*> copyout
+     )
+
 -- ----------------------------------------------------------------------------
 -- CgStmts
 
@@ -640,4 +732,3 @@ cgStmtsToBlocks :: CmmAGraph -> FCode CmmGraph
 cgStmtsToBlocks stmts
   = do  { us <- newUniqSupply
 	; return (initUs_ us (lgraphOfAGraph stmts)) }	
-

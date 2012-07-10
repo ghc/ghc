@@ -60,13 +60,14 @@ module CmmUtils(
         -- * Operations that probably don't belong here
         modifyGraph,
 
-        lastNode, replaceLastNode, insertBetween,
+        lastNode, replaceLastNode,
         ofBlockMap, toBlockMap, insertBlock,
         ofBlockList, toBlockList, bodyToBlockList,
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
       
         analFwd, analBwd, analRewFwd, analRewBwd,
-        dataflowPassFwd, dataflowPassBwd
+        dataflowPassFwd, dataflowPassBwd, dataflowAnalFwd, dataflowAnalBwd,
+        dataflowAnalFwdBlocks
   ) where
 
 #include "HsVersions.h"
@@ -79,7 +80,6 @@ import Cmm
 import BlockId
 import CLabel
 import Outputable
-import OptimizationFuel as F
 import Unique
 import UniqSupply
 import Constants( wORD_SIZE, tAG_MASK )
@@ -88,8 +88,7 @@ import Util
 import Data.Word
 import Data.Maybe
 import Data.Bits
-import Control.Monad
-import Compiler.Hoopl hiding ( Unique )
+import Hoopl
 
 ---------------------------------------------------
 --
@@ -402,13 +401,13 @@ mkLiveness (reg:regs)
 modifyGraph :: (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
 modifyGraph f g = CmmGraph {g_entry=g_entry g, g_graph=f (g_graph g)}
 
-toBlockMap :: CmmGraph -> LabelMap CmmBlock
+toBlockMap :: CmmGraph -> BlockEnv CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
-ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+ofBlockMap :: BlockId -> BlockEnv CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
 
-insertBlock :: CmmBlock -> LabelMap CmmBlock -> LabelMap CmmBlock
+insertBlock :: CmmBlock -> BlockEnv CmmBlock -> BlockEnv CmmBlock
 insertBlock block map =
   ASSERT (isNothing $ mapLookup id map)
   mapInsert id block map
@@ -418,7 +417,8 @@ toBlockList :: CmmGraph -> [CmmBlock]
 toBlockList g = mapElems $ toBlockMap g
 
 ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
-ofBlockList entry blocks = CmmGraph {g_entry=entry, g_graph=GMany NothingO body NothingO}
+ofBlockList entry blocks = CmmGraph { g_entry = entry
+                                    , g_graph = GMany NothingO body NothingO }
   where body = foldr addBlock emptyBody blocks
 
 bodyToBlockList :: Body CmmNode -> [CmmBlock]
@@ -429,97 +429,77 @@ mapGraphNodes :: ( CmmNode C O -> CmmNode C O
                  , CmmNode O C -> CmmNode O C)
               -> CmmGraph -> CmmGraph
 mapGraphNodes funs@(mf,_,_) g =
-  ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (blockMapNodes3 funs) $ toBlockMap g
+  ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (mapBlock3' funs) $ toBlockMap g
 
 mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGraph
-mapGraphNodes1 f g = modifyGraph (graphMapBlocks (blockMapNodes f)) g
+mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 
 foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
 foldGraphBlocks k z g = mapFold k z $ toBlockMap g
 
 postorderDfs :: CmmGraph -> [CmmBlock]
-postorderDfs g = postorder_dfs_from (toBlockMap g) (g_entry g)
-
--------------------------------------------------
--- Manipulating CmmBlocks
-
-lastNode :: CmmBlock -> CmmNode O C
-lastNode block = foldBlockNodesF3 (nothing, nothing, const) block ()
-  where nothing :: a -> b -> ()
-        nothing _ _ = ()
-
-replaceLastNode :: Block CmmNode e C -> CmmNode O C -> Block CmmNode e C
-replaceLastNode block last = blockOfNodeList (first, middle, JustC last)
-  where (first, middle, _) = blockToNodeList block
-
-----------------------------------------------------------------------
------ Splicing between blocks
--- Given a middle node, a block, and a successor BlockId,
--- we can insert the middle node between the block and the successor.
--- We return the updated block and a list of new blocks that must be added
--- to the graph.
--- The semantics is a bit tricky. We consider cases on the last node:
--- o For a branch, we can just insert before the branch,
---   but sometimes the optimizer does better if we actually insert
---   a fresh basic block, enabling some common blockification.
--- o For a conditional branch, switch statement, or call, we must insert
---   a new basic block.
--- o For a jump or return, this operation is impossible.
-
-insertBetween :: MonadUnique m => CmmBlock -> [CmmNode O O] -> BlockId -> m (CmmBlock, [CmmBlock])
-insertBetween b ms succId = insert $ lastNode b
-  where insert :: MonadUnique m => CmmNode O C -> m (CmmBlock, [CmmBlock])
-        insert (CmmBranch bid) =
-          if bid == succId then
-            do (bid', bs) <- newBlocks
-               return (replaceLastNode b (CmmBranch bid'), bs)
-          else panic "tried invalid block insertBetween"
-        insert (CmmCondBranch c t f) =
-          do (t', tbs) <- if t == succId then newBlocks else return $ (t, [])
-             (f', fbs) <- if f == succId then newBlocks else return $ (f, [])
-             return (replaceLastNode b (CmmCondBranch c t' f'), tbs ++ fbs)
-        insert (CmmSwitch e ks) =
-          do (ids, bs) <- mapAndUnzipM mbNewBlocks ks
-             return (replaceLastNode b (CmmSwitch e ids), join bs)
-        insert (CmmCall {}) =
-          panic "unimp: insertBetween after a call -- probably not a good idea"
-        insert (CmmForeignCall {}) =
-          panic "unimp: insertBetween after a foreign call -- probably not a good idea"
-
-        newBlocks :: MonadUnique m => m (BlockId, [CmmBlock])
-        newBlocks = do id <- liftM mkBlockId $ getUniqueM
-                       return $ (id, [blockOfNodeList (JustC (CmmEntry id), ms, JustC (CmmBranch succId))])
-        mbNewBlocks :: MonadUnique m => Maybe BlockId -> m (Maybe BlockId, [CmmBlock])
-        mbNewBlocks (Just k) = if k == succId then liftM fstJust newBlocks
-                               else return (Just k, [])
-        mbNewBlocks Nothing  = return (Nothing, [])
-        fstJust (id, bs) = (Just id, bs)
+postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g_entry g)
 
 -------------------------------------------------
 -- Running dataflow analysis and/or rewrites
 
 -- Constructing forward and backward analysis-only pass
-analFwd    :: Monad m => DataflowLattice f -> FwdTransfer n f -> FwdPass m n f
-analBwd    :: Monad m => DataflowLattice f -> BwdTransfer n f -> BwdPass m n f
+analFwd    :: DataflowLattice f -> FwdTransfer n f -> FwdPass UniqSM n f
+analBwd    :: DataflowLattice f -> BwdTransfer n f -> BwdPass UniqSM n f
 
 analFwd lat xfer = analRewFwd lat xfer noFwdRewrite
 analBwd lat xfer = analRewBwd lat xfer noBwdRewrite
 
 -- Constructing forward and backward analysis + rewrite pass
-analRewFwd :: Monad m => DataflowLattice f -> FwdTransfer n f -> FwdRewrite m n f -> FwdPass m n f
-analRewBwd :: Monad m => DataflowLattice f -> BwdTransfer n f -> BwdRewrite m n f -> BwdPass m n f
+analRewFwd :: DataflowLattice f -> FwdTransfer n f
+           -> FwdRewrite UniqSM n f
+           -> FwdPass UniqSM n f
+
+analRewBwd :: DataflowLattice f
+           -> BwdTransfer n f
+           -> BwdRewrite UniqSM n f
+           -> BwdPass UniqSM n f
 
 analRewFwd lat xfer rew = FwdPass {fp_lattice = lat, fp_transfer = xfer, fp_rewrite = rew}
 analRewBwd lat xfer rew = BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewrite = rew}
 
 -- Running forward and backward dataflow analysis + optional rewrite
-dataflowPassFwd :: NonLocal n => GenCmmGraph n -> [(BlockId, f)] -> FwdPass FuelUniqSM n f -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+dataflowPassFwd :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> FwdPass UniqSM n f
+                -> UniqSM (GenCmmGraph n, BlockEnv f)
 dataflowPassFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
   (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
   return (CmmGraph {g_entry=entry, g_graph=graph}, facts)
 
-dataflowPassBwd :: NonLocal n => GenCmmGraph n -> [(BlockId, f)] -> BwdPass FuelUniqSM n f -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+dataflowAnalFwd :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> FwdPass UniqSM n f
+                -> BlockEnv f
+dataflowAnalFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd =
+  analyzeFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
+
+dataflowAnalFwdBlocks :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> FwdPass UniqSM n f
+                -> UniqSM (BlockEnv f)
+dataflowAnalFwdBlocks (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
+--  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
+--  return facts
+  return (analyzeFwdBlocks fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts))
+
+dataflowAnalBwd :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> BwdPass UniqSM n f
+                -> BlockEnv f
+dataflowAnalBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd =
+  analyzeBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
+
+dataflowPassBwd :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> BwdPass UniqSM n f
+                -> UniqSM (GenCmmGraph n, BlockEnv f)
 dataflowPassBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd = do
   (graph, facts, NothingO) <- analyzeAndRewriteBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
   return (CmmGraph {g_entry=entry, g_graph=graph}, facts)

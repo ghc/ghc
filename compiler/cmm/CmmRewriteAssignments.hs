@@ -18,23 +18,23 @@ module CmmRewriteAssignments
 import Cmm
 import CmmUtils
 import CmmOpt
-import OptimizationFuel
 import StgCmmUtils
 
-import Control.Monad
+import UniqSupply
 import Platform
 import UniqFM
 import Unique
 import BlockId
 
-import Compiler.Hoopl hiding (Unique)
+import Hoopl
 import Data.Maybe
+import Control.Monad
 import Prelude hiding (succ, zip)
 
 ----------------------------------------------------------------
 --- Main function
 
-rewriteAssignments :: Platform -> CmmGraph -> FuelUniqSM CmmGraph
+rewriteAssignments :: Platform -> CmmGraph -> UniqSM CmmGraph
 rewriteAssignments platform g = do
   -- Because we need to act on forwards and backwards information, we
   -- first perform usage analysis and bake this information into the
@@ -213,7 +213,7 @@ usageTransfer = mkBTransfer3 first middle last
           increaseUsage f r = addToUFM_C combine f r SingleUse
             where combine _ _ = ManyUse
 
-usageRewrite :: BwdRewrite FuelUniqSM (WithRegUsage CmmNode) UsageMap
+usageRewrite :: BwdRewrite UniqSM (WithRegUsage CmmNode) UsageMap
 usageRewrite = mkBRewrite3 first middle last
     where first  _ _ = return Nothing
           middle :: Monad m => WithRegUsage CmmNode O O -> UsageMap -> m (Maybe (Graph (WithRegUsage CmmNode) O O))
@@ -226,7 +226,7 @@ usageRewrite = mkBRewrite3 first middle last
           last   _ _ = return Nothing
 
 type CmmGraphWithRegUsage = GenCmmGraph (WithRegUsage CmmNode)
-annotateUsage :: CmmGraph -> FuelUniqSM (CmmGraphWithRegUsage)
+annotateUsage :: CmmGraph -> UniqSM (CmmGraphWithRegUsage)
 annotateUsage vanilla_g =
     let g = modifyGraph liftRegUsage vanilla_g
     in liftM fst $ dataflowPassBwd g [(g_entry g, fact_bot usageLattice)] $
@@ -404,8 +404,8 @@ clobbers (CmmReg (CmmGlobal Hp), _) (_, _) = False
 -- ToDo: Also catch MachOp case
 clobbers (ss@CmmStackSlot{}, CmmReg (CmmLocal r)) (u, CmmLoad (ss'@CmmStackSlot{}) _)
     | getUnique r == u, ss == ss' = False -- No-op on the stack slot (XXX: Do we need this special case?)
-clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
-    where f (CmmLoad (CmmStackSlot (CallArea a') o') t)
+clobbers (CmmStackSlot a o, rhs) (_, expr) = f expr
+    where f (CmmLoad (CmmStackSlot a' o') t)
             = (a, o, widthInBytes (cmmExprWidth rhs)) `overlaps` (a', o', widthInBytes (typeWidth t))
           f (CmmLoad e _)    = containsStackSlot e
           f (CmmMachOp _ es) = or (map f es)
@@ -416,9 +416,6 @@ clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
           containsStackSlot (CmmMachOp _ es) = or (map containsStackSlot es)
           containsStackSlot (CmmStackSlot{}) = True
           containsStackSlot _ = False
-clobbers (CmmStackSlot (RegSlot l) _, _) (_, expr) = f expr
-    where f (CmmLoad (CmmStackSlot (RegSlot l') _) _) = l == l'
-          f _ = False
 clobbers _ (_, e) = f e
     where f (CmmLoad (CmmStackSlot _ _) _) = False
           f (CmmLoad{}) = True -- conservative
@@ -432,7 +429,7 @@ clobbers _ (_, e) = f e
 --      [ I32  ]
 --      [    F64     ]
 --      s'   -w'-    o'
-type CallSubArea = (AreaId, Int, Int) -- area, offset, width
+type CallSubArea = (Area, Int, Int) -- area, offset, width
 overlaps :: CallSubArea -> CallSubArea -> Bool
 overlaps (a, _, _) (a', _, _) | a /= a' = False
 overlaps (_, o, w) (_, o', w') =
@@ -441,7 +438,7 @@ overlaps (_, o, w) (_, o', w') =
     in (s' < o) && (s < o) -- Not LTE, because [ I32  ][ I32  ] is OK
 
 lastAssignment :: WithRegUsage CmmNode O C -> AssignmentMap -> [(Label, AssignmentMap)]
-lastAssignment (Plain (CmmCall _ (Just k) _ _ _)) assign = [(k, invalidateVolatile k assign)]
+lastAssignment (Plain (CmmCall _ (Just k) _ _ _ _)) assign = [(k, invalidateVolatile k assign)]
 lastAssignment (Plain (CmmForeignCall {succ=k}))  assign = [(k, invalidateVolatile k assign)]
 lastAssignment l assign = map (\id -> (id, deleteSinks l assign)) $ successors l
 
@@ -457,7 +454,7 @@ invalidateVolatile :: BlockId -> AssignmentMap -> AssignmentMap
 invalidateVolatile k m = mapUFM p m
   where p (AlwaysInline e) = if exp e then AlwaysInline e else NeverOptimize
             where exp CmmLit{} = True
-                  exp (CmmLoad (CmmStackSlot (CallArea (Young k')) _) _)
+                  exp (CmmLoad (CmmStackSlot (Young k') _) _)
                     | k' == k = False
                   exp (CmmLoad (CmmStackSlot _ _) _) = True
                   exp (CmmMachOp _ es) = and (map exp es)
@@ -527,7 +524,7 @@ assignmentTransfer = mkFTransfer3 (flip const) middleAssignment ((mkFactBase ass
 -- values from the assignment map, due to reassignment of the local
 -- register.)  This is probably not locally sound.
 
-assignmentRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) AssignmentMap
+assignmentRewrite :: FwdRewrite UniqSM (WithRegUsage CmmNode) AssignmentMap
 assignmentRewrite = mkFRewrite3 first middle last
     where
         first _ _ = return Nothing
@@ -596,10 +593,6 @@ assignmentRewrite = mkFRewrite3 first middle last
                           where rep = typeWidth (localRegType r)
               _ -> old
         -- See Note [Soundness of store rewriting]
-        inlineExp assign old@(CmmLoad (CmmStackSlot (RegSlot r) _) _)
-          = case lookupUFM assign r of
-              Just (AlwaysInline x) -> x
-              _ -> old
         inlineExp _ old = old
 
         inlinable :: CmmNode e x -> Bool
@@ -612,7 +605,7 @@ assignmentRewrite = mkFRewrite3 first middle last
 -- in literals, which we can inline more aggressively, and inlining
 -- gives us opportunities for more folding.  However, we don't need any
 -- facts to do MachOp folding.
-machOpFoldRewrite :: Platform -> FwdRewrite FuelUniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite :: Platform -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
 machOpFoldRewrite platform = mkFRewrite3 first middle last
   where first _ _ = return Nothing
         middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O

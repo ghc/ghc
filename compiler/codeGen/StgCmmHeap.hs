@@ -10,7 +10,7 @@ module StgCmmHeap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset, hpRel,
 
-        entryHeapCheck, altHeapCheck,
+        entryHeapCheck, altHeapCheck, altHeapCheckReturnsTo,
 
         mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
@@ -20,7 +20,6 @@ module StgCmmHeap (
 
 #include "HsVersions.h"
 
-import CmmType
 import StgSyn
 import CLabel
 import StgCmmLayout
@@ -34,6 +33,7 @@ import StgCmmEnv
 
 import MkGraph
 
+import Hoopl hiding ((<*>), mkBranch)
 import SMRep
 import Cmm
 import CmmUtils
@@ -44,6 +44,8 @@ import Module
 import FastString( mkFastString, fsLit )
 import Constants
 import Util
+
+import Control.Monad (when)
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects
@@ -109,7 +111,7 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 
         -- ALLOCATE THE OBJECT
         ; base <- getHpRelOffset info_offset
-        ; emit (mkComment $ mkFastString "allocDynClosure")
+        ; emitComment $ mkFastString "allocDynClosure"
         ; emitSetDynHdr base info_ptr  use_cc
         ; let (cmm_args, offsets) = unzip amodes_w_offsets
         ; hpStore base cmm_args offsets
@@ -151,9 +153,10 @@ mkStaticClosureFields
         :: CmmInfoTable
         -> CostCentreStack
         -> CafInfo
+        -> Bool                 -- SRT is non-empty?
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields info_tbl ccs caf_refs payload
+mkStaticClosureFields info_tbl ccs caf_refs has_srt payload
   = mkStaticClosure info_lbl ccs payload padding
         static_link_field saved_info_field
   where
@@ -178,8 +181,10 @@ mkStaticClosureFields info_tbl ccs caf_refs payload
         | otherwise  = ASSERT(null payload) [mkIntCLit 0]
 
     static_link_field
-        | is_caf || staticClosureNeedsLink info_tbl = [static_link_value]
-        | otherwise                                 = []
+        | is_caf || staticClosureNeedsLink has_srt info_tbl
+        = [static_link_value]
+        | otherwise
+        = []
 
     saved_info_field
         | is_caf     = [mkIntCLit 0]
@@ -335,11 +340,12 @@ entryHeapCheck cl_info offset nodeSet arity args code
 
            args' = map (CmmReg . CmmLocal) args
            setN = case nodeSet of
-                          Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
+                          Just _  -> mkNop -- No need to assign R1, it already
+                                           -- points to the closure
                           Nothing -> mkAssign nodeReg $
                               CmmLit (CmmLabel $ staticClosureLabel cl_info)
 
-           {- Thunks:          Set R1 = node, jump GCEnter1
+           {- Thunks:          jump GCEnter1
               Function (fast): Set R1 = node, jump GCFun
               Function (slow): Set R1 = node, call generic_gc -}
            gc_call upd = setN <*> gc_lbl upd
@@ -354,7 +360,10 @@ entryHeapCheck cl_info offset nodeSet arity args code
             - GC calls, but until then this fishy code works -}
 
        updfr_sz <- getUpdFrameOff
-       heapCheck True (gc_call updfr_sz) code
+
+       loop_id <- newLabelC
+       emitLabel loop_id
+       heapCheck True (gc_call updfr_sz <*> mkBranch loop_id) code
 
 {-
     -- This code is slightly outdated now and we could easily keep the above
@@ -400,21 +409,29 @@ entryHeapCheck cl_info offset nodeSet arity args code
 -}
 
 
---------------------------------------------------------------
--- A heap/stack check at in a case alternative
+-- ------------------------------------------------------------
+-- A heap/stack check in a case alternative
 
 altHeapCheck :: [LocalReg] -> FCode a -> FCode a
 altHeapCheck regs code
+  = do loop_id <- newLabelC
+       emitLabel loop_id
+       altHeapCheckReturnsTo regs loop_id code
+
+altHeapCheckReturnsTo :: [LocalReg] -> Label -> FCode a -> FCode a
+altHeapCheckReturnsTo regs retry_lbl code
   = do updfr_sz <- getUpdFrameOff
-       heapCheck False (gc_call updfr_sz) code
+       gc_call_code <- gc_call updfr_sz
+       heapCheck False (gc_call_code <*> mkBranch retry_lbl) code
 
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
+      -- Note [stg_gc arguments]
 
     gc_call sp =
         case rts_label regs of
-             Just gc -> mkCall (CmmLit gc) (GC, GC) regs reg_exprs sp
-             Nothing -> mkCall generic_gc (GC, GC) [] [] sp
+             Just gc -> mkCall (CmmLit gc) (GC, GC) regs reg_exprs sp (0,[])
+             Nothing -> mkCall generic_gc (GC, GC) [] [] sp (0,[])
 
     rts_label [reg]
         | isGcPtrType ty = Just (mkGcLabel "stg_gc_unpt_r1")
@@ -432,6 +449,23 @@ altHeapCheck regs code
 
     rts_label _ = Nothing
 
+-- Note [stg_gc arguments]
+-- It might seem that we could avoid passing the arguments to the
+-- stg_gc function, because they are already in the right registers.
+-- While this is usually the case, it isn't always.  Sometimes the
+-- code generator has cleverly avoided the eval in a case, e.g. in
+-- ffi/should_run/4221.hs we found
+--
+--   case a_r1mb of z
+--     FunPtr x y -> ...
+--
+-- where a_r1mb is bound a top-level constructor, and is known to be
+-- evaluated.  The codegen just assigns x, y and z, and continues;
+-- R1 is never assigned.
+--
+-- So we'll have to rely on optimisations to eliminatethese
+-- assignments where possible.
+
 
 -- | The generic GC procedure; no params, no results
 generic_gc :: CmmExpr
@@ -447,7 +481,7 @@ heapCheck checkStack do_gc code
   = getHeapUsage $ \ hpHw ->
     -- Emit heap checks, but be sure to do it lazily so
     -- that the conditionals on hpHw don't cause a black hole
-    do  { emit $ do_checks checkStack hpHw do_gc
+    do  { codeOnly $ do_checks checkStack hpHw do_gc
         ; tickyAllocHeap hpHw
         ; doGranAllocate hpHw
         ; setRealHp hpHw
@@ -456,22 +490,20 @@ heapCheck checkStack do_gc code
 do_checks :: Bool       -- Should we check the stack?
           -> WordOff    -- Heap headroom
           -> CmmAGraph  -- What to do on failure
-          -> CmmAGraph
-do_checks checkStack alloc do_gc
-  = withFreshLabel "gc" $ \ loop_id ->
-    withFreshLabel "gc" $ \ gc_id   ->
-      mkLabel loop_id
-      <*> (let hpCheck = if alloc == 0 then mkNop
-                         else mkAssign hpReg bump_hp <*>
-                              mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
-           in if checkStack
-                 then mkCmmIfThenElse sp_oflo (mkBranch gc_id) hpCheck
-                 else hpCheck)
-      <*> mkComment (mkFastString "outOfLine should follow:")
-      <*> outOfLine (mkLabel gc_id
-                     <*> mkComment (mkFastString "outOfLine here")
-                     <*> do_gc
-                     <*> mkBranch loop_id)
+          -> FCode ()
+do_checks checkStack alloc do_gc = do
+  gc_id <- newLabelC
+
+  when checkStack $
+     emit =<< mkCmmIfGoto sp_oflo gc_id
+
+  when (alloc /= 0) $ do
+     emitAssign hpReg bump_hp
+     emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
+
+  emitOutOfLine gc_id $
+     do_gc -- this is expected to jump back somewhere
+
                 -- Test for stack pointer exhaustion, then
                 -- bump heap pointer, and test for heap exhaustion
                 -- Note that we don't move the heap pointer unless the
