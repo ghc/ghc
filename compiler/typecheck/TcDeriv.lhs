@@ -728,14 +728,10 @@ mk_data_eqn :: CtOrigin -> [TyVar] -> Class
    	    -> TyCon -> [TcType] -> TyCon -> [TcType] -> DerivContext
    	    -> TcM EarlyDerivSpec
 mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-  = do	{ dfun_name <- new_dfun_name cls tycon
-  	; loc <- getSrcSpanM
-        -- TODO NSF 9 April 2012: only recover from the anticipated
-        -- "base:Data.Functor.Functor could not be found" error
-        ; (_, functorClass_maybe) <- tryTc $ tcLookupClass functorClassName
-	; let inst_tys = [mkTyConApp tycon tc_args]
-	      inferred_constraints = inferConstraints functorClass_maybe tvs cls inst_tys rep_tc rep_tc_args
-	      spec = DS { ds_loc = loc, ds_orig = orig
+  = do	{ loc                  <- getSrcSpanM
+	; dfun_name            <- new_dfun_name cls tycon
+  	; inferred_constraints <- inferConstraints cls inst_tys rep_tc rep_tc_args
+	; let spec = DS { ds_loc = loc, ds_orig = orig
 			, ds_name = dfun_name, ds_tvs = tvs
 			, ds_cls = cls, ds_tys = inst_tys
 			, ds_tc = rep_tc, ds_tc_args = rep_tc_args
@@ -744,6 +740,8 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 
   	; return (if isJust mtheta then Right spec	-- Specified context
 				   else Left spec) }	-- Infer context
+  where
+    inst_tys = [mkTyConApp tycon tc_args]
 
 ----------------------
 mk_typeable_eqn :: CtOrigin -> [TyVar] -> Class
@@ -763,6 +761,7 @@ mk_typeable_eqn orig tvs cls tycon tc_args mtheta
   = do	{ checkTc (cls `hasKey` typeableClassKey)
 		  (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
 	; real_cls <- tcLookupClass (typeableClassNames !! tyConArity tycon)
+                      -- See Note [Getting base classes]
 	; mk_typeable_eqn orig tvs real_cls tycon [] (Just []) }
 
   | otherwise		-- standaone deriving
@@ -778,28 +777,30 @@ mk_typeable_eqn orig tvs cls tycon tc_args mtheta
 		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
 
 ----------------------
-inferConstraints :: Maybe Class -> -- the base:Functor class, if in scope
-                    [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaType
+inferConstraints :: Class -> [TcType]
+                 -> TyCon -> [TcType] 
+                 -> TcM ThetaType
 -- Generate a sufficiently large set of constraints that typechecking the
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
-inferConstraints functorClass_maybe _ cls inst_tys rep_tc rep_tc_args
-  -- Generic constraints are easy
-  | cls `hasKey` genClassKey
-  = []
-  | cls `hasKey` gen1ClassKey
-  = ASSERT (length rep_tc_tvs > 0)
-    con_arg_constraints functorClass_maybe (get_gen1_constrained_tys last_tv) 
-  -- The others are a bit more complicated
-  | otherwise
+inferConstraints cls inst_tys rep_tc rep_tc_args
+  | cls `hasKey` genClassKey    -- Generic constraints are easy
+  = return [] 
+
+  | cls `hasKey` gen1ClassKey   -- Gen1 needs Functor
+  = ASSERT (length rep_tc_tvs > 0)   -- See Note [Getting base classes]
+    do { functorClass <- tcLookupClass functorClassName
+       ; return (con_arg_constraints functorClass (get_gen1_constrained_tys last_tv)) }
+
+  | otherwise  -- The others are a bit more complicated
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
-    stupid_constraints ++ extra_constraints
-    ++ sc_constraints
-    ++ con_arg_constraints (Just cls) get_std_constrained_tys
+    return (stupid_constraints ++ extra_constraints
+            ++ sc_constraints
+            ++ con_arg_constraints cls get_std_constrained_tys) 
+
   where
        -- Constraints arising from the arguments of each constructor
-    con_arg_constraints Nothing _ = []
-    con_arg_constraints (Just cls') get_constrained_tys
+    con_arg_constraints cls' get_constrained_tys
       = [ mkClassPred cls' [arg_ty]
         | data_con <- tyConDataCons rep_tc,
           arg_ty   <- ASSERT( isVanillaDataCon data_con )
@@ -850,6 +851,12 @@ inferConstraints functorClass_maybe _ cls inst_tys rep_tc rep_tc_args
       | otherwise
       = []
 \end{code}
+
+Note [Getting base classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Functor and Typeable are define in package 'base', and that is not available
+when compiling 'ghc-prim'.  So we must be careful that 'deriving' for stuff in 
+ghc-prim does not use Functor or Typeable implicitly via these lookups.
 
 Note [Deriving and unboxed types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
