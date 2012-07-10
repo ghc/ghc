@@ -38,7 +38,8 @@ module TcRnTypes(
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
-	TcTypeEnv, TcTyThing(..), pprTcTyThingCategory, 
+	TcTypeEnv, TcTyThing(..), PromotionErr(..), 
+        pprTcTyThingCategory, pprPECategory,
 
 	-- Template Haskell
 	ThStage(..), topStage, topAnnStage, topSpliceStage,
@@ -580,10 +581,17 @@ data TcTyThing
                      -- Can be a mono-kind or a poly-kind; in TcTyClsDcls see
                      -- Note [Type checking recursive type and class declarations]
 
-  | AFamDataCon      -- Data constructor for a data family
+  | APromotionErr PromotionErr 
+
+data PromotionErr 
+  = TyConPE          -- TyCon used in a kind before we are ready
+                     --     data T :: T -> * where ...
+  | ClassPE          -- Ditto Class
+
+  | FamDataConPE     -- Data constructor for a data family
                      -- See Note [AFamDataCon: not promoting data family constructors] in TcRnDriver
 
-  | ARecDataCon      -- Data constructor in a reuursive loop
+  | RecDataConPE     -- Data constructor in a reuursive loop
                      -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
 
 instance Outputable TcTyThing where	-- Debugging only
@@ -595,16 +603,26 @@ instance Outputable TcTyThing where	-- Debugging only
 				 <+> ppr (tct_level elt))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
-   ppr AFamDataCon      = text "AFamDataCon"
-   ppr ARecDataCon      = text "ARecDataCon"
+   ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
+
+instance Outputable PromotionErr where
+  ppr ClassPE      = text "ClassPE"
+  ppr TyConPE      = text "TyConPE"
+  ppr FamDataConPE = text "FamDataConPE"
+  ppr RecDataConPE = text "RecDataConPE"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
-pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar {})     = ptext (sLit "Type variable")
-pprTcTyThingCategory (ATcId {})      = ptext (sLit "Local identifier")
-pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
-pprTcTyThingCategory AFamDataCon     = ptext (sLit "Family data con")
-pprTcTyThingCategory ARecDataCon     = ptext (sLit "Recursive data con")
+pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
+pprTcTyThingCategory (ATyVar {})        = ptext (sLit "Type variable")
+pprTcTyThingCategory (ATcId {})         = ptext (sLit "Local identifier")
+pprTcTyThingCategory (AThing {})        = ptext (sLit "Kinded thing")
+pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
+
+pprPECategory :: PromotionErr -> SDoc
+pprPECategory ClassPE      = ptext (sLit "Class")
+pprPECategory TyConPE      = ptext (sLit "Type constructor")
+pprPECategory FamDataConPE = ptext (sLit "Data constructor")
+pprPECategory RecDataConPE = ptext (sLit "Data constructor")
 \end{code}
 
 

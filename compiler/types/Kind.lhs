@@ -34,7 +34,8 @@ module Kind (
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-        isConstraintKind, isConstraintOrLiftedKind, isKind, isKindVar,
+        isConstraintKind, isConstraintOrLiftedKind, returnsConstraintKind,
+        isKind, isKindVar,
         isSuperKind, isSuperKindTyCon,
         isLiftedTypeKindCon, isConstraintKindCon,
         isAnyKind, isAnyKindCon,
@@ -134,6 +135,12 @@ isConstraintKind _               = False
 isConstraintOrLiftedKind (TyConApp tc _)
   = isConstraintKindCon tc || isLiftedTypeKindCon tc
 isConstraintOrLiftedKind _ = False
+
+returnsConstraintKind :: Kind -> Bool
+returnsConstraintKind (ForAllTy _ k)  = returnsConstraintKind k
+returnsConstraintKind (FunTy _ k)     = returnsConstraintKind k
+returnsConstraintKind (TyConApp tc _) = isConstraintKindCon tc
+returnsConstraintKind _               = False
 
 --------------------------------------------
 --            Kinding for arrow (->)

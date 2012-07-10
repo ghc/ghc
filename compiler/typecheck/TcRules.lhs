@@ -166,7 +166,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
        ; zonked_forall_tvs <- zonkTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
        ; let tvs_to_quantify = varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs)
-       ; qkvs <- kindGeneralize $ tyVarsOfTypes (map tyVarKind tvs_to_quantify)
+       ; qkvs <- kindGeneralize (tyVarsOfTypes (map tyVarKind tvs_to_quantify))
+                                (map getName tvs_to_quantify)
        ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
        ; let qtkvs = qkvs ++ qtvs
        ; traceTc "tcRule" (vcat [ doubleQuotes (ftext name)

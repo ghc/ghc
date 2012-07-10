@@ -967,8 +967,8 @@ tcTyClsInstDecls :: ModDetails
                           HsValBinds Name)    -- Supporting bindings for derived instances
 
 tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
- = tcExtendTcTyThingEnv [(con, AFamDataCon) | lid <- inst_decls
-                                            , con <- get_cons lid ] $
+ = tcExtendTcTyThingEnv [(con, APromotionErr FamDataConPE) 
+                        | lid <- inst_decls, con <- get_cons lid ] $
       -- Note [AFamDataCon: not promoting data family constructors]
    do { tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
       ; setGblEnv tcg_env $
@@ -1890,7 +1890,9 @@ ppr_tydecls tycons
   = vcat (map ppr_tycon (sortLe le_sig tycons))
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
-    ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
+    ppr_tycon tycon = vcat [ ppr (tyConName tycon) <+> dcolon <+> ppr (tyConKind tycon)
+                              -- Temporarily print the kind signature too
+                           , ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
