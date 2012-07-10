@@ -535,6 +535,13 @@
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
+          <row>
+            <entry><option>-interactive-print</option></entry>
+            <entry><link linkend="ghci-interactive-print">Select the function
+                    to use for printing evaluated expressions in GHCi</link></entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
 
         </tbody>
       </tgroup>

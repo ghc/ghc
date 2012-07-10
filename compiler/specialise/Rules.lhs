@@ -54,6 +54,7 @@ import Maybes
 import Bag
 import Util
 import Data.List
+import Data.Ord
 \end{code}
 
 Note [Overall plumbing for rules]
@@ -239,10 +240,8 @@ pprRulesForUser :: [CoreRule] -> SDoc
 pprRulesForUser rules
   = withPprStyle defaultUserStyle $
     pprRules $
-    sortLe le_rule  $
+    sortBy (comparing ru_name) $
     tidyRules emptyTidyEnv rules
-  where
-    le_rule r1 r2 = ru_name r1 <= ru_name r2
 \end{code}
 
 

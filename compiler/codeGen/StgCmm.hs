@@ -46,6 +46,13 @@ import TyCon
 import Module
 import ErrUtils
 import Outputable
+import Stream
+
+import OrdList
+import MkGraph
+
+import Data.IORef
+import Control.Monad (when)
 import Util
 
 codeGen :: DynFlags
@@ -54,39 +61,51 @@ codeGen :: DynFlags
          -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
 	 -> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	 -> HpcInfo
-         -> IO [CmmGroup]         -- Output
+         -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
-  = do  { showPass dflags "New CodeGen"
+  = do  { liftIO $ showPass dflags "New CodeGen"
 
--- Why?
---   ; mapM_ (\x -> seq x (return ())) data_tycons
+              -- cg: run the code generator, and yield the resulting CmmGroup
+              -- Using an IORef to store the state is a bit crude, but otherwise
+              -- we would need to add a state monad layer.
+        ; cgref <- liftIO $ newIORef =<< initC
+        ; let cg :: FCode () -> Stream IO CmmGroup ()
+              cg fcode = do
+                cmm <- liftIO $ do
+                         st <- readIORef cgref
+                         let (a,st') = runC dflags this_mod st (getCmm fcode)
 
-        ; code_stuff <- initC dflags this_mod $ do 
-                { cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
-                ; cmm_tycons <- mapM cgTyCon data_tycons
-                ; cmm_init   <- getCmm (mkModuleInit cost_centre_info
-                                             this_mod hpc_info)
-                ; return (cmm_init : cmm_binds ++ cmm_tycons)
-                }
+                         -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
+                         -- a big space leak.  DO NOT REMOVE!
+                         writeIORef cgref $! st'{ cgs_tops = nilOL,
+                                                  cgs_stmts = mkNop }
+                         return a
+                yield cmm
+
+               -- Note [codegen-split-init] the cmm_init block must come
+               -- FIRST.  This is because when -split-objs is on we need to
+               -- combine this block with its initialisation routines; see
+               -- Note [pipeline-split-init].
+        ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
+
+        ; mapM_ (cg . cgTopBinding dflags) stg_binds
+
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
                 -- code_stuff
+        ; let do_tycon tycon = do
+                -- Generate a table of static closures for an
+                -- enumeration type Note that the closure pointers are
+                -- tagged.
+                 when (isEnumerationTyCon tycon) $ cg (cgEnumerationTyCon tycon)
+                 mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
-                -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
-                -- possible for object splitting to split up the
-                -- pieces later.
-
-                -- Note [codegen-split-init] the cmm_init block must
-                -- come FIRST.  This is because when -split-objs is on
-                -- we need to combine this block with its
-                -- initialisation routines; see Note
-                -- [pipeline-split-init].
-
-        ; return code_stuff }
-
+        ; mapM_ do_tycon data_tycons
+        }
 
 ---------------------------------------------------------------
 --	Top-level bindings
@@ -108,7 +127,7 @@ cgTopBinding dflags (StgNonRec id rhs, _srts)
 	; info <- cgTopRhs id' rhs
 	; addBindC (cg_id info) info -- Add the *un-externalised* Id to the envt,
 				     -- so we find it when we look up occurrences
-	}
+        }
 
 cgTopBinding dflags (StgRec pairs, _srts)
   = do	{ let (bndrs, rhss) = unzip pairs
@@ -117,7 +136,7 @@ cgTopBinding dflags (StgRec pairs, _srts)
 	; fixC_(\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
-	; return () }
+        ; return () }
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
@@ -187,65 +206,19 @@ mkModuleInit cost_centre_info this_mod hpc_info
         ; emitDecl (CmmData Data (Statics (mkPlainModuleInitLabel this_mod) []))
         }
 
+
 ---------------------------------------------------------------
 --	Generating static stuff for algebraic data types
 ---------------------------------------------------------------
 
-{-	[These comments are rather out of date]
 
-Macro  		    	     Kind of constructor
-CONST_INFO_TABLE@	Zero arity (no info -- compiler uses static closure)
-CHARLIKE_INFO_TABLE	Charlike   (no info -- compiler indexes fixed array)
-INTLIKE_INFO_TABLE	Intlike; the one macro generates both info tbls
-SPEC_INFO_TABLE		SPECish, and bigger than or equal to MIN_UPD_SIZE
-GEN_INFO_TABLE		GENish (hence bigger than or equal to MIN_UPD_SIZE@)
-
-Possible info tables for constructor con:
-
-* _con_info:
-  Used for dynamically let(rec)-bound occurrences of
-  the constructor, and for updates.  For constructors
-  which are int-like, char-like or nullary, when GC occurs,
-  the closure tries to get rid of itself.
-
-* _static_info:
-  Static occurrences of the constructor macro: STATIC_INFO_TABLE.
-
-For zero-arity constructors, \tr{con}, we NO LONGER generate a static closure;
-it's place is taken by the top level defn of the constructor.
-
-For charlike and intlike closures there is a fixed array of static
-closures predeclared.
--}
-
-cgTyCon :: TyCon -> FCode CmmGroup  -- All constructors merged together
-cgTyCon tycon
-  = do	{ constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
-
-	    -- Generate a table of static closures for an enumeration type
-	    -- Put the table after the data constructor decls, because the
-	    -- datatype closure table (for enumeration types)
-	    -- to (say) PrelBase_$wTrue_closure, which is defined in code_stuff
-            -- Note that the closure pointers are tagged.
-
-            -- N.B. comment says to put table after constructor decls, but
-            -- code puts it before --- NR 16 Aug 2007
-	; extra <- cgEnumerationTyCon tycon
-
-        ; return (concat (extra ++ constrs))
-        }
-
-cgEnumerationTyCon :: TyCon -> FCode [CmmGroup]
+cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
-  | isEnumerationTyCon tycon
-  = do	{ tbl <- getCmm $ 
-		 emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
-	      	   [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs) 
-				 (tagForCon con)
-    	      	   | con <- tyConDataCons tycon]
-	; return [tbl] }
-  | otherwise
-  = return []
+  = emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
+             [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
+                           (tagForCon con)
+             | con <- tyConDataCons tycon]
+
 
 cgDataCon :: DataCon -> FCode ()
 -- Generate the entry code, info tables, and (for niladic constructor)

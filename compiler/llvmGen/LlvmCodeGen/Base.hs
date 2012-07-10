@@ -9,7 +9,8 @@ module LlvmCodeGen.Base (
         LlvmCmmDecl, LlvmBasicBlock,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, defaultLlvmVersion,
+        LlvmVersion, defaultLlvmVersion, minSupportLlvmVersion,
+        maxSupportLlvmVersion,
 
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
         funLookup, funInsert, getLlvmVer, setLlvmVer, getLlvmPlatform,
@@ -144,7 +145,13 @@ type LlvmVersion = Int
 
 -- | The LLVM Version we assume if we don't know
 defaultLlvmVersion :: LlvmVersion
-defaultLlvmVersion = 28
+defaultLlvmVersion = 30
+
+minSupportLlvmVersion :: LlvmVersion
+minSupportLlvmVersion = 28
+
+maxSupportLlvmVersion :: LlvmVersion
+maxSupportLlvmVersion = 31
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling

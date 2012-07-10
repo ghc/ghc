@@ -27,7 +27,7 @@ module StgCmmEnv (
 
 	bindArgsToRegs, bindToReg, rebindToReg,
 	bindArgToReg, idToReg,
-	getArgAmode, getNonVoidArgAmodes, 
+        getArgAmode, getNonVoidArgAmodes,
 	getCgIdInfo, 
 	maybeLetNoEscape, 
     ) where
@@ -211,7 +211,6 @@ getNonVoidArgAmodes (arg:args)
   | otherwise = do { amode  <- getArgAmode (NonVoid arg)
 	 	   ; amodes <- getNonVoidArgAmodes args
 	 	   ; return ( amode : amodes ) }
-
 
 ------------------------------------------------------------------------
 --	Interface functions for binding and re-binding names

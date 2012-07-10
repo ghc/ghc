@@ -18,6 +18,8 @@ module PrelRules ( primOpRules, builtinRules ) where
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} MkId ( mkPrimOpId )
+
 import CoreSyn
 import MkCore
 import Id
@@ -659,7 +661,15 @@ builtinIntegerRules =
   rule_binop          "xorInteger"          xorIntegerName          xor,
   rule_unop           "complementInteger"   complementIntegerName   complement,
   rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
-  rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR]
+  rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR,
+  -- These rules below don't actually have to be built in, but if we
+  -- put them in the Haskell source then we'd have to duplicate them
+  -- between all Integer implementations
+  rule_smallIntegerToInt "smallIntegerToInt" integerToIntName,
+  rule_smallIntegerTo "smallIntegerToWord"   integerToWordName     Int2WordOp,
+  rule_smallIntegerTo "smallIntegerToFloat"  floatFromIntegerName  Int2FloatOp,
+  rule_smallIntegerTo "smallIntegerToDouble" doubleFromIntegerName Int2DoubleOp
+  ]
     where rule_convert str name convert
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_convert convert }
@@ -702,6 +712,12 @@ builtinIntegerRules =
           rule_decodeDouble str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_decodeDouble }
+          rule_smallIntegerToInt str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_smallIntegerToInt }
+          rule_smallIntegerTo str name primOp
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_smallIntegerTo primOp }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -809,7 +825,7 @@ match_Word64ToInteger :: Id
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
 match_Word64ToInteger id id_unf [xl]
-  | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
+  | Just (MachWord64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
@@ -946,4 +962,23 @@ match_decodeDouble fn id_unf [xl]
     _ ->
         panic "match_decodeDouble: Id has the wrong type"
 match_decodeDouble _ _ _ = Nothing
+
+match_smallIntegerToInt :: Id
+                        -> IdUnfoldingFun
+                        -> [Expr CoreBndr]
+                        -> Maybe (Expr CoreBndr)
+match_smallIntegerToInt _ _ [App (Var x) y]
+  | idName x == smallIntegerName
+  = Just y
+match_smallIntegerToInt _ _ _ = Nothing
+
+match_smallIntegerTo :: PrimOp
+                     -> Id
+                     -> IdUnfoldingFun
+                     -> [Expr CoreBndr]
+                     -> Maybe (Expr CoreBndr)
+match_smallIntegerTo primOp _ _ [App (Var x) y]
+  | idName x == smallIntegerName
+  = Just $ App (Var (mkPrimOpId primOp)) y
+match_smallIntegerTo _ _ _ _ = Nothing
 \end{code}

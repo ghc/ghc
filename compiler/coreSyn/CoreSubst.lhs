@@ -658,7 +658,7 @@ substUnfoldingSC subst unf 	 -- Short-cut version
 substUnfolding subst (DFunUnfolding ar con args)
   = DFunUnfolding ar con (map subst_arg args)
   where
-    subst_arg = substExpr (text "dfun-unf") subst
+    subst_arg = fmap (substExpr (text "dfun-unf") subst)
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
@@ -1194,7 +1194,8 @@ exprIsConApp_maybe id_unf expr
         , length args == dfun_nargs    -- See Note [DFun arity check]
         , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
-              mk_arg e = mkApps e args
+              mk_arg (DFunPolyArg e) = mkApps e args
+              mk_arg (DFunLamArg i)  = args !! i
         = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
 
         -- Look through unfoldings, but only arity-zero one; 

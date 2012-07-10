@@ -205,8 +205,8 @@ tidyIdBndr env@(tidy_env, var_env) id
 
 ------------ Unfolding  --------------
 tidyUnfolding :: TidyEnv -> Unfolding -> Unfolding -> Unfolding
-tidyUnfolding tidy_env (DFunUnfolding ar con ids) _
-  = DFunUnfolding ar con (map (tidyExpr tidy_env) ids)
+tidyUnfolding tidy_env (DFunUnfolding ar con args) _
+  = DFunUnfolding ar con (map (fmap (tidyExpr tidy_env)) args)
 tidyUnfolding tidy_env 
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs

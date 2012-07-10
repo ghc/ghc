@@ -2002,7 +2002,7 @@ srcParseErr
   -> MsgDoc
 srcParseErr buf len
   = hcat [ if null token
-             then ptext (sLit "parse error (possibly incorrect indentation)")
+             then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
              else hcat [ptext (sLit "parse error on input "),
                         char '`', text token, char '\'']
     ]

@@ -17,7 +17,9 @@ module X86.Regs (
         argRegs,
         allArgRegs,
         allIntArgRegs,
+        allHaskellArgRegs,
         callClobberedRegs,
+        instrClobberedRegs,
         allMachRegNos,
         classOfRealReg,
         showReg,
@@ -56,6 +58,7 @@ import RegClass
 
 import BlockId
 import OldCmm
+import CmmCallConv
 import CLabel           ( CLabel )
 import Outputable
 import Platform
@@ -468,6 +471,11 @@ callClobberedRegs       :: [Reg]
 freeReg esp = fastBool False  --        %esp is the C stack pointer
 #endif
 
+#if i386_TARGET_ARCH
+freeReg esi = fastBool False -- Note [esi/edi not allocatable]
+freeReg edi = fastBool False
+#endif
+
 #if x86_64_TARGET_ARCH
 freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 #endif
@@ -475,59 +483,8 @@ freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 #ifdef REG_Base
 freeReg REG_Base = fastBool False
 #endif
-#ifdef REG_R1
-freeReg REG_R1   = fastBool False
-#endif
-#ifdef REG_R2
-freeReg REG_R2   = fastBool False
-#endif
-#ifdef REG_R3
-freeReg REG_R3   = fastBool False
-#endif
-#ifdef REG_R4
-freeReg REG_R4   = fastBool False
-#endif
-#ifdef REG_R5
-freeReg REG_R5   = fastBool False
-#endif
-#ifdef REG_R6
-freeReg REG_R6   = fastBool False
-#endif
-#ifdef REG_R7
-freeReg REG_R7   = fastBool False
-#endif
-#ifdef REG_R8
-freeReg REG_R8   = fastBool False
-#endif
-#ifdef REG_R9
-freeReg REG_R9   = fastBool False
-#endif
-#ifdef REG_R10
-freeReg REG_R10  = fastBool False
-#endif
-#ifdef REG_F1
-freeReg REG_F1 = fastBool False
-#endif
-#ifdef REG_F2
-freeReg REG_F2 = fastBool False
-#endif
-#ifdef REG_F3
-freeReg REG_F3 = fastBool False
-#endif
-#ifdef REG_F4
-freeReg REG_F4 = fastBool False
-#endif
-#ifdef REG_D1
-freeReg REG_D1 = fastBool False
-#endif
-#ifdef REG_D2
-freeReg REG_D2 = fastBool False
-#endif
 #ifdef REG_Sp
 freeReg REG_Sp   = fastBool False
-#endif
-#ifdef REG_Su
-freeReg REG_Su   = fastBool False
 #endif
 #ifdef REG_SpLim
 freeReg REG_SpLim = fastBool False
@@ -538,7 +495,10 @@ freeReg REG_Hp   = fastBool False
 #ifdef REG_HpLim
 freeReg REG_HpLim = fastBool False
 #endif
-freeReg _               = fastBool True
+
+-- All other regs are considered to be "free", because we can track
+-- their liveness accurately.
+freeReg _         = fastBool True
 
 
 --  | Returns 'Nothing' if this global register is not stored
@@ -647,6 +607,20 @@ allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
 
 #endif
 
+-- All machine registers that are used for argument-passing to Haskell functions
+allHaskellArgRegs :: [Reg]
+allHaskellArgRegs = [ RegReal r | Just r <- map globalRegMaybe globalArgRegs ]
+
+-- Machine registers which might be clobbered by instructions that
+-- generate results into fixed registers, or need arguments in a fixed
+-- register.
+instrClobberedRegs :: [RealReg]
+#if   i386_TARGET_ARCH
+instrClobberedRegs = map RealRegSingle [ eax, ecx, edx ]
+#elif x86_64_TARGET_ARCH
+instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
+#endif
+
 -- | these are the regs which we cannot assume stay alive over a C call.
 
 #if   i386_TARGET_ARCH
@@ -677,6 +651,11 @@ allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
 allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
 callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
 
+instrClobberedRegs :: [RealReg]
+instrClobberedRegs = panic "X86.Regs.instrClobberedRegs: not defined for this arch"
+
+allHaskellArgRegs :: [Reg]
+allHaskellArgRegs = panic "X86.Regs.allHaskellArgRegs: not defined for this arch"
 
 #endif
 
@@ -688,4 +667,16 @@ allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
      in  map RealRegSingle $ filter isFree allMachRegNos
 
+{-
+Note [esi/edi not allocatable]
 
+%esi is mapped to R1, so %esi would normally be allocatable while it
+is not being used for R1.  However, %esi has no 8-bit version on x86,
+and the linear register allocator is not sophisticated enough to
+handle this irregularity (we need more RegClasses).  The
+graph-colouring allocator also cannot handle this - it was designed
+with more flexibility in mind, but the current implementation is
+restricted to the same set of classes as the linear allocator.
+
+Hence, on x86 esi and edi are treated as not allocatable.
+-}

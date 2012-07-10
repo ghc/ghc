@@ -69,6 +69,9 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
          -no-auto-link-packages \
          -o $$@
+# Now check that the DLL doesn't have too many symbols. See trac #5987.
+	case `$$(OBJDUMP) -p $$@ | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $$@ OK;; 0) echo No symbols in DLL $$@; exit 1;; [0-9]*) echo Too many symbols in DLL $$@; exit 1;; *) echo bad DLL $$@; exit 1;; esac
+
 else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_ALL_OBJS) \

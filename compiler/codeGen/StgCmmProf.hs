@@ -103,7 +103,7 @@ initUpdFrameProf :: CmmExpr -> FCode ()
 -- Initialise the profiling field of an update frame
 initUpdFrameProf frame_amode 
   = ifProfiling $	-- frame->header.prof.ccs = CCCS
-    emit (mkStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS)
+    emitStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS
 	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
 	-- is unnecessary because it is not used anyhow.
 
@@ -143,7 +143,7 @@ saveCurrentCostCentre
   = return Nothing
   | otherwise
   = do	{ local_cc <- newTemp ccType
-	; emit (mkAssign (CmmLocal local_cc) curCCS)
+        ; emitAssign (CmmLocal local_cc) curCCS
 	; return (Just local_cc) }
 
 restoreCurrentCostCentre :: Maybe LocalReg -> FCode ()
@@ -338,9 +338,9 @@ ldvEnter cl_ptr
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
      --                era | LDV_STATE_USE }
-    emit (mkCmmIfThenElse (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
+    emit =<< mkCmmIfThenElse (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
 		(mkStore ldv_wd new_ldv_wd)
-		mkNop)
+                mkNop
   where
         -- don't forget to substract node's tag
     ldv_wd = ldvWord cl_ptr

@@ -176,6 +176,7 @@ typedef struct gc_thread_ {
     // -------------------
     // stats
 
+    lnat allocated;          // result of clearNursery()
     lnat copied;
     lnat scanned;
     lnat any_work;

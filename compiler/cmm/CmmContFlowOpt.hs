@@ -2,19 +2,19 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations -fno-warn-incomplete-patterns #-}
 
 module CmmContFlowOpt
-    ( runCmmContFlowOpts
-    , removeUnreachableBlocks, replaceBranches
+    ( cmmCfgOpts
+    , cmmCfgOptsProc
+    , removeUnreachableBlocks
+    , replaceLabels
     )
 where
 
 import BlockId
 import Cmm
 import CmmUtils
-import Digraph
 import Maybes
-import Outputable
 
-import Compiler.Hoopl
+import Hoopl
 import Control.Monad
 import Prelude hiding (succ, unzip, zip)
 
@@ -24,136 +24,16 @@ import Prelude hiding (succ, unzip, zip)
 --
 -----------------------------------------------------------------------------
 
-runCmmContFlowOpts :: CmmGroup -> CmmGroup
-runCmmContFlowOpts = map (optProc cmmCfgOpts)
-
 cmmCfgOpts :: CmmGraph -> CmmGraph
-cmmCfgOpts = removeUnreachableBlocks . blockConcat . branchChainElim
-        -- Here branchChainElim can ultimately be replaced
-        -- with a more exciting combination of optimisations
+cmmCfgOpts = removeUnreachableBlocks . blockConcat
+
+cmmCfgOptsProc :: CmmDecl -> CmmDecl
+cmmCfgOptsProc = optProc cmmCfgOpts
 
 optProc :: (g -> g) -> GenCmmDecl d h g -> GenCmmDecl d h g
 optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
 optProc _   top                  = top
 
------------------------------------------------------------------------------
---
--- Branch Chain Elimination
---
------------------------------------------------------------------------------
-
--- | Remove any basic block of the form L: goto L', and replace L with
--- L' everywhere else, unless L is the successor of a call instruction
--- and L' is the entry block. You don't want to set the successor of a
--- function call to the entry block because there is no good way to
--- store both the infotables for the call and from the callee, while
--- putting the stack pointer in a consistent place.
---
--- JD isn't quite sure when it's safe to share continuations for different
--- function calls -- have to think about where the SP will be,
--- so we'll table that problem for now by leaving all call successors alone.
-
-branchChainElim :: CmmGraph -> CmmGraph
-branchChainElim g
-  | null lone_branch_blocks = g    -- No blocks to remove
-  | otherwise               = {- pprTrace "branchChainElim" (ppr forest) $ -}
-                              replaceLabels (mapFromList edges) g
-  where
-    blocks = toBlockList g
-
-    lone_branch_blocks :: [(BlockId, BlockId)]
-      -- each (L,K) is a block of the form
-      --   L : goto K
-    lone_branch_blocks = mapCatMaybes isLoneBranch blocks
-
-    call_succs = foldl add emptyBlockSet blocks
-      where add :: BlockSet -> CmmBlock -> BlockSet
-            add succs b =
-              case lastNode b of
-                (CmmCall _ (Just k) _ _ _) -> setInsert k succs
-                (CmmForeignCall {succ=k})  -> setInsert k succs
-                _                          -> succs
-
-    isLoneBranch :: CmmBlock -> Maybe (BlockId, BlockId)
-    isLoneBranch block
-      | (JustC (CmmEntry id), [], JustC (CmmBranch target)) <- blockToNodeList block
-      , not (setMember id call_succs)
-      = Just (id,target)
-      | otherwise
-      = Nothing
-
-    -- We build a graph from lone_branch_blocks (every node has only
-    -- one out edge).  Then we
-    --   - topologically sort the graph: if from A we can reach B,
-    --     then A occurs before B in the result list.
-    --   - depth-first search starting from the nodes in this list.
-    --     This gives us a [[node]], in which each list is a dependency
-    --     chain.
-    --   - for each list [a1,a2,...an] replace branches to ai with an.
-    --
-    -- This approach nicely deals with cycles by ignoring them.
-    -- Branches in a cycle will be redirected to somewhere in the
-    -- cycle, but we don't really care where.  A cycle should be dead code,
-    -- and so will be eliminated by removeUnreachableBlocks.
-    --
-    fromNode (b,_) = b
-    toNode   a     = (a,a)
-
-    all_block_ids :: LabelSet
-    all_block_ids = setFromList (map fst lone_branch_blocks)
-                      `setUnion`
-                    setFromList (map snd lone_branch_blocks)
-
-    forest = dfsTopSortG $ graphFromVerticesAndAdjacency nodes lone_branch_blocks
-        where nodes = map toNode $ setElems $ all_block_ids
-
-    edges  = [ (fromNode y, fromNode x)
-             | (x:xs) <- map reverse forest, y <- xs ]
-
-----------------------------------------------------------------
-
-replaceLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
-replaceLabels env =
-  replace_eid . mapGraphNodes1 txnode
-   where
-     replace_eid g = g {g_entry = lookup (g_entry g)}
-     lookup id = mapLookup id env `orElse` id
-
-     txnode :: CmmNode e x -> CmmNode e x
-     txnode (CmmBranch bid)         = CmmBranch (lookup bid)
-     txnode (CmmCondBranch p t f)   = CmmCondBranch (exp p) (lookup t) (lookup f)
-     txnode (CmmSwitch e arms)      = CmmSwitch (exp e) (map (liftM lookup) arms)
-     txnode (CmmCall t k a res r)   = CmmCall (exp t) (liftM lookup k) a res r
-     txnode fc@CmmForeignCall{}     = fc{ args = map exp (args fc)
-                                        , succ = lookup (succ fc) }
-     txnode other                   = mapExpDeep exp other
-
-     exp :: CmmExpr -> CmmExpr
-     exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
-     exp (CmmStackSlot (CallArea (Young id)) i) = CmmStackSlot (CallArea (Young (lookup id))) i
-     exp e                                      = e
-
-
-replaceBranches :: BlockEnv BlockId -> CmmGraph -> CmmGraph
-replaceBranches env g = mapGraphNodes (id, id, last) g
-  where
-    last :: CmmNode O C -> CmmNode O C
-    last (CmmBranch id)          = CmmBranch (lookup id)
-    last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
-    last (CmmSwitch e tbl)       = CmmSwitch e (map (fmap lookup) tbl)
-    last l@(CmmCall {})          = l
-    last l@(CmmForeignCall {})   = l
-    lookup id = fmap lookup (mapLookup id env) `orElse` id
-            -- XXX: this is a recursive lookup, it follows chains until the lookup
-            -- returns Nothing, at which point we return the last BlockId
-
-----------------------------------------------------------------
--- Build a map from a block to its set of predecessors. Very useful.
-predMap :: [CmmBlock] -> BlockEnv BlockSet
-predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
-  where add_preds block env = foldl (add (entryLabel block)) env (successors block)
-        add bid env b' =
-          mapInsert b' (setInsert bid (mapLookup b' env `orElse` setEmpty)) env
 
 -----------------------------------------------------------------------------
 --
@@ -161,59 +41,172 @@ predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
 --
 -----------------------------------------------------------------------------
 
--- If a block B branches to a label L, L is not the entry block,
--- and L has no other predecessors,
--- then we can splice the block starting with L onto the end of B.
--- Order matters, so we work bottom up (reverse postorder DFS).
--- This optimization can be inhibited by unreachable blocks, but
--- the reverse postorder DFS returns only reachable blocks.
+-- This optimisation does two things:
+--   - If a block finishes with an unconditional branch, then we may
+--     be able to concatenate the block it points to and remove the
+--     branch.  We do this either if the destination block is small
+--     (e.g. just another branch), or if this is the only jump to
+--     this particular destination block.
 --
--- To ensure correctness, we have to make sure that the BlockId of the block
--- we are about to eliminate is not named in another instruction.
+--   - If a block finishes in a call whose continuation block is a
+--     goto, then we can shortcut the destination, making the
+--     continuation block the destination of the goto.
 --
--- Note: This optimization does _not_ subsume branch chain elimination.
+-- Both transformations are improved by working from the end of the
+-- graph towards the beginning, because we may be able to perform many
+-- shortcuts in one go.
+
+
+-- We need to walk over the blocks from the end back to the
+-- beginning.  We are going to maintain the "current" graph
+-- (BlockEnv CmmBlock) as we go, and also a mapping from BlockId
+-- to BlockId, representing continuation labels that we have
+-- renamed.  This latter mapping is important because we might
+-- shortcut a CmmCall continuation.  For example:
+--
+--    Sp[0] = L
+--    call g returns to L
+--
+--    L: goto M
+--
+--    M: ...
+--
+-- So when we shortcut the L block, we need to replace not only
+-- the continuation of the call, but also references to L in the
+-- code (e.g. the assignment Sp[0] = L).  So we keep track of
+-- which labels we have renamed and apply the mapping at the end
+-- with replaceLabels.
 
 blockConcat  :: CmmGraph -> CmmGraph
-blockConcat g@(CmmGraph {g_entry=eid}) =
-  replaceLabels concatMap $ ofBlockMap (g_entry g) blocks'
+blockConcat g@CmmGraph { g_entry = entry_id }
+  = replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks
   where
+     -- we might be able to shortcut the entry BlockId itself
+     new_entry
+       | Just entry_blk <- mapLookup entry_id new_blocks
+       , Just dest      <- canShortcut entry_blk
+       = dest
+       | otherwise
+       = entry_id
+
      blocks = postorderDfs g
 
-     (blocks', concatMap) =
-           foldr maybe_concat (toBlockMap g, mapEmpty) $ blocks
+     (new_blocks, shortcut_map) =
+           foldr maybe_concat (toBlockMap g, mapEmpty) blocks
 
-     maybe_concat :: CmmBlock -> (LabelMap CmmBlock, LabelMap Label) -> (LabelMap CmmBlock, LabelMap Label)
-     maybe_concat b unchanged@(blocks', concatMap) =
-       let bid = entryLabel b
-       in case blockToNodeList b of
-            (JustC h, m, JustC (CmmBranch b')) ->
-               if canConcatWith b' then
-                 (mapInsert bid (splice blocks' h m b') blocks',
-                  mapInsert b' bid concatMap)
-               else unchanged
-            _ -> unchanged
+     maybe_concat :: CmmBlock
+                  -> (BlockEnv CmmBlock, BlockEnv BlockId)
+                  -> (BlockEnv CmmBlock, BlockEnv BlockId)
+     maybe_concat block (blocks, shortcut_map)
+        | CmmBranch b' <- last
+        , Just blk' <- mapLookup b' blocks
+        , shouldConcatWith b' blk'
+        = (mapInsert bid (splice head blk') blocks, shortcut_map)
 
-     num_preds bid = liftM setSize (mapLookup bid backEdges) `orElse` 0
+        -- calls: if we can shortcut the continuation label, then
+        -- we must *also* remember to substitute for the label in the
+        -- code, because we will push it somewhere.
+        | Just b'   <- callContinuation_maybe last
+        , Just blk' <- mapLookup b' blocks
+        , Just dest <- canShortcut blk'
+        = (blocks, mapInsert b' dest shortcut_map)
+           -- replaceLabels will substitute dest for b' everywhere, later
 
-     canConcatWith b' = b' /= eid && num_preds b' == 1
+        -- non-calls: see if we can shortcut any of the successors.
+        | Nothing <- callContinuation_maybe last
+        = ( mapInsert bid (blockJoinTail head shortcut_last) blocks
+          , shortcut_map )
 
-     backEdges = predMap blocks
+        | otherwise
+        = (blocks, shortcut_map)
+        where
+          (head, last) = blockSplitTail block
+          bid = entryLabel block
+          shortcut_last = mapSuccessors shortcut last
+          shortcut l =
+             case mapLookup l blocks of
+               Just b | Just dest <- canShortcut b  -> dest
+               _otherwise -> l
 
-     splice :: forall map n e x.
-               IsMap map =>
-               map (Block n e x) -> n C O -> [n O O] -> KeyOf map -> Block n C x
-     splice blocks' h m bid' =
-          case mapLookup bid' blocks' of
-            Nothing -> panic "unknown successor block"
-            Just block | (_, m', l') <- blockToNodeList block
-                -> blockOfNodeList (JustC h, (m ++ m'), l')
+     shouldConcatWith b block
+       | num_preds b == 1    = True  -- only one predecessor: go for it
+       | okToDuplicate block = True  -- short enough to duplicate
+       | otherwise           = False
+       where num_preds bid = mapLookup bid backEdges `orElse` 0
+
+     canShortcut :: CmmBlock -> Maybe BlockId
+     canShortcut block
+       | (_, middle, CmmBranch dest) <- blockSplit block
+       , isEmptyBlock middle
+       = Just dest
+       | otherwise
+       = Nothing
+
+     backEdges :: BlockEnv Int -- number of predecessors for each block
+     backEdges = mapInsertWith (+) entry_id 1 $ -- add 1 for the entry id
+                   mapMap setSize $ predMap blocks
+
+     splice :: Block CmmNode C O -> CmmBlock -> CmmBlock
+     splice head rest = head `blockAppend` snd (blockSplitHead rest)
+
+
+callContinuation_maybe :: CmmNode O C -> Maybe BlockId
+callContinuation_maybe (CmmCall { cml_cont = Just b }) = Just b
+callContinuation_maybe (CmmForeignCall { succ = b })   = Just b
+callContinuation_maybe _ = Nothing
+
+okToDuplicate :: CmmBlock -> Bool
+okToDuplicate block
+  = case blockSplit block of
+      (_, m, CmmBranch _) -> isEmptyBlock m
+      -- cheap and cheerful; we might expand this in the future to
+      -- e.g. spot blocks that represent a single instruction or two.
+      -- Be careful: a CmmCall can be more than one instruction, it
+      -- has a CmmExpr inside it.
+      _otherwise -> False
+
+------------------------------------------------------------------------
+-- Map over the CmmGraph, replacing each label with its mapping in the
+-- supplied BlockEnv.
+
+replaceLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+replaceLabels env g
+  | mapNull env = g
+  | otherwise   = replace_eid $ mapGraphNodes1 txnode g
+   where
+     replace_eid g = g {g_entry = lookup (g_entry g)}
+     lookup id = mapLookup id env `orElse` id
+
+     txnode :: CmmNode e x -> CmmNode e x
+     txnode (CmmBranch bid)         = CmmBranch (lookup bid)
+     txnode (CmmCondBranch p t f)   = mkCmmCondBranch (exp p) (lookup t) (lookup f)
+     txnode (CmmSwitch e arms)      = CmmSwitch (exp e) (map (liftM lookup) arms)
+     txnode (CmmCall t k rg a res r) = CmmCall (exp t) (liftM lookup k) rg a res r
+     txnode fc@CmmForeignCall{}     = fc{ args = map exp (args fc)
+                                        , succ = lookup (succ fc) }
+     txnode other                   = mapExpDeep exp other
+
+     exp :: CmmExpr -> CmmExpr
+     exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
+     exp (CmmStackSlot (Young id) i) = CmmStackSlot (Young (lookup id)) i
+     exp e                                      = e
+
+mkCmmCondBranch :: CmmExpr -> Label -> Label -> CmmNode O C
+mkCmmCondBranch p t f = if t == f then CmmBranch t else CmmCondBranch p t f
+
+----------------------------------------------------------------
+-- Build a map from a block to its set of predecessors. Very useful.
+
+predMap :: [CmmBlock] -> BlockEnv BlockSet
+predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
+  where add_preds block env = foldl (add (entryLabel block)) env (successors block)
+        add bid env b' =
+          mapInsert b' (setInsert bid (mapLookup b' env `orElse` setEmpty)) env
 
 
 -----------------------------------------------------------------------------
 --
 -- Removing unreachable blocks
---
------------------------------------------------------------------------------
 
 removeUnreachableBlocks :: CmmGraph -> CmmGraph
 removeUnreachableBlocks g

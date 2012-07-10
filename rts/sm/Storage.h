@@ -81,7 +81,7 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
 extern nursery *nurseries;
 
 void     resetNurseries       ( void );
-lnat     clearNurseries       ( void );
+lnat     clearNursery         ( Capability *cap );
 void     resizeNurseries      ( nat blocks );
 void     resizeNurseriesFixed ( nat blocks );
 lnat     countNurseryBlocks   ( void );

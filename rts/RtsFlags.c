@@ -474,7 +474,7 @@ void setupRtsFlags (int *argc, char *argv[],
     total_arg = *argc;
     arg = 1;
 
-    *argc = 1;
+    if (*argc > 1) { *argc = 1; };
     rts_argc = 0;
 
     rts_argv_size = total_arg + 1;
@@ -1677,16 +1677,22 @@ static void freeArgv(int argc, char *argv[])
 void
 setProgName(char *argv[])
 {
+    char *last_slash;
+
+    if (argv[0] == NULL) { // #7037
+        prog_name = "";
+        return;
+    }
+
     /* Remove directory from argv[0] -- default files in current directory */
 #if !defined(mingw32_HOST_OS)
-    char *last_slash;
     if ( (last_slash = (char *) strrchr(argv[0], '/')) != NULL ) {
 	prog_name = last_slash+1;
    } else {
 	prog_name = argv[0];
    }
 #else
-    char* last_slash = argv[0] + (strlen(argv[0]) - 1);
+    last_slash = argv[0] + (strlen(argv[0]) - 1);
     while ( last_slash > argv[0] ) {
 	if ( *last_slash == '/' || *last_slash == '\\' ) {
 	    prog_name = last_slash+1;

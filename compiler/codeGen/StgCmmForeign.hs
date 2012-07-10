@@ -22,6 +22,7 @@ import StgCmmEnv
 import StgCmmMonad
 import StgCmmUtils
 import StgCmmClosure
+import StgCmmLayout
 
 import BlockId
 import Cmm
@@ -45,15 +46,16 @@ import Control.Monad
 -- Code generation for Foreign Calls
 -----------------------------------------------------------------------------
 
-cgForeignCall :: [LocalReg]             -- r1,r2  where to put the results
-              -> [ForeignHint]
-              -> ForeignCall            -- the op
+-- | emit code for a foreign call, and return the results to the sequel.
+--
+cgForeignCall :: ForeignCall            -- the op
               -> [StgArg]               -- x,y    arguments
+              -> Type                   -- result type
               -> FCode ()
--- Emits code for an unsafe foreign call:      r1, r2 = foo( x, y, z )
 
-cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_args
+cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
   = do  { cmm_args <- getFCallArgs stg_args
+        ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
                    StaticTarget _   _      False ->
@@ -63,7 +65,7 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage
                                         Just pkgId      -> ForeignLabelInPackage pkgId
-                            size        = call_size cmm_args
+                            size = call_size cmm_args
                         in  ( unzip cmm_args
                             , CmmLit (CmmLabel
                                         (mkForeignLabel lbl size labelSource IsFunction)))
@@ -71,13 +73,31 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
                    DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)
                                            [] -> panic "cgForeignCall []"
-              fc = ForeignConvention cconv arg_hints result_hints
+              fc = ForeignConvention cconv arg_hints res_hints
               call_target = ForeignTarget cmm_target fc
 
-        ; srt <- getSRTInfo NoSRT        -- SLPJ: Not sure what SRT
-                                        -- is right here
-                                        -- JD: Does it matter in the new codegen?
-        ; emitForeignCall safety results call_target call_args srt CmmMayReturn }
+        -- we want to emit code for the call, and then emitReturn.
+        -- However, if the sequel is AssignTo, we shortcut a little
+        -- and generate a foreign call that assigns the results
+        -- directly.  Otherwise we end up generating a bunch of
+        -- useless "r = r" assignments, which are not merely annoying:
+        -- they prevent the common block elimination from working correctly
+        -- in the case of a safe foreign call.
+        -- See Note [safe foreign call convention]
+        --
+        ; sequel <- getSequel
+        ; case sequel of
+            AssignTo assign_to_these _ ->
+                do { emitForeignCall safety assign_to_these call_target
+                                     call_args CmmMayReturn
+                   }
+
+            _something_else ->
+                do { emitForeignCall safety res_regs call_target
+                                     call_args CmmMayReturn
+                   ; emitReturn (map (CmmReg . CmmLocal) res_regs)
+                   }
+         }
   where
         -- in the stdcall calling convention, the symbol needs @size appended
         -- to it, where size is the total number of bytes of arguments.  We
@@ -88,16 +108,83 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
         | otherwise            = Nothing
 
         -- ToDo: this might not be correct for 64-bit API
-      arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType arg) wORD_SIZE
+      arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType arg)
+                               wORD_SIZE
+
+{- Note [safe foreign call convention]
+
+The simple thing to do for a safe foreign call would be the same as an
+unsafe one: just
+
+    emitForeignCall ...
+    emitReturn ...
+
+but consider what happens in this case
+
+   case foo x y z of
+     (# s, r #) -> ...
+
+The sequel is AssignTo [r].  The call to newUnboxedTupleRegs picks [r]
+as the result reg, and we generate
+
+  r = foo(x,y,z) returns to L1  -- emitForeignCall
+ L1:
+  r = r  -- emitReturn
+  goto L2
+L2:
+  ...
+
+Now L1 is a proc point (by definition, it is the continuation of the
+safe foreign call).  If L2 does a heap check, then L2 will also be a
+proc point.
+
+Furthermore, the stack layout algorithm has to arrange to save r
+somewhere between the call and the jump to L1, which is annoying: we
+would have to treat r differently from the other live variables, which
+have to be saved *before* the call.
+
+So we adopt a special convention for safe foreign calls: the results
+are copied out according to the NativeReturn convention by the call,
+and the continuation of the call should copyIn the results.  (The
+copyOut code is actually inserted when the safe foreign call is
+lowered later).  The result regs attached to the safe foreign call are
+only used temporarily to hold the results before they are copied out.
+
+We will now generate this:
+
+  r = foo(x,y,z) returns to L1
+ L1:
+  r = R1  -- copyIn, inserted by mkSafeCall
+  goto L2
+ L2:
+  ... r ...
+
+And when the safe foreign call is lowered later (see Note [lower safe
+foreign calls]) we get this:
+
+  suspendThread()
+  r = foo(x,y,z)
+  resumeThread()
+  R1 = r  -- copyOut, inserted by lowerSafeForeignCall
+  jump L1
+ L1:
+  r = R1  -- copyIn, inserted by mkSafeCall
+  goto L2
+ L2:
+  ... r ...
+
+Now consider what happens if L2 does a heap check: the Adams
+optimisation kicks in and commons up L1 with the heap-check
+continuation, resulting in just one proc point instead of two. Yay!
+-}
+
 
 emitCCall :: [(CmmFormal,ForeignHint)]
           -> CmmExpr
           -> [(CmmActual,ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
-  = emitForeignCall PlayRisky results target args
-                    NoC_SRT -- No SRT b/c we PlayRisky
-                    CmmMayReturn
+  = emitForeignCall PlayRisky results target args CmmMayReturn
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
@@ -107,7 +194,7 @@ emitCCall hinted_results fn hinted_args
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
-  = emitForeignCall PlayRisky res (PrimTarget op) args NoC_SRT CmmMayReturn
+  = emitForeignCall PlayRisky res (PrimTarget op) args CmmMayReturn
 
 -- alternative entry point, used by CmmParse
 emitForeignCall
@@ -115,11 +202,10 @@ emitForeignCall
         -> [CmmFormal]          -- where to put the results
         -> ForeignTarget        -- the op
         -> [CmmActual]          -- arguments
-        -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo        -- This can say "never returns"
                                 --   only RTS procedures do this
         -> FCode ()
-emitForeignCall safety results target args _srt _ret
+emitForeignCall safety results target args _ret
   | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs
     emit caller_save
@@ -129,7 +215,9 @@ emitForeignCall safety results target args _srt _ret
   | otherwise = do
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
-    emit $ mkSafeCall temp_target results args updfr_off (playInterruptible safety)
+    emit =<< mkSafeCall temp_target results args updfr_off
+                (playInterruptible safety)
+
 
 
 {-
@@ -162,7 +250,7 @@ maybe_assign_temp e
         -- expressions, which are wrong here.
         -- this is a NonPtr because it only duplicates an existing
         reg <- newTemp (cmmExprType e) --TODO FIXME NOW
-        emit (mkAssign (CmmLocal reg) e)
+        emitAssign (CmmLocal reg) e
         return (CmmReg (CmmLocal reg))
 
 -- -----------------------------------------------------------------------------
@@ -184,12 +272,12 @@ saveThreadState =
 emitSaveThreadState :: BlockId -> FCode ()
 emitSaveThreadState bid = do
   -- CurrentTSO->stackobj->sp = Sp;
-  emit $ mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
-                 (CmmStackSlot (CallArea (Young bid)) (widthInBytes (typeWidth gcWord)))
+  emitStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
+                 (CmmStackSlot (Young bid) (widthInBytes (typeWidth gcWord)))
   emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
   when opt_SccProfilingOn $
-        emit (mkStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
+        emitStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS
 
    -- CurrentNursery->free = Hp+1;
 closeNursery :: CmmAGraph

@@ -63,30 +63,11 @@ instance Outputable instr => Outputable (GenBasicBlock instr) where
 instance Outputable CmmStmt where
     ppr s = pprStmt s
 
-instance Outputable CmmInfo where
-    ppr i = pprInfo i
-
-
 -- --------------------------------------------------------------------------
 instance Outputable CmmSafety where
   ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
   ppr CmmInterruptible = ptext (sLit "_interruptible_call_")
   ppr (CmmSafe srt) = ppr srt
-
--- --------------------------------------------------------------------------
--- Info tables. The current pretty printer needs refinement
--- but will work for now.
---
--- For ideas on how to refine it, they used to be printed in the
--- style of C--'s 'stackdata' declaration, just inside the proc body,
--- and were labelled with the procedure name ++ "_info".
-pprInfo :: CmmInfo -> SDoc
-pprInfo (CmmInfo _gc_target update_frame info_table) =
-    vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) ppr gc_target,-}
-          ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
-          ppr info_table]
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
@@ -155,18 +136,6 @@ pprStmt stmt = case stmt of
 -- ... is that a good idea? --Isaac Dupree
 instance (Outputable a) => Outputable (CmmHinted a) where
   ppr (CmmHinted a k) = ppr (a, k)
-
-pprUpdateFrame :: UpdateFrame -> SDoc
-pprUpdateFrame (UpdateFrame expr args) =
-    hcat [ ptext (sLit "jump")
-         , space
-         , if isTrivialCmmExpr expr
-                then pprExpr expr
-                else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr
-                    _ -> parens (pprExpr expr)
-         , space
-         , parens  ( commafy $ map ppr args ) ]
 
 -- --------------------------------------------------------------------------
 -- goto local label. [1], section 6.6

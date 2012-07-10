@@ -767,7 +767,9 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   --
   let preload1 = [ installedPackageId p | f <- flags, p <- get_exposed f ]
 
-      get_exposed (ExposePackage   s) = filter (matchingStr s) pkgs2
+      get_exposed (ExposePackage   s)
+         = take 1 $ sortByVersion (filter (matchingStr s) pkgs2)
+         --  -package P means "the latest version of P" (#7030)
       get_exposed (ExposePackageId s) = filter (matchingId  s) pkgs2
       get_exposed _                   = []
 

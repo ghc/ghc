@@ -18,11 +18,11 @@ $(call profStart, build-package-data($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-ifeq "$$(filter p,$$(GhcLibWays))" "p"
+ifeq "$$(filter p,$$($1_$2_WAYS))" "p"
 $1_$2_CONFIGURE_OPTS += --enable-library-profiling
 endif
 
-ifeq "$$(filter dyn,$$(GhcLibWays))" "dyn"
+ifeq "$$(filter dyn,$$($1_$2_WAYS))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 

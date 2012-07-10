@@ -293,7 +293,7 @@ processBlock
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
 processBlock platform block_live (BasicBlock id instrs)
- = do   initBlock id
+ = do   initBlock id block_live
         (instrs', fixups)
                 <- linearRA platform block_live [] [] id instrs
         return  $ BasicBlock id instrs' : fixups
@@ -301,16 +301,22 @@ processBlock platform block_live (BasicBlock id instrs)
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
-initBlock :: FR freeRegs => BlockId -> RegM freeRegs ()
-initBlock id
+initBlock :: FR freeRegs => BlockId -> BlockMap RegSet -> RegM freeRegs ()
+initBlock id block_live
  = do   block_assig     <- getBlockAssigR
         case mapLookup id block_assig of
-                -- no prior info about this block: assume everything is
-                -- free and the assignment is empty.
+                -- no prior info about this block: we must consider
+                -- any fixed regs to be allocated, but we can ignore
+                -- virtual regs (presumably this is part of a loop,
+                -- and we'll iterate again).  The assignment begins
+                -- empty.
                 Nothing
                  -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-
-                        setFreeRegsR    frInitFreeRegs
+                        case mapLookup id block_live of
+                          Nothing ->
+                            setFreeRegsR    frInitFreeRegs
+                          Just live ->
+                            setFreeRegsR $ foldr frAllocateReg frInitFreeRegs [ r | RegReal r <- uniqSetToList live ]
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
@@ -385,7 +391,7 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
         Just (src,dst)  | src `elementOfUniqSet` (liveDieRead live),
                           isVirtualReg dst,
                           not (dst `elemUFM` assig),
-                          Just (InReg _) <- (lookupUFM assig src) -> do
+                          isRealReg src || isInReg src assig -> do
            case src of
               (RegReal rr) -> setAssigR (addToUFM assig dst (InReg rr))
                 -- if src is a fixed reg, then we just map dest to this
@@ -412,6 +418,11 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
 
 raInsn _ _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)
+
+
+isInReg :: Reg -> RegMap Loc -> Bool
+isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
+                  | otherwise = False
 
 
 genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
@@ -441,7 +452,7 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
     -- debugging
 {-    freeregs <- getFreeRegsR
     assig    <- getAssigR
-    pprTrace "genRaInsn"
+    pprDebugAndThen (defaultDynFlags Settings{ sTargetPlatform=platform }) trace "genRaInsn"
         (ppr instr
                 $$ text "r_dying      = " <+> ppr r_dying
                 $$ text "w_dying      = " <+> ppr w_dying

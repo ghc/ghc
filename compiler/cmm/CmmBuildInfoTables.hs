@@ -14,166 +14,50 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal, localCAFInfo, mkTopCAFInfo
-    , setInfoTableSRT, setInfoTableStackMap
+    , setInfoTableSRT
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
-    , lowerSafeForeignCalls
-    , cafTransfers, liveSlotTransfers
-    , mkLiveness )
+    , cafTransfers )
 where
 
 #include "HsVersions.h"
 
 -- These should not be imported here!
-import StgCmmForeign
 import StgCmmUtils
 
-import Constants
 import Digraph
 import qualified Prelude as P
 import Prelude hiding (succ)
-import Util
 
 import BlockId
 import Bitmap
 import CLabel
 import Cmm
 import CmmUtils
-import CmmStackLayout
-import Module
-import FastString
-import ForeignCall
 import IdInfo
 import Data.List
 import Maybes
-import MkGraph as M
-import Control.Monad
 import Name
-import OptimizationFuel
 import Outputable
 import SMRep
 import UniqSupply
 
-import Compiler.Hoopl
+import Hoopl
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified FiniteMap as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
+
+foldSet :: (a -> b -> b) -> b -> Set a -> b
+#if __GLASGOW_HASKELL__ < 704
+foldSet = Set.fold
+#else
+foldSet = Set.foldr
+#endif
 
 ----------------------------------------------------------------
 -- Building InfoTables
-
-
------------------------------------------------------------------------
--- Stack Maps
-
--- Given a block ID, we return a representation of the layout of the stack,
--- as suspended before entering that block.
--- (For a return site to a function call, the layout does not include the
---  parameter passing area (or the "return address" on the stack)).
--- If the element is `Nothing`, then it represents a word of the stack that
--- does not contain a live pointer.
--- If the element is `Just` a register, then it represents a live spill slot
--- for a pointer; we assume that a pointer is the size of a word.
--- The head of the list represents the young end of the stack where the infotable
--- pointer for the block `Bid` is stored.
--- The infotable pointer itself is not included in the list.
--- Call areas are also excluded from the list: besides the stuff in the update
--- frame (and the return infotable), call areas should never be live across
--- function calls.
-
--- RTS Invariant: All pointers must be word-aligned because each bit in the bitmap
--- represents a word. Consequently, we have to be careful when we see a live slot
--- on the stack: if we have packed multiple sub-word values into a word,
--- we have to make sure that we only mark the entire word as a non-pointer.
-
--- Also, don't forget to stop at the old end of the stack (oldByte),
--- which may differ depending on whether there is an update frame.
-
-type RegSlotInfo
-   = ( Int	  -- Offset from oldest byte of Old area
-     , LocalReg   -- The register
-     , Int)       -- Width of the register
-
-live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> StackLayout
-live_ptrs oldByte slotEnv areaMap bid =
-  -- pprTrace "live_ptrs for" (ppr bid <+> text (show oldByte ++ "-" ++ show youngByte) <+>
-  --                           ppr liveSlots) $
-  -- pprTrace ("stack layout for " ++ show bid ++ ": ") (ppr res) $ res
-  res
-  where 
-        res = mkLiveness (reverse $ slotsToList youngByte liveSlots [])
- 
-        slotsToList :: Int -> [RegSlotInfo] -> [Maybe LocalReg] -> [Maybe LocalReg]
-        -- n starts at youngByte and is decremented down to oldByte
-	-- Returns a list, one element per word, with 
-	--    (Just r) meaning 'pointer register r is saved here', 
-	--    Nothing  meaning 'non-pointer or empty'
-
-        slotsToList n [] results | n == oldByte = results -- at old end of stack frame
-
-        slotsToList n (s : _) _  | n == oldByte =
-          pprPanic "slot left off live_ptrs" (ppr s <+> ppr oldByte <+>
-               ppr n <+> ppr liveSlots <+> ppr youngByte)
-
-        slotsToList n _ _ | n < oldByte =
-          panic "stack slots not allocated on word boundaries?"
-
-        slotsToList n l@((n', r, w) : rst) results =
-          if n == (n' + w) then -- slot's young byte is at n
-            ASSERT (not (isPtr r) ||
-                    (n `mod` wORD_SIZE == 0 && w == wORD_SIZE)) -- ptrs must be aligned
-            slotsToList next (dropWhile (non_ptr_younger_than next) rst)
-                        (stack_rep : results)
-          else slotsToList next (dropWhile (non_ptr_younger_than next) l)
-                           (Nothing : results)
-          where next = n - wORD_SIZE
-                stack_rep = if isPtr r then Just r else Nothing
-
-        slotsToList n [] results = slotsToList (n - wORD_SIZE) [] (Nothing : results)
-
-        non_ptr_younger_than next (n', r, w) =
-          n' + w > next &&
-            ASSERT (not (isPtr r))
-            True
-        isPtr = isGcPtrType . localRegType
-
-        liveSlots :: [RegSlotInfo]
-        liveSlots = sortBy (\ (off,_,_) (off',_,_) -> compare off' off)
-                           (Map.foldRightWithKey (\_ -> flip $ foldl add_slot) [] slots)
-                    
-        add_slot :: [RegSlotInfo] -> SubArea -> [RegSlotInfo]
-        add_slot rst (a@(RegSlot r@(LocalReg _ ty)), off, w) = 
-          if off == w && widthInBytes (typeWidth ty) == w then
-            (expectJust "add_slot" (Map.lookup a areaMap), r, w) : rst
-          else panic "live_ptrs: only part of a variable live at a proc point"
-        add_slot rst (CallArea Old, _, _) =
-          rst -- the update frame (or return infotable) should be live
-              -- would be nice to check that only that part of the callarea is live...
-        add_slot rst ((CallArea _), _, _) =
-          rst
-          -- JD: THIS ISN'T CURRENTLY A CORRECTNESS PROBLEM, BUT WE SHOULD REALLY
-          -- MAKE LIVENESS INFO AROUND CALLS MORE PRECISE -- FOR NOW, A 32-BIT
-          -- FLOAT PADS OUT TO 64 BITS, BUT WE ASSUME THE WHOLE PARAMETER-PASSING
-          -- AREA IS LIVE (WHICH IT ISN'T...).  WE SHOULD JUST PUT THE LIVE AREAS
-          -- IN THE CALL NODES, WHICH SHOULD EVENTUALLY HAVE LIVE REGISTER AS WELL,
-          -- SO IT'S ALL GOING IN THE SAME DIRECTION.
-          -- pprPanic "CallAreas must not be live across function calls" (ppr bid <+> ppr c)
-
-        slots :: SubAreaSet	 -- The SubAreaSet for 'bid'
-        slots = expectJust "live_ptrs slots" $ mapLookup bid slotEnv
-        youngByte = expectJust "live_ptrs bid_pos" $ Map.lookup (CallArea (Young bid)) areaMap
-
--- Construct the stack maps for a procedure _if_ it needs an infotable.
--- When wouldn't a procedure need an infotable? If it is a procpoint that
--- is not the successor of a call.
-setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap slotEnv areaMap
-     t@(CmmProc (TopInfo {stack_info=StackInfo {updfr_space = Just updfr_off}}) _ 
-                (CmmGraph {g_entry = eid}))
-  = updInfo (const (live_ptrs updfr_off slotEnv areaMap eid)) id t
-setInfoTableStackMap _ _ t = t
-                 
 
 
 -----------------------------------------------------------------------
@@ -191,14 +75,14 @@ setInfoTableStackMap _ _ t = t
 -----------------------------------------------------------------------
 -- Finding the CAFs used by a procedure
 
-type CAFSet = Map CLabel ()
+type CAFSet = Set CLabel
 type CAFEnv = BlockEnv CAFSet
 
 -- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
-cafLattice = DataflowLattice "live cafs" Map.empty add
-  where add _ (OldFact old) (NewFact new) = case old `Map.union` new of
-                                              new' -> (changeIf $ Map.size new' > Map.size old, new')
+cafLattice = DataflowLattice "live cafs" Set.empty add
+  where add _ (OldFact old) (NewFact new) = case old `Set.union` new of
+                                              new' -> (changeIf $ Set.size new' > Set.size old, new')
 
 cafTransfers :: BwdTransfer CmmNode CAFSet
 cafTransfers = mkBTransfer3 first middle last
@@ -210,11 +94,11 @@ cafTransfers = mkBTransfer3 first middle last
                CmmLit (CmmLabelOff c _)         -> add c set
                CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                _ -> set
-        add l s = if hasCAF l then Map.insert (toClosureLbl l) () s
+        add l s = if hasCAF l then Set.insert (toClosureLbl l) s
                               else s
 
-cafAnal :: CmmGraph -> FuelUniqSM CAFEnv
-cafAnal g = liftM snd $ dataflowPassBwd g [] $ analBwd cafLattice cafTransfers
+cafAnal :: CmmGraph -> CAFEnv
+cafAnal g = dataflowAnalBwd g [] $ analBwd cafLattice cafTransfers
 
 -----------------------------------------------------------------------
 -- Building the SRTs
@@ -264,15 +148,15 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
 buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
-             FuelUniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+             UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
-  do let liftCAF lbl () z = -- get CAFs for functions without static closures
-           case Map.lookup lbl topCAFMap of Just cafs -> z `Map.union` cafs
-                                            Nothing   -> Map.insert lbl () z
+  do let liftCAF lbl z = -- get CAFs for functions without static closures
+           case Map.lookup lbl topCAFMap of Just cafs -> z `Set.union` cafs
+                                            Nothing   -> Set.insert lbl z
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
-           let cafs = Map.keys (Map.foldRightWithKey liftCAF Map.empty localCafs)
+           let cafs = Set.elems (foldSet liftCAF Set.empty localCafs)
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
@@ -307,7 +191,7 @@ buildSRTs topSRT topCAFMap cafs =
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
 procpointSRT :: CLabel -> Map CLabel Int -> [CLabel] ->
-                FuelUniqSM (Maybe CmmDecl, C_SRT)
+                UniqSM (Maybe CmmDecl, C_SRT)
 procpointSRT _ _ [] =
  return (Nothing, NoC_SRT)
 procpointSRT top_srt top_table entries =
@@ -315,7 +199,7 @@ procpointSRT top_srt top_table entries =
     return (top, srt)
   where
     ints = map (expectJust "constructSRT" . flip Map.lookup top_table) entries
-    sorted_ints = sortLe (<=) ints
+    sorted_ints = sort ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = P.last bitmap_entries + 1
@@ -325,7 +209,7 @@ maxBmpSize :: Int
 maxBmpSize = widthInBits wordWidth `div` 2
 
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
-to_SRT :: CLabel -> Int -> Int -> Bitmap -> FuelUniqSM (Maybe CmmDecl, C_SRT)
+to_SRT :: CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
 to_SRT top_srt off len bmp
   | len > maxBmpSize || bmp == [fromIntegral srt_escape]
   = do id <- getUniqueM
@@ -373,30 +257,30 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
           Map.insert l (flatten env cafset) env
         addToTop env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
-              cafset  = lbls `Map.deleteList` foldl Map.union Map.empty cafsets
+              cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
-        flatten env cafset = Map.foldRightWithKey (lookup env) Map.empty cafset
-        lookup env caf () cafset' =
-          case Map.lookup caf env of Just cafs -> Map.foldRightWithKey add cafset' cafs
-                                     Nothing -> add caf () cafset'
-        add caf () cafset' = Map.insert caf () cafset'
+        flatten env cafset = foldSet (lookup env) Set.empty cafset
+        lookup env caf cafset' =
+          case Map.lookup caf env of Just cafs -> foldSet add cafset' cafs
+                                     Nothing -> add caf cafset'
+        add caf cafset' = Set.insert caf cafset'
         g = stronglyConnCompFromEdgedVertices
-              (map (\n@(l, cafs) -> (n, l, Map.keys cafs)) localCAFs)
+              (map (\n@(l, cafs) -> (n, l, Set.elems cafs)) localCAFs)
 
 -- Bundle the CAFs used at a procpoint.
 bundleCAFs :: CAFEnv -> CmmDecl -> (CAFSet, CmmDecl)
 bundleCAFs cafEnv t@(CmmProc _ _ (CmmGraph {g_entry=entry})) =
   (expectJust "bundleCAFs" (mapLookup entry cafEnv), t)
-bundleCAFs _ t = (Map.empty, t)
+bundleCAFs _ t = (Set.empty, t)
 
 -- Construct the SRTs for the given procedure.
 setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmDecl) ->
-                   FuelUniqSM (TopSRT, [CmmDecl])
+                   UniqSM (TopSRT, [CmmDecl])
 setInfoTableSRT topCAFMap topSRT (cafs, t) =
   setSRT cafs topCAFMap topSRT t
 
 setSRT :: CAFSet -> Map CLabel CAFSet -> TopSRT ->
-          CmmDecl -> FuelUniqSM (TopSRT, [CmmDecl])
+          CmmDecl -> UniqSM (TopSRT, [CmmDecl])
 setSRT cafs topCAFMap topSRT t =
   do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs
      let t' = updInfo id (const srt) t
@@ -418,91 +302,3 @@ updInfoTbl toVars toSrt info_tbl@(CmmInfoTable {})
                            StackRep ls -> StackRep (toVars ls)
                            other       -> other }
 updInfoTbl _ _ t@CmmNonInfoTable = t
-  
-----------------------------------------------------------------
--- Safe foreign calls: We need to insert the code that suspends and resumes
--- the thread before and after a safe foreign call.
--- Why do we do this so late in the pipeline?
--- Because we need this code to appear without interrruption: you can't rely on the
--- value of the stack pointer between the call and resetting the thread state;
--- you need to have an infotable on the young end of the stack both when
--- suspending the thread and making the foreign call.
--- All of this is much easier if we insert the suspend and resume calls here.
-
--- At the same time, we prepare for the stages of the compiler that
--- build the proc points. We have to do this at the same time because
--- the safe foreign calls need special treatment with respect to infotables.
--- A safe foreign call needs an infotable even though it isn't
--- a procpoint. The following datatype captures the information
--- needed to generate the infotables along with the Cmm data and procedures.
-
--- JD: Why not do this while splitting procedures?
-lowerSafeForeignCalls :: AreaMap -> CmmDecl -> FuelUniqSM CmmDecl
-lowerSafeForeignCalls _ t@(CmmData _ _) = return t
-lowerSafeForeignCalls areaMap (CmmProc info l g@(CmmGraph {g_entry=entry})) = do
-  let block b mblocks = mblocks >>= lowerSafeCallBlock entry areaMap b
-  blocks <- foldGraphBlocks block (return mapEmpty) g
-  return $ CmmProc info l (ofBlockMap entry blocks)
-
--- If the block ends with a safe call in the block, lower it to an unsafe
--- call (with appropriate saves and restores before and after).
-lowerSafeCallBlock :: BlockId -> AreaMap -> CmmBlock -> BlockEnv CmmBlock
-                              -> FuelUniqSM (BlockEnv CmmBlock)
-lowerSafeCallBlock entry areaMap b blocks =
-  case blockToNodeList b of
-    (JustC (CmmEntry id), m, JustC l@(CmmForeignCall {})) -> lowerSafeForeignCall entry areaMap blocks id m l
-    _                                                    -> return $ insertBlock b blocks
-
--- Late in the code generator, we want to insert the code necessary
--- to lower a safe foreign call to a sequence of unsafe calls.
-lowerSafeForeignCall :: BlockId -> AreaMap -> BlockEnv CmmBlock -> BlockId -> [CmmNode O O] -> CmmNode O C
-                                -> FuelUniqSM (BlockEnv CmmBlock)
-lowerSafeForeignCall entry areaMap blocks bid m
-    (CmmForeignCall {tgt=tgt, res=rs, args=as, succ=succ, updfr = updfr_off, intrbl = intrbl}) =
- do let newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
-    -- Both 'id' and 'new_base' are KindNonPtr because they're
-    -- RTS-only objects and are not subject to garbage collection
-    id <- newTemp bWord
-    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
-    let (caller_save, caller_load) = callerSaveVolatileRegs
-    load_tso <- newTemp gcWord -- TODO FIXME NOW
-    load_stack <- newTemp gcWord -- TODO FIXME NOW
-    let (<**>) = (M.<*>)
-    let suspendThread = foreignLbl "suspendThread"
-        resumeThread  = foreignLbl "resumeThread"
-        foreignLbl name = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit name)))
-        suspend = saveThreadState <**>
-                  caller_save <**>
-                  mkUnsafeCall (ForeignTarget suspendThread
-                                (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
-                               [id] [CmmReg (CmmGlobal BaseReg), CmmLit (CmmInt (fromIntegral (fromEnum intrbl)) wordWidth)]
-        midCall = mkUnsafeCall tgt rs as
-        resume  = mkUnsafeCall (ForeignTarget resumeThread
-                                (ForeignConvention CCallConv [AddrHint] [AddrHint]))
-                     [new_base] [CmmReg (CmmLocal id)] <**>
-                  -- Assign the result to BaseReg: we
-                  -- might now have a different Capability!
-                  mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <**>
-                  caller_load <**>
-                  loadThreadState load_tso load_stack
-        -- We have to save the return value on the stack because its next use
-        -- may appear in a different procedure due to procpoint splitting...
-        saveRetVals = foldl (<**>) emptyAGraph $ map (M.mkMiddle . spill) rs
-        spill r = CmmStore (regSlot r) (CmmReg $ CmmLocal r)
-        regSlot r@(LocalReg _ _) = CmmRegOff (CmmGlobal Sp) (sp_off - offset)
-          where offset = w + expectJust "lowerForeign" (Map.lookup (RegSlot r) areaMap)
-                sp_off = wORD_SIZE + expectJust "lowerForeign" (Map.lookup (CallArea area) areaMap)
-                area = if succ == entry then Old else Young succ
-                w = widthInBytes $ typeWidth $ localRegType r
-        -- Note: The successor must be a procpoint, and we have already split,
-        --       so we use a jump, not a branch.
-        succLbl = CmmLit (CmmLabel (infoTblLbl succ))
-        jump = CmmCall { cml_target  = succLbl, cml_cont = Nothing
-                       , cml_args    = widthInBytes wordWidth ,cml_ret_args = 0
-                       , cml_ret_off = updfr_off}
-    graph' <- liftUniq $ labelAGraph bid $ catAGraphs (map M.mkMiddle m) <**>
-                                           suspend <**> midCall <**>
-                                           resume  <**> saveRetVals <**> M.mkLast jump
-    return $ blocks `mapUnion` toBlockMap graph'
-lowerSafeForeignCall _ _ _ _ _ _ = panic "lowerSafeForeignCall was passed something else"
-

@@ -14,7 +14,9 @@
 -- for details
 
 module StgCmmPrim (
-   cgOpApp
+   cgOpApp,
+   cgPrimOp -- internal(ish), used by cgCase to get code for a
+            -- comparison without also turning it into a Bool.
  ) where
 
 #include "HsVersions.h"
@@ -67,14 +69,9 @@ cgOpApp :: StgOp	-- The op
 
 -- Foreign calls 
 cgOpApp (StgFCallOp fcall _) stg_args res_ty 
-  = do	{ (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
-	 	-- Choose result regs r1, r2
-		-- Note [Foreign call results]
-	; cgForeignCall res_regs res_hints fcall stg_args
-		-- r1, r2 = foo( x, y )
-	; emitReturn (map (CmmReg . CmmLocal) res_regs) }
-		-- return (r1, r2) 
-      
+  = cgForeignCall fcall stg_args res_ty
+      -- Note [Foreign call results]
+
 -- tagToEnum# is special: we need to pull the constructor 
 -- out of the table, and perform an appropriate return.
 
@@ -229,23 +226,23 @@ emitPrimOp [res] SparkOp [arg]
             [(tmp2,NoHint)]
             (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
             [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
-        emit (mkAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
+        emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
 emitPrimOp [res] GetCCSOfOp [arg]
-  = emit (mkAssign (CmmLocal res) val)
+  = emitAssign (CmmLocal res) val
   where
     val | opt_SccProfilingOn = costCentreFrom (cmmUntag arg)
         | otherwise          = CmmLit zeroCLit
 
 emitPrimOp [res] GetCurrentCCSOp [_dummy_arg]
-   = emit (mkAssign (CmmLocal res) curCCS)
+   = emitAssign (CmmLocal res) curCCS
 
 emitPrimOp [res] ReadMutVarOp [mutv]
-   = emit (mkAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
+   = emitAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord)
 
 emitPrimOp [] WriteMutVarOp [mutv,var]
    = do
-	emit (mkStore (cmmOffsetW mutv fixedHdrSize) var)
+        emitStore (cmmOffsetW mutv fixedHdrSize) var
 	emitCCall
 		[{-no results-}]
 		(CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
@@ -269,32 +266,32 @@ emitPrimOp res@[] TouchOp args@[_arg]
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp [res] ByteArrayContents_Char [arg]
-   = emit (mkAssign (CmmLocal res) (cmmOffsetB arg arrWordsHdrSize))
+   = emitAssign (CmmLocal res) (cmmOffsetB arg arrWordsHdrSize)
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
 emitPrimOp [res] StableNameToIntOp [arg]
-   = emit (mkAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord))
+   = emitAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
 
 --  #define eqStableNamezh(r,sn1,sn2)					\
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 emitPrimOp [res] EqStableNameOp [arg1,arg2]
-   = emit (mkAssign (CmmLocal res) (CmmMachOp mo_wordEq [
+   = emitAssign (CmmLocal res) (CmmMachOp mo_wordEq [
 				cmmLoadIndexW arg1 fixedHdrSize bWord,
 				cmmLoadIndexW arg2 fixedHdrSize bWord
-			 ]))
+                         ])
 
 
 emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2]
-   = emit (mkAssign (CmmLocal res) (CmmMachOp mo_wordEq [arg1,arg2]))
+   = emitAssign (CmmLocal res) (CmmMachOp mo_wordEq [arg1,arg2])
 
 --  #define addrToHValuezh(r,a) r=(P_)a
 emitPrimOp [res] AddrToAnyOp [arg]
-   = emit (mkAssign (CmmLocal res) arg)
+   = emitAssign (CmmLocal res) arg
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 --  Note: argument may be tagged!
 emitPrimOp [res] DataToTagOp [arg]
-   = emit (mkAssign (CmmLocal res) (getConstrTag (cmmUntag arg)))
+   = emitAssign (CmmLocal res) (getConstrTag (cmmUntag arg))
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -317,7 +314,7 @@ emitPrimOp [res] UnsafeFreezeArrayArrayOp [arg]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 emitPrimOp [res] UnsafeFreezeByteArrayOp [arg]
-   = emit (mkAssign (CmmLocal res) arg)
+   = emitAssign (CmmLocal res) arg
 
 -- Copying pointer arrays
 
@@ -497,11 +494,11 @@ emitPrimOp [res] PopCntOp [w] = emitPopCntCall res w wordWidth
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg]
    | nopOp op
-   = emit (mkAssign (CmmLocal res) arg)
+   = emitAssign (CmmLocal res) arg
 
    | Just (mop,rep) <- narrowOp op
-   = emit (mkAssign (CmmLocal res) $
-	   CmmMachOp (mop rep wordWidth) [CmmMachOp (mop wordWidth rep) [arg]])
+   = emitAssign (CmmLocal res) $
+           CmmMachOp (mop rep wordWidth) [CmmMachOp (mop wordWidth rep) [arg]]
 
 emitPrimOp r@[res] op args
    | Just prim <- callishOp op
@@ -746,15 +743,15 @@ loadArrPtrsSize addr = CmmLoad (cmmOffsetB addr off) bWord
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType
 		   -> LocalReg -> CmmExpr -> CmmExpr -> FCode ()
 mkBasicIndexedRead off Nothing read_rep res base idx
-   = emit (mkAssign (CmmLocal res) (cmmLoadIndexOffExpr off read_rep base idx))
+   = emitAssign (CmmLocal res) (cmmLoadIndexOffExpr off read_rep base idx)
 mkBasicIndexedRead off (Just cast) read_rep res base idx
-   = emit (mkAssign (CmmLocal res) (CmmMachOp cast [
-				cmmLoadIndexOffExpr off read_rep base idx]))
+   = emitAssign (CmmLocal res) (CmmMachOp cast [
+                                cmmLoadIndexOffExpr off read_rep base idx])
 
 mkBasicIndexedWrite :: ByteOff -> Maybe MachOp
 		   -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 mkBasicIndexedWrite off Nothing base idx val
-   = emit (mkStore (cmmIndexOffExpr off (typeWidth (cmmExprType val)) base idx) val)
+   = emitStore (cmmIndexOffExpr off (typeWidth (cmmExprType val)) base idx) val
 mkBasicIndexedWrite off (Just cast) base idx val
    = mkBasicIndexedWrite off Nothing base idx (CmmMachOp cast [val])
 
@@ -805,7 +802,7 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
             getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit 1)),
             getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit 1))
             ]
-        emit $ mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
+        emit =<< mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
 
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> FCode ())
@@ -875,7 +872,7 @@ doCopyMutableArrayOp = emitCopyArray copy
             getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE)),
             getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE))
             ]
-        emit $ mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
+        emit =<< mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
 
 emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ())

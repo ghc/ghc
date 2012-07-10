@@ -180,7 +180,7 @@ registerTickyCtr :: CLabel -> FCode ()
 --	    ticky_entry_ctrs = & (f_ct);	/* mark it as "registered" */
 --	    f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl
-  = emit (mkCmmIfThen test (catAGraphs register_stmts))
+  = emit =<< mkCmmIfThen test (catAGraphs register_stmts)
   where
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
     test = CmmMachOp (MO_Eq wordWidth)
@@ -352,7 +352,7 @@ bumpHistogram _lbl _n
 bumpHistogramE :: LitString -> CmmExpr -> FCode ()
 bumpHistogramE lbl n 
   = do  t <- newTemp cLong
-	emit (mkAssign (CmmLocal t) n)
+        emitAssign (CmmLocal t) n
 	emit (mkCmmIfThen (CmmMachOp (MO_U_Le cLongWidth) [CmmReg (CmmLocal t), eight])
 	  		  (mkAssign (CmmLocal t) eight))
 	emit (addToMem cLong

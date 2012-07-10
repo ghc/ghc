@@ -14,11 +14,11 @@ module CmmExpr
     , GlobalReg(..), globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
     , VGcPtr(..), vgcFlag 	-- Temporary!
     , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
-    , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
-            , plusRegSet, minusRegSet, timesRegSet
-    , regUsedIn, regSlot
-    , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
+            , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
+            , regSetToList
+    , regUsedIn
+    , Area(..)
     , module CmmMachOp
     , module CmmType
     )
@@ -31,9 +31,9 @@ import CmmMachOp
 import BlockId
 import CLabel
 import Unique
-import UniqSet
 
-import Data.Map (Map)
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 -----------------------------------------------------------------------------
 --		CmmExpr
@@ -42,11 +42,12 @@ import Data.Map (Map)
 
 data CmmExpr
   = CmmLit CmmLit               -- Literal
-  | CmmLoad CmmExpr CmmType     -- Read memory location
-  | CmmReg CmmReg		-- Contents of register
+  | CmmLoad !CmmExpr !CmmType   -- Read memory location
+  | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
-  | CmmStackSlot Area Int       -- addressing expression of a stack slot
-  | CmmRegOff CmmReg Int	
+  | CmmStackSlot Area {-# UNPACK #-} !Int
+                                -- addressing expression of a stack slot
+  | CmmRegOff !CmmReg Int
 	-- CmmRegOff reg i
 	--        ** is shorthand only, meaning **
 	-- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
@@ -62,20 +63,16 @@ instance Eq CmmExpr where	-- Equality ignores the types
   _e1               == _e2               = False
 
 data CmmReg 
-  = CmmLocal  LocalReg
+  = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq, Ord )
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
 data Area
-  = RegSlot  LocalReg
-  | CallArea AreaId
-  deriving (Eq, Ord)
-
-data AreaId
   = Old            -- See Note [Old Area]
-  | Young BlockId
+  | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
+                   -- See Note [Continuation BlockId] in CmmNode.
   deriving (Eq, Ord)
 
 {- Note [Old Area] 
@@ -94,15 +91,8 @@ necessarily at the young end of the Old area.
 
 End of note -}
 
-type SubArea    = (Area, Int, Int) -- area, offset, width
-type SubAreaSet = Map Area [SubArea]
-
-type AreaMap    = Map Area Int
-     -- Byte offset of the oldest byte of the Area, 
-     -- relative to the oldest byte of the Old Area
-
 data CmmLit
-  = CmmInt Integer  Width
+  = CmmInt !Integer  Width
 	-- Interpretation: the 2's complement representation of the value
 	-- is truncated to the specified size.  This is easier than trying
 	-- to keep the value within range, because we don't know whether
@@ -120,7 +110,11 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
-  | CmmBlock BlockId			-- Code label
+
+  | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
+        -- Invariant: must be a continuation BlockId
+        -- See Note [Continuation BlockId] in CmmNode.
+
   | CmmHighStackMark -- stands for the max stack space used during a procedure
   deriving Eq
 
@@ -163,7 +157,7 @@ maybeInvertCmmExpr _ = Nothing
 -----------------------------------------------------------------------------
 
 data LocalReg
-  = LocalReg !Unique CmmType
+  = LocalReg {-# UNPACK #-} !Unique CmmType
     -- ^ Parameters:
     --   1. Identifier
     --   2. Type
@@ -189,22 +183,35 @@ localRegType (LocalReg _ rep) = rep
 -----------------------------------------------------------------------------
 
 -- | Sets of local registers
-type RegSet              =  UniqSet LocalReg
+
+-- These are used for dataflow facts, and a common operation is taking
+-- the union of two RegSets and then asking whether the union is the
+-- same as one of the inputs.  UniqSet isn't good here, because
+-- sizeUniqSet is O(n) whereas Set.size is O(1), so we use ordinary
+-- Sets.
+
+type RegSet              =  Set LocalReg
 emptyRegSet             :: RegSet
+nullRegSet              :: RegSet -> Bool
 elemRegSet              :: LocalReg -> RegSet -> Bool
 extendRegSet            :: RegSet -> LocalReg -> RegSet
 deleteFromRegSet        :: RegSet -> LocalReg -> RegSet
 mkRegSet                :: [LocalReg] -> RegSet
 minusRegSet, plusRegSet, timesRegSet :: RegSet -> RegSet -> RegSet
+sizeRegSet              :: RegSet -> Int
+regSetToList            :: RegSet -> [LocalReg]
 
-emptyRegSet      = emptyUniqSet
-elemRegSet       = elementOfUniqSet
-extendRegSet     = addOneToUniqSet
-deleteFromRegSet = delOneFromUniqSet
-mkRegSet         = mkUniqSet
-minusRegSet      = minusUniqSet
-plusRegSet       = unionUniqSets
-timesRegSet      = intersectUniqSets
+emptyRegSet      = Set.empty
+nullRegSet       = Set.null
+elemRegSet       = Set.member
+extendRegSet     = flip Set.insert
+deleteFromRegSet = flip Set.delete
+mkRegSet         = Set.fromList
+minusRegSet      = Set.difference
+plusRegSet       = Set.union
+timesRegSet      = Set.intersection
+sizeRegSet       = Set.size
+regSetToList     = Set.toList
 
 class UserOfLocalRegs a where
   foldRegsUsed :: (b -> LocalReg -> b) -> b -> a -> b
@@ -236,7 +243,7 @@ instance DefinerOfLocalRegs LocalReg where
     foldRegsDefd f z r = f z r
 
 instance UserOfLocalRegs RegSet where
-    foldRegsUsed f = foldUniqSet (flip f)
+    foldRegsUsed f = Set.fold (flip f)
 
 instance UserOfLocalRegs CmmExpr where
   foldRegsUsed f z e = expr z e
@@ -269,49 +276,6 @@ reg `regUsedIn` CmmReg reg' 	 = reg == reg'
 reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
 reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
 _   `regUsedIn` CmmStackSlot _ _ = False
-
------------------------------------------------------------------------------
---    Stack slots
------------------------------------------------------------------------------
-
-isStackSlotOf :: CmmExpr -> LocalReg -> Bool
-isStackSlotOf (CmmStackSlot (RegSlot r) _) r' = r == r'
-isStackSlotOf _ _ = False
-
-regSlot :: LocalReg -> CmmExpr
-regSlot r = CmmStackSlot (RegSlot r) (widthInBytes $ typeWidth $ localRegType r)
-
------------------------------------------------------------------------------
---    Stack slot use information for expressions and other types [_$_]
------------------------------------------------------------------------------
-
--- Fold over the area, the offset into the area, and the width of the subarea.
-class UserOfSlots a where
-  foldSlotsUsed :: (b -> SubArea -> b) -> b -> a -> b
-
-class DefinerOfSlots a where
-  foldSlotsDefd :: (b -> SubArea -> b) -> b -> a -> b
-
-instance UserOfSlots CmmExpr where
-  foldSlotsUsed f z e = expr z e
-    where expr z (CmmLit _)          = z
-          expr z (CmmLoad (CmmStackSlot a i) ty) = f z (a, i, widthInBytes $ typeWidth ty)
-          expr z (CmmLoad addr _)    = foldSlotsUsed f z addr
-          expr z (CmmReg _)          = z
-          expr z (CmmMachOp _ exprs) = foldSlotsUsed f z exprs
-          expr z (CmmRegOff _ _)     = z
-          expr z (CmmStackSlot _ _)  = z
-
-instance UserOfSlots a => UserOfSlots [a] where
-  foldSlotsUsed _ set [] = set
-  foldSlotsUsed f set (x:xs) = foldSlotsUsed f (foldSlotsUsed f set x) xs
-
-instance DefinerOfSlots a => DefinerOfSlots [a] where
-  foldSlotsDefd _ set [] = set
-  foldSlotsDefd f set (x:xs) = foldSlotsDefd f (foldSlotsDefd f set x) xs
-
-instance DefinerOfSlots SubArea where
-    foldSlotsDefd f z a = f z a
 
 -----------------------------------------------------------------------------
 --		Global STG registers

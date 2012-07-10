@@ -18,12 +18,11 @@ module StgCmmUtils (
 	emitDataLits, mkDataLits,
         emitRODataLits, mkRODataLits,
         emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult, emitRtsCallGen,
-        assignTemp, newTemp, withTemp,
+        assignTemp, newTemp,
 
 	newUnboxedTupleRegs,
 
-	mkMultiAssign, mkCmmSwitch, mkCmmLitSwitch,
-	emitSwitch,
+        emitMultiAssign, emitCmmLitSwitch, emitSwitch,
 
 	tagToClosure, mkTaggedObjectLoad,
 
@@ -72,6 +71,7 @@ import Module
 import Literal
 import Digraph
 import ListSetOps
+import VarSet
 import Util
 import Unique
 import DynFlags
@@ -79,6 +79,8 @@ import FastString
 import Outputable
 
 import Data.Char
+import Data.List
+import Data.Ord
 import Data.Word
 import Data.Maybe
 
@@ -202,14 +204,14 @@ emitRtsCallGen
 emitRtsCallGen res pkg fun args _vols safe
   = do { updfr_off <- getUpdFrameOff
        ; emit caller_save
-       ; emit $ call updfr_off
+       ; call updfr_off
        ; emit caller_load }
   where
     call updfr_off =
       if safe then
-        mkCmmCall fun_expr res' args' updfr_off
+        emit =<< mkCmmCall fun_expr res' args' updfr_off
       else
-        mkUnsafeCall (ForeignTarget fun_expr
+        emit $ mkUnsafeCall (ForeignTarget fun_expr
                          (ForeignConvention CCallConv arg_hints res_hints)) res' args'
     (args', arg_hints) = unzip args
     (res',  res_hints) = unzip res
@@ -439,7 +441,7 @@ assignTemp :: CmmExpr -> FCode LocalReg
 assignTemp (CmmReg (CmmLocal reg)) = return reg
 assignTemp e = do { uniq <- newUnique
 		  ; let reg = LocalReg uniq (cmmExprType e)
-		  ; emit (mkAssign (CmmLocal reg) e)
+                  ; emitAssign (CmmLocal reg) e
 		  ; return reg }
 
 newTemp :: CmmType -> FCode LocalReg
@@ -469,10 +471,10 @@ newUnboxedTupleRegs res_ty
 
 
 -------------------------------------------------------------------------
---	mkMultiAssign
+--      emitMultiAssign
 -------------------------------------------------------------------------
 
-mkMultiAssign :: [LocalReg] -> [CmmExpr] -> CmmAGraph
+emitMultiAssign :: [LocalReg] -> [CmmExpr] -> FCode ()
 -- Emit code to perform the assignments in the
 -- input simultaneously, using temporary variables when necessary.
 
@@ -487,14 +489,13 @@ type Stmt = (LocalReg, CmmExpr)	-- r := e
 --		s1 assigns to something s2 uses
 --	  that is, if s1 should *follow* s2 in the final order
 
-mkMultiAssign []    []    = mkNop
-mkMultiAssign [reg] [rhs] = mkAssign (CmmLocal reg) rhs
-mkMultiAssign regs  rhss  = ASSERT( equalLength regs rhss )
-			    unscramble ([1..] `zip` (regs `zip` rhss))
+emitMultiAssign []    []    = return ()
+emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
+emitMultiAssign regs  rhss  = ASSERT( equalLength regs rhss )
+                              unscramble ([1..] `zip` (regs `zip` rhss))
 
-unscramble :: [Vrtx] -> CmmAGraph
-unscramble vertices
-  = catAGraphs (map do_component components)
+unscramble :: [Vrtx] -> FCode ()
+unscramble vertices = mapM_ do_component components
   where
 	edges :: [ (Vrtx, Key, [Key]) ]
 	edges = [ (vertex, key1, edges_from stmt1)
@@ -509,19 +510,19 @@ unscramble vertices
 
 	-- do_components deal with one strongly-connected component
 	-- Not cyclic, or singleton?  Just do it
-	do_component :: SCC Vrtx -> CmmAGraph
-	do_component (AcyclicSCC (_,stmt))  = mk_graph stmt
+        do_component :: SCC Vrtx -> FCode ()
+        do_component (AcyclicSCC (_,stmt))  = mk_graph stmt
 	do_component (CyclicSCC []) 	    = panic "do_component"
 	do_component (CyclicSCC [(_,stmt)]) = mk_graph stmt
 
 		-- Cyclic?  Then go via temporaries.  Pick one to
 		-- break the loop and try again with the rest.
-	do_component (CyclicSCC ((_,first_stmt) : rest))
-	  = withUnique 		$ \u -> 
+        do_component (CyclicSCC ((_,first_stmt) : rest)) = do
+            u <- newUnique
 	    let (to_tmp, from_tmp) = split u first_stmt
-	    in mk_graph to_tmp
-	       <*> unscramble rest
-	       <*> mk_graph from_tmp
+            mk_graph to_tmp
+            unscramble rest
+            mk_graph from_tmp
 
 	split :: Unique -> Stmt -> (Stmt, Stmt)
 	split uniq (reg, rhs)
@@ -530,8 +531,8 @@ unscramble vertices
 	    rep = cmmExprType rhs
 	    tmp = LocalReg uniq rep
 
-	mk_graph :: Stmt -> CmmAGraph
-	mk_graph (reg, rhs) = mkAssign (CmmLocal reg) rhs
+        mk_graph :: Stmt -> FCode ()
+        mk_graph (reg, rhs) = emitAssign (CmmLocal reg) rhs
 
 mustFollow :: Stmt -> Stmt -> Bool
 (reg, _) `mustFollow` (_, rhs) = CmmLocal reg `regUsedIn` rhs
@@ -549,7 +550,7 @@ emitSwitch :: CmmExpr  		-- Tag to switch on
 	   -> FCode ()
 emitSwitch tag_expr branches mb_deflt lo_tag hi_tag
   = do	{ dflags <- getDynFlags
-	; emit (mkCmmSwitch (via_C dflags) tag_expr branches mb_deflt lo_tag hi_tag) }
+        ; mkCmmSwitch (via_C dflags) tag_expr branches mb_deflt lo_tag hi_tag }
   where
     via_C dflags | HscC <- hscTarget dflags = True
 		 | otherwise                = False
@@ -561,41 +562,40 @@ mkCmmSwitch :: Bool			-- True <=> never generate a conditional tree
 	    -> Maybe CmmAGraph	    	-- Default branch (if any)
 	    -> ConTagZ -> ConTagZ	-- Min and Max possible values; behaviour
 	    			        -- 	outside this range is undefined
-	    -> CmmAGraph
+            -> FCode ()
 
 -- First, two rather common cases in which there is no work to do
-mkCmmSwitch _ _ []         (Just code) _ _ = code
-mkCmmSwitch _ _ [(_,code)] Nothing     _ _ = code
+mkCmmSwitch _ _ []         (Just code) _ _ = emit code
+mkCmmSwitch _ _ [(_,code)] Nothing     _ _ = emit code
 
 -- Right, off we go
-mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag
-  = withFreshLabel "switch join" 	$ \ join_lbl ->
-    label_default join_lbl mb_deflt	$ \ mb_deflt ->
-    label_branches join_lbl branches	$ \ branches ->
-    assignTemp' tag_expr		$ \tag_expr' -> 
+mkCmmSwitch via_C tag_expr branches mb_deflt lo_tag hi_tag = do
+    join_lbl      <- newLabelC
+    mb_deflt_lbl  <- label_default join_lbl mb_deflt
+    branches_lbls <- label_branches join_lbl branches
+    tag_expr'     <- assignTemp' tag_expr
     
-    mk_switch tag_expr' (sortLe le branches) mb_deflt 
-	      lo_tag hi_tag via_C
-	  -- Sort the branches before calling mk_switch
-    <*> mkLabel join_lbl
+    emit =<< mk_switch tag_expr' (sortBy (comparing fst) branches_lbls)
+                mb_deflt_lbl lo_tag hi_tag via_C
 
-  where
-    (t1,_) `le` (t2,_) = t1 <= t2
+          -- Sort the branches before calling mk_switch
+
+    emitLabel join_lbl
 
 mk_switch :: CmmExpr -> [(ConTagZ, BlockId)]
 	  -> Maybe BlockId 
 	  -> ConTagZ -> ConTagZ -> Bool
-	  -> CmmAGraph
+          -> FCode CmmAGraph
 
 -- SINGLETON TAG RANGE: no case analysis to do
 mk_switch _tag_expr [(tag, lbl)] _ lo_tag hi_tag _via_C
   | lo_tag == hi_tag
   = ASSERT( tag == lo_tag )
-    mkBranch lbl
+    return (mkBranch lbl)
 
 -- SINGLETON BRANCH, NO DEFAULT: no case analysis to do
 mk_switch _tag_expr [(_tag,lbl)] Nothing _ _ _
-  = mkBranch lbl
+  = return (mkBranch lbl)
 	-- The simplifier might have eliminated a case
 	-- 	 so we may have e.g. case xs of 
 	--				 [] -> e
@@ -604,7 +604,7 @@ mk_switch _tag_expr [(_tag,lbl)] Nothing _ _ _
 
 -- SINGLETON BRANCH: one equality check to do
 mk_switch tag_expr [(tag,lbl)] (Just deflt) _ _ _
-  = mkCbranch cond deflt lbl
+  = return (mkCbranch cond deflt lbl)
   where
     cond =  cmmNeWord tag_expr (CmmLit (mkIntCLit tag))
 	-- We have lo_tag < hi_tag, but there's only one branch, 
@@ -637,30 +637,34 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 	arms :: [Maybe BlockId]
 	arms = [ find_branch i | i <- [real_lo_tag..real_hi_tag]]
     in
-    mkSwitch (cmmOffset tag_expr (- real_lo_tag)) arms
+    return (mkSwitch (cmmOffset tag_expr (- real_lo_tag)) arms)
 
   -- if we can knock off a bunch of default cases with one if, then do so
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
-  = mkCmmIfThenElse 
+  = do stmts <- mk_switch tag_expr branches mb_deflt
+                        lowest_branch hi_tag via_C
+       mkCmmIfThenElse
 	(cmmULtWord tag_expr (CmmLit (mkIntCLit lowest_branch)))
 	(mkBranch deflt)
-	(mk_switch tag_expr branches mb_deflt 
-			lowest_branch hi_tag via_C)
+        stmts
 
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
-  = mkCmmIfThenElse 
+  = do stmts <- mk_switch tag_expr branches mb_deflt
+                        lo_tag highest_branch via_C
+       mkCmmIfThenElse
 	(cmmUGtWord tag_expr (CmmLit (mkIntCLit highest_branch)))
 	(mkBranch deflt)
-	(mk_switch tag_expr branches mb_deflt 
-			lo_tag highest_branch via_C)
+        stmts
 
   | otherwise	-- Use an if-tree
-  = mkCmmIfThenElse 
+  = do lo_stmts <- mk_switch tag_expr lo_branches mb_deflt
+                             lo_tag (mid_tag-1) via_C
+       hi_stmts <- mk_switch tag_expr hi_branches mb_deflt
+                             mid_tag hi_tag via_C
+       mkCmmIfThenElse
 	(cmmUGeWord tag_expr (CmmLit (mkIntCLit mid_tag)))
-	(mk_switch tag_expr hi_branches mb_deflt 
-			     mid_tag hi_tag via_C)
-	(mk_switch tag_expr lo_branches mb_deflt 
-			     lo_tag (mid_tag-1) via_C)
+        hi_stmts
+        lo_stmts
 	-- we test (e >= mid_tag) rather than (e < mid_tag), because
 	-- the former works better when e is a comparison, and there
 	-- are two tags 0 & 1 (mid_tag == 1).  In this case, the code
@@ -715,32 +719,31 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
     is_lo (t,_) = t < mid_tag
 
 --------------
-mkCmmLitSwitch :: CmmExpr		  -- Tag to switch on
+emitCmmLitSwitch :: CmmExpr               -- Tag to switch on
 	       -> [(Literal, CmmAGraph)]  -- Tagged branches
 	       -> CmmAGraph		  -- Default branch (always)
-	       -> CmmAGraph		  -- Emit the code
+               -> FCode ()                -- Emit the code
 -- Used for general literals, whose size might not be a word, 
 -- where there is always a default case, and where we don't know
 -- the range of values for certain.  For simplicity we always generate a tree.
 --
 -- ToDo: for integers we could do better here, perhaps by generalising
 -- mk_switch and using that.  --SDM 15/09/2004
-mkCmmLitSwitch _scrut []       deflt = deflt
-mkCmmLitSwitch scrut  branches deflt
-  = assignTemp' scrut		$ \ scrut' ->
-    withFreshLabel "switch join" 	$ \ join_lbl ->
-    label_code join_lbl deflt		$ \ deflt ->
-    label_branches join_lbl branches	$ \ branches ->
-    mk_lit_switch scrut' deflt (sortLe le branches)
-    <*> mkLabel join_lbl
-  where
-    le (t1,_) (t2,_) = t1 <= t2
+emitCmmLitSwitch _scrut []       deflt = emit deflt
+emitCmmLitSwitch scrut  branches deflt = do
+    scrut' <- assignTemp' scrut
+    join_lbl <- newLabelC
+    deflt_lbl <- label_code join_lbl deflt
+    branches_lbls <- label_branches join_lbl branches
+    emit =<< mk_lit_switch scrut' deflt_lbl
+               (sortBy (comparing fst) branches_lbls)
+    emitLabel join_lbl
 
 mk_lit_switch :: CmmExpr -> BlockId 
  	      -> [(Literal,BlockId)]
-	      -> CmmAGraph
+              -> FCode CmmAGraph
 mk_lit_switch scrut deflt [(lit,blk)] 
-  = mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk
+  = return (mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk)
   where
     cmm_lit = mkSimpleLit lit
     cmm_ty  = cmmLitType cmm_lit
@@ -748,9 +751,9 @@ mk_lit_switch scrut deflt [(lit,blk)]
     ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
 
 mk_lit_switch scrut deflt_blk_id branches
-  = mkCmmIfThenElse cond
-	(mk_lit_switch scrut deflt_blk_id lo_branches)
-	(mk_lit_switch scrut deflt_blk_id hi_branches)
+  = do lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
+       hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
+       mkCmmIfThenElse cond lo_blk hi_blk
   where
     n_branches = length branches
     (mid_lit,_) = branches !! (n_branches `div` 2)
@@ -764,49 +767,42 @@ mk_lit_switch scrut deflt_blk_id branches
 
 
 --------------
-label_default :: BlockId -> Maybe CmmAGraph
-	      -> (Maybe BlockId -> CmmAGraph)
-	      -> CmmAGraph
-label_default _ Nothing thing_inside 
-  = thing_inside Nothing
-label_default join_lbl (Just code) thing_inside 
-  = label_code join_lbl code 	$ \ lbl ->
-    thing_inside (Just lbl)
+label_default :: BlockId -> Maybe CmmAGraph -> FCode (Maybe BlockId)
+label_default _ Nothing
+  = return  Nothing
+label_default join_lbl (Just code)
+  = do lbl <- label_code join_lbl code
+       return (Just lbl)
 
 --------------
-label_branches :: BlockId -> [(a,CmmAGraph)]
-	       -> ([(a,BlockId)] -> CmmAGraph) 
-	       -> CmmAGraph
-label_branches _join_lbl [] thing_inside 
-  = thing_inside []
-label_branches join_lbl ((tag,code):branches) thing_inside
-  = label_code join_lbl code		$ \ lbl ->
-    label_branches join_lbl branches 	$ \ branches' ->
-    thing_inside ((tag,lbl):branches')
+label_branches :: BlockId -> [(a,CmmAGraph)] -> FCode [(a,BlockId)]
+label_branches _join_lbl []
+  = return []
+label_branches join_lbl ((tag,code):branches)
+  = do lbl <- label_code join_lbl code
+       branches' <- label_branches join_lbl branches
+       return ((tag,lbl):branches')
 
 --------------
-label_code :: BlockId -> CmmAGraph -> (BlockId -> CmmAGraph) -> CmmAGraph
--- (label_code J code fun)
+label_code :: BlockId -> CmmAGraph -> FCode BlockId
+--  label_code J code
 --	generates
---  [L: code; goto J] fun L
-label_code join_lbl code thing_inside
-  = withFreshLabel "switch" 	$ \lbl -> 
-    outOfLine (mkLabel lbl <*> code <*> mkBranch join_lbl)
-    <*> thing_inside lbl
- 
+--  [L: code; goto J]
+-- and returns L
+label_code join_lbl code = do
+    lbl <- newLabelC
+    emitOutOfLine lbl (code <*> mkBranch join_lbl)
+    return lbl
 
 --------------
-assignTemp' :: CmmExpr -> (CmmExpr -> CmmAGraph) -> CmmAGraph
-assignTemp' e thing_inside
-  | isTrivialCmmExpr e = thing_inside e
-  | otherwise          = withTemp (cmmExprType e)	$ \ lreg ->
-			 let reg = CmmLocal lreg in 
-			 mkAssign reg e <*> thing_inside (CmmReg reg)
-
-withTemp :: CmmType -> (LocalReg -> CmmAGraph) -> CmmAGraph
-withTemp rep thing_inside
-  = withUnique $ \uniq -> thing_inside (LocalReg uniq rep)
-
+assignTemp' :: CmmExpr -> FCode CmmExpr
+assignTemp' e
+  | isTrivialCmmExpr e = return e
+  | otherwise = do
+       lreg <- newTemp (cmmExprType e)
+       let reg = CmmLocal lreg
+       emitAssign reg e
+       return (CmmReg reg)
 
 -------------------------------------------------------------------------
 --
@@ -814,36 +810,13 @@ withTemp rep thing_inside
 --
 -------------------------------------------------------------------------
 
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTInfo :: SRT -> FCode C_SRT
-getSRTInfo (SRTEntries {}) = panic "getSRTInfo"
-
-getSRTInfo (SRT off len bmp)
-  | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
-  = do 	{ id <- newUnique
-	-- ; top_srt <- getSRTLabel
-        ; let srt_desc_lbl = mkLargeSRTLabel id
-        -- JD: We're not constructing and emitting SRTs in the back end,
-        -- which renders this code wrong (it now names a now-non-existent label).
-	-- ; emitRODataLits srt_desc_lbl
-        --      ( cmmLabelOffW top_srt off
-	--        : mkWordCLit (fromIntegral len)
-	--        : map mkWordCLit bmp)
-	; return (C_SRT srt_desc_lbl 0 srt_escape) }
-
-  | otherwise
-  = do	{ top_srt <- getSRTLabel
-	; return (C_SRT top_srt off (fromIntegral (head bmp))) }
-	-- The fromIntegral converts to StgHalfWord
-
-getSRTInfo NoSRT 
-  = -- TODO: Should we panic in this case?
-    -- Someone obviously thinks there should be an SRT
-    return NoC_SRT
-
+-- | Returns 'True' if there is a non-empty SRT, or 'False' otherwise
+-- NB. the SRT attached to an StgBind is still used in the new codegen
+-- to decide whether we need a static link field on a static closure
+-- or not.
+getSRTInfo :: SRT -> FCode Bool
+getSRTInfo (SRTEntries vs) = return (not (isEmptyVarSet vs))
+getSRTInfo _               = return False
 
 srt_escape :: StgHalfWord
 srt_escape = -1

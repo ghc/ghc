@@ -18,7 +18,7 @@ module CmmNode (
      CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
      UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
-     mapExpM, mapExpDeepM, wrapRecExpM
+     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
   ) where
 
 import CmmExpr
@@ -35,15 +35,17 @@ import Prelude hiding (succ)
 ------------------------
 -- CmmNode
 
+#define ULabel {-# UNPACK #-} !Label
+
 data CmmNode e x where
-  CmmEntry :: Label -> CmmNode C O
+  CmmEntry :: ULabel -> CmmNode C O
 
   CmmComment :: FastString -> CmmNode O O
 
-  CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O
+  CmmAssign :: !CmmReg -> !CmmExpr -> CmmNode O O
     -- Assign to register
 
-  CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O
+  CmmStore :: !CmmExpr -> !CmmExpr -> CmmNode O O
     -- Assign to memory location.  Size is
     -- given by cmmExprType of the rhs.
 
@@ -60,11 +62,12 @@ data CmmNode e x where
       --            bug for what can be put in arguments, see
       --            Note [Register Parameter Passing]
 
-  CmmBranch :: Label -> CmmNode O C  -- Goto another block in the same procedure
+  CmmBranch :: ULabel -> CmmNode O C
+                                   -- Goto another block in the same procedure
 
   CmmCondBranch :: {                 -- conditional branch
       cml_pred :: CmmExpr,
-      cml_true, cml_false :: Label
+      cml_true, cml_false :: ULabel
   } -> CmmNode O C
 
   CmmSwitch :: CmmExpr -> [Maybe Label] -> CmmNode O C -- Table branch
@@ -78,15 +81,20 @@ data CmmNode e x where
 
       cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
+          --
+          -- Note [Continuation BlockId]: these BlockIds are called
+          -- Continuation BlockIds, and are the only BlockIds that can
+          -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
+          -- (CmmStackSlot (Young b) _).
 
--- ToDO: add this:
---       cml_args_regs :: [GlobalReg],
--- It says which GlobalRegs are live for the parameters at the
--- moment of the call.  Later stages can use this to give liveness
--- everywhere, which in turn guides register allocation.
--- It is the companion of cml_args; cml_args says which stack words
--- hold parameters, while cml_arg_regs says which global regs hold parameters.
--- But do note [Register parameter passing]
+      cml_args_regs :: [GlobalReg],
+          -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are passed
+          -- to the call.  This is essential information for the
+          -- native code generator's register allocator; without
+          -- knowing which GlobalRegs are live it has to assume that
+          -- they are all live.  This list should only include
+          -- GlobalRegs that are mapped to real machine registers on
+          -- the target platform.
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -117,7 +125,7 @@ data CmmNode e x where
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: [CmmFormal],     -- zero or more results
       args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
-      succ  :: Label,           -- Label of continuation
+      succ  :: ULabel,          -- Label of continuation
       updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
       intrbl:: Bool             -- whether or not the call is interruptible
   } -> CmmNode O C
@@ -181,7 +189,7 @@ instance Eq (CmmNode e x) where
   (CmmBranch a)                == (CmmBranch a')                  = a==a'
   (CmmCondBranch a b c)        == (CmmCondBranch a' b' c')        = a==a' && b==b' && c==c'
   (CmmSwitch a b)              == (CmmSwitch a' b')               = a==a' && b==b'
-  (CmmCall a b c d e)          == (CmmCall a' b' c' d' e')        = a==a' && b==b' && c==c' && d==d' && e==e'
+  (CmmCall a b c d e f)          == (CmmCall a' b' c' d' e' f')   = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
   (CmmForeignCall a b c d e f) == (CmmForeignCall a' b' c' d' e' f') = a==a' && b==b' && c==c' && d==d' && e==e' && f==f'
   _                            == _                               = False
 
@@ -197,10 +205,6 @@ instance NonLocal CmmNode where
   successors (CmmCall {cml_cont=l}) = maybeToList l
   successors (CmmForeignCall {succ=l}) = [l]
 
-
-instance HooplNode CmmNode where
-  mkBranchNode label = CmmBranch label
-  mkLabelNode label  = CmmEntry label
 
 --------------------------------------------------
 -- Various helper types
@@ -218,14 +222,6 @@ data Convention
   | GC               -- Entry to the garbage collector: uses the node reg!
   | PrimOpCall       -- Calling prim ops
   | PrimOpReturn     -- Returning from prim ops
-  | Foreign          -- Foreign call/return
-        ForeignConvention
-  | Private
-        -- Used for control transfers within a (pre-CPS) procedure All
-        -- jump sites known, never pushed on the stack (hence no SRT)
-        -- You can choose whatever calling convention you please
-        -- (provided you make sure all the call sites agree)!
-        -- This data type eventually to be extended to record the convention.
   deriving( Eq )
 
 data ForeignConvention
@@ -283,37 +279,6 @@ instance DefinerOfLocalRegs (CmmNode e x) where
           fold f z n = foldRegsDefd f z n
 
 
-instance UserOfSlots (CmmNode e x) where
-  foldSlotsUsed f z n = case n of
-    CmmAssign _ expr -> fold f z expr
-    CmmStore addr rval -> fold f (fold f z addr) rval
-    CmmUnsafeForeignCall _ _ args -> fold f z args
-    CmmCondBranch expr _ _ -> fold f z expr
-    CmmSwitch expr _ -> fold f z expr
-    CmmCall {cml_target=tgt} -> fold f z tgt
-    CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
-    _ -> z
-    where fold :: forall a b.
-                       UserOfSlots a =>
-                       (b -> SubArea -> b) -> b -> a -> b
-          fold f z n = foldSlotsUsed f z n
-
-instance UserOfSlots ForeignTarget where
-  foldSlotsUsed  f z (ForeignTarget e _) = foldSlotsUsed f z e
-  foldSlotsUsed _f z (PrimTarget _)      = z
-
-instance DefinerOfSlots (CmmNode e x) where
-  foldSlotsDefd f z n = case n of
-    CmmStore (CmmStackSlot a i) expr -> f z (a, i, widthInBytes $ typeWidth $ cmmExprType expr)
-    CmmForeignCall {res=res} -> fold f z $ map foreign_call_slot res
-    _ -> z
-    where
-          fold :: forall a b.
-                  DefinerOfSlots a =>
-                  (b -> SubArea -> b) -> b -> a -> b
-          fold f z n = foldSlotsDefd f z n
-          foreign_call_slot r = case widthInBytes $ typeWidth $ localRegType r of w -> (RegSlot r, w, w)
-
 -----------------------------------
 -- mapping Expr in CmmNode
 
@@ -336,7 +301,7 @@ mapExp f   (CmmUnsafeForeignCall tgt fs as)      = CmmUnsafeForeignCall (mapFore
 mapExp _ l@(CmmBranch _)                         = l
 mapExp f   (CmmCondBranch e ti fi)               = CmmCondBranch (f e) ti fi
 mapExp f   (CmmSwitch e tbl)                     = CmmSwitch (f e) tbl
-mapExp f   (CmmCall tgt mb_id o i s)             = CmmCall (f tgt) mb_id o i s
+mapExp f   n@CmmCall {cml_target=tgt}            = n{cml_target = f tgt}
 mapExp f   (CmmForeignCall tgt fs as succ updfr intrbl) = CmmForeignCall (mapForeignTarget f tgt) fs (map f as) succ updfr intrbl
 
 mapExpDeep :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
@@ -362,7 +327,7 @@ mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap`
 mapExpM _ (CmmBranch _)             = Nothing
 mapExpM f (CmmCondBranch e ti fi)   = (\x -> CmmCondBranch x ti fi) `fmap` f e
 mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
-mapExpM f (CmmCall tgt mb_id o i s) = (\x -> CmmCall x mb_id o i s) `fmap` f tgt
+mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
@@ -416,4 +381,20 @@ foldExp f (CmmCall {cml_target=tgt}) z            = f tgt z
 foldExp f (CmmForeignCall {tgt=tgt, args=args}) z = foldr f (foldExpForeignTarget f tgt z) args
 
 foldExpDeep :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
-foldExpDeep f = foldExp $ wrapRecExpf f
+foldExpDeep f = foldExp go
+  where -- go :: CmmExpr -> z -> z
+        go e@(CmmMachOp _ es) z = gos es $! f e z
+        go e@(CmmLoad addr _) z = go addr $! f e z
+        go e                  z = f e z
+
+        gos [] z = z
+        gos (e:es) z = gos es $! f e z
+
+-- -----------------------------------------------------------------------------
+
+mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
+mapSuccessors f (CmmBranch bid)        = CmmBranch (f bid)
+mapSuccessors f (CmmCondBranch p y n)  = CmmCondBranch p (f y) (f n)
+mapSuccessors f (CmmSwitch e arms)     = CmmSwitch e (map (fmap f) arms)
+mapSuccessors _ n = n
+

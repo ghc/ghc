@@ -36,7 +36,7 @@ import CgBindery
 import CgCallConv
 import CgUtils
 import CgMonad
-import CmmBuildInfoTables
+import CmmUtils
 
 import OldCmm
 import CLabel
@@ -66,10 +66,9 @@ emitClosureCodeAndInfoTable cl_info args body
 
 -- Convert from 'ClosureInfo' to 'CmmInfo'.
 -- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
-mkCmmInfo :: ClosureInfo -> FCode CmmInfo
+mkCmmInfo :: ClosureInfo -> FCode CmmInfoTable
 mkCmmInfo cl_info
-  = return (CmmInfo gc_target Nothing $
-            CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
+  = return (CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
                    	   cit_rep  = closureSMRep cl_info,
                    	   cit_prof = prof,
                    	   cit_srt  = closureSRT cl_info })
@@ -78,14 +77,6 @@ mkCmmInfo cl_info
          | otherwise = ProfilingInfo ty_descr_w8 val_descr_w8
     ty_descr_w8  = stringToWord8s (closureTypeDescr cl_info)
     val_descr_w8 = stringToWord8s (closureValDescr cl_info)
-
-    -- The gc_target is to inform the CPS pass when it inserts a stack check.
-    -- Since that pass isn't used yet we'll punt for now.
-    -- When the CPS pass is fully integrated, this should
-    -- be replaced by the label that any heap check jumped to,
-    -- so that branch can be shared by both the heap (from codeGen)
-    -- and stack checks (from the CPS pass).
-    gc_target = panic "TODO: gc_target"
 
 -------------------------------------------------------------------------
 --
@@ -105,8 +96,7 @@ emitReturnTarget name stmts
 	; blks <- cgStmtsToBlocks stmts
         ; frame <- mkStackLayout
         ; let smrep    = mkStackRep (mkLiveness frame)
-              info     = CmmInfo gc_target Nothing info_tbl
-              info_tbl = CmmInfoTable { cit_lbl  = info_lbl
+              info     = CmmInfoTable { cit_lbl  = info_lbl
                                       , cit_prof = NoProfilingInfo
                                       , cit_rep  = smrep
                                       , cit_srt  = srt_info }
@@ -117,14 +107,6 @@ emitReturnTarget name stmts
     uniq      = getUnique name
     info_lbl  = mkReturnInfoLabel uniq
     entry_lbl = mkReturnPtLabel uniq
-
-    -- The gc_target is to inform the CPS pass when it inserts a stack check.
-    -- Since that pass isn't used yet we'll punt for now.
-    -- When the CPS pass is fully integrated, this should
-    -- be replaced by the label that any heap check jumped to,
-    -- so that branch can be shared by both the heap (from codeGen)
-    -- and stack checks (from the CPS pass).
-    gc_target = panic "TODO: gc_target"
 
 -- Build stack layout information from the state of the 'FCode' monad.
 -- Should go away once 'codeGen' starts using the CPS conversion
@@ -375,8 +357,8 @@ funInfoTable info_ptr
 
 emitInfoTableAndCode 
 	:: CLabel 		-- Label of entry or ret
-	-> CmmInfo 		-- ...the info table
-	-> [CmmFormal]	-- ...args
+        -> CmmInfoTable         -- ...the info table
+        -> [CmmFormal]          -- ...args
 	-> [CmmBasicBlock]	-- ...and body
 	-> Code
 

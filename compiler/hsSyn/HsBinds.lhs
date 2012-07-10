@@ -34,13 +34,13 @@ import NameSet
 import BasicTypes
 import Outputable	
 import SrcLoc
-import Util
 import Var
 import Bag
 import FastString
 
 import Data.Data hiding ( Fixity )
-import Data.List ( intersect )
+import Data.List
+import Data.Ord
 \end{code}
 
 %************************************************************************
@@ -267,7 +267,7 @@ pprLHsBindsForUser binds sigs
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
             [(loc, ppr bind) | L loc bind <- bagToList binds]
 
-    sort_by_loc decls = sortLe (\(l1,_) (l2,_) -> l1 <= l2) decls
+    sort_by_loc decls = sortBy (comparing fst) decls
 
 pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 -- Print a bunch of declarations

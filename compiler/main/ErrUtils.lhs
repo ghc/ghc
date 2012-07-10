@@ -37,7 +37,6 @@ module ErrUtils (
 
 import Bag              ( Bag, bagToList, isEmptyBag, emptyBag )
 import Exception
-import Util
 import Outputable
 import Panic
 import FastString
@@ -51,6 +50,7 @@ import System.FilePath
 import Data.List
 import qualified Data.Set as Set
 import Data.IORef
+import Data.Ord
 import Control.Monad
 import System.IO
 
@@ -178,13 +178,8 @@ printMsgBag dflags bag
                          errMsgContext   = unqual } <- sortMsgBag bag ]
 
 sortMsgBag :: Bag ErrMsg -> [ErrMsg]
-sortMsgBag bag = sortLe srcOrder $ bagToList bag
-  where
-    srcOrder err1 err2 =
-        case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
-            LT -> True
-            EQ -> True
-            GT -> False
+sortMsgBag bag = sortBy (comparing (head . errMsgSpans)) $ bagToList bag
+                 -- TODO: Why "head ."? Why not compare the whole list?
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

@@ -71,6 +71,8 @@ import FastString
 import UniqSet
 import ErrUtils
 import Module
+import Stream (Stream)
+import qualified Stream
 
 -- DEBUGGING ONLY
 --import OrdList
@@ -147,7 +149,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> Stream IO RawCmmGroup () -> IO ()
 nativeCodeGen dflags h us cmms
  = let platform = targetPlatform dflags
        nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
@@ -209,16 +211,16 @@ nativeCodeGen dflags h us cmms
 nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
-               -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
+               -> Handle -> UniqSupply -> Stream IO RawCmmGroup () -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
         let platform = targetPlatform dflags
-            split_cmms  = concat $ map add_split cmms
+            split_cmms  = Stream.map add_split cmms
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        (imports, prof) <- cmmNativeGens dflags ncgImpl bufh us split_cmms [] [] 0
+        (imports, prof) <- cmmNativeGenStream dflags ncgImpl bufh us split_cmms [] [] 0
         bFlush bufh
 
         let (native, colorStats, linearStats)
@@ -272,6 +274,34 @@ nativeCodeGen' dflags ncgImpl h us cmms
         split_marker = CmmProc Nothing mkSplitMarkerLabel (ListGraph [])
 
 
+cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
+              => DynFlags
+              -> NcgImpl statics instr jumpDest
+              -> BufHandle
+              -> UniqSupply
+              -> Stream IO RawCmmGroup ()
+              -> [[CLabel]]
+              -> [ ([NatCmmDecl statics instr],
+                   Maybe [Color.RegAllocStats statics instr],
+                   Maybe [Linear.RegAllocStats]) ]
+              -> Int
+              -> IO ( [[CLabel]],
+                      [([NatCmmDecl statics instr],
+                      Maybe [Color.RegAllocStats statics instr],
+                      Maybe [Linear.RegAllocStats])] )
+
+cmmNativeGenStream dflags ncgImpl h us cmm_stream impAcc profAcc count
+ = do
+        r <- Stream.runStream cmm_stream
+        case r of
+          Left () -> return (reverse impAcc, reverse profAcc)
+          Right (cmms, cmm_stream') -> do
+            (impAcc,profAcc,us') <- cmmNativeGens dflags ncgImpl h us cmms
+                                              impAcc profAcc count
+            cmmNativeGenStream dflags ncgImpl h us' cmm_stream'
+                                              impAcc profAcc count
+
+
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
@@ -287,11 +317,12 @@ cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
               -> Int
               -> IO ( [[CLabel]],
                       [([NatCmmDecl statics instr],
-                      Maybe [Color.RegAllocStats statics instr],
-                      Maybe [Linear.RegAllocStats])] )
+                       Maybe [Color.RegAllocStats statics instr],
+                       Maybe [Linear.RegAllocStats])],
+                      UniqSupply )
 
-cmmNativeGens _ _ _ _ [] impAcc profAcc _
-        = return (reverse impAcc, reverse profAcc)
+cmmNativeGens _ _ _ us [] impAcc profAcc _
+        = return (impAcc,profAcc,us)
 
 cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
  = do
@@ -817,7 +848,11 @@ Ideas for other things we could do (put these in Hoopl please!):
 cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline dflags (cmmEliminateDeadBlocks blocks))
+  let reachable_blocks | dopt Opt_TryNewCodeGen dflags = blocks
+                       | otherwise = cmmEliminateDeadBlocks blocks
+      -- The new codegen path has already eliminated unreachable blocks by now
+
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline dflags reachable_blocks)
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
@@ -911,7 +946,8 @@ cmmExprConFold referenceKind expr = do
     dflags <- getDynFlags
     -- Skip constant folding if new code generator is running
     -- (this optimization is done in Hoopl)
-    let expr' = if dopt Opt_TryNewCodeGen dflags
+    -- SDM: re-enabled for now, while cmmRewriteAssignments is turned off
+    let expr' = if False -- dopt Opt_TryNewCodeGen dflags
                     then expr
                     else cmmExprCon (targetPlatform dflags) expr
     cmmExprNative referenceKind expr'

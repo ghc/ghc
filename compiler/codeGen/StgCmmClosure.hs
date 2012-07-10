@@ -657,7 +657,6 @@ data ClosureInfo
           -- the rest is just an unpacked CmmInfoTable.
         closureInfoLabel :: !CLabel,
         closureSMRep     :: !SMRep,          -- representation used by storage mgr
-        closureSRT       :: !C_SRT,          -- What SRT applies to this closure
         closureProf      :: !ProfilingInfo
     }
 
@@ -667,7 +666,7 @@ mkCmmInfo ClosureInfo {..}
   = CmmInfoTable { cit_lbl  = closureInfoLabel
                  , cit_rep  = closureSMRep
                  , cit_prof = closureProf
-                 , cit_srt  = closureSRT }
+                 , cit_srt  = NoC_SRT }
 
 
 --------------------------------------
@@ -678,16 +677,14 @@ mkClosureInfo :: Bool		-- Is static
 	      -> Id
 	      -> LambdaFormInfo 
 	      -> Int -> Int	-- Total and pointer words
-	      -> C_SRT
-	      -> String		-- String descriptor
+              -> String         -- String descriptor
 	      -> ClosureInfo
-mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info val_descr
+mkClosureInfo is_static id lf_info tot_wds ptr_wds val_descr
   = ClosureInfo { closureName      = name,
                   closureLFInfo    = lf_info,
-                  closureInfoLabel = info_lbl,
-                  closureSMRep     = sm_rep,    -- These four fields are a
-                  closureSRT       = srt_info,  --        CmmInfoTable
-                  closureProf      = prof }     -- ---
+                  closureInfoLabel = info_lbl,  -- These three fields are
+                  closureSMRep     = sm_rep,    -- (almost) an info table
+                  closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
     sm_rep     = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
@@ -920,15 +917,21 @@ cafBlackHoleInfoTable
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-staticClosureNeedsLink :: CmmInfoTable -> Bool
+staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
 -- A static closure needs a link field to aid the GC when traversing
 -- the static closure graph.  But it only needs such a field if either
 -- 	a) it has an SRT
 --	b) it's a constructor with one or more pointer fields
 -- In case (b), the constructor's fields themselves play the role
 -- of the SRT.
-staticClosureNeedsLink info_tbl@CmmInfoTable{ cit_rep = smrep }
+--
+-- At this point, the cit_srt field has not been calculated (that
+-- happens right at the end of the Cmm pipeline), but we do have the
+-- VarSet of CAFs that CoreToStg attached, and if that is empty there
+-- will definitely not be an SRT.
+--
+staticClosureNeedsLink has_srt CmmInfoTable{ cit_rep = smrep }
   | isConRep smrep         = not (isStaticNoCafCon smrep)
-  | otherwise              = needsSRT (cit_srt info_tbl)
-staticClosureNeedsLink _ = False
+  | otherwise              = has_srt -- needsSRT (cit_srt info_tbl)
+staticClosureNeedsLink _ _ = False
 
