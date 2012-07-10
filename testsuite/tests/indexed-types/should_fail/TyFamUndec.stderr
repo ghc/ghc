@@ -1,6 +1,6 @@
 
 TyFamUndec.hs:6:1:
-    Variable occurs more often than in instance head
+    Variable `b' occurs more often than in the instance head
       in the type family application: T (b, b)
     (Use -XUndecidableInstances to permit this)
     In the type instance declaration for `T'
