@@ -34,6 +34,8 @@ module GHC.ForeignPtr
         mallocPlainForeignPtr,
         mallocForeignPtrBytes,
         mallocPlainForeignPtrBytes,
+        mallocForeignPtrAlignedBytes,
+        mallocPlainForeignPtrAlignedBytes,
         addForeignPtrFinalizer,
         addForeignPtrFinalizerEnv,
         touchForeignPtr,
@@ -183,6 +185,20 @@ mallocForeignPtrBytes (I# size) = do
                          (MallocPtr mbarr# r) #)
      }
 
+-- | This function is similar to 'mallocForeignPtrBytes', except that the
+-- size and alignment of the memory required is given explicitly as numbers of
+-- bytes.
+mallocForeignPtrAlignedBytes :: Int -> Int -> IO (ForeignPtr a)
+mallocForeignPtrAlignedBytes size alignment | size < 0 =
+  error "mallocForeignPtrAlignedBytes: size must be >= 0"
+mallocForeignPtrAlignedBytes (I# size) (I# alignment) = do
+  r <- newIORef (NoFinalizers, [])
+  IO $ \s ->
+     case newAlignedPinnedByteArray# size alignment s of { (# s', mbarr# #) ->
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                         (MallocPtr mbarr# r) #)
+     }
+
 -- | Allocate some memory and return a 'ForeignPtr' to it.  The memory
 -- will be released automatically when the 'ForeignPtr' is discarded.
 --
@@ -218,6 +234,19 @@ mallocPlainForeignPtrBytes size | size < 0 =
   error "mallocPlainForeignPtrBytes: size must be >= 0"
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                         (PlainPtr mbarr#) #)
+     }
+
+-- | This function is similar to 'mallocForeignPtrAlignedBytes', except that
+-- the internally an optimised ForeignPtr representation with no
+-- finalizer is used. Attempts to add a finalizer will cause an
+-- exception to be thrown.
+mallocPlainForeignPtrAlignedBytes :: Int -> Int -> IO (ForeignPtr a)
+mallocPlainForeignPtrAlignedBytes size alignment | size < 0 =
+  error "mallocPlainForeignPtrAlignedBytes: size must be >= 0"
+mallocPlainForeignPtrAlignedBytes (I# size) (I# alignment) = IO $ \s ->
+    case newAlignedPinnedByteArray# size alignment s of { (# s', mbarr# #) ->
        (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                          (PlainPtr mbarr#) #)
      }
