@@ -404,7 +404,7 @@ xmm n = regSingle (firstxmm+n)
 
 
 -- horror show -----------------------------------------------------------------
-freeReg, freeRegBase    :: RegNo -> FastBool
+freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
 allArgRegs              :: [(Reg, Reg)]
 allIntArgRegs           :: [Reg]
@@ -482,6 +482,8 @@ freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 
 -- split patterns in two functions to prevent overlaps
 freeReg r         = freeRegBase r
+
+freeRegBase :: RegNo -> FastBool
 
 #ifdef REG_Base
 freeRegBase REG_Base = fastBool False
