@@ -73,6 +73,8 @@ binaryInterfaceVersion = 20
 binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 705
 binaryInterfaceVersion = 20
+#elif __GLASGOW_HASKELL__ == 706
+binaryInterfaceVersion = 20
 #else
 #error Unknown GHC version
 #endif
