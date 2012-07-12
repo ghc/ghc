@@ -459,6 +459,7 @@ Library
         Supercompile.Drive.Process2
         Supercompile.Drive.Process3
         Supercompile.Drive.Split
+        Supercompile.Drive.Split2
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars

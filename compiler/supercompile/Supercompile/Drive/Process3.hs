@@ -3,7 +3,7 @@ module Supercompile.Drive.Process3 (supercompile) where
 
 --import Supercompile.Drive.Match
 import Supercompile.Drive.MSG
-import Supercompile.Drive.Split
+import Supercompile.Drive.Split2
 import Supercompile.Drive.Process
 
 import Supercompile.Core.FreeVars
@@ -44,7 +44,7 @@ import Data.Monoid (mempty)
 
 
 {--}
-type RollbackState = ((State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm))
+type RollbackState = ScpM (ResidTags, Deeds, Out FVedTerm)
 type ProcessHistory = GraphicalHistory (NodeKey, (String, State, RollbackState -> ScpM ()))
 
 pROCESS_HISTORY :: ProcessHistory
@@ -166,9 +166,11 @@ newtype ScpM a = ScpM { unScpM :: StateT ScpState
                                          (ReaderT ScpEnv (ContT ScpResType Identity)) a }
                deriving (Functor, Applicative, Monad)
 
+{-
 instance MonadStatics ScpM where
     bindCapturedFloats _fvs mx = liftM ((,) []) mx -- FIXME: do something other than hope for the best
     monitorFVs = liftM ((,) emptyVarSet)
+-}
 
 withScpEnv :: (ScpEnv -> ScpEnv) -> ScpM a -> ScpM a
 withScpEnv f mx = ScpM $ StateT $ \s -> ReaderT $ \env -> unReaderT (unStateT (unScpM mx) s) (f env)
@@ -273,18 +275,18 @@ sc = memo sc' . gc -- Garbage collection necessary because normalisation might h
 sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)) -- Bool records whether generalisation occurred, for debug printing
 sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> -- traceRenderM "!sc" (PrettyDoc (pPrintFullState quietStatePrettiness state)) >>
-                                                   my_split state sc
+                                                   my_split state
   Just h  -> flip catchM try_generalise $ \rb ->
                terminateM h state rb
-                 (speculateM (reduce state) $ \state -> my_split state sc)
+                 (speculateM (reduce state) $ \state -> my_split state)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $ do
-                                                           let gen = fmap (trace "sc-stop(msg)") (tryMSG shallow_state state) `mplus`
-                                                                     fmap (trace "sc-stop(tag)") (tryTaG shallow_state state) `orElse`
-                                                                          trace "sc-stop(split)" (split shallow_state, split state)
+                                                           let gen = fmap (trace "sc-stop(msg)") (tryMSG sc shallow_state state) `mplus`
+                                                                     fmap (trace "sc-stop(tag)") (tryTaG sc shallow_state state) `orElse`
+                                                                          trace "sc-stop(split)" (split sc shallow_state, split sc state)
                                                            when sC_ROLLBACK $ shallow_rb (fst gen)
                                                            try_generalise (snd gen))
   where
-    try_generalise gen = my_generalise gen sc
+    try_generalise gen = my_generalise gen
 
     -- FIXME: the "could have tied back" case is reachable (e.g. exp3_8 with unfoldings as internal bindings), and it doesn't appear to be
     -- because of dumped promises (no "dumped" in output). I'm reasonably sure this should not happen :(
@@ -296,24 +298,25 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
-    my_generalise splt  = liftM ((,) True)  . (>>= insertTagsM) . splt
-    my_split      state = liftM ((,) False) . (>>= insertTagsM) . split state
+    my_generalise splt  = liftM ((,) True)  $ splt           >>= insertTagsM
+    my_split      state = liftM ((,) False) $ split sc state >>= insertTagsM
 
-tryTaG, tryMSG :: State -> State
-               -> Maybe ((State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm),
-                         (State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm))
-tryTaG shallow_state state = bothWays (\_ -> generalise gen) shallow_state state
+tryTaG, tryMSG :: (State -> ScpM (Deeds, Out FVedTerm))
+               -> State -> State
+               -> Maybe (ScpM (ResidTags, Deeds, Out FVedTerm),
+                         ScpM (ResidTags, Deeds, Out FVedTerm))
+tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallow_state state
   where gen = mK_GENERALISER shallow_state state
 
-tryMSG = bothWays $ \shallow_state state -> do
+tryMSG opt = bothWays $ \shallow_state state -> do
   -- FIXME: better? In particular, could rollback and then MSG
   (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
   pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
-                          pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ \opt -> do
+                          pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ do
     (deeds', e) <- sc (deeds, heap, k, qa)
     rn_r <- mkOutRenaming rn_r -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
-    instanceSplit (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e) opt
+    instanceSplit opt (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e)
 
 -- NB: in the case of both callers, if "f" fails one way then it fails the other way as well (and likewise for success).
 -- Therefore we can return a single Maybe rather than a pair of two Maybes.
@@ -520,7 +523,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
         in case fmap (\(exact, (p, mr)) -> (exact, case mr of
                        RightIsInstance heap_inst rn_lr k_inst -> do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                                                    ; stuff <- instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt
+                                                                    ; stuff <- instanceSplit memo_opt (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
                                                                     ; insertTagsM stuff }
                          where
                           -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
