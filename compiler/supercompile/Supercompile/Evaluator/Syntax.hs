@@ -112,8 +112,8 @@ mkVarCastBy tg_y y' cast_by = (mkIdentityRenaming (castByFreeVars cast_by `exten
 --
 -- This means that if we want correct tag propagation we have to be very careful when we use an
 -- existing CastBy in the construction of an Answer.
-type AnswerF f = Coerced (In (ValueF f))
-type Answer = AnswerF Anned
+type AnswerG value = Coerced value
+type Answer = AnswerG (In AnnedValue)
 
 answerSize' :: Answer -> Size
 answerSize' = annedTermSize' . answerToAnnedTerm' emptyInScopeSet
@@ -129,10 +129,10 @@ termToAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) 
         _       -> Nothing
     _ -> Nothing
 
-data QAF f = Question (Out Id)
-           | Answer   (AnswerF f)
+data QAG value = Question (Out Id)
+               | Answer   (AnswerG value)
 
-type QA = QAF Anned
+type QA = QAG (In AnnedValue)
 
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
@@ -282,14 +282,15 @@ instance Outputable Heap where
 --  Update, Cast, Update
 -- NB: Cast, Update, Cast *is* allowed
 type Stack = Train (Tagged StackFrame) Generalised
-data StackFrame = TyApply (Out Type)
-                | CoApply (Out NormalCo)
-                | Apply (Out Id)
-                | Scrutinise (Out Id) (Out Type) (In [AnnedAlt])
-                | PrimApply PrimOp [Out Type] [Anned Answer] [In AnnedTerm]
-                | StrictLet (Out Id) (In AnnedTerm)
-                | Update (Out Id)
-                | CastIt (Out NormalCo)
+type StackFrame = StackFrameG (Anned Answer) (In AnnedTerm) (In [AnnedAlt])
+data StackFrameG answer term alts = TyApply (Out Type)
+                                  | CoApply (Out NormalCo)
+                                  | Apply (Out Id)
+                                  | Scrutinise (Out Id) (Out Type) alts
+                                  | PrimApply PrimOp [Out Type] [answer] [term]
+                                  | StrictLet (Out Id) term
+                                  | Update (Out Id)
+                                  | CastIt (Out NormalCo)
 
 instance Outputable StackFrame where
     pprPrec prec kf = case kf of

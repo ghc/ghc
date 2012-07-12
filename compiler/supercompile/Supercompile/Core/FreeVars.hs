@@ -65,28 +65,29 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term = rec term'
     term' (Var x)            = unitVarSet x
     term' (Value v)          = value' v
-    term' (TyApp e ty)       = typ ty `unionVarSet` term e
+    term' (TyApp e ty)       = tyVarsOfType ty `unionVarSet` term e
     term' (CoApp e co)       = term e `unionVarSet` tyCoVarsOfCo co
     term' (App e x)          = term e `extendVarSet` x
-    term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
-    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecBinderFreeVars x (alternatives alts)
+    term' (PrimOp _ tys es)  = unionVarSets (map tyVarsOfType tys) `unionVarSet` unionVarSets (map term es)
+    term' (Case e x ty alts) = tyVarsOfType ty `unionVarSet` term e `unionVarSet` nonRecBinderFreeVars x (alternatives alts)
     term' (Let x e1 e2)      = term e1 `unionVarSet` nonRecBinderFreeVars x (term e2)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idBndrFreeVars xs)) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     
     value = rec value'
-    value' (TyLambda x e)      = nonRecBinderFreeVars x (term e)
-    value' (Lambda x e)        = nonRecBinderFreeVars x (term e)
-    value' (Data _ tys cos xs) = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map tyCoVarsOfCo cos) `unionVarSet` mkVarSet xs
-    value' (Literal _)         = emptyVarSet
-    value' (Coercion co)       = tyCoVarsOfCo co
+    value' = valueGFreeVars' term
     
     alternatives = unionVarSets . map alternative
     
     alternative (altcon, e) = altConFreeVars altcon $ term e
-    
-    typ = tyVarsOfType
+
+valueGFreeVars' :: (a -> FreeVars) -> ValueG a -> FreeVars
+valueGFreeVars' term (TyLambda x e)      = nonRecBinderFreeVars x (term e)
+valueGFreeVars' term (Lambda x e)        = nonRecBinderFreeVars x (term e)
+valueGFreeVars' _    (Data _ tys cos xs) = unionVarSets (map tyVarsOfType tys) `unionVarSet` unionVarSets (map tyCoVarsOfCo cos) `unionVarSet` mkVarSet xs
+valueGFreeVars' _    (Literal _)         = emptyVarSet
+valueGFreeVars' _    (Coercion co)       = tyCoVarsOfCo co
 
 nonRecBinderFreeVars :: Var -> FreeVars -> FreeVars
 nonRecBinderFreeVars x fvs = (fvs `delVarSet` x) `unionVarSet` varBndrFreeVars x

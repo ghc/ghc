@@ -28,7 +28,7 @@ module Supercompile.Core.Renaming (
     renameBounds, renameNonRecBound,
     
     -- | Renaming actual bits of syntax
-    renameAltCon,
+    renameValueG, renameAltCon,
     renameTerm,                renameAlts,                renameValue,                renameValue',
     renameFVedTerm,            renameFVedAlts,            renameFVedValue,            renameFVedValue',
     renameTaggedTerm,          renameTaggedAlts,          renameTaggedValue,          renameTaggedValue',
@@ -319,7 +319,16 @@ mkRename rec = (term, alternatives, value, value')
       Cast e co -> Cast (term ids rn e) (renameCoercion ids rn co)
     
     value ids rn = rec (value' ids) rn
-    value' ids rn v = case v of
+    value' ids rn v = renameValueG term ids rn v
+    
+    alternatives ids rn = map (alternative ids rn)
+    
+    alternative ids rn (alt_con, alt_e) = (alt_con', term ids' rn' alt_e)
+        where (ids', rn', alt_con') = renameAltCon ids rn alt_con
+
+renameValueG :: (InScopeSet -> Renaming -> a -> b)
+             -> InScopeSet -> Renaming -> ValueG a -> ValueG b
+renameValueG term ids rn v = case v of
       TyLambda x e -> TyLambda x' (term ids' rn' e)
         where (ids', rn', x') = renameNonRecBinder ids rn x
       Lambda x e -> Lambda x' (term ids' rn' e)
@@ -327,11 +336,6 @@ mkRename rec = (term, alternatives, value, value')
       Data dc tys cos xs -> Data dc (map (renameType ids rn) tys) (map (renameCoercion ids rn) cos) (map (renameId rn) xs)
       Literal l -> Literal l
       Coercion co -> Coercion (renameCoercion ids rn co)
-    
-    alternatives ids rn = map (alternative ids rn)
-    
-    alternative ids rn (alt_con, alt_e) = (alt_con', term ids' rn' alt_e)
-        where (ids', rn', alt_con') = renameAltCon ids rn alt_con
 
 renameAltCon :: InScopeSet -> Renaming -> AltCon -> (InScopeSet, Renaming, AltCon)
 renameAltCon ids rn_alt alt_con = case alt_con of

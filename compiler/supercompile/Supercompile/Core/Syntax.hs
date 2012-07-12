@@ -136,15 +136,17 @@ data TermF ann = Var Id
 
 type Alt = AltF Identity
 type TaggedAlt = AltF Tagged
-type AltF ann = (AltCon, ann (TermF ann))
+type AltF ann = AltG (ann (TermF ann))
+type AltG term = (AltCon, term)
 
 -- FIXME: I should probably implement a correct operational semantics for TyLambdas!
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Literal Literal | Coercion Coercion
-                | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) -- NB: might bind a CoVar
-                | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
-                                                      -- NB: not a newtype DataCon
+type ValueF ann = ValueG (ann (TermF ann))
+data ValueG term = Literal Literal | Coercion Coercion
+                 | TyLambda TyVar term | Lambda Id term -- NB: might bind a CoVar
+                 | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
+                                                       -- NB: not a newtype DataCon
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
