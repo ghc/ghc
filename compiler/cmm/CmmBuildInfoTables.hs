@@ -17,8 +17,7 @@ module CmmBuildInfoTables
     , setInfoTableSRT
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
-    , cafTransfers )
-where
+    ) where
 
 #include "HsVersions.h"
 
