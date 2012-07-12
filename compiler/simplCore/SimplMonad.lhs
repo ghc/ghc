@@ -35,6 +35,7 @@ import DynFlags
 import CoreMonad
 import Outputable
 import FastString
+import MonadUtils
 \end{code}
 
 %************************************************************************
@@ -152,6 +153,11 @@ instance MonadUnique SimplM where
 
 instance HasDynFlags SimplM where
     getDynFlags = SM (\st_env us sc -> return (st_flags st_env, us, sc))
+
+instance MonadIO SimplM where
+    liftIO m = SM $ \_ us sc -> do
+      x <- m
+      return (x, us, sc)
 
 getSimplRules :: SimplM RuleBase
 getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
