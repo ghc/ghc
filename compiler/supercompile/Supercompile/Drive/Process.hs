@@ -457,48 +457,6 @@ eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound
   _ -> []
 
 
-{-# INLINE traverseWithKey #-}
--- INLINE so it gets inlined before specialisation, eta-expanded so any automatic SCCs
--- don't interfere with inlining (inlining doesn't look through SCCs for arguments!)
-traverseWithKey :: Applicative t => (k -> a -> t b) -> M.Map k a -> t (M.Map k b)
-#if (MIN_VERSION_containers(0,4,3))
-traverseWithKey f kvs = M.traverseWithKey f kvs
-#else
-traverseWithKey f = traverse (uncurry f) . M.mapWithKey (\k v -> (k, v))
-#endif
-
-newtype State2L s1 s2 a = State2L { unState2L :: s1 -> s2 -> (s1, s2) }
-
-instance Functor (State2L s1 s2) where
-    fmap _ = State2L . unState2L
-
-instance Applicative (State2L s1 s2) where
-    pure _ = State2L (,)
-    mf <*> mx = State2L $ \s1 s2 -> case unState2L mf s1 s2 of (s1, s2) -> unState2L mx s1 s2 -- NB: left side first
-
-newtype State3R s1 s2 s3 a = State3R { unState3R :: s1 -> s2 -> s3 -> (s1, s2, s3) }
-
-instance Functor (State3R s1 s2 s3) where
-    fmap _ = State3R . unState3R
-
-instance Applicative (State3R s1 s2 s3) where
-    pure _ = State3R (,,)
-    mf <*> mx = State3R $ \s1 s2 s3 -> case unState3R mx s1 s2 s3 of (s1, s2, s3) -> unState3R mf s1 s2 s3 -- NB: right side first
-
--- You might wonder why we don't just use foldlWithKey and make the accumulator into a pair. The reason is that
--- if we do that then (due to a problem in the strictness analyser, which I've emailed Simon about) the resulting
--- loop will allocate a new pair on every iteration. If we specialise the traverseWithKey code instead then we can
--- pass the components of the pair in seperate arguments and totally avoid the allocations. This is a Big Win,
--- since prepareTerm was accounting for 10% of all allocations in some of my tests.
-{-# INLINE foldl2WithKey' #-}
-foldl2WithKey' :: ((a1, a2) -> k -> v -> (a1, a2)) -> (a1, a2) -> M.Map k v -> (a1, a2)
-foldl2WithKey' f (a1, a2) kvs = unState2L (traverseWithKey (\k v -> State2L $ \a1 a2 -> f (a1, a2) k v) kvs) a1 a2
-
-{-# INLINE foldr3WithKey' #-}
-foldr3WithKey' :: (k -> v -> (a1, a2, a3) -> (a1, a2, a3)) -> (a1, a2, a3) -> M.Map k v -> (a1, a2, a3)
-foldr3WithKey' f (a1, a2, a3) kvs = unState3R (traverseWithKey (\k v -> State3R $ \a1 a2 a3 -> f k v (a1, a2, a3)) kvs) a1 a2 a3
-
-
 data SCStats = SCStats {
     stat_reduce_stops :: !Int,
     stat_sc_stops :: !Int
@@ -652,11 +610,7 @@ speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M
                           -- TODO: might it not be cleaner to speculate the term with an Update frame for x' bunged on the end
                           -- of the stack? In this case, I could be asurred that mb_update is Just
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
-                                -- NB: this "fmap" is safe for a rather delicate reason -- the renaming returned by annedQAToInAnnedTerm
-                                -- is an identity renaming that includes at least all of the variables in the input InScopeSet, *IN THE CASE
-                                -- THAT YOU PASS AN ANSWER*. This is just barely sufficient for our purposes due to the fact that "reduce" never
-                                -- returns an Answer with a cast pending on the stack -- it only returns such a Question.
-                                in_e' = fmap (castAnnedTerm cast_by) $ annedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa)) qa
+                                in_e' = castAnnedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa)) qa cast_by
                                 h_speculated_ok'' = case mb_update of
                                   Nothing                           -> M.insert x' (internallyBound in_e') h_speculated_ok
                                   Just (Tagged tg_y' y', y_cast_by) -> M.insert x' (internallyBound (mkVarCastBy tg_y' y' y_cast_by)) $

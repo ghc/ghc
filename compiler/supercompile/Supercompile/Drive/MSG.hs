@@ -1022,7 +1022,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
                  return $ go (insertVarRenaming rn_l x_common x_l) (insertVarRenaming rn_r x_common x_r) used_l' used_r' init_h_l init_h_r
-                             (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert x_common generalised h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
+                             (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert x_common generalisedLambdaBound h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
       where
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
@@ -1126,7 +1126,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                  (used_l', h_l') <- sucks init_h_l k_bvs_l (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) used_l (annedTermFreeVars e_l `unionVarSet` varBndrFreeVars x_common_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) used_r (annedTermFreeVars e_r `unionVarSet` varBndrFreeVars x_common_r)
                  return (go (insertIdRenaming rn_l x_common x_common_l) (insertIdRenaming rn_r x_common x_common_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalised h) msg_s))
+                            (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalisedLambdaBound h) msg_s))
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
       -- NB: the heap only ever maps TyVars to lambdaBound/generalised, so there is no point trying to detect TyVars on either side
       | msg_s <- msg_s { msgPending = rest }
@@ -1134,7 +1134,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
                  return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert a_common generalised h) msg_s))
+                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert a_common generalisedLambdaBound h) msg_s))
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
       -- TODO: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
       -- the non-variable into a new heap binding which looks just like it was in the initial heap on the left/right and then matching the variable pair we are
@@ -1149,7 +1149,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyCoVarsOfCo co_r)
                  return (go (insertCoercionSubst rn_l q_common co_l) (insertCoercionSubst rn_r q_common co_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert q_common generalised h) msg_s))
+                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert q_common generalisedLambdaBound h) msg_s))
 
     find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
          -> Var -> (MSG' (S.Set Var, HeapBinding),

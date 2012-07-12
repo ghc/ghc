@@ -27,15 +27,15 @@ import Outputable hiding (Depth)
 import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))
-import Control.Applicative (Applicative(..), (<$>), liftA2)
+import Control.Applicative (Applicative(..), (<$>), liftA, liftA2)
 import Control.Exception (bracket)
-import Control.Monad hiding (join)
+import Control.Monad hiding (join, forM_)
 
 import Data.Function (on)
 import Data.Maybe
 import Data.Ord
 import Data.List
-import Data.Foldable (Foldable(foldMap))
+import Data.Foldable (Foldable(foldMap), forM_)
 import Data.Traversable (Traversable(traverse))
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -511,6 +511,13 @@ runs f g (x:xs) = go (f x) [g x] xs
 distinct :: Ord a => [a] -> Bool
 distinct xs = length xs == S.size (S.fromList xs)
 
+the_maybe :: Eq a => [a] -> Maybe a
+the_maybe [] = error "the_maybe: empty list"
+the_maybe (x:xs) = go x xs
+  where go x []                 = Just x
+        go x (y:ys) | x == y    = go x ys
+                    | otherwise = Nothing
+
 
 -- | Orders elements of a map into dependency order insofar as that is possible.
 --
@@ -583,6 +590,76 @@ foldToMapAccumL :: (forall acc'. (x -> acc' -> acc') -> acc' -> f_x -> acc')
                 -> (acc -> x -> (acc, y))
                 -> acc -> f_x -> (acc, [y])
 foldToMapAccumL fold f init_acc xs = fold (\x (acc, ys) -> case f acc x of (acc', y) -> (acc', y:ys)) (init_acc, []) xs
+
+
+{-# INLINE traverseWithKey #-}
+-- INLINE so it gets inlined before specialisation, eta-expanded so any automatic SCCs
+-- don't interfere with inlining (inlining doesn't look through SCCs for arguments!)
+traverseWithKey :: Applicative t => (k -> a -> t b) -> M.Map k a -> t (M.Map k b)
+#if (MIN_VERSION_containers(0,4,3))
+traverseWithKey f kvs = M.traverseWithKey f kvs
+#else
+traverseWithKey f = traverse (uncurry f) . M.mapWithKey (\k v -> (k, v))
+#endif
+
+newtype Discard t a = Discard { unDiscard :: t () }
+
+instance Functor (Discard t) where
+    fmap _ = Discard . unDiscard
+
+instance Applicative t => Applicative (Discard t) where
+    pure _ = Discard (pure ())
+    mf <*> mx = Discard $ fmap (\() () -> ()) (unDiscard mf) <*> unDiscard mx
+
+newtype StateTL s m a = StateTL { unStateTL :: s -> m s }
+
+instance Functor (StateTL s m) where
+    fmap _ = StateTL . unStateTL
+
+instance Monad m => Applicative (StateTL s m) where
+    pure _ = StateTL return
+    mf <*> mx = StateTL $ \s -> unStateTL mx s >>= unStateTL mf
+
+newtype State2L s1 s2 a = State2L { unState2L :: s1 -> s2 -> (s1, s2) }
+
+instance Functor (State2L s1 s2) where
+    fmap _ = State2L . unState2L
+
+instance Applicative (State2L s1 s2) where
+    pure _ = State2L (,)
+    mf <*> mx = State2L $ \s1 s2 -> case unState2L mf s1 s2 of (s1, s2) -> unState2L mx s1 s2 -- NB: left side first
+
+newtype State3R s1 s2 s3 a = State3R { unState3R :: s1 -> s2 -> s3 -> (s1, s2, s3) }
+
+instance Functor (State3R s1 s2 s3) where
+    fmap _ = State3R . unState3R
+
+instance Applicative (State3R s1 s2 s3) where
+    pure _ = State3R (,,)
+    mf <*> mx = State3R $ \s1 s2 s3 -> case unState3R mx s1 s2 s3 of (s1, s2, s3) -> unState3R mf s1 s2 s3 -- NB: right side first
+
+{-# INLINE traverseWithKey_ #-}
+traverseWithKey_ :: Applicative t => (k -> a -> t b) -> M.Map k a -> t ()
+traverseWithKey_ f kvs = unDiscard (traverseWithKey (\k v -> Discard (void (f k v))) kvs)
+
+{-# INLINE foldlWithKeyM' #-}
+foldlWithKeyM' :: Monad m
+               => (a -> k -> v -> m a)
+               -> a -> M.Map k v -> m a
+foldlWithKeyM' f a kvs = unStateTL (traverseWithKey (\k v -> StateTL $ \a -> f a k v) kvs) a
+
+-- You might wonder why we don't just use foldlWithKey and make the accumulator into a pair. The reason is that
+-- if we do that then (due to a problem in the strictness analyser, which I've emailed Simon about) the resulting
+-- loop will allocate a new pair on every iteration. If we specialise the traverseWithKey code instead then we can
+-- pass the components of the pair in seperate arguments and totally avoid the allocations. This is a Big Win,
+-- since prepareTerm was accounting for 10% of all allocations in some of my tests.
+{-# INLINE foldl2WithKey' #-}
+foldl2WithKey' :: ((a1, a2) -> k -> v -> (a1, a2)) -> (a1, a2) -> M.Map k v -> (a1, a2)
+foldl2WithKey' f (a1, a2) kvs = unState2L (traverseWithKey (\k v -> State2L $ \a1 a2 -> f (a1, a2) k v) kvs) a1 a2
+
+{-# INLINE foldr3WithKey' #-}
+foldr3WithKey' :: (k -> v -> (a1, a2, a3) -> (a1, a2, a3)) -> (a1, a2, a3) -> M.Map k v -> (a1, a2, a3)
+foldr3WithKey' f (a1, a2, a3) kvs = unState3R (traverseWithKey (\k v -> State3R $ \a1 a2 a3 -> f k v (a1, a2, a3)) kvs) a1 a2 a3
 
 
 traverseAll :: Traversable t => ([a] -> (c, [b])) -> t a -> (c, t b)

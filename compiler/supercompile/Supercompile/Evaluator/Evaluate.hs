@@ -248,9 +248,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
          -- the update frame already on the stack (which is preserved by squeezing) contains the name by which the *user*
          -- tried to access the function, and it is in keeping with the rest of GHC (where the inlinability you see is
          -- based on the label you wrote in your own code) that that is the relevant flag.
-         then return $ normalise $ case (case k of Tagged tg_y  (Update y') `Car`                               _ -> Just (Uncast,          Tagged tg_y y')
-                                                   Tagged tg_co (CastIt co) `Car` Tagged tg_y (Update y') `Car` _ -> Just (CastBy co tg_co, Tagged tg_y y')
-                                                   _ -> Nothing) of
+         then return $ normalise $ case (fst (peelUpdateStack k)) of
                   Nothing                        -> (deeds, Heap (M.delete x' h)                            ids, Tagged tg (Update x') `Car` k, in_e)
                   Just (cast_by, Tagged tg_y y') -> (deeds, Heap (M.insert x' (internallyBound in_e_ref) h) ids,                             k, in_e)
                     where in_e_ref = mkVarCastBy tg_y y' cast_by

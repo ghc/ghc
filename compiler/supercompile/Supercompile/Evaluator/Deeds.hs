@@ -32,6 +32,9 @@ emptyDeeds = Deeds { sizeLimit = 0, stepLimit = 0 }
 plusDeeds :: Deeds -> Deeds -> Deeds
 plusDeeds d1 d2 = d1 `seq` d2 `seq` Deeds { sizeLimit = sizeLimit d1 + sizeLimit d2, stepLimit = stepLimit d1 + stepLimit d2 }
 
+plusDeedss :: [Deeds] -> Deeds
+plusDeedss = foldr plusDeeds emptyDeeds
+
 claimStep :: Deeds -> Maybe Deeds
 claimStep deeds = guard (stepLimit deeds > 0) >> return (deeds { stepLimit = stepLimit deeds - 1 })
 

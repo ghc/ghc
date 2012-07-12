@@ -230,7 +230,7 @@ termIsCheap :: Copointed ann => ann (TermF ann) -> Bool
 termIsCheap = termIsCheap' . extract
 
 termIsCheap' :: Copointed ann => TermF ann -> Bool
-termIsCheap' _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
+termIsCheap' _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required... (TODO: not for stack bound things..)
 termIsCheap' (Var _)         = True
 termIsCheap' (Value _)       = True
 termIsCheap' (Cast e _)      = termIsCheap e
@@ -254,6 +254,15 @@ castBy co tg | isReflCo co = Uncast -- TODO: this throws away a tag (and hence a
 castByCo :: CastBy -> Maybe NormalCo
 castByCo Uncast        = Nothing
 castByCo (CastBy co _) = Just co
+
+mkSymCastBy :: InScopeSet -> CastBy -> CastBy
+mkSymCastBy _   Uncast         = Uncast
+mkSymCastBy ids (CastBy co tg) = CastBy (mkSymCo ids co) tg
+
+mkTransCastBy :: InScopeSet -> CastBy -> CastBy -> CastBy
+mkTransCastBy _   Uncast            cast_by2         = cast_by2
+mkTransCastBy _   cast_by1          Uncast           = cast_by1
+mkTransCastBy ids (CastBy co1 _tg1) (CastBy co2 tg2) = castBy (mkTransCo ids co1 co2) tg2
 
 
 valueType :: Copointed ann => ValueF ann -> Type

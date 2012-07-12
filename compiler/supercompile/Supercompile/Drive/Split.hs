@@ -32,9 +32,12 @@ import Util      (zipWithEqual, zipWith3Equal, thirdOf3)
 import Digraph
 import UniqFM    (delListFromUFM_Directly)
 import VarEnv
+import State     (get, put, modify, evalState)
+import MonadUtils (concatMapM, mapMaybeM)
 
 import Data.Traversable (fmapDefault, foldMapDefault)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 
@@ -195,8 +198,6 @@ instanceSplit (deeds, heap, k, focus) opt = generaliseSplit opt splitterUniqSupp
 nameStack :: Stack -> NamedStack
 nameStack = snd . trainCarMapAccumL (\i kf -> (i + 1, (i, kf))) 0
 
--- TODO: could do instance-matching on generalised parts of terms. It would make tieback faster when generalising,
--- at the cost of pessimising some programs
 {-# INLINE generalise #-}
 generalise :: MonadStatics m
            => Generaliser
@@ -704,10 +705,10 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (mb_anned_qa, brac
         --
         -- Basically the idea of this heap is "stuff we want to make available to push down"
         h_updated_phantoms = M.fromDistinctAscList [(x', lambdaBound) | x' <- M.keys bracketeds_updated] -- TODO: move this into h_cheap_and_phantoms?
-        h_inlineable = varSetToDataMap generalised gen_xs `M.union` -- The exclusion just makes sure we don't inline explicitly generalised bindings (even phantom ones)
-                       (h_not_residualised `M.union`                -- Take any non-residualised bindings from the input heap/stack...
-                        h_cheap_and_phantom `M.union`               -- ...failing which, take concrete definitions for cheap heap bindings (even if they are also residualised) or phantom definitions for expensive ones...
-                        h_updated_phantoms)                         -- ...failing which, take phantoms for things bound by update frames (if supercompilation couldn't turn these into values, GHC is unlikely to get anything good from seeing defs)
+        h_inlineable = varSetToDataMap generalisedLambdaBound gen_xs `M.union` -- The exclusion just makes sure we don't inline explicitly generalised bindings (even phantom ones)
+                       (h_not_residualised `M.union`                           -- Take any non-residualised bindings from the input heap/stack...
+                        h_cheap_and_phantom `M.union`                          -- ...failing which, take concrete definitions for cheap heap bindings (even if they are also residualised) or phantom definitions for expensive ones...
+                        h_updated_phantoms)                                    -- ...failing which, take phantoms for things bound by update frames (if supercompilation couldn't turn these into values, GHC is unlikely to get anything good from seeing defs)
         
         -- Generalising the final proposed floats may cause some bindings that we *thought* were going to be inlined to instead be
         -- residualised. We need to account for this in the Entered information (for work-duplication purposes), and in that we will
@@ -926,6 +927,12 @@ howToBindCheap e
 -- would be forced to residualise the binding just as if e.g. "Just x" had been in the focus of the state. Since I don't,
 -- x doesn't appear in the extraFvs, and I can compute Entered information for it with transitiveInline. If this says x
 -- was entered Once in aggregate I can stop residualising the update frame! Beautiful!
+--
+-- FIXME: this buggered up when I started splitting terms like < | I# a# | update a > because they split to *themselves*
+-- by pushing the recovered value heap { a |-> I# a# } into the oneBracketed "a" from the update frame. I only really need
+-- this trick because I start by assuming that x is non-pushable, anyway, so I should probably rewrite the splitter
+-- to use that new more agressive algorithm.. (I can remove the eager value splittin for Update frames too since that wasn't
+-- causing the loops I was seeing - this was)
 --
 -- Note [Entered information]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1175,15 +1182,15 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith3Equal "alt_hs" (\alt_rn alt_con alt_bvs -> M.fromList (do guard pOSITIVE_INFORMATION
-                                                                                       Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
-                                                                                       let in_scrut_e@(_, scrut_e) = renamedTerm (fmap Value scrut_v)
-                                                                                       scrut <- scruts'
-                                                                                       -- Localise the Id just in case this is the occurrence of a lambda-bound variable.
-                                                                                       -- We don't really want a Let-bound external name in the output!
-                                                                                       return (localiseId scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
-                                                                        `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
-                                            alt_rns alt_cons alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWithEqual "alt_hs" (\alt_con' alt_bvs -> M.fromList (do guard pOSITIVE_INFORMATION
+                                                                                Just scrut_v <- [altConToValue (idType x') alt_con']
+                                                                                let in_scrut_e@(_, scrut_e) = renamedTerm (fmap Value scrut_v)
+                                                                                scrut <- scruts'
+                                                                                -- Localise the Id just in case this is the occurrence of a lambda-bound variable.
+                                                                                -- We don't really want a Let-bound external name in the output!
+                                                                                return (localiseId scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
+                                                                 `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
+                                           alt_cons' alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, Loco False, alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, Loco False, in_e))]
@@ -1201,21 +1208,6 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
   where
     tg = tag kf
     shell = Shell (oneResidTag tg)
-
-    -- NB: I used to source the tag for the positive information from the tag of the case branch RHS, but that
-    -- leads to WAY TOO MUCH specialisation for examples like gen_regexps because we get lots of e.g. cons cells
-    -- that are all given different tags.
-    altConToValue :: Type -> In AltCon -> Maybe (Anned AnnedValue)
-    altConToValue ty' (rn, DataAlt dc as qs xs) = do
-        (_, univ_tys') <- splitTyConApp_maybe ty'
-        Just (annedValue (dataConTag dc) (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs)))
-    altConToValue _  (_,  LiteralAlt l) = Just (annedValue (literalTag l) (Literal l))
-    altConToValue _  (_,  DefaultAlt)   = Nothing -- NB: could actually put an indirection in the heap in this case, for fun..
-
-    zapAltConIdOccInfo :: AltCon -> AltCon
-    zapAltConIdOccInfo (DataAlt dc as qs xs) = DataAlt dc as qs (map zapIdOccInfo xs)
-    zapAltConIdOccInfo (LiteralAlt l)        = LiteralAlt l
-    zapAltConIdOccInfo DefaultAlt            = DefaultAlt
 
 -- I'm making use of a clever trick: after splitting an update frame for x, instead of continuing to split the stack with a
 -- noneBracketed for x in the focus, I split the stack with a oneBracketed for it in the focus.

@@ -13,11 +13,11 @@ import Supercompile.Core.Tag
 
 import Supercompile.Utilities
 
-import Id       (Id, idType)
+import Id       (Id, idType, zapIdOccInfo)
 import PrimOp   (primOpType)
-import Type     (applyTy, applyTys, isUnLiftedType)
+import Type     (applyTy, applyTys, isUnLiftedType, splitTyConApp_maybe, mkTyVarTy)
 import Pair     (pSnd)
-import Coercion (coercionType, coercionKind)
+import Coercion (coercionType, coercionKind, mkCoVarCo)
 
 import qualified Data.Map as M
 import qualified Data.Foldable as Foldable
@@ -142,19 +142,15 @@ caseAnnedQA anned_qa = case extract anned_qa of
     Question anned_q -> Left  (fmap (const anned_q) anned_qa)
     Answer   anned_a -> Right (fmap (const anned_a) anned_qa)
 
--- NB: one of the callers in Speculate depends (rather delicately) on the fact that
--- the renaming returned in the Question case mentions all of the things in the supplied
--- InScopeSet, even though it could get away with just mentioning the single Var.
---
--- TODO: perhaps we can do something more satisfactory?
 annedQAToInAnnedTerm :: InScopeSet -> Anned QA -> In AnnedTerm
 annedQAToInAnnedTerm iss anned_qa = case caseAnnedQA anned_qa of
-    Left  anned_q -> annedQuestionToInAnnedTerm iss anned_q
+    Left  anned_q -> (mkInScopeIdentityRenaming iss, fmap Var anned_q)
     Right anned_a -> annedAnswerToInAnnedTerm iss anned_a
 
-
-annedQuestionToInAnnedTerm :: InScopeSet -> Anned (Out Id) -> In AnnedTerm
-annedQuestionToInAnnedTerm iss anned_q = (mkInScopeIdentityRenaming iss, fmap Var anned_q)
+castAnnedQAToInAnnedTerm :: InScopeSet -> Anned QA -> CastBy -> In AnnedTerm
+castAnnedQAToInAnnedTerm iss anned_qa cast_by = case caseAnnedQA anned_qa of
+    Left  anned_q -> (mkInScopeIdentityRenaming iss, castAnnedTerm cast_by (fmap Var anned_q))
+    Right anned_a -> annedAnswerToInAnnedTerm iss (castAnnedAnswer iss anned_a cast_by)
 
 
 annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
@@ -257,8 +253,8 @@ instance Outputable HeapBinding where
 lambdaBound :: HeapBinding
 lambdaBound = HB LambdaBound (Left (Left False))
 
-generalised :: HeapBinding
-generalised = HB LambdaBound (Left (Left True))
+generalisedLambdaBound :: HeapBinding
+generalisedLambdaBound = HB LambdaBound (Left (Left True))
 
 internallyBound :: In AnnedTerm -> HeapBinding
 internallyBound in_e = HB InternallyBound (Right in_e)
@@ -425,6 +421,27 @@ peelValueStack :: Stack -> (Maybe (Tagged Var, CastBy), Stack)
 peelValueStack (Tagged x_tg (Update x) `Car` Tagged co_tg (CastIt co) `Car` k) = (Just (Tagged x_tg x, CastBy co co_tg), k)
 peelValueStack (Tagged x_tg (Update x) `Car` k)                                = (Just (Tagged x_tg x, Uncast), k)
 peelValueStack k                                                               = (Nothing, k)
+
+peelUpdateStack :: Stack -> (Maybe (CastBy, Tagged Var), Stack)
+peelUpdateStack (Tagged co_tg (CastIt co) `Car` Tagged x_tg (Update x) `Car` k) = (Just (CastBy co co_tg, Tagged x_tg x), k)
+peelUpdateStack (Tagged x_tg (Update x) `Car` k)                                = (Just (Uncast, Tagged x_tg x), k)
+peelUpdateStack k                                                               = (Nothing, k)
+
+
+-- NB: I used to source the tag for the positive information from the tag of the case branch RHS, but that
+-- leads to WAY TOO MUCH specialisation for examples like gen_regexps because we get lots of e.g. cons cells
+-- that are all given different tags.
+altConToValue :: Type -> AltCon -> Maybe (Anned AnnedValue)
+altConToValue ty (DataAlt dc as qs xs) = do
+    (_, univ_tys) <- splitTyConApp_maybe ty
+    Just (annedValue (dataConTag dc) (Data dc (univ_tys ++ map mkTyVarTy as) (map mkCoVarCo qs) xs))
+altConToValue _  (LiteralAlt l) = Just (annedValue (literalTag l) (Literal l))
+altConToValue _  DefaultAlt     = Nothing -- NB: could actually put an indirection in the heap in this case, for fun..
+
+zapAltConIdOccInfo :: AltCon -> AltCon
+zapAltConIdOccInfo (DataAlt dc as qs xs) = DataAlt dc as qs (map zapIdOccInfo xs)
+zapAltConIdOccInfo (LiteralAlt l)        = LiteralAlt l
+zapAltConIdOccInfo DefaultAlt            = DefaultAlt
 
 
 -- Unlifted bindings are irritating. They mean that the PureHeap has an implicit order that we need to carefully
