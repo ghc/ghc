@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 #endif
 module CmmLayoutStack (
-       cmmLayoutStack, setInfoTableStackMap, cmmSink
+       cmmLayoutStack, setInfoTableStackMap
   ) where
 
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX
@@ -34,7 +34,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
-import Data.List (nub, partition)
+import Data.List (nub)
 import Control.Monad (liftM)
 
 #include "HsVersions.h"
@@ -111,20 +111,20 @@ cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph
 cmmLayoutStack procpoints entry_args
                graph0@(CmmGraph { g_entry = entry })
   = do
-    pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
+    -- pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
     (graph, liveness) <- removeDeadAssignments graph0
-    pprTrace "liveness" (ppr liveness) $ return ()
+    -- pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
 
-    (final_stackmaps, final_high_sp, new_blocks) <-
+    (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
             layout procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
     new_blocks' <- mapM lowerSafeForeignCall new_blocks
 
-    pprTrace ("Sp HWM") (ppr final_high_sp) $
-       return (ofBlockList entry new_blocks', final_stackmaps)
+    -- pprTrace ("Sp HWM") (ppr _final_high_sp) $ return ()
+    return (ofBlockList entry new_blocks', final_stackmaps)
 
 
 
@@ -167,7 +167,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
     
-       pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
+       -- pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
     
        -- (a) Update the stack map to include the effects of
        --     assignments in this block
@@ -188,7 +188,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
            <- handleLastNode procpoints liveness cont_info
                              acc_stackmaps stack1 middle0 last0
     
-       pprTrace "layout(out)" (ppr out) $ return ()
+       -- pprTrace "layout(out)" (ppr out) $ return ()
 
        -- (d) Manifest Sp: run over the nodes in the block and replace
        --     CmmStackSlot with CmmLoad from Sp with a concrete offset.
@@ -416,8 +416,8 @@ handleLastNode procpoints liveness cont_info stackmaps
                   case mapLookup l stackmaps of
                     Just pp_sm -> (pp_sm, fixupStack stack0 pp_sm)
                     Nothing    ->
-                      pprTrace "first visit to proc point"
-                                   (ppr l <+> ppr stack1) $
+                      --pprTrace "first visit to proc point"
+                      --             (ppr l <+> ppr stack1) $
                       (stack1, assigs)
                       where
                        cont_args = mapFindWithDefault 0 l cont_info
@@ -570,7 +570,7 @@ allocate :: ByteOff -> RegSet -> StackMap -> (StackMap, [CmmNode O O])
 allocate ret_off live stackmap@StackMap{ sm_sp = sp0
                                        , sm_regs = regs0 }
  =
-  pprTrace "allocate" (ppr live $$ ppr stackmap) $
+  -- pprTrace "allocate" (ppr live $$ ppr stackmap) $
 
    -- we only have to save regs that are not already in a slot
    let to_save = filter (not . (`elemUFM` regs0)) (Set.elems live)
@@ -798,7 +798,8 @@ elimStackStores stackmap stackmaps area_off nodes
          CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
             | Just (_,off) <- lookupUFM (sm_regs stackmap) r
             , area_off area + m == off
-            -> pprTrace "eliminated a node!" (ppr r) $ go stackmap ns
+            -> -- pprTrace "eliminated a node!" (ppr r) $
+               go stackmap ns
          _otherwise
             -> n : go (procMiddle stackmaps n stackmap) ns
 
@@ -978,75 +979,3 @@ insertReloads stackmap =
 stackSlotRegs :: StackMap -> [(LocalReg, StackLoc)]
 stackSlotRegs sm = eltsUFM (sm_regs sm)
 
--- -----------------------------------------------------------------------------
-
--- If we do this *before* stack layout, we might be able to avoid
--- saving some things across calls/procpoints.
---
--- *but*, that will invalidate the liveness analysis, and we'll have
--- to re-do it.
-
-cmmSink :: CmmGraph -> UniqSM CmmGraph
-cmmSink graph = do
-  let liveness = cmmLiveness graph
-  return $ cmmSink' liveness graph
-
-cmmSink' :: BlockEnv CmmLive -> CmmGraph -> CmmGraph
-cmmSink' liveness graph
-  = ofBlockList (g_entry graph) $ sink mapEmpty $ postorderDfs graph
-  where
-
-  sink :: BlockEnv [(LocalReg, CmmExpr)] -> [CmmBlock] -> [CmmBlock]
-  sink _ [] = []
-  sink sunk (b:bs) =
-    pprTrace "sink" (ppr l) $
-    blockJoin first final_middle last : sink sunk' bs
-    where
-      l = entryLabel b
-      (first, middle, last) = blockSplit b
-      (middle', assigs) = walk (blockToList middle) emptyBlock
-                               (mapFindWithDefault [] l sunk)
-
-      (dropped_last, assigs') = partition (`conflictsWithLast` last) assigs
-
-      final_middle = foldl blockSnoc middle' (toNodes dropped_last)
-
-      sunk' = mapUnion sunk $
-                 mapFromList [ (l, filt assigs' (getLive l))
-                             | l <- successors last ]
-           where
-               getLive l = mapFindWithDefault Set.empty l liveness
-               filt as live = [ (r,e) | (r,e) <- as, r `Set.member` live ]
-
-
-walk :: [CmmNode O O] -> Block CmmNode O O -> [(LocalReg, CmmExpr)]
-     -> (Block CmmNode O O, [(LocalReg, CmmExpr)])
-
-walk []     acc as = (acc, as)
-walk (n:ns) acc as
-  | Just a <- collect_it  = walk ns acc (a:as)
-  | otherwise             = walk ns (foldr (flip blockSnoc) acc (n:drop_nodes)) as'
-  where
-    collect_it = case n of
-                   CmmAssign (CmmLocal r) e@(CmmReg (CmmGlobal _)) -> Just (r,e)
---                   CmmAssign (CmmLocal r) e@(CmmLoad addr _) |
---                      foldRegsUsed (\b r -> False) True addr -> Just (r,e)
-                   _ -> Nothing
-
-    drop_nodes = toNodes dropped
-    (dropped, as') = partition should_drop as
-       where should_drop a = a `conflicts` n
-
-toNodes :: [(LocalReg,CmmExpr)] -> [CmmNode O O]
-toNodes as = [ CmmAssign (CmmLocal r) rhs | (r,rhs) <- as ]
-
--- We only sink "r = G" assignments right now, so conflicts is very simple:
-conflicts :: (LocalReg,CmmExpr) -> CmmNode O O -> Bool
-(_, rhs) `conflicts` CmmAssign reg  _  | reg `regUsedIn` rhs = True
---(r, CmmLoad _ _) `conflicts` CmmStore _ _ = True
-(r, _)   `conflicts` node
-  = foldRegsUsed (\b r' -> r == r' || b) False node
-
-conflictsWithLast :: (LocalReg,CmmExpr) -> CmmNode O C -> Bool
-(r, _) `conflictsWithLast` node
-  = foldRegsUsed (\b r' -> r == r' || b) False node

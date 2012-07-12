@@ -17,6 +17,7 @@ import CmmCommonBlockElim
 import CmmProcPoint
 import CmmContFlowOpt
 import CmmLayoutStack
+import CmmSink
 
 import UniqSupply
 import DynFlags
@@ -110,8 +111,13 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                          runUniqSM $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
---       g <- {-# SCC "sink" #-} runUniqSM $ cmmSink g
---       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+       g <- if optLevel dflags >= 99
+               then do g <- {-# SCC "sink" #-} return (cmmSink g)
+                       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+                       g <- {-# SCC "inline" #-} return (cmmPeepholeInline g)
+                       dump Opt_D_dump_cmmz_rewrite "Peephole inline" g
+                       return g
+               else return g
 
 --       ----------- Sink and inline assignments -------------------
 --       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
