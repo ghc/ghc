@@ -276,3 +276,5 @@ test('T5853', normal, compile_fail, [''])
 test('T6078', normal, compile_fail, [''])
 
 test('FDsFromGivens', normal, compile_fail, [''])
+test('T7019', normal, compile_fail,[''])
+test('T7019a', normal, compile_fail,[''])
