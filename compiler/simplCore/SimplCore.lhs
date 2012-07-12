@@ -493,7 +493,8 @@ simplifyExpr dflags expr
         ; us <-  mkSplitUniqSupply 's'
 
 	; let sz = exprSize expr
-              (expr', counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
+
+        ; (expr', counts) <- initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
 
         ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
@@ -629,18 +630,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
 
                 -- Simplify the program
-                -- We do this with a *case* not a *let* because lazy pattern
-                -- matching bit us with bad space leak!
-                -- With a let, we ended up with
-                --   let
-                --      t = initSmpl ...
-                --      counts1 = snd t
-                --   in
-                --      case t of {(_,counts1) -> if counts1=0 then ... }
-                -- So the conditional didn't force counts1, because the
-                -- selection got duplicated.  Sigh!
-           case initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds of {
-                (env1, counts1) -> do {
+           (env1, counts1) <- initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds ;
 
            let  { binds1 = getFloatBinds env1
                 ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
@@ -667,7 +657,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Loop
            do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
-           } } } }
+           } }
       | otherwise = panic "do_iteration"
       where
         (us1, us2) = splitUniqSupply us
