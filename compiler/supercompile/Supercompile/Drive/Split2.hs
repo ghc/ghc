@@ -322,8 +322,12 @@ recurseStack opt k (init_resid_tgs, init_deeds, init_e) = (\f -> foldM f (init_r
 recurseHeap :: Monad m
             => (State -> m (Deeds, Out FVedTerm))
             -> PushedHeap -> (ResidTags, Deeds, [(Var, FVedTerm)], FVedTerm) -> m (ResidTags, Deeds, FVedTerm)
-recurseHeap opt init_h (resid_tgs, init_deeds, init_xes, e) = go init_h init_deeds init_xes (fvedTermFreeVars e)
-  where go h deeds xes do_fvs | M.null h_to_do = return (resid_tgs, deeds, letRec xes e)
+recurseHeap opt init_h (resid_tgs, init_deeds, init_xes, e)
+  -- Unfortunately, it is necessary to remove elements from init_h that already have a residual binding in init_xes.
+  -- The reason for this is that if the stack has an initial update and a value is in focus, we can get a residual
+  -- binding for that from either the "stack" or the "heap" portion. What we must avoid is binding both in a let at the same time!
+  = go (foldr (M.delete . fst) init_h init_xes) init_deeds init_xes (fvedTermFreeVars e)
+  where go h deeds xes do_fvs | M.null h_to_do = return (resid_tgs, deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)
                               | otherwise      = do (extra_deedss, extra_xes) <- liftM unzip $ mapM (\(x, e) -> liftM (second ((,) x)) $ opt e) (M.toList h_to_do)
                                                     go h' (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
                                                        (foldr (\(x, e) do_fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` do_fvs) emptyVarSet xes)
@@ -490,7 +494,7 @@ solve :: S.Set Context
       -> S.Set Context
 solve generalised = M.keysSet . go_graph
   where
-    go_graph = uncurry (flip $ go M.empty) . first M.toAscList . sccs
+    go_graph = uncurry (flip $ go M.empty) . sccs
 
     -- NB: the input list is ascending, so lower indexes come first, so we process all predecessors of a SCC before the SCC itself
     go :: M.Map Context (M.Map Context (Maybe Context))         -- Successor |-> Predecessor |-> Just context (iff you end up in a *single* context by inlining along this edge, and which context that is). INVARIANT: no empty maps in range of first mapping
