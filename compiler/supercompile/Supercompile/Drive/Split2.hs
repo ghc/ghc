@@ -46,15 +46,16 @@ filterEdges keep_edge = M.map (M.mapMaybeWithKey (\n e -> if keep_edge e n then 
 shortcutEdges :: forall node edge.
                  Ord node
               => (node -> Bool)
-              -> (edge -> node -> edge -> edge)
+              -> (edge -> edge -> edge)         -- Used to join edges if after shortcutting there is more than one path from a node to another one
+              -> (edge -> node -> edge -> edge) -- Used when joining two edges in a contiguous path
               -> LGraph node edge
               -> LGraph node edge
-shortcutEdges should_shortcut combine g = State.evalState visit_graph M.empty
+shortcutEdges should_shortcut combine_edges combine g = State.evalState visit_graph M.empty
   where
     visit_graph :: State.State (M.Map node [(node, edge)]) (LGraph node edge)
     visit_graph = liftM M.fromDistinctAscList $ sequence $ flip mapMaybe (M.toAscList g) $ \(n, ens) -> do
         guard (not (should_shortcut n))
-        return $ liftM (((,) n) . M.fromListWith (error "visit: non-distinct")) $ visit S.empty ens
+        return $ liftM (((,) n) . M.fromListWith combine_edges) $ visit S.empty ens
 
     visit :: S.Set node -> M.Map node edge -> State.State (M.Map node [(node, edge)]) [(node, edge)]
     -- Given the outgoing edges for some node, returns all the outgoing edges for that node
@@ -85,13 +86,13 @@ shortcutEdges should_shortcut combine g = State.evalState visit_graph M.empty
 --     Note that in particular the sub-graph for an acyclic SCC will contain exactly one node and no edges.
 --
 -- Uses an adaptation of Tarjan's algorithm <http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm>
--- Returns SCCs in reverse topological order (i.e. the SCC with no *incoming* edges is first in the output (with lowest index), and that with no *outgoing* edges is last (with highest index))
+-- Returns SCCs in topological order (i.e. the SCC with no *incoming* edges is first in the output, and that with no *outgoing* edges is last)
 sccs :: forall node edge.
-        Ord node
+        (Outputable node, Ord node)
      => LGraph node edge
-     -> (LGraph Int (M.Map (node, node) edge),
+     -> ([(Int, M.Map Int (M.Map (node, node) edge))],
          IM.IntMap (LGraph node edge))
-sccs g = case State.execState strongconnect_graph (0, M.empty, [], M.empty, IM.empty, M.empty, M.empty) of (_, _, _, sccs, scc_datas, _, _) -> (sccs, scc_datas)
+sccs g = case State.execState strongconnect_graph (0, M.empty, [], [], IM.empty, M.empty, M.empty) of (_, _, _, sccs, scc_datas, _, _) -> (sccs, scc_datas)
   where
     -- Observations about Tarjan's algorithm:
     --  1. strongconnect(v) is only called if v.index is undefined
@@ -124,7 +125,7 @@ sccs g = case State.execState strongconnect_graph (0, M.empty, [], M.empty, IM.e
                                   -- Stack containing expanded nodes that are not presently in a SCC
                                   [node],
                                   -- Work-in-progress graph of SCC
-                                  LGraph Int (M.Map (node, node) edge),
+                                  [(Int, M.Map Int (M.Map (node, node) edge))],
                                   -- Work-in-progress SCC sub-graph mapping
                                   IM.IntMap (LGraph node edge),
                                   -- Records all discovered "internal" edges from expanded nodes to somewhere *within* their SCC
@@ -142,7 +143,7 @@ sccs g = case State.execState strongconnect_graph (0, M.empty, [], M.empty, IM.e
                                   -- Successor not yet visited: recurse on it
                                   -- Whether we add an internal or external edge depends on whether the recursive call created an SCC or not.
                                   -- If it did create an SCC, that SCC will be identified by lowlink'
-          Nothing              -> do (lowlink', in_s') <- strongconnect n' (M.findWithDefault (error "sccs") n' g)
+          Nothing              -> do (lowlink', in_s') <- strongconnect n' (M.findWithDefault (pprPanic "sccs: unknown successor" (ppr n')) n' g)
                                      return (lowlink `min` lowlink', if in_s' then Nothing else Just lowlink')
                                   -- Successor is in the stack and hence the current SCC, so record an internal edge
           Just ix' | in_s'     -> return (lowlink `min` ix', Nothing)
@@ -163,7 +164,7 @@ sccs g = case State.execState strongconnect_graph (0, M.empty, [], M.empty, IM.e
                                                                                                                     scc = M.fromList [(n, M.findWithDefault (error "sccs") n all_internal_ens) | n <- n:s_scc]
                                                                                                                     -- Replace node indexes with the lowlink of the SCC they were assigned to (a small hack to save one map lookup):
                                                                                                                     ixs' = foldr (\n -> M.insert n lowlink) ixs (n:s_scc)
-                                                                                                                in (next_ix, ixs', s', M.insert lowlink all_external_ens sccs, IM.insert lowlink scc scc_datas, all_internal_ens, M.empty)
+                                                                                                                in (next_ix, ixs', s', (lowlink, all_external_ens):sccs, IM.insert lowlink scc scc_datas, all_internal_ens, M.empty)
                       return False
               else return True
       -- Return this nodes final lowlink for use when computing the predecessors lowlink
@@ -197,7 +198,17 @@ data Context = HeapContext Var
              | FocusContext
              deriving (Eq, Ord)
 
+instance Outputable Context where
+    pprPrec prec (HeapContext x') = pprPrec prec x'
+    pprPrec prec (StackContext i) = pprPrec prec i
+    pprPrec _    FocusContext     = text "[_]"
+
 data Entries = OneEntry | ManyEntries
+
+instance Outputable Entries where
+    ppr OneEntry    = text "1"
+    ppr ManyEntries = text "Many"
+
 
 varEdges :: Entries -> FreeVars -> M.Map Context Entries
 varEdges ents xs = M.fromList [(HeapContext x, ents) | x <- varSetElems xs]
@@ -459,14 +470,15 @@ push generalised (Heap h ids, k, focus) = (h', k', focus')
         -- NB: must explicitly avoid collapsing away any value nodes if they are marked as generalised
         cheap_marked = (cheap_marked_k_head `S.union` S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, Just (_, e) <- [heapBindingTerm hb], termIsCheap e]) S.\\ generalised
         verts = shortcutEdges (`S.member` cheap_marked)
-                              (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
+                              plusEntries (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
                               (verts_h `M.union` (verts_k `unionDisjoint` verts_focus))
         extra_marked = solve generalised verts
         marked = cheap_marked `S.union` extra_marked
 
         -- Prepare a version of the heap and stack suitable for inlining
-        h_prep = prepare_h generalised marked
-        k_prep = prepare_k generalised marked
+        h_prep_h           = prepare_h generalised marked
+        (h_prep_k, k_prep) = prepare_k generalised marked
+        h_prep             = h_prep_h `M.union` h_prep_k
 
         -- Produce final syntax with nested States
         h'     = mk_h     h_prep {- We never inline any stack information into the heap -}
@@ -505,7 +517,7 @@ solve generalised = M.keysSet . go_graph
                    , M.null internal_ens
                    -> M.empty
                    | otherwise
-                   -> error "solveSCCs: node with no predecessors but more than one node/an internal edge"
+                   -> pprPanic "solveSCCs: node with no predecessors but more than one node/an internal edge" (ppr scc)
               -- SCC has predecessors
               False | Just (Just common_ctxt) <- the_maybe $ concatMap M.elems (M.elems predecessors_here)
                     , S.null (M.keysSet scc `S.intersection` generalised)
@@ -521,7 +533,7 @@ solve generalised = M.keysSet . go_graph
                     -- and then recursively solve the simplified SCC graph to see if we can inline anything that previously
                     -- participated in a cycle but was not itself an entry node.
                     , let force_unmarked = M.keysSet predecessors_here
-                          scc_cut = filterEdges (\_ n' -> n' `S.member` force_unmarked) scc
+                          scc_cut = filterEdges (\_ n' -> n' `S.notMember` force_unmarked) scc
                           -- NB: no need to specify any predecessors in this recursive call because all nodes with a
                           -- predecessor in a previous SCC have been force unmarked
                     -> go_graph scc_cut
@@ -571,7 +583,7 @@ splitAnswer ids (cast_by, (rn, v)) = (plusEntered (varEdges ManyEntries (castByF
         Data dc tys' cos' xs' -> holeless_v $ Data dc tys' cos' xs'
       where holeless_v v' = (varEdges ManyEntries $ valueGFreeVars' (const emptyVarSet) v', \_ -> v')
 
-    split_lambda x' entries (ids', rn', e) = (varEdges ManyEntries (varBndrFreeVars x') `plusEntered` e_verts, mk_e . M.insert x' lambdaBound)
+    split_lambda x' entries (ids', rn', e) = (varBndrEdges x' e_verts, mk_e . M.insert x' lambdaBound)
       where (e_verts, mk_e) = splitTerm ids' entries (rn', e)
 
 splitTerm :: InScopeSet -> Entries -> In AnnedTerm -> (M.Map Context Entries,
@@ -613,22 +625,22 @@ splitPureHeap ids h = (M.fromDistinctAscList [ (HeapContext x', fmap fst mb_spli
 
 -- NB: we need to add an explicit final frame to prevent the stack and QA graphs from having references to nonexistant nodes
 splitStack :: InScopeSet -> Stack -> Maybe Var -> (LGraph Context Entries,
-                                                   S.Set Context -> S.Set Context -> IM.IntMap Stack,
+                                                   S.Set Context -> S.Set Context -> (PureHeap, IM.IntMap Stack),
                                                    PureHeap -> IM.IntMap Stack -> PushedStack)
-splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, [], \_ _ -> (Nothing, IM.empty), \_ _ -> [] {- \_ _ -> ss_unknown_tail [] -}) k
+splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, [], \_ _ -> (M.empty, (Nothing, IM.empty)), \_ _ -> [] {- \_ _ -> ss_unknown_tail [] -}) k
   where
     finish_prep_k :: Generalised -> (Maybe (Int, Stack -> Stack), IM.IntMap Stack) -> IM.IntMap Stack
     finish_prep_k gen (mb_next_run, done_runs) = maybe id (\(next_run_frame, next_run) -> IM.insert next_run_frame (next_run (Loco gen))) mb_next_run done_runs
 
-    go (_,         last_frame, verts, prep_k, mk_k) (Loco gen)                = (fromListDisjoint ((StackContext last_frame, M.empty):verts), (finish_prep_k gen .) . prep_k, (reverse .) . mk_k)
+    go (_,         last_frame, verts, prep_k, mk_k) (Loco gen)                = (fromListDisjoint ((StackContext last_frame, M.empty):verts), (second (finish_prep_k gen) .) . prep_k, (reverse .) . mk_k)
     go (mb_scruts, frame,      verts, prep_k, mk_k) (Tagged tg_kf kf `Car` k) = go (mb_scruts', next_frame, verts' ++ verts, prep_k', mk_k') k
       where
         -- NB: we insert dummies into done_runs so we can signal to mk_k that frame was marked, even if the frame is not the first in a run of marked frames
         -- NB: this *does* produce the stack in the right order, since:
         --       xs == foldl (\rest x -> (. (x:)) rest) id xs []
-        prep_k' generalised marked | StackContext frame `S.member` marked = (Just $ second (. (Tagged tg_kf kf `Car`)) $ fromMaybe (frame, id) mb_next_run, IM.insert frame (error "prep_k': dummy") done_runs)
-                                   | otherwise                            = (Nothing, finish_prep_k (StackContext frame `S.member` generalised) (mb_next_run, done_runs))
-          where (mb_next_run, done_runs) = prep_k generalised marked
+        prep_k' generalised marked | StackContext frame `S.member` marked = (h_update,                                                   (Just $ second (. (Tagged tg_kf kf `Car`)) $ fromMaybe (frame, id) mb_next_run, IM.insert frame (error "prep_k': dummy") done_runs))
+                                   | otherwise                            = (maybe id (flip M.insert lambdaBound) mb_update_x' h_update, (Nothing, finish_prep_k (StackContext frame `S.member` generalised) (mb_next_run, done_runs)))
+          where (h_update, (mb_next_run, done_runs)) = prep_k generalised marked
 
         mk_k' h_prep k_prep | frame `IM.member` k_prep = mk_k h_prep k_prep -- If the frame was marked (inlined), we needn't residualise it
                             | otherwise                = Tagged tg_kf (kf_prep h_prep k_prep) : mk_k h_prep k_prep
@@ -637,11 +649,15 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
 
         next_frame = frame + 1
         verts' = (StackContext frame, M.insert (StackContext next_frame) (if know_tail then OneEntry else ManyEntries) edges):update_verts
-        (mb_scruts', update_verts, know_tail, edges, kf_prep) = case kf of
-          TyApply ty'                  -> (Nothing, [], False, M.empty, \_ _ -> TyApply ty')
-          CoApply co'                  -> (Nothing, [], False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CoApply co')
-          Apply x'                     -> (Nothing, [], False, M.singleton (HeapContext x') ManyEntries, \_ _ -> Apply x')
-          Scrutinise x' ty' (rn, alts) -> (Nothing, [], True, varEdges ManyEntries (varBndrFreeVars x') `plusEntered` foldr plusEntered M.empty alts_verts,
+        update_verts = case mb_update_x' of
+          Just x' -> [(HeapContext x', M.singleton (StackContext frame) ManyEntries)]
+          Nothing -> []
+
+        (mb_scruts', mb_update_x', know_tail, edges, kf_prep) = case kf of
+          TyApply ty'                  -> (Nothing, Nothing, False, M.empty, \_ _ -> TyApply ty')
+          CoApply co'                  -> (Nothing, Nothing, False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CoApply co')
+          Apply x'                     -> (Nothing, Nothing, False, M.singleton (HeapContext x') ManyEntries, \_ _ -> Apply x')
+          Scrutinise x' ty' (rn, alts) -> (Nothing, Nothing, True, varBndrEdges x' $ foldr plusEntered M.empty alts_verts,
                                            \h_prep k_prep -> Scrutinise x' ty' (map (($ k_prep) . ($ h_prep)) mk_alts))
             where any_scrut_live = any (not . isDeadBinder . snd) scruts_flat
                   
@@ -655,7 +671,7 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
                                                                                         | (altcon, e) <- alts
                                                                                         , let (altcon', xs) = altConToCoreAltCon altcon ] ]
 
-                  (alts_verts, mk_alts) = unzip [ (varEdges ManyEntries (unionVarSets (map varBndrFreeVars alt_bvs')) `plusEntered` e_verts,
+                  (alts_verts, mk_alts) = unzip [ (foldr varBndrEdges e_verts alt_bvs',
                                                    \h_prep k_prep -> let h_pos | pOSITIVE_INFORMATION
                                                                                , Just anned_v <- altConToValue (idType x') alt_con'
                                                                                , let anned_e = fmap Value anned_v
@@ -677,18 +693,20 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
                                                 , let (ids', rn', alt_con') = renameAltCon ids rn (if any_scrut_live then zapAltConIdOccInfo alt_con else alt_con)
                                                       (e_verts, mk_e) = splitTailKnownTerm ids' next_frame (rn', e)
                                                       alt_bvs' = altConBoundVars alt_con' ]
-          PrimApply pop tys' as in_es  -> (Nothing, [], False, foldr multEntered M.empty (as_verts ++ es_verts),
+          PrimApply pop tys' as in_es  -> (Nothing, Nothing, False, foldr multEntered M.empty (as_verts ++ es_verts),
                                            \h_prep _k_prep -> PrimApply pop tys' (map ($ h_prep) mk_as) (map ($ h_prep) mk_es))
             where (as_verts, mk_as) = unzip $ map (\anned_a -> second (Tagged (annedTag anned_a) .) $ splitAnswer ids (annee anned_a)) as
                   (es_verts, mk_es) = unzip $ map (splitTerm ids OneEntry) in_es
-          StrictLet x' in_e            -> (Nothing, [], True, varEdges ManyEntries (varBndrFreeVars x') `plusEntered` e_verts,
+          StrictLet x' in_e            -> (Nothing, Nothing, True, varBndrEdges x' e_verts,
                                            \h_prep k_prep -> StrictLet x' (mk_e (M.insert x' lambdaBound h_prep) k_prep))
             where (e_verts, mk_e) = splitTailKnownTerm ids next_frame in_e
           CastIt co'                   -> (fmap (\((cast_by, x'), rest) -> ((castBy (maybe co' (\co'' -> mkTransCo ids co'' co') (castByCo cast_by)) tg_kf, x'), rest)) mb_scruts,
-                                           [], False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CastIt co')
+                                           Nothing, False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CastIt co')
           Update x'                    -> (Just ((Uncast, x'), scruts_flat),
-                                           [(HeapContext x', M.singleton (StackContext frame) ManyEntries)], False,
-                                           varEdges ManyEntries (varBndrFreeVars x'), \_ _ -> Update x')
+                                           Just x', False, varEdges ManyEntries (varBndrFreeVars x'), \_ _ -> Update x')
 
 lookupStackPrep :: Int -> IM.IntMap Stack -> Stack
 lookupStackPrep = IM.findWithDefault (Loco False)
+
+varBndrEdges :: Var -> M.Map Context Entries -> M.Map Context Entries
+varBndrEdges x' verts = varEdges ManyEntries (varBndrFreeVars x') `plusEntered` M.delete (HeapContext x') verts

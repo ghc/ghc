@@ -28,7 +28,7 @@ import Supercompile.Utilities
 import Type       (typeSize, isTyVarTy)
 import Coercion   (coercionSize, getCoVar_maybe)
 import Var        (varName)
-import Id         (mkLocalId)
+import Id         (Id, mkLocalId)
 import MkId       (nullAddrId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
@@ -189,10 +189,9 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         e' = letRec fulfils e
 
 
-mkOutRenaming :: Renaming -> ScpM Renaming
-mkOutRenaming rn = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
-                                             hs = concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps
-                                         in return (foldr (\x rn -> insertIdRenaming rn x x) rn hs, s)
+hFunctions :: ScpM [Id]
+hFunctions = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
+                                   in return (concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps, s)
 
 callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
 callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
@@ -310,13 +309,20 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
 
 tryMSG opt = bothWays $ \shallow_state state -> do
   -- FIXME: better? In particular, could rollback and then MSG
-  (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
+  (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
   pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
                           pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ do
     (deeds', e) <- sc (deeds, heap, k, qa)
-    rn_r <- mkOutRenaming rn_r -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
-    instanceSplit opt (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e)
+    -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
+    -- NB: adding some new bindings to h_r for the h functions is a bit of a hack because:
+    --  1. It only serves to suppress errors from "split" which occur when e' refers to some variables not bound in the heap
+    --  2. These new dummy bindings will never be passed down to any recursive invocation of opt
+    hs <- hFunctions
+    let rn_r' = foldr (\x rn -> insertIdRenaming rn x x) rn_r hs
+        h_r'  = foldr (\x h  -> M.insert x lambdaBound h) h_r hs
+        e'    = renameFVedTerm ids rn_r' e
+    instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap h_r' ids_r, k_r, e')
 
 -- NB: in the case of both callers, if "f" fails one way then it fails the other way as well (and likewise for success).
 -- Therefore we can return a single Maybe rather than a pair of two Maybes.
