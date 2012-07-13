@@ -942,7 +942,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (show (runSDoc doc (initSDocContext dflags PprDebug)))
+ = cont (showSDocDebug dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}
