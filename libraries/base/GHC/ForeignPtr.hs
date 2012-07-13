@@ -189,12 +189,12 @@ mallocForeignPtrBytes (I# size) = do
 -- size and alignment of the memory required is given explicitly as numbers of
 -- bytes.
 mallocForeignPtrAlignedBytes :: Int -> Int -> IO (ForeignPtr a)
-mallocForeignPtrAlignedBytes size alignment | size < 0 =
+mallocForeignPtrAlignedBytes size _align | size < 0 =
   error "mallocForeignPtrAlignedBytes: size must be >= 0"
-mallocForeignPtrAlignedBytes (I# size) (I# alignment) = do
+mallocForeignPtrAlignedBytes (I# size) (I# align) = do
   r <- newIORef (NoFinalizers, [])
   IO $ \s ->
-     case newAlignedPinnedByteArray# size alignment s of { (# s', mbarr# #) ->
+     case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
        (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                          (MallocPtr mbarr# r) #)
      }
@@ -243,10 +243,10 @@ mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
 -- finalizer is used. Attempts to add a finalizer will cause an
 -- exception to be thrown.
 mallocPlainForeignPtrAlignedBytes :: Int -> Int -> IO (ForeignPtr a)
-mallocPlainForeignPtrAlignedBytes size alignment | size < 0 =
+mallocPlainForeignPtrAlignedBytes size _align | size < 0 =
   error "mallocPlainForeignPtrAlignedBytes: size must be >= 0"
-mallocPlainForeignPtrAlignedBytes (I# size) (I# alignment) = IO $ \s ->
-    case newAlignedPinnedByteArray# size alignment s of { (# s', mbarr# #) ->
+mallocPlainForeignPtrAlignedBytes (I# size) (I# align) = IO $ \s ->
+    case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
        (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
                          (PlainPtr mbarr#) #)
      }
