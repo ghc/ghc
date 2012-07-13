@@ -135,11 +135,6 @@ int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
 
 integerToInt :: Integer -> Int#
 {-# NOINLINE integerToInt #-}
-{-# RULES "integerToInt" forall i. integerToInt (S# i) = i #-}
--- Don't inline integerToInt, because it can't do much unless
--- it sees a (S# i), and inlining just creates fruitless
--- join points.  But we do need a RULE to get the constants
--- to work right:  1::Int had better optimise to (I# 1)!
 integerToInt (S# i)   = i
 integerToInt (J# s d) = integer2Int# s d
 
@@ -287,8 +282,10 @@ lcmInteger a b =      if a `eqInteger` S# 0# then S# 0#
   where aa = absInteger a
         ab = absInteger b
 
+-- This rule needs to use absInteger so that it works correctly when
+-- the result is minBound :: Int
 {-# RULES "gcdInteger/Int" forall a b.
-            gcdInteger (S# a) (S# b) = S# (gcdInt a b)
+    gcdInteger (smallInteger a) (smallInteger b) = absInteger (smallInteger (gcdInt a b))
   #-}
 gcdInt :: Int# -> Int# -> Int#
 gcdInt 0# y  = absInt y
