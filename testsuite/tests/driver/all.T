@@ -354,3 +354,10 @@ test('T5584', normal, run_command,
 test('T5198', extra_clean(['T5198dump/T5198.dump-simpl', 'T5198dump']),
      run_command,
      ['$MAKE -s --no-print-directory T5198'])
+test('T7060',
+     extra_clean(['T7060dump/T7060.dump-rules',
+                  'T7060dump/T7060.dump-rule-firings',
+                  'T7060dump/T7060.dump-rule-rewrites',
+                  'T7060dump']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7060'])
