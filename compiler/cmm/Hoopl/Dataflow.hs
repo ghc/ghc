@@ -16,6 +16,9 @@
 #if __GLASGOW_HASKELL__ >= 701
 {-# LANGUAGE Trustworthy #-}
 #endif
+#if __GLASGOW_HASKELL__ < 701
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#endif
 
 module Hoopl.Dataflow
   ( DataflowLattice(..), OldFact(..), NewFact(..), Fact, mkFactBase
