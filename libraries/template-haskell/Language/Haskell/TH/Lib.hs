@@ -242,6 +242,9 @@ lamE ps e = do ps' <- sequence ps
 lam1E :: PatQ -> ExpQ -> ExpQ
 lam1E p e = lamE [p] e
 
+lamCaseE :: [MatchQ] -> ExpQ
+lamCaseE ms = sequence ms >>= return . LamCaseE
+
 tupE :: [ExpQ] -> ExpQ
 tupE es = do { es1 <- sequence es; return (TupE es1)}
 

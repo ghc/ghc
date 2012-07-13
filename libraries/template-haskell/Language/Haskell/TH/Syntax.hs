@@ -862,6 +862,7 @@ data Exp
                                        --
                                        -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
+  | LamCaseE [Match]                   -- ^ @{ \case m1; m2 }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@

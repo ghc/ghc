@@ -106,6 +106,8 @@ pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
                                     <+> pprMaybeExp noPrec me2
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
+pprExp i (LamCaseE ms) = parensIf (i > noPrec)
+                       $ text "\\case" $$ nest nestDepth (ppr ms)
 pprExp _ (TupE es) = parens $ sep $ punctuate comma $ map ppr es
 pprExp _ (UnboxedTupE es) = hashParens $ sep $ punctuate comma $ map ppr es
 -- Nesting in Cond is to avoid potential problems in do statments
