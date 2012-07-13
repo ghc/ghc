@@ -56,3 +56,9 @@ IntegerConversionRules:
 	-grep -q integerToWord     $@.simpl && echo "integerToWord present"
 	-grep -q int2Word          $@.simpl || echo "int2Word absent"
 
+.PHONY: T7041
+T7041:
+	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -ddump-simpl > $@.simpl
+	-grep -q gcdInteger        $@.simpl && echo "gcdInteger present"
+	-grep -q "gcdInt\>"        $@.simpl || echo "gcdInt absent"
+
