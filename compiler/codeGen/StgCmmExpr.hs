@@ -79,8 +79,8 @@ cgExpr (StgLetNoEscape _ _ binds expr) =
      ; cgExpr expr 
      ; emitLabel join_id}
 
-cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts) =
-  cgCase expr bndr srt alt_type alts
+cgExpr (StgCase expr _live_vars _save_vars bndr _srt alt_type alts) =
+  cgCase expr bndr alt_type alts
 
 cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 
@@ -283,9 +283,9 @@ data GcPlan
 			-- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: StgExpr -> Id -> SRT -> AltType -> [StgAlt] -> FCode ()
+cgCase :: StgExpr -> Id -> AltType -> [StgAlt] -> FCode ()
 
-cgCase (StgOpApp (StgPrimOp op) args _) bndr _srt (AlgAlt tycon) alts
+cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
   | isEnumerationTyCon tycon -- Note [case on bool]
   = do { tag_expr <- do_enum_primop op args
 
@@ -360,7 +360,7 @@ would make this special case go away.
   -- code that enters the HValue, then we'll get a runtime panic, because
   -- the HValue really is a MutVar#.  The types are compatible though,
   -- so we can just generate an assignment.
-cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
+cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnLiftedType (idType v)
   || reps_compatible
   = -- assignment suffices for unlifted types
@@ -373,7 +373,7 @@ cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
   where
     reps_compatible = idPrimRep v == idPrimRep bndr
 
-cgCase scrut@(StgApp v []) _ _ (PrimAlt _) _ 
+cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = -- fail at run-time, not compile-time
     do { mb_cc <- maybeSaveCostCentre True
        ; withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
@@ -396,11 +396,11 @@ case a of v
 (taking advantage of the fact that the return convention for (# State#, a #)
 is the same as the return convention for just 'a')
 -}
-cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr srt alt_type alts
+cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- handle seq#, same return convention as vanilla 'a'.
-    cgCase (StgApp a []) bndr srt alt_type alts
+    cgCase (StgApp a []) bndr alt_type alts
 
-cgCase scrut bndr _srt alt_type alts
+cgCase scrut bndr alt_type alts
   = -- the general case
     do { up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
@@ -609,7 +609,8 @@ cgIdApp fun_id args
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ()
 cgLneJump blk_id lne_regs args	-- Join point; discard sequel
-  = do	{ cmm_args <- getNonVoidArgAmodes args
+  = do  { adjustHpBackwards -- always do this before a tail-call
+        ; cmm_args <- getNonVoidArgAmodes args
         ; emitMultiAssign lne_regs cmm_args
         ; emit (mkBranch blk_id) }
     

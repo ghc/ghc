@@ -2266,6 +2266,14 @@ last (x : xs) = last' x xs
             precision/range of
             <literal>Float</literal>/<literal>Double</literal> values
             and should not use this option for their compilation.</para>
+
+            <para>
+              Note that the 32-bit x86 native code generator only
+              supports excess-precision mode, so neither
+              <option>-fexcess-precision</option> nor
+              <option>-fno-excess-precision</option> has any effect.
+              This is a known bug, see <xref linkend="bugs-ghc" />.
+            </para>
           </listitem>
         </varlistentry>
 

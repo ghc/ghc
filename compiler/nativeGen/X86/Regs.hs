@@ -480,26 +480,30 @@ freeReg edi = fastBool False
 freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 #endif
 
+-- split patterns in two functions to prevent overlaps
+freeReg r         = freeRegBase r
+
+freeRegBase :: RegNo -> FastBool
+
 #ifdef REG_Base
-freeReg REG_Base = fastBool False
+freeRegBase REG_Base = fastBool False
 #endif
 #ifdef REG_Sp
-freeReg REG_Sp   = fastBool False
+freeRegBase REG_Sp   = fastBool False
 #endif
 #ifdef REG_SpLim
-freeReg REG_SpLim = fastBool False
+freeRegBase REG_SpLim = fastBool False
 #endif
 #ifdef REG_Hp
-freeReg REG_Hp   = fastBool False
+freeRegBase REG_Hp   = fastBool False
 #endif
 #ifdef REG_HpLim
-freeReg REG_HpLim = fastBool False
+freeRegBase REG_HpLim = fastBool False
 #endif
 
 -- All other regs are considered to be "free", because we can track
 -- their liveness accurately.
-freeReg _         = fastBool True
-
+freeRegBase _ = fastBool True
 
 --  | Returns 'Nothing' if this global register is not stored
 -- in a real machine register, otherwise returns @'Just' reg@, where

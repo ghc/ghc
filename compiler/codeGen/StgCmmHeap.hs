@@ -33,7 +33,7 @@ import StgCmmEnv
 
 import MkGraph
 
-import Hoopl hiding ((<*>), mkBranch)
+import Hoopl
 import SMRep
 import Cmm
 import CmmUtils
@@ -153,10 +153,9 @@ mkStaticClosureFields
         :: CmmInfoTable
         -> CostCentreStack
         -> CafInfo
-        -> Bool                 -- SRT is non-empty?
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields info_tbl ccs caf_refs has_srt payload
+mkStaticClosureFields info_tbl ccs caf_refs payload
   = mkStaticClosure info_lbl ccs payload padding
         static_link_field saved_info_field
   where
@@ -181,7 +180,7 @@ mkStaticClosureFields info_tbl ccs caf_refs has_srt payload
         | otherwise  = ASSERT(null payload) [mkIntCLit 0]
 
     static_link_field
-        | is_caf || staticClosureNeedsLink has_srt info_tbl
+        | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
         = [static_link_value]
         | otherwise
         = []

@@ -1197,6 +1197,7 @@ setInteractiveContext hsc_env icxt thing_inside
              -- setting tcg_field_env is necessary to make RecordWildCards work
              -- (test: ghci049)
         , tcg_fix_env      = ic_fix_env icxt
+        , tcg_default      = ic_default icxt
         }) $
 
         tcExtendGhciEnv visible_tmp_ids $ -- Note [GHCi temporary Ids]

@@ -54,6 +54,7 @@ import FastBool hiding ( fastOr )
 import SrcLoc
 import Util
 import FastString
+import qualified ErrUtils as Err
 
 import Control.Monad
 import Data.Function
@@ -372,11 +373,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-        ; dumpIfSet dflags (dopt Opt_D_dump_rules dflags
-                     && (not (dopt Opt_D_dump_simpl dflags)))
-                    CoreTidy
-                    (ptext (sLit "rules"))
-                    (pprRulesForUser tidy_rules)
+        ; unless (dopt Opt_D_dump_simpl dflags) $
+            Err.dumpIfSet_dyn dflags Opt_D_dump_rules
+              (showSDoc dflags (ppr CoreTidy <+> ptext (sLit "rules")))
+              (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds

@@ -43,13 +43,14 @@ import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict, Arity )
 import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
-import MonadUtils	( foldlM, mapAccumLM )
+import MonadUtils	( foldlM, mapAccumLM, liftIO )
 import Maybes           ( orElse, isNothing )
 import Data.List        ( mapAccumL )
 import Outputable
 import FastString
 import Pair
 import Util
+import ErrUtils
 \end{code}
 
 
@@ -1565,23 +1566,26 @@ tryRules env rules fn args call_cont
 
              do { checkedTick (RuleFired (ru_name rule))
                 ; dflags <- getDynFlags
-                ; trace_dump dflags rule rule_rhs $
-                  return (Just (ruleArity rule, rule_rhs)) }}}
+                ; trace_dump dflags rule rule_rhs
+                ; return (Just (ruleArity rule, rule_rhs)) }}}
   where
-    trace_dump dflags rule rule_rhs stuff
-      | not (dopt Opt_D_dump_rule_firings dflags)
-      , not (dopt Opt_D_dump_rule_rewrites dflags) = stuff
+    trace_dump dflags rule rule_rhs
+      | dopt Opt_D_dump_rule_rewrites dflags
+      = liftIO . dumpSDoc dflags Opt_D_dump_rule_rewrites "" $
+           vcat [text "Rule fired",
+                 text "Rule:" <+> ftext (ru_name rule),
+                 text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args)),
+                 text "After: " <+> pprCoreExpr rule_rhs,
+                 text "Cont:  " <+> ppr call_cont]
 
-      | not (dopt Opt_D_dump_rule_rewrites dflags)
-      = pprDefiniteTrace dflags "Rule fired:" (ftext (ru_name rule)) stuff
+      | dopt Opt_D_dump_rule_firings dflags
+      = liftIO . dumpSDoc dflags Opt_D_dump_rule_firings "" $
+          vcat [text "Rule fired",
+                ftext (ru_name rule)]
 
       | otherwise
-      = pprDefiniteTrace dflags "Rule fired"
-           (vcat [text "Rule:" <+> ftext (ru_name rule),
-           	  text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args)),
-           	  text "After: " <+> pprCoreExpr rule_rhs,
-           	  text "Cont:  " <+> ppr call_cont])
-           stuff
+      = return ()
+
 \end{code}
 
 Note [Rules for recursive functions]

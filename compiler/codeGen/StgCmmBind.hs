@@ -68,16 +68,14 @@ cgTopRhsClosure :: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
 		-> UpdateFlag
-		-> SRT
-		-> [Id]		        -- Args
+                -> [Id]                 -- Args
 		-> StgExpr
 		-> FCode CgIdInfo
 
-cgTopRhsClosure id ccs _ upd_flag srt args body = do
+cgTopRhsClosure id ccs _ upd_flag args body = do
   {	-- LAY OUT THE OBJECT
     let name = idName id
   ; lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
-  ; has_srt <- getSRTInfo srt
   ; mod_name <- getModuleName
   ; dflags   <- getDynFlags
   ; let descr         = closureDescription dflags mod_name name
@@ -86,7 +84,7 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
         caffy         = idCafInfo id
         info_tbl      = mkCmmInfo closure_info -- XXX short-cut
-        closure_rep   = mkStaticClosureFields info_tbl ccs caffy has_srt []
+        closure_rep   = mkStaticClosureFields info_tbl ccs caffy []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
