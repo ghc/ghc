@@ -416,9 +416,10 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
              
 
        ; if isEmptyVarSet qtvs && isEmptyBag bound
-         then ASSERT( isEmptyBag (wc_insol wanted_transformed) )
-              do { traceTc "} simplifyInfer/no quantification" empty                   
-                 ; emitWC wanted_transformed
+         then do { traceTc "} simplifyInfer/no quantification" empty                   
+                 ; emitConstraints wanted_transformed
+                    -- Includes insolubles (if -fdefer-type-errors)
+                    -- as well as flats and implications
                  ; return ([], [], mr_bites, TcEvBinds ev_binds_var) }
          else do
 
