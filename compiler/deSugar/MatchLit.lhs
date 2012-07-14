@@ -69,7 +69,7 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
 dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsStringPrim s) = return (Lit (MachStr (fastStringToFastBytes s)))
+dsLit (HsStringPrim s) = return (Lit (MachStr s))
 dsLit (HsCharPrim   c) = return (Lit (MachChar c))
 dsLit (HsIntPrim    i) = return (Lit (MachInt i))
 dsLit (HsWordPrim   w) = return (Lit (MachWord w))
@@ -124,7 +124,7 @@ hsLitKey (HsWordPrim    w) = mkMachWord w
 hsLitKey (HsInt64Prim   i) = mkMachInt64  i
 hsLitKey (HsWord64Prim  w) = mkMachWord64 w
 hsLitKey (HsCharPrim    c) = MachChar   c
-hsLitKey (HsStringPrim  s) = MachStr    (fastStringToFastBytes s)
+hsLitKey (HsStringPrim  s) = MachStr    s
 hsLitKey (HsFloatPrim   f) = MachFloat  (fl_value f)
 hsLitKey (HsDoublePrim  d) = MachDouble (fl_value d)
 hsLitKey (HsString s)      = MachStr    (fastStringToFastBytes s)

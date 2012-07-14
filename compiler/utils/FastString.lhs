@@ -31,6 +31,7 @@ module FastString
         mkFastStringFastBytes,
         foreignPtrToFastBytes,
         fastStringToFastBytes,
+        mkFastBytesByteList,
         bytesFB,
         hashFB,
         lengthFB,
@@ -109,7 +110,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.Data
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
-import Data.Char        ( ord )
+import Data.Char
 
 import GHC.IO           ( IO(..) )
 
@@ -144,6 +145,14 @@ instance Eq FastBytes where
 instance Ord FastBytes where
     compare = cmpFB
 
+instance Show FastBytes where
+    show fb = show (concatMap escape $ bytesFB fb) ++ "#"
+        where escape :: Word8 -> String
+              escape w = let c = chr (fromIntegral w)
+                         in if isAscii c
+                            then [c]
+                            else '\\' : show w
+
 foreignPtrToFastBytes :: ForeignPtr Word8 -> Int -> FastBytes
 foreignPtrToFastBytes fp len = FastBytes len fp
 
@@ -153,6 +162,15 @@ mkFastStringFastBytes (FastBytes len fp)
 
 fastStringToFastBytes :: FastString -> FastBytes
 fastStringToFastBytes f = FastBytes (n_bytes f) (buf f)
+
+mkFastBytesByteList :: [Word8] -> FastBytes
+mkFastBytesByteList bs =
+  inlinePerformIO $ do
+    let l = Prelude.length bs
+    buf <- mallocForeignPtrBytes l
+    withForeignPtr buf $ \ptr -> do
+      pokeArray (castPtr ptr) bs
+      return $ foreignPtrToFastBytes buf l
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFB :: FastBytes -> [Word8]

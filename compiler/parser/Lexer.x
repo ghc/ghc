@@ -551,7 +551,7 @@ data Token
   | ITrational   FractionalLit
 
   | ITprimchar   Char
-  | ITprimstring FastString
+  | ITprimstring FastBytes
   | ITprimint    Integer
   | ITprimword   Integer
   | ITprimfloat  FractionalLit
@@ -1227,10 +1227,8 @@ lex_string s = do
                    setInput i
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let s' = mkZFastString (reverse s) in
-                         return (ITprimstring s')
-                        -- mkZFastString is a hack to avoid encoding the
-                        -- string in UTF-8.  We just want the exact bytes.
+                    else let bs = map (fromIntegral . ord) (reverse s)
+                         in return (ITprimstring (mkFastBytesByteList bs))
               _other ->
                 return (ITstring (mkFastString (reverse s)))
           else
