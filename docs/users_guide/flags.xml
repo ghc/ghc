@@ -1128,6 +1128,12 @@
             <entry><option>-XNoLambdaCase</option></entry>
           </row>
           <row>
+            <entry><option>-XMultiWayIf</option></entry>
+            <entry>Enable <link linkend="multi-way-if">multi-way if-expressions</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoMultiWayIf</option></entry>
+          </row>
+          <row>
             <entry><option>-XSafe</option></entry>
             <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Safe mode.</entry>
             <entry>dynamic</entry>

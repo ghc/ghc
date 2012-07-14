@@ -495,6 +495,10 @@ cvtl e = wrapL (cvt e)
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
 			    ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
+    cvt (MultiIfE alts)
+      | null alts      = failWith (ptext (sLit "Multi-way if-expression with no alternatives"))
+      | otherwise      = do { alts' <- mapM cvtpair alts
+                            ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
                             ; e' <- cvtl e; return $ HsLet ds' e' }
     cvt (CaseE e ms)

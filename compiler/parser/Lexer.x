@@ -1867,6 +1867,8 @@ explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
 lambdaCaseBit :: Int
 lambdaCaseBit = 30
+multiWayIfBit :: Int
+multiWayIfBit = 31
 
 
 always :: Int -> Bool
@@ -1918,6 +1920,8 @@ explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 lambdaCaseEnabled :: Int -> Bool
 lambdaCaseEnabled flags = testBit flags lambdaCaseBit
+multiWayIfEnabled :: Int -> Bool
+multiWayIfEnabled flags = testBit flags multiWayIfBit
 
 -- PState for parsing options pragmas
 --
@@ -1979,6 +1983,7 @@ mkPState flags buf loc =
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
                .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. multiWayIfBit               `setBitIf` xopt Opt_MultiWayIf               flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

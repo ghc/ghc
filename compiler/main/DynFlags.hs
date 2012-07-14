@@ -486,6 +486,7 @@ data ExtensionFlag
    | Opt_RelaxedLayout
    | Opt_TraditionalRecordSyntax
    | Opt_LambdaCase
+   | Opt_MultiWayIf
    deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -2164,6 +2165,7 @@ xFlags = [
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
   ( "LambdaCase",                       Opt_LambdaCase, nop ),
+  ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
     \ turn_on -> if not turn_on

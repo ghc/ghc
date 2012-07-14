@@ -445,6 +445,11 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
        -- and it maintains uniformity with other rebindable syntax
        ; return (HsIf (Just fun') pred' b1' b2') }
 
+tcExpr (HsMultiIf _ alts) res_ty
+  = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
+       ; return $ HsMultiIf res_ty alts' }
+  where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
+
 tcExpr (HsDo do_or_lc stmts _) res_ty
   = tcDoStmts do_or_lc stmts res_ty
 

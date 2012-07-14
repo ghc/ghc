@@ -29,7 +29,7 @@ import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 
 import RnSource  ( rnSrcDecls, findSplice )
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
-                   rnMatchGroup, makeMiniFixityEnv) 
+                   rnMatchGroup, rnGRHS, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
 import TcEnv		( thRnBrack )
@@ -283,6 +283,10 @@ rnExpr (HsIf _ p b1 b2)
        ; (b2', fvB2) <- rnLExpr b2
        ; (mb_ite, fvITE) <- lookupIfThenElse
        ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
+
+rnExpr (HsMultiIf ty alts)
+  = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt) alts
+       ; return (HsMultiIf ty alts', fvs) }
 
 rnExpr (HsType a)
   = rnLHsType HsTypeCtx a	`thenM` \ (t, fvT) -> 

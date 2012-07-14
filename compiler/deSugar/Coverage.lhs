@@ -423,6 +423,7 @@ isGoodBreakExpr (HsApp {})     = True
 isGoodBreakExpr (OpApp {})     = True
 isGoodBreakExpr (NegApp {})    = True
 isGoodBreakExpr (HsIf {})      = True
+isGoodBreakExpr (HsMultiIf {}) = True
 isGoodBreakExpr (HsCase {})    = True
 isGoodBreakExpr (RecordCon {}) = True
 isGoodBreakExpr (RecordUpd {}) = True
@@ -496,6 +497,10 @@ addTickHsExpr (HsIf cnd e1 e2 e3) =
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
+addTickHsExpr (HsMultiIf ty alts)
+  = do { let isOneOfMany = case alts of [_] -> False; _ -> True
+       ; alts' <- mapM (liftL $ addTickGRHS isOneOfMany False) alts
+       ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet binds e) =
         bindLocals (collectLocalBinders binds) $
         liftM2 HsLet

@@ -6,7 +6,7 @@
 Matching guarded right-hand-sides (GRHSs)
 
 \begin{code}
-module DsGRHSs ( dsGuarded, dsGRHSs ) where
+module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS ) where
 
 #include "HsVersions.h"
 
@@ -55,8 +55,8 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchCon
         -> GRHSs Id                             -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty = do
-    match_results <- mapM (dsGRHS hs_ctx pats rhs_ty) grhss
+dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty = do
+    match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
     let
         match_result1 = foldr1 combineMatchResults match_results
         match_result2 = adjustMatchResultDs
@@ -66,8 +66,8 @@ dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty = do
     --
     return match_result2
 
-dsGRHS :: HsMatchContext Name -> [Pat Id] -> Type -> LGRHS Id -> DsM MatchResult
-dsGRHS hs_ctx _ rhs_ty (L _ (GRHS guards rhs))
+dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id -> DsM MatchResult
+dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
 \end{code}
 
