@@ -715,12 +715,11 @@ dumpFinalStats dflags =
 dumpFastStringStats :: DynFlags -> IO ()
 dumpFastStringStats dflags = do
   buckets <- getFastStringTable
-  let (entries, longest, is_z, has_z) = countFS 0 0 0 0 buckets
+  let (entries, longest, has_z) = countFS 0 0 0 buckets
       msg = text "FastString stats:" $$
             nest 4 (vcat [text "size:           " <+> int (length buckets),
                           text "entries:        " <+> int entries,
                           text "longest chain:  " <+> int longest,
-                          text "z-encoded:      " <+> (is_z `pcntOf` entries),
                           text "has z-encoding: " <+> (has_z `pcntOf` entries)
                          ])
         -- we usually get more "has z-encoding" than "z-encoded", because
@@ -732,17 +731,16 @@ dumpFastStringStats dflags = do
   where
    x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
 
-countFS :: Int -> Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int, Int)
-countFS entries longest is_z has_z [] = (entries, longest, is_z, has_z)
-countFS entries longest is_z has_z (b:bs) =
+countFS :: Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int)
+countFS entries longest has_z [] = (entries, longest, has_z)
+countFS entries longest has_z (b:bs) =
   let
         len = length b
         longest' = max len longest
         entries' = entries + len
-        is_zs = length (filter isZEncoded b)
         has_zs = length (filter hasZEncoding b)
   in
-        countFS entries' longest' (is_z + is_zs) (has_z + has_zs) bs
+        countFS entries' longest' (has_z + has_zs) bs
 
 -- -----------------------------------------------------------------------------
 -- ABI hash support

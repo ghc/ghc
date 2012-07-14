@@ -23,6 +23,7 @@ module BufWrite (
 	bPutChar,
 	bPutStr,
 	bPutFS,
+	bPutFZS,
 	bPutLitString,
 	bFlush,
   ) where
@@ -84,7 +85,13 @@ bPutStr (BufHandle buf r hdl) str = do
 		loop cs (i+1)
   
 bPutFS :: BufHandle -> FastString -> IO ()
-bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len _ fp _) =
+bPutFS b fs = bPutFB b $ fastStringToFastBytes fs
+
+bPutFZS :: BufHandle -> FastZString -> IO ()
+bPutFZS b fs = bPutFB b $ fastZStringToFastBytes fs
+
+bPutFB :: BufHandle -> FastBytes -> IO ()
+bPutFB b@(BufHandle buf r hdl) fb@(FastBytes len fp) =
  withForeignPtr fp $ \ptr -> do
   i <- readFastMutInt r
   if (i + len) >= buf_size
@@ -92,7 +99,7 @@ bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len _ fp _) =
 		writeFastMutInt r 0
 		if (len >= buf_size) 
 		    then hPutBuf hdl ptr len
-		    else bPutFS b fs
+		    else bPutFB b fb
 	else do
 		copyBytes (buf `plusPtr` i) ptr len
 		writeFastMutInt r (i+len)

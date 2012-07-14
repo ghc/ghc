@@ -31,11 +31,18 @@ module FastString
         mkFastStringFastBytes,
         foreignPtrToFastBytes,
         fastStringToFastBytes,
+        fastZStringToFastBytes,
         mkFastBytesByteList,
         bytesFB,
         hashFB,
         lengthFB,
         appendFB,
+
+        -- * FastZString
+        FastZString,
+        hPutFZS,
+        zString,
+        lengthFZS,
 
         -- * FastStrings
         FastString(..),     -- not abstract, for now.
@@ -49,15 +56,12 @@ module FastString
 #if defined(__GLASGOW_HASKELL__)
         mkFastString#,
 #endif
-        mkZFastString,
-        mkZFastStringBytes,
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
         bytesFS,            -- :: FastString -> [Word8]
 
         -- ** Encoding
-        isZEncoded,
         zEncodeFS,
 
         -- ** Operations
@@ -163,6 +167,9 @@ mkFastStringFastBytes (FastBytes len fp)
 fastStringToFastBytes :: FastString -> FastBytes
 fastStringToFastBytes f = FastBytes (n_bytes f) (buf f)
 
+fastZStringToFastBytes :: FastZString -> FastBytes
+fastZStringToFastBytes (FastZString fb) = fb
+
 mkFastBytesByteList :: [Word8] -> FastBytes
 mkFastBytesByteList bs =
   inlinePerformIO $ do
@@ -199,6 +206,27 @@ appendFB fb1 fb2 =
         len1 = fb_n_bytes fb1
         len2 = fb_n_bytes fb2
 
+hPutFB :: Handle -> FastBytes -> IO ()
+hPutFB handle (FastBytes len fp)
+  | len == 0  = return ()
+  | otherwise = do withForeignPtr fp $ \ptr -> hPutBuf handle ptr len
+
+-- -----------------------------------------------------------------------------
+
+newtype FastZString = FastZString FastBytes
+
+hPutFZS :: Handle -> FastZString -> IO ()
+hPutFZS handle (FastZString fb) = hPutFB handle fb
+
+zString :: FastZString -> String
+zString (FastZString (FastBytes n_bytes buf)) =
+    inlinePerformIO $ withForeignPtr buf $ \ptr ->
+        peekCAStringLen (castPtr ptr, n_bytes)
+
+lengthFZS :: FastZString -> Int
+lengthFZS (FastZString fb) = lengthFB fb
+
+-- -----------------------------------------------------------------------------
 
 {-|
 A 'FastString' is an array of bytes, hashed to support fast O(1)
@@ -214,14 +242,8 @@ data FastString = FastString {
       n_bytes :: {-# UNPACK #-} !Int, -- number of bytes
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       buf     :: {-# UNPACK #-} !(ForeignPtr Word8),
-      enc     :: FSEncoding
+      ref     :: {-# UNPACK #-} !(IORef (Maybe FastZString))
   } deriving Typeable
-
-data FSEncoding
-    -- including strings that don't need any encoding
-  = ZEncoded
-    -- A UTF-8 string with a memoized Z-encoding
-  | UTF8Encoded {-# UNPACK #-} !(IORef (Maybe FastString))
 
 instance Eq FastString where
   f1 == f2  =  uniq f1 == uniq f2
@@ -328,26 +350,6 @@ mkFastStringBytes ptr len = unsafePerformIO $ do
          Nothing -> add_it ls
          Just v  -> {- _trace ("re-use: "++show v) $ -} return v
 
-mkZFastStringBytes :: Ptr Word8 -> Int -> FastString
-mkZFastStringBytes ptr len = unsafePerformIO $ do
-  ft@(FastStringTable uid _) <- readIORef string_table
-  let
-   h = hashStr ptr len
-   add_it ls = do
-        fs <- copyNewZFastString uid ptr len
-        updTbl string_table ft h (fs:ls)
-        {- _trace ("new: " ++ show f_str)   $ -}
-        return fs
-  --
-  lookup_result <- lookupTbl ft h
-  case lookup_result of
-    [] -> add_it []
-    ls -> do
-       b <- bucket_match ls len ptr
-       case b of
-         Nothing -> add_it ls
-         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
-
 -- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
@@ -372,28 +374,6 @@ mkFastStringForeignPtr ptr fp len = do
          Nothing -> add_it ls
          Just v  -> {- _trace ("re-use: "++show v) $ -} return v
 
-mkZFastStringForeignPtr :: Ptr Word8 -> ForeignPtr Word8 -> Int -> IO FastString
-mkZFastStringForeignPtr ptr fp len = do
-  ft@(FastStringTable uid _) <- readIORef string_table
---  _trace ("hashed: "++show (I# h)) $
-  let
-    h = hashStr ptr len
-    add_it ls = do
-        fs <- mkNewZFastString uid ptr fp len
-        updTbl string_table ft h (fs:ls)
-        {- _trace ("new: " ++ show f_str)   $ -}
-        return fs
-  --
-  lookup_result <- lookupTbl ft h
-  case lookup_result of
-    [] -> add_it []
-    ls -> do
-       b <- bucket_match ls len ptr
-       case b of
-         Nothing -> add_it ls
-         Just v  -> {- _trace ("re-use: "++show v) $ -} return v
-
-
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
 mkFastString str =
@@ -415,14 +395,9 @@ mkFastStringByteList str =
       mkFastStringForeignPtr ptr buf l
 
 -- | Creates a Z-encoded 'FastString' from a 'String'
-mkZFastString :: String -> FastString
-mkZFastString str =
-  inlinePerformIO $ do
-    let l = Prelude.length str
-    buf <- mallocForeignPtrBytes l
-    withForeignPtr buf $ \ptr -> do
-      pokeCAString (castPtr ptr) str
-      mkZFastStringForeignPtr ptr buf l
+mkZFastString :: String -> FastZString
+mkZFastString str = FastZString
+                  $ mkFastBytesByteList $ map (fromIntegral . ord) str
 
 bucket_match :: [FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
 bucket_match [] _ _ = return Nothing
@@ -439,24 +414,14 @@ mkNewFastString :: Int -> Ptr Word8 -> ForeignPtr Word8 -> Int
 mkNewFastString uid ptr fp len = do
   ref <- newIORef Nothing
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid len n_chars fp (UTF8Encoded ref))
-
-mkNewZFastString :: Int -> Ptr Word8 -> ForeignPtr Word8 -> Int
-                 -> IO FastString
-mkNewZFastString uid _ fp len = do
-  return (FastString uid len len fp ZEncoded)
+  return (FastString uid len n_chars fp ref)
 
 copyNewFastString :: Int -> Ptr Word8 -> Int -> IO FastString
 copyNewFastString uid ptr len = do
   fp <- copyBytesToForeignPtr ptr len
   ref <- newIORef Nothing
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid len n_chars fp (UTF8Encoded ref))
-
-copyNewZFastString :: Int -> Ptr Word8 -> Int -> IO FastString
-copyNewZFastString uid ptr len = do
-  fp <- copyBytesToForeignPtr ptr len
-  return (FastString uid len len fp ZEncoded)
+  return (FastString uid len n_chars fp ref)
 
 copyBytesToForeignPtr :: Ptr Word8 -> Int -> IO (ForeignPtr Word8)
 copyBytesToForeignPtr ptr len = do
@@ -488,18 +453,10 @@ hashStr (Ptr a#) (I# len#) = loop 0# 0#
 lengthFS :: FastString -> Int
 lengthFS f = n_chars f
 
--- | Returns @True@ if the 'FastString' is Z-encoded
-isZEncoded :: FastString -> Bool
-isZEncoded fs | ZEncoded <- enc fs = True
-              | otherwise          = False
-
 -- | Returns @True@ if this 'FastString' is not Z-encoded but already has
 -- a Z-encoding cached (used in producing stats).
 hasZEncoding :: FastString -> Bool
-hasZEncoding (FastString _ _ _ _ enc) =
-  case enc of
-    ZEncoded -> False
-    UTF8Encoded ref ->
+hasZEncoding (FastString _ _ _ _ ref) =
       inlinePerformIO $ do
         m <- readIORef ref
         return (isJust m)
@@ -510,11 +467,9 @@ nullFS f  =  n_bytes f == 0
 
 -- | Unpacks and decodes the FastString
 unpackFS :: FastString -> String
-unpackFS (FastString _ n_bytes _ buf enc) =
+unpackFS (FastString _ n_bytes _ buf _) =
   inlinePerformIO $ withForeignPtr buf $ \ptr ->
-    case enc of
-        ZEncoded      -> peekCAStringLen (castPtr ptr,n_bytes)
-        UTF8Encoded _ -> utf8DecodeString ptr n_bytes
+        utf8DecodeString ptr n_bytes
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> [Word8]
@@ -525,19 +480,16 @@ bytesFS fs = bytesFB $ fastStringToFastBytes fs
 -- function is applied to a particular 'FastString', the results are
 -- memoized.
 --
-zEncodeFS :: FastString -> FastString
-zEncodeFS fs@(FastString _ _ _ _ enc) =
-  case enc of
-    ZEncoded -> fs
-    UTF8Encoded ref ->
+zEncodeFS :: FastString -> FastZString
+zEncodeFS fs@(FastString _ _ _ _ ref) =
       inlinePerformIO $ do
         m <- readIORef ref
         case m of
-          Just fs -> return fs
+          Just zfs -> return zfs
           Nothing -> do
-            let efs = mkZFastString (zEncodeString (unpackFS fs))
-            writeIORef ref (Just efs)
-            return efs
+            let zfs = mkZFastString (zEncodeString (unpackFS fs))
+            writeIORef ref (Just zfs)
+            return zfs
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = inlinePerformIO
@@ -550,23 +502,14 @@ concatFS ls = mkFastString (Prelude.concat (map unpackFS ls)) -- ToDo: do better
 
 headFS :: FastString -> Char
 headFS (FastString _ 0 _ _ _) = panic "headFS: Empty FastString"
-headFS (FastString _ _ _ buf enc) =
+headFS (FastString _ _ _ buf _) =
   inlinePerformIO $ withForeignPtr buf $ \ptr -> do
-    case enc of
-      ZEncoded -> do
-         w <- peek (castPtr ptr)
-         return (castCCharToChar w)
-      UTF8Encoded _ ->
          return (fst (utf8DecodeChar ptr))
 
 tailFS :: FastString -> FastString
 tailFS (FastString _ 0 _ _ _) = panic "tailFS: Empty FastString"
-tailFS (FastString _ n_bytes _ buf enc) =
+tailFS (FastString _ n_bytes _ buf _) =
   inlinePerformIO $ withForeignPtr buf $ \ptr -> do
-    case enc of
-      ZEncoded -> do
-        return $! mkZFastStringBytes (ptr `plusPtr` 1) (n_bytes - 1)
-      UTF8Encoded _ -> do
          let (_,ptr') = utf8DecodeChar ptr
          let off = ptr' `minusPtr` ptr
          return $! mkFastStringBytes (ptr `plusPtr` off) (n_bytes - off)
@@ -595,9 +538,7 @@ getFastStringTable = do
 -- |Outputs a 'FastString' with /no decoding at all/, that is, you
 -- get the actual bytes in the 'FastString' written to the 'Handle'.
 hPutFS :: Handle -> FastString -> IO ()
-hPutFS handle (FastString _ len _ fp _)
-  | len == 0  = return ()
-  | otherwise = do withForeignPtr fp $ \ptr -> hPutBuf handle ptr len
+hPutFS handle fs = hPutFB handle $ fastStringToFastBytes fs
 
 -- ToDo: we'll probably want an hPutFSLocal, or something, to output
 -- in the current locale's encoding (for error messages and suchlike).
@@ -674,17 +615,6 @@ lengthLS = length
 
 foreign import ccall unsafe "ghc_strlen"
   ptrStrLength :: Ptr Word8 -> Int
-
--- NB. does *not* add a '\0'-terminator.
--- We only use CChar here to be parallel to the imported
--- peekC(A)StringLen.
-pokeCAString :: Ptr CChar -> String -> IO ()
-pokeCAString ptr str =
-  let
-        go [] _     = return ()
-        go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
-  in
-  go str 0
 
 {-# NOINLINE sLit #-}
 sLit :: String -> LitString

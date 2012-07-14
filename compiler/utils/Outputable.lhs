@@ -20,7 +20,7 @@ module Outputable (
         interppSP, interpp'SP, pprQuotedList, pprWithCommas, quotedListWithOr,
         empty, nest,
         char,
-        text, ftext, ptext,
+        text, ftext, ptext, ztext,
         int, intWithCommas, integer, float, double, rational,
         parens, cparen, brackets, braces, quotes, quote, 
         doubleQuotes, angleBrackets, paBrackets,
@@ -419,6 +419,7 @@ char     :: Char       -> SDoc
 text     :: String     -> SDoc
 ftext    :: FastString -> SDoc
 ptext    :: LitString  -> SDoc
+ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc
 float    :: Float      -> SDoc
@@ -430,6 +431,7 @@ char c      = docToSDoc $ Pretty.char c
 text s      = docToSDoc $ Pretty.text s
 ftext s     = docToSDoc $ Pretty.ftext s
 ptext s     = docToSDoc $ Pretty.ptext s
+ztext s     = docToSDoc $ Pretty.ztext s
 int n       = docToSDoc $ Pretty.int n
 integer n   = docToSDoc $ Pretty.integer n
 float n     = docToSDoc $ Pretty.float n

@@ -408,7 +408,10 @@ dsFExportDynamic id co0 cconv = do
     dflags <- getDynFlags
     let
         -- hack: need to get at the name of the C stub we're about to generate.
-        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
+        -- TODO: There's no real need to go via String with
+        -- (mkFastString . zString). In fact, is there a reason to convert
+        -- to FastString at all now, rather than sticking with FastZString?
+        fe_nm    = mkFastString (zString (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
 
     cback <- newSysLocalDs arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
