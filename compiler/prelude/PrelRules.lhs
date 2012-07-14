@@ -737,7 +737,7 @@ match_append_lit _ [Type ty1,
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
-                   `App` Lit (MachStr (s1 `appendFS` s2))
+                   `App` Lit (MachStr (s1 `appendFB` s2))
                    `App` c1
                    `App` n)
 

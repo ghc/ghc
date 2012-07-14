@@ -303,7 +303,7 @@ lit	:: { Literal }
 	: '(' INTEGER '::' aty ')'	{ convIntLit $2 $4 }
 	| '(' RATIONAL '::' aty ')'	{ convRatLit $2 $4 }
 	| '(' CHAR '::' aty ')'		{ MachChar $2 }
-	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
+	| '(' STRING '::' aty ')'	{ MachStr (fastStringToFastBytes (mkFastString $2)) }
 
 fs_var_occ	:: { FastString }
 		: NAME	{ mkFastString $1 }

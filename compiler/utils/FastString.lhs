@@ -26,6 +26,16 @@
 -- Use 'LitString' unless you want the facilities of 'FastString'.
 module FastString
        (
+        -- * FastBytes
+        FastBytes(..),
+        mkFastStringFastBytes,
+        foreignPtrToFastBytes,
+        fastStringToFastBytes,
+        bytesFB,
+        hashFB,
+        lengthFB,
+        appendFB,
+
         -- * FastStrings
         FastString(..),     -- not abstract, for now.
 
@@ -117,6 +127,61 @@ import GHC.Base         ( unpackCString# )
 #define hASH_TBL_SIZE_UNBOXED  4091#
 
 
+data FastBytes = FastBytes {
+      fb_n_bytes :: {-# UNPACK #-} !Int, -- number of bytes
+      fb_buf     :: {-# UNPACK #-} !(ForeignPtr Word8)
+  } deriving Typeable
+
+instance Data FastBytes where
+  -- don't traverse?
+  toConstr _   = abstractConstr "FastBytes"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "FastBytes"
+
+instance Eq FastBytes where
+    x == y = (x `compare` y) == EQ
+
+instance Ord FastBytes where
+    compare = cmpFB
+
+foreignPtrToFastBytes :: ForeignPtr Word8 -> Int -> FastBytes
+foreignPtrToFastBytes fp len = FastBytes len fp
+
+mkFastStringFastBytes :: FastBytes -> IO FastString
+mkFastStringFastBytes (FastBytes len fp)
+ = withForeignPtr fp $ \ptr -> mkFastStringForeignPtr ptr fp len
+
+fastStringToFastBytes :: FastString -> FastBytes
+fastStringToFastBytes f = FastBytes (n_bytes f) (buf f)
+
+-- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
+bytesFB :: FastBytes -> [Word8]
+bytesFB (FastBytes n_bytes buf) =
+  inlinePerformIO $ withForeignPtr buf $ \ptr ->
+    peekArray n_bytes ptr
+
+hashFB :: FastBytes -> Int
+hashFB (FastBytes len buf)
+    = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $ hashStr ptr len
+
+lengthFB :: FastBytes -> Int
+lengthFB f = fb_n_bytes f
+
+appendFB :: FastBytes -> FastBytes -> FastBytes
+appendFB fb1 fb2 =
+  inlinePerformIO $ do
+    r <- mallocForeignPtrBytes len
+    withForeignPtr r $ \ r' -> do
+    withForeignPtr (fb_buf fb1) $ \ fb1Ptr -> do
+    withForeignPtr (fb_buf fb2) $ \ fb2Ptr -> do
+        copyBytes r' fb1Ptr len1
+        copyBytes (advancePtr r' len1) fb2Ptr len2
+        return $ foreignPtrToFastBytes r len
+  where len  = len1 + len2
+        len1 = fb_n_bytes fb1
+        len2 = fb_n_bytes fb2
+
+
 {-|
 A 'FastString' is an array of bytes, hashed to support fast O(1)
 comparison.  It is also associated with a character encoding, so that
@@ -165,8 +230,12 @@ instance Data FastString where
   dataTypeOf _ = mkNoRepType "FastString"
 
 cmpFS :: FastString -> FastString -> Ordering
-cmpFS (FastString u1 l1 _ buf1 _) (FastString u2 l2 _ buf2 _) =
+cmpFS f1@(FastString u1 _ _ _ _) f2@(FastString u2 _ _ _ _) =
   if u1 == u2 then EQ else
+  cmpFB (fastStringToFastBytes f1) (fastStringToFastBytes f2)
+
+cmpFB :: FastBytes -> FastBytes -> Ordering
+cmpFB (FastBytes l1 buf1) (FastBytes l2 buf2) =
   case unsafeMemcmp buf1 buf2 (min l1 l2) `compare` 0 of
      LT -> LT
      EQ -> compare l1 l2
@@ -431,9 +500,7 @@ unpackFS (FastString _ n_bytes _ buf enc) =
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> [Word8]
-bytesFS (FastString _ n_bytes _ buf _) =
-  inlinePerformIO $ withForeignPtr buf $ \ptr ->
-    peekArray n_bytes ptr
+bytesFS fs = bytesFB $ fastStringToFastBytes fs
 
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this

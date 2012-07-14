@@ -725,7 +725,14 @@ type SymbolTable = Array Int Name
 ---------------------------------------------------------
 
 putFS :: BinHandle -> FastString -> IO ()
-putFS bh (FastString _ l _ buf _) = do
+putFS bh fs = putFB bh $ fastStringToFastBytes fs
+
+getFS :: BinHandle -> IO FastString
+getFS bh = do fb <- getFB bh
+              mkFastStringFastBytes fb
+
+putFB :: BinHandle -> FastBytes -> IO ()
+putFB bh (FastBytes l buf) = do
   put_ bh l
   withForeignPtr buf $ \ptr ->
     let
@@ -738,25 +745,29 @@ putFS bh (FastString _ l _ buf _) = do
    go 0
 
 {- -- possible faster version, not quite there yet:
-getFS bh@BinMem{} = do
+getFB bh@BinMem{} = do
   (I# l) <- get bh
   arr <- readIORef (arr_r bh)
   off <- readFastMutInt (off_r bh)
-  return $! (mkFastSubStringBA# arr off l)
+  return $! (mkFastSubBytesBA# arr off l)
 -}
-getFS :: BinHandle -> IO FastString
-getFS bh = do
+getFB :: BinHandle -> IO FastBytes
+getFB bh = do
   l <- get bh
   fp <- mallocForeignPtrBytes l
   withForeignPtr fp $ \ptr -> do
   let
-        go n | n == l = mkFastStringForeignPtr ptr fp l
+        go n | n == l = return $ foreignPtrToFastBytes fp l
              | otherwise = do
                 b <- getByte bh
                 pokeElemOff ptr n b
                 go (n+1)
   --
   go 0
+
+instance Binary FastBytes where
+  put_ bh f = putFB bh f
+  get bh = getFB bh
 
 instance Binary FastString where
   put_ bh f =

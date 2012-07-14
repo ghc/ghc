@@ -92,8 +92,7 @@ addIdReps ids = [(idCgRep id, id) | id <- ids]
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = newByteStringCLit (bytesFS s)
- -- not unpackFS; we want the UTF-8 byte stream.
+cgLit (MachStr s) = newByteStringCLit (bytesFB s)
 cgLit other_lit   = return (mkSimpleLit other_lit)
 
 mkSimpleLit :: Literal -> CmmLit

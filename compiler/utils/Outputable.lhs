@@ -48,7 +48,7 @@ module Outputable (
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
-        pprHsChar, pprHsString, 
+        pprHsChar, pprHsString, pprHsBytes,
         pprFastFilePath,
 
         -- * Controlling the style in which output is printed
@@ -742,6 +742,16 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
 -- | Special combinator for showing string literals.
 pprHsString :: FastString -> SDoc
 pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
+
+-- | Special combinator for showing string literals.
+pprHsBytes :: FastBytes -> SDoc
+pprHsBytes fb = let escaped = concatMap escape $ bytesFB fb
+                in vcat (map text (showMultiLineString escaped)) <> char '#'
+    where escape :: Word8 -> String
+          escape w = let c = chr (fromIntegral w)
+                     in if isAscii c
+                        then [c]
+                        else '\\' : show w
 
 ---------------------
 -- Put a name in parens if it's an operator

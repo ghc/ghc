@@ -11,6 +11,8 @@
 
 module ExternalCore where
 
+import Data.Word
+
 data Module 
  = Module Mname [Tdef] [Vdefg]
 
@@ -84,7 +86,7 @@ data Lit
   = Lint Integer Ty
   | Lrational Rational Ty
   | Lchar Char Ty
-  | Lstring String Ty
+  | Lstring [Word8] Ty
   
 
 type Mname = Id

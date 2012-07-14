@@ -1259,7 +1259,7 @@ pushAtom _ _ (AnnLit lit)
         pushStr s
            = let getMallocvilleAddr
                     = case s of
-                         FastString _ n _ fp _ ->
+                         FastBytes n fp ->
                             -- we could grab the Ptr from the ForeignPtr,
                             -- but then we have no way to control its lifetime.
                             -- In reality it'll probably stay alive long enoungh
