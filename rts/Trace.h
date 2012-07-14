@@ -373,7 +373,7 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
-                           par_tot_copied)              \
+                           par_tot_copied)
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
                        mblockSize, blockSize)           \
