@@ -291,10 +291,10 @@ INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
 #if defined(freebsd_HOST_OS) || defined(darwin_HOST_OS)
     // Here OSThreadId is a pthread_t and pthread_t is a pointer, but within
     // the process we can still use that pointer value as a unique id.
-    return (TaskId) taskID
+    return (TaskId) (size_t) taskID
 #else
     // On Windows, Linux and others it's an integral type to start with.
-    return taskID;
+    return (TaskId) taskID;
 #endif
 }
 #endif
@@ -303,7 +303,11 @@ INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
 // Get a serialisable Id for the Task's OS thread
 // Needed mainly for logging since the OSThreadId is an opaque type
 INLINE_HEADER TaskId
-serialisableTaskId (Task *task STG_UNUSED)
+serialisableTaskId (Task *task
+#if !defined(THREADED_RTS)
+                               STG_UNUSED
+#endif
+                                         )
 {
 #if defined(THREADED_RTS)
     return serialiseTaskId(task->id);

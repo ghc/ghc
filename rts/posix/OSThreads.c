@@ -324,7 +324,7 @@ KernelThreadId kernelThreadId (void)
 {
 #if defined(linux_HOST_OS)
     pid_t tid = syscall(SYS_gettid); // no really, see man gettid
-    return tid;
+    return (KernelThreadId) tid;
 
 #elif defined(freebsd_HOST_OS)
     return pthread_getthreadid_np();
