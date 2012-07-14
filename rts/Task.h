@@ -291,7 +291,7 @@ INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
 #if defined(freebsd_HOST_OS) || defined(darwin_HOST_OS)
     // Here OSThreadId is a pthread_t and pthread_t is a pointer, but within
     // the process we can still use that pointer value as a unique id.
-    return (TaskId) (size_t) taskID
+    return (TaskId) (size_t) taskID;
 #else
     // On Windows, Linux and others it's an integral type to start with.
     return (TaskId) taskID;
