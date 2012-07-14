@@ -866,6 +866,7 @@ data Exp
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
+  | MultiIfE [(Guard, Exp)]            -- ^ @{ if | g1 -> e1 | g2 -> e2 }@
   | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
   | CaseE Exp [Match]                  -- ^ @{ case e of m1; m2 }@
   | DoE [Stmt]                         -- ^ @{ do { p <- e1; e2 }  }@

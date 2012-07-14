@@ -115,6 +115,12 @@ pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
                        nest 1 $ text "then" <+> ppr true,
                        nest 1 $ text "else" <+> ppr false]
+pprExp i (MultiIfE alts)
+  = parensIf (i > noPrec) $ vcat $
+      case alts of
+        []            -> [text "if {}"]
+        (alt : alts') -> text "if" <+> pprGuarded arrow alt
+                         : map (nest 3 . pprGuarded arrow) alts'
 pprExp i (LetE ds e) = parensIf (i > noPrec) $ text "let" <+> ppr ds
                                             $$ text " in" <+> ppr e
 pprExp i (CaseE e ms)
@@ -156,13 +162,19 @@ instance Ppr Match where
                         $$ where_clause ds
 
 ------------------------------
+pprGuarded :: Doc -> (Guard, Exp) -> Doc
+pprGuarded eqDoc (guard, expr) = case guard of
+  NormalG guardExpr -> char '|' <+> ppr guardExpr <+> eqDoc <+> ppr expr
+  PatG    stmts     -> char '|' <+> vcat (punctuate comma $ map ppr stmts) $$ 
+                         nest nestDepth (eqDoc <+> ppr expr)
+
+------------------------------
 pprBody :: Bool -> Body -> Doc
-pprBody eq (GuardedB xs) = nest nestDepth $ vcat $ map do_guard xs
-  where eqd = if eq then text "=" else text "->"
-        do_guard (NormalG g, e) = text "|" <+> ppr g <+> eqd <+> ppr e
-        do_guard (PatG ss, e) = text "|" <+> vcat (map ppr ss)
-                             $$ nest nestDepth (eqd <+> ppr e)
-pprBody eq (NormalB e) = (if eq then text "=" else text "->") <+> ppr e
+pprBody eq body = case body of
+    GuardedB xs -> nest nestDepth $ vcat $ map (pprGuarded eqDoc) xs
+    NormalB  e  -> eqDoc <+> ppr e
+  where eqDoc | eq        = equals
+              | otherwise = arrow
 
 ------------------------------
 pprLit :: Precedence -> Lit -> Doc

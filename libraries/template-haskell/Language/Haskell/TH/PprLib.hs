@@ -10,7 +10,7 @@ module Language.Haskell.TH.PprLib (
 
 	-- * Primitive Documents
         empty,
-        semi, comma, colon, space, equals,
+        semi, comma, colon, space, equals, arrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
 	-- * Converting values into documents
@@ -63,6 +63,7 @@ comma	:: Doc;			-- ^ A ',' character
 colon	:: Doc;			-- ^ A ':' character
 space	:: Doc;			-- ^ A space character
 equals	:: Doc;			-- ^ A '=' character
+arrow	:: Doc;			-- ^ A "->" string
 lparen	:: Doc;			-- ^ A '(' character
 rparen	:: Doc;			-- ^ A ')' character
 lbrack	:: Doc;			-- ^ A '[' character
@@ -163,6 +164,7 @@ comma = return HPJ.comma
 colon = return HPJ.colon
 space = return HPJ.space
 equals = return HPJ.equals
+arrow = return $ HPJ.text "->"
 lparen = return HPJ.lparen
 rparen = return HPJ.rparen
 lbrack = return HPJ.lbrack

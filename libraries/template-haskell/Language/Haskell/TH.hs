@@ -56,7 +56,7 @@ module Language.Haskell.TH(
     -- *** Expressions
 	dyn, global, varE, conE, litE, appE, uInfixE, parensE,
 	infixE, infixApp, sectionL, sectionR,
-	lamE, lam1E, lamCaseE, tupE, condE, letE, caseE, appsE,
+	lamE, lam1E, lamCaseE, tupE, condE, multiIfE, letE, caseE, appsE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,

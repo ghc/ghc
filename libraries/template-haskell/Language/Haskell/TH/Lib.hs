@@ -254,6 +254,9 @@ unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE es1)}
 condE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 condE x y z =  do { a <- x; b <- y; c <- z; return (CondE a b c)}
 
+multiIfE :: [Q (Guard, Exp)] -> ExpQ
+multiIfE alts = sequence alts >>= return . MultiIfE
+
 letE :: [DecQ] -> ExpQ -> ExpQ
 letE ds e = do { ds2 <- sequence ds; e2 <- e; return (LetE ds2 e2) }
 
