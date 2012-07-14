@@ -55,14 +55,13 @@ provider HaskellEvent {
   probe gc__idle (EventCapNo);
   probe gc__work (EventCapNo);
   probe gc__done (EventCapNo);
-  probe gc__sync (EventCapNo);
-/* FIXME: leads to a validate failure on OS X (Lion)
-  probe gc__stats (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord);
-  probe heap__info (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord);
-  probe heap__allocated (EventCapNo, CapsetID, StgWord64);
-  probe heap__size (CapsetID, StgWord);
-  probe heap__live (CapsetID, StgWord);
- */
+  probe gc__global__sync (EventCapNo);
+  probe gc__stats (EventCapsetID, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord);
+  probe heap__info (EventCapsetID, StgWord, StgWord, StgWord, StgWord, StgWord);
+  probe heap__allocated (EventCapNo, EventCapsetID, StgWord64);
+  probe heap__size (EventCapsetID, StgWord);
+  probe heap__live (EventCapsetID, StgWord);
+
   /* capability events */
   probe startup (EventCapNo);
   probe cap__create (EventCapNo);
@@ -89,6 +88,11 @@ provider HaskellEvent {
   probe spark__steal    (EventCapNo, EventCapNo);
   probe spark__fizzle   (EventCapNo);
   probe spark__gc       (EventCapNo);
+
+  /* task events */
+  probe task__create(EventTaskId, EventCapNo, EventKernelThreadId);
+  probe task__migrate(EventTaskId, EventCapNo, EventCapNo);
+  probe task__delete(EventTaskId);
 
   /* other events */
 /* This one doesn't seem to be used at all at the moment: */
