@@ -572,13 +572,10 @@ mkLitString s =
    p <- mallocBytes (length s + 1)
    let
      loop :: Int -> String -> IO ()
-     loop n cs | n `seq` null cs = pokeByteOff p n (0 :: Word8)
+     loop !n [] = pokeByteOff p n (0 :: Word8)
      loop n (c:cs) = do
         pokeByteOff p n (fromIntegral (ord c) :: Word8)
         loop (1+n) cs
-     -- XXX GHC isn't smart enough to know that we have already covered
-     -- this case.
-     loop _ [] = panic "mkLitString"
    loop 0 s
    return p
  )
