@@ -277,3 +277,4 @@ test('T6078', normal, compile_fail, [''])
 test('FDsFromGivens', normal, compile_fail, [''])
 test('T5978', normal, compile_fail, [''])
 
+test('TcMultiWayIfFail', if_compiler_lt('ghc', '7.5', skip), compile_fail, [''])
