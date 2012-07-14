@@ -412,8 +412,8 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_SPARK_FIZZLE(cap)
 #define dtraceSparkGc(cap)                              \
     HASKELLEVENT_SPARK_GC(cap)
-#define dtraceTaskCreate(taskID, cap)                   \
-    HASKELLEVENT_TASK_CREATE(taskID, cap)
+#define dtraceTaskCreate(taskID, cap, tid)              \
+    HASKELLEVENT_TASK_CREATE(taskID, cap, tid)
 #define dtraceTaskMigrate(taskID, cap, new_cap)         \
     HASKELLEVENT_TASK_MIGRATE(taskID, cap, new_cap)
 #define dtraceTaskDelete(taskID)                        \
@@ -467,7 +467,7 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceSparkSteal(cap, victim_cap)               /* nothing */
 #define dtraceSparkFizzle(cap)                          /* nothing */
 #define dtraceSparkGc(cap)                              /* nothing */
-#define dtraceTaskCreate(taskID, cap)                   /* nothing */
+#define dtraceTaskCreate(taskID, cap, tid)              /* nothing */
 #define dtraceTaskMigrate(taskID, cap, new_cap)         /* nothing */
 #define dtraceTaskDelete(taskID)                        /* nothing */
 
@@ -837,7 +837,9 @@ INLINE_HEADER void traceTaskCreate(Task       *task STG_UNUSED,
     if (RTS_UNLIKELY(TRACE_sched)) {
         traceTaskCreate_(task, cap);
     }
-    dtraceTaskCreate(serialisableTaskId(task), (EventCapNo)cap->no);
+    dtraceTaskCreate(serialisableTaskId(task),
+                     (EventCapNo)cap->no,
+                     kernelThreadId());
 }
 
 INLINE_HEADER void traceTaskMigrate(Task       *task    STG_UNUSED,
