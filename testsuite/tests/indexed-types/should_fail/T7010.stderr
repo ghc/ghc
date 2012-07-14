@@ -1,0 +1,8 @@
+
+T7010.hs:44:27:
+    Couldn't match type `Serial (ValueTuple Float)' with `IO Float'
+    Expected type: (Float, ValueTuple Vector)
+      Actual type: (Float, ValueTuple Float)
+    In the first argument of `withArgs', namely `plug'
+    In the expression: withArgs plug
+    In an equation for `filterFormants': filterFormants = withArgs plug

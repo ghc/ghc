@@ -274,5 +274,6 @@ test('T6001', normal, compile_fail, [''])
 test('T6022', expect_broken(6022), compile_fail, [''])
 test('T5853', normal, compile_fail, [''])
 test('T6078', normal, compile_fail, [''])
-
 test('FDsFromGivens', normal, compile_fail, [''])
+test('T5978', normal, compile_fail, [''])
+
