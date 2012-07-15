@@ -91,10 +91,7 @@ foreign import ccall unsafe "MD5Final"
 ##endif
 
 instance Outputable Fingerprint where
-  ppr (Fingerprint w1 w2) = text (printf "%016x%016x" i1 i2)
-    where i1 = fromIntegral w1 :: Integer
-          i2 = fromIntegral w2 :: Integer
-          -- printf in GHC 6.4.2 didn't have Word64 instances
+  ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
 
 -- useful for parsing the output of 'md5sum', should we want to do that.
 readHexFingerprint :: String -> Fingerprint
