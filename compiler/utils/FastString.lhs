@@ -242,7 +242,7 @@ data FastString = FastString {
       n_bytes :: {-# UNPACK #-} !Int, -- number of bytes
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       buf     :: {-# UNPACK #-} !(ForeignPtr Word8),
-      ref     :: {-# UNPACK #-} !(IORef (Maybe FastZString))
+      fs_ref  :: {-# UNPACK #-} !(IORef (Maybe FastZString))
   } deriving Typeable
 
 instance Eq FastString where
