@@ -33,6 +33,7 @@ module FastString
         fastStringToFastBytes,
         fastZStringToFastBytes,
         mkFastBytesByteList,
+        unsafeMkFastBytesString,
         bytesFB,
         hashFB,
         lengthFB,
@@ -179,6 +180,24 @@ mkFastBytesByteList bs =
       pokeArray (castPtr ptr) bs
       return $ foreignPtrToFastBytes buf l
 
+-- This will drop information if any character > '\xFF'
+unsafeMkFastBytesString :: String -> FastBytes
+unsafeMkFastBytesString str =
+  inlinePerformIO $ do
+    let l = Prelude.length str
+    buf <- mallocForeignPtrBytes l
+    withForeignPtr buf $ \ptr -> do
+      pokeCAString (castPtr ptr) str
+      return $ foreignPtrToFastBytes buf l
+
+pokeCAString :: Ptr CChar -> String -> IO ()
+pokeCAString ptr str =
+  let
+        go []     !_ = return ()
+        go (c:cs) n  = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
+  in
+  go str 0
+
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFB :: FastBytes -> [Word8]
 bytesFB (FastBytes n_bytes buf) =
@@ -225,6 +244,9 @@ zString (FastZString (FastBytes n_bytes buf)) =
 
 lengthFZS :: FastZString -> Int
 lengthFZS (FastZString fb) = lengthFB fb
+
+mkFastZStringString :: String -> FastZString
+mkFastZStringString str = FastZString (unsafeMkFastBytesString str)
 
 -- -----------------------------------------------------------------------------
 
@@ -395,8 +417,7 @@ mkFastStringByteList str =
 
 -- | Creates a Z-encoded 'FastString' from a 'String'
 mkZFastString :: String -> FastZString
-mkZFastString str = FastZString
-                  $ mkFastBytesByteList $ map (fromIntegral . ord) str
+mkZFastString = mkFastZStringString
 
 bucket_match :: [FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
 bucket_match [] _ _ = return Nothing

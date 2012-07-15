@@ -66,7 +66,6 @@ import BasicTypes
 
 import Bag
 import Control.Monad
-import Data.Char
 import Data.List
 \end{code}
 
@@ -1628,7 +1627,7 @@ mkRecSelBind (tycon, sel_name)
     inst_tys = tyConAppArgs data_ty
 
     unit_rhs = mkLHsTupleExpr []
-    msg_lit = HsStringPrim $ mkFastBytesByteList $ map (fromIntegral . ord) $
+    msg_lit = HsStringPrim $ unsafeMkFastBytesString $
               occNameString (getOccName sel_name)
 
 ---------------

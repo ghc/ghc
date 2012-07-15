@@ -1227,8 +1227,8 @@ lex_string s = do
                    setInput i
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let bs = map (fromIntegral . ord) (reverse s)
-                         in return (ITprimstring (mkFastBytesByteList bs))
+                    else let fb = unsafeMkFastBytesString (reverse s)
+                         in return (ITprimstring fb)
               _other ->
                 return (ITstring (mkFastString (reverse s)))
           else
