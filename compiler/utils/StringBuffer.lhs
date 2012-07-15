@@ -44,7 +44,7 @@ module StringBuffer
 #include "HsVersions.h"
 
 import Encoding
-import FastString hiding ( buf )
+import FastString
 import FastTypes
 import FastFunctions
 
