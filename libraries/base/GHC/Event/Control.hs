@@ -77,14 +77,6 @@ wakeupReadFd = controlEventFd
 {-# INLINE wakeupReadFd #-}
 #endif
 
-setNonBlock :: CInt -> IO ()
-setNonBlock fd =
-#if __GLASGOW_HASKELL__ >= 611
-  setNonBlockingFD fd True
-#else
-  setNonBlockingFD fd
-#endif
-
 -- | Create the structure (usually a pipe) used for waking up the IO
 -- manager thread from another thread.
 newControl :: IO Control
@@ -95,7 +87,7 @@ newControl = allocaArray 2 $ \fds -> do
         wr <- peekElemOff fds 1
         -- The write end must be non-blocking, since we may need to
         -- poke the event manager from a signal handler.
-        setNonBlock wr
+        setNonBlockingFD wr True
         setCloseOnExec rd
         setCloseOnExec wr
         return (rd, wr)
@@ -103,7 +95,7 @@ newControl = allocaArray 2 $ \fds -> do
   c_setIOManagerControlFd ctrl_wr
 #if defined(HAVE_EVENTFD)
   ev <- throwErrnoIfMinus1 "eventfd" $ c_eventfd 0 0
-  setNonBlock ev
+  setNonBlockingFD ev True
   setCloseOnExec ev
   c_setIOManagerWakeupFd ev
 #else
