@@ -654,8 +654,8 @@ INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
                            copied, slop, fragmentation,
                            par_n_threads, par_max_copied, par_tot_copied);
     }
-    dtraceEventGcStats(heap_capset, gens,
-                       copies, slop, fragmentation,
+    dtraceEventGcStats(heap_capset, gen,
+                       copied, slop, fragmentation,
                        par_n_threads, par_max_copied, par_tot_copied);
 }
 

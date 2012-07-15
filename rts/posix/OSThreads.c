@@ -29,6 +29,10 @@
 #include <sys/syscall.h>
 #endif
 
+#if defined(HAVE_PTHREAD_H)
+#include <pthread.h>
+#endif
+
 #if defined(THREADED_RTS)
 #include "RtsUtils.h"
 #include "Task.h"
