@@ -24,7 +24,7 @@ import GHC
 import OccName
 import Name                 ( nameOccName )
 import RdrName              ( rdrNameOcc )
-import FastString           ( unpackFS, unpackLitString )
+import FastString           ( unpackFS, unpackLitString, zString )
 
 import qualified Data.Map as Map
 import System.Directory
@@ -170,6 +170,7 @@ string_txt :: TextDetails -> String -> String
 string_txt (Chr c)   s  = c:s
 string_txt (Str s1)  s2 = s1 ++ s2
 string_txt (PStr s1) s2 = unpackFS s1 ++ s2
+string_txt (ZStr s1) s2 = zString s1 ++ s2
 string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
 
