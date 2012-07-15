@@ -1,4 +1,5 @@
 {- BlockId module should probably go away completely, being superseded by Label -}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module BlockId
   ( BlockId, mkBlockId -- ToDo: BlockId should be abstract, but it isn't yet
   , BlockSet, BlockEnv

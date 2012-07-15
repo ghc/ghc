@@ -3,6 +3,7 @@
 %
 
 \begin{code}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and

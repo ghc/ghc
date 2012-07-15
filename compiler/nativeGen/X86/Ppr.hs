@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module X86.Ppr (
         pprNatCmmDecl,
         pprBasicBlock,

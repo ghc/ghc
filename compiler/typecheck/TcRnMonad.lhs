@@ -5,6 +5,7 @@
 Functions for working with the typechecker environment (setters, getters...).
 
 \begin{code}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module TcRnMonad(
         module TcRnMonad,
         module TcRnTypes,

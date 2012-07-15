@@ -32,6 +32,7 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCmmDecl
     ( writeCmms, pprCmms, pprCmmGroup, pprSection, pprStatic
     )

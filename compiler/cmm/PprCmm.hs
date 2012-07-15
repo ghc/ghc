@@ -30,6 +30,7 @@
 --
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
 module PprCmm
   ( module PprCmmDecl

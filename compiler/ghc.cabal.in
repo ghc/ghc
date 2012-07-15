@@ -67,7 +67,7 @@ Library
     else
         Build-Depends: unix
 
-    GHC-Options: -Wall -fno-warn-name-shadowing -fno-warn-orphans
+    GHC-Options: -Wall -fno-warn-name-shadowing
 
     if flag(ghci)
         Build-Depends: template-haskell

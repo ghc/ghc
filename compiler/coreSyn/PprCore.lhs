@@ -6,6 +6,7 @@
 Printing of Core syntax
 
 \begin{code}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
