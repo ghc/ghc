@@ -218,7 +218,7 @@ render dflags flags ifaces installedIfaces srcMap = do
     sourceUrls' = (srcBase, srcModule, srcMap')
 
   libDir   <- getHaddockLibDir flags
-  prologue <- getPrologue flags
+  prologue <- getPrologue dflags flags
   themes   <- getThemes libDir flags >>= either bye return
 
   when (Flag_GenIndex `elem` flags) $ do
@@ -404,13 +404,13 @@ updateHTMLXRefs packages = do
     mapping' = [ (moduleName m, html) | (m, html) <- mapping ]
 
 
-getPrologue :: [Flag] -> IO (Maybe (Doc RdrName))
-getPrologue flags =
+getPrologue :: DynFlags -> [Flag] -> IO (Maybe (Doc RdrName))
+getPrologue dflags flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-      case parseParas (tokenise (defaultDynFlags (panic "No settings")) str
+      case parseParas (tokenise dflags str
                       (1,0) {- TODO: real position -}) of
         Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
         Just doc -> return (Just doc)
