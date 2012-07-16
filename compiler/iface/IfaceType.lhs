@@ -37,11 +37,13 @@ module IfaceType (
 
 import Coercion
 import TypeRep hiding( maybeParen )
+import Unique( hasKey )
 import TyCon
 import Id
 import Var
 import TysWiredIn
 import TysPrim
+import PrelNames( funTyConKey )
 import Name
 import BasicTypes
 import Outputable
@@ -352,7 +354,10 @@ toIfaceContext = toIfaceTypes
 ----------------
 coToIfaceType :: Coercion -> IfaceType
 coToIfaceType (Refl ty)             = IfaceCoConApp IfaceReflCo [toIfaceType ty]
-coToIfaceType (TyConAppCo tc cos)   = IfaceTyConApp (toIfaceTyCon tc) 
+coToIfaceType (TyConAppCo tc cos)   
+  | tc `hasKey` funTyConKey
+  , [arg,res] <- cos                = IfaceFunTy (coToIfaceType arg) (coToIfaceType res)
+  | otherwise                       = IfaceTyConApp (toIfaceTyCon tc) 
                                                     (map coToIfaceType cos)
 coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1) 
                                                     (coToIfaceType co2)
