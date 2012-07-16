@@ -12,4 +12,9 @@ test('IntegerConversionRules',
      extra_clean(['IntegerConversionRules.simpl']),
      run_command,
      ['$MAKE -s --no-print-directory IntegerConversionRules'])
+test('gcdInteger', normal, compile_and_run, [''])
+test('T7041',
+     extra_clean(['T7041.simpl']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7041'])
 
