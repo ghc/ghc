@@ -45,7 +45,6 @@ import OldPprCmm        ()
 import CLabel
 
 -- The rest:
-import StaticFlags      ( opt_PIC )
 import ForeignCall      ( CCallConv(..) )
 import OrdList
 import Outputable
@@ -165,7 +164,8 @@ stmtToInstrs stmt = do
 
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
-    CmmSwitch arg ids     -> genSwitch arg ids
+    CmmSwitch arg ids     -> do dflags <- getDynFlags
+                                genSwitch dflags arg ids
     CmmJump arg gregs     -> genJump arg (jumpRegs gregs)
     CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
@@ -2250,10 +2250,10 @@ outOfLineCmmOp mop res args
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
+genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
 
-genSwitch expr ids
-  | opt_PIC
+genSwitch dflags expr ids
+  | dopt Opt_PIC dflags
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
@@ -2305,14 +2305,16 @@ genSwitch expr ids
                  ]
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
-generateJumpTableForInstr (JMP_TBL _ ids section lbl) = Just (createJumpTable ids section lbl)
-generateJumpTableForInstr _ = Nothing
+generateJumpTableForInstr :: DynFlags -> Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
+generateJumpTableForInstr dflags (JMP_TBL _ ids section lbl)
+    = Just (createJumpTable dflags ids section lbl)
+generateJumpTableForInstr _ _ = Nothing
 
-createJumpTable :: [Maybe BlockId] -> Section -> CLabel -> GenCmmDecl (Alignment, CmmStatics) h g
-createJumpTable ids section lbl
+createJumpTable :: DynFlags -> [Maybe BlockId] -> Section -> CLabel
+                -> GenCmmDecl (Alignment, CmmStatics) h g
+createJumpTable dflags ids section lbl
     = let jumpTable
-            | opt_PIC =
+            | dopt Opt_PIC dflags =
                   let jumpTableEntryRel Nothing
                           = CmmStaticLit (CmmInt 0 wordWidth)
                       jumpTableEntryRel (Just blockid)

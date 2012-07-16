@@ -158,10 +158,6 @@ flagsStatic = [
 
         ------ Compiler flags -----------------------------------------------
 
-        -- -fPIC requires extra checking: only the NCG supports it.
-        -- See also DynFlags.parseDynamicFlags.
-  , Flag "fPIC" (PassFlag setPIC)
-
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
@@ -170,12 +166,6 @@ flagsStatic = [
         -- Pass all remaining "-f<blah>" options to hsc
   , Flag "f" (AnySuffixPred isStaticFlag addOpt)
   ]
-
-setPIC :: String -> StaticP ()
-setPIC | cGhcWithNativeCodeGen == "YES" || cGhcUnregisterised == "YES"
-       = addOpt
-       | otherwise
-       = ghcError $ CmdLineError "-fPIC is not supported on this platform"
 
 isStaticFlag :: String -> Bool
 isStaticFlag f =
@@ -196,7 +186,6 @@ isStaticFlag f =
     "funregisterised",
     "fcpr-off",
     "ferror-spans",
-    "fPIC",
     "fhpc"
     ]
   || any (`isPrefixOf` f) [
