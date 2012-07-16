@@ -185,6 +185,15 @@ newName s = Q (qNewName s)
 -- but carry on; use 'fail' to stop.
 report  :: Bool -> String -> Q ()
 report b s = Q (qReport b s)
+{-# DEPRECATED report "Use reportError or reportWarning instead" #-}
+
+-- | Report an error to the user, but allow the current splice's computation to carry on. To abort the computation, use 'fail'.
+reportError :: String -> Q ()
+reportError = report True
+
+-- | Report a warning to the user, and carry on.
+reportWarning :: String -> Q ()
+reportWarning = report False
 
 -- | Recover from errors raised by 'reportError' or 'fail'.
 recover :: Q a -- ^ handler to invoke on failure
