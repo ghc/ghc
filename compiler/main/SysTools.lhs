@@ -7,7 +7,6 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -fno-warn-unused-do-bind #-}
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -631,7 +630,11 @@ readElfSection _dflags section exe = do
                     [(p,"")] -> Just p
                     _r       -> doFilter r
    where parse = do
-           skipSpaces; R.char '['; skipSpaces; string "0]"; skipSpaces;
+           skipSpaces
+           _ <- R.char '['
+           skipSpaces
+           _ <- string "0]"
+           skipSpaces
            munch (const True)
 \end{code}
 
