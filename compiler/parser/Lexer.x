@@ -990,7 +990,7 @@ varid span buf len =
                      Just ITlam -> ITlcase
                      _          -> ITcase
                  else
-		   return ITcase
+                   return ITcase
       maybe_layout keyword
       return $ L span keyword
     Just (keyword, 0) -> do
@@ -999,8 +999,8 @@ varid span buf len =
     Just (keyword, exts) -> do
       extsEnabled <- extension $ \i -> exts .&. i /= 0
       if extsEnabled
-	then do
-	  maybe_layout keyword
+        then do
+          maybe_layout keyword
           return $ L span keyword
         else
           return $ L span $ ITvarid fs
