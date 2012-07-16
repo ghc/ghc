@@ -96,10 +96,8 @@ data DefMeth = NoDefMeth 		-- No default method
 	     | GenDefMeth Name 		-- A generic default method
              deriving Eq
 
-type ClassATItem = (TyCon, [ATDefault])
-  -- Default associated types from these templates. If the template list is empty,
-  -- we assume that there is no default -- not that the default is to generate no
-  -- instances (this only makes a difference for warnings).
+type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
+                    [ATDefault])     -- Default associated types from these templates 
   -- We can have more than one default per type; see
   -- Note [Associated type defaults] in TcTyClsDecls
 
@@ -148,6 +146,25 @@ mkClass tyvars fds super_classes superdict_sels at_stuff
 		classOpStuff = op_stuff,
 		classTyCon   = tycon }
 \end{code}
+
+Note [Associated type tyvar names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The TyCon of an associated type should use the same variable names as its
+parent class. Thus
+    class C a b where
+      type F b x a :: *
+We make F use the same Name for 'a' as C does, and similary 'b'.
+
+The only reason for this is when checking instances it's easier to match 
+them up, to ensure they match.  Eg
+    instance C Int [d] where
+      type F [d] x Int = ....
+we should make sure that the first and third args match the instance
+header.
+
+This is the reason we use the Name and TyVar from the parent declaration,
+in both class and instance decls: just to make this check easier.
+
 
 %************************************************************************
 %*									*

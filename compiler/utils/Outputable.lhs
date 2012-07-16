@@ -934,7 +934,7 @@ assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
 -- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
-  = pprDebugAndThen tracingDynFlags panic "ASSERT failed!" doc
+  = pprPanic "ASSERT failed!" doc
   where
     doc = sep [ hsep [ text "file", text file
                      , text "line", int line ]
@@ -942,7 +942,7 @@ assertPprPanic file line msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> String -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg
- = cont (show (runSDoc doc (initSDocContext dflags PprDebug)))
+ = cont (showSDocDebug dflags doc)
  where
      doc = sep [text heading, nest 4 pretty_msg]
 \end{code}

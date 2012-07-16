@@ -1488,14 +1488,29 @@ checkValidClass cls
            ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
              mapM_ (check_loc_at_def fam_tc) defs }
 
+    -- Check that the index of the type instance is the same as on
+    -- its parent class.  Eg
+    --    class C a b where
+    --       type F b x a ::*
+    --    instnace C Int Bool where
+    --       type F Bool Char Int = Int
+    --       type F Bool Bool Int = Bool
+    --  Here the first and third args should match
+    --  the (C Int Bool)  header
+    -- This is not to do with soundness; it's just checking that the
+    -- type instance arg is the sam
     check_loc_at_def fam_tc (ATD _tvs pats _rhs loc)
       -- Set the location for each of the default declarations
       = setSrcSpan loc $ zipWithM_ check_arg (tyConTyVars fam_tc) pats
 
     -- We only want to check this on the *class* TyVars,
     -- not the *family* TyVars (there may be more of these)
+    -- Nor do we want to check kind vars, for which we don't enforce
+    -- the "same name as parent" rule as we do for type variables
+    -- c.f. Trac #7073
     check_arg fam_tc_tv at_ty
-      = checkTc (   not (fam_tc_tv `elem` tyvars)
+      = checkTc (   isKindVar fam_tc_tv
+                 || not (fam_tc_tv `elem` tyvars)
                  || mkTyVarTy fam_tc_tv `eqType` at_ty) 
           (wrongATArgErr at_ty (mkTyVarTy fam_tc_tv))
 

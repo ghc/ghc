@@ -1669,6 +1669,48 @@ continues to stand for the unboxed singleton tuple data constructor.
 
 </sect2>
 
+<sect2 id="lambda-case">
+<title>Lambda-case</title>
+<para>
+The <option>-XLambdaCase</option> flag enables expressions of the form
+<programlisting>
+  \case { p1 -> e1; ...; pN -> eN }
+</programlisting>
+which is equivalent to
+<programlisting>
+  \freshName -> case freshName of { p1 -> e1; ...; pN -> eN }
+</programlisting>
+Note that <literal>\case</literal> starts a layout, so you can write
+<programlisting>
+  \case
+    p1 -> e1
+    ...
+    pN -> eN
+</programlisting>
+</para>
+</sect2>
+
+<sect2 id="multi-way-if">
+<title>Multi-way if-expressions</title>
+<para>
+With <option>-XMultiWayIf</option> flag GHC accepts conditional expressions
+with multiple branches:
+<programlisting>
+  if | guard1 -> expr1
+     | ...
+     | guardN -> exprN
+</programlisting>
+which is roughly equivalent to
+<programlisting>
+  case () of
+    _ | guard1 -> expr1
+    ...
+    _ | guardN -> exprN
+</programlisting>
+except that multi-way if-expressions do not alter the layout.
+</para>
+</sect2>
+
 <sect2 id="disambiguate-fields">
 <title>Record field disambiguation</title>
 <para>

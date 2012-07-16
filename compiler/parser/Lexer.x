@@ -500,6 +500,7 @@ data Token
   | ITdcolon
   | ITequal
   | ITlam
+  | ITlcase
   | ITvbar
   | ITlarrow
   | ITrarrow
@@ -979,23 +980,37 @@ splitQualName orig_buf len parens = split orig_buf orig_buf
 
 varid :: Action
 varid span buf len =
-  fs `seq`
   case lookupUFM reservedWordsFM fs of
-        Just (keyword,0)    -> do
-                maybe_layout keyword
-                return (L span keyword)
-        Just (keyword,exts) -> do
-                b <- extension (\i -> exts .&. i /= 0)
-                if b then do maybe_layout keyword
-                             return (L span keyword)
-                     else return (L span (ITvarid fs))
-        _other -> return (L span (ITvarid fs))
+    Just (ITcase, _) -> do
+      lambdaCase <- extension lambdaCaseEnabled
+      keyword <- if lambdaCase
+                 then do
+                   lastTk <- getLastTk
+                   return $ case lastTk of
+                     Just ITlam -> ITlcase
+                     _          -> ITcase
+                 else
+                   return ITcase
+      maybe_layout keyword
+      return $ L span keyword
+    Just (keyword, 0) -> do
+      maybe_layout keyword
+      return $ L span keyword
+    Just (keyword, exts) -> do
+      extsEnabled <- extension $ \i -> exts .&. i /= 0
+      if extsEnabled
+        then do
+          maybe_layout keyword
+          return $ L span keyword
+        else
+          return $ L span $ ITvarid fs
+    Nothing ->
+      return $ L span $ ITvarid fs
   where
-        fs = lexemeToFastString buf len
+    !fs = lexemeToFastString buf len
 
 conid :: StringBuffer -> Int -> Token
-conid buf len = ITconid fs
-  where fs = lexemeToFastString buf len
+conid buf len = ITconid $! lexemeToFastString buf len
 
 qvarsym, qconsym, prefixqvarsym, prefixqconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
@@ -1007,17 +1022,18 @@ varsym, consym :: Action
 varsym = sym ITvarsym
 consym = sym ITconsym
 
-sym :: (FastString -> Token) -> RealSrcSpan -> StringBuffer -> Int
-    -> P (RealLocated Token)
+sym :: (FastString -> Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
-        Just (keyword,exts) -> do
-                b <- extension exts
-                if b then return (L span keyword)
-                     else return (L span $! con fs)
-        _other -> return (L span $! con fs)
+    Just (keyword, exts) -> do
+      extsEnabled <- extension exts
+      let !tk | extsEnabled = keyword
+              | otherwise   = con fs
+      return $ L span tk
+    Nothing ->
+      return $ L span $! con fs
   where
-        fs = lexemeToFastString buf len
+    !fs = lexemeToFastString buf len
 
 -- Variations on the integral numeric literal.
 tok_integral :: (Integer -> Token)
@@ -1094,6 +1110,7 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
     where f ITdo    = pushLexState layout_do
           f ITmdo   = pushLexState layout_do
           f ITof    = pushLexState layout
+          f ITlcase = pushLexState layout
           f ITlet   = pushLexState layout
           f ITwhere = pushLexState layout
           f ITrec   = pushLexState layout
@@ -1522,6 +1539,7 @@ data PState = PState {
         buffer     :: StringBuffer,
         dflags     :: DynFlags,
         messages   :: Messages,
+        last_tk    :: Maybe Token,
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
         loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
@@ -1625,6 +1643,12 @@ setLastToken loc len = P $ \s -> POk s {
   last_loc=loc,
   last_len=len
   } ()
+
+setLastTk :: Token -> P ()
+setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
+
+getLastTk :: P (Maybe Token)
+getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
@@ -1841,6 +1865,10 @@ typeLiteralsBit :: Int
 typeLiteralsBit = 28
 explicitNamespacesBit :: Int
 explicitNamespacesBit = 29
+lambdaCaseBit :: Int
+lambdaCaseBit = 30
+multiWayIfBit :: Int
+multiWayIfBit = 31
 
 
 always :: Int -> Bool
@@ -1890,6 +1918,10 @@ typeLiteralsEnabled flags = testBit flags typeLiteralsBit
 
 explicitNamespacesEnabled :: Int -> Bool
 explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
+lambdaCaseEnabled :: Int -> Bool
+lambdaCaseEnabled flags = testBit flags lambdaCaseBit
+multiWayIfEnabled :: Int -> Bool
+multiWayIfEnabled flags = testBit flags multiWayIfBit
 
 -- PState for parsing options pragmas
 --
@@ -1906,6 +1938,7 @@ mkPState flags buf loc =
       buffer        = buf,
       dflags        = flags,
       messages      = emptyMessages,
+      last_tk       = Nothing,
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
       loc           = loc,
@@ -1949,6 +1982,8 @@ mkPState flags buf loc =
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
                .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
+               .|. lambdaCaseBit               `setBitIf` xopt Opt_LambdaCase               flags
+               .|. multiWayIfBit               `setBitIf` xopt Opt_MultiWayIf               flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -2276,7 +2311,13 @@ lexToken = do
         let span = mkRealSrcSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
-        t span buf bytes
+        lt <- t span buf bytes
+        case unLoc lt of
+          ITlineComment _  -> return lt
+          ITblockComment _ -> return lt
+          lt' -> do
+            setLastTk lt'
+            return lt
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str

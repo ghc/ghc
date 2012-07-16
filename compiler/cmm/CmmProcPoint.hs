@@ -1,5 +1,8 @@
 {-# LANGUAGE GADTs, DisambiguateRecordFields #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+#if __GLASGOW_HASKELL__ < 701
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#endif
 
 module CmmProcPoint
     ( ProcPointSet, Status(..)

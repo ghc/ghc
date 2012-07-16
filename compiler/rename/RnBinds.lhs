@@ -25,7 +25,7 @@ module RnBinds (
 
    -- Other bindings
    rnMethodBinds, renameSigs, mkSigTvFn,
-   rnMatchGroup, rnGRHSs,
+   rnMatchGroup, rnGRHSs, rnGRHS,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..)
    ) where

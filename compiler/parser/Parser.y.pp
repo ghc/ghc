@@ -55,7 +55,7 @@ import FastString
 import Maybes           ( orElse )
 import Outputable
 
-import Control.Monad    ( unless )
+import Control.Monad    ( unless, liftM )
 import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
@@ -275,6 +275,7 @@ incorrect.
  '::'           { L _ ITdcolon }
  '='            { L _ ITequal }
  '\\'           { L _ ITlam }
+ 'lcase'        { L _ ITlcase }
  '|'            { L _ ITvbar }
  '<-'           { L _ ITlarrow }
  '->'           { L _ ITrarrow }
@@ -1388,9 +1389,13 @@ exp10 :: { LHsExpr RdrName }
                                                                 (unguardedGRHSs $6)
                                                             ]) }
         | 'let' binds 'in' exp                  { LL $ HsLet (unLoc $2) $4 }
+        | '\\' 'lcase' altslist
+            { LL $ HsLamCase placeHolderType (mkMatchGroup (unLoc $3)) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                                         {% checkDoAndIfThenElse $2 $3 $5 $6 $8 >>
                                            return (LL $ mkHsIf $2 $5 $8) }
+        | 'if' gdpats                   {% hintMultiWayIf (getLoc $1) >>
+                                           return (LL $ HsMultiIf placeHolderType (reverse $ unLoc $2)) }
         | 'case' exp 'of' altslist              { LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
         | '-' fexp                              { LL $ NegApp $2 noSyntaxExpr }
 
@@ -2138,4 +2143,11 @@ fileSrcSpan = do
   l <- getSrcLoc; 
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
+
+-- Hint about the MultiWayIf extension
+hintMultiWayIf :: SrcSpan -> P ()
+hintMultiWayIf span = do
+  mwiEnabled <- liftM ((Opt_MultiWayIf `xopt`) . dflags) getPState
+  unless mwiEnabled $ parseErrorSDoc span $
+    text "Multi-way if-expressions need -XMultiWayIf turned on"
 }

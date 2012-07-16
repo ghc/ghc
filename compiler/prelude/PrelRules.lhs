@@ -779,7 +779,11 @@ match_inline _ (Type _ : e : _)
 
 match_inline _ _ = Nothing
 
+-------------------------------------------------
 -- Integer rules
+--   smallInteger  (79::Int#)  = 79::Integer   
+--   wordToInteger (79::Word#) = 79::Integer   
+-- Similarly Int64, Word64
 
 match_IntToInteger :: Id
                    -> IdUnfoldingFun
@@ -833,6 +837,7 @@ match_Word64ToInteger id id_unf [xl]
         panic "match_Word64ToInteger: Id has the wrong type"
 match_Word64ToInteger _ _ _ = Nothing
 
+-------------------------------------------------
 match_Integer_convert :: Num a
                       => (a -> Expr CoreBndr)
                       -> Id

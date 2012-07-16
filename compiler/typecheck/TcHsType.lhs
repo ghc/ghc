@@ -850,6 +850,7 @@ tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TyVar
 --   instance C (a,b) where
 --     type F (a,b) c = ...
 -- Here a,b will be in scope when processing the associated type instance for F.
+-- See Note [Associated type tyvar names] in TyCon
 tcHsTyVarBndr (L _ hs_tv)
   = do { let name = hsTyVarName hs_tv
        ; mb_tv <- tcLookupLcl_maybe name

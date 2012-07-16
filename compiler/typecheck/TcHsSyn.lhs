@@ -557,6 +557,11 @@ zonkExpr env (HsLam matches)
   = zonkMatchGroup env matches	`thenM` \ new_matches ->
     returnM (HsLam new_matches)
 
+zonkExpr env (HsLamCase arg matches)
+  = zonkTcTypeToType env arg	`thenM` \ new_arg ->
+    zonkMatchGroup env matches	`thenM` \ new_matches ->
+    returnM (HsLamCase new_arg new_matches)
+
 zonkExpr env (HsApp e1 e2)
   = zonkLExpr env e1	`thenM` \ new_e1 ->
     zonkLExpr env e2	`thenM` \ new_e2 ->
@@ -615,6 +620,15 @@ zonkExpr env (HsIf e0 e1 e2 e3)
        ; new_e2 <- zonkLExpr env e2
        ; new_e3 <- zonkLExpr env e3
        ; returnM (HsIf new_e0 new_e1 new_e2 new_e3) }
+
+zonkExpr env (HsMultiIf ty alts)
+  = do { alts' <- mapM (wrapLocM zonk_alt) alts
+       ; ty'   <- zonkTcTypeToType env ty
+       ; returnM $ HsMultiIf ty' alts' }
+  where zonk_alt (GRHS guard expr)
+          = do { (env', guard') <- zonkStmts env guard
+               ; expr'          <- zonkLExpr env' expr
+               ; returnM $ GRHS guard' expr' }
 
 zonkExpr env (HsLet binds expr)
   = zonkLocalBinds env binds	`thenM` \ (new_env, new_binds) ->

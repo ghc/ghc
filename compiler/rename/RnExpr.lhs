@@ -29,7 +29,7 @@ import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
 
 import RnSource  ( rnSrcDecls, findSplice )
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
-                   rnMatchGroup, makeMiniFixityEnv) 
+                   rnMatchGroup, rnGRHS, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
 import TcEnv		( thRnBrack )
@@ -224,6 +224,10 @@ rnExpr (HsLam matches)
   = rnMatchGroup LambdaExpr matches	`thenM` \ (matches', fvMatch) ->
     return (HsLam matches', fvMatch)
 
+rnExpr (HsLamCase arg matches)
+  = rnMatchGroup CaseAlt matches	`thenM` \ (matches', fvs_ms) ->
+    return (HsLamCase arg matches', fvs_ms)
+
 rnExpr (HsCase expr matches)
   = rnLExpr expr		 	`thenM` \ (new_expr, e_fvs) ->
     rnMatchGroup CaseAlt matches	`thenM` \ (new_matches, ms_fvs) ->
@@ -279,6 +283,10 @@ rnExpr (HsIf _ p b1 b2)
        ; (b2', fvB2) <- rnLExpr b2
        ; (mb_ite, fvITE) <- lookupIfThenElse
        ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
+
+rnExpr (HsMultiIf ty alts)
+  = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt) alts
+       ; return (HsMultiIf ty alts', fvs) }
 
 rnExpr (HsType a)
   = rnLHsType HsTypeCtx a	`thenM` \ (t, fvT) -> 

@@ -482,6 +482,12 @@ cvtl e = wrapL (cvt e)
     cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
+    cvt (LamCaseE ms)
+      | null ms        = failWith (ptext (sLit "Lambda-case expression with no alternatives"))
+      | otherwise      = do { ms' <- mapM cvtMatch ms
+                            ; return $ HsLamCase placeHolderType
+                                                 (mkMatchGroup ms')
+                            }
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
     	      	       	         -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)
@@ -489,6 +495,10 @@ cvtl e = wrapL (cvt e)
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
 			    ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
+    cvt (MultiIfE alts)
+      | null alts      = failWith (ptext (sLit "Multi-way if-expression with no alternatives"))
+      | otherwise      = do { alts' <- mapM cvtpair alts
+                            ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
                             ; e' <- cvtl e; return $ HsLet ds' e' }
     cvt (CaseE e ms)

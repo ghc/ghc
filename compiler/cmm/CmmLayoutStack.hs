@@ -1,4 +1,7 @@
 {-# LANGUAGE RecordWildCards, GADTs #-}
+#if __GLASGOW_HASKELL__ < 701
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#endif
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap, cmmSink
   ) where
