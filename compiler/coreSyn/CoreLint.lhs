@@ -260,8 +260,8 @@ lintCoreExpr (Var var)
         ; checkL (isId var && not (isCoVar var))
                  (ptext (sLit "Non term variable") <+> ppr var)
 
-        ; checkDeadIdOcc var
 	; var' <- lookupIdInScope var
+        ; checkDeadIdOcc var'
         ; return (idType var') }
 
 lintCoreExpr (Lit lit)
@@ -276,8 +276,8 @@ lintCoreExpr (Cast expr co)
 
 lintCoreExpr (Tick (Breakpoint _ ids) expr)
   = do forM_ ids $ \id -> do
-         checkDeadIdOcc id
-         lookupIdInScope id
+         id' <- lookupIdInScope id
+         checkDeadIdOcc id'
        lintCoreExpr expr
 
 lintCoreExpr (Tick _other_tickish expr)
