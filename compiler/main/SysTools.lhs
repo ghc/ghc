@@ -50,7 +50,6 @@ import Panic
 import Platform
 import Util
 import DynFlags
-import StaticFlags
 import Exception
 
 import Data.IORef
@@ -295,10 +294,7 @@ initSysTools mbMinusB
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
                         sOpt_L       = [],
-                        sOpt_P       = (if opt_PIC
-                                        then -- this list gets reversed
-                                             ["-D__PIC__", "-U __PIC__"]
-                                        else []),
+                        sOpt_P       = [],
                         sOpt_F       = [],
                         sOpt_c       = [],
                         sOpt_a       = [],

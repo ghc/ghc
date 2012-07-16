@@ -2036,7 +2036,7 @@ linkDynLib dflags o_files dep_packages = do
 
 doCpp :: DynFlags -> Bool -> Bool -> FilePath -> FilePath -> IO ()
 doCpp dflags raw include_cc_opts input_fn output_fn = do
-    let hscpp_opts = getOpts dflags opt_P
+    let hscpp_opts = getOpts dflags opt_P ++ picPOpts
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []

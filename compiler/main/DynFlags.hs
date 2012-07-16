@@ -94,7 +94,7 @@ module DynFlags (
         supportedLanguagesAndExtensions,
 
         -- ** DynFlag C compiler options
-        picCCOpts,
+        picCCOpts, picPOpts,
 
         -- * Configuration of the stg-to-stg passes
         StgToDo(..),
@@ -2795,6 +2795,11 @@ picCCOpts dflags
       -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
        | opt_PIC || not opt_Static -> ["-fPIC", "-U __PIC__", "-D__PIC__"]
        | otherwise                 -> []
+
+picPOpts :: [String]
+picPOpts
+ | opt_PIC   = ["-U __PIC__", "-D__PIC__"]
+ | otherwise = []
 
 -- -----------------------------------------------------------------------------
 -- Splitting
