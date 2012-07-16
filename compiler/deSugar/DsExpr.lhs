@@ -206,8 +206,8 @@ dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
 
 dsExpr (HsLamCase arg matches@(MatchGroup _ rhs_ty))
-  | isEmptyMatchGroup matches	-- A Core 'case' is always non-empty
-  = 		      		-- So desugar empty HsLamCase to error call
+  | isEmptyMatchGroup matches   -- A Core 'case' is always non-empty
+  =                             -- So desugar empty HsLamCase to error call
     mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) (ptext (sLit "\\case"))
   | otherwise
   = do { arg_var <- newSysLocalDs arg
