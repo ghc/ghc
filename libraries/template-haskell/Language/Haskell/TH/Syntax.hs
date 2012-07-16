@@ -20,44 +20,10 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.Haskell.TH.Syntax(
-	Quasi(..), Lift(..), liftString,
-
-	Q, runQ, 
-	report,	recover, reify, 
-        lookupTypeName, lookupValueName,
-	location, runIO, addDependentFile,
-        isInstance, reifyInstances,
-
-	-- * Names
-	Name(..), mkName, newName, nameBase, nameModule,
-        showName, showName', NameIs(..),
-
-	-- * The algebraic data types
-	-- $infix
-	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind, Cxt,
-        TyLit(..),
-	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
-	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	Inline(..), InlineSpec(..), StrictType, VarStrictType, FunDep(..),
-	FamFlavour(..), Info(..), Loc(..), CharPos,
-	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
-
-	-- * Internal functions
-	returnQ, bindQ, sequenceQ,
-	NameFlavour(..), NameSpace (..), 
-	mkNameG_v, mkNameG_d, mkNameG_tc, Uniq, mkNameL, mkNameU,
- 	tupleTypeName, tupleDataName,
-	unboxedTupleTypeName, unboxedTupleDataName,
-	OccName, mkOccName, occString,
-	ModName, mkModName, modString,
-	PkgName, mkPkgName, pkgString
-    ) where
+module Language.Haskell.TH.Syntax where
 
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
-import Language.Haskell.TH.Syntax.Internals
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
 import Control.Applicative( Applicative(..) )
@@ -460,6 +426,15 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 -----------------------------------------------------
 --		Names and uniques 
 -----------------------------------------------------
+
+newtype ModName = ModName String	-- Module name
+ deriving (Eq,Ord,Typeable,Data)
+
+newtype PkgName = PkgName String	-- package name
+ deriving (Eq,Ord,Typeable,Data)
+
+newtype OccName = OccName String
+ deriving (Eq,Ord,Typeable,Data)
 
 mkModName :: String -> ModName
 mkModName s = ModName s
