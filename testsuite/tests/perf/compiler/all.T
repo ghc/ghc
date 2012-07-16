@@ -35,12 +35,13 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 420000000,
-                                                      580000000)),
+          compiler_stats_range_field('bytes allocated', 581842104,
+                                                        10)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
                                     # 05/08/2011:     561,382,568 (amd64/OS X)
+                                    # 16/07/2012:     581,842,104 (amd64/Linux)
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint')
           # Leave -dcore-lint on for this one test, so that we have something
