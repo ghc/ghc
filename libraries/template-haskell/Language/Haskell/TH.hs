@@ -6,33 +6,59 @@ For other documentation, refer to:
 -}
 module Language.Haskell.TH(
 	-- * The monad and its operations
-	Q, runQ,
-	report,		  -- :: Bool -> String -> Q ()
+	Q,
+	runQ,
+        -- ** Administration: errors, locations and IO
+	reportError,		  -- :: String -> Q ()
+	reportWarning,		  -- :: String -> Q ()
+	report,			  -- :: Bool -> String -> Q ()
 	recover, 	  -- :: Q a -> Q a -> Q a
-	reify, 		  -- :: Name -> Q Info
-	location,	  -- :: Q Location
+	location,	  -- :: Q Loc
+	Loc(..),
 	runIO, 		  -- :: IO a -> Q a
-	lookupTypeName, lookupValueName,
-        isInstance, reifyInstances,
+	-- ** Querying the compiler
+	-- *** Reify
+	reify, 		  -- :: Name -> Q Info
+	Info(..),
+	InstanceDec,
+	ParentName,
+	Arity,
+	Unlifted,
+	-- *** Name lookup
+	lookupTypeName,	 -- :: String -> Q (Maybe Name)
+	lookupValueName, -- :: String -> Q (Maybe Name)
+	-- *** Instance lookup
+	reifyInstances,
+	isInstance,
 
 	-- * Names
 	Name, NameSpace,	-- Abstract
+	-- ** Constructing names
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
+	-- ** Deconstructing names
 	nameBase,	-- :: Name -> String
 	nameModule,	-- :: Name -> Maybe String
+	-- ** Built-in names
 	tupleTypeName, tupleDataName,	-- Int -> Name
+	unboxedTupleTypeName, unboxedTupleDataName, -- :: Int -> Name
 
     -- * The algebraic data types
     -- | The lowercase versions (/syntax operators/) of these constructors are
     -- preferred to these constructors, since they compose better with
     -- quotations (@[| |]@) and splices (@$( ... )@)
-	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt,
-	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat,
+
+    -- ** Declarations
+	Dec(..), Con(..), Clause(..), 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	Inline(..), InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
+	Inline(..), InlineSpec(..), FunDep(..), FamFlavour(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
+    -- ** Expressions
+        Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
+    -- ** Patterns
+        Pat(..), FieldExp, FieldPat,
+    -- ** Types
+        Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred(..),
 
     -- * Library functions
     -- ** Abbreviations
