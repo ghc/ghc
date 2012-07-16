@@ -1121,7 +1121,7 @@ pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
   = ptext (sLit "rec") <+> 
-    vcat [ braces (vcat (map ppr segment))
+    vcat [ ppr_do_stmts segment
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
 
@@ -1153,7 +1153,7 @@ pprDo PArrComp    stmts = paBrackets $ pprComp stmts
 pprDo MonadComp   stmts = brackets    $ pprComp stmts
 pprDo _           _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: OutputableBndr id => [LStmt id] -> SDoc
+ppr_do_stmts :: (OutputableBndr idL, OutputableBndr idR) => [LStmtLR idL idR] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
 ppr_do_stmts stmts 
