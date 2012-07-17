@@ -72,22 +72,12 @@ import GHC.Stack
 import Data.String
 import Data.List
 import Data.Data
+import Data.Ord
 import qualified Debug.Trace
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
 maxTupleSize = 62
-
--- | The 'Down' type allows you to reverse sort order conveniently.  A value of type
--- @'Down' a@ contains a value of type @a@ (represented as @'Down' a@).
--- If @a@ has an @'Ord'@ instance associated with it then comparing two
--- values thus wrapped will give you the opposite of their normal sort order.
--- This is particularly useful when sorting in generalised list comprehensions,
--- as in: @then sortWith by 'Down' x@
-newtype Down a = Down a deriving (Eq)
-
-instance Ord a => Ord (Down a) where
-    compare (Down x) (Down y) = y `compare` x
 
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element
