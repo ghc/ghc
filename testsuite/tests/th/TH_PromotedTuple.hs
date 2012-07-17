@@ -12,7 +12,7 @@ data Equal a b where
   Refl :: Equal a a
 
 equal :: Equal '(Int, False) $(do ty <- [t| '(Int, False) |]
-                                  report False (show ty)
+                                  reportWarning (show ty)
                                   return ty)
 
 equal = Refl

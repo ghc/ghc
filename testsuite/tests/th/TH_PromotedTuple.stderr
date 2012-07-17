@@ -1,6 +1,6 @@
 TH_PromotedTuple.hs:(14,32)-(16,43): Splicing type
     do { ty <- [t| '(Int, False) |];
-         report False (show ty);
+         reportWarning (show ty);
          return ty }
   ======>
     '(Int, False)

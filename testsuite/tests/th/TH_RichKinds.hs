@@ -17,5 +17,5 @@ $(do  tys <- sequence [ [t| forall a. (a :: Bool) |]
                       , [t| forall a. (a :: (* -> Bool) -> ((*, * -> *) -> Bool)) |]
                       ]
 
-      report False (pprint tys)
+      reportWarning (pprint tys)
       return [])

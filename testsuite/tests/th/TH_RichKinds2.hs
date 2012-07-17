@@ -38,7 +38,7 @@ $( let fixKs :: String -> String -- need to remove TH renaming index from k vari
                    type instance Map f '[] = '[]
                    type instance Map f (h ': t) = ((f h) ': (Map f t))
                    |]
-      report False (fixKs (pprint decls))
+      reportWarning (fixKs (pprint decls))
       return decls )
 
 data SBool :: Bool -> * where
