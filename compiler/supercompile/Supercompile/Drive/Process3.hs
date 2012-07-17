@@ -189,9 +189,9 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         e' = letRec fulfils e
 
 
-hFunctions :: ScpM [Id]
-hFunctions = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
-                                   in return (concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps, s)
+outputFreeVars :: ScpM [Id]
+outputFreeVars = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
+                                       in return (varSetElems extraOutputFvs ++ concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps, s)
 
 callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
 callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
@@ -318,11 +318,15 @@ tryMSG opt = bothWays $ \shallow_state state -> do
     -- NB: adding some new bindings to h_r for the h functions is a bit of a hack because:
     --  1. It only serves to suppress errors from "split" which occur when e' refers to some variables not bound in the heap
     --  2. These new dummy bindings will never be passed down to any recursive invocation of opt
-    hs <- hFunctions
+    (h_hs, e') <- renameSCResult ids (rn_r, e)
+    instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
+
+renameSCResult :: InScopeSet -> In FVedTerm -> ScpM (PureHeap, FVedTerm)
+renameSCResult ids (rn_r, e) = do
+    hs <- outputFreeVars
     let rn_r' = foldr (\x rn -> insertIdRenaming rn x x) rn_r hs
-        h_r'  = foldr (\x h  -> M.insert x lambdaBound h) h_r hs
-        e'    = renameFVedTerm ids rn_r' e
-    instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap h_r' ids_r, k_r, e')
+        h_r'  = foldr (\x h  -> M.insert x lambdaBound h) M.empty hs
+    return (h_r', renameFVedTerm ids rn_r' e)
 
 -- NB: in the case of both callers, if "f" fails one way then it fails the other way as well (and likewise for success).
 -- Therefore we can return a single Maybe rather than a pair of two Maybes.
@@ -528,15 +532,15 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 ; fulfillM res }, s { scpMemoState = ms' })
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
         in case fmap (\(exact, (p, mr)) -> (exact, case mr of
-                       RightIsInstance heap_inst rn_lr k_inst -> do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                                                    ; stuff <- instanceSplit memo_opt (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
-                                                                    ; insertTagsM stuff }
+                       RightIsInstance (Heap h_inst ids_inst) rn_lr k_inst -> do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                                                                 ; stuff <- instanceSplit memo_opt (remaining_deeds, Heap (foldr (\x -> M.insert x lambdaBound) h_inst (fun p:varSetElems extraOutputFvs)) ids_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
+                                                                                 ; insertTagsM stuff }
                          where
                           -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
-                          Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
+                          Just remaining_deeds = claimDeeds (releaseStateDeed state) (pureHeapSize h_inst + stackSize k_inst)
                         -- FIXME: in rare cases (i.e when rollback is off OR when the state we are type-genning against is on the stack)
                         -- then this codepath could also overwrite the fulfilment for the old state to call into the generalised version:
-                       RightGivesTypeGen _rn_l s rn_r -> trace "typegen" $ do { (deeds, e') <- memo_opt s; return (deeds, renameFVedTerm (case s of (_, Heap _ ids, _, _) -> ids) rn_r e') })) $
+                       RightGivesTypeGen _rn_l s rn_r -> trace "typegen" $ do { (deeds, e') <- memo_opt s; (_, e'') <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_r, e'); return (deeds, e'') })) $
                      bestChoice [ (p, mr)
                                 | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
                                 , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
