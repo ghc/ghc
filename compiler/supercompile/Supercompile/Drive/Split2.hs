@@ -43,6 +43,16 @@ filterEdges :: Ord node
             -> LGraph node edge
 filterEdges keep_edge = M.map (M.mapMaybeWithKey (\n e -> if keep_edge e n then Just e else Nothing))
 
+trimUnreachable :: Ord node
+                => node
+                -> LGraph node edge
+                -> LGraph node edge
+trimUnreachable root_n g = go (S.singleton root_n) S.empty
+  where go n_todo n_done | S.null n_todo' = M.filterWithKey (\n _ -> n `S.member` n_done') g -- NB: all outgoing edges of retained nodes will still be present by definition
+                         | otherwise      = go n_todo' n_done'
+          where n_done' = n_todo `S.union` n_done
+                n_todo' = S.fold (\n n_todo' -> M.keysSet (M.findWithDefault (error "trimUnreachable") n g) `S.union` n_todo') S.empty n_todo S.\\ n_done'
+
 shortcutEdges :: forall node edge.
                  Ord node
               => (node -> Bool)
@@ -475,10 +485,16 @@ push generalised (Heap h ids, k, focus) = (h', k', focus')
         -- in general anyway. 
         --
         -- NB: must explicitly avoid collapsing away any value nodes if they are marked as generalised
+        --
+        -- We have to remove any unreachable nodes, or they may pessimise my results by acting as extra "roots" and hence
+        -- forcing more things to be unmarked. In particular, we have to watch out for:
+        --   1. Vertices originating from dead heap bindings
+        --   2. Heap verticies originating from on-stack updates that bind dead variables
         cheap_marked = (cheap_marked_k_head `S.union` S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, maybe True (termIsCheap . snd) (heapBindingTerm hb)]) S.\\ generalised
-        verts = shortcutEdges (`S.member` cheap_marked)
+        verts = trimUnreachable FocusContext $
+                shortcutEdges (`S.member` cheap_marked)
                               plusEntries (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
-                              (verts_h `M.union` (verts_k `unionDisjoint` verts_focus))
+                              (verts_h `M.union` (verts_k `unionDisjoint` verts_focus)) -- NB: verts_h might mention a heap binding bound by a leading update frame in verts_k: h takes precedence
         extra_marked = solve generalised verts
         marked = cheap_marked `S.union` extra_marked
 
@@ -518,13 +534,10 @@ solve generalised = M.keysSet . go_graph
         predecessors_here = M.filterWithKey (\n _ -> n `M.member` scc) predecessors
 
         marks' = case M.null predecessors_here of
-              -- No predecessors to whole SCC: this must be a root node, which may never be marked or be a self-cycle.
-              -- This works for FocusContext as well as elements of SCCs forced to be resid to break cycles in the induction step
-              True | [(_root_ctxt, internal_ens)] <- M.toList scc
-                   , M.null internal_ens
-                   -> M.empty
-                   | otherwise
-                   -> pprPanic "solveSCCs: node with no predecessors but more than one node/an internal edge" (ppr scc)
+              -- No predecessors to whole SCC: this must be a root node (which incidentally may never be a self-cycle).
+              -- A root node is either a FocusContext or an element of a SCC forced to be resid to break cycles in the
+              -- induction step. We NEVER want to mark such a node.
+              True -> M.empty
               -- SCC has predecessors
               False | Just (Just common_ctxt) <- the_maybe $ concatMap M.elems (M.elems predecessors_here)
                     , S.null (M.keysSet scc `S.intersection` generalised)
