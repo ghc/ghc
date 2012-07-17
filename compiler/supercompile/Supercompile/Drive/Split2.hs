@@ -623,6 +623,9 @@ splitPureHeap ids h = (M.fromDistinctAscList [ (HeapContext x', fmap fst mb_spli
                                              | (x', mb_split_hb) <- M.toAscList split_h ],
                        \generalised marked -> (\f -> M.mapWithKey f h) $ \x' hb -> if HeapContext x' `S.member` marked then hb else if HeapContext x' `S.member` generalised then generalisedLambdaBound else lambdaBound, -- FIXME: bugger around with howToBindCheap?
                        \h_prep -> (\f -> M.mapMaybe f split_h) $ \mb_split_hb -> do
+                                    -- TODO: we could only include in the output those bindings that are either NOT marked for inlining,
+                                    -- or are cheap (and thus had marking forced regardless of whether they are used in the residual).
+                                    -- Similarly, it would be cool to exclude bindings arising from the first update frame to avoid messiness in recurseHeap
                                     (_, (how_bound, mk_e)) <- mb_split_hb
                                     guard (how_bound == InternallyBound)
                                     return (mk_e h_prep))
@@ -665,7 +668,7 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
           CoApply co'                  -> (Nothing, Nothing, False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CoApply co')
           Apply x'                     -> (Nothing, Nothing, False, M.singleton (HeapContext x') ManyEntries, \_ _ -> Apply x')
           Scrutinise x' ty' (rn, alts) -> (Nothing, Nothing, True, varBndrEdges x' $ foldr plusEntered M.empty alts_verts,
-                                           \h_prep k_prep -> Scrutinise x' ty' (map (($ k_prep) . ($ h_prep)) mk_alts))
+                                           \h_prep k_prep -> Scrutinise x' (stackType (lookupStackPrep next_frame k_prep) ty') (map (($ k_prep) . ($ h_prep)) mk_alts))
             where any_scrut_live = any (not . isDeadBinder . snd) scruts_flat
                   
                   -- These lines achieve two things:
