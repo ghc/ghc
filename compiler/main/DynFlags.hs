@@ -1017,7 +1017,7 @@ defaultLogAction :: LogAction
 defaultLogAction dflags severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
-      SevDump   -> hPrintDump dflags stdout msg
+      SevDump   -> printSDoc (msg $$ blankLine) style
       SevInfo   -> printErrs msg style
       SevFatal  -> printErrs msg style
       _         -> do hPutChar stderr '\n'

@@ -230,6 +230,9 @@ mkDumpDoc hdr doc
 -- | Write out a dump.
 --      If --dump-to-file is set then this goes to a file.
 --      otherwise emit to stdout.
+-- 
+-- When hdr is empty, we print in a more compact format (no separators and
+-- blank lines)
 dumpSDoc :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags dflag hdr doc
  = do let mFile = chooseDumpFile dflags dflag
@@ -247,7 +250,10 @@ dumpSDoc dflags dflag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
-                        hPrintDump dflags handle doc
+                        let doc'
+                              | null hdr  = doc
+                              | otherwise = doc $$ blankLine
+                        defaultLogActionHPrintDoc dflags handle doc' defaultDumpStyle
                         hClose handle
 
             -- write the dump to stdout
