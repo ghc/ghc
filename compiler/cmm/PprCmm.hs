@@ -230,12 +230,17 @@ pprNode node = pp_node <+> pp_debug
       CmmCall tgt k regs out res updfr_off ->
           hcat [ ptext (sLit "call"), space
                , pprFun tgt, parens (interpp'SP regs), space
-               , ptext (sLit "returns to") <+> ppr k <+> parens (ppr out)
-                                                     <+> parens (ppr res)
-               , ptext (sLit " with update frame") <+> ppr updfr_off
+               , returns <+>
+                 ptext (sLit "args: ") <> ppr out <> comma <+>
+                 ptext (sLit "res: ") <> ppr res <> comma <+>
+                 ptext (sLit "upd: ") <> ppr updfr_off
                , semi ]
           where pprFun f@(CmmLit _) = ppr f
                 pprFun f = parens (ppr f)
+
+                returns
+                  | Just r <- k = ptext (sLit "returns to") <+> ppr r <> comma
+                  | otherwise   = empty
 
       CmmForeignCall {tgt=t, res=rs, args=as, succ=s, updfr=u, intrbl=i} ->
           hcat $ if i then [ptext (sLit "interruptible"), space] else [] ++
@@ -244,7 +249,7 @@ pprNode node = pp_node <+> pp_debug
                , ptext (sLit "returns to") <+> ppr s
                     <+> ptext (sLit "args:") <+> parens (ppr as)
                     <+> ptext (sLit "ress:") <+> parens (ppr rs)
-               , ptext (sLit " with update frame") <+> ppr u
+               , ptext (sLit "upd:") <+> ppr u
                , semi ]
 
     pp_debug :: SDoc
