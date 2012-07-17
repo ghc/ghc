@@ -326,12 +326,15 @@ recurseHeap opt init_h (resid_tgs, init_deeds, init_xes, e)
   -- Unfortunately, it is necessary to remove elements from init_h that already have a residual binding in init_xes.
   -- The reason for this is that if the stack has an initial update and a value is in focus, we can get a residual
   -- binding for that from either the "stack" or the "heap" portion. What we must avoid is binding both in a let at the same time!
-  = go (foldr (M.delete . fst) init_h init_xes) init_deeds init_xes (fvedTermFreeVars e)
-  where go h deeds xes do_fvs | M.null h_to_do = return (resid_tgs, deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)
-                              | otherwise      = do (extra_deedss, extra_xes) <- liftM unzip $ mapM (\(x, e) -> liftM (second ((,) x)) $ opt e) (M.toList h_to_do)
-                                                    go h' (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
-                                                       (foldr (\(x, e) do_fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` do_fvs) emptyVarSet xes)
-          where (h_to_do, h') = M.partitionWithKey (\x _ -> x `elemVarSet` do_fvs) h
+  = go (foldr (M.delete . fst) init_h init_xes) init_deeds init_xes
+       (foldr (\(x, e) fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` fvs) (fvedTermFreeVars e) init_xes)
+  where go h deeds xes do_fvs
+          -- | pprTrace "go" (ppr do_fvs $$ ppr (M.keysSet h)) False = undefined
+          | M.null h_to_do = return (resid_tgs, deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)
+          | otherwise      = do (extra_deedss, extra_xes) <- liftM unzip $ mapM (\(x, e) -> {- pprTrace "go1" (ppr x) $ -} liftM (second ((,) x)) $ opt e) (M.toList h_to_do)
+                                go h' (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
+                                   (foldr (\(x, e) do_fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` do_fvs) emptyVarSet extra_xes)
+         where (h_to_do, h') = M.partitionWithKey (\x _ -> x `elemVarSet` do_fvs) h
 
 {-
 
