@@ -475,7 +475,7 @@ push generalised (Heap h ids, k, focus) = (h', k', focus')
         -- in general anyway. 
         --
         -- NB: must explicitly avoid collapsing away any value nodes if they are marked as generalised
-        cheap_marked = (cheap_marked_k_head `S.union` S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, Just (_, e) <- [heapBindingTerm hb], termIsCheap e]) S.\\ generalised
+        cheap_marked = (cheap_marked_k_head `S.union` S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, maybe True (termIsCheap . snd) (heapBindingTerm hb)]) S.\\ generalised
         verts = shortcutEdges (`S.member` cheap_marked)
                               plusEntries (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
                               (verts_h `M.union` (verts_k `unionDisjoint` verts_focus))
