@@ -467,11 +467,19 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
   --  2) Do both heaps only contain lambdaBounds?
   , isPureHeapEmpty h_l
   , isPureHeapEmpty h_r
-  = Just (RightGivesTypeGen rn_l (deeds_r, heap, k, qa) rn_r)
+  --  3) Are both type substitutions non-trivial? If they are trivial then we risk not making any progress after we generalise away the type info
+  , let state = (deeds_r, heap, k, qa)
+        fvs = stateFreeVars state
+  , isTypeRenamingNonTrivial rn_l fvs
+  , isTypeRenamingNonTrivial rn_r fvs
+  = Just (RightGivesTypeGen rn_l state rn_r)
 
   -- No information gained in this case :-(
   | otherwise
   = Nothing
+
+isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
+isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
 msg mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
