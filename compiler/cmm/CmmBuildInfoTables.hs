@@ -13,16 +13,15 @@
 -- Todo: remove -fno-warn-warnings-deprecations
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
-    ( CAFSet, CAFEnv, cafAnal, localCAFInfo, mkTopCAFInfo
-    , setInfoTableSRT
-    , TopSRT, emptySRT, srtToData
-    , bundleCAFs
-    ) where
+    ( CAFSet, CAFEnv, cafAnal
+    , doSRTs, TopSRT, emptySRT, srtToData )
+where
 
 #include "HsVersions.h"
 
 -- These should not be imported here!
 import StgCmmUtils
+import Hoopl
 
 import Digraph
 import qualified Prelude as P
@@ -40,13 +39,13 @@ import Name
 import Outputable
 import SMRep
 import UniqSupply
-
-import Hoopl
+import Util
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Control.Monad
 
 foldSet :: (a -> b -> b) -> b -> Set a -> b
 #if __GLASGOW_HASKELL__ < 704
@@ -184,16 +183,13 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
-buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
-             UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
-buildSRTs topSRT topCAFMap cafs =
-  do let liftCAF lbl z = -- get CAFs for functions without static closures
-           case Map.lookup lbl topCAFMap of Just cafs -> z `Set.union` cafs
-                                            Nothing   -> Set.insert lbl z
+buildSRTs :: TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+buildSRTs topSRT cafs =
+  do let
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
-           let cafs = Set.elems (foldSet liftCAF Set.empty localCafs)
+           let cafs = Set.elems localCafs
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
@@ -267,15 +263,15 @@ to_SRT top_srt off len bmp
 --  keep its CAFs live.)
 -- Any procedure referring to a non-static CAF c must keep live
 -- any CAF that is reachable from c.
-localCAFInfo :: CAFEnv -> CmmDecl -> Maybe (CLabel, CAFSet)
-localCAFInfo _      (CmmData _ _) = Nothing
+localCAFInfo :: CAFEnv -> CmmDecl -> (CAFSet, Maybe CLabel)
+localCAFInfo _      (CmmData _ _) = (Set.empty, Nothing)
 localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
-    CmmInfoTable { cit_rep = rep } 
-      | not (isStaticRep rep) 
-      -> Just (toClosureLbl top_l,
-               expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
-    _ -> Nothing
+    CmmInfoTable { cit_rep = rep } | not (isStaticRep rep)
+      -> (cafs, Just (toClosureLbl top_l))
+    _other -> (cafs, Nothing)
+  where
+    cafs = expectJust "maybeBindCAFs" $ mapLookup entry cafEnv
 
 -- Once we have the local CAF sets for some (possibly) mutually
 -- recursive functions, we can create an environment mapping
@@ -288,54 +284,77 @@ localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
 -- the environment with every reference to f replaced by its set of CAFs.
 -- To do this replacement efficiently, we gather strongly connected
 -- components, then we sort the components in topological order.
-mkTopCAFInfo :: [(CLabel, CAFSet)] -> Map CLabel CAFSet
+mkTopCAFInfo :: [(CAFSet, Maybe CLabel)] -> Map CLabel CAFSet
 mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
-  where addToTop env (AcyclicSCC (l, cafset)) =
+  where
+        addToTop env (AcyclicSCC (l, cafset)) =
           Map.insert l (flatten env cafset) env
         addToTop env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
               cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
-        flatten env cafset = foldSet (lookup env) Set.empty cafset
-        lookup env caf cafset' =
-          case Map.lookup caf env of Just cafs -> foldSet add cafset' cafs
-                                     Nothing -> add caf cafset'
-        add caf cafset' = Set.insert caf cafset'
+
         g = stronglyConnCompFromEdgedVertices
-              (map (\n@(l, cafs) -> (n, l, Set.elems cafs)) localCAFs)
+              [ ((l,cafs), l, Set.elems cafs) | (cafs, Just l) <- localCAFs ]
 
--- Bundle the CAFs used at a procpoint.
-bundleCAFs :: CAFEnv -> CmmDecl -> (CAFSet, CmmDecl)
-bundleCAFs cafEnv t@(CmmProc _ _ (CmmGraph {g_entry=entry})) =
-  (expectJust "bundleCAFs" (mapLookup entry cafEnv), t)
-bundleCAFs _ t = (Set.empty, t)
+flatten :: Map CLabel CAFSet -> CAFSet -> CAFSet
+flatten env cafset = foldSet (lookup env) Set.empty cafset
+  where
+      lookup env caf cafset' =
+          case Map.lookup caf env of
+             Just cafs -> foldSet Set.insert cafset' cafs
+             Nothing   -> Set.insert caf cafset'
 
--- Construct the SRTs for the given procedure.
-setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmDecl) ->
-                   UniqSM (TopSRT, [CmmDecl])
-setInfoTableSRT topCAFMap topSRT (cafs, t) =
-  setSRT cafs topCAFMap topSRT t
+bundle :: Map CLabel CAFSet
+       -> (CAFEnv, CmmDecl)
+       -> (CAFSet, Maybe CLabel)
+       -> (CAFSet, CmmDecl)
+bundle flatmap (_, decl) (cafs, Nothing)
+  = (flatten flatmap cafs, decl)
+bundle flatmap (_, decl) (_, Just l)
+  = (expectJust "bundle" $ Map.lookup l flatmap, decl)
 
-setSRT :: CAFSet -> Map CLabel CAFSet -> TopSRT ->
-          CmmDecl -> UniqSM (TopSRT, [CmmDecl])
-setSRT cafs topCAFMap topSRT t =
-  do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs
-     let t' = updInfo id (const srt) t
-     case cafTable of
-       Just tbl -> return (topSRT, [t', tbl])
-       Nothing  -> return (topSRT, [t'])
+flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(CAFSet, CmmDecl)]
+flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
+   where
+     zipped    = [(e,d) | (e,ds) <- cpsdecls, d <- ds ]
+     localCAFs = unzipWith localCAFInfo zipped
+     flatmap   = mkTopCAFInfo localCAFs -- transitive closure of localCAFs
 
-type StackLayout = Liveness
+doSRTs :: TopSRT
+       -> [(CAFEnv, [CmmDecl])]
+       -> IO (TopSRT, [CmmDecl])
 
-updInfo :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmDecl -> CmmDecl
-updInfo toVars toSrt (CmmProc top_info top_l g) =
-  CmmProc (top_info {info_tbl=updInfoTbl toVars toSrt (info_tbl top_info)}) top_l g
-updInfo _ _ t = t
+doSRTs topSRT tops
+  = do
+     let caf_decls = flattenCAFSets tops
+     us <- mkSplitUniqSupply 'u'
+     let (topSRT', gs') = initUs_ us $ foldM setSRT (topSRT, []) caf_decls
+     return (topSRT', reverse gs' {- Note [reverse gs] -})
+  where
+    setSRT (topSRT, rst) (cafs, decl@(CmmProc{})) = do
+       (topSRT, cafTable, srt) <- buildSRTs topSRT cafs
+       let decl' = updInfo (const srt) decl
+       case cafTable of
+         Just tbl -> return (topSRT, decl': tbl : rst)
+         Nothing  -> return (topSRT, decl' : rst)
+    setSRT (topSRT, rst) (_, decl) =
+      return (topSRT, decl : rst)
 
-updInfoTbl :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmInfoTable -> CmmInfoTable
-updInfoTbl toVars toSrt info_tbl@(CmmInfoTable {})
-  = info_tbl { cit_srt = toSrt (cit_srt info_tbl)
-             , cit_rep = case cit_rep info_tbl of
-                           StackRep ls -> StackRep (toVars ls)
-                           other       -> other }
-updInfoTbl _ _ t@CmmNonInfoTable = t
+{- Note [reverse gs]
+
+   It is important to keep the code blocks in the same order,
+   otherwise binary sizes get slightly bigger.  I'm not completely
+   sure why this is, perhaps the assembler generates bigger jump
+   instructions for forward refs.  --SDM
+-}
+
+updInfo :: (C_SRT -> C_SRT) -> CmmDecl -> CmmDecl
+updInfo toSrt (CmmProc top_info top_l g) =
+  CmmProc (top_info {info_tbl = updInfoTbl toSrt (info_tbl top_info)}) top_l g
+updInfo _ t = t
+
+updInfoTbl :: (C_SRT -> C_SRT) -> CmmInfoTable -> CmmInfoTable
+updInfoTbl toSrt info_tbl@(CmmInfoTable {})
+  = info_tbl { cit_srt = toSrt (cit_srt info_tbl) }
+updInfoTbl _ t@CmmNonInfoTable = t
