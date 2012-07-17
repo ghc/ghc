@@ -251,8 +251,11 @@ dumpSDoc dflags dflag hdr doc
                         hClose handle
 
             -- write the dump to stdout
-            Nothing
-                 -> log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
+            Nothing -> do
+              let (doc', severity)
+                    | null hdr  = (doc, SevOutput)
+                    | otherwise = (mkDumpDoc hdr doc, SevDump)
+              log_action dflags dflags severity noSrcSpan defaultDumpStyle doc'
 
 
 -- | Choose where to put a dump file based on DynFlags

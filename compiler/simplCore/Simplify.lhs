@@ -1571,20 +1571,21 @@ tryRules env rules fn args call_cont
   where
     trace_dump dflags rule rule_rhs
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO . dumpSDoc dflags Opt_D_dump_rule_rewrites "" $
-           vcat [text "Rule fired",
-                 text "Rule:" <+> ftext (ru_name rule),
-                 text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args)),
-                 text "After: " <+> pprCoreExpr rule_rhs,
-                 text "Cont:  " <+> ppr call_cont]
+      = log_rule dflags Opt_D_dump_rule_rewrites "Rule fired" $ vcat
+          [ text "Rule:" <+> ftext (ru_name rule)
+          , text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args))
+          , text "After: " <+> pprCoreExpr rule_rhs
+          , text "Cont:  " <+> ppr call_cont ]
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO . dumpSDoc dflags Opt_D_dump_rule_firings "" $
-          vcat [text "Rule fired",
-                ftext (ru_name rule)]
+      = log_rule dflags Opt_D_dump_rule_firings "Rule fired:" $
+          ftext (ru_name rule)
 
       | otherwise
       = return ()
+
+    log_rule dflags dflag hdr details = liftIO . dumpSDoc dflags dflag "" $
+      sep [text hdr, nest 4 details]
 
 \end{code}
 
