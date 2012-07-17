@@ -13,6 +13,7 @@
 --
 -- GHC Extensions: this is the Approved Way to get at GHC-specific extensions.
 --
+-- Note: no other base module should import this module.
 -----------------------------------------------------------------------------
 
 module GHC.Exts
