@@ -306,7 +306,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe State
     unwind deeds heap@(Heap h ids) k tg_a a = do
       -- Peel off any (update, cast) at the beginning of the stack
-      -- In order to proceed further, we're certainly going to have to do the update (if any)
+      -- In order to proceed further, we're certainly going to have to do the update IF there is one
       let (mb_update, k') = peelValueStack k
           anned_a = annedAnswer tg_a a
           in_e = annedAnswerToInAnnedTerm ids anned_a
@@ -340,7 +340,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
       where
         -- Should check this is not Nothing before using the "meaning" a
         checkShouldExposeUnfolding = case mb_x' of
-                     Nothing -> Just False
+                     -- FIXME: if we eliminate "dead" update frames, we should return True here or else WAY TOO MUCH will be treated as superinlinable
+                     Nothing -> Just True
                      -- We have to check this here (not just when preparing unfoldings) because
                      -- we would like to also exclude local recursive loops, not just top-level ones
                      Just x' -> case shouldExposeUnfolding x' of
@@ -350,13 +351,13 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
         -- NB: assumes that ei_state has the same size as what we would return from "step" if the dereferencing fails.
         -- At the time of writing, this invariant holds (since turning terms into equivalent stack frames doesn't change size)
-        checkLambdaish :: Maybe UnnormalisedState -> Maybe State
-        checkLambdaish it
+        checkLambdaish :: UnnormalisedState -> Maybe State
+        checkLambdaish s'_unnormalised
           -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
           | normalising, isJust mb_x', not dUPLICATE_VALUES_EVALUATOR = Nothing
           | otherwise = do
             super <- checkShouldExposeUnfolding
-            s' <- fmap normalise it
+            let s' = normalise s'_unnormalised
             -- NB: you might think it would be OK to inline even when *normalising*, as long as the inlining
             -- makes the term strictly smaller. This is very tempting, but we would have to check that the size
             -- measure decreased by the inlining is the same as the size measure needed to prove normalisation of
@@ -385,7 +386,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 -- However, this is important so that speculation is able to turn partial applications into explicit values
                 | (_, _, k, qa) <- s'
                 , Answer _ <- annee qa
-                , nullTrain k -- NB: no need to check for a trailing cast since in a normalised state that will be folded into the answer
+                , Just _ <- isTrivialValueStack_maybe k -- Might be a trailing update or (update, cast)
                 -> True
                 -- If the result is actually smaller, accept it (this catches manifest values)
                 -- NB: garbage collect before comparison in case we inlined an internallyBound thing
@@ -404,46 +405,48 @@ step' normalising ei_state = {-# SCC "step'" #-}
               return s'
 
         tyApply :: Deeds -> Out Type -> Maybe State
-        tyApply deeds ty' = checkLambdaish $ do
-            TyLambda x e_body <- return v
-            fmap (\deeds -> let (deeds', k') = case mb_co of Uncast            -> (deeds, k)
-                                                             CastBy co' _tg_co -> appendCast deeds ids tg_a (co' `mk_inst` ty') k
-                            in (deeds', heap, k', (insertTypeSubst rn x ty', e_body))) $
-                 claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
+        tyApply deeds0 ty' = do
+          TyLambda x e_body <- return v
+          checkLambdaish $
+            let deeds1 = deeds0 `releaseDeeds` 1 -- Release deed associated with the lambda (but not its body)
+                (deeds2, k') = case mb_co of Uncast            -> (deeds1, k)
+                                             CastBy co' _tg_co -> appendCast deeds1 ids tg_a (co' `mk_inst` ty') k
+            in (deeds2, heap, k', (insertTypeSubst rn x ty', e_body))
           where mk_inst = mkInstCo ids
 
         coApply :: Deeds -> Out Coercion -> Maybe State
-        coApply deeds apply_co' = checkLambdaish $ do
-            Lambda x e_body <- return v
-            flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
-                Uncast            -> (deeds,  heap, k,  (insertCoercionSubst rn x apply_co',      e_body))
-                CastBy co' _tg_co -> (deeds', heap, k', (insertCoercionSubst rn x cast_apply_co', e_body))
-                  where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
-                        -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
-                        --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
-                        --  2. The rules in Figure 5, to replace a cast of a coercion value with a simple coercion value
-                        --  3. The fact that nth commutes with sym to clean up the result (can be proven from Figure 4)
-                        (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
-                        (arg_from_co', arg_to_co') = (mkNthCo 0 arg_co', mkNthCo 1 arg_co')
-                        cast_apply_co' = arg_from_co' `mk_trans` apply_co' `mk_trans` mk_sym arg_to_co'
-                        mk_trans = mkTransCo ids
-                        mk_sym = mkSymCo ids
-                        -- Maintain the no-adjacent-casts invariant
-                        (deeds', k') = appendCast deeds ids tg_a res_co' k
+        coApply deeds0 apply_co' = do
+          Lambda x e_body <- return v
+          checkLambdaish $
+            let deeds1 = deeds0 `releaseDeeds` 1 -- Release deed associated with the lambda (but not its body)
+            in case mb_co of
+                 Uncast            -> (deeds1, heap, k,  (insertCoercionSubst rn x apply_co',      e_body))
+                 CastBy co' _tg_co -> (deeds2, heap, k', (insertCoercionSubst rn x cast_apply_co', e_body))
+                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
+                         -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
+                         --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
+                         --  2. The rules in Figure 5, to replace a cast of a coercion value with a simple coercion value
+                         --  3. The fact that nth commutes with sym to clean up the result (can be proven from Figure 4)
+                         (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
+                         (arg_from_co', arg_to_co') = (mkNthCo 0 arg_co', mkNthCo 1 arg_co')
+                         cast_apply_co' = arg_from_co' `mk_trans` apply_co' `mk_trans` mk_sym arg_to_co'
+                         mk_trans = mkTransCo ids
+                         mk_sym = mkSymCo ids
+                         -- Maintain the no-adjacent-casts invariant
+                         (deeds2, k') = appendCast deeds1 ids tg_a res_co' k
 
         apply :: Deeds -> Tag -> Out Var -> Maybe State
-        apply deeds tg_kf x' = checkLambdaish $ do
-            Lambda x e_body <- return v
-            case mb_co of
-              Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
-                             claimDeeds (deeds `releaseDeeds` 1 `releaseDeeds` answerSize' a) (annedSize e_body)
-              CastBy co' _tg_co -> fmap (\deeds -> let (deeds', k') = appendCast deeds ids tg_a res_co' k
-                                                   in (deeds', Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', k', (rn', e_body))) $
-                                        claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_arg + annedSize e_body)
+        apply deeds0 tg_kf x' = do
+          Lambda x e_body <- return v
+          checkLambdaish $ case mb_co of
+              Uncast -> (deeds1, Heap h ids, k, (insertIdRenaming rn x x', e_body))
+                where deeds1 = deeds0 `releaseDeeds` 2 -- Release deed associated with the lambda (but not its body), AND that from the stack frame
+              CastBy co' _tg_co -> (deeds1, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', k', (rn', e_body))
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
                       (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
                       e_arg = annedTerm tg_a (annedTerm tg_kf (Var x') `Cast` mkSymCo ids arg_co')
+                      (deeds1, k') = appendCast deeds0 ids tg_a res_co' k -- Might release a deed if the final body coercion is refl
 
         -- TODO: use checkShouldExposeUnfolding
         scrutinise :: Deeds -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
@@ -636,7 +639,9 @@ gc _state@(deeds0, Heap h ids, k, in_e)
     live0 = stateAllFreeVars (deeds0, Heap M.empty ids, k, in_e)
     (deeds1, h', live1) = inlineLiveHeap deeds0 h live0
     -- Collecting dead update frames doesn't make any new heap bindings dead since they don't refer to anything
-    (deeds2, k') = pruneLiveStack deeds1 k live1
+    (deeds2, k') | False     = pruneLiveStack deeds1 k live1
+                 | otherwise = (deeds1, k) -- FIXME: turned this off for now because it means that the resulting term might not be normalised (!!!)
+                                           -- NB: if you change this check out checkShouldExposeUnfolding as well
     
     inlineLiveHeap :: Deeds -> PureHeap -> FreeVars -> (Deeds, PureHeap, FreeVars)
     inlineLiveHeap deeds h live = (foldr (flip releaseHeapBindingDeeds . snd) deeds h_dead_kvs, h_live, live')
