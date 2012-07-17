@@ -667,7 +667,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
             --  2. Otherwise, check and remember (we can't Skip if the state is reducible because otherwise [f] will diverge)
             --
             -- This can only be used when eagerly splitting values or examples like [b] will diverge (note that [c] will still converge)
-            --memo_how = CheckAndRemember
+
             -- I've disabled all this nonsense because it is causing non-termination with the new evaluator. Consider:
             --  let a:1 = I# ago1
             --      ago1 = a:1 : a:2
@@ -675,8 +675,10 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
             -- With eager value splitting on, this splits to exactly the same term.
             --
             -- TODO: think about if it actualy makes sense to fix and reenable this
-            {--}
-            memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
+            memo_how | {- False -} True
+                     = CheckAndRemember
+
+                     | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
                      = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
     
                      | (_, _, k, qa) <- state -- NB: not safe to use reduced_state!
@@ -686,7 +688,6 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
     
                      | otherwise
                      = if state_did_reduce || eAGER_SPLIT_VALUES then CheckAndRemember else Skip
-            {--}
 
 data MemoHow = Skip | CheckOnly | CheckAndRemember
 
