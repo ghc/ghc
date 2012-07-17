@@ -121,6 +121,7 @@ walk (n:ns) block as
     (dropped, as') = dropAssignments (`conflicts` n) as
     block' = foldl blockSnoc block dropped `blockSnoc` n
 
+shouldSink :: CmmNode O O -> Maybe Assignment
 shouldSink (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprAddr e)
   where no_local_regs = foldRegsUsed (\_ _ -> False) True e
 shouldSink _other = Nothing
@@ -239,7 +240,7 @@ cmmPeepholeInline graph = ofBlockList (g_entry graph) $ map do_block (toBlockLis
        addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
        addUsage m r = addToUFM_C (+) m r 1
     
-       tryInline stmt usages live stmts@(CmmAssign (CmmLocal l) rhs : rest)
+       tryInline stmt usages live (CmmAssign (CmmLocal l) rhs : rest)
           | not (l `elemRegSet` live),
             Just 1 <- lookupUFM usages l = tryInline stmt' usages' live' rest
           where live'   = foldRegsUsed extendRegSet live rhs
