@@ -272,16 +272,6 @@ lcmInteger a b =      if a `eqInteger` S# 0# then S# 0#
   where aa = absInteger a
         ab = absInteger b
 
--- This rule needs to use absInteger so that it works correctly when
--- the result is minBound :: Int. But that isn't necessary when the
--- result is converted to an Int.
-{-# RULES
-"gcdInteger/Int" forall a b.
-    gcdInteger (smallInteger a) (smallInteger b)
-        = absInteger (smallInteger (gcdInt a b))
-"integerToInt/gcdInteger/Int" forall a b.
-    integerToInt (gcdInteger (smallInteger a) (smallInteger b)) = gcdInt a b
-  #-}
 gcdInt :: Int# -> Int# -> Int#
 gcdInt 0# y  = absInt y
 gcdInt x  0# = absInt x
