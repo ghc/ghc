@@ -657,13 +657,13 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
 #ifdef OPTIMISE_INTEGER_GCD_LCM
 {-# RULES
-"gcd/Int->Int->Int"             gcd = gcdInt
+"gcd/Int->Int->Int"             gcd = gcdInt'
 "gcd/Integer->Integer->Integer" gcd = gcdInteger
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
 
-gcdInt :: Int -> Int -> Int
-gcdInt a b = fromIntegral (gcdInteger (fromIntegral a) (fromIntegral b))
+gcdInt' :: Int -> Int -> Int
+gcdInt' (I# x) (I# y) = I# (gcdInt x y)
 #endif
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
