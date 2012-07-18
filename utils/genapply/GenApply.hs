@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp -fglasgow-exts #-}
 {-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
+-- The above warning suppression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
@@ -179,7 +179,7 @@ mb_tag_node arity | Just tag <- tagForArity arity = mkTagStmt tag <> semi
 mkTagStmt tag = text ("R1 = R1 + "++ show tag)
 
 genMkPAP regstatus macro jump ticker disamb
-        no_load_regs    -- don't load argumnet regs before jumping
+        no_load_regs    -- don't load argument regs before jumping
         args_in_regs    -- arguments are already in regs
         is_pap args all_args_size fun_info_label
         is_fun_case
@@ -223,7 +223,7 @@ genMkPAP regstatus macro jump ticker disamb
                 else shuffle_extra_args,
 
                 -- for a PAP, we have to arrange that the stack contains a
-                -- return address in the even that stg_PAP_entry fails its
+                -- return address in the event that stg_PAP_entry fails its
                 -- heap check.  See stg_PAP_entry in Apply.hc for details.
              if is_pap 
                 then text "R2 = " <> mkApplyInfoName this_call_args <> semi
