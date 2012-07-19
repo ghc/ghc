@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2009
+ * (c) The GHC Team, 2009-2012
  *
  * Macros for profiling operations in STG code
  *
@@ -107,7 +107,7 @@ typedef struct IndexTable_ {
     CostCentre *cc;
     CostCentreStack *ccs;
     struct IndexTable_ *next;
-    unsigned int back_edge;
+    nat back_edge;
 } IndexTable;
 
      
