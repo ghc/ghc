@@ -113,6 +113,8 @@ data HsExpr id
 
   | HsLam     (MatchGroup id)           -- Currently always a single match
 
+  | HsLamCase PostTcType (MatchGroup id) -- Lambda-case
+
   | HsApp     (LHsExpr id) (LHsExpr id) -- Application
 
   -- Operator applications:
@@ -149,6 +151,8 @@ data HsExpr id
                 (LHsExpr id)    --  predicate
                 (LHsExpr id)    --  then part
                 (LHsExpr id)    --  else part
+
+  | HsMultiIf   PostTcType [LGRHS id] -- Multi-way if
 
   | HsLet       (HsLocalBinds id) -- let(rec)
                 (LHsExpr  id)
@@ -448,6 +452,10 @@ ppr_expr (ExplicitTuple exprs boxity)
 ppr_expr (HsLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
+ppr_expr (HsLamCase _ matches)
+  = sep [ sep [ptext (sLit "\\case {")],
+          nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
+
 ppr_expr (HsCase expr matches)
   = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of {")],
           nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
@@ -457,6 +465,12 @@ ppr_expr (HsIf _ e1 e2 e3)
          nest 4 (ppr e2),
          ptext (sLit "else"),
          nest 4 (ppr e3)]
+
+ppr_expr (HsMultiIf _ alts)
+  = sep $ ptext (sLit "if") : map ppr_alt alts
+  where ppr_alt (L _ (GRHS guards expr)) =
+          sep [ char '|' <+> interpp'SP guards
+              , ptext (sLit "->") <+> pprDeeper (ppr expr) ]
 
 -- special case: let ... in let ...
 ppr_expr (HsLet binds expr@(L _ (HsLet _ _)))
@@ -1107,7 +1121,7 @@ pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
   = ptext (sLit "rec") <+> 
-    vcat [ braces (vcat (map ppr segment))
+    vcat [ ppr_do_stmts segment
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
 
@@ -1139,7 +1153,7 @@ pprDo PArrComp    stmts = paBrackets $ pprComp stmts
 pprDo MonadComp   stmts = brackets    $ pprComp stmts
 pprDo _           _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: OutputableBndr id => [LStmt id] -> SDoc
+ppr_do_stmts :: (OutputableBndr idL, OutputableBndr idR) => [LStmtLR idL idR] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
 ppr_do_stmts stmts 
@@ -1257,6 +1271,7 @@ data HsMatchContext id  -- Context of a Match
   = FunRhs id Bool              -- Function binding for f; True <=> written infix
   | LambdaExpr                  -- Patterns of a lambda
   | CaseAlt                     -- Patterns and guards on a case alternative
+  | IfAlt                       -- Guards of a multi-way if alternative
   | ProcExpr                    -- Patterns of a proc
   | PatBindRhs                  -- A pattern binding  eg [y] <- e = e
 
@@ -1307,6 +1322,7 @@ isMonadCompExpr _                    = False
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})  = ptext (sLit "=")
 matchSeparator CaseAlt      = ptext (sLit "->")
+matchSeparator IfAlt        = ptext (sLit "->")
 matchSeparator LambdaExpr   = ptext (sLit "->")
 matchSeparator ProcExpr     = ptext (sLit "->")
 matchSeparator PatBindRhs   = ptext (sLit "=")
@@ -1329,6 +1345,7 @@ pprMatchContextNoun :: Outputable id => HsMatchContext id -> SDoc
 pprMatchContextNoun (FunRhs fun _)  = ptext (sLit "equation for")
                                       <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt         = ptext (sLit "case alternative")
+pprMatchContextNoun IfAlt           = ptext (sLit "multi-way if alternative")
 pprMatchContextNoun RecUpd          = ptext (sLit "record-update construct")
 pprMatchContextNoun ThPatQuote      = ptext (sLit "Template Haskell pattern quotation")
 pprMatchContextNoun PatBindRhs      = ptext (sLit "pattern binding")
@@ -1377,6 +1394,7 @@ pprStmtContext (TransStmtCtxt c)
 matchContextErrString :: Outputable id => HsMatchContext id -> SDoc
 matchContextErrString (FunRhs fun _)             = ptext (sLit "function") <+> ppr fun
 matchContextErrString CaseAlt                    = ptext (sLit "case")
+matchContextErrString IfAlt                      = ptext (sLit "multi-way if")
 matchContextErrString PatBindRhs                 = ptext (sLit "pattern binding")
 matchContextErrString RecUpd                     = ptext (sLit "record update")
 matchContextErrString LambdaExpr                 = ptext (sLit "lambda")

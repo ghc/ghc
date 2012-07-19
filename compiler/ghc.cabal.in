@@ -186,6 +186,7 @@ Library
         CmmParse
         CmmProcPoint
         CmmRewriteAssignments
+        CmmSink
         CmmType
         CmmUtils
         CmmLayoutStack

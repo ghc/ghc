@@ -9,7 +9,6 @@ module CmmPipeline (
   cmmPipeline
 ) where
 
-import CLabel
 import Cmm
 import CmmLint
 import CmmBuildInfoTables
@@ -17,76 +16,42 @@ import CmmCommonBlockElim
 import CmmProcPoint
 import CmmContFlowOpt
 import CmmLayoutStack
+import CmmSink
+import Hoopl
 
 import UniqSupply
 import DynFlags
 import ErrUtils
 import HscTypes
-import Data.Maybe
 import Control.Monad
 import Outputable
-
-import qualified Data.Set as Set
-import Data.Map (Map)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
--- There are two complications here:
--- 1. We need to compile the procedures in two stages because we need
---    an analysis of the procedures to tell us what CAFs they use.
---    The first stage returns a map from procedure labels to CAFs,
---    along with a closure that will compute SRTs and attach them to
---    the compiled procedures.
---    The second stage is to combine the CAF information into a top-level
---    CAF environment mapping non-static closures to the CAFs they keep live,
---    then pass that environment to the closures returned in the first
---    stage of compilation.
--- 2. We need to thread the module's SRT around when the SRT tables
---    are computed for each procedure.
---    The SRT needs to be threaded because it is grown lazily.
--- 3. We run control flow optimizations twice, once before any pipeline
---    work is done, and once again at the very end on all of the
---    resulting C-- blocks.  EZY: It's unclear whether or not whether
---    we actually need to do the initial pass.
+
 cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
              -> TopSRT     -- SRT table and accumulating list of compiled procs
              -> CmmGroup             -- Input C-- with Procedures
              -> IO (TopSRT, CmmGroup) -- Output CPS transformed C--
+
 cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
-     --
+
      showPass dflags "CPSZ"
 
-     (cafEnvs, tops) <- {-# SCC "tops" #-} liftM unzip $ mapM (cpsTop hsc_env) prog
-     -- tops :: [[(CmmDecl,CAFSet]]  (one list per group)
+     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     let topCAFEnv = {-# SCC "topCAFEnv" #-} mkTopCAFInfo (concat cafEnvs)
-
-     -- folding over the groups
-     (topSRT, tops) <- {-# SCC "toTops" #-} foldM (toTops topCAFEnv) (topSRT, []) tops
-
-     let cmms :: CmmGroup
-         cmms = reverse (concat tops)
-
+     (topSRT, cmms) <- {-# SCC "toTops" #-} doSRTs topSRT tops
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
 
      return (topSRT, cmms)
 
-{- [Note global fuel]
-~~~~~~~~~~~~~~~~~~~~~
-The identity and the last pass are stored in
-mutable reference cells in an 'HscEnv' and are
-global to one compiler session.
--}
 
--- EZY: It might be helpful to have an easy way of dumping the "pre"
--- input for any given phase, besides just turning it all on with
--- -ddump-cmmz
 
-cpsTop :: HscEnv -> CmmDecl -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmDecl)])
-cpsTop _ p@(CmmData {}) = return ([], [(Set.empty, p)])
+cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
+cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
        ----------- Control-flow optimisations ---------------
@@ -110,8 +75,13 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                          runUniqSM $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
---       g <- {-# SCC "sink" #-} runUniqSM $ cmmSink g
---       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+       g <- if optLevel dflags >= 99
+               then do g <- {-# SCC "sink" #-} return (cmmSink g)
+                       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+                       g <- {-# SCC "inline" #-} return (cmmPeepholeInline g)
+                       dump Opt_D_dump_cmmz_rewrite "Peephole inline" g
+                       return g
+               else return g
 
 --       ----------- Sink and inline assignments -------------------
 --       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
@@ -126,31 +96,21 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
              splitAtProcPoints l callPPs procPoints procPointMap (CmmProc h l g)
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
-       ------------- More CAFs ------------------------------
+       ------------- CAF analysis ------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
-       let localCAFs = {-# SCC "localCAFs" #-} catMaybes $ map (localCAFInfo cafEnv) gs
-       mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
-       -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
+       ------------- Populate info tables with stack info ------
        gs <- {-# SCC "setInfoTableStackMap" #-}
              return $ map (setInfoTableStackMap stackmaps) gs
        dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
 
-       ----------- Control-flow optimisations ---------------
+       ----------- Control-flow optimisations -----------------
        gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
        dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
-       gs <- {-# SCC "bundleCAFs" #-} return $ map (bundleCAFs cafEnv) gs
-       dumps Opt_D_dump_cmmz_cafs "after bundleCAFs" gs
-
-       return (localCAFs, gs)
-
-              -- gs        :: [ (CAFSet, CmmDecl) ]
-              -- localCAFs :: [ (CLabel, CAFSet) ] -- statics filtered out(?)
+       return (cafEnv, gs)
 
   where dflags = hsc_dflags hsc_env
-        mbpprTrace x y z | dopt Opt_D_dump_cmmz dflags = pprTrace x y z
-                         | otherwise = z
         dump = dumpGraph dflags
 
         dumps flag name
@@ -182,14 +142,3 @@ dumpWith dflags flag txt g = do
    when (not (dopt flag dflags)) $
       dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
 
--- This probably belongs in CmmBuildInfoTables?
--- We're just finishing the job here: once we know what CAFs are defined
--- in non-static closures, we can build the SRTs.
-toTops :: Map CLabel CAFSet -> (TopSRT, [[CmmDecl]])
-       -> [(CAFSet, CmmDecl)] -> IO (TopSRT, [[CmmDecl]])
-toTops topCAFEnv (topSRT, tops) gs =
-  do let setSRT (topSRT, rst) g =
-           do (topSRT, gs) <- setInfoTableSRT topCAFEnv topSRT g
-              return (topSRT, gs : rst)
-     (topSRT, gs') <- runUniqSM $ foldM setSRT (topSRT, []) gs
-     return (topSRT, concat gs' : tops)

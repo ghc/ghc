@@ -486,6 +486,8 @@ data ExtensionFlag
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
    | Opt_TraditionalRecordSyntax
+   | Opt_LambdaCase
+   | Opt_MultiWayIf
    deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -1016,7 +1018,7 @@ defaultLogAction :: LogAction
 defaultLogAction dflags severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
-      SevDump   -> hPrintDump dflags stdout msg
+      SevDump   -> printSDoc (msg $$ blankLine) style
       SevInfo   -> printErrs msg style
       SevFatal  -> printErrs msg style
       _         -> do hPutChar stderr '\n'
@@ -2165,6 +2167,8 @@ xFlags = [
   ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
+  ( "LambdaCase",                       Opt_LambdaCase, nop ),
+  ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
     \ turn_on -> if not turn_on

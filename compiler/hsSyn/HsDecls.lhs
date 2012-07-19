@@ -435,7 +435,7 @@ data TyClDecl name
 
   | -- | @type/data declaration
     TyDecl { tcdLName  :: Located name            -- ^ Type constructor
-           , tcdTyVars :: LHsTyVarBndrs name      -- ^ Type variables; for an assoicated type
+           , tcdTyVars :: LHsTyVarBndrs name      -- ^ Type variables; for an associated type
                                                   --   these include outer binders
                                                   -- Eg  class T a where
                                                   --       type F a :: *

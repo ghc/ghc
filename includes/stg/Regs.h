@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2009
+ * (c) The GHC Team, 1998-2012
  *
  * Registers in the STG machine.
  *
@@ -21,7 +21,7 @@
  *
  * The register set is backed by a table in memory (struct
  * StgRegTable).  If a particular STG register is not mapped to a
- * machine register, then the apprpriate slot in this table is used
+ * machine register, then the appropriate slot in this table is used
  * instead.  
  *
  * This table is itself pointed to by another register, BaseReg.  If
@@ -58,7 +58,7 @@ typedef union {
  *        register, probably because there's a shortage of real registers.
  *     2) caller-saves registers are saved across a CCall
  */
-typedef struct StgRegTable_ {
+typedef struct {
   StgUnion 	  rR1;
   StgUnion   	  rR2;
   StgUnion   	  rR3;
@@ -80,13 +80,13 @@ typedef struct StgRegTable_ {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
-  struct CostCentreStack_ * rCCCS;  // current cost-centre-stack
+  struct CostCentreStack_ * rCCCS;  /* current cost-centre-stack */
   struct StgTSO_ *     rCurrentTSO;
   struct nursery_ *    rNursery;
   struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *     rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */
-  StgWord         rRet;  // holds the return code of the thread
+  StgWord         rRet;  /* holds the return code of the thread */
 } StgRegTable;
 
 #if IN_STG_CODE

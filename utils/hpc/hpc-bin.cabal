@@ -31,9 +31,9 @@ Executable hpc
         Build-Depends: base       < 3
 
     if flag(base3) || flag(base4)
-        Build-Depends: directory  >= 1   && < 1.1,
-                       containers >= 0.1 && < 0.3,
-                       array      >= 0.1 && < 0.3
+        Build-Depends: directory  >= 1   && < 1.2,
+                       containers >= 0.1 && < 0.6,
+                       array      >= 0.1 && < 0.5
     Build-Depends: haskell98, hpc
     Extensions: CPP
 

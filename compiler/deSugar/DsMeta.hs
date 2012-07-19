@@ -864,6 +864,9 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
 repE (HsLam (MatchGroup [m] _)) = repLambda m
+repE (HsLamCase _ (MatchGroup ms _))
+                   = do { ms' <- mapM repMatchTup ms
+                        ; repLamCase (nonEmptyCoreList ms') }
 repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
 
 repE (OpApp e1 op _ e2) =
@@ -878,14 +881,19 @@ repE (NegApp x _)        = do
 repE (HsPar x)            = repLE x
 repE (SectionL x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase e (MatchGroup ms _)) = do { arg <- repLE e
-				       ; ms2 <- mapM repMatchTup ms
-				       ; repCaseE arg (nonEmptyCoreList ms2) }
+repE (HsCase e (MatchGroup ms _))
+                          = do { arg <- repLE e
+                               ; ms2 <- mapM repMatchTup ms
+                               ; repCaseE arg (nonEmptyCoreList ms2) }
 repE (HsIf _ x y z)         = do
 			      a <- repLE x
 			      b <- repLE y
 			      c <- repLE z
 			      repCond a b c
+repE (HsMultiIf _ alts)
+  = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
+       ; expr' <- repMultiIf (nonEmptyCoreList alts')
+       ; wrapGenSyms (concat binds) expr' }
 repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; e2 <- addBinds ss (repLE e)
 			       ; z <- repLetE ds e2
@@ -976,22 +984,22 @@ repClauseTup (L _ (Match ps _ (GRHSs guards wheres))) =
 
 repGuards ::  [LGRHS Name] ->  DsM (Core TH.BodyQ)
 repGuards [L _ (GRHS [] e)]
-  = do {a <- repLE e; repNormal a }
-repGuards other
-  = do { zs <- mapM process other;
-     let {(xs, ys) = unzip zs};
-	 gd <- repGuarded (nonEmptyCoreList ys);
-     wrapGenSyms (concat xs) gd }
-  where
-    process :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
-    process (L _ (GRHS [L _ (ExprStmt e1 _ _ _)] e2))
-           = do { x <- repLNormalGE e1 e2;
-                  return ([], x) }
-    process (L _ (GRHS ss rhs))
-           = do (gs, ss') <- repLSts ss
-		rhs' <- addBinds gs $ repLE rhs
-                g <- repPatGE (nonEmptyCoreList ss') rhs'
-                return (gs, g)
+  = do { a <- repLE e
+       ; repNormal a }
+repGuards alts
+  = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
+       ; body <- repGuarded (nonEmptyCoreList alts')
+       ; wrapGenSyms (concat binds) body }
+
+repLGRHS :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
+repLGRHS (L _ (GRHS [L _ (ExprStmt guard _ _ _)] rhs))
+  = do { guarded <- repLNormalGE guard rhs
+       ; return ([], guarded) }
+repLGRHS (L _ (GRHS stmts rhs))
+  = do { (gs, stmts') <- repLSts stmts
+       ; rhs'         <- addBinds gs $ repLE rhs
+       ; guarded      <- repPatGE (nonEmptyCoreList stmts') rhs'
+       ; return (gs, guarded) }
 
 repFields :: HsRecordBinds Name -> DsM (Core [TH.Q TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
@@ -1455,6 +1463,9 @@ repApp (MkC x) (MkC y) = rep2 appEName [x,y]
 repLam :: Core [TH.PatQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 
+repLamCase :: Core [TH.MatchQ] -> DsM (Core TH.ExpQ)
+repLamCase (MkC ms) = rep2 lamCaseEName [ms]
+
 repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
 repTup (MkC es) = rep2 tupEName [es]
 
@@ -1463,6 +1474,9 @@ repUnboxedTup (MkC es) = rep2 unboxedTupEName [es]
 
 repCond :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repCond (MkC x) (MkC y) (MkC z) = rep2 condEName [x,y,z]
+
+repMultiIf :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.ExpQ)
+repMultiIf (MkC alts) = rep2 multiIfEName [alts]
 
 repLetE :: Core [TH.DecQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLetE (MkC ds) (MkC e) = rep2 letEName [ds, e]
@@ -1893,9 +1907,9 @@ templateHaskellNames = [
     clauseName,
     -- Exp
     varEName, conEName, litEName, appEName, infixEName,
-    infixAppName, sectionLName, sectionRName, lamEName,
+    infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
     tupEName, unboxedTupEName,
-    condEName, letEName, caseEName, doEName, compEName,
+    condEName, multiIfEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName,
     -- FieldExp
@@ -2058,8 +2072,9 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, tupEName, unboxedTupEName, condEName,
-    letEName, caseEName, doEName, compEName :: Name
+    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
+    unboxedTupEName, condEName, multiIfEName, letEName, caseEName,
+    doEName, compEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
@@ -2069,9 +2084,11 @@ infixAppName    = libFun (fsLit "infixApp")    infixAppIdKey
 sectionLName    = libFun (fsLit "sectionL")    sectionLIdKey
 sectionRName    = libFun (fsLit "sectionR")    sectionRIdKey
 lamEName        = libFun (fsLit "lamE")        lamEIdKey
+lamCaseEName    = libFun (fsLit "lamCaseE")    lamCaseEIdKey
 tupEName        = libFun (fsLit "tupE")        tupEIdKey
 unboxedTupEName = libFun (fsLit "unboxedTupE") unboxedTupEIdKey
 condEName       = libFun (fsLit "condE")       condEIdKey
+multiIfEName    = libFun (fsLit "multiIfE")    multiIfEIdKey
 letEName        = libFun (fsLit "letE")        letEIdKey
 caseEName       = libFun (fsLit "caseE")       caseEIdKey
 doEName         = libFun (fsLit "doE")         doEIdKey
@@ -2370,8 +2387,8 @@ clauseIdKey         = mkPreludeMiscIdUnique 262
 
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
-    sectionLIdKey, sectionRIdKey, lamEIdKey, tupEIdKey, unboxedTupEIdKey,
-    condEIdKey,
+    sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey, tupEIdKey,
+    unboxedTupEIdKey, condEIdKey, multiIfEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey :: Unique
@@ -2384,21 +2401,23 @@ infixAppIdKey     = mkPreludeMiscIdUnique 275
 sectionLIdKey     = mkPreludeMiscIdUnique 276
 sectionRIdKey     = mkPreludeMiscIdUnique 277
 lamEIdKey         = mkPreludeMiscIdUnique 278
-tupEIdKey         = mkPreludeMiscIdUnique 279
-unboxedTupEIdKey  = mkPreludeMiscIdUnique 280
-condEIdKey        = mkPreludeMiscIdUnique 281
-letEIdKey         = mkPreludeMiscIdUnique 282
-caseEIdKey        = mkPreludeMiscIdUnique 283
-doEIdKey          = mkPreludeMiscIdUnique 284
-compEIdKey        = mkPreludeMiscIdUnique 285
-fromEIdKey        = mkPreludeMiscIdUnique 286
-fromThenEIdKey    = mkPreludeMiscIdUnique 287
-fromToEIdKey      = mkPreludeMiscIdUnique 288
-fromThenToEIdKey  = mkPreludeMiscIdUnique 289
-listEIdKey        = mkPreludeMiscIdUnique 290
-sigEIdKey         = mkPreludeMiscIdUnique 291
-recConEIdKey      = mkPreludeMiscIdUnique 292
-recUpdEIdKey      = mkPreludeMiscIdUnique 293
+lamCaseEIdKey     = mkPreludeMiscIdUnique 279
+tupEIdKey         = mkPreludeMiscIdUnique 280
+unboxedTupEIdKey  = mkPreludeMiscIdUnique 281
+condEIdKey        = mkPreludeMiscIdUnique 282
+multiIfEIdKey     = mkPreludeMiscIdUnique 283
+letEIdKey         = mkPreludeMiscIdUnique 284
+caseEIdKey        = mkPreludeMiscIdUnique 285
+doEIdKey          = mkPreludeMiscIdUnique 286
+compEIdKey        = mkPreludeMiscIdUnique 287
+fromEIdKey        = mkPreludeMiscIdUnique 288
+fromThenEIdKey    = mkPreludeMiscIdUnique 289
+fromToEIdKey      = mkPreludeMiscIdUnique 290
+fromThenToEIdKey  = mkPreludeMiscIdUnique 291
+listEIdKey        = mkPreludeMiscIdUnique 292
+sigEIdKey         = mkPreludeMiscIdUnique 293
+recConEIdKey      = mkPreludeMiscIdUnique 294
+recUpdEIdKey      = mkPreludeMiscIdUnique 295
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

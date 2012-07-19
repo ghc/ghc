@@ -855,7 +855,7 @@ inferConstraints cls inst_tys rep_tc rep_tc_args
 
 Note [Getting base classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Functor and Typeable are define in package 'base', and that is not available
+Functor and Typeable are defined in package 'base', and that is not available
 when compiling 'ghc-prim'.  So we must be careful that 'deriving' for stuff in 
 ghc-prim does not use Functor or Typeable implicitly via these lookups.
 

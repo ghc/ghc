@@ -38,7 +38,6 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        hPrintDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
@@ -91,7 +90,7 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
-import System.IO        ( Handle, hFlush )
+import System.IO        ( Handle )
 import System.FilePath
 
 
@@ -330,13 +329,6 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
-hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
-hPrintDump dflags h doc = do
-   Pretty.printDoc PageMode (pprCols dflags) h
-     (runSDoc better_doc (initSDocContext dflags defaultDumpStyle))
-   hFlush h
- where
-   better_doc = doc $$ blankLine
 
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc

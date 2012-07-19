@@ -726,7 +726,7 @@ match_co :: RuleEnv
 match_co renv subst (CoVarCo cv) co
   = match_var renv subst cv (Coercion co)
 match_co _ _ co1 _
-  = pprTrace "match_co baling out" (ppr co1) Nothing
+  = pprTrace "match_co bailing out" (ppr co1) Nothing
 
 -------------
 rnMatchBndr2 :: RuleEnv -> RuleSubst -> Var -> Var -> RuleEnv
