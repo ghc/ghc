@@ -578,7 +578,7 @@ setupUpdate closure_info node body
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf True
-		; pushUpdateFrame [CmmReg (CmmLocal upd_closure),
+                ; pushUpdateFrame [upd_closure,
                                    mkLblExpr mkBHUpdInfoLabel] body }
 	  else do {tickyUpdateFrameOmitted; body}
     }
@@ -633,8 +633,8 @@ pushUpdateFrame es body
 -- be closer together, and the compiler wouldn't need to know
 -- about off_indirectee etc.
 
-link_caf :: Bool                -- True <=> updatable, False <=> single-entry
-         -> FCode LocalReg      -- Returns amode for closure to be updated
+link_caf :: Bool               -- True <=> updatable, False <=> single-entry
+         -> FCode CmmExpr      -- Returns amode for closure to be updated
 -- To update a CAF we must allocate a black hole, link the CAF onto the
 -- CAF list, then update the CAF to point to the fresh black hole.
 -- This function returns the address of the black hole, so it can be
@@ -648,19 +648,24 @@ link_caf _is_upd = do
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
 
-  ; (hp_rel, init) <- allocDynClosureCmm cafBlackHoleInfoTable mkLFBlackHole
+  ; hp_rel <- allocDynClosureCmm cafBlackHoleInfoTable mkLFBlackHole
                                          use_cc blame_cc [(tso,fixedHdrSize dflags)]
-  ; emit init
+        -- small optimisation: we duplicate the hp_rel expression in
+        -- both the newCAF call and the value returned below.
+        -- If we instead used allocDynClosureReg which assigns it to a reg,
+        -- then the reg is live across the newCAF call and gets spilled,
+        -- which is stupid.  Really we should have an optimisation pass to
+        -- fix this, but we don't yet. --SDM
 
-	-- Call the RTS function newCAF to add the CAF to the CafList
-	-- so that the garbage collector can find them
+        -- Call the RTS function newCAF to add the CAF to the CafList
+        -- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten,
 	-- because the old info table ptr is needed for reversion
   ; ret <- newTemp bWord
   ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
         (CmmReg nodeReg, AddrHint),
-        (CmmReg (CmmLocal hp_rel), AddrHint) ]
+        (hp_rel, AddrHint) ]
       (Just [node]) False
         -- node is live, so save it.
 
