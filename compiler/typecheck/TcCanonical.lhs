@@ -506,7 +506,8 @@ flatten :: SubGoalDepth -- Depth
 flatten d f ctxt ty 
   | Just ty' <- tcView ty
   = do { (xi, co) <- flatten d f ctxt ty'
-       ; return (xi,co) } 
+       ; if eqType xi ty then return (ty,co) else return (xi,co) } 
+       -- Small tweak for better error messages 
 
 flatten _ _ _ xi@(LitTy {}) = return (xi, mkTcReflCo xi)
 
