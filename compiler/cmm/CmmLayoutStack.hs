@@ -211,10 +211,28 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
 
            acc_stackmaps' = mapUnion acc_stackmaps out
 
-           hwm' = maximum (acc_hwm : (sp0 - sp_off) : map sm_sp (mapElems out))
+           -- If this block jumps to the GC, then we do not take its
+           -- stack usage into account for the high-water mark.
+           -- Otherwise, if the only stack usage is in the stack-check
+           -- failure block itself, we will do a redundant stack
+           -- check.  The stack has a buffer designed to accommodate
+           -- the largest amount of stack needed for calling the GC.
+           --
+           this_sp_hwm | isGcJump last0 = 0
+                       | otherwise      = sp0 - sp_off
+
+           hwm' = maximum (acc_hwm : this_sp_hwm : map sm_sp (mapElems out))
 
        go bs acc_stackmaps' hwm' (final_blocks ++ acc_blocks)
 
+
+-- -----------------------------------------------------------------------------
+
+-- Not foolproof, but GCFun is the culprit we most want to catch
+isGcJump :: CmmNode O C -> Bool
+isGcJump (CmmCall { cml_target = CmmReg (CmmGlobal l) })
+  = l == GCFun || l == GCEnter1
+isGcJump _something_else = False
 
 -- -----------------------------------------------------------------------------
 
