@@ -22,24 +22,25 @@ module Haddock.InterfaceFile (
 import Haddock.Types
 import Haddock.Utils hiding (out)
 
-import Data.List
-import Data.Word
+import Control.Monad
 import Data.Array
 import Data.IORef
+import Data.List
 import qualified Data.Map as Map
 import Data.Map (Map)
+import Data.Word
 
-import GHC hiding (NoLink)
-import Binary
 import BinIface (getSymtabName, getDictFastString)
-import Name
-import UniqSupply
-import UniqFM
-import IfaceEnv
-import HscTypes
-import GhcMonad (withSession)
+import Binary
 import FastMutInt
 import FastString
+import GHC hiding (NoLink)
+import GhcMonad (withSession)
+import HscTypes
+import IfaceEnv
+import Name
+import UniqFM
+import UniqSupply
 import Unique
 
 
@@ -65,13 +66,13 @@ binaryInterfaceMagic = 0xD0Cface
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 702
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 704
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 705
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #else
 #error Unknown GHC version
 #endif
@@ -110,8 +111,8 @@ writeInterfaceFile filename iface = do
                       bin_dict_map  = dict_map_ref }
 
   -- put the main thing
-  bh <- return $ setUserData bh0 $ newWriteState (putName bin_symtab)
-                                                 (putFastString bin_dict)
+  let bh = setUserData bh0 $ newWriteState (putName bin_symtab)
+                                           (putFastString bin_dict)
   put_ bh iface
 
   -- write the symtab pointer at the front of the file
@@ -295,12 +296,9 @@ putSymbolTable bh next_off symtab = do
 getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
 getSymbolTable bh namecache = do
   sz <- get bh
-  od_names <- sequence (replicate sz (get bh))
-  let
-        arr = listArray (0,sz-1) names
-        (namecache', names) =
-                mapAccumR (fromOnDiskName arr) namecache od_names
-  --
+  od_names <- replicateM sz (get bh)
+  let arr = listArray (0,sz-1) names
+      (namecache', names) = mapAccumR (fromOnDiskName arr) namecache od_names
   return (namecache', arr)
 
 
@@ -469,6 +467,9 @@ instance (Binary id) => Binary (Doc id) where
     put_ bh (DocIdentifierUnchecked x) = do
             putByte bh 16
             put_ bh x
+    put_ bh (DocWarning ag) = do
+            putByte bh 17
+            put_ bh ag
     get bh = do
             h <- getByte bh
             case h of
@@ -523,6 +524,9 @@ instance (Binary id) => Binary (Doc id) where
               16 -> do
                     x <- get bh
                     return (DocIdentifierUnchecked x)
+              17 -> do
+                    ag <- get bh
+                    return (DocWarning ag)
               _ -> fail "invalid binary data found"
 
 

@@ -34,6 +34,7 @@ import Data.Char
 import Data.Word (Word8)
 import Numeric
 import System.IO.Unsafe
+import Debug.Trace
 }
 
 $ws    = $white # \n
@@ -181,7 +182,7 @@ tokenise dflags str (line, col) = let toks = go (posn, '\n', eofHack str) para i
     go inp@(pos, _, str) sc =
 	  case alexScan inp sc of
 		AlexEOF -> []
-		AlexError _ -> error "lexical error"
+		AlexError _ -> []
 		AlexSkip  inp' _       -> go inp' sc
 		AlexToken inp'@(pos',_,_) len act -> act pos (take len str) sc (\sc -> go inp' sc) dflags
 

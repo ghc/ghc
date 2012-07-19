@@ -57,6 +57,7 @@ import Paths_haddock
 import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
+import StaticFlags (saveStaticFlagGlobals, restoreStaticFlagGlobals)
 import Panic (panic, handleGhcException)
 import Module
 
@@ -126,9 +127,13 @@ main :: IO ()
 main = handleTopExceptions $ do
 
   -- Parse command-line flags and handle some of them initially.
+  -- TODO: unify all of this (and some of what's in the 'render' function),
+  -- into one function that returns a record with a field for each option,
+  -- or which exits with an error or help message.
   args <- getArgs
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
+  qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}
 
   libDir <- fmap snd (getGhcDirs flags)
 
@@ -151,7 +156,7 @@ main = handleTopExceptions $ do
         Nothing -> return ()
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags flags packages ifaces
+      liftIO $ renderStep dflags flags qual packages ifaces
 
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
@@ -161,7 +166,7 @@ main = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags)
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags flags packages []
+      liftIO $ renderStep dflags flags qual packages []
 
 
 readPackagesAndProcessModules :: [Flag] -> [String]
@@ -177,19 +182,19 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: DynFlags -> [Flag] -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
-renderStep dflags flags pkgs interfaces = do
+renderStep :: DynFlags -> [Flag] -> QualOption -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
+renderStep dflags flags qual pkgs interfaces = do
   updateHTMLXRefs pkgs
   let
     ifaceFiles = map snd pkgs
     installedIfaces = concatMap ifInstalledIfaces ifaceFiles
     srcMap = Map.fromList [ (ifPackageId if_, x) | ((_, Just x), if_) <- pkgs ]
-  render dflags flags interfaces installedIfaces srcMap
+  render dflags flags qual interfaces installedIfaces srcMap
 
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> [Flag] -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
-render dflags flags ifaces installedIfaces srcMap = do
+render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
+render dflags flags qual ifaces installedIfaces srcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -200,7 +205,6 @@ render dflags flags ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
-    opt_qualification    = qualification     flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -230,14 +234,15 @@ render dflags flags ifaces installedIfaces srcMap = do
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title pkgStr
                    themes opt_index_url sourceUrls' opt_wiki_urls
-                   allVisibleIfaces True prologue pretty opt_qualification
+                   allVisibleIfaces True prologue pretty
+                   (makeContentsQual qual)
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title pkgStr visibleIfaces odir
                 prologue
                 themes sourceUrls' opt_wiki_urls
-                opt_contents_url opt_index_url unicode opt_qualification
+                opt_contents_url opt_index_url unicode qual
                 pretty
     copyHtmlBits odir libDir themes
 
@@ -292,7 +297,7 @@ dumpInterfaceFile path ifaces homeLinks = writeInterfaceFile path ifaceFile
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking. Then run the given 'Ghc' action.
 withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-withGhc libDir flags ghcActs = do
+withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
   -- TODO: handle warnings?
   (restFlags, _) <- parseStaticFlags (map noLoc flags)
   runGhc (Just libDir) $ do
@@ -310,6 +315,7 @@ withGhc libDir flags ghcActs = do
         -- dynamic or static linking at all!
         _ <- setSessionDynFlags dynflags'''
         ghcActs dynflags'''
+  `finally` restoreStaticFlagGlobals savedFlags
   where
     parseGhcFlags :: Monad m => DynFlags -> [Located String]
                   -> [String] -> m DynFlags

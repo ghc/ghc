@@ -25,7 +25,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Ticket112.html");};
 	  >Index</a
 	  ></li
 	></ul
-      ><p class="caption" class="empty"
+      ><p class="caption empty"
       >&nbsp;</p
       ></div
     ><div id="content"
@@ -75,7 +75,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Ticket112.html");};
     ><p
       >Produced by <a href=""
 	>Haddock</a
-	> version 2.10.0</p
+	> version 2.11.0</p
       ></div
     ></body
   ></html

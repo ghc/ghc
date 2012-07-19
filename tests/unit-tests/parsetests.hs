@@ -1,3 +1,5 @@
+{-# LANGUAGE StandaloneDeriving, FlexibleInstances, UndecidableInstances, IncoherentInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Main (main) where
 
 import Test.HUnit
@@ -6,9 +8,13 @@ import DynFlags (defaultDynFlags)
 import Haddock.Lex (tokenise)
 import Haddock.Parse (parseParas)
 import Haddock.Types
+import Outputable
 
-instance Show RdrName where
-  show x = "RdrName"
+instance Outputable a => Show a where
+  show = showSDoc . ppr
+
+deriving instance Show a => Show (Doc a)
+deriving instance Eq a =>Eq (Doc a)
 
 data ParseTest = ParseTest {
     input   :: String
@@ -50,13 +56,14 @@ tests = [
   ]
 
 
+main :: IO ()
 main = do
   _ <- runTestTT $ TestList $ map toTestCase tests
   return ();
   where
 
     toTestCase :: ParseTest -> Test
-    toTestCase (ParseTest input result) = TestCase $ assertEqual input result (parse input)
+    toTestCase (ParseTest s r) = TestCase $ assertEqual s r (parse s)
 
     parse :: String -> Maybe (Doc RdrName)
-    parse input = parseParas $ tokenise defaultDynFlags input (0,0)
+    parse s = parseParas $ tokenise (defaultDynFlags undefined) s (0,0)

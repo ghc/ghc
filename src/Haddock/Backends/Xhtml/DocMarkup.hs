@@ -15,7 +15,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
   rdrDocToHtml,
   origDocToHtml,
 
-  docElement, docSection, maybeDocSection,
+  docElement, docSection, docSection_,
 ) where
 
 
@@ -39,6 +39,7 @@ parHtmlMarkup qual ppId = Markup {
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \m -> let (mdl,ref) = break (=='#') m
                                      in ppModuleRef (mkModuleName mdl) ref,
+  markupWarning              = thediv ! [theclass "warning"],
   markupEmphasis             = emphasize,
   markupMonospaced           = thecode,
   markupUnorderedList        = unordList,
@@ -84,12 +85,12 @@ docElement el content_ =
     else el ! [theclass "doc"] << content_
 
 
-docSection :: Qualification -> Doc DocName -> Html
-docSection qual = (docElement thediv <<) . docToHtml qual
+docSection :: Qualification -> Documentation DocName -> Html
+docSection qual = maybe noHtml (docSection_ qual) . combineDocumentation
 
 
-maybeDocSection :: Qualification -> Maybe (Doc DocName) -> Html
-maybeDocSection qual = maybe noHtml (docSection qual)
+docSection_ :: Qualification -> Doc DocName -> Html
+docSection_ qual = (docElement thediv <<) . docToHtml qual
 
 
 cleanup :: Doc a -> Doc a

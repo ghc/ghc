@@ -66,7 +66,7 @@ ppHtml :: String
        -> Maybe String                 -- ^ The contents URL (--use-contents)
        -> Maybe String                 -- ^ The index URL (--use-index)
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
-       -> Qualification                -- ^ How to qualify names
+       -> QualOption                   -- ^ How to qualify names
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
        -> IO ()
 
@@ -83,7 +83,7 @@ ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
-        prologue debug qual
+        prologue debug (makeContentsQual qual)
 
   when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
@@ -175,7 +175,7 @@ bodyHtml doctitle iface
         contentsButton maybe_contents_url,
         indexButton maybe_index_url])
             ! [theclass "links", identifier "page-menu"],
-      nonEmpty sectionName << doctitle
+      nonEmptySectionName << doctitle
       ],
     divContent << pageContent,
     divFooter << paragraph << (
@@ -431,7 +431,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
                           indexLinks nm entries
           many_entities ->
               td ! [ theclass "src" ] << toHtml str <-> td << spaceHtml </>
-                  aboves (map doAnnotatedEntity (zip [1..] many_entities))
+                  aboves (zipWith (curry doAnnotatedEntity) [1..] many_entities)
 
     doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
     doAnnotatedEntity (j,(nm,entries))
@@ -461,18 +461,16 @@ ppHtmlIndex odir doctitle _maybe_package themes
 ppHtmlModule
         :: FilePath -> String -> Themes
         -> SourceURLs -> WikiURLs
-        -> Maybe String -> Maybe String -> Bool -> Qualification
+        -> Maybe String -> Maybe String -> Bool -> QualOption
         -> Bool -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
   maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url unicode qual debug iface = do
   let
       mdl = ifaceMod iface
+      aliases = ifaceModuleAliases iface
       mdl_str = moduleString mdl
-      real_qual = case qual of
-          LocalQual Nothing    -> LocalQual (Just mdl)
-          RelativeQual Nothing -> RelativeQual (Just mdl)
-          _                     -> qual
+      real_qual = makeModuleQual qual aliases mdl
       html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
         bodyHtml doctitle (Just iface)
@@ -484,8 +482,7 @@ ppHtmlModule odir doctitle themes
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode qual debug
-
+  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode real_qual debug
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
   -> Interface -> Bool -> Qualification -> Bool -> IO ()
@@ -511,18 +508,16 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
     -- todo: if something has only sub-docs, or fn-args-docs, should
     -- it be measured here and thus prevent omitting the synopsis?
-    has_doc (ExportDecl _ doc _ _) = isJust (fst doc)
+    has_doc (ExportDecl _ (Documentation mDoc mWarning, _) _ _) = isJust mDoc || isJust mWarning
     has_doc (ExportNoDecl _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True
 
     no_doc_at_all = not (any has_doc exports)
 
-    description
-          = case ifaceRnDoc iface of
-              Nothing -> noHtml
-              Just doc -> divDescription $
-                            sectionName << "Description" +++ docSection qual doc
+    description | isNoHtml doc = doc
+                | otherwise    = divDescription $ sectionName << "Description" +++ doc
+                where doc = docSection qual (ifaceRnDoc iface)
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
@@ -539,7 +534,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     maybe_doc_hdr
       = case exports of
           [] -> noHtml
-          ExportGroup _ _ _ : _ -> noHtml
+          ExportGroup {} : _ -> noHtml
           _ -> h1 << "Documentation"
 
     bdy =
@@ -617,7 +612,7 @@ ppModuleContents qual exports
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
 numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
-numberSectionHeadings exports = go 1 exports
+numberSectionHeadings = go 1
   where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
         go _ [] = []
         go n (ExportGroup lev _ doc : es)
@@ -638,7 +633,7 @@ processExport summary _ _ qual (ExportNoDecl y subs)
   = processDeclOneLiner summary $
       ppDocName qual y +++ parenList (map (ppDocName qual) subs)
 processExport summary _ _ qual (ExportDoc doc)
-  = nothingIf summary $ docSection qual doc
+  = nothingIf summary $ docSection_ qual doc
 processExport summary _ _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 

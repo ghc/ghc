@@ -1,15 +1,15 @@
 #!/bin/sh
 cd `dirname $0`
 
-runhaskell -hide-all-packages -cpp \
-    -packagecontainers \
-    -packagearray \
-    -packagebase \
+runhaskell \
+    -i../../src \
+    -i../../dist/build/autogen \
+    -i../../dist/build/haddock/haddock-tmp/ \
     -packageghc \
-    -packagexhtml \
-    -packageghc-paths \
-    -packageHUnit \
-    -i../../dist/build/ \
-    -i../../src/ \
-    -optP-include -optP../../dist/build/autogen/cabal_macros.h \
+    -optP-include \
+    -optP../../dist/build/autogen/cabal_macros.h \
+    -XCPP \
+    -XDeriveDataTypeable \
+    -XScopedTypeVariables \
+    -XMagicHash \
     parsetests.hs

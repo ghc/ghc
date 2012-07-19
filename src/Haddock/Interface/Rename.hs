@@ -12,18 +12,19 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
-import Haddock.Types
 import Haddock.GhcUtils
+import Haddock.Types
 
+import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
-import Bag (emptyBag)
 
+import Control.Applicative
+import Control.Monad hiding (mapM)
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
-import Prelude hiding (mapM)
 import Data.Traversable (mapM)
-import Control.Monad hiding (mapM)
+import Prelude hiding (mapM)
 
 
 renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
@@ -45,7 +46,7 @@ renameInterface dflags renamingEnv warnings iface =
       (rnArgMap, missingNames3) = runRnFM localEnv (mapM (mapM renameDoc) (ifaceArgMap iface))
 
       (finalModuleDoc, missingNames4)
-        = runRnFM localEnv (renameMaybeDoc (ifaceDoc iface))
+        = runRnFM localEnv (renameDocumentation (ifaceDoc iface))
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing.
@@ -92,6 +93,13 @@ instance Monad (GenRnM n) where
   (>>=) = thenRn
   return = returnRn
 
+instance Functor (GenRnM n) where
+  fmap f x = do a <- x; return (f a)
+
+instance Applicative (GenRnM n) where
+  pure = return
+  (<*>) = ap
+
 returnRn :: a -> GenRnM n a
 returnRn a   = RnM (const (a,[]))
 thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
@@ -137,15 +145,14 @@ renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
 renameExportItems = mapM renameExportItem
 
 
-renameDocForDecl :: (Maybe (Doc Name), FnArgsDoc Name) -> RnM (Maybe (Doc DocName), FnArgsDoc DocName)
-renameDocForDecl (mbDoc, fnArgsDoc) = do
-  mbDoc' <- renameMaybeDoc mbDoc
-  fnArgsDoc' <- renameFnArgsDoc fnArgsDoc
-  return (mbDoc', fnArgsDoc')
+renameDocForDecl :: DocForDecl Name -> RnM (DocForDecl DocName)
+renameDocForDecl (doc, fnArgsDoc) =
+  (,) <$> renameDocumentation doc <*> renameFnArgsDoc fnArgsDoc
 
 
-renameMaybeDoc :: Maybe (Doc Name) -> RnM (Maybe (Doc DocName))
-renameMaybeDoc = mapM renameDoc
+renameDocumentation :: Documentation Name -> RnM (Documentation DocName)
+renameDocumentation (Documentation mDoc mWarning) =
+  Documentation <$> mapM renameDoc mDoc <*> mapM renameDoc mWarning
 
 
 renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
@@ -168,6 +175,9 @@ renameDoc d = case d of
     return (DocIdentifier x')
   DocIdentifierUnchecked x -> return (DocIdentifierUnchecked x)
   DocModule str -> return (DocModule str)
+  DocWarning doc -> do
+    doc' <- renameDoc doc
+    return (DocWarning doc')
   DocEmphasis doc -> do
     doc' <- renameDoc doc
     return (DocEmphasis doc')
@@ -240,11 +250,11 @@ renameType t = case t of
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
 
-  HsOpTy a (w, (L loc op)) b -> do
+  HsOpTy a (w, L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy a' (w, (L loc op')) b')
+    return (HsOpTy a' (w, L loc op') b')
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
 

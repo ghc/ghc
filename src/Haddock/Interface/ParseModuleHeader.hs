@@ -137,14 +137,14 @@ parseKey key toParse0 =
                (spaces1,cs1) = extractLeadingSpaces cs
             in
                (c:spaces1,cs1)
-         | True = ([],s)
+         | otherwise = ([],s)
 
       extractNextLine :: String -> (String,String)
       extractNextLine [] = ([],[])
       extractNextLine (c:cs)
          | c == '\n' =
             ([],cs)
-         | True =
+         | otherwise =
             let
                (line,rest) = extractNextLine cs
             in
@@ -156,5 +156,5 @@ parseKey key toParse0 =
       extractPrefix _ [] = Nothing
       extractPrefix (c1:cs1) (c2:cs2)
          | toUpper c1 == toUpper c2 = extractPrefix cs1 cs2
-         | True = Nothing
+         | otherwise = Nothing
 
