@@ -325,9 +325,9 @@ handleLastNode procpoints liveness cont_info stackmaps
        return $ lastCall cont_lbl wORD_SIZE wORD_SIZE (sm_ret_off stack0)
             -- one word each for args and results: the return address
 
-    CmmBranch{..}     ->  handleProcPoints
-    CmmCondBranch{..} ->  handleProcPoints
-    CmmSwitch{..}     ->  handleProcPoints
+    CmmBranch{..}     ->  handleBranches
+    CmmCondBranch{..} ->  handleBranches
+    CmmSwitch{..}     ->  handleBranches
 
   where
      -- Calls and ForeignCalls are handled the same way:
@@ -365,13 +365,13 @@ handleLastNode procpoints liveness cont_info stackmaps
      -- proc point, we have to set up the stack to match what the proc
      -- point is expecting.
      --
-     handleProcPoints :: UniqSM ( [CmmNode O O]
+     handleBranches :: UniqSM ( [CmmNode O O]
                                 , ByteOff
                                 , CmmNode O C
                                 , [CmmBlock]
                                 , BlockEnv StackMap )
 
-     handleProcPoints
+     handleBranches
          -- Note [diamond proc point]
        | Just l <- futureContinuation middle
        , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
@@ -387,52 +387,65 @@ handleLastNode procpoints liveness cont_info stackmaps
                 , out)
 
         | otherwise = do
-          pps <- mapM handleProcPoint (successors last)
+          pps <- mapM handleBranch (successors last)
           let lbl_map :: LabelMap Label
               lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
-              fix_lbl l = mapLookup l lbl_map `orElse` l
+              fix_lbl l = mapFindWithDefault l l lbl_map
           return ( []
                  , 0
                  , mapSuccessors fix_lbl last
                  , concat [ blk | (_,_,_,blk) <- pps ]
                  , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
 
-     -- For each proc point that is a successor of this block
-     --   (a) if the proc point already has a stackmap, we need to
-     --       shuffle the current stack to make it look the same.
-     --       We have to insert a new block to make this happen.
-     --   (b) otherwise, call "allocate live stack0" to make the
-     --       stack map for the proc point
-     handleProcPoint :: BlockId
-                     -> UniqSM (BlockId, BlockId, StackMap, [CmmBlock])
-     handleProcPoint l
-        | not (l `setMember` procpoints) = return (l, l, stack0, [])
-        | otherwise = do
-           tmp_lbl <- liftM mkBlockId $ getUniqueM
-           let
-               (stack2, assigs) =
-                  case mapLookup l stackmaps of
-                    Just pp_sm -> (pp_sm, fixupStack stack0 pp_sm)
-                    Nothing    ->
+     -- For each successor of this block
+     handleBranch :: BlockId -> UniqSM (BlockId, BlockId, StackMap, [CmmBlock])
+     handleBranch l
+        --   (a) if the successor already has a stackmap, we need to
+        --       shuffle the current stack to make it look the same.
+        --       We have to insert a new block to make this happen.
+        | Just stack2 <- mapLookup l stackmaps
+        = do
+             let assigs = fixupStack stack0 stack2
+             (tmp_lbl, block) <- makeFixupBlock sp0 l stack2 assigs
+             return (l, tmp_lbl, stack2, block)
+
+        --   (b) if the successor is a proc point, save everything
+        --       on the stack.
+        | l `setMember` procpoints
+        = do
+             let cont_args = mapFindWithDefault 0 l cont_info
+                 (stack2, assigs) =
                       --pprTrace "first visit to proc point"
                       --             (ppr l <+> ppr stack1) $
-                      (stack1, assigs)
-                      where
-                       cont_args = mapFindWithDefault 0 l cont_info
-                       (stack1, assigs) =
-                           setupStackFrame l liveness (sm_ret_off stack0)
+                      setupStackFrame l liveness (sm_ret_off stack0)
                                                        cont_args stack0
+             --
+             (tmp_lbl, block) <- makeFixupBlock sp0 l stack2 assigs
+             return (l, tmp_lbl, stack2, block)
 
-               sp_off = sp0 - sm_sp stack2
+        --   (c) otherwise, the current StackMap is the StackMap for
+        --       the continuation.  But we must remember to remove any
+        --       variables from the StackMap that are *not* live at
+        --       the destination, because this StackMap might be used
+        --       by fixupStack if this is a join point.
+        | otherwise = return (l, l, stack1, [])
+        where live = mapFindWithDefault (panic "handleBranch") l liveness
+              stack1 = stack0 { sm_regs = filterUFM is_live (sm_regs stack0) }
+              is_live (r,_) = r `elemRegSet` live
 
-               block = blockJoin (CmmEntry tmp_lbl)
-                                 (maybeAddSpAdj sp_off (blockFromList assigs))
-                                 (CmmBranch l)
-           --
-           return (l, tmp_lbl, stack2, [block])
+
+makeFixupBlock :: ByteOff -> Label -> StackMap -> [CmmNode O O] -> UniqSM (Label, [CmmBlock])
+makeFixupBlock sp0 l stack assigs
+  | null assigs && sp0 == sm_sp stack = return (l, [])
+  | otherwise = do
+    tmp_lbl <- liftM mkBlockId $ getUniqueM
+    let sp_off = sp0 - sm_sp stack
+        block = blockJoin (CmmEntry tmp_lbl)
+                          (maybeAddSpAdj sp_off (blockFromList assigs))
+                          (CmmBranch l)
+    return (tmp_lbl, [block])
 
 
-  
 -- Sp is currently pointing to current_sp,
 -- we want it to point to
 --    (sm_sp cont_stack - sm_args cont_stack + args)
