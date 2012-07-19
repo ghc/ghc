@@ -279,6 +279,7 @@ data DynFlag
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
    | Opt_RegLiveness                    -- Use the STG Reg liveness information (hidden flag)
    | Opt_IrrefutableTuples
+   | Opt_CmmSink
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2039,6 +2040,7 @@ fFlags = [
   ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
   ( "regs-liveness",                    Opt_RegLiveness, nop), -- hidden flag
   ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
+  ( "cmm-sink",                         Opt_CmmSink, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
@@ -2311,6 +2313,7 @@ optLevelFlags
     , ([2],     Opt_RegsGraph)
     , ([0,1,2], Opt_LlvmTBAA)
     , ([0,1,2], Opt_RegLiveness)
+    , ([1,2],   Opt_CmmSink)
 
 --     , ([2],     Opt_StaticArgumentTransformation)
 -- Max writes: I think it's probably best not to enable SAT with -O2 for the

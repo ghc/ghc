@@ -114,8 +114,6 @@ pprTop (CmmData section ds) =
 -- Info tables.
 
 pprInfoTable :: CmmInfoTable -> SDoc
-pprInfoTable CmmNonInfoTable
-  = empty
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = _srt })

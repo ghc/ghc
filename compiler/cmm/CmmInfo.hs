@@ -21,6 +21,7 @@ import SMRep
 import Bitmap
 import Stream (Stream)
 import qualified Stream
+import Hoopl
 
 import Maybes
 import Constants
@@ -90,17 +91,63 @@ mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) 
   = return [CmmData sec dat]
 
-mkInfoTable dflags (CmmProc info entry_label blocks)
-  | CmmNonInfoTable <- info   -- Code without an info table.  Easy.
-  = return [CmmProc Nothing entry_label blocks]
-                               
-  | CmmInfoTable { cit_lbl = info_lbl } <- info
-  = do { (top_decls, info_cts) <- mkInfoTableContents dflags info Nothing
-       ; return (top_decls  ++
-                 mkInfoTableAndCode info_lbl info_cts
-                                    entry_label blocks) }
-  | otherwise = panic "mkInfoTable"
-                  -- Patern match overlap check not clever enough
+mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
+  --
+  -- in the non-tables-next-to-code case, procs can have at most a
+  -- single info table associated with the entry label of the proc.
+  --
+  | not tablesNextToCode
+  = case topInfoTable proc of   --  must be at most one
+      -- no info table
+      Nothing ->
+         return [CmmProc mapEmpty entry_lbl blocks]
+
+      Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
+        (top_decls, (std_info, extra_bits)) <-
+             mkInfoTableContents dflags info Nothing
+        let
+          rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
+          rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
+        --
+        case blocks of
+          ListGraph [] ->
+              -- No code; only the info table is significant
+              -- Use a zero place-holder in place of the
+              -- entry-label in the info table
+              return (top_decls ++
+                      [mkRODataLits info_lbl (zeroCLit : rel_std_info ++
+                                                         rel_extra_bits)])
+          _nonempty ->
+             -- Separately emit info table (with the function entry
+             -- point as first entry) and the entry code
+             return (top_decls ++
+                     [CmmProc mapEmpty entry_lbl blocks,
+                      mkDataLits Data info_lbl
+                         (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
+
+  --
+  -- With tables-next-to-code, we can have many info tables,
+  -- associated with some of the BlockIds of the proc.  For each info
+  -- table we need to turn it into CmmStatics, and collect any new
+  -- CmmDecls that arise from doing so.
+  --
+  | otherwise
+  = do
+    (top_declss, raw_infos) <- unzip `fmap` mapM do_one_info (mapToList infos)
+    return (concat top_declss ++
+            [CmmProc (mapFromList raw_infos) entry_lbl blocks])
+
+  where
+   do_one_info (lbl,itbl) = do
+     (top_decls, (std_info, extra_bits)) <-
+         mkInfoTableContents dflags itbl Nothing
+     let
+        info_lbl = cit_lbl itbl
+        rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
+        rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
+     --
+     return (top_decls, (lbl, Statics info_lbl $ map CmmStaticLit $
+                              reverse rel_extra_bits ++ rel_std_info))
 
 -----------------------------------------------------
 type InfoTableContents = ( [CmmLit]	     -- The standard part
@@ -206,36 +253,6 @@ mkSRTLit (C_SRT lbl off bitmap) = ([cmmLabelOffW lbl off], bitmap)
 --   * the entry label
 --   * the code
 -- and lays them out in memory, producing a list of RawCmmDecl
-
--- The value of tablesNextToCode determines the relative positioning
--- of the extra bits and the standard info table, and whether the
--- former is reversed or not.  It also decides whether pointers in the
--- info table should be expressed as offsets relative to the info
--- pointer or not (see "Position Independent Code" below.
-
-mkInfoTableAndCode :: CLabel             -- Info table label
-                   -> InfoTableContents
-                   -> CLabel     	 -- Entry label
-                   -> ListGraph CmmStmt  -- Entry code
-                   -> [RawCmmDecl]
-mkInfoTableAndCode info_lbl (std_info, extra_bits) entry_lbl blocks
-  | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
-  = [CmmProc (Just $ Statics info_lbl $ map CmmStaticLit $
-                     reverse rel_extra_bits ++ rel_std_info)
-             entry_lbl blocks]
-
-  | ListGraph [] <- blocks -- No code; only the info table is significant
-  =		-- Use a zero place-holder in place of the 
-		-- entry-label in the info table
-    [mkRODataLits info_lbl (zeroCLit : rel_std_info ++ rel_extra_bits)]
-
-  | otherwise	-- Separately emit info table (with the function entry 
-  =		-- point as first entry) and the entry code 
-    [CmmProc Nothing entry_lbl blocks,
-     mkDataLits Data info_lbl (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)]
-  where
-    rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
-    rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
 
 -------------------------------------------------------------------------
 --

@@ -10,6 +10,7 @@ module CmmPipeline (
 ) where
 
 import Cmm
+import CmmUtils
 import CmmLint
 import CmmBuildInfoTables
 import CmmCommonBlockElim
@@ -25,6 +26,7 @@ import ErrUtils
 import HscTypes
 import Control.Monad
 import Outputable
+import StaticFlags
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -65,56 +67,83 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        -- elimCommonBlocks
 
        ----------- Proc points -------------------
-       let callPPs = {-# SCC "callProcPoints" #-} callProcPoints g
-       procPoints <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
-                     minimalProcPointSet (targetPlatform dflags) callPPs g
+       let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       proc_points <-
+          if splitting_proc_points
+             then {-# SCC "minimalProcPointSet" #-} runUniqSM $
+                  minimalProcPointSet (targetPlatform dflags) call_pps g
+             else
+                  return call_pps
+
+       let noncall_pps = proc_points `setDifference` call_pps
+       when (not (setNull noncall_pps)) $
+         pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Layout the stack and manifest Sp ---------------
        -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
        (g, stackmaps) <- {-# SCC "layoutStack" #-}
-                         runUniqSM $ cmmLayoutStack dflags procPoints entry_off g
+                         runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
-       g <- if optLevel dflags >= 99
+       ----------- Sink and inline assignments -------------------
+       g <- if dopt Opt_CmmSink dflags
                then do g <- {-# SCC "sink" #-} return (cmmSink g)
                        dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
-                       g <- {-# SCC "inline" #-} return (cmmPeepholeInline g)
-                       dump Opt_D_dump_cmmz_rewrite "Peephole inline" g
                        return g
                else return g
-
---       ----------- Sink and inline assignments -------------------
---       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
---            rewriteAssignments platform g
---       dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
-
-       ------------- Split into separate procedures ------------
-       procPointMap  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
-                        procPointAnalysis procPoints g
-       dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
-       gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
-             splitAtProcPoints l callPPs procPoints procPointMap (CmmProc h l g)
-       dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
        ------------- CAF analysis ------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
 
-       ------------- Populate info tables with stack info ------
-       gs <- {-# SCC "setInfoTableStackMap" #-}
-             return $ map (setInfoTableStackMap stackmaps) gs
-       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
+       if splitting_proc_points
+          then do
+            ------------- Split into separate procedures ------------
+            pp_map  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
+                             procPointAnalysis proc_points g
+            dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" pp_map
+            gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
+                  splitAtProcPoints l call_pps proc_points pp_map (CmmProc h l g)
+            dumps Opt_D_dump_cmmz_split "Post splitting" gs
+     
+            ------------- Populate info tables with stack info ------
+            gs <- {-# SCC "setInfoTableStackMap" #-}
+                  return $ map (setInfoTableStackMap stackmaps) gs
+            dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
+     
+            ----------- Control-flow optimisations ---------------
+            gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
+            dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
-       ----------- Control-flow optimisations -----------------
-       gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
-       dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
+            return (cafEnv, gs)
 
-       return (cafEnv, gs)
+          else do
+            -- attach info tables to return points
+            g <- return $ attachContInfoTables call_pps (CmmProc h l g)
+
+            ------------- Populate info tables with stack info ------
+            g <- {-# SCC "setInfoTableStackMap" #-}
+                  return $ setInfoTableStackMap stackmaps g
+            dump' Opt_D_dump_cmmz_info "after setInfoTableStackMap" g
+     
+            ----------- Control-flow optimisations ---------------
+            g <- {-# SCC "cmmCfgOpts(2)" #-} return $ cmmCfgOptsProc g
+            dump' Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
+
+            return (cafEnv, [g])
 
   where dflags = hsc_dflags hsc_env
         dump = dumpGraph dflags
+        dump' = dumpWith dflags
 
         dumps flag name
            = mapM_ (dumpWith dflags flag name)
+
+        -- we don't need to split proc points for the NCG, unless
+        -- tablesNextToCode is off.  The latter is because we have no
+        -- label to put on info tables for basic blocks that are not
+        -- the entry point.
+        splitting_proc_points = hscTarget dflags /= HscAsm
+                             || not tablesNextToCode
 
 runUniqSM :: UniqSM a -> IO a
 runUniqSM m = do

@@ -820,18 +820,17 @@ elimStackStores stackmap stackmaps area_off nodes
 
 
 setInfoTableStackMap :: BlockEnv StackMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap stackmaps
-    (CmmProc top_info@TopInfo{..} l g@CmmGraph{g_entry = eid})
-  = CmmProc top_info{ info_tbl = fix_info info_tbl } l g
+setInfoTableStackMap stackmaps (CmmProc top_info@TopInfo{..} l g)
+  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l g
   where
-    fix_info info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
-       info_tbl { cit_rep = StackRep (get_liveness eid) }
-    fix_info other = other
+    fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
+       info_tbl { cit_rep = StackRep (get_liveness lbl) }
+    fix_info _ other = other
 
     get_liveness :: BlockId -> Liveness
     get_liveness lbl
       = case mapLookup lbl stackmaps of
-          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl)
+          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> ppr info_tbls)
           Just sm -> stackMapToLiveness sm
 
 setInfoTableStackMap _ d = d

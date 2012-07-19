@@ -470,7 +470,7 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
            jump = mkDirectJump (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
                                initUpdFrameOff
-       emitProcWithConvention Slow CmmNonInfoTable slow_lbl arg_regs jump
+       emitProcWithConvention Slow Nothing slow_lbl arg_regs jump
   | otherwise = return ()
 
 -----------------------------------------

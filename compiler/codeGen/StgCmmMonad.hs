@@ -66,6 +66,7 @@ module StgCmmMonad (
 import Cmm
 import StgCmmClosure
 import DynFlags
+import Hoopl
 import MkGraph
 import BlockId
 import CLabel
@@ -639,23 +640,30 @@ emitDecl decl
 emitOutOfLine :: BlockId -> CmmAGraph -> FCode ()
 emitOutOfLine l stmts = emitCgStmt (CgFork l stmts)
 
-emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> [CmmFormal] ->
-                          CmmAGraph -> FCode ()
-emitProcWithConvention conv info lbl args blocks
+emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
+                       -> [CmmFormal] -> CmmAGraph -> FCode ()
+emitProcWithConvention conv mb_info lbl args blocks
   = do  { us <- newUniqSupply
         ; let (offset, entry) = mkCallEntry conv args
               blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
         ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
-              proc_block = CmmProc (TopInfo {info_tbl=info, stack_info=sinfo}) lbl blks
+              tinfo = TopInfo {info_tbls = infos, stack_info=sinfo}
+              proc_block = CmmProc tinfo lbl blks
+
+              infos | Just info <- mb_info
+                    = mapSingleton (g_entry blks) info
+                    | otherwise
+                    = mapEmpty
+
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
-emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> CmmAGraph -> FCode ()
+emitProc :: Maybe CmmInfoTable -> CLabel -> [CmmFormal] -> CmmAGraph -> FCode ()
 emitProc = emitProcWithConvention NativeNodeCall
 
 emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
 emitSimpleProc lbl code = 
-  emitProc CmmNonInfoTable lbl [] code
+  emitProc Nothing lbl [] code
 
 getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)

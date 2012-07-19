@@ -100,7 +100,7 @@ pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   ptext (sLit "updfr_space: ") <> ppr updfr_space
 
 pprTopInfo :: CmmTopInfo -> SDoc
-pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
+pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
   vcat [ptext (sLit "info_tbl: ") <> ppr info_tbl,
         ptext (sLit "stack_info: ") <> ppr stack_info]
 
