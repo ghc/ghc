@@ -66,8 +66,8 @@ module TcSMonad (
     InertSet(..), InertCans(..), 
     getInertEqs, getCtCoercion,
     emptyInert, getTcSInerts, lookupInInerts, 
-    extractUnsolved,
-    extractUnsolvedTcS, modifyInertTcS,
+    getInertUnsolved, getInertInsols, splitInertsForImplications,
+    modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
     getRelevantCts, extractRelevantInerts,
     CCanMap(..), CtTypeMap, CtFamHeadMap, CtPredMap,
@@ -362,6 +362,13 @@ extractUnsolvedCMap cmap =
   in (wntd `unionBags` derd, 
       cmap { cts_wanted = emptyUFM, cts_derived = emptyUFM })
 
+extractWantedCMap :: CCanMap a -> (Cts, CCanMap a)
+-- Gets the wanted /only/ constraints and returns a residual
+-- CCanMap with only givens or derived
+extractWantedCMap cmap =
+  let wntd = foldUFM unionBags emptyCts (cts_wanted cmap)
+  in (wntd, cmap { cts_wanted = emptyUFM })
+
 
 -- Maps from PredTypes to Constraints
 type CtTypeMap    = TypeMap    Ct
@@ -655,64 +662,92 @@ modifyInertTcS upd
        ; return a }
 
 
-extractUnsolvedTcS :: TcS (Cts,Cts) 
--- Extracts frozen errors and remaining unsolved and sets the 
--- inert set to be the remaining! 
-extractUnsolvedTcS = modifyInertTcS extractUnsolved 
 
-extractUnsolved :: InertSet -> ((Cts,Cts), InertSet)
--- Postcondition
--- -------------
--- When: 
---   ((frozen,cts),is_solved) <- extractUnsolved inert
--- Then: 
--- -----------------------------------------------------------------------------
---  cts       |  The unsolved (Derived or Wanted only) residual 
---            |  canonical constraints, that is, no CNonCanonicals.
--- -----------|-----------------------------------------------------------------
---  frozen    | The CNonCanonicals of the original inert (frozen errors), 
---            | of all flavors
--- -----------|-----------------------------------------------------------------
---  is_solved | Whatever remains from the inert after removing the previous two. 
--- -----------------------------------------------------------------------------
-extractUnsolved (IS { inert_cans = IC { inert_eqs    = eqs
-                                      , inert_eq_tvs = eq_tvs
-                                      , inert_irreds = irreds
-                                      , inert_funeqs = funeqs
-                                      , inert_dicts  = dicts
-                                      }
-                    , inert_frozen = frozen
-                    , inert_solved = solved
-                    , inert_flat_cache = flat_cache 
-                    , inert_solved_funeqs = funeq_cache
-                    })
-  
-  = let is_solved  = IS { inert_cans = IC { inert_eqs    = solved_eqs
-                                          , inert_eq_tvs = eq_tvs
-                                          , inert_dicts  = solved_dicts
-                                          , inert_irreds = solved_irreds
-                                          , inert_funeqs = solved_funeqs }
-                        , inert_frozen = emptyCts -- All out
-                                         
-                              -- At some point, I used to flush all the solved, in 
-                              -- fear of evidence loops. But I think we are safe, 
-                              -- flushing is why T3064 had become slower
-                        , inert_solved        = solved      -- PredMap emptyTM
-                        , inert_flat_cache    = flat_cache  -- FamHeadMap emptyTM
-                        , inert_solved_funeqs = funeq_cache -- FamHeadMap emptyTM
-                        }
-    in ((frozen, unsolved), is_solved)
+splitInertsForImplications :: InertSet -> ([Ct],InertSet)
+-- Converts the Wanted of the original inert to Given and removes 
+-- all Wanted and Derived from the inerts.
+-- DV: Is the removal of Derived essential? 
+splitInertsForImplications is
+  = let (cts,is') = extractWanted is
+    in  (givens_from_unsolved cts,is')
+  where givens_from_unsolved = foldrBag get_unsolved []
+        get_unsolved cc rest_givens
+            | pushable_wanted cc
+            = let fl   = ctEvidence cc
+                  gfl  = Given { ctev_gloc = setCtLocOrigin (ctev_wloc fl) UnkSkol
+                               , ctev_evtm = EvId (ctev_evar fl)
+                               , ctev_pred = ctev_pred fl }
+                  this_given = cc { cc_ev = gfl }
+              in this_given : rest_givens
+            | otherwise = rest_givens 
 
-  where solved_eqs = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs
-        unsolved_eqs = foldVarEnv (\ct cts -> cts `extendCts` ct) emptyCts $
-                       eqs `minusVarEnv` solved_eqs
+        pushable_wanted :: Ct -> Bool 
+        pushable_wanted cc 
+         = isEqPred (ctPred cc) -- see Note [Preparing inert set for implications]
 
-        (unsolved_irreds, solved_irreds) = Bag.partitionBag (not.isGivenCt) irreds
-        (unsolved_dicts, solved_dicts)   = extractUnsolvedCMap dicts
-        (unsolved_funeqs, solved_funeqs) = partCtFamHeadMap (not . isGivenCt) funeqs
+        -- Returns Wanted constraints and a Derived/Given InertSet
+        extractWanted (IS { inert_cans = IC { inert_eqs    = eqs
+                                            , inert_eq_tvs = eq_tvs
+                                            , inert_irreds = irreds
+                                            , inert_funeqs = funeqs
+                                            , inert_dicts  = dicts
+                                            }
+                          , inert_frozen = _frozen
+                          , inert_solved = solved
+                          , inert_flat_cache = flat_cache 
+                          , inert_solved_funeqs = funeq_cache
+                          })
+          
+          = let is_solved  = IS { inert_cans = IC { inert_eqs    = solved_eqs
+                                                  , inert_eq_tvs = eq_tvs
+                                                  , inert_dicts  = solved_dicts
+                                                  , inert_irreds = solved_irreds
+                                                  , inert_funeqs = solved_funeqs }
+                                , inert_frozen = emptyCts -- All out
+                                                 
+                                      -- At some point, I used to flush all the solved, in 
+                                      -- fear of evidence loops. But I think we are safe, 
+                                      -- flushing is why T3064 had become slower
+                                , inert_solved        = solved      -- PredMap emptyTM
+                                , inert_flat_cache    = flat_cache  -- FamHeadMap emptyTM
+                                , inert_solved_funeqs = funeq_cache -- FamHeadMap emptyTM
+                                }
+            in (wanted, is_solved)
 
-        unsolved = unsolved_eqs `unionBags` unsolved_irreds `unionBags`
-                   unsolved_dicts `unionBags` unsolved_funeqs
+          where gd_eqs = filterVarEnv_Directly (\_ ct -> not (isWantedCt ct)) eqs
+                wanted_eqs = foldVarEnv (\ct cts -> cts `extendCts` ct) emptyCts $ 
+                             eqs `minusVarEnv` gd_eqs
+                
+                (wanted_irreds, gd_irreds) = Bag.partitionBag isWantedCt irreds
+                (wanted_dicts,  gd_dicts)  = extractWantedCMap dicts
+                (wanted_funeqs, gd_funeqs) = partCtFamHeadMap isWantedCt funeqs
+
+                -- Is this all necessary? 
+                solved_eqs        = filterVarEnv_Directly (\_ ct -> isGivenCt ct) gd_eqs 
+                solved_irreds     = Bag.filterBag isGivenCt gd_irreds
+                (_,solved_dicts)  = extractUnsolvedCMap gd_dicts
+                (_,solved_funeqs) = partCtFamHeadMap (not . isGivenCt) gd_funeqs
+
+                wanted = wanted_eqs `unionBags` wanted_irreds `unionBags`
+                         wanted_dicts `unionBags` wanted_funeqs
+
+
+getInertInsols :: InertSet -> Cts
+-- Insolubles only
+getInertInsols is = inert_frozen is
+
+getInertUnsolved :: InertSet -> Cts
+-- Unsolved Wanted or Derived only 
+getInertUnsolved (IS { inert_cans = icans }) 
+  = let unsolved_eqs = foldVarEnv add_if_not_given emptyCts (inert_eqs icans)
+        add_if_not_given ct cts
+            | isGivenCt ct = cts
+            | otherwise    = cts `extendCts` ct
+        (unsolved_irreds,_) = Bag.partitionBag (not . isGivenCt) (inert_irreds icans)
+        (unsolved_dicts,_)  = extractUnsolvedCMap (inert_dicts icans)
+        (unsolved_funeqs,_) = partCtFamHeadMap (not . isGivenCt) (inert_funeqs icans)
+    in unsolved_eqs `unionBags` unsolved_irreds `unionBags` 
+       unsolved_dicts `unionBags` unsolved_funeqs
 
 
 

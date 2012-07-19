@@ -782,7 +782,9 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
        -- out of one or more of the implications. 
        ; unsolved_implics <- simpl_loop 1 (implics `unionBags` impls_from_flats)
 
-       ; (insoluble_flats,unsolved_flats) <- extractUnsolvedTcS 
+       ; is <- getTcSInerts 
+       ; let insoluble_flats = getInertInsols is
+             unsolved_flats  = getInertUnsolved is
 
        ; bb <- getTcEvBindsMap
        ; tb <- getTcSTyBindsMap
@@ -815,23 +817,23 @@ simpl_loop n implics
   | otherwise 
   = do { (implic_eqs, unsolved_implics) <- solveNestedImplications implics
 
-       ; inerts <- getTcSInerts
-       ; let ((_,unsolved_flats),_) = extractUnsolved inerts
-                                      
        ; let improve_eqs = implic_eqs
              -- NB: improve_eqs used to contain defaulting equations HERE but 
              -- defaulting now happens only at simplifyTop and not deep inside 
              -- simpl_loop! See Note [Top-level Defaulting Plan]
-             
+
+       ; unsolved_flats <- getTcSInerts >>= (return . getInertUnsolved) 
        ; traceTcS "solveWanteds: simpl_loop end" $
              vcat [ text "improve_eqs      =" <+> ppr improve_eqs
                   , text "unsolved_flats   =" <+> ppr unsolved_flats
                   , text "unsolved_implics =" <+> ppr unsolved_implics ]
 
+
        ; if isEmptyBag improve_eqs then return unsolved_implics 
          else do { impls_from_eqs <- solveInteractCts $ bagToList improve_eqs
                  ; simpl_loop (n+1) (unsolved_implics `unionBags` 
                                                  impls_from_eqs)} }
+
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Cts, Bag Implication)
@@ -842,19 +844,17 @@ solveNestedImplications implics
   = return (emptyBag, emptyBag)
   | otherwise 
   = do { inerts <- getTcSInerts
-       ; traceTcS "solveNestedImplications starting, inerts are:" $ ppr inerts
-         
-       ; let ((_insoluble_flats, unsolved_flats),thinner_inerts) = extractUnsolved inerts 
+       ; traceTcS "solveNestedImplications starting, inerts are:" $ ppr inerts         
+       ; let (pushed_givens, thinner_inerts) = splitInertsForImplications inerts
+  
        ; traceTcS "solveNestedImplications starting, more info:" $ 
-         vcat [ text "inerts          = " <+> ppr inerts
-              , text "insoluble_flats = " <+> ppr _insoluble_flats
-              , text "unsolved_flats  = " <+> ppr unsolved_flats
+         vcat [ text "original inerts = " <+> ppr inerts
+              , text "pushed_givens   = " <+> ppr pushed_givens
               , text "thinner_inerts  = " <+> ppr thinner_inerts ]
          
        ; (implic_eqs, unsolved_implics)
            <- doWithInert thinner_inerts $ 
-              do { let pushed_givens = givens_from_wanteds unsolved_flats
-                       tcs_untouchables 
+              do { let tcs_untouchables 
                          = foldr (unionVarSet . tyVarsOfCt) emptyVarSet pushed_givens
                                           -- Typically pushed_givens is very small, consists
                                           -- only of unsolved equalities, so no inefficiency 
@@ -884,23 +884,6 @@ solveNestedImplications implics
                        , text "unsolved_implics =" <+> ppr unsolved_implics ]
 
        ; return (implic_eqs, unsolved_implics) }
-
-  where givens_from_wanteds = foldrBag get_wanted []
-        get_wanted cc rest_givens
-            | pushable_wanted cc
-            = let fl   = ctEvidence cc
-                  gfl  = Given { ctev_gloc = setCtLocOrigin (ctev_wloc fl) UnkSkol
-                               , ctev_evtm = EvId (ctev_evar fl)
-                               , ctev_pred = ctev_pred fl }
-                  this_given = cc { cc_ev = gfl }
-              in this_given : rest_givens
-            | otherwise = rest_givens 
-
-        pushable_wanted :: Ct -> Bool 
-        pushable_wanted cc 
-         | isWantedCt cc 
-         = isEqPred (ctPred cc) -- see Note [Preparing inert set for implications]
-         | otherwise = False 
 
 solveImplication :: TcTyVarSet     -- Untouchable TcS unification variables
                  -> Implication    -- Wanted
@@ -1522,7 +1505,7 @@ defaultTyVar the_tv
        ; implics_from_defaulting <- solveInteractCts cts
        ; MASSERT (isEmptyBag implics_from_defaulting)
          
-       ; (_,unsolved) <- extractUnsolvedTcS
+       ; unsolved <- getTcSInerts >>= (return . getInertUnsolved)
        ; if isEmptyBag (keepWanted unsolved) then return (listToBag cts)
          else return emptyBag }
   | otherwise = return emptyBag	 -- The common case
@@ -1638,7 +1621,7 @@ disambigGroup (default_ty:default_tys) group
                            -- I am not certain if any implications can be generated
                            -- but I am letting this fail aggressively if this ever happens.
                                      
-                       ; (_,unsolved) <- extractUnsolvedTcS 
+                       ; unsolved <- getTcSInerts >>= (return . getInertUnsolved)  
                        ; traceTcS "disambigGroup (solving) }" $
                          text "disambigGroup unsolved =" <+> ppr (keepWanted unsolved)
                        ; if isEmptyBag (keepWanted unsolved) then -- Don't care about Derived's
