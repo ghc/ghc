@@ -25,10 +25,10 @@ import Prelude hiding (succ, unzip, zip)
 -----------------------------------------------------------------------------
 
 cmmCfgOpts :: CmmGraph -> CmmGraph
-cmmCfgOpts g = removeUnreachableBlocks $ fst (blockConcat g)
+cmmCfgOpts g = fst (blockConcat g)
 
 cmmCfgOptsProc :: CmmDecl -> CmmDecl
-cmmCfgOptsProc (CmmProc info lbl g) = CmmProc info' lbl (removeUnreachableBlocks g')
+cmmCfgOptsProc (CmmProc info lbl g) = CmmProc info' lbl g'
     where (g', env) = blockConcat g
           info' = info{ info_tbls = new_info_tbls }
           new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))
