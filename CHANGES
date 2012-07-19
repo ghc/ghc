@@ -1,3 +1,40 @@
+Changes in version 2.11.0
+
+ * Show deprecation messages for identifiers
+
+ * List identifiers declared on the same line (with a common type) separately
+
+ * Don't crash on unicode strings in doc comments
+
+ * Fix reporting of modules safe haskell mode
+
+ * Fix a case where we were generating invalid xhtml 
+
+ * Improved --qual option (no crashes, proper error messages)
+
+ * A new --qual option "aliased" which qualifies identifers by the module alias
+   used in the source code
+
+ * The Haddock API restores GHC's static flags after invocation
+
+ * Access to unexported identifiers through the Haddock API again
+
+Changes in version 2.10.0
+
+ * Require GHC >= 7.4
+
+ * Safe Haskell indications on module pages
+
+ * Type declarations on identifiers no longer necessary
+
+ * Add flag --interface-version
+
+ * Warn when comment refers to in-scope identifier without documentation
+
+ * Bug fix: links to out-of-scope things (#78)
+
+ * Bug fix: module references to other packages work again
+
 Changes in version 2.9.4
 
   * Require GHC >= 7.2

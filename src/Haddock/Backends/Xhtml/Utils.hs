@@ -17,7 +17,7 @@ module Haddock.Backends.Xhtml.Utils (
   spliceURL,
   groupId,
 
-  (<+>), char, nonEmpty,
+  (<+>), char,
   keyword, punctuate,
 
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
@@ -44,7 +44,7 @@ import Name     ( getOccString, nameOccName, isValOcc )
 
 spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name ->
              Maybe SrcSpan -> String -> String
-spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
+spliceURL maybe_file maybe_mod maybe_name maybe_loc = run
  where
   file = fromMaybe "" maybe_file
   mdl = case maybe_mod of
@@ -72,7 +72,7 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
   run ('%':'N':rest) = name ++ run rest
   run ('%':'K':rest) = kind ++ run rest
   run ('%':'L':rest) = line ++ run rest
-  run ('%':'%':rest) = "%"  ++ run rest
+  run ('%':'%':rest) = '%'   : run rest
 
   run ('%':'{':'M':'O':'D':'U':'L':'E':'}':rest) = mdl  ++ run rest
   run ('%':'{':'F':'I':'L':'E':'}':rest)         = file ++ run rest
@@ -117,15 +117,6 @@ comma  = char ','
 
 char :: Char -> Html
 char c = toHtml [c]
-
-
--- | Make an element that always has at least something (a non-breaking space)
--- If it would have otherwise been empty, then give it the class ".empty"
-nonEmpty :: (Html -> Html) -> Html -> Html
-nonEmpty el content_ =
-  if isNoHtml content_
-    then el ! [theclass "empty"] << spaceHtml
-    else el << content_
 
 
 quote :: Html -> Html

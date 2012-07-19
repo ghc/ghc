@@ -488,6 +488,6 @@ td.rdoc p {
 	background: inherit;
 }
 
-
-
-
+.warning {
+  color: red;
+}

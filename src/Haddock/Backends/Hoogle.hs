@@ -48,11 +48,11 @@ ppHoogle dflags package version synopsis prologue ifaces odir = do
     hClose h
 
 ppModule :: DynFlags -> Interface -> [String]
-ppModule dflags iface
-               = "" : doc dflags (ifaceDoc iface) ++
-                 ["module " ++ moduleString (ifaceMod iface)] ++
-                 concatMap (ppExport dflags) (ifaceExportItems iface) ++
-                 concatMap (ppInstance dflags) (ifaceInstances iface)
+ppModule dflags iface =
+  "" : ppDocumentation dflags (ifaceDoc iface) ++
+  ["module " ++ moduleString (ifaceMod iface)] ++
+  concatMap (ppExport dflags) (ifaceExportItems iface) ++
+  concatMap (ppInstance dflags) (ifaceInstances iface)
 
 
 ---------------------------------------------------------------------
@@ -102,7 +102,7 @@ out dflags = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual dfla
 
 
 operator :: String -> String
-operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = "(" ++ x:xs ++ ")"
+operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x:xs ++ ")"
 operator x = x
 
 
@@ -110,7 +110,7 @@ operator x = x
 -- How to print each export
 
 ppExport :: DynFlags -> ExportItem Name -> [String]
-ppExport dflags (ExportDecl decl dc subdocs _) = doc dflags (fst dc) ++ f (unL decl)
+ppExport dflags (ExportDecl decl dc subdocs _) = ppDocumentation dflags (fst dc) ++ f (unL decl)
     where
         f (TyClD d@TyDecl{})
             | isDataDecl d      = ppData dflags d subdocs
@@ -127,7 +127,7 @@ ppSig :: DynFlags -> Sig Name -> [String]
 ppSig dflags (TypeSig names sig)
     = [operator prettyNames ++ " :: " ++ outHsType dflags typ]
     where
-        prettyNames = concat . intersperse ", " $ map (out dflags) names
+        prettyNames = intercalate ", " $ map (out dflags) names
         typ = case unL sig of
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
                    x -> x
@@ -172,19 +172,19 @@ ppData dflags decl@(TyDecl { tcdTyDefn = defn }) subdocs
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
-lookupCon :: [(Name, DocForDecl Name)] -> Located Name -> Maybe (Doc Name)
-lookupCon subdocs (L _ name) = case lookup name subdocs of
-  Just (d, _) -> d
-  _ -> Nothing
+lookupCon :: DynFlags -> [(Name, DocForDecl Name)] -> Located Name -> [String]
+lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
+  Just (d, _) -> ppDocumentation dflags d
+  _ -> []
 
 ppCtor :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> ConDecl Name -> [String]
-ppCtor dflags dat subdocs con = doc dflags (lookupCon subdocs (con_name con))
+ppCtor dflags dat subdocs con = lookupCon dflags subdocs (con_name con)
                          ++ f (con_details con)
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++ concat
-                          [doc dflags (lookupCon subdocs (cd_fld_name r)) ++
+                          [lookupCon dflags subdocs (cd_fld_name r) ++
                            [out dflags (unL $ cd_fld_name r) `typeSig` [resType, cd_fld_type r]]
                           | r <- recs]
 
@@ -202,6 +202,10 @@ ppCtor dflags dat subdocs con = doc dflags (lookupCon subdocs (con_name con))
 
 ---------------------------------------------------------------------
 -- DOCUMENTATION
+
+ppDocumentation :: Outputable o => DynFlags -> Documentation o -> [String]
+ppDocumentation dflags (Documentation d w) = doc dflags d ++ doc dflags w
+
 
 doc :: Outputable o => DynFlags -> Maybe (Doc o) -> [String]
 doc dflags = docWith dflags ""
@@ -242,6 +246,7 @@ markupTag dflags = Markup {
   markupIdentifier           = box (TagInline "a") . str . out dflags,
   markupIdentifierUnchecked  = box (TagInline "a") . str . out dflags . snd,
   markupModule               = box (TagInline "a") . str,
+  markupWarning              = box (TagInline "i"),
   markupEmphasis             = box (TagInline "i"),
   markupMonospaced           = box (TagInline "tt"),
   markupPic                  = const $ str " ",

@@ -70,7 +70,7 @@ import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( isSuffixOf )
 import Data.Maybe ( mapMaybe )
 import System.Environment ( getProgName )
-import System.Exit ( exitWith, ExitCode(..) )
+import System.Exit
 import System.IO ( hPutStr, stderr )
 import System.IO.Unsafe ( unsafePerformIO )
 import qualified System.FilePath.Posix as HtmlPath
@@ -162,11 +162,11 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         field_avail (ConDeclField n _ _) = unLoc n `elem` names
         field_types flds = [ t | ConDeclField _ t _ <- flds ]
 
-    keep _ | otherwise = Nothing
+    keep _ = Nothing
 
 
 restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
-restrictDecls names decls = mapMaybe (filterLSigNames (`elem` names)) decls
+restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 
 
 restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]
@@ -298,7 +298,7 @@ getProgramName = liftM (`withoutSuffix` ".bin") getProgName
 
 
 bye :: String -> IO a
-bye s = putStr s >> exitWith ExitSuccess
+bye s = putStr s >> exitSuccess
 
 
 die :: String -> IO a
@@ -331,7 +331,6 @@ escapeStr = escapeURIString isUnreserved
 -- to avoid depending on the network lib, since doing so gives a
 -- circular build dependency between haddock and network
 -- (at least if you want to build network with haddock docs)
--- NB: These functions do NOT escape Unicode strings for URLs as per the RFCs
 escapeURIChar :: (Char -> Bool) -> Char -> String
 escapeURIChar p c
     | p c       = [c]
@@ -422,6 +421,7 @@ markup m (DocParagraph d)            = markupParagraph m (markup m d)
 markup m (DocIdentifier x)           = markupIdentifier m x
 markup m (DocIdentifierUnchecked x)  = markupIdentifierUnchecked m x
 markup m (DocModule mod0)            = markupModule m mod0
+markup m (DocWarning d)              = markupWarning m (markup m d)
 markup m (DocEmphasis d)             = markupEmphasis m (markup m d)
 markup m (DocMonospaced d)           = markupMonospaced m (markup m d)
 markup m (DocUnorderedList ds)       = markupUnorderedList m (map (markup m) ds)
@@ -448,6 +448,7 @@ idMarkup = Markup {
   markupIdentifier           = DocIdentifier,
   markupIdentifierUnchecked  = DocIdentifierUnchecked,
   markupModule               = DocModule,
+  markupWarning              = DocWarning,
   markupEmphasis             = DocEmphasis,
   markupMonospaced           = DocMonospaced,
   markupUnorderedList        = DocUnorderedList,

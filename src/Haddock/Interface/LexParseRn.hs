@@ -1,4 +1,4 @@
------------------------------------------------------------------------------
+  -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
 -- Copyright   :  (c) Isaac Dupree 2009,
@@ -9,11 +9,10 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Interface.LexParseRn
-  ( HaddockCommentType(..)
-  , lexParseRnHaddockComment
-  , lexParseRnHaddockCommentList
-  , lexParseRnMbHaddockComment
-  , lexParseRnHaddockModHeader
+  ( processDocString
+  , processDocStringParas
+  , processDocStrings
+  , processModuleHeader
   ) where
 
 
@@ -24,6 +23,7 @@ import Haddock.Interface.ParseModuleHeader
 import Haddock.Doc
 
 import Control.Applicative
+import Data.List
 import Data.Maybe
 import FastString
 import GHC
@@ -33,60 +33,57 @@ import RdrName
 import RnEnv
 
 
-data HaddockCommentType = NormalHaddockComment | DocSectionComment
-
-
-lexParseRnHaddockCommentList :: DynFlags -> HaddockCommentType -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
-lexParseRnHaddockCommentList dflags hty gre docStrs = do
-  docMbs <- mapM (lexParseRnHaddockComment dflags hty gre) docStrs
-  let docs = catMaybes docMbs
-  let doc = foldl docAppend DocEmpty docs
+processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString] -> ErrMsgM (Maybe (Doc Name))
+processDocStrings dflags gre strs = do
+  docs <- catMaybes <$> mapM (processDocStringParas dflags gre) strs
+  let doc = foldl' docAppend DocEmpty docs
   case doc of
     DocEmpty -> return Nothing
     _ -> return (Just doc)
 
 
-lexParseRnHaddockComment :: DynFlags -> HaddockCommentType ->
-    GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
-lexParseRnHaddockComment dflags hty gre (HsDocString fs) = do
+processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
+processDocStringParas = process parseParas
+
+
+processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Maybe (Doc Name))
+processDocString = process parseString
+
+process :: ([LToken] -> Maybe (Doc RdrName))
+        -> DynFlags
+        -> GlobalRdrEnv
+        -> HsDocString
+        -> ErrMsgM (Maybe (Doc Name))
+process parse dflags gre (HsDocString fs) = do
    let str = unpackFS fs
-   let toks = tokenise dflags str (0,0) -- TODO: real position
-   let parse = case hty of
-         NormalHaddockComment -> parseParas
-         DocSectionComment -> parseString
+   let toks = tokenise dflags str (0,0)  -- TODO: real position
    case parse toks of
      Nothing -> do
-       tell ["doc comment parse failed: "++str]
+       tell [ "doc comment parse failed: " ++ str ]
        return Nothing
      Just doc -> return (Just (rename dflags gre doc))
 
 
-lexParseRnMbHaddockComment :: DynFlags -> HaddockCommentType -> GlobalRdrEnv -> Maybe HsDocString -> ErrMsgM (Maybe (Doc Name))
-lexParseRnMbHaddockComment _ _ _ Nothing = return Nothing
-lexParseRnMbHaddockComment dflags hty gre (Just d) = lexParseRnHaddockComment dflags hty gre d
+processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
+                    -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
+processModuleHeader dflags gre safety mayStr = do
+  (hmi, doc) <-
+    case mayStr of
 
-
--- yes, you always get a HaddockModInfo though it might be empty
-lexParseRnHaddockModHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> GhcDocHdr
-                           -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
-lexParseRnHaddockModHeader dflags gre safety mbStr = do
-  (hmi, docn) <-
-    case mbStr of
       Nothing -> return failure
       Just (L _ (HsDocString fs)) -> do
         let str = unpackFS fs
         case parseModuleHeader dflags str of
-          Left mess -> do
-            tell ["haddock module header parse failed: " ++ mess]
+          Left msg -> do
+            tell ["haddock module header parse failed: " ++ msg]
             return failure
-          Right (info, doc) -> return (renameHmi dflags gre info, Just (rename dflags gre doc))
-  return (hmi { hmi_safety = Just $ showPpr dflags safety }, docn)
+          Right (hmi, doc) -> do
+            let hmi' = hmi { hmi_description = rename dflags gre <$> hmi_description hmi }
+                doc' = rename dflags gre doc
+            return (hmi', Just doc')
+  return (hmi { hmi_safety = Just $ showPpr dflags safety }, doc)
   where
     failure = (emptyHaddockModInfo, Nothing)
-
-
-renameHmi :: DynFlags -> GlobalRdrEnv -> HaddockModInfo RdrName -> HaddockModInfo Name
-renameHmi dflags gre hmi = hmi { hmi_description = rename dflags gre <$> hmi_description hmi }
 
 
 rename :: DynFlags -> GlobalRdrEnv -> Doc RdrName -> Doc Name
@@ -109,6 +106,7 @@ rename dflags gre = rn
           a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
               -- If an id can refer to multiple things, we give precedence to type
               -- constructors.
+      DocWarning doc -> DocWarning (rn doc)
       DocEmphasis doc -> DocEmphasis (rn doc)
       DocMonospaced doc -> DocMonospaced (rn doc)
       DocUnorderedList docs -> DocUnorderedList (map rn docs)

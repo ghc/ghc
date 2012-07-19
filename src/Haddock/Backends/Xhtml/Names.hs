@@ -25,6 +25,7 @@ import Haddock.Types
 import Haddock.Utils
 
 import Text.XHtml hiding ( name, title, p, quote )
+import qualified Data.Map as M
 import qualified Data.List as List
 
 import GHC
@@ -57,7 +58,10 @@ ppDocName qual docName =
   case docName of
     Documented name mdl ->
       linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual name mdl
-    Undocumented name -> ppQualifyName qual name (nameModule name)
+    Undocumented name
+      | isExternalName name || isWiredInName name ->
+          ppQualifyName qual name (nameModule name)
+      | otherwise -> ppName name
 
 
 -- | Render a name depending on the selected qualification mode
@@ -66,28 +70,33 @@ ppQualifyName qual name mdl =
   case qual of
     NoQual   -> ppName name
     FullQual -> ppFullQualName mdl name
-    -- this is just in case, it should never happen
-    LocalQual Nothing -> ppQualifyName FullQual name mdl
-    LocalQual (Just localmdl)
-      | moduleString mdl == moduleString localmdl -> ppName name
-      | otherwise -> ppFullQualName mdl name
-    -- again, this never happens
-    RelativeQual Nothing -> ppQualifyName FullQual name mdl
-    RelativeQual (Just localmdl) ->
+    LocalQual localmdl ->
+      if moduleString mdl == moduleString localmdl
+        then ppName name
+        else ppFullQualName mdl name
+    RelativeQual localmdl ->
       case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
         -- local, A.x -> x
-        Just []      -> ppQualifyName NoQual name mdl
+        Just []      -> ppName name
         -- sub-module, A.B.x -> B.x
         Just ('.':m) -> toHtml $ m ++ '.' : getOccString name
         -- some module with same prefix, ABC.x -> ABC.x
-        Just _       -> ppQualifyName FullQual name mdl
+        Just _       -> ppFullQualName mdl name
         -- some other module, D.x -> D.x
-        Nothing      -> ppQualifyName FullQual name mdl
+        Nothing      -> ppFullQualName mdl name
+    AliasedQual aliases localmdl ->
+      case (moduleString mdl == moduleString localmdl,
+            M.lookup mdl aliases) of
+        (False, Just alias) -> ppQualName alias name
+        _ -> ppName name
 
 
 ppFullQualName :: Module -> Name -> Html
 ppFullQualName mdl name = toHtml $ moduleString mdl ++ '.' : getOccString name
 
+ppQualName :: ModuleName -> Name -> Html
+ppQualName mdlName name =
+  toHtml $ moduleNameString mdlName ++ '.' : getOccString name
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)

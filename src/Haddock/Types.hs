@@ -24,6 +24,7 @@ import Control.Exception
 import Control.Arrow
 import Data.Typeable
 import Data.Map (Map)
+import Data.Maybe
 import qualified Data.Map as Map
 import Data.Monoid
 import GHC hiding (NoLink)
@@ -42,7 +43,6 @@ type ArgMap a      = Map Name (Map Int (Doc a))
 type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type SrcMap        = Map PackageId FilePath
-type GhcDocHdr     = Maybe LHsDocString
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 
@@ -68,10 +68,10 @@ data Interface = Interface
   , ifaceInfo            :: !(HaddockModInfo Name)
 
     -- | Documentation header.
-  , ifaceDoc             :: !(Maybe (Doc Name))
+  , ifaceDoc             :: !(Documentation Name)
 
     -- | Documentation header with cross-reference information.
-  , ifaceRnDoc           :: Maybe (Doc DocName)
+  , ifaceRnDoc           :: Documentation DocName
 
     -- | Haddock options for this module (prune, ignore-exports, etc).
   , ifaceOptions         :: ![DocOption]
@@ -104,12 +104,15 @@ data Interface = Interface
     -- module.
   , ifaceVisibleExports  :: ![Name]
 
+    -- | Aliases of module imports as in @import A.B.C as C@.
+  , ifaceModuleAliases   :: AliasMap
+
     -- | Instances exported by the module.
   , ifaceInstances       :: ![ClsInst]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
-  , ifaceHaddockCoverage  :: (Int,Int)
+  , ifaceHaddockCoverage :: (Int,Int)
   }
 
 
@@ -211,20 +214,30 @@ data ExportItem name
   -- | A cross-reference to another module.
   | ExportModule Module
 
+data Documentation name = Documentation
+  { documentationDoc :: Maybe (Doc name)
+  , documentationWarning :: Maybe (Doc name)
+  } deriving Functor
+
+
+combineDocumentation :: Documentation name -> Maybe (Doc name)
+combineDocumentation (Documentation Nothing Nothing) = Nothing
+combineDocumentation (Documentation mDoc mWarning)   = Just (fromMaybe mempty mWarning `mappend` fromMaybe mempty mDoc)
+
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (Doc name)
-type DocForDecl name = (Maybe (Doc name), FnArgsDoc name)
+type DocForDecl name = (Documentation name, FnArgsDoc name)
 
 
 noDocForDecl :: DocForDecl name
-noDocForDecl = (Nothing, Map.empty)
+noDocForDecl = (Documentation Nothing Nothing, Map.empty)
 
 
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
-unrenameDocForDecl (mbDoc, fnArgsDoc) =
-    (fmap unrenameDoc mbDoc, fmap unrenameDoc fnArgsDoc)
+unrenameDocForDecl (doc, fnArgsDoc) =
+    (fmap getName doc, (fmap . fmap) getName fnArgsDoc)
 
 
 -----------------------------------------------------------------------------
@@ -283,6 +296,7 @@ data Doc id
   | DocIdentifier id
   | DocIdentifierUnchecked (ModuleName, OccName)
   | DocModule String
+  | DocWarning (Doc id)
   | DocEmphasis (Doc id)
   | DocMonospaced (Doc id)
   | DocUnorderedList [Doc id]
@@ -299,10 +313,6 @@ data Doc id
 instance Monoid (Doc id) where
   mempty  = DocEmpty
   mappend = DocAppend
-
-
-unrenameDoc :: Doc DocName -> Doc Name
-unrenameDoc = fmap getName
 
 
 data Example = Example
@@ -324,6 +334,7 @@ data DocMarkup id a = Markup
   , markupIdentifier           :: id -> a
   , markupIdentifierUnchecked  :: (ModuleName, OccName) -> a
   , markupModule               :: String -> a
+  , markupWarning              :: a -> a
   , markupEmphasis             :: a -> a
   , markupMonospaced           :: a -> a
   , markupUnorderedList        :: [a] -> a
@@ -373,12 +384,44 @@ data DocOption
 
 
 -- | Option controlling how to qualify names
+data QualOption
+  = OptNoQual         -- ^ Never qualify any names.
+  | OptFullQual       -- ^ Qualify all names fully.
+  | OptLocalQual      -- ^ Qualify all imported names fully.
+  | OptRelativeQual   -- ^ Like local, but strip module prefix
+                      --   from modules in the same hierarchy.
+  | OptAliasedQual    -- ^ Uses aliases of module names
+                      --   as suggested by module import renamings.
+                      --   However, we are unfortunately not able
+                      --   to maintain the original qualifications.
+                      --   Image a re-export of a whole module,
+                      --   how could the re-exported identifiers be qualified?
+
+type AliasMap = Map Module ModuleName
+
 data Qualification
-  = NoQual                       -- ^ Never qualify any names.
-  | FullQual                     -- ^ Qualify all names fully.
-  | LocalQual (Maybe Module)     -- ^ Qualify all imported names fully.
-  | RelativeQual (Maybe Module)  -- ^ Like local, but strip module prefix.
-                                 --   from modules in the same hierarchy.
+  = NoQual
+  | FullQual
+  | LocalQual Module
+  | RelativeQual Module
+  | AliasedQual AliasMap Module
+       -- ^ @Module@ contains the current module.
+       --   This way we can distinguish imported and local identifiers.
+
+makeContentsQual :: QualOption -> Qualification
+makeContentsQual qual =
+  case qual of
+    OptNoQual -> NoQual
+    _         -> FullQual
+
+makeModuleQual :: QualOption -> AliasMap -> Module -> Qualification
+makeModuleQual qual aliases mdl =
+  case qual of
+    OptLocalQual      -> LocalQual mdl
+    OptRelativeQual   -> RelativeQual mdl
+    OptAliasedQual    -> AliasedQual aliases mdl
+    OptFullQual       -> FullQual
+    OptNoQual         -> NoQual
 
 
 -----------------------------------------------------------------------------
@@ -429,7 +472,7 @@ throwE str = throw (HaddockException str)
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
 -- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
 -- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: (Ghc (a, [ErrMsg])) }
+newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: Ghc (a, [ErrMsg]) }
 --instance MonadIO ErrMsgGhc where
 --  liftIO = WriterGhc . fmap (\a->(a,[])) liftIO
 --er, implementing GhcMonad involves annoying ExceptionMonad and
