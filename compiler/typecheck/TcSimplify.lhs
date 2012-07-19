@@ -65,7 +65,7 @@ simplifyTop wanteds
   = do { ev_binds_var <- newTcEvBinds
                          
        ; zonked_wanteds <- zonkWC wanteds
-       ; wc_first_go <- runTcSWithEvBinds ev_binds_var $ solveWanteds zonked_wanteds
+       ; wc_first_go <- solveWantedsWithEvBinds ev_binds_var zonked_wanteds
        ; cts <- applyTyVarDefaulting wc_first_go 
                 -- See Note [Top-level Defaulting Plan]
                 
@@ -79,7 +79,7 @@ simplifyTop wanteds
           = do { traceTc "simpl_top_loop }" empty
                ; TcRnMonad.getTcEvBinds ev_binds_var }
           | otherwise
-          = do { wc_residual <- runTcSWithEvBinds ev_binds_var $ solveWanteds wc
+          = do { wc_residual <- solveWantedsWithEvBinds ev_binds_var wc
                ; let wc_flat_approximate = approximateWC wc_residual
                ; (dflt_eqs,_unused_bind) <- runTcS $
                                             applyDefaultingRules wc_flat_approximate
@@ -198,13 +198,17 @@ simplifyDeriv orig pred tvs theta
        ; traceTc "simplifyDeriv" $ 
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
        ; (residual_wanted, _ev_binds1)
-             <- runTcS $ solveWanteds (mkFlatWC wanted)
+             <- solveWanteds (mkFlatWC wanted)
 
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
                          -- See Note [Exotic derived instance contexts]
              get_good :: Ct -> Either PredType Ct
-             get_good ct | validDerivPred skol_set p = Left p
-                         | otherwise                 = Right ct
+             get_good ct | validDerivPred skol_set p 
+                         , isWantedCt ct  = Left p 
+                         -- NB: residual_wanted may contain unsolved
+                         -- Derived and we stick them into the bad set
+                         -- so that reportUnsolved may decide what to do with them
+                         | otherwise = Right ct
                          where p = ctPred ct
 
        -- We never want to defer these errors because they are errors in the
@@ -363,8 +367,7 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
               -- bindings, so we can't just revert to the input
               -- constraint.
        ; ev_binds_var <- newTcEvBinds
-       ; wanted_transformed <- runTcSWithEvBinds ev_binds_var $ 
-                               solveWanteds zonked_wanteds
+       ; wanted_transformed <- solveWantedsWithEvBinds ev_binds_var zonked_wanteds
 
               -- Step 3) Fail fast if there is an insoluble constraint,
               -- unless we are deferring errors to runtime
@@ -376,12 +379,13 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
               -- NB: Already the fixpoint of any unifications that may have happened                                
               -- NB: We do not do any defaulting when inferring a type, this can lead
               -- to less polymorphic types, see Note [Default while Inferring]
-                                
+              -- NB: quant_candidates here are wanted or derived, we filter the wanteds later, anyway
+ 
               -- Step 5) Minimize the quantification candidates                             
        ; (quant_candidates_transformed, _extra_binds)   
-             <- runTcS $ solveWanteds $ WC { wc_flat  = quant_candidates
-                                           , wc_impl  = emptyBag
-                                           , wc_insol = emptyBag }
+             <- solveWanteds $ WC { wc_flat  = quant_candidates
+                                  , wc_impl  = emptyBag
+                                  , wc_insol = emptyBag }
 
               -- Step 6) Final candidates for quantification                
        ; let final_quant_candidates :: Bag PredType
@@ -515,6 +519,7 @@ to check the original wanted.
 
 
 approximateWC :: WantedConstraints -> Cts
+-- Postcondition: Wanted or Derived Cts 
 approximateWC wc = float_wc emptyVarSet wc
   where 
     float_wc :: TcTyVarSet -> WantedConstraints -> Cts
@@ -529,7 +534,7 @@ approximateWC wc = float_wc emptyVarSet wc
     float_flat :: TcTyVarSet -> Ct -> Cts
     float_flat skols ct
       | tyVarsOfCt ct `disjointVarSet` skols 
-      , isWantedCt ct = singleCt ct
+      = singleCt ct
       | otherwise = emptyCts
         
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
@@ -642,7 +647,7 @@ simplifyRule name lhs_wanted rhs_wanted
              
              	 -- We allow ourselves to unify environment 
 		 -- variables: runTcS runs with NoUntouchables
-       ; (resid_wanted, _) <- runTcS (solveWanteds zonked_all)
+       ; (resid_wanted, _) <- solveWanteds zonked_all
 
        ; zonked_lhs <- zonkWC lhs_wanted
 
@@ -696,7 +701,7 @@ simplifyCheck wanteds
        ; traceTc "simplifyCheck {" (vcat
              [ ptext (sLit "wanted =") <+> ppr wanteds ])
 
-       ; (unsolved, eb1) <- runTcS (solveWanteds wanteds)
+       ; (unsolved, eb1) <- solveWanteds wanteds
 
        ; traceTc "simplifyCheck }" $ ptext (sLit "unsolved =") <+> ppr unsolved
 
@@ -748,37 +753,28 @@ and does not fail if -fwarn-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
 
 \begin{code}
-solveWanteds :: WantedConstraints -> TcS WantedConstraints
--- Returns: residual constraints, plus evidence bindings 
--- NB: When we are called from TcM there are no inerts to pass down to TcS
-solveWanteds wanted
-  = do { (_,wc_out) <- solve_wanteds wanted
-       ; let wc_ret = wc_out { wc_flat = keepWanted (wc_flat wc_out) } 
-                      -- Discard Derived
-       ; return wc_ret }
 
-solve_wanteds :: WantedConstraints
-              -> TcS (TvSubst, WantedConstraints) 
-              -- NB: wc_flats may be wanted *or* derived now
-              -- Returns the flattening substitution as well in case we need to apply it
+solveWanteds :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
+-- Return the evidence binds in the BagEvBinds result
+solveWanteds wanted = runTcS $ solve_wanteds wanted 
+
+solveWantedsWithEvBinds :: EvBindsVar -> WantedConstraints -> TcM WantedConstraints
+-- Side-effect the EvBindsVar argument to add new bindings from solving
+solveWantedsWithEvBinds ev_binds_var wanted
+  = runTcSWithEvBinds ev_binds_var $ solve_wanteds wanted
+
+
+solve_wanteds :: WantedConstraints -> TcS WantedConstraints 
+-- NB: wc_flats may be wanted /or/ derived now
 solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols }) 
   = do { traceTcS "solveWanteds {" (ppr wanted)
 
-                 -- Try the flat bit
-                 -- Discard from insols all the derived/given constraints
-                 -- because they will show up again when we try to solve
-                 -- everything else.  Solving them a second time is a bit
-                 -- of a waste, but the code is simple, and the program is
-                 -- wrong anyway!
-
-                 -- DV: why only keepWanted? We make sure that we never float out
-                 -- whatever constraints can yield equalities, including class 
-                 -- constraints with functional dependencies and hence all the derived
-                 -- that were potentially insoluble will be re-generated.
-                 -- (It would not hurt though to just keep the wanted and the derived)
-                 -- See Note [The HasEqualities Predicate] in Inst.lhs
-         
+         -- Try the flat bit, including insolubles. Solving insolubles a 
+         -- second time round is a bit of a waste but the code is simple 
+         -- and the program is wrong anyway. 
+         -- Why keepWanted insols? See Note [KeepWanted in SolveWanteds] 
        ; let all_flats = flats `unionBags` keepWanted insols
+             -- DV: Used to be 'keepWanted insols' but just insols is
                          
        ; impls_from_flats <- solveInteractCts $ bagToList all_flats
 
@@ -798,20 +794,17 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
                       , text "current tybinds  =" <+> vcat (map ppr (varEnvElts tb))
                       ]
 
-       ; (subst, remaining_unsolved_flats) <- solveCTyFunEqs unsolved_flats
-                -- See Note [Solving Family Equations]
-                -- NB: remaining_flats has already had subst applied
+       ; let wc =  WC { wc_flat  = unsolved_flats
+                      , wc_impl  = unsolved_implics
+                      , wc_insol = insoluble_flats }
+
 
        ; traceTcS "solveWanteds finished with" $
-                 vcat [ text "remaining_unsolved_flats =" <+> ppr remaining_unsolved_flats
-                      , text "subst =" <+> ppr subst
-                      ]
+                 vcat [ text "wc (unflattened) =" <+> ppr wc ]
 
-       ; return $ 
-         (subst, WC { wc_flat  = mapBag (substCt subst) remaining_unsolved_flats
-                    , wc_impl  = mapBag (substImplication subst) unsolved_implics
-                    , wc_insol = mapBag (substCt subst) insoluble_flats })
-       }
+       ; unFlattenWC wc }
+
+
 
 simpl_loop :: Int
            -> Bag Implication
@@ -934,19 +927,17 @@ solveImplication tcs_untouchables
        ; MASSERT (isEmptyBag impls_from_givens)
          
          -- Simplify the wanteds
-       ; (_flat_subst, 
-           WC { wc_flat = unsolved_flats
-              , wc_impl = unsolved_implics
-              , wc_insol = insols }) <- solve_wanteds wanteds
-          -- NB: Not solveWanteds because we need the derived equalities,            
-          -- which may not be solvable (due to touchability) in this implication
-          -- but may become solvable by spontantenous unification outside. 
+       ; WC { wc_flat = unsolved_flats
+            , wc_impl = unsolved_implics
+            , wc_insol = insols } <- solve_wanteds wanteds
 
        ; let (res_flat_free, res_flat_bound)
                  = floatEqualities skols givens unsolved_flats
-             final_flat = keepWanted res_flat_bound
 
-       ; let res_wanted = WC { wc_flat  = final_flat
+       ; let res_wanted = WC { wc_flat  = keepWanted $ res_flat_bound
+                               -- I think this keepWanted must eventually go away, but it is
+                               -- a real code-breaking change. 
+                               -- See Note [KeepWanted in SolveImplication]
                              , wc_impl  = unsolved_implics
                              , wc_insol = insols }
 
@@ -963,6 +954,82 @@ solveImplication tcs_untouchables
 
        ; return (res_flat_free, res_implic) }
     -- and we are back to the original inerts
+
+\end{code}
+
+Note [KeepWanted in SolveWanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why do we have:
+   let all_flats = flats `unionBags` keepWanted insols
+instead of the simpler:
+   let all_flats = flats `unionBags` insols
+in solve_wanteds?
+
+Assume a top-level class and instance declaration:
+
+  class D a b | a -> b 
+  instance D [a] [a] 
+
+Assume we have started with an implication:
+
+  forall c. Eq c => { wc_flat = D [c] c [W] }
+
+which we have simplified to:
+
+  forall c. Eq c => { wc_flat = D [c] c [W]
+                    , wc_insols = (c ~ [c]) [D] }
+
+For some reason, e.g. because we floated an equality somewhere else,
+we might try to re-solve this implication. If we do not do a
+keepWanted, then we will end up trying to solve the following
+constraints the second time:
+
+  (D [c] c) [W]
+  (c ~ [c]) [D]
+
+which will result in two Deriveds to end up in the insoluble set:
+
+  wc_flat   = D [c] c [W]
+  wc_insols = (c ~ [c]) [D], (c ~ [c]) [D]
+
+which can result in reporting the same error twice.  
+
+So, do we /lose/ some potentially useful information by doing this? 
+
+No, because the insoluble Derived/Given are going to be equalities, 
+which are going to be derivable anyway from the rest of the flat 
+constraints. 
+
+
+Note [KeepWanted in SolveImplication]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here is a real example, 
+stripped off from libraries/utf8-string/Codec/Binary/UTF8/Generic.hs
+
+  class C a b | a -> b
+  g :: C a b => a -> b -> () 
+  f :: C a b => a -> b -> () 
+  f xa xb = 
+      let loop = g xa 
+      in loop xb
+
+We will first try to infer a type for loop, and we will succeed:
+    C a b' => b' -> ()
+Subsequently, we will type check (loop xb) and all is good. But, 
+recall that we have to solve a final implication constraint: 
+    C a b => (C a b' => .... cts from body of loop .... )) 
+And now we have a problem as we will generate an equality b ~ b' and fail to 
+solve it. 
+
+I actually think this is a legitimate behaviour (to fail). After all, if we had 
+given the inferred signature to foo we would have failed as well, but we have to 
+find a workaround because library code breaks.
+
+For now I keep the 'keepWanted' though it seems problematic e.g. we might discard 
+a useful Derived!
+
+\begin{code}
 
 
 floatEqualities :: [TcTyVar] -> [EvVar] -> Cts -> (Cts, Cts)
@@ -1259,28 +1326,42 @@ and `?x :: Char` never exist in the same context, so they don't get to
 interact to cause failure.
 \begin{code}
 
-solveCTyFunEqs :: Cts -> TcS (TvSubst, Cts)
--- Default equalities (F xi ~ alpha) by setting (alpha := F xi), whenever possible
--- See Note [Solving Family Equations]
--- Returns: a bunch of unsolved constraints from the original Cts and implications
---          where the newly generated equalities (alpha := F xi) have been substituted through.
-solveCTyFunEqs cts
- = do { untch   <- getUntouchables 
-      ; let (unsolved_can_cts, (ni_subst, cv_binds))
-                = getSolvableCTyFunEqs untch cts
-      ; traceTcS "defaultCTyFunEqs" (vcat [text "Trying to default family equations:"
-                                          , ppr ni_subst, ppr cv_binds
-                                          ])
-      ; mapM_ solve_one cv_binds
 
-      ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
-  where
-    solve_one (Wanted { ctev_evar = cv }, tv, ty) 
-      = setWantedTyBind tv ty >> setEvBind cv (EvCoercion (mkTcReflCo ty))
-    solve_one (Derived {}, tv, ty)
-      = setWantedTyBind tv ty
-    solve_one arg
-      = pprPanic "solveCTyFunEqs: can't solve a /given/ family equation!" $ ppr arg
+
+unFlattenWC :: WantedConstraints -> TcS WantedConstraints
+unFlattenWC wc 
+  = do { (subst, remaining_unsolved_flats) <- solveCTyFunEqs (wc_flat wc)
+                -- See Note [Solving Family Equations]
+                -- NB: remaining_flats has already had subst applied
+       ; return $ 
+         WC { wc_flat  = mapBag (substCt subst) remaining_unsolved_flats
+            , wc_impl  = mapBag (substImplication subst) (wc_impl wc) 
+            , wc_insol = mapBag (substCt subst) (wc_insol wc) }
+       }
+  where 
+    solveCTyFunEqs :: Cts -> TcS (TvSubst, Cts)
+    -- Default equalities (F xi ~ alpha) by setting (alpha := F xi), whenever possible
+    -- See Note [Solving Family Equations]
+    -- Returns: a bunch of unsolved constraints from the original Cts and implications
+    --          where the newly generated equalities (alpha := F xi) have been substituted through.
+    solveCTyFunEqs cts
+     = do { untch   <- getUntouchables 
+          ; let (unsolved_can_cts, (ni_subst, cv_binds))
+                    = getSolvableCTyFunEqs untch cts
+          ; traceTcS "defaultCTyFunEqs" (vcat [text "Trying to default family equations:"
+                                              , ppr ni_subst, ppr cv_binds
+                                              ])
+          ; mapM_ solve_one cv_binds
+
+          ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
+      where
+        solve_one (Wanted { ctev_evar = cv }, tv, ty) 
+          = setWantedTyBind tv ty >> setEvBind cv (EvCoercion (mkTcReflCo ty))
+        solve_one (Derived {}, tv, ty)
+          = setWantedTyBind tv ty
+        solve_one arg
+          = pprPanic "solveCTyFunEqs: can't solve a /given/ family equation!" $ ppr arg
+
 ------------
 type FunEqBinds = (TvSubstEnv, [(CtEvidence, TcTyVar, TcType)])
   -- The TvSubstEnv is not idempotent, but is loop-free
@@ -1355,10 +1436,10 @@ When is it ok to do so?
 *                                                                               *
 *********************************************************************************
 \begin{code}
-applyDefaultingRules :: Cts      -- All wanteds
-                     -> TcS Cts  -- All wanteds again!
--- Return some *extra* givens, which express the 
--- type-class-default choice
+applyDefaultingRules :: Cts      -- Wanteds or Deriveds
+                     -> TcS Cts  -- Derived equalities 
+-- Return some extra derived equalities, which express the
+-- type-class default choice. 
 applyDefaultingRules wanteds
   | isEmptyBag wanteds 
   = return emptyBag
@@ -1485,7 +1566,7 @@ default is default_k we do not simply generate [D] (k ~ default_k) because:
 findDefaultableGroups 
     :: ( [Type]
        , (Bool,Bool) )  -- (Overloaded strings, extended default rules)
-    -> Cts	-- Unsolved
+    -> Cts	        -- Unsolved (wanted or derived)
     -> [[(Ct,TcTyVar)]]
 findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
   | null default_tys             = []
