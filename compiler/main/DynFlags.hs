@@ -11,6 +11,9 @@
 --
 -------------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-missing-fields #-}
+-- So that tracingSettings works properly
+
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
@@ -998,6 +1001,7 @@ defaultDynFlags mySettings =
         interactivePrint = Nothing
       }
 
+--------------------------------------------------------------------------
 -- Do not use tracingDynFlags!
 -- tracingDynFlags is a hack, necessary because we need to be able to
 -- show SDocs when tracing, but we don't always have DynFlags available.
@@ -1006,7 +1010,16 @@ defaultDynFlags mySettings =
 -- undefined.
 tracingDynFlags :: DynFlags
 tracingDynFlags = defaultDynFlags tracingSettings
-    where tracingSettings = panic "Settings not defined in tracingDynFlags"
+
+tracingSettings :: Settings
+tracingSettings = trace "panic: Settings not defined in tracingDynFlags" $
+                  Settings { sTargetPlatform = tracingPlatform }
+                  -- Missing flags give a nice error
+
+tracingPlatform :: Platform
+tracingPlatform = Platform { platformWordSize = 4, platformOS = OSUnknown }
+                  -- Missing flags give a nice error
+--------------------------------------------------------------------------
 
 type FatalMessager = String -> IO ()
 type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
