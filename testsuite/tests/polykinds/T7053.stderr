@@ -1,0 +1,6 @@
+
+T7053.hs:6:52:
+    Expecting one more argument to `b'
+    In the type `TypeRep (a b)'
+    In the definition of data constructor `TyApp'
+    In the data declaration for `TypeRep'

@@ -72,5 +72,7 @@ test('NondecreasingIndentationFail', normal, compile_fail, [''])
 test('readFailTraditionalRecords1', normal, compile_fail, [''])
 test('readFailTraditionalRecords2', normal, compile_fail, [''])
 test('readFailTraditionalRecords3', normal, compile_fail, [''])
+test('ParserNoLambdaCase', if_compiler_lt('ghc', '7.5', skip), compile_fail, [''])
+test('ParserNoMultiWayIf', if_compiler_lt('ghc', '7.5', skip), compile_fail, [''])
 
 test('T5425', normal, compile_fail, [''])

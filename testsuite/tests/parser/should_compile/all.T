@@ -90,6 +90,7 @@ test('NondecreasingIndentation', normal, compile, [''])
 test('mc15', normal, compile, [''])
 test('mc16', normal, compile, [''])
 test('EmptyDecls', normal, compile, [''])
+test('ParserLambdaCase', if_compiler_lt('ghc', '7.5', skip), compile, [''])
 
 test('T5243', extra_clean(['T5243A.hi', 'T5243A.o']),
      multimod_compile, ['T5243',''])

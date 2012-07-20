@@ -1,1 +1,1 @@
-                   ((->) (Sym (Eta.NTCo:Foo)) (Refl Eta.T))) -}
+       Unfolding: (Eta.bof `cast` (Sym (Eta.NTCo:Foo) -> Refl Eta.T)) -}

@@ -11,7 +11,7 @@ import Language.Haskell.TH
 $(let ty = AppT (AppT PromotedConsT (ConT ''Int))
             (AppT (AppT PromotedConsT (ConT ''Bool)) PromotedNilT)
 
-  in  report False (pprint ty) >>
+  in  reportWarning (pprint ty) >>
         return [])
 
 data Proxy a = Proxy
