@@ -3982,6 +3982,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
 #  define ELF_64BIT
+#elif defined(powerpc64_HOST_ARCH)
+#  define ELF_64BIT
 #endif
 
 #if !defined(openbsd_HOST_OS)
