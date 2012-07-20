@@ -163,7 +163,7 @@ mkUnfolding src top_lvl is_bottoming expr
   , not (exprIsTrivial expr)
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
   | otherwise
-  = CoreUnfolding { uf_tmpl   	    = occ_anald_expr,
+  = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
     		    uf_src          = src,
     		    uf_arity        = arity,
 		    uf_is_top 	    = top_lvl,
@@ -173,18 +173,34 @@ mkUnfolding src top_lvl is_bottoming expr
 		    uf_is_work_free = exprIsWorkFree   expr,
 		    uf_guidance     = guidance }
   where
-    occ_anald_expr    = occurAnalyseExpr expr
-    (arity, guidance) = calcUnfoldingGuidance occ_anald_expr
-	-- Sometimes during simplification, there's a large let-bound thing	
-	-- which has been substituted, and so is now dead; so 'expr' contains
-	-- two copies of the thing while the occurrence-analysed expression doesn't
-	-- Nevertheless, we *don't* occ-analyse before computing the size because the
-	-- size computation bales out after a while, whereas occurrence analysis does not.
-	--
-	-- This can occasionally mean that the guidance is very pessimistic;
-	-- it gets fixed up next round.  And it should be rare, because large
-	-- let-bound things that are dead are usually caught by preInlineUnconditionally
+    (arity, guidance) = calcUnfoldingGuidance expr
+        -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
+	-- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 \end{code}
+
+Note [Calculate unfolding guidance on the non-occ-anal'd expression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Notice that we give the non-occur-analysed expression to
+calcUnfoldingGuidance.  In some ways it'd be better to occur-analyse
+first; for example, sometimes during simplification, there's a large
+let-bound thing which has been substituted, and so is now dead; so
+'expr' contains two copies of the thing while the occurrence-analysed
+expression doesn't.
+
+Nevertheless, we *don't* and *must not* occ-analyse before computing
+the size because 
+
+a) The size computation bales out after a while, whereas occurrence
+   analysis does not.
+
+b) Residency increases sharply if you occ-anal first.  I'm not 
+   100% sure why, but it's a large effect.  Compiling Cabal went 
+   from residency of 534M to over 800M with this one change.
+
+This can occasionally mean that the guidance is very pessimistic;
+it gets fixed up next round.  And it should be rare, because large
+let-bound things that are dead are usually caught by preInlineUnconditionally
+
 
 %************************************************************************
 %*									*
@@ -237,9 +253,17 @@ calcUnfoldingGuidance expr
       	                         , ug_size  = iBox size
       	        	  	 , ug_res   = iBox scrut_discount }
 
-        discount cbs bndr
-           = foldlBag (\acc (b',n) -> if bndr==b' then acc+n else acc) 
-		      0 cbs
+        discount :: Bag (Id,Int) -> Id -> Int
+        discount cbs bndr = foldlBag combine 0 cbs
+           where
+             combine acc (bndr', disc) 
+               | bndr == bndr' = acc `plus_disc` disc
+               | otherwise     = acc
+   
+             plus_disc :: Int -> Int -> Int
+             plus_disc | isFunTy (idType bndr) = max
+                       | otherwise             = (+)
+             -- See Note [Function and non-function discounts]
     in
     (n_val_bndrs, guidance) }
 \end{code}
@@ -549,8 +573,8 @@ funSize top_args fun n_val_args
 	-- the allocation cost, as in let(rec)
   
         --                  DISCOUNTS
-        --  See Note [Function application discounts]
-    arg_discount | some_val_args && one_call fun top_args
+        --  See Note [Function and non-function discounts]
+    arg_discount | some_val_args && fun `elem` top_args
     		 = unitBag (fun, opt_UF_FunAppDiscount)
 		 | otherwise = emptyBag
 	-- If the function is an argument and is applied
@@ -559,12 +583,6 @@ funSize top_args fun n_val_args
     res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
     		 | otherwise   	 	    = 0
         -- If the function is partially applied, show a result discount
-
-    one_call _   []                     = False
-    one_call fun (arg:args) | fun==arg  = case idOccInfo arg of
-                                           OneOcc _ one_branch _ -> one_branch
-                                           _                     -> False
-                            | otherwise = one_call fun args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
@@ -615,8 +633,8 @@ shrank binary sizes by 0.5% it also made spectral/boyer allocate 5%
 more. All other changes were very small. So it's not a big deal but I
 didn't adopt the idea.
 
-Note [Function application discount]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Function and non-function discounts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want a discount if the function is applied. A good example is
 monadic combinators with continuation arguments, where inlining is
 quite important.
@@ -627,8 +645,15 @@ big it won't be inlined at its many call sites and no benefit results.
 Indeed, we can get exponentially big inlinings this way; that is what
 Trac #6048 is about.
 
-So, we only give a function-application discount when the function appears
-textually once, albeit possibly inside a lambda.
+On the other hand, for data-valued arguments, if there are lots of
+case expressions in the body, each one will get smaller if we apply
+the function to a constructor application, so we *want* a big discount
+if the argument is scrutinised by many case expressions.
+
+Conclusion:
+  - For functions, take the max of the discounts
+  - For data values, take the sum of the discounts
+
 
 Note [Literal integer size]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
