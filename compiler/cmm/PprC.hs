@@ -51,12 +51,8 @@ import Data.Word
 import System.IO
 import qualified Data.Map as Map
 
-#if __GLASGOW_HASKELL__ >= 703
 import Data.Array.Unsafe ( castSTUArray )
 import Data.Array.ST hiding ( castSTUArray )
-#else
-import Data.Array.ST
-#endif
 
 -- --------------------------------------------------------------------------
 -- Top level

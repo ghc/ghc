@@ -119,11 +119,7 @@ import Data.Char
 
 import GHC.IO           ( IO(..) )
 
-#if __GLASGOW_HASKELL__ >= 701
 import Foreign.Safe
-#else
-import Foreign hiding ( unsafePerformIO )
-#endif
 
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )

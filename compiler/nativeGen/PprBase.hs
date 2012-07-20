@@ -22,13 +22,8 @@ module PprBase (
 
 where
 
--- castSTUArray has moved to Data.Array.Unsafe
-#if __GLASGOW_HASKELL__ >= 703
 import Data.Array.Unsafe( castSTUArray )
 import Data.Array.ST hiding( castSTUArray )
-#else
-import Data.Array.ST
-#endif
 
 import Control.Monad.ST
 

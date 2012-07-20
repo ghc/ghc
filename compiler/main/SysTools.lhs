@@ -596,7 +596,6 @@ copyWithHeader dflags purpose maybe_header from to = do
   hClose hout
   hClose hin
  where
-#if __GLASGOW_HASKELL__ >= 702
   -- write the header string in UTF-8.  The header is something like
   --   {-# LINE "foo.hs" #-}
   -- and we want to make sure a Unicode filename isn't mangled.
@@ -604,9 +603,6 @@ copyWithHeader dflags purpose maybe_header from to = do
    hSetEncoding h utf8
    hPutStr h str
    hSetBinaryMode h True
-#else
-  header h str = hPutStr h str
-#endif
 
 -- | read the contents of the named section in an ELF object as a
 -- String.
@@ -782,11 +778,7 @@ runSomethingWith
 
 runSomethingWith dflags phase_name pgm args io = do
   let real_args = filter notNull (map showOpt args)
-#if __GLASGOW_HASKELL__ >= 701
       cmdLine = showCommandForUser pgm real_args
-#else
-      cmdLine = unwords (pgm:real_args)
-#endif
   traceCmd dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r

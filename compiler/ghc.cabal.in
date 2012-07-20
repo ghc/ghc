@@ -100,7 +100,6 @@ Library
 
     c-sources:
         parser/cutils.c
-        utils/md5.c
 
     if flag(dynlibs)
         c-sources:

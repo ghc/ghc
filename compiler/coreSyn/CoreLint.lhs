@@ -14,9 +14,7 @@ A ``lint'' pass to check for Core correctness
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-#if __GLASGOW_HASKELL__ >= 704
 {-# OPTIONS_GHC -fprof-auto #-}
-#endif
 
 module CoreLint ( lintCoreBindings, lintUnfolding ) where
 

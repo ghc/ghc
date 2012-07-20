@@ -48,11 +48,7 @@ import qualified Data.Set as Set
 import Control.Monad
 
 foldSet :: (a -> b -> b) -> b -> Set a -> b
-#if __GLASGOW_HASKELL__ < 704
-foldSet = Set.fold
-#else
 foldSet = Set.foldr
-#endif
 
 ----------------------------------------------------------------
 -- Building InfoTables
