@@ -1457,9 +1457,9 @@ exprSize :: CoreExpr -> Int
 exprSize (Var v)         = v `seq` 1
 exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
-exprSize (Lam b e)       = varSize b + exprSize e
+exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
+exprSize (Case e b t as) = seqType t `seq` exprSize e + bndrSize b + 1 + foldr ((+) . altSize) 0 as
 exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
 exprSize (Tick n e)      = tickSize n + exprSize e
 exprSize (Type t)        = seqType t `seq` 1
@@ -1469,24 +1469,24 @@ tickSize :: Tickish Id -> Int
 tickSize (ProfNote cc _ _) = cc `seq` 1
 tickSize _ = 1 -- the rest are strict
 
-varSize :: Var -> Int
-varSize b  | isTyVar b = 1
+bndrSize :: Var -> Int
+bndrSize b | isTyVar b = seqType (tyVarKind b) `seq` 1
            | otherwise = seqType (idType b)             `seq`
                          megaSeqIdInfo (idInfo b)       `seq`
                          1
 
-varsSize :: [Var] -> Int
-varsSize = sum . map varSize
+bndrsSize :: [Var] -> Int
+bndrsSize = sum . map bndrSize
 
 bindSize :: CoreBind -> Int
-bindSize (NonRec b e) = varSize b + exprSize e
+bindSize (NonRec b e) = bndrSize b + exprSize e
 bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
 
 pairSize :: (Var, CoreExpr) -> Int
-pairSize (b,e) = varSize b + exprSize e
+pairSize (b,e) = bndrSize b + exprSize e
 
 altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
+altSize (c,bs,e) = c `seq` bndrsSize bs + exprSize e
 \end{code}
 
 
