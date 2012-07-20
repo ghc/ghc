@@ -67,7 +67,7 @@ Library
     else
         Build-Depends: unix
 
-    GHC-Options: -Wall -fno-warn-name-shadowing -fno-warn-orphans
+    GHC-Options: -Wall -fno-warn-name-shadowing
 
     if flag(ghci)
         Build-Depends: template-haskell
@@ -100,7 +100,6 @@ Library
 
     c-sources:
         parser/cutils.c
-        utils/md5.c
 
     if flag(dynlibs)
         c-sources:

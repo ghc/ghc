@@ -277,7 +277,7 @@ ppCostCentreLbl :: CostCentre -> SDoc
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_key = k, cc_name = n, cc_mod = m,
                            cc_is_caf = is_caf})
-  = ppr m <> char '_' <> ftext (zEncodeFS n) <> char '_' <>
+  = ppr m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
         case is_caf of { CafCC -> ptext (sLit "CAF"); _ -> ppr (mkUniqueGrimily k)} <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 

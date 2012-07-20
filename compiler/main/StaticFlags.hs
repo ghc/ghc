@@ -70,7 +70,6 @@ module StaticFlags (
 	opt_Fuel,
 
 	-- Related to linking
-	opt_PIC,
 	opt_Static,
 
 	-- misc opts
@@ -317,14 +316,6 @@ opt_UF_DearOp            = ( 40 :: Int)
 
 
 -- Related to linking
-opt_PIC :: Bool
-#if darwin_TARGET_OS && x86_64_TARGET_ARCH
-opt_PIC                         = True
-#elif darwin_TARGET_OS
-opt_PIC                         = lookUp (fsLit "-fPIC") || not opt_Static
-#else
-opt_PIC                         = lookUp (fsLit "-fPIC")
-#endif
 opt_Static :: Bool
 opt_Static			= lookUp  (fsLit "-static")
 opt_Unregisterised :: Bool

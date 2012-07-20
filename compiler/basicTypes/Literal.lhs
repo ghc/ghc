@@ -84,7 +84,7 @@ data Literal
         -- First the primitive guys
     MachChar    Char            -- ^ @Char#@ - at least 31 bits. Create with 'mkMachChar'
 
-  | MachStr     FastString      -- ^ A string-literal: stored and emitted
+  | MachStr     FastBytes       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @'\0'@
                                 -- terminator. Create with 'mkMachString'
@@ -248,7 +248,8 @@ mkMachChar = MachChar
 -- | Creates a 'Literal' of type @Addr#@, which is appropriate for passing to
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkMachString :: String -> Literal
-mkMachString s = MachStr (mkFastString s) -- stored UTF-8 encoded
+-- stored UTF-8 encoded
+mkMachString s = MachStr (fastStringToFastBytes $ mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger = LitInteger
@@ -436,7 +437,7 @@ pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 -- to wrap parens around literals that occur in
 -- a context requiring an atomic thing
 pprLiteral _       (MachChar ch)    = pprHsChar ch
-pprLiteral _       (MachStr s)      = pprHsString s
+pprLiteral _       (MachStr s)      = pprHsBytes s
 pprLiteral _       (MachInt i)      = pprIntVal i
 pprLiteral _       (MachDouble d)   = double (fromRat d)
 pprLiteral _       (MachNullAddr)   = ptext (sLit "__NULL")
@@ -469,7 +470,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 \begin{code}
 hashLiteral :: Literal -> Int
 hashLiteral (MachChar c)        = ord c + 1000  -- Keep it out of range of common ints
-hashLiteral (MachStr s)         = hashFS s
+hashLiteral (MachStr s)         = hashFB s
 hashLiteral (MachNullAddr)      = 0
 hashLiteral (MachInt i)         = hashInteger i
 hashLiteral (MachInt64 i)       = hashInteger i

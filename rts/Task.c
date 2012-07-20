@@ -321,6 +321,11 @@ discardTasksExcept (Task *keep)
         next = task->all_next;
         if (task != keep) {
             debugTrace(DEBUG_sched, "discarding task %" FMT_SizeT "", (size_t)TASK_ID(task));
+            // Note that we do not traceTaskDelete here because
+            // we are not really deleting a task.
+            // The OS threads for all these tasks do not exist in
+            // this process (since we're currently
+            // in the child of a forkProcess).
             freeTask(task);
         }
     }
@@ -383,13 +388,18 @@ workerTaskStop (Task *task)
 
     RELEASE_LOCK(&all_tasks_mutex);
 
+    traceTaskDelete(task);
+
     freeTask(task);
 }
 
 #endif
 
 #ifdef DEBUG
-
+// We don't replace this function with serialisableTaskId,
+// because debug prints as pointers are more readable than random
+// 64-bit intergers (especially on 32-bit architectures)
+// and because we want to use this function also for non-threaded RTS.
 static void *taskId(Task *task)
 {
 #ifdef THREADED_RTS
@@ -422,6 +432,9 @@ workerStart(Task *task)
 
     newInCall(task);
 
+    // Everything set up; emit the event before the worker starts working.
+    traceTaskCreate(task, cap);
+
     scheduleWorker(cap,task);
 }
 
@@ -440,6 +453,8 @@ startWorkerTask (Capability *cap)
   // worker thread reads it.
   ACQUIRE_LOCK(&task->lock);
 
+  // We don't emit a task creation event here, but in workerStart,
+  // where the kernel thread id is known.
   task->cap = cap;
 
   // Give the capability directly to the worker; we can't let anyone

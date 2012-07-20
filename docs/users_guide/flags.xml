@@ -2015,7 +2015,7 @@
           <row>
             <entry><option>-fPIC</option></entry>
             <entry>Generate position-independent code (where available)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

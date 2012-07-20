@@ -221,7 +221,7 @@ make_lit dflags l =
     -- For a character bigger than 0xff, we represent it in ext-core
     -- as an int lit with a char type.
     MachChar i             -> C.Lint (fromIntegral $ ord i) t 
-    MachStr s -> C.Lstring (unpackFS s) t
+    MachStr s -> C.Lstring (bytesFB s) t
     MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t
     MachInt64 i -> C.Lint i t

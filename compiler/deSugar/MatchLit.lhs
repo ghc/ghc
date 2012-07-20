@@ -39,6 +39,7 @@ import TysWiredIn
 import Literal
 import SrcLoc
 import Data.Ratio
+import MonadUtils
 import Outputable
 import BasicTypes
 import Util
@@ -126,7 +127,7 @@ hsLitKey (HsCharPrim    c) = MachChar   c
 hsLitKey (HsStringPrim  s) = MachStr    s
 hsLitKey (HsFloatPrim   f) = MachFloat  (fl_value f)
 hsLitKey (HsDoublePrim  d) = MachDouble (fl_value d)
-hsLitKey (HsString s)	   = MachStr    s
+hsLitKey (HsString s)      = MachStr    (fastStringToFastBytes s)
 hsLitKey l                 = pprPanic "hsLitKey" (ppr l)
 
 hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
@@ -138,7 +139,7 @@ litValKey (HsIntegral i)   False = MachInt i
 litValKey (HsIntegral i)   True  = MachInt (-i)
 litValKey (HsFractional r) False = MachFloat (fl_value r)
 litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
-litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr s
+litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr (fastStringToFastBytes s)
 \end{code}
 
 %************************************************************************
@@ -253,7 +254,10 @@ matchLiterals (var:vars) ty sub_groups
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
 	-- Equality check for string literals
     wrap_str_guard eq_str (MachStr s, mr)
-	= do { lit    <- mkStringExprFS s
+	= do { -- We now have to convert back to FastString. Perhaps there
+	       -- should be separate MachBytes and MachStr constructors?
+	       s'     <- liftIO $ mkFastStringFastBytes s
+	     ; lit    <- mkStringExprFS s'
 	     ; let pred = mkApps (Var eq_str) [Var var, lit]
 	     ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)

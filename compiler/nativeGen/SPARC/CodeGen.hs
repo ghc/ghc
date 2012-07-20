@@ -48,7 +48,6 @@ import CPrim
 import BasicTypes
 import DynFlags
 import FastString
-import StaticFlags      ( opt_PIC )
 import OrdList
 import Outputable
 import Platform
@@ -135,7 +134,8 @@ stmtToInstrs stmt = case stmt of
 
     CmmBranch   id              -> genBranch id
     CmmCondBranch arg id        -> genCondJump id arg
-    CmmSwitch   arg ids         -> genSwitch arg ids
+    CmmSwitch   arg ids         -> do dflags <- getDynFlags
+                                      genSwitch dflags arg ids
     CmmJump     arg _           -> genJump arg
 
     CmmReturn
@@ -289,9 +289,9 @@ genCondJump bid bool = do
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
-genSwitch expr ids
-        | opt_PIC
+genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
+genSwitch dflags expr ids
+        | dopt Opt_PIC dflags
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise
@@ -317,11 +317,12 @@ genSwitch expr ids
                         , JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
                         , NOP ]
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl CmmStatics Instr)
-generateJumpTableForInstr (JMP_TBL _ ids label) =
+generateJumpTableForInstr :: DynFlags -> Instr
+                          -> Maybe (NatCmmDecl CmmStatics Instr)
+generateJumpTableForInstr _ (JMP_TBL _ ids label) =
         let jumpTable = map jumpTableEntry ids
         in Just (CmmData ReadOnlyData (Statics label jumpTable))
-generateJumpTableForInstr _ = Nothing
+generateJumpTableForInstr _ _ = Nothing
 
 
 

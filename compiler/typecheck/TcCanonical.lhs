@@ -364,30 +364,29 @@ newSCWorkFromFlavored d flavor cls xis
     
   | isGiven flavor 
   = do { let sc_theta = immSuperClasses cls xis 
-             xev = XEvTerm { ev_comp = panic "Can't compose for given!" 
-                           , ev_decomp = \x -> zipWith (\_ i -> EvSuperClass x i) sc_theta [0..] }
+             xev_decomp x = zipWith (\_ i -> EvSuperClass x i) sc_theta [0..] 
+             xev = XEvTerm { ev_comp   = panic "Can't compose for given!" 
+                           , ev_decomp = xev_decomp }
        ; ctevs <- xCtFlavor flavor sc_theta xev
-       ; emit_sc_flavs d ctevs }
+
+       ; traceTcS "newSCWork/Given" $ ppr "ctevs =" <+> ppr ctevs 
+       ; mapM_ emit_non_can ctevs }
 
   | isEmptyVarSet (tyVarsOfTypes xis)
-  = return () -- Wanteds/Derived with no variables yield no deriveds.
+  = return () -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement. 
+  | otherwise -- Wanted case, just add those SC that can lead to improvement. 
   = do { let sc_rec_theta = transSuperClasses cls xis 
-             impr_theta   = filter is_improvement_pty sc_rec_theta              
-             xev = panic "Derived's are not supposed to transform evidence!" 
-             der_ev = Derived { ctev_wloc = ctev_wloc flavor, ctev_pred = ctev_pred flavor }
-       ; ctevs <- xCtFlavor der_ev impr_theta xev
-       ; emit_sc_flavs d ctevs }
+             impr_theta   = filter is_improvement_pty sc_rec_theta
+       ; traceTcS "newSCWork/Derived" $ text "impr_theta =" <+> ppr impr_theta
+       ; mapM_ emit_der impr_theta }
 
-emit_sc_flavs :: SubGoalDepth -> [CtEvidence] -> TcS ()
-emit_sc_flavs d fls 
-  = do { traceTcS "newSCWorkFromFlavored" $
-         text "Emitting superclass work:" <+> ppr sc_cts
-       ; updWorkListTcS $ appendWorkListCt sc_cts }
-  where 
-    sc_cts = map (\fl -> CNonCanonical { cc_ev = fl, cc_depth  = d }) fls
+  where emit_der pty = newDerived (ctev_wloc flavor) pty >>= mb_emit
+        mb_emit Nothing     = return ()
+        mb_emit (Just ctev) = emit_non_can ctev 
+        emit_non_can ctev   = updWorkListTcS $ 
+                              extendWorkListCt (CNonCanonical ctev d)
 
 is_improvement_pty :: PredType -> Bool 
 -- Either it's an equality, or has some functional dependency
@@ -507,7 +506,8 @@ flatten :: SubGoalDepth -- Depth
 flatten d f ctxt ty 
   | Just ty' <- tcView ty
   = do { (xi, co) <- flatten d f ctxt ty'
-       ; return (xi,co) } 
+       ; if eqType xi ty then return (ty,co) else return (xi,co) } 
+       -- Small tweak for better error messages 
 
 flatten _ _ _ xi@(LitTy {}) = return (xi, mkTcReflCo xi)
 

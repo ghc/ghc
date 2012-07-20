@@ -261,15 +261,15 @@ nameToCLabel n suffix
   where
         pkgid = modulePackageId mod
         mod = ASSERT( isExternalName n ) nameModule n
-        package_part = unpackFS (zEncodeFS (packageIdFS (modulePackageId mod)))
-        module_part  = unpackFS (zEncodeFS (moduleNameFS (moduleName mod)))
-        occ_part     = unpackFS (zEncodeFS (occNameFS (nameOccName n)))
+        package_part = zString (zEncodeFS (packageIdFS (modulePackageId mod)))
+        module_part  = zString (zEncodeFS (moduleNameFS (moduleName mod)))
+        occ_part     = zString (zEncodeFS (occNameFS (nameOccName n)))
         qual_name = module_part ++ '_':occ_part ++ '_':suffix
 
 
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix
-   = let str = "ghczmprim_GHCziPrimopWrappers_" ++ unpackFS (zEncodeFS (occNameFS (primOpOcc primop))) ++ '_':suffix
+   = let str = "ghczmprim_GHCziPrimopWrappers_" ++ zString (zEncodeFS (occNameFS (primOpOcc primop))) ++ '_':suffix
      in --trace ("primopToCLabel: " ++ str)
         str
 \end{code}

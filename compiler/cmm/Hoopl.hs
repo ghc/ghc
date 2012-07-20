@@ -1,6 +1,3 @@
-#if __GLASGOW_HASKELL__ < 701
-{-# OPTIONS_GHC -fno-warn-duplicate-exports #-}
-#endif
 module Hoopl (
     module Compiler.Hoopl,
     module Hoopl.Dataflow,

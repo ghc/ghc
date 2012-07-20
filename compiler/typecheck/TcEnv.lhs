@@ -3,6 +3,7 @@
 %
 
 \begin{code}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
 

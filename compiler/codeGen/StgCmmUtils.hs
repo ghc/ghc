@@ -90,7 +90,7 @@ import Data.Maybe
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = newByteStringCLit (bytesFS s)
+cgLit (MachStr s) = newByteStringCLit (bytesFB s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = return (mkSimpleLit other_lit)
 

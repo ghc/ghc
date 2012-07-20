@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module PPC.Ppr (
         pprNatCmmDecl,
         pprBasicBlock,

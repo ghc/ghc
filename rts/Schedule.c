@@ -1634,7 +1634,12 @@ delete_threads_and_gc:
             while (!emptyRunQueue(tmp_cap)) {
                 tso = popRunQueue(tmp_cap);
                 migrateThread(tmp_cap, tso, dest_cap);
-                if (tso->bound) { tso->bound->task->cap = dest_cap; }
+                if (tso->bound) {
+                  traceTaskMigrate(tso->bound->task,
+                                   tso->bound->task->cap,
+                                   dest_cap);
+                  tso->bound->task->cap = dest_cap;
+                }
             }
         }
     }
@@ -1898,6 +1903,10 @@ forkProcess(HsStablePtr *entry
         // the timer again.
         initTimer();
         startTimer();
+
+        // TODO: need to trace various other things in the child
+        // like startup event, capabilities, process info etc
+        traceTaskCreate(task, cap);
 
 #if defined(THREADED_RTS)
         ioManagerStartCap(&cap);
@@ -2521,6 +2530,8 @@ performGC_(rtsBool force_major)
     // associated with a particular Capability, and chained onto the 
     // suspended_ccalls queue.
     task = newBoundTask();
+    
+    // TODO: do we need to traceTask*() here?
 
     waitForReturnCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major);

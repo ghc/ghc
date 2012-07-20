@@ -7,7 +7,6 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
-{-# OPTIONS -fno-warn-unused-do-bind #-}
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -51,7 +50,6 @@ import Panic
 import Platform
 import Util
 import DynFlags
-import StaticFlags
 import Exception
 
 import Data.IORef
@@ -296,10 +294,7 @@ initSysTools mbMinusB
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
                         sOpt_L       = [],
-                        sOpt_P       = (if opt_PIC
-                                        then -- this list gets reversed
-                                             ["-D__PIC__", "-U __PIC__"]
-                                        else []),
+                        sOpt_P       = [],
                         sOpt_F       = [],
                         sOpt_c       = [],
                         sOpt_a       = [],
@@ -601,7 +596,6 @@ copyWithHeader dflags purpose maybe_header from to = do
   hClose hout
   hClose hin
  where
-#if __GLASGOW_HASKELL__ >= 702
   -- write the header string in UTF-8.  The header is something like
   --   {-# LINE "foo.hs" #-}
   -- and we want to make sure a Unicode filename isn't mangled.
@@ -609,9 +603,6 @@ copyWithHeader dflags purpose maybe_header from to = do
    hSetEncoding h utf8
    hPutStr h str
    hSetBinaryMode h True
-#else
-  header h str = hPutStr h str
-#endif
 
 -- | read the contents of the named section in an ELF object as a
 -- String.
@@ -631,7 +622,11 @@ readElfSection _dflags section exe = do
                     [(p,"")] -> Just p
                     _r       -> doFilter r
    where parse = do
-           skipSpaces; R.char '['; skipSpaces; string "0]"; skipSpaces;
+           skipSpaces
+           _ <- R.char '['
+           skipSpaces
+           _ <- string "0]"
+           skipSpaces
            munch (const True)
 \end{code}
 
@@ -783,11 +778,7 @@ runSomethingWith
 
 runSomethingWith dflags phase_name pgm args io = do
   let real_args = filter notNull (map showOpt args)
-#if __GLASGOW_HASKELL__ >= 701
       cmdLine = showCommandForUser pgm real_args
-#else
-      cmdLine = unwords (pgm:real_args)
-#endif
   traceCmd dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r

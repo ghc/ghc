@@ -191,7 +191,7 @@ pprModuleName :: ModuleName -> SDoc
 pprModuleName (ModuleName nm) =
     getPprStyle $ \ sty ->
     if codeStyle sty
-        then ftext (zEncodeFS nm)
+        then ztext (zEncodeFS nm)
         else ftext nm
 
 moduleNameFS :: ModuleName -> FastString
@@ -271,7 +271,7 @@ pprPackagePrefix p mod = getPprStyle doc
        | codeStyle sty =
           if p == mainPackageId
                 then empty -- never qualify the main package in code
-                else ftext (zEncodeFS (packageIdFS p)) <> char '_'
+                else ztext (zEncodeFS (packageIdFS p)) <> char '_'
        | qualModule sty mod = ftext (packageIdFS (modulePackageId mod)) <> char ':'
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names

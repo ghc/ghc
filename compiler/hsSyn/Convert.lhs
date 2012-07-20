@@ -729,7 +729,7 @@ cvtLit (CharL c)       = do { force c; return $ HsChar c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
        		       	    ; force s'
        		       	    ; return $ HsString s' }
-cvtLit (StringPrimL s) = do { let { s' = mkFastStringByteList s }
+cvtLit (StringPrimL s) = do { let { s' = mkFastBytesByteList s }
        			    ; force s'
        			    ; return $ HsStringPrim s' }
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"

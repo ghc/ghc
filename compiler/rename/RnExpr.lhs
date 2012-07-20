@@ -1175,7 +1175,7 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
 \begin{code}
 srcSpanPrimLit :: DynFlags -> SrcSpan -> HsExpr Name
 srcSpanPrimLit dflags span
-    = HsLit (HsStringPrim (mkFastString (showSDocOneLine dflags (ppr span))))
+    = HsLit (HsStringPrim (unsafeMkFastBytesString (showSDocOneLine dflags (ppr span))))
 
 mkAssertErrorExpr :: RnM (HsExpr Name)
 -- Return an expression for (assertError "Foo.hs:27")

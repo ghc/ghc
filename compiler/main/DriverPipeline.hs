@@ -39,7 +39,7 @@ import Module
 import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags      ( v_Ld_inputs, opt_PIC, opt_Static, WayName(..) )
+import StaticFlags      ( v_Ld_inputs, opt_Static, WayName(..) )
 import Config
 import Panic
 import Util
@@ -1349,7 +1349,7 @@ runPhase LlvmLlc input_fn dflags
 
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
-        rmodel | opt_PIC        = "pic"
+        rmodel | dopt Opt_PIC dflags = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
@@ -2036,7 +2036,7 @@ linkDynLib dflags o_files dep_packages = do
 
 doCpp :: DynFlags -> Bool -> Bool -> FilePath -> FilePath -> IO ()
 doCpp dflags raw include_cc_opts input_fn output_fn = do
-    let hscpp_opts = getOpts dflags opt_P
+    let hscpp_opts = getOpts dflags opt_P ++ picPOpts dflags
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []

@@ -40,7 +40,6 @@ import Literal
 import PrelInfo
 import Outputable
 import Platform
-import StaticFlags
 import Util
 
 import Control.Monad
@@ -115,9 +114,10 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
                -- Return details about how to find it and initialization code
 buildDynCon binder cc con args
     = do dflags <- getDynFlags
-         buildDynCon' (targetPlatform dflags) binder cc con args
+         buildDynCon' dflags (targetPlatform dflags) binder cc con args
 
-buildDynCon' :: Platform
+buildDynCon' :: DynFlags
+             -> Platform
              -> Id
              -> CostCentreStack
              -> DataCon
@@ -145,7 +145,7 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon' _ binder _cc con []
+buildDynCon' _ _ binder _cc con []
   = return (litIdInfo binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             mkNop)
@@ -176,9 +176,9 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-buildDynCon' platform binder _cc con [arg]
+buildDynCon' dflags platform binder _cc con [arg]
   | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not opt_PIC
+  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , StgLitArg (MachInt val) <- arg
   , val <= fromIntegral mAX_INTLIKE     -- Comparisons at type Integer!
   , val >= fromIntegral mIN_INTLIKE     -- ...ditto...
@@ -189,9 +189,9 @@ buildDynCon' platform binder _cc con [arg]
               intlike_amode = cmmLabelOffW intlike_lbl offsetW
         ; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
 
-buildDynCon' platform binder _cc con [arg]
+buildDynCon' dflags platform binder _cc con [arg]
   | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not opt_PIC
+  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , StgLitArg (MachChar val) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE
@@ -203,7 +203,7 @@ buildDynCon' platform binder _cc con [arg]
         ; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
 
 -------- buildDynCon': the general case -----------
-buildDynCon' _ binder ccs con args
+buildDynCon' _ _ binder ccs con args
   = do  { let (tot_wds, ptr_wds, args_w_offsets)
                 = mkVirtConstrOffsets (addArgReps args)
                 -- No void args in args_w_offsets

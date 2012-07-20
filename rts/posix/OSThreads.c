@@ -23,6 +23,16 @@
 
 #include "Rts.h"
 
+#if defined(linux_HOST_OS)
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#endif
+
+#if defined(HAVE_PTHREAD_H)
+#include <pthread.h>
+#endif
+
 #if defined(THREADED_RTS)
 #include "RtsUtils.h"
 #include "Task.h"
@@ -312,4 +322,24 @@ nat getNumberOfProcessors (void)
     return 1;
 }
 
+#endif /* defined(THREADED_RTS) */
+
+KernelThreadId kernelThreadId (void)
+{
+#if defined(linux_HOST_OS)
+    pid_t tid = syscall(SYS_gettid); // no really, see man gettid
+    return (KernelThreadId) tid;
+
+#elif defined(freebsd_HOST_OS)
+    return pthread_getthreadid_np();
+
+#elif defined(darwin_HOST_OS)
+    uint64_t ktid;
+    pthread_threadid_np(NULL, &ktid);
+    return ktid;
+
+#else
+    // unsupported
+    return 0;
 #endif
+}

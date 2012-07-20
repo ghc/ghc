@@ -44,7 +44,7 @@ module StringBuffer
 #include "HsVersions.h"
 
 import Encoding
-import FastString hiding ( buf )
+import FastString
 import FastTypes
 import FastFunctions
 
@@ -54,11 +54,7 @@ import System.IO.Unsafe         ( unsafePerformIO )
 
 import GHC.Exts
 
-#if __GLASGOW_HASKELL__ >= 701
 import Foreign.Safe
-#else
-import Foreign hiding           ( unsafePerformIO )
-#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type

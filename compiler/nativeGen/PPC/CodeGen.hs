@@ -45,7 +45,6 @@ import OldCmm
 import CLabel
 
 -- The rest:
-import StaticFlags      ( opt_PIC )
 import OrdList
 import Outputable
 import Unique
@@ -140,7 +139,8 @@ stmtToInstrs stmt = do
 
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
-    CmmSwitch arg ids     -> genSwitch arg ids
+    CmmSwitch arg ids     -> do dflags <- getDynFlags
+                                genSwitch dflags arg ids
     CmmJump arg _         -> genJump arg
     CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
@@ -1153,9 +1153,9 @@ genCCall' gcp target dest_regs argsAndHints
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
-genSwitch :: CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
-genSwitch expr ids
-  | opt_PIC
+genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
+genSwitch dflags expr ids
+  | dopt Opt_PIC dflags
   = do
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat II32
@@ -1185,10 +1185,11 @@ genSwitch expr ids
                     ]
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl CmmStatics Instr)
-generateJumpTableForInstr (BCTR ids (Just lbl)) =
+generateJumpTableForInstr :: DynFlags -> Instr
+                          -> Maybe (NatCmmDecl CmmStatics Instr)
+generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
     let jumpTable
-            | opt_PIC   = map jumpTableEntryRel ids
+            | dopt Opt_PIC dflags = map jumpTableEntryRel ids
             | otherwise = map jumpTableEntry ids
                 where jumpTableEntryRel Nothing
                         = CmmStaticLit (CmmInt 0 wordWidth)
@@ -1196,7 +1197,7 @@ generateJumpTableForInstr (BCTR ids (Just lbl)) =
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                             where blockLabel = mkAsmTempLabel (getUnique blockid)
     in Just (CmmData ReadOnlyData (Statics lbl jumpTable))
-generateJumpTableForInstr _ = Nothing
+generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers

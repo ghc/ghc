@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
 -- | Graph coloring register allocator.
 --
 -- TODO: The colors in graphviz graphs for x86_64 and ppc could be nicer.

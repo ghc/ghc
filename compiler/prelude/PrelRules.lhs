@@ -665,7 +665,10 @@ builtinIntegerRules =
   -- These rules below don't actually have to be built in, but if we
   -- put them in the Haskell source then we'd have to duplicate them
   -- between all Integer implementations
-  rule_smallIntegerToInt "smallIntegerToInt" integerToIntName,
+  rule_XToIntegerToX "smallIntegerToInt"       integerToIntName    smallIntegerName,
+  rule_XToIntegerToX "wordToIntegerToWord"     integerToWordName   wordToIntegerName,
+  rule_XToIntegerToX "int64ToIntegerToInt64"   integerToInt64Name  int64ToIntegerName,
+  rule_XToIntegerToX "word64ToIntegerToWord64" integerToWord64Name word64ToIntegerName,
   rule_smallIntegerTo "smallIntegerToWord"   integerToWordName     Int2WordOp,
   rule_smallIntegerTo "smallIntegerToFloat"  floatFromIntegerName  Int2FloatOp,
   rule_smallIntegerTo "smallIntegerToDouble" doubleFromIntegerName Int2DoubleOp
@@ -712,9 +715,9 @@ builtinIntegerRules =
           rule_decodeDouble str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_decodeDouble }
-          rule_smallIntegerToInt str name
+          rule_XToIntegerToX str name toIntegerName
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_smallIntegerToInt }
+                           ru_try = match_XToIntegerToX toIntegerName }
           rule_smallIntegerTo str name primOp
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_smallIntegerTo primOp }
@@ -737,7 +740,7 @@ match_append_lit _ [Type ty1,
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
-                   `App` Lit (MachStr (s1 `appendFS` s2))
+                   `App` Lit (MachStr (s1 `appendFB` s2))
                    `App` c1
                    `App` n)
 
@@ -968,14 +971,15 @@ match_decodeDouble fn id_unf [xl]
         panic "match_decodeDouble: Id has the wrong type"
 match_decodeDouble _ _ _ = Nothing
 
-match_smallIntegerToInt :: Id
-                        -> IdUnfoldingFun
-                        -> [Expr CoreBndr]
-                        -> Maybe (Expr CoreBndr)
-match_smallIntegerToInt _ _ [App (Var x) y]
-  | idName x == smallIntegerName
+match_XToIntegerToX :: Name
+                    -> Id
+                    -> IdUnfoldingFun
+                    -> [Expr CoreBndr]
+                    -> Maybe (Expr CoreBndr)
+match_XToIntegerToX n _ _ [App (Var x) y]
+  | idName x == n
   = Just y
-match_smallIntegerToInt _ _ _ = Nothing
+match_XToIntegerToX _ _ _ _ = Nothing
 
 match_smallIntegerTo :: PrimOp
                      -> Id

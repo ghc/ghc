@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
 -- | Clean out unneeded spill\/reload instrs
 --
 -- * Handling of join points
@@ -333,6 +332,13 @@ cleanBackward liveSlotsOnEntry noReloads acc lis
  = do	reloadedBy	<- gets sReloadedBy
  	cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc lis
 
+cleanBackward' :: Instruction instr
+               => Map BlockId (Set Int)
+               -> UniqFM [BlockId]
+               -> UniqSet Int
+               -> [LiveInstr instr]
+               -> [LiveInstr instr]
+               -> State CleanS [LiveInstr instr]
 cleanBackward' _ _ _      acc []
 	= return  acc
 

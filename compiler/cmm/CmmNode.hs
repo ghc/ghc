@@ -8,12 +8,6 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-#if __GLASGOW_HASKELL__ >= 703
--- GHC 7.0.1 improved incomplete pattern warnings with GADTs
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-#endif
-
 module CmmNode (
      CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
      UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),

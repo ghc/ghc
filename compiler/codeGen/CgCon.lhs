@@ -119,9 +119,10 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> FCode CgIdInfo     -- Return details about how to find it
 buildDynCon binder ccs con args
     = do dflags <- getDynFlags
-         buildDynCon' (targetPlatform dflags) binder ccs con args
+         buildDynCon' dflags (targetPlatform dflags) binder ccs con args
 
-buildDynCon' :: Platform
+buildDynCon' :: DynFlags
+             -> Platform
              -> Id
              -> CostCentreStack
              -> DataCon
@@ -148,7 +149,7 @@ which have exclusively size-zero (VoidRep) args, we generate no code
 at all.
 
 \begin{code}
-buildDynCon' _ binder _ con []
+buildDynCon' _ _ binder _ con []
   = returnFC (taggedStableIdInfo binder
                            (mkLblExpr (mkClosureLabel (dataConName con)
                                       (idCafInfo binder)))
@@ -183,9 +184,9 @@ because they don't support cross package data references well.
 \begin{code}
 
 
-buildDynCon' platform binder _ con [arg_amode]
+buildDynCon' dflags platform binder _ con [arg_amode]
   | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not opt_PIC
+  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
@@ -195,9 +196,9 @@ buildDynCon' platform binder _ con [arg_amode]
               intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
 
-buildDynCon' platform binder _ con [arg_amode]
+buildDynCon' dflags platform binder _ con [arg_amode]
   | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not opt_PIC
+  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
@@ -212,7 +213,7 @@ buildDynCon' platform binder _ con [arg_amode]
 Now the general case.
 
 \begin{code}
-buildDynCon' _ binder ccs con args
+buildDynCon' _ _ binder ccs con args
   = do  {
         ; let
             (closure_info, amodes_w_offsets) = layOutDynConstr con args

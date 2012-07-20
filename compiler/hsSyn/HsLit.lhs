@@ -60,7 +60,7 @@ data HsLit
   = HsChar	    Char		-- Character
   | HsCharPrim	    Char		-- Unboxed character
   | HsString	    FastString		-- String
-  | HsStringPrim    FastString		-- Packed string
+  | HsStringPrim    FastBytes		-- Packed bytes
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
   | HsIntPrim       Integer             -- literal Int#
@@ -170,7 +170,7 @@ instance Outputable HsLit where
     ppr (HsChar c)	 = pprHsChar c
     ppr (HsCharPrim c)	 = pprHsChar c <> char '#'
     ppr (HsString s)	 = pprHsString s
-    ppr (HsStringPrim s) = pprHsString s <> char '#'
+    ppr (HsStringPrim s) = pprHsBytes s <> char '#'
     ppr (HsInt i)	 = integer i
     ppr (HsInteger i _)	 = integer i
     ppr (HsRat f _)	 = ppr f

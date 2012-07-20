@@ -514,7 +514,7 @@ ppr_occ_name occ = ftext (occNameFS occ)
 -- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
 -- cached behind the scenes in the FastString implementation.
 ppr_z_occ_name :: OccName -> SDoc
-ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
+ppr_z_occ_name occ = ztext (zEncodeFS (occNameFS occ))
 
 -- Prints (if mod information is available) "Defined at <loc>" or 
 --  "Defined in <mod>" information for a Name.

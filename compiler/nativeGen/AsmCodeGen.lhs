@@ -59,7 +59,6 @@ import UniqFM
 import Unique           ( Unique, getUnique )
 import UniqSupply
 import DynFlags
-import StaticFlags
 import Util
 
 import BasicTypes       ( Alignment )
@@ -135,7 +134,7 @@ The machine-dependent bits break down as follows:
 
 data NcgImpl statics instr jumpDest = NcgImpl {
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
-    generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
+    generateJumpTableForInstr :: DynFlags -> instr -> Maybe (NatCmmDecl statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
@@ -494,7 +493,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         ---- generate jump tables
         let tabled      =
                 {-# SCC "generateJumpTables" #-}
-                generateJumpTables ncgImpl kludged
+                generateJumpTables dflags ncgImpl kludged
 
         ---- shortcut branches
         let shorted     =
@@ -572,10 +571,10 @@ makeImportsDoc dflags imports
         -- (Hack) sometimes two Labels pretty-print the same, but have
         -- different uniques; so we compare their text versions...
         dyld_stubs imps
-                | needImportedSymbols arch os
+                | needImportedSymbols dflags arch os
                 = vcat $
-                        (pprGotDeclaration arch os :) $
-                        map ( pprImportedSymbol platform . fst . head) $
+                        (pprGotDeclaration dflags arch os :) $
+                        map ( pprImportedSymbol dflags platform . fst . head) $
                         groupBy (\(_,a) (_,b) -> a == b) $
                         sortBy (\(_,a) (_,b) -> compare a b) $
                         map doPpr $
@@ -712,12 +711,12 @@ makeFarBranches blocks
 -- Analyzes all native code and generates data sections for all jump
 -- table instructions.
 generateJumpTables
-        :: NcgImpl statics instr jumpDest
+        :: DynFlags -> NcgImpl statics instr jumpDest
     -> [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
-generateJumpTables ncgImpl xs = concatMap f xs
+generateJumpTables dflags ncgImpl xs = concatMap f xs
     where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
-          g (BasicBlock _ xs) = catMaybes (map (generateJumpTableForInstr ncgImpl) xs)
+          g (BasicBlock _ xs) = catMaybes (map (generateJumpTableForInstr ncgImpl dflags) xs)
 
 -- -----------------------------------------------------------------------------
 -- Shortcut branches
@@ -887,7 +886,7 @@ cmmBlockConFold (BasicBlock id stmts) = do
 --  * reg = reg      --> nop
 --  * if 0 then jump --> nop
 --  * if 1 then jump --> jump
--- We might be tempted to skip this step entirely of not opt_PIC, but
+-- We might be tempted to skip this step entirely of not Opt_PIC, but
 -- there is some PowerPC code for the non-PIC case, which would also
 -- have to be separated.
 cmmStmtConFold :: CmmStmt -> CmmOptM CmmStmt
@@ -990,15 +989,15 @@ cmmExprNative referenceKind expr = do
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | arch == ArchPPC && not opt_PIC
+          | arch == ArchPPC && not (dopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | arch == ArchPPC && not opt_PIC
+          | arch == ArchPPC && not (dopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
-          | arch == ArchPPC && not opt_PIC
+          | arch == ArchPPC && not (dopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 

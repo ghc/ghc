@@ -15,7 +15,7 @@
 #ifndef RTS_OSTHREADS_H
 #define RTS_OSTHREADS_H
 
-#if defined(THREADED_RTS) /* to the end */
+#if defined(THREADED_RTS) /* to near the end */
 
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
@@ -222,6 +222,29 @@ int forkOS_createThread ( HsStablePtr entry );
 // Returns the number of processor cores in the machine
 //
 nat getNumberOfProcessors (void);
-#endif
+
+//
+// Support for getting at the kernel thread Id for tracing/profiling.
+//
+// This stuff is optional and only used for tracing/profiling purposes, to
+// match up thread ids recorded by other tools. For example, on Linux and OSX
+// the pthread_t type is not the same as the kernel thread id, and system
+// profiling tools like Linux perf, and OSX's DTrace use the kernel thread Id.
+// So if we want to match up RTS tasks with kernel threads recorded by these
+// tools then we need to know the kernel thread Id, and this must be a separate
+// type from the OSThreadId.
+//
+// If the feature cannot be supported on an OS, it is OK to always return 0.
+// In particular it would almost certaily be meaningless on systems not using
+// a 1:1 threading model.
+
+// We use a common serialisable representation on all OSs
+// This is ok for Windows, OSX and Linux.
+typedef StgWord64 KernelThreadId;
+
+// Get the current kernel thread id
+KernelThreadId kernelThreadId (void);
+
+#endif /* CMINUSMINUS */
 
 #endif /* RTS_OSTHREADS_H */

@@ -265,7 +265,7 @@ pprOccName :: OccName -> SDoc
 pprOccName (OccName sp occ) 
   = getPprStyle $ \ sty ->
     if codeStyle sty 
-    then ftext (zEncodeFS occ)
+    then ztext (zEncodeFS occ)
     else pp_occ <> pp_debug sty
   where
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)

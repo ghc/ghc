@@ -7,6 +7,7 @@ TcSplice: Template Haskell splices
 
 
 \begin{code}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module TcSplice( tcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  lookupThName_maybe,
                  runQuasiQuoteExpr, runQuasiQuotePat,

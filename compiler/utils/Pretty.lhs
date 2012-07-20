@@ -153,9 +153,6 @@ Relative to John's original paper, there are the following new features:
 
 \begin{code}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS -fno-warn-unused-imports #-}
--- XXX GHC 6.9 seems to be confused by unpackCString# being used only in
---     a RULE
 
 module Pretty (
         Doc,            -- Abstract
@@ -163,7 +160,7 @@ module Pretty (
 
         empty, isEmpty, nest,
 
-        char, text, ftext, ptext, zeroWidthText,
+        char, text, ftext, ptext, ztext, zeroWidthText,
         int, integer, float, double, rational,
         parens, brackets, braces, quotes, quote, doubleQuotes,
         semi, comma, colon, space, equals,
@@ -185,7 +182,6 @@ import BufWrite
 import FastString
 import FastTypes
 import Panic
-import StaticFlags
 import Numeric (fromRat)
 import System.IO
 
@@ -464,6 +460,7 @@ reduceDoc p              = p
 data TextDetails = Chr  {-#UNPACK#-}!Char
                  | Str  String
                  | PStr FastString                      -- a hashed string
+                 | ZStr FastZString                     -- a z-encoded string
                  | LStr {-#UNPACK#-}!LitString FastInt  -- a '\0'-terminated
                                                         -- array of bytes
 
@@ -563,6 +560,8 @@ ftext :: FastString -> Doc
 ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
 ptext :: LitString -> Doc
 ptext s = case iUnbox (lengthLS s) of {sl -> textBeside_ (LStr s sl) sl Empty}
+ztext :: FastZString -> Doc
+ztext s = case iUnbox (lengthFZS s) of {sl -> textBeside_ (ZStr s) sl Empty}
 zeroWidthText s = textBeside_ (Str s) (_ILIT(0)) Empty
 
 #if defined(__GLASGOW_HASKELL__)
@@ -906,6 +905,7 @@ string_txt :: TextDetails -> String -> String
 string_txt (Chr c)   s  = c:s
 string_txt (Str s1)  s2 = s1 ++ s2
 string_txt (PStr s1) s2 = unpackFS s1 ++ s2
+string_txt (ZStr s1) s2 = zString s1 ++ s2
 string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 \end{code}
 
@@ -1014,6 +1014,7 @@ printDoc mode pprCols hdl doc
     put (PStr s) next = hPutStr  hdl (unpackFS s) >> next
                         -- NB. not hPutFS, we want this to go through
                         -- the I/O library's encoding layer. (#3398)
+    put (ZStr s) next = hPutFZS  hdl s >> next
     put (LStr s l) next = hPutLitString hdl s l >> next
 
     done = hPutChar hdl '\n'
@@ -1065,6 +1066,7 @@ layLeft b (TextBeside s _ p) = put b s >> layLeft b p
     put b (Chr c)    = bPutChar b c
     put b (Str s)    = bPutStr  b s
     put b (PStr s)   = bPutFS   b s
+    put b (ZStr s)   = bPutFZS  b s
     put b (LStr s l) = bPutLitString b s l
 layLeft _ _                  = panic "layLeft: Unhandled case"
 \end{code}

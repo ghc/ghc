@@ -47,9 +47,7 @@ import System.Posix.Signals
 import GHC.ConsoleHandler
 #endif
 
-#if __GLASGOW_HASKELL__ >= 703
 import GHC.Stack
-#endif
 
 #if __GLASGOW_HASKELL__ >= 705
 import System.Mem.Weak  ( Weak, deRefWeak )
@@ -188,15 +186,11 @@ handleGhcException = ghandle
 
 -- | Panics and asserts.
 panic, sorry, pgmError :: String -> a
-#if __GLASGOW_HASKELL__ >= 703
 panic    x = unsafeDupablePerformIO $ do
    stack <- ccsToStrings =<< getCurrentCCS x
    if null stack
       then throwGhcException (Panic x)
       else throwGhcException (Panic (x ++ '\n' : renderStack stack))
-#else
-panic    x = throwGhcException (Panic x)
-#endif
 
 sorry    x = throwGhcException (Sorry x)
 pgmError x = throwGhcException (ProgramError x)

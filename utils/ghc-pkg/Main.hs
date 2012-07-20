@@ -137,6 +137,8 @@ flags = [
         "location of the global package database",
   Option [] ["no-user-package-db"] (NoArg FlagNoUserDb)
         "never read the user package database",
+  Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
+        "never read the user package database (DEPRECATED)",
   Option [] ["force"] (NoArg FlagForce)
          "ignore missing dependencies, directories, and libraries",
   Option [] ["force-files"] (NoArg FlagForceFiles)

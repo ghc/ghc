@@ -11,6 +11,9 @@
 --
 -------------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-missing-fields #-}
+-- So that tracingSettings works properly
+
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
@@ -94,7 +97,7 @@ module DynFlags (
         supportedLanguagesAndExtensions,
 
         -- ** DynFlag C compiler options
-        picCCOpts,
+        picCCOpts, picPOpts,
 
         -- * Configuration of the stg-to-stg passes
         StgToDo(..),
@@ -317,6 +320,7 @@ data DynFlag
    | Opt_DeferTypeErrors
    | Opt_Parallel
    | Opt_GranMacros
+   | Opt_PIC
 
    -- output style opts
    | Opt_PprCaseAsLet
@@ -974,7 +978,7 @@ defaultDynFlags mySettings =
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
-        flags = IntSet.fromList (map fromEnum defaultFlags),
+        flags = IntSet.fromList (map fromEnum (defaultFlags (sTargetPlatform mySettings))),
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
@@ -997,6 +1001,7 @@ defaultDynFlags mySettings =
         interactivePrint = Nothing
       }
 
+--------------------------------------------------------------------------
 -- Do not use tracingDynFlags!
 -- tracingDynFlags is a hack, necessary because we need to be able to
 -- show SDocs when tracing, but we don't always have DynFlags available.
@@ -1005,7 +1010,16 @@ defaultDynFlags mySettings =
 -- undefined.
 tracingDynFlags :: DynFlags
 tracingDynFlags = defaultDynFlags tracingSettings
-    where tracingSettings = panic "Settings not defined in tracingDynFlags"
+
+tracingSettings :: Settings
+tracingSettings = trace "panic: Settings not defined in tracingDynFlags" $
+                  Settings { sTargetPlatform = tracingPlatform }
+                  -- Missing flags give a nice error
+
+tracingPlatform :: Platform
+tracingPlatform = Platform { platformWordSize = 4, platformOS = OSUnknown }
+                  -- Missing flags give a nice error
+--------------------------------------------------------------------------
 
 type FatalMessager = String -> IO ()
 type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
@@ -1017,7 +1031,7 @@ defaultLogAction :: LogAction
 defaultLogAction dflags severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
-      SevDump   -> hPrintDump dflags stdout msg
+      SevDump   -> printSDoc (msg $$ blankLine) style
       SevInfo   -> printErrs msg style
       SevFatal  -> printErrs msg style
       _         -> do hPutChar stderr '\n'
@@ -1842,6 +1856,8 @@ dynamic_flags = [
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
   , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
+  , Flag "fPIC"             (NoArg setFPIC)
+  , Flag "fno-PIC"          (NoArg unSetFPIC)
  ]
  ++ map (mkFlag turnOn  ""     setDynFlag  ) negatableFlags
  ++ map (mkFlag turnOff "no-"  unSetDynFlag) negatableFlags
@@ -2199,8 +2215,8 @@ xFlags = [
   ( "PackageImports",                   Opt_PackageImports, nop )
   ]
 
-defaultFlags :: [DynFlag]
-defaultFlags
+defaultFlags :: Platform -> [DynFlag]
+defaultFlags platform
   = [ Opt_AutoLinkPackages,
 
       Opt_SharedImplib,
@@ -2220,6 +2236,14 @@ defaultFlags
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
+
+    ++ (case platformOS platform of
+        OSDarwin ->
+            case platformArch platform of
+            ArchX86_64         -> [Opt_PIC]
+            _ | not opt_Static -> [Opt_PIC]
+            _                  -> []
+        _ -> [])
 
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
@@ -2616,7 +2640,7 @@ setObjTarget l = updM set
                 return dflags
          HscLlvm
           | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
-            (not opt_Static || opt_PIC)
+            (not opt_Static || dopt Opt_PIC dflags)
             ->
              do addWarn ("Ignoring " ++ flag ++ " as it is incompatible with -fPIC and -dynamic on this platform")
                 return dflags
@@ -2626,6 +2650,37 @@ setObjTarget l = updM set
            arch = platformArch platform
            os   = platformOS   platform
            flag = showHscTargetFlag l
+
+setFPIC :: DynP ()
+setFPIC = updM set
+  where
+   set dflags
+    | cGhcWithNativeCodeGen == "YES" || cGhcUnregisterised == "YES"
+       = let platform = targetPlatform dflags
+         in case hscTarget dflags of
+            HscLlvm
+             | (platformArch platform == ArchX86_64) &&
+               (platformOS platform `elem` [OSLinux, OSDarwin]) ->
+                do addWarn "Ignoring -fPIC as it is incompatible with LLVM on this platform"
+                   return dflags
+            _ -> return $ dopt_set dflags Opt_PIC
+    | otherwise
+       = ghcError $ CmdLineError "-fPIC is not supported on this platform"
+
+unSetFPIC :: DynP ()
+unSetFPIC = updM set
+  where
+   set dflags
+       = let platform = targetPlatform dflags
+         in case platformOS platform of
+            OSDarwin
+             | platformArch platform == ArchX86_64 ->
+                do addWarn "Ignoring -fno-PIC on this platform"
+                   return dflags
+            _ | not opt_Static ->
+                do addWarn "Ignoring -fno-PIC as -fstatic is off"
+                   return dflags
+            _ -> return $ dopt_unset dflags Opt_PIC
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags
@@ -2786,19 +2841,24 @@ picCCOpts dflags
           --     Don't generate "common" symbols - these are unwanted
           --     in dynamic libraries.
 
-       | opt_PIC   -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
-       | otherwise -> ["-mdynamic-no-pic"]
+       | dopt Opt_PIC dflags -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
+       | otherwise           -> ["-mdynamic-no-pic"]
       OSMinGW32 -- no -fPIC for Windows
-       | opt_PIC   -> ["-U __PIC__", "-D__PIC__"]
-       | otherwise -> []
+       | dopt Opt_PIC dflags -> ["-U __PIC__", "-D__PIC__"]
+       | otherwise           -> []
       _
       -- we need -fPIC for C files when we are compiling with -dynamic,
       -- otherwise things like stub.c files don't get compiled
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
-       | opt_PIC || not opt_Static -> ["-fPIC", "-U __PIC__", "-D__PIC__"]
-       | otherwise                 -> []
+       | dopt Opt_PIC dflags || not opt_Static -> ["-fPIC", "-U __PIC__", "-D__PIC__"]
+       | otherwise                             -> []
+
+picPOpts :: DynFlags -> [String]
+picPOpts dflags
+ | dopt Opt_PIC dflags = ["-U __PIC__", "-D__PIC__"]
+ | otherwise           = []
 
 -- -----------------------------------------------------------------------------
 -- Splitting
