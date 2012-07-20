@@ -72,16 +72,6 @@ module Control.Concurrent (
 
         module Control.Concurrent.MVar,
         module Control.Concurrent.Chan,
-        module Control.Concurrent.QSem,
-        module Control.Concurrent.QSemN,
-        module Control.Concurrent.SampleVar,
-
-        -- * Merging of streams
-#ifndef __HUGS__
-        mergeIO,                -- :: [a]   -> [a] -> IO [a]
-        nmergeIO,               -- :: [[a]] -> IO [a]
-#endif
-        -- $merge
 
 #ifdef __GLASGOW_HASKELL__
         -- * Bound Threads
@@ -147,9 +137,6 @@ import Hugs.ConcBase
 
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
-import Control.Concurrent.QSem
-import Control.Concurrent.QSemN
-import Control.Concurrent.SampleVar
 
 #ifdef __HUGS__
 type ThreadId = ()
@@ -224,85 +211,6 @@ forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
 forkFinally action and_then =
   mask $ \restore ->
     forkIO $ try (restore action) >>= and_then
-
--- -----------------------------------------------------------------------------
--- Merging streams
-
-#ifndef __HUGS__
-max_buff_size :: Int
-max_buff_size = 1
-
-{-# DEPRECATED mergeIO "Control.Concurrent.mergeIO will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
-{-# DEPRECATED nmergeIO "Control.Concurrent.nmergeIO will be removed in GHC 7.8. Please use an alternative, e.g. the SafeSemaphore package, instead." #-}
-mergeIO :: [a] -> [a] -> IO [a]
-nmergeIO :: [[a]] -> IO [a]
-
--- $merge
--- The 'mergeIO' and 'nmergeIO' functions fork one thread for each
--- input list that concurrently evaluates that list; the results are
--- merged into a single output list.  
---
--- Note: Hugs does not provide these functions, since they require
--- preemptive multitasking.
-
-mergeIO ls rs
- = newEmptyMVar                >>= \ tail_node ->
-   newMVar tail_node           >>= \ tail_list ->
-   newQSem max_buff_size       >>= \ e ->
-   newMVar 2                   >>= \ branches_running ->
-   let
-    buff = (tail_list,e)
-   in
-    forkIO (suckIO branches_running buff ls) >>
-    forkIO (suckIO branches_running buff rs) >>
-    takeMVar tail_node  >>= \ val ->
-    signalQSem e        >>
-    return val
-
-type Buffer a
- = (MVar (MVar [a]), QSem)
-
-suckIO :: MVar Int -> Buffer a -> [a] -> IO ()
-
-suckIO branches_running buff@(tail_list,e) vs
- = case vs of
-        [] -> takeMVar branches_running >>= \ val ->
-              if val == 1 then
-                 takeMVar tail_list     >>= \ node ->
-                 putMVar node []        >>
-                 putMVar tail_list node
-              else
-                 putMVar branches_running (val-1)
-        (x:xs) ->
-                waitQSem e                       >>
-                takeMVar tail_list               >>= \ node ->
-                newEmptyMVar                     >>= \ next_node ->
-                unsafeInterleaveIO (
-                        takeMVar next_node  >>= \ y ->
-                        signalQSem e        >>
-                        return y)                >>= \ next_node_val ->
-                putMVar node (x:next_node_val)   >>
-                putMVar tail_list next_node      >>
-                suckIO branches_running buff xs
-
-nmergeIO lss
- = let
-    len = length lss
-   in
-    newEmptyMVar          >>= \ tail_node ->
-    newMVar tail_node     >>= \ tail_list ->
-    newQSem max_buff_size >>= \ e ->
-    newMVar len           >>= \ branches_running ->
-    let
-     buff = (tail_list,e)
-    in
-    mapIO (\ x -> forkIO (suckIO branches_running buff x)) lss >>
-    takeMVar tail_node  >>= \ val ->
-    signalQSem e        >>
-    return val
-  where
-    mapIO f xs = sequence (map f xs)
-#endif /* __HUGS__ */
 
 #ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------

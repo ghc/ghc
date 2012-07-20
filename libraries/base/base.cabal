@@ -120,9 +120,6 @@ Library {
         Control.Concurrent,
         Control.Concurrent.Chan,
         Control.Concurrent.MVar,
-        Control.Concurrent.QSem,
-        Control.Concurrent.QSemN,
-        Control.Concurrent.SampleVar,
         Control.Exception,
         Control.Exception.Base
         Control.Monad,
@@ -148,7 +145,6 @@ Library {
         Data.Foldable
         Data.Function,
         Data.Functor,
-        Data.HashTable,
         Data.IORef,
         Data.Int,
         Data.Ix,
