@@ -452,11 +452,14 @@ rnBind _ (L loc bind@(PatBind { pat_lhs = pat
 	        -- Keep locally-defined Names
 		-- As well as dependency analysis, we need these for the
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+              bndrs = collectPatBinders pat
+              bind' = bind { pat_rhs  = grhss', bind_fvs = fvs' }
+
+        ; ifWOptM Opt_WarnUnusedBinds $
+          when (null bndrs) (addWarn $ unusedPatBindWarn bind')
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
-          return (L loc (bind { pat_rhs  = grhss' 
-			      , bind_fvs = fvs' }),
-		  collectPatBinders pat, all_fvs) }
+          return (L loc bind', bndrs, all_fvs) }
 
 rnBind sig_fn (L loc bind@(FunBind { fun_id = name 
                             	   , fun_infix = is_infix 
@@ -854,4 +857,8 @@ nonStdGuardErr guards
   = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)
 
+unusedPatBindWarn :: HsBind Name -> SDoc
+unusedPatBindWarn bind
+  = hang (ptext (sLit "This pattern-binding binds no variables:"))
+       2 (ppr bind)
 \end{code}
