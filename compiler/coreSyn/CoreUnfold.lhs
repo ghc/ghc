@@ -752,7 +752,7 @@ Code for manipulating sizes
 \begin{code}
 data ExprSize = TooBig
 	      | SizeIs FastInt		-- Size found
-		       (Bag (Id,Int))	-- Arguments cased herein, and discount for each such
+		       !(Bag (Id,Int))	-- Arguments cased herein, and discount for each such
 		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
 
