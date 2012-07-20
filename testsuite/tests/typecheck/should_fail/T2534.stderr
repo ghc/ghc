@@ -1,1 +1,7 @@
- 
+
+T2534.hs:3:19:
+    Couldn't match expected type `a0 -> a0 -> b0'
+                with actual type `[a1]'
+    In the second argument of `foldr', namely `[]'
+    In the expression: foldr (>>=) [] []
+    In an equation for `foo': foo = foldr (>>=) [] []
