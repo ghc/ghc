@@ -76,7 +76,7 @@ else
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
-	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) \
+	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
 	     -dylib-install-name $(ghclibdir)/`basename "$$@" | sed 's/^libHS//;s/[-]ghc.*//'`/`basename "$$@"` \
          -no-auto-link-packages \
          -o $$@
