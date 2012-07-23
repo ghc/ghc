@@ -516,7 +516,7 @@ solve generalised = M.keysSet . go_graph
     go_graph = uncurry (flip $ go M.empty) . sccs
 
     -- NB: the input list is ascending, so lower indexes come first, so we process all predecessors of a SCC before the SCC itself
-    go :: M.Map Context (M.Map Context (Maybe Context))         -- Successor |-> Predecessor |-> Just context (iff you end up in a *single* context by inlining along this edge, and which context that is). INVARIANT: no empty maps in range of first mapping
+    go :: M.Map Context (Maybe Context)                         -- Successor |-> Just context (iff you end up in a *single* context by inlining into all predecessors, and which context that is).
        -> IM.IntMap (LGraph Context Entries)                    -- Information about the internal structure of each SCC
        -> [(Int, M.Map Int (M.Map (Context, Context) Entries))] -- Topologically sorted SCC graph
        -> M.Map Context Context                                 -- Marked contexts, mapped to the context they will end up in after inlining
@@ -539,7 +539,7 @@ solve generalised = M.keysSet . go_graph
               -- induction step. We NEVER want to mark such a node.
               True -> M.empty
               -- SCC has predecessors
-              False | Just (Just common_ctxt) <- the_maybe $ concatMap M.elems (M.elems predecessors_here)
+              False | Just common_ctxt <- foldr1 plusContext $ M.elems predecessors_here
                     , S.null (M.keysSet scc `S.intersection` generalised)
                     -- Inlining along *all* of the predecessors for *all* of the entry points arrives at a
                     -- common destination, and all of the SCC nodes are ungeneralised, so we can mark the whole SCC.
@@ -558,15 +558,18 @@ solve generalised = M.keysSet . go_graph
                           -- predecessor in a previous SCC have been force unmarked
                     -> go_graph scc_cut
 
-        -- NB: this must be careful to preserve the predecessors invariant
-        predecessors' = foldr (uncurry $ M.insertWith unionDisjoint) predecessors
-                              [ (ctxt', M.singleton ctxt mb_destination)
+        predecessors' = foldr (uncurry $ M.insertWith plusContext) predecessors
+                              [ (ctxt', mb_destination)
                               | external_ens' <- M.elems external_ens
                               , ((ctxt, ctxt'), ent) <- M.toList external_ens'
                               , let mb_destination | Just dest_ctxt <- M.lookup ctxt marks' = Just dest_ctxt -- Marked, inherits final context (NB: in this case the edge annotation is irrelevant)
                                                    | ManyEntries <- ent                     = Nothing        -- Not marked and inlining would duplicate work, so prevent marking of successors
                                                    | otherwise                              = Just ctxt      -- Not marked, so any inlining (which would not duplicate work) stops here
                               ]
+
+plusContext :: Maybe Context -> Maybe Context -> Maybe Context
+plusContext (Just c1) (Just c2) | c1 == c2 = Just c1
+plusContext _ _ = Nothing
 
 splitFocus :: InScopeSet -> PushFocus (Anned QA) (In AnnedTerm) -> Generalised -> (LGraph Context Entries,
                                                                                    PureHeap -> IM.IntMap Stack -> PushedFocus)
