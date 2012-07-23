@@ -454,9 +454,18 @@ rnBind _ (L loc bind@(PatBind { pat_lhs = pat
 		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss', bind_fvs = fvs' }
+              is_wild_pat = case pat of
+                              L _ (WildPat {}) -> True
+                              _                -> False
 
+        -- Warn if the pattern binds no variables, except for the
+        -- entirely-explicit idiom    _ = rhs
+        -- which (a) is not that different from  _v = rhs
+        --       (b) is sometimes used to give a type sig for,
+        --           or an occurrence of, a variable on the RHS
         ; ifWOptM Opt_WarnUnusedBinds $
-          when (null bndrs) (addWarn $ unusedPatBindWarn bind')
+          when (null bndrs && not is_wild_pat) $
+          addWarn $ unusedPatBindWarn bind'
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
           return (L loc bind', bndrs, all_fvs) }
