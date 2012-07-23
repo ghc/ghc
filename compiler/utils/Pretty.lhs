@@ -555,7 +555,10 @@ isEmpty Empty = True
 isEmpty _     = False
 
 char  c = textBeside_ (Chr c) (_ILIT(1)) Empty
+
 text  s = case iUnbox (length   s) of {sl -> textBeside_ (Str s)  sl Empty}
+{-# NOINLINE [1] text #-}   -- Give the RULE a chance to fire
+
 ftext :: FastString -> Doc
 ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
 ptext :: LitString -> Doc
