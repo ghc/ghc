@@ -386,7 +386,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                     (AlwaysActive, _)   -> True
                     (ActiveBefore {}, _) -> True
                     (ActiveAfter {}, NeverActive)     -> True
-                    (ActiveAfter n, ActiveAfter r)    -> r >= n
+                    (ActiveAfter n, ActiveAfter r)    -> r < n  -- Rule active strictly first
                     (ActiveAfter {}, AlwaysActive)    -> False
                     (ActiveAfter {}, ActiveBefore {}) -> False
                                        
