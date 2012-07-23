@@ -771,10 +771,10 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
 
          -- Try the flat bit, including insolubles. Solving insolubles a 
          -- second time round is a bit of a waste but the code is simple 
-         -- and the program is wrong anyway. 
-         -- Why keepWanted insols? See Note [KeepWanted in SolveWanteds] 
-       ; let all_flats = flats `unionBags` keepWanted insols
-             -- DV: Used to be 'keepWanted insols' but just insols is
+         -- and the program is wrong anyway, and we don't run the danger 
+         -- of adding Derived insolubles twice; see 
+         -- TcSMonad Note [Do not add duplicate derived insolubles] 
+       ; let all_flats = flats `unionBags` insols
                          
        ; impls_from_flats <- solveInteractCts $ bagToList all_flats
 
@@ -917,10 +917,7 @@ solveImplication tcs_untouchables
        ; let (res_flat_free, res_flat_bound)
                  = floatEqualities skols givens unsolved_flats
 
-       ; let res_wanted = WC { wc_flat  = keepWanted $ res_flat_bound
-                               -- I think this keepWanted must eventually go away, but it is
-                               -- a real code-breaking change. 
-                               -- See Note [KeepWanted in SolveImplication]
+       ; let res_wanted = WC { wc_flat  = res_flat_bound
                              , wc_impl  = unsolved_implics
                              , wc_insol = insols }
 
@@ -940,81 +937,8 @@ solveImplication tcs_untouchables
 
 \end{code}
 
-Note [KeepWanted in SolveWanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why do we have:
-   let all_flats = flats `unionBags` keepWanted insols
-instead of the simpler:
-   let all_flats = flats `unionBags` insols
-in solve_wanteds?
-
-Assume a top-level class and instance declaration:
-
-  class D a b | a -> b 
-  instance D [a] [a] 
-
-Assume we have started with an implication:
-
-  forall c. Eq c => { wc_flat = D [c] c [W] }
-
-which we have simplified to:
-
-  forall c. Eq c => { wc_flat = D [c] c [W]
-                    , wc_insols = (c ~ [c]) [D] }
-
-For some reason, e.g. because we floated an equality somewhere else,
-we might try to re-solve this implication. If we do not do a
-keepWanted, then we will end up trying to solve the following
-constraints the second time:
-
-  (D [c] c) [W]
-  (c ~ [c]) [D]
-
-which will result in two Deriveds to end up in the insoluble set:
-
-  wc_flat   = D [c] c [W]
-  wc_insols = (c ~ [c]) [D], (c ~ [c]) [D]
-
-which can result in reporting the same error twice.  
-
-So, do we /lose/ some potentially useful information by doing this? 
-
-No, because the insoluble Derived/Given are going to be equalities, 
-which are going to be derivable anyway from the rest of the flat 
-constraints. 
-
-
-Note [KeepWanted in SolveImplication]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Here is a real example, 
-stripped off from libraries/utf8-string/Codec/Binary/UTF8/Generic.hs
-
-  class C a b | a -> b
-  g :: C a b => a -> b -> () 
-  f :: C a b => a -> b -> () 
-  f xa xb = 
-      let loop = g xa 
-      in loop xb
-
-We will first try to infer a type for loop, and we will succeed:
-    C a b' => b' -> ()
-Subsequently, we will type check (loop xb) and all is good. But, 
-recall that we have to solve a final implication constraint: 
-    C a b => (C a b' => .... cts from body of loop .... )) 
-And now we have a problem as we will generate an equality b ~ b' and fail to 
-solve it. 
-
-I actually think this is a legitimate behaviour (to fail). After all, if we had 
-given the inferred signature to foo we would have failed as well, but we have to 
-find a workaround because library code breaks.
-
-For now I keep the 'keepWanted' though it seems problematic e.g. we might discard 
-a useful Derived!
 
 \begin{code}
-
-
 floatEqualities :: [TcTyVar] -> [EvVar] -> Cts -> (Cts, Cts)
 -- Post: The returned FlavoredEvVar's are only Wanted or Derived
 -- and come from the input wanted ev vars or deriveds 

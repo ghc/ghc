@@ -1158,26 +1158,25 @@ zonkEvBinds env binds
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
 zonkEvBind env (EvBind var term)
-  -- This function has some special cases for avoiding re-zonking the
-  -- same types many types. See Note [Optimized Evidence Binding Zonking]
   = case term of 
-      -- Fast path for reflexivity coercions:
+      -- Special-case fast paths for small coercions
+      -- NB: could be optimized further! (e.g. SymCo cv)
+      -- See Note [Optimized Evidence Binding Zonking]
       EvCoercion co 
         | Just ty <- isTcReflCo_maybe co
-        ->
-          do { zty  <- zonkTcTypeToType env ty
-             ; let var' = setVarType var (mkEqPred zty zty)
-             ; return (EvBind var' (EvCoercion (mkTcReflCo zty))) }
+        -> do { zty  <- zonkTcTypeToType env ty
+              ; let var' = setVarType var (mkEqPred zty zty)
+                  -- Here we save the task of zonking var's type, 
+                  -- because we know just what it is!
+              ; return (EvBind var' (EvCoercion (mkTcReflCo zty))) }
 
-      -- Fast path for variable-variable bindings 
-      -- NB: could be optimized further! (e.g. SymCo cv)
         | Just cv <- getTcCoVar_maybe co 
         -> do { let cv'   = zonkIdOcc env cv -- Just lazily look up
                     term' = EvCoercion (TcCoVarCo cv')
                     var'  = setVarType var (varType cv')
               ; return (EvBind var' term') }
 
-      -- Ugly safe and slow path
+      -- The default path
       _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
               ; term' <- zonkEvTerm env term 
               ; return (EvBind var' term')
@@ -1238,29 +1237,16 @@ not the ill-kinded Any BOX).
 
 Note [Optimized Evidence Binding Zonking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When optimising evidence binds we may come accross situations where 
-a coercion is just reflexivity: 
+When optimising evidence binds we may come across situations where 
+a coercion looks like
       cv = ReflCo ty
-In such a case it is a waste of time to zonk both ty and the type 
-of the coercion, especially if the types involved are huge. For this
-reason this case is optimized to only zonk 'ty' and set the type of 
-the variable to be that zonked type.
-
-Another case that hurts a lot are simple coercion bindings of the form:
-      cv1 = cv2
-      cv3 = cv1
-      cv4 = cv2 
-etc. In all such cases it is very easy to just get the zonked type of 
-cv2 and use it to set the type of the LHS coercion variable without zonking
-twice. Though this case is funny, it can happen due the way that evidence 
-from spontaneously solved goals is now used.
-See Note [Optimizing Spontaneously Solved Goals] about this.
-
-NB: That these optimizations are independently useful, regardless of the 
-constraint solver strategy.
-
-DV, TODO: followup on this note mentioning new examples I will add to perf/
+or    cv1 = cv2
+where the type 'ty' is big.  In such cases it is a waste of time to zonk both 
+  * The variable on the LHS
+  * The coercion on the RHS
+Rather, we can zonk the coercion, take its type and use that for 
+the variable.  For big coercions this might be a lose, though, so we
+just have a fast case for a couple of special cases.
 
 
 \begin{code}

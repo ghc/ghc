@@ -47,7 +47,6 @@ import Control.Monad ( foldM )
 
 import VarEnv
 import qualified Data.Traversable as Traversable
-import Data.Maybe ( isJust )
 
 import Control.Monad( when, unless )
 import Pair ()
@@ -763,19 +762,6 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_depth = d1 }) 
                     wi@(CFunEqCan { cc_ev = fl2, cc_fun = tc2
                                   , cc_tyargs = args2, cc_rhs = xi2, cc_depth = d2 })
-{-  ToDo: Check with Dimitrios
-  | lhss_match  
-  , isSolved fl1 -- Inert is solved and we can simply ignore it
-                 -- when workitem is given/solved
-  , isGiven fl2
-  = irInertConsumed "FunEq/FunEq"
-  | lhss_match
-  , isSolved fl2 -- Workitem is solved and we can ignore it when
-                 -- the inert is given/solved
-  , isGiven fl1                 
-  = irWorkItemConsumed "FunEq/FunEq" 
--}
-
   | fl1 `canSolve` fl2 && lhss_match
   = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
@@ -934,12 +920,6 @@ solveOneFromTheOther info ifl workItem
 		  -- so it's safe to continue on from this point
   = irInertConsumed ("Solved[DI] " ++ info)
   
-{-  ToDo: Check with Dimitrios
-  | isSolved ifl, isGiven wfl
-    -- Same if the inert is a GivenSolved -- just get rid of it
-  = irInertConsumed ("Solved[SI] " ++ info)
--}
-
   | otherwise
   = ASSERT( ifl `canSolve` wfl )
       -- Because of Note [The Solver Invariant], plus Derived dealt with
@@ -1443,16 +1423,32 @@ doTopReact :: InertSet -> WorkItem -> TcS TopInteractResult
 --   (b) See Note [Given constraint that matches an instance declaration] 
 --       for some design decisions for given dictionaries. 
 
-doTopReact inerts workItem@(CDictCan { cc_ev = fl
-                                     , cc_class = cls, cc_tyargs = xis, cc_depth = depth })
+doTopReact inerts workItem
   = do { traceTcS "doTopReact" (ppr workItem)
-       ; instEnvs <- getInstEnvs 
-       ; let fd_eqns = improveFromInstEnv instEnvs (mkClassPred cls xis, arising_sdoc)
+       ; case workItem of
+      	   CDictCan { cc_ev = fl, cc_class = cls, cc_tyargs = xis
+      	            , cc_depth = d }
+      	      -> doTopReactDict inerts workItem fl cls xis d
+
+      	   CFunEqCan { cc_ev = fl, cc_fun = tc, cc_tyargs = args
+      	             , cc_rhs = xi, cc_depth = d }
+      	      -> doTopReactFunEq fl tc args xi d
+
+      	   _  -> -- Any other work item does not react with any top-level equations
+      	         return NoTopInt  }
+
+--------------------
+doTopReactDict :: InertSet -> WorkItem -> CtEvidence -> Class -> [Xi]
+               -> SubGoalDepth -> TcS TopInteractResult
+doTopReactDict inerts workItem fl cls xis depth
+  = do { instEnvs <- getInstEnvs 
+       ; let fd_eqns = improveFromInstEnv instEnvs 
+                           (mkClassPred cls xis, arising_sdoc)
              
        ; m <- rewriteWithFunDeps fd_eqns xis fl
        ; case m of
            Just (_xis',fd_work) ->
-               do { emitFDWorkAsDerived fd_work (cc_depth workItem)
+               do { emitFDWorkAsDerived fd_work depth
                   ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
                                       , tir_new_item = ContinueWith workItem } }
            Nothing 
@@ -1493,106 +1489,54 @@ doTopReact inerts workItem@(CDictCan { cc_ev = fl
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
                           , tir_new_item = Stop } }
 
+--------------------
+doTopReactFunEq :: CtEvidence -> TyCon -> [Xi] -> Xi
+                -> SubGoalDepth -> TcS TopInteractResult
+doTopReactFunEq fl tc args xi d
+  = ASSERT (isSynFamilyTyCon tc) -- No associated data families have 
+                                 -- reached that far 
 
--- Otherwise, it's a Given, Derived, or Wanted
-doTopReact _inerts workItem@(CFunEqCan { cc_ev = fl, cc_depth = d
-                                       , cc_fun = tc, cc_tyargs = args, cc_rhs = xi })
-  = ASSERT (isSynFamilyTyCon tc) -- No associated data families have reached that far 
+    -- First look in the cache of solved funeqs
+    do { fun_eq_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
+       ; case lookupFamHead fun_eq_cache (mkTyConApp tc args) of {
+            Just ctev -> ASSERT( not (isDerived ctev) )
+                         ASSERT( isEqPred (ctEvPred ctev) )
+                         succeed_with (evTermCoercion (ctEvTerm ctev)) 
+                                      (snd (getEqPredTys (ctEvPred ctev))) ;
+            Nothing -> 
+
+    -- No cached solved, so look up in top-level instances
     do { match_res <- matchFam tc args   -- See Note [MATCHING-SYNONYMS]
-       ; case match_res of
-           Nothing -> return NoTopInt 
-           Just (famInst, rep_tys)
-             -> do { mb_already_solved <- lkpSolvedFunEqCache (mkTyConApp tc args)
-                   ; traceTcS "doTopReact: Family instance matches" $ 
-                     vcat [ text "solved-fun-cache" <+> if isJust mb_already_solved 
-                                                        then text "hit" else text "miss"
-                          , text "workItem =" <+> ppr workItem ]
-                   ; let (coe,rhs_ty) 
-                           | Just ctev <- mb_already_solved
-                           , not (isDerived ctev)
-                           = ASSERT( isEqPred (ctEvPred ctev) )
-                             (evTermCoercion (ctEvTerm ctev), snd (getEqPredTys (ctEvPred ctev)))
-                           | otherwise 
-                           = let coe_ax = famInstAxiom famInst
-                             in (mkTcAxInstCo coe_ax rep_tys, 
-                                              mkAxInstRHS coe_ax rep_tys)
-                                
-                         xdecomp x = [EvCoercion (mkTcSymCo coe `mkTcTransCo` evTermCoercion x)]
-                         xcomp [x] = EvCoercion (coe `mkTcTransCo` evTermCoercion x)
-                         xcomp _   = panic "No more goals!"
-                         
-                         xev = XEvTerm xcomp xdecomp
-                   ; ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
-                   ; case ctevs of
-                       [ctev] -> updWorkListTcS $ extendWorkListEq $
-                                 CNonCanonical { cc_ev = ctev
-                                               , cc_depth  = d+1 }
-                       ctevs -> -- No subgoal (because it's cached)
-                                ASSERT( null ctevs) return () 
+       ; case match_res of {
+           Nothing -> return NoTopInt ;
+           Just (famInst, rep_tys) -> 
 
-                   ; unless (isDerived fl) $
-                     do { addSolvedFunEq fl
-                        ; addToSolved fl }
-                   ; return $ SomeTopInt { tir_rule = "Fun/Top"
-                                       , tir_new_item = Stop } } }
-            
--- Any other work item does not react with any top-level equations
-doTopReact _inerts _workItem = return NoTopInt 
+    -- Found a top-level instance
+    do {    -- Add it to the solved goals
+         unless (isDerived fl) $
+         do { addSolvedFunEq fl            
+            ; addToSolved fl }
 
-
-lkpSolvedFunEqCache :: TcType -> TcS (Maybe CtEvidence)
-lkpSolvedFunEqCache fam_head 
-  = do { (_subst,_inscope) <- getInertEqs 
-       ; fun_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
-       ; traceTcS "lkpFunEqCache" $ vcat [ text "fam_head    =" <+> ppr fam_head
-                                         , text "funeq cache =" <+> ppr fun_cache ]
-       ; return (lookupFamHead fun_cache fam_head) }
-
-{-             ToDo; talk to Dimitrios.  I have no idea what is happening here
-
-       ; rewrite_cached (lookupFamHead fun_cache fam_head) }
--- The two different calls do not seem to make a significant difference in 
--- terms of hit/miss rate for many memory-critical/performance tests but the
--- latter blows up the space on the heap somehow ... It maybe the niFixTvSubst.
--- So, I am simply disabling it for now, until we investigate a bit more.
---       lookupTypeMap_mod subst cc_rhs fam_head (unCtFamHeadMap fun_cache) }
- 
-  where rewrite_cached Nothing = return Nothing
-        rewrite_cached (Just ct@(CFunEqCan { cc_ev = fl, cc_depth = d
-                                           , cc_fun = tc, cc_tyargs = xis
-                                           , cc_rhs = xi}))
-          = do { (xis_subst,cos) <- flattenMany d FMFullFlatten fl xis 
-                                    -- cos :: xis_subst ~ xis 
-               ; (xi_subst,co) <- flatten d FMFullFlatten fl xi
-                                    -- co :: xi_subst ~ xi
-               ; let flat_fam_head = mkTyConApp tc xis_subst 
-
-               ; unless (flat_fam_head `eqType` fam_head) $ 
-                        pprPanic "lkpFunEqCache" (vcat [ text "Cached (solved) constraint =" <+> ppr ct
-                                                       , text "Flattened constr. head     =" <+> ppr flat_fam_head ])
-               ; traceTcS "lkpFunEqCache" $ text "Flattened constr. rhs = " <+> ppr xi_subst 
-                                                  
-
-               ; let new_pty = mkTcEqPred (mkTyConApp tc xis_subst) xi_subst
-                     new_co  = mkTcTyConAppCo eqTyCon [ mkTcReflCo (defaultKind $ typeKind xi_subst)
-                                                      , mkTcTyConAppCo tc cos
-                                                      , co ]
-                               -- new_co :: (F xis_subst ~  xi_subst) ~ (F xis ~ xi)
-                               -- new_co = (~) <k> (F cos) co
-               ; new_fl <- rewriteCtFlavor fl new_pty new_co 
-               ; case new_fl of
-                    Nothing 
-                      -> return Nothing -- Strange: cached?
-                    Just fl' 
-                      -> return $ 
-                         Just (CFunEqCan { cc_ev = fl'
-                                         , cc_depth = d
-                                         , cc_fun = tc
-                                         , cc_tyargs = xis_subst
-                                         , cc_rhs = xi_subst }) }
-        rewrite_cached (Just other_ct) 
-          = pprPanic "lkpFunEqCache:not family equation!" $ ppr other_ct
--}
+       ; let coe_ax = famInstAxiom famInst 
+       ; succeed_with (mkTcAxInstCo coe_ax rep_tys)
+                      (mkAxInstRHS coe_ax rep_tys) } } } } }
+  where
+    succeed_with :: TcCoercion -> TcType -> TcS TopInteractResult
+    succeed_with coe rhs_ty 
+      = do { ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
+           ; case ctevs of
+               [ctev] -> updWorkListTcS $ extendWorkListEq $
+                         CNonCanonical { cc_ev = ctev
+                                       , cc_depth  = d+1 }
+               ctevs -> -- No subgoal (because it's cached)
+                        ASSERT( null ctevs) return () 
+           ; return $ SomeTopInt { tir_rule = "Fun/Top"
+                                 , tir_new_item = Stop } }
+      where
+        xdecomp x = [EvCoercion (mkTcSymCo coe `mkTcTransCo` evTermCoercion x)]
+        xcomp [x] = EvCoercion (coe `mkTcTransCo` evTermCoercion x)
+        xcomp _   = panic "No more goals!"
+        xev = XEvTerm xcomp xdecomp
 \end{code}
 
 

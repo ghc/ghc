@@ -857,8 +857,8 @@ type SubGoalDepth = Int -- An ever increasing number used to restrict
 data Ct
   -- Atomic canonical constraints 
   = CDictCan {  -- e.g.  Num xi
-      cc_ev :: CtEvidence, 
-      cc_class  :: Class, 
+      cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_class  :: Class,   
       cc_tyargs :: [Xi],
 
       cc_depth  :: SubGoalDepth -- Simplification depth of this constraint
@@ -866,7 +866,7 @@ data Ct
     }
 
   | CIrredEvCan {  -- These stand for yet-unknown predicates
-      cc_ev :: CtEvidence,
+      cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
       cc_ty     :: Xi, -- cc_ty is flat hence it may only be of the form (tv xi1 xi2 ... xin)
                        -- Since, if it were a type constructor application, that'd make the
                        -- whole constraint a CDictCan, or CTyEqCan. And it can't be
@@ -880,7 +880,7 @@ data Ct
        --   * typeKind xi `compatKind` typeKind tv
        --       See Note [Spontaneous solving and kind compatibility]
        --   * We prefer unification variables on the left *JUST* for efficiency
-      cc_ev :: CtEvidence, 
+      cc_ev :: CtEvidence,    -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar, 
       cc_rhs    :: Xi,
 
@@ -890,7 +890,7 @@ data Ct
   | CFunEqCan {  -- F xis ~ xi  
                  -- Invariant: * isSynFamilyTyCon cc_fun 
                  --            * typeKind (F xis) `compatKind` typeKind xi
-      cc_ev :: CtEvidence, 
+      cc_ev :: CtEvidence,      -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,	-- A type function
       cc_tyargs :: [Xi],	-- Either under-saturated or exactly saturated
       cc_rhs    :: Xi,      	--    *never* over-saturated (because if so
@@ -904,8 +904,15 @@ data Ct
       cc_ev :: CtEvidence, 
       cc_depth  :: SubGoalDepth
     }
-
 \end{code}
+
+Note [Ct/evidence invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If  ct :: Ct, then extra fields of 'ct' cache precisely the ctev_pred field
+of (cc_ev ct).   Eg for CDictCan, 
+   ctev_pred (cc_ev ct) = (cc_class ct) (cc_tyargs ct)
+This holds by construction; look at the unique place where CDictCan is
+built (in TcCanonical)
 
 \begin{code}
 mkNonCanonical :: CtEvidence -> Ct
@@ -915,6 +922,7 @@ ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
 
 ctPred :: Ct -> PredType 
+-- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
 
 keepWanted :: Cts -> Cts
@@ -922,18 +930,6 @@ keepWanted = filterBag isWantedCt
     -- DV: there used to be a note here that read: 
     -- ``Important: use fold*r*Bag to preserve the order of the evidence variables'' 
     -- DV: Is this still relevant? 
-
--- ToDo Check with Dimitrios
-{-
-ctPred (CNonCanonical { cc_ev = fl }) = ctEvPred fl
-ctPred (CDictCan { cc_class = cls, cc_tyargs = xis }) 
-  = mkClassPred cls xis
-ctPred (CTyEqCan { cc_tyvar = tv, cc_rhs = xi }) 
-  = mkTcEqPred (mkTyVarTy tv) xi
-ctPred (CFunEqCan { cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) 
-  = mkTcEqPred (mkTyConApp fn xis1) xi2
-ctPred (CIrredEvCan { cc_ty = xi }) = xi
--}
 \end{code}
 
 
@@ -1197,6 +1193,12 @@ At the end, we will hopefully have substituted uf1 := F alpha, and we
 will be able to report a more informative error:
     'Can't construct the infinite type beta ~ F alpha beta'
 
+Insoluble constraints *do* include Derived constraints. For example,
+a functional dependency might give rise to [D] Int ~ Bool, and we must
+report that.  If insolubles did not contain Deriveds, reportErrors would
+never see it.
+
+
 %************************************************************************
 %*									*
             Pretty printing
@@ -1233,14 +1235,12 @@ ctev_evar; instead we look at the cte_pred field.  The evtm/evar field
 may be un-zonked.
 
 \begin{code}
-data CtEvidence   -- Rename to CtEvidence
+data CtEvidence 
   = Given { ctev_gloc :: GivenLoc
           , ctev_pred :: TcPredType
           , ctev_evtm :: EvTerm }          -- See Note [Evidence field of CtEvidence]
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
-    -- DV TODOs: (i)  Consider caching actual evidence _term_
-    --           (ii) Revisit Note [Optimizing Spontaneously Solved Coercions]
     
   | Wanted { ctev_wloc :: WantedLoc
            , ctev_pred :: TcPredType
