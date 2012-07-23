@@ -199,7 +199,7 @@ renameDoc d = case d of
   DocCodeBlock doc -> do
     doc' <- renameDoc doc
     return (DocCodeBlock doc')
-  DocURL str -> return (DocURL str)
+  DocHyperlink l -> return (DocHyperlink l)
   DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
   DocExamples e -> return (DocExamples e)

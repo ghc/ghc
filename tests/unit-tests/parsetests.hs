@@ -9,6 +9,7 @@ import Haddock.Lex (tokenise)
 import Haddock.Parse (parseParas)
 import Haddock.Types
 import Outputable
+import Data.Monoid
 
 instance Outputable a => Show a where
   show = showSDoc . ppr
@@ -53,8 +54,21 @@ tests = [
       input  = ">>> putFooBar\nfoo\n<BLANKLINE>\nbar"
     , result = Just $ DocExamples $ [Example "putFooBar" ["foo","","bar"]]
     }
+
+  -- tests for links
+  , ParseTest {
+      input  = "<http://example.com/>"
+    , result = Just . DocParagraph $ hyperlink "http://example.com/" Nothing `mappend` DocString "\n"
+    }
+
+  , ParseTest {
+      input  = "<http://example.com/ some link>"
+    , result = Just . DocParagraph $ hyperlink "http://example.com/" (Just "some link") `mappend` DocString "\n"
+    }
   ]
 
+hyperlink :: String -> Maybe String -> Doc RdrName
+hyperlink url = DocHyperlink . Hyperlink url
 
 main :: IO ()
 main = do
