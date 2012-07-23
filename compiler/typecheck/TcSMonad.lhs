@@ -1593,7 +1593,7 @@ matchClass clas tys
             ([], _unifs, _)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching" $ 
                         vcat [ text "dict" <+> ppr pred
-                             , ppr instEnvs ]
+                             {- , ppr instEnvs -} ]
                         
                       ; return MatchInstNo  
                       } ;  
