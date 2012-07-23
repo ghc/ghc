@@ -395,7 +395,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
           warnDs (vcat [ hang (ptext (sLit "Rule") <+> doubleQuotes (ftext name)
                                <+> ptext (sLit "may never fire"))
                             2 (ptext (sLit "becuase") <+> quotes (ppr fn_id)
-                               <+> ptext (sLit "might inline firsrt"))
+                               <+> ptext (sLit "might inline first"))
                        , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma on")
                          <+> quotes (ppr fn_id) ])
 
