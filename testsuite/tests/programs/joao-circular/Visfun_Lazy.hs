@@ -854,6 +854,20 @@ visit_PPCArgs (C_NilPPCArgs_1 ) x_ifillerrs x_ifillfmts x_ifillmins x_ireqs = (x
       x_fmts = ([] )
       x_fillmins = ([] )
       x_error = ([] )
+
+
+visit_PPSArgs :: PPSArgs -> [T_Frame] -> (T_Errs, T_Fmts, Integer, T_Mins)
+-- This function's most general type is
+-- visit_PPSArgs :: forall a. (Integral a, Show a)
+--               => PPSArgs -> [T_Frame] -> (T_Errs, T_Fmts, a, T_Mins)
+-- But in the same mutually recusive group is visit_PPS whose type becomes
+-- visit_PPS :: forall a. (Integral a, Show a)
+--           => PPS -> T_Frame -> (Bool, T_Formats, INT, INT, INT)
+-- which GHC now (rightfully) rejects that as ambiguous, even though
+-- acutally default resolution will allow it at call sites,
+-- So I've added a type signature 
+-- SLPJ July 2012
+
 visit_PPSArgs (C_ConsArgs_1 t_PPS t_PPSArgs_2 ) x_reqs = (x_error , x_fmts , x_len , x_mins )
   where
       x_reqs_2 = (tail_T_Reqs x_reqs)
