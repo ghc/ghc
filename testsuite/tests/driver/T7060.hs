@@ -1,4 +1,8 @@
 main :: IO ()
-main = print (3 + 4 :: Int)
+main = print (f (3 + 4 :: Int))
 
-{-# RULES "rule"  forall xs . map id xs = xs #-}
+f :: Int -> Int
+f x = x
+{-# NOINLINE [1] f #-}
+
+{-# RULES "rule" forall x. f x = 8 #-}

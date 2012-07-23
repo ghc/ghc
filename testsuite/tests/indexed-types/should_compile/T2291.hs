@@ -10,6 +10,6 @@ class CoCCC k where
 
 {-# RULES
 "cocurry coapply"               cocurry coapply = id
-"cocurry . uncocurry"           cocurry . uncocurry = id
-"uncocurry . cocurry"           uncocurry . cocurry = id
+"cocurry . uncocurry"           forall x. cocurry (uncocurry x) = x
+"uncocurry . cocurry"           forall x. uncocurry (cocurry x) = x
  #-}

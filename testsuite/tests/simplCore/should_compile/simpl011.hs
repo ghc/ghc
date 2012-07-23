@@ -49,6 +49,7 @@ updateST= update'
 
 update  :: (MutHash arr ref m)
         => HashTable key val arr ref m -> key -> val -> m Bool
+{-# NOINLINE [1] update #-}
 update  = update'
 
 update' :: (MutHash arr ref m)
