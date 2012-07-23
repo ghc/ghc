@@ -1,3 +1,7 @@
+Changes in version 2.12.0
+
+ * Labeled URLs (e.g <http://example.net/ some label>)
+
 Changes in version 2.11.0
 
  * Show deprecation messages for identifiers
@@ -8,7 +12,7 @@ Changes in version 2.11.0
 
  * Fix reporting of modules safe haskell mode
 
- * Fix a case where we were generating invalid xhtml 
+ * Fix a case where we were generating invalid xhtml
 
  * Improved --qual option (no crashes, proper error messages)
 
