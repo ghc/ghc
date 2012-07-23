@@ -7,6 +7,7 @@ module ShouldCompile where
 -- The reason was that foobar is monomorphic, so the RULE 
 -- should not generalise over it.
 
+{-# NOINLINE [1] foo #-}
 foo 1 = 2
 bar 0 = 1
 

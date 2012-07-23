@@ -12,6 +12,7 @@ mapT :: (C a, C b) => (a -> b) -> T a -> T b
 mapT = undefined
 
 zipT :: (C a, C b) => T a -> T b -> T (a,b)
+{-# NOINLINE [1] zipT #-}
 zipT = undefined
 
 {-# RULES
