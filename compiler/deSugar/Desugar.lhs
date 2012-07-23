@@ -42,7 +42,9 @@ import RdrName
 import NameSet
 import NameEnv
 import Rules
+import BasicTypes       ( Activation(.. ) )
 import CoreMonad	( endPass, CoreToDo(..) )
+import FastString
 import ErrUtils
 import Outputable
 import SrcLoc
@@ -52,6 +54,7 @@ import MonadUtils
 import OrdList
 import Data.List
 import Data.IORef
+import Control.Monad( when )
 \end{code}
 
 %************************************************************************
@@ -376,6 +379,26 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 	      final_rhs = simpleOptExpr rhs'	-- De-crap it
 	      rule      = mkRule False {- Not auto -} is_local 
                                  name act fn_name final_bndrs args final_rhs
+
+              inline_shadows_rule   -- Function can be inlined before rule fires
+                = case (idInlineActivation fn_id, act) of
+                    (NeverActive, _)    -> False
+                    (AlwaysActive, _)   -> True
+                    (ActiveBefore {}, _) -> True
+                    (ActiveAfter {}, NeverActive)     -> True
+                    (ActiveAfter n, ActiveAfter r)    -> r >= n
+                    (ActiveAfter {}, AlwaysActive)    -> False
+                    (ActiveAfter {}, ActiveBefore {}) -> False
+                                       
+
+        ; when inline_shadows_rule $
+          warnDs (vcat [ hang (ptext (sLit "Rule") <+> doubleQuotes (ftext name)
+                               <+> ptext (sLit "may never fire"))
+                            2 (ptext (sLit "becuase") <+> quotes (ppr fn_id)
+                               <+> ptext (sLit "might inline firsrt"))
+                       , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma on")
+                         <+> quotes (ppr fn_id) ])
+
 	; return (Just rule)
 	} } }
 \end{code}
