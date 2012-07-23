@@ -1062,8 +1062,29 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(dirty_MUT_VAR)                      \
       SymI_HasProto(stg_forkzh)                         \
       SymI_HasProto(stg_forkOnzh)                       \
+      SymI_HasProto(stg_newSContzh)                     \
+      SymI_HasProto(stg_getSContzh)                     \
+      SymI_HasProto(stg_atomicSwitchzh)                 \
+      SymI_HasProto(stg_sleepCapabilityzh)              \
+      SymI_HasProto(stg_getSContIdzh)                   \
+      SymI_HasProto(stg_getSContCapabilityzh)           \
+      SymI_HasProto(stg_defaultUpcallErrorzh)           \
+      SymI_HasProto(stg_getCurrentCapabilityzh)         \
+      SymI_HasProto(stg_getSLSzh)                       \
+      SymI_HasProto(stg_setSLSzh)                       \
+      SymI_HasProto(stg_killSContzh)                    \
+      SymI_HasProto(stg_getStatusTVarzh)                \
+      SymI_HasProto(stg_setScheduleSContActionzh)       \
+      SymI_HasProto(stg_getScheduleSContActionzh)       \
+      SymI_HasProto(stg_setYieldControlActionzh)        \
+      SymI_HasProto(stg_getYieldControlActionzh)        \
+      SymI_HasProto(stg_setFinalizzerzh)                \
+      SymI_HasProto(stg_scheduleThreadOnFreeCapzh)      \
+      SymI_HasProto(stg_setSContCapabilityzh)           \
+      SymI_HasProto(stg_isThreadBoundzh)                \
       SymI_HasProto(forkProcess)                        \
       SymI_HasProto(forkOS_createThread)                \
+      SymI_HasProto(forkOS_createThreadForSCont)        \
       SymI_HasProto(freeHaskellFunctionPtr)             \
       SymI_HasProto(getOrSetGHCConcSignalSignalHandlerStore)            \
       SymI_HasProto(getOrSetGHCConcWindowsPendingDelaysStore)           \
@@ -2489,7 +2510,7 @@ loadObj( pathchar *path )
         offset = 0;
 #endif
       image = VirtualAlloc(NULL, fileSize + offset, MEM_RESERVE | MEM_COMMIT,
-                           PAGE_EXECUTE_READWRITE);
+                             PAGE_EXECUTE_READWRITE);
       image += offset;
     }
 #   elif defined(darwin_HOST_OS)
@@ -3042,10 +3063,10 @@ ocFlushInstructionCache( ObjectCode *oc )
 
 
 
-typedef unsigned char          UChar;
-typedef unsigned short         UInt16;
-typedef unsigned int           UInt32;
-typedef          int           Int32;
+typedef unsigned char  UChar;
+typedef unsigned short UInt16;
+typedef unsigned int   UInt32;
+typedef          int   Int32;
 typedef unsigned long long int UInt64;
 
 
@@ -3927,7 +3948,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                             v, (char *)symbol);
                    }
                    *(UInt32 *)pP = (UInt32)v;
-                   break;
+               break;
                }
             case 4: /* R_X86_64_PC32 */
                {
@@ -3999,7 +4020,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #    define R_X86_64_PC64 24
 #  endif
 
-/* 
+/*
  * Workaround for libc implementations (e.g. eglibc) with incomplete
  * relocation lists
  */
@@ -4878,7 +4899,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                   | (offset & 0x01fe);
             break;
          }
-         
+
          case R_ARM_THM_JUMP11:
          {
             StgWord16 *word = (StgWord16 *)P;
@@ -5306,7 +5327,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 
     IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
 
-    for (i = 0; i < header->ncmds; i++) {   
+    for (i = 0; i < header->ncmds; i++) {
         if (lc->cmd == LC_SYMTAB) {
 
                 // Find out the first and last undefined external
@@ -5363,7 +5384,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 
     IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
 
-    for (i = 0; i < header->ncmds; i++) {   
+    for (i = 0; i < header->ncmds; i++) {
         if (lc->cmd == LC_SYMTAB) {
 
                 // Just allocate one entry for every symbol
@@ -5634,7 +5655,7 @@ relocateSection(
 				       " and should be defined in a section, but isn't!\n", nm);
 		    }
 	    }
-	    
+
             value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, (unsigned long)addr)->addr;
 
             type = X86_64_RELOC_SIGNED;
@@ -5967,7 +5988,7 @@ relocateSection(
                         return 0;
                     }
 
-                    if (reloc->r_pcrel) {  
+                    if (reloc->r_pcrel) {
 #ifdef powerpc_HOST_ARCH
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a relative jump to the symbol
@@ -6136,7 +6157,7 @@ ocGetNames_MachO(ObjectCode* oc)
             addSection(oc, SECTIONKIND_RWDATA,
                 (void*) (image + sections[i].offset),
                 (void*) (image + sections[i].offset + sections[i].size));
-        }    
+        }
         else if (!strcmp(sections[i].sectname,"__data")) {
 
             IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __data section\n"));

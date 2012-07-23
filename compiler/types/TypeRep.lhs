@@ -8,7 +8,7 @@ Note [The Type-related module hierarchy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Class
   TyCon    imports Class
-  TypeRep 
+  TypeRep
   TysPrim  imports TypeRep ( including mkTyConTy )
   Kind     imports TysPrim ( mainly for primitive kinds )
   Type     imports Kind
@@ -35,13 +35,13 @@ module TypeRep (
         -- Functions over types
         mkNakedTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
         isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
-        
+
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, pprSigmaType,
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
+	Prec(..), maybeParen, pprTcApp, pprTypeNameApp,
         pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
@@ -117,7 +117,7 @@ data Type
 	                --    can appear as the right hand side of a type synonym.
 
   | FunTy
-	Type		
+	Type
 	Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
 			-- See Note [Equality-constrained types]
 
@@ -170,7 +170,7 @@ has a UnliftedTypeKind or ArgTypeKind underneath an arrow.
 
 Nor can we abstract over a type variable with any of these kinds.
 
-    k :: = kk | # | ArgKind | (#) | OpenKind 
+    k :: = kk | # | ArgKind | (#) | OpenKind
     kk :: = * | kk -> kk | T kk1 ... kkn
 
 So a type variable can only be abstracted kk.
@@ -212,13 +212,13 @@ is encoded like this:
 
 \begin{code}
 -- | A type of the form @p@ of kind @Constraint@ represents a value whose type is
--- the Haskell predicate @p@, where a predicate is what occurs before 
+-- the Haskell predicate @p@, where a predicate is what occurs before
 -- the @=>@ in a Haskell type.
 --
 -- We use 'PredType' as documentation to mark those types that we guarantee to have
 -- this kind.
 --
--- It can be expanded into its representation, but: 
+-- It can be expanded into its representation, but:
 --
 -- * The type checker must treat it as opaque
 --
@@ -241,7 +241,7 @@ type ThetaType = [PredType]
 to expand to allow them.)
 
 A Haskell qualified type, such as that for f,g,h above, is
-represented using 
+represented using
 	* a FunTy for the double arrow
 	* with a type of kind Constraint as the function argument
 
@@ -266,9 +266,9 @@ mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 mkNakedTyConApp :: TyCon -> [Type] -> Type
--- Builds a TyConApp 
+-- Builds a TyConApp
 --   * without being strict in TyCon,
---   * the TyCon should never be a saturated FunTyCon 
+--   * the TyCon should never be a saturated FunTyCon
 -- Type.mkTyConApp is the usual one
 mkNakedTyConApp tc tys
   = TyConApp (ASSERT( not (isFunTyCon tc && length tys == 2) ) tc) tys
@@ -293,7 +293,7 @@ isSuperKind _                 = False
 isTypeVar :: Var -> Bool
 isTypeVar v = isTKVar v && not (isSuperKind (varType v))
 
-isKindVar :: Var -> Bool 
+isKindVar :: Var -> Bool
 isKindVar v = isTKVar v && isSuperKind (varType v)
 \end{code}
 
@@ -304,7 +304,7 @@ isKindVar v = isTKVar v && isSuperKind (varType v)
 %*									*
 %************************************************************************
 
-\begin{code}  
+\begin{code}
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
 -- tyVarsOfType returns only the free variables of a type
@@ -328,7 +328,7 @@ tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
 %*									*
 %************************************************************************
 
-Despite the fact that DataCon has to be imported via a hi-boot route, 
+Despite the fact that DataCon has to be imported via a hi-boot route,
 this module seems the right place for TyThing, because it's needed for
 funTyCon and all the types in TysPrim.
 
@@ -342,14 +342,14 @@ The Class and its associated TyCon have the same Name.
 
 \begin{code}
 -- | A typecheckable-thing, essentially anything that has a name
-data TyThing 
+data TyThing
   = AnId     Id
   | ADataCon DataCon
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
   | ACoAxiom CoAxiom
   deriving (Eq, Ord)
 
-instance Outputable TyThing where 
+instance Outputable TyThing where
   ppr = pprTyThing
 
 pprTyThing :: TyThing -> SDoc
@@ -389,12 +389,12 @@ instance NamedThing TyThing where	-- Can't put this with the type
 -- 1. The in-scope set is needed /only/ to
 -- guide the generation of fresh uniques
 --
--- 2. In particular, the /kind/ of the type variables in 
+-- 2. In particular, the /kind/ of the type variables in
 -- the in-scope set is not relevant
 --
 -- 3. The substition is only applied ONCE! This is because
 -- in general such application will not reached a fixed point.
-data TvSubst 		
+data TvSubst
   = TvSubst InScopeSet 	-- The in-scope type and kind variables
 	    TvSubstEnv  -- Substitutes both type and kind variables
 	-- See Note [Apply Once]
@@ -420,7 +420,7 @@ So the substition might go [a->b, b->a].  A similar situation arises in Core
 when we find a beta redex like
 	(/\ a /\ b -> e) b a
 Then we also end up with a substition that permutes type variables. Other
-variations happen to; for example [a -> (a, b)].  
+variations happen to; for example [a -> (a, b)].
 
 	***************************************************
 	*** So a TvSubst must be applied precisely once ***
@@ -444,7 +444,7 @@ nevertheless we add 'b' to the TvSubstEnv, because b's kind does change
 
 This invariant has several crucial consequences:
 
-* In substTyVarBndr, we need extend the TvSubstEnv 
+* In substTyVarBndr, we need extend the TvSubstEnv
 	- if the unique has changed
 	- or if the kind has changed
 
@@ -494,8 +494,8 @@ pprParendKind = pprParendType
 
 ------------------
 pprEqPred :: Pair Type -> SDoc
--- NB: Maybe move to Coercion? It's only called after coercionKind anyway. 
-pprEqPred (Pair ty1 ty2) 
+-- NB: Maybe move to Coercion? It's only called after coercionKind anyway.
+pprEqPred (Pair ty1 ty2)
   = sep [ ppr_type FunPrec ty1
         , nest 2 (ptext (sLit "~#"))
         , ppr_type FunPrec ty2]
@@ -608,7 +608,7 @@ ppr_sigma_type show_foralls ty
 
     split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
     split1 tvs ty          = (reverse tvs, ty)
- 
+
     split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
     split2 ps ty                               = (reverse ps, ty)
 
@@ -624,7 +624,7 @@ pprTvBndrs :: [TyVar] -> SDoc
 pprTvBndrs tvs = sep (map pprTvBndr tvs)
 
 pprTvBndr :: TyVar -> SDoc
-pprTvBndr tv 
+pprTvBndr tv
   | isLiftedTypeKind kind = ppr_tvar tv
   | otherwise	          = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
 	     where
@@ -654,7 +654,7 @@ pprTcApp :: Prec -> (Prec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 pprTcApp _ _ tc []      -- No brackets for SymOcc
   = pp_nt_debug <> ppr tc
   where
-   pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
+   pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc
 				             then ptext (sLit "<recnt>")
 					     else ptext (sLit "<nt>"))
 	       | otherwise     = empty
@@ -681,7 +681,7 @@ pprTcApp p pp tc tys
 pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
 -- The first arg is the tycon, or sometimes class
 -- Print infix if the tycon/class looks like an operator
-pprTypeApp tc tys 
+pprTypeApp tc tys
   = pprTypeNameApp TopPrec ppr_type (getName tc) tys
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc

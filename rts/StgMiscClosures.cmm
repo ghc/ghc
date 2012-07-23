@@ -273,7 +273,9 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 
 INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
-    W_ r, p, info, bq, msg, owner, bd;
+    W_ r, p, info;
+    W_ msg, owner, bh;
+    W_ trec;
 
     TICK_ENT_DYN_IND(); /* tick */
 
@@ -296,6 +298,16 @@ retry:
         info == stg_BLOCKING_QUEUE_CLEAN_info ||
         info == stg_BLOCKING_QUEUE_DIRTY_info)
     {
+        trec = StgTSO_trec (CurrentTSO);
+        if (trec != NO_TREC) {
+          bh = R1;
+          (p) = foreign "C" suspendAllComputation (MyCapability() "ptr", bh "ptr") [R1];
+          if (p != 0) {
+            goto retry;
+          }
+          foreign "C" debugBelch ("cap %d: PTM + BLACKHOLE + DIFFERENT_CAPABILIY\n",
+                                  Capability_no (MyCapability ())) [R1];
+        }
         ("ptr" msg) = foreign "C" allocate(MyCapability() "ptr",
                                            BYTES_TO_WDS(SIZEOF_MessageBlackHole)) [R1];
 

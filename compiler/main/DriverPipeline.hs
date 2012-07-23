@@ -1310,15 +1310,15 @@ runPhase LlvmOpt input_fn dflags
   = do
     ver <- io $ readIORef (llvmVersion dflags)
 
-    let lo_opts  = getOpts dflags opt_lo
+    let lo_opts = getOpts dflags opt_lo
         opt_lvl  = max 0 (min 2 $ optLevel dflags)
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
         -- passes only, so if the user is passing us extra options we assume
         -- they know what they are doing and don't get in the way.
         optFlag  = if null lo_opts
-                       then [SysTools.Option (llvmOpts !! opt_lvl)]
-                       else []
+                     then [SysTools.Option (llvmOpts !! opt_lvl)]
+                     else []
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
              | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
@@ -1389,7 +1389,7 @@ runPhase LlvmLlc input_fn dflags
                                       else if (elem VFPv3D16 ext)
                                            then ["-mattr=+v7,+vfp3,+d16"]
                                            else []
-                   _                 -> []
+                   _               -> []
         -- On Ubuntu/Debian with ARM hard float ABI, LLVM's llc still
         -- compiles into soft-float ABI. We need to explicitly set abi
         -- to hard
@@ -1534,7 +1534,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
     link_opts info = hcat [
           text "\t.section ", text ghcLinkInfoSectionName,
                                    text ",\"\",",
-                                   text elfSectionNote,
+                                    text elfSectionNote,
                                    text "\n",
 
           text "\t.ascii \"", info', text "\"\n" ]
@@ -1547,7 +1547,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
             elfSectionNote :: String
             elfSectionNote = case platformArch (targetPlatform dflags) of
                                ArchARM _ _ _ -> "%note"
-                               _             -> "@note"
+                               _           -> "@note"
 
 -- The "link info" is a string representing the parameters of the
 -- link.  We save this information in the binary, and the next time we

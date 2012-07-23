@@ -1,0 +1,3 @@
+extra-lib-dirs: @ICONV_LIB_DIRS@
+extra-libraries: @EXTRA_LIBS@
+include-dirs: @ICONV_INCLUDE_DIRS@

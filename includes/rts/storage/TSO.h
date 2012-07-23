@@ -102,7 +102,7 @@ typedef struct StgTSO_ {
 
     struct StgTSO_*         global_link;    // Links threads on the
                                             // generation->threads lists
-    
+
     /*
      * The thread's stack
      */
@@ -129,6 +129,8 @@ typedef struct StgTSO_ {
     StgThreadID             id;
     StgWord32               saved_errno;
     StgWord32               dirty;          /* non-zero => dirty */
+    StgWord32               is_sleeping;
+    StgWord32               is_upcall_thread;
     struct InCall_*         bound;
     struct Capability_*     cap;
 
@@ -144,6 +146,36 @@ typedef struct StgTSO_ {
      * blocked on thunks that are under evaluation by this thread.
     */
     struct StgBlockingQueue_ *bq;
+
+    /*
+     * A reference to the resume function. This will enque this thread into its
+     * scheduler.
+     */
+    StgClosure* schedule_scont_action;
+
+    /*
+     * A reference to the yield_control_action function. This will switch to the next
+     * thread picked from the scheduler.
+     */
+    StgClosure* yield_control_action;
+
+    /*
+     * A reference to this threads finalizer. If the thread becomes unreachable
+     * with why_blocked == BlockedInHaskell, finalizer will be invoked on the
+     * sandbox thread.
+     */
+    StgClosure* finalizer;
+
+    /*
+     * A reference to SCont status maintained in Haskell. This is
+     * necessary to change state of the thread transactionally.
+     */
+    StgTVar* scont_status;
+
+    /*
+     * thread-local storage
+     */
+    StgClosure* tls;
 
 #ifdef TICKY_TICKY
     /* TICKY-specific stuff would go here. */
@@ -180,10 +212,7 @@ typedef struct StgStack_ {
 
 // Calculate SpLim from a TSO (reads tso->stackobj, but no fields from
 // the stackobj itself).
-INLINE_HEADER StgPtr tso_SpLim (StgTSO* tso)
-{
-    return tso->stackobj->stack + RESERVED_STACK_WORDS;
-}
+StgPtr tso_SpLim (StgTSO* tso);
 
 /* -----------------------------------------------------------------------------
    functions
@@ -202,7 +231,7 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
       tso->stack < tso->sp < tso->stack+tso->stack_size
       tso->stack_size <= tso->max_stack_size
-      
+
       RESERVED_STACK_WORDS is large enough for any heap-check or
       stack-check failure.
 
@@ -213,13 +242,13 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 	tso->why_blocked       tso->block_info      location
         ----------------------------------------------------------------------
 	NotBlocked             END_TSO_QUEUE        runnable_queue, or running
-	
+
         BlockedOnBlackHole     the BLACKHOLE        blackhole_queue
-	
+
         BlockedOnMVar          the MVAR             the MVAR's queue
 
 	BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
-	
+
         BlockedOnMsgThrowTo    MessageThrowTo *     TSO->blocked_exception
 
         BlockedOnRead          NULL                 blocked_queue
@@ -231,7 +260,7 @@ void dirty_STACK (Capability *cap, StgStack *stack);
       tso->link == END_TSO_QUEUE, if the thread is currently running.
 
    A zombie thread has the following properties:
-      
+
       tso->what_next == ThreadComplete or ThreadKilled
       tso->link     ==  (could be on some queue somewhere)
       tso->sp       ==  tso->stack + tso->stack_size - 1 (i.e. top stack word)

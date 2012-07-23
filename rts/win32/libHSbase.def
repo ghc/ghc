@@ -14,6 +14,7 @@ EXPORTS
 	base_GHCziWord_W64zh_con_info
 
 	base_GHCziStable_StablePtr_con_info
+  base_LwConcziSubstrate_SCont_con_info
 
 	base_GHCziPack_unpackCString_closure
 
@@ -34,10 +35,15 @@ EXPORTS
 	base_GHCziWeak_runFinalizzerBatch_closure
 	base_GHCziPack_unpackCString_closure
 	base_GHCziIOziException_blockedIndefinitelyOnMVar_closure
+	base_LwConcziSubstrate_blockedIndefinitelyOnConcDS_closure
 	base_GHCziIOziException_blockedIndefinitelyOnSTM_closure
 	base_GHCziIOziException_stackOverflow_closure
 
 	base_ControlziExceptionziBase_nonTermination_closure
 	base_ControlziExceptionziBase_nestedAtomically_closure
 
-
+  base_LwConcziSubstrate_initSContStatus_closure
+  base_LwConcziSubstrate_defaultUpcall_closure
+  base_LwConcziSubstrate_defaultExceptionHandler_closure
+  base_LwConcziSubstrate_scheduleSContActionRts_closure
+  base_LwConcziSubstrate_yieldControlActionRts_closure

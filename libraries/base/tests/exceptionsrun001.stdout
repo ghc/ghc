@@ -1,0 +1,5 @@
+user exception caught
+error call caught
+no method error
+exceptionsrun001.hs:38:1-13: Non-exhaustive patterns in function test1
+exceptionsrun001.hs:45:1-26: Non-exhaustive patterns in function test2

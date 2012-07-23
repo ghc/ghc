@@ -5553,7 +5553,7 @@ type T1 = P     -- 1
 type T2 = 'P    -- promoted 2
 </programlisting>
 Note that promoted datatypes give rise to named kinds. Since these can never be
-ambiguous, we do not allow quotes in kind names. 
+ambiguous, we do not allow quotes in kind names.
 </para>
 <para>Just as in the case of Template Haskell (<xref linkend="th-syntax"/>), there is
 no way to quote a data constructor or type constructor whose second character

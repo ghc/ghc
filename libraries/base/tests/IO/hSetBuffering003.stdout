@@ -1,0 +1,22 @@
+Buffering for stdin is: BlockBuffering Nothing
+Buffering for stdout is: BlockBuffering Nothing
+Buffering for stderr is: NoBuffering
+Buffering for stdin is: NoBuffering
+Buffering for stdin is: LineBuffering
+Buffering for stdin is: BlockBuffering (Just 2)
+Buffering for stdin is: BlockBuffering Nothing
+Caught illegal op: hSetBuffering stdin (BlockBuffering (Just (-3)))
+
+Hello stdout 1Buffering for stdout is: NoBuffering
+Hello stdout 2Buffering for stdout is: LineBuffering
+Hello stdout 3Buffering for stdout is: BlockBuffering (Just 2)
+Hello stdout 4Buffering for stdout is: BlockBuffering Nothing
+Hello stdout 5Caught illegal op: hSetBuffering stdout (BlockBuffering (Just (-3)))
+
+Buffering for stderr is: NoBuffering
+Buffering for stderr is: LineBuffering
+Buffering for stderr is: BlockBuffering (Just 2)
+Buffering for stderr is: BlockBuffering Nothing
+Caught illegal op: hSetBuffering stderr (BlockBuffering (Just (-3)))
+-- !!! Reconfiguring the buffering of a handle
+module Main(main) where

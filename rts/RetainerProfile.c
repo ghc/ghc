@@ -137,7 +137,7 @@ typedef union {
 	StgLargeSRT *srt;
 	StgWord offset;
     } large_srt;
-	
+
 } nextPos;
 
 typedef struct {
@@ -277,7 +277,7 @@ retainerStackBlocks( void )
     bdescr* bd;
     lnat res = 0;
 
-    for (bd = firstStack; bd != NULL; bd = bd->link) 
+    for (bd = firstStack; bd != NULL; bd = bd->link)
       res += bd->blocks;
 
     return res;
@@ -541,7 +541,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     case THUNK:
     case THUNK_2_0:
-	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, 
+	init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs,
 		  (StgPtr)((StgThunk *)c)->payload);
 	*first_child = find_ptrs(&se.info);
 	if (*first_child == NULL)
@@ -586,7 +586,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	if (*first_child == NULL)
 	    return;     // no child
 	break;
-	
+
     case TREC_CHUNK:
 	*first_child = (StgClosure *)((StgTRecChunk *)c)->prev_chunk;
 	se.info.next.step = 0;  // entry no.
@@ -1156,7 +1156,7 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, nat size,
 {
     nat i, b;
     StgWord bitmap;
-    
+
     b = 0;
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
@@ -1199,7 +1199,7 @@ retain_large_srt_bitmap (StgLargeSRT *srt, StgClosure *c, retainer c_child_r)
     nat i, b, size;
     StgWord bitmap;
     StgClosure **p;
-    
+
     b = 0;
     p = (StgClosure **)srt->srt;
     size   = srt->l.size;
@@ -1228,7 +1228,7 @@ retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
   bitmap = srt_bitmap;
   p = srt;
 
-  if (bitmap == (StgHalfWord)(-1)) {  
+  if (bitmap == (StgHalfWord)(-1)) {
       retain_large_srt_bitmap( (StgLargeSRT *)srt, c, c_child_r );
       return;
   }
@@ -1237,7 +1237,7 @@ retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
       if ((bitmap & 1) != 0) {
 #if defined(COMPILING_WINDOWS_DLL)
 	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      retainClosure(* (StgClosure**) ((unsigned long) (*srt) & ~0x1), 
+	      retainClosure(* (StgClosure**) ((unsigned long) (*srt) & ~0x1),
 			    c, c_child_r);
 	  } else {
 	      retainClosure(*srt,c,c_child_r);
@@ -1263,7 +1263,7 @@ retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
  *    RSET(c) and RSET(c_child_r) are valid, i.e., their
  *    interpretation conforms to the current value of flip (even when they
  *    are interpreted to be NULL).
- *    If *c is TSO, its state is not ThreadComplete,or ThreadKilled, 
+ *    If *c is TSO, its state is not ThreadComplete,or ThreadKilled,
  *    which means that its stack is ready to process.
  *  Note:
  *    This code was almost plagiarzied from GC.c! For each pointer,
@@ -1328,7 +1328,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 
 	case RET_BCO: {
 	    StgBCO *bco;
-	    
+
 	    p++;
 	    retainClosure((StgClosure *)*p, c, c_child_r);
 	    bco = (StgBCO *)*p;
@@ -1339,17 +1339,17 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    continue;
 	}
 
-	    // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
+	    // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
 	case RET_BIG:
 	    size = GET_LARGE_BITMAP(&info->i)->size;
 	    p++;
 	    retain_large_bitmap(p, GET_LARGE_BITMAP(&info->i),
 				size, c, c_child_r);
 	    p += size;
-	    // and don't forget to follow the SRT 
+	    // and don't forget to follow the SRT
 	    goto follow_srt;
 
-	    // Dynamic bitmap: the mask is stored on the stack 
+	    // Dynamic bitmap: the mask is stored on the stack
 	case RET_DYN: {
 	    StgWord dyn;
 	    dyn = ((StgRetDyn *)p)->liveness;
@@ -1359,10 +1359,10 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    p      = (P_)&((StgRetDyn *)p)->payload[0];
 	    size   = RET_DYN_BITMAP_SIZE;
 	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
-	    
+
 	    // skip over the non-ptr words
 	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
-	    
+
 	    // follow the ptr words
 	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 		retainClosure((StgClosure *)*p, c, c_child_r);
@@ -1374,10 +1374,10 @@ retainStack( StgClosure *c, retainer c_child_r,
 	case RET_FUN: {
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
-	    
+
 	    retainClosure(ret_fun->fun, c, c_child_r);
 	    fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-	    
+
 	    p = (P_)&ret_fun->payload;
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
@@ -1387,7 +1387,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 		break;
 	    case ARG_GEN_BIG:
 		size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-		retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), 
+		retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info),
 				    size, c, c_child_r);
 		p += size;
 		break;
@@ -1423,7 +1423,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 
 static INLINE StgPtr
 retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
-                    retainer c_child_r, /* NOT tagged */ 
+                    retainer c_child_r, /* NOT tagged */
                     StgClosure *fun,    /* tagged */
 		    StgClosure** payload, StgWord n_args)
 {
@@ -1441,7 +1441,7 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
 	bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
-	p = retain_small_bitmap(p, n_args, bitmap, 
+	p = retain_small_bitmap(p, n_args, bitmap,
 				pap, c_child_r);
 	break;
     case ARG_GEN_BIG:
@@ -1692,9 +1692,11 @@ inner_loop:
         retainClosure(tso->blocked_exceptions, c, c_child_r);
         retainClosure(tso->bq,                 c, c_child_r);
         retainClosure(tso->trec,               c, c_child_r);
-        if (   tso->why_blocked == BlockedOnMVar
-               || tso->why_blocked == BlockedOnBlackHole
-               || tso->why_blocked == BlockedOnMsgThrowTo
+        if (  tso->why_blocked == BlockedOnMVar
+              || tso->why_blocked == BlockedOnBlackHole
+              || tso->why_blocked == BlockedOnMsgThrowTo
+              || tso->why_blocked == Yielded
+              || tso->why_blocked == BlockedInHaskell
             ) {
             retainClosure(tso->block_info.closure, c, c_child_r);
         }
@@ -1817,7 +1819,7 @@ computeRetainerSet( void )
 		    // first visit to *ml
 		    // This is a violation of the interface rule!
 		    RSET(ml) = (RetainerSet *)((StgWord)(&tmpRetainerSet) | flip);
-		    
+
 		    switch (get_itbl((StgClosure *)ml)->type) {
 		    case IND_STATIC:
 			// no cost involved

@@ -1,0 +1,25 @@
+name:         lwconc
+version:      0.1.0.0
+license:      BSD3
+license-file: LICENSE
+author:       KC Sivaramakrishnan
+maintainer:   libraries@haskell.org
+category:     Control
+synopsis:     Lightweight Concurrency
+build-type:   Simple
+Cabal-Version: >= 1.6
+
+source-repository head
+    type:     git
+    location: http://darcs.haskell.org/packages/lwconc.git/
+
+Library
+    exposed-modules:
+      LwConc.Concurrent
+      LwConc.MVar
+    extensions: CPP
+    Build-Depends: base       >= 4.2   && < 5,
+                   array,
+                   containers >= 0.1 && < 0.6
+    ghc-options: -Wall
+

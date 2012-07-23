@@ -338,9 +338,9 @@ PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
-#                    It is set in rules/extra-package.mk, 
-#                    by $(call extra-packages) a little further down 
-#                    this ghc.mk 
+#                    It is set in rules/extra-package.mk,
+#                    by $(call extra-packages) a little further down
+#                    this ghc.mk
 
 
 
@@ -348,7 +348,7 @@ PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
 # Packages to build
 # The lists of packages that we *actually* going to build in each stage:
 #
-#  $(PACKAGES_STAGE0) 
+#  $(PACKAGES_STAGE0)
 #  $(PACKAGES_STAGE1)
 #  $(PACKAGES_STAGE2)
 #
@@ -402,6 +402,7 @@ $(eval $(call addPackage,array))
 $(eval $(call addPackage,deepseq))
 $(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
+$(eval $(call addPackage,lwconc))
 $(eval $(call addPackage,old-locale))
 $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
@@ -675,10 +676,10 @@ stage1_libs : $(ALL_STAGE1_LIBS)
 
 # ----------------------------------------------
 # Per-package compiler flags
-# 
-# If you want to add per-package compiler flags, this 
+#
+# If you want to add per-package compiler flags, this
 # is the place to do it.  Do it like this for package <pkg>
-#   
+#
 #   libraries/<pkg>_dist-boot_HC_OPTS += -Wwarn
 #   libraries/<pkg>_dist-install_HC_OPTS += -Wwarn
 

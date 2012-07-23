@@ -5,7 +5,7 @@
  * The task manager subsystem.  Tasks execute STG code, with this
  * module providing the API which the Scheduler uses to control their
  * creation and destruction.
- * 
+ *
  * -------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
@@ -69,11 +69,11 @@ void
 initTaskManager (void)
 {
     if (!tasksInitialized) {
-        taskCount = 0;
+	taskCount = 0;
         workerCount = 0;
         currentWorkerCount = 0;
         peakWorkerCount = 0;
-        tasksInitialized = 1;
+	tasksInitialized = 1;
 #if defined(THREADED_RTS)
 #if !defined(MYTASK_USE_TLV)
 	newThreadLocalKey(&currentTaskKey);
@@ -111,7 +111,7 @@ freeTaskManager (void)
     RELEASE_LOCK(&all_tasks_mutex);
 
 #if defined(THREADED_RTS)
-    closeMutex(&all_tasks_mutex); 
+    closeMutex(&all_tasks_mutex);
 #if !defined(MYTASK_USE_TLV)
     freeThreadLocalKey(&currentTaskKey);
 #endif
@@ -176,7 +176,7 @@ newTask (rtsBool worker)
 
 #define ROUND_TO_CACHE_LINE(x) ((((x)+63) / 64) * 64)
     task = stgMallocBytes(ROUND_TO_CACHE_LINE(sizeof(Task)), "newTask");
-    
+
     task->cap           = NULL;
     task->worker        = worker;
     task->stopped       = rtsFalse;
@@ -184,7 +184,7 @@ newTask (rtsBool worker)
     task->n_spare_incalls = 0;
     task->spare_incalls = NULL;
     task->incall        = NULL;
-    
+
 #if defined(THREADED_RTS)
     initCondition(&task->cond);
     initMutex(&task->lock);
@@ -222,7 +222,7 @@ static void
 newInCall (Task *task)
 {
     InCall *incall;
-    
+
     if (task->spare_incalls != NULL) {
         incall = task->spare_incalls;
         task->spare_incalls = incall->next;
@@ -300,7 +300,7 @@ boundTaskExiting (Task *task)
         task->stopped = rtsTrue;
     }
 
-    debugTrace(DEBUG_sched, "task exiting");
+    debugTrace(DEBUG_sched, "task exiting %p", task);
 }
 
 
@@ -511,7 +511,7 @@ printAllTasks(void)
 	}
 	debugBelch("\n");
     }
-}		       
+}
 
 #endif
 

@@ -495,12 +495,12 @@ and then we can pull from this other tree with
 get
 
     Clones all sub-repositories from the same place that the ghc
-    repository was cloned from. See "which repos to use" below
+    repository was cloned from.  See "which repos to use" below
     for details of how the subrepositories are laid out.
 
     There are various --<package-tag> options that can be given
-    before "get" that enable extra repositories. The full list is
-    given at the end of this help. For example:
+    before "get" that enable extra repositories.  The full list is
+    given at the end of this help.  For example:
 
     ./sync-all --testsuite get
 
@@ -512,13 +512,13 @@ remote rm <remote-name>
 remote set-url [--push] <remote-name>
 
     Runs a "git remote" command on each subrepository, adjusting the
-    repository location in each case appropriately. For example, to
+    repository location in each case appropriately.  For example, to
     add a new remote pointing to the upstream repositories:
 
     ./sync-all -r http://darcs.haskell.org/ remote add upstream
 
     The -r flag points to the root of the repository tree (see "which
-    repos to use" below). For a repository on the local filesystem it
+    repos to use" below).  For a repository on the local filesystem it
     would point to the ghc repository, and for a remote repository it
     points to the directory containing "ghc.git".
 
@@ -605,15 +605,15 @@ file for a description of the contents.
 If <repo_base> looks like a local filesystem path, or if you give the
 --checked-out flag, sync-all works on repos of form:
 
-  <repo_base>/<local-path>
+          <repo_base>/<local-path>
 
 otherwise sync-all works on repos of form:
 
-  <repo_base>/<remote-path>
+          <repo_base>/<remote-path>
 
 This logic lets you say
-  both    sync-all -r http://darcs.haskell.org/ghc-6.12 remote add ghc-6.12
-  and     sync-all -r ../working remote add working
+      both    sync-all -r http://darcs.haskell.org/ghc-6.12 remote add ghc-6.12
+      and     sync-all -r ../working remote add working
 The latter is called a "checked-out tree".
 
 sync-all *ignores* the defaultrepo of all repos other than the root one. So the
@@ -650,7 +650,6 @@ END
 sub main {
 
     $tags{"-"} = 1;
-    $tags{"dph"} = 1;
 
     while ($#_ ne -1) {
         my $arg = shift;

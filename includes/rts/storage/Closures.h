@@ -28,11 +28,11 @@ typedef struct {
 
 /* -----------------------------------------------------------------------------
    The SMP header
-   
+
    A thunk has a padding word to take the updated value.  This is so
    that the update doesn't overwrite the payload, so we can avoid
    needing to lock the thunk during entry and update.
-   
+
    Note: this doesn't apply to THUNK_STATICs, which have no payload.
 
    Note: we leave this padding word in all ways, rather than just SMP,
@@ -172,7 +172,7 @@ typedef struct {
 
 typedef struct {
     StgHeader  header;
-} StgStopFrame;  
+} StgStopFrame;
 
 typedef struct {
   StgHeader header;
@@ -255,7 +255,7 @@ typedef struct {
    on the stack; the liveness mask tells the GC which ones contain
    pointers.
 
-   Good places to use a generic heap check: 
+   Good places to use a generic heap check:
 
         - case alternatives (the return address with an SRT is already
 	  on the stack).
@@ -266,13 +266,13 @@ typedef struct {
 
           some pointers         |-- RET_DYN_PTRS(liveness) words
           some nonpointers      |-- RET_DYN_NONPTRS(liveness) words
-			       
+
 	  L1                    \
           D1-2                  |-- RET_DYN_NONPTR_REGS_SIZE words
 	  F1-4                  /
-			       
+
 	  R1-8                  |-- RET_DYN_BITMAP_SIZE words
-			       
+
 	  return address        \
 	  liveness mask         |-- StgRetDyn structure
 	  stg_gen_chk_info      /
@@ -328,14 +328,14 @@ typedef struct {
  *
  *  StgTVar defines the only type that can be updated through the STM
  *  interface.
- * 
+ *
  *  Note that various optimisations may be possible in order to use less
  *  space for these data structures at the cost of more complexity in the
  *  implementation:
  *
  *   - In StgTVar, current_value and first_watch_queue_entry could be held in
  *     the same field: if any thread is waiting then its expected_value for
- *     the tvar is the current value.  
+ *     the tvar is the current value.
  *
  *   - In StgTRecHeader, it might be worthwhile having separate chunks
  *     of read-only and read-write locations.  This would save a
@@ -377,7 +377,7 @@ typedef struct {
 typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
-  StgClosure                *new_value; 
+  StgClosure                *new_value;
 #if defined(THREADED_RTS)
   StgInt                     num_updates;
 #endif
@@ -392,7 +392,7 @@ typedef struct StgTRecChunk_ {
   TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
 } StgTRecChunk;
 
-typedef enum { 
+typedef enum {
   TREC_ACTIVE,        /* Transaction in progress, outcome undecided */
   TREC_CONDEMNED,     /* Transaction in progress, inconsistent / out of date reads */
   TREC_COMMITTED,     /* Transaction has committed, now updating tvars */

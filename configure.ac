@@ -34,7 +34,7 @@ fi
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
 dnl ----------------------------------------------------------
-dnl ** Find unixy sort and find commands, 
+dnl ** Find unixy sort and find commands,
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
@@ -91,7 +91,7 @@ AC_ARG_WITH([ghc],
 
 
 dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
+dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
 AC_SUBST(OSTYPE)
 
 dnl ** Booting from .hc files?
@@ -134,9 +134,9 @@ if test "$WithGhc" != ""; then
   BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os],['unkown'])
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command],['$(CC)'])
   if test "x$OS_STAGE0" != "xOSDarwin"; then
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
-    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
   else
     AR_STAGE0='$(AR)'
     AR_OPTS_STAGE0='$(AR_OPTS)'
@@ -280,39 +280,39 @@ then
     if test "$HostArch" = "i386"
     then
         # NB. If you update the tarballs to a new version of gcc, don't
-        # forget to tweak the paths in driver/gcc/gcc.c.
-        if ! test -d inplace/mingw ||
-             test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
-             test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
-             test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
-             test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
-             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
-             test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
-             test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
-        then
-            AC_MSG_NOTICE([Making in-tree mingw tree])
-            rm -rf inplace/mingw
-            mkdir inplace/mingw
-            (
-                cd inplace/mingw &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
-                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
-                tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
-                tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
-                mv bin/gcc.exe bin/realgcc.exe
-            )
-            PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+    # forget to tweak the paths in driver/gcc/gcc.c.
+    if ! test -d inplace/mingw ||
+         test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
+         test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
+         test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
+    then
+        AC_MSG_NOTICE([Making in-tree mingw tree])
+        rm -rf inplace/mingw
+        mkdir inplace/mingw
+        (
+            cd inplace/mingw &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
+            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
+            tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
+            mv bin/gcc.exe bin/realgcc.exe
+        )
+        PATH=`pwd`/inplace/mingw/bin:$PATH inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
             AC_MSG_NOTICE([In-tree mingw tree created])
         fi
     else
@@ -501,9 +501,9 @@ dnl --------------------------------------------------------------
 
 if test "$TargetOS" = "mingw32"
 then
-    GhcLibsWithUnix=NO
+   GhcLibsWithUnix=NO
 else
-    GhcLibsWithUnix=YES
+   GhcLibsWithUnix=YES
 fi
 AC_SUBST([GhcLibsWithUnix])
 
@@ -625,8 +625,8 @@ AC_SUBST(HaveDtrace)
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
 if test "$HostOS"      = "mingw32" && \
-   test "${OSTYPE}"   != "msys"    && \
-   test "${HSCOLOUR}" != ""
+   test "${OSTYPE}"      != "msys"                  && \
+   test "${HSCOLOUR}"    != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
@@ -757,11 +757,11 @@ if test "$cross_compiling" = "no" ; then
     #include <sys/types.h>
     #include <sys/time.h>
     int main(void) {
-      struct itimerval tval;
-      tval.it_value.tv_sec = 1;
-      tval.it_value.tv_usec = 0;
-      tval.it_interval = tval.it_value;
-      return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
+  struct itimerval tval;
+  tval.it_value.tv_sec = 1;
+  tval.it_value.tv_usec = 0;
+  tval.it_interval = tval.it_value;
+  return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
     }
     ],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
 fi
@@ -964,8 +964,8 @@ echo ["\
 fi
 
 echo ["\
-   Using GCC                 : $WhatGccIsCalled
-      which is version       : $GccVersion
+   Using GCC             : $WhatGccIsCalled
+      which is version   : $GccVersion
    Building a cross compiler : $BuildingCrossCompiler
    Porting to foreign arch   : $PortingCompiler
    Alien script              : $AlienScript

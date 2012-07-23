@@ -24,6 +24,7 @@
 #include "sm/GC.h" // for evac_fn
 #include "Task.h"
 #include "Sparks.h"
+#include "Upcalls.h"
 
 #include "BeginPrivate.h"
 
@@ -64,7 +65,14 @@ struct Capability_ {
     // the suspended TSOs easily.  Hence, when migrating a Task from
     // the returning_tasks list, we must also migrate its entry from
     // this list.
-    InCall *suspended_ccalls;
+    //
+    // New suspended_ccalls are always added to the head of the list. An
+    // outstanding ccall's scheduler might be resumed by a worker task, in which
+    // case, the incall is moved to the tail of the suspeneded_ccalls list. This
+    // way, a worker only needs to check the incall at the head of the list to
+    // see if there are any blocked schedulers (pending work).
+    InCall *suspended_ccalls_hd;
+    InCall *suspended_ccalls_tl;
 
     // One mutable list per generation, so we don't need to take any
     // locks when updating an old-generation thunk.  This also lets us
@@ -92,6 +100,16 @@ struct Capability_ {
     // Haskell code, unlike the context_switch flag which is only
     // reset after we have executed the context switch.
     int interrupt;
+
+    //Upcall thread -- Every capability has a upcall thread attached to it,
+    //which is used to execute the upcalls (schedule_scont_action actions, finalizers,
+    //etc). upcall_thread picks up work from upcall_queue, and evaluates each
+    //upcall until they are finished or get blocked. Also, for an upcall thread,
+    //schedule_scont_action == yield_control_action == scont_state == END_TSO_QUEUE.
+    StgTSO* upcall_thread;
+
+    UpcallQueue* upcall_queue_returning;
+    UpcallQueue* upcall_queue_non_returning;
 
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
@@ -179,6 +197,11 @@ regTableToCapability (StgRegTable *reg)
 //
 void initCapabilities (void);
 
+// Initialize upcall threads for the available capabilities
+
+void initUpcallThreadOnCapability (Capability* cap);
+void initUpcallThreads (void);
+
 // Add and initialise more Capabilities
 //
 Capability * moreCapabilities (nat from, nat to);
@@ -192,18 +215,18 @@ Capability * moreCapabilities (nat from, nat to);
 #if defined(THREADED_RTS)
 void releaseCapability           (Capability* cap);
 void releaseAndWakeupCapability  (Capability* cap);
-void releaseCapability_ (Capability* cap, rtsBool always_wakeup); 
+void releaseCapability_ (Capability* cap, rtsBool always_wakeup);
 // assumes cap->lock is held
 #else
 // releaseCapability() is empty in non-threaded RTS
 INLINE_HEADER void releaseCapability  (Capability* cap STG_UNUSED) {};
 INLINE_HEADER void releaseAndWakeupCapability  (Capability* cap STG_UNUSED) {};
-INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED, 
+INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
                                        rtsBool always_wakeup STG_UNUSED) {};
 #endif
 
 // declared in includes/rts/Threads.h:
-// extern Capability MainCapability; 
+// extern Capability MainCapability;
 
 // declared in includes/rts/Threads.h:
 // extern nat n_capabilities;
@@ -373,15 +396,15 @@ recordClosureMutated (Capability *cap, StgClosure *p)
 
 #if defined(THREADED_RTS)
 INLINE_HEADER rtsBool
-emptySparkPoolCap (Capability *cap) 
+emptySparkPoolCap (Capability *cap)
 { return looksEmpty(cap->sparks); }
 
 INLINE_HEADER nat
-sparkPoolSizeCap (Capability *cap) 
+sparkPoolSizeCap (Capability *cap)
 { return sparkPoolSize(cap->sparks); }
 
 INLINE_HEADER void
-discardSparksCap (Capability *cap) 
+discardSparksCap (Capability *cap)
 { discardSparks(cap->sparks); }
 #endif
 

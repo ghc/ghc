@@ -342,7 +342,7 @@ extendLocalRdrEnv (env, ns) name
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
 extendLocalRdrEnvList (env, ns) names
-  = (extendOccEnvList env [(nameOccName n, n) | n <- names], addListToNameSet ns names)
+  = (extendOccEnvList env [(nameOccName n, n) | n <- names], addListToNameSet  ns names)
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
 lookupLocalRdrEnv (env, _) (Unqual occ) = lookupOccEnv env occ

@@ -1,4 +1,4 @@
-/* The RTS is just another package! */
+/* The Rts is just another package! */
 
 #include "ghcconfig.h"
 #include "rts/Config.h"
@@ -34,7 +34,7 @@ extra-libraries:
 			      , "dl"
 #endif
 #ifdef mingw32_HOST_OS
-			      ,"wsock32"    /* for the linker */
+			      ,"wsock32"	/* for the linker */
 			      ,"gdi32"      /* for the linker */
 			      ,"winmm"      /* for the linker */
 #endif
@@ -53,7 +53,7 @@ extra-libraries:
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-ghcconstants/header" TOP"/includes/dist-derivedconstants/header"
+include-dirs:		TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-ghcconstants/header" TOP"/includes/dist-derivedconstants/header"
 #endif
 
 includes:		Stg.h
@@ -77,6 +77,7 @@ ld-options:
          , "-u", "_base_GHCziWord_W32zh_static_info"
          , "-u", "_base_GHCziWord_W64zh_static_info"
          , "-u", "_base_GHCziStable_StablePtr_static_info"
+         , "-u", "_base_LwConcziSubstrate_SCont_static_info"
          , "-u", "_ghczmprim_GHCziTypes_Izh_con_info"
          , "-u", "_ghczmprim_GHCziTypes_Czh_con_info"
          , "-u", "_ghczmprim_GHCziTypes_Fzh_con_info"
@@ -86,11 +87,18 @@ ld-options:
          , "-u", "_base_GHCziStable_StablePtr_con_info"
          , "-u", "_ghczmprim_GHCziTypes_False_closure"
          , "-u", "_ghczmprim_GHCziTypes_True_closure"
+         , "-u", "_base_LwConcziSubstrate_initSContStatus_closure"
+         , "-u", "_base_LwConcziSubstrate_defaultUpcall_closure"
+         , "-u", "_base_LwConcziSubstrate_defaultExceptionHandler_closure"
+         , "-u", "_base_LwConcziSubstrate_SCont_con_info"
+         , "-u", "_base_LwConcziSubstrate_scheduleSContActionRts_closure"
+         , "-u", "_base_LwConcziSubstrate_yieldControlActionRts_closure"
          , "-u", "_base_GHCziPack_unpackCString_closure"
          , "-u", "_base_GHCziIOziException_stackOverflow_closure"
          , "-u", "_base_GHCziIOziException_heapOverflow_closure"
          , "-u", "_base_ControlziExceptionziBase_nonTermination_closure"
          , "-u", "_base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+         , "-u", "_base_LwConcziSubstrate_blockedIndefinitelyOnConcDS_closure"
          , "-u", "_base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
          , "-u", "_base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-u", "_base_GHCziWeak_runFinalizzerBatch_closure"
@@ -116,6 +124,7 @@ ld-options:
          , "-u", "base_GHCziWord_W32zh_static_info"
          , "-u", "base_GHCziWord_W64zh_static_info"
          , "-u", "base_GHCziStable_StablePtr_static_info"
+         , "-u", "base_LwConcziSubstrate_SCont_static_info"
          , "-u", "ghczmprim_GHCziTypes_Izh_con_info"
          , "-u", "ghczmprim_GHCziTypes_Czh_con_info"
          , "-u", "ghczmprim_GHCziTypes_Fzh_con_info"
@@ -125,11 +134,18 @@ ld-options:
          , "-u", "base_GHCziStable_StablePtr_con_info"
          , "-u", "ghczmprim_GHCziTypes_False_closure"
          , "-u", "ghczmprim_GHCziTypes_True_closure"
+         , "-u", "base_LwConcziSubstrate_initSContStatus_closure"
+         , "-u", "base_LwConcziSubstrate_defaultUpcall_closure"
+         , "-u", "base_LwConcziSubstrate_defaultExceptionHandler_closure"
+         , "-u", "base_LwConcziSubstrate_SCont_con_info"
+         , "-u", "base_LwConcziSubstrate_scheduleSContActionRts_closure"
+         , "-u", "base_LwConcziSubstrate_yieldControlActionRts_closure"
          , "-u", "base_GHCziPack_unpackCString_closure"
          , "-u", "base_GHCziIOziException_stackOverflow_closure"
          , "-u", "base_GHCziIOziException_heapOverflow_closure"
          , "-u", "base_ControlziExceptionziBase_nonTermination_closure"
          , "-u", "base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+         , "-u", "base_LwConcziSubstrate_blockedIndefinitelyOnConcDS_closure"
          , "-u", "base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
          , "-u", "base_ControlziExceptionziBase_nestedAtomically_closure"
          , "-u", "base_GHCziWeak_runFinalizzerBatch_closure"

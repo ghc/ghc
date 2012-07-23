@@ -19,21 +19,29 @@
 #include <sys/types.h>
 #endif
 
-// 
+//
 // Creating threads
 //
+
 StgTSO *createThread (Capability *cap, nat stack_size);
 
 void scheduleWaitThread (/* in    */ StgTSO *tso,
                          /* out   */ HaskellObj* ret,
-                         /* inout */ Capability **cap);
+                         /* inout */ Capability **cap,
+                         /* in    */ rtsBool skipAppend);
 
-StgTSO *createGenThread       (Capability *cap, nat stack_size,  
+void pushClosure (StgTSO *tso, StgWord c);
+
+StgTSO *createGenThread       (Capability *cap, nat stack_size,
 			       StgClosure *closure);
-StgTSO *createIOThread        (Capability *cap, nat stack_size,  
+StgTSO *createIOThread        (Capability *cap, nat stack_size,
 			       StgClosure *closure);
-StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,  
+StgTSO *createUserLevelThread (Capability *cap, nat stack_size,
 			       StgClosure *closure);
+StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,
+			       StgClosure *closure);
+
+void setOwningCapability (Capability* cap, StgTSO* tso, nat target);
 
 // Suspending/resuming threads around foreign calls
 void *        suspendThread (StgRegTable *, rtsBool interruptible);
@@ -44,6 +52,10 @@ StgRegTable * resumeThread  (void *);
 //
 int    cmp_thread      (StgPtr tso1, StgPtr tso2);
 int    rts_getThreadId (StgPtr tso);
+void   labelThread          (Capability *cap,
+                             StgTSO     *tso,
+                             char       *label);
+
 
 #if !defined(mingw32_HOST_OS)
 pid_t  forkProcess     (HsStablePtr *entry);

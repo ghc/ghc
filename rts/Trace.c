@@ -172,29 +172,32 @@ static void tracePreface (void)
 
 #ifdef DEBUG
 static char *thread_stop_reasons[] = {
-    [HeapOverflow] = "heap overflow",
-    [StackOverflow] = "stack overflow",
-    [ThreadYielding] = "yielding",
-    [ThreadBlocked] = "blocked",
-    [ThreadFinished] = "finished",
-    [THREAD_SUSPENDED_FOREIGN_CALL] = "suspended while making a foreign call",
-    [6 + BlockedOnMVar]         = "blocked on an MVar",
-    [6 + BlockedOnBlackHole]    = "blocked on a black hole",
-    [6 + BlockedOnRead]         = "blocked on a read operation",
-    [6 + BlockedOnWrite]        = "blocked on a write operation",
-    [6 + BlockedOnDelay]        = "blocked on a delay operation",
-    [6 + BlockedOnSTM]          = "blocked on STM",
-    [6 + BlockedOnDoProc]       = "blocked on asyncDoProc",
-    [6 + BlockedOnCCall]        = "blocked on a foreign call",
-    [6 + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
-    [6 + BlockedOnMsgThrowTo]   =  "blocked on throwTo",
-    [6 + ThreadMigrating]       =  "migrating"
+    [HeapOverflow]                              = "heap overflow",
+    [StackOverflow]                             = "stack overflow",
+    [ThreadYielding]                            = "yielding",
+    [ThreadBlocked]                             = "blocked",
+    [ThreadFinished]                            = "finished",
+    [ThreadSwitch]                              = "switched to",
+    [THREAD_SUSPENDED_FOREIGN_CALL]             = "suspended while making a foreign call",
+    [STOP_EVENT_OFFSET + BlockedOnMVar]         = "blocked on an MVar",
+    [STOP_EVENT_OFFSET + BlockedOnBlackHole]    = "blocked on a black hole",
+    [STOP_EVENT_OFFSET + BlockedOnRead]         = "blocked on a read operation",
+    [STOP_EVENT_OFFSET + BlockedOnWrite]        = "blocked on a write operation",
+    [STOP_EVENT_OFFSET + BlockedOnDelay]        = "blocked on a delay operation",
+    [STOP_EVENT_OFFSET + BlockedOnSTM]          = "blocked on STM",
+    [STOP_EVENT_OFFSET + BlockedOnDoProc]       = "blocked on asyncDoProc",
+    [STOP_EVENT_OFFSET + BlockedOnCCall]        = "blocked on a foreign call",
+    [STOP_EVENT_OFFSET + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
+    [STOP_EVENT_OFFSET + BlockedOnMsgThrowTo]   = "blocked on throwTo",
+    [STOP_EVENT_OFFSET + ThreadMigrating]       = "migrating",
+    [STOP_EVENT_OFFSET + BlockedInHaskell]       = "blocked on a user-level concurrent data structure",
+    [STOP_EVENT_OFFSET + Yielded]               = "blocked on a user-level scheduler (Yielded)"
 };
 #endif
 
 #ifdef DEBUG
-static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag, 
-                                    StgTSO *tso, 
+static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
+                                    StgTSO *tso,
                                     StgWord info1 STG_UNUSED,
                                     StgWord info2 STG_UNUSED)
 {
@@ -203,28 +206,28 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     tracePreface();
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %" FMT_SizeT "\n", 
+        debugBelch("cap %d: created thread %" FMT_SizeT "\n",
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %" FMT_SizeT " (%s)\n", 
+        debugBelch("cap %d: running thread %" FMT_SizeT " (%s)\n",
                    cap->no, (lnat)tso->id, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %" FMT_SizeT " appended to run queue\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " appended to run queue\n",
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %" FMT_SizeT " migrating to cap %d\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " migrating to cap %d\n",
                    cap->no, (lnat)tso->id, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
-        debugBelch("cap %d: waking up thread %" FMT_SizeT " on cap %d\n", 
+        debugBelch("cap %d: waking up thread %" FMT_SizeT " on cap %d\n",
                    cap->no, (lnat)tso->id, (int)info1);
         break;
-        
+
     case EVENT_STOP_THREAD:     // (cap, thread, status)
-        if (info1 == 6 + BlockedOnBlackHole) {
+        if (info1 == STOP_EVENT_OFFSET + BlockedOnBlackHole) {
             debugBelch("cap %d: thread %" FMT_SizeT " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (lnat)tso->id, (long)info2);
         } else {
@@ -233,7 +236,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         }
         break;
     default:
-        debugBelch("cap %d: thread %" FMT_SizeT ": event %d\n\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT ": event %d\n\n",
                    cap->no, (lnat)tso->id, tag);
         break;
     }
@@ -242,7 +245,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
 }
 #endif
 
-void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
+void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
                        StgTSO *tso, StgWord info1, StgWord info2)
 {
 #ifdef DEBUG
@@ -410,8 +413,8 @@ void traceCapEvent (Capability   *cap,
 }
 
 void traceCapsetEvent (EventTypeNum tag,
-                       CapsetID     capset,
-                       StgWord      info)
+                        CapsetID capset,
+                        StgWord info)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_sched)
@@ -498,7 +501,7 @@ void traceOSProcessInfo_(void) {
 }
 
 #ifdef DEBUG
-static void traceSparkEvent_stderr (Capability *cap, EventTypeNum tag, 
+static void traceSparkEvent_stderr (Capability *cap, EventTypeNum tag,
                                     StgWord info1)
 {
     ACQUIRE_LOCK(&trace_utx);
@@ -507,7 +510,7 @@ static void traceSparkEvent_stderr (Capability *cap, EventTypeNum tag,
     switch (tag) {
 
     case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
-        debugBelch("cap %d: creating spark thread %lu\n", 
+        debugBelch("cap %d: creating spark thread %lu\n",
                    cap->no, (long)info1);
         break;
     case EVENT_SPARK_CREATE:        // (cap)
@@ -515,27 +518,27 @@ static void traceSparkEvent_stderr (Capability *cap, EventTypeNum tag,
                    cap->no);
         break;
     case EVENT_SPARK_DUD:           //  (cap)
-        debugBelch("cap %d: discarded dud spark\n", 
+        debugBelch("cap %d: discarded dud spark\n",
                    cap->no);
         break;
     case EVENT_SPARK_OVERFLOW:      // (cap)
-        debugBelch("cap %d: discarded overflowed spark\n", 
+        debugBelch("cap %d: discarded overflowed spark\n",
                    cap->no);
         break;
     case EVENT_SPARK_RUN:           // (cap)
-        debugBelch("cap %d: running a spark\n", 
+        debugBelch("cap %d: running a spark\n",
                    cap->no);
         break;
     case EVENT_SPARK_STEAL:         // (cap, victim_cap)
-        debugBelch("cap %d: stealing a spark from cap %d\n", 
+        debugBelch("cap %d: stealing a spark from cap %d\n",
                    cap->no, (int)info1);
         break;
     case EVENT_SPARK_FIZZLE:        // (cap)
-        debugBelch("cap %d: fizzled spark removed from pool\n", 
+        debugBelch("cap %d: fizzled spark removed from pool\n",
                    cap->no);
         break;
     case EVENT_SPARK_GC:            // (cap)
-        debugBelch("cap %d: GCd spark removed from pool\n", 
+        debugBelch("cap %d: GCd spark removed from pool\n",
                    cap->no);
         break;
     default:
@@ -638,7 +641,7 @@ void traceCap_(Capability *cap, char *msg, ...)
 {
     va_list ap;
     va_start(ap,msg);
-    
+
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         traceCap_stderr(cap, msg, ap);

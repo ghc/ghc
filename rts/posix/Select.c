@@ -172,7 +172,7 @@ awaitEvent(rtsBool wait)
        */
 	switch (tso->why_blocked) {
 	case BlockedOnRead:
-	  { 
+	  {
 	    int fd = tso->block_info.fd;
 	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
                 fdOutOfRange(fd);
@@ -183,7 +183,7 @@ awaitEvent(rtsBool wait)
 	  }
 
 	case BlockedOnWrite:
-	  { 
+	  {
 	    int fd = tso->block_info.fd;
 	    if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
                 fdOutOfRange(fd);
@@ -232,8 +232,8 @@ awaitEvent(rtsBool wait)
 	       practice, but having the RTS as a result fall over isn't
 	       acceptable, so we simply unblock all the waiting threads
 	       should we see a bad file descriptor & give the threads
-	       a chance to clean up their act. 
-	       
+	       a chance to clean up their act.
+
 	       Note: assume here that threads becoming unblocked
 	       will try to read/write the file descriptor before trying
 	       to issue a threadWaitRead/threadWaitWrite again (==> an
@@ -243,12 +243,12 @@ awaitEvent(rtsBool wait)
 	       the RTS won't loop.
 	    */
 	    if ( errno == EBADF ) {
-                unblock_all = rtsTrue;
-                break;
+	      unblock_all = rtsTrue;
+	      break;
 	    } else {
                 sysErrorBelch("select");
                 stg_exit(EXIT_FAILURE);
-            }
+	    }
 	  }
 
 	  /* We got a signal; could be one of ours.  If so, we need
@@ -268,8 +268,8 @@ awaitEvent(rtsBool wait)
 	  if (sched_state >= SCHED_INTERRUPTING) {
 	      return; /* still hold the lock */
 	  }
-	  
-	  /* check for threads that need waking up 
+
+	  /* check for threads that need waking up
 	   */
           wakeUpSleepingThreads(getLowResTimeOfDay());
 
@@ -300,7 +300,7 @@ awaitEvent(rtsBool wait)
 	      default:
 		  barf("awaitEvent");
 	      }
-      
+
 	      if (ready) {
 		IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %lu\n", (unsigned long)tso->id));
 		  tso->why_blocked = NotBlocked;
@@ -322,7 +322,7 @@ awaitEvent(rtsBool wait)
 	      blocked_queue_tl = prev;
 	  }
       }
-      
+
     } while (wait && sched_state == SCHED_RUNNING
 	     && emptyRunQueue(&MainCapability));
 }

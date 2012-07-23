@@ -84,7 +84,7 @@ if [ $no_clean -eq 0 ]; then
         INSTDIR=`cygpath -m "$INSTDIR"`
     fi
 
-    /usr/bin/perl -w boot --validate --required-tag=dph
+    /usr/bin/perl -w boot --validate
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
@@ -113,7 +113,7 @@ if [ $speed != "FAST" ]; then
     # coverage, and also verify that we can install a package into the
     # bindist with Cabal.
     #
-    bindistdir="bindisttest/install   dir"
+    bindistdir="bindisttest/install dir"
 
     # This is a hack to make
     #     HADDOCK_DOCS = NO

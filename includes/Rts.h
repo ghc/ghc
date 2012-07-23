@@ -119,7 +119,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define ASSERTM(predicate,msg,...) CHECKM(predicate,msg,##__VA_ARGS__)
 #endif /* DEBUG */
 
-/* 
+/*
  * Use this on the RHS of macros which expand to nothing
  * to make sure that the macro can be used in a context which
  * demands a non-empty statement.

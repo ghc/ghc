@@ -534,10 +534,10 @@ getLocalNonValBinders fixity_env
       = do { avail <- new_ti Nothing d
            ; return [avail] }
     new_assoc (L _ (ClsInstD { cid_poly_ty = inst_ty, cid_fam_insts = ats }))
-      | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
+          | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
            ; mapM (new_ti (Just cls_nm) . unLoc) ats }
-      | otherwise
+          | otherwise
       = return []     -- Do not crash on ill-formed instances
                       -- Eg   instance !Show Int   Trac #3811c
 

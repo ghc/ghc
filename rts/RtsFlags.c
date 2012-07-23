@@ -1217,7 +1217,7 @@ error = rtsTrue;
                         RtsFlags.ParFlags.parGcNoSyncWithIdle
                             = strtol(rts_argv[arg]+3, (char **) NULL, 10);
                         break;
-                    case 'a':
+		    case 'a':
 			RtsFlags.ParFlags.setAffinity = rtsTrue;
 			break;
 		    case 'm':

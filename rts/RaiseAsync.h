@@ -17,19 +17,23 @@
 #include "BeginPrivate.h"
 
 void throwToSingleThreaded (Capability *cap,
-			    StgTSO *tso,
-			    StgClosure *exception);
+                            StgTSO *tso,
+                            StgClosure *exception);
 
-void throwToSingleThreaded_ (Capability *cap, 
-			     StgTSO *tso, 
-			     StgClosure *exception, 
-			     rtsBool stop_at_atomically);
+void throwToSingleThreaded_ (Capability *cap,
+                             StgTSO *tso,
+                             StgClosure *exception,
+                             rtsBool stop_at_atomically);
 
-void suspendComputation (Capability *cap, 
-			 StgTSO *tso, 
-			 StgUpdateFrame *stop_here);
+void suspendComputation (Capability *cap,
+                         StgTSO *tso,
+                         StgUpdateFrame *stop_here);
 
-MessageThrowTo *throwTo (Capability *cap,      // the Capability we hold 
+rtsBool suspendAllComputation (Capability *cap,
+                               StgClosure *bh);
+
+
+MessageThrowTo *throwTo (Capability *cap,      // the Capability we hold
                          StgTSO *source,
                          StgTSO *target,
                          StgClosure *exception); // the exception closure
@@ -48,21 +52,25 @@ INLINE_HEADER int
 interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {
-  case BlockedOnMVar:
-  case BlockedOnMsgThrowTo:
-  case BlockedOnRead:
-  case BlockedOnWrite:
+    case BlockedOnMVar:
+    case BlockedOnMsgThrowTo:
+    case BlockedOnRead:
+    case BlockedOnWrite:
 #if defined(mingw32_HOST_OS)
-  case BlockedOnDoProc:
+    case BlockedOnDoProc:
 #endif
-  case BlockedOnDelay:
-    return 1;
-  // NB. Threaded blocked on foreign calls (BlockedOnCCall) are
-  // *not* interruptible.  We can't send these threads an exception.
-  default:
-    return 0;
+    case BlockedOnDelay:
+    case Yielded:
+    case BlockedInHaskell:
+      return 1;
+      // NB. Threaded blocked on foreign calls (BlockedOnCCall) are
+      // *not* interruptible.  We can't send these threads an exception.
+    default:
+      return 0;
   }
 }
+
+StgUpdateFrame* findLastUpdateFrame (StgTSO* tso);
 
 #include "EndPrivate.h"
 

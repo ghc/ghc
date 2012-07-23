@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2001-2005
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
- * manner. 
+ * manner.
  *
  * --------------------------------------------------------------------------*/
 
@@ -78,52 +78,52 @@
  *
  */
 
-void
+  void
 initCondition( Condition* pCond )
 {
   pthread_cond_init(pCond, NULL);
   return;
 }
 
-void
+  void
 closeCondition( Condition* pCond )
 {
   pthread_cond_destroy(pCond);
   return;
 }
 
-rtsBool
+  rtsBool
 broadcastCondition ( Condition* pCond )
 {
   return (pthread_cond_broadcast(pCond) == 0);
 }
 
-rtsBool
+  rtsBool
 signalCondition ( Condition* pCond )
 {
   return (pthread_cond_signal(pCond) == 0);
 }
 
-rtsBool
+  rtsBool
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
   return (pthread_cond_wait(pCond,pMut) == 0);
 }
 
-void
+  void
 yieldThread(void)
 {
   sched_yield();
   return;
 }
 
-void
+  void
 shutdownThread(void)
 {
   pthread_exit(NULL);
 }
 
-int
+  int
 createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
 {
   int result = pthread_create(pId, NULL, (void *(*)(void *))startProc, param);
@@ -132,181 +132,220 @@ createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
   return result;
 }
 
-OSThreadId
+  OSThreadId
 osThreadId(void)
 {
   return pthread_self();
 }
 
-rtsBool
+  rtsBool
 osThreadIsAlive(OSThreadId id STG_UNUSED)
 {
-    // no good way to implement this on POSIX, AFAICT.  Returning true
-    // is safe.
-    return rtsTrue;
+  // no good way to implement this on POSIX, AFAICT.  Returning true
+  // is safe.
+  return rtsTrue;
 }
 
-void
+  void
 initMutex(Mutex* pMut)
 {
 #if defined(DEBUG)
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK);
-    pthread_mutex_init(pMut,&attr);
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK);
+  pthread_mutex_init(pMut,&attr);
 #else
-    pthread_mutex_init(pMut,NULL);
+  pthread_mutex_init(pMut,NULL);
 #endif
-    return;
+  return;
 }
-void
+  void
 closeMutex(Mutex* pMut)
 {
-    pthread_mutex_destroy(pMut);
+  pthread_mutex_destroy(pMut);
 }
 
-void
+  void
 newThreadLocalKey (ThreadLocalKey *key)
 {
-    int r;
-    if ((r = pthread_key_create(key, NULL)) != 0) {
-	barf("newThreadLocalKey: %s", strerror(r));
-    }
+  int r;
+  if ((r = pthread_key_create(key, NULL)) != 0) {
+    barf("newThreadLocalKey: %s", strerror(r));
+  }
 }
 
-void *
+  void *
 getThreadLocalVar (ThreadLocalKey *key)
 {
-    return pthread_getspecific(*key);
-    // Note: a return value of NULL can indicate that either the key
-    // is not valid, or the key is valid and the data value has not
-    // yet been set.  We need to use the latter case, so we cannot
-    // detect errors here.
+  return pthread_getspecific(*key);
+  // Note: a return value of NULL can indicate that either the key
+  // is not valid, or the key is valid and the data value has not
+  // yet been set.  We need to use the latter case, so we cannot
+  // detect errors here.
 }
 
-void
+  void
 setThreadLocalVar (ThreadLocalKey *key, void *value)
 {
-    int r;
-    if ((r = pthread_setspecific(*key,value)) != 0) {
-	barf("setThreadLocalVar: %s", strerror(r));
-    }
+  int r;
+  if ((r = pthread_setspecific(*key,value)) != 0) {
+    barf("setThreadLocalVar: %s", strerror(r));
+  }
 }
 
-void
+  void
 freeThreadLocalKey (ThreadLocalKey *key)
 {
-    int r;
-    if ((r = pthread_key_delete(*key)) != 0) {
-	barf("freeThreadLocalKey: %s", strerror(r));
-    }
+  int r;
+  if ((r = pthread_key_delete(*key)) != 0) {
+    barf("freeThreadLocalKey: %s", strerror(r));
+  }
 }
 
-static void *
+  static void *
 forkOS_createThreadWrapper ( void * entry )
 {
-    Capability *cap;
-    cap = rts_lock();
-    rts_evalStableIO(&cap, (HsStablePtr) entry, NULL);
-    rts_unlock(cap);
-    return NULL;
+  Capability *cap;
+  cap = rts_lock();
+  rts_evalStableIO(&cap, (HsStablePtr) entry, NULL);
+  rts_unlock(cap);
+  return NULL;
+}
+
+  int
+forkOS_createThread ( HsStablePtr entry )
+{
+  pthread_t tid;
+  int result = pthread_create(&tid, NULL,
+                              forkOS_createThreadWrapper, (void*)entry);
+  if(!result)
+    pthread_detach(tid);
+  return result;
+}
+
+static void*
+forkOS_createThreadForSContWrapper (void* p)
+{
+  Capability *cap;
+  CreateTaskForSContArgs *args;
+  HsStablePtr entry;
+
+  args = (CreateTaskForSContArgs*)p;
+  cap = args->cap;
+  entry = args->entry;
+  free (args);
+
+  rts_lockWithCapability (cap);
+  rts_bindSContToCurrentTask (&cap, entry);
+
+  rts_unlock(cap);
+  return NULL;
 }
 
 int
-forkOS_createThread ( HsStablePtr entry )
+forkOS_createThreadForSCont ( HsStablePtr entry )
 {
-    pthread_t tid;
-    int result = pthread_create(&tid, NULL,
-				forkOS_createThreadWrapper, (void*)entry);
-    if(!result)
-        pthread_detach(tid);
-    return result;
+  pthread_t tid;
+  CreateTaskForSContArgs* args;
+  Capability* cap;
+
+  cap = myTask()->cap;
+  args = (CreateTaskForSContArgs*)malloc (sizeof(CreateTaskForSContArgs));
+  ASSERT (args);
+  args->cap = cap;
+  args->entry = entry;
+
+  int result = pthread_create(&tid, NULL, forkOS_createThreadForSContWrapper,
+                              (void*)args);
+  if(!result)
+    pthread_detach (tid);
+  return result;
 }
 
-nat
+  nat
 getNumberOfProcessors (void)
 {
-    static nat nproc = 0;
+  static nat nproc = 0;
 
-    if (nproc == 0) {
+  if (nproc == 0) {
 #if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
-        nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    nproc = sysconf(_SC_NPROCESSORS_ONLN);
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
-        nproc = sysconf(_SC_NPROCESSORS_CONF);
+    nproc = sysconf(_SC_NPROCESSORS_CONF);
 #elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
-        size_t size = sizeof(nat);
-        if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
-            nproc = 1;
+    size_t size = sizeof(nat);
+    if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
+      nproc = 1;
 #else
-        nproc = 1;
+    nproc = 1;
 #endif
-    }
+  }
 
-    return nproc;
+  return nproc;
 }
 
 #if defined(HAVE_SCHED_H) && defined(HAVE_SCHED_SETAFFINITY)
 // Schedules the thread to run on CPU n of m.  m may be less than the
 // number of physical CPUs, in which case, the thread will be allowed
 // to run on CPU n, n+m, n+2m etc.
-void
+  void
 setThreadAffinity (nat n, nat m)
 {
-    nat nproc;
-    cpu_set_t cs;
-    nat i;
+  nat nproc;
+  cpu_set_t cs;
+  nat i;
 
-    nproc = getNumberOfProcessors();
-    CPU_ZERO(&cs);
-    for (i = n; i < nproc; i+=m) {
-        CPU_SET(i, &cs);
-    }
-    sched_setaffinity(0, sizeof(cpu_set_t), &cs);
+  nproc = getNumberOfProcessors();
+  CPU_ZERO(&cs);
+  for (i = n; i < nproc; i+=m) {
+    CPU_SET(i, &cs);
+  }
+  sched_setaffinity(0, sizeof(cpu_set_t), &cs);
 }
 
 #elif defined(darwin_HOST_OS) && defined(THREAD_AFFINITY_POLICY)
 // Schedules the current thread in the affinity set identified by tag n.
-void
+  void
 setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
 {
-    thread_affinity_policy_data_t policy;
+  thread_affinity_policy_data_t policy;
 
-    policy.affinity_tag = n;
-    thread_policy_set(mach_thread_self(), 
-		      THREAD_AFFINITY_POLICY,
-		      (thread_policy_t) &policy,
-		      THREAD_AFFINITY_POLICY_COUNT);
+  policy.affinity_tag = n;
+  thread_policy_set(mach_thread_self(),
+                    THREAD_AFFINITY_POLICY,
+                    (thread_policy_t) &policy,
+                    THREAD_AFFINITY_POLICY_COUNT);
 }
 
 #elif defined(HAVE_SYS_CPUSET_H) /* FreeBSD 7.1+ */
-void
+  void
 setThreadAffinity(nat n, nat m)
 {
-	nat nproc;
-	cpuset_t cs;
-	nat i;
+  nat nproc;
+  cpuset_t cs;
+  nat i;
 
-	nproc = getNumberOfProcessors();
-	CPU_ZERO(&cs);
+  nproc = getNumberOfProcessors();
+  CPU_ZERO(&cs);
 
-	for (i = n; i < nproc; i += m)
-		CPU_SET(i, &cs);
+  for (i = n; i < nproc; i += m)
+    CPU_SET(i, &cs);
 
-	cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof(cpuset_t), &cs);
+  cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1, sizeof(cpuset_t), &cs);
 }
 
 #else
-void
-setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__), 
-		   nat m GNUC3_ATTRIBUTE(__unused__))
+  void
+setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__),
+                   nat m GNUC3_ATTRIBUTE(__unused__))
 {
 }
 #endif
 
-void
+  void
 interruptOSThread (OSThreadId id)
 {
-    pthread_kill(id, SIGPIPE);
+  pthread_kill(id, SIGPIPE);
 }
 
 #else /* !defined(THREADED_RTS) */
@@ -314,12 +353,19 @@ interruptOSThread (OSThreadId id)
 int
 forkOS_createThread ( HsStablePtr entry STG_UNUSED )
 {
-    return -1;
+  return -1;
 }
+
+int
+forkOS_createThreadForSCont ( HsStablePtr entry STG_UNUSED )
+{
+  return -1;
+}
+
 
 nat getNumberOfProcessors (void)
 {
-    return 1;
+  return 1;
 }
 
 #endif /* defined(THREADED_RTS) */

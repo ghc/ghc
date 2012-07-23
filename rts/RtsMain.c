@@ -49,19 +49,19 @@ static void real_main(void)
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;
        then enter the scheduler with this thread and off we go;
-      
+
        the same for GranSim (we have only one instance of this code)
 
        in a parallel setup, where we have many instances of this code
        running on different PEs, we should do this only for the main PE
-       (IAmMainThread is set in startupHaskell) 
+       (IAmMainThread is set in startupHaskell)
     */
 
     /* ToDo: want to start with a larger stack size */
-    { 
-	Capability *cap = rts_lock();
+    {
+        Capability *cap = rts_lock();
         rts_evalLazyIO(&cap,progmain_closure, NULL);
-	status = rts_getSchedStatus(cap);
+        status = rts_getSchedStatus(cap);
         rts_unlock(cap);
     }
 

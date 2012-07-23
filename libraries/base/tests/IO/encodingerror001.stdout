@@ -1,0 +1,36 @@
+test 1
+Caught <stdout>: hPutChar: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: hPutChar: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: hPutChar: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"
+test 1
+Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"
+test 1
+Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"
+test 1
+Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"
+test 1
+Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"
+test 1
+Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "\283\n"
+test 2
+HCaught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "H\941llo\n"
+test 3
+Hello Caught <stdout>: commitBuffer: invalid argument (invalid character) while trying to write "Hello \945\946\947\n"

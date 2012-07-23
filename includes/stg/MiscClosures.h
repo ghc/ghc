@@ -230,7 +230,7 @@ RTS_THUNK(stg_ap_5_upd);
 RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
-/* standard application routines (see also rts/gen_apply.py, 
+/* standard application routines (see also rts/gen_apply.py,
  * and compiler/codeGen/CgStackery.lhs).
  */
 RTS_RET(stg_ap_v);
@@ -424,6 +424,27 @@ RTS_FUN_DECL(stg_myThreadIdzh);
 RTS_FUN_DECL(stg_labelThreadzh);
 RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
 RTS_FUN_DECL(stg_threadStatuszh);
+
+RTS_FUN_DECL(stg_killSContzh);
+RTS_FUN_DECL(stg_newSContzh);
+RTS_FUN_DECL(stg_getSContzh);
+RTS_FUN_DECL(stg_atomicSwitchzh);
+RTS_FUN_DECL(stg_sleepCapabilityzh);
+RTS_FUN_DECL(stg_isThreadBoundzh);
+RTS_FUN_DECL(stg_getSContIdzh);
+RTS_FUN_DECL(stg_getSContCapabilityzh);
+RTS_FUN_DECL(stg_defaultUpcallErrorzh);
+RTS_FUN_DECL(stg_getCurrentCapabilityzh);
+RTS_FUN_DECL(stg_getSLSzh);
+RTS_FUN_DECL(stg_setSLSzh);
+RTS_FUN_DECL(stg_getStatusTVarzh);
+RTS_FUN_DECL(stg_setScheduleSContActionzh);
+RTS_FUN_DECL(stg_getScheduleSContActionzh);
+RTS_FUN_DECL(stg_setYieldControlActionzh);
+RTS_FUN_DECL(stg_getYieldControlActionzh);
+RTS_FUN_DECL(stg_setFinalizzerzh);
+RTS_FUN_DECL(stg_scheduleThreadOnFreeCapzh);
+RTS_FUN_DECL(stg_setSContCapabilityzh);
 
 RTS_FUN_DECL(stg_mkWeakzh);
 RTS_FUN_DECL(stg_mkWeakNoFinalizzerzh);

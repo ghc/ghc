@@ -16,10 +16,10 @@
 
 #include "BeginPrivate.h"
 
-/* 
+/*
    Definition of a Task
    --------------------
- 
+
    A task is an OSThread that runs Haskell code.  Every OSThread that
    runs inside the RTS, whether as a worker created by the RTS or via
    an in-call from C to Haskell, has an associated Task.  The first
@@ -29,7 +29,7 @@
    There is a one-to-one relationship between OSThreads and Tasks.
    The Task for an OSThread is kept in thread-local storage, and can
    be retrieved at any time using myTask().
-   
+
    In the THREADED_RTS build, multiple Tasks may all be running
    Haskell code simultaneously. A task relinquishes its Capability
    when it is asked to evaluate an external (C) call.
@@ -67,7 +67,7 @@
           This call will return when we have ownership of the Task and
           a Capability.  The Capability we get might not be the same
 	  as the one we had when we called yieldCapability().
-          
+
       (b) we must call resumeThread(task), which will safely establish
           ownership of the Task and a Capability.
 */
@@ -85,6 +85,11 @@ typedef struct InCall_ {
                                 // we can't read this from the TSO
                                 // without owning a Capability in the
                                 // first place.
+
+    UserLevelSchedulerStatus uls_stat; //Status of the user-level scheduler.
+                                       //This is modified if a worker resumes the
+                                       //scheduler to which the blocked thread
+                                       //belongs to.
 
     SchedulerStatus  stat;      // return status
     StgClosure **    ret;       // return value
@@ -154,7 +159,7 @@ typedef struct Task_ {
 } Task;
 
 INLINE_HEADER rtsBool
-isBoundTask (Task *task) 
+isBoundTask (Task *task)
 {
     return (task->incall->tso != NULL);
 }

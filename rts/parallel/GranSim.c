@@ -1,4 +1,4 @@
-/* 
+/*
    Time-stamp: <2009-07-06 21:48:36 simonmar>
 
    Variables and functions specific to GranSim the parallelism simulator
@@ -14,27 +14,27 @@
    contains a mask, where the n-th bit stands for the n-th processor, where
    this data can be found. In case of multiple copies, several bits are
    set. The total number of processors is bounded by @MAX_PROC@, which
-   should be <= the length of a word in bits.  -- HWL 
+   should be <= the length of a word in bits.  -- HWL
 */
 
 //@menu
-//* Includes::			
-//* Prototypes and externs::	
-//* Constants and Variables::	
-//* Initialisation::		
-//* Global Address Operations::	 
-//* Global Event Queue::	
-//* Spark queue functions::	
-//* Scheduling functions::	
-//* Thread Queue routines::	
-//* GranSim functions::		
-//* GranSimLight routines::	
-//* Code for Fetching Nodes::	
-//* Idle PEs::			
-//* Routines directly called from Haskell world::  
-//* Emiting profiling info for GrAnSim::  
-//* Dumping routines::		
-//* Index::			
+//* Includes::
+//* Prototypes and externs::
+//* Constants and Variables::
+//* Initialisation::
+//* Global Address Operations::
+//* Global Event Queue::
+//* Spark queue functions::
+//* Scheduling functions::
+//* Thread Queue routines::
+//* GranSim functions::
+//* GranSimLight routines::
+//* Code for Fetching Nodes::
+//* Idle PEs::
+//* Routines directly called from Haskell world::
+//* Emiting profiling info for GrAnSim::
+//* Dumping routines::
+//* Index::
 //@end menu
 
 //@node Includes, Prototypes and externs, GranSim specific code, GranSim specific code
@@ -72,13 +72,13 @@ static rtsBool         stealThread(PEs proc);
 static rtsBool         stealSparkMagic(PEs proc);
 static rtsBool         stealThreadMagic(PEs proc);
 /* subsumed by stealSomething
-static void            stealThread(PEs proc); 
+static void            stealThread(PEs proc);
 static void            stealSpark(PEs proc);
 */
 static rtsTime         sparkStealTime(void);
 static nat             natRandom(nat from, nat to);
 static PEs             findRandomPE(PEs proc);
-static void            sortPEsByTime (PEs proc, PEs *pes_by_time, 
+static void            sortPEsByTime (PEs proc, PEs *pes_by_time,
 				      nat *firstp, nat *np);
 
 void GetRoots(void);
@@ -106,13 +106,13 @@ char *gran_event_names[] = {
 
 #if defined(GRAN)                                              /* whole file */
 char *proc_status_names[] = {
-  "Idle", "Sparking", "Starting", "Fetching", "Fishing", "Busy", 
+  "Idle", "Sparking", "Starting", "Fetching", "Fishing", "Busy",
   "UnknownProcStatus"
 };
 
 /* For internal use (event statistics) only */
 char *event_names[] =
-    { "ContinueThread", "StartThread", "ResumeThread", 
+    { "ContinueThread", "StartThread", "ResumeThread",
       "MoveSpark", "MoveThread", "FindWork",
       "FetchNode", "FetchReply",
       "GlobalBlock", "UnblockThread"
@@ -122,13 +122,13 @@ char *event_names[] =
 PEs CurrentProc = 0;
 
 /*
-  ToDo: Create a structure for the processor status and put all the 
-        arrays below into it. 
+  ToDo: Create a structure for the processor status and put all the
+        arrays below into it.
   -- HWL */
 
 //@cindex CurrentTime
 /* One clock for each PE */
-rtsTime CurrentTime[MAX_PROC];  
+rtsTime CurrentTime[MAX_PROC];
 
 /* Useful to restrict communication; cf fishing model in GUM */
 nat OutstandingFetches[MAX_PROC], OutstandingFishes[MAX_PROC];
@@ -147,7 +147,7 @@ nat SparksAvail = 0;     /* How many sparks are available */
 nat SurplusThreads = 0;  /* How many excess threads are there */
 
 /* Do we need to reschedule following a fetch? */
-rtsBool NeedToReSchedule = rtsFalse, IgnoreEvents = rtsFalse, IgnoreYields = rtsFalse; 
+rtsBool NeedToReSchedule = rtsFalse, IgnoreEvents = rtsFalse, IgnoreYields = rtsFalse;
 rtsTime TimeOfNextEvent, TimeOfLastEvent, EndOfTimeSlice; /* checked from the threaded world! */
 
 //@cindex spark queue
@@ -159,7 +159,7 @@ nat sparksIgnored = 0, sparksCreated = 0;
 
 GlobalGranStats globalGranStats;
 
-nat gran_arith_cost, gran_branch_cost, gran_load_cost, 
+nat gran_arith_cost, gran_branch_cost, gran_load_cost,
     gran_store_cost, gran_float_cost;
 
 /*
@@ -169,9 +169,9 @@ The following variables control the behaviour of GrAnSim. In general, there
 is one RTS option for enabling each of these features. In getting the
 desired setup of GranSim the following questions have to be answered:
 \begin{itemize}
-\item {\em Which scheduling algorithm} to use (@RtsFlags.GranFlags.DoFairSchedule@)? 
+\item {\em Which scheduling algorithm} to use (@RtsFlags.GranFlags.DoFairSchedule@)?
       Currently only unfair scheduling is supported.
-\item What to do when remote data is fetched (@RtsFlags.GranFlags.DoAsyncFetch@)? 
+\item What to do when remote data is fetched (@RtsFlags.GranFlags.DoAsyncFetch@)?
       Either block and wait for the
       data or reschedule and do some other work.
       Thus, if this variable is true, asynchronous communication is
@@ -193,7 +193,7 @@ desired setup of GranSim the following questions have to be answered:
       The variable @RtsFlags.GranFlags.FetchStrategy@ determines how far to go in this list
       when rescheduling on a fetch.
 \item Should sparks or threads be stolen first when looking for work
-      (@RtsFlags.GranFlags.DoStealThreadsFirst@)? 
+      (@RtsFlags.GranFlags.DoStealThreadsFirst@)?
       The default is to steal sparks first (much cheaper).
 \item Should the RTS use a lazy thread creation scheme
       (@RtsFlags.GranFlags.DoAlwaysCreateThreads@)?  By default yes i.e.\ sparks are only
@@ -203,9 +203,9 @@ desired setup of GranSim the following questions have to be answered:
       the creation of threads at the next possibility (i.e.\ when new work
       is demanded the next time).
 \item Should data be fetched closure-by-closure or in packets
-      (@RtsFlags.GranFlags.DoBulkFetching@)? The default strategy is a GRIP-like incremental 
+      (@RtsFlags.GranFlags.DoBulkFetching@)? The default strategy is a GRIP-like incremental
       (i.e.\ closure-by-closure) strategy. This makes sense in a
-      low-latency setting but is bad in a high-latency system. Setting 
+      low-latency setting but is bad in a high-latency system. Setting
       @RtsFlags.GranFlags.DoBulkFetching@ to @True@ enables bulk (packet) fetching. Other
       parameters determine the size of the packets (@pack_buffer_size@) and the number of
       thunks that should be put into one packet (@RtsFlags.GranFlags.ThunksToPack@).
@@ -217,13 +217,13 @@ desired setup of GranSim the following questions have to be answered:
       the closure, which will be evaluated next by that TSO is not
       transferred together with the TSO (that might block another thread).
 \item Should the RTS distinguish between sparks created by local nodes and
-      stolen sparks (@RtsFlags.GranFlags.PreferSparksOfLocalNodes@)?  The idea is to improve 
+      stolen sparks (@RtsFlags.GranFlags.PreferSparksOfLocalNodes@)?  The idea is to improve
       data locality by preferring sparks of local nodes (it is more likely
-      that the data for those sparks is already on the local processor). 
+      that the data for those sparks is already on the local processor).
       However, such a distinction also imposes an overhead on the spark
       queue management, and typically a large number of sparks are
       generated during execution. By default this variable is set to @False@.
-\item Should the RTS use granularity control mechanisms? The idea of a 
+\item Should the RTS use granularity control mechanisms? The idea of a
       granularity control mechanism is to make use of granularity
       information provided via annotation of the @par@ construct in order
       to prefer bigger threads when either turning a spark into a thread or
@@ -232,12 +232,12 @@ desired setup of GranSim the following questions have to be answered:
       \begin{itemize}
         \item Cut-off: The granularity information is interpreted as a
               priority. If a threshold priority is given to the RTS, then
-              only those sparks with a higher priority than the threshold 
+              only those sparks with a higher priority than the threshold
               are actually created. Other sparks are immediately discarded.
-              This is similar to a usual cut-off mechanism often used in 
-              parallel programs, where parallelism is only created if the 
-              input data is lage enough. With this option, the choice is 
-              hidden in the RTS and only the threshold value has to be 
+              This is similar to a usual cut-off mechanism often used in
+              parallel programs, where parallelism is only created if the
+              input data is lage enough. With this option, the choice is
+              hidden in the RTS and only the threshold value has to be
               provided as a parameter to the runtime system.
         \item Priority Sparking: This mechanism keeps priorities for sparks
               and chooses the spark with the highest priority when turning
@@ -245,17 +245,17 @@ desired setup of GranSim the following questions have to be answered:
               discarded. The overhead of this mechanism comes from
               maintaining a sorted spark queue.
         \item Priority Scheduling: This mechanism keeps the granularity
-              information for threads, to. Thus, on each reschedule the 
+              information for threads, to. Thus, on each reschedule the
               largest thread is chosen. This mechanism has a higher
               overhead, as the thread queue is sorted, too.
-       \end{itemize}  
+       \end{itemize}
 \end{itemize}
 */
 
 //@node Initialisation, Global Address Operations, Constants and Variables, GranSim specific code
 //@subsection Initialisation
 
-void 
+void
 init_gr_stats (void) {
   memset(&globalGranStats, '\0', sizeof(GlobalGranStats));
 #if 0
@@ -267,16 +267,16 @@ init_gr_stats (void) {
   globalGranStats.fetch_misses = 0;
   globalGranStats.tot_low_pri_sparks = 0;
 
-  /* obscure stats */  
+  /* obscure stats */
   globalGranStats.rs_sp_count = 0;
   globalGranStats.rs_t_count = 0;
-  globalGranStats.ntimes_total = 0, 
+  globalGranStats.ntimes_total = 0,
   globalGranStats.fl_total = 0;
   globalGranStats.no_of_steals = 0;
 
   /* spark queue stats */
-  globalGranStats.tot_sq_len = 0, 
-  globalGranStats.tot_sq_probes = 0; 
+  globalGranStats.tot_sq_len = 0,
+  globalGranStats.tot_sq_probes = 0;
   globalGranStats.tot_sparks = 0;
   globalGranStats.withered_sparks = 0;
   globalGranStats.tot_add_threads = 0;
@@ -316,7 +316,7 @@ init_gr_stats (void) {
 /* ga_to_proc returns the first processor marked in the bitmask ga.
    Normally only one bit in ga should be set. But for PLCs all bits
    are set. That shouldn't hurt since we only need IS_LOCAL_TO for PLCs */
- 
+
 //@cindex ga_to_proc
 
 static inline PEs
@@ -338,7 +338,7 @@ where_is(StgClosure *node)
 //@cindex is_unique
 rtsBool
 is_unique(StgClosure *node)
-{ 
+{
   PEs i;
   rtsBool unique = rtsFalse;
 
@@ -346,8 +346,8 @@ is_unique(StgClosure *node)
     if (IS_LOCAL_TO(PROCS(node), i))
       if (unique)          // exactly 1 instance found so far
 	return rtsFalse;   // found a 2nd instance => not unique
-      else 
-	unique = rtsTrue;  // found 1st instance 
+      else
+	unique = rtsTrue;  // found 1st instance
   ASSERT(unique);          // otherwise returned from within loop
   return (unique);
 }
@@ -355,21 +355,21 @@ is_unique(StgClosure *node)
 //@cindex any_idle
 static inline rtsBool
 any_idle(void) { /* any (map (\ i -> procStatus[i] == Idle)) [0,..,MAX_PROC] */
- PEs i; 
- rtsBool any_idle; 
- for(i=0, any_idle=rtsFalse; 
-     !any_idle && i<RtsFlags.GranFlags.proc; 
-     any_idle = any_idle || procStatus[i] == Idle, i++) 
+ PEs i;
+ rtsBool any_idle;
+ for(i=0, any_idle=rtsFalse;
+     !any_idle && i<RtsFlags.GranFlags.proc;
+     any_idle = any_idle || procStatus[i] == Idle, i++)
  {} ;
 }
 
 //@cindex idlers
 static inline nat
 idlers(void) {  /* number of idle PEs */
- PEs i, j; 
+ PEs i, j;
  for(i=0, j=0;
-     i<RtsFlags.GranFlags.proc; 
-     j += (procStatus[i] == Idle) ? 1 : 0, i++) 
+     i<RtsFlags.GranFlags.proc;
+     j += (procStatus[i] == Idle) ? 1 : 0, i++)
  {} ;
  return j;
 }
@@ -377,7 +377,7 @@ idlers(void) {  /* number of idle PEs */
 //@node Global Event Queue, Spark queue functions, Global Address Operations, GranSim specific code
 //@subsection Global Event Queue
 /*
-The following routines implement an ADT of an event-queue (FIFO). 
+The following routines implement an ADT of an event-queue (FIFO).
 ToDo: Put that in an own file(?)
 */
 
@@ -413,12 +413,12 @@ get_next_event(void)
 
 /* When getting the time of the next event we ignore CONTINUETHREAD events:
    we don't want to be interrupted before the end of the current time slice
-   unless there is something important to handle. 
+   unless there is something important to handle.
 */
 //@cindex get_time_of_next_event
 rtsTime
 get_time_of_next_event(void)
-{ 
+{
   rtsEventQ event = EventHd;
 
   while (event != NULL && event->evttype==ContinueThread) {
@@ -449,8 +449,8 @@ rtsEvent *newentry;
      irrelevant, but matters for ridiculously low latencies...
   */
 
-  /* Changed the ordering: Now FINDWORK comes after everything but 
-     CONTINUETHREAD. This makes sure that a MOVESPARK comes before a 
+  /* Changed the ordering: Now FINDWORK comes after everything but
+     CONTINUETHREAD. This makes sure that a MOVESPARK comes before a
      FINDWORK. This is important when a GranSimSparkAt happens and
      DoAlwaysCreateThreads is turned on. Also important if a GC occurs
      when trying to build a new thread (see much_spark)  -- HWL 02/96  */
@@ -458,8 +458,8 @@ rtsEvent *newentry;
   if(EventHd == NULL)
     EventHd = newentry;
   else {
-    for (event = EventHd, prev=(rtsEvent**)&EventHd; 
-	 event != NULL; 
+    for (event = EventHd, prev=(rtsEvent**)&EventHd;
+	 event != NULL;
          prev = (rtsEvent**)&(event->next), event = event->next) {
       switch (evttype) {
         case FindWork: if ( event->time < newentry->time ||
@@ -472,7 +472,7 @@ rtsEvent *newentry;
 			       continue;
 			     else
                                break;
-        default: if ( event->time < newentry->time || 
+        default: if ( event->time < newentry->time ||
 	              ((event->time == newentry->time) &&
 		       (event->evttype == newentry->evttype)) )
 		   continue;
@@ -513,8 +513,8 @@ rtsSpark *spark;
 
   insert_event(newentry);
 
-  IF_DEBUG(gran, 
-	   fprintf(stderr, "GRAN: new_event: \n"); 
+  IF_DEBUG(gran,
+	   fprintf(stderr, "GRAN: new_event: \n");
 	   print_event(newentry));
 }
 
@@ -542,7 +542,7 @@ grab_event(void)             /* undo prepend_event i.e. get the event */
 }
 
 //@cindex traverse_eventq_for_gc
-void 
+void
 traverse_eventq_for_gc(void)
 {
  rtsEventQ event = EventHd;
@@ -570,7 +570,7 @@ traverse_eventq_for_gc(void)
      tsop = stgCast(StgTSO*,buffer[PACK_TSO_LOCN]);
      proc = event->proc;
      creator = event->creator;                 /* similar to unpacking */
-     for (bufptr=buffer+PACK_HDR_SIZE; 
+     for (bufptr=buffer+PACK_HDR_SIZE;
 	  bufptr<(buffer+bufsize);
 	  bufptr++) {
 	 // if ( (INFO_TYPE(INFO_PTR(*bufptr)) == INFO_SPEC_RBH_TYPE) ||
@@ -592,7 +592,7 @@ traverse_eventq_for_gc(void)
 
 void
 markEventQueue(void)
-{ 
+{
   StgClosure *MarkRoot(StgClosure *root); // prototype
 
   rtsEventQ event = EventHd;
@@ -601,10 +601,10 @@ markEventQueue(void)
   /* iterate over eventq and register relevant fields in event as roots */
   for(event = EventHd, len =  0; event!=NULL; event=event->next, len++) {
     switch (event->evttype) {
-      case ContinueThread:  
+      case ContinueThread:
 	event->tso = (StgTSO *)MarkRoot((StgClosure *)event->tso);
 	break;
-      case StartThread: 
+      case StartThread:
 	event->tso = (StgTSO *)MarkRoot((StgClosure *)event->tso);
 	event->node = (StgClosure *)MarkRoot((StgClosure *)event->node);
 	break;
@@ -620,7 +620,7 @@ markEventQueue(void)
 	break;
       case FindWork:
 	break;
-      case FetchNode: 
+      case FetchNode:
 	event->tso = (StgTSO *)MarkRoot((StgClosure *)event->tso);
 	event->node = (StgClosure *)MarkRoot((StgClosure *)event->node);
   	break;
@@ -654,32 +654,32 @@ markEventQueue(void)
   will be reawakended via a call to awakenBlockedQueue. Until then no
   event effecting this tso should appear in the eventq.  A bit of a hack,
   because ideally we shouldn't generate such spurious ContinueThread events
-  in the first place.  
+  in the first place.
 */
-//@cindex prune_eventq 
-void 
-prune_eventq(tso, node) 
-StgTSO *tso; 
-StgClosure *node; 
+//@cindex prune_eventq
+void
+prune_eventq(tso, node)
+StgTSO *tso;
+StgClosure *node;
 { rtsEventQ prev = (rtsEventQ)NULL, event = EventHd;
 
-  /* node unused for now */ 
-  ASSERT(node==NULL); 
+  /* node unused for now */
+  ASSERT(node==NULL);
   /* tso must be valid, then */
   ASSERT(tso!=END_TSO_QUEUE);
   while (event != NULL) {
-    if (event->evttype==ContinueThread && 
+    if (event->evttype==ContinueThread &&
 	(event->tso==tso)) {
       IF_GRAN_DEBUG(event_trace, // ToDo: use another debug flag
 		    belch("prune_eventq: pruning ContinueThread event for TSO %d (%p) on PE %d @ %lx (%p)",
 			  event->tso->id, event->tso, event->proc, event->time, event));
       if (prev==(rtsEventQ)NULL) { // beginning of eventq
 	EventHd = event->next;
-	free(event); 
+	free(event);
 	event = EventHd;
       } else {
 	prev->next = event->next;
-	free(event); 
+	free(event);
 	event = prev->next;
       }
     } else { // no pruning necessary; go to next event
@@ -700,7 +700,7 @@ rtsEvent *event;
   if (event->tso==END_TSO_QUEUE) {
     strcpy(str_tso, "______");
     tso_id = 0;
-  } else { 
+  } else {
     sprintf(str_tso, "%p", event->tso);
     tso_id = (event->tso==NULL) ? 0 : event->tso->id;
   }
@@ -718,7 +718,7 @@ rtsEvent *event;
   else
     fprintf(stderr, "Evt: %s (%u), PE %u [%u], Time %lu, TSO %d (%s), Node %s\n", //"Evt: %s (%u), PE %u [%u], Time %u, TSO %s (%#l), Node %s\n",
 	      event_names[event->evttype], event->evttype,
-              event->proc, event->creator, event->time, 
+              event->proc, event->creator, event->time,
 	      tso_id, str_tso, str_node
 	      /*, event->spark, event->next */ );
 
@@ -737,23 +737,23 @@ rtsEvent *hd;
   }
 }
 
-/* 
+/*
    Spark queue functions are now all  in Sparks.c!!
 */
 //@node Scheduling functions, Thread Queue routines, Spark queue functions, GranSim specific code
 //@subsection Scheduling functions
 
-/* 
+/*
    These functions are variants of thread initialisation and therefore
    related to initThread and friends in Schedule.c. However, they are
    specific to a GranSim setup in storing more info in the TSO's statistics
-   buffer and sorting the thread queues etc.  
+   buffer and sorting the thread queues etc.
 */
 
 /*
    A large portion of startThread deals with maintaining a sorted thread
    queue, which is needed for the Priority Sparking option. Without that
-   complication the code boils down to FIFO handling.  
+   complication the code boils down to FIFO handling.
 */
 //@cindex insertThread
 void
@@ -772,7 +772,7 @@ PEs         proc;
   if (run_queue_hds[proc] == END_TSO_QUEUE)
     {
       /* too strong!
-      ASSERT((CurrentProc==MainProc &&   
+      ASSERT((CurrentProc==MainProc &&
 	      CurrentTime[MainProc]==0 &&
 	      procStatus[MainProc]==Idle) ||
 	     procStatus[proc]==Starting);
@@ -784,8 +784,8 @@ PEs         proc;
       /* new_event of ContinueThread has been moved to do_the_startthread */
 
       /* too strong!
-      ASSERT(procStatus[proc]==Idle || 
-             procStatus[proc]==Fishing || 
+      ASSERT(procStatus[proc]==Idle ||
+             procStatus[proc]==Fishing ||
              procStatus[proc]==Starting);
       procStatus[proc] = Busy;
       */
@@ -799,21 +799,21 @@ PEs         proc;
   if (RtsFlags.GranFlags.DoPriorityScheduling && tso->gran.pri!=0)
     /* {add_to_spark_queue}vo' jInIHta'; Qu' wa'DIch yIleghQo' */
     for (prev = run_queue_hds[proc], next = run_queue_hds[proc]->link, count=0;
-	 (next != END_TSO_QUEUE) && 
+	 (next != END_TSO_QUEUE) &&
 	 !(found = tso->gran.pri >= next->gran.pri);
-	 prev = next, next = next->link, count++) 
-      { 
+	 prev = next, next = next->link, count++)
+      {
        ASSERT((prev!=(StgTSO*)NULL || next==run_queue_hds[proc]) &&
 	      (prev==(StgTSO*)NULL || prev->link==next));
       }
 
   ASSERT(!found || next != END_TSO_QUEUE);
   ASSERT(procStatus[proc]!=Idle);
- 
+
   if (found) {
-     /* found can only be rtsTrue if pri scheduling enabled */ 
+     /* found can only be rtsTrue if pri scheduling enabled */
      ASSERT(RtsFlags.GranFlags.DoPriorityScheduling);
-     if (RtsFlags.GranFlags.GranSimStats.Global) 
+     if (RtsFlags.GranFlags.GranSimStats.Global)
        globalGranStats.non_end_add_threads++;
      /* Add tso to ThreadQueue between prev and next */
      tso->link = next;
@@ -822,7 +822,7 @@ PEs         proc;
      } else {
        /* no back link for TSO chain */
      }
-     
+
      if ( prev == (StgTSO*)END_TSO_QUEUE ) {
        /* Never add TSO as first elem of thread queue; the first */
        /* element should be the one that is currently running -- HWL */
@@ -842,25 +842,25 @@ PEs         proc;
   CurrentTime[proc] += count * RtsFlags.GranFlags.Costs.pri_sched_overhead +
                        RtsFlags.GranFlags.Costs.threadqueuetime;
 
-  /* ToDo: check if this is still needed -- HWL 
+  /* ToDo: check if this is still needed -- HWL
   if (RtsFlags.GranFlags.DoThreadMigration)
     ++SurplusThreads;
 
   if (RtsFlags.GranFlags.GranSimStats.Full &&
-      !(( event_type == GR_START || event_type == GR_STARTQ) && 
+      !(( event_type == GR_START || event_type == GR_STARTQ) &&
 	RtsFlags.GranFlags.labelling) )
-    DumpRawGranEvent(proc, creator, event_type+1, tso, node, 
+    DumpRawGranEvent(proc, creator, event_type+1, tso, node,
 	             tso->gran.sparkname, spark_queue_len(proc));
   */
 
 # if defined(GRAN_CHECK)
   /* Check if thread queue is sorted. Only for testing, really!  HWL */
-  if ( RtsFlags.GranFlags.DoPriorityScheduling && 
+  if ( RtsFlags.GranFlags.DoPriorityScheduling &&
        (RtsFlags.GranFlags.Debug.sortedQ) ) {
     rtsBool sorted = rtsTrue;
     StgTSO *prev, *next;
 
-    if (run_queue_hds[proc]==END_TSO_QUEUE || 
+    if (run_queue_hds[proc]==END_TSO_QUEUE ||
 	run_queue_hds[proc]->link==END_TSO_QUEUE) {
       /* just 1 elem => ok */
     } else {
@@ -870,7 +870,7 @@ PEs         proc;
 	   prev = next, next = prev->link) {
 	ASSERT((prev!=(StgTSO*)NULL || next==run_queue_hds[proc]) &&
 	       (prev==(StgTSO*)NULL || prev->link==next));
-	sorted = sorted && 
+	sorted = sorted &&
 	         (prev->gran.pri >= next->gran.pri);
       }
     }
@@ -887,7 +887,7 @@ PEs         proc;
   insertThread, which is only used for GranSim Light, is similar to
   startThread in that it adds a TSO to a thread queue. However, it assumes
   that the thread queue is sorted by local clocks and it inserts the TSO at
-  the right place in the queue. Don't create any event, just insert.  
+  the right place in the queue. Don't create any event, just insert.
 */
 //@cindex GranSimLight_insertThread
 rtsBool
@@ -913,10 +913,10 @@ PEs proc;
 
   /* If only one thread in queue so far we emit DESCHEDULE in debug mode */
   if (RtsFlags.GranFlags.GranSimStats.Full &&
-      (RtsFlags.GranFlags.Debug.checkLight) && 
+      (RtsFlags.GranFlags.Debug.checkLight) &&
       (run_queue_hd->link == END_TSO_QUEUE)) {
     DumpRawGranEvent(proc, proc, GR_DESCHEDULE,
-		     run_queue_hds[proc], (StgClosure*)NULL, 
+		     run_queue_hds[proc], (StgClosure*)NULL,
 		     tso->gran.sparkname, spark_queue_len(proc)); // ToDo: check spar_queue_len
     // resched = rtsTrue;
   }
@@ -934,15 +934,15 @@ PEs proc;
     }
 
   for (prev = run_queue_hds[proc], next = run_queue_hds[proc]->link, count = 0;
-       (next != END_TSO_QUEUE) && 
+       (next != END_TSO_QUEUE) &&
        !(found = (tso->gran.clock < next->gran.clock));
-       prev = next, next = next->link, count++) 
-    { 
+       prev = next, next = next->link, count++)
+    {
        ASSERT((prev!=(StgTSO*)NULL || next==run_queue_hds[proc]) &&
 	      (prev==(StgTSO*)NULL || prev->link==next));
     }
 
-  /* found can only be rtsTrue if pri sparking enabled */ 
+  /* found can only be rtsTrue if pri sparking enabled */
   if (found) {
      /* Add tso to ThreadQueue between prev and next */
      tso->link = next;
@@ -951,7 +951,7 @@ PEs proc;
      } else {
        /* no back link for TSO chain */
      }
-     
+
      if ( prev == END_TSO_QUEUE ) {
        run_queue_hds[proc] = tso;
      } else {
@@ -969,8 +969,8 @@ PEs proc;
 	      tso, (StgClosure*)NULL, (rtsSpark*)NULL);
   }
   /*
-  if (RtsFlags.GranFlags.GranSimStats.Full && 
-      !(( event_type == GR_START || event_type == GR_STARTQ) && 
+  if (RtsFlags.GranFlags.GranSimStats.Full &&
+      !(( event_type == GR_START || event_type == GR_STARTQ) &&
 	RtsFlags.GranFlags.labelling) )
     DumpRawGranEvent(proc, creator, gr_evttype, tso, node,
 		     tso->gran.sparkname, spark_queue_len(proc));
@@ -980,10 +980,10 @@ PEs proc;
 
 /*
   endThread is responsible for general clean-up after the thread tso has
-  finished. This includes emitting statistics into the profile etc.  
+  finished. This includes emitting statistics into the profile etc.
 */
 void
-endThread(StgTSO *tso, PEs proc) 
+endThread(StgTSO *tso, PEs proc)
 {
   ASSERT(procStatus[proc]==Busy);        // coming straight out of STG land
   ASSERT(tso->what_next==ThreadComplete);
@@ -999,19 +999,19 @@ endThread(StgTSO *tso, PEs proc)
 //@node Thread Queue routines, GranSim functions, Scheduling functions, GranSim specific code
 //@subsection Thread Queue routines
 
-/* 
+/*
    Check whether given tso resides on the run queue of the current processor.
    Only used for debugging.
 */
-   
+
 //@cindex is_on_queue
 rtsBool
-is_on_queue (StgTSO *tso, PEs proc) 
+is_on_queue (StgTSO *tso, PEs proc)
 {
   StgTSO *t;
   rtsBool found;
 
-  for (t=run_queue_hds[proc], found=rtsFalse; 
+  for (t=run_queue_hds[proc], found=rtsFalse;
        t!=END_TSO_QUEUE && !(found = t==tso);
        t=t->link)
     /* nothing */ ;
@@ -1020,18 +1020,18 @@ is_on_queue (StgTSO *tso, PEs proc)
 }
 
 /* This routine  is only  used for keeping   a statistics  of thread  queue
-   lengths to evaluate the impact of priority scheduling. -- HWL 
+   lengths to evaluate the impact of priority scheduling. -- HWL
    {spark_queue_len}vo' jInIHta'
 */
 //@cindex thread_queue_len
 nat
-thread_queue_len(PEs proc) 
+thread_queue_len(PEs proc)
 {
  StgTSO *prev, *next;
  nat len;
 
  for (len = 0, prev = END_TSO_QUEUE, next = run_queue_hds[proc];
-      next != END_TSO_QUEUE; 
+      next != END_TSO_QUEUE;
       len++, prev = next, next = prev->link)
    {}
 
@@ -1044,12 +1044,12 @@ thread_queue_len(PEs proc)
 /* -----------------------------------------------------------------  */
 /* The main event handling functions; called from Schedule.c (schedule) */
 /* -----------------------------------------------------------------  */
- 
+
 //@cindex do_the_globalblock
 
-void 
+void
 do_the_globalblock(rtsEvent* event)
-{ 
+{
   PEs proc          = event->proc;        /* proc that requested node */
   StgTSO *tso       = event->tso;         /* tso that requested node */
   StgClosure  *node = event->node;        /* requested, remote node */
@@ -1089,7 +1089,7 @@ do_the_globalblock(rtsEvent* event)
     }
   } else {  /* RtsFlags.GranFlags.DoAsyncFetch i.e. block-on-fetch */
 	      /* other thread is already running */
-	      /* 'oH 'utbe' 'e' vIHar ; I think that's not needed -- HWL 
+	      /* 'oH 'utbe' 'e' vIHar ; I think that's not needed -- HWL
 	      new_event(proc,proc,CurrentTime[proc],
 		       CONTINUETHREAD,EVENT_TSO(event),
 		       (RtsFlags.GranFlags.DoBulkFetching ? closure :
@@ -1101,14 +1101,14 @@ do_the_globalblock(rtsEvent* event)
 
 //@cindex do_the_unblock
 
-void 
-do_the_unblock(rtsEvent* event) 
+void
+do_the_unblock(rtsEvent* event)
 {
   PEs proc = event->proc,       /* proc that requested node */
       creator = event->creator; /* proc that requested node */
   StgTSO* tso = event->tso;     /* tso that requested node */
   StgClosure* node = event->node;  /* requested, remote node */
-  
+
   IF_DEBUG(gran, fprintf(stderr, "GRAN: doing the UnBlock\n"))
   /* There should be no UNBLOCKs in GrAnSim Light setup */
   ASSERT(!RtsFlags.GranFlags.Light);
@@ -1118,15 +1118,15 @@ do_the_unblock(rtsEvent* event)
   ASSERT(procStatus[proc]==Fetching || IS_BLACK_HOLE(event->node));
   */
   if (!RtsFlags.GranFlags.DoAsyncFetch) {  /* block-on-fetch */
-    /* We count block-on-fetch as normal block time */    
+    /* We count block-on-fetch as normal block time */
     tso->gran.blocktime += CurrentTime[proc] - tso->gran.blockedat;
     /* Dumping now done when processing the event
-       No costs for contextswitch or thread queueing in this case 
+       No costs for contextswitch or thread queueing in this case
        if (RtsFlags.GranFlags.GranSimStats.Full)
-         DumpRawGranEvent(proc, CurrentProc, GR_RESUME, tso, 
+         DumpRawGranEvent(proc, CurrentProc, GR_RESUME, tso,
                           (StgClosure*)NULL, tso->gran.sparkname, spark_queue_len(CurrentProc));
     */
-    /* Maybe do this in FetchReply already 
+    /* Maybe do this in FetchReply already
     if (procStatus[proc]==Fetching)
       procStatus[proc] = Busy;
     */
@@ -1140,7 +1140,7 @@ do_the_unblock(rtsEvent* event)
     /* Bring the TSO from the blocked queue into the threadq */
   }
   /* In all cases, the UnblockThread causes a ResumeThread to be scheduled */
-  new_event(proc, proc, 
+  new_event(proc, proc,
 	    CurrentTime[proc]+RtsFlags.GranFlags.Costs.threadqueuetime,
 	    ResumeThread,
 	    tso, node, (rtsSpark*)NULL);
@@ -1179,17 +1179,17 @@ do_the_fetchnode(rtsEvent* event)
 # endif
      barf("//// do_the_fetchnode: out of heap after handleFetchRequest; ToDo: call GarbageCollect()");
      prepend_event(event);
-     GarbageCollect(GetRoots, rtsFalse); 
+     GarbageCollect(GetRoots, rtsFalse);
      // HWL: ToDo: check whether a ContinueThread has to be issued
      // HWL old: ReallyPerformThreadGC(PACK_HEAP_REQUIRED, rtsFalse);
 # if 0 && defined(GRAN_CHECK)  && defined(GRAN)
      if (RtsFlags.GcFlags.giveStats) {
        fprintf(RtsFlags.GcFlags.statsFile,"*****      SAVE_Hp=%p, SAVE_HpLim=%p, PACK_HEAP_REQUIRED=%d\n",
      	        Hp, HpLim, 0) ; // PACK_HEAP_REQUIRED);  ???
-       fprintf(stderr,"*****      No. of packets so far: %d (total size: %d)\n", 
+       fprintf(stderr,"*****      No. of packets so far: %d (total size: %d)\n",
      	        globalGranStats.tot_packets, globalGranStats.tot_packet_size);
      }
-# endif 
+# endif
      event = grab_event();
      // Hp -= PACK_HEAP_REQUIRED; // ???
 
@@ -1201,7 +1201,7 @@ do_the_fetchnode(rtsEvent* event)
 }
 
 //@cindex do_the_fetchreply
-void 
+void
 do_the_fetchreply(rtsEvent* event)
 {
   PEs proc = event->proc,       /* proc that requested node */
@@ -1219,18 +1219,18 @@ do_the_fetchreply(rtsEvent* event)
 
   /* assign message unpack costs *before* dumping the event */
   CurrentTime[proc] += RtsFlags.GranFlags.Costs.munpacktime;
-  
+
   /* ToDo: check whether this is the right place for dumping the event */
   if (RtsFlags.GranFlags.GranSimStats.Full)
-    DumpRawGranEvent(proc, creator, GR_REPLY, tso, node, 
+    DumpRawGranEvent(proc, creator, GR_REPLY, tso, node,
   		      tso->gran.sparkname, spark_queue_len(proc));
 
-  /* THIS SHOULD NEVER HAPPEN 
-     If tso is in the BQ of node this means that it actually entered the 
-     remote closure, due to a missing GranSimFetch at the beginning of the 
-     entry code; therefore, this is actually a faked fetch, triggered from 
-     within GranSimBlock; 
-     since tso is both in the EVQ and the BQ for node, we have to take it out 
+  /* THIS SHOULD NEVER HAPPEN
+     If tso is in the BQ of node this means that it actually entered the
+     remote closure, due to a missing GranSimFetch at the beginning of the
+     entry code; therefore, this is actually a faked fetch, triggered from
+     within GranSimBlock;
+     since tso is both in the EVQ and the BQ for node, we have to take it out
      of the BQ first before we can handle the FetchReply;
      ToDo: special cases in awakenBlockedQueue, since the BQ magically moved.
   */
@@ -1240,15 +1240,15 @@ do_the_fetchreply(rtsEvent* event)
 			tso->id, tso, node));
     // unlink_from_bq(tso, node);
   }
-    
+
   if (RtsFlags.GranFlags.DoBulkFetching) {      /* bulk (packet) fetching */
     rtsPackBuffer *buffer = (rtsPackBuffer*)node;
     nat size = buffer->size;
-  
+
     /* NB: Fetch misses can't occur with GUM fetching, as */
     /* updatable closure are turned into RBHs and therefore locked */
     /* for other processors that try to grab them. */
-  
+
     closure = UnpackGraph(buffer);
     CurrentTime[proc] += size * RtsFlags.GranFlags.Costs.munpacktime;
   } else  // incremental fetching
@@ -1257,7 +1257,7 @@ do_the_fetchreply(rtsEvent* event)
         /* Fetch has failed i.e. node has been grabbed by another PE */
         PEs p = where_is(node);
         rtsTime fetchtime;
-     
+
 	if (RtsFlags.GranFlags.GranSimStats.Global)
 	  globalGranStats.fetch_misses++;
 
@@ -1266,14 +1266,14 @@ do_the_fetchreply(rtsEvent* event)
 		       CurrentTime[proc],node,p,creator));
 
 	CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mpacktime;
-	
+
 	/* Count fetch again !? */
 	++(tso->gran.fetchcount);
 	tso->gran.fetchtime += RtsFlags.GranFlags.Costs.fetchtime;
-        
+
 	fetchtime = stg_max(CurrentTime[CurrentProc],CurrentTime[p]) +
 		    RtsFlags.GranFlags.Costs.latency;
-	
+
 	/* Chase the grabbed node */
 	new_event(p, proc, fetchtime,
 		  FetchNode,
@@ -1282,13 +1282,13 @@ do_the_fetchreply(rtsEvent* event)
 # if 0 && defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
        IF_GRAN_DEBUG(blockOnFetch,
 		     BlockedOnFetch[CurrentProc] = tso;) /*-rtsTrue;-*/
-	
+
        IF_GRAN_DEBUG(blockOnFetch_sanity,
 		     tso->type |= FETCH_MASK_TSO;)
 # endif
 
         CurrentTime[proc] += RtsFlags.GranFlags.Costs.mtidytime;
-	
+
         return; /* NB: no REPLy has been processed; tso still sleeping */
     }
 
@@ -1299,8 +1299,8 @@ do_the_fetchreply(rtsEvent* event)
     /* this is now done at the beginning of this routine
     if (RtsFlags.GranFlags.GranSimStats.Full)
        DumpRawGranEvent(proc,event->creator, GR_REPLY, event->tso,
-			(RtsFlags.GranFlags.DoBulkFetching ? 
-			       closure : 
+			(RtsFlags.GranFlags.DoBulkFetching ?
+			       closure :
 			       event->node),
                         tso->gran.sparkname, spark_queue_len(proc));
     */
@@ -1309,8 +1309,8 @@ do_the_fetchreply(rtsEvent* event)
     --OutstandingFetches[proc];
     new_event(proc, proc, CurrentTime[proc],
 	      ResumeThread,
-	      event->tso, (RtsFlags.GranFlags.DoBulkFetching ? 
-			   closure : 
+	      event->tso, (RtsFlags.GranFlags.DoBulkFetching ?
+			   closure :
 			   event->node),
 	      (rtsSpark*)NULL);
 }
@@ -1341,7 +1341,7 @@ do_the_movethread(rtsEvent* event) {
 
  /* ToDo: check whether this is the right place for dumping the event */
  if (RtsFlags.GranFlags.GranSimStats.Full)
-   DumpRawGranEvent(proc, creator, 
+   DumpRawGranEvent(proc, creator,
 		    GR_STOLEN, tso, (StgClosure*)NULL, (StgInt)0, 0);
 
  // ToDo: check cost functions
@@ -1371,10 +1371,10 @@ do_the_movespark(rtsEvent* event) {
  ASSERT(spark!=NULL);
  ASSERT(procStatus[proc] == Fishing ||
 	RtsFlags.GranFlags.DoAsyncFetch);
- ASSERT(OutstandingFishes[proc]>0); 
+ ASSERT(OutstandingFishes[proc]>0);
 
  CurrentTime[proc] += RtsFlags.GranFlags.Costs.munpacktime;
-          
+
  /* record movement of spark only if spark profiling is turned on */
  if (RtsFlags.GranFlags.GranSimStats.Sparks)
     DumpRawGranEvent(proc, creator,
@@ -1417,9 +1417,9 @@ do_the_movespark(rtsEvent* event) {
    - create a new thread (previously this was done in ActivateSpark);
    - insert the thread into the run queue of the current processor
    - generate a new event for actually running the new thread
-  Note that the insertThread is called via createThread. 
+  Note that the insertThread is called via createThread.
 */
-  
+
 //@cindex do_the_startthread
 
 void
@@ -1438,8 +1438,8 @@ do_the_startthread(rtsEvent *event)
   ASSERT(event->evttype!=StartThread || tso == END_TSO_QUEUE); // not yet created
   // ToDo: check: ASSERT(event->evttype!=StartThread || procStatus[proc]==Starting);
   /* if this was called via ResumeThread: */
-  ASSERT(event->evttype!=ResumeThread || 
-	   RtsFlags.GranFlags.DoAsyncFetch ||!is_on_queue(tso,proc)); 
+  ASSERT(event->evttype!=ResumeThread ||
+	   RtsFlags.GranFlags.DoAsyncFetch ||!is_on_queue(tso,proc));
 
   /* startThread may have been called from the main event handler upon
      finding either a ResumeThread or a StartThread event; set the
@@ -1447,7 +1447,7 @@ do_the_startthread(rtsEvent *event)
   // gr_evttype = (event->evttype == ResumeThread) ? GR_RESUME : GR_START;
 
   if ( event->evttype == StartThread ) {
-    GranEventType gr_evttype = (run_queue_hds[proc]==END_TSO_QUEUE) ? 
+    GranEventType gr_evttype = (run_queue_hds[proc]==END_TSO_QUEUE) ?
                                  GR_START : GR_STARTQ;
 
     tso = createThread(BLOCK_SIZE_W, spark->gran_info);// implicit insertThread!
@@ -1464,7 +1464,7 @@ do_the_startthread(rtsEvent *event)
 
     CurrentTime[proc] += RtsFlags.GranFlags.Costs.threadcreatetime;
   } else { // event->evttype == ResumeThread
-    GranEventType gr_evttype = (run_queue_hds[proc]==END_TSO_QUEUE) ? 
+    GranEventType gr_evttype = (run_queue_hds[proc]==END_TSO_QUEUE) ?
                                  GR_RESUME : GR_RESUMEQ;
 
     insertThread(tso, proc);
@@ -1477,11 +1477,11 @@ do_the_startthread(rtsEvent *event)
   ASSERT(run_queue_hds[proc]!=END_TSO_QUEUE); // non-empty run queue
   procStatus[proc] = Busy;
   /* make sure that this thread is actually run */
-  new_event(proc, proc, 
+  new_event(proc, proc,
 	    CurrentTime[proc],
 	    ContinueThread,
 	    tso, node, (rtsSpark*)NULL);
-  
+
   /* A wee bit of statistics gathering */
   if (RtsFlags.GranFlags.GranSimStats.Global) {
     globalGranStats.tot_add_threads++;
@@ -1492,7 +1492,7 @@ do_the_startthread(rtsEvent *event)
 
 //@cindex do_the_findwork
 void
-do_the_findwork(rtsEvent* event) 
+do_the_findwork(rtsEvent* event)
 {
   PEs proc = event->proc,       /* proc to search for work */
       creator = event->creator; /* proc that requested work */
@@ -1520,31 +1520,31 @@ do_the_findwork(rtsEvent* event)
  ToDo: check available heap
 
   if (Hp + req_heap > HpLim ) {
-    IF_DEBUG(gc, 
+    IF_DEBUG(gc,
 	     belch("GC: Doing GC from within Findwork handling (that's bloody dangerous if you ask me)");)
       GarbageCollect(GetRoots);
       // ReallyPerformThreadGC(req_heap, rtsFalse);   old -- HWL
       Hp -= req_heap;
-      if (procStatus[CurrentProc]==Sparking) 
+      if (procStatus[CurrentProc]==Sparking)
 	procStatus[CurrentProc]=Idle;
       return;
   }
 #endif
-  
+
   if ( RtsFlags.GranFlags.DoAlwaysCreateThreads ||
        RtsFlags.GranFlags.Fishing ||
        ((procStatus[proc]==Idle || procStatus[proc]==Sparking) &&
-	(RtsFlags.GranFlags.FetchStrategy >= 2 || 
-	 OutstandingFetches[proc] == 0)) ) 
+	(RtsFlags.GranFlags.FetchStrategy >= 2 ||
+	 OutstandingFetches[proc] == 0)) )
    {
     rtsBool found;
     rtsSparkQ  prev, spark;
-    
+
     /* ToDo: check */
     ASSERT(procStatus[proc]==Sparking ||
 	   RtsFlags.GranFlags.DoAlwaysCreateThreads ||
 	   RtsFlags.GranFlags.Fishing);
-    
+
     /* SImmoHwI' yInej! Search spark queue! */
     /* gimme_spark (event, &found, &spark); */
     findLocalSpark(event, &found, &spark);
@@ -1552,17 +1552,17 @@ do_the_findwork(rtsEvent* event)
     if (!found) { /* pagh vumwI' */
       /*
         If no spark has been found this can mean 2 things:
-	 1/ The FindWork was a fish (i.e. a message sent by another PE) and 
+	 1/ The FindWork was a fish (i.e. a message sent by another PE) and
 	    the spark pool of the receiver is empty
 	    --> the fish has to be forwarded to another PE
          2/ The FindWork was local to this PE (i.e. no communication; in this
-            case creator==proc) and the spark pool of the PE is not empty 
-	    contains only sparks of closures that should not be sparked 
-	    (note: if the spark pool were empty, handleIdlePEs wouldn't have 
+            case creator==proc) and the spark pool of the PE is not empty
+	    contains only sparks of closures that should not be sparked
+	    (note: if the spark pool were empty, handleIdlePEs wouldn't have
 	    generated a FindWork in the first place)
 	    --> the PE has to be made idle to trigger stealing sparks the next
 	        time handleIdlePEs is performed
-      */ 
+      */
 
       ASSERT(pending_sparks_hds[proc]==(rtsSpark*)NULL);
       if (creator==proc) {
@@ -1584,7 +1584,7 @@ do_the_findwork(rtsEvent* event)
 	/* any assertions on state of proc possible here? */
       }
     } else {
-      /* DaH chu' Qu' yIchen! Now create new work! */ 
+      /* DaH chu' Qu' yIchen! Now create new work! */
       IF_GRAN_DEBUG(findWork,
 		    belch("+- munching spark %p; creating thread for node %p",
 			  spark, spark->node));
@@ -1595,7 +1595,7 @@ do_the_findwork(rtsEvent* event)
 
     IF_GRAN_DEBUG(findWork,
 		  belch("+- Contents of spark queues at the end of FindWork @ %lx",
-			CurrentTime[proc]); 
+			CurrentTime[proc]);
 		  print_sparkq_stats());
 
     /* ToDo: check ; not valid if GC occurs in ActivateSpark */
@@ -1603,29 +1603,29 @@ do_the_findwork(rtsEvent* event)
 	    /* forward fish  or */
 	    (proc!=creator ||
 	    /* local spark  or */
-            (proc==creator && procStatus[proc]==Starting)) || 
+            (proc==creator && procStatus[proc]==Starting)) ||
 	   //(!found && procStatus[proc]==Idle) ||
-	   RtsFlags.GranFlags.DoAlwaysCreateThreads); 
+	   RtsFlags.GranFlags.DoAlwaysCreateThreads);
    } else {
     IF_GRAN_DEBUG(findWork,
 		  belch("+- RTS refuses to findWork on PE %d @ %lx",
 			proc, CurrentTime[proc]);
-		  belch("  procStatus[%d]=%s, fetch strategy=%d, outstanding fetches[%d]=%d", 
+		  belch("  procStatus[%d]=%s, fetch strategy=%d, outstanding fetches[%d]=%d",
 			proc, proc_status_names[procStatus[proc]],
-			RtsFlags.GranFlags.FetchStrategy, 
+			RtsFlags.GranFlags.FetchStrategy,
 			proc, OutstandingFetches[proc]));
-   }  
+   }
 }
- 
+
 //@node GranSimLight routines, Code for Fetching Nodes, GranSim functions, GranSim specific code
 //@subsection GranSimLight routines
 
-/* 
+/*
    This code is called from the central scheduler after having rgabbed a
    new event and is only needed for GranSim-Light. It mainly adjusts the
    ActiveTSO so that all costs that have to be assigned from within the
    scheduler are assigned to the right TSO. The choice of ActiveTSO depends
-   on the type of event that has been found.  
+   on the type of event that has been found.
 */
 
 void
@@ -1636,7 +1636,7 @@ StgTSO **ActiveTSOp;
   StgTSO *ActiveTSO = *ActiveTSOp;
 
   ASSERT (RtsFlags.GranFlags.Light);
-  
+
   /* Restore local clock of the virtual processor attached to CurrentTSO.
      All costs will be associated to the `virt. proc' on which the tso
      is living. */
@@ -1650,12 +1650,12 @@ StgTSO **ActiveTSOp;
       }
   }
   switch (event->evttype)
-    { 
-    case ContinueThread: 
+    {
+    case ContinueThread:
     case FindWork:       /* inaccurate this way */
       ActiveTSO = run_queue_hd;
       break;
-    case ResumeThread:   
+    case ResumeThread:
     case StartThread:
     case MoveSpark:      /* has tso of virt proc in tso field of event */
       ActiveTSO = event->tso;
@@ -1696,7 +1696,7 @@ StgTSO **ActiveTSOp;
 	RtsFlags.GranFlags.Debug.checkLight)
       DumpGranEvent(GR_SCHEDULE,run_queue_hd);
   }
-  /* 
+  /*
      if (TSO_LINK(ThreadQueueHd)!=PrelBase_Z91Z93_closure &&
      (TimeOfNextEvent == 0 ||
      TSO_CLOCK(TSO_LINK(ThreadQueueHd))+1000<TimeOfNextEvent)) {
@@ -1723,7 +1723,7 @@ StgTSO **ActiveTSOp;
    be forwarded to C. This is simulated by issuing another FetchNode event
    on processor C with A as creator.
 */
- 
+
 /* ngoqvam che' {GrAnSim}! */
 
 /* Fetch node "node" to processor "p" */
@@ -1735,7 +1735,7 @@ fetchNode(node,from,to)
 StgClosure* node;
 PEs from, to;
 {
-  /* In case of RtsFlags.GranFlags.DoBulkFetching this fct should never be 
+  /* In case of RtsFlags.GranFlags.DoBulkFetching this fct should never be
      entered! Instead, UnpackGraph is used in ReSchedule */
   StgClosure* closure;
 
@@ -1747,9 +1747,9 @@ PEs from, to;
 
   /* Now fetch the node */
   if (!IS_LOCAL_TO(PROCS(node),from) &&
-      !IS_LOCAL_TO(PROCS(node),to) ) 
+      !IS_LOCAL_TO(PROCS(node),to) )
     return NodeHasMoved;
-  
+
   if (closure_HNF(node))                /* node already in head normal form? */
     node->header.gran.procs |= PE_NUMBER(to);           /* Copy node */
   else
@@ -1758,11 +1758,11 @@ PEs from, to;
   return Ok;
 }
 
-/* 
-   Process a fetch request. 
-   
+/*
+   Process a fetch request.
+
    Cost of sending a packet of size n = C + P*n
-   where C = packet construction constant, 
+   where C = packet construction constant,
          P = cost of packing one word into a packet
    [Should also account for multiple packets].
 */
@@ -1785,7 +1785,7 @@ StgTSO* tso;        // the tso which needs the node
   if (IS_LOCAL_TO(PROCS(node), from)) /* Somebody else moved node already => */
     {                                 /* start tso */
       IF_GRAN_DEBUG(thunkStealing,
-		    fprintf(stderr,"ghuH: handleFetchRequest entered with local node %p (%s) (PE %d)\n", 
+		    fprintf(stderr,"ghuH: handleFetchRequest entered with local node %p (%s) (PE %d)\n",
 			    node, info_type(node), from));
 
       if (RtsFlags.GranFlags.DoBulkFetching) {
@@ -1793,7 +1793,7 @@ StgTSO* tso;        // the tso which needs the node
 	rtsPackBuffer *graph;
 
 	/* Create a 1-node-buffer and schedule a FETCHREPLY now */
-	graph = PackOneNode(node, tso, &size); 
+	graph = PackOneNode(node, tso, &size);
 	new_event(from, to, CurrentTime[to],
 		  FetchReply,
 		  tso, (StgClosure *)graph, (rtsSpark*)NULL);
@@ -1816,16 +1816,16 @@ StgTSO* tso;        // the tso which needs the node
 	  new_event(from, to, CurrentTime[to],
 		    GlobalBlock,
 		    tso, node, (rtsSpark*)NULL);
-	  /* Note: blockFetch is done when handling GLOBALBLOCK event; 
+	  /* Note: blockFetch is done when handling GLOBALBLOCK event;
 	           make sure the TSO stays out of the run queue */
-          /* When this thread is reawoken it does the usual: it tries to 
+          /* When this thread is reawoken it does the usual: it tries to
              enter the updated node and issues a fetch if it's remote.
              It has forgotten that it has sent a fetch already (i.e. a
              FETCHNODE is swallowed by a BH, leaving the thread in a BQ) */
           --OutstandingFetches[from];
 
 	  IF_GRAN_DEBUG(thunkStealing,
-			belch("== majQa'! closure %p on PE %d is a BH (demander=PE %d); faking a FMBQ", 
+			belch("== majQa'! closure %p on PE %d is a BH (demander=PE %d); faking a FMBQ",
 			      node, to, from));
 	  if (RtsFlags.GranFlags.GranSimStats.Global) {
 	    globalGranStats.tot_FMBQs++;
@@ -1835,9 +1835,9 @@ StgTSO* tso;        // the tso which needs the node
 
 	/* The tso requesting the node is blocked and cannot be on a run queue */
 	ASSERT(!is_on_queue(tso, from));
-	
+
 	// ToDo: check whether graph is ever used as an rtsPackBuffer!!
-	if ((graph = (StgClosure *)PackNearbyGraph(node, tso, &size, 0)) == NULL) 
+	if ((graph = (StgClosure *)PackNearbyGraph(node, tso, &size, 0)) == NULL)
 	  return (OutOfHeap);  /* out of heap */
 
 	/* Actual moving/copying of node is done on arrival; see FETCHREPLY */
@@ -1849,7 +1849,7 @@ StgTSO* tso;        // the tso which needs the node
 		  CurrentTime[to]+RtsFlags.GranFlags.Costs.latency,
 		  FetchReply,
 		  tso, (StgClosure *)graph, (rtsSpark*)NULL);
-        
+
 	CurrentTime[to] += RtsFlags.GranFlags.Costs.mtidytime;
 	return (Ok);
       } else {                   /* incremental (single closure) fetching */
@@ -1861,13 +1861,13 @@ StgTSO* tso;        // the tso which needs the node
 		  CurrentTime[to]+RtsFlags.GranFlags.Costs.latency,
 		  FetchReply,
 		  tso, node, (rtsSpark*)NULL);
-      
+
 	CurrentTime[to] += RtsFlags.GranFlags.Costs.mtidytime;
 	return (Ok);
       }
     }
   else       /* Qu'vatlh! node has been grabbed by another proc => forward */
-    {    
+    {
       PEs node_loc = where_is(node);
       rtsTime fetchtime;
 
@@ -1880,10 +1880,10 @@ StgTSO* tso;        // the tso which needs the node
 
       /* Prepare FORWARD message to proc p_new */
       CurrentTime[to] += RtsFlags.GranFlags.Costs.mpacktime;
-      
+
       fetchtime = stg_max(CurrentTime[to], CurrentTime[node_loc]) +
                   RtsFlags.GranFlags.Costs.latency;
-          
+
       new_event(node_loc, from, fetchtime,
 		FetchNode,
 		tso, node, (rtsSpark*)NULL);
@@ -1897,14 +1897,14 @@ StgTSO* tso;        // the tso which needs the node
 /*
    blockFetch blocks a BlockedFetch node on some kind of black hole.
 
-   Taken from gum/HLComms.lc.   [find a  better  place for that ?] --  HWL  
+   Taken from gum/HLComms.lc.   [find a  better  place for that ?] --  HWL
 
    {\bf Note:} In GranSim we don't have @FETCHME@ nodes and therefore don't
    create @FMBQ@'s (FetchMe blocking queues) to cope with global
    blocking. Instead, non-local TSO are put into the BQ in the same way as
    local TSOs. However, we have to check if a TSO is local or global in
    order to account for the latencies involved and for keeping track of the
-   number of fetches that are really going on.  
+   number of fetches that are really going on.
 */
 
 //@cindex blockFetch
@@ -1918,12 +1918,12 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
   StgInfoTable *info;
 
   IF_GRAN_DEBUG(bq,
-		fprintf(stderr,"## blockFetch: blocking TSO %p (%d)[PE %d] on node %p (%s) [PE %d]. No graph is packed!\n", 
+		fprintf(stderr,"## blockFetch: blocking TSO %p (%d)[PE %d] on node %p (%s) [PE %d]. No graph is packed!\n",
 		tso, tso->id, proc, bh, info_type(bh), where_is(bh)));
 
     if (!IS_BLACK_HOLE(bh)) {                      /* catches BHs and RBHs */
       IF_GRAN_DEBUG(bq,
-		    fprintf(stderr,"## blockFetch: node %p (%s) is not a BH => awakening TSO %p (%d) [PE %u]\n", 
+		    fprintf(stderr,"## blockFetch: node %p (%s) is not a BH => awakening TSO %p (%d) [PE %u]\n",
 			    bh, info_type(bh), tso, tso->id, proc));
 
       /* No BH anymore => immediately unblock tso */
@@ -1939,7 +1939,7 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
 
     /* DaH {BQ}Daq Qu' Suq 'e' wISov!
        Now we know that we have to put the tso into the BQ.
-       2 cases: If block-on-fetch, tso is at head of threadq => 
+       2 cases: If block-on-fetch, tso is at head of threadq =>
                 => take it out of threadq and into BQ
                 If reschedule-on-fetch, tso is only pointed to be event
                 => just put it into BQ
@@ -1984,14 +1984,14 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
 
     case BLACKHOLE_BQ:
 	/* basically an inlined version of BLACKHOLE_BQ_entry -- HWL */
-	tso->link = (StgTSO *) (((StgBlockingQueue*)bh)->blocking_queue); 
+	tso->link = (StgTSO *) (((StgBlockingQueue*)bh)->blocking_queue);
 	((StgBlockingQueue*)bh)->blocking_queue = (StgBlockingQueueElement *)tso;
 	recordMutable((StgMutClosure *)bh);
 
 # if 0 && defined(GC_MUT_REQUIRED)
 	ToDo: check whether recordMutable is necessary -- HWL
 	/*
-	 * If we modify a black hole in the old generation, we have to make 
+	 * If we modify a black hole in the old generation, we have to make
 	 * sure it goes on the mutables list
 	 */
 
@@ -2028,7 +2028,7 @@ StgClosure* bh;                     /* closure to block on (BH, RBH, BQ) */
    simplification compared to GUM's fishing model. We try to compensate for
    that by making the cost for stealing work dependent on the number of
    idle processors and thereby on the probability with which a randomly
-   sent fish would find work.  
+   sent fish would find work.
 */
 
 //@cindex handleIdlePEs
@@ -2044,7 +2044,7 @@ handleIdlePEs(void)
   ASSERT(!RtsFlags.GranFlags.Light);
 
   /* Could check whether there are idle PEs if it's a cheap check */
-  for (p = 0; p < RtsFlags.GranFlags.proc; p++) 
+  for (p = 0; p < RtsFlags.GranFlags.proc; p++)
     if (procStatus[p]==Idle)  /*  && IS_SPARKING(p) && IS_STARTING(p) */
       /* First look for local work i.e. examine local spark pool! */
       if (pending_sparks_hds[p]!=(rtsSpark *)NULL) {
@@ -2055,23 +2055,23 @@ handleIdlePEs(void)
       } else if ((RtsFlags.GranFlags.maxFishes==0 ||
 		  OutstandingFishes[p]<RtsFlags.GranFlags.maxFishes) ) {
 
-	/* If no local work then try to get remote work! 
+	/* If no local work then try to get remote work!
 	   Qu' Hopbe' pagh tu'lu'pu'chugh Qu' Hop yISuq ! */
-	if (RtsFlags.GranFlags.DoStealThreadsFirst && 
+	if (RtsFlags.GranFlags.DoStealThreadsFirst &&
 	    (RtsFlags.GranFlags.FetchStrategy >= 4 || OutstandingFetches[p] == 0))
 	  {
 	    if (SurplusThreads > 0l)                    /* Steal a thread */
 	      stealThread(p);
-          
+
 	    if (procStatus[p]!=Idle)
 	      break;
 	  }
-	
-	if (SparksAvail > 0 && 
+
+	if (SparksAvail > 0 &&
 	    (RtsFlags.GranFlags.FetchStrategy >= 3 || OutstandingFetches[p] == 0)) /* Steal a spark */
 	  stealSpark(p);
-	
-	if (SurplusThreads > 0 && 
+
+	if (SurplusThreads > 0 &&
 	    (RtsFlags.GranFlags.FetchStrategy >= 4 || OutstandingFetches[p] == 0)) /* Steal a thread */
 	  stealThread(p);
       }
@@ -2087,10 +2087,10 @@ handleIdlePEs(void)
    We model a sort of fishing mechanism by counting the number of sparks
    and threads we are currently stealing.  */
 
-/* 
-   Return a random nat value in the intervall [from, to) 
+/*
+   Return a random nat value in the intervall [from, to)
 */
-static nat 
+static nat
 natRandom(from, to)
 nat from, to;
 {
@@ -2102,13 +2102,13 @@ nat from, to;
   r = (nat) ((float)from + ((float)random()*(float)d)/(float)RAND_MAX);
   r = (r==to) ? from : r;
   ASSERT(from<=r && (r<to || from==to));
-  return r;  
+  return r;
 }
 
-/* 
+/*
    Find any PE other than proc. Used for GUM style fishing only.
 */
-static PEs 
+static PEs
 findRandomPE (proc)
 PEs proc;
 {
@@ -2123,16 +2123,16 @@ PEs proc;
   IF_GRAN_DEBUG(randomSteal,
 		belch("^^ RANDOM_STEAL (fishing): stealing from PE %d (current proc is %d)",
 		      p, proc));
-    
+
   return (PEs)p;
 }
 
 /*
   Magic code for stealing sparks/threads makes use of global knowledge on
-  spark queues.  
+  spark queues.
 */
 static void
-sortPEsByTime (proc, pes_by_time, firstp, np) 
+sortPEsByTime (proc, pes_by_time, firstp, np)
 PEs proc;
 PEs *pes_by_time;
 nat *firstp, *np;
@@ -2142,7 +2142,7 @@ nat *firstp, *np;
 
   ASSERT(!RtsFlags.GranFlags.Fishing);
 
-#if 0  
+#if 0
   upb = RtsFlags.GranFlags.proc;            /* full range of PEs */
 
   if (RtsFlags.GranFlags.RandomSteal) {
@@ -2152,7 +2152,7 @@ nat *firstp, *np;
   }
 #endif
 
-  /* pes_by_time shall contain processors from which we may steal sparks */ 
+  /* pes_by_time shall contain processors from which we may steal sparks */
   for(n=0, p=0; p < RtsFlags.GranFlags.proc; ++p)
     if ((proc != p) &&                       // not the current proc
         (pending_sparks_hds[p] != (rtsSpark *)NULL) && // non-empty spark pool
@@ -2170,7 +2170,7 @@ nat *firstp, *np;
 
   /* Choose random processor to steal spark from; first look at processors */
   /* that are earlier than the current one (i.e. proc) */
-  for(first=0; 
+  for(first=0;
       (first < n) && (CurrentTime[pes_by_time[first]] <= CurrentTime[proc]);
       ++first)
     /* nothing */ ;
@@ -2183,21 +2183,21 @@ nat *firstp, *np;
   *np = n;
 }
 
-/* 
+/*
    Steal a spark (piece of work) from any processor and bring it to proc.
 */
 //@cindex stealSpark
-static rtsBool 
+static rtsBool
 stealSpark(PEs proc) { stealSomething(proc, rtsTrue, rtsFalse); }
 
-/* 
+/*
    Steal a thread from any processor and bring it to proc i.e. thread migration
 */
 //@cindex stealThread
-static rtsBool 
+static rtsBool
 stealThread(PEs proc) { stealSomething(proc, rtsFalse, rtsTrue); }
 
-/* 
+/*
    Steal a spark or a thread and schedule moving it to proc.
 */
 //@cindex stealSomething
@@ -2226,7 +2226,7 @@ rtsBool steal_spark, steal_thread;  // should a spark and/or thread be stolen
 	if (steal_thread)
 	  return stealThreadMagic(proc);
         else                           // no thread found
-	  return rtsFalse;             
+	  return rtsFalse;
     } else {                           // ASSERT(steal_thread);
       return stealThreadMagic(proc);
     }
@@ -2234,12 +2234,12 @@ rtsBool steal_spark, steal_thread;  // should a spark and/or thread be stolen
   }
 
   /* The rest of this function does GUM style fishing */
-  
+
   p = findRandomPE(proc); /* find a random PE other than proc */
-  
+
   /* Message packing costs for sending a Fish; qeq jabbI'ID */
   CurrentTime[proc] += RtsFlags.GranFlags.Costs.mpacktime;
-  
+
   /* use another GranEvent for requesting a thread? */
   if (steal_spark && RtsFlags.GranFlags.GranSimStats.Sparks)
     DumpRawGranEvent(p, proc, SP_REQUESTED,
@@ -2247,7 +2247,7 @@ rtsBool steal_spark, steal_thread;  // should a spark and/or thread be stolen
 
   /* time of the fish arrival on the remote PE */
   fish_arrival_time = CurrentTime[proc] + RtsFlags.GranFlags.Costs.latency;
-  
+
   /* Phps use an own Fish event for that? */
   /* The contents of the spark component is a HACK:
       1 means give me a spark;
@@ -2256,14 +2256,14 @@ rtsBool steal_spark, steal_thread;  // should a spark and/or thread be stolen
   */
   new_event(p, proc, fish_arrival_time,
 	    FindWork,
-	    (StgTSO*)NULL, (StgClosure*)NULL, 
+	    (StgTSO*)NULL, (StgClosure*)NULL,
 	    (steal_spark ? (rtsSpark*)1 : steal_thread ? (rtsSpark*)2 : (rtsSpark*)0));
-  
+
   ++OutstandingFishes[proc];
   /* only with Async fetching? */
-  if (procStatus[proc]==Idle)  
+  if (procStatus[proc]==Idle)
     procStatus[proc]=Fishing;
-  
+
   /* time needed to clean up buffers etc after sending a message */
   CurrentTime[proc] += RtsFlags.GranFlags.Costs.mtidytime;
 
@@ -2273,7 +2273,7 @@ rtsBool steal_spark, steal_thread;  // should a spark and/or thread be stolen
   return rtsTrue;
 }
 
-/* 
+/*
    This version of stealing a spark makes use of the global info on all
    spark pools etc which is not available in a real parallel system.
    This could be extended to test e.g. the impact of perfect load information.
@@ -2302,27 +2302,27 @@ PEs proc;
     IF_GRAN_DEBUG(randomSteal,
 		  belch("^^ stealSparkMagic (random_steal, not fishing): stealing spark from PE %d (current proc is %d)",
 			p, proc));
-      
+
     ASSERT(pending_sparks_hds[p]!=(rtsSpark *)NULL); /* non-empty spark pool */
 
     /* Now go through rtsSparkQ and steal the first eligible spark */
-    
-    spark = pending_sparks_hds[p]; 
+
+    spark = pending_sparks_hds[p];
     while (!stolen && spark != (rtsSpark*)NULL)
       {
-	/* NB: no prev pointer is needed here because all sparks that are not 
+	/* NB: no prev pointer is needed here because all sparks that are not
 	   chosen are pruned
 	*/
 	if ((procStatus[p]==Idle || procStatus[p]==Sparking || procStatus[p] == Fishing) &&
-	    spark->next==(rtsSpark*)NULL) 
+	    spark->next==(rtsSpark*)NULL)
 	  {
-	    /* Be social! Don't steal the only spark of an idle processor 
+	    /* Be social! Don't steal the only spark of an idle processor
 	       not {spark} neH yInIH !! */
 	    break; /* next PE */
-	  } 
+	  }
 	else if (closure_SHOULD_SPARK(spark->node))
 	  {
-	    /* Don't Steal local sparks; 
+	    /* Don't Steal local sparks;
 	       ToDo: optionally prefer local over global sparks
 	    if (!spark->global) {
 	      prev=spark;
@@ -2339,15 +2339,15 @@ PEs proc;
 			       (StgTSO*)NULL, spark->node,
 			       spark->name, spark_queue_len(p));
 
-	    stealtime = (CurrentTime[p] > CurrentTime[proc] ? 
-			   CurrentTime[p] : 
+	    stealtime = (CurrentTime[p] > CurrentTime[proc] ?
+			   CurrentTime[p] :
 			   CurrentTime[proc])
 	                + sparkStealTime();
 
 	    new_event(proc, p /* CurrentProc */, stealtime,
 		      MoveSpark,
 		      (StgTSO*)NULL, spark->node, spark);
-	    
+
 	    stolen = rtsTrue;
 	    ++OutstandingFishes[proc]; /* no. of sparks currently on the fly */
 	    if (procStatus[proc]==Idle)
@@ -2372,7 +2372,7 @@ PEs proc;
 			       spark->name, spark_queue_len(p));
 	    if (RtsFlags.GranFlags.GranSimStats.Global)
 	      globalGranStats.pruned_sparks++;
-	    
+
 	    ASSERT(SparksAvail>0);
 	    --SparksAvail;
 	    spark = delete_from_sparkq(spark, p, rtsTrue);
@@ -2380,11 +2380,11 @@ PEs proc;
 	/* unlink spark (may have been freed!) from sparkq;
 	if (prev == NULL) // spark was head of spark queue
 	  pending_sparks_hds[p] = spark->next;
-        else  
+        else
 	  prev->next = spark->next;
 	if (spark->next == NULL)
 	  pending_sparks_tls[p] = prev;
-        else  
+        else
 	  next->prev = prev;
 	*/
       }                    /* while ...    iterating over sparkq */
@@ -2398,22 +2398,22 @@ PEs proc;
       for (j=i; j+1<n; j++)
 	pes_by_time[j] = pes_by_time[j+1];
       n--;
-      
+
       /* update index to first proc which is later (or equal) than proc */
       for ( ;
 	    (first>0) &&
 	      (CurrentTime[pes_by_time[first-1]]>CurrentTime[proc]);
 	    first--)
 	/* nothing */ ;
-    } 
+    }
   }  /* while ... iterating over PEs in pes_by_time */
 
   IF_GRAN_DEBUG(randomSteal,
 		if (stolen)
 		  belch("^^ stealSparkMagic: spark %p (node=%p) stolen by PE %d from PE %d (SparksAvail=%d; idlers=%d)",
-		       spark, spark->node, proc, p, 
+		       spark, spark->node, proc, p,
 		       SparksAvail, idlers());
-		else  
+		else
 		  belch("^^ stealSparkMagic: nothing stolen by PE %d (sparkq len after pruning=%d)(SparksAvail=%d; idlers=%d)",
 		        proc, SparksAvail, idlers()));
 
@@ -2428,12 +2428,12 @@ PEs proc;
   return stolen;
 }
 
-/* 
+/*
    The old stealThread code, which makes use of global info and does not
-   send out fishes.  
+   send out fishes.
    NB: most of this is the same as in stealSparkMagic;
-       only the pieces specific to processing thread queues are different; 
-       long live polymorphism!  
+       only the pieces specific to processing thread queues are different;
+       long live polymorphism!
 */
 
 //@cindex stealThreadMagic
@@ -2460,7 +2460,7 @@ PEs proc;
     IF_GRAN_DEBUG(randomSteal,
 		  belch("^^ stealThreadMagic (random_steal, not fishing): stealing thread from PE %d (current proc is %d)",
 			p, proc));
-      
+
     /* Steal the first exportable thread in the runnable queue but
        never steal the first in the queue for social reasons;
        not Qu' wa'DIch yInIH !!
@@ -2469,7 +2469,7 @@ PEs proc;
        the threads to pick when stealing */
     if (run_queue_hds[p] == END_TSO_QUEUE) {
       IF_GRAN_DEBUG(randomSteal,
-		    belch("^^ stealThreadMagic: No thread to steal from PE %d (stealer=PE %d)", 
+		    belch("^^ stealThreadMagic: No thread to steal from PE %d (stealer=PE %d)",
 			  p, proc));
     } else {
       tso = run_queue_hds[p]->link;  /* tso is *2nd* thread in thread queue */
@@ -2480,20 +2480,20 @@ PEs proc;
       run_queue_hds[p]->link = tso->link;
       if (run_queue_tls[p] == tso)
 	run_queue_tls[p] = run_queue_hds[p];
-      
+
       /* ToDo: Turn magic constants into params */
-      
+
       CurrentTime[p] += 5l * RtsFlags.GranFlags.Costs.mpacktime;
-      
-      stealtime = (CurrentTime[p] > CurrentTime[proc] ? 
-		   CurrentTime[p] : 
+
+      stealtime = (CurrentTime[p] > CurrentTime[proc] ?
+		   CurrentTime[p] :
 		   CurrentTime[proc])
-	+ sparkStealTime() 
+	+ sparkStealTime()
 	+ 4l * RtsFlags.GranFlags.Costs.additional_latency
 	+ 5l * RtsFlags.GranFlags.Costs.munpacktime;
 
       /* Move the thread; set bitmask to 0 while TSO is `on-the-fly' */
-      SET_GRAN_HDR(tso,Nowhere /* PE_NUMBER(proc) */); 
+      SET_GRAN_HDR(tso,Nowhere /* PE_NUMBER(proc) */);
 
       /* Move from one queue to another */
       new_event(proc, p, stealtime,
@@ -2507,10 +2507,10 @@ PEs proc;
       --SurplusThreads;
 
       if(RtsFlags.GranFlags.GranSimStats.Full)
-	DumpRawGranEvent(p, proc, 
-			 GR_STEALING, 
+	DumpRawGranEvent(p, proc,
+			 GR_STEALING,
 			 tso, (StgClosure*)NULL, (StgInt)0, 0);
-      
+
       /* costs for tidying up buffer after having sent it */
       CurrentTime[p] += 5l * RtsFlags.GranFlags.Costs.mtidytime;
     }
@@ -2524,14 +2524,14 @@ PEs proc;
       for (j=i; j+1<n; j++)
 	pes_by_time[j] = pes_by_time[j+1];
       n--;
-      
+
       /* update index to first proc which is later (or equal) than proc */
       for ( ;
 	    (first>0) &&
 	      (CurrentTime[pes_by_time[first-1]]>CurrentTime[proc]);
 	    first--)
 	/* nothing */ ;
-    } 
+    }
   }  /* while ... iterating over PEs in pes_by_time */
 
   IF_GRAN_DEBUG(randomSteal,
@@ -2559,7 +2559,7 @@ sparkStealTime(void)
 {
   double fishdelay, sparkdelay, latencydelay;
   fishdelay =  (double)RtsFlags.GranFlags.proc/2;
-  sparkdelay = fishdelay - 
+  sparkdelay = fishdelay -
           ((fishdelay-1.0)/(double)(RtsFlags.GranFlags.proc-1))*((double)idlers());
   latencydelay = sparkdelay*((double)RtsFlags.GranFlags.Costs.latency);
 
@@ -2568,22 +2568,22 @@ sparkStealTime(void)
 
 //@node Routines directly called from Haskell world, Emiting profiling info for GrAnSim, Idle PEs, GranSim specific code
 //@subsection Routines directly called from Haskell world
-/* 
+/*
 The @GranSim...@ routines in here are directly called via macros from the
-threaded world. 
+threaded world.
 
 First some auxiliary routines.
 */
 
-/* Take the current thread off the thread queue and thereby activate the 
-   next thread. It's assumed that the next ReSchedule after this uses 
-   NEW_THREAD as param. 
-   This fct is called from GranSimBlock and GranSimFetch 
+/* Take the current thread off the thread queue and thereby activate the
+   next thread. It's assumed that the next ReSchedule after this uses
+   NEW_THREAD as param.
+   This fct is called from GranSimBlock and GranSimFetch
 */
 
 //@cindex ActivateNextThread
 
-void 
+void
 ActivateNextThread (proc)
 PEs proc;
 {
@@ -2591,8 +2591,8 @@ PEs proc;
   /*
     This routine is entered either via GranSimFetch or via GranSimBlock.
     It has to prepare the CurrentTSO for being blocked and update the
-    run queue and other statistics on PE proc. The actual enqueuing to the 
-    blocking queue (if coming from GranSimBlock) is done in the entry code 
+    run queue and other statistics on PE proc. The actual enqueuing to the
+    blocking queue (if coming from GranSimBlock) is done in the entry code
     of the BLACKHOLE and BLACKHOLE_BQ closures (see StgMiscClosures.hc).
   */
   /* ToDo: add assertions here!! */
@@ -2608,21 +2608,21 @@ PEs proc;
   } else {
     /* ToDo: check cost assignment */
     CurrentTime[proc] += RtsFlags.GranFlags.Costs.threadcontextswitchtime;
-    if (RtsFlags.GranFlags.GranSimStats.Full && 
-	(!RtsFlags.GranFlags.Light || RtsFlags.GranFlags.Debug.checkLight)) 
-                                      /* right flag !?? ^^^ */ 
+    if (RtsFlags.GranFlags.GranSimStats.Full &&
+	(!RtsFlags.GranFlags.Light || RtsFlags.GranFlags.Debug.checkLight))
+                                      /* right flag !?? ^^^ */
       DumpRawGranEvent(proc, 0, GR_SCHEDULE, run_queue_hds[proc],
                        (StgClosure*)NULL, (StgInt)0, 0);
   }
 }
 
-/* 
-   The following GranSim fcts are stg-called from the threaded world.    
+/*
+   The following GranSim fcts are stg-called from the threaded world.
 */
 
 /* Called from HP_CHK and friends (see StgMacros.h)  */
 //@cindex GranSimAllocate
-void 
+void
 GranSimAllocate(n)
 StgInt n;
 {
@@ -2633,7 +2633,7 @@ StgInt n;
       DumpRawGranEvent(CurrentProc, 0, GR_ALLOC, CurrentTSO,
                        (StgClosure*)NULL, (StgInt)0, n);
   }
-  
+
   CurrentTSO->gran.exectime += RtsFlags.GranFlags.Costs.heapalloc_cost;
   CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.heapalloc_cost;
 }
@@ -2643,34 +2643,34 @@ StgInt n;
   so has to be redone.
 */
 //@cindex GranSimUnallocate
-void 
+void
 GranSimUnallocate(n)
 StgInt n;
 {
   CurrentTSO->gran.allocs -= n;
   --(CurrentTSO->gran.basicblocks);
-  
+
   CurrentTSO->gran.exectime -= RtsFlags.GranFlags.Costs.heapalloc_cost;
   CurrentTime[CurrentProc] -= RtsFlags.GranFlags.Costs.heapalloc_cost;
 }
 
 /* NB: We now inline this code via GRAN_EXEC rather than calling this fct */
 //@cindex GranSimExec
-void 
+void
 GranSimExec(ariths,branches,loads,stores,floats)
 StgWord ariths,branches,loads,stores,floats;
 {
-  StgWord cost = RtsFlags.GranFlags.Costs.arith_cost*ariths + 
-            RtsFlags.GranFlags.Costs.branch_cost*branches + 
+  StgWord cost = RtsFlags.GranFlags.Costs.arith_cost*ariths +
+            RtsFlags.GranFlags.Costs.branch_cost*branches +
             RtsFlags.GranFlags.Costs.load_cost * loads +
-            RtsFlags.GranFlags.Costs.store_cost*stores + 
+            RtsFlags.GranFlags.Costs.store_cost*stores +
             RtsFlags.GranFlags.Costs.float_cost*floats;
 
   CurrentTSO->gran.exectime += cost;
   CurrentTime[CurrentProc] += cost;
 }
 
-/* 
+/*
    Fetch the node if it isn't local
    -- result indicates whether fetch has been done.
 
@@ -2678,21 +2678,21 @@ StgWord ariths,branches,loads,stores,floats;
 */
 
 //@cindex GranSimFetch
-StgInt 
+StgInt
 GranSimFetch(node /* , liveness_mask */ )
 StgClosure *node;
 /* StgInt liveness_mask; */
 {
   /* reset the return value (to be checked within STG land) */
-  NeedToReSchedule = rtsFalse;   
+  NeedToReSchedule = rtsFalse;
 
   if (RtsFlags.GranFlags.Light) {
      /* Always reschedule in GrAnSim-Light to prevent one TSO from
-        running off too far 
+        running off too far
      new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
 	      ContinueThread,CurrentTSO,node,NULL);
      */
-     return(0); 
+     return(0);
   }
 
   /* Faking an RBH closure:
@@ -2700,16 +2700,16 @@ StgClosure *node;
   */
   if (node->header.gran.procs == Nowhere) {
     IF_GRAN_DEBUG(bq,
-		  belch("## Found fake RBH (node %p); delaying TSO %d (%p)", 
+		  belch("## Found fake RBH (node %p); delaying TSO %d (%p)",
 			node, CurrentTSO->id, CurrentTSO));
-		  
+
     new_event(CurrentProc, CurrentProc, CurrentTime[CurrentProc]+10000,
 	      ContinueThread, CurrentTSO, node, (rtsSpark*)NULL);
 
     /* Rescheduling (GranSim internal) is necessary */
     NeedToReSchedule = rtsTrue;
-    
-    return(1); 
+
+    return(1);
   }
 
   /* Note: once a node has been fetched, this test will be passed */
@@ -2717,48 +2717,48 @@ StgClosure *node;
     {
       PEs p = where_is(node);
       rtsTime fetchtime;
-      
+
       IF_GRAN_DEBUG(thunkStealing,
-		    if (p==CurrentProc) 
+		    if (p==CurrentProc)
 		      belch("GranSimFetch: Trying to fetch from own processor%u\n", p););
-      
+
       CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mpacktime;
       /* NB: Fetch is counted on arrival (FetchReply) */
-      
+
       fetchtime = stg_max(CurrentTime[CurrentProc],CurrentTime[p]) +
 	RtsFlags.GranFlags.Costs.latency;
-      
+
       new_event(p, CurrentProc, fetchtime,
 		FetchNode, CurrentTSO, node, (rtsSpark*)NULL);
-      
+
       if (fetchtime<TimeOfNextEvent)
 	TimeOfNextEvent = fetchtime;
-      
+
       /* About to block */
       CurrentTSO->gran.blockedat = CurrentTime[CurrentProc];
-      
+
       ++OutstandingFetches[CurrentProc];
-      
-      if (RtsFlags.GranFlags.DoAsyncFetch) 
+
+      if (RtsFlags.GranFlags.DoAsyncFetch)
 	/* if asynchr comm is turned on, activate the next thread in the q */
 	ActivateNextThread(CurrentProc);
       else
 	procStatus[CurrentProc] = Fetching;
 
-#if 0 
+#if 0
       /* ToDo: nuke the entire if (anything special for fair schedule?) */
-      if (RtsFlags.GranFlags.DoAsyncFetch) 
+      if (RtsFlags.GranFlags.DoAsyncFetch)
 	{
 	  /* Remove CurrentTSO from the queue -- assumes head of queue == CurrentTSO */
 	  if(!RtsFlags.GranFlags.DoFairSchedule)
 	    {
-	      /* now done in do_the_fetchnode 
+	      /* now done in do_the_fetchnode
 	      if (RtsFlags.GranFlags.GranSimStats.Full)
 		DumpRawGranEvent(CurrentProc, p, GR_FETCH, CurrentTSO,
 				 node, (StgInt)0, 0);
-	      */				
+	      */
 	      ActivateNextThread(CurrentProc);
-              
+
 # if 0 && defined(GRAN_CHECK)
 	      if (RtsFlags.GranFlags.Debug.blockOnFetch_sanity) {
 		if (TSO_TYPE(CurrentTSO) & FETCH_MASK_TSO) {
@@ -2772,7 +2772,7 @@ StgClosure *node;
 # endif
 	      CurrentTSO->link = END_TSO_QUEUE;
 	      /* CurrentTSO = END_TSO_QUEUE; */
-	      
+
 	      /* CurrentTSO is pointed to by the FetchNode event; it is
 		 on no run queue any more */
 	  } else {  /* fair scheduling currently not supported -- HWL */
@@ -2780,28 +2780,28 @@ StgClosure *node;
 	  }
 	} else {                /* !RtsFlags.GranFlags.DoAsyncFetch */
 	  procStatus[CurrentProc] = Fetching; // ToDo: BlockedOnFetch;
-	  /* now done in do_the_fetchnode 
+	  /* now done in do_the_fetchnode
 	  if (RtsFlags.GranFlags.GranSimStats.Full)
 	    DumpRawGranEvent(CurrentProc, p,
 			     GR_FETCH, CurrentTSO, node, (StgInt)0, 0);
 	  */
-	  IF_GRAN_DEBUG(blockOnFetch, 
+	  IF_GRAN_DEBUG(blockOnFetch,
 			BlockedOnFetch[CurrentProc] = CurrentTSO;); /*- rtsTrue; -*/
 	}
 #endif /* 0 */
 
       CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mtidytime;
-      
+
       /* Rescheduling (GranSim internal) is necessary */
       NeedToReSchedule = rtsTrue;
-      
-      return(1); 
+
+      return(1);
     }
   return(0);
 }
 
 //@cindex GranSimSpark
-void 
+void
 GranSimSpark(local,node)
 StgInt local;
 StgClosure *node;
@@ -2827,7 +2827,7 @@ StgClosure *node;
 }
 
 //@cindex GranSimSparkAt
-void 
+void
 GranSimSparkAt(spark,where,identifier)
 rtsSpark *spark;
 StgClosure *where;    /* This should be a node; alternatively could be a GA */
@@ -2838,10 +2838,10 @@ StgInt identifier;
 }
 
 //@cindex GranSimSparkAtAbs
-void 
+void
 GranSimSparkAtAbs(spark,proc,identifier)
 rtsSpark *spark;
-PEs proc;        
+PEs proc;
 StgInt identifier;
 {
   rtsTime exporttime;
@@ -2856,7 +2856,7 @@ StgInt identifier;
 
   if (proc!=CurrentProc) {
     CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mpacktime;
-    exporttime = (CurrentTime[proc] > CurrentTime[CurrentProc]? 
+    exporttime = (CurrentTime[proc] > CurrentTime[CurrentProc]?
                   CurrentTime[proc]: CurrentTime[CurrentProc])
                  + RtsFlags.GranFlags.Costs.latency;
   } else {
@@ -2889,33 +2889,33 @@ StgInt identifier;
   if (proc!=CurrentProc) {
     CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mtidytime;
     ++CurrentTSO->gran.globalsparks;
-  } else { 
+  } else {
     ++CurrentTSO->gran.localsparks;
   }
 }
 
-/* 
+/*
    This function handles local and global blocking.  It's called either
    from threaded code (RBH_entry, BH_entry etc) or from blockFetch when
-   trying to fetch an BH or RBH 
+   trying to fetch an BH or RBH
 */
 
 //@cindex GranSimBlock
-void 
+void
 GranSimBlock(tso, proc, node)
 StgTSO *tso;
 PEs proc;
 StgClosure *node;
 {
-  PEs node_proc = where_is(node), 
+  PEs node_proc = where_is(node),
       tso_proc = where_is((StgClosure *)tso);
 
   ASSERT(tso_proc==CurrentProc);
   // ASSERT(node_proc==CurrentProc);
   IF_GRAN_DEBUG(bq,
-		if (node_proc!=CurrentProc) 
+		if (node_proc!=CurrentProc)
 		  belch("## ghuH: TSO %d (%lx) [PE %d] blocks on non-local node %p [PE %d] (no simulation of FETCHMEs)",
-		        tso->id, tso, tso_proc, node, node_proc)); 
+		        tso->id, tso, tso_proc, node, node_proc));
   ASSERT(tso->link==END_TSO_QUEUE);
   ASSERT(!is_on_queue(tso,proc)); // tso must not be on run queue already!
   //ASSERT(tso==run_queue_hds[proc]);
@@ -2928,11 +2928,11 @@ StgClosure *node;
     /* THIS SHOULD NEVER HAPPEN!
        If tso tries to block on a remote node (i.e. node_proc!=CurrentProc)
        we have missed a GranSimFetch before entering this closure;
-       we hack around it for now, faking a FetchNode; 
+       we hack around it for now, faking a FetchNode;
        because GranSimBlock is entered via a BLACKHOLE(_BQ) closure,
        tso will be blocked on this closure until the FetchReply occurs.
 
-       ngoq Dogh! 
+       ngoq Dogh!
 
     if (node_proc!=CurrentProc) {
       StgInt ret;
@@ -3001,7 +3001,7 @@ StgClosure *node;
 //* prepend_event::  @cindex\s-+prepend_event
 //* print_event::  @cindex\s-+print_event
 //* print_eventq::  @cindex\s-+print_eventq
-//* prune_eventq ::  @cindex\s-+prune_eventq 
+//* prune_eventq ::  @cindex\s-+prune_eventq
 //* spark queue::  @cindex\s-+spark queue
 //* sparkStealTime::  @cindex\s-+sparkStealTime
 //* stealSomething::  @cindex\s-+stealSomething

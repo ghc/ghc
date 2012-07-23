@@ -53,7 +53,7 @@ import GHC.Stack
 import System.Mem.Weak  ( Weak, deRefWeak )
 #endif
 
--- | GHC's own exception type
+-- | GHC's own exception type 
 --   error messages all take the form:
 --
 --  @

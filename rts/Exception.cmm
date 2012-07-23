@@ -20,7 +20,7 @@ import ghczmprim_GHCziTypes_True_closure;
 
    A thread can request that asynchronous exceptions not be delivered
    ("blocked") for the duration of an I/O computation.  The primitive
-   
+
 	maskAsyncExceptions# :: IO a -> IO a
 
    is used for this purpose.  During a blocked section, asynchronous
@@ -61,7 +61,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL)
     if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
 
         STK_CHK_GEN( WDS(2), R1_PTR, stg_unmaskAsyncExceptionszh_ret_info);
-        /* 
+        /*
          * We have to be very careful here, as in killThread#, since
          * we are about to raise an async exception in the current
          * thread, which might result in the thread being killed.
@@ -70,7 +70,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL)
         Sp(1) = R1;
         Sp(0) = stg_gc_unpt_r1_info;
         SAVE_THREAD_STATE();
-        (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+        (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr",
     					              CurrentTSO "ptr") [R1];
 
         if (r != 0::CInt) {
@@ -86,8 +86,8 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL)
             /*
                the thread might have been removed from the
                blocked_exception list by someone else in the meantime.
-               Just restore the stack pointer and continue.  
-            */   
+               Just restore the stack pointer and continue.
+            */
             Sp_adj(2);
         }
     }
@@ -98,7 +98,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL)
 
 INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL)
 {
-    StgTSO_flags(CurrentTSO) = 
+    StgTSO_flags(CurrentTSO) =
        %lobits32(
 	 TO_W_(StgTSO_flags(CurrentTSO))
           | TSO_BLOCKEX | TSO_INTERRUPTIBLE
@@ -110,7 +110,7 @@ INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL)
 
 INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL)
 {
-    StgTSO_flags(CurrentTSO) = 
+    StgTSO_flags(CurrentTSO) =
        %lobits32(
 	(TO_W_(StgTSO_flags(CurrentTSO))
           | TSO_BLOCKEX)
@@ -208,7 +208,7 @@ stg_unmaskAsyncExceptionszh
 
         /* Eagerly raise a blocked exception, if there is one */
         if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
-            /* 
+            /*
              * We have to be very careful here, as in killThread#, since
              * we are about to raise an async exception in the current
              * thread, which might result in the thread being killed.
@@ -225,7 +225,7 @@ stg_unmaskAsyncExceptionszh
             Sp(0) = stg_enter_info;
 
             SAVE_THREAD_STATE();
-            (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+            (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr",
 						      CurrentTSO "ptr") [R1];
 
             if (r != 0::CInt) {
@@ -252,7 +252,7 @@ stg_unmaskAsyncExceptionszh
 stg_getMaskingStatezh
 {
     /* args: none */
-    /* 
+    /*
        returns: 0 == unmasked,
                 1 == masked, non-interruptible,
                 2 == masked, interruptible
@@ -261,67 +261,73 @@ stg_getMaskingStatezh
           ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0));
 }
 
+stg_killSContzh
+{
+  /* args: R1 = SCont to kill, R2 = Exception */
+  jump stg_killThreadzh;
+}
+
 stg_killThreadzh
 {
-    /* args: R1 = TSO to kill, R2 = Exception */
+  /* args: R1 = TSO to kill, R2 = Exception */
 
-    W_ why_blocked;
-    W_ target;
-    W_ exception;
-    
-    target = R1;
-    exception = R2;
-    
-    /* Needs 3 words because throwToSingleThreaded uses some stack */
-    STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, stg_killThreadzh);
-    /* We call allocate in throwTo(), so better check for GC */
-    MAYBE_GC(R1_PTR & R2_PTR, stg_killThreadzh);
+  W_ why_blocked;
+  W_ target;
+  W_ exception;
 
-    /* 
-     * We might have killed ourselves.  In which case, better be *very*
-     * careful.  If the exception killed us, then return to the scheduler.
-     * If the exception went to a catch frame, we'll just continue from
-     * the handler.
+  target = R1;
+  exception = R2;
+
+  /* Needs 3 words because throwToSingleThreaded uses some stack */
+  STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, stg_killThreadzh);
+  /* We call allocate in throwTo(), so better check for GC */
+  MAYBE_GC(R1_PTR & R2_PTR, stg_killThreadzh);
+
+  /*
+   * We might have killed ourselves.  In which case, better be *very*
+   * careful.  If the exception killed us, then return to the scheduler.
+   * If the exception went to a catch frame, we'll just continue from
+   * the handler.
+   */
+  if (target == CurrentTSO) {
+    /*
+     * So what should happen if a thread calls "throwTo self" inside
+     * unsafePerformIO, and later the closure is evaluated by another
+     * thread?  Presumably it should behave as if throwTo just returned,
+     * and then continue from there.  See #3279, #3288.  This is what
+     * happens: on resumption, we will just jump to the next frame on
+     * the stack, which is the return point for stg_killThreadzh.
      */
-    if (target == CurrentTSO) {
-        /*
-         * So what should happen if a thread calls "throwTo self" inside
-         * unsafePerformIO, and later the closure is evaluated by another
-         * thread?  Presumably it should behave as if throwTo just returned,
-         * and then continue from there.  See #3279, #3288.  This is what
-         * happens: on resumption, we will just jump to the next frame on
-         * the stack, which is the return point for stg_killThreadzh.
-         */
-	SAVE_THREAD_STATE();
-	/* ToDo: what if the current thread is blocking exceptions? */
-	foreign "C" throwToSingleThreaded(MyCapability() "ptr", 
-					  target "ptr", exception "ptr")[R1,R2];
-	if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-            jump stg_threadFinished;
-	} else {
-	    LOAD_THREAD_STATE();
-	    ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
-	    jump %ENTRY_CODE(Sp(0));
-	}
+    SAVE_THREAD_STATE();
+    /* ToDo: what if the current thread is blocking exceptions? */
+    foreign "C" throwToSingleThreaded(MyCapability() "ptr",
+                                      target "ptr", exception "ptr")[R1,R2];
+    if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+      jump stg_threadFinished;
     } else {
-	W_ out;
-	W_ msg;
-	out = Sp - WDS(1); /* ok to re-use stack space here */
-
-	(msg) = foreign "C" throwTo(MyCapability() "ptr",
-                                    CurrentTSO "ptr",
-                                    target "ptr",
-                                    exception "ptr") [R1,R2];
-	
-        if (msg == NULL) {
-	    jump %ENTRY_CODE(Sp(0));
-	} else {
-            StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
-            StgTSO_block_info(CurrentTSO) = msg;
-	    // we must block, and unlock the message before returning
-	    jump stg_block_throwto;
-	}
+      LOAD_THREAD_STATE();
+      ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+      jump %ENTRY_CODE(Sp(0));
     }
+  } else {
+    W_ out;
+    W_ msg;
+    out = Sp - WDS(1); /* ok to re-use stack space here */
+
+    (msg) = foreign "C" throwTo(MyCapability() "ptr",
+                                CurrentTSO "ptr",
+                                target "ptr",
+                                exception "ptr") [R1,R2];
+
+    if (msg == NULL) {
+      jump %ENTRY_CODE(Sp(0));
+    } else {
+      StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
+      StgTSO_block_info(CurrentTSO) = msg;
+      // we must block, and unlock the message before returning
+      jump stg_block_throwto;
+    }
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -366,13 +372,13 @@ stg_catchzh
 {
     /* args: R1 = m :: IO a, R2 = handler :: Exception -> IO a */
     STK_CHK_GEN(SIZEOF_StgCatchFrame + WDS(1), R1_PTR & R2_PTR, stg_catchzh);
-  
+
     /* Set up the catch frame */
     Sp = Sp - SIZEOF_StgCatchFrame;
     SET_HDR(Sp,stg_catch_frame_info,CCCS);
-    
+
     StgCatchFrame_handler(Sp) = R2;
-    StgCatchFrame_exceptions_blocked(Sp) = 
+    StgCatchFrame_exceptions_blocked(Sp) =
         TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     TICK_CATCHF_PUSHED();
 
@@ -384,7 +390,7 @@ stg_catchzh
 
 /* -----------------------------------------------------------------------------
  * The raise infotable
- * 
+ *
  * This should be exactly the same as would be generated by this STG code
  *
  *   raise = {err} \n {} -> raise#{err}
@@ -406,7 +412,7 @@ INFO_TABLE_RET(stg_raise_ret, RET_SMALL, P_ arg1)
 {
   R1 = Sp(1);
   Sp = Sp + WDS(2);
-  W_[no_break_on_exception] = 1;  
+  W_[no_break_on_exception] = 1;
   jump stg_raisezh;
 }
 
@@ -433,16 +439,16 @@ stg_raisezh
         LOAD_THREAD_STATE();
     }
 #endif
-    
+
 retry_pop_stack:
     SAVE_THREAD_STATE();
     (frame_type) = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr") [];
     LOAD_THREAD_STATE();
     if (frame_type == ATOMICALLY_FRAME) {
-      /* The exception has reached the edge of a memory transaction.  Check that 
+      /* The exception has reached the edge of a memory transaction.  Check that
        * the transaction is valid.  If not then perhaps the exception should
        * not have been thrown: re-run the transaction.  "trec" will either be
-       * a top-level transaction running the atomic block, or a nested 
+       * a top-level transaction running the atomic block, or a nested
        * transaction running an invariant check.  In the latter case we
        * abort and de-allocate the top-level transaction that encloses it
        * as well (we could just abandon its transaction record, but this makes
@@ -472,7 +478,7 @@ retry_pop_stack:
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgAtomicallyFrame_code(Sp);
         jump stg_ap_v_fast;
-      }          
+      }
     }
 
     // After stripping the stack, see whether we should break here for
@@ -532,7 +538,7 @@ retry_pop_stack:
     }
 
     /* Restore the blocked/unblocked state for asynchronous exceptions
-     * at the CATCH_FRAME.  
+     * at the CATCH_FRAME.
      *
      * If exceptions were unblocked, arrange that they are unblocked
      * again after executing the handler by pushing an

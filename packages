@@ -1,4 +1,4 @@
-# Despite the name "package", this file contains the master list of 
+# Despite the name "package", this file contains the master list of
 # the *repositories* that make up GHC. It is parsed by
 # * boot
 # * sync-all
@@ -14,7 +14,7 @@
 #    - The main GHC source repo
 #    - Each boot package lives in a repo
 #    - DPH is a repo that contains several packages
-#    - Haddock and hsc2hs are applications, built on top of GHC, 
+#    - Haddock and hsc2hs are applications, built on top of GHC,
 #        and in turn needed to bootstrap GHC
 #    - ghc-tarballs is need to build GHC
 #    - nofib and testsuite are optional helpers
@@ -32,9 +32,9 @@
 #     if you want to get the packages with an "extralibs" or "testsuite"
 #     tag then you need to use "darcs-all --extra --testsuite get".
 #     Support for new tags must be manually added to the darcs-all script.
-# 
+#
 #     'tag' is also used to determine which packages the build system
-#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra' 
+#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra'
 #     both give this property
 #
 # Lines that start with a '#' are comments.
@@ -63,6 +63,7 @@ libraries/hoopl                 -           packages/hoopl.git                  
 libraries/hpc                   -           packages/hpc.git                    git
 libraries/integer-gmp           -           packages/integer-gmp.git            git
 libraries/integer-simple        -           packages/integer-simple.git         git
+libraries/lwconc                -           packages/lwconc.git                 git
 libraries/old-locale            -           packages/old-locale.git             git
 libraries/old-time              -           packages/old-time.git               git
 libraries/pretty                -           packages/pretty.git                 git

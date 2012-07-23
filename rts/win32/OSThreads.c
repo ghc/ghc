@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2001-2005
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
- * manner. 
+ * manner.
  *
  * --------------------------------------------------------------------------*/
 
@@ -14,7 +14,7 @@
 #if defined(THREADED_RTS)
 #include "RtsUtils.h"
 
-/* For reasons not yet clear, the entire contents of process.h is protected 
+/* For reasons not yet clear, the entire contents of process.h is protected
  * by __STRICT_ANSI__ not being defined.
  */
 #undef __STRICT_ANSI__
@@ -26,7 +26,7 @@
  * a Mutex by a Mutex kernel object.
  *
  * ToDo: go through the defn and usage of these to
- * make sure the semantics match up with that of 
+ * make sure the semantics match up with that of
  * the (assumed) pthreads behaviour. This is really
  * just a first pass at getting something compilable.
  */
@@ -34,11 +34,11 @@
 void
 initCondition( Condition* pCond )
 {
-  HANDLE h =  CreateEvent(NULL, 
+  HANDLE h =  CreateEvent(NULL,
 			  FALSE,  /* auto reset */
 			  FALSE,  /* initially not signalled */
 			  NULL); /* unnamed => process-local. */
-  
+
   if ( h == NULL ) {
       sysErrorBelch("initCondition: unable to create");
       stg_exit(EXIT_FAILURE);
@@ -242,6 +242,12 @@ forkOS_createThread ( HsStablePtr entry )
 			   0,
 			   (unsigned*)&pId) == 0);
 }
+
+int forkOS_createThreadForSCont ( Capability* cap, HsStablePtr entry )
+{
+  return -1;
+}
+
 
 nat
 getNumberOfProcessors (void)

@@ -185,11 +185,11 @@ stg_unsafeThawArrayzh
 {
   // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
   //
-  // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN 
+  // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN
   // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
   // it on the mutable list for the GC to remove (removing something from
   // the mutable list is not easy).
-  // 
+  //
   // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
   // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0
   // to indicate that it is still on the mutable list.
@@ -266,7 +266,7 @@ stg_newMutVarzh
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
     StgMutVar_var(mv) = R1;
-    
+
     RET_P(mv);
 }
 
@@ -297,13 +297,13 @@ stg_atomicModifyMutVarzh
     W_ mv, f, z, x, y, r, h;
     /* Args: R1 :: MutVar#,  R2 :: a -> (a,b) */
 
-    /* If x is the current contents of the MutVar#, then 
+    /* If x is the current contents of the MutVar#, then
        We want to make the new contents point to
 
          (sel_0 (f x))
- 
+
        and the return value is
-	 
+
 	 (sel_1 (f x))
 
         obviously we can share (f x).
@@ -499,7 +499,7 @@ stg_finalizzeWeakzh
   //    LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)w);
   // or, LDV_recordDead():
   //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
-  // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as 
+  // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as
   // large as weak pointers, so there is no need to fill the slop, either.
   // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
 #endif
@@ -551,7 +551,7 @@ stg_deRefWeakzh
    -------------------------------------------------------------------------- */
 
 stg_decodeFloatzuIntzh
-{ 
+{
     W_ p;
     F_ arg;
     W_ mp_tmp1;
@@ -561,19 +561,19 @@ stg_decodeFloatzuIntzh
 
     mp_tmp1  = Sp - WDS(1);
     mp_tmp_w = Sp - WDS(2);
-    
+
     /* arguments: F1 = Float# */
     arg = F1;
-    
+
     /* Perform the operation */
     foreign "C" __decodeFloat_Int(mp_tmp1 "ptr", mp_tmp_w "ptr", arg) [];
-    
+
     /* returns: (Int# (mantissa), Int# (exponent)) */
     RET_NN(W_[mp_tmp1], W_[mp_tmp_w]);
 }
 
 stg_decodeDoublezu2Intzh
-{ 
+{
     D_ arg;
     W_ p;
     W_ mp_tmp1;
@@ -601,6 +601,405 @@ stg_decodeDoublezu2Intzh
     RET_NNNN(W_[mp_tmp1], W_[mp_tmp2], W_[mp_result1], W_[mp_result2]);
 }
 
+
+/* -----------------------------------------------------------------------------
+ * Lightweight concurrency primitives
+ * -------------------------------------------------------------------------- */
+
+STRING(stg_switch_msg,"Switching from thread %d (%s) to thread %d [%d]\n")
+STRING(stg_switch_reason_1, "Yielded")
+STRING(stg_switch_reason_2, "BlockedInHaskell")
+STRING(stg_switch_reason_3, "BlockedInRTS")
+STRING(stg_switch_reason_4, "ThreadComplete")
+STRING(stg_switch_reason_5, "ThreadKilled")
+
+stg_scheduleThreadOnFreeCapzh
+{
+  /* args: R1 = scont */
+
+  W_ scont;
+  scont = R1;
+
+  foreign "C" scheduleThreadOnFreeCap (MyCapability () "ptr", scont "ptr") [];
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_defaultUpcallErrorzh
+{
+  /* args: no args */
+  foreign "C" barf ("defaultUpcall triggered\n");
+}
+
+stg_atomicSwitchzh
+{
+  /* args: R1 = scont, R2 = switch_reason
+   * switch_reason: 1 - Blocking on a concurrent data structure
+   *                2 - Yielding on the scheduler
+   *                4 - Completing a thread
+   */
+  W_ tso, switch_reason;
+  W_ frame_type, frame, trec, outer, valid, limit, q, next_invariant;
+  W_ cap;
+
+  MAYBE_GC (R1_PTR, stg_atomicSwitchzh); // STM operations may allocate
+
+  tso = R1;
+  switch_reason = R2;
+
+  #if defined(DEBUG) || defined (TRACING)
+
+  cap = MyCapability ();
+  if (switch_reason == 1) {
+    foreign "C" debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
+                            stg_switch_reason_1, StgTSO_id(tso),
+                            Capability_no(cap)) [];
+  }
+  else {
+   if (switch_reason == 2) {
+      foreign "C" debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
+                              stg_switch_reason_2, StgTSO_id(tso),
+                              Capability_no(cap)) [];
+    }
+    else {
+      if (switch_reason == 3) {
+        foreign "C" debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
+                                stg_switch_reason_3, StgTSO_id(tso),
+                                Capability_no(cap)) [];
+      }
+			else {
+				if (switch_reason == 4) {
+					foreign "C" debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
+																	stg_switch_reason_4, StgTSO_id(tso),
+																	Capability_no(cap)) [];
+				}
+				else {
+          if (switch_reason == 5) {
+            foreign "C" debugBelch (stg_switch_msg, StgTSO_id(CurrentTSO),
+                                    stg_switch_reason_5, StgTSO_id(tso),
+                                    Capability_no(cap)) [];
+          }
+          else {
+            if (switch_reason == 0 && StgTSO_id(CurrentTSO) == StgTSO_id(tso)) {
+              tso = CurrentTSO;
+            }
+            else {
+              foreign "C" barf ("Unexpected: Switching from thread %d to %d - switch reason %d\n",
+                                StgTSO_id(CurrentTSO), StgTSO_id(tso), switch_reason) [];
+            }
+          }
+      	}
+			}
+    }
+  }
+
+  #endif
+
+
+  // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
+  SAVE_THREAD_STATE();
+  (frame_type) = foreign "C" findRetryFrameHelper(MyCapability(), CurrentTSO "ptr") [];
+  LOAD_THREAD_STATE();
+  frame = Sp;
+  trec = StgTSO_trec(CurrentTSO);
+  outer  = StgTRecHeader_enclosing_trec(trec);
+
+  //This is what Sp has to be if the transaction commits. If it aborts, we get
+  //the Sp and code pointer from the "frame" variable captured above.
+  Sp = Sp + SIZEOF_StgAtomicallyFrame;
+
+
+  if (frame_type == CATCH_RETRY_FRAME) {
+    foreign "C" barf("Not implemented! stg_atomicSwitchzh->CATCH_RETRY_FRAME"); // Not tested
+  }
+
+  ASSERT(frame_type == ATOMICALLY_FRAME);
+  ASSERT(outer == NO_TREC);
+
+
+  ("ptr" q) = foreign "C" stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr") [];
+
+  if (q != END_INVARIANT_CHECK_QUEUE) {
+    /* We can't commit yet: another invariant to check */
+    ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [];
+    StgTSO_trec(CurrentTSO) = trec;
+
+    next_invariant = StgInvariantCheckQueue_invariant(q);
+    R1 = StgAtomicInvariant_code(next_invariant);
+    jump stg_ap_v_fast;
+
+  } else {
+    /* We've got no more invariants to check, try to commit. */
+
+    (valid) = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr") [];
+
+    if (valid != 0) {
+      /* Transaction was valid: commit succeeded */
+
+      //XXX KC -- operating on CurrentTSO is unsafe since the transaction has
+      //been committed and mucking with CurrentTSO info violates atomicity.
+
+      if (CurrentTSO != tso) {
+        ASSERT (StgTSO_why_blocked(tso) != NotBlocked::I16); //Thread is blocked
+
+        //Set the current thread status
+        if (switch_reason == 1) {
+          StgTSO_why_blocked(CurrentTSO) = Yielded::I16;
+        }
+        else {
+          if (switch_reason == 2) {
+            StgTSO_why_blocked(CurrentTSO) = BlockedInHaskell::I16;
+          }
+          else {
+            if (switch_reason == 4) {
+              StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
+            }
+            else {
+              if (switch_reason == 5) {
+                StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
+              }
+              else {
+                foreign "C" barf ("atomicSwitch: Unknown switch reason %d",
+                                  switch_reason) never returns;
+              }
+            }
+          }
+        }
+      }
+      StgTSO_trec(CurrentTSO) = NO_TREC;
+      StgStack_sp(StgTSO_stackobj(CurrentTSO)) = Sp;
+
+      if (TO_W_(StgStack_dirty(StgTSO_stackobj(CurrentTSO))) == 0) {
+        foreign "C" dirty_STACK (MyCapability () "ptr",
+                                 StgTSO_stackobj(CurrentTSO) "ptr") [];
+      }
+
+      CurrentTSO = tso;
+      StgTSO_why_blocked(CurrentTSO) = NotBlocked::I16;
+      ("ptr" limit)  = foreign "C" tso_SpLim (tso "ptr") [];
+      SpLim = limit;
+      Sp = StgStack_sp(StgTSO_stackobj(CurrentTSO));
+
+      //Enter the scheduler. This is necessary for several reasons:
+      //  - tso might be bound, or current task might be bound in which case we
+      //    need to pass capability to correct task
+      //  - task might have returned from a safe foreign call
+      jump stg_switch_noregs;
+    } else {
+      /* Transaction was not valid: try again */
+      ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
+      StgTSO_trec(CurrentTSO) = trec;
+      StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
+      R1 = StgAtomicallyFrame_code(frame);
+      Sp = frame;
+      jump stg_ap_v_fast;
+    }
+  }
+}
+
+stg_setSContCapabilityzh
+{
+  /* args: R1 = SCont, R2 = int */
+  W_ scont, target;
+  scont = R1;
+  target = R2;
+
+#if defined (THREADED_RTS)
+  foreign "C" setOwningCapability (MyCapability() "ptr", scont, target) [];
+#endif
+
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_getCurrentCapabilityzh {
+  /* no args */
+  W_ result;
+  result = TO_W_(Capability_no (MyCapability ()));
+  RET_N (result);
+}
+
+stg_getSContCapabilityzh {
+  /* args : R1 = scont */
+  W_ sc, result;
+  sc = R1;
+  result = TO_W_(Capability_no (StgTSO_cap (sc)));
+  RET_N (result);
+}
+
+stg_getSContIdzh {
+  /* args : R1 = scont */
+  W_ sc, result;
+  sc = R1;
+  result = TO_W_(StgTSO_id (sc));
+  RET_N (result);
+}
+
+
+stg_iCanRunSContzh
+{
+  /* args: R1 = SCont */
+
+  W_ scont, result;
+  result = 1;
+  scont = R1;
+
+#if defined(THREADED_RTS)
+  if (StgTSO_cap(scont) != MyCapability ()) {
+    result = 0;
+  }
+  foreign "C" debugBelch ("cap %d: can I run thread %d? %d\n",
+                          Capability_no (MyCapability ()),
+                          StgTSO_id (scont), result);
+#endif
+
+  RET_N(result);
+}
+
+/* Set the resume thread closure for the given TSO. This closure, when
+ * evaluated, will add the given thread to its user-level scheduler.
+ */
+stg_setScheduleSContActionzh
+{
+  /* args: R1 = SCont, R2 = closure to resume this spark */
+
+  MAYBE_GC (R1_PTR & R2_PTR, stg_setScheduleSContActionzh);
+
+  W_ threadid, schedule_scont_action;
+  threadid = R1;
+  schedule_scont_action = R2;
+
+  StgTSO_schedule_scont_action(threadid) = schedule_scont_action;
+  foreign "C" dirty_TSO (MyCapability () "ptr", threadid "ptr") [];
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_getScheduleSContActionzh
+{
+  /* args: R1 = SCont */
+  MAYBE_GC (R1_PTR, stg_getScheduleSContActionzh);
+
+  W_ threadid, schedule_scont_action;
+  threadid = R1;
+  schedule_scont_action = StgTSO_schedule_scont_action(threadid);
+  RET_P (schedule_scont_action);
+}
+
+stg_setYieldControlActionzh
+{
+  /* args: R1 = SCont, R2 = closure to resume this spark */
+
+  MAYBE_GC (R1_PTR & R2_PTR, stg_setYieldControlActionzh);
+
+  W_ threadid, yield_control_action;
+  threadid = R1;
+  yield_control_action = R2;
+
+  StgTSO_yield_control_action (threadid) = yield_control_action;
+  foreign "C" dirty_TSO (MyCapability () "ptr", threadid "ptr") [];
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_getYieldControlActionzh
+{
+  /* args: R1 = SCont */
+  MAYBE_GC (R1_PTR, stg_getYieldControlActionzh);
+
+  W_ threadid, yield_control_action;
+  threadid = R1;
+  yield_control_action = StgTSO_yield_control_action (threadid);
+  RET_P (yield_control_action);
+}
+
+stg_setSLSzh
+{
+  /* args: R1 = scont, R2 = tls */
+  MAYBE_GC (R1_PTR & R2_PTR, stg_setSLSzh);
+
+  W_ tso, tls;
+  tso = R1;
+  tls = R2;
+  StgTSO_tls(tso) = tls;
+  foreign "C" dirty_TSO (StgTSO_cap(tso) "ptr", tso "ptr") [];
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_getSLSzh
+{
+ /* args: R1 = scont */
+ W_ tso, tls;
+ tso = R1;
+ tls = StgTSO_tls(tso);
+ RET_P (tls);
+}
+
+stg_setFinalizzerzh
+{
+  /* args: R1 = SCont, R2 = finalizer */
+
+  MAYBE_GC (R1_PTR & R2_PTR, stg_setFinalizzerzh);
+
+  W_ threadid, finalizer;
+  threadid = R1;
+  finalizer = R2;
+
+  StgTSO_finalizer (threadid) = finalizer;
+  foreign "C" dirty_TSO (MyCapability () "ptr", threadid "ptr") [];
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_newSContzh
+{
+  /* args: R1 = closure to spark */
+
+  MAYBE_GC(R1_PTR, stg_newSContzh);
+
+  W_ closure, threadid;
+  closure = R1;
+
+  ("ptr" threadid) = foreign "C" createUserLevelThread( MyCapability() "ptr",
+				RtsFlags_GcFlags_initialStkSize(RtsFlags),
+				closure "ptr") [];
+  StgTSO_why_blocked (threadid) = Yielded::I16;
+
+  RET_P(threadid);
+}
+
+stg_getSContzh
+{
+  /* no args */
+  RET_P(CurrentTSO);
+}
+
+stg_isThreadBoundzh
+{
+  /* args: R1 = SCont */
+
+  MAYBE_GC (R1_PTR, stg_isThreadBoundzh);
+
+  W_ r, scont;
+  scont = R1;
+  (r) = foreign "C" isThreadBound(scont) [];
+  RET_N(r);
+}
+
+stg_getStatusTVarzh
+{
+  /* args: R1 = SCont */
+
+  MAYBE_GC (R1_PTR, stg_getStatusTVarzh);
+
+  W_ scont, tvar;
+  scont = R1;
+  tvar = StgTSO_scont_status(scont);
+  RET_P(tvar);
+}
+
+stg_sleepCapabilityzh
+{
+  StgTSO_is_sleeping (CurrentTSO) = 1::I32;
+  jump stg_retryzh;
+}
+
+
 /* -----------------------------------------------------------------------------
  * Concurrency primitives
  * -------------------------------------------------------------------------- */
@@ -615,13 +1014,13 @@ stg_forkzh
   W_ threadid;
   closure = R1;
 
-  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
-				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
+  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr",
+				RtsFlags_GcFlags_initialStkSize(RtsFlags),
 				closure "ptr") [];
 
   /* start blocked if the current thread is blocked */
   StgTSO_flags(threadid) = %lobits16(
-     TO_W_(StgTSO_flags(threadid)) | 
+     TO_W_(StgTSO_flags(threadid)) |
      TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
@@ -629,7 +1028,7 @@ stg_forkzh
   // context switch soon, but not immediately: we don't want every
   // forkIO to force a context-switch.
   Capability_context_switch(MyCapability()) = 1 :: CInt;
-  
+
   RET_P(threadid);
 }
 
@@ -645,13 +1044,13 @@ stg_forkOnzh
   cpu = R1;
   closure = R2;
 
-  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
-				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
+  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr",
+				RtsFlags_GcFlags_initialStkSize(RtsFlags),
 				closure "ptr") [];
 
   /* start blocked if the current thread is blocked */
   StgTSO_flags(threadid) = %lobits16(
-     TO_W_(StgTSO_flags(threadid)) | 
+     TO_W_(StgTSO_flags(threadid)) |
      TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE));
 
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
@@ -659,7 +1058,7 @@ stg_forkOnzh
   // context switch soon, but not immediately: we don't want every
   // forkIO to force a context-switch.
   Capability_context_switch(MyCapability()) = 1 :: CInt;
-  
+
   RET_P(threadid);
 }
 
@@ -681,7 +1080,7 @@ stg_myThreadIdzh
 
 stg_labelThreadzh
 {
-  /* args: 
+  /* args:
 	R1 = ThreadId#
 	R2 = Addr# */
 #if defined(DEBUG) || defined(TRACING) || defined(DTRACE)
@@ -911,9 +1310,9 @@ stg_atomicallyzh
   W_ frame;
   W_ old_trec;
   W_ new_trec;
-  
+
   // stmStartTransaction may allocate
-  MAYBE_GC (R1_PTR, stg_atomicallyzh); 
+  MAYBE_GC (R1_PTR, stg_atomicallyzh);
 
   /* Args: R1 = m :: STM a */
   STK_CHK_GEN(SIZEOF_StgAtomicallyFrame + WDS(1), R1_PTR, stg_atomicallyzh);
@@ -957,7 +1356,7 @@ INFO_TABLE(stg_atomically,1,0,THUNK_1_0,"atomically","atomically")
 stg_catchSTMzh
 {
   W_ frame;
-  
+
   /* Args: R1 :: STM a */
   /* Args: R2 :: Exception -> STM a */
   STK_CHK_GEN(SIZEOF_StgCatchSTMFrame + WDS(1), R1_PTR & R2_PTR, stg_catchSTMzh);
@@ -971,7 +1370,7 @@ stg_catchSTMzh
   StgCatchSTMFrame_code(frame) = R1;
 
   /* Start a nested transaction to run the body of the try block in */
-  W_ cur_trec;  
+  W_ cur_trec;
   W_ new_trec;
   cur_trec = StgTSO_trec(CurrentTSO);
   ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", cur_trec "ptr");
@@ -989,7 +1388,7 @@ stg_catchRetryzh
   W_ trec;
 
   // stmStartTransaction may allocate
-  MAYBE_GC (R1_PTR & R2_PTR, stg_catchRetryzh); 
+  MAYBE_GC (R1_PTR & R2_PTR, stg_catchRetryzh);
 
   /* Args: R1 :: STM a */
   /* Args: R2 :: STM a */
@@ -1003,7 +1402,7 @@ stg_catchRetryzh
   /* Set up the catch-retry frame */
   Sp = Sp - SIZEOF_StgCatchRetryFrame;
   frame = Sp;
-  
+
   SET_HDR(frame, stg_catch_retry_frame_info, CCCS);
   StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
   StgCatchRetryFrame_first_code(frame) = R1;
@@ -1054,7 +1453,7 @@ retry_pop_stack:
     }
   }
 
-  // We've reached the ATOMICALLY_FRAME: attempt to wait 
+  // We've reached the ATOMICALLY_FRAME: attempt to wait
   ASSERT(frame_type == ATOMICALLY_FRAME);
   if (outer != NO_TREC) {
     // We called retry while checking invariants, so abort the current
@@ -1092,11 +1491,11 @@ stg_checkzh
   W_ trec, closure;
 
   /* Args: R1 = invariant closure */
-  MAYBE_GC (R1_PTR, stg_checkzh); 
+  MAYBE_GC (R1_PTR, stg_checkzh);
 
   trec = StgTSO_trec(CurrentTSO);
   closure = R1;
-  foreign "C" stmAddInvariantToCheck(MyCapability() "ptr", 
+  foreign "C" stmAddInvariantToCheck(MyCapability() "ptr",
                                      trec "ptr",
                                      closure "ptr") [];
 
@@ -1111,7 +1510,7 @@ stg_newTVarzh
 
   /* Args: R1 = initialisation value */
 
-  MAYBE_GC (R1_PTR, stg_newTVarzh); 
+  MAYBE_GC (R1_PTR, stg_newTVarzh);
   new_value = R1;
   ("ptr" tv) = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr") [];
   RET_P(tv);
@@ -1151,7 +1550,7 @@ stg_writeTVarzh
   W_ trec;
   W_ tvar;
   W_ new_value;
-  
+
   /* Args: R1 = TVar closure */
   /*       R2 = New value    */
 
@@ -1214,7 +1613,7 @@ stg_newMVarzh
     W_ mvar;
 
     ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, stg_newMVarzh );
-  
+
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
     SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
         // MVARs start dirty: generation 0 has no mutable list
@@ -1249,7 +1648,7 @@ stg_takeMVarzh
 #else
     info = GET_INFO(mvar);
 #endif
-        
+
     if (info == stg_MVAR_CLEAN_info) {
         foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
     }
@@ -1258,7 +1657,7 @@ stg_takeMVarzh
      * and wait until we're woken up.
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
-        
+
         // Note [mvar-heap-check] We want to do the heap check in the
         // branch here, to avoid the conditional in the common case.
         // However, we've already locked the MVar above, so we better
@@ -1287,14 +1686,14 @@ stg_takeMVarzh
 	StgTSO_block_info(CurrentTSO)  = mvar;
 	StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 	StgMVar_tail(mvar)             = q;
-	
+
         R1 = mvar;
 	jump stg_block_takemvar;
     }
-    
+
     /* we got the value... */
     val = StgMVar_value(mvar);
-    
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
@@ -1308,9 +1707,9 @@ loop:
         q = StgInd_indirectee(q);
         goto loop;
     }
-    
+
     // There are putMVar(s) waiting... wake up the first thread on the queue
-    
+
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1327,11 +1726,11 @@ loop:
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-    
+
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
-    
+
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_P(val);
 }
@@ -1349,7 +1748,7 @@ stg_tryTakeMVarzh
 #else
     info = GET_INFO(mvar);
 #endif
-        
+
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
      */
@@ -1357,19 +1756,19 @@ stg_tryTakeMVarzh
 #if defined(THREADED_RTS)
         unlockClosure(mvar, info);
 #endif
-	/* HACK: we need a pointer to pass back, 
+	/* HACK: we need a pointer to pass back,
 	 * so we abuse NO_FINALIZER_closure
 	 */
 	RET_NP(0, stg_NO_FINALIZER_closure);
     }
-    
+
     if (info == stg_MVAR_CLEAN_info) {
         foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
     }
 
     /* we got the value... */
     val = StgMVar_value(mvar);
-    
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
@@ -1383,9 +1782,9 @@ loop:
         q = StgInd_indirectee(q);
         goto loop;
     }
-    
+
     // There are putMVar(s) waiting... wake up the first thread on the queue
-    
+
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1402,11 +1801,11 @@ loop:
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-    
+
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
-    
+
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_NP(1,val);
 }
@@ -1459,7 +1858,7 @@ stg_putMVarzh
         R2 = val;
 	jump stg_block_putmvar;
     }
-  
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
@@ -1475,7 +1874,7 @@ loop:
     }
 
     // There are takeMVar(s) waiting: wake up the first one
-    
+
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1496,7 +1895,7 @@ loop:
     if (TO_W_(StgStack_dirty(stack)) == 0) {
         foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
     }
-    
+
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
@@ -1524,7 +1923,7 @@ stg_tryPutMVarzh
 #endif
 	RET_N(0);
     }
-  
+
     if (info == stg_MVAR_CLEAN_info) {
         foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
     }
@@ -1544,7 +1943,7 @@ loop:
     }
 
     // There are takeMVar(s) waiting: wake up the first one
-    
+
     tso = StgMVarTSOQueue_tso(q);
     StgMVar_head(mvar) = StgMVarTSOQueue_link(q);
     if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -1561,11 +1960,11 @@ loop:
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-    
+
     if (TO_W_(StgStack_dirty(stack)) == 0) {
         foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
     }
-    
+
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
@@ -1582,7 +1981,7 @@ stg_makeStableNamezh
     W_ index, sn_obj;
 
     ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, stg_makeStableNamezh );
-  
+
     (index) = foreign "C" lookupStableName(R1 "ptr") [];
 
     /* Is there already a StableName for this heap object?
@@ -1596,7 +1995,7 @@ stg_makeStableNamezh
     } else {
 	sn_obj = snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry);
     }
-    
+
     RET_P(sn_obj);
 }
 
@@ -1632,7 +2031,7 @@ stg_newBCOzh
        R5 = bitmap array
     */
     W_ bco, bitmap_arr, bytes, words;
-    
+
     bitmap_arr = R5;
 
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + BYTE_ARR_WDS(bitmap_arr);
@@ -1642,13 +2041,13 @@ stg_newBCOzh
 
     bco = Hp - bytes + WDS(1);
     SET_HDR(bco, stg_BCO_info, CCCS);
-    
+
     StgBCO_instrs(bco)     = R1;
     StgBCO_literals(bco)   = R2;
     StgBCO_ptrs(bco)       = R3;
     StgBCO_arity(bco)      = HALF_W_(R4);
     StgBCO_size(bco)       = HALF_W_(words);
-    
+
     // Copy the arity/bitmap info into the BCO
     W_ i;
     i = 0;
@@ -1658,7 +2057,7 @@ for:
 	i = i + 1;
 	goto for;
     }
-    
+
     RET_P(bco);
 }
 
@@ -1666,7 +2065,7 @@ for:
 stg_mkApUpd0zh
 {
     // R1 = the BCO# for the AP
-    //	
+    //
     W_ ap;
 
     // This function is *only* used to wrap zero-arity BCOs in an
@@ -1681,10 +2080,10 @@ stg_mkApUpd0zh
 
     ap = Hp - SIZEOF_StgAP + WDS(1);
     SET_HDR(ap, stg_AP_info, CCCS);
-    
+
     StgAP_n_args(ap) = HALF_W_(0);
     StgAP_fun(ap) = R1;
-    
+
     RET_P(ap);
 }
 
@@ -1705,14 +2104,14 @@ stg_unpackClosurezh
         nptrs = 0;
         goto out;
     }
-    case THUNK, THUNK_1_0, THUNK_0_1, THUNK_2_0, THUNK_1_1, 
+    case THUNK, THUNK_1_0, THUNK_0_1, THUNK_2_0, THUNK_1_1,
          THUNK_0_2, THUNK_STATIC, AP, PAP, AP_STACK, BCO : {
         ptrs = 0;
         nptrs = 0;
         goto out;
     }
     default: {
-        ptrs  = TO_W_(%INFO_PTRS(info)); 
+        ptrs  = TO_W_(%INFO_PTRS(info));
         nptrs = TO_W_(%INFO_NPTRS(info));
         goto out;
     }}
@@ -1745,7 +2144,7 @@ for:
     /* We can leave the card table uninitialised, since the array is
        allocated in the nursery.  The GC will fill it in if/when the array
        is promoted. */
-    
+
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(nptrs_arr) = WDS(nptrs);
     p = 0;
@@ -1849,8 +2248,7 @@ stg_delayzh
 #else
 
 
-    (target) = foreign "C" getDelayTarget(R1) [R1];
-
+		(target) = foreign "C" getDelayTarget(R1) [R1];
     StgTSO_block_info(CurrentTSO) = target;
 
     /* Insert the new thread in the sleeping queue. */
@@ -1948,7 +2346,7 @@ stg_asyncDoProczh
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    stg_asyncDoProczh_malloc_str) 
+					    stg_asyncDoProczh_malloc_str)
 				[R1,R2];
     (reqID) = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr") [];
     StgAsyncIOResult_reqID(ares)   = reqID;
@@ -1985,7 +2383,7 @@ stg_asyncDoProczh
  *   |    -------+-----> A <-------+-------        |
  *   |  update   |   BLACKHOLE     | marked_update |
  *   +-----------+                 +---------------+
- *   |           |                 |               | 
+ *   |           |                 |               |
  *        ...                             ...
  *   |           |                 +---------------+
  *   +-----------+
@@ -2029,7 +2427,7 @@ stg_noDuplicatezh
     SAVE_THREAD_STATE();
     ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
     foreign "C" threadPaused (MyCapability() "ptr", CurrentTSO "ptr") [];
-    
+
     if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
         jump stg_threadFinished;
     } else {
@@ -2057,7 +2455,7 @@ stg_getApStackValzh
 
    if (%INFO_PTR(ap_stack) == stg_AP_STACK_info) {
         ok = 1;
-        val = StgAP_STACK_payload(ap_stack,offset); 
+        val = StgAP_STACK_payload(ap_stack,offset);
    } else {
         ok = 0;
         val = R1;

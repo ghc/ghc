@@ -756,13 +756,13 @@ fuzzyLookup user_entered possibilites
     -- Work out an approriate match threshold:
     -- We report a candidate if its edit distance is <= the threshold,
     -- The threshhold is set to about a quarter of the # of characters the user entered
-    --   Length    Threshold
-    --     1         0          -- Don't suggest *any* candidates
-    --     2         1          -- for single-char identifiers
-    --     3         1
-    --     4         1
-    --     5         1
-    --     6         2
+    -- 	 Length    Threshold
+    --	   1	     0		-- Don't suggest *any* candidates
+    --	   2	     1		-- for single-char identifiers
+    -- 	   3	     1
+    --	   4	     1
+    --	   5	     1
+    --	   6	     2
     --
     fuzzy_threshold = truncate $ fromIntegral (length user_entered + 2) / (4 :: Rational)
     mAX_RESULTS = 3
@@ -1043,10 +1043,10 @@ abstractDataType n = mkDataType n [abstractConstr n]
 charToC :: Word8 -> String
 charToC w =
   case chr (fromIntegral w) of
-        '\"' -> "\\\""
-        '\'' -> "\\\'"
-        '\\' -> "\\\\"
-        c | c >= ' ' && c <= '~' -> [c]
+	'\"' -> "\\\""
+	'\'' -> "\\\'"
+	'\\' -> "\\\\"
+	c | c >= ' ' && c <= '~' -> [c]
           | otherwise -> ['\\',
                          chr (ord '0' + ord c `div` 64),
                          chr (ord '0' + ord c `div` 8 `mod` 8),

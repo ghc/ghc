@@ -56,7 +56,7 @@ MACOSX_DEPLOYMENT_LD_OPTS = -mmacosx-version-min=$(MACOSX_DEPLOYMENT_VERSION) \
 			    -Wl,-syslibroot,$(MACOSX_DEPLOYMENT_SDK)
 # We don't extend SRC_CC_OPTS and friends here directly, as (a) they may get
 # overwritten in build.mk and (b) we must not use the deployment options in
-# stage 1 or we get a linker error if the bootstrap compiler is for a more 
+# stage 1 or we get a linker error if the bootstrap compiler is for a more
 # recent OS version.
 #
 # We need --no-builtin-fprintf, as the use of the builtin function optimisation
@@ -150,7 +150,7 @@ endif
 #
 # Target platforms supported:
 #   i386, powerpc
-#   AIX is not supported 
+#   AIX is not supported
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
 
@@ -176,7 +176,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
-else 
+else
 GhcWithInterpreter=NO
 endif
 
@@ -246,7 +246,7 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 
 # In addition, the RTS is built in some further variations.  Ways that
 # make sense here:
-# 
+#
 #   thr         : threaded
 #   thr_p       : threaded profiled
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
@@ -260,7 +260,7 @@ GhcRTSWays=l
 
 # Usually want the debug version
 ifeq "$(BootingFromHc)" "NO"
-GhcRTSWays += debug 
+GhcRTSWays += debug
 endif
 
 # We always have the threaded versions, but note that SMP support may be disabled
@@ -397,7 +397,7 @@ WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-i386-windows
 WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 
 # -----------------------------------------------------------------------------
-# Utilities programs: flags 
+# Utilities programs: flags
 
 # If you want to give any standard flags to pretty much any utility
 # (see utils.mk for a complete list), by adding a line here
@@ -405,7 +405,7 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 # 	SRC_P_OPTS += ...
 #
 # where P is the utility. For example, to add -O to all Haskell
-# compilations, 
+# compilations,
 #
 #	SRC_HC_OPTS += -O
 
@@ -413,7 +413,7 @@ WINDOWS_INSTALLER = $(WINDOWS_INSTALLER_BASE)$(exeext)
 # SRC_HC_OPTS includes flags to be added to *every* Haskell
 # compilation.  Setting SRC_HC_OPTS is a good way to set the default
 # optimisation level (-O) and heap size (-H<size>).
-# 
+#
 # SRC_HC_OPTS is *not* for adding flags that are required to make your
 # build work.  Examples:
 #
@@ -538,7 +538,7 @@ endif
 ifeq "$(GhcVersion)" "7.2.1"
 CONF_HC_OPTS_STAGE0 += -fno-full-laziness
 compiler/cmm/Bitmap_HC_OPTS += -ffull-laziness
-# urgh.  Compiling cmm/Bitmap.hs with -fno-full-laziness results in 
+# urgh.  Compiling cmm/Bitmap.hs with -fno-full-laziness results in
 #   "gmp: overflow in mpz type"
 # for some unknown reason, so turn full-laziness back on for this module.
 endif
@@ -552,8 +552,8 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 # the flag --with-gcc=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-WhatGccIsCalled       = @WhatGccIsCalled@
-GccVersion            = @GccVersion@
+WhatGccIsCalled = @WhatGccIsCalled@
+GccVersion      = @GccVersion@
 AlienScript           = @AlienScript@
 ifeq "$(phase)" "0"
 CrossCompilePrefix    =
@@ -645,7 +645,7 @@ endif
 
 # FLEX			= @LEX@
 # Don't bother with -lfl, we define our own yywrap()s anyway.
-# FLEX_LIB		= 
+# FLEX_LIB		=
 #WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
@@ -690,7 +690,7 @@ SORT		        = @SortCmd@
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
-# 
+#
 INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
 
@@ -736,7 +736,7 @@ LdHasBuildId	        = @LdHasBuildId@
 # and compiler/main/DriverPipeline.hs.
 LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
 
-# On MSYS, building with SplitObjs=YES fails with 
+# On MSYS, building with SplitObjs=YES fails with
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size
 # to work around it.  32767 doesn't work; 30000 does, but says
@@ -750,16 +750,16 @@ endif
 #
 # In emergency situations, REAL_SHELL is used to perform shell commands
 # from within the ghc driver script, by scribbling the command line to
-# a temp file and then having $(REAL_SHELL) execute it. 
+# a temp file and then having $(REAL_SHELL) execute it.
 #
 # The reason for having to do this is that overly long command lines
 # cause unnecessary trouble with some shells (e.g., /bin/sh on Solaris
 # 2.5.1), which is why this backdoor is provided. The situation of overly
-# long command lines is either encountered while doing `make boot' in compiler/, 
-# or when linking the compiler binary (`hsc'). 
+# long command lines is either encountered while doing `make boot' in compiler/,
+# or when linking the compiler binary (`hsc').
 #
 # We do not use SHELL to execute long commands, as `make' will more than likely
-# override whatever setting you have in your environment while executing. 
+# override whatever setting you have in your environment while executing.
 
 # By default, REAL_SHELL is set equal to SHELL, which is not really a smart move
 # as it is SHELL that will show up the bogosity in the first place, but setting
@@ -827,7 +827,7 @@ GHC_PKG		        = @GhcPkgCmd@
 # Happy
 #
 HAPPY			= @HappyCmd@
-HAPPY_VERSION		= @HappyVersion@		
+HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
@@ -837,7 +837,7 @@ SRC_HAPPY_OPTS		= -agc --strict
 # Alex
 #
 ALEX			= @AlexCmd@
-ALEX_VERSION		= @AlexVersion@		
+ALEX_VERSION		= @AlexVersion@
 Alex3			= @Alex3@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
@@ -865,7 +865,7 @@ endif
 #
 ################################################################################
 
-# 
+#
 # It is possible to configure the compiler and prelude to support 31-bit
 # integers, suitable for a back-end and RTS using a tag bit on a 32-bit
 # architecture.  Currently the only useful output from this option is external Core

@@ -3,8 +3,8 @@
  * (c) The GHC Team, 2001-2009
  *
  * Accessing OS threads functionality in a (mostly) OS-independent
- * manner. 
- * 
+ * manner.
+ *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
  * To understand the structure of the RTS headers, see the wiki:
@@ -93,7 +93,7 @@ EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 
 typedef HANDLE Condition;
 typedef DWORD OSThreadId;
-// don't be tempted to use HANDLE as the OSThreadId: there can be 
+// don't be tempted to use HANDLE as the OSThreadId: there can be
 // many HANDLES to a given thread, so comparison would not work.
 typedef DWORD ThreadLocalKey;
 
@@ -171,7 +171,7 @@ extern void yieldThread           ( void );
 
 typedef void OSThreadProcAttr OSThreadProc(void *);
 
-extern int  createOSThread        ( OSThreadId* tid, 
+extern int  createOSThread        ( OSThreadId* tid,
 				    OSThreadProc *startProc, void *param);
 extern rtsBool osThreadIsAlive    ( OSThreadId id );
 extern void interruptOSThread (OSThreadId id);
@@ -216,7 +216,15 @@ void setThreadAffinity     (nat n, nat m);
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
 //
+
+typedef struct {
+  HsStablePtr entry;
+  Capability* cap;
+} CreateTaskForSContArgs;
+
+
 int forkOS_createThread ( HsStablePtr entry );
+int forkOS_createThreadForSCont ( HsStablePtr entry );
 
 //
 // Returns the number of processor cores in the machine

@@ -252,7 +252,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
              repr_axs   = map famInstAxiom repr_fis
              pdata_tcs  = famInstsRepTyCons pdata_fis
              pdatas_tcs = famInstsRepTyCons pdatas_fis
-             
+
        ; updGEnv $ extendFamEnv fam_insts
 
            -- Generate workers for the vectorised data constructors, dfuns for the 'PA' instances of

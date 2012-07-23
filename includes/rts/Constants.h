@@ -60,11 +60,11 @@
  *   NB. This corresponds with the number of actual INTLIKE/CHARLIKE
  *   closures defined in rts/StgMiscClosures.cmm.
  */
-#define MAX_INTLIKE             16
-#define MIN_INTLIKE             (-16)
+#define MAX_INTLIKE 		16
+#define MIN_INTLIKE 		(-16)
 
-#define MAX_CHARLIKE            255
-#define MIN_CHARLIKE            0
+#define MAX_CHARLIKE		255
+#define MIN_CHARLIKE		0
 
 /* Each byte in the card table for an StgMutaArrPtrs covers
  * (1<<MUT_ARR_PTRS_CARD_BITS) elements in the array.  To find a good
@@ -99,9 +99,9 @@
    ToDo: find out if we need any of this.
    -------------------------------------------------------------------------- */
 
-#define INFO_OTHER_TAG          (-1)
-#define INFO_IND_TAG            (-2)
-#define INFO_FIRST_TAG          0
+#define INFO_OTHER_TAG		(-1)
+#define INFO_IND_TAG		(-2)
+#define INFO_FIRST_TAG		0
 
 /* -----------------------------------------------------------------------------
    How much C stack to reserve for local temporaries when in the STG
@@ -195,10 +195,10 @@
  * Constants for the what_next field of a TSO, which indicates how it
  * is to be run.
  */
-#define ThreadRunGHC    1       /* return to address on top of stack */
-#define ThreadInterpret 2       /* interpret this thread */
-#define ThreadKilled    3       /* thread has died, don't run it */
-#define ThreadComplete  4       /* thread has finished */
+#define ThreadRunGHC    1	/* return to address on top of stack */
+#define ThreadInterpret 2	/* interpret this thread */
+#define ThreadKilled	  3	/* thread has died, don't run it */
+#define ThreadComplete  4 /* thread has finished */
 
 /*
  * Constants for the why_blocked field of a TSO
@@ -231,17 +231,21 @@
 /* The thread is not on any run queues, but can be woken up
    by tryWakeupThread() */
 #define ThreadMigrating     13
+/* MVar is blocked on a concurrent data structure in user-land */
+#define BlockedInHaskell     14
+#define Yielded             15
 
 /*
  * These constants are returned to the scheduler by a thread that has
  * stopped for one reason or another.  See typedef StgThreadReturnCode
  * in TSO.h.
  */
-#define HeapOverflow   1                /* might also be StackOverflow */
+#define HeapOverflow   1		/* might also be StackOverflow */
 #define StackOverflow  2
 #define ThreadYielding 3
 #define ThreadBlocked  4
 #define ThreadFinished 5
+#define ThreadSwitch   6
 
 /*
  * Flags for the tso->flags field.

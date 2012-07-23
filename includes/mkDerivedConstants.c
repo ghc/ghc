@@ -177,7 +177,7 @@
     field_type(s_type, field);			\
     tso_field_offset(s_type,field);		\
     tso_field_macro(str(s_type,field))
-  
+
 #define opt_struct_size(s_type, option)					\
     printf("#ifdef " #option "\n");					\
     printf("#define SIZEOF_OPT_" #s_type " SIZEOF_" #s_type "\n");	\
@@ -206,7 +206,7 @@ main(int argc, char *argv[])
     printf("\n\n");
 #endif
 
-    field_offset(StgRegTable, rR1);
+    struct_field(StgRegTable, rR1);
     field_offset(StgRegTable, rR2);
     field_offset(StgRegTable, rR3);
     field_offset(StgRegTable, rR4);
@@ -298,12 +298,19 @@ main(int argc, char *argv[])
     closure_field(StgTSO, id);
     closure_field(StgTSO, cap);
     closure_field(StgTSO, saved_errno);
+    closure_field(StgTSO, schedule_scont_action);
+    closure_field(StgTSO, yield_control_action);
+    closure_field(StgTSO, finalizer);
+    closure_field(StgTSO, scont_status);
+    closure_field(StgTSO, tls);
     closure_field(StgTSO, trec);
     closure_field(StgTSO, flags);
     closure_field(StgTSO, dirty);
     closure_field(StgTSO, bq);
+    closure_field(StgTSO, is_sleeping);
     closure_field_("StgTSO_cccs", StgTSO, prof.cccs);
     closure_field(StgTSO, stackobj);
+    closure_field(StgTSO, is_upcall_thread);
 
     closure_field(StgStack, sp);
     closure_field_offset(StgStack, stack);

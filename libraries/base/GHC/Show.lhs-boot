@@ -1,0 +1,11 @@
+\begin{code}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
+module GHC.Show (showSignedInt) where
+
+import GHC.Types
+
+showSignedInt :: Int -> Int -> [Char] -> [Char]
+\end{code}
+

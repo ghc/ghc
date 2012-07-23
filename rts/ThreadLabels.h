@@ -18,9 +18,6 @@ void    freeThreadLabelTable (void);
 void *  lookupThreadLabel    (StgWord key);
 void    removeThreadLabel    (StgWord key);
 #endif
-void    labelThread          (Capability *cap,
-                              StgTSO     *tso,
-                              char       *label);
 
 #include "EndPrivate.h"
 

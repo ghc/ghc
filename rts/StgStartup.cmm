@@ -12,6 +12,8 @@
 
 #include "Cmm.h"
 
+import ghczmprim_GHCziTypes_True_closure;
+
 /*
  * This module contains the two entry points and the final exit point
  * to/from the Haskell world.  We can enter either by:
@@ -41,30 +43,38 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
 #endif
 )
 {
-    /* 
+    /*
        The final exit.
-      
+
        The top-top-level closures (e.g., "main") are of type "IO a".
        When entered, they perform an IO action and return an 'a' in R1.
-      
+
        We save R1 on top of the stack where the scheduler can find it,
        tidy up the registers and return to the scheduler.
-      
+
        We Leave the stack looking like this:
-      
+
             	+----------------+
                 |      -------------------> return value
             	+----------------+
             	| stg_enter_info |
             	+----------------+
-      
+
        The stg_enter_info is just a dummy info table so that the
        garbage collector can understand the stack (there must always
        be an info table on top of the stack).
     */
 
     Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
-    Sp(1) = R1;
+    if (LOOKS_LIKE_CLOSURE_PTR (R1)) {
+      Sp(1) = R1;
+    }
+    else {
+      //This can happen if the last action in the thread is an yield. R1 in this
+      //case happens to be Task*, which is not a valid closure and GC throws an
+      //error.
+      Sp(1) = ghczmprim_GHCziTypes_True_closure;
+    }
     Sp(0) = stg_enter_info;
 
     StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
@@ -127,11 +137,11 @@ stg_threadFinished
   StgRegTable_rRet(BaseReg) = ThreadFinished;
   R1 = BaseReg;
   jump StgReturn;
-}  
+}
 
 /* -----------------------------------------------------------------------------
     Strict IO application - performing an IO action and entering its result.
-    
+
     rts_evalIO() lets you perform Haskell IO actions from outside of
     Haskell-land, returning back to you their result. Want this result
     to be evaluated to WHNF by that time, so that we can easily get at

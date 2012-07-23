@@ -16,8 +16,8 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module CgClosure ( cgTopRhsClosure, 
-		   cgStdRhsClosure, 
+module CgClosure ( cgTopRhsClosure,
+		   cgStdRhsClosure,
 		   cgRhsClosure,
 		   emitBlackHoleCode,
 		   ) where
@@ -42,7 +42,7 @@ import OldCmm
 import OldCmmUtils
 import CLabel
 import StgSyn
-import CostCentre	
+import CostCentre
 import Id
 import Name
 import Module
@@ -122,15 +122,15 @@ cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
     amodes <- getArgAmodes payload
   ; mod_name <- getModuleName
   ; dflags <- getDynFlags
-  ; let (tot_wds, ptr_wds, amodes_w_offsets) 
+  ; let (tot_wds, ptr_wds, amodes_w_offsets)
 	    = mkVirtHeapOffsets (isLFThunk lf_info) amodes
 
 	descr	     = closureDescription dflags mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
-				     bndr lf_info tot_wds ptr_wds 
+				     bndr lf_info tot_wds ptr_wds
 				     NoC_SRT	-- No SRT for a std-form closure
 				     descr
-		
+
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
 
 	-- BUILD THE OBJECT
@@ -173,7 +173,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; mod_name <- getModuleName
   ; dflags <- getDynFlags
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
-	(tot_wds, ptr_wds, bind_details) 
+	(tot_wds, ptr_wds, bind_details)
 	   = mkVirtHeapOffsets (isLFThunk lf_info) (map add_rep fv_infos)
 
 	add_rep info = (cgIdInfoArgRep info, info)
@@ -186,7 +186,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 	-- BUILD ITS INFO TABLE AND CODE
   ; forkClosureBody (do
 	{	-- Bind the fvs
-	  let 
+	  let
               -- A function closure pointer may be tagged, so we
               -- must take it into account when accessing the free variables.
               mbtag       = tagForArity (length args)
@@ -199,7 +199,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 
 	  	-- Bind the binder itself, if it is a free var
 	; whenC bndr_is_a_fv (bindNewToReg bndr nodeReg lf_info)
-	
+
 		-- Compile the body
 	; closureCodeBody bndr_info closure_info cc args body })
 
@@ -260,7 +260,7 @@ closureCodeBody _binder_info cl_info _cc [{- No args i.e. thunk -}] body = do
             { enterCostCentreThunk (CmmReg nodeReg)
 	    ; cgExpr body }
 	}
-    
+
   ; emitClosureCodeAndInfoTable cl_info [] body_absC }
 \end{code}
 
@@ -272,9 +272,9 @@ argSatisfactionCheck (by calling fetchAndReschedule).  There info if
 Node points to closure is available. -- HWL
 
 \begin{code}
-closureCodeBody _binder_info cl_info cc args body 
+closureCodeBody _binder_info cl_info cc args body
   = ASSERT( length args > 0 )
-  do { 	-- Get the current virtual Sp (it might not be zero, 
+  do { 	-- Get the current virtual Sp (it might not be zero,
 	-- eg. if we're compiling a let-no-escape).
     vSp <- getVirtSp
   ; let (reg_args, other_args) = assignCallRegs (addIdReps args)
@@ -284,7 +284,7 @@ closureCodeBody _binder_info cl_info cc args body
   ; let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) (clHasCafRefs cl_info)
   ; emitTickyCounter cl_info args sp_top
 
-   	-- ...and establish the ticky-counter 
+   	-- ...and establish the ticky-counter
 	-- label for this block
   ; setTickyCtrLabel ticky_ctr_lbl $ do
 
@@ -336,7 +336,7 @@ R1/node.
 
 The slow entry point is used in two places:
 
- (a) unknown calls: eg. stg_PAP_entry 
+ (a) unknown calls: eg. stg_PAP_entry
  (b) returning from a heap-check failure
 
 \begin{code}
@@ -344,7 +344,7 @@ mkSlowEntryCode :: ClosureInfo -> [(Id,GlobalReg)] -> FCode CmmStmts
 -- If this function doesn't have a specialised ArgDescr, we need
 -- to generate the function's arg bitmap, slow-entry code, and
 -- register-save code for the heap-check failure
--- Here, we emit the slow-entry code, and 
+-- Here, we emit the slow-entry code, and
 -- return the register-save assignments
 mkSlowEntryCode cl_info reg_args
   | Just (_, ArgGen _) <- closureFunInfo cl_info
@@ -367,13 +367,13 @@ mkSlowEntryCode cl_info reg_args
 
 
      load_assts = zipWithEqual "mk_load" mk_load reps_w_regs stk_offsets
-     mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg) 
+     mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg)
 					  (CmmLoad (cmmRegOffW spReg offset)
 						   (argMachRep rep))
 
      save_assts = zipWithEqual "mk_save" mk_save reps_w_regs stk_offsets
      mk_save (rep,reg) offset = ASSERT( argMachRep rep `cmmEqType` globalRegType reg )
-				CmmStore (cmmRegOffW spReg offset) 
+				CmmStore (cmmRegOffW spReg offset)
 					 (CmmReg (CmmGlobal reg))
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
@@ -396,8 +396,8 @@ thunkWrapper closure_info thunk_code = do
 
     -- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
     -- (we prefer fetchAndReschedule-style context switches to yield ones)
-  ; if node_points 
-    then granFetchAndReschedule [] node_points 
+  ; if node_points
+    then granFetchAndReschedule [] node_points
     else granYield 		[] node_points
 
         -- Stack and/or heap checks
@@ -462,7 +462,7 @@ emitBlackHoleCode is_single_entry = do
   -- Eager blackholing is normally disabled, but can be turned on with
   -- -feager-blackholing.  When it is on, we replace the info pointer
   -- of the thunk with stg_EAGER_BLACKHOLE_info on entry.
-  
+
   -- If we wanted to do eager blackholing with slop filling, we'd need
   -- to do it at the *end* of a basic block, otherwise we overwrite
   -- the free variables in the thunk that we still need.  We have a
@@ -473,7 +473,7 @@ emitBlackHoleCode is_single_entry = do
   -- on. But it didn't work, and it wasn't strictly necessary to bring
   -- back minimal ticky-ticky, so now EAGER_BLACKHOLING is
   -- unconditionally disabled. -- krc 1/2007
-  
+
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from CmmParse.
 
@@ -513,7 +513,7 @@ setupUpdate closure_info code
              not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
                then pushBHUpdateFrame (CmmReg nodeReg) code
                else pushUpdateFrame   (CmmReg nodeReg) code
-  
+
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
 
@@ -539,7 +539,7 @@ setupUpdate closure_info code
 -- allocated black hole to be empty.
 --
 -- Why do we make a black hole in the heap when we enter a CAF?
---    
+--
 --     - for a  generational garbage collector, which needs a fast
 --       test for whether an updatee is in an old generation or not
 --
@@ -557,7 +557,7 @@ setupUpdate closure_info code
 -- ToDo [Feb 04]  This entire link_caf nonsense could all be moved
 -- into the "newCAF" RTS procedure, which we call anyway, including
 -- the allocation of the black-hole indirection closure.
--- That way, code size would fall, the CAF-handling code would 
+-- That way, code size would fall, the CAF-handling code would
 -- be closer together, and the compiler wouldn't need to know
 -- about off_indirectee etc.
 
@@ -580,7 +580,7 @@ link_caf cl_info _is_upd = do
 
 	-- Call the RTS function newCAF to add the CAF to the CafList
 	-- so that the garbage collector can find them
-	-- This must be done *before* the info table pointer is overwritten, 
+	-- This must be done *before* the info table pointer is overwritten,
 	-- because the old info table ptr is needed for reversion
   ; ret <- newTemp bWord
   ; emitRtsCallGen [CmmHinted ret NoHint] rtsPackageId (fsLit "newCAF")
@@ -630,4 +630,4 @@ closureDescription dflags mod_name name
 		    char '>')
    -- showSDocDumpOneLine, because we want to see the unique on the Name.
 \end{code}
-  
+

@@ -230,12 +230,12 @@ pprStmt stmt = case stmt of
 
     CmmCall (CmmPrim op _) results args _ret ->
         proto $$ fn_call
-      where
+        where
         cconv = CCallConv
         fn = pprCallishMachOp_for_C op
         (proto, fn_call)
-          -- The mem primops carry an extra alignment arg, must drop it.
-          -- We could maybe emit an alignment directive using this info.
+        -- The mem primops carry an extra alignment arg, must drop it.
+        -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
           | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
@@ -596,7 +596,7 @@ pprMachOp_for_C mop = case mop of
 
         MO_SF_Conv _from to -> parens (machRep_F_CType to)
         MO_FS_Conv _from to -> parens (machRep_S_CType to)
-        
+
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
                                 (ptext $ sLit "MO_S_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
@@ -938,9 +938,11 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
-te_Stmt (CmmCall target rs es _) = do te_Target target
-                                      mapM_ (te_temp.hintlessCmm) rs
-                                      mapM_ (te_Expr.hintlessCmm) es
+te_Stmt (CmmCall target rs es _) = do {
+                                     te_Target target;
+                                     mapM_ (te_temp.hintlessCmm) rs;
+                                     mapM_ (te_Expr.hintlessCmm) es
+                                   }
 te_Stmt (CmmCondBranch e _)     = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e
 te_Stmt (CmmJump e _)           = te_Expr e

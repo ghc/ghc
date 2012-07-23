@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team 1998-2005
  *
- * Prototypes for functions in Schedule.c 
+ * Prototypes for functions in Schedule.c
  * (RTS internal scheduler interface)
  *
  * -------------------------------------------------------------------------*/
@@ -33,8 +33,10 @@ void scheduleThread (Capability *cap, StgTSO *tso);
 // the desired Capability).
 void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
 
+void scheduleThreadOnFreeCap (Capability *cap, StgTSO *tso);
+
 /* wakeUpRts()
- * 
+ *
  * Causes an OS thread to wake up and run the scheduler, if necessary.
  */
 #if defined(THREADED_RTS)
@@ -60,7 +62,7 @@ void scheduleWorker (Capability *cap, Task *task);
 
 extern volatile StgWord sched_state;
 
-/* 
+/*
  * flag that tracks whether we have done any execution in this time slice.
  */
 #define ACTIVITY_YES      0 /* there has been activity in the current slice */
@@ -116,15 +118,15 @@ appendToRunQueue (Capability *cap, StgTSO *tso);
 EXTERN_INLINE void
 appendToRunQueue (Capability *cap, StgTSO *tso)
 {
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (cap->run_queue_hd == END_TSO_QUEUE) {
-	cap->run_queue_hd = tso;
-        tso->block_info.prev = END_TSO_QUEUE;
-    } else {
-	setTSOLink(cap, cap->run_queue_tl, tso);
-        setTSOPrev(cap, tso, cap->run_queue_tl);
-    }
-    cap->run_queue_tl = tso;
+  ASSERT(tso->_link == END_TSO_QUEUE);
+  if (cap->run_queue_hd == END_TSO_QUEUE) {
+    cap->run_queue_hd = tso;
+    tso->block_info.prev = END_TSO_QUEUE;
+  } else {
+    setTSOLink(cap, cap->run_queue_tl, tso);
+    setTSOPrev(cap, tso, cap->run_queue_tl);
+  }
+  cap->run_queue_tl = tso;
 }
 
 /* Push a thread on the beginning of the run queue.
@@ -133,36 +135,36 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 EXTERN_INLINE void
 pushOnRunQueue (Capability *cap, StgTSO *tso);
 
-EXTERN_INLINE void
+  EXTERN_INLINE void
 pushOnRunQueue (Capability *cap, StgTSO *tso)
 {
-    setTSOLink(cap, tso, cap->run_queue_hd);
-    tso->block_info.prev = END_TSO_QUEUE;
-    if (cap->run_queue_hd != END_TSO_QUEUE) {
-        setTSOPrev(cap, cap->run_queue_hd, tso);
-    }
-    cap->run_queue_hd = tso;
-    if (cap->run_queue_tl == END_TSO_QUEUE) {
-	cap->run_queue_tl = tso;
-    }
+  setTSOLink(cap, tso, cap->run_queue_hd);
+  tso->block_info.prev = END_TSO_QUEUE;
+  if (cap->run_queue_hd != END_TSO_QUEUE) {
+    setTSOPrev(cap, cap->run_queue_hd, tso);
+  }
+  cap->run_queue_hd = tso;
+  if (cap->run_queue_tl == END_TSO_QUEUE) {
+    cap->run_queue_tl = tso;
+  }
 }
 
 /* Pop the first thread off the runnable queue.
  */
-INLINE_HEADER StgTSO *
+  INLINE_HEADER StgTSO *
 popRunQueue (Capability *cap)
-{ 
-    StgTSO *t = cap->run_queue_hd;
-    ASSERT(t != END_TSO_QUEUE);
-    cap->run_queue_hd = t->_link;
-    if (t->_link != END_TSO_QUEUE) {
-        t->_link->block_info.prev = END_TSO_QUEUE;
-    }
-    t->_link = END_TSO_QUEUE; // no write barrier req'd
-    if (cap->run_queue_hd == END_TSO_QUEUE) {
-	cap->run_queue_tl = END_TSO_QUEUE;
-    }
-    return t;
+{
+  StgTSO *t = cap->run_queue_hd;
+  ASSERT(t != END_TSO_QUEUE);
+  cap->run_queue_hd = t->_link;
+  if (t->_link != END_TSO_QUEUE) {
+    t->_link->block_info.prev = END_TSO_QUEUE;
+  }
+  t->_link = END_TSO_QUEUE; // no write barrier req'd
+  if (cap->run_queue_hd == END_TSO_QUEUE) {
+    cap->run_queue_tl = END_TSO_QUEUE;
+  }
+  return t;
 }
 
 extern void removeFromRunQueue (Capability *cap, StgTSO *tso);
@@ -170,31 +172,31 @@ extern void removeFromRunQueue (Capability *cap, StgTSO *tso);
 /* Add a thread to the end of the blocked queue.
  */
 #if !defined(THREADED_RTS)
-INLINE_HEADER void
+  INLINE_HEADER void
 appendToBlockedQueue(StgTSO *tso)
 {
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (blocked_queue_hd == END_TSO_QUEUE) {
-	blocked_queue_hd = tso;
-    } else {
-	setTSOLink(&MainCapability, blocked_queue_tl, tso);
-    }
-    blocked_queue_tl = tso;
+  ASSERT(tso->_link == END_TSO_QUEUE);
+  if (blocked_queue_hd == END_TSO_QUEUE) {
+    blocked_queue_hd = tso;
+  } else {
+    setTSOLink(&MainCapability, blocked_queue_tl, tso);
+  }
+  blocked_queue_tl = tso;
 }
 #endif
 
 /* Check whether various thread queues are empty
  */
-INLINE_HEADER rtsBool
+  INLINE_HEADER rtsBool
 emptyQueue (StgTSO *q)
 {
-    return (q == END_TSO_QUEUE);
+  return (q == END_TSO_QUEUE);
 }
 
-INLINE_HEADER rtsBool
+  INLINE_HEADER rtsBool
 emptyRunQueue(Capability *cap)
 {
-    return emptyQueue(cap->run_queue_hd);
+  return emptyQueue(cap->run_queue_hd);
 }
 
 #if !defined(THREADED_RTS)
@@ -202,12 +204,12 @@ emptyRunQueue(Capability *cap)
 #define EMPTY_SLEEPING_QUEUE() (emptyQueue(sleeping_queue))
 #endif
 
-INLINE_HEADER rtsBool
+  INLINE_HEADER rtsBool
 emptyThreadQueues(Capability *cap)
 {
-    return emptyRunQueue(cap)
+  return emptyRunQueue(cap)
 #if !defined(THREADED_RTS)
-	&& EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
+    && EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
 #endif
     ;
 }

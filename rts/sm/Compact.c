@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
@@ -56,7 +56,7 @@
    pointer-tagging tag bits on each pointer during the
    threading/unthreading process.
 
-   Our solution is as follows: 
+   Our solution is as follows:
      - an info pointer (chain length zero) is identified by having tag 0
      - in a threaded chain of length > 0:
         - the pointer-tagging tag bits are attached to the info pointer
@@ -83,16 +83,16 @@ thread (StgClosure **p)
     // It doesn't look like a closure at the moment, because the info
     // ptr is possibly threaded:
     // ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
-    
+
     if (HEAP_ALLOCED(q)) {
-	bd = Bdescr(q); 
+	bd = Bdescr(q);
 
 	if (bd->flags & BF_MARKED)
         {
             iptr = *q;
             switch (GET_CLOSURE_TAG((StgClosure *)iptr))
             {
-            case 0: 
+            case 0:
                 // this is the info pointer; we are creating a new chain.
                 // save the original tag at the end of the chain.
                 *p = (StgClosure *)((StgWord)iptr + GET_CLOSURE_TAG(q0));
@@ -157,11 +157,11 @@ STATIC_INLINE StgWord
 get_threaded_info( StgPtr p )
 {
     StgWord q;
-    
+
     q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
 
 loop:
-    switch (GET_CLOSURE_TAG((StgClosure *)q)) 
+    switch (GET_CLOSURE_TAG((StgClosure *)q))
     {
     case 0:
         ASSERT(LOOKS_LIKE_INFO_PTR(q));
@@ -196,17 +196,17 @@ thread_static( StgClosure* p )
   const StgInfoTable *info;
 
   // keep going until we've threaded all the objects on the linked
-  // list... 
+  // list...
   while (p != END_OF_STATIC_LIST) {
 
     info = get_itbl(p);
     switch (info->type) {
-      
+
     case IND_STATIC:
 	thread(&((StgInd *)p)->indirectee);
 	p = *IND_STATIC_LINK(p);
 	continue;
-      
+
     case THUNK_STATIC:
 	p = *THUNK_STATIC_LINK(p);
 	continue;
@@ -216,7 +216,7 @@ thread_static( StgClosure* p )
     case CONSTR_STATIC:
 	p = *STATIC_LINK(info,p);
 	continue;
-      
+
     default:
 	barf("thread_static: strange closure %d", (int)(info->type));
     }
@@ -288,9 +288,9 @@ thread_stack(StgPtr p, StgPtr stack_end)
     const StgRetInfoTable* info;
     StgWord bitmap;
     nat size;
-    
+
     // highly similar to scavenge_stack, but we do pointer threading here.
-    
+
     while (p < stack_end) {
 
 	// *p must be the info pointer of an activation
@@ -298,10 +298,10 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	// info.
 	//
 	info  = get_ret_itbl((StgClosure *)p);
-	
+
 	switch (info->i.type) {
-	    
-	    // Dynamic bitmap: the mask is stored on the stack 
+
+	    // Dynamic bitmap: the mask is stored on the stack
 	case RET_DYN:
 	{
 	    StgWord dyn;
@@ -319,10 +319,10 @@ thread_stack(StgPtr p, StgPtr stack_end)
 		bitmap = bitmap >> 1;
 		size--;
 	    }
-	    
+
 	    // skip over the non-ptr words
 	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
-	    
+
 	    // follow the ptr words
 	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
 		thread((StgClosure **)p);
@@ -330,8 +330,8 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    }
 	    continue;
 	}
-	    
-	    // small bitmap (<= 32 entries, or 64 on a 64-bit machine) 
+
+	    // small bitmap (<= 32 entries, or 64 on a 64-bit machine)
         case CATCH_RETRY_FRAME:
         case CATCH_STM_FRAME:
         case ATOMICALLY_FRAME:
@@ -358,7 +358,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	case RET_BCO: {
 	    StgBCO *bco;
 	    nat size;
-	    
+
 	    p++;
 	    bco = (StgBCO *)*p;
 	    thread((StgClosure **)p);
@@ -369,7 +369,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    continue;
 	}
 
-	    // large bitmap (> 32 entries, or 64 on a 64-bit machine) 
+	    // large bitmap (> 32 entries, or 64 on a 64-bit machine)
 	case RET_BIG:
 	    p++;
 	    size = GET_LARGE_BITMAP(&info->i)->size;
@@ -381,7 +381,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	{
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
-	    
+
 	    fun_info = FUN_INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)
                            get_threaded_info((StgPtr)ret_fun->fun)));
 	         // *before* threading it!
@@ -391,7 +391,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	}
 
 	default:
-	    barf("thread_stack: weird activation record found on stack: %d", 
+	    barf("thread_stack: weird activation record found on stack: %d",
 		 (int)(info->i.type));
 	}
     }
@@ -447,7 +447,7 @@ thread_PAP (StgPAP *pap)
     thread(&pap->fun);
     return p;
 }
-    
+
 STATIC_INLINE StgPtr
 thread_AP (StgAP *ap)
 {
@@ -455,7 +455,7 @@ thread_AP (StgAP *ap)
     p = thread_PAP_payload(ap->fun, ap->payload, ap->n_args);
     thread(&ap->fun);
     return p;
-}    
+}
 
 STATIC_INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
@@ -472,15 +472,17 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->global_link);
 
     if (   tso->why_blocked == BlockedOnMVar
-	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnMsgThrowTo
+      	|| tso->why_blocked == BlockedOnBlackHole
+      	|| tso->why_blocked == BlockedOnMsgThrowTo
         || tso->why_blocked == NotBlocked
+        || tso->why_blocked == Yielded
+        || tso->why_blocked == BlockedInHaskell
         ) {
 	thread_(&tso->block_info.closure);
     }
     thread_(&tso->blocked_exceptions);
     thread_(&tso->bq);
-    
+
     thread_(&tso->trec);
 
     thread_(&tso->stackobj);
@@ -506,14 +508,14 @@ update_fwd_large( bdescr *bd )
     switch (info->type) {
 
     case ARR_WORDS:
-      // nothing to follow 
+      // nothing to follow
       continue;
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-      // follow everything 
+      // follow everything
       {
           StgMutArrPtrs *a;
 
@@ -570,23 +572,23 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case FUN_0_1:
     case CONSTR_0_1:
 	return p + sizeofW(StgHeader) + 1;
-	
+
     case FUN_1_0:
     case CONSTR_1_0:
 	thread(&((StgClosure *)p)->payload[0]);
 	return p + sizeofW(StgHeader) + 1;
-	
+
     case THUNK_1_0:
 	thread(&((StgThunk *)p)->payload[0]);
 	return p + sizeofW(StgThunk) + 1;
-	
+
     case THUNK_0_2:
 	return p + sizeofW(StgThunk) + 2;
 
     case FUN_0_2:
     case CONSTR_0_2:
 	return p + sizeofW(StgHeader) + 2;
-	
+
     case THUNK_1_1:
 	thread(&((StgThunk *)p)->payload[0]);
 	return p + sizeofW(StgThunk) + 2;
@@ -595,7 +597,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case CONSTR_1_1:
 	thread(&((StgClosure *)p)->payload[0]);
 	return p + sizeofW(StgHeader) + 2;
-	
+
     case THUNK_2_0:
 	thread(&((StgThunk *)p)->payload[0]);
 	thread(&((StgThunk *)p)->payload[1]);
@@ -606,7 +608,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	thread(&((StgClosure *)p)->payload[0]);
 	thread(&((StgClosure *)p)->payload[1]);
 	return p + sizeofW(StgHeader) + 2;
-	
+
     case BCO: {
 	StgBCO *bco = (StgBCO *)p;
 	thread_(&bco->instrs);
@@ -618,8 +620,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case THUNK:
     {
 	StgPtr end;
-	
-	end = (P_)((StgThunk *)p)->payload + 
+
+	end = (P_)((StgThunk *)p)->payload +
 	    info->layout.payload.ptrs;
 	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
 	    thread((StgClosure **)p);
@@ -637,15 +639,15 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case BLOCKING_QUEUE:
     {
 	StgPtr end;
-	
-	end = (P_)((StgClosure *)p)->payload + 
+
+	end = (P_)((StgClosure *)p)->payload +
 	    info->layout.payload.ptrs;
 	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
 	    thread((StgClosure **)p);
 	}
 	return p + info->layout.payload.nptrs;
     }
-    
+
     case WEAK:
     {
 	StgWeak *w = (StgWeak *)p;
@@ -658,46 +660,46 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	}
 	return p + sizeofW(StgWeak);
     }
-    
+
     case MVAR_CLEAN:
     case MVAR_DIRTY:
-    { 
+    {
 	StgMVar *mvar = (StgMVar *)p;
 	thread_(&mvar->head);
 	thread_(&mvar->tail);
 	thread(&mvar->value);
 	return p + sizeofW(StgMVar);
     }
-    
+
     case IND:
     case IND_PERM:
 	thread(&((StgInd *)p)->indirectee);
 	return p + sizeofW(StgInd);
 
     case THUNK_SELECTOR:
-    { 
+    {
 	StgSelector *s = (StgSelector *)p;
 	thread(&s->selectee);
 	return p + THUNK_SELECTOR_sizeW();
     }
-    
+
     case AP_STACK:
 	return thread_AP_STACK((StgAP_STACK *)p);
-	
+
     case PAP:
 	return thread_PAP((StgPAP *)p);
 
     case AP:
 	return thread_AP((StgAP *)p);
-	
+
     case ARR_WORDS:
 	return p + arr_words_sizeW((StgArrWords *)p);
-	
+
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-	// follow everything 
+	// follow everything
     {
         StgMutArrPtrs *a;
 
@@ -708,10 +710,10 @@ thread_obj (StgInfoTable *info, StgPtr p)
 
 	return (StgPtr)a + mut_arr_ptrs_sizeW(a);
     }
-    
+
     case TSO:
 	return thread_TSO((StgTSO *)p);
-    
+
     case STACK:
     {
         StgStack *stack = (StgStack*)p;
@@ -759,7 +761,7 @@ update_fwd( bdescr *blocks )
 	    p = thread_obj(info, p);
 	}
     }
-} 
+}
 
 static void
 update_fwd_compact( bdescr *blocks )
@@ -811,7 +813,7 @@ update_fwd_compact( bdescr *blocks )
 	    // Problem: we need to know the destination for this cell
 	    // in order to unthread its info pointer.  But we can't
 	    // know the destination without the size, because we may
-	    // spill into the next block.  So we have to run down the 
+	    // spill into the next block.  So we have to run down the
 	    // threaded list and get the info ptr first.
             //
             // ToDo: one possible avenue of attack is to use the fact
@@ -958,7 +960,7 @@ compact(StgClosure *static_objects)
 	bdescr *bd;
 	StgPtr p;
         for (n = 0; n < n_capabilities; n++) {
-            for (bd = capabilities[n].mut_lists[g]; 
+            for (bd = capabilities[n].mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (p = bd->start; p < bd->free; p++) {
                     thread((StgClosure **)p);
@@ -980,7 +982,7 @@ compact(StgClosure *static_objects)
 	Task *task;
         InCall *incall;
         for (task = all_tasks; task != NULL; task = task->all_next) {
-            for (incall = task->incall; incall != NULL; 
+            for (incall = task->incall; incall != NULL;
                  incall = incall->prev_stack) {
                 if (incall->tso) {
                     thread_(&incall->tso);
@@ -1019,7 +1021,7 @@ compact(StgClosure *static_objects)
     gen = oldest_gen;
     if (gen->old_blocks != NULL) {
 	blocks = update_bkwd_compact(gen);
-	debugTrace(DEBUG_gc, 
+	debugTrace(DEBUG_gc,
 		   "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
 		   gen->no, gen->n_old_blocks, blocks);
 	gen->n_old_blocks = blocks;

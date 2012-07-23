@@ -1062,7 +1062,7 @@ isUntouchable tv
   = return False
   | otherwise 
   = do { env <- getLclEnv
-       ; return (varUnique tv < tcl_untch env) }
+                      ; return (varUnique tv < tcl_untch env) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }
