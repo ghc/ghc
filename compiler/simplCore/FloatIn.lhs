@@ -204,7 +204,8 @@ Urk! if all are tyvars, and we don't float in, we may miss an
 
 \begin{code}
 fiExpr to_drop lam@(_, AnnLam _ _)
-  | go False bndrs 	-- Float in
+  | okToFloatInside bndrs 	-- Float in
+     -- NB: Must line up with noFloatIntoRhs (AnnLam...); see Trac #7088
   = mkLams bndrs (fiExpr to_drop body)
 
   | otherwise	 	-- Dump it all here
@@ -212,12 +213,6 @@ fiExpr to_drop lam@(_, AnnLam _ _)
 
   where
     (bndrs, body) = collectAnnBndrs lam
-
-    go seen_one_shot_id [] = seen_one_shot_id
-    go seen_one_shot_id (b:bs)
-      | isTyVar       b = go seen_one_shot_id bs
-      | isOneShotBndr b = go True bs
-      | otherwise       = False	 -- Give up at a non-one-shot Id
 \end{code}
 
 We don't float lets inwards past an SCC.
@@ -399,8 +394,18 @@ fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
 
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr to_drop rhs)
 
+okToFloatInside :: [Var] -> Bool
+okToFloatInside bndrs = all ok bndrs
+  where
+    ok b = not (isId b) || isOneShotBndr b
+    -- Push the floats inside there are no non-one-shot value binders
+
 noFloatIntoRhs :: AnnExpr' Var (UniqFM Var) -> Bool
-noFloatIntoRhs (AnnLam b _) = not (is_one_shot b)
+noFloatIntoRhs (AnnLam bndr e) 
+   = not (okToFloatInside (bndr:bndrs))
+     -- NB: Must line up with fiExpr (AnnLam...); see Trac #7088
+   where
+     (bndrs, _) = collectAnnBndrs e
 	-- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
 	-- This makes a big difference for things like
 	--	f x# = let x = I# x#
@@ -413,9 +418,6 @@ noFloatIntoRhs (AnnLam b _) = not (is_one_shot b)
 noFloatIntoRhs rhs = exprIsExpandable (deAnnotate' rhs)	
        -- We'd just float right back out again...
        -- Should match the test in SimplEnv.doFloatFromRhs
-
-is_one_shot :: Var -> Bool
-is_one_shot b = isId b && isOneShotBndr b
 \end{code}
 
 
