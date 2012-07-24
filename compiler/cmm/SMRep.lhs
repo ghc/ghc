@@ -9,25 +9,18 @@ This is here, rather than in ClosureInfo, just to keep nhc happy.
 Other modules should access this info through ClosureInfo.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module SMRep (
         -- * Words and bytes
-	StgWord, StgHalfWord, 
-	hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
-	WordOff, ByteOff,
+        StgWord, StgHalfWord,
+        hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
+        WordOff, ByteOff,
         roundUpToWords,
 
         -- * Closure repesentation
-        SMRep(..),	-- CmmInfo sees the rep; no one else does
-        IsStatic, 
+        SMRep(..), -- CmmInfo sees the rep; no one else does
+        IsStatic,
         ClosureTypeInfo(..), ArgDescr(..), Liveness,
-        ConstrDescription, 
+        ConstrDescription,
 
         -- ** Construction
         mkHeapRep, blackHoleRep, mkStackRep, mkRTSRep,
@@ -45,7 +38,7 @@ module SMRep (
         aRG_GEN, aRG_GEN_BIG,
 
         -- * Operations over [Word8] strings that don't belong here
-	pprWord8String, stringToWord8s
+        pprWord8String, stringToWord8s
     ) where
 
 #include "../HsVersions.h"
@@ -63,14 +56,14 @@ import Data.Bits
 
 
 %************************************************************************
-%*									*
-		Words and bytes
-%*									*
+%*                                                                      *
+                Words and bytes
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-type WordOff = Int	-- Word offset, or word count
-type ByteOff = Int	-- Byte offset, or byte count
+type WordOff = Int -- Word offset, or word count
+type ByteOff = Int -- Byte offset, or byte count
 
 roundUpToWords :: ByteOff -> ByteOff
 roundUpToWords n = (n + (wORD_SIZE - 1)) .&. (complement (wORD_SIZE - 1))
@@ -100,9 +93,9 @@ hALF_WORD_SIZE_IN_BITS = 32
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[SMRep-datatype]{@SMRep@---storage manager representation}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -146,10 +139,10 @@ type SelectorOffset    = StgWord
 -- We represent liveness bitmaps as a Bitmap (whose internal
 -- representation really is a bitmap).  These are pinned onto case return
 -- vectors to indicate the state of the stack for the garbage collector.
--- 
+--
 -- In the compiled program, liveness bitmaps that fit inside a single
 -- word (StgWord) are stored as a single word, while larger bitmaps are
--- stored as a pointer to an array of words. 
+-- stored as a pointer to an array of words.
 
 type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
                          --                    False <=> ptr
@@ -158,11 +151,11 @@ type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
 -- An ArgDescr describes the argument pattern of a function
 
 data ArgDescr
-  = ArgSpec		-- Fits one of the standard patterns
-	!StgHalfWord	-- RTS type identifier ARG_P, ARG_N, ...
+  = ArgSpec             -- Fits one of the standard patterns
+        !StgHalfWord    -- RTS type identifier ARG_P, ARG_N, ...
 
-  | ArgGen	 	-- General case
-	Liveness	-- Details about the arguments
+  | ArgGen              -- General case
+        Liveness        -- Details about the arguments
 
 
 -----------------------------------------------------------------------------
@@ -231,7 +224,7 @@ fixedHdrSize = sTD_HDR_SIZE + profHdrSize
 -- (StgProfHeader in includes/rts/storage/Closures.h)
 profHdrSize  :: WordOff
 profHdrSize  | opt_SccProfilingOn   = pROF_HDR_SIZE
-	     | otherwise	    = 0
+             | otherwise            = 0
 
 -- | The garbage collector requires that every closure is at least as big as this.
 minClosureSize :: WordOff
@@ -243,11 +236,11 @@ arrWordsHdrSize   = fixedHdrSize*wORD_SIZE + sIZEOF_StgArrWords_NoHdr
 arrPtrsHdrSize    :: ByteOff
 arrPtrsHdrSize    = fixedHdrSize*wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
 
--- Thunks have an extra header word on SMP, so the update doesn't 
+-- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: WordOff
 thunkHdrSize = fixedHdrSize + smp_hdr
-	where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
+        where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
 
 
 nonHdrSize :: SMRep -> WordOff
@@ -265,11 +258,11 @@ closureTypeHdrSize ty = case ty of
                   ThunkSelector{} -> thunkHdrSize
                   BlackHole{}     -> thunkHdrSize
                   _               -> fixedHdrSize
-	-- All thunks use thunkHdrSize, even if they are non-updatable.
-	-- this is because we don't have separate closure types for
-	-- updatable vs. non-updatable thunks, so the GC can't tell the
-	-- difference.  If we ever have significant numbers of non-
-	-- updatable thunks, it might be worth fixing this.
+        -- All thunks use thunkHdrSize, even if they are non-updatable.
+        -- this is because we don't have separate closure types for
+        -- updatable vs. non-updatable thunks, so the GC can't tell the
+        -- difference.  If we ever have significant numbers of non-
+        -- updatable thunks, it might be worth fixing this.
 
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep
@@ -326,20 +319,20 @@ aRG_GEN_BIG = ARG_GEN_BIG
 
 Note [Static NoCaf constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we know that a top-level binding 'x' is not Caffy (ie no CAFs are 
+If we know that a top-level binding 'x' is not Caffy (ie no CAFs are
 reachable from 'x'), then a statically allocated constructor (Just x)
 is also not Caffy, and the garbage collector need not follow its
 argument fields.  Exploiting this would require two static info tables
 for Just, for the two cases where the argument was Caffy or non-Caffy.
 
-Currently we don't do this; instead we treat nullary constructors 
+Currently we don't do this; instead we treat nullary constructors
 as non-Caffy, and the others as potentially Caffy.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
              Pretty printing of SMRep and friends
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -364,19 +357,19 @@ instance Outputable SMRep where
 instance Outputable ArgDescr where
   ppr (ArgSpec n) = ptext (sLit "ArgSpec") <+> integer (toInteger n)
   ppr (ArgGen ls) = ptext (sLit "ArgGen") <+> ppr ls
-  
+
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)
-  = ptext (sLit "Con") <+> 
+  = ptext (sLit "Con") <+>
     braces (sep [ ptext (sLit "tag:") <+> integer (toInteger tag)
                 , ptext (sLit "descr:") <> text (show descr) ])
 
 pprTypeInfo (Fun arity args)
-  = ptext (sLit "Fun") <+> 
+  = ptext (sLit "Fun") <+>
     braces (sep [ ptext (sLit "arity:") <+> integer (toInteger arity)
                 , ptext (sLit ("fun_type:")) <+> ppr args ])
 
-pprTypeInfo (ThunkSelector offset) 
+pprTypeInfo (ThunkSelector offset)
   = ptext (sLit "ThunkSel") <+> integer (toInteger offset)
 
 pprTypeInfo Thunk     = ptext (sLit "Thunk")
