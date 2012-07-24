@@ -71,7 +71,6 @@ libraries/template-haskell      -           packages/template-haskell.git       
 libraries/terminfo              -           packages/terminfo.git               git
 libraries/transformers          -           packages/transformers.git           git
 libraries/unix                  -           packages/unix.git                   git
-libraries/utf8-string           -           packages/utf8-string.git            git
 libraries/Win32                 -           packages/Win32.git                  git
 libraries/xhtml                 -           packages/xhtml.git                  git
 testsuite                       testsuite   testsuite.git                       git
