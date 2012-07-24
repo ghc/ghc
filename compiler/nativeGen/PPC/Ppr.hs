@@ -46,21 +46,22 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> SDoc
-pprNatCmmDecl _ (CmmData section dats) =
+pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph []))
+pprNatCmmDecl (CmmProc Nothing lbl (ListGraph []))
     = pprLabel lbl
 
  -- special case for code without an info table:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph blocks)) =
+pprNatCmmDecl (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   pprLabel lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map pprBasicBlock blocks)
 
-pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+pprNatCmmDecl (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+  sdocWithPlatform $ \platform ->
   pprSectionHeader Text $$
   (
        (if platformHasSubsectionsViaSymbols platform

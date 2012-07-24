@@ -47,27 +47,28 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
-pprNatCmmDecl platform (CmmData section dats) =
-  pprSectionHeader platform section $$ pprDatas platform dats
+pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
+pprNatCmmDecl (CmmData section dats) =
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmDecl (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
  -- special case for code without info table:
-pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader platform Text $$
+pprNatCmmDecl (CmmProc Nothing lbl (ListGraph blocks)) =
+  pprSectionHeader Text $$
   pprLabel lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map pprBasicBlock blocks) $$
-  pprSizeDecl platform lbl
+  pprSizeDecl lbl
 
-pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  pprSectionHeader platform Text $$
+pprNatCmmDecl (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+  sdocWithPlatform $ \platform ->
+  pprSectionHeader Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
         then ppr (mkDeadStripPreventer info_lbl) <> char ':'
         else empty) $$
-       vcat (map (pprData platform) info) $$
+       vcat (map pprData info) $$
        pprLabel info_lbl
   ) $$
   vcat (map pprBasicBlock blocks) $$
@@ -86,15 +87,16 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
               <+> char '-'
               <+> ppr (mkDeadStripPreventer info_lbl)
          else empty) $$
-  pprSizeDecl platform info_lbl
+  pprSizeDecl info_lbl
 
 -- | Output the ELF .size directive.
-pprSizeDecl :: Platform -> CLabel -> SDoc
-pprSizeDecl platform lbl
- | osElfTarget (platformOS platform) =
-    ptext (sLit "\t.size") <+> ppr lbl
-    <> ptext (sLit ", .-") <> ppr lbl
- | otherwise = empty
+pprSizeDecl :: CLabel -> SDoc
+pprSizeDecl lbl
+ = sdocWithPlatform $ \platform ->
+   if osElfTarget (platformOS platform)
+   then ptext (sLit "\t.size") <+> ppr lbl
+     <> ptext (sLit ", .-") <> ppr lbl
+   else empty
 
 pprBasicBlock :: NatBasicBlock Instr -> SDoc
 pprBasicBlock (BasicBlock blockid instrs) =
@@ -102,19 +104,20 @@ pprBasicBlock (BasicBlock blockid instrs) =
   vcat (map pprInstr instrs)
 
 
-pprDatas :: Platform -> (Alignment, CmmStatics) -> SDoc
-pprDatas platform (align, (Statics lbl dats))
- = vcat (pprAlign platform align : pprLabel lbl : map (pprData platform) dats)
+pprDatas :: (Alignment, CmmStatics) -> SDoc
+pprDatas (align, (Statics lbl dats))
+ = vcat (pprAlign align : pprLabel lbl : map pprData dats)
  -- TODO: could remove if align == 1
 
-pprData :: Platform -> CmmStatic -> SDoc
-pprData _ (CmmString str)          = pprASCII str
+pprData :: CmmStatic -> SDoc
+pprData (CmmString str) = pprASCII str
 
-pprData platform (CmmUninitialised bytes)
- | platformOS platform == OSDarwin = ptext (sLit ".space ") <> int bytes
- | otherwise                       = ptext (sLit ".skip ")  <> int bytes
+pprData (CmmUninitialised bytes)
+ = sdocWithPlatform $ \platform ->
+   if platformOS platform == OSDarwin then ptext (sLit ".space ") <> int bytes
+                                      else ptext (sLit ".skip ")  <> int bytes
 
-pprData platform (CmmStaticLit lit) = pprDataItem platform lit
+pprData (CmmStaticLit lit) = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
@@ -141,13 +144,14 @@ pprASCII str
        do1 :: Word8 -> SDoc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
-pprAlign :: Platform -> Int -> SDoc
-pprAlign platform bytes
-        = ptext (sLit ".align ") <> int alignment
+pprAlign :: Int -> SDoc
+pprAlign bytes
+        = sdocWithPlatform $ \platform ->
+          ptext (sLit ".align ") <> int (alignment platform)
   where
-        alignment = if platformOS platform == OSDarwin
-                    then log2 bytes
-                    else      bytes
+        alignment platform = if platformOS platform == OSDarwin
+                             then log2 bytes
+                             else      bytes
 
         log2 :: Int -> Int  -- cache the common ones
         log2 1 = 0
@@ -362,9 +366,10 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 
-pprSectionHeader :: Platform -> Section -> SDoc
-pprSectionHeader platform seg
- = case platformOS platform of
+pprSectionHeader :: Section -> SDoc
+pprSectionHeader seg
+ = sdocWithPlatform $ \platform ->
+   case platformOS platform of
    OSDarwin
     | target32Bit platform ->
        case seg of
@@ -407,8 +412,11 @@ pprSectionHeader platform seg
 
 
 
-pprDataItem :: Platform -> CmmLit -> SDoc
-pprDataItem platform lit
+pprDataItem :: CmmLit -> SDoc
+pprDataItem lit = sdocWithPlatform $ \platform -> pprDataItem' platform lit
+
+pprDataItem' :: Platform -> CmmLit -> SDoc
+pprDataItem' platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
         imm = litToImm lit
