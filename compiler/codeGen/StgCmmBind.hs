@@ -55,7 +55,6 @@ import Outputable
 import FastString
 import Maybes
 import DynFlags
-import StaticFlags
 
 ------------------------------------------------------------------------
 --		Top-level bindings
@@ -79,17 +78,17 @@ cgTopRhsClosure id ccs _ upd_flag args body = do
   ; mod_name <- getModuleName
   ; dflags   <- getDynFlags
   ; let descr         = closureDescription dflags mod_name name
-        closure_info  = mkClosureInfo True id lf_info 0 0 descr
+        closure_info  = mkClosureInfo dflags True id lf_info 0 0 descr
         closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
         caffy         = idCafInfo id
         info_tbl      = mkCmmInfo closure_info -- XXX short-cut
-        closure_rep   = mkStaticClosureFields info_tbl ccs caffy []
+        closure_rep   = mkStaticClosureFields dflags info_tbl ccs caffy []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
   ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
-	(_, _, fv_details) = mkVirtHeapOffsets (isLFThunk lf_info)
+	(_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info)
 				               (addIdReps [])
   -- Don't drop the non-void args until the closure info has been made
   ; forkClosureBody (closureCodeBody True id closure_info ccs
@@ -161,13 +160,14 @@ cgRhs name (StgRhsCon cc con args)
   = buildDynCon name cc con args
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag _srt args body)
-  = mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag args body
+  = do dflags <- getDynFlags
+       mkRhsClosure dflags name cc bi (nonVoidIds fvs) upd_flag args body
 
 ------------------------------------------------------------------------
 --		Non-constructor right hand sides
 ------------------------------------------------------------------------
 
-mkRhsClosure :: Id -> CostCentreStack -> StgBinderInfo
+mkRhsClosure :: DynFlags -> Id -> CostCentreStack -> StgBinderInfo
 	     -> [NonVoid Id]			-- Free vars
              -> UpdateFlag
 	     -> [Id]			        -- Args
@@ -210,7 +210,7 @@ for semi-obvious reasons.
 -}
 
 ---------- Note [Selectors] ------------------
-mkRhsClosure	bndr cc bi
+mkRhsClosure	dflags bndr cc bi
 		[NonVoid the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
                 []                      -- A thunk
@@ -234,14 +234,14 @@ mkRhsClosure	bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, _, params_w_offsets) = mkVirtConstrOffsets (addIdReps params)
+    (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps params)
 			       -- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets (NonVoid selectee)
     Just the_offset 	  = maybe_offset
-    offset_into_int       = the_offset - fixedHdrSize
+    offset_into_int       = the_offset - fixedHdrSize dflags
 
 ---------- Note [Ap thunks] ------------------
-mkRhsClosure    bndr cc bi
+mkRhsClosure    dflags bndr cc bi
 		fvs
 		upd_flag
                 []                      -- No args; a thunk
@@ -251,7 +251,8 @@ mkRhsClosure    bndr cc bi
  	&& all (isGcPtrRep . idPrimRep . stripNV) fvs
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE
-        && not opt_SccProfilingOn -- not when profiling: we don't want to
+        && not (dopt Opt_SccProfilingOn dflags)
+                                  -- not when profiling: we don't want to
                                   -- lose information about this particular
                                   -- thunk (e.g. its type) (#949)
 
@@ -265,7 +266,7 @@ mkRhsClosure    bndr cc bi
 	arity 	= length fvs
 
 ---------- Default case ------------------
-mkRhsClosure bndr cc _ fvs upd_flag args body
+mkRhsClosure _ bndr cc _ fvs upd_flag args body
   = do	{ 	-- LAY OUT THE OBJECT
 	-- If the binder is itself a free variable, then don't store
 	-- it in the closure.  Instead, just bind it to Node on entry.
@@ -289,9 +290,9 @@ mkRhsClosure bndr cc _ fvs upd_flag args body
                 descr = closureDescription dflags mod_name name
                 fv_details :: [(NonVoid Id, VirtualHpOffset)]
 		(tot_wds, ptr_wds, fv_details)
-		   = mkVirtHeapOffsets (isLFThunk lf_info)
+		   = mkVirtHeapOffsets dflags (isLFThunk lf_info)
 				       (addIdReps (map stripNV reduced_fvs))
-		closure_info = mkClosureInfo False	-- Not static
+		closure_info = mkClosureInfo dflags False	-- Not static
 					     bndr lf_info tot_wds ptr_wds
                                              descr
 
@@ -335,10 +336,10 @@ cgStdThunk bndr _cc _bndr_info _body lf_info payload
     mod_name <- getModuleName
   ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, payload_w_offsets)
-	    = mkVirtHeapOffsets (isLFThunk lf_info) (addArgReps payload)
+	    = mkVirtHeapOffsets dflags (isLFThunk lf_info) (addArgReps payload)
 
 	descr = closureDescription dflags mod_name (idName bndr)
-	closure_info = mkClosureInfo False 	-- Not static
+	closure_info = mkClosureInfo dflags False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds
                                      descr
 
@@ -419,8 +420,9 @@ closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode cl_info arg_regs
 
+                ; dflags <- getDynFlags
                 ; let lf_info = closureLFInfo cl_info
-                      node_points = nodeMustPointToIt lf_info
+                      node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
                 ; tickyEnterFun cl_info
                 ; whenC node_points (ldvEnterClosure cl_info)
@@ -475,7 +477,8 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
 thunkCode :: ClosureInfo -> [(NonVoid Id, VirtualHpOffset)] -> CostCentreStack
           -> LocalReg -> Int -> StgExpr -> FCode ()
 thunkCode cl_info fv_details _cc node arity body
-  = do { let node_points = nodeMustPointToIt (closureLFInfo cl_info)
+  = do { dflags <- getDynFlags
+       ; let node_points = nodeMustPointToIt dflags (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
         ; tickyEnterThunk cl_info
         ; ldvEnterClosure cl_info -- NB: Node always points when profiling
@@ -532,7 +535,7 @@ emitBlackHoleCode is_single_entry = do
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from CmmParse.
 
-  let  eager_blackholing =  not opt_SccProfilingOn
+  let  eager_blackholing =  not (dopt Opt_SccProfilingOn dflags)
                          && dopt Opt_EagerBlackHoling dflags
              -- Profiling needs slop filling (to support LDV
              -- profiling), so currently eager blackholing doesn't
@@ -540,7 +543,7 @@ emitBlackHoleCode is_single_entry = do
 
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
-    emitStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+    emitStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
                   (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
     emitStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -561,7 +564,8 @@ setupUpdate closure_info node body
           dflags <- getDynFlags
           let
               bh = blackHoleOnEntry closure_info &&
-                   not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+                   not (dopt Opt_SccProfilingOn dflags) &&
+                   dopt Opt_EagerBlackHoling dflags
 
               lbl | bh        = mkBHUpdInfoLabel
                   | otherwise = mkUpdInfoLabel
@@ -638,13 +642,14 @@ link_caf :: Bool                -- True <=> updatable, False <=> single-entry
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
 link_caf _is_upd = do
-  { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
+  { dflags <- getDynFlags
+    -- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
 
   ; (hp_rel, init) <- allocDynClosureCmm cafBlackHoleInfoTable mkLFBlackHole
-                                         use_cc blame_cc [(tso,fixedHdrSize)]
+                                         use_cc blame_cc [(tso,fixedHdrSize dflags)]
   ; emit init
 
 	-- Call the RTS function newCAF to add the CAF to the CafList

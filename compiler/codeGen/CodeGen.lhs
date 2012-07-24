@@ -104,7 +104,7 @@ mkModuleInit dflags cost_centre_info this_mod hpc_info
         ; whenC (opt_Hpc) $
               hpcTable this_mod hpc_info
 
-        ; whenC (opt_SccProfilingOn) $ do
+        ; whenC (dopt Opt_SccProfilingOn dflags) $ do
             initCostCentres cost_centre_info
 
             -- For backwards compatibility: user code may refer to this
@@ -128,11 +128,11 @@ code-generator.)
 initCostCentres :: CollectedCCs -> Code
 -- Emit the declarations, and return code to register them
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
-  | not opt_SccProfilingOn = nopC
-  | otherwise
-  = do  { mapM_ emitCostCentreDecl       local_CCs
-        ; mapM_ emitCostCentreStackDecl  singleton_CCSs
-        }
+  = do dflags <- getDynFlags
+       if not (dopt Opt_SccProfilingOn dflags)
+           then nopC
+           else do mapM_ emitCostCentreDecl      local_CCs
+                   mapM_ emitCostCentreStackDecl singleton_CCSs
 \end{code}
 
 %************************************************************************

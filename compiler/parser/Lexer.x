@@ -57,7 +57,7 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
-   explicitNamespacesEnabled,
+   explicitNamespacesEnabled, sccProfilingOn,
    addWarning,
    lexTokenStream
   ) where
@@ -1849,6 +1849,8 @@ inRulePragBit :: Int
 inRulePragBit = 19
 rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
+sccProfilingOnBit :: Int
+sccProfilingOnBit = 21
 alternativeLayoutRuleBit :: Int
 alternativeLayoutRuleBit = 23
 relaxedLayoutBit :: Int
@@ -1909,6 +1911,8 @@ relaxedLayout :: Int -> Bool
 relaxedLayout flags = testBit flags relaxedLayoutBit
 nondecreasingIndentation :: Int -> Bool
 nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
+sccProfilingOn :: Int -> Bool
+sccProfilingOn flags = testBit flags sccProfilingOnBit
 traditionalRecordSyntaxEnabled :: Int -> Bool
 traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
 typeLiteralsEnabled :: Int -> Bool
@@ -1975,6 +1979,7 @@ mkPState flags buf loc =
                .|. rawTokenStreamBit           `setBitIf` dopt Opt_KeepRawTokenStream       flags
                .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
                .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
+               .|. sccProfilingOnBit           `setBitIf` dopt Opt_SccProfilingOn           flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags

@@ -30,8 +30,8 @@ import SMRep
 import Module
 import Constants
 import Outputable
+import DynFlags
 import FastString
-import StaticFlags
 
 import Control.Monad
 
@@ -154,20 +154,23 @@ emitPrimOp [res] SparkOp [arg] live = do
         newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
 
 emitPrimOp [res] GetCCSOfOp [arg] _live
-  = stmtC (CmmAssign (CmmLocal res) val)
+  = do dflags <- getDynFlags
+       stmtC (CmmAssign (CmmLocal res) (val dflags))
   where
-    val | opt_SccProfilingOn = costCentreFrom (cmmUntag arg)
-        | otherwise          = CmmLit zeroCLit
+    val dflags
+     | dopt Opt_SccProfilingOn dflags = costCentreFrom (cmmUntag arg)
+     | otherwise                      = CmmLit zeroCLit
 
 emitPrimOp [res] GetCurrentCCSOp [_dummy_arg] _live
    = stmtC (CmmAssign (CmmLocal res) curCCS)
 
 emitPrimOp [res] ReadMutVarOp [mutv] _
-   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
+   = do dflags <- getDynFlags
+        stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv (fixedHdrSize dflags) gcWord))
 
 emitPrimOp [] WriteMutVarOp [mutv,var] live
-   = do
-        stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
+   = do dflags <- getDynFlags
+        stmtC (CmmStore (cmmOffsetW mutv (fixedHdrSize dflags)) var)
         vols <- getVolatileRegs live
         emitForeignCall' PlayRisky
                 [{-no results-}]
@@ -182,8 +185,10 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrWords *)(a))->bytes
 emitPrimOp [res] SizeofByteArrayOp [arg] _
-   = stmtC $
-        CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
+   = do dflags <- getDynFlags
+        stmtC $
+            CmmAssign (CmmLocal res)
+                      (cmmLoadIndexW arg (fixedHdrSize dflags) bWord)
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrWords *)(a))->bytes
@@ -197,18 +202,21 @@ emitPrimOp [] TouchOp [_] _
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp [res] ByteArrayContents_Char [arg] _
-   = stmtC (CmmAssign (CmmLocal res) (cmmOffsetB arg arrWordsHdrSize))
+   = do dflags <- getDynFlags
+        stmtC (CmmAssign (CmmLocal res) (cmmOffsetB arg (arrWordsHdrSize dflags)))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
 emitPrimOp [res] StableNameToIntOp [arg] _
-   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord))
+   = do dflags <- getDynFlags
+        stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize dflags) bWord))
 
 --  #define eqStableNamezh(r,sn1,sn2)                                   \
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 emitPrimOp [res] EqStableNameOp [arg1,arg2] _
-   = stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [
-                                cmmLoadIndexW arg1 fixedHdrSize bWord,
-                                cmmLoadIndexW arg2 fixedHdrSize bWord
+   = do dflags <- getDynFlags
+        stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [
+                                cmmLoadIndexW arg1 (fixedHdrSize dflags) bWord,
+                                cmmLoadIndexW arg2 (fixedHdrSize dflags) bWord
                          ]))
 
 
@@ -222,7 +230,8 @@ emitPrimOp [res] AddrToAnyOp [arg] _
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 --  Note: argument may be tagged!
 emitPrimOp [res] DataToTagOp [arg] _
-   = stmtC (CmmAssign (CmmLocal res) (getConstrTag (cmmUntag arg)))
+   = do dflags <- getDynFlags
+        stmtC (CmmAssign (CmmLocal res) (getConstrTag dflags (cmmUntag arg)))
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -281,8 +290,9 @@ emitPrimOp []  WriteArrayArrayOp_ArrayArray        [obj,ix,v] _  = doWritePtrArr
 emitPrimOp []  WriteArrayArrayOp_MutableArrayArray [obj,ix,v] _  = doWritePtrArrayOp obj ix v
 
 emitPrimOp [res] SizeofArrayOp [arg] _
-   = stmtC $
-       CmmAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize + oFFSET_StgMutArrPtrs_ptrs) bWord)
+   = do dflags <- getDynFlags
+        stmtC $ CmmAssign (CmmLocal res)
+                          (cmmLoadIndexW arg (fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs) bWord)
 emitPrimOp [res] SizeofMutableArrayOp [arg] live
    = emitPrimOp [res] SizeofArrayOp [arg] live
 emitPrimOp [res] SizeofArrayArrayOp [arg] live
@@ -797,13 +807,15 @@ doIndexOffAddrOp _ _ _ _
    = panic "CgPrimOp: doIndexOffAddrOp"
 
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
-   = mkBasicIndexedRead arrWordsHdrSize maybe_post_read_cast rep res addr idx
+   = do dflags <- getDynFlags
+        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx
 doIndexByteArrayOp _ _ _ _
    = panic "CgPrimOp: doIndexByteArrayOp"
 
 doReadPtrArrayOp :: LocalReg -> CmmExpr -> CmmExpr -> Code
 doReadPtrArrayOp res addr idx
-   = mkBasicIndexedRead arrPtrsHdrSize Nothing gcWord res addr idx
+   = do dflags <- getDynFlags
+        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing gcWord res addr idx
 
 
 doWriteOffAddrOp, doWriteByteArrayOp
@@ -815,27 +827,29 @@ doWriteOffAddrOp _ _ _ _
    = panic "CgPrimOp: doWriteOffAddrOp"
 
 doWriteByteArrayOp maybe_pre_write_cast rep [] [addr,idx,val]
-   = mkBasicIndexedWrite arrWordsHdrSize maybe_pre_write_cast rep addr idx val
+   = do dflags <- getDynFlags
+        mkBasicIndexedWrite (arrWordsHdrSize dflags) maybe_pre_write_cast rep addr idx val
 doWriteByteArrayOp _ _ _ _
    = panic "CgPrimOp: doWriteByteArrayOp"
 
 doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 doWritePtrArrayOp addr idx val
-   = do mkBasicIndexedWrite arrPtrsHdrSize Nothing bWord addr idx val
+   = do dflags <- getDynFlags
+        mkBasicIndexedWrite (arrPtrsHdrSize dflags) Nothing bWord addr idx val
         stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
    -- the write barrier.  We must write a byte into the mark table:
    -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
         stmtC $ CmmStore (
           cmmOffsetExpr
-           (cmmOffsetExprW (cmmOffsetB addr arrPtrsHdrSize)
-                          (loadArrPtrsSize addr))
+           (cmmOffsetExprW (cmmOffsetB addr (arrPtrsHdrSize dflags))
+                          (loadArrPtrsSize dflags addr))
            (CmmMachOp mo_wordUShr [idx,
                                    CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
           ) (CmmLit (CmmInt 1 W8))
 
-loadArrPtrsSize :: CmmExpr -> CmmExpr
-loadArrPtrsSize addr = CmmLoad (cmmOffsetB addr off) bWord
- where off = fixedHdrSize*wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs
+loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
+loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB addr off) bWord
+ where off = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs
 
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType
                    -> LocalReg -> CmmExpr -> CmmExpr -> Code
@@ -905,8 +919,9 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> StgLiveVars
                   -> Code
 emitCopyByteArray copy src src_off dst dst_off n live = do
-    dst_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
-    src_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
+    dflags <- getDynFlags
+    dst_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB dst (arrWordsHdrSize dflags)) dst_off
+    src_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB src (arrWordsHdrSize dflags)) src_off
     copy src dst dst_p src_p n live
 
 -- ----------------------------------------------------------------------------
@@ -918,7 +933,8 @@ emitCopyByteArray copy src src_off dst dst_off n live = do
 doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> StgLiveVars -> Code
 doSetByteArrayOp ba off len c live
-    = do p <- assignTemp $ cmmOffsetExpr (cmmOffsetB ba arrWordsHdrSize) off
+    = do dflags <- getDynFlags
+         p <- assignTemp $ cmmOffsetExpr (cmmOffsetB ba (arrWordsHdrSize dflags)) off
          emitMemsetCall p c len (CmmLit (mkIntCLit 1)) live
 
 -- ----------------------------------------------------------------------------
@@ -966,6 +982,7 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
               -> StgLiveVars
               -> Code
 emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
+    dflags <- getDynFlags
     -- Assign the arguments to temporaries so the code generator can
     -- calculate liveness for us.
     src <- assignTemp_ src0
@@ -977,15 +994,15 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
     -- Set the dirty bit in the header.
     stmtC (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
-    dst_elems_p <- assignTemp $ cmmOffsetB dst arrPtrsHdrSize
+    dst_elems_p <- assignTemp $ cmmOffsetB dst (arrPtrsHdrSize dflags)
     dst_p <- assignTemp $ cmmOffsetExprW dst_elems_p dst_off
-    src_p <- assignTemp $ cmmOffsetExprW (cmmOffsetB src arrPtrsHdrSize) src_off
+    src_p <- assignTemp $ cmmOffsetExprW (cmmOffsetB src (arrPtrsHdrSize dflags)) src_off
     bytes <- assignTemp $ cmmMulWord n (CmmLit (mkIntCLit wORD_SIZE))
 
     copy src dst dst_p src_p bytes live
 
     -- The base address of the destination card table
-    dst_cards_p <- assignTemp $ cmmOffsetExprW dst_elems_p (loadArrPtrsSize dst)
+    dst_cards_p <- assignTemp $ cmmOffsetExprW dst_elems_p (loadArrPtrsSize dflags dst)
 
     emitSetCards dst_off dst_cards_p n live
 
@@ -996,6 +1013,7 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
 emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
                -> StgLiveVars -> Code
 emitCloneArray info_p res_r src0 src_off0 n0 live = do
+    dflags <- getDynFlags
     -- Assign the arguments to temporaries so the code generator can
     -- calculate liveness for us.
     src <- assignTemp_ src0
@@ -1006,22 +1024,22 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
                                 (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)))
                   `cmmAddWord` CmmLit (mkIntCLit 1)
     size <- assignTemp $ n `cmmAddWord` card_words
-    words <- assignTemp $ arrPtrsHdrSizeW `cmmAddWord` size
+    words <- assignTemp $ arrPtrsHdrSizeW dflags `cmmAddWord` size
 
     arr_r <- newTemp bWord
     emitAllocateCall arr_r myCapability words live
-    tickyAllocPrim (CmmLit (mkIntCLit arrPtrsHdrSize)) (n `cmmMulWord` wordSize)
+    tickyAllocPrim (CmmLit (mkIntCLit (arrPtrsHdrSize dflags))) (n `cmmMulWord` wordSize)
         (CmmLit $ mkIntCLit 0)
 
     let arr = CmmReg (CmmLocal arr_r)
     emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
-    stmtC $ CmmStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +
+    stmtC $ CmmStore (cmmOffsetB arr (fixedHdrSize dflags * wORD_SIZE +
                                       oFFSET_StgMutArrPtrs_ptrs)) n
-    stmtC $ CmmStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +
+    stmtC $ CmmStore (cmmOffsetB arr (fixedHdrSize dflags * wORD_SIZE +
                                       oFFSET_StgMutArrPtrs_size)) size
 
-    dst_p <- assignTemp $ cmmOffsetB arr arrPtrsHdrSize
-    src_p <- assignTemp $ cmmOffsetExprW (cmmOffsetB src arrPtrsHdrSize)
+    dst_p <- assignTemp $ cmmOffsetB arr (arrPtrsHdrSize dflags)
+    src_p <- assignTemp $ cmmOffsetExprW (cmmOffsetB src (arrPtrsHdrSize dflags))
              src_off
 
     emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize)
@@ -1034,8 +1052,8 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
         live
     stmtC $ CmmAssign (CmmLocal res_r) arr
   where
-    arrPtrsHdrSizeW = CmmLit $ mkIntCLit $ fixedHdrSize +
-                      (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE)
+    arrPtrsHdrSizeW dflags = CmmLit $ mkIntCLit $ fixedHdrSize dflags +
+                                 (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE)
     wordSize = CmmLit (mkIntCLit wORD_SIZE)
     myCapability = CmmReg baseReg `cmmSubWord`
                    CmmLit (mkIntCLit oFFSET_Capability_r)

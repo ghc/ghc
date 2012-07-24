@@ -44,7 +44,7 @@ module SMRep (
 #include "../HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import StaticFlags
+import DynFlags
 import Constants
 import Outputable
 import FastString
@@ -161,8 +161,9 @@ data ArgDescr
 -----------------------------------------------------------------------------
 -- Construction
 
-mkHeapRep :: IsStatic -> WordOff -> WordOff -> ClosureTypeInfo -> SMRep
-mkHeapRep is_static ptr_wds nonptr_wds cl_type_info
+mkHeapRep :: DynFlags -> IsStatic -> WordOff -> WordOff -> ClosureTypeInfo
+          -> SMRep
+mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type_info
   = HeapRep is_static
             ptr_wds
             (nonptr_wds + slop_wds)
@@ -170,9 +171,9 @@ mkHeapRep is_static ptr_wds nonptr_wds cl_type_info
   where
      slop_wds
       | is_static = 0
-      | otherwise = max 0 (minClosureSize - (hdr_size + payload_size))
+      | otherwise = max 0 (minClosureSize dflags - (hdr_size + payload_size))
 
-     hdr_size     = closureTypeHdrSize cl_type_info
+     hdr_size     = closureTypeHdrSize dflags cl_type_info
      payload_size = ptr_wds + nonptr_wds
 
 mkRTSRep :: StgHalfWord -> SMRep -> SMRep
@@ -217,29 +218,33 @@ isStaticNoCafCon _                           = False
 -- Size-related things
 
 -- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
-fixedHdrSize :: WordOff
-fixedHdrSize = sTD_HDR_SIZE + profHdrSize
+fixedHdrSize :: DynFlags -> WordOff
+fixedHdrSize dflags = sTD_HDR_SIZE + profHdrSize dflags
 
 -- | Size of the profiling part of a closure header
 -- (StgProfHeader in includes/rts/storage/Closures.h)
-profHdrSize  :: WordOff
-profHdrSize  | opt_SccProfilingOn   = pROF_HDR_SIZE
-             | otherwise            = 0
+profHdrSize  :: DynFlags -> WordOff
+profHdrSize dflags
+ | dopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE
+ | otherwise                      = 0
 
--- | The garbage collector requires that every closure is at least as big as this.
-minClosureSize :: WordOff
-minClosureSize = fixedHdrSize + mIN_PAYLOAD_SIZE
+-- | The garbage collector requires that every closure is at least as
+--   big as this.
+minClosureSize :: DynFlags -> WordOff
+minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE
 
-arrWordsHdrSize   :: ByteOff
-arrWordsHdrSize   = fixedHdrSize*wORD_SIZE + sIZEOF_StgArrWords_NoHdr
+arrWordsHdrSize :: DynFlags -> ByteOff
+arrWordsHdrSize dflags
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr
 
-arrPtrsHdrSize    :: ByteOff
-arrPtrsHdrSize    = fixedHdrSize*wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
+arrPtrsHdrSize :: DynFlags -> ByteOff
+arrPtrsHdrSize dflags
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
-thunkHdrSize :: WordOff
-thunkHdrSize = fixedHdrSize + smp_hdr
+thunkHdrSize :: DynFlags -> WordOff
+thunkHdrSize dflags = fixedHdrSize dflags + smp_hdr
         where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
 
 
@@ -248,16 +253,17 @@ nonHdrSize (HeapRep _ p np _) = p + np
 nonHdrSize (StackRep bs)      = length bs
 nonHdrSize (RTSRep _ rep)     = nonHdrSize rep
 
-heapClosureSize :: SMRep -> WordOff
-heapClosureSize (HeapRep _ p np ty) = closureTypeHdrSize ty + p + np
-heapClosureSize _ = panic "SMRep.heapClosureSize"
+heapClosureSize :: DynFlags -> SMRep -> WordOff
+heapClosureSize dflags (HeapRep _ p np ty)
+ = closureTypeHdrSize dflags ty + p + np
+heapClosureSize _ _ = panic "SMRep.heapClosureSize"
 
-closureTypeHdrSize :: ClosureTypeInfo -> WordOff
-closureTypeHdrSize ty = case ty of
-                  Thunk{}         -> thunkHdrSize
-                  ThunkSelector{} -> thunkHdrSize
-                  BlackHole{}     -> thunkHdrSize
-                  _               -> fixedHdrSize
+closureTypeHdrSize :: DynFlags -> ClosureTypeInfo -> WordOff
+closureTypeHdrSize dflags ty = case ty of
+                  Thunk{}         -> thunkHdrSize dflags
+                  ThunkSelector{} -> thunkHdrSize dflags
+                  BlackHole{}     -> thunkHdrSize dflags
+                  _               -> fixedHdrSize dflags
         -- All thunks use thunkHdrSize, even if they are non-updatable.
         -- this is because we don't have separate closure types for
         -- updatable vs. non-updatable thunks, so the GC can't tell the

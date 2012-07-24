@@ -50,6 +50,7 @@ import OldCmm hiding( ClosureTypeInfo(..) )
 
 -- import BasicTypes
 import BlockId
+import DynFlags
 import FastString
 import Module
 import UniqFM
@@ -86,6 +87,10 @@ thenExtFC (EC m) k = EC $ \e s -> do (s',r) <- m e s; unEC (k r) e s'
 instance Monad ExtFCode where
   (>>=) = thenExtFC
   return = returnExtFC
+
+instance HasDynFlags ExtFCode where
+    getDynFlags = EC (\_ d -> do dflags <- getDynFlags
+                                 return (d, dflags))
 
 
 -- | Takes the variable decarations and imports from the monad

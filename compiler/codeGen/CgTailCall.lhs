@@ -41,8 +41,8 @@ import Type
 import Id
 import StgSyn
 import PrimOp
+import DynFlags
 import Outputable
-import StaticFlags
 import Util
 
 import Control.Monad
@@ -112,15 +112,15 @@ performTailCall fun_info arg_amodes pending_assts
 
   | otherwise
   = do 	{ fun_amode <- idInfoToAmode fun_info
+	; dflags <- getDynFlags
 	; let assignSt  = CmmAssign nodeReg fun_amode
               node_asst = oneStmt assignSt
               node_live = Just [node]
 	      (opt_node_asst, opt_node_live)
-                      | nodeMustPointToIt lf_info = (node_asst, node_live)
+                      | nodeMustPointToIt dflags lf_info = (node_asst, node_live)
                       | otherwise                 = (noStmts, Just [])
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
 
-	; dflags <- getDynFlags
 	; case (getCallMethod dflags fun_name fun_has_cafs lf_info (length arg_amodes)) of
 
 	    -- Node must always point to things we enter
@@ -133,7 +133,7 @@ performTailCall fun_info arg_amodes pending_assts
                       -- so we can directly jump to the alternatives switch
                       -- statement.
                       jumpInstr = getEndOfBlockInfo >>=
-                                  maybeSwitchOnCons enterClosure
+                                  maybeSwitchOnCons dflags enterClosure
 		; doFinalJump sp False jumpInstr }
     
 	    -- A function, but we have zero arguments.  It is already in WHNF,
@@ -194,9 +194,9 @@ performTailCall fun_info arg_amodes pending_assts
     fun_has_cafs = idCafInfo fun_id
     untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
     -- Test if closure is a constructor
-    maybeSwitchOnCons enterClosure eob
+    maybeSwitchOnCons dflags enterClosure eob
               | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
-                not opt_SccProfilingOn
+                not (dopt Opt_SccProfilingOn dflags)
                 -- we can't shortcut when profiling is on, because we have
                 -- to enter a closure to mark it as "used" for LDV profiling
               = do { is_constr <- newLabelC
@@ -251,13 +251,14 @@ directCall :: VirtualSpOffset -> CLabel -> [(CgRep, CmmExpr)]
            -> [(CgRep, CmmExpr)] -> Maybe [GlobalReg] -> CmmStmts
            -> Code
 directCall sp lbl args extra_args live_node assts = do
+  dflags <- getDynFlags
   let
 	-- First chunk of args go in registers
 	(reg_arg_amodes, stk_args) = assignCallRegs args
      
 	-- Any "extra" arguments are placed in frames on the
 	-- stack after the other arguments.
-	slow_stk_args = slowArgs extra_args
+	slow_stk_args = slowArgs dflags extra_args
 
 	reg_assts = assignToRegs reg_arg_amodes
         live_args = map snd reg_arg_amodes

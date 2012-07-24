@@ -84,8 +84,8 @@ byteCodeGen dflags this_mod binds tycs modBreaks
                         | (bndr, rhs) <- flattenBinds binds]
 
         us <- mkSplitUniqSupply 'y'
-        (BcM_State _us _this_mod _final_ctr mallocd _, proto_bcos)
-           <- runBc us this_mod modBreaks (mapM schemeTopBind flatBinds)
+        (BcM_State _dflags _us _this_mod _final_ctr mallocd _, proto_bcos)
+           <- runBc dflags us this_mod modBreaks (mapM schemeTopBind flatBinds)
 
         when (notNull mallocd)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -115,8 +115,8 @@ coreExprToBCOs dflags this_mod expr
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
-      (BcM_State _us _this_mod _final_ctr mallocd _ , proto_bco)
-         <- runBc us this_mod emptyModBreaks $
+      (BcM_State _dflags _us _this_mod _final_ctr mallocd _ , proto_bco)
+         <- runBc dflags us this_mod emptyModBreaks $
               schemeTopBind (invented_id, freeVars expr)
 
       when (notNull mallocd)
@@ -942,13 +942,15 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                     -- contains.
                     Just t
                      | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
-                       -> do rest <- pargs (d + fromIntegral addr_sizeW) az
-                             code <- parg_ArrayishRep (fromIntegral arrPtrsHdrSize) d p a
+                       -> do dflags <- getDynFlags
+                             rest <- pargs (d + fromIntegral addr_sizeW) az
+                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize dflags)) d p a
                              return ((code,AddrRep):rest)
 
                      | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
-                       -> do rest <- pargs (d + fromIntegral addr_sizeW) az
-                             code <- parg_ArrayishRep (fromIntegral arrWordsHdrSize) d p a
+                       -> do dflags <- getDynFlags
+                             rest <- pargs (d + fromIntegral addr_sizeW) az
+                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize dflags)) d p a
                              return ((code,AddrRep):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
@@ -1526,7 +1528,8 @@ type BcPtr = Either ItblPtr (Ptr ())
 
 data BcM_State
    = BcM_State
-        { uniqSupply :: UniqSupply       -- for generating fresh variable names
+        { bcm_dflags :: DynFlags
+        , uniqSupply :: UniqSupply       -- for generating fresh variable names
         , thisModule :: Module           -- current module (for breakpoints)
         , nextlabel :: Word16            -- for generating local labels
         , malloced  :: [BcPtr]           -- thunks malloced for current BCO
@@ -1541,9 +1544,10 @@ ioToBc io = BcM $ \st -> do
   x <- io
   return (st, x)
 
-runBc :: UniqSupply -> Module -> ModBreaks -> BcM r -> IO (BcM_State, r)
-runBc us this_mod modBreaks (BcM m)
-   = m (BcM_State us this_mod 0 [] breakArray)
+runBc :: DynFlags -> UniqSupply -> Module -> ModBreaks -> BcM r
+      -> IO (BcM_State, r)
+runBc dflags us this_mod modBreaks (BcM m)
+   = m (BcM_State dflags us this_mod 0 [] breakArray)
    where
    breakArray = modBreaks_flags modBreaks
 
@@ -1567,6 +1571,9 @@ instance Monad BcM where
   (>>=) = thenBc
   (>>)  = thenBc_
   return = returnBc
+
+instance HasDynFlags BcM where
+    getDynFlags = BcM $ \st -> return (st, bcm_dflags st)
 
 emitBc :: ([BcPtr] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco

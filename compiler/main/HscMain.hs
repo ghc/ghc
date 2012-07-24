@@ -1249,7 +1249,6 @@ hscGenHardCode cgguts mod_summary = do
                     cg_dep_pkgs = dependencies,
                     cg_hpc_info = hpc_info } = cgguts
             dflags = hsc_dflags hsc_env
-            platform = targetPlatform dflags
             location = ms_location mod_summary
             data_tycons = filter isDataTyCon tycons
             -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1283,7 +1282,7 @@ hscGenHardCode cgguts mod_summary = do
 
         ------------------  Code output -----------------------
         rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                   cmmToRawCmm platform cmms
+                   cmmToRawCmm dflags cmms
 
         let dump a = do dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm"
                            (ppr a)
@@ -1342,7 +1341,7 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        rawCmms <- cmmToRawCmm (targetPlatform dflags) (Stream.yield cmm)
+        rawCmms <- cmmToRawCmm dflags (Stream.yield cmm)
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where

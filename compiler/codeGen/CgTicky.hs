@@ -264,7 +264,7 @@ tickyDynAlloc cl_info
         _               -> return () }
   where
 	-- will be needed when we fill in stubs
-    _cl_size   = closureSize cl_info
+    -- _cl_size   = closureSize dflags cl_info
 --    _slop_size = slopSize cl_info
 
     tick_alloc_thk 

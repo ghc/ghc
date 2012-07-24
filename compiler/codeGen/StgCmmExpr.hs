@@ -505,12 +505,12 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 	        emitSwitch tag_expr branches' mb_deflt 1 fam_sz
 
 	   else 	-- No, get tag from info table
-                let -- Note that ptr _always_ has tag 1
-                    -- when the family size is big enough
-                    untagged_ptr = cmmRegOffB bndr_reg (-1)
-                    tag_expr = getConstrTag (untagged_ptr)
-		 in
-		 emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1) }
+                do dflags <- getDynFlags
+                   let -- Note that ptr _always_ has tag 1
+                       -- when the family size is big enough
+                       untagged_ptr = cmmRegOffB bndr_reg (-1)
+                       tag_expr = getConstrTag dflags (untagged_ptr)
+                   emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1) }
 
 cgAlts _ _ _ _ = panic "cgAlts"
 	-- UbxTupAlt and PolyAlt have only one alternative
@@ -633,7 +633,7 @@ cgTailCall fun_id fun_info args = do
       	-- A direct function call (possibly with some left-over arguments)
       	DirectEntry lbl arity -> do
 		{ tickyDirectCall arity args
-                ; if node_points
+                ; if node_points dflags
                      then directCall NativeNodeCall   lbl arity (fun_arg:args)
                      else directCall NativeDirectCall lbl arity args }
 
@@ -644,7 +644,7 @@ cgTailCall fun_id fun_info args = do
     fun_name    = idName            fun_id
     fun         = idInfoToAmode     fun_info
     lf_info     = cgIdInfoLF        fun_info
-    node_points = nodeMustPointToIt lf_info
+    node_points dflags = nodeMustPointToIt dflags lf_info
 
 
 emitEnter :: CmmExpr -> FCode ()

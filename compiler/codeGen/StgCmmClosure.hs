@@ -376,8 +376,8 @@ thunkClosureType _                   = Thunk
 
 -- Be sure to see the stg-details notes about these...
 
-nodeMustPointToIt :: LambdaFormInfo -> Bool
-nodeMustPointToIt (LFReEntrant top _ no_fvs _)
+nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
+nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
   = not no_fvs ||   -- Certainly if it has fvs we need to point to it
     isNotTopLevel top
 		    -- If it is not top level we will point to it
@@ -389,7 +389,7 @@ nodeMustPointToIt (LFReEntrant top _ no_fvs _)
 		-- non-inherited function i.e. not top level
 		-- the  not top  case above ensures this is ok.
 
-nodeMustPointToIt (LFCon _) = True
+nodeMustPointToIt _ (LFCon _) = True
 
 	-- Strictly speaking, the above two don't need Node to point
 	-- to it if the arity = 0.  But this is a *really* unlikely
@@ -402,8 +402,8 @@ nodeMustPointToIt (LFCon _) = True
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-nodeMustPointToIt (LFThunk _ no_fvs updatable NonStandardThunk _)
-  = updatable || not no_fvs || opt_SccProfilingOn
+nodeMustPointToIt dflags (LFThunk _ no_fvs updatable NonStandardThunk _)
+  = updatable || not no_fvs || dopt Opt_SccProfilingOn dflags
 	  -- For the non-updatable (single-entry case):
 	  --
 	  -- True if has fvs (in which case we need access to them, and we
@@ -411,13 +411,13 @@ nodeMustPointToIt (LFThunk _ no_fvs updatable NonStandardThunk _)
 	  -- or profiling (in which case we need to recover the cost centre
 	  --		 from inside it)
 
-nodeMustPointToIt (LFThunk {})	-- Node must point to a standard-form thunk
+nodeMustPointToIt _ (LFThunk {})	-- Node must point to a standard-form thunk
   = True 
 
-nodeMustPointToIt (LFUnknown _)   = True
-nodeMustPointToIt LFUnLifted      = False
-nodeMustPointToIt LFBlackHole     = True    -- BH entry may require Node to point
-nodeMustPointToIt LFLetNoEscape   = False 
+nodeMustPointToIt _ (LFUnknown _)   = True
+nodeMustPointToIt _ LFUnLifted      = False
+nodeMustPointToIt _ LFBlackHole     = True    -- BH entry may require Node to point
+nodeMustPointToIt _ LFLetNoEscape   = False 
 
 -----------------------------------------------------------------------------
 --		getCallMethod
@@ -475,7 +475,7 @@ getCallMethod :: DynFlags
 	      -> CallMethod
 
 getCallMethod dflags _name _ lf_info _n_args
-  | nodeMustPointToIt lf_info && dopt Opt_Parallel dflags
+  | nodeMustPointToIt dflags lf_info && dopt Opt_Parallel dflags
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
@@ -673,13 +673,14 @@ mkCmmInfo ClosureInfo {..}
 --	Building ClosureInfos
 --------------------------------------
 
-mkClosureInfo :: Bool		-- Is static
+mkClosureInfo :: DynFlags
+              -> Bool		-- Is static
 	      -> Id
 	      -> LambdaFormInfo 
 	      -> Int -> Int	-- Total and pointer words
               -> String         -- String descriptor
 	      -> ClosureInfo
-mkClosureInfo is_static id lf_info tot_wds ptr_wds val_descr
+mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
   = ClosureInfo { closureName      = name,
                   closureLFInfo    = lf_info,
                   closureInfoLabel = info_lbl,  -- These three fields are
@@ -687,8 +688,8 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds val_descr
                   closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
-    sm_rep     = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-    prof       = mkProfilingInfo id val_descr
+    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    prof       = mkProfilingInfo dflags id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
     info_lbl = mkClosureInfoTableLabel id lf_info
@@ -851,9 +852,9 @@ enterIdLabel id c
 -- The type is determined from the type information stored with the @Id@
 -- in the closure info using @closureTypeDescr@.
 
-mkProfilingInfo :: Id -> String -> ProfilingInfo
-mkProfilingInfo id val_descr
-  | not opt_SccProfilingOn = NoProfilingInfo
+mkProfilingInfo :: DynFlags -> Id -> String -> ProfilingInfo
+mkProfilingInfo dflags id val_descr
+  | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
   | otherwise = ProfilingInfo ty_descr_w8 val_descr_w8
   where
     ty_descr_w8  = stringToWord8s (getTyDescription (idType id))
@@ -884,8 +885,8 @@ getTyLitDescription l =
 --   CmmInfoTable-related things
 --------------------------------------
 
-mkDataConInfoTable :: DataCon -> Bool -> Int -> Int -> CmmInfoTable
-mkDataConInfoTable data_con is_static ptr_wds nonptr_wds
+mkDataConInfoTable :: DynFlags -> DataCon -> Bool -> Int -> Int -> CmmInfoTable
+mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
  = CmmInfoTable { cit_lbl  = info_lbl
                 , cit_rep  = sm_rep
                 , cit_prof = prof
@@ -896,13 +897,13 @@ mkDataConInfoTable data_con is_static ptr_wds nonptr_wds
    info_lbl | is_static = mkStaticInfoTableLabel name NoCafRefs
             | otherwise = mkConInfoTableLabel    name NoCafRefs
 
-   sm_rep = mkHeapRep is_static ptr_wds nonptr_wds cl_type
+   sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
 
    cl_type = Constr (fromIntegral (dataConTagZ data_con))
                    (dataConIdentity data_con)
 
-   prof | not opt_SccProfilingOn = NoProfilingInfo
-        | otherwise              = ProfilingInfo ty_descr val_descr
+   prof | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
+        | otherwise                            = ProfilingInfo ty_descr val_descr
 
    ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con
    val_descr = stringToWord8s $ occNameString $ getOccName data_con

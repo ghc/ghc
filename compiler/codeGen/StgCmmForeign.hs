@@ -35,7 +35,7 @@ import CLabel
 import SMRep
 import ForeignCall
 import Constants
-import StaticFlags
+import DynFlags
 import Maybes
 import Outputable
 import BasicTypes
@@ -259,52 +259,55 @@ maybe_assign_temp e
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
-saveThreadState :: CmmAGraph
-saveThreadState =
+saveThreadState :: DynFlags -> CmmAGraph
+saveThreadState dflags =
   -- CurrentTSO->stackobj->sp = Sp;
-  mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP) stgSp
+  mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO (tso_stackobj dflags)) bWord) (stack_SP dflags)) stgSp
   <*> closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
-  <*> if opt_SccProfilingOn then
-        mkStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS
+  <*> if dopt Opt_SccProfilingOn dflags then
+        mkStore (cmmOffset stgCurrentTSO (tso_CCCS dflags)) curCCS
       else mkNop
 
 emitSaveThreadState :: BlockId -> FCode ()
 emitSaveThreadState bid = do
+  dflags <- getDynFlags
+
   -- CurrentTSO->stackobj->sp = Sp;
-  emitStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
+  emitStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO (tso_stackobj dflags)) bWord) (stack_SP dflags))
                  (CmmStackSlot (Young bid) (widthInBytes (typeWidth gcWord)))
   emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
-  when opt_SccProfilingOn $
-        emitStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS
+  when (dopt Opt_SccProfilingOn dflags) $
+        emitStore (cmmOffset stgCurrentTSO (tso_CCCS dflags)) curCCS
 
    -- CurrentNursery->free = Hp+1;
 closeNursery :: CmmAGraph
 closeNursery = mkStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
-loadThreadState :: LocalReg -> LocalReg -> CmmAGraph
-loadThreadState tso stack = do
+loadThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
+loadThreadState dflags tso stack = do
   -- tso <- newTemp gcWord -- TODO FIXME NOW
   -- stack <- newTemp gcWord -- TODO FIXME NOW
   catAGraphs [
         -- tso = CurrentTSO;
         mkAssign (CmmLocal tso) stgCurrentTSO,
         -- stack = tso->stackobj;
-        mkAssign (CmmLocal stack) (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_stackobj) bWord),
+        mkAssign (CmmLocal stack) (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) bWord),
         -- Sp = stack->sp;
-        mkAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal stack)) stack_SP) bWord),
+        mkAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal stack)) (stack_SP dflags)) bWord),
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
-        mkAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) stack_STACK)
+        mkAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) (stack_STACK dflags))
                                     rESERVED_STACK_WORDS),
         openNursery,
         -- and load the current cost centre stack from the TSO when profiling:
-        if opt_SccProfilingOn then
+        if dopt Opt_SccProfilingOn dflags then
           storeCurCCS
-            (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType)
+            (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) ccsType)
         else mkNop]
 emitLoadThreadState :: LocalReg -> LocalReg -> FCode ()
-emitLoadThreadState tso stack = emit $ loadThreadState tso stack
+emitLoadThreadState tso stack = do dflags <- getDynFlags
+                                   emit $ loadThreadState dflags tso stack
 
 openNursery :: CmmAGraph
 openNursery = catAGraphs [
@@ -334,15 +337,15 @@ nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
-tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: ByteOff
-tso_stackobj = closureField oFFSET_StgTSO_stackobj
-tso_CCCS     = closureField oFFSET_StgTSO_cccs
-stack_STACK  = closureField oFFSET_StgStack_stack
-stack_SP     = closureField oFFSET_StgStack_sp
+tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: DynFlags -> ByteOff
+tso_stackobj dflags = closureField dflags oFFSET_StgTSO_stackobj
+tso_CCCS     dflags = closureField dflags oFFSET_StgTSO_cccs
+stack_STACK  dflags = closureField dflags oFFSET_StgStack_stack
+stack_SP     dflags = closureField dflags oFFSET_StgStack_sp
 
 
-closureField :: ByteOff -> ByteOff
-closureField off = off + fixedHdrSize * wORD_SIZE
+closureField :: DynFlags -> ByteOff -> ByteOff
+closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp             = CmmReg sp
@@ -376,19 +379,20 @@ getFCallArgs args
             = return Nothing
             | otherwise
             = do { cmm <- getArgAmode (NonVoid arg)
-                 ; return (Just (add_shim arg_ty cmm, hint)) }
+                 ; dflags <- getDynFlags
+                 ; return (Just (add_shim dflags arg_ty cmm, hint)) }
             where
               arg_ty  = stgArgType arg
               arg_rep = typePrimRep arg_ty
               hint    = typeForeignHint arg_ty
 
-add_shim :: Type -> CmmExpr -> CmmExpr
-add_shim arg_ty expr
+add_shim :: DynFlags -> Type -> CmmExpr -> CmmExpr
+add_shim dflags arg_ty expr
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
-  = cmmOffsetB expr arrPtrsHdrSize
+  = cmmOffsetB expr (arrPtrsHdrSize dflags)
 
   | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
-  = cmmOffsetB expr arrWordsHdrSize
+  = cmmOffsetB expr (arrWordsHdrSize dflags)
 
   | otherwise = expr
   where

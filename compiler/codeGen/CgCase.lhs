@@ -32,8 +32,8 @@ import ClosureInfo
 import OldCmmUtils
 import OldCmm
 
+import DynFlags
 import StgSyn
-import StaticFlags
 import Id
 import ForeignCall
 import VarSet
@@ -650,13 +650,13 @@ saveCurrentCostCentre ::
                CmmStmts)                -- Assignment to save it
 
 saveCurrentCostCentre
-  | not opt_SccProfilingOn
-  = returnFC (Nothing, noStmts)
-  | otherwise
-  = do  { slot <- allocPrimStack PtrArg
-        ; sp_rel <- getSpRelOffset slot
-        ; returnFC (Just slot,
-                    oneStmt (CmmStore sp_rel curCCS)) }
+  = do dflags <- getDynFlags
+       if not (dopt Opt_SccProfilingOn dflags)
+           then returnFC (Nothing, noStmts)
+           else do slot <- allocPrimStack PtrArg
+                   sp_rel <- getSpRelOffset slot
+                   returnFC (Just slot,
+                             oneStmt (CmmStore sp_rel curCCS))
 
 -- Sometimes we don't free the slot containing the cost centre after restoring it
 -- (see CgLetNoEscape.cgLetNoEscapeBody).

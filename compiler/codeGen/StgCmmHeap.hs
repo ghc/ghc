@@ -41,6 +41,7 @@ import CostCentre
 import Outputable
 import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
+import DynFlags
 import FastString( mkFastString, fsLit )
 import Constants
 import Util
@@ -117,7 +118,8 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
         ; hpStore base cmm_args offsets
 
         -- BUMP THE VIRTUAL HEAP POINTER
-        ; setVirtHp (virt_hp + heapClosureSize rep)
+        ; dflags <- getDynFlags
+        ; setVirtHp (virt_hp + heapClosureSize dflags rep)
 
         -- Assign to a temporary and return
         -- Note [Return a LocalReg]
@@ -126,10 +128,11 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs
-  = hpStore base header [0..]
+  = do dflags <- getDynFlags
+       hpStore base (header dflags) [0..]
   where
-    header :: [CmmExpr]
-    header = [info_ptr] ++ dynProfHdr ccs
+    header :: DynFlags -> [CmmExpr]
+    header dflags = [info_ptr] ++ dynProfHdr dflags ccs
         -- ToDo: Gransim stuff
         -- ToDo: Parallel stuff
         -- No ticky header
@@ -150,13 +153,14 @@ hpStore base vals offs
 -- and adding a static link field if necessary.
 
 mkStaticClosureFields
-        :: CmmInfoTable
+        :: DynFlags
+        -> CmmInfoTable
         -> CostCentreStack
         -> CafInfo
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields info_tbl ccs caf_refs payload
-  = mkStaticClosure info_lbl ccs payload padding
+mkStaticClosureFields dflags info_tbl ccs caf_refs payload
+  = mkStaticClosure dflags info_lbl ccs payload padding
         static_link_field saved_info_field
   where
     info_lbl = cit_lbl info_tbl
@@ -197,9 +201,9 @@ mkStaticClosureFields info_tbl ccs caf_refs payload
         | otherwise                = mkIntCLit 1  -- No CAF refs
 
 
-mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
+mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure info_lbl ccs payload padding static_link_field saved_info_field
+mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
   ++ concatMap padLitToWord payload
@@ -210,7 +214,7 @@ mkStaticClosure info_lbl ccs payload padding static_link_field saved_info_field
     variable_header_words
         =  staticGranHdr
         ++ staticParHdr
-        ++ staticProfHdr ccs
+        ++ staticProfHdr dflags ccs
         ++ staticTickyHdr
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts

@@ -40,9 +40,6 @@ module StaticFlags (
 	opt_SuppressTypeSignatures,
         opt_SuppressVarKinds,
 
-	-- profiling opts
-	opt_SccProfilingOn,
-
         -- Hpc opts
 	opt_Hpc,
 
@@ -249,10 +246,6 @@ opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
 
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
-
--- profiling opts
-opt_SccProfilingOn :: Bool
-opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
 
 -- Hpc opts
 opt_Hpc :: Bool

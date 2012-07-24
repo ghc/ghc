@@ -459,14 +459,15 @@ dataConTagZ con = dataConTag con - fIRST_TAG
 %************************************************************************
 
 \begin{code}
-mkClosureInfo :: Bool		-- Is static
+mkClosureInfo :: DynFlags
+              -> Bool		-- Is static
 	      -> Id
 	      -> LambdaFormInfo 
 	      -> Int -> Int	-- Total and pointer words
 	      -> C_SRT
 	      -> String		-- String descriptor
 	      -> ClosureInfo
-mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
+mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds srt_info descr
   = ClosureInfo { closureName = name, 
 		  closureLFInfo = lf_info,
 		  closureSMRep = sm_rep, 
@@ -480,18 +481,19 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
 		    -- anything else gets eta expanded.
   where
     name   = idName id
-    sm_rep = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     nonptr_wds = tot_wds - ptr_wds
 
-mkConInfo :: Bool	-- Is static
+mkConInfo :: DynFlags
+          -> Bool	-- Is static
 	  -> DataCon	
 	  -> Int -> Int	-- Total and pointer words
 	  -> ClosureInfo
-mkConInfo is_static data_con tot_wds ptr_wds
+mkConInfo dflags is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
 		closureCon = data_con }
   where
-    sm_rep  = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep  = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     lf_info = mkConLFInfo data_con
     nonptr_wds = tot_wds - ptr_wds
 \end{code}
@@ -503,8 +505,8 @@ mkConInfo is_static data_con tot_wds ptr_wds
 %************************************************************************
 
 \begin{code}
-closureSize :: ClosureInfo -> WordOff
-closureSize cl_info = heapClosureSize (closureSMRep cl_info)
+closureSize :: DynFlags -> ClosureInfo -> WordOff
+closureSize dflags cl_info = heapClosureSize dflags (closureSMRep cl_info)
 \end{code}
 
 \begin{code}
@@ -551,8 +553,8 @@ thunkClosureType _                   = Thunk
 Be sure to see the stg-details notes about these...
 
 \begin{code}
-nodeMustPointToIt :: LambdaFormInfo -> Bool
-nodeMustPointToIt (LFReEntrant top _ no_fvs _)
+nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
+nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
   = not no_fvs ||   -- Certainly if it has fvs we need to point to it
     isNotTopLevel top
 		    -- If it is not top level we will point to it
@@ -564,7 +566,7 @@ nodeMustPointToIt (LFReEntrant top _ no_fvs _)
 		-- non-inherited function i.e. not top level
 		-- the  not top  case above ensures this is ok.
 
-nodeMustPointToIt (LFCon _) = True
+nodeMustPointToIt _ (LFCon _) = True
 
 	-- Strictly speaking, the above two don't need Node to point
 	-- to it if the arity = 0.  But this is a *really* unlikely
@@ -577,8 +579,8 @@ nodeMustPointToIt (LFCon _) = True
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-nodeMustPointToIt (LFThunk _ no_fvs updatable NonStandardThunk _)
-  = updatable || not no_fvs || opt_SccProfilingOn
+nodeMustPointToIt dflags (LFThunk _ no_fvs updatable NonStandardThunk _)
+  = updatable || not no_fvs || dopt Opt_SccProfilingOn dflags
 	  -- For the non-updatable (single-entry case):
 	  --
 	  -- True if has fvs (in which case we need access to them, and we
@@ -586,12 +588,12 @@ nodeMustPointToIt (LFThunk _ no_fvs updatable NonStandardThunk _)
 	  -- or profiling (in which case we need to recover the cost centre
 	  --		 from inside it)
 
-nodeMustPointToIt (LFThunk _ _ _ _ _)
+nodeMustPointToIt _ (LFThunk _ _ _ _ _)
   = True  -- Node must point to any standard-form thunk
 
-nodeMustPointToIt (LFUnknown _)     = True
-nodeMustPointToIt LFBlackHole       = True    -- BH entry may require Node to point
-nodeMustPointToIt (LFLetNoEscape _) = False 
+nodeMustPointToIt _ (LFUnknown _)     = True
+nodeMustPointToIt _ LFBlackHole       = True    -- BH entry may require Node to point
+nodeMustPointToIt _ (LFLetNoEscape _) = False 
 \end{code}
 
 The entry conventions depend on the type of closure being entered,
@@ -650,7 +652,7 @@ getCallMethod :: DynFlags
 	      -> CallMethod
 
 getCallMethod dflags _ _ lf_info _
-  | nodeMustPointToIt lf_info && dopt Opt_Parallel dflags
+  | nodeMustPointToIt dflags lf_info && dopt Opt_Parallel dflags
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
@@ -662,10 +664,11 @@ getCallMethod _ name caf (LFReEntrant _ arity _ _) n_args
   | n_args < arity = SlowCall	-- Not enough args
   | otherwise      = DirectEntry (enterIdLabel name caf) arity
 
-getCallMethod _ _ _ (LFCon con) n_args
-  | opt_SccProfilingOn     -- when profiling, we must always enter
-  = EnterIt                -- a closure when we use it, so that the closure
-                           -- can be recorded as used for LDV profiling.
+getCallMethod dflags _ _ (LFCon con) n_args
+  -- when profiling, we must always enter a closure when we use it, so
+  -- that the closure can be recorded as used for LDV profiling.
+  | dopt Opt_SccProfilingOn dflags
+  = EnterIt
   | otherwise
   = ASSERT( n_args == 0 )
     ReturnCon con

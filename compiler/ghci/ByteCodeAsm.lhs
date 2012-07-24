@@ -121,7 +121,7 @@ instance Outputable UnlinkedBCO where
 -- Top level assembler fn.
 assembleBCOs :: DynFlags -> [ProtoBCO Name] -> [TyCon] -> IO CompiledByteCode
 assembleBCOs dflags proto_bcos tycons
-  = do  itblenv <- mkITbls tycons
+  = do  itblenv <- mkITbls dflags tycons
         bcos    <- mapM (assembleBCO dflags) proto_bcos
         return (ByteCode bcos itblenv)
 

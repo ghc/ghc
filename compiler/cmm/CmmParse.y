@@ -216,12 +216,13 @@ static 	:: { ExtFCode [CmmStatic] }
 						(widthInBytes (typeWidth $1) * 
 							fromIntegral $3)] }
 	| 'CLOSURE' '(' NAME lits ')'
-		{ do lits <- sequence $4;
-		     return $ map CmmStaticLit $
-                       mkStaticClosure (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
+		{ do { lits <- sequence $4
+             ; dflags <- getDynFlags
+		     ; return $ map CmmStaticLit $
+                        mkStaticClosure dflags (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
-			 dontCareCCS (map getLit lits) [] [] [] }
+                        dontCareCCS (map getLit lits) [] [] [] } }
 	-- arrays of closures required for the CHARLIKE & INTLIKE arrays
 
 lits	:: { [ExtFCode CmmExpr] }
@@ -260,9 +261,10 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
 		{% withThisPackage $ \pkg ->
-		   do let prof = profilingInfo $11 $13
+                   do dflags <- getDynFlags
+                      let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
-                                   mkHeapRep False (fromIntegral $5)
+                                   mkHeapRep dflags False (fromIntegral $5)
                                                    (fromIntegral $7) Thunk
                               -- not really Thunk, but that makes the info table
                               -- we want.
@@ -275,11 +277,12 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{% withThisPackage $ \pkg -> 
-		   do let prof = profilingInfo $11 $13
+                   do dflags <- getDynFlags
+                      let prof = profilingInfo dflags $11 $13
                           ty   = Fun 0 (ArgSpec (fromIntegral $15))
                                 -- Arity zero, arg_type $15
                           rep = mkRTSRep (fromIntegral $9) $
-                                    mkHeapRep False (fromIntegral $5)
+                                    mkHeapRep dflags False (fromIntegral $5)
                                                     (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
@@ -292,11 +295,12 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
 		{% withThisPackage $ \pkg ->
-		   do let prof = profilingInfo $13 $15
+                   do dflags <- getDynFlags
+                      let prof = profilingInfo dflags $13 $15
                           ty  = Constr (fromIntegral $9)  -- Tag
 	                           	(stringToWord8s $13)
                           rep = mkRTSRep (fromIntegral $11) $
-                                  mkHeapRep False (fromIntegral $5)
+                                  mkHeapRep dflags False (fromIntegral $5)
                                                   (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
@@ -310,10 +314,11 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
 		{% withThisPackage $ \pkg ->
-		   do let prof = profilingInfo $9 $11
+                   do dflags <- getDynFlags
+                      let prof = profilingInfo dflags $9 $11
                           ty  = ThunkSelector (fromIntegral $5)
                           rep = mkRTSRep (fromIntegral $7) $
-                                   mkHeapRep False 0 0 ty
+                                   mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
@@ -639,8 +644,9 @@ nameToMachOp name =
 	Just m  -> return m
 
 exprOp :: FastString -> [ExtFCode CmmExpr] -> P (ExtFCode CmmExpr)
-exprOp name args_code =
-  case lookupUFM exprMacros name of
+exprOp name args_code = do
+  dflags <- getDynFlags
+  case lookupUFM (exprMacros dflags) name of
      Just f  -> return $ do
         args <- sequence args_code
 	return (f args)
@@ -648,18 +654,18 @@ exprOp name args_code =
 	mo <- nameToMachOp name
 	return $ mkMachOp mo args_code
 
-exprMacros :: UniqFM ([CmmExpr] -> CmmExpr)
-exprMacros = listToUFM [
+exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
+exprMacros dflags = listToUFM [
   ( fsLit "ENTRY_CODE",   \ [x] -> entryCode x ),
   ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr x ),
-  ( fsLit "STD_INFO",     \ [x] -> infoTable x ),
-  ( fsLit "FUN_INFO",     \ [x] -> funInfoTable x ),
+  ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
+  ( fsLit "FUN_INFO",     \ [x] -> funInfoTable dflags x ),
   ( fsLit "GET_ENTRY",    \ [x] -> entryCode (closureInfoPtr x) ),
-  ( fsLit "GET_STD_INFO", \ [x] -> infoTable (closureInfoPtr x) ),
-  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable (closureInfoPtr x) ),
-  ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType x ),
-  ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs x ),
-  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs x )
+  ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr x) ),
+  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr x) ),
+  ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
+  ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs dflags x ),
+  ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x )
   ]
 
 -- we understand a subset of C-- primitives:
@@ -824,15 +830,17 @@ stmtMacros = listToUFM [
  ]
 
 
-profilingInfo desc_str ty_str 
-  | not opt_SccProfilingOn = NoProfilingInfo
-  | otherwise              = ProfilingInfo (stringToWord8s desc_str)
-                                           (stringToWord8s ty_str)
+profilingInfo dflags desc_str ty_str 
+  = if not (dopt Opt_SccProfilingOn dflags)
+    then NoProfilingInfo
+    else ProfilingInfo (stringToWord8s desc_str)
+                       (stringToWord8s ty_str)
 
 staticClosure :: PackageId -> FastString -> FastString -> [CmmLit] -> ExtCode
 staticClosure pkg cl_label info payload
-  = code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
-  where  lits = mkStaticClosure (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
+  = do dflags <- getDynFlags
+       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
+       code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
 
 foreignCall
 	:: String
@@ -1036,12 +1044,12 @@ doSwitch mb_range scrut arms deflt
 
 -- The initial environment: we define some constants that the compiler
 -- knows about here.
-initEnv :: Env
-initEnv = listToUFM [
+initEnv :: DynFlags -> Env
+initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader", 
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordWidth) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE)) wordWidth) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordWidth) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) wordWidth) ))
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
@@ -1059,7 +1067,7 @@ parseCmmFile dflags filename = do
         return ((emptyBag, unitBag msg), Nothing)
     POk pst code -> do
         st <- initC
-        let (cmm,_) = runC dflags no_module st (getCmm (unEC code initEnv [] >> return ()))
+        let (cmm,_) = runC dflags no_module st (getCmm (unEC code (initEnv dflags) [] >> return ()))
         let ms = getMessages pst
         if (errorsFound dflags ms)
          then return (ms, Nothing)

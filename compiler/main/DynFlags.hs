@@ -321,6 +321,7 @@ data DynFlag
    | Opt_Parallel
    | Opt_GranMacros
    | Opt_PIC
+   | Opt_SccProfilingOn
 
    -- output style opts
    | Opt_PprCaseAsLet
@@ -2045,6 +2046,7 @@ fFlags = [
   ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
   ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
   ( "parallel",                         Opt_Parallel, nop ),
+  ( "scc-profiling",                    Opt_SccProfilingOn, nop ),
   ( "gransim",                          Opt_GranMacros, nop ),
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),

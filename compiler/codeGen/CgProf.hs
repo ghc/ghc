@@ -49,7 +49,7 @@ import CLabel
 
 import qualified Module
 import CostCentre
-import StaticFlags
+import DynFlags
 import FastString
 import Module
 import Constants	-- Lots of field offsets
@@ -81,15 +81,15 @@ costCentreFrom :: CmmExpr 	-- A closure pointer
 	       -> CmmExpr	-- The cost centre from that closure
 costCentreFrom cl = CmmLoad (cmmOffsetB cl oFFSET_StgHeader_ccs) bWord
 
-staticProfHdr :: CostCentreStack -> [CmmLit]
+staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
 -- Was SET_STATIC_PROF_HDR
-staticProfHdr ccs = ifProfilingL [mkCCostCentreStack ccs, 
-			  	  staticLdvInit]
+staticProfHdr dflags ccs = ifProfilingL dflags [mkCCostCentreStack ccs,
+                                                staticLdvInit]
 
-dynProfHdr :: CmmExpr -> [CmmExpr]
+dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
-dynProfHdr ccs = ifProfilingL [ccs, dynLdvInit]
+dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
 
 initUpdFrameProf :: CmmExpr -> Code
 -- Initialise the profiling field of an update frame
@@ -107,7 +107,8 @@ initUpdFrameProf frame_amode
 profDynAlloc :: ClosureInfo -> CmmExpr -> Code
 profDynAlloc cl_info ccs
   = ifProfiling $
-    profAlloc (CmmLit (mkIntCLit (closureSize cl_info))) ccs
+    do dflags <- getDynFlags
+       profAlloc (CmmLit (mkIntCLit (closureSize dflags cl_info))) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -118,13 +119,14 @@ profDynAlloc cl_info ccs
 profAlloc :: CmmExpr -> CmmExpr -> Code
 profAlloc words ccs
   = ifProfiling $
-    stmtC (addToMemE alloc_rep
-		(cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
-	  	(CmmMachOp (MO_UU_Conv wordWidth alloc_rep) $
-		  [CmmMachOp mo_wordSub [words, 
-					 CmmLit (mkIntCLit profHdrSize)]]))
-		-- subtract the "profiling overhead", which is the
-		-- profiling header in a closure.
+    do dflags <- getDynFlags
+       stmtC (addToMemE alloc_rep
+                   (cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
+                   (CmmMachOp (MO_UU_Conv wordWidth alloc_rep) $
+                     [CmmMachOp mo_wordSub [words,
+                                            CmmLit (mkIntCLit (profHdrSize dflags))]]))
+                   -- subtract the "profiling overhead", which is the
+                   -- profiling header in a closure.
  where 
    alloc_rep = typeWidth REP_CostCentreStack_mem_alloc
 
@@ -147,13 +149,13 @@ enterCostCentreFun ccs closure vols =
 
 ifProfiling :: Code -> Code
 ifProfiling code
-  | opt_SccProfilingOn = code
-  | otherwise	       = nopC
+    = do dflags <- getDynFlags
+         if dopt Opt_SccProfilingOn dflags then code else nopC
 
-ifProfilingL :: [a] -> [a]
-ifProfilingL xs
-  | opt_SccProfilingOn = xs
-  | otherwise	       = []
+ifProfilingL :: DynFlags -> [a] -> [a]
+ifProfilingL dflags xs
+  | dopt Opt_SccProfilingOn dflags = xs
+  | otherwise                      = []
 
 -- ---------------------------------------------------------------------------
 -- Initialising Cost Centres & CCSs
@@ -226,12 +228,13 @@ sizeof_ccs_words
 
 emitSetCCC :: CostCentre -> Bool -> Bool -> Code
 emitSetCCC cc tick push
-  | not opt_SccProfilingOn = nopC
-  | otherwise = do 
-    tmp <- newTemp bWord -- TODO FIXME NOW
-    pushCostCentre tmp curCCS cc
-    when tick $ stmtC (bumpSccCount (CmmReg (CmmLocal tmp)))
-    when push $ stmtC (storeCurCCS (CmmReg (CmmLocal tmp)))
+ = do dflags <- getDynFlags
+      if dopt Opt_SccProfilingOn dflags
+          then do tmp <- newTemp bWord -- TODO FIXME NOW
+                  pushCostCentre tmp curCCS cc
+                  when tick $ stmtC (bumpSccCount (CmmReg (CmmLocal tmp)))
+                  when push $ stmtC (storeCurCCS (CmmReg (CmmLocal tmp)))
+          else nopC
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc

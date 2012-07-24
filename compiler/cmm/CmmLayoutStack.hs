@@ -23,6 +23,7 @@ import Maybes
 import UniqFM
 import Util
 
+import DynFlags
 import FastString
 import Outputable
 import Data.Map (Map)
@@ -103,9 +104,9 @@ instance Outputable StackMap where
      text "sm_regs = " <> ppr (eltsUFM sm_regs)
 
 
-cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph
+cmmLayoutStack :: DynFlags -> ProcPointSet -> ByteOff -> CmmGraph
                -> UniqSM (CmmGraph, BlockEnv StackMap)
-cmmLayoutStack procpoints entry_args
+cmmLayoutStack dflags procpoints entry_args
                graph0@(CmmGraph { g_entry = entry })
   = do
     -- pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
@@ -118,7 +119,7 @@ cmmLayoutStack procpoints entry_args
             layout procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
-    new_blocks' <- mapM lowerSafeForeignCall new_blocks
+    new_blocks' <- mapM (lowerSafeForeignCall dflags) new_blocks
 
     -- pprTrace ("Sp HWM") (ppr _final_high_sp) $ return ()
     return (ofBlockList entry new_blocks', final_stackmaps)
@@ -870,8 +871,8 @@ Note the copyOut, which saves the results in the places that L1 is
 expecting them (see Note {safe foreign call convention]).
 -}
 
-lowerSafeForeignCall :: CmmBlock -> UniqSM CmmBlock
-lowerSafeForeignCall block
+lowerSafeForeignCall :: DynFlags -> CmmBlock -> UniqSM CmmBlock
+lowerSafeForeignCall dflags block
   | (entry, middle, CmmForeignCall { .. }) <- blockSplit block
   = do
     -- Both 'id' and 'new_base' are KindNonPtr because they're
@@ -881,7 +882,7 @@ lowerSafeForeignCall block
     let (caller_save, caller_load) = callerSaveVolatileRegs
     load_tso <- newTemp gcWord
     load_stack <- newTemp gcWord
-    let suspend = saveThreadState <*>
+    let suspend = saveThreadState dflags <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread id intrbl)
         midCall = mkUnsafeCall tgt res args
@@ -890,7 +891,7 @@ lowerSafeForeignCall block
                   -- might now have a different Capability!
                   mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
-                  loadThreadState load_tso load_stack
+                  loadThreadState dflags load_tso load_stack
         -- Note: The successor must be a procpoint, and we have already split,
         --       so we use a jump, not a branch.
         succLbl = CmmLit (CmmLabel (infoTblLbl succ))

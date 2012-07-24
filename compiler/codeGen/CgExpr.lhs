@@ -48,8 +48,8 @@ import Maybes
 import ListSetOps
 import BasicTypes
 import Util
+import DynFlags
 import Outputable
-import StaticFlags
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -117,6 +117,7 @@ re-enters the RTS the stack is in a sane state.
 
 \begin{code}
 cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
+    dflags <- getDynFlags
     {-
 	First, copy the args into temporaries.  We're going to push
 	a return address right before doing the call, so the args
@@ -125,7 +126,7 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
     reps_n_amodes <- getArgAmodes stg_args
     let 
 	-- Get the *non-void* args, and jiggle them with shimForeignCall
-	arg_exprs = [ (shimForeignCallArg stg_arg expr, stg_arg)
+	arg_exprs = [ (shimForeignCallArg dflags stg_arg expr, stg_arg)
 		    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 		      nonVoidArg rep]
 
@@ -310,7 +311,8 @@ cgRhs name (StgRhsCon maybe_cc con args)
 	; returnFC (name, idinfo) }
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
-  = setSRT srt $ mkRhsClosure name cc bi fvs upd_flag args body
+  = do dflags <- getDynFlags
+       setSRT srt $ mkRhsClosure dflags name cc bi fvs upd_flag args body
 \end{code}
 
 mkRhsClosure looks for two special forms of the right-hand side:
@@ -333,10 +335,10 @@ form:
 
 
 \begin{code}
-mkRhsClosure :: Id -> CostCentreStack -> StgBinderInfo
+mkRhsClosure :: DynFlags -> Id -> CostCentreStack -> StgBinderInfo
              -> [Id] -> UpdateFlag -> [Id] -> GenStgExpr Id Id
              -> FCode (Id, CgIdInfo)
-mkRhsClosure	bndr cc bi
+mkRhsClosure	dflags bndr cc bi
 		[the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
 		[]			-- A thunk
@@ -358,11 +360,11 @@ mkRhsClosure	bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
+    (_, params_w_offsets) = layOutDynConstr dflags con (addIdReps params)
 			-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
-    offset_into_int       = the_offset - fixedHdrSize
+    offset_into_int       = the_offset - fixedHdrSize dflags
 \end{code}
 
 Ap thunks
@@ -382,7 +384,7 @@ We only generate an Ap thunk if all the free variables are pointers,
 for semi-obvious reasons.
 
 \begin{code}
-mkRhsClosure    bndr cc bi
+mkRhsClosure dflags bndr cc bi
 		fvs
 		upd_flag
 		[]			-- No args; a thunk
@@ -392,7 +394,8 @@ mkRhsClosure    bndr cc bi
  	&& all isFollowableArg (map idCgRep fvs) 
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE 
-        && not opt_SccProfilingOn -- not when profiling: we don't want to
+        && not (dopt Opt_SccProfilingOn dflags)
+                                  -- not when profiling: we don't want to
                                   -- lose information about this particular
                                   -- thunk (e.g. its type) (#949)
 
@@ -410,7 +413,7 @@ mkRhsClosure    bndr cc bi
 The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
-mkRhsClosure bndr cc bi fvs upd_flag args body
+mkRhsClosure _ bndr cc bi fvs upd_flag args body
   = cgRhsClosure bndr cc bi fvs upd_flag args body
 \end{code}
 

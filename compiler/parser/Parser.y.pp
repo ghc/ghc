@@ -43,7 +43,7 @@ import OccName          ( varName, dataName, tcClsName, tvName )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
-import StaticFlags      ( opt_SccProfilingOn, opt_Hpc )
+import StaticFlags      ( opt_Hpc )
 import Kind             ( Kind, liftedTypeKind, unliftedTypeKind, mkArrowKind )
 import Class            ( FunDep )
 import BasicTypes
@@ -1402,9 +1402,10 @@ exp10 :: { LHsExpr RdrName }
         | 'do' stmtlist                 { L (comb2 $1 $2) (mkHsDo DoExpr  (unLoc $2)) }
         | 'mdo' stmtlist                { L (comb2 $1 $2) (mkHsDo MDoExpr (unLoc $2)) }
 
-        | scc_annot exp                         { LL $ if opt_SccProfilingOn
-                                                        then HsSCC (unLoc $1) $2
-                                                        else HsPar $2 }
+        | scc_annot exp             {% do { on <- extension sccProfilingOn
+                                          ; return $ LL $ if on
+                                                          then HsSCC (unLoc $1) $2
+                                                          else HsPar $2 } }
         | hpc_annot exp                         { LL $ if opt_Hpc
                                                         then HsTickPragma (unLoc $1) $2
                                                         else HsPar $2 }

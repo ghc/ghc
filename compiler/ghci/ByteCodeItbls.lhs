@@ -20,6 +20,7 @@ module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
 
 #include "HsVersions.h"
 
+import DynFlags
 import Name             ( Name, getName )
 import NameEnv
 import ClosureInfo
@@ -66,31 +67,31 @@ mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
 
 
 -- Make info tables for the data decls in this module
-mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return emptyNameEnv
-mkITbls (tc:tcs) = do itbls  <- mkITbl tc
-                      itbls2 <- mkITbls tcs
-                      return (itbls `plusNameEnv` itbls2)
+mkITbls :: DynFlags -> [TyCon] -> IO ItblEnv
+mkITbls _ [] = return emptyNameEnv
+mkITbls dflags (tc:tcs) = do itbls  <- mkITbl dflags tc
+                             itbls2 <- mkITbls dflags tcs
+                             return (itbls `plusNameEnv` itbls2)
 
-mkITbl :: TyCon -> IO ItblEnv
-mkITbl tc
+mkITbl :: DynFlags -> TyCon -> IO ItblEnv
+mkITbl dflags tc
    | not (isDataTyCon tc) 
    = return emptyNameEnv
    | dcs `lengthIs` n -- paranoia; this is an assertion.
-   = make_constr_itbls dcs
+   = make_constr_itbls dflags dcs
      where
         dcs = tyConDataCons tc
         n   = tyConFamilySize tc
 
-mkITbl _ = error "Unmatched patter in mkITbl: assertion failed!"
+mkITbl _ _ = error "Unmatched patter in mkITbl: assertion failed!"
 
 #include "../includes/rts/storage/ClosureTypes.h"
 cONSTR :: Int   -- Defined in ClosureTypes.h
 cONSTR = CONSTR 
 
 -- Assumes constructors are numbered from zero, not one
-make_constr_itbls :: [DataCon] -> IO ItblEnv
-make_constr_itbls cons
+make_constr_itbls :: DynFlags -> [DataCon] -> IO ItblEnv
+make_constr_itbls dflags cons
    = do is <- mapM mk_dirret_itbl (zip cons [0..])
         return (mkItblEnv is)
      where
@@ -100,7 +101,7 @@ make_constr_itbls cons
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr = do
            let rep_args = [ (typeCgRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
-               (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False{-not a THUNK-} rep_args
+               (tot_wds, ptr_wds, _) = mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args
 
                ptrs'  = ptr_wds
                nptrs' = tot_wds - ptr_wds

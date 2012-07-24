@@ -24,8 +24,8 @@ import qualified Stream
 
 import Maybes
 import Constants
+import DynFlags
 import Panic
-import Platform
 import StaticFlags
 import UniqSupply
 import MonadUtils
@@ -42,12 +42,12 @@ mkEmptyContInfoTable info_lbl
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: Platform -> Stream IO Old.CmmGroup ()
+cmmToRawCmm :: DynFlags -> Stream IO Old.CmmGroup ()
             -> IO (Stream IO Old.RawCmmGroup ())
-cmmToRawCmm platform cmms
+cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
        ; let do_one uniqs cmm = do
-                case initUs uniqs $ concatMapM (mkInfoTable platform) cmm of
+                case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                   (b,uniqs') -> return (uniqs',b)
                   -- NB. strictness fixes a space leak.  DO NOT REMOVE.
        ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
@@ -86,16 +86,16 @@ cmmToRawCmm platform cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: Platform -> CmmDecl -> UniqSM [RawCmmDecl]
+mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) 
   = return [CmmData sec dat]
 
-mkInfoTable platform (CmmProc info entry_label blocks)
+mkInfoTable dflags (CmmProc info entry_label blocks)
   | CmmNonInfoTable <- info   -- Code without an info table.  Easy.
   = return [CmmProc Nothing entry_label blocks]
                                
   | CmmInfoTable { cit_lbl = info_lbl } <- info
-  = do { (top_decls, info_cts) <- mkInfoTableContents platform info Nothing
+  = do { (top_decls, info_cts) <- mkInfoTableContents dflags info Nothing
        ; return (top_decls  ++
                  mkInfoTableAndCode info_lbl info_cts
                                     entry_label blocks) }
@@ -107,20 +107,20 @@ type InfoTableContents = ( [CmmLit]	     -- The standard part
                          , [CmmLit] )	     -- The "extra bits"
 -- These Lits have *not* had mkRelativeTo applied to them
 
-mkInfoTableContents :: Platform
+mkInfoTableContents :: DynFlags
                     -> CmmInfoTable
                     -> Maybe StgHalfWord    -- Override default RTS type tag?
                     -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
                                InfoTableContents)	-- Info tbl + extra bits
 
-mkInfoTableContents platform
+mkInfoTableContents dflags
                     info@(CmmInfoTable { cit_lbl  = info_lbl
                                        , cit_rep  = smrep
                                        , cit_prof = prof
                                        , cit_srt = srt }) 
                     mb_rts_tag
   | RTSRep rts_tag rep <- smrep
-  = mkInfoTableContents platform info{cit_rep = rep} (Just rts_tag)
+  = mkInfoTableContents dflags info{cit_rep = rep} (Just rts_tag)
     -- Completely override the rts_tag that mkInfoTableContents would
     -- otherwise compute, with the rts_tag stored in the RTSRep
     -- (which in turn came from a handwritten .cmm file)
@@ -130,7 +130,7 @@ mkInfoTableContents platform
        ; let (srt_label, srt_bitmap) = mkSRTLit srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits frame
        ; let
-             std_info = mkStdInfoTable prof_lits rts_tag srt_bitmap liveness_lit
+             std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
              rts_tag | Just tag <- mb_rts_tag = tag
                      | null liveness_data     = rET_SMALL -- Fits in extra_bits
                      | otherwise              = rET_BIG   -- Does not; extra_bits is
@@ -143,7 +143,7 @@ mkInfoTableContents platform
        ; let (srt_label, srt_bitmap) = mkSRTLit srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
-       ; let std_info = mkStdInfoTable prof_lits
+       ; let std_info = mkStdInfoTable dflags prof_lits
                                        (mb_rts_tag   `orElse` rtsClosureType smrep)
                                        (mb_srt_field `orElse` srt_bitmap)
                                        (mb_layout    `orElse` layout)
@@ -326,13 +326,14 @@ mkLivenessBits liveness
 -- so we can't use constant offsets from Constants
 
 mkStdInfoTable
-   :: (CmmLit,CmmLit)	-- Closure type descr and closure descr  (profiling)
+   :: DynFlags
+   -> (CmmLit,CmmLit)	-- Closure type descr and closure descr  (profiling)
    -> StgHalfWord	-- Closure RTS tag 
    -> StgHalfWord	-- SRT length
    -> CmmLit		-- layout field
    -> [CmmLit]
 
-mkStdInfoTable (type_descr, closure_descr) cl_type srt_len layout_lit
+mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt_len layout_lit
  = 	-- Parallel revertible-black hole field
     prof_info
 	-- Ticky info (none at present)
@@ -341,8 +342,8 @@ mkStdInfoTable (type_descr, closure_descr) cl_type srt_len layout_lit
 
  where  
     prof_info 
-	| opt_SccProfilingOn = [type_descr, closure_descr]
-	| otherwise	     = []
+	| dopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
+	| otherwise = []
 
     type_lit = packHalfWordsCLit cl_type srt_len
 

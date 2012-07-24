@@ -42,6 +42,7 @@ import Maybes
 import Id
 import Name
 import Util
+import DynFlags
 import StaticFlags
 import Module
 import FastString
@@ -159,11 +160,11 @@ constructSlowCall amodes
 -- | 'slowArgs' takes a list of function arguments and prepares them for
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
-slowArgs :: [(CgRep,CmmExpr)] -> [(CgRep,CmmExpr)]
-slowArgs [] = []
-slowArgs amodes
-  | opt_SccProfilingOn = save_cccs ++ this_pat ++ slowArgs rest
-  | otherwise          =              this_pat ++ slowArgs rest
+slowArgs :: DynFlags -> [(CgRep,CmmExpr)] -> [(CgRep,CmmExpr)]
+slowArgs _ [] = []
+slowArgs dflags amodes
+  | dopt Opt_SccProfilingOn dflags = save_cccs ++ this_pat ++ slowArgs dflags rest
+  | otherwise                      =              this_pat ++ slowArgs dflags rest
   where
     (arg_pat, args, rest) = matchSlowPattern amodes
     stg_ap_pat = mkCmmRetInfoLabel rtsPackageId arg_pat

@@ -49,7 +49,6 @@ import Module
 import ListSetOps
 import Util
 import BasicTypes
-import StaticFlags
 import DynFlags
 import Outputable
 import FastString
@@ -83,10 +82,10 @@ cgTopRhsClosure id ccs binder_info upd_flag args body = do
   ; mod_name <- getModuleName
   ; dflags   <- getDynFlags
   ; let descr         = closureDescription dflags mod_name name
-	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
+	closure_info  = mkClosureInfo dflags True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name $ idCafInfo id
     	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
-	closure_rep   = mkStaticClosureFields closure_info ccs True []
+	closure_rep   = mkStaticClosureFields dflags closure_info ccs True []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
@@ -123,10 +122,10 @@ cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
   ; mod_name <- getModuleName
   ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, amodes_w_offsets) 
-	    = mkVirtHeapOffsets (isLFThunk lf_info) amodes
+	    = mkVirtHeapOffsets dflags (isLFThunk lf_info) amodes
 
 	descr	     = closureDescription dflags mod_name (idName bndr)
-	closure_info = mkClosureInfo False 	-- Not static
+	closure_info = mkClosureInfo dflags False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds 
 				     NoC_SRT	-- No SRT for a std-form closure
 				     descr
@@ -174,12 +173,12 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; dflags <- getDynFlags
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
 	(tot_wds, ptr_wds, bind_details) 
-	   = mkVirtHeapOffsets (isLFThunk lf_info) (map add_rep fv_infos)
+	   = mkVirtHeapOffsets dflags (isLFThunk lf_info) (map add_rep fv_infos)
 
 	add_rep info = (cgIdInfoArgRep info, info)
 
 	descr	     = closureDescription dflags mod_name name
-	closure_info = mkClosureInfo False	-- Not static
+	closure_info = mkClosureInfo dflags False	-- Not static
 				     bndr lf_info tot_wds ptr_wds
 				     srt_info descr
 
@@ -392,7 +391,8 @@ mkSlowEntryCode cl_info reg_args
 \begin{code}
 thunkWrapper:: ClosureInfo -> Code -> Code
 thunkWrapper closure_info thunk_code = do
-  { let node_points = nodeMustPointToIt (closureLFInfo closure_info)
+  { dflags <- getDynFlags
+  ; let node_points = nodeMustPointToIt dflags (closureLFInfo closure_info)
 
     -- HWL: insert macros for GrAnSim; 2 versions depending on liveness of node
     -- (we prefer fetchAndReschedule-style context switches to yield ones)
@@ -416,7 +416,8 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 	   -> Code		-- Body of function being compiled
 	   -> Code
 funWrapper closure_info arg_regs reg_save_code fun_body = do
-  { let node_points = nodeMustPointToIt (closureLFInfo closure_info)
+  { dflags <- getDynFlags
+  ; let node_points = nodeMustPointToIt dflags (closureLFInfo closure_info)
         live        = Just $ map snd arg_regs
 
   {-
@@ -477,7 +478,7 @@ emitBlackHoleCode is_single_entry = do
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from CmmParse.
 
-  let  eager_blackholing =  not opt_SccProfilingOn
+  let  eager_blackholing =  not (dopt Opt_SccProfilingOn dflags)
                          && dopt Opt_EagerBlackHoling dflags
              -- Profiling needs slop filling (to support LDV
              -- profiling), so currently eager blackholing doesn't
@@ -486,7 +487,7 @@ emitBlackHoleCode is_single_entry = do
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
     stmtsC [
-       CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+       CmmStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
                 (CmmReg (CmmGlobal CurrentTSO)),
        CmmCall (CmmPrim MO_WriteBarrier Nothing) [] [] CmmMayReturn,
        CmmStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -510,7 +511,8 @@ setupUpdate closure_info code
           tickyPushUpdateFrame
           dflags <- getDynFlags
           if blackHoleOnEntry closure_info &&
-             not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+             not (dopt Opt_SccProfilingOn dflags) &&
+             dopt Opt_EagerBlackHoling dflags
                then pushBHUpdateFrame (CmmReg nodeReg) code
                else pushUpdateFrame   (CmmReg nodeReg) code
   
@@ -575,7 +577,9 @@ link_caf cl_info _is_upd = do
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
-  ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc [(tso,fixedHdrSize)]
+  ; dflags    <- getDynFlags
+  ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc
+                                 [(tso, fixedHdrSize dflags)]
   ; hp_rel    <- getHpRelOffset hp_offset
 
 	-- Call the RTS function newCAF to add the CAF to the CafList

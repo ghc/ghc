@@ -51,7 +51,7 @@ import CLabel
 
 import qualified Module
 import CostCentre
-import StaticFlags
+import DynFlags
 import FastString
 import Module
 import Constants        -- Lots of field offsets
@@ -89,15 +89,15 @@ costCentreFrom :: CmmExpr 	-- A closure pointer
 	       -> CmmExpr	-- The cost centre from that closure
 costCentreFrom cl = CmmLoad (cmmOffsetB cl oFFSET_StgHeader_ccs) ccsType
 
-staticProfHdr :: CostCentreStack -> [CmmLit]
+staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
 -- Was SET_STATIC_PROF_HDR
-staticProfHdr ccs = ifProfilingL [mkCCostCentreStack ccs, 
-			  	  staticLdvInit]
+staticProfHdr dflags ccs
+ = ifProfilingL dflags [mkCCostCentreStack ccs, staticLdvInit]
 
-dynProfHdr :: CmmExpr -> [CmmExpr]
+dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
-dynProfHdr ccs = ifProfilingL [ccs, dynLdvInit]
+dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
 
 initUpdFrameProf :: CmmExpr -> FCode ()
 -- Initialise the profiling field of an update frame
@@ -139,12 +139,12 @@ We want this kind of code:
 saveCurrentCostCentre :: FCode (Maybe LocalReg)
 	-- Returns Nothing if profiling is off
 saveCurrentCostCentre
-  | not opt_SccProfilingOn 
-  = return Nothing
-  | otherwise
-  = do	{ local_cc <- newTemp ccType
-        ; emitAssign (CmmLocal local_cc) curCCS
-	; return (Just local_cc) }
+  = do dflags <- getDynFlags
+       if not (dopt Opt_SccProfilingOn dflags)
+           then return Nothing
+           else do local_cc <- newTemp ccType
+                   emitAssign (CmmLocal local_cc) curCCS
+                   return (Just local_cc)
 
 restoreCurrentCostCentre :: Maybe LocalReg -> FCode ()
 restoreCurrentCostCentre Nothing 
@@ -162,7 +162,8 @@ restoreCurrentCostCentre (Just local_cc)
 profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
-    profAlloc (CmmLit (mkIntCLit (heapClosureSize rep))) ccs
+    do dflags <- getDynFlags
+       profAlloc (CmmLit (mkIntCLit (heapClosureSize dflags rep))) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -170,15 +171,16 @@ profDynAlloc rep ccs
 profAlloc :: CmmExpr -> CmmExpr -> FCode ()
 profAlloc words ccs
   = ifProfiling $
-    emit (addToMemE alloc_rep
-		(cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
-	  	(CmmMachOp (MO_UU_Conv wordWidth (typeWidth alloc_rep)) $
-		  [CmmMachOp mo_wordSub [words, 
-					 CmmLit (mkIntCLit profHdrSize)]]))
-		-- subtract the "profiling overhead", which is the
-		-- profiling header in a closure.
+        do dflags <- getDynFlags
+           emit (addToMemE alloc_rep
+                       (cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
+                       (CmmMachOp (MO_UU_Conv wordWidth (typeWidth alloc_rep)) $
+                         [CmmMachOp mo_wordSub [words, 
+                                                CmmLit (mkIntCLit (profHdrSize dflags))]]))
+                       -- subtract the "profiling overhead", which is the
+                       -- profiling header in a closure.
  where 
-	alloc_rep =  REP_CostCentreStack_mem_alloc
+        alloc_rep =  REP_CostCentreStack_mem_alloc
 
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
@@ -190,13 +192,15 @@ enterCostCentreThunk closure =
 
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
-  | opt_SccProfilingOn = code
-  | otherwise	       = nopC
+  = do dflags <- getDynFlags
+       if dopt Opt_SccProfilingOn dflags
+           then code
+           else nopC
 
-ifProfilingL :: [a] -> [a]
-ifProfilingL xs
-  | opt_SccProfilingOn = xs
-  | otherwise	       = []
+ifProfilingL :: DynFlags -> [a] -> [a]
+ifProfilingL dflags xs
+  | dopt Opt_SccProfilingOn dflags = xs
+  | otherwise                      = []
 
 
 ---------------------------------------------------------------
@@ -206,9 +210,10 @@ ifProfilingL xs
 initCostCentres :: CollectedCCs -> FCode ()
 -- Emit the declarations
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
-  = whenC opt_SccProfilingOn $
-    do	{ mapM_ emitCostCentreDecl local_CCs
-        ; mapM_ emitCostCentreStackDecl  singleton_CCSs  }
+  = do dflags <- getDynFlags
+       whenC (dopt Opt_SccProfilingOn dflags) $
+           do mapM_ emitCostCentreDecl local_CCs
+              mapM_ emitCostCentreStackDecl singleton_CCSs
 
 
 emitCostCentreDecl :: CostCentre -> FCode ()
@@ -272,12 +277,13 @@ sizeof_ccs_words
 
 emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
-  | not opt_SccProfilingOn = nopC
-  | otherwise = do 
-    tmp <- newTemp ccsType -- TODO FIXME NOW
-    pushCostCentre tmp curCCS cc
-    when tick $ emit (bumpSccCount (CmmReg (CmmLocal tmp)))
-    when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
+ = do dflags <- getDynFlags
+      if not (dopt Opt_SccProfilingOn dflags)
+          then nopC
+          else do tmp <- newTemp ccsType -- TODO FIXME NOW
+                  pushCostCentre tmp curCCS cc
+                  when tick $ emit (bumpSccCount (CmmReg (CmmLocal tmp)))
+                  when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc

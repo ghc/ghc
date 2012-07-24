@@ -31,7 +31,7 @@ import OldCmmUtils
 import SMRep
 import ForeignCall
 import Constants
-import StaticFlags
+import DynFlags
 import Outputable
 import Module
 import FastString
@@ -51,9 +51,10 @@ cgForeignCall
 cgForeignCall results fcall stg_args live
   = do
   reps_n_amodes <- getArgAmodes stg_args
+  dflags <- getDynFlags
   let
         -- Get the *non-void* args, and jiggle them with shimForeignCall
-        arg_exprs = [ shimForeignCallArg stg_arg expr
+        arg_exprs = [ shimForeignCallArg dflags stg_arg expr
                     | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes,
                        nonVoidArg rep]
 
@@ -206,13 +207,14 @@ maybe_assign_temp e
 
 emitSaveThreadState :: Code
 emitSaveThreadState = do
+  dflags <- getDynFlags
   -- CurrentTSO->stackobj->sp = Sp;
-  stmtC $ CmmStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord)
-                              stack_SP) stgSp
+  stmtC $ CmmStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO (tso_stackobj dflags)) bWord)
+                              (stack_SP dflags)) stgSp
   emitCloseNursery
   -- and save the current cost centre stack in the TSO when profiling:
-  when opt_SccProfilingOn $
-        stmtC (CmmStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
+  when (dopt Opt_SccProfilingOn dflags) $
+        stmtC (CmmStore (cmmOffset stgCurrentTSO (tso_CCCS dflags)) curCCS)
 
    -- CurrentNursery->free = Hp+1;
 emitCloseNursery :: Code
@@ -220,18 +222,19 @@ emitCloseNursery = stmtC $ CmmStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
 emitLoadThreadState :: Code
 emitLoadThreadState = do
+  dflags <- getDynFlags
   tso <- newTemp bWord -- TODO FIXME NOW
   stack <- newTemp bWord -- TODO FIXME NOW
   stmtsC [
         -- tso = CurrentTSO
         CmmAssign (CmmLocal tso) stgCurrentTSO,
         -- stack = tso->stackobj
-        CmmAssign (CmmLocal stack) (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_stackobj) bWord),
+        CmmAssign (CmmLocal stack) (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) (tso_stackobj dflags)) bWord),
         -- Sp = stack->sp;
-        CmmAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal stack)) stack_SP)
+        CmmAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal stack)) (stack_SP dflags))
                               bWord),
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
-        CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) stack_STACK)
+        CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) (stack_STACK dflags))
                                     rESERVED_STACK_WORDS),
         -- HpAlloc = 0;
         --   HpAlloc is assumed to be set to non-zero only by a failed
@@ -240,9 +243,9 @@ emitLoadThreadState = do
     ]
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
-  when opt_SccProfilingOn $
+  when (dopt Opt_SccProfilingOn dflags) $
         stmtC $ storeCurCCS $
-                  CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord
+                  CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) bWord
 
 emitOpenNursery :: Code
 emitOpenNursery = stmtsC [
@@ -270,14 +273,14 @@ nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
-tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: ByteOff
-tso_stackobj = closureField oFFSET_StgTSO_stackobj
-tso_CCCS     = closureField oFFSET_StgTSO_cccs
-stack_STACK  = closureField oFFSET_StgStack_stack
-stack_SP     = closureField oFFSET_StgStack_sp
+tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: DynFlags -> ByteOff
+tso_stackobj dflags = closureField dflags oFFSET_StgTSO_stackobj
+tso_CCCS     dflags = closureField dflags oFFSET_StgTSO_cccs
+stack_STACK  dflags = closureField dflags oFFSET_StgStack_stack
+stack_SP     dflags = closureField dflags oFFSET_StgStack_sp
 
-closureField :: ByteOff -> ByteOff
-closureField off = off + fixedHdrSize * wORD_SIZE
+closureField :: DynFlags -> ByteOff -> ByteOff
+closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp             = CmmReg sp
@@ -299,13 +302,13 @@ hpAlloc           = CmmGlobal HpAlloc
 -- value passed to the call.  For ByteArray#/Array# we pass the
 -- address of the actual array, not the address of the heap object.
 
-shimForeignCallArg :: StgArg -> CmmExpr -> CmmExpr
-shimForeignCallArg arg expr
+shimForeignCallArg :: DynFlags -> StgArg -> CmmExpr -> CmmExpr
+shimForeignCallArg dflags arg expr
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
-        = cmmOffsetB expr arrPtrsHdrSize
+        = cmmOffsetB expr (arrPtrsHdrSize dflags)
 
   | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
-        = cmmOffsetB expr arrWordsHdrSize
+        = cmmOffsetB expr (arrWordsHdrSize dflags)
 
   | otherwise = expr
   where

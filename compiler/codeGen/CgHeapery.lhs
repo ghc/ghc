@@ -44,6 +44,7 @@ import Util
 import Module
 import Constants
 import Outputable
+import DynFlags
 import FastString
 
 import Data.List
@@ -115,7 +116,8 @@ getHpRelOffset virtual_offset
 
 \begin{code}
 layOutDynConstr, layOutStaticConstr
-        :: DataCon
+        :: DynFlags
+        -> DataCon
         -> [(CgRep,a)]
         -> (ClosureInfo,
             [(a,VirtualHpOffset)])
@@ -123,15 +125,15 @@ layOutDynConstr, layOutStaticConstr
 layOutDynConstr    = layOutConstr False
 layOutStaticConstr = layOutConstr True
 
-layOutConstr :: Bool -> DataCon -> [(CgRep, a)]
+layOutConstr :: Bool -> DynFlags -> DataCon -> [(CgRep, a)]
              -> (ClosureInfo, [(a, VirtualHpOffset)])
-layOutConstr is_static data_con args
-   = (mkConInfo is_static data_con tot_wds ptr_wds,
+layOutConstr is_static dflags data_con args
+   = (mkConInfo dflags is_static data_con tot_wds ptr_wds,
       things_w_offsets)
   where
     (tot_wds,            --  #ptr_wds + #nonptr_wds
      ptr_wds,            --  #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} args
+     things_w_offsets) = mkVirtHeapOffsets dflags False{-not a thunk-} args
 \end{code}
 
 @mkVirtHeapOffsets@ always returns boxed things with smaller offsets
@@ -140,7 +142,8 @@ list
 
 \begin{code}
 mkVirtHeapOffsets
-          :: Bool               -- True <=> is a thunk
+          :: DynFlags
+          -> Bool               -- True <=> is a thunk
           -> [(CgRep,a)]        -- Things to make offsets for
           -> (WordOff,          -- _Total_ number of words allocated
               WordOff,          -- Number of words allocated for *pointers*
@@ -150,7 +153,7 @@ mkVirtHeapOffsets
 
 -- First in list gets lowest offset, which is initial offset + 1.
 
-mkVirtHeapOffsets is_thunk things
+mkVirtHeapOffsets dflags is_thunk things
   = let non_void_things               = filterOut (isVoidArg . fst) things
         (ptrs, non_ptrs)              = separateByPtrFollowness non_void_things
         (wds_of_ptrs, ptrs_w_offsets) = mapAccumL computeOffset 0 ptrs
@@ -158,8 +161,8 @@ mkVirtHeapOffsets is_thunk things
     in
     (tot_wds, wds_of_ptrs, ptrs_w_offsets ++ non_ptrs_w_offsets)
   where
-    hdr_size    | is_thunk   = thunkHdrSize
-                | otherwise  = fixedHdrSize
+    hdr_size    | is_thunk   = thunkHdrSize dflags
+                | otherwise  = fixedHdrSize dflags
 
     computeOffset wds_so_far (rep, thing)
       = (wds_so_far + cgRepSizeW rep, (thing, hdr_size + wds_so_far))
@@ -177,13 +180,14 @@ and adding a static link field if necessary.
 
 \begin{code}
 mkStaticClosureFields
-        :: ClosureInfo
+        :: DynFlags
+        -> ClosureInfo
         -> CostCentreStack
         -> Bool                 -- Has CAF refs
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields cl_info ccs caf_refs payload
-  = mkStaticClosure info_lbl ccs payload padding_wds
+mkStaticClosureFields dflags cl_info ccs caf_refs payload
+  = mkStaticClosure dflags info_lbl ccs payload padding_wds
         static_link_field saved_info_field
   where
     info_lbl = infoTableLabelFromCI cl_info
@@ -221,9 +225,9 @@ mkStaticClosureFields cl_info ccs caf_refs payload
         | caf_refs      = mkIntCLit 0
         | otherwise     = mkIntCLit 1
 
-mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
+mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_field
+mkStaticClosure dflags info_lbl ccs payload padding_wds static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
   ++ concatMap padLitToWord payload
@@ -234,7 +238,7 @@ mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_fi
     variable_header_words
         =  staticGranHdr
         ++ staticParHdr
-        ++ staticProfHdr ccs
+        ++ staticProfHdr dflags ccs
         ++ staticTickyHdr
 
 padLitToWord :: CmmLit -> [CmmLit]
@@ -290,24 +294,29 @@ hpStkCheck cl_info is_fun reg_save_code live code
             {   -- Emit heap checks, but be sure to do it lazily so
                 -- that the conditionals on hpHw don't cause a black hole
               codeOnly $ do
-                { do_checks stk_words hpHw full_save_code rts_label full_live
-                ; tickyAllocHeap hpHw }
+
+                dflags <- getDynFlags
+
+                let (node_asst, full_live)
+                        | nodeMustPointToIt dflags (closureLFInfo cl_info)
+                        = (noStmts, live)
+                        | otherwise
+                        = (oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
+                          ,Just $ node : fromMaybe [] live)
+                        -- Strictly speaking, we should tag node here.  But if
+                        -- node doesn't point to the closure, the code for the closure
+                        -- cannot depend on the value of R1 anyway, so we're safe.
+
+                    full_save_code = node_asst `plusStmts` reg_save_code
+
+                do_checks stk_words hpHw full_save_code rts_label full_live
+                tickyAllocHeap hpHw
             ; setRealHp hpHw
             ; code }
         }
   where
-    (node_asst, full_live)
-        | nodeMustPointToIt (closureLFInfo cl_info)
-        = (noStmts, live)
-        | otherwise
-        = (oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
-          ,Just $ node : fromMaybe [] live)
-        -- Strictly speaking, we should tag node here.  But if
-        -- node doesn't point to the closure, the code for the closure
-        -- cannot depend on the value of R1 anyway, so we're safe.
     closure_lbl = closureLabelFromCI cl_info
 
-    full_save_code = node_asst `plusStmts` reg_save_code
 
     rts_label | is_fun    = CmmReg (CmmGlobal GCFun)
                                 -- Function entry point
@@ -578,6 +587,7 @@ allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
   = do  { virt_hp <- getVirtHp
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
+        ; dflags <- getDynFlags
         ; let   info_offset = virt_hp + 1
                 -- info_offset is the VirtualHpOffset of the first
                 -- word of the new object
@@ -585,7 +595,7 @@ allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
                 -- ie 1 *before* the info-ptr word of new object.
 
                 info_ptr = CmmLit (CmmLabel (infoTableLabelFromCI cl_info))
-                hdr_w_offsets = initDynHdr info_ptr use_cc `zip` [0..]
+                hdr_w_offsets = initDynHdr dflags info_ptr use_cc `zip` [0..]
 
         -- SAY WHAT WE ARE ABOUT TO DO
         ; profDynAlloc cl_info use_cc
@@ -596,20 +606,21 @@ allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
         ; hpStore base (hdr_w_offsets ++ amodes_with_offsets)
 
         -- BUMP THE VIRTUAL HEAP POINTER
-        ; setVirtHp (virt_hp + closureSize cl_info)
+        ; setVirtHp (virt_hp + closureSize dflags cl_info)
 
         -- RETURN PTR TO START OF OBJECT
         ; returnFC info_offset }
 
 
-initDynHdr :: CmmExpr
+initDynHdr :: DynFlags
+           -> CmmExpr
            -> CmmExpr           -- Cost centre to put in object
            -> [CmmExpr]
-initDynHdr info_ptr cc
+initDynHdr dflags info_ptr cc
   =  [info_ptr]
         -- ToDo: Gransim stuff
         -- ToDo: Parallel stuff
-  ++ dynProfHdr cc
+  ++ dynProfHdr dflags cc
         -- No ticky header
 
 hpStore :: CmmExpr -> [(CmmExpr, VirtualHpOffset)] -> Code
@@ -620,5 +631,6 @@ hpStore base es
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 emitSetDynHdr base info_ptr ccs
-  = hpStore base (zip (initDynHdr info_ptr ccs) [0..])
+  = do dflags <- getDynFlags
+       hpStore base (zip (initDynHdr dflags info_ptr ccs) [0..])
 \end{code}

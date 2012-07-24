@@ -170,7 +170,6 @@ flagsStatic = [
 isStaticFlag :: String -> Bool
 isStaticFlag f =
   f `elem` [
-    "fscc-profiling",
     "fdicts-strict",
     "fspec-inline-join-points",
     "fno-hi-version-check",

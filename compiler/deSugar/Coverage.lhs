@@ -254,6 +254,8 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
 
 
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
+  env <- getEnv
+  let dflags = tte_dflags env
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
@@ -263,7 +265,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
                  || id `elemVarSet` inline_ids
 
   -- See Note [inline sccs]
-  if inline && opt_SccProfilingOn then return (L pos funBind) else do
+  if inline && dopt Opt_SccProfilingOn dflags then return (L pos funBind) else do
 
   (fvs, (MatchGroup matches' ty)) <-
         getFreeVars $
@@ -1054,12 +1056,14 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
 
         cc = mkUserCC (mkFastString cc_name) (this_mod env) pos (mkCostCentreUnique c)
 
-        count = countEntries && dopt Opt_ProfCountEntries (tte_dflags env)
+        dflags = tte_dflags env
+
+        count = countEntries && dopt Opt_ProfCountEntries dflags
 
         tickish
-          | opt_Hpc            = HpcTick (this_mod env) c
-          | opt_SccProfilingOn = ProfNote cc count True{-scopes-}
-          | otherwise          = Breakpoint c ids
+          | opt_Hpc                        = HpcTick (this_mod env) c
+          | dopt Opt_SccProfilingOn dflags = ProfNote cc count True{-scopes-}
+          | otherwise                      = Breakpoint c ids
     in
     ( tickish
     , fvs

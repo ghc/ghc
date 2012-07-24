@@ -72,7 +72,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        ----------- Layout the stack and manifest Sp ---------------
        -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
        (g, stackmaps) <- {-# SCC "layoutStack" #-}
-                         runUniqSM $ cmmLayoutStack procPoints entry_off g
+                         runUniqSM $ cmmLayoutStack dflags procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
        g <- if optLevel dflags >= 99

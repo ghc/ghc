@@ -285,7 +285,7 @@ tickyDynAlloc rep lf
         | otherwise      -> return ()
   where
         -- will be needed when we fill in stubs
-    _cl_size   = heapClosureSize rep
+--    _cl_size   = heapClosureSize rep
 --    _slop_size = slopSize cl_info
 
     tick_alloc_thk 
