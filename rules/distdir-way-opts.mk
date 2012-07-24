@@ -105,7 +105,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_$2_MORE_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
- $$($$(basename $$<)_HC_OPTS) \
+ $$($$(basename $$(subst ./,,$$<))_HC_OPTS) \
  $$(SRC_HC_WARNING_OPTS) \
  $$(EXTRA_HC_OPTS)
 
