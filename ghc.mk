@@ -389,6 +389,9 @@ endif
 endif
 endef
 
+# Add all the packages. Note that we need to add them in dependency
+# order, as this is the order that they get configured in.
+
 $(eval $(call addPackage,ghc-prim))
 ifeq "$(CLEANING)" "YES"
 $(eval $(call addPackage,integer-gmp))
@@ -404,9 +407,9 @@ $(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
 $(eval $(call addPackage,old-locale))
 $(eval $(call addPackage,old-time))
-$(eval $(call addPackage,time))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
+$(eval $(call addPackage,time))
 $(eval $(call addPackage,unix,($$(Windows),NO)))
 
 $(eval $(call addPackage,directory))
