@@ -70,7 +70,7 @@ That is why these rules are built in here.
 
 
 \begin{code}
-primOpRules :: Name -> PrimOp -> [CoreRule]
+primOpRules :: Name -> PrimOp -> Maybe CoreRule
     -- ToDo: something for integer-shift ops?
     --       NotOp
 primOpRules nm TagToEnumOp = mkPrimOpRule nm 2 [ tagToEnumRule ]
@@ -174,46 +174,46 @@ primOpRules nm DoubleDivOp   = mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (
 primOpRules nm DoubleNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp ]
 
 -- Relational operators
-primOpRules nm IntEqOp    = mkRelOpRule nm (==) ++ litEq nm True
-primOpRules nm IntNeOp    = mkRelOpRule nm (/=) ++ litEq nm False
-primOpRules nm CharEqOp   = mkRelOpRule nm (==) ++ litEq nm True
-primOpRules nm CharNeOp   = mkRelOpRule nm (/=) ++ litEq nm False
+primOpRules nm IntEqOp    = mkRelOpRule nm (==) [ litEq True ]
+primOpRules nm IntNeOp    = mkRelOpRule nm (/=) [ litEq False ]
+primOpRules nm CharEqOp   = mkRelOpRule nm (==) [ litEq True ]
+primOpRules nm CharNeOp   = mkRelOpRule nm (/=) [ litEq False ]
 
-primOpRules nm IntGtOp    = mkRelOpRule nm (>)  ++ boundsCmp nm Gt
-primOpRules nm IntGeOp    = mkRelOpRule nm (>=) ++ boundsCmp nm Ge
-primOpRules nm IntLeOp    = mkRelOpRule nm (<=) ++ boundsCmp nm Le
-primOpRules nm IntLtOp    = mkRelOpRule nm (<)  ++ boundsCmp nm Lt
+primOpRules nm IntGtOp    = mkRelOpRule nm (>)  [ boundsCmp Gt ]
+primOpRules nm IntGeOp    = mkRelOpRule nm (>=) [ boundsCmp Ge ]
+primOpRules nm IntLeOp    = mkRelOpRule nm (<=) [ boundsCmp Le ]
+primOpRules nm IntLtOp    = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm CharGtOp   = mkRelOpRule nm (>)  ++ boundsCmp nm Gt
-primOpRules nm CharGeOp   = mkRelOpRule nm (>=) ++ boundsCmp nm Ge
-primOpRules nm CharLeOp   = mkRelOpRule nm (<=) ++ boundsCmp nm Le
-primOpRules nm CharLtOp   = mkRelOpRule nm (<)  ++ boundsCmp nm Lt
+primOpRules nm CharGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
+primOpRules nm CharGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
+primOpRules nm CharLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
+primOpRules nm CharLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
-primOpRules nm FloatGtOp  = mkRelOpRule nm (>)
-primOpRules nm FloatGeOp  = mkRelOpRule nm (>=)
-primOpRules nm FloatLeOp  = mkRelOpRule nm (<=)
-primOpRules nm FloatLtOp  = mkRelOpRule nm (<)
-primOpRules nm FloatEqOp  = mkRelOpRule nm (==)
-primOpRules nm FloatNeOp  = mkRelOpRule nm (/=)
+primOpRules nm FloatGtOp  = mkRelOpRule nm (>)  []
+primOpRules nm FloatGeOp  = mkRelOpRule nm (>=) []
+primOpRules nm FloatLeOp  = mkRelOpRule nm (<=) []
+primOpRules nm FloatLtOp  = mkRelOpRule nm (<)  []
+primOpRules nm FloatEqOp  = mkRelOpRule nm (==) [ litEq True ]
+primOpRules nm FloatNeOp  = mkRelOpRule nm (/=) [ litEq True ]
 
-primOpRules nm DoubleGtOp = mkRelOpRule nm (>)
-primOpRules nm DoubleGeOp = mkRelOpRule nm (>=)
-primOpRules nm DoubleLeOp = mkRelOpRule nm (<=)
-primOpRules nm DoubleLtOp = mkRelOpRule nm (<)
-primOpRules nm DoubleEqOp = mkRelOpRule nm (==)
-primOpRules nm DoubleNeOp = mkRelOpRule nm (/=)
+primOpRules nm DoubleGtOp = mkRelOpRule nm (>)  []
+primOpRules nm DoubleGeOp = mkRelOpRule nm (>=) []
+primOpRules nm DoubleLeOp = mkRelOpRule nm (<=) []
+primOpRules nm DoubleLtOp = mkRelOpRule nm (<)  []
+primOpRules nm DoubleEqOp = mkRelOpRule nm (==) [ litEq True ]
+primOpRules nm DoubleNeOp = mkRelOpRule nm (/=) [ litEq True ]
 
-primOpRules nm WordGtOp   = mkRelOpRule nm (>)  ++ boundsCmp nm Gt
-primOpRules nm WordGeOp   = mkRelOpRule nm (>=) ++ boundsCmp nm Ge
-primOpRules nm WordLeOp   = mkRelOpRule nm (<=) ++ boundsCmp nm Le
-primOpRules nm WordLtOp   = mkRelOpRule nm (<)  ++ boundsCmp nm Lt
-primOpRules nm WordEqOp   = mkRelOpRule nm (==)
-primOpRules nm WordNeOp   = mkRelOpRule nm (/=)
+primOpRules nm WordGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
+primOpRules nm WordGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
+primOpRules nm WordLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
+primOpRules nm WordLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
+primOpRules nm WordEqOp   = mkRelOpRule nm (==) [ litEq True ]
+primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq True ]
 
 primOpRules nm SeqOp      = mkPrimOpRule nm 4 [ seqRule ]
 primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
 
-primOpRules _  _          = []
+primOpRules _  _          = Nothing
 
 \end{code}
 
@@ -226,19 +226,22 @@ primOpRules _  _          = []
 \begin{code}
 
 -- useful shorthands
-mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> [CoreRule]
-mkPrimOpRule nm arity rules = mkBasicRule nm arity (msum rules)
+mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
+mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
 
-mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool) -> [CoreRule]
-mkRelOpRule nm cmp
-  = mkPrimOpRule nm 2 [ binaryLit (cmpOp cmp)
-                      , equalArgs >>
-                        -- x `cmp` x does not depend on x, so
-                        -- compute it for the arbitrary value 'True'
-                        -- and use that result
-                        return (if cmp True True
-                                  then trueVal
-                                  else falseVal) ]
+mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
+            -> [RuleM CoreExpr] -> Maybe CoreRule
+mkRelOpRule nm cmp extra
+  = mkPrimOpRule nm 2 $ rules ++ extra
+  where
+    rules = [ binaryLit (cmpOp cmp)
+            , equalArgs >>
+              -- x `cmp` x does not depend on x, so
+              -- compute it for the arbitrary value 'True'
+              -- and use that result
+              return (if cmp True True
+                        then trueVal
+                        else falseVal) ]
 
 -- common constants
 zeroi, onei, zerow, onew, zerof, onef, zerod, oned :: Literal
@@ -340,24 +343,17 @@ doubleOp2 _ _ _ = Nothing
 --        m  -> e2
 -- (modulo the usual precautions to avoid duplicating e1)
 
-litEq :: Name
-      -> Bool  -- True <=> equality, False <=> inequality
-      -> [CoreRule]
-litEq op_name is_eq
-  = [BuiltinRule { ru_name = occNameFS (nameOccName op_name)
-                                `appendFS` (fsLit "->case"),
-                   ru_fn = op_name,
-                   ru_nargs = 2, ru_try = rule_fn }]
+litEq :: Bool  -- True <=> equality, False <=> inequality
+      -> RuleM CoreExpr
+litEq is_eq = msum
+  [ do [Lit lit, expr] <- getArgs
+       do_lit_eq lit expr
+  , do [expr, Lit lit] <- getArgs
+       do_lit_eq lit expr ]
   where
-    rule_fn _ _ [Lit lit, expr] = do_lit_eq lit expr
-    rule_fn _ _ [expr, Lit lit] = do_lit_eq lit expr
-    rule_fn _ _ _               = Nothing
-
-    do_lit_eq lit expr
-      | litIsLifted lit 
-      = Nothing
-      | otherwise
-      = Just (mkWildCase expr (literalType lit) boolTy
+    do_lit_eq lit expr = do
+      guard (not (litIsLifted lit))
+      return (mkWildCase expr (literalType lit) boolTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
     val_if_eq  | is_eq     = trueVal
@@ -369,18 +365,10 @@ litEq op_name is_eq
 -- | Check if there is comparison with minBound or maxBound, that is
 -- always true or false. For instance, an Int cannot be smaller than its
 -- minBound, so we can replace such comparison with False.
-boundsCmp :: Name -> Comparison -> [CoreRule]
-boundsCmp op_name op = [ rule ]
-  where
-    rule = BuiltinRule
-      { ru_name = occNameFS (nameOccName op_name)
-                    `appendFS` (fsLit "min/maxBound")
-      , ru_fn = op_name
-      , ru_nargs = 2
-      , ru_try = rule_fn
-      }
-    rule_fn _ _ [a, b] = mkRuleFn op a b
-    rule_fn _ _ _      = Nothing
+boundsCmp :: Comparison -> RuleM CoreExpr
+boundsCmp op = do
+  [a, b] <- getArgs
+  liftMaybe $ mkRuleFn op a b
 
 data Comparison = Gt | Ge | Lt | Le
 
@@ -434,13 +422,13 @@ wordResult result
 %************************************************************************
 
 \begin{code}
-mkBasicRule :: Name -> Int -> RuleM CoreExpr -> [CoreRule]
+mkBasicRule :: Name -> Int -> RuleM CoreExpr -> CoreRule
 -- Gives the Rule the same name as the primop itself
 mkBasicRule op_name n_args rm
-  = [BuiltinRule { ru_name = occNameFS (nameOccName op_name),
-                   ru_fn = op_name,
-                   ru_nargs = n_args,
-                   ru_try = \_ -> runRuleM rm }]
+  = BuiltinRule { ru_name = occNameFS (nameOccName op_name),
+                  ru_fn = op_name,
+                  ru_nargs = n_args,
+                  ru_try = \_ -> runRuleM rm }
 
 newtype RuleM r = RuleM
   { runRuleM :: IdUnfoldingFun -> [CoreExpr] -> Maybe r }
