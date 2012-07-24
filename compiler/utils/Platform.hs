@@ -21,6 +21,8 @@ data Platform
         = Platform {
               platformArch                     :: Arch,
               platformOS                       :: OS,
+              -- Word size in bytes (i.e. normally 4 or 8,
+              -- for 32bit and 64bit platforms respectively)
               platformWordSize                 :: {-# UNPACK #-} !Int,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
