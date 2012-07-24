@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Integer.Type
--- Copyright   :  (c) Ian Lynagh 2007-2008
+-- Copyright   :  (c) Ian Lynagh 2007-2012
 -- License     :  BSD3
 --
 -- Maintainer  :  igloo@earth.li
@@ -369,6 +369,16 @@ n `divModInteger` d =
                negateInteger (signumInteger d)
             then (# q `minusInteger` oneInteger, r `plusInteger` d #)
             else (# q, r #)
+
+{-# NOINLINE divInteger #-}
+divInteger :: Integer -> Integer -> Integer
+n `divInteger` d = quotient
+    where (# quotient, _ #) = n `divModInteger` d
+
+{-# NOINLINE modInteger #-}
+modInteger :: Integer -> Integer -> Integer
+n `modInteger` d = modulus
+    where (# _, modulus #) = n `divModInteger` d
 
 {-# NOINLINE quotRemInteger #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
