@@ -312,7 +312,7 @@ serialisableTaskId (Task *task
 #if defined(THREADED_RTS)
     return serialiseTaskId(task->id);
 #else
-    return 1;
+    return (TaskId) (size_t) task;
 #endif
 }
 
