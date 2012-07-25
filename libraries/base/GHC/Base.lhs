@@ -363,6 +363,7 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 
+{-# NOINLINE [1] map #-}
 map :: (a -> b) -> [a] -> [b]
 map _ []     = []
 map f (x:xs) = f x : map f xs
@@ -409,6 +410,7 @@ mapFB c f = \x ys -> c (f x) ys
 --
 -- If the first list is not finite, the result is the first list.
 
+{-# NOINLINE [1] (++) #-}
 (++) :: [a] -> [a] -> [a]
 (++) []     ys = ys
 (++) (x:xs) ys = x : xs ++ ys
