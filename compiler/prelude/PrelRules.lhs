@@ -18,6 +18,7 @@ ToDo:
 module PrelRules ( primOpRules, builtinRules ) where
 
 #include "HsVersions.h"
+#include "../includes/MachDeps.h"
 
 import {-# SOURCE #-} MkId ( mkPrimOpId )
 
@@ -129,14 +130,18 @@ primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ binaryLit (wordShiftOp2 shiftRi
                                                , rightIdentity zeroi ]
 
 -- coercions
-primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLit word2IntLit ]
-primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLit int2WordLit ]
+primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLit word2IntLit
+                                                  , inversePrimOp Int2WordOp ]
+primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLit int2WordLit
+                                                  , inversePrimOp Word2IntOp ]
 primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit ]
 primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit ]
-primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit ]
+primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit
+                                                  , removeOp32 ]
 primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit ]
 primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit ]
-primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit ]
+primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit
+                                                  , removeOp32 ]
 primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit ]
 primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do { [Lit lit] <- getArgs
                                                   ; guard (litFitsInChar lit)
@@ -194,21 +199,21 @@ primOpRules nm FloatGeOp  = mkRelOpRule nm (>=) []
 primOpRules nm FloatLeOp  = mkRelOpRule nm (<=) []
 primOpRules nm FloatLtOp  = mkRelOpRule nm (<)  []
 primOpRules nm FloatEqOp  = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm FloatNeOp  = mkRelOpRule nm (/=) [ litEq True ]
+primOpRules nm FloatNeOp  = mkRelOpRule nm (/=) [ litEq False ]
 
 primOpRules nm DoubleGtOp = mkRelOpRule nm (>)  []
 primOpRules nm DoubleGeOp = mkRelOpRule nm (>=) []
 primOpRules nm DoubleLeOp = mkRelOpRule nm (<=) []
 primOpRules nm DoubleLtOp = mkRelOpRule nm (<)  []
 primOpRules nm DoubleEqOp = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm DoubleNeOp = mkRelOpRule nm (/=) [ litEq True ]
+primOpRules nm DoubleNeOp = mkRelOpRule nm (/=) [ litEq False ]
 
 primOpRules nm WordGtOp   = mkRelOpRule nm (>)  [ boundsCmp Gt ]
 primOpRules nm WordGeOp   = mkRelOpRule nm (>=) [ boundsCmp Ge ]
 primOpRules nm WordLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
 primOpRules nm WordLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 primOpRules nm WordEqOp   = mkRelOpRule nm (==) [ litEq True ]
-primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq True ]
+primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq False ]
 
 primOpRules nm SeqOp      = mkPrimOpRule nm 4 [ seqRule ]
 primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
@@ -412,8 +417,14 @@ intResult result
 wordResult :: Integer -> Maybe CoreExpr
 wordResult result
   = Just (mkWordVal (toInteger (fromInteger result :: TargetWord)))
-\end{code}
 
+inversePrimOp :: PrimOp -> RuleM CoreExpr
+inversePrimOp primop = do
+  [Var primop_id `App` e] <- getArgs
+  matchPrimOpId primop primop_id
+  return e
+
+\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -453,6 +464,18 @@ liftLit :: (Literal -> Literal) -> RuleM CoreExpr
 liftLit f = do
   [Lit lit] <- getArgs
   return $ Lit (f lit)
+
+removeOp :: RuleM CoreExpr
+removeOp = do
+  [e] <- getArgs
+  return e
+
+removeOp32 :: RuleM CoreExpr
+#if WORD_SIZE_IN_BITS == 32
+removeOp32 = removeOp
+#else
+removeOp32 = mzero
+#endif
 
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ args -> Just args
@@ -558,8 +581,13 @@ mkFloatVal :: Rational -> Expr CoreBndr
 mkFloatVal  f = Lit (convFloating (MachFloat  f))
 mkDoubleVal :: Rational -> Expr CoreBndr
 mkDoubleVal d = Lit (convFloating (MachDouble d))
-\end{code}
 
+matchPrimOpId :: PrimOp -> Id -> RuleM ()
+matchPrimOpId op id = do
+  op' <- liftMaybe $ isPrimOpId_maybe id
+  guard $ op == op'
+
+\end{code}
 
 %************************************************************************
 %*                                                                      *
