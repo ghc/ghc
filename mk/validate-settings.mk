@@ -114,3 +114,5 @@ libraries/binary/src/Data/Binary/Get_HC_OPTS += -fno-warn-warnings-deprecations
 GhcLibHcOpts += -fno-warn-deprecated-flags
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
 
+# Temporarely disable rule shadowing warning
+GhcLibHcOpts += -fno-warn-inline-rule-shadowing

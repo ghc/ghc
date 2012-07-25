@@ -364,6 +364,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
 	; rhs' <- dsLExpr rhs
+        ; dflags <- getDynFlags
 
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
@@ -381,6 +382,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                                  name act fn_name final_bndrs args final_rhs
 
               inline_shadows_rule   -- Function can be inlined before rule fires
+                | wopt Opt_WarnInlineRuleShadowing dflags
                 = case (idInlineActivation fn_id, act) of
                     (NeverActive, _)    -> False
                     (AlwaysActive, _)   -> True
@@ -389,7 +391,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
                     (ActiveAfter n, ActiveAfter r)    -> r < n  -- Rule active strictly first
                     (ActiveAfter {}, AlwaysActive)    -> False
                     (ActiveAfter {}, ActiveBefore {}) -> False
-                                       
+                | otherwise = False
 
         ; when inline_shadows_rule $
           warnDs (vcat [ hang (ptext (sLit "Rule") <+> doubleQuotes (ftext name)
