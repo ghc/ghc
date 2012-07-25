@@ -714,19 +714,6 @@ iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
                 | otherwise                = a `uncheckedIShiftRL#` b
 
-#if WORD_SIZE_IN_BITS == 32
-{-# RULES
-"narrow32Int#"  forall x#. narrow32Int#   x# = x#
-"narrow32Word#" forall x#. narrow32Word#   x# = x#
-   #-}
-#endif
-
-{-# RULES
-"int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
-"word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
-  #-}
-
-
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES
 "unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
