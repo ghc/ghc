@@ -825,6 +825,8 @@ Now, here's Lennart's code (which works)
 "fromRat/Float"     fromRat = (fromRational :: Rational -> Float)
 "fromRat/Double"    fromRat = (fromRational :: Rational -> Double)
   #-}
+
+{-# NOINLINE [1] fromRat #-}
 fromRat :: (RealFloat a) => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
