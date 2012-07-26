@@ -2346,7 +2346,8 @@ standardWarnings
         Opt_WarnWrongDoBind,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnPointlessPragmas,
-        Opt_WarnUnsupportedCallingConventions
+        Opt_WarnUnsupportedCallingConventions,
+        Opt_WarnInlineRuleShadowing
       ]
 
 minusWOpts :: [WarningFlag]

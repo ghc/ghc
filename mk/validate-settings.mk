@@ -110,9 +110,10 @@ libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
 libraries/binary/src/Data/Binary/Builder/Base_HC_OPTS += -fno-warn-warnings-deprecations
 libraries/binary/src/Data/Binary/Get_HC_OPTS += -fno-warn-warnings-deprecations
 
+# Temporarely disable inline rule shadowing warning
+libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
+libraries/template-haskell_dist-install_EXTRA_HC_OPTS += -fno-warn-inline-rule-shadowing
+
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
 GhcLibHcOpts += -fno-warn-deprecated-flags
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
-
-# Temporarely disable rule shadowing warning
-GhcLibHcOpts += -fno-warn-inline-rule-shadowing
