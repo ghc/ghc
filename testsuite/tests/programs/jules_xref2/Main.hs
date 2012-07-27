@@ -1,6 +1,9 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- partain: the failure (crashing) was w/ -prof-auto compilation
 
 module Main where
+
+import Control.Exception (IOException, catch)
 
 xreff :: Int -> [String] -> Table -> Int -> String -> String
 xreff cc exs stab lineno [] = display (foldl delete stab exs)
@@ -61,7 +64,7 @@ dispNos (n:ns) = ' ':(show n ++ dispNos ns)
 
 main = do
     input <- getContents
-    exceptions <- catch (readFile "exceptions") (\ e -> return "")
+    exceptions <- catch (readFile "exceptions") (\(e :: IOException) -> return "")
     putStr (xref (lines exceptions) input)
 
 {- OLD 1.2:

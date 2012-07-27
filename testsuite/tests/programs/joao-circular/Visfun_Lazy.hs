@@ -559,6 +559,7 @@ visit_PPRoot (C_Best_1 t_PPS ) x_pw = (x_fmts )
       x_frame_1 = (C_F_1 x_pw x_pw)
       x_fmts = (eq_best_fmts x_pw x_fmts_1)
       (x_error_1 , x_fmts_1 , x_maxh_1 , x_minll_1 , x_minw_1 ) = visit_PPS t_PPS x_frame_1
+visit_PPS :: PPS -> T_Frame -> (Bool, T_Formats, INT, Integer, Integer)
 visit_PPS (C_Above_1 t_PPS_2 t_PPS_3 ) x_frame = (x_error , x_fmts , x_maxh , x_minll , x_minw )
   where
       x_frame_2 = x_frame
