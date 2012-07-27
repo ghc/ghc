@@ -465,14 +465,11 @@ liftLit f = do
   [Lit lit] <- getArgs
   return $ Lit (f lit)
 
-removeOp :: RuleM CoreExpr
-removeOp = do
-  [e] <- getArgs
-  return e
-
 removeOp32 :: RuleM CoreExpr
 #if WORD_SIZE_IN_BITS == 32
-removeOp32 = removeOp
+removeOp32 = do
+  [e] <- getArgs
+  return e
 #else
 removeOp32 = mzero
 #endif
