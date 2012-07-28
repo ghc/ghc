@@ -24,7 +24,7 @@ import FastString
 
 -- |Build the PA dictionary function for some type and hoist it to top level.
 --
---  The PA dictionary holds fns that convert values to and from their vectorised representations.
+-- The PA dictionary holds fns that convert values to and from their vectorised representations.
 --
 -- @Recall the definition:
 --    class PR (PRepr a) => PA a where
@@ -32,6 +32,8 @@ import FastString
 --      fromPRepr    :: PRepr a -> a
 --      toArrPRepr   :: PData a -> PData (PRepr a)
 --      fromArrPRepr :: PData (PRepr a) -> PData a
+--      toArrPReprs   :: PDatas a         -> PDatas (PRepr a)
+--      fromArrPReprs :: PDatas (PRepr a) -> PDatas a
 --
 -- Example:
 --    df :: forall a. PR (PRepr a) -> PA a -> PA (T a)
@@ -93,7 +95,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
       ; raw_dfun <- newExportedVar dfun_name dfun_ty
       ; let dfun_unf = mkDFunUnfolding dfun_ty $
                        map (const $ DFunLamArg 0) super_args
-                       -- ++ map DFunConstArg super_consts
+                       ++ map DFunPolyArg super_consts
                        ++ map (DFunPolyArg . Var) method_ids
             dfun = raw_dfun `setIdUnfolding`  dfun_unf
                             `setInlinePragma` dfunInlinePragma
