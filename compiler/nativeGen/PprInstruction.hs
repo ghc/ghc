@@ -1,2 +1,0 @@
-
-        pprInstruction :: Platform -> instr -> SDoc
