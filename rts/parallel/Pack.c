@@ -2801,7 +2801,7 @@ UnpackFetchMe (StgWord ***bufptrP, StgClosure **graphP) {
   ToDo: implement packing of MUT_ARRAYs
 */
 
-//@cindex UnackArray
+//@cindex UnpackArray
 static void
 UnpackArray(StgWord ***bufptrP, StgClosure *graph)
 {
@@ -2995,7 +2995,7 @@ UnpackPAP(StgWord ***bufptrP, StgClosure *graph)
 	//ASSERT(type==BLACKHOLE || type==CAF_BLACKHOLE || type==BLACKHOLE_BQ);
 
 	IF_PAR_DEBUG(pack,
-		     belch("*<** UnackPAP @ %p: UPDATE_FRAME", 
+		     belch("*<** UnpackPAP @ %p: UPDATE_FRAME", 
 			   p));
 
 	((StgUpdateFrame *)p)->header.info = (StgInfoTable*)*bufptr++;

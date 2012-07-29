@@ -79,8 +79,12 @@
     field_offset_(str(s_type,field),s_type,field);
 
 /* An access macro for use in C-- sources. */
+#if defined(GEN_HASKELL)
+#define struct_field_macro(str) /* nothing */
+#else
 #define struct_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+OFFSET_" str "]\n");
+#endif
 
 /* Outputs the byte offset and MachRep for a field */
 #define struct_field(s_type, field)		\
@@ -125,8 +129,12 @@
     closure_size(s_type)
 
 /* An access macro for use in C-- sources. */
+#if defined(GEN_HASKELL)
+#define closure_field_macro(str) /* nothing */
+#else
 #define closure_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n");
+#endif
 
 #define closure_field_offset_(str, s_type,field) \
     def_offset(str, OFFSET(s_type,field) - TYPE_SIZE(StgHeader));
@@ -134,8 +142,12 @@
 #define closure_field_offset(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field)
 
+#if defined(GEN_HASKELL)
+#define closure_payload_macro(str) /* nothing */
+#else
 #define closure_payload_macro(str) \
     printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgHeader+OFFSET_" str " + WDS(__ix__)]\n");
+#endif
 
 #define closure_payload(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field); \
@@ -164,26 +176,39 @@
     def_offset(str(s_type,field), OFFSET(s_type,field) - TYPE_SIZE(StgHeader) - TYPE_SIZE(StgTSOProfInfo));
 
 /* Full byte offset for a TSO field, for use from Cmm */
+#if defined(GEN_HASKELL)
+#define tso_field_offset_macro(str) /* nothing */
+#else
 #define tso_field_offset_macro(str) \
     printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+OFFSET_" str ")\n");
+#endif
 
 #define tso_field_offset(s_type, field) \
     tso_payload_offset(s_type, field);  	\
     tso_field_offset_macro(str(s_type,field));
 
+#if defined(GEN_HASKELL)
+#define tso_field_macro(str) /* nothing */
+#else
 #define tso_field_macro(str) \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n")
+#endif
+
 #define tso_field(s_type, field)		\
     field_type(s_type, field);			\
     tso_field_offset(s_type,field);		\
     tso_field_macro(str(s_type,field))
   
+#if defined(GEN_HASKELL)
+#define opt_struct_size(s_type, option) /* nothing */
+#else
 #define opt_struct_size(s_type, option)					\
     printf("#ifdef " #option "\n");					\
     printf("#define SIZEOF_OPT_" #s_type " SIZEOF_" #s_type "\n");	\
     printf("#else\n");							\
     printf("#define SIZEOF_OPT_" #s_type " 0\n");			\
     printf("#endif\n\n");
+#endif
 
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 

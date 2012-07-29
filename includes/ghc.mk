@@ -113,7 +113,7 @@ endif
 	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
 	@echo "#define HOST_VENDOR  \"$(TargetVendor_CPP)\"" >> $@
 	@echo >> $@
-	@echo "/* These TARGET macros are for backwards compatibily... DO NOT USE! */" >> $@
+	@echo "/* These TARGET macros are for backwards compatibility... DO NOT USE! */" >> $@
 	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
 	@echo "#define $(TargetPlatform_CPP)_TARGET  1" >> $@
 	@echo "#define $(TargetArch_CPP)_TARGET_ARCH  1" >> $@
