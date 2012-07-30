@@ -9,7 +9,7 @@
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
-        CmmInfoTable(..), ClosureTypeInfo(..),
+        CmmInfoTable(..), ClosureTypeInfo(..), topInfoTable,
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
 
         cmmMapGraph, cmmTopMapGraph,
@@ -64,16 +64,18 @@ import ForeignCall
 -- across a whole compilation unit.
 newtype ListGraph i = ListGraph [GenBasicBlock i]
 
+type CmmInfoTables = BlockEnv CmmInfoTable
+
 -- | Cmm with the info table as a data type
-type CmmGroup = GenCmmGroup CmmStatics CmmInfoTable (ListGraph CmmStmt)
-type CmmDecl = GenCmmDecl CmmStatics CmmInfoTable (ListGraph CmmStmt)
+type CmmGroup = GenCmmGroup CmmStatics CmmInfoTables (ListGraph CmmStmt)
+type CmmDecl = GenCmmDecl CmmStatics CmmInfoTables (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
 -- table label. If we are building without tables-next-to-code there will be no statics
 --
 -- INVARIANT: if there is an info table, it has at least one CmmStatic
-type RawCmmGroup = GenCmmGroup CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
-type RawCmmDecl = GenCmmDecl CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
+type RawCmmGroup = GenCmmGroup CmmStatics (BlockEnv CmmStatics) (ListGraph CmmStmt)
+type RawCmmDecl = GenCmmDecl CmmStatics (BlockEnv CmmStatics) (ListGraph CmmStmt)
 
 
 -- A basic block containing a single label, at the beginning.
@@ -98,6 +100,14 @@ blockStmts (BasicBlock _ stmts) = stmts
 
 mapBlockStmts :: (i -> i') -> GenBasicBlock i -> GenBasicBlock i'
 mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
+
+-- | Returns the info table associated with the CmmDecl's entry point,
+-- if any.
+topInfoTable :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> Maybe i
+topInfoTable (CmmProc infos _ (ListGraph (b:_)))
+  = mapLookup (blockId b) infos
+topInfoTable _
+  = Nothing
 
 ----------------------------------------------------------------
 --   graph maps

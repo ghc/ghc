@@ -542,7 +542,7 @@ emitClosureAndInfoTable ::
 emitClosureAndInfoTable info_tbl conv args body
   = do { blks <- getCode body
        ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
-       ; emitProcWithConvention conv info_tbl entry_lbl args blks
+       ; emitProcWithConvention conv (Just info_tbl) entry_lbl args blks
        }
 
 -----------------------------------------------------------------------------

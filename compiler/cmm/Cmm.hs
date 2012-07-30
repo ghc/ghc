@@ -14,7 +14,7 @@ module Cmm (
      CmmReplGraph, GenCmmReplGraph, CmmFwdRewrite, CmmBwdRewrite,
    
      -- * Info Tables
-     CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..),
+     CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
      ClosureTypeInfo(..), 
      C_SRT(..), needsSRT,
      ProfilingInfo(..), ConstrDescription, 
@@ -96,8 +96,12 @@ type CmmBwdRewrite f = BwdRewrite UniqSM CmmNode f
 --     Info Tables
 -----------------------------------------------------------------------------
 
-data CmmTopInfo   = TopInfo { info_tbl :: CmmInfoTable
+data CmmTopInfo   = TopInfo { info_tbls  :: BlockEnv CmmInfoTable
                             , stack_info :: CmmStackInfo }
+
+topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
+topInfoTable (CmmProc infos _ g) = mapLookup (g_entry g) (info_tbls infos)
+topInfoTable _                   = Nothing
 
 data CmmStackInfo
    = StackInfo {
@@ -105,8 +109,10 @@ data CmmStackInfo
                -- number of bytes of arguments on the stack on entry to the
                -- the proc.  This is filled in by StgCmm.codeGen, and used
                -- by the stack allocator later.
-       updfr_space :: Maybe ByteOff     -- XXX: comment?
-   }
+       updfr_space :: Maybe ByteOff
+               -- XXX: this never contains anything useful, but it should.
+               -- See comment in CmmLayoutStack.
+  }
 
 -- | Info table as a haskell data type
 data CmmInfoTable
@@ -116,7 +122,6 @@ data CmmInfoTable
       cit_prof :: ProfilingInfo,
       cit_srt  :: C_SRT
     }
-  | CmmNonInfoTable   -- Procedure doesn't need an info table
 
 data ProfilingInfo
   = NoProfilingInfo

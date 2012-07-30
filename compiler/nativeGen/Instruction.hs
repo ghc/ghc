@@ -39,13 +39,13 @@ noUsage  = RU [] []
 type NatCmm instr
         = GenCmmGroup
                 CmmStatics
-                (Maybe CmmStatics)
+                (BlockEnv CmmStatics)
                 (ListGraph instr)
 
 type NatCmmDecl statics instr
         = GenCmmDecl
                 statics
-                (Maybe CmmStatics)
+                (BlockEnv CmmStatics)
                 (ListGraph instr)
 
 

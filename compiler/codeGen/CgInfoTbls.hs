@@ -366,5 +366,5 @@ emitInfoTableAndCode
 	-> Code
 
 emitInfoTableAndCode entry_ret_lbl info args blocks
-  = emitProc info entry_ret_lbl args blocks
+  = emitProc (Just info) entry_ret_lbl args blocks
 

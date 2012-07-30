@@ -15,7 +15,8 @@ module StgCmmHeap (
         mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
 
-        allocDynClosure, allocDynClosureCmm, emitSetDynHdr
+        allocDynClosure, allocDynClosureReg, allocDynClosureCmm,
+        emitSetDynHdr
     ) where
 
 #include "HsVersions.h"
@@ -64,10 +65,15 @@ allocDynClosure
                                                 -- No void args in here
         -> FCode (LocalReg, CmmAGraph)
 
-allocDynClosureCmm
+allocDynClosureReg
         :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
         -> [(CmmExpr, VirtualHpOffset)]
         -> FCode (LocalReg, CmmAGraph)
+
+allocDynClosureCmm
+        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
+        -> [(CmmExpr, VirtualHpOffset)]
+        -> FCode CmmExpr -- returns Hp+n
 
 -- allocDynClosure allocates the thing in the heap,
 -- and modifies the virtual Hp to account for this.
@@ -89,8 +95,16 @@ allocDynClosureCmm
 allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureCmm info_tbl lf_info
+        ; allocDynClosureReg info_tbl lf_info
                              use_cc _blame_cc (zip cmm_args offsets)
+        }
+
+allocDynClosureReg  info_tbl lf_info use_cc _blame_cc amodes_w_offsets
+  = do  { hp_rel <- allocDynClosureCmm info_tbl lf_info
+                                       use_cc _blame_cc amodes_w_offsets
+
+        -- Note [Return a LocalReg]
+        ; getCodeR $ assignTemp hp_rel
         }
 
 allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
@@ -121,10 +135,8 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
         ; dflags <- getDynFlags
         ; setVirtHp (virt_hp + heapClosureSize dflags rep)
 
-        -- Assign to a temporary and return
-        -- Note [Return a LocalReg]
-        ; hp_rel <- getHpRelOffset info_offset
-        ; getCodeR $ assignTemp hp_rel }
+        ; getHpRelOffset info_offset
+        }
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs

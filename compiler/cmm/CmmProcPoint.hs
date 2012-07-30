@@ -5,6 +5,7 @@ module CmmProcPoint
     ( ProcPointSet, Status(..)
     , callProcPoints, minimalProcPointSet
     , splitAtProcPoints, procPointAnalysis
+    , attachContInfoTables
     )
 where
 
@@ -209,7 +210,7 @@ extendPPSet platform g blocks procPoints =
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
                      CmmDecl -> UniqSM [CmmDecl]
 splitAtProcPoints entry_label callPPs procPoints procMap
-                  (CmmProc (TopInfo {info_tbl=info_tbl})
+                  (CmmProc (TopInfo {info_tbls = info_tbls})
                            top_l g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
      let addBlock b graphEnv =
@@ -234,10 +235,9 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      --    the proc point is a callPP)
      -- Due to common blockification, we may overestimate the set of procpoints.
      let add_label map pp = Map.insert pp lbls map
-           where lbls | pp == entry = (entry_label, Just entry_info_lbl)
+           where lbls | pp == entry = (entry_label, Just (toInfoLbl entry_label))
                       | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> 
                                                     Just (infoTblLbl pp))
-                 entry_info_lbl = cit_lbl info_tbl
          procLabels = foldl add_label Map.empty
                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
      -- In each new graph, add blocks jumping off to the new procedures,
@@ -278,13 +278,13 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      let to_proc (bid, g) = case expectJust "pp label" $ Map.lookup bid procLabels of
              (lbl, Just info_lbl)
                | bid == entry
-               -> CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info})
+               -> CmmProc (TopInfo {info_tbls=info_tbls, stack_info=stack_info})
                           top_l (replacePPIds g)
                | otherwise
-               -> CmmProc (TopInfo {info_tbl=mkEmptyContInfoTable info_lbl, stack_info=stack_info})
+               -> CmmProc (TopInfo {info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl), stack_info=stack_info})
                           lbl (replacePPIds g)
              (lbl, Nothing)
-               -> CmmProc (TopInfo {info_tbl=CmmNonInfoTable, stack_info=stack_info})
+               -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info})
                           lbl (replacePPIds g)
             where
              stack_info = StackInfo 0 Nothing -- panic "No StackInfo"
@@ -334,6 +334,20 @@ replaceBranches env cmmg
             -- XXX: this is a recursive lookup, it follows chains
             -- until the lookup returns Nothing, at which point we
             -- return the last BlockId
+
+-- --------------------------------------------------------------
+-- Not splitting proc points: add info tables for continuations
+
+attachContInfoTables :: ProcPointSet -> CmmDecl -> CmmDecl
+attachContInfoTables call_proc_points (CmmProc top_info top_l g)
+ = CmmProc top_info{info_tbls = info_tbls'} top_l g
+ where
+   info_tbls' = mapUnion (info_tbls top_info) $
+                mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
+                            | l <- setElems call_proc_points
+                            , l /= g_entry g ]
+attachContInfoTables _ other_decl
+ = other_decl
 
 ----------------------------------------------------------------
 

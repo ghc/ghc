@@ -25,14 +25,26 @@ import Prelude hiding (succ, unzip, zip)
 -----------------------------------------------------------------------------
 
 cmmCfgOpts :: CmmGraph -> CmmGraph
-cmmCfgOpts = removeUnreachableBlocks . blockConcat
+cmmCfgOpts g = fst (blockConcat g)
 
 cmmCfgOptsProc :: CmmDecl -> CmmDecl
-cmmCfgOptsProc = optProc cmmCfgOpts
+cmmCfgOptsProc (CmmProc info lbl g) = CmmProc info' lbl g'
+    where (g', env) = blockConcat g
+          info' = info{ info_tbls = new_info_tbls }
+          new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))
 
-optProc :: (g -> g) -> GenCmmDecl d h g -> GenCmmDecl d h g
-optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
-optProc _   top                  = top
+          -- If we changed any labels, then we have to update the info tables
+          -- too, except for the top-level info table because that might be
+          -- referred to by other procs.
+          upd_info (k,info)
+             | Just k' <- mapLookup k env
+             = (k', if k' == g_entry g'
+                       then info
+                       else info{ cit_lbl = infoTblLbl k' })
+             | otherwise
+             = (k,info)
+
+cmmCfgOptsProc top = top
 
 
 -----------------------------------------------------------------------------
@@ -41,7 +53,7 @@ optProc _   top                  = top
 --
 -----------------------------------------------------------------------------
 
--- This optimisation does two things:
+-- This optimisation does three things:
 --   - If a block finishes with an unconditional branch, then we may
 --     be able to concatenate the block it points to and remove the
 --     branch.  We do this either if the destination block is small
@@ -52,6 +64,10 @@ optProc _   top                  = top
 --     goto, then we can shortcut the destination, making the
 --     continuation block the destination of the goto.
 --
+--   - removes any unreachable blocks from the graph.  This is a side
+--     effect of starting with a postorder DFS traversal of the graph
+--
+
 -- Both transformations are improved by working from the end of the
 -- graph towards the beginning, because we may be able to perform many
 -- shortcuts in one go.
@@ -77,9 +93,9 @@ optProc _   top                  = top
 -- which labels we have renamed and apply the mapping at the end
 -- with replaceLabels.
 
-blockConcat  :: CmmGraph -> CmmGraph
+blockConcat  :: CmmGraph -> (CmmGraph, BlockEnv BlockId)
 blockConcat g@CmmGraph { g_entry = entry_id }
-  = replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks
+  = (replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks, shortcut_map)
   where
      -- we might be able to shortcut the entry BlockId itself
      new_entry
@@ -90,9 +106,12 @@ blockConcat g@CmmGraph { g_entry = entry_id }
        = entry_id
 
      blocks = postorderDfs g
+     blockmap = foldr addBlock emptyBody blocks
+      -- the initial blockmap is constructed from the postorderDfs result,
+      -- so that we automatically throw away unreachable blocks.
 
      (new_blocks, shortcut_map) =
-           foldr maybe_concat (toBlockMap g, mapEmpty) blocks
+           foldr maybe_concat (blockmap, mapEmpty) blocks
 
      maybe_concat :: CmmBlock
                   -> (BlockEnv CmmBlock, BlockEnv BlockId)

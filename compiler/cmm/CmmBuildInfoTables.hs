@@ -50,20 +50,8 @@ import Control.Monad
 foldSet :: (a -> b -> b) -> b -> Set a -> b
 foldSet = Set.foldr
 
-----------------------------------------------------------------
--- Building InfoTables
-
-
 -----------------------------------------------------------------------
 -- SRTs
-
--- WE NEED AN EXAMPLE HERE.
--- IN PARTICULAR, WE NEED TO POINT OUT THE DISTINCTION BETWEEN
--- FUNCTIONS WITH STATIC CLOSURES AND THOSE THAT MUST BE CONSTRUCTED
--- DYNAMICALLY (AND HENCE CAN'T BE REFERENCED IN AN SRT).
--- IN THE LATTER CASE, WE HAVE TO TAKE ALL THE CAFs REFERENCED BY
--- THE CLOSURE AND INLINE THEM INTO ANY SRT THAT MAY MENTION THE CLOSURE.
--- (I.E. TAKE THE TRANSITIVE CLOSURE, but only for non-static closures).
 
 {- EXAMPLE
 
@@ -100,7 +88,7 @@ h_closure with their contents:
    [ g_entry{c2_closure, c1_closure} ]
    [ h_entry{c2_closure} ]
 
-This is what mkTopCAFInfo is doing.
+This is what flattenCAFSets is doing.
 
 -}
 
@@ -179,8 +167,8 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
-buildSRTs :: TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
-buildSRTs topSRT cafs =
+buildSRT :: TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+buildSRT topSRT cafs =
   do let
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
@@ -261,9 +249,9 @@ to_SRT top_srt off len bmp
 -- any CAF that is reachable from c.
 localCAFInfo :: CAFEnv -> CmmDecl -> (CAFSet, Maybe CLabel)
 localCAFInfo _      (CmmData _ _) = (Set.empty, Nothing)
-localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
-  case info_tbl top_info of
-    CmmInfoTable { cit_rep = rep } | not (isStaticRep rep)
+localCAFInfo cafEnv proc@(CmmProc _ top_l (CmmGraph {g_entry=entry})) =
+  case topInfoTable proc of
+    Just (CmmInfoTable { cit_rep = rep }) | not (isStaticRep rep)
       -> (cafs, Just (toClosureLbl top_l))
     _other -> (cafs, Nothing)
   where
@@ -304,16 +292,30 @@ flatten env cafset = foldSet (lookup env) Set.empty cafset
 bundle :: Map CLabel CAFSet
        -> (CAFEnv, CmmDecl)
        -> (CAFSet, Maybe CLabel)
-       -> (CAFSet, CmmDecl)
-bundle flatmap (_, decl) (cafs, Nothing)
-  = (flatten flatmap cafs, decl)
-bundle flatmap (_, decl) (_, Just l)
-  = (expectJust "bundle" $ Map.lookup l flatmap, decl)
+       -> (BlockEnv CAFSet, CmmDecl)
+bundle flatmap (env, decl@(CmmProc infos lbl g)) (closure_cafs, mb_lbl)
+  = ( mapMapWithKey get_cafs (info_tbls infos), decl )
+ where
+  entry = g_entry g
 
-flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(CAFSet, CmmDecl)]
+  entry_cafs
+    | Just l <- mb_lbl = expectJust "bundle" $ Map.lookup l flatmap
+    | otherwise        = flatten flatmap closure_cafs
+
+  get_cafs l _
+    | l == entry = entry_cafs
+    | otherwise  = if not (mapMember l env)
+                      then pprPanic "bundle" (ppr l <+> ppr lbl <+> ppr (info_tbls infos))
+                      else flatten flatmap $ expectJust "bundle" $ mapLookup l env
+
+bundle _flatmap (_, decl) _
+  = ( mapEmpty, decl )
+
+
+flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(BlockEnv CAFSet, CmmDecl)]
 flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
    where
-     zipped    = [(e,d) | (e,ds) <- cpsdecls, d <- ds ]
+     zipped    = [ (env,decl) | (env,decls) <- cpsdecls, decl <- decls ]
      localCAFs = unzipWith localCAFInfo zipped
      flatmap   = mkTopCAFInfo localCAFs -- transitive closure of localCAFs
 
@@ -328,14 +330,34 @@ doSRTs topSRT tops
      let (topSRT', gs') = initUs_ us $ foldM setSRT (topSRT, []) caf_decls
      return (topSRT', reverse gs' {- Note [reverse gs] -})
   where
-    setSRT (topSRT, rst) (cafs, decl@(CmmProc{})) = do
-       (topSRT, cafTable, srt) <- buildSRTs topSRT cafs
-       let decl' = updInfo (const srt) decl
-       case cafTable of
-         Just tbl -> return (topSRT, decl': tbl : rst)
-         Nothing  -> return (topSRT, decl' : rst)
+    setSRT (topSRT, rst) (caf_map, decl@(CmmProc{})) = do
+       (topSRT, srt_tables, srt_env) <- buildSRTs topSRT caf_map
+       let decl' = updInfoSRTs srt_env decl
+       return (topSRT, decl': srt_tables ++ rst)
     setSRT (topSRT, rst) (_, decl) =
       return (topSRT, decl : rst)
+
+buildSRTs :: TopSRT -> BlockEnv CAFSet
+          -> UniqSM (TopSRT, [CmmDecl], BlockEnv C_SRT)
+buildSRTs top_srt caf_map
+  = foldM doOne (top_srt, [], mapEmpty) (mapToList caf_map)
+  where
+  doOne (top_srt, decls, srt_env) (l, cafs)
+    = do (top_srt, mb_decl, srt) <- buildSRT top_srt cafs
+         return ( top_srt, maybeToList mb_decl ++ decls
+                , mapInsert l srt srt_env )
+
+{-
+- In each CmmDecl there is a mapping from BlockId -> CmmInfoTable
+- The one corresponding to g_entry is the closure info table, the
+  rest are continuations.
+- Each one needs an SRT.
+- We get the CAFSet for each one from the CAFEnv
+- flatten gives us
+    [(BlockEnv CAFSet, CmmDecl)]
+-
+-}
+
 
 {- Note [reverse gs]
 
@@ -345,12 +367,9 @@ doSRTs topSRT tops
    instructions for forward refs.  --SDM
 -}
 
-updInfo :: (C_SRT -> C_SRT) -> CmmDecl -> CmmDecl
-updInfo toSrt (CmmProc top_info top_l g) =
-  CmmProc (top_info {info_tbl = updInfoTbl toSrt (info_tbl top_info)}) top_l g
-updInfo _ t = t
-
-updInfoTbl :: (C_SRT -> C_SRT) -> CmmInfoTable -> CmmInfoTable
-updInfoTbl toSrt info_tbl@(CmmInfoTable {})
-  = info_tbl { cit_srt = toSrt (cit_srt info_tbl) }
-updInfoTbl _ t@CmmNonInfoTable = t
+updInfoSRTs :: BlockEnv C_SRT -> CmmDecl -> CmmDecl
+updInfoSRTs srt_env (CmmProc top_info top_l g) =
+  CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}) top_l g
+  where updInfoTbl l info_tbl
+             = info_tbl { cit_srt = expectJust "updInfo" $ mapLookup l srt_env }
+updInfoSRTs _ t = t

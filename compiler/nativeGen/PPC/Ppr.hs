@@ -50,42 +50,43 @@ pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
- -- special case for split markers:
-pprNatCmmDecl (CmmProc Nothing lbl (ListGraph []))
-    = pprLabel lbl
+pprNatCmmDecl proc@(CmmProc _ lbl (ListGraph blocks)) =
+  case topInfoTable proc of
+    Nothing ->
+       case blocks of
+         []     -> -- special case for split markers:
+           pprLabel lbl
+         blocks -> -- special case for code without info table:
+           pprSectionHeader Text $$
+           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+           vcat (map pprBasicBlock blocks)
 
- -- special case for code without an info table:
-pprNatCmmDecl (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
-  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-  vcat (map pprBasicBlock blocks)
-
-pprNatCmmDecl (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  sdocWithPlatform $ \platform ->
-  pprSectionHeader Text $$
-  (
-       (if platformHasSubsectionsViaSymbols platform
-        then ppr (mkDeadStripPreventer info_lbl) <> char ':'
-        else empty) $$
-       vcat (map pprData info) $$
-       pprLabel info_lbl
-  ) $$
-  vcat (map pprBasicBlock blocks) $$
-     -- above: Even the first block gets a label, because with branch-chain
-     -- elimination, it might be the target of a goto.
-        (if platformHasSubsectionsViaSymbols platform
-         then
-         -- If we are using the .subsections_via_symbols directive
-         -- (available on recent versions of Darwin),
-         -- we have to make sure that there is some kind of reference
-         -- from the entry code to a label on the _top_ of of the info table,
-         -- so that the linker will not think it is unreferenced and dead-strip
-         -- it. That's why the label is called a DeadStripPreventer (_dsp).
-                  text "\t.long "
-              <+> ppr info_lbl
-              <+> char '-'
-              <+> ppr (mkDeadStripPreventer info_lbl)
-         else empty)
+    Just (Statics info_lbl info) ->
+      sdocWithPlatform $ \platform ->
+      pprSectionHeader Text $$
+      (
+           (if platformHasSubsectionsViaSymbols platform
+            then ppr (mkDeadStripPreventer info_lbl) <> char ':'
+            else empty) $$
+           vcat (map pprData info) $$
+           pprLabel info_lbl
+      ) $$
+      vcat (map pprBasicBlock blocks) $$
+         -- above: Even the first block gets a label, because with branch-chain
+         -- elimination, it might be the target of a goto.
+            (if platformHasSubsectionsViaSymbols platform
+             then
+             -- If we are using the .subsections_via_symbols directive
+             -- (available on recent versions of Darwin),
+             -- we have to make sure that there is some kind of reference
+             -- from the entry code to a label on the _top_ of of the info table,
+             -- so that the linker will not think it is unreferenced and dead-strip
+             -- it. That's why the label is called a DeadStripPreventer (_dsp).
+                      text "\t.long "
+                  <+> ppr info_lbl
+                  <+> char '-'
+                  <+> ppr (mkDeadStripPreventer info_lbl)
+             else empty)
 
 
 pprBasicBlock :: NatBasicBlock Instr -> SDoc

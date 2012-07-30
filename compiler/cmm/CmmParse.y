@@ -255,7 +255,7 @@ cmmproc :: { ExtCode }
                                         $4;
                                         return formals }
 			blks <- code (cgStmtsToBlocks stmts)
-                        code (emitProc CmmNonInfoTable (mkCmmCodeLabel pkg $1) formals blks) }
+                        code (emitProc Nothing (mkCmmCodeLabel pkg $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'

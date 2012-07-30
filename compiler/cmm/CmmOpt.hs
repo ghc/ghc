@@ -22,6 +22,7 @@ import CmmNode (wrapRecExp)
 import CmmUtils
 import DynFlags
 import StaticFlags
+import CLabel
 
 import UniqFM
 import Unique
@@ -667,11 +668,12 @@ exactLog2 x_
 -}
 
 cmmLoopifyForC :: RawCmmDecl -> RawCmmDecl
-cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
-cmmLoopifyForC (CmmProc (Just info@(Statics info_lbl _)) entry_lbl
+-- XXX: revisit if we actually want to do this
+-- cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
+cmmLoopifyForC (CmmProc infos entry_lbl
                  (ListGraph blocks@(BasicBlock top_id _ : _))) =
 --  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $
-  CmmProc (Just info) entry_lbl (ListGraph blocks')
+  CmmProc infos entry_lbl (ListGraph blocks')
   where blocks' = [ BasicBlock id (map do_stmt stmts)
                   | BasicBlock id stmts <- blocks ]
 
@@ -679,7 +681,7 @@ cmmLoopifyForC (CmmProc (Just info@(Statics info_lbl _)) entry_lbl
                 = CmmBranch top_id
         do_stmt stmt = stmt
 
-        jump_lbl | tablesNextToCode = info_lbl
+        jump_lbl | tablesNextToCode = toInfoLbl entry_lbl
                  | otherwise        = entry_lbl
 
 cmmLoopifyForC top = top

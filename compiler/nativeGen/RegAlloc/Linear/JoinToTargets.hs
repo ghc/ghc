@@ -235,16 +235,10 @@ joinToTargets_again
 --
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [(Unique, Loc, [Loc])]
 makeRegMovementGraph adjusted_assig dest_assig
- = let
- 	mkNodes src vreg
-	 = expandNode vreg src
-	 $ lookupWithDefaultUFM_Directly
-           	dest_assig
-                (panic "RegAllocLinear.makeRegMovementGraph")
-		vreg
-
-   in	[ node 	| (vreg, src) <- ufmToList adjusted_assig
- 		, node <- mkNodes src vreg ]
+ = [ node       | (vreg, src) <- ufmToList adjusted_assig
+                    -- source reg might not be needed at the dest:
+                , Just loc <- [lookupUFM_Directly dest_assig vreg]
+                , node <- expandNode vreg src loc ]
 
 
 -- | Expand out the destination, so InBoth destinations turn into

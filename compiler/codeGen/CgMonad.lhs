@@ -709,11 +709,16 @@ emitDecl decl = do
     state <- getState
     setState $ state { cgs_tops = cgs_tops state `snocOL` decl }
 
-emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
-emitProc info lbl [] blocks = do
-    let proc_block = CmmProc info lbl (ListGraph blocks)
+emitProc :: Maybe CmmInfoTable -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
+emitProc mb_info lbl [] blocks = do
+    let proc_block = CmmProc infos lbl (ListGraph blocks)
     state <- getState
     setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block }
+  where
+    infos = case (blocks,mb_info) of
+                (b:_, Just info) -> mapSingleton (blockId b) info
+                _other           -> mapEmpty
+
 emitProc _ _ (_:_) _ = panic "emitProc called with nonempty args"
 
 -- Emit a procedure whose body is the specified code; no info table
@@ -721,7 +726,7 @@ emitSimpleProc :: CLabel -> Code -> Code
 emitSimpleProc lbl code = do
     stmts <- getCgStmts code
     blks <- cgStmtsToBlocks stmts
-    emitProc CmmNonInfoTable lbl [] blks
+    emitProc Nothing lbl [] blks
 
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
