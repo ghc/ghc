@@ -67,7 +67,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl (ListGraph blocks)) =
     Just (Statics info_lbl info) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprCLabel (mkDeadStripPreventer info_lbl) <> char ':'
+          then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
          -- above: Even the first block gets a label, because with branch-chain
@@ -81,9 +81,9 @@ pprNatCmmDecl proc@(CmmProc top_info lbl (ListGraph blocks)) =
              -- so that the linker will not think it is unreferenced and dead-strip
              -- it. That's why the label is called a DeadStripPreventer (_dsp).
                       text "\t.long "
-                  <+> pprCLabel info_lbl
+                  <+> ppr info_lbl
                   <+> char '-'
-                  <+> pprCLabel (mkDeadStripPreventer info_lbl)
+                  <+> ppr (mkDeadStripPreventer info_lbl)
              else empty) $$
       pprSizeDecl info_lbl
 
@@ -107,7 +107,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
        Just (Statics info_lbl info) ->
            pprSectionHeader Text $$
            vcat (map pprData info) $$
-           pprLabel platform info_lbl
+           pprLabel info_lbl
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 pprDatas (align, (Statics lbl dats))

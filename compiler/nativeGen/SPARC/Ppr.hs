@@ -68,7 +68,7 @@ pprNatCmmDecl proc@(CmmProc _ lbl (ListGraph blocks)) =
       pprSectionHeader Text $$
       (
            (if platformHasSubsectionsViaSymbols platform
-            then pprCLabel (mkDeadStripPreventer info_lbl) <> char ':'
+            then ppr (mkDeadStripPreventer info_lbl) <> char ':'
             else empty) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
@@ -85,9 +85,9 @@ pprNatCmmDecl proc@(CmmProc _ lbl (ListGraph blocks)) =
              -- so that the linker will not think it is unreferenced and dead-strip
              -- it. That's why the label is called a DeadStripPreventer (_dsp).
                       text "\t.long "
-                  <+> pprCLabel info_lbl
+                  <+> ppr info_lbl
                   <+> char '-'
-                  <+> pprCLabel (mkDeadStripPreventer info_lbl)
+                  <+> ppr (mkDeadStripPreventer info_lbl)
              else empty)
 
 
