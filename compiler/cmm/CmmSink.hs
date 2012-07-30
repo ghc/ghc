@@ -179,7 +179,7 @@ tryToInline _live _usages node []
 tryToInline live usages node (a@(l,rhs,_) : rest)
   | occurs_once_in_this_node  = inline_and_discard
   | False {- isTiny rhs -}    = inline_and_keep
-    -- ^^ seems to make things slightly worse
+    --  ^^ seems to make things slightly worse
   where
         inline_and_discard = tryToInline live' usages' node' rest
 
