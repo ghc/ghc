@@ -33,9 +33,14 @@ cmmCfgOptsProc (CmmProc info lbl g) = CmmProc info' lbl g'
           info' = info{ info_tbls = new_info_tbls }
           new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))
 
+          -- If we changed any labels, then we have to update the info tables
+          -- too, except for the top-level info table because that might be
+          -- referred to by other procs.
           upd_info (k,info)
              | Just k' <- mapLookup k env
-             = (k', info{ cit_lbl = infoTblLbl k' })
+             = (k', if k' == g_entry g'
+                       then info
+                       else info{ cit_lbl = infoTblLbl k' })
              | otherwise
              = (k,info)
 
