@@ -308,7 +308,7 @@ bundle flatmap (env, decl@(CmmProc infos lbl g)) (closure_cafs, mb_lbl)
                       then pprPanic "bundle" (ppr l <+> ppr lbl <+> ppr (info_tbls infos))
                       else flatten flatmap $ expectJust "bundle" $ mapLookup l env
 
-bundle flatmap (_, decl) _
+bundle _flatmap (_, decl) _
   = ( mapEmpty, decl )
 
 

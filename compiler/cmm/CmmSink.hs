@@ -136,11 +136,13 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
                  mapFromList [ (l, filterAssignments (getLive l) assigs')
                              | l <- succs ]
 
+{-
 -- tiny: an expression we don't mind duplicating
 isTiny :: CmmExpr -> Bool
 isTiny (CmmReg _) = True
 isTiny (CmmLit _) = True
 isTiny _other     = False
+-}
 
 -- annotate each node with the set of registers live *after* the node
 annotate :: RegSet -> [CmmNode O O] -> [(RegSet, CmmNode O O)]

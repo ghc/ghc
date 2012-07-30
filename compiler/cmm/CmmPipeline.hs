@@ -10,7 +10,6 @@ module CmmPipeline (
 ) where
 
 import Cmm
-import CmmUtils
 import CmmLint
 import CmmBuildInfoTables
 import CmmCommonBlockElim

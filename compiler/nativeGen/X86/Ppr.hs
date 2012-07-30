@@ -64,7 +64,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl (ListGraph blocks)) =
            vcat (map (pprBasicBlock top_info) blocks) $$
            pprSizeDecl lbl
 
-    Just (Statics info_lbl info) ->
+    Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
