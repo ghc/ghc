@@ -67,9 +67,18 @@ static LowResTime getLowResTimeOfDay(void)
  */
 LowResTime getDelayTarget (HsInt us)
 {
-    // round up the target time, because we never want to sleep *less*
-    // than the desired amount.
-    return TimeToLowResTimeRoundUp(getProcessElapsedTime() + USToTime(us));
+    Time elapsed;
+    elapsed = getProcessElapsedTime();
+
+    // If the desired target would be larger than the maximum Time,
+    // default to the maximum Time. (#7087)
+    if (us > TimeToUS(TIME_MAX - elapsed)) {
+        return TimeToLowResTimeRoundDown(TIME_MAX);
+    } else {
+        // round up the target time, because we never want to sleep *less*
+        // than the desired amount.
+        return TimeToLowResTimeRoundUp(elapsed + USToTime(us));
+    }
 }
 
 /* There's a clever trick here to avoid problems when the time wraps

@@ -156,6 +156,8 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define TIME_RESOLUTION 1000000000
 typedef StgInt64 Time;
 
+#define TIME_MAX HS_INT64_MAX
+
 #if TIME_RESOLUTION == 1000000000
 // I'm being lazy, but it's awkward to define fully general versions of these
 #define TimeToUS(t)      ((t) / 1000)
