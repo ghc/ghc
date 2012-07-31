@@ -147,3 +147,5 @@ test('T7037',
      [ extra_clean(['T7037_main.o','T7037_main']) ],
      run_command,
      ['$MAKE -s --no-print-directory T7037'])
+
+test('7087', exit_code(1), compile_and_run, [''])
