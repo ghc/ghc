@@ -244,8 +244,9 @@ cgDataCon data_con
  	        do { _ <- ticky_code
 		   ; ldvEnter (CmmReg nodeReg)
 		   ; tickyReturnOldCon (length arg_things)
-		   ; emitReturn [cmmOffsetB (CmmReg nodeReg)
-					    (tagForCon data_con)] }
+                   ; _ <- emitReturn [cmmOffsetB (CmmReg nodeReg)
+                                            (tagForCon data_con)]
+                   ; return () }
                         -- The case continuation code expects a tagged pointer
 
 	    arg_reps :: [(PrimRep, UnaryType)]

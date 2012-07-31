@@ -427,42 +427,79 @@ entryHeapCheck cl_info offset nodeSet arity args code
 -- ------------------------------------------------------------
 -- A heap/stack check in a case alternative
 
+
+-- If there are multiple alts and we need to GC, but don't have a
+-- continuation already (the scrut was simple), then we should
+-- pre-generate the continuation.  (if there are multiple alts it is
+-- always a canned GC point).
+
+-- altHeapCheck:
+-- If we have a return continuation,
+--   then if it is a canned GC pattern,
+--           then we do mkJumpReturnsTo
+--           else we do a normal call to stg_gc_noregs
+--   else if it is a canned GC pattern,
+--           then generate the continuation and do mkCallReturnsTo
+--           else we do a normal call to stg_gc_noregs
+
 altHeapCheck :: [LocalReg] -> FCode a -> FCode a
 altHeapCheck regs code
-  = do loop_id <- newLabelC
-       emitLabel loop_id
-       altHeapCheckReturnsTo regs loop_id code
+  = case cannedGCEntryPoint regs of
+      Nothing -> genericGC code
+      Just gc -> do
+        lret <- newLabelC
+        let (off, copyin) = copyInOflow NativeReturn (Young lret) regs
+        lcont <- newLabelC
+        emitOutOfLine lret (copyin <*> mkBranch lcont)
+        emitLabel lcont
+        cannedGCReturnsTo False gc regs lret off code
 
-altHeapCheckReturnsTo :: [LocalReg] -> Label -> FCode a -> FCode a
-altHeapCheckReturnsTo regs retry_lbl code
+altHeapCheckReturnsTo :: [LocalReg] -> Label -> ByteOff -> FCode a -> FCode a
+altHeapCheckReturnsTo regs lret off code
+  = case cannedGCEntryPoint regs of
+      Nothing -> genericGC code
+      Just gc -> cannedGCReturnsTo True gc regs lret off code
+
+cannedGCReturnsTo :: Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
+                  -> FCode a
+                  -> FCode a
+cannedGCReturnsTo cont_on_stack gc regs lret off code
   = do updfr_sz <- getUpdFrameOff
-       gc_call_code <- gc_call updfr_sz
-       heapCheck False (gc_call_code <*> mkBranch retry_lbl) code
-
+       heapCheck False (gc_call gc updfr_sz) code
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
       -- Note [stg_gc arguments]
 
-    gc_call sp =
-        case rts_label regs of
-             Just gc -> mkCall (CmmLit gc) (GC, GC) regs reg_exprs sp (0,[])
-             Nothing -> mkCall generic_gc (GC, GC) [] [] sp (0,[])
+    gc_call label sp
+      | cont_on_stack = mkJumpReturnsTo label GC reg_exprs lret off sp
+      | otherwise     = mkCallReturnsTo label GC reg_exprs lret off sp (0,[])
 
-    rts_label [reg]
-        | isGcPtrType ty = Just (mkGcLabel "stg_gc_unpt_r1")
-        | isFloatType ty = case width of
-                                W32       -> Just (mkGcLabel "stg_gc_f1")
-                                W64       -> Just (mkGcLabel "stg_gc_d1")
-                                _         -> Nothing
+genericGC :: FCode a -> FCode a
+genericGC code
+  = do updfr_sz <- getUpdFrameOff
+       lretry <- newLabelC
+       emitLabel lretry
+       call <- mkCall generic_gc (GC, GC) [] [] updfr_sz (0,[])
+       heapCheck False (call <*> mkBranch lretry) code
 
-        | width == wordWidth = Just (mkGcLabel "stg_gc_unbx_r1")
-        | width == W64       = Just (mkGcLabel "stg_gc_l1")
-        | otherwise          = Nothing
-        where
-            ty = localRegType reg
-            width = typeWidth ty
-
-    rts_label _ = Nothing
+cannedGCEntryPoint :: [LocalReg] -> Maybe CmmExpr
+cannedGCEntryPoint regs
+  = case regs of
+      []  -> Just (mkGcLabel "stg_gc_noregs")
+      [reg]
+          | isGcPtrType ty -> Just (mkGcLabel "stg_gc_unpt_r1")
+          | isFloatType ty -> case width of
+                                  W32       -> Just (mkGcLabel "stg_gc_f1")
+                                  W64       -> Just (mkGcLabel "stg_gc_d1")
+                                  _         -> Nothing
+        
+          | width == wordWidth -> Just (mkGcLabel "stg_gc_unbx_r1")
+          | width == W64       -> Just (mkGcLabel "stg_gc_l1")
+          | otherwise          -> Nothing
+          where
+              ty = localRegType reg
+              width = typeWidth ty
+      _otherwise -> Nothing
 
 -- Note [stg_gc arguments]
 -- It might seem that we could avoid passing the arguments to the
@@ -484,11 +521,11 @@ altHeapCheckReturnsTo regs retry_lbl code
 
 -- | The generic GC procedure; no params, no results
 generic_gc :: CmmExpr
-generic_gc = CmmLit $ mkGcLabel "stg_gc_noregs"
+generic_gc = mkGcLabel "stg_gc_noregs"
 
 -- | Create a CLabel for calling a garbage collector entry point
-mkGcLabel :: String -> CmmLit
-mkGcLabel = (CmmLabel . (mkCmmCodeLabel rtsPackageId) . fsLit)
+mkGcLabel :: String -> CmmExpr
+mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit s)))
 
 -------------------------------
 heapCheck :: Bool -> CmmAGraph -> FCode a -> FCode a

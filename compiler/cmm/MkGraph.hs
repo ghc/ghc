@@ -8,6 +8,7 @@ module MkGraph
 
   , stackStubExpr
   , mkNop, mkAssign, mkStore, mkUnsafeCall, mkFinalCall, mkCallReturnsTo
+  , mkJumpReturnsTo
   , mkJump, mkDirectJump, mkForeignJump, mkForeignJumpExtra, mkJumpGC
   , mkCbranch, mkSwitch
   , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
@@ -234,6 +235,17 @@ mkCallReturnsTo f callConv actuals ret_lbl ret_off updfr_off extra_stack = do
      updfr_off extra_stack $
        toCall f (Just ret_lbl) updfr_off ret_off
 
+-- Like mkCallReturnsTo, but does not push the return address (it is assumed to be
+-- already on the stack).
+mkJumpReturnsTo :: CmmExpr -> Convention -> [CmmActual]
+                -> BlockId
+                -> ByteOff
+                -> UpdFrameOffset
+                -> CmmAGraph
+mkJumpReturnsTo f callConv actuals ret_lbl ret_off updfr_off  = do
+  lastWithArgs JumpRet (Young ret_lbl) callConv actuals updfr_off $
+       toCall f (Just ret_lbl) updfr_off ret_off
+
 mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
 mkUnsafeCall t fs as = mkMiddle $ CmmUnsafeForeignCall t fs as
 
@@ -289,7 +301,7 @@ oneCopyOflowI area (reg, off) (n, ms) =
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
 
-data Transfer = Call | Jump | Ret deriving Eq
+data Transfer = Call | JumpRet | Jump | Ret deriving Eq
 
 copyOutOflow :: Convention -> Transfer -> Area -> [CmmActual]
              -> UpdFrameOffset
@@ -321,10 +333,15 @@ copyOutOflow conv transfer area actuals updfr_off
       case area of
             Young id -> id `seq` -- Generate a store instruction for
                                  -- the return address if making a call
-                  if transfer == Call then
-                    ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                     widthInBytes wordWidth)
-                  else ([], 0)
+                  case transfer of
+                     Call ->
+                       ([(CmmLit (CmmBlock id), StackParam init_offset)],
+                       widthInBytes wordWidth)
+                     JumpRet ->
+                       ([],
+                       widthInBytes wordWidth)
+                     _other ->
+                       ([], 0)
             Old -> ([], updfr_off)
 
     arg_offset = init_offset + extra_stack_off

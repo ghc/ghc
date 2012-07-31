@@ -56,7 +56,7 @@ import UniqSupply
 --		cgExpr: the main function
 ------------------------------------------------------------------------
 
-cgExpr	:: StgExpr -> FCode ()
+cgExpr  :: StgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
@@ -76,8 +76,9 @@ cgExpr (StgLetNoEscape _ _ binds expr) =
   do { us <- newUniqSupply
      ; let join_id = mkBlockId (uniqFromSupply us)
      ; cgLneBinds join_id binds
-     ; cgExpr expr 
-     ; emitLabel join_id}
+     ; r <- cgExpr expr
+     ; emitLabel join_id
+     ; return r }
 
 cgExpr (StgCase expr _live_vars _save_vars bndr _srt alt_type alts) =
   cgCase expr bndr alt_type alts
@@ -161,7 +162,7 @@ cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
   = do  { arg_regs <- forkProc $ do	
 		{ restoreCurrentCostCentre cc_slot
 		; arg_regs <- bindArgsToRegs args
-		; altHeapCheck arg_regs (cgExpr body)
+                ; _ <- altHeapCheck arg_regs (cgExpr body)
 			-- Using altHeapCheck just reduces
 			-- instructions to save on stack
 		; return arg_regs }
@@ -283,7 +284,7 @@ data GcPlan
 			-- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: StgExpr -> Id -> AltType -> [StgAlt] -> FCode ()
+cgCase :: StgExpr -> Id -> AltType -> [StgAlt] -> FCode ReturnKind
 
 cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
   | isEnumerationTyCon tycon -- Note [case on bool]
@@ -296,9 +297,10 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
             ; emitAssign (CmmLocal tmp_reg)
                          (tagToClosure tycon tag_expr) }
 
-       ; (mb_deflt, branches) <- cgAlgAltRhss NoGcInAlts Nothing
+       ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
        ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
+       ; return AssignedDirectly
        }
   where
     do_enum_primop :: PrimOp -> [StgArg] -> FCode CmmExpr
@@ -369,21 +371,21 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info)
        ; _ <- bindArgsToRegs [NonVoid bndr]
-       ; cgAlts NoGcInAlts (NonVoid bndr) alt_type alts }
+       ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = idPrimRep v == idPrimRep bndr
 
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = -- fail at run-time, not compile-time
     do { mb_cc <- maybeSaveCostCentre True
-       ; withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
+       ; _ <- withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newLabelC
        ; emitLabel l
        ; emit (mkBranch l)
+       ; return AssignedDirectly
        }
-
 {-
 case seq# a s of v
   (# s', a' #) -> e
@@ -396,6 +398,7 @@ case a of v
 (taking advantage of the fact that the return convention for (# State#, a #)
 is the same as the return convention for just 'a')
 -}
+
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- handle seq#, same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
@@ -406,19 +409,25 @@ cgCase scrut bndr alt_type alts
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map idToReg ret_bndrs
              simple_scrut = isSimpleScrut scrut alt_type
-             gcInAlts | not simple_scrut = True
-                      | isSingleton alts = False
-                      | up_hp_usg > 0    = False
-                      | otherwise        = True
-             gc_plan = if gcInAlts then GcInAlts alt_regs else NoGcInAlts
+             do_gc  | not simple_scrut = True
+                    | isSingleton alts = False
+                    | up_hp_usg > 0    = False
+                    | otherwise        = True
+             gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
 
        ; mb_cc <- maybeSaveCostCentre simple_scrut
-       ; withSequel (AssignTo alt_regs gcInAlts) (cgExpr scrut)
-       ; restoreCurrentCostCentre mb_cc
 
-  -- JD: We need Note: [Better Alt Heap Checks]
+       -- if do_gc then our sequel will be ReturnTo
+       --   - generate code for the sequel now
+       --   - pass info about the sequel to cgAlts for use in the heap check
+       -- else sequel will be AssignTo
+
+       ; ret_kind <- withSequel (AssignTo alt_regs False) (cgExpr scrut)
+       ; restoreCurrentCostCentre mb_cc
        ; _ <- bindArgsToRegs ret_bndrs
-       ; cgAlts gc_plan (NonVoid bndr) alt_type alts }
+       ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
+       }
+
 
 -----------------
 maybeSaveCostCentre :: Bool -> FCode (Maybe LocalReg)
@@ -465,17 +474,18 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
 	-- UbxTupALt has only one alternative
 
 -------------------------------------
-cgAlts :: GcPlan -> NonVoid Id -> AltType -> [StgAlt] -> FCode ()
+cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [StgAlt]
+       -> FCode ReturnKind
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [(_, _, _, rhs)]
-  = maybeAltHeapCheck gc_plan Nothing (cgExpr rhs)
-  
+  = maybeAltHeapCheck gc_plan (cgExpr rhs)
+
 cgAlts gc_plan _bndr (UbxTupAlt _) [(_, _, _, rhs)]
-  = maybeAltHeapCheck gc_plan Nothing (cgExpr rhs)
+  = maybeAltHeapCheck gc_plan (cgExpr rhs)
 	-- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
-  = do  { tagged_cmms <- cgAltRhss gc_plan Nothing bndr alts
+  = do  { tagged_cmms <- cgAltRhss gc_plan bndr alts
 
 	; let bndr_reg = CmmLocal (idToReg bndr)
 	      (DEFAULT,deflt) = head tagged_cmms
@@ -484,25 +494,23 @@ cgAlts gc_plan bndr (PrimAlt _) alts
 
 	      tagged_cmms' = [(lit,code) 
 			     | (LitAlt lit, code) <- tagged_cmms]
-        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt }
+        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
+        ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
-  = do  { retry_lbl <- newLabelC
-        ; emitLabel retry_lbl -- Note [alg-alt heap checks]
-
-        ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan (Just retry_lbl)
-                                               bndr alts
+  = do  { (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
 	; let fam_sz   = tyConFamilySize tycon
 	      bndr_reg = CmmLocal (idToReg bndr)
 
                     -- Is the constructor tag in the node reg?
         ; if isSmallFamily fam_sz
-	  then let	-- Yes, bndr_reg has constr. tag in ls bits
+          then do
+                let   -- Yes, bndr_reg has constr. tag in ls bits
                    tag_expr = cmmConstrTag1 (CmmReg bndr_reg)
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
-                in
-	        emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+                emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+                return AssignedDirectly
 
 	   else 	-- No, get tag from info table
                 do dflags <- getDynFlags
@@ -510,7 +518,8 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                        -- when the family size is big enough
                        untagged_ptr = cmmRegOffB bndr_reg (-1)
                        tag_expr = getConstrTag dflags (untagged_ptr)
-                   emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1) }
+                   emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+                   return AssignedDirectly }
 
 cgAlts _ _ _ _ = panic "cgAlts"
 	-- UbxTupAlt and PolyAlt have only one alternative
@@ -537,11 +546,11 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --   goto L1
 
 -------------------
-cgAlgAltRhss :: GcPlan -> Maybe BlockId -> NonVoid Id -> [StgAlt]
+cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
              -> FCode ( Maybe CmmAGraph
                       , [(ConTagZ, CmmAGraph)] )
-cgAlgAltRhss gc_plan retry_lbl bndr alts
-  = do { tagged_cmms <- cgAltRhss gc_plan retry_lbl bndr alts
+cgAlgAltRhss gc_plan bndr alts
+  = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
 
        ; let { mb_deflt = case tagged_cmms of
                            ((DEFAULT,rhs) : _) -> Just rhs
@@ -557,32 +566,32 @@ cgAlgAltRhss gc_plan retry_lbl bndr alts
 
 
 -------------------
-cgAltRhss :: GcPlan -> Maybe BlockId -> NonVoid Id -> [StgAlt]
+cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
           -> FCode [(AltCon, CmmAGraph)]
-cgAltRhss gc_plan retry_lbl bndr alts
+cgAltRhss gc_plan bndr alts
   = forkAlts (map cg_alt alts)
   where
     base_reg = idToReg bndr
     cg_alt :: StgAlt -> FCode (AltCon, CmmAGraph)
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR		  $
-        maybeAltHeapCheck gc_plan retry_lbl $
+        maybeAltHeapCheck gc_plan $
 	do { _ <- bindConArgs con base_reg bndrs
-	   ; cgExpr rhs
-	   ; return con }
+           ; _ <- cgExpr rhs
+           ; return con }
 
-maybeAltHeapCheck :: GcPlan -> Maybe BlockId -> FCode a -> FCode a
-maybeAltHeapCheck NoGcInAlts      _    code = code
-maybeAltHeapCheck (GcInAlts regs) mlbl code =
-  case mlbl of
-     Nothing -> altHeapCheck regs code
-     Just retry_lbl -> altHeapCheckReturnsTo regs retry_lbl code
+maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
+maybeAltHeapCheck (NoGcInAlts,_)  code = code
+maybeAltHeapCheck (GcInAlts regs, AssignedDirectly) code =
+  altHeapCheck regs code
+maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
+  altHeapCheckReturnsTo regs lret off code
 
 -----------------------------------------------------------------------------
 -- 	Tail calls
 -----------------------------------------------------------------------------
 
-cgConApp :: DataCon -> [StgArg] -> FCode ()
+cgConApp :: DataCon -> [StgArg] -> FCode ReturnKind
 cgConApp con stg_args
   | isUnboxedTupleCon con	-- Unboxed tuple: assign and return
   = do { arg_exprs <- getNonVoidArgAmodes stg_args
@@ -599,7 +608,7 @@ cgConApp con stg_args
 	; emitReturn [idInfoToAmode idinfo] }
 
 
-cgIdApp :: Id -> [StgArg] -> FCode ()
+cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
 cgIdApp fun_id args
   = do 	{ fun_info <- getCgIdInfo fun_id
@@ -607,14 +616,15 @@ cgIdApp fun_id args
             Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
             Nothing -> cgTailCall fun_id fun_info args }
 
-cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ()
+cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ReturnKind
 cgLneJump blk_id lne_regs args	-- Join point; discard sequel
   = do  { adjustHpBackwards -- always do this before a tail-call
         ; cmm_args <- getNonVoidArgAmodes args
         ; emitMultiAssign lne_regs cmm_args
-        ; emit (mkBranch blk_id) }
+        ; emit (mkBranch blk_id)
+        ; return AssignedDirectly }
     
-cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ()
+cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ReturnKind
 cgTailCall fun_id fun_info args = do
     dflags <- getDynFlags
     case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
@@ -647,7 +657,7 @@ cgTailCall fun_id fun_info args = do
     node_points dflags = nodeMustPointToIt dflags lf_info
 
 
-emitEnter :: CmmExpr -> FCode ()
+emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
   { adjustHpBackwards
   ; sequel <- getSequel
@@ -665,6 +675,7 @@ emitEnter fun = do
         { let entry = entryCode $ closureInfoPtr $ CmmReg nodeReg
         ; emit $ mkForeignJump NativeNodeCall entry
                     [cmmUntag fun] updfr_off
+        ; return AssignedDirectly
         }
 
       -- The result will be scrutinised in the sequel.  This is where
@@ -687,12 +698,18 @@ emitEnter fun = do
       -- ensure that we generate only one proc-point for this
       -- sequence.
       --
+      -- Furthermore, we tell the caller that we generated a native
+      -- return continuation by returning (ReturnedTo Lret off), so
+      -- that the continuation can be reused by the heap-check failure
+      -- code in the enclosing case expression.
+      --
       AssignTo res_regs _ -> do
        { lret <- newLabelC
+       ; let (off, copyin) = copyInOflow NativeReturn (Young lret) res_regs
        ; lcall <- newLabelC
+       ; updfr_off <- getUpdFrameOff
        ; let area = Young lret
-       ; let (off, copyin) = copyInOflow NativeReturn area res_regs
-             (outArgs, regs, copyout) = copyOutOflow NativeNodeCall Call area
+       ; let (outArgs, regs, copyout) = copyOutOflow NativeNodeCall Call area
                                           [fun] updfr_off (0,[])
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
@@ -705,54 +722,6 @@ emitEnter fun = do
            outOfLine lcall the_call <*>
            mkLabel lret <*>
            copyin
+       ; return (ReturnedTo lret off)
        }
   }
-
-
-{- Note [Better Alt Heap Checks]
-If two function calls can share a return point, then they will also
-get the same info table. Therefore, it's worth our effort to make
-those opportunities appear as frequently as possible.
-
-Here are a few examples of how it should work:
-
-  STG:
-    case f x of
-      True  -> <True code -- including allocation>
-      False -> <False code>
-  Cmm:
-      r = call f(x) returns to L;
-   L:
-      if r & 7 >= 2 goto L1 else goto L2;
-   L1:
-      if Hp > HpLim then
-        r = gc(r);
-        goto L;
-      <True code -- including allocation>
-   L2:
-      <False code>
-Note that the code following both the call to f(x) and the code to gc(r)
-should be the same, which will allow the common blockifier to discover
-that they are the same. Therefore, both function calls will return to the same
-block, and they will use the same info table.        
-
-Here's an example of the Cmm code we want from a primOp.
-The primOp doesn't produce an info table for us to reuse, but that's okay:
-we should still generate the same code:
-  STG:
-    case f x of
-      0 -> <0-case code -- including allocation>
-      _ -> <default-case code>
-  Cmm:
-      r = a +# b;
-   L:
-      if r == 0 then goto L1 else goto L2;
-   L1:
-      if Hp > HpLim then
-        r = gc(r);
-        goto L;
-      <0-case code -- including allocation>
-   L2:
-      <default-case code>
--}
-

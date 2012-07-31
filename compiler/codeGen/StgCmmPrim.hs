@@ -68,7 +68,7 @@ might be a Haskell closure pointer, we don't want to evaluate it. -}
 cgOpApp :: StgOp	-- The op
 	-> [StgArg]	-- Arguments
 	-> Type		-- Result type (always an unboxed tuple)
-	-> FCode ()
+        -> FCode ReturnKind
 
 -- Foreign calls 
 cgOpApp (StgFCallOp fcall _) stg_args res_ty 

@@ -51,7 +51,7 @@ import Control.Monad
 cgForeignCall :: ForeignCall            -- the op
               -> [StgArg]               -- x,y    arguments
               -> Type                   -- result type
-              -> FCode ()
+              -> FCode ReturnKind
 
 cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
   = do  { cmm_args <- getFCallArgs stg_args
@@ -90,6 +90,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
             AssignTo assign_to_these _ ->
                 do { emitForeignCall safety assign_to_these call_target
                                      call_args CmmMayReturn
+                   ; return AssignedDirectly
                    }
 
             _something_else ->

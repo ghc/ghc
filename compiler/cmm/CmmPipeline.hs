@@ -60,8 +60,12 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
        ----------- Eliminate common blocks -------------------
-       g <- {-# SCC "elimCommonBlocks" #-} return $ elimCommonBlocks g
-       dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
+       g <- if dopt Opt_CmmElimCommonBlocks dflags
+               then do g <- {-# SCC "elimCommonBlocks" #-} return $ elimCommonBlocks g
+                       dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
+                       return g
+               else return g
+
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
 
