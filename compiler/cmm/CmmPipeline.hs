@@ -56,7 +56,8 @@ cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
        ----------- Control-flow optimisations ---------------
-       g <- {-# SCC "cmmCfgOpts(1)" #-} return $ cmmCfgOpts g
+       g <- {-# SCC "cmmCfgOpts(1)" #-}
+            return $ cmmCfgOpts splitting_proc_points g
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
        ----------- Eliminate common blocks -------------------
@@ -114,7 +115,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
             dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
      
             ----------- Control-flow optimisations ---------------
-            gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
+            gs <- {-# SCC "cmmCfgOpts(2)" #-}
+                  return $ map (cmmCfgOptsProc splitting_proc_points) gs
             dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
             return (cafEnv, gs)
@@ -129,7 +131,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
             dump' Opt_D_dump_cmmz_info "after setInfoTableStackMap" g
      
             ----------- Control-flow optimisations ---------------
-            g <- {-# SCC "cmmCfgOpts(2)" #-} return $ cmmCfgOptsProc g
+            g <- {-# SCC "cmmCfgOpts(2)" #-}
+                 return $ cmmCfgOptsProc splitting_proc_points g
             dump' Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
             return (cafEnv, [g])
