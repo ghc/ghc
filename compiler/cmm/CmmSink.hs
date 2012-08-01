@@ -64,28 +64,21 @@ type Assignment = (LocalReg, CmmExpr, AbsAddr)
 cmmSink :: CmmGraph -> CmmGraph
 cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
-
   liveness = cmmLiveness graph
   getLive l = mapFindWithDefault Set.empty l liveness
 
   blocks = postorderDfs graph
 
-  all_succs = concatMap successors blocks
-  succ_counts :: BlockEnv Int
-  succ_counts = foldr (\l -> mapInsertWith (+) l 1) mapEmpty all_succs
-  join_pts = mapFilter (>1) succ_counts
-
+  join_pts = findJoinPoints blocks
 
   sink :: BlockEnv [Assignment] -> [CmmBlock] -> [CmmBlock]
   sink _ [] = []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle last : sink sunk' bs
+    blockJoin first final_middle final_last : sink sunk' bs
     where
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
-      (middle', assigs) = walk ann_middles emptyBlock
-                               (mapFindWithDefault [] lbl sunk)
 
       succs = successors last
 
@@ -95,6 +88,10 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       live = Set.unions (map getLive succs)
       live_middle = gen_kill last live
       ann_middles = annotate live_middle (blockToList middle)
+
+      -- Now sink and inline in this block
+      (middle', assigs) = walk ann_middles (mapFindWithDefault [] lbl sunk)
+      (final_last, assigs') = tryToInline live last assigs
 
       -- We cannot sink into join points (successors with more than
       -- one predecessor), so identify the join points and the set
@@ -114,11 +111,11 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
            _ -> False
 
       -- Now, drop any assignments that we will not sink any further.
-      (dropped_last, assigs') = dropAssignments drop_if init_live_sets assigs
+      (dropped_last, assigs'') = dropAssignments drop_if init_live_sets assigs'
 
       drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
           where
-            should_drop =  a `conflicts` last
+            should_drop =  a `conflicts` final_last
                         || {- not (isTiny rhs) && -} live_in_multi live_sets r
                         || r `Set.member` live_in_joins
 
@@ -133,7 +130,7 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       final_middle = foldl blockSnoc middle' dropped_last
 
       sunk' = mapUnion sunk $
-                 mapFromList [ (l, filterAssignments (getLive l) assigs')
+                 mapFromList [ (l, filterAssignments (getLive l) assigs'')
                              | l <- succs ]
 
 {-
@@ -144,66 +141,85 @@ isTiny (CmmLit _) = True
 isTiny _other     = False
 -}
 
+--
 -- annotate each node with the set of registers live *after* the node
+--
 annotate :: RegSet -> [CmmNode O O] -> [(RegSet, CmmNode O O)]
-annotate live nodes = snd $ foldr (\n (live,nodes) -> (gen_kill n live, (live,n) : nodes)) (live,[]) nodes
+annotate live nodes = snd $ foldr ann (live,[]) nodes
+  where ann n (live,nodes) = (gen_kill n live, (live,n) : nodes)
 
+--
+-- Find the blocks that have multiple successors (join points)
+--
+findJoinPoints :: [CmmBlock] -> BlockEnv Int
+findJoinPoints blocks = mapFilter (>1) succ_counts
+ where
+  all_succs = concatMap successors blocks
+
+  succ_counts :: BlockEnv Int
+  succ_counts = foldr (\l -> mapInsertWith (+) l 1) mapEmpty all_succs
+
+--
+-- filter the list of assignments to remove any assignments that
+-- are not live in a continuation.
+--
 filterAssignments :: RegSet -> [Assignment] -> [Assignment]
 filterAssignments live assigs = reverse (go assigs [])
-  where go []           kept = kept
+  where go []             kept = kept
         go (a@(r,_,_):as) kept | needed    = go as (a:kept)
                                | otherwise = go as kept
            where
-              needed = r `Set.member` live || any (a `conflicts`) (map toNode kept)
+              needed = r `Set.member` live
+                       || any (a `conflicts`) (map toNode kept)
+                       --  Note that we must keep assignments that are
+                       -- referred to by other assignments we have
+                       -- already kept.
 
+-- -----------------------------------------------------------------------------
+-- Walk through the nodes of a block, sinking and inlining assignments
+-- as we go.
 
-walk :: [(RegSet, CmmNode O O)] -> Block CmmNode O O -> [Assignment]
-     -> (Block CmmNode O O, [Assignment])
+walk :: [(RegSet, CmmNode O O)]         -- nodes of the block, annotated with
+                                        -- the set of registers live *after*
+                                        -- this node.
 
-walk []               block as = (block, as)
-walk ((live,node):ns) block as
-  | Just a <- shouldSink node1 = walk ns block (a : as1)
-  | otherwise                  = walk ns block' as'
-  where
-    (node1, as1) = tryToInline live usages node as
-       where usages :: UniqFM Int
-             usages = foldRegsUsed addUsage emptyUFM node
+     -> [Assignment]                    -- The current list of
+                                        -- assignments we are sinking.
+                                        -- Later assignments may refer
+                                        -- to earlier ones.
 
-    (dropped, as') = dropAssignmentsSimple (`conflicts` node1) as1
-    block' = foldl blockSnoc block dropped `blockSnoc` node1
+     -> ( Block CmmNode O O             -- The new block
+        , [Assignment]                  -- Assignments to sink further
+        )
 
-tryToInline :: RegSet -> UniqFM Int -> CmmNode O x -> [Assignment]
-            -> (CmmNode O x, [Assignment])
-tryToInline _live _usages node []
-  = (node, [])
-tryToInline live usages node (a@(l,rhs,_) : rest)
-  | occurs_once_in_this_node  = inline_and_discard
-  | False {- isTiny rhs -}    = inline_and_keep
-    --  ^^ seems to make things slightly worse
-  where
-        inline_and_discard = tryToInline live' usages' node' rest
+walk nodes assigs = go nodes emptyBlock assigs
+ where
+   go []               block as = (block, as)
+   go ((live,node):ns) block as
+    | discard                    = go ns block as
+    | Just a <- shouldSink node1 = go ns block (a : as1)
+    | otherwise                  = go ns block' as'
+    where
+      -- discard dead assignments.  This doesn't do as good a job as
+      -- removeDeadAsssignments, because it would need multiple passes
+      -- to get all the dead code, but it catches the common case of
+      -- superfluous reloads from the stack that the stack allocator
+      -- leaves behind.
+      discard = case node of
+                  CmmAssign (CmmLocal r) _ -> not (r `Set.member` live)
+                  _otherwise -> False
+  
+      (node1, as1) = tryToInline live node as
 
-        inline_and_keep = (node'', a : rest')
-          where (node'',rest') = inline_and_discard
+      (dropped, as') = dropAssignmentsSimple (`conflicts` node1) as1
+      block' = foldl blockSnoc block dropped `blockSnoc` node1
 
-        occurs_once_in_this_node =
-         not (l `elemRegSet` live) &&  lookupUFM usages l == Just 1
-
-        live'   = foldRegsUsed extendRegSet live rhs
-        usages' = foldRegsUsed addUsage usages rhs
-
-        node' = mapExpDeep inline node
-           where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
-                 inline (CmmRegOff (CmmLocal l') off) | l == l' = cmmOffset rhs off
-                 inline other = other
-tryToInline live usages node (assig@(_,rhs,_) : rest)
-  = (node', assig : rest')
-  where (node', rest') = tryToInline live usages' node rest
-        usages' = foldRegsUsed addUsage usages rhs
-
-addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
-addUsage m r = addToUFM_C (+) m r 1
-
+--
+-- Heuristic to decide whether to pick up and sink an assignment
+-- Currently we pick up all assignments to local registers.  It might
+-- be profitable to sink assignments to global regs too, but the
+-- liveness analysis doesn't track those (yet) so we can't.
+--
 shouldSink :: CmmNode e x -> Maybe Assignment
 shouldSink (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprAddr e)
   where no_local_regs = True -- foldRegsUsed (\_ _ -> False) True e
@@ -212,10 +228,12 @@ shouldSink _other = Nothing
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
 
-dropAssignmentsSimple :: (Assignment -> Bool) -> [Assignment] -> ([CmmNode O O], [Assignment])
+dropAssignmentsSimple :: (Assignment -> Bool) -> [Assignment]
+                      -> ([CmmNode O O], [Assignment])
 dropAssignmentsSimple f = dropAssignments (\a _ -> (f a, ())) ()
 
-dropAssignments :: (Assignment -> s -> (Bool, s)) -> s -> [Assignment] -> ([CmmNode O O], [Assignment])
+dropAssignments :: (Assignment -> s -> (Bool, s)) -> s -> [Assignment]
+                -> ([CmmNode O O], [Assignment])
 dropAssignments should_drop state assigs
  = (dropped, reverse kept)
  where
@@ -228,6 +246,60 @@ dropAssignments should_drop state assigs
       where
         (dropit, state') = should_drop assig state
         conflict = dropit || any (assig `conflicts`) dropped
+
+
+-- -----------------------------------------------------------------------------
+-- Try to inline assignments into a node.
+
+tryToInline
+   :: RegSet                    -- set of registers live after this
+                                -- node.  We cannot inline anything
+                                -- that is live after the node, unless
+                                -- it is small enough to duplicate.
+   -> CmmNode O x               -- The node to inline into
+   -> [Assignment]              -- Assignments to inline
+   -> (
+        CmmNode O x             -- New node
+      , [Assignment]            -- Remaining assignments
+      )
+
+tryToInline live node assigs = go live usages node assigs
+ where
+  usages :: UniqFM Int
+  usages = foldRegsUsed addUsage emptyUFM node
+
+  go _live _usages node [] = (node, [])
+
+  go live usages node (a@(l,rhs,_) : rest)
+   | occurs_once_in_this_node  = inline_and_discard
+   | False {- isTiny rhs -}    = inline_and_keep
+     -- ^^ seems to make things slightly worse
+   where
+        inline_and_discard = go live' usages' node' rest
+
+        inline_and_keep = (node'', a : rest')
+          where (node'',rest') = inline_and_discard
+
+        occurs_once_in_this_node =
+         not (l `elemRegSet` live) &&  lookupUFM usages l == Just 1
+
+        live'   = foldRegsUsed extendRegSet live rhs
+        usages' = foldRegsUsed addUsage usages rhs
+
+        node' = mapExpDeep inline node
+           where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
+                 inline (CmmRegOff (CmmLocal l') off) | l == l'
+                    = cmmOffset rhs off
+                 inline other = other
+
+  go live usages node (assig@(_,rhs,_) : rest)
+    = (node', assig : rest')
+    where (node', rest') = go live usages' node rest
+          usages' = foldRegsUsed addUsage usages rhs
+
+addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
+addUsage m r = addToUFM_C (+) m r 1
+
 
 -- -----------------------------------------------------------------------------
 
