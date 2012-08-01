@@ -83,7 +83,14 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        when (not (setNull noncall_pps)) $
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
-       ----------- Layout the stack and manifest Sp ---------------
+       ----------- Sink and inline assignments *before* stack layout -----------
+       g <- if False -- maybe enable this later
+               then do g <- {-# SCC "sink" #-} return (cmmSink g)
+                       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
+                       return g
+               else return g
+
+       ----------- Layout the stack and manifest Sp ----------------------------
        -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
        (g, stackmaps) <- {-# SCC "layoutStack" #-}
                          runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
