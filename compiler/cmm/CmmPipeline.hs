@@ -55,22 +55,20 @@ cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
 cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
-       ----------- Control-flow optimisations ---------------
+       ----------- Control-flow optimisations ----------------------------------
        g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOpts splitting_proc_points g
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
-       ----------- Eliminate common blocks -------------------
-       g <- if dopt Opt_CmmElimCommonBlocks dflags
-               then do g <- {-# SCC "elimCommonBlocks" #-} return $ elimCommonBlocks g
-                       dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
-                       return g
-               else return g
+       ----------- Eliminate common blocks -------------------------------------
+       g <- {-# SCC "elimCommonBlocks" #-}
+            condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
+                     Opt_D_dump_cmmz_cbe "Post common block elimination"
 
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
 
-       ----------- Proc points -------------------
+       ----------- Proc points -------------------------------------------------
        let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
        proc_points <-
           if splitting_proc_points
@@ -84,31 +82,29 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Sink and inline assignments *before* stack layout -----------
-       g <- if False -- maybe enable this later
-               then do g <- {-# SCC "sink" #-} return (cmmSink g)
-                       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
-                       return g
-               else return g
+       {-  Maybe enable this later
+       g <- {-# SCC "sink1" #-}
+            condPass Opt_CmmSink cmmSink g
+                     Opt_D_dump_cmmz_rewrite "Sink assignments (1)"
+       -}
 
        ----------- Layout the stack and manifest Sp ----------------------------
-       -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
-       (g, stackmaps) <- {-# SCC "layoutStack" #-}
-                         runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+       (g, stackmaps) <-
+            {-# SCC "layoutStack" #-}
+            runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
-       ----------- Sink and inline assignments -------------------
-       g <- if dopt Opt_CmmSink dflags
-               then do g <- {-# SCC "sink" #-} return (cmmSink g)
-                       dump Opt_D_dump_cmmz_rewrite "Sink assignments" g
-                       return g
-               else return g
+       ----------- Sink and inline assignments *after* stack layout ------------
+       g <- {-# SCC "sink2" #-}
+            condPass Opt_CmmSink cmmSink g
+                     Opt_D_dump_cmmz_rewrite "Sink assignments (2)"
 
-       ------------- CAF analysis ------------------------------
+       ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
 
        if splitting_proc_points
           then do
-            ------------- Split into separate procedures ------------
+            ------------- Split into separate procedures -----------------------
             pp_map  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
                              procPointAnalysis proc_points g
             dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" pp_map
@@ -116,12 +112,12 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                   splitAtProcPoints l call_pps proc_points pp_map (CmmProc h l g)
             dumps Opt_D_dump_cmmz_split "Post splitting" gs
      
-            ------------- Populate info tables with stack info ------
+            ------------- Populate info tables with stack info -----------------
             gs <- {-# SCC "setInfoTableStackMap" #-}
                   return $ map (setInfoTableStackMap stackmaps) gs
             dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
      
-            ----------- Control-flow optimisations ---------------
+            ----------- Control-flow optimisations -----------------------------
             gs <- {-# SCC "cmmCfgOpts(2)" #-}
                   return $ map (cmmCfgOptsProc splitting_proc_points) gs
             dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
@@ -132,12 +128,12 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
             -- attach info tables to return points
             g <- return $ attachContInfoTables call_pps (CmmProc h l g)
 
-            ------------- Populate info tables with stack info ------
+            ------------- Populate info tables with stack info -----------------
             g <- {-# SCC "setInfoTableStackMap" #-}
                   return $ setInfoTableStackMap stackmaps g
             dump' Opt_D_dump_cmmz_info "after setInfoTableStackMap" g
      
-            ----------- Control-flow optimisations ---------------
+            ----------- Control-flow optimisations -----------------------------
             g <- {-# SCC "cmmCfgOpts(2)" #-}
                  return $ cmmCfgOptsProc splitting_proc_points g
             dump' Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
@@ -150,6 +146,15 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
         dumps flag name
            = mapM_ (dumpWith dflags flag name)
+
+        condPass flag pass g dumpflag dumpname =
+            if dopt flag dflags
+               then do
+                    g <- return $ pass g
+                    dump dumpflag dumpname g
+                    return g
+               else return g
+
 
         -- we don't need to split proc points for the NCG, unless
         -- tablesNextToCode is off.  The latter is because we have no
