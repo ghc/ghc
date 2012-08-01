@@ -475,7 +475,7 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
     (r_spills, r_allocd) <-
         allocateRegsAndSpill platform True{-reading-} virt_read [] [] virt_read
 
-    -- (a) save any temporaries which will be clobbered by this instruction
+    -- (c) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps platform real_written r_dying
 
     -- (d) Update block map for new destinations
