@@ -562,7 +562,7 @@ wrapTick t (FB tops defns)
     wrap_one (FloatLet bind)      = FloatLet (wrap_bind bind)
     wrap_one (FloatCase e b c bs) = FloatCase (maybe_tick e) b c bs
 
-    maybe_tick e | exprIsHNF e = e
+    maybe_tick e | exprIsHNF e = tickHNFArgs t e
                  | otherwise   = mkTick t e
       -- we don't need to wrap a tick around an HNF when we float it
       -- outside a tick: that is an invariant of the tick semantics

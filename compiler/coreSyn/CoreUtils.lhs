@@ -10,7 +10,7 @@ Utility functions on @Core@ syntax
 module CoreUtils (
         -- * Constructing expressions
         mkCast,
-        mkTick, mkTickNoHNF,
+        mkTick, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
         mkAltExpr,
 
