@@ -855,7 +855,10 @@ cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
                        | otherwise = cmmEliminateDeadBlocks blocks
       -- The new codegen path has already eliminated unreachable blocks by now
 
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline dflags reachable_blocks)
+      inlined_blocks | dopt Opt_TryNewCodeGen dflags = reachable_blocks
+                     | otherwise = cmmMiniInline dflags reachable_blocks
+
+  blocks' <- mapM cmmBlockConFold inlined_blocks
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
