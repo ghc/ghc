@@ -1498,8 +1498,12 @@ tyConToIfaceDecl env tycon
 
     (syn_rhs, syn_ki) 
        = case synTyConRhs tycon of
-            SynFamilyTyCon  -> (Nothing,               tidyToIfaceType env1 (synTyConResKind tycon))
-            SynonymTyCon ty -> (Just (toIfaceType ty), tidyToIfaceType env1 (typeKind ty))
+            SynFamilyTyCon  ->
+               ( Nothing
+               , tidyToIfaceType env1 (synTyConResKind tycon) )
+            SynonymTyCon ty ->
+               ( Just (tidyToIfaceType env1 ty)
+               , tidyToIfaceType env1 (typeKind ty) )
 
     ifaceConDecls (NewTyCon { data_con = con })     = IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
