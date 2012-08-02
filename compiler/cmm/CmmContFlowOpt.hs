@@ -216,8 +216,9 @@ code in replaceLabels.
 However, we probably do want to do this if we are splitting proc
 points, because L1 will be a proc-point anyway, so merging it with L4
 reduces the number of proc points.  Unfortunately recursive
-let-no-escapes won't generate very good code with proc-point
-splitting on - we should probably
+let-no-escapes won't generate very good code with proc-point splitting
+on - we should probably compile them to explicitly use the native
+calling convention instead.
 -}
 
 ------------------------------------------------------------------------
