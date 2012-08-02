@@ -113,7 +113,8 @@ cgBind (StgRec pairs)
        ; addBindsC new_binds
        ; emit (catAGraphs inits <*> body) }
 
-{- Recursive let-bindings are tricky.
+{- Note [cgBind rec]
+   Recursive let-bindings are tricky.
    Consider the following pseudocode:
      let x = \_ ->  ... y ...
          y = \_ ->  ... z ...

@@ -143,6 +143,13 @@ thenFC (FCode m) k = FCode (
 		in 
 			kcode info_down new_state
 	)
+    -- Note: this is a lazy monad.  We can't easily make it strict due
+    -- to the use of fixC for compiling recursive bindings (see Note
+    -- [cgBind rec]).  cgRhs returns a CgIdInfo which is fed back in
+    -- via the CgBindings, and making the monad strict means that we
+    -- can't look at the CgIdInfo too early.  Things seem to just
+    -- about work when the monad is lazy.  I hate this stuff --SDM
+
 
 listFCs :: [FCode a] -> FCode [a]
 listFCs = Prelude.sequence
