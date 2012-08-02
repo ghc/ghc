@@ -10,6 +10,7 @@ import CmmUtils
 import Hoopl
 
 import UniqFM
+-- import PprCmm ()
 -- import Outputable
 
 import Data.List (partition)
@@ -51,7 +52,8 @@ import qualified Data.Set as Set
 --        live in that successor
 -- 
 -- As a side-effect we'll delete some dead assignments (transitively,
--- even).  Maybe we could do without removeDeadAssignments?
+-- even).  This isn't as good as removeDeadAssignments, but it's much
+-- cheaper.
 
 -- If we do this *before* stack layout, we might be able to avoid
 -- saving some things across calls/procpoints.
@@ -268,19 +270,19 @@ tryToInline
       , [Assignment]            -- Remaining assignments
       )
 
-tryToInline live node assigs = go live usages node assigs
+tryToInline live node assigs = go usages node assigs
  where
   usages :: UniqFM Int
   usages = foldRegsUsed addUsage emptyUFM node
 
-  go _live _usages node [] = (node, [])
+  go _usages node [] = (node, [])
 
-  go live usages node (a@(l,rhs,_) : rest)
+  go usages node (a@(l,rhs,_) : rest)
    | occurs_once_in_this_node  = inline_and_discard
    | False {- isTiny rhs -}    = inline_and_keep
      -- ^^ seems to make things slightly worse
    where
-        inline_and_discard = go live' usages' node' rest
+        inline_and_discard = go usages' node' rest
 
         inline_and_keep = (node'', a : rest')
           where (node'',rest') = inline_and_discard
@@ -288,7 +290,6 @@ tryToInline live node assigs = go live usages node assigs
         occurs_once_in_this_node =
          not (l `elemRegSet` live) &&  lookupUFM usages l == Just 1
 
-        live'   = foldRegsUsed extendRegSet live rhs
         usages' = foldRegsUsed addUsage usages rhs
 
         node' = mapExpDeep inline node
@@ -297,10 +298,13 @@ tryToInline live node assigs = go live usages node assigs
                     = cmmOffset rhs off
                  inline other = other
 
-  go live usages node (assig@(_,rhs,_) : rest)
+  go usages node (assig@(_,rhs,_) : rest)
     = (node', assig : rest')
-    where (node', rest') = go live usages' node rest
-          usages' = foldRegsUsed addUsage usages rhs
+    where (node', rest') = go usages' node rest
+          usages' = foldRegsUsed (\m r -> addToUFM m r 2) usages rhs
+          -- we must not inline anything that is mentioned in the RHS
+          -- of a binding that we have already skipped, so we set the
+          -- usages of the regs on the RHS to 2.
 
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
