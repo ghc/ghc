@@ -52,7 +52,7 @@ import OrdList
 import MkGraph
 
 import Data.IORef
-import Control.Monad (when)
+import Control.Monad (when,void)
 import Util
 
 codeGen :: DynFlags
@@ -244,9 +244,9 @@ cgDataCon data_con
  	        do { _ <- ticky_code
 		   ; ldvEnter (CmmReg nodeReg)
 		   ; tickyReturnOldCon (length arg_things)
-                   ; _ <- emitReturn [cmmOffsetB (CmmReg nodeReg)
+                   ; void $ emitReturn [cmmOffsetB (CmmReg nodeReg)
                                             (tagForCon data_con)]
-                   ; return () }
+                   }
                         -- The case continuation code expects a tagged pointer
 
 	    arg_reps :: [(PrimRep, UnaryType)]

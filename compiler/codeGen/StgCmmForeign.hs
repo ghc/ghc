@@ -41,6 +41,7 @@ import Outputable
 import BasicTypes
 
 import Control.Monad
+import Prelude hiding( succ )
 
 -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls
@@ -88,13 +89,11 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
         ; sequel <- getSequel
         ; case sequel of
             AssignTo assign_to_these _ ->
-                do { emitForeignCall safety assign_to_these call_target
+                emitForeignCall safety assign_to_these call_target
                                      call_args CmmMayReturn
-                   ; return AssignedDirectly
-                   }
 
             _something_else ->
-                do { emitForeignCall safety res_regs call_target
+                do { _ <- emitForeignCall safety res_regs call_target
                                      call_args CmmMayReturn
                    ; emitReturn (map (CmmReg . CmmLocal) res_regs)
                    }
@@ -185,7 +184,7 @@ emitCCall :: [(CmmFormal,ForeignHint)]
           -> [(CmmActual,ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
-  = emitForeignCall PlayRisky results target args CmmMayReturn
+  = void $ emitForeignCall PlayRisky results target args CmmMayReturn
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
@@ -195,7 +194,7 @@ emitCCall hinted_results fn hinted_args
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
-  = emitForeignCall PlayRisky res (PrimTarget op) args CmmMayReturn
+  = void $ emitForeignCall PlayRisky res (PrimTarget op) args CmmMayReturn
 
 -- alternative entry point, used by CmmParse
 emitForeignCall
@@ -205,20 +204,34 @@ emitForeignCall
         -> [CmmActual]          -- arguments
         -> CmmReturnInfo        -- This can say "never returns"
                                 --   only RTS procedures do this
-        -> FCode ()
+        -> FCode ReturnKind
 emitForeignCall safety results target args _ret
   | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs
     emit caller_save
     emit $ mkUnsafeCall target results args
     emit caller_load
+    return AssignedDirectly
 
   | otherwise = do
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
-    emit =<< mkSafeCall temp_target results args updfr_off
-                (playInterruptible safety)
-
+    k <- newLabelC
+    let (off, copyout) = copyInOflow NativeReturn (Young k) results
+       -- see Note [safe foreign call convention]
+    emit $
+           (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
+                        (CmmLit (CmmBlock k))
+            <*> mkLast (CmmForeignCall { tgt  = temp_target
+                                       , res  = results
+                                       , args = args
+                                       , succ = k
+                                       , updfr = updfr_off
+                                       , intrbl = playInterruptible safety })
+            <*> mkLabel k
+            <*> copyout
+           )
+    return (ReturnedTo k off)
 
 
 {-

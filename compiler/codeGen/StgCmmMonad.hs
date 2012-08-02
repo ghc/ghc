@@ -30,7 +30,7 @@ module StgCmmMonad (
 	getCodeR, getCode, getHeapUsage,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
-        mkCall, mkCmmCall, mkSafeCall,
+        mkCall, mkCmmCall,
 
         forkClosureBody, forkStatics, forkAlts, forkProc, codeOnly,
 
@@ -94,6 +94,9 @@ infixr 9 `thenFC`
 --------------------------------------------------------
 
 newtype FCode a = FCode (CgInfoDownwards -> CgState -> (a, CgState))
+
+instance Functor FCode where
+  fmap f (FCode g) = FCode $ \i s -> let (a,s') = g i s in (f a, s')
 
 instance Monad FCode where
 	(>>=) = thenFC
@@ -791,22 +794,6 @@ mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset
 mkCmmCall f results actuals updfr_off
    = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off (0,[])
 
-
-mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
-           -> UpdFrameOffset -> Bool
-           -> FCode CmmAGraph
-mkSafeCall   t fs as upd i = do
-  k <- newLabelC
-  let (_off, copyout) = copyInOflow NativeReturn (Young k) fs
-    -- see Note [safe foreign call convention]
-  return
-     (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
-                  (CmmLit (CmmBlock k))
-      <*> mkLast (CmmForeignCall { tgt=t, res=fs, args=as, succ=k
-                                 , updfr=upd, intrbl=i })
-      <*> mkLabel k
-      <*> copyout
-     )
 
 -- ----------------------------------------------------------------------------
 -- CgStmts
