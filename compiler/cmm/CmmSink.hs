@@ -205,7 +205,12 @@ walk nodes assigs = go nodes emptyBlock assigs
       -- to get all the dead code, but it catches the common case of
       -- superfluous reloads from the stack that the stack allocator
       -- leaves behind.
+      --
+      -- Also we catch "r = r" here.  You might think it would fall
+      -- out of inlining, but the inliner will see that r is live
+      -- after the instruction and choose not to inline r in the rhs.
       discard = case node of
+                  CmmAssign r (CmmReg r') | r == r' -> True
                   CmmAssign (CmmLocal r) _ -> not (r `Set.member` live)
                   _otherwise -> False
   
