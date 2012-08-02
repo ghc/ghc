@@ -59,7 +59,7 @@ import qualified Data.Set as Set
 -- *but*, that will invalidate the liveness analysis, and we'll have
 -- to re-do it.
 
-type Assignment = (LocalReg, CmmExpr, AbsAddr)
+type Assignment = (LocalReg, CmmExpr, AbsMem)
 
 cmmSink :: CmmGraph -> CmmGraph
 cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
@@ -221,7 +221,7 @@ walk nodes assigs = go nodes emptyBlock assigs
 -- liveness analysis doesn't track those (yet) so we can't.
 --
 shouldSink :: CmmNode e x -> Maybe Assignment
-shouldSink (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprAddr e)
+shouldSink (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprMem e)
   where no_local_regs = True -- foldRegsUsed (\_ _ -> False) True e
 shouldSink _other = Nothing
 
@@ -309,51 +309,85 @@ addUsage m r = addToUFM_C (+) m r 1
 -- We only sink "r = G" assignments right now, so conflicts is very simple:
 --
 conflicts :: Assignment -> CmmNode O x -> Bool
-(_, rhs, _   ) `conflicts` CmmAssign reg  _ | reg `regUsedIn` rhs = True
-(_, _,   addr) `conflicts` CmmStore addr' _ | addrConflicts addr (loadAddr addr') = True
-(r, _,   _)    `conflicts` node
-  = foldRegsUsed (\b r' -> r == r' || b) False node
+(r, rhs, addr) `conflicts` node
 
--- An abstraction of the addresses read or written.
-data AbsAddr = NoAddr | HeapAddr | StackAddr | AnyAddr
+  -- (1) an assignment to a register conflicts with a use of the register
+  | CmmAssign reg  _ <- node, reg `regUsedIn` rhs                 = True
+  | foldRegsUsed (\b r' -> r == r' || b) False node               = True
 
-bothAddrs :: AbsAddr -> AbsAddr -> AbsAddr
-bothAddrs NoAddr    x         = x
-bothAddrs x         NoAddr    = x
-bothAddrs HeapAddr  HeapAddr  = HeapAddr
-bothAddrs StackAddr StackAddr = StackAddr
-bothAddrs _         _         = AnyAddr
+  -- (2) a store to an address conflicts with a read of the same memory
+  | CmmStore addr' e <- node, memConflicts addr (loadAddr addr' (cmmExprWidth e)) = True
 
-addrConflicts :: AbsAddr -> AbsAddr -> Bool
-addrConflicts NoAddr    _         = False
-addrConflicts _         NoAddr    = False
-addrConflicts HeapAddr  StackAddr = False
-addrConflicts StackAddr HeapAddr  = False
-addrConflicts _         _         = True
+  -- (3) an assignment to Hp/Sp conflicts with a heap/stack read respectively
+  | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node         = True
+  | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node         = True
+  | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node         = True
 
-exprAddr :: CmmExpr -> AbsAddr -- here NoAddr means "no reads"
-exprAddr (CmmLoad addr _)  = loadAddr addr
-exprAddr (CmmMachOp _ es)  = foldr bothAddrs NoAddr (map exprAddr es)
-exprAddr _                 = NoAddr
+  -- (4) otherwise, no conflict
+  | otherwise = False
 
-absAddr :: CmmExpr -> AbsAddr -- here NoAddr means "don't know"
-absAddr (CmmLoad addr _)  = bothAddrs HeapAddr (loadAddr addr) -- (1)
-absAddr (CmmMachOp _ es)  = foldr bothAddrs NoAddr (map absAddr es)
-absAddr (CmmReg r)        = regAddr r
-absAddr (CmmRegOff r _)   = regAddr r
-absAddr _ = NoAddr
 
-loadAddr :: CmmExpr -> AbsAddr
-loadAddr e = case absAddr e of
-               NoAddr -> HeapAddr -- (2)
-               a      -> a
+-- An abstraction of memory read or written.
+data AbsMem
+  = NoMem            -- no memory accessed
+  | AnyMem           -- arbitrary memory
+  | HeapMem          -- definitely heap memory
+  | StackMem         -- definitely stack memory
+  | SpMem            -- <size>[Sp+n]
+       {-# UNPACK #-} !Int
+       {-# UNPACK #-} !Int
 
--- (1) we assume that an address read from memory is a heap address.
--- We never read a stack address from memory.
+-- Having SpMem is important because it lets us float loads from Sp
+-- past stores to Sp as long as they don't overlap, and this helps to
+-- unravel some long sequences of
+--    x1 = [Sp + 8]
+--    x2 = [Sp + 16]
+--    ...
+--    [Sp + 8]  = xi
+--    [Sp + 16] = xj
 --
--- (2) loading from an unknown address is assumed to be a heap load.
+-- Note that SpMem is invalidated if Sp is changed, but the definition
+-- of 'conflicts' above handles that.
 
-regAddr :: CmmReg -> AbsAddr
-regAddr (CmmGlobal Sp) = StackAddr
-regAddr (CmmGlobal Hp) = HeapAddr
-regAddr _              = NoAddr
+bothMems :: AbsMem -> AbsMem -> AbsMem
+bothMems NoMem    x         = x
+bothMems x        NoMem     = x
+bothMems HeapMem  HeapMem   = HeapMem
+bothMems StackMem StackMem     = StackMem
+bothMems (SpMem o1 w1) (SpMem o2 w2)
+  | o1 == o2  = SpMem o1 (max w1 w2)
+  | otherwise = StackMem
+bothMems SpMem{}  StackMem  = StackMem
+bothMems StackMem SpMem{}   = StackMem
+bothMems _         _        = AnyMem
+
+memConflicts :: AbsMem -> AbsMem -> Bool
+memConflicts NoMem      _          = False
+memConflicts _          NoMem      = False
+memConflicts HeapMem    StackMem   = False
+memConflicts StackMem   HeapMem    = False
+memConflicts SpMem{}    HeapMem    = False
+memConflicts HeapMem    SpMem{}    = False
+memConflicts (SpMem o1 w1) (SpMem o2 w2)
+  | o1 < o2   = o1 + w1 > o2
+  | otherwise = o2 + w2 > o1
+memConflicts _         _         = True
+
+exprMem :: CmmExpr -> AbsMem
+exprMem (CmmLoad addr w)  = bothMems (loadAddr addr (typeWidth w)) (exprMem addr)
+exprMem (CmmMachOp _ es)  = foldr bothMems NoMem (map exprMem es)
+exprMem _                 = NoMem
+
+loadAddr :: CmmExpr -> Width -> AbsMem
+loadAddr e w =
+  case e of
+   CmmReg r       -> regAddr r 0 w
+   CmmRegOff r i  -> regAddr r i w
+   _other | CmmGlobal Sp `regUsedIn` e -> StackMem
+          | otherwise -> AnyMem
+
+regAddr :: CmmReg -> Int -> Width -> AbsMem
+regAddr (CmmGlobal Sp) i w = SpMem i (widthInBytes w)
+regAddr (CmmGlobal Hp) _ _ = HeapMem
+regAddr r _ _ | isGcPtrType (cmmRegType r) = HeapMem -- yay! GCPtr pays for itself
+regAddr _ _ _ = AnyMem
