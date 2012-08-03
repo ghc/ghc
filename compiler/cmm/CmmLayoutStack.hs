@@ -897,7 +897,7 @@ live across the call.  Our job now is to expand the call so we get
  | BaseReg = resumeThread(token)
  | LOAD_THREAD_STATE()
  | R1 = r  -- copyOut
- | jump L1
+ | jump Sp[0]
  '-----------------------
  L1:
    r = R1 -- copyIn, inserted by mkSafeCall
@@ -928,15 +928,17 @@ lowerSafeForeignCall dflags block
                   mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
                   loadThreadState dflags load_tso load_stack
-        -- Note: The successor must be a procpoint, and we have already split,
-        --       so we use a jump, not a branch.
-        succLbl = CmmLit (CmmLabel (infoTblLbl succ))
 
         (ret_args, regs, copyout) = copyOutOflow NativeReturn Jump (Young succ)
                                            (map (CmmReg . CmmLocal) res)
                                            updfr (0, [])
 
-        jump = CmmCall { cml_target    = succLbl
+        -- NB. after resumeThread returns, the top-of-stack probably contains
+        -- the stack frame for succ, but it might not: if the current thread
+        -- received an exception during the call, then the stack might be
+        -- different.  Hence we continue by jumping to the top stack frame,
+        -- not by jumping to succ.
+        jump = CmmCall { cml_target    = CmmLoad (CmmReg spReg) bWord
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes wordWidth
