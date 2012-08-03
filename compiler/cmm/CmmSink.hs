@@ -316,7 +316,7 @@ tryToInline live node assigs = go usages node [] assigs
   usages :: UniqFM Int
   usages = foldRegsUsed addUsage emptyUFM node
 
-  go _usages node skipped [] = (node, [])
+  go _usages node _skipped [] = (node, [])
 
   go usages node skipped (a@(l,rhs,_) : rest)
    | can_inline              = inline_and_discard
@@ -373,7 +373,7 @@ addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
 
 regsUsedIn :: [LocalReg] -> CmmExpr -> Bool
-regsUsedIn [] e = False
+regsUsedIn [] _ = False
 regsUsedIn ls e = wrapRecExpf f e False
   where f (CmmReg (CmmLocal l))      _ | l `elem` ls = True
         f (CmmRegOff (CmmLocal l) _) _ | l `elem` ls = True
