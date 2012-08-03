@@ -51,10 +51,11 @@ data CmmNode e x where
       [CmmFormal] ->               -- zero or more results
       [CmmActual] ->               -- zero or more arguments
       CmmNode O O
-      -- Semantics: kills only result regs; all other regs (both GlobalReg
-      --            and LocalReg) are preserved.  But there is a current
-      --            bug for what can be put in arguments, see
-      --            Note [Register Parameter Passing]
+      -- Semantics: clobbers any GlobalRegs for which callerSaves r == True
+      -- See Note [foreign calls clobber GlobalRegs]
+      --
+      -- Also, there is a current bug for what can be put in
+      -- arguments, see Note [Register Parameter Passing]
 
   CmmBranch :: ULabel -> CmmNode O C
                                    -- Goto another block in the same procedure
@@ -147,12 +148,31 @@ ultimately expands to
      pop "return address"
 We cannot "lower" a safe foreign call to this sequence of Cmms, because
 after we've saved Sp all the Cmm optimiser's assumptions are broken.
-Furthermore, currently the smart Cmm constructors know the calling
-conventions for Haskell, the garbage collector, etc, and "lower" them
-so that a LastCall passes no parameters or results.  But the smart 
-constructors do *not* (currently) know the foreign call conventions.
 
 Note that a safe foreign call needs an info table.
+
+So Safe Foreign Calls must remain as last nodes until the stack is
+made manifest in CmmLayoutStack, where they are lowered into the above
+sequence.
+-}
+
+{- Note [foreign calls clobber GlobalRegs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A foreign call is defined to clobber any GlobalRegs that are mapped to
+caller-saves machine registers (according to the prevailing C ABI).
+StgCmmUtils.callerSaves tells you which GlobalRegs are caller-saves.
+
+This is a design choice that makes it easier to generate code later.
+We could instead choose to say that foreign calls do *not* clobber
+caller-saves regs, but then we would have to figure out which regs
+were live across the call later and insert some saves/restores.
+
+Furthermore when we generate code we never have any GlobalRegs live
+across a call, because they are always copied-in to LocalRegs and
+copied-out again before making a call/jump.  So all we have to do is
+avoid any code motion that would make a caller-saves GlobalReg live
+across a foreign call during subsequent optimisations.
 -}
 
 {- Note [Register parameter passing]

@@ -3,6 +3,8 @@ module CmmSink (
      cmmSink
   ) where
 
+import StgCmmUtils (callerSaves)
+
 import Cmm
 import BlockId
 import CmmLive
@@ -347,13 +349,28 @@ conflicts :: Assignment -> CmmNode O x -> Bool
   | CmmStore addr' e <- node, memConflicts addr (loadAddr addr' (cmmExprWidth e)) = True
 
   -- (3) an assignment to Hp/Sp conflicts with a heap/stack read respectively
-  | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node         = True
-  | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node         = True
-  | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node         = True
+  | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
+  | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
+  | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
 
-  -- (4) otherwise, no conflict
+  -- (4) assignments that read caller-saves GlobalRegs conflict with a
+  -- foreign call.  See Note [foreign calls clobber GlobalRegs].
+  | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs rhs        = True
+
+  -- (5) foreign calls clobber memory, but not heap/stack memory
+  | CmmUnsafeForeignCall{} <- node, AnyMem <- addr                = True
+
+  -- (6) native calls clobber any memory
+  | CmmCall{} <- node, memConflicts addr AnyMem                   = True
+
+  -- (7) otherwise, no conflict
   | otherwise = False
 
+
+anyCallerSavesRegs :: CmmExpr -> Bool
+anyCallerSavesRegs e = wrapRecExpf f e False
+  where f (CmmReg (CmmGlobal r)) _ | callerSaves r = True
+        f _ z = z
 
 -- An abstraction of memory read or written.
 data AbsMem
