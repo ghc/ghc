@@ -278,8 +278,11 @@
 	<term>Stable snapshots</term>
 	<listitem>
 	  <para>
-      We may make snapshot releases of the current
-      stable branch <ulink url="http://www.haskell.org/ghc/dist/stable/dist/">available for download</ulink>, and the latest sources are available from <ulink url="http://hackage.haskell.org/trac/ghc/wiki/DarcsRepositories">the darcs repositories</ulink>.
+            We may make snapshot releases of the current stable branch <ulink
+            url="http://www.haskell.org/ghc/dist/stable/dist/">available for
+            download</ulink>, and the latest sources are available from <ulink
+            url="http://hackage.haskell.org/trac/ghc/wiki/Repositories">the git
+            repositories</ulink>.
 	  </para>
 
 	  <para>Stable snapshot releases are named
@@ -310,8 +313,11 @@
 	<term>Unstable snapshots</term>
 	<listitem>
 	  <para>
-      We may make snapshot releases of the
-      HEAD <ulink url="http://www.haskell.org/ghc/dist/current/dist/">available for download</ulink>, and the latest sources are available from <ulink url="http://hackage.haskell.org/trac/ghc/wiki/DarcsRepositories">the darcs repositories</ulink>.
+            We may make snapshot releases of the HEAD <ulink
+            url="http://www.haskell.org/ghc/dist/current/dist/">available for
+            download</ulink>, and the latest sources are available from <ulink
+            url="http://hackage.haskell.org/trac/ghc/wiki/Repositories">the git
+            repositories</ulink>.
 	  </para>
 
 	  <para>Unstable snapshot releases are named
