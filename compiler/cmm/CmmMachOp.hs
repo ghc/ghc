@@ -198,6 +198,8 @@ isCommutableMachOp mop =
         MO_And _                -> True
         MO_Or _                 -> True
         MO_Xor _                -> True
+        MO_F_Add _              -> True
+        MO_F_Mul _              -> True
         _other                  -> False
 
 -- ----------------------------------------------------------------------------
