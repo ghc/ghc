@@ -605,6 +605,11 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
                 Just (cmmMachOpFold platform (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)])
         _ -> Nothing
 
+-- ToDo (#7116): optimise floating-point multiplication, e.g. x*2.0 -> x+x
+-- Unfortunately this needs a unique supply because x might not be a
+-- register.  See #2253 (program 6) for an example.
+
+
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
