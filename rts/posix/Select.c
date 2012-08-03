@@ -45,7 +45,7 @@
 
 #if SIZEOF_VOID_P == 4
 #define LowResTimeToTime(t)          (USToTime((t) * 1000))
-#define TimeToLowResTimeRoundDown(t) (TimeToUS(t) / 1000)
+#define TimeToLowResTimeRoundDown(t) ((LowResTime)(TimeToUS(t) / 1000))
 #define TimeToLowResTimeRoundUp(t)   ((TimeToUS(t) + 1000-1) / 1000)
 #else
 #define LowResTimeToTime(t) (t)
