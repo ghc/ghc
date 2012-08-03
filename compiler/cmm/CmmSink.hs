@@ -75,6 +75,26 @@ import qualified Data.Set as Set
 -- *but*, that will invalidate the liveness analysis, and we'll have
 -- to re-do it.
 
+-- TODO: things that we aren't optimising very well yet.
+--
+-- From GHC's FastString.hashStr:
+--
+--  s2ay:
+--      if ((_s2an::I64 == _s2ao::I64) >= 1) goto c2gn; else goto c2gp;
+--  c2gn:
+--      R1 = _s2au::I64;
+--      call (I64[Sp])(R1) args: 8, res: 0, upd: 8;
+--  c2gp:
+--      _s2cO::I64 = %MO_S_Rem_W64(%MO_UU_Conv_W8_W64(I8[_s2aq::I64 + (_s2an::I64 << 0)]) + _s2au::I64 * 128,
+--                                 4091);
+--      _s2an::I64 = _s2an::I64 + 1;
+--      _s2au::I64 = _s2cO::I64;
+--      goto s2ay;
+--
+-- a nice loop, but we didn't eliminate the silly assignment at the end.
+-- See Note [dependent assignments], which would probably fix this.
+--
+
 type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- Assignment caches AbsMem, an abstraction of the memory read by
   -- the RHS of the assignment.
@@ -291,25 +311,28 @@ tryToInline
       , [Assignment]            -- Remaining assignments
       )
 
-tryToInline live node assigs = go usages node assigs
+tryToInline live node assigs = go usages node [] assigs
  where
   usages :: UniqFM Int
   usages = foldRegsUsed addUsage emptyUFM node
 
-  go _usages node [] = (node, [])
+  go _usages node skipped [] = (node, [])
 
-  go usages node (a@(l,rhs,_) : rest)
-   | occurs_once_in_this_node  = inline_and_discard
-   | False {- isTiny rhs -}    = inline_and_keep
+  go usages node skipped (a@(l,rhs,_) : rest)
+   | can_inline              = inline_and_discard
+   | False {- isTiny rhs -}  = inline_and_keep
      --  ^^ seems to make things slightly worse
    where
-        inline_and_discard = go usages' node' rest
+        inline_and_discard = go usages' node' skipped rest
 
         inline_and_keep = (node'', a : rest')
-          where (node'',rest') = inline_and_discard
+          where (node'',rest') = go usages' node' (l:skipped) rest
 
-        occurs_once_in_this_node =
-         not (l `elemRegSet` live) &&  lookupUFM usages l == Just 1
+        can_inline =
+            not (l `elemRegSet` live)
+         && not (skipped `regsUsedIn` rhs)  -- Note [dependent assignments]
+         && okToInline rhs node
+         && lookupUFM usages l == Just 1
 
         usages' = foldRegsUsed addUsage usages rhs
 
@@ -319,17 +342,52 @@ tryToInline live node assigs = go usages node assigs
                     = cmmOffset rhs off
                  inline other = other
 
-  go usages node (assig@(_,rhs,_) : rest)
+  go usages node skipped (assig@(l,rhs,_) : rest)
     = (node', assig : rest')
-    where (node', rest') = go usages' node rest
+    where (node', rest') = go usages' node (l:skipped) rest
           usages' = foldRegsUsed (\m r -> addToUFM m r 2) usages rhs
           -- we must not inline anything that is mentioned in the RHS
           -- of a binding that we have already skipped, so we set the
           -- usages of the regs on the RHS to 2.
 
+-- Note [dependent assignments]
+--
+-- If our assignment list looks like
+--
+--    [ y = e,  x = ... y ... ]
+--
+-- We cannot inline x.  Remember this list is really in reverse order,
+-- so it means  x = ... y ...; y = e
+--
+-- Hence if we inline x, the outer assignment to y will capture the
+-- reference in x's right hand side.
+--
+-- In this case we should rename the y in x's right-hand side,
+-- i.e. change the list to [ y = e, x = ... y1 ..., y1 = y ]
+-- Now we can go ahead and inline x.
+--
+-- For now we do nothing, because this would require putting
+-- everything inside UniqSM.
+
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
 
+regsUsedIn :: [LocalReg] -> CmmExpr -> Bool
+regsUsedIn [] e = False
+regsUsedIn ls e = wrapRecExpf f e False
+  where f (CmmReg (CmmLocal l))      _ | l `elem` ls = True
+        f (CmmRegOff (CmmLocal l) _) _ | l `elem` ls = True
+        f _ z = z
+
+-- we don't inline into CmmUnsafeForeignCall if the expression refers
+-- to global registers.  This is a HACK to avoid global registers
+-- clashing with C argument-passing registers, really the back-end
+-- ought to be able to handle it properly, but currently neither PprC
+-- nor the NCG can do it.  See Note [Register parameter passing]
+-- See also StgCmmForeign:load_args_into_temps.
+okToInline :: CmmExpr -> CmmNode e x -> Bool
+okToInline expr CmmUnsafeForeignCall{} = not (anyCallerSavesRegs expr)
+okToInline _ _ = True
 
 -- -----------------------------------------------------------------------------
 
