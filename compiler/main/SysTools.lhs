@@ -166,144 +166,145 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
 initSysTools mbMinusB
-  = do  { top_dir <- findTopDir mbMinusB
-                -- see [Note topdir]
-                -- NB: top_dir is assumed to be in standard Unix
-                -- format, '/' separated
+  = do top_dir <- findTopDir mbMinusB
+             -- see [Note topdir]
+             -- NB: top_dir is assumed to be in standard Unix
+             -- format, '/' separated
 
-        ; let settingsFile = top_dir </> "settings"
-              installed :: FilePath -> FilePath
-              installed file = top_dir </> file
+       let settingsFile = top_dir </> "settings"
+           installed :: FilePath -> FilePath
+           installed file = top_dir </> file
 
-        ; settingsStr <- readFile settingsFile
-        ; mySettings <- case maybeReadFuzzy settingsStr of
-                        Just s ->
-                            return s
-                        Nothing ->
-                            pgmError ("Can't parse " ++ show settingsFile)
-        ; let getSetting key = case lookup key mySettings of
-                               Just xs ->
-                                   return $ case stripPrefix "$topdir" xs of
-                                            Just [] ->
-                                                top_dir
-                                            Just xs'@(c:_)
-                                             | isPathSeparator c ->
-                                                top_dir ++ xs'
-                                            _ ->
-                                                xs
-                               Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-              readSetting key = case lookup key mySettings of
-                                Just xs ->
-                                    case maybeRead xs of
-                                    Just v -> return v
-                                    Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
-                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-        ; targetArch <- readSetting "target arch"
-        ; targetOS <- readSetting "target os"
-        ; targetWordSize <- readSetting "target word size"
-        ; targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
-        ; targetHasIdentDirective <- readSetting "target has .ident directive"
-        ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
-        ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
-        -- On Windows, mingw is distributed with GHC,
-        -- so we look in TopDir/../mingw/bin
-        -- It would perhaps be nice to be able to override this
-        -- with the settings file, but it would be a little fiddly
-        -- to make that possible, so for now you can't.
-        ; gcc_prog <- getSetting "C compiler command"
-        ; gcc_args_str <- getSetting "C compiler flags"
-        ; let gcc_args = map Option (words gcc_args_str)
-        ; perl_path <- getSetting "perl command"
+       settingsStr <- readFile settingsFile
+       mySettings <- case maybeReadFuzzy settingsStr of
+                     Just s ->
+                         return s
+                     Nothing ->
+                         pgmError ("Can't parse " ++ show settingsFile)
+       let getSetting key = case lookup key mySettings of
+                            Just xs ->
+                                return $ case stripPrefix "$topdir" xs of
+                                         Just [] ->
+                                             top_dir
+                                         Just xs'@(c:_)
+                                          | isPathSeparator c ->
+                                             top_dir ++ xs'
+                                         _ ->
+                                             xs
+                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+           readSetting key = case lookup key mySettings of
+                             Just xs ->
+                                 case maybeRead xs of
+                                 Just v -> return v
+                                 Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
+                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       targetArch <- readSetting "target arch"
+       targetOS <- readSetting "target os"
+       targetWordSize <- readSetting "target word size"
+       targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
+       targetHasIdentDirective <- readSetting "target has .ident directive"
+       targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
+       myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
+       -- On Windows, mingw is distributed with GHC,
+       -- so we look in TopDir/../mingw/bin
+       -- It would perhaps be nice to be able to override this
+       -- with the settings file, but it would be a little fiddly
+       -- to make that possible, so for now you can't.
+       gcc_prog <- getSetting "C compiler command"
+       gcc_args_str <- getSetting "C compiler flags"
+       let gcc_args = map Option (words gcc_args_str)
+       perl_path <- getSetting "perl command"
 
-        ; let pkgconfig_path = installed "package.conf.d"
-              ghc_usage_msg_path  = installed "ghc-usage.txt"
-              ghci_usage_msg_path = installed "ghci-usage.txt"
+       let pkgconfig_path = installed "package.conf.d"
+           ghc_usage_msg_path  = installed "ghc-usage.txt"
+           ghci_usage_msg_path = installed "ghci-usage.txt"
 
-                -- For all systems, unlit, split, mangle are GHC utilities
-                -- architecture-specific stuff is done when building Config.hs
-              unlit_path = installed cGHC_UNLIT_PGM
+             -- For all systems, unlit, split, mangle are GHC utilities
+             -- architecture-specific stuff is done when building Config.hs
+           unlit_path = installed cGHC_UNLIT_PGM
 
-                -- split is a Perl script
-              split_script  = installed cGHC_SPLIT_PGM
+             -- split is a Perl script
+           split_script  = installed cGHC_SPLIT_PGM
 
-        ; windres_path <- getSetting "windres command"
+       windres_path <- getSetting "windres command"
 
-        ; tmpdir <- getTemporaryDirectory
+       tmpdir <- getTemporaryDirectory
 
-        ; touch_path <- getSetting "touch command"
+       touch_path <- getSetting "touch command"
 
-        ; let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-              -- a call to Perl to get the invocation of split.
-              -- On Unix, scripts are invoked using the '#!' method.  Binary
-              -- installations of GHC on Unix place the correct line on the
-              -- front of the script at installation time, so we don't want
-              -- to wire-in our knowledge of $(PERL) on the host system here.
-              (split_prog,  split_args)
-                | isWindowsHost = (perl_path,    [Option split_script])
-                | otherwise     = (split_script, [])
-        ; mkdll_prog <- getSetting "dllwrap command"
-        ; let mkdll_args = []
+       let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+           -- a call to Perl to get the invocation of split.
+           -- On Unix, scripts are invoked using the '#!' method.  Binary
+           -- installations of GHC on Unix place the correct line on the
+           -- front of the script at installation time, so we don't want
+           -- to wire-in our knowledge of $(PERL) on the host system here.
+           (split_prog,  split_args)
+             | isWindowsHost = (perl_path,    [Option split_script])
+             | otherwise     = (split_script, [])
+       mkdll_prog <- getSetting "dllwrap command"
+       let mkdll_args = []
 
-        -- cpp is derived from gcc on all platforms
-        -- HACK, see setPgmP below. We keep 'words' here to remember to fix
-        -- Config.hs one day.
-        ; let cpp_prog  = gcc_prog
-              cpp_args  = Option "-E"
-                        : map Option (words cRAWCPP_FLAGS)
-                       ++ gcc_args
+       -- cpp is derived from gcc on all platforms
+       -- HACK, see setPgmP below. We keep 'words' here to remember to fix
+       -- Config.hs one day.
+       let cpp_prog  = gcc_prog
+           cpp_args  = Option "-E"
+                     : map Option (words cRAWCPP_FLAGS)
+                    ++ gcc_args
 
-        -- Other things being equal, as and ld are simply gcc
-        ; let   as_prog  = gcc_prog
-                as_args  = gcc_args
-                ld_prog  = gcc_prog
-                ld_args  = gcc_args
+       -- Other things being equal, as and ld are simply gcc
+       let   as_prog  = gcc_prog
+             as_args  = gcc_args
+             ld_prog  = gcc_prog
+             ld_args  = gcc_args
 
-        -- We just assume on command line
-        ; lc_prog <- getSetting "LLVM llc command"
-        ; lo_prog <- getSetting "LLVM opt command"
+       -- We just assume on command line
+       lc_prog <- getSetting "LLVM llc command"
+       lo_prog <- getSetting "LLVM opt command"
 
-        ; return $ Settings {
-                        sTargetPlatform = Platform {
-                                              platformArch = targetArch,
-                                              platformOS   = targetOS,
-                                              platformWordSize = targetWordSize,
-                                              platformHasGnuNonexecStack = targetHasGnuNonexecStack,
-                                              platformHasIdentDirective = targetHasIdentDirective,
-                                              platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
-                                          },
-                        sTmpDir = normalise tmpdir,
-                        sGhcUsagePath = ghc_usage_msg_path,
-                        sGhciUsagePath = ghci_usage_msg_path,
-                        sTopDir  = top_dir,
-                        sRawSettings = mySettings,
-                        sExtraGccViaCFlags = words myExtraGccViaCFlags,
-                        sSystemPackageConfig = pkgconfig_path,
-                        sPgm_L   = unlit_path,
-                        sPgm_P   = (cpp_prog, cpp_args),
-                        sPgm_F   = "",
-                        sPgm_c   = (gcc_prog, gcc_args),
-                        sPgm_s   = (split_prog,split_args),
-                        sPgm_a   = (as_prog, as_args),
-                        sPgm_l   = (ld_prog, ld_args),
-                        sPgm_dll = (mkdll_prog,mkdll_args),
-                        sPgm_T   = touch_path,
-                        sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
-                        sPgm_windres = windres_path,
-                        sPgm_lo  = (lo_prog,[]),
-                        sPgm_lc  = (lc_prog,[]),
-                        -- Hans: this isn't right in general, but you can
-                        -- elaborate it in the same way as the others
-                        sOpt_L       = [],
-                        sOpt_P       = [],
-                        sOpt_F       = [],
-                        sOpt_c       = [],
-                        sOpt_a       = [],
-                        sOpt_l       = [],
-                        sOpt_windres = [],
-                        sOpt_lo      = [],
-                        sOpt_lc      = []
-                }
-        }
+       let platform = Platform {
+                          platformArch = targetArch,
+                          platformOS   = targetOS,
+                          platformWordSize = targetWordSize,
+                          platformHasGnuNonexecStack = targetHasGnuNonexecStack,
+                          platformHasIdentDirective = targetHasIdentDirective,
+                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
+                      }
+
+       return $ Settings {
+                    sTargetPlatform = platform,
+                    sTmpDir         = normalise tmpdir,
+                    sGhcUsagePath   = ghc_usage_msg_path,
+                    sGhciUsagePath  = ghci_usage_msg_path,
+                    sTopDir         = top_dir,
+                    sRawSettings    = mySettings,
+                    sExtraGccViaCFlags = words myExtraGccViaCFlags,
+                    sSystemPackageConfig = pkgconfig_path,
+                    sPgm_L   = unlit_path,
+                    sPgm_P   = (cpp_prog, cpp_args),
+                    sPgm_F   = "",
+                    sPgm_c   = (gcc_prog, gcc_args),
+                    sPgm_s   = (split_prog,split_args),
+                    sPgm_a   = (as_prog, as_args),
+                    sPgm_l   = (ld_prog, ld_args),
+                    sPgm_dll = (mkdll_prog,mkdll_args),
+                    sPgm_T   = touch_path,
+                    sPgm_sysman  = top_dir ++ "/ghc/rts/parallel/SysMan",
+                    sPgm_windres = windres_path,
+                    sPgm_lo  = (lo_prog,[]),
+                    sPgm_lc  = (lc_prog,[]),
+                    -- Hans: this isn't right in general, but you can
+                    -- elaborate it in the same way as the others
+                    sOpt_L       = [],
+                    sOpt_P       = [],
+                    sOpt_F       = [],
+                    sOpt_c       = [],
+                    sOpt_a       = [],
+                    sOpt_l       = [],
+                    sOpt_windres = [],
+                    sOpt_lo      = [],
+                    sOpt_lc      = []
+             }
 \end{code}
 
 \begin{code}
