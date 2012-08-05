@@ -1655,6 +1655,7 @@ getHCFilePackages filename =
 linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
 linkBinary dflags o_files dep_packages = do
     let platform = targetPlatform dflags
+        mySettings = settings dflags
         verbFlags = getVerbFlags dflags
         output_fn = exeFileName dflags
 
@@ -1767,7 +1768,7 @@ linkBinary dflags o_files dep_packages = do
                       -- like
                       --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
                       -- on x86.
-                      ++ (if cLdHasNoCompactUnwind == "YES"    &&
+                      ++ (if sLdSupportsCompactUnwind mySettings &&
                              platformOS   platform == OSDarwin &&
                              platformArch platform `elem` [ArchX86, ArchX86_64]
                           then ["-Wl,-no_compact_unwind"]
@@ -2089,7 +2090,8 @@ hsSourceCppOpts =
 
 joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles dflags o_files output_fn = do
-  let ld_r args = SysTools.runLink dflags ([
+  let mySettings = settings dflags
+      ld_r args = SysTools.runLink dflags ([
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-nodefaultlibs",
                             SysTools.Option "-Wl,-r"
@@ -2100,20 +2102,18 @@ joinObjectFiles dflags o_files output_fn = do
                          ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                                 then [SysTools.Option "-Wl,-no-relax"]
                                 else [])
-                         ++ [
-                            SysTools.Option ld_build_id,
-                            -- SysTools.Option ld_x_flag,
-                            SysTools.Option "-o",
-                            SysTools.FileOption "" output_fn ]
+                         ++ map SysTools.Option ld_build_id
+                         ++ [ SysTools.Option "-o",
+                              SysTools.FileOption "" output_fn ]
                          ++ args)
 
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
-      ld_build_id | cLdHasBuildId == "YES"  = "-Wl,--build-id=none"
-                  | otherwise               = ""
+      ld_build_id | sLdSupportsBuildId mySettings = ["-Wl,--build-id=none"]
+                  | otherwise                     = []
 
-  if cLdIsGNULd == "YES"
+  if sLdIsGnuLd mySettings
      then do
           script <- newTempName dflags "ldscript"
           writeFile script $ "INPUT(" ++ unwords o_files ++ ")"

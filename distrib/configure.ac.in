@@ -72,6 +72,9 @@ AC_PROG_CPP
 
 FP_PROG_LD_HashSize31
 FP_PROG_LD_ReduceMemoryOverheads
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
 
 #
 dnl ** Check gcc version and flags we need to pass it **

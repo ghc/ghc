@@ -192,6 +192,11 @@ initSysTools mbMinusB
                                          _ ->
                                              xs
                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+           getBooleanSetting key = case lookup key mySettings of
+                                   Just "YES" -> return True
+                                   Just "NO" -> return False
+                                   Just xs -> pgmError ("Bad value for " ++ show key ++ ": " ++ show xs)
+                                   Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
            readSetting key = case lookup key mySettings of
                              Just xs ->
                                  case maybeRead xs of
@@ -213,6 +218,9 @@ initSysTools mbMinusB
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
        let gcc_args = map Option (words gcc_args_str)
+       ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
+       ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
+       ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
        perl_path <- getSetting "perl command"
 
        let pkgconfig_path = installed "package.conf.d"
@@ -280,6 +288,9 @@ initSysTools mbMinusB
                     sRawSettings    = mySettings,
                     sExtraGccViaCFlags = words myExtraGccViaCFlags,
                     sSystemPackageConfig = pkgconfig_path,
+                    sLdSupportsCompactUnwind = ldSupportsCompactUnwind,
+                    sLdSupportsBuildId       = ldSupportsBuildId,
+                    sLdIsGnuLd               = ldIsGnuLd,
                     sPgm_L   = unlit_path,
                     sPgm_P   = (cpp_prog, cpp_args),
                     sPgm_F   = "",

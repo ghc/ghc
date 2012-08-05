@@ -99,12 +99,6 @@ endif
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
 	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
-	@echo 'cLdHasNoCompactUnwind :: String'                             >> $@
-	@echo 'cLdHasNoCompactUnwind = "$(LdHasNoCompactUnwind)"'           >> $@
-	@echo 'cLdIsGNULd            :: String'                             >> $@
-	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
-	@echo 'cLdHasBuildId         :: String'                             >> $@
-	@echo 'cLdHasBuildId         = "$(LdHasBuildId)"'                   >> $@
 	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@
 	@echo 'cGHC_DRIVER_DIR       = "$(GHC_DRIVER_DIR)"'                 >> $@
 	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
