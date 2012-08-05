@@ -67,6 +67,12 @@ FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
 CC="$WhatGccIsCalled"
 export CC
 
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+LdCmd="$LD"
+AC_SUBST([LdCmd])
+
 FP_GCC_VERSION
 AC_PROG_CPP
 
