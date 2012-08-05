@@ -2107,14 +2107,6 @@ joinObjectFiles dflags o_files output_fn = do
                             SysTools.FileOption "" output_fn ]
                          ++ args)
 
-      -- Do *not* add the -x flag to ld, because we want to keep those
-      -- local symbols around for the benefit of external tools. e.g.
-      -- the 'perf report' output is much less useful if all the local
-      -- symbols have been stripped out.
-      --
-      -- ld_x_flag | null cLD_X = ""
-      --           | otherwise  = "-Wl,-x"
-
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:

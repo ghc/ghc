@@ -863,17 +863,6 @@ $2=$fp_cv_$2
 ])# FP_PROG_LD_FLAG
 
 
-# FP_PROG_LD_X
-# ------------
-# Sets the output variable LdXFlag to -x if ld supports this flag.
-# Otherwise the variable's value is empty.
-AC_DEFUN([FP_PROG_LD_X],
-[
-FP_PROG_LD_FLAG([-x],[LdXFlag])
-AC_SUBST([LdXFlag])
-])# FP_PROG_LD_X
-
-
 # FP_PROG_LD_HashSize31
 # ------------
 # Sets the output variable LdHashSize31 to --hash-size=31 if ld supports
