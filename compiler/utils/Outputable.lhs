@@ -597,6 +597,9 @@ class Outputable a where
 \end{code}
 
 \begin{code}
+instance Outputable Char where
+    ppr c = text [c]
+
 instance Outputable Bool where
     ppr True  = ptext (sLit "True")
     ppr False = ptext (sLit "False")

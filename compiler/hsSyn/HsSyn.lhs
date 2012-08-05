@@ -9,7 +9,6 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -96,9 +95,6 @@ data HsExtCore name	-- Read from Foo.hcr
 
 
 \begin{code}
-instance Outputable Char where
-  ppr c = text [c]
-
 instance (OutputableBndr name, HasOccName name)
 	=> Outputable (HsModule name) where
 
