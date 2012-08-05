@@ -605,19 +605,19 @@ instance Outputable Bool where
     ppr False = ptext (sLit "False")
 
 instance Outputable Int where
-   ppr n = int n
+    ppr n = int n
 
 instance Outputable Word16 where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable Word32 where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable Word where
-   ppr n = integer $ fromIntegral n
+    ppr n = integer $ fromIntegral n
 
 instance Outputable () where
-   ppr _ = text "()"
+    ppr _ = text "()"
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
@@ -629,12 +629,12 @@ instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 instance Outputable a => Outputable (Maybe a) where
-  ppr Nothing = ptext (sLit "Nothing")
-  ppr (Just x) = ptext (sLit "Just") <+> ppr x
+    ppr Nothing = ptext (sLit "Nothing")
+    ppr (Just x) = ptext (sLit "Just") <+> ppr x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
-  ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
-  ppr (Right y) = ptext (sLit "Right") <+> ppr y
+    ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
+    ppr (Right y) = ptext (sLit "Right") <+> ppr y
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
