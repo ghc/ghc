@@ -314,6 +314,13 @@ shiftRInteger j@(Negative _) i
     = complementInteger (shiftRInteger (complementInteger j) i)
 shiftRInteger Naught         _ = Naught
 
+-- XXX this could be a lot more efficient, but this is a quick
+-- reimplementation of the default Data.Bits instance, so that we can
+-- implement the Integer interface
+testBitInteger :: Integer -> Int# -> Bool
+testBitInteger x i = (x `andInteger` (smallInteger 1# `shiftLInteger` i))
+        `neqInteger` smallInteger 0#
+
 twosComplementPositive :: Positive -> DigitsOnes
 twosComplementPositive p = flipBits (p `minusPositive` onePositive)
 
