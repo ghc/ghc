@@ -38,6 +38,7 @@ import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
 import Maybes           ( orElse, isNothing )
+import Control.Monad
 import Data.List        ( mapAccumL )
 import Outputable
 import FastString
@@ -1402,8 +1403,8 @@ completeCall env var cont
         ; case maybe_inline of {
             Just expr      -- There is an inlining!
               ->  do { checkedTick (UnfoldingDone var)
-                     ; trace_inline dflags expr cont $
-                       simplExprF (zapSubstEnv env) expr cont }
+                     ; dump_inline dflags expr cont
+                     ; simplExprF (zapSubstEnv env) expr cont }
 
             ; Nothing -> do               -- No inlining!
 
@@ -1412,17 +1413,17 @@ completeCall env var cont
         ; rebuildCall env info cont
     }}}
   where
-    trace_inline dflags unfolding cont stuff
-      | not (dopt Opt_D_dump_inlinings dflags) = stuff
+    dump_inline dflags unfolding cont
+      | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
-      = if isExternalName (idName var) then
-          pprDefiniteTrace dflags "Inlining done:" (ppr var) stuff
-        else stuff
+      = when (isExternalName (idName var)) $
+            liftIO $ printInfoForUser dflags alwaysQualify $
+                sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = pprDefiniteTrace dflags ("Inlining done: " ++ showSDocDump dflags (ppr var))
-           (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
-                  text "Cont:  " <+> ppr cont])
-           stuff
+      = liftIO $ printInfoForUser dflags alwaysQualify $
+           sep [text "Inlining done: " <> ppr var,
+                nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
+                              text "Cont:  " <+> ppr cont])]
 
 rebuildCall :: SimplEnv
             -> ArgInfo

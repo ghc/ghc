@@ -65,7 +65,7 @@ module Outputable (
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPanicFastInt, pprPgmError,
-        pprTrace, pprDefiniteTrace, warnPprTrace,
+        pprTrace, warnPprTrace,
         trace, pgmError, panic, sorry, panicFastInt, assertPanic,
         pprDebugAndThen,
     ) where
@@ -915,10 +915,6 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
    | opt_NoDebugOutput = x
    | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
-
-pprDefiniteTrace :: DynFlags -> String -> SDoc -> a -> a
--- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace dflags str doc x = pprDebugAndThen dflags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
