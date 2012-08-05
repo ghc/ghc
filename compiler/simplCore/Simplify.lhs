@@ -1559,10 +1559,10 @@ tryRules env rules fn args call_cont
 
              do { checkedTick (RuleFired (ru_name rule))
                 ; dflags <- getDynFlags
-                ; trace_dump dflags rule rule_rhs
+                ; dump dflags rule rule_rhs
                 ; return (Just (ruleArity rule, rule_rhs)) }}}
   where
-    trace_dump dflags rule rule_rhs
+    dump dflags rule rule_rhs
       | dopt Opt_D_dump_rule_rewrites dflags
       = log_rule dflags Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ru_name rule)
