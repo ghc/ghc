@@ -92,7 +92,9 @@ import qualified Data.Set as Set
 import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
+import Text.Printf
 
+import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 \end{code}
 
@@ -689,6 +691,9 @@ instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
+
+instance Outputable Fingerprint where
+    ppr (Fingerprint w1 w2) = text (printf "%016x%016x" w1 w2)
 \end{code}
 
 %************************************************************************
