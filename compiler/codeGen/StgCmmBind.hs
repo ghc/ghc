@@ -435,7 +435,8 @@ closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
                 -- heap check, to reduce live vars over check
                 ; if node_points then load_fvs node lf_info fv_bindings
                                  else return ()
-                ; cgExpr body }}
+                ; _ <- cgExpr body
+                ; return () }}
   }
 
 -- A function closure pointer may be tagged, so we
@@ -501,7 +502,8 @@ thunkCode cl_info fv_details _cc node arity body
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings
-               ; cgExpr body }}}
+               ; _ <- cgExpr body
+               ; return () }}}
 
 
 ------------------------------------------------------------------------

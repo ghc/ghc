@@ -77,11 +77,10 @@ import FastString
 --
 -- >    p=x; q=y;
 --
-emitReturn :: [CmmExpr] -> FCode ()
+emitReturn :: [CmmExpr] -> FCode ReturnKind
 emitReturn results
   = do { sequel    <- getSequel;
        ; updfr_off <- getUpdFrameOff
-       ; emitComment $ mkFastString ("emitReturn: " ++ show sequel)
        ; case sequel of
            Return _ ->
              do { adjustHpBackwards
@@ -89,6 +88,7 @@ emitReturn results
            AssignTo regs adjust ->
              do { if adjust then adjustHpBackwards else return ()
                 ; emitMultiAssign  regs results }
+       ; return AssignedDirectly
        }
 
 
@@ -96,7 +96,7 @@ emitReturn results
 -- using the call/return convention @conv@, passing @args@, and
 -- returning the results to the current sequel.
 --
-emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ()
+emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ReturnKind
 emitCall convs fun args
   = emitCallWithExtraStack convs fun args noExtraStack
 
@@ -108,17 +108,23 @@ emitCall convs fun args
 --
 emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
-   -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ()
-emitCallWithExtraStack convs@(callConv, _) fun args extra_stack
+   -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ReturnKind
+emitCallWithExtraStack (callConv, retConv) fun args extra_stack
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
-        ; emitComment $ mkFastString ("emitCallWithExtraStack: " ++ show sequel)
         ; case sequel of
-            Return _ ->
+            Return _ -> do
               emit $ mkForeignJumpExtra callConv fun args updfr_off extra_stack
+              return AssignedDirectly
             AssignTo res_regs _ -> do
-              emit =<< mkCall fun convs res_regs args updfr_off extra_stack
+              k <- newLabelC
+              let area = Young k
+                  (off, copyin) = copyInOflow retConv area res_regs
+                  copyout = mkCallReturnsTo fun callConv args k off updfr_off
+                                   extra_stack
+              emit (copyout <*> mkLabel k <*> copyin)
+              return (ReturnedTo k off)
       }
 
 
@@ -166,7 +172,7 @@ adjustHpBackwards
 --          call f() return to Nothing updfr_off: 32
 
 
-directCall :: Convention -> CLabel -> RepArity -> [StgArg] -> FCode ()
+directCall :: Convention -> CLabel -> RepArity -> [StgArg] -> FCode ReturnKind
 -- (directCall f n args)
 -- calls f(arg1, ..., argn), and applies the result to the remaining args
 -- The function f has arity n, and there are guaranteed at least n args
@@ -176,17 +182,18 @@ directCall conv lbl arity stg_args
         ; direct_call "directCall" conv lbl arity argreps }
 
 
-slowCall :: CmmExpr -> [StgArg] -> FCode ()
+slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args 
   = do  { dflags <- getDynFlags
         ; argsreps <- getArgRepsAmodes stg_args
         ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
-        ; direct_call "slow_call" NativeNodeCall
+        ; r <- direct_call "slow_call" NativeNodeCall
                  (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
         ; emitComment $ mkFastString ("slow_call for " ++
                                       showSDoc dflags (ppr fun) ++
                                       " with pat " ++ unpackFS rts_fun)
+        ; return r
         }
 
 
@@ -194,7 +201,7 @@ slowCall fun stg_args
 direct_call :: String
             -> Convention     -- e.g. NativeNodeCall or NativeDirectCall
             -> CLabel -> RepArity
-            -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
+            -> [(ArgRep,Maybe CmmExpr)] -> FCode ReturnKind
 direct_call caller call_conv lbl arity args
   | debugIsOn && real_arity > length args  -- Too few args
   = do -- Caller should ensure that there enough args!

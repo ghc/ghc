@@ -110,7 +110,13 @@ cmmLayoutStack dflags procpoints entry_args
                graph0@(CmmGraph { g_entry = entry })
   = do
     -- pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
-    (graph, liveness) <- removeDeadAssignments graph0
+
+    -- We need liveness info.  We could do removeDeadAssignments at
+    -- the same time, but it buys nothing over doing cmmSink later,
+    -- and costs a lot more than just cmmLiveness.
+    -- (graph, liveness) <- removeDeadAssignments graph0
+    let (graph, liveness) = (graph0, cmmLiveness graph0)
+
     -- pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
 

@@ -36,7 +36,7 @@ module StgCmmMonad (
 
 	ConTagZ,
 
-	Sequel(..),
+        Sequel(..), ReturnKind(..),
 	withSequel, getSequel,
 
 	setSRTLabel, getSRTLabel, 
@@ -222,13 +222,85 @@ data Sequel
   | AssignTo 
 	[LocalReg]	-- Put result(s) in these regs and fall through
 			-- 	NB: no void arguments here
-        Bool            -- Should we adjust the heap pointer back to recover
-                        -- space that's unused on this path?
-                        -- We need to do this only if the expression may
-                        -- allocate (e.g. it's a foreign call or allocating primOp)
-instance Show Sequel where
-  show (Return _) = "Sequel: Return"
-  show (AssignTo _ _) = "Sequel: Assign"
+                        --
+        Bool            -- Should we adjust the heap pointer back to
+                        -- recover space that's unused on this path?
+                        -- We need to do this only if the expression
+                        -- may allocate (e.g. it's a foreign call or
+                        -- allocating primOp)
+
+-- See Note [sharing continuations] below
+data ReturnKind
+  = AssignedDirectly
+  | ReturnedTo BlockId ByteOff
+
+-- Note [sharing continuations]
+--
+-- ReturnKind says how the expression being compiled returned its
+-- results: either by assigning directly to the registers specified
+-- by the Sequel, or by returning to a continuation that does the
+-- assignments.  The point of this is we might be able to re-use the
+-- continuation in a subsequent heap-check.  Consider:
+--
+--    case f x of z
+--      True  -> <True code>
+--      False -> <False code>
+--
+-- Naively we would generate
+--
+--    R2 = x   -- argument to f
+--    Sp[young(L1)] = L1
+--    call f returns to L1
+--  L1:
+--    z = R1
+--    if (z & 1) then Ltrue else Lfalse
+--  Ltrue:
+--    Hp = Hp + 24
+--    if (Hp > HpLim) then L4 else L7
+--  L4:
+--    HpAlloc = 24
+--    goto L5
+--  L5:
+--    R1 = z
+--    Sp[young(L6)] = L6
+--    call stg_gc_unpt_r1 returns to L6
+--  L6:
+--    z = R1
+--    goto L1
+--  L7:
+--    <True code>
+--  Lfalse:
+--    <False code>
+--
+-- We want the gc call in L4 to return to L1, and discard L6.  Note
+-- that not only can we share L1 and L6, but the assignment of the
+-- return address in L4 is unnecessary because the return address for
+-- L1 is already on the stack.  We used to catch the sharing of L1 and
+-- L6 in the common-block-eliminator, but not the unnecessary return
+-- address assignment.
+--
+-- Since this case is so common I decided to make it more explicit and
+-- robust by programming the sharing directly, rather than relying on
+-- the common-block elimiantor to catch it.  This makes
+-- common-block-elimianteion an optional optimisation, and furthermore
+-- generates less code in the first place that we have to subsequently
+-- clean up.
+--
+-- There are some rarer cases of common blocks that we don't catch
+-- this way, but that's ok.  Common-block-elimation is still available
+-- to catch them when optimisation is enabled.  Some examples are:
+--
+--   - when both the True and False branches do a heap check, we
+--     can share the heap-check failure code L4a and maybe L4
+--
+--   - in a case-of-case, there might be multiple continuations that
+--     we can common up.
+--
+-- It is always safe to use AssignedDirectly.  Expressions that jump
+-- to the continuation from multiple places (e.g. case expressions)
+-- fall back to AssignedDirectly.
+--
+
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
@@ -410,7 +482,7 @@ getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
 
-withSequel :: Sequel -> FCode () -> FCode ()
+withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
   = do	{ info  <- getInfoDown
 	; withInfoDown code (info {cgd_sequel = sequel }) }

@@ -464,7 +464,7 @@ newUnboxedTupleRegs res_ty
     	   , let rep = typePrimRep ty
   	   , not (isVoidRep rep) ]
     choose_regs (AssignTo regs _) = return regs
-    choose_regs _other		  = mapM (newTemp . primRepCmmType) reps
+    choose_regs _other            = mapM (newTemp . primRepCmmType) reps
 
 
 
