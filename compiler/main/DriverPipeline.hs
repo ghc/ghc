@@ -1118,11 +1118,16 @@ runPhase cc_phase input_fn dflags
                            then ["-mcpu=v9"]
                            else [])
 
+                       -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
+                       ++ (if (cc_phase /= Ccpp && cc_phase /= Cobjcpp)
+                             then ["-Wimplicit"]
+                             else [])
+
                        ++ (if hcc
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
                        ++ verbFlags
-                       ++ [ "-S", "-Wimplicit", cc_opt ]
+                       ++ [ "-S", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
                        ++ framework_paths
                        ++ cc_opts
