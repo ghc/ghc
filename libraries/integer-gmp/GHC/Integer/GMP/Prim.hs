@@ -37,6 +37,7 @@ module GHC.Integer.GMP.Prim (
     xorInteger#,
     complementInteger#,
 
+    testBitInteger#,
     mul2ExpInteger#,
     fdivQ2ExpInteger#,
 
@@ -159,6 +160,11 @@ foreign import prim "integer_cmm_orIntegerzh" orInteger#
 --
 foreign import prim "integer_cmm_xorIntegerzh" xorInteger#
   :: Int# -> ByteArray# -> Int# -> ByteArray# -> (# Int#, ByteArray# #)
+
+-- |
+--
+foreign import prim "integer_cmm_testBitIntegerzh" testBitInteger#
+  :: Int# -> ByteArray# -> Int# -> Int#
 
 -- |
 --

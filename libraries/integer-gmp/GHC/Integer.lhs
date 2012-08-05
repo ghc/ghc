@@ -33,7 +33,7 @@ module GHC.Integer (
     encodeDoubleInteger, decodeDoubleInteger, doubleFromInteger,
     -- gcdInteger, lcmInteger,
     andInteger, orInteger, xorInteger, complementInteger,
-    shiftLInteger, shiftRInteger,
+    shiftLInteger, shiftRInteger, testBitInteger,
     hashInteger,
  ) where
 

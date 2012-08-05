@@ -299,6 +299,36 @@ name                                                                    \
          MP_INT__mp_d(mp_result) - SIZEOF_StgArrWords);                 \
 }
 
+#define GMP_TAKE1_UL1_RETI1(name,mp_fun)                                \
+name                                                                    \
+{                                                                       \
+  CInt s1;                                                              \
+  W_ d1;                                                                \
+  CLong ul;                                                             \
+  W_ mp_tmp;                                                            \
+  CInt res;                                                             \
+                                                                        \
+  /* call doYouWantToGC() */                                            \
+  MAYBE_GC(R2_PTR, name);                                               \
+                                                                        \
+  STK_CHK_GEN( SIZEOF_MP_INT, R2_PTR, name );                           \
+                                                                        \
+  s1 = W_TO_INT(R1);                                                    \
+  d1 = R2;                                                              \
+  ul = W_TO_LONG(R3);                                                   \
+                                                                        \
+  mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
+  MP_INT__mp_alloc(mp_tmp) = W_TO_INT(BYTE_ARR_WDS(d1));                \
+  MP_INT__mp_size(mp_tmp)  = (s1);                                      \
+  MP_INT__mp_d(mp_tmp)     = BYTE_ARR_CTS(d1);                          \
+                                                                        \
+  /* Perform the operation */                                           \
+  (res) = foreign "C" mp_fun(mp_tmp "ptr", ul) [];                      \
+  R1 = res;                                                             \
+                                                                        \
+  jump %ENTRY_CODE(Sp(0));                                              \
+}
+
 #define GMP_TAKE1_RET1(name,mp_fun)                                     \
 name                                                                    \
 {                                                                       \
@@ -385,6 +415,7 @@ GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh,       __gmpz_divexact)
 GMP_TAKE2_RET1(integer_cmm_andIntegerzh,            __gmpz_and)
 GMP_TAKE2_RET1(integer_cmm_orIntegerzh,             __gmpz_ior)
 GMP_TAKE2_RET1(integer_cmm_xorIntegerzh,            __gmpz_xor)
+GMP_TAKE1_UL1_RETI1(integer_cmm_testBitIntegerzh,   __gmpz_tstbit)
 GMP_TAKE1_UL1_RET1(integer_cmm_mul2ExpIntegerzh,    __gmpz_mul_2exp)
 GMP_TAKE1_UL1_RET1(integer_cmm_fdivQ2ExpIntegerzh,  __gmpz_fdiv_q_2exp)
 GMP_TAKE1_RET1(integer_cmm_complementIntegerzh,     __gmpz_com)

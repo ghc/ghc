@@ -37,7 +37,7 @@ import GHC.Integer.GMP.Prim (
     decodeDouble#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
-    mul2ExpInteger#, fdivQ2ExpInteger#,
+    testBitInteger#, mul2ExpInteger#, fdivQ2ExpInteger#,
 #if WORD_SIZE_IN_BITS < 64
     int64ToInteger#,  integerToInt64#,
     word64ToInteger#, integerToWord64#,
@@ -553,6 +553,11 @@ shiftRInteger :: Integer -> Int# -> Integer
 shiftRInteger j@(S# _) i = shiftRInteger (toBig j) i
 shiftRInteger (J# s d) i = case fdivQ2ExpInteger# s d i of
                            (# s', d' #) -> J# s' d'
+
+{-# NOINLINE testBitInteger #-}
+testBitInteger :: Integer -> Int# -> Bool
+testBitInteger j@(S# _) i = testBitInteger (toBig j) i
+testBitInteger (J# s d) i = testBitInteger# s d i /=# 0#
 \end{code}
 
 %*********************************************************
