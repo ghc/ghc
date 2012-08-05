@@ -373,24 +373,24 @@ name                                                                            
            MP_INT__mp_d(mp_result2) - SIZEOF_StgArrWords);                              \
 }
 
-GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,     __gmpz_add)
-GMP_TAKE2_RET1(integer_cmm_minusIntegerzh,    __gmpz_sub)
-GMP_TAKE2_RET1(integer_cmm_timesIntegerzh,    __gmpz_mul)
-GMP_TAKE2_RET1(integer_cmm_gcdIntegerzh,      __gmpz_gcd)
-GMP_TAKE2_RET1(integer_cmm_quotIntegerzh,     __gmpz_tdiv_q)
-GMP_TAKE2_RET1(integer_cmm_remIntegerzh,      __gmpz_tdiv_r)
-GMP_TAKE2_RET1(integer_cmm_divIntegerzh,      __gmpz_fdiv_q)
-GMP_TAKE2_RET1(integer_cmm_modIntegerzh,      __gmpz_fdiv_r)
-GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh, __gmpz_divexact)
-GMP_TAKE2_RET1(integer_cmm_andIntegerzh,      __gmpz_and)
-GMP_TAKE2_RET1(integer_cmm_orIntegerzh,       __gmpz_ior)
-GMP_TAKE2_RET1(integer_cmm_xorIntegerzh,      __gmpz_xor)
-GMP_TAKE1_UL1_RET1(integer_cmm_mul2ExpIntegerzh, __gmpz_mul_2exp)
-GMP_TAKE1_UL1_RET1(integer_cmm_fdivQ2ExpIntegerzh, __gmpz_fdiv_q_2exp)
-GMP_TAKE1_RET1(integer_cmm_complementIntegerzh, __gmpz_com)
+GMP_TAKE2_RET1(integer_cmm_plusIntegerzh,           __gmpz_add)
+GMP_TAKE2_RET1(integer_cmm_minusIntegerzh,          __gmpz_sub)
+GMP_TAKE2_RET1(integer_cmm_timesIntegerzh,          __gmpz_mul)
+GMP_TAKE2_RET1(integer_cmm_gcdIntegerzh,            __gmpz_gcd)
+GMP_TAKE2_RET1(integer_cmm_quotIntegerzh,           __gmpz_tdiv_q)
+GMP_TAKE2_RET1(integer_cmm_remIntegerzh,            __gmpz_tdiv_r)
+GMP_TAKE2_RET1(integer_cmm_divIntegerzh,            __gmpz_fdiv_q)
+GMP_TAKE2_RET1(integer_cmm_modIntegerzh,            __gmpz_fdiv_r)
+GMP_TAKE2_RET1(integer_cmm_divExactIntegerzh,       __gmpz_divexact)
+GMP_TAKE2_RET1(integer_cmm_andIntegerzh,            __gmpz_and)
+GMP_TAKE2_RET1(integer_cmm_orIntegerzh,             __gmpz_ior)
+GMP_TAKE2_RET1(integer_cmm_xorIntegerzh,            __gmpz_xor)
+GMP_TAKE1_UL1_RET1(integer_cmm_mul2ExpIntegerzh,    __gmpz_mul_2exp)
+GMP_TAKE1_UL1_RET1(integer_cmm_fdivQ2ExpIntegerzh,  __gmpz_fdiv_q_2exp)
+GMP_TAKE1_RET1(integer_cmm_complementIntegerzh,     __gmpz_com)
 
-GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh, __gmpz_tdiv_qr)
-GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,  __gmpz_fdiv_qr)
+GMP_TAKE2_RET2(integer_cmm_quotRemIntegerzh,        __gmpz_tdiv_qr)
+GMP_TAKE2_RET2(integer_cmm_divModIntegerzh,         __gmpz_fdiv_qr)
 
 integer_cmm_gcdIntzh
 {
