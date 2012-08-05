@@ -386,6 +386,7 @@ instance Bits Integer where
    complement = complementInteger
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
+   testBit x (I# i) = testBitInteger x i
 #else
    -- reduce bitwise binary operations to special cases we can handle
 
@@ -404,10 +405,10 @@ instance Bits Integer where
    complement a = -1 - a
    shift x i | i >= 0    = x * 2^i
              | otherwise = x `div` 2^(-i)
+   testBit    = testBitDefault
 #endif
 
    bit        = bitDefault
-   testBit    = testBitDefault
    popCount   = popCountDefault
 
    rotate x i = shift x i   -- since an Integer never wraps around
