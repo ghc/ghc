@@ -613,13 +613,13 @@ pprInstr (JXX cond blockid)
 
 pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr        (JMP (OpImm imm) _) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
+pprInstr        (JMP (OpImm imm) _) = ptext (sLit "\tjmp ") <> pprImm imm
 pprInstr (JMP op _)          = sdocWithPlatform $ \platform ->
-                               (<>) (ptext (sLit "\tjmp *")) (pprOperand (archWordSize (target32Bit platform)) op)
+                               ptext (sLit "\tjmp *") <> pprOperand (archWordSize (target32Bit platform)) op
 pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op [])
-pprInstr        (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
+pprInstr        (CALL (Left imm) _)    = ptext (sLit "\tcall ") <> pprImm imm
 pprInstr (CALL (Right reg) _)   = sdocWithPlatform $ \platform ->
-                                  (<>) (ptext (sLit "\tcall *")) (pprReg (archWordSize (target32Bit platform)) reg)
+                                  ptext (sLit "\tcall *") <> pprReg (archWordSize (target32Bit platform)) reg
 
 pprInstr (IDIV sz op)   = pprSizeOp (sLit "idiv") sz op
 pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op

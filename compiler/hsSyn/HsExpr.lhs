@@ -434,7 +434,7 @@ ppr_expr (SectionR op expr)
     pp_expr = pprDebugParendExpr expr
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext (sLit "x_")])
-                       4 ((<>) pp_expr rparen)
+                       4 (pp_expr <> rparen)
     pp_infixly v = sep [pprInfixOcc v, pp_expr]
 
 ppr_expr (ExplicitTuple exprs boxity)

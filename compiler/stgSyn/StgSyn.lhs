@@ -635,7 +635,7 @@ pprGenStgBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
 
 pprGenStgBinding (StgNonRec bndr rhs)
   = hang (hsep [pprBndr LetBind bndr, equals])
-        4 ((<>) (ppr rhs) semi)
+        4 (ppr rhs <> semi)
 
 pprGenStgBinding (StgRec pairs)
   = vcat $ ifPprDebug (ptext $ sLit "{- StgRec (begin) -}") :
@@ -643,7 +643,7 @@ pprGenStgBinding (StgRec pairs)
   where
     ppr_bind (bndr, expr)
       = hang (hsep [pprBndr LetBind bndr, equals])
-             4 ((<>) (ppr expr) semi)
+             4 (ppr expr <> semi)
 
 pprStgBinding :: StgBinding -> SDoc
 pprStgBinding  bind  = pprGenStgBinding bind
@@ -739,12 +739,12 @@ pprStgExpr (StgLet bind expr)
 pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
   = sep [hang (ptext (sLit "let-no-escape {"))
                 2 (pprGenStgBinding bind),
-           hang ((<>) (ptext (sLit "} in "))
-                   (ifPprDebug (
+           hang (ptext (sLit "} in ") <>
+                   ifPprDebug (
                     nest 4 (
                       hcat [ptext  (sLit "-- lvs: ["), interppSP (uniqSetToList lvs_whole),
                              ptext (sLit "]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
-                             char ']']))))
+                             char ']'])))
                 2 (ppr expr)]
 
 pprStgExpr (StgSCC cc tick push expr)

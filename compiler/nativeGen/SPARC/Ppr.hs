@@ -535,7 +535,7 @@ pprInstr (BF cond b blockid)
         ppr (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
+pprInstr (JMP addr) = ptext (sLit "\tjmp\t") <> pprAddr addr
 pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
