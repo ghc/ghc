@@ -1175,10 +1175,8 @@ runPhase As input_fn dflags
                         = do
                             llvmVer <- io $ figureLlvmVersion dflags
                             return $ case llvmVer of
-                                -- using cGccLinkerOpts here but not clear if
-                                -- opt_c isn't a better choice
                                 Just n | n >= 30 ->
-                                    (SysTools.runClang, cGccLinkerOpts)
+                                    (SysTools.runClang, getOpts dflags opt_c)
 
                                 _ -> (SysTools.runAs, getOpts dflags opt_a)
 

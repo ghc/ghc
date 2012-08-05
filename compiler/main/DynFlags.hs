@@ -2907,7 +2907,6 @@ compilerInfo dflags
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags),
-       ("Gcc Linker flags",            show cGccLinkerOpts),
        ("Ld Linker flags",             show cLdLinkerOpts)
       ]
 
