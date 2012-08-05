@@ -23,7 +23,6 @@ import VarSet
 import Data.List
 import FastString
 import HscTypes
-import Platform
 import StaticFlags
 import TyCon
 import Unique
@@ -1158,9 +1157,9 @@ static void hpc_init_Main(void)
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
 
 \begin{code}
-hpcInitCode :: Platform -> Module -> HpcInfo -> SDoc
-hpcInitCode _ _ (NoHpcInfo {}) = empty
-hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
+hpcInitCode :: Module -> HpcInfo -> SDoc
+hpcInitCode _ (NoHpcInfo {}) = empty
+hpcInitCode this_mod (HpcInfo tickCount hashNo)
  = vcat
     [ text "static void hpc_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
@@ -1178,7 +1177,7 @@ hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
        ])
     ]
   where
-    tickboxes = pprCLabel platform (mkHpcTicksLabel $ this_mod)
+    tickboxes = ppr (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $
                          bytesFS (moduleNameFS (Module.moduleName this_mod)))
