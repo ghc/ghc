@@ -427,6 +427,10 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                       node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
                 ; tickyEnterFun cl_info
+                ; enterCostCentreFun cc
+                    (CmmMachOp mo_wordSub
+                         [ CmmReg nodeReg
+                         , CmmLit (mkIntCLit (funTag cl_info)) ])
                 ; whenC node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 
@@ -670,7 +674,7 @@ link_caf _is_upd = do
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
         (CmmReg nodeReg, AddrHint),
         (hp_rel, AddrHint) ]
-      (Just [node]) False
+      False
         -- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c

@@ -17,7 +17,7 @@ module StgCmmUtils (
 	cgLit, mkSimpleLit,
 	emitDataLits, mkDataLits,
         emitRODataLits, mkRODataLits,
-        emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult, emitRtsCallGen,
+        emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
         assignTemp, newTemp,
 
 	newUnboxedTupleRegs,
@@ -179,17 +179,12 @@ tagToClosure tycon tag
 -------------------------------------------------------------------------
 
 emitRtsCall :: PackageId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCall pkg fun args safe = emitRtsCallGen [] pkg fun args Nothing safe
-   -- The 'Nothing' says "save all global registers"
-
-emitRtsCallWithVols :: PackageId -> FastString -> [(CmmExpr,ForeignHint)] -> [GlobalReg] -> Bool -> FCode ()
-emitRtsCallWithVols pkg fun args vols safe
-   = emitRtsCallGen [] pkg fun args (Just vols) safe
+emitRtsCall pkg fun args safe = emitRtsCallGen [] pkg fun args safe
 
 emitRtsCallWithResult :: LocalReg -> ForeignHint -> PackageId -> FastString
 	-> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCallWithResult res hint pkg fun args safe
-   = emitRtsCallGen [(res,hint)] pkg fun args Nothing safe
+   = emitRtsCallGen [(res,hint)] pkg fun args safe
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
@@ -197,10 +192,9 @@ emitRtsCallGen
    -> PackageId
    -> FastString
    -> [(CmmExpr,ForeignHint)]
-   -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
-emitRtsCallGen res pkg fun args _vols safe
+emitRtsCallGen res pkg fun args safe
   = do { dflags <- getDynFlags
        ; updfr_off <- getUpdFrameOff
        ; let (caller_save, caller_load) = callerSaveVolatileRegs dflags
