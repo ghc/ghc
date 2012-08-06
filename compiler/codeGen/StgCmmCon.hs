@@ -210,9 +210,9 @@ buildDynCon' dflags _ binder ccs con args
                 -- No void args in args_w_offsets
               nonptr_wds = tot_wds - ptr_wds
               info_tbl = mkDataConInfoTable dflags con False ptr_wds nonptr_wds
-        ; (tmp, init) <- allocDynClosure info_tbl lf_info
+        ; hp_plus_n <- allocDynClosure info_tbl lf_info
                                          use_cc blame_cc args_w_offsets
-        ; regIdInfo binder lf_info tmp init }
+        ; regIdInfo binder lf_info hp_plus_n }
   where
     lf_info = mkConLFInfo con
 

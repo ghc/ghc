@@ -15,7 +15,7 @@ module StgCmmHeap (
         mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
 
-        allocDynClosure, allocDynClosureReg, allocDynClosureCmm,
+        allocDynClosure, allocDynClosureCmm,
         emitSetDynHdr
     ) where
 
@@ -63,12 +63,7 @@ allocDynClosure
         -> [(NonVoid StgArg, VirtualHpOffset)]  -- Offsets from start of object
                                                 -- ie Info ptr has offset zero.
                                                 -- No void args in here
-        -> FCode (LocalReg, CmmAGraph)
-
-allocDynClosureReg
-        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
-        -> [(CmmExpr, VirtualHpOffset)]
-        -> FCode (LocalReg, CmmAGraph)
+        -> FCode CmmExpr -- returns Hp+n
 
 allocDynClosureCmm
         :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
@@ -81,30 +76,23 @@ allocDynClosureCmm
 -- returned LocalReg, which should point to the closure after executing
 -- the graph.
 
--- Note [Return a LocalReg]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- allocDynClosure returns a LocalReg, not a (Hp+8) CmmExpr.
--- Reason:
---      ...allocate object...
---      obj = Hp + 8
---      y = f(z)
---      ...here obj is still valid,
---         but Hp+8 means something quite different...
+-- allocDynClosure returns an (Hp+8) CmmExpr, and hence the result is
+-- only valid until Hp is changed.  The caller should assign the
+-- result to a LocalReg if it is required to remain live.
+--
+-- The reason we don't assign it to a LocalReg here is that the caller
+-- is often about to call regIdInfo, which immediately assigns the
+-- result of allocDynClosure to a new temp in order to add the tag.
+-- So by not generating a LocalReg here we avoid a common source of
+-- new temporaries and save some compile time.  This can be quite
+-- significant - see test T4801.
 
 
 allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureReg info_tbl lf_info
+        ; allocDynClosureCmm info_tbl lf_info
                              use_cc _blame_cc (zip cmm_args offsets)
-        }
-
-allocDynClosureReg  info_tbl lf_info use_cc _blame_cc amodes_w_offsets
-  = do  { hp_rel <- allocDynClosureCmm info_tbl lf_info
-                                       use_cc _blame_cc amodes_w_offsets
-
-        -- Note [Return a LocalReg]
-        ; getCodeR $ assignTemp hp_rel
         }
 
 allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets

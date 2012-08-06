@@ -104,7 +104,8 @@ cgBind :: StgBinding -> FCode ()
 cgBind (StgNonRec name rhs)
   = do	{ ((info, init), body) <- getCodeR $ cgRhs name rhs
         ; addBindC (cg_id info) info
-        ; emit (init <*> body) }
+        ; emit (body <*> init) }
+        -- init cannot be used in body, so slightly better to sink it eagerly
 
 cgBind (StgRec pairs)
   = do  { ((new_binds, inits), body) <- getCodeR $ fixC (\ new_binds_inits ->
@@ -311,11 +312,11 @@ mkRhsClosure _ bndr cc _ fvs upd_flag args body
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info
-        ; (tmp, init) <- allocDynClosure info_tbl lf_info use_cc blame_cc
+        ; hp_plus_n <- allocDynClosure info_tbl lf_info use_cc blame_cc
                                          (map toVarArg fv_details)
 
 	-- RETURN
-	; regIdInfo bndr lf_info tmp init }
+        ; regIdInfo bndr lf_info hp_plus_n }
 
 -- Use with care; if used inappropriately, it could break invariants.
 stripNV :: NonVoid a -> a
@@ -349,11 +350,11 @@ cgStdThunk bndr _cc _bndr_info _body lf_info payload
 
 	-- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
-  ; (tmp, init) <- allocDynClosure info_tbl lf_info
+  ; hp_plus_n <- allocDynClosure info_tbl lf_info
                                    use_cc blame_cc payload_w_offsets
 
 	-- RETURN
-  ; regIdInfo bndr lf_info tmp init }
+  ; regIdInfo bndr lf_info hp_plus_n }
 
 mkClosureLFInfo :: Id		-- The binder
 		-> TopLevelFlag	-- True of top level
