@@ -346,7 +346,6 @@
  * Need MachRegs, because some of the RTS code is conditionally
  * compiled based on REG_R1, REG_R2, etc.
  */
-#define STOLEN_X86_REGS 4
 #include "stg/MachRegs.h"
 
 #include "rts/storage/Liveness.h"
