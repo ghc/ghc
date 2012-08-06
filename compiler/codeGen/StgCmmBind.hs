@@ -396,15 +396,15 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   There info if Node points to closure is available. -- HWL -}
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
-  | length args == 0 -- No args i.e. thunk
+  | arity == 0 -- No args i.e. thunk
   = emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
    where
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info
 
-closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
-  = ASSERT( length args > 0 )
+closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
+  = -- Note: args may be [], if all args are Void
     do  { -- Allocate the global ticky counter,
           -- and establish the ticky-counter
           -- label for this block
@@ -464,7 +464,6 @@ mkSlowEntryCode :: ClosureInfo -> [LocalReg] -> FCode ()
 -- If this function doesn't have a specialised ArgDescr, we need
 -- to generate the function's arg bitmap and slow-entry code.
 -- Here, we emit the slow-entry code.
-mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
 mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
   = do dflags <- getDynFlags
