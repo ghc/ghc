@@ -229,7 +229,7 @@ typedef StgFunPtr       F_;
    -------------------------------------------------------------------------- */
 
 #include "stg/DLL.h"
-#include "stg/MachRegs.h"
+#include "stg/RtsMachRegs.h"
 #include "stg/Regs.h"
 #include "stg/Ticky.h"
 

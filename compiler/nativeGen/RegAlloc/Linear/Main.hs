@@ -130,7 +130,7 @@ import Data.Maybe
 import Data.List
 import Control.Monad
 
-#include "../includes/stg/MachRegs.h"
+#include "../includes/stg/HaskellMachRegs.h"
 
 
 -- -----------------------------------------------------------------------------

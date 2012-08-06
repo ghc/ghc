@@ -16,7 +16,8 @@ settings for the target plat instead).
 -}
 #include "../includes/ghcautoconf.h"
 
-#include "stg/MachRegs.h"
+#include "stg/HaskellMachRegs.h"
+
 #include "rts/Constants.h"
 #include "MachDeps.h"
 #include "../includes/dist-derivedconstants/header/DerivedConstants.h"

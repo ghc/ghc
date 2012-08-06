@@ -20,38 +20,21 @@
  */
 
 /*
- * Defining NO_REGS causes no global registers to be used.  NO_REGS is
+ * Defining MACHREGS_NO_REGS to 1 causes no global registers to be used.
+ * MACHREGS_NO_REGS is typically controlled by NO_REGS, which is
  * typically defined by GHC, via a command-line option passed to gcc,
  * when the -funregisterised flag is given.
  *
- * NB. When NO_REGS is on, calling & return conventions may be
+ * NB. When MACHREGS_NO_REGS to 1, calling & return conventions may be
  * different.  For example, all function arguments will be passed on
  * the stack, and components of an unboxed tuple will be returned on
  * the stack rather than in registers.
  */
-#ifndef NO_REGS
+#if MACHREGS_NO_REGS == 1
 
-/* NOTE: when testing the platform in this file we must test either
- * *_HOST_ARCH and *_TARGET_ARCH, depending on whether COMPILING_GHC
- * is set.  This is because when we're compiling the RTS and HC code,
- * the platform we're running on is the HOST, but when compiling GHC
- * we want to know about the register mapping on the TARGET platform.
- */
-#ifdef COMPILING_GHC
-#define i386_REGS     i386_TARGET_ARCH
-#define x86_64_REGS   x86_64_TARGET_ARCH
-#define powerpc_REGS  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH)
-#define sparc_REGS    sparc_TARGET_ARCH
-#define arm_REGS      arm_TARGET_ARCH
-#define darwin_REGS   darwin_TARGET_OS
-#else
-#define i386_REGS     i386_HOST_ARCH
-#define x86_64_REGS   x86_64_HOST_ARCH
-#define powerpc_REGS  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH || rs6000_HOST_ARCH)
-#define sparc_REGS    sparc_HOST_ARCH
-#define arm_REGS      arm_HOST_ARCH
-#define darwin_REGS   darwin_HOST_OS
-#endif
+/* Nothing */
+
+#elif MACHREGS_NO_REGS == 0
 
 /* ----------------------------------------------------------------------------
    Caller saves and callee-saves regs.
@@ -84,7 +67,7 @@
    Leaving SpLim out of the picture.
    -------------------------------------------------------------------------- */
 
-#if i386_REGS
+#if MACHREGS_i386
 
 #define REG(x) __asm__("%" #x)
 
@@ -109,8 +92,6 @@
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
-
-#endif /* iX86 */
 
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
@@ -141,7 +122,7 @@
 
   --------------------------------------------------------------------------- */
 
-#if x86_64_REGS
+#elif MACHREGS_x86_64
 
 #define REG(x) __asm__("%" #x)
 
@@ -186,8 +167,6 @@
 #define MAX_REAL_DOUBLE_REG  2
 #define MAX_REAL_LONG_REG    0
 
-#endif /* x86_64 */
-
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping
 
@@ -218,7 +197,7 @@
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#if powerpc_REGS
+#elif MACHREGS_powerpc
 
 #define REG(x) __asm__(#x)
 
@@ -231,7 +210,7 @@
 #define REG_R7          r20
 #define REG_R8          r21
 
-#if darwin_REGS
+#if MACHREGS_darwin
 
 #define REG_F1          f14
 #define REG_F2          f15
@@ -259,8 +238,6 @@
 #define REG_Hp          r25
 
 #define REG_Base        r27
-
-#endif /* powerpc */
 
 /* -----------------------------------------------------------------------------
    The Sun SPARC register mapping
@@ -353,7 +330,7 @@
 
    -------------------------------------------------------------------------- */
 
-#if sparc_REGS
+#elif MACHREGS_sparc
 
 #define REG(x) __asm__("%" #x)
 
@@ -396,8 +373,6 @@
 
 #define NCG_FirstFloatReg f22
 
-#endif /* sparc */
-
 /* -----------------------------------------------------------------------------
    The ARM EABI register mapping
 
@@ -433,8 +408,7 @@
    d16-d31/q8-q15        Argument / result/ scratch registers
    ----------------------------------------------------------------------------- */
 
-
-#if arm_REGS
+#elif MACHREGS_arm
 
 #define REG(x) __asm__(#x)
 
@@ -459,9 +433,17 @@
 #define REG_D2    d11
 #endif
 
-#endif /* arm */
+#else
 
-#endif /* NO_REGS */
+#error Cannot find platform to give register info for
+
+#endif
+
+#else
+
+#error Bad MACHREGS_NO_REGS value
+
+#endif
 
 /* -----------------------------------------------------------------------------
  * These constants define how many stg registers will be used for

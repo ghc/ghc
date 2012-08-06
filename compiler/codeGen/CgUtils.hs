@@ -45,7 +45,7 @@ module CgUtils (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/stg/MachRegs.h"
+#include "../includes/stg/HaskellMachRegs.h"
 
 import BlockId
 import CgMonad

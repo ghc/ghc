@@ -50,7 +50,7 @@ module StgCmmUtils (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/stg/MachRegs.h"
+#include "../includes/stg/HaskellMachRegs.h"
 
 import StgCmmMonad
 import StgCmmClosure

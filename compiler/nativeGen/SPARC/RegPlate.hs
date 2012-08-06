@@ -100,7 +100,7 @@ import FastBool
 #define f31	63
 
 
-#include "../includes/stg/MachRegs.h"
+#include "../includes/stg/HaskellMachRegs.h"
 
 -- | Check whether a machine register is free for allocation.
 freeReg :: RegNo -> FastBool

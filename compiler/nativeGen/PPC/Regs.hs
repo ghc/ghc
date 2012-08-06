@@ -55,7 +55,7 @@ where
 
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
-#include "../includes/stg/MachRegs.h"
+#include "../includes/stg/HaskellMachRegs.h"
 
 import Reg
 import RegClass
