@@ -46,6 +46,7 @@ module DynFlags (
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
         wayNames, dynFlagDependencies,
+        tablesNextToCode,
 
         printOutputForUser, printInfoForUser,
 
@@ -880,6 +881,15 @@ defaultObjectTarget
   | cGhcUnregisterised    == "YES"      =  HscC
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
   | otherwise                           =  HscLlvm
+
+-- Derived, not a real option.  Determines whether we will be compiling
+-- info tables that reside just before the entry code, or with an
+-- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
+-- includes/rts/storage/InfoTables.h.
+tablesNextToCode :: DynFlags -> Bool
+tablesNextToCode _ = not opt_Unregisterised
+                  && cGhcEnableTablesNextToCode == "YES"
+
 
 data DynLibLoader
   = Deployable

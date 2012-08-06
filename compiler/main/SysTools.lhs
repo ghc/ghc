@@ -51,6 +51,7 @@ import Platform
 import Util
 import DynFlags
 import Exception
+import StaticFlags
 
 import Data.IORef
 import Control.Monad
@@ -217,7 +218,12 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
-       let gcc_args = map Option (words gcc_args_str)
+       let
+           -- TABLES_NEXT_TO_CODE affects the info table layout.
+           tntc_gcc_args
+            | tablesNextToCode' = ["-DTABLES_NEXT_TO_CODE"]
+            | otherwise         = []
+           gcc_args = map Option (words gcc_args_str ++ tntc_gcc_args)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
@@ -316,6 +322,14 @@ initSysTools mbMinusB
                     sOpt_lo      = [],
                     sOpt_lc      = []
              }
+
+-- Derived, not a real option.  Determines whether we will be compiling
+-- info tables that reside just before the entry code, or with an
+-- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
+-- includes/rts/storage/InfoTables.h.
+tablesNextToCode' :: Bool
+tablesNextToCode' = not opt_Unregisterised
+                 && cGhcEnableTablesNextToCode == "YES"
 \end{code}
 
 \begin{code}

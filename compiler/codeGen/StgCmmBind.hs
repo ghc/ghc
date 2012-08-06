@@ -466,8 +466,9 @@ mkSlowEntryCode :: ClosureInfo -> [LocalReg] -> FCode ()
 mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
 mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = do let slow_lbl = closureSlowEntryLabel  cl_info
-           fast_lbl = closureLocalEntryLabel cl_info
+  = do dflags <- getDynFlags
+       let slow_lbl = closureSlowEntryLabel  cl_info
+           fast_lbl = closureLocalEntryLabel dflags cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkDirectJump (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
@@ -678,7 +679,7 @@ link_caf _is_upd = do
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-       (let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
+       (let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
         mkJump target [] updfr)
 
   ; return hp_rel }

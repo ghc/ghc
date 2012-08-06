@@ -25,7 +25,6 @@ import ErrUtils
 import HscTypes
 import Control.Monad
 import Outputable
-import StaticFlags
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -161,7 +160,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
         splitting_proc_points = hscTarget dflags /= HscAsm
-                             || not tablesNextToCode
+                             || not (tablesNextToCode dflags)
 
 runUniqSM :: UniqSM a -> IO a
 runUniqSM m = do

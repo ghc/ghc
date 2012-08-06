@@ -83,7 +83,6 @@ import SMRep
 import CLabel
 import Cmm
 import Unique
-import StaticFlags
 import Var
 import Id
 import IdInfo
@@ -658,11 +657,11 @@ getCallMethod dflags _ _ lf_info _
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod _ name caf (LFReEntrant _ arity _ _) n_args
+getCallMethod dflags name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel name caf) arity
+  | otherwise      = DirectEntry (enterIdLabel dflags name caf) arity
 
 getCallMethod dflags _ _ (LFCon con) n_args
   -- when profiling, we must always enter a closure when we use it, so
@@ -716,11 +715,11 @@ getCallMethod _ _ _ LFBlackHole _
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod _ name _ (LFLetNoEscape 0) _
-  = JumpToIt (enterReturnPtLabel (nameUnique name))
+getCallMethod dflags name _ (LFLetNoEscape 0) _
+  = JumpToIt (enterReturnPtLabel dflags (nameUnique name))
 
-getCallMethod _ name _ (LFLetNoEscape arity) n_args
-  | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
+getCallMethod dflags name _ (LFLetNoEscape arity) n_args
+  | n_args == arity = DirectEntry (enterReturnPtLabel dflags (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
 
@@ -971,10 +970,10 @@ Label generation.
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI = fst . labelsFromCI
 
-entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI ci
-  | tablesNextToCode = info_lbl
-  | otherwise        = entry_lbl
+entryLabelFromCI :: DynFlags -> ClosureInfo -> CLabel
+entryLabelFromCI dflags ci
+  | tablesNextToCode dflags = info_lbl
+  | otherwise               = entry_lbl
   where (info_lbl, entry_lbl) = labelsFromCI ci
 
 labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
@@ -1039,15 +1038,15 @@ enterSelectorLabel upd_flag offset
   | otherwise        = mkSelectorEntryLabel upd_flag offset
 -}
 
-enterIdLabel :: Name -> CafInfo -> CLabel
-enterIdLabel id
-  | tablesNextToCode = mkInfoTableLabel id
-  | otherwise        = mkEntryLabel id
+enterIdLabel :: DynFlags -> Name -> CafInfo -> CLabel
+enterIdLabel dflags id
+  | tablesNextToCode dflags = mkInfoTableLabel id
+  | otherwise               = mkEntryLabel id
 
-enterReturnPtLabel :: Unique -> CLabel
-enterReturnPtLabel name
-  | tablesNextToCode = mkReturnInfoLabel name
-  | otherwise        = mkReturnPtLabel name
+enterReturnPtLabel :: DynFlags -> Unique -> CLabel
+enterReturnPtLabel dflags name
+  | tablesNextToCode dflags = mkReturnInfoLabel name
+  | otherwise               = mkReturnPtLabel name
 \end{code}
 
 

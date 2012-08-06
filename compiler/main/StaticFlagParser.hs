@@ -18,7 +18,7 @@ module StaticFlagParser (
 #include "HsVersions.h"
 
 import qualified StaticFlags as SF
-import StaticFlags ( v_opt_C_ready, getWayFlags, tablesNextToCode, WayName(..)
+import StaticFlags ( v_opt_C_ready, getWayFlags, WayName(..)
                    , opt_SimplExcessPrecision )
 import CmdLineParser
 import Config
@@ -81,14 +81,6 @@ parseStaticFlagsFull flagsAvailable args = do
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
 
-    -- TABLES_NEXT_TO_CODE affects the info table layout.
-    -- Be careful to do this *after* all processArgs,
-    -- because evaluating tablesNextToCode involves looking at the global
-    -- static flags.  Those pesky global variables...
-  let cg_flags | tablesNextToCode = map (mkGeneralLocated "in cg_flags")
-                                        ["-optc-DTABLES_NEXT_TO_CODE"]
-               | otherwise        = []
-
     -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
     -- the static flag parser has slurped it, we must return it as a
     -- leftover too.  ToDo: make -fexcess-precision dynamic only.
@@ -98,7 +90,7 @@ parseStaticFlagsFull flagsAvailable args = do
        | otherwise                = []
 
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
-  return (excess_prec ++ cg_flags ++ more_leftover ++ leftover,
+  return (excess_prec ++ more_leftover ++ leftover,
           warns1 ++ warns2)
 
 flagsStatic :: [Flag IO]

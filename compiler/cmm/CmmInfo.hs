@@ -27,7 +27,6 @@ import Maybes
 import Constants
 import DynFlags
 import Panic
-import StaticFlags
 import UniqSupply
 import MonadUtils
 import Util
@@ -88,7 +87,7 @@ cmmToRawCmm dflags cmms
 --  * The SRT slot is only there if there is SRT info to record
 
 mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
-mkInfoTable _ (CmmData sec dat) 
+mkInfoTable _ (CmmData sec dat)
   = return [CmmData sec dat]
 
 mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
@@ -96,7 +95,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
   -- in the non-tables-next-to-code case, procs can have at most a
   -- single info table associated with the entry label of the proc.
   --
-  | not tablesNextToCode
+  | not (tablesNextToCode dflags)
   = case topInfoTable proc of   --  must be at most one
       -- no info table
       Nothing ->
@@ -106,8 +105,8 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
         (top_decls, (std_info, extra_bits)) <-
              mkInfoTableContents dflags info Nothing
         let
-          rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
-          rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
+          rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
+          rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
         --
         case blocks of
           ListGraph [] ->
@@ -143,8 +142,8 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
          mkInfoTableContents dflags itbl Nothing
      let
         info_lbl = cit_lbl itbl
-        rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
-        rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
+        rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
+        rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
      --
      return (top_decls, (lbl, Statics info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
@@ -267,15 +266,15 @@ mkSRTLit (C_SRT lbl off bitmap) = ([cmmLabelOffW lbl off], bitmap)
 -- Note that this is done even when the -fPIC flag is not specified,
 -- as we want to keep binary compatibility between PIC and non-PIC.
 
-makeRelativeRefTo :: CLabel -> CmmLit -> CmmLit
+makeRelativeRefTo :: DynFlags -> CLabel -> CmmLit -> CmmLit
         
-makeRelativeRefTo info_lbl (CmmLabel lbl)
-  | tablesNextToCode
+makeRelativeRefTo dflags info_lbl (CmmLabel lbl)
+  | tablesNextToCode dflags
   = CmmLabelDiffOff lbl info_lbl 0
-makeRelativeRefTo info_lbl (CmmLabelOff lbl off)
-  | tablesNextToCode
+makeRelativeRefTo dflags info_lbl (CmmLabelOff lbl off)
+  | tablesNextToCode dflags
   = CmmLabelDiffOff lbl info_lbl off
-makeRelativeRefTo _ lit = lit
+makeRelativeRefTo _ _ lit = lit
 
 
 -------------------------------------------------------------------------

@@ -105,9 +105,10 @@ performTailCall fun_info arg_amodes pending_assts
 	   -- to make the heap check easier.  The tail-call sequence
 	   -- is very similar to returning an unboxed tuple, so we
 	   -- share some code.
-     do	{ (final_sp, arg_assts, live) <- pushUnboxedTuple join_sp arg_amodes
+     do	{ dflags <- getDynFlags
+        ; (final_sp, arg_assts, live) <- pushUnboxedTuple join_sp arg_amodes
 	; emitSimultaneously (pending_assts `plusStmts` arg_assts)
-	; let lbl = enterReturnPtLabel (idUnique (cgIdInfoId fun_info))
+	; let lbl = enterReturnPtLabel dflags (idUnique (cgIdInfoId fun_info))
 	; doFinalJump final_sp True $ jumpToLbl lbl (Just live) }
 
   | otherwise
@@ -126,7 +127,7 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- Node must always point to things we enter
 	    EnterIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts) 
-		; let target       = entryCode (closureInfoPtr (CmmReg nodeReg))
+		; let target       = entryCode dflags (closureInfoPtr (CmmReg nodeReg))
                       enterClosure = stmtC (CmmJump target node_live)
                       -- If this is a scrutinee
                       -- let's check if the closure is a constructor
@@ -207,7 +208,7 @@ performTailCall fun_info arg_amodes pending_assts
                    -- No, enter the closure.
                    ; enterClosure
                    ; labelC is_constr
-                   ; stmtC (CmmJump (entryCode $
+                   ; stmtC (CmmJump (entryCode dflags $
                                CmmLit (CmmLabel lbl)) (Just [node]))
                    }
 {-

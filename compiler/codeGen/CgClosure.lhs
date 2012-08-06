@@ -288,7 +288,8 @@ closureCodeBody _binder_info cl_info cc args body
   ; setTickyCtrLabel ticky_ctr_lbl $ do
 
     	-- Emit the slow-entry code
-  { reg_save_code <- mkSlowEntryCode cl_info reg_args
+  { dflags <- getDynFlags
+  ; reg_save_code <- mkSlowEntryCode dflags cl_info reg_args
 
 	-- Emit the main entry code
   ; blks <- forkProc $
@@ -339,13 +340,13 @@ The slow entry point is used in two places:
  (b) returning from a heap-check failure
 
 \begin{code}
-mkSlowEntryCode :: ClosureInfo -> [(Id,GlobalReg)] -> FCode CmmStmts
+mkSlowEntryCode :: DynFlags -> ClosureInfo -> [(Id,GlobalReg)] -> FCode CmmStmts
 -- If this function doesn't have a specialised ArgDescr, we need
 -- to generate the function's arg bitmap, slow-entry code, and
 -- register-save code for the heap-check failure
 -- Here, we emit the slow-entry code, and 
 -- return the register-save assignments
-mkSlowEntryCode cl_info reg_args
+mkSlowEntryCode dflags cl_info reg_args
   | Just (_, ArgGen _) <- closureFunInfo cl_info
   = do 	{ emitSimpleProc slow_lbl (emitStmts load_stmts)
 	; return save_stmts }
@@ -378,7 +379,7 @@ mkSlowEntryCode cl_info reg_args
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
      live_regs     = Just $ map snd reps_w_regs
-     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI cl_info)) live_regs
+     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI dflags cl_info)) live_regs
 \end{code}
 
 
@@ -599,7 +600,7 @@ link_caf cl_info _is_upd = do
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-        let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
+        let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
         stmtC (CmmJump target $ Just [node])
 
   ; returnFC hp_rel }

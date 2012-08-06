@@ -659,7 +659,8 @@ cgTailCall fun_id fun_info args = do
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
-  { adjustHpBackwards
+  { dflags <- getDynFlags
+  ; adjustHpBackwards
   ; sequel <- getSequel
   ; updfr_off <- getUpdFrameOff
   ; case sequel of
@@ -672,7 +673,7 @@ emitEnter fun = do
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
       Return _ -> do
-        { let entry = entryCode $ closureInfoPtr $ CmmReg nodeReg
+        { let entry = entryCode dflags $ closureInfoPtr $ CmmReg nodeReg
         ; emit $ mkForeignJump NativeNodeCall entry
                     [cmmUntag fun] updfr_off
         ; return AssignedDirectly
@@ -714,7 +715,7 @@ emitEnter fun = do
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode (closureInfoPtr (CmmReg nodeReg))
+       ; let entry = entryCode dflags (closureInfoPtr (CmmReg nodeReg))
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; emit $
            copyout <*>

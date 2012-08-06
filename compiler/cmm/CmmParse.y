@@ -656,11 +656,11 @@ exprOp name args_code = do
 
 exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
 exprMacros dflags = listToUFM [
-  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode x ),
+  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode dflags x ),
   ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr x ),
   ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
   ( fsLit "FUN_INFO",     \ [x] -> funInfoTable dflags x ),
-  ( fsLit "GET_ENTRY",    \ [x] -> entryCode (closureInfoPtr x) ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode dflags (closureInfoPtr x) ),
   ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr x) ),
   ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr x) ),
   ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
@@ -932,13 +932,14 @@ doStore rep addr_code val_code
 -- Return an unboxed tuple.
 emitRetUT :: [(CgRep,CmmExpr)] -> Code
 emitRetUT args = do
+  dflags <- getDynFlags
   tickyUnboxedTupleReturn (length args)  -- TICK
   (sp, stmts, live) <- pushUnboxedTuple 0 args
   emitSimultaneously stmts -- NB. the args might overlap with the stack slots
                            -- or regs that we assign to, so better use
                            -- simultaneous assignments here (#3546)
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC $ CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord)) (Just live)
+  stmtC $ CmmJump (entryCode dflags (CmmLoad (cmmRegOffW spReg sp) bWord)) (Just live)
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions

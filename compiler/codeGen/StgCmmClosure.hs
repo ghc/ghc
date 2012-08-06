@@ -76,7 +76,6 @@ import SMRep
 import Cmm
 
 import CLabel
-import StaticFlags
 import Id
 import IdInfo
 import DataCon
@@ -481,11 +480,11 @@ getCallMethod dflags _name _ lf_info _n_args
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod _ name caf (LFReEntrant _ arity _ _) n_args
+getCallMethod dflags name caf (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel name caf) arity
+  | otherwise      = DirectEntry (enterIdLabel dflags name caf) arity
 
 getCallMethod _ _name _ LFUnLifted n_args
   = ASSERT( n_args == 0 ) ReturnIt
@@ -515,7 +514,7 @@ getCallMethod dflags name caf (LFThunk _ _ updatable std_form_info is_fun) n_arg
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    DirectEntry (thunkEntryLabel name caf std_form_info updatable) 0
+    DirectEntry (thunkEntryLabel dflags name caf std_form_info updatable) 0
 
 getCallMethod _ _name _ (LFUnknown True) _n_args
   = SlowCall -- might be a function
@@ -779,10 +778,10 @@ closureRednCountsLabel = toRednCountsLbl . closureInfoLabel
 closureSlowEntryLabel :: ClosureInfo -> CLabel
 closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
 
-closureLocalEntryLabel :: ClosureInfo -> CLabel
-closureLocalEntryLabel
-  | tablesNextToCode = toInfoLbl  . closureInfoLabel
-  | otherwise        = toEntryLbl . closureInfoLabel
+closureLocalEntryLabel :: DynFlags -> ClosureInfo -> CLabel
+closureLocalEntryLabel dflags
+  | tablesNextToCode dflags = toInfoLbl  . closureInfoLabel
+  | otherwise               = toEntryLbl . closureInfoLabel
 
 mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel id lf_info
@@ -813,30 +812,30 @@ mkClosureInfoTableLabel id lf_info
        -- invariants in CorePrep anything else gets eta expanded.
 
 
-thunkEntryLabel :: Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
+thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
 -- thunkEntryLabel is a local help function, not exported.  It's used from
 -- getCallMethod.
-thunkEntryLabel _thunk_id _ (ApThunk arity) upd_flag
-  = enterApLabel upd_flag arity
-thunkEntryLabel _thunk_id _ (SelectorThunk offset) upd_flag
-  = enterSelectorLabel upd_flag offset
-thunkEntryLabel thunk_id c _ _
-  = enterIdLabel thunk_id c
+thunkEntryLabel dflags _thunk_id _ (ApThunk arity) upd_flag
+  = enterApLabel dflags upd_flag arity
+thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset) upd_flag
+  = enterSelectorLabel dflags upd_flag offset
+thunkEntryLabel dflags thunk_id c _ _
+  = enterIdLabel dflags thunk_id c
 
-enterApLabel :: Bool -> Arity -> CLabel
-enterApLabel is_updatable arity
-  | tablesNextToCode = mkApInfoTableLabel is_updatable arity
-  | otherwise        = mkApEntryLabel is_updatable arity
+enterApLabel :: DynFlags -> Bool -> Arity -> CLabel
+enterApLabel dflags is_updatable arity
+  | tablesNextToCode dflags = mkApInfoTableLabel is_updatable arity
+  | otherwise               = mkApEntryLabel is_updatable arity
 
-enterSelectorLabel :: Bool -> WordOff -> CLabel
-enterSelectorLabel upd_flag offset
-  | tablesNextToCode = mkSelectorInfoLabel upd_flag offset
-  | otherwise        = mkSelectorEntryLabel upd_flag offset
+enterSelectorLabel :: DynFlags -> Bool -> WordOff -> CLabel
+enterSelectorLabel dflags upd_flag offset
+  | tablesNextToCode dflags = mkSelectorInfoLabel upd_flag offset
+  | otherwise               = mkSelectorEntryLabel upd_flag offset
 
-enterIdLabel :: Name -> CafInfo -> CLabel
-enterIdLabel id c
-  | tablesNextToCode = mkInfoTableLabel id c
-  | otherwise        = mkEntryLabel id c
+enterIdLabel :: DynFlags -> Name -> CafInfo -> CLabel
+enterIdLabel dflags id c
+  | tablesNextToCode dflags = mkInfoTableLabel id c
+  | otherwise               = mkEntryLabel id c
 
 
 --------------------------------------
