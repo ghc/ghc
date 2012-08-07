@@ -255,7 +255,7 @@ directCall sp lbl args extra_args live_node assts = do
   dflags <- getDynFlags
   let
 	-- First chunk of args go in registers
-	(reg_arg_amodes, stk_args) = assignCallRegs args
+	(reg_arg_amodes, stk_args) = assignCallRegs dflags args
      
 	-- Any "extra" arguments are placed in frames on the
 	-- stack after the other arguments.
@@ -354,7 +354,8 @@ pushUnboxedTuple :: VirtualSpOffset		-- Sp at which to start pushing
 pushUnboxedTuple sp [] 
   = return (sp, noStmts, [])
 pushUnboxedTuple sp amodes
-  = do	{ let	(reg_arg_amodes, stk_arg_amodes) = assignReturnRegs amodes
+  = do	{ dflags <- getDynFlags
+        ; let	(reg_arg_amodes, stk_arg_amodes) = assignReturnRegs dflags amodes
                 live_regs = map snd reg_arg_amodes
 	
 		-- separate the rest of the args into pointers and non-pointers

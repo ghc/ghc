@@ -273,10 +273,12 @@ Node points to closure is available. -- HWL
 \begin{code}
 closureCodeBody _binder_info cl_info cc args body 
   = ASSERT( length args > 0 )
-  do { 	-- Get the current virtual Sp (it might not be zero, 
+  do {
+    dflags <- getDynFlags
+        -- Get the current virtual Sp (it might not be zero, 
 	-- eg. if we're compiling a let-no-escape).
-    vSp <- getVirtSp
-  ; let (reg_args, other_args) = assignCallRegs (addIdReps args)
+  ; vSp <- getVirtSp
+  ; let (reg_args, other_args) = assignCallRegs dflags (addIdReps args)
 	(sp_top, stk_args)     = mkVirtStkOffsets vSp other_args
 
 	-- Allocate the global ticky counter

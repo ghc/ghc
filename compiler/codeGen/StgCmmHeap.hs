@@ -348,7 +348,8 @@ entryHeapCheck :: ClosureInfo
                -> FCode ()
 
 entryHeapCheck cl_info offset nodeSet arity args code
-  = do let is_thunk = arity == 0
+  = do dflags <- getDynFlags
+       let is_thunk = arity == 0
            is_fastf = case closureFunInfo cl_info of
                            Just (_, ArgGen _) -> False
                            _otherwise         -> True
@@ -365,9 +366,9 @@ entryHeapCheck cl_info offset nodeSet arity args code
               Function (slow): Set R1 = node, call generic_gc -}
            gc_call upd = setN <*> gc_lbl upd
            gc_lbl upd
-               | is_thunk  = mkDirectJump (CmmReg $ CmmGlobal GCEnter1) [] sp
-               | is_fastf  = mkDirectJump (CmmReg $ CmmGlobal GCFun) [] sp
-               | otherwise = mkForeignJump Slow (CmmReg $ CmmGlobal GCFun) args' upd
+               | is_thunk  = mkDirectJump dflags (CmmReg $ CmmGlobal GCEnter1) [] sp
+               | is_fastf  = mkDirectJump dflags (CmmReg $ CmmGlobal GCFun) [] sp
+               | otherwise = mkForeignJump dflags Slow (CmmReg $ CmmGlobal GCFun) args' upd
                where sp = max offset upd
            {- DT (12/08/10) This is a little fishy, mainly the sp fix up amount.
             - This is since the ncg inserts spills before the stack/heap check.
@@ -447,8 +448,9 @@ altHeapCheck regs code
   = case cannedGCEntryPoint regs of
       Nothing -> genericGC code
       Just gc -> do
+        dflags <- getDynFlags
         lret <- newLabelC
-        let (off, copyin) = copyInOflow NativeReturn (Young lret) regs
+        let (off, copyin) = copyInOflow dflags NativeReturn (Young lret) regs
         lcont <- newLabelC
         emitOutOfLine lret (copyin <*> mkBranch lcont)
         emitLabel lcont
@@ -464,15 +466,16 @@ cannedGCReturnsTo :: Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
                   -> FCode a
                   -> FCode a
 cannedGCReturnsTo cont_on_stack gc regs lret off code
-  = do updfr_sz <- getUpdFrameOff
-       heapCheck False (gc_call gc updfr_sz) code
+  = do dflags <- getDynFlags
+       updfr_sz <- getUpdFrameOff
+       heapCheck False (gc_call dflags gc updfr_sz) code
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
       -- Note [stg_gc arguments]
 
-    gc_call label sp
-      | cont_on_stack = mkJumpReturnsTo label GC reg_exprs lret off sp
-      | otherwise     = mkCallReturnsTo label GC reg_exprs lret off sp (0,[])
+    gc_call dflags label sp
+      | cont_on_stack = mkJumpReturnsTo dflags label GC reg_exprs lret off sp
+      | otherwise     = mkCallReturnsTo dflags label GC reg_exprs lret off sp (0,[])
 
 genericGC :: FCode a -> FCode a
 genericGC code

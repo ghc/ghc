@@ -24,6 +24,7 @@ data Platform
               -- Word size in bytes (i.e. normally 4 or 8,
               -- for 32bit and 64bit platforms respectively)
               platformWordSize                 :: {-# UNPACK #-} !Int,
+              platformUnregisterised           :: Bool,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
               platformHasSubsectionsViaSymbols :: Bool

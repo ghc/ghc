@@ -260,6 +260,29 @@ esac
 
 AC_SUBST(SOLARIS_BROKEN_SHLD)
 
+dnl ** Do an unregisterised build?
+dnl --------------------------------------------------------------
+case "$HostArch" in
+    i386|x86_64|powerpc|arm)
+        UnregisterisedDefault=NO
+        ;;
+    *)
+        UnregisterisedDefault=YES
+        ;;
+esac
+AC_ARG_ENABLE(unregisterised,
+[AC_HELP_STRING([--enable-unregisterised],
+[Build an unregisterised compiler (enabled by default on platforms without registerised support) [default="$UnregisterisedDefault"]])],
+[ if test x"$enableval" = x"yes"; then
+        Unregisterised=YES
+  else
+        Unregisterised=NO
+  fi
+],
+[Unregisterised="$UnregisterisedDefault"]
+)
+AC_SUBST(Unregisterised)
+
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
         [Use ARG as the path to the compiler for compiling ordinary

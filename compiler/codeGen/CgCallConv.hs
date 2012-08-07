@@ -43,10 +43,10 @@ import Id
 import Name
 import Util
 import DynFlags
-import StaticFlags
 import Module
 import FastString
 import Outputable
+import Platform
 import Data.Bits
 
 -------------------------------------------------------------------------
@@ -255,16 +255,19 @@ getSequelAmode
 -- registers.  This is used for calling special RTS functions and PrimOps
 -- which expect their arguments to always be in the same registers.
 
-assignCallRegs, assignPrimOpCallRegs, assignReturnRegs
-        :: [(CgRep,a)]          -- Arg or result values to assign
-        -> ([(a, GlobalReg)],   -- Register assignment in same order
-                                -- for *initial segment of* input list
-                                --   (but reversed; doesn't matter)
-                                -- VoidRep args do not appear here
-            [(CgRep,a)])        -- Leftover arg or result values
+type AssignRegs a = [(CgRep,a)]          -- Arg or result values to assign
+                 -> ([(a, GlobalReg)],   -- Register assignment in same order
+                                         -- for *initial segment of* input list
+                                         --   (but reversed; doesn't matter)
+                                         -- VoidRep args do not appear here
+                     [(CgRep,a)])        -- Leftover arg or result values
 
-assignCallRegs args
-  = assign_regs args (mkRegTbl [node])
+assignCallRegs       :: DynFlags -> AssignRegs a
+assignPrimOpCallRegs ::             AssignRegs a
+assignReturnRegs     :: DynFlags -> AssignRegs a
+
+assignCallRegs dflags args
+  = assign_regs args (mkRegTbl dflags [node])
         -- The entry convention for a function closure
         -- never uses Node for argument passing; instead
         -- Node points to the function closure itself
@@ -273,7 +276,7 @@ assignPrimOpCallRegs args
  = assign_regs args (mkRegTbl_allRegs [])
         -- For primops, *all* arguments must be passed in registers
 
-assignReturnRegs args
+assignReturnRegs dflags args
  -- when we have a single non-void component to return, use the normal
  -- unpointed return convention.  This make various things simpler: it
  -- means we can assume a consistent convention for IO, which is useful
@@ -285,7 +288,7 @@ assignReturnRegs args
  | [(rep,arg)] <- non_void_args, CmmGlobal r <- dataReturnConvPrim rep
     = ([(arg, r)], [])
  | otherwise
-    = assign_regs args (mkRegTbl [])
+    = assign_regs args (mkRegTbl dflags [])
         -- For returning unboxed tuples etc,
         -- we use all regs
  where
@@ -327,24 +330,28 @@ assign_reg _         _                  = Nothing
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
-useVanillaRegs :: Int
-useVanillaRegs | opt_Unregisterised = 0
-               | otherwise          = mAX_Real_Vanilla_REG
-useFloatRegs :: Int
-useFloatRegs   | opt_Unregisterised = 0
-               | otherwise          = mAX_Real_Float_REG
-useDoubleRegs :: Int
-useDoubleRegs  | opt_Unregisterised = 0
-               | otherwise          = mAX_Real_Double_REG
-useLongRegs :: Int
-useLongRegs    | opt_Unregisterised = 0
-               | otherwise          = mAX_Real_Long_REG
+useVanillaRegs :: DynFlags -> Int
+useVanillaRegs dflags
+ | platformUnregisterised (targetPlatform dflags) = 0
+ | otherwise                                      = mAX_Real_Vanilla_REG
+useFloatRegs :: DynFlags -> Int
+useFloatRegs dflags
+ | platformUnregisterised (targetPlatform dflags) = 0
+ | otherwise                                      = mAX_Real_Float_REG
+useDoubleRegs :: DynFlags -> Int
+useDoubleRegs dflags
+ | platformUnregisterised (targetPlatform dflags) = 0
+ | otherwise                                      = mAX_Real_Double_REG
+useLongRegs :: DynFlags -> Int
+useLongRegs dflags
+ | platformUnregisterised (targetPlatform dflags) = 0
+ | otherwise                                      = mAX_Real_Long_REG
 
-vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: [Int]
-vanillaRegNos    = regList useVanillaRegs
-floatRegNos      = regList useFloatRegs
-doubleRegNos     = regList useDoubleRegs
-longRegNos       = regList useLongRegs
+vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: DynFlags -> [Int]
+vanillaRegNos dflags = regList $ useVanillaRegs dflags
+floatRegNos   dflags = regList $ useFloatRegs   dflags
+doubleRegNos  dflags = regList $ useDoubleRegs  dflags
+longRegNos    dflags = regList $ useLongRegs    dflags
 
 allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
 allVanillaRegNos = regList mAX_Vanilla_REG
@@ -361,9 +368,12 @@ type AvailRegs = ( [Int]   -- available vanilla regs.
                  , [Int]   -- longs (int64 and word64)
                  )
 
-mkRegTbl :: [GlobalReg] -> AvailRegs
-mkRegTbl regs_in_use
-  = mkRegTbl' regs_in_use vanillaRegNos floatRegNos doubleRegNos longRegNos
+mkRegTbl :: DynFlags -> [GlobalReg] -> AvailRegs
+mkRegTbl dflags regs_in_use
+  = mkRegTbl' regs_in_use (vanillaRegNos dflags)
+                          (floatRegNos   dflags)
+                          (doubleRegNos  dflags)
+                          (longRegNos    dflags)
 
 mkRegTbl_allRegs :: [GlobalReg] -> AvailRegs
 mkRegTbl_allRegs regs_in_use

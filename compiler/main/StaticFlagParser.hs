@@ -21,7 +21,6 @@ import qualified StaticFlags as SF
 import StaticFlags ( v_opt_C_ready, getWayFlags, WayName(..)
                    , opt_SimplExcessPrecision )
 import CmdLineParser
-import Config
 import SrcLoc
 import Util
 import Panic
@@ -69,14 +68,9 @@ parseStaticFlagsFull flagsAvailable args = do
   way_flags <- getWayFlags
   let way_flags' = map (mkGeneralLocated "in way flags") way_flags
 
-    -- if we're unregisterised, add some more flags
-  let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
-                  | otherwise = []
-
     -- as these are GHC generated flags, we parse them with all static flags
     -- in scope, regardless of what availableFlags are passed in.
-  (more_leftover, errs, warns2) <-
-      processArgs flagsStatic (unreg_flags ++ way_flags')
+  (more_leftover, errs, warns2) <- processArgs flagsStatic way_flags'
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -174,7 +168,6 @@ isStaticFlag f =
     "fexcess-precision",
     "static",
     "fhardwire-lib-paths",
-    "funregisterised",
     "fcpr-off",
     "ferror-spans",
     "fhpc"
@@ -189,12 +182,6 @@ isStaticFlag f =
     "funfolding-fun-discount",
     "funfolding-keeness-factor"
      ]
-
-unregFlags :: [Located String]
-unregFlags = map (mkGeneralLocated "in unregFlags")
-   [ "-optc-DNO_REGS"
-   , "-optc-DUSE_MINIINTERPRETER"
-   , "-funregisterised" ]
 
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers

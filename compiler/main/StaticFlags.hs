@@ -72,7 +72,6 @@ module StaticFlags (
 	-- misc opts
 	opt_ErrorSpans,
 	opt_HistorySize,
-        opt_Unregisterised,
 	v_Ld_inputs,
         opt_StubDeadValues,
         opt_Ticky,
@@ -309,8 +308,6 @@ opt_UF_DearOp            = ( 40 :: Int)
 -- Related to linking
 opt_Static :: Bool
 opt_Static			= lookUp  (fsLit "-static")
-opt_Unregisterised :: Bool
-opt_Unregisterised		= lookUp  (fsLit "-funregisterised")
 
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans :: Bool

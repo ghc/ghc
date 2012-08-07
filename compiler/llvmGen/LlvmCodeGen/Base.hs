@@ -31,7 +31,6 @@ import LlvmCodeGen.Regs
 
 import CLabel
 import CgUtils ( activeStgRegs )
-import Config
 import Constants
 import DynFlags
 import FastString
@@ -84,23 +83,25 @@ widthToLlvmInt :: Width -> LlvmType
 widthToLlvmInt w = LMInt $ widthInBits w
 
 -- | GHC Call Convention for LLVM
-llvmGhcCC :: LlvmCallConvention
-llvmGhcCC | cGhcUnregisterised == "NO" = CC_Ncc 10
-          | otherwise                  = CC_Ccc
+llvmGhcCC :: DynFlags -> LlvmCallConvention
+llvmGhcCC dflags
+ | platformUnregisterised (targetPlatform dflags) = CC_Ncc 10
+ | otherwise                                      = CC_Ccc
 
 -- | Llvm Function type for Cmm function
-llvmFunTy :: LlvmType
-llvmFunTy = LMFunction $ llvmFunSig' (fsLit "a") ExternallyVisible
+llvmFunTy :: DynFlags -> LlvmType
+llvmFunTy dflags = LMFunction $ llvmFunSig' dflags (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
 llvmFunSig :: LlvmEnv -> CLabel -> LlvmLinkageType -> LlvmFunctionDecl
-llvmFunSig env lbl link = llvmFunSig' (strCLabel_llvm env lbl) link
+llvmFunSig env lbl link
+    = llvmFunSig' (getDflags env) (strCLabel_llvm env lbl) link
 
-llvmFunSig' :: LMString -> LlvmLinkageType -> LlvmFunctionDecl
-llvmFunSig' lbl link
+llvmFunSig' :: DynFlags -> LMString -> LlvmLinkageType -> LlvmFunctionDecl
+llvmFunSig' dflags lbl link
   = let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                    | otherwise   = (x, [])
-    in LlvmFunctionDecl lbl link llvmGhcCC LMVoid FixedArgs
+    in LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
                         (map (toParams . getVarType) llvmFunArgs) llvmFunAlign
 
 -- | Create a Haskell function in LLVM.

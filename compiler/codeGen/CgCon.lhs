@@ -271,11 +271,13 @@ bindUnboxedTupleComponents
 
 bindUnboxedTupleComponents args
  =  do  {
-          vsp <- getVirtSp
+          dflags <- getDynFlags
+
+        ; vsp <- getVirtSp
         ; rsp <- getRealSp
 
            -- Assign as many components as possible to registers
-        ; let (reg_args, stk_args) = assignReturnRegs (addIdReps args)
+        ; let (reg_args, stk_args) = assignReturnRegs dflags (addIdReps args)
 
                 -- Separate the rest of the args into pointers and non-pointers
               (ptr_args, nptr_args) = separateByPtrFollowness stk_args

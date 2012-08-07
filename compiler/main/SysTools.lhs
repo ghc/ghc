@@ -51,7 +51,6 @@ import Platform
 import Util
 import DynFlags
 import Exception
-import StaticFlags
 
 import Data.IORef
 import Control.Monad
@@ -207,6 +206,7 @@ initSysTools mbMinusB
        targetArch <- readSetting "target arch"
        targetOS <- readSetting "target os"
        targetWordSize <- readSetting "target word size"
+       targetUnregisterised <- getBooleanSetting "Unregisterised"
        targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
        targetHasIdentDirective <- readSetting "target has .ident directive"
        targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
@@ -218,12 +218,17 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
-       let
+       let unreg_gcc_args = if targetUnregisterised
+                            then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
+                            else []
            -- TABLES_NEXT_TO_CODE affects the info table layout.
            tntc_gcc_args
-            | tablesNextToCode' = ["-DTABLES_NEXT_TO_CODE"]
-            | otherwise         = []
-           gcc_args = map Option (words gcc_args_str ++ tntc_gcc_args)
+            | mkTablesNextToCode targetUnregisterised
+               = ["-DTABLES_NEXT_TO_CODE"]
+            | otherwise = []
+           gcc_args = map Option (words gcc_args_str
+                               ++ unreg_gcc_args
+                               ++ tntc_gcc_args)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
@@ -280,6 +285,7 @@ initSysTools mbMinusB
                           platformArch = targetArch,
                           platformOS   = targetOS,
                           platformWordSize = targetWordSize,
+                          platformUnregisterised = targetUnregisterised,
                           platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                           platformHasIdentDirective = targetHasIdentDirective,
                           platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
@@ -322,14 +328,6 @@ initSysTools mbMinusB
                     sOpt_lo      = [],
                     sOpt_lc      = []
              }
-
--- Derived, not a real option.  Determines whether we will be compiling
--- info tables that reside just before the entry code, or with an
--- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
--- includes/rts/storage/InfoTables.h.
-tablesNextToCode' :: Bool
-tablesNextToCode' = not opt_Unregisterised
-                 && cGhcEnableTablesNextToCode == "YES"
 \end{code}
 
 \begin{code}

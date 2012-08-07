@@ -139,11 +139,7 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # the compiler you build with is generating registerised binaries), but
 # the stage2 compiler will be an unregisterised binary.
 #
-ifneq "$(findstring $(TargetArch_CPP), i386 x86_64 powerpc arm)" ""
-GhcUnregisterised=NO
-else
-GhcUnregisterised=YES
-endif
+GhcUnregisterised=@Unregisterised@
 
 # Build a compiler with a native code generator backend
 # (as well as a C backend)
@@ -154,8 +150,7 @@ endif
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
 
-# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
-GhcWithNativeCodeGen=$(strip\
+GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
@@ -165,8 +160,7 @@ HaveLibDL = @HaveLibDL@
 # includes/stg/SMP.h
 ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc arm)))
 
-# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
-GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
+GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
@@ -304,8 +298,7 @@ ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerp
 OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
 SplitObjsBroken = @SplitObjsBroken@
 
-# lazy test, so that $(GhcUnregisterised) can be set in build.mk
-SupportsSplitObjs=$(strip \
+SupportsSplitObjs := $(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
                                $(filter NO,$(SplitObjsBroken)),\

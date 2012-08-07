@@ -46,7 +46,7 @@ module DynFlags (
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
         wayNames, dynFlagDependencies,
-        tablesNextToCode,
+        tablesNextToCode, mkTablesNextToCode,
 
         printOutputForUser, printInfoForUser,
 
@@ -871,25 +871,28 @@ data PackageFlag
   | DistrustPackage String
   deriving Eq
 
-defaultHscTarget :: HscTarget
+defaultHscTarget :: Platform -> HscTarget
 defaultHscTarget = defaultObjectTarget
 
 -- | The 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
-defaultObjectTarget :: HscTarget
-defaultObjectTarget
-  | cGhcUnregisterised    == "YES"      =  HscC
+defaultObjectTarget :: Platform -> HscTarget
+defaultObjectTarget platform
+  | platformUnregisterised platform     =  HscC
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
   | otherwise                           =  HscLlvm
 
--- Derived, not a real option.  Determines whether we will be compiling
+tablesNextToCode :: DynFlags -> Bool
+tablesNextToCode dflags
+    = mkTablesNextToCode (platformUnregisterised (targetPlatform dflags))
+
+-- Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
 -- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
 -- includes/rts/storage/InfoTables.h.
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode _ = not opt_Unregisterised
-                  && cGhcEnableTablesNextToCode == "YES"
-
+mkTablesNextToCode :: Bool -> Bool
+mkTablesNextToCode unregisterised
+    = not unregisterised && cGhcEnableTablesNextToCode == "YES"
 
 data DynLibLoader
   = Deployable
@@ -925,7 +928,7 @@ defaultDynFlags mySettings =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget,
+        hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
         hscOutName              = "",
         extCoreName             = "",
         verbosity               = 0,
@@ -1866,7 +1869,7 @@ dynamic_flags = [
   , Flag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
                                        setTarget HscNothing))
   , Flag "fbyte-code"       (NoArg (setTarget HscInterpreted))
-  , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget))
+  , Flag "fobject-code"     (NoArg (setTargetWithPlatform defaultHscTarget))
   , Flag "fglasgow-exts"    (NoArg (enableGlasgowExts >> deprecate "Use individual extensions instead"))
   , Flag "fno-glasgow-exts" (NoArg (disableGlasgowExts >> deprecate "Use individual extensions instead"))
 
@@ -2637,11 +2640,15 @@ setPackageName p s =  s{ thisPackage = stringToPackageId p }
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
 setTarget :: HscTarget -> DynP ()
-setTarget l = upd set
+setTarget l = setTargetWithPlatform (const l)
+
+setTargetWithPlatform :: (Platform -> HscTarget) -> DynP ()
+setTargetWithPlatform f = upd set
   where
-   set dfs
-     | ghcLink dfs /= LinkBinary || isObjectTarget l  = dfs{ hscTarget = l }
-     | otherwise = dfs
+   set dfs = let l = f (targetPlatform dfs)
+             in if ghcLink dfs /= LinkBinary || isObjectTarget l
+                then dfs{ hscTarget = l }
+                else dfs
 
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
@@ -2654,7 +2661,7 @@ setObjTarget l = updM set
      | isObjectTarget (hscTarget dflags)
        = case l of
          HscC
-          | cGhcUnregisterised /= "YES" ->
+          | platformUnregisterised (targetPlatform dflags) ->
              do addWarn ("Compiler not unregisterised, so ignoring " ++ flag)
                 return dflags
          HscAsm
@@ -2679,7 +2686,7 @@ setFPIC :: DynP ()
 setFPIC = updM set
   where
    set dflags
-    | cGhcWithNativeCodeGen == "YES" || cGhcUnregisterised == "YES"
+    | cGhcWithNativeCodeGen == "YES" || platformUnregisterised (targetPlatform dflags)
        = let platform = targetPlatform dflags
          in case hscTarget dflags of
             HscLlvm
@@ -2913,7 +2920,6 @@ compilerInfo dflags
        ("Object splitting supported",  cSupportsSplitObjs),
        ("Have native code generator",  cGhcWithNativeCodeGen),
        ("Support SMP",                 cGhcWithSMP),
-       ("Unregisterised",              cGhcUnregisterised),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
        ("Leading underscore",          cLeadingUnderscore),

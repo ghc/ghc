@@ -929,7 +929,7 @@ lowerSafeForeignCall dflags block
                   caller_load <*>
                   loadThreadState dflags load_tso load_stack
 
-        (ret_args, regs, copyout) = copyOutOflow NativeReturn Jump (Young succ)
+        (ret_args, regs, copyout) = copyOutOflow dflags NativeReturn Jump (Young succ)
                                            (map (CmmReg . CmmLocal) res)
                                            updfr (0, [])
 

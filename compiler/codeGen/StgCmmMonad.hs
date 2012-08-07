@@ -725,8 +725,9 @@ emitOutOfLine l stmts = emitCgStmt (CgFork l stmts)
 emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
                        -> [CmmFormal] -> CmmAGraph -> FCode ()
 emitProcWithConvention conv mb_info lbl args blocks
-  = do  { us <- newUniqSupply
-        ; let (offset, entry) = mkCallEntry conv args
+  = do  { dflags <- getDynFlags
+        ; us <- newUniqSupply
+        ; let (offset, entry) = mkCallEntry dflags conv args
               blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
         ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
               tinfo = TopInfo {info_tbls = infos, stack_info=sinfo}
@@ -783,10 +784,11 @@ mkCmmIfThen e tbranch = do
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
        -> UpdFrameOffset -> (ByteOff,[(CmmExpr,ByteOff)]) -> FCode CmmAGraph
 mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
+  dflags <- getDynFlags
   k <- newLabelC
   let area = Young k
-      (off, copyin) = copyInOflow retConv area results
-      copyout = mkCallReturnsTo f callConv actuals k off updfr_off extra_stack
+      (off, copyin) = copyInOflow dflags retConv area results
+      copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
   return (copyout <*> mkLabel k <*> copyin)
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset

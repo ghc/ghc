@@ -516,7 +516,7 @@ genJump env (CmmLit (CmmLabel lbl)) live = do
 
 -- Call to unknown function / address
 genJump env expr live = do
-    let fty = llvmFunTy
+    let fty = llvmFunTy (getDflags env)
     (env', vf, stmts, top) <- exprToVar env expr
 
     let cast = case getVarType vf of
@@ -1293,7 +1293,8 @@ trashStmts = concatOL $ map trashReg activeStgRegs
 -- with foreign functions.
 getHsFunc :: LlvmEnv -> CLabel -> UniqSM ExprData
 getHsFunc env lbl
-  = let fn = strCLabel_llvm env lbl
+  = let dflags = getDflags env
+        fn = strCLabel_llvm env lbl
         ty    = funLookup fn env
     in case ty of
         -- Function in module in right form
@@ -1305,8 +1306,8 @@ getHsFunc env lbl
         Just ty' -> do
             let fun = LMGlobalVar fn (pLift ty') ExternallyVisible
                             Nothing Nothing False
-            (v1, s1) <- doExpr (pLift llvmFunTy) $
-                            Cast LM_Bitcast fun (pLift llvmFunTy)
+            (v1, s1) <- doExpr (pLift (llvmFunTy dflags)) $
+                            Cast LM_Bitcast fun (pLift (llvmFunTy dflags))
             return (env, v1, unitOL s1, [])
 
         -- label not in module, create external reference

@@ -78,12 +78,13 @@ import FastString
 --
 emitReturn :: [CmmExpr] -> FCode ReturnKind
 emitReturn results
-  = do { sequel    <- getSequel;
+  = do { dflags    <- getDynFlags
+       ; sequel    <- getSequel
        ; updfr_off <- getUpdFrameOff
        ; case sequel of
            Return _ ->
              do { adjustHpBackwards
-                ; emit (mkReturnSimple results updfr_off) }
+                ; emit (mkReturnSimple dflags results updfr_off) }
            AssignTo regs adjust ->
              do { if adjust then adjustHpBackwards else return ()
                 ; emitMultiAssign  regs results }
@@ -109,18 +110,19 @@ emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
    -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ReturnKind
 emitCallWithExtraStack (callConv, retConv) fun args extra_stack
-  = do	{ adjustHpBackwards
+  = do	{ dflags <- getDynFlags
+        ; adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
         ; case sequel of
             Return _ -> do
-              emit $ mkForeignJumpExtra callConv fun args updfr_off extra_stack
+              emit $ mkForeignJumpExtra dflags callConv fun args updfr_off extra_stack
               return AssignedDirectly
             AssignTo res_regs _ -> do
               k <- newLabelC
               let area = Young k
-                  (off, copyin) = copyInOflow retConv area res_regs
-                  copyout = mkCallReturnsTo fun callConv args k off updfr_off
+                  (off, copyin) = copyInOflow dflags retConv area res_regs
+                  copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
                                    extra_stack
               emit (copyout <*> mkLabel k <*> copyin)
               return (ReturnedTo k off)
@@ -537,7 +539,7 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
         ; let args' = if node_points then (node : arg_regs) else arg_regs
               conv  = if nodeMustPointToIt dflags lf_info then NativeNodeCall
                                                           else NativeDirectCall
-              (offset, _) = mkCallEntry conv args'
+              (offset, _) = mkCallEntry dflags conv args'
         ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
         }
 

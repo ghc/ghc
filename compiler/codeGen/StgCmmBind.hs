@@ -470,7 +470,8 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
        let slow_lbl = closureSlowEntryLabel  cl_info
            fast_lbl = closureLocalEntryLabel dflags cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
-           jump = mkDirectJump (mkLblExpr fast_lbl)
+           jump = mkDirectJump dflags
+                               (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
                                initUpdFrameOff
        emitProcWithConvention Slow Nothing slow_lbl arg_regs jump
@@ -680,7 +681,7 @@ link_caf _is_upd = do
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
        (let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
-        mkJump target [] updfr)
+        mkJump dflags target [] updfr)
 
   ; return hp_rel }
 

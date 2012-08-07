@@ -45,7 +45,7 @@ llvmCodeGen dflags h us cmms
             let lbl = strCLabel_llvm env $ case topInfoTable p of
                         Nothing                   -> l
                         Just (Statics info_lbl _) -> info_lbl
-                env' = funInsert lbl llvmFunTy e
+                env' = funInsert lbl (llvmFunTy dflags) e
             in (d,env')
     in do
         showPass dflags "LlVM CodeGen"

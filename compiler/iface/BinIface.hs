@@ -44,7 +44,6 @@ import Panic
 import Binary
 import SrcLoc
 import ErrUtils
-import Config
 import FastMutInt
 import Unique
 import Outputable
@@ -572,8 +571,8 @@ instance Binary ModIface where
 
 getWayDescr :: DynFlags -> String
 getWayDescr dflags
-  | cGhcUnregisterised == "YES" = 'u':tag
-  | otherwise                   = tag
+  | platformUnregisterised (targetPlatform dflags) = 'u':tag
+  | otherwise                                      =     tag
   where tag = buildTag dflags
         -- if this is an unregisterised build, make sure our interfaces
         -- can't be used by a registerised build.

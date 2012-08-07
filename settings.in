@@ -18,6 +18,7 @@
  ("target has GNU nonexec stack", "@HaskellHaveGnuNonexecStack@"),
  ("target has .ident directive", "@HaskellHaveIdentDirective@"),
  ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@"),
+ ("Unregisterised", "@Unregisterised@"),
  ("LLVM llc command", "@SettingsLlcCommand@"),
  ("LLVM opt command", "@SettingsOptCommand@")
  ]
