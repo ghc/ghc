@@ -200,8 +200,9 @@ test('T783',
           compiler_stats_num_field('bytes allocated', 125000000,
                                                       225000000)),
       # sample: 349263216 (amd64/Linux)
+      # sample: 384479856 (amd64/Linux, 7/8/2012)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 349263216, 10))
+          compiler_stats_range_field('bytes allocated', 384479856, 10))
       ],
       compile,[''])
 
