@@ -585,7 +585,7 @@ setupUpdate closure_info node body
 
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
-                { upd_closure <- link_caf True
+                { upd_closure <- link_caf node True
                 ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
 	  else do {tickyUpdateFrameOmitted; body}
     }
@@ -645,7 +645,8 @@ pushUpdateFrame lbl updatee body
 -- be closer together, and the compiler wouldn't need to know
 -- about off_indirectee etc.
 
-link_caf :: Bool               -- True <=> updatable, False <=> single-entry
+link_caf :: LocalReg           -- pointer to the closure
+         -> Bool               -- True <=> updatable, False <=> single-entry
          -> FCode CmmExpr      -- Returns amode for closure to be updated
 -- To update a CAF we must allocate a black hole, link the CAF onto the
 -- CAF list, then update the CAF to point to the fresh black hole.
@@ -653,7 +654,7 @@ link_caf :: Bool               -- True <=> updatable, False <=> single-entry
 -- updated with the new value when available.  The reason for all of this
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
-link_caf _is_upd = do
+link_caf node _is_upd = do
   { dflags <- getDynFlags
     -- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
@@ -676,7 +677,7 @@ link_caf _is_upd = do
   ; ret <- newTemp bWord
   ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
-        (CmmReg nodeReg, AddrHint),
+        (CmmReg (CmmLocal node), AddrHint),
         (hp_rel, AddrHint) ]
       False
         -- node is live, so save it.
@@ -688,7 +689,7 @@ link_caf _is_upd = do
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-       (let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
+       (let target = entryCode dflags (closureInfoPtr (CmmReg (CmmLocal node))) in
         mkJump dflags target [] updfr)
 
   ; return hp_rel }
