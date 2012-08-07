@@ -418,7 +418,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 
         -- Emit the main entry code
         ; emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args $
-            \(offset, node, arg_regs) -> do
+            \(_offset, node, arg_regs) -> do
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode cl_info arg_regs
 
