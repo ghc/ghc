@@ -22,7 +22,6 @@ import Constants
 import qualified Data.List as L
 import DynFlags
 import Outputable
-import Platform
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
@@ -111,34 +110,19 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
-vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: DynFlags -> [Int]
-vanillaRegNos dflags
- | platformUnregisterised (targetPlatform dflags) = []
- | otherwise                                      = regList mAX_Real_Vanilla_REG
-floatRegNos dflags
- | platformUnregisterised (targetPlatform dflags) = []
- | otherwise                                      = regList mAX_Real_Float_REG
-doubleRegNos dflags
- | platformUnregisterised (targetPlatform dflags) = []
- | otherwise                                      = regList mAX_Real_Double_REG
-longRegNos dflags
- | platformUnregisterised (targetPlatform dflags) = []
- | otherwise                                      = regList mAX_Real_Long_REG
-
--- 
 getRegsWithoutNode, getRegsWithNode :: DynFlags -> AvailRegs
-getRegsWithoutNode dflags =
-  (filter (\r -> r VGcPtr /= node) intRegs,
-   map FloatReg  (floatRegNos dflags),
-   map DoubleReg (doubleRegNos dflags),
-   map LongReg   (longRegNos dflags))
-    where intRegs = map VanillaReg (vanillaRegNos dflags)
-getRegsWithNode dflags =
-  (intRegs,
-   map FloatReg  (floatRegNos dflags),
-   map DoubleReg (doubleRegNos dflags),
-   map LongReg   (longRegNos dflags))
-    where intRegs = map VanillaReg (vanillaRegNos dflags)
+getRegsWithoutNode _dflags =
+  ( filter (\r -> r VGcPtr /= node) realVanillaRegs
+  , realFloatRegs
+  , realDoubleRegs
+  , realLongRegs )
+
+-- getRegsWithNode uses R1/node even if it isn't a register
+getRegsWithNode _dflags =
+  ( if null realVanillaRegs then [VanillaReg 1] else realVanillaRegs
+  , realFloatRegs
+  , realDoubleRegs
+  , realLongRegs )
 
 allFloatRegs, allDoubleRegs, allLongRegs :: [GlobalReg]
 allVanillaRegs :: [VGcPtr -> GlobalReg]
@@ -147,6 +131,14 @@ allVanillaRegs = map VanillaReg $ regList mAX_Vanilla_REG
 allFloatRegs   = map FloatReg   $ regList mAX_Float_REG
 allDoubleRegs  = map DoubleReg  $ regList mAX_Double_REG
 allLongRegs    = map LongReg    $ regList mAX_Long_REG
+
+realFloatRegs, realDoubleRegs, realLongRegs :: [GlobalReg]
+realVanillaRegs :: [VGcPtr -> GlobalReg]
+
+realVanillaRegs = map VanillaReg $ regList mAX_Real_Vanilla_REG
+realFloatRegs   = map FloatReg   $ regList mAX_Real_Float_REG
+realDoubleRegs  = map DoubleReg  $ regList mAX_Real_Double_REG
+realLongRegs    = map LongReg    $ regList mAX_Real_Long_REG
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
