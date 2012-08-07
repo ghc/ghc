@@ -395,7 +395,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   argSatisfactionCheck (by calling fetchAndReschedule).
   There info if Node points to closure is available. -- HWL -}
 
-closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
+closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
   | arity == 0 -- No args i.e. thunk
   = emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
