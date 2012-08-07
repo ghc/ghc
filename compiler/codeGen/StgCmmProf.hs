@@ -99,11 +99,11 @@ dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
 dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
 
-initUpdFrameProf :: CmmExpr -> FCode ()
+initUpdFrameProf :: ByteOff -> FCode ()
 -- Initialise the profiling field of an update frame
-initUpdFrameProf frame_amode 
+initUpdFrameProf frame_off
   = ifProfiling $	-- frame->header.prof.ccs = CCCS
-    emitStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS
+    emitStore (CmmStackSlot Old (frame_off - oFFSET_StgHeader_ccs)) curCCS
 	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
 	-- is unnecessary because it is not used anyhow.
 

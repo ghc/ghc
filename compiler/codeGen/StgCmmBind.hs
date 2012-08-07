@@ -578,7 +578,7 @@ setupUpdate closure_info node body
               lbl | bh        = mkBHUpdInfoLabel
                   | otherwise = mkUpdInfoLabel
 
-          pushUpdateFrame [CmmReg (CmmLocal node), mkLblExpr lbl] body
+          pushUpdateFrame lbl (CmmReg (CmmLocal node)) body
 
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
@@ -586,8 +586,7 @@ setupUpdate closure_info node body
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf True
-                ; pushUpdateFrame [upd_closure,
-                                   mkLblExpr mkBHUpdInfoLabel] body }
+                ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
 	  else do {tickyUpdateFrameOmitted; body}
     }
 
@@ -597,16 +596,21 @@ setupUpdate closure_info node body
 -- Push the update frame on the stack in the Entry area,
 -- leaving room for the return address that is already
 -- at the old end of the area.
-pushUpdateFrame :: [CmmExpr] -> FCode () -> FCode ()
-pushUpdateFrame es body
-  = do -- [EZY] I'm not sure if we need to special-case for BH too
+--
+pushUpdateFrame :: CLabel -> CmmExpr -> FCode () -> FCode ()
+pushUpdateFrame lbl updatee body
+  = do
        updfr  <- getUpdFrameOff
-       offset <- foldM push updfr es
-       withUpdFrameOff offset body
-     where push off e =
-             do emitStore (CmmStackSlot Old base) e
-                return base
-             where base = off + widthInBytes (cmmExprWidth e)
+       dflags <- getDynFlags
+       let
+           hdr         = fixedHdrSize dflags * wORD_SIZE
+           frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr
+           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee
+       --
+       emitStore (CmmStackSlot Old frame) (mkLblExpr lbl)
+       emitStore (CmmStackSlot Old (frame - off_updatee)) updatee
+       initUpdFrameProf frame
+       withUpdFrameOff frame body
 
 -----------------------------------------------------------------------------
 -- Entering a CAF
