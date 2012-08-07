@@ -33,6 +33,7 @@ import "integer-gmp" __gmpz_add;
 import "integer-gmp" __gmpz_sub;
 import "integer-gmp" __gmpz_mul;
 import "integer-gmp" __gmpz_mul_2exp;
+import "integer-gmp" __gmpz_tstbit;
 import "integer-gmp" __gmpz_fdiv_q_2exp;
 import "integer-gmp" __gmpz_gcd;
 import "integer-gmp" __gmpn_gcd_1;
