@@ -200,6 +200,7 @@ Library
         PprCmmDecl
         PprCmmExpr
         Bitmap
+        CallerSaves
         CgBindery
         CgCallConv
         CgCase

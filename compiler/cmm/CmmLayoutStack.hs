@@ -915,7 +915,7 @@ lowerSafeForeignCall dflags block
     -- RTS-only objects and are not subject to garbage collection
     id <- newTemp bWord
     new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
-    let (caller_save, caller_load) = callerSaveVolatileRegs
+    let (caller_save, caller_load) = callerSaveVolatileRegs dflags
     load_tso <- newTemp gcWord
     load_stack <- newTemp gcWord
     let suspend = saveThreadState dflags <*>

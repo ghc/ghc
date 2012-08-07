@@ -95,7 +95,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ----------- Sink and inline assignments *after* stack layout ------------
        g <- {-# SCC "sink2" #-}
-            condPass Opt_CmmSink cmmSink g
+            condPass Opt_CmmSink (cmmSink dflags) g
                      Opt_D_dump_cmmz_rewrite "Sink assignments (2)"
 
        ------------- CAF analysis ----------------------------------------------

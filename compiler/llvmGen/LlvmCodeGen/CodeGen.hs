@@ -222,7 +222,7 @@ genCall env t@(CmmPrim op _) [] args' CmmMayReturn
     let arguments = argVars' ++ (alignVal:isVolVal)
         call = Expr $ Call StdCall fptr arguments []
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
-                `appOL` trashStmts `snocOL` call
+                `appOL` trashStmts (getDflags env) `snocOL` call
     return (env2, stmts, top1 ++ top2)
   
   where
@@ -297,7 +297,7 @@ genCall env target res args ret = do
                 | ret == CmmNeverReturns = unitOL $ Unreachable
                 | otherwise              = nilOL
 
-    let stmts = stmts1 `appOL` stmts2 `appOL` trashStmts
+    let stmts = stmts1 `appOL` stmts2 `appOL` trashStmts (getDflags env)
 
     -- make the actual call
     case retTy of
@@ -1276,13 +1276,13 @@ funEpilogue _ _ = do
 -- before the call by assigning the 'undef' value to them. The ones we
 -- need are restored from the Cmm local var and the ones we don't need
 -- are fine to be trashed.
-trashStmts :: LlvmStatements
-trashStmts = concatOL $ map trashReg activeStgRegs
+trashStmts :: DynFlags -> LlvmStatements
+trashStmts dflags = concatOL $ map trashReg activeStgRegs
     where trashReg r =
             let reg   = lmGlobalRegVar r
                 ty    = (pLower . getVarType) reg
                 trash = unitOL $ Store (LMLitVar $ LMUndefLit ty) reg
-            in case callerSaves r of
+            in case callerSaves (targetPlatform dflags) r of
                       True  -> trash
                       False -> nilOL
 

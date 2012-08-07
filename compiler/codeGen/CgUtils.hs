@@ -48,6 +48,7 @@ module CgUtils (
 #include "../includes/stg/HaskellMachRegs.h"
 
 import BlockId
+import CallerSaves
 import CgMonad
 import TyCon
 import DataCon
@@ -260,11 +261,12 @@ emitRtsCallGen
    -> Maybe [GlobalReg]
    -> Code
 emitRtsCallGen res pkg fun args vols = do
+  dflags <- getDynFlags
+  let (caller_save, caller_load) = callerSaveVolatileRegs dflags vols
   stmtsC caller_save
   stmtC (CmmCall target res args CmmMayReturn)
   stmtsC caller_load
   where
-    (caller_save, caller_load) = callerSaveVolatileRegs vols
     target   = CmmCallee fun_expr CCallConv
     fun_expr = mkLblExpr (mkCmmCodeLabel pkg fun)
 
@@ -281,9 +283,12 @@ emitRtsCallGen res pkg fun args vols = do
 --  * Regs.h claims that BaseReg should be saved last and loaded first
 --    * This might not have been tickled before since BaseReg is callee save
 --  * Regs.h saves SparkHd, ParkT1, SparkBase and SparkLim
-callerSaveVolatileRegs :: Maybe [GlobalReg] -> ([CmmStmt], [CmmStmt])
-callerSaveVolatileRegs vols = (caller_save, caller_load)
+callerSaveVolatileRegs :: DynFlags -> Maybe [GlobalReg]
+                       -> ([CmmStmt], [CmmStmt])
+callerSaveVolatileRegs dflags vols = (caller_save, caller_load)
   where
+    platform = targetPlatform dflags
+
     caller_save = foldr ($!) [] (map callerSaveGlobalReg    regs_to_save)
     caller_load = foldr ($!) [] (map callerRestoreGlobalReg regs_to_save)
 
@@ -301,100 +306,17 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
              ++ [ LongReg    n | n <- [0..mAX_Long_REG] ]
 
     callerSaveGlobalReg reg next
-        | callerSaves reg =
+        | callerSaves platform reg =
                 CmmStore (get_GlobalReg_addr reg)
                          (CmmReg (CmmGlobal reg)) : next
         | otherwise = next
 
     callerRestoreGlobalReg reg next
-        | callerSaves reg =
+        | callerSaves platform reg =
                 CmmAssign (CmmGlobal reg)
                           (CmmLoad (get_GlobalReg_addr reg) (globalRegType reg))
                         : next
         | otherwise = next
-
-
--- | Returns @True@ if this global register is stored in a caller-saves
--- machine register.
-
-callerSaves :: GlobalReg -> Bool
-
-#ifdef CALLER_SAVES_Base
-callerSaves BaseReg             = True
-#endif
-#ifdef CALLER_SAVES_R1
-callerSaves (VanillaReg 1 _)    = True
-#endif
-#ifdef CALLER_SAVES_R2
-callerSaves (VanillaReg 2 _)    = True
-#endif
-#ifdef CALLER_SAVES_R3
-callerSaves (VanillaReg 3 _)    = True
-#endif
-#ifdef CALLER_SAVES_R4
-callerSaves (VanillaReg 4 _)    = True
-#endif
-#ifdef CALLER_SAVES_R5
-callerSaves (VanillaReg 5 _)    = True
-#endif
-#ifdef CALLER_SAVES_R6
-callerSaves (VanillaReg 6 _)    = True
-#endif
-#ifdef CALLER_SAVES_R7
-callerSaves (VanillaReg 7 _)    = True
-#endif
-#ifdef CALLER_SAVES_R8
-callerSaves (VanillaReg 8 _)    = True
-#endif
-#ifdef CALLER_SAVES_R9
-callerSaves (VanillaReg 9 _)    = True
-#endif
-#ifdef CALLER_SAVES_R10
-callerSaves (VanillaReg 10 _)   = True
-#endif
-#ifdef CALLER_SAVES_F1
-callerSaves (FloatReg 1)        = True
-#endif
-#ifdef CALLER_SAVES_F2
-callerSaves (FloatReg 2)        = True
-#endif
-#ifdef CALLER_SAVES_F3
-callerSaves (FloatReg 3)        = True
-#endif
-#ifdef CALLER_SAVES_F4
-callerSaves (FloatReg 4)        = True
-#endif
-#ifdef CALLER_SAVES_D1
-callerSaves (DoubleReg 1)       = True
-#endif
-#ifdef CALLER_SAVES_D2
-callerSaves (DoubleReg 2)       = True
-#endif
-#ifdef CALLER_SAVES_L1
-callerSaves (LongReg 1)         = True
-#endif
-#ifdef CALLER_SAVES_Sp
-callerSaves Sp                  = True
-#endif
-#ifdef CALLER_SAVES_SpLim
-callerSaves SpLim               = True
-#endif
-#ifdef CALLER_SAVES_Hp
-callerSaves Hp                  = True
-#endif
-#ifdef CALLER_SAVES_HpLim
-callerSaves HpLim               = True
-#endif
-#ifdef CALLER_SAVES_CCCS
-callerSaves CCCS                = True
-#endif
-#ifdef CALLER_SAVES_CurrentTSO
-callerSaves CurrentTSO          = True
-#endif
-#ifdef CALLER_SAVES_CurrentNursery
-callerSaves CurrentNursery      = True
-#endif
-callerSaves _                   = False
 
 
 -- -----------------------------------------------------------------------------

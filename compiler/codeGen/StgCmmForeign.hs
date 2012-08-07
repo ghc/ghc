@@ -207,7 +207,8 @@ emitForeignCall
         -> FCode ReturnKind
 emitForeignCall safety results target args _ret
   | not (playSafe safety) = do
-    let (caller_save, caller_load) = callerSaveVolatileRegs
+    dflags <- getDynFlags
+    let (caller_save, caller_load) = callerSaveVolatileRegs dflags
     emit caller_save
     emit $ mkUnsafeCall target results args
     emit caller_load

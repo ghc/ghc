@@ -11,6 +11,7 @@ import CmmLive
 import CmmUtils
 import Hoopl
 
+import DynFlags
 import UniqFM
 -- import PprCmm ()
 -- import Outputable
@@ -99,8 +100,8 @@ type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- Assignment caches AbsMem, an abstraction of the memory read by
   -- the RHS of the assignment.
 
-cmmSink :: CmmGraph -> CmmGraph
-cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink :: DynFlags -> CmmGraph -> CmmGraph
+cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
   liveness = cmmLiveness graph
   getLive l = mapFindWithDefault Set.empty l liveness
@@ -128,8 +129,8 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       ann_middles = annotate live_middle (blockToList middle)
 
       -- Now sink and inline in this block
-      (middle', assigs) = walk ann_middles (mapFindWithDefault [] lbl sunk)
-      (final_last, assigs') = tryToInline live last assigs
+      (middle', assigs) = walk dflags ann_middles (mapFindWithDefault [] lbl sunk)
+      (final_last, assigs') = tryToInline dflags live last assigs
 
       -- We cannot sink into join points (successors with more than
       -- one predecessor), so identify the join points and the set
@@ -149,11 +150,11 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
            _ -> False
 
       -- Now, drop any assignments that we will not sink any further.
-      (dropped_last, assigs'') = dropAssignments drop_if init_live_sets assigs'
+      (dropped_last, assigs'') = dropAssignments dflags drop_if init_live_sets assigs'
 
       drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
           where
-            should_drop =  a `conflicts` final_last
+            should_drop =  conflicts dflags a final_last
                         || {- not (isTiny rhs) && -} live_in_multi live_sets r
                         || r `Set.member` live_in_joins
 
@@ -168,7 +169,7 @@ cmmSink graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       final_middle = foldl blockSnoc middle' dropped_last
 
       sunk' = mapUnion sunk $
-                 mapFromList [ (l, filterAssignments (getLive l) assigs'')
+                 mapFromList [ (l, filterAssignments dflags (getLive l) assigs'')
                              | l <- succs ]
 
 {-
@@ -201,14 +202,14 @@ findJoinPoints blocks = mapFilter (>1) succ_counts
 -- filter the list of assignments to remove any assignments that
 -- are not live in a continuation.
 --
-filterAssignments :: RegSet -> [Assignment] -> [Assignment]
-filterAssignments live assigs = reverse (go assigs [])
+filterAssignments :: DynFlags -> RegSet -> [Assignment] -> [Assignment]
+filterAssignments dflags live assigs = reverse (go assigs [])
   where go []             kept = kept
         go (a@(r,_,_):as) kept | needed    = go as (a:kept)
                                | otherwise = go as kept
            where
               needed = r `Set.member` live
-                       || any (a `conflicts`) (map toNode kept)
+                       || any (conflicts dflags a) (map toNode kept)
                        --  Note that we must keep assignments that are
                        -- referred to by other assignments we have
                        -- already kept.
@@ -217,7 +218,8 @@ filterAssignments live assigs = reverse (go assigs [])
 -- Walk through the nodes of a block, sinking and inlining assignments
 -- as we go.
 
-walk :: [(RegSet, CmmNode O O)]         -- nodes of the block, annotated with
+walk :: DynFlags
+     -> [(RegSet, CmmNode O O)]         -- nodes of the block, annotated with
                                         -- the set of registers live *after*
                                         -- this node.
 
@@ -230,7 +232,7 @@ walk :: [(RegSet, CmmNode O O)]         -- nodes of the block, annotated with
         , [Assignment]                  -- Assignments to sink further
         )
 
-walk nodes assigs = go nodes emptyBlock assigs
+walk dflags nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
@@ -238,9 +240,9 @@ walk nodes assigs = go nodes emptyBlock assigs
     | Just a <- shouldSink node1 = go ns block (a : as1)
     | otherwise                  = go ns block' as'
     where
-      (node1, as1) = tryToInline live node as
+      (node1, as1) = tryToInline dflags live node as
 
-      (dropped, as') = dropAssignmentsSimple (`conflicts` node1) as1
+      (dropped, as') = dropAssignmentsSimple dflags (\a -> conflicts dflags a node1) as1
       block' = foldl blockSnoc block dropped `blockSnoc` node1
 
 --
@@ -276,13 +278,13 @@ shouldDiscard node live
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
 
-dropAssignmentsSimple :: (Assignment -> Bool) -> [Assignment]
+dropAssignmentsSimple :: DynFlags -> (Assignment -> Bool) -> [Assignment]
                       -> ([CmmNode O O], [Assignment])
-dropAssignmentsSimple f = dropAssignments (\a _ -> (f a, ())) ()
+dropAssignmentsSimple dflags f = dropAssignments dflags (\a _ -> (f a, ())) ()
 
-dropAssignments :: (Assignment -> s -> (Bool, s)) -> s -> [Assignment]
+dropAssignments :: DynFlags -> (Assignment -> s -> (Bool, s)) -> s -> [Assignment]
                 -> ([CmmNode O O], [Assignment])
-dropAssignments should_drop state assigs
+dropAssignments dflags should_drop state assigs
  = (dropped, reverse kept)
  where
    (dropped,kept) = go state assigs [] []
@@ -293,14 +295,15 @@ dropAssignments should_drop state assigs
       | otherwise = go state' rest dropped (assig:kept)
       where
         (dropit, state') = should_drop assig state
-        conflict = dropit || any (assig `conflicts`) dropped
+        conflict = dropit || any (conflicts dflags assig) dropped
 
 
 -- -----------------------------------------------------------------------------
 -- Try to inline assignments into a node.
 
 tryToInline
-   :: RegSet                    -- set of registers live after this
+   :: DynFlags
+   -> RegSet                    -- set of registers live after this
                                 -- node.  We cannot inline anything
                                 -- that is live after the node, unless
                                 -- it is small enough to duplicate.
@@ -311,7 +314,7 @@ tryToInline
       , [Assignment]            -- Remaining assignments
       )
 
-tryToInline live node assigs = go usages node [] assigs
+tryToInline dflags live node assigs = go usages node [] assigs
  where
   usages :: UniqFM Int
   usages = foldRegsUsed addUsage emptyUFM node
@@ -331,7 +334,7 @@ tryToInline live node assigs = go usages node [] assigs
         can_inline =
             not (l `elemRegSet` live)
          && not (skipped `regsUsedIn` rhs)  -- Note [dependent assignments]
-         && okToInline rhs node
+         && okToInline dflags rhs node
          && lookupUFM usages l == Just 1
 
         usages' = foldRegsUsed addUsage usages rhs
@@ -385,9 +388,9 @@ regsUsedIn ls e = wrapRecExpf f e False
 -- ought to be able to handle it properly, but currently neither PprC
 -- nor the NCG can do it.  See Note [Register parameter passing]
 -- See also StgCmmForeign:load_args_into_temps.
-okToInline :: CmmExpr -> CmmNode e x -> Bool
-okToInline expr CmmUnsafeForeignCall{} = not (anyCallerSavesRegs expr)
-okToInline _ _ = True
+okToInline :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
+okToInline dflags expr CmmUnsafeForeignCall{} = not (anyCallerSavesRegs dflags expr)
+okToInline _ _ _ = True
 
 -- -----------------------------------------------------------------------------
 
@@ -396,8 +399,8 @@ okToInline _ _ = True
 --
 -- We only sink "r = G" assignments right now, so conflicts is very simple:
 --
-conflicts :: Assignment -> CmmNode O x -> Bool
-(r, rhs, addr) `conflicts` node
+conflicts :: DynFlags -> Assignment -> CmmNode O x -> Bool
+conflicts dflags (r, rhs, addr) node
 
   -- (1) an assignment to a register conflicts with a use of the register
   | CmmAssign reg  _ <- node, reg `regUsedIn` rhs                 = True
@@ -413,7 +416,7 @@ conflicts :: Assignment -> CmmNode O x -> Bool
 
   -- (4) assignments that read caller-saves GlobalRegs conflict with a
   -- foreign call.  See Note [foreign calls clobber GlobalRegs].
-  | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs rhs        = True
+  | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
   -- (5) foreign calls clobber memory, but not heap/stack memory
   | CmmUnsafeForeignCall{} <- node, AnyMem <- addr                = True
@@ -425,9 +428,10 @@ conflicts :: Assignment -> CmmNode O x -> Bool
   | otherwise = False
 
 
-anyCallerSavesRegs :: CmmExpr -> Bool
-anyCallerSavesRegs e = wrapRecExpf f e False
-  where f (CmmReg (CmmGlobal r)) _ | callerSaves r = True
+anyCallerSavesRegs :: DynFlags -> CmmExpr -> Bool
+anyCallerSavesRegs dflags e = wrapRecExpf f e False
+  where f (CmmReg (CmmGlobal r)) _
+         | callerSaves (targetPlatform dflags) r = True
         f _ z = z
 
 -- An abstraction of memory read or written.

@@ -125,21 +125,23 @@ emitForeignCall'
         -> Code
 emitForeignCall' safety results target args vols _srt ret
   | not (playSafe safety) = do
+    dflags <- getDynFlags
     temp_args <- load_args_into_temps args
-    let (caller_save, caller_load) = callerSaveVolatileRegs vols
+    let (caller_save, caller_load) = callerSaveVolatileRegs dflags vols
     let caller_load' = if ret == CmmNeverReturns then [] else caller_load
     stmtsC caller_save
     stmtC (CmmCall target results temp_args ret)
     stmtsC caller_load'
 
   | otherwise = do
+    dflags <- getDynFlags
     -- Both 'id' and 'new_base' are GCKindNonPtr because they're
     -- RTS only objects and are not subject to garbage collection
     id <- newTemp bWord
     new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
     temp_args <- load_args_into_temps args
     temp_target <- load_target_into_temp target
-    let (caller_save, caller_load) = callerSaveVolatileRegs vols
+    let (caller_save, caller_load) = callerSaveVolatileRegs dflags vols
     emitSaveThreadState
     stmtsC caller_save
     -- The CmmUnsafe arguments are only correct because this part

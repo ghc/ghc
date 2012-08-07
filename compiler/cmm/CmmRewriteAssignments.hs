@@ -44,7 +44,7 @@ rewriteAssignments platform g = do
   g'  <- annotateUsage g
   g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
                                      analRewFwd assignmentLattice
-                                                assignmentTransfer
+                                                (assignmentTransfer platform)
                                                 (assignmentRewrite `thenFwdRw` machOpFoldRewrite platform)
   return (modifyGraph eraseRegUsage g'')
 
@@ -309,7 +309,8 @@ invalidateUsersOf reg = mapUFM (invalidateUsers' reg)
 -- optimize; we need an algorithmic change to prevent us from having to
 -- traverse the /entire/ map continually.
 
-middleAssignment :: WithRegUsage CmmNode O O -> AssignmentMap -> AssignmentMap
+middleAssignment :: Platform -> WithRegUsage CmmNode O O -> AssignmentMap
+                 -> AssignmentMap
 
 -- Algorithm for annotated assignments:
 --  1. Delete any sinking assignments that were used by this instruction
@@ -317,7 +318,7 @@ middleAssignment :: WithRegUsage CmmNode O O -> AssignmentMap -> AssignmentMap
 --     the correct optimization policy.
 --  3. Look for all assignments that reference that register and
 --     invalidate them.
-middleAssignment n@(AssignLocal r e usage) assign
+middleAssignment _ n@(AssignLocal r e usage) assign
     = invalidateUsersOf (CmmLocal r) . add . deleteSinks n $ assign
       where add m = addToUFM m r
                   $ case usage of
@@ -337,18 +338,18 @@ middleAssignment n@(AssignLocal r e usage) assign
 -- 1. Delete any sinking assignments that were used by this instruction
 -- 2. Look for all assignments that reference this register and
 --    invalidate them.
-middleAssignment (Plain n@(CmmAssign reg@(CmmGlobal _) _)) assign
+middleAssignment _ (Plain n@(CmmAssign reg@(CmmGlobal _) _)) assign
     = invalidateUsersOf reg . deleteSinks n $ assign
 
 -- Algorithm for unannotated assignments of *local* registers: do
 -- nothing (it's a reload, so no state should have changed)
-middleAssignment (Plain (CmmAssign (CmmLocal _) _)) assign = assign
+middleAssignment _ (Plain (CmmAssign (CmmLocal _) _)) assign = assign
 
 -- Algorithm for stores:
 --  1. Delete any sinking assignments that were used by this instruction
 --  2. Look for all assignments that load from memory locations that
 --     were clobbered by this store and invalidate them.
-middleAssignment (Plain n@(CmmStore lhs rhs)) assign
+middleAssignment _ (Plain n@(CmmStore lhs rhs)) assign
     = let m = deleteSinks n assign
       in foldUFM_Directly f m m -- [foldUFM performance]
       where f u (xassign -> Just x) m | (lhs, rhs) `clobbers` (u, x) = addToUFM_Directly m u NeverOptimize
@@ -370,16 +371,16 @@ middleAssignment (Plain n@(CmmStore lhs rhs)) assign
 -- This is kind of expensive. (One way to optimize this might be to
 -- store extra information about expressions that allow this and other
 -- checks to be done cheaply.)
-middleAssignment (Plain n@(CmmUnsafeForeignCall{})) assign
+middleAssignment platform (Plain n@(CmmUnsafeForeignCall{})) assign
     = deleteCallerSaves (foldRegsDefd (\m r -> addToUFM m r NeverOptimize) (deleteSinks n assign) n)
     where deleteCallerSaves m = foldUFM_Directly f m m
           f u (xassign -> Just x) m | wrapRecExpf g x False = addToUFM_Directly m u NeverOptimize
           f _ _ m = m
-          g (CmmReg (CmmGlobal r)) _      | callerSaves r = True
-          g (CmmRegOff (CmmGlobal r) _) _ | callerSaves r = True
+          g (CmmReg (CmmGlobal r)) _      | callerSaves platform r = True
+          g (CmmRegOff (CmmGlobal r) _) _ | callerSaves platform r = True
           g _ b = b
 
-middleAssignment (Plain (CmmComment {})) assign
+middleAssignment _ (Plain (CmmComment {})) assign
     = assign
 
 -- Assumptions:
@@ -462,8 +463,12 @@ invalidateVolatile k m = mapUFM p m
                   exp _ = False
         p _ = NeverOptimize -- probably shouldn't happen with AlwaysSink
 
-assignmentTransfer :: FwdTransfer (WithRegUsage CmmNode) AssignmentMap
-assignmentTransfer = mkFTransfer3 (flip const) middleAssignment ((mkFactBase assignmentLattice .) . lastAssignment)
+assignmentTransfer :: Platform
+                   -> FwdTransfer (WithRegUsage CmmNode) AssignmentMap
+assignmentTransfer platform
+    = mkFTransfer3 (flip const)
+                   (middleAssignment platform)
+                   ((mkFactBase assignmentLattice .) . lastAssignment)
 
 -- Note [Soundness of inlining]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
