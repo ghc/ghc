@@ -133,7 +133,8 @@ createIfaces0 verbosity modules flags instIfaceMap =
 
     enableCompilation :: ModuleGraph -> Ghc ModuleGraph
     enableCompilation modGraph = do
-      let enableComp d = d { hscTarget = defaultObjectTarget }
+      let enableComp d = let platform = targetPlatform d
+                         in d { hscTarget = defaultObjectTarget platform }
       modifySessionDynFlags enableComp
       -- We need to update the DynFlags of the ModSummaries as well.
       let upd m = m { ms_hspp_opts = enableComp (ms_hspp_opts m) }
