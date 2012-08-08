@@ -45,12 +45,13 @@ import PrimOp
 import TyCon
 import Type
 import CostCentre	( CostCentreStack, currentCCS )
-import Control.Monad (when)
 import Maybes
 import Util
 import FastString
 import Outputable
 import UniqSupply
+
+import Control.Monad (when,void)
 
 ------------------------------------------------------------------------
 --		cgExpr: the main function
@@ -108,17 +109,17 @@ cgLneBinds :: BlockId -> StgBinding -> FCode ()
 cgLneBinds join_id (StgNonRec bndr rhs)
   = do  { local_cc <- saveCurrentCostCentre
                 -- See Note [Saving the current cost centre]
-        ; info <- cgLetNoEscapeRhs join_id local_cc bndr rhs 
+        ; (info, fcode) <- cgLetNoEscapeRhs join_id local_cc bndr rhs
+        ; fcode
         ; addBindC (cg_id info) info }
 
 cgLneBinds join_id (StgRec pairs)
   = do  { local_cc <- saveCurrentCostCentre
-        ; new_bindings <- fixC (\ new_bindings -> do
-                { addBindsC new_bindings
-                ; listFCs [ cgLetNoEscapeRhs join_id local_cc b e 
-                          | (b,e) <- pairs ] })
-        ; addBindsC new_bindings }
-
+        ; r <- sequence $ unzipWith (cgLetNoEscapeRhs join_id local_cc) pairs
+        ; let (infos, fcodes) = unzip r
+        ; addBindsC infos
+        ; sequence_ fcodes
+        }
 
 -------------------------
 cgLetNoEscapeRhs
@@ -126,20 +127,21 @@ cgLetNoEscapeRhs
     -> Maybe LocalReg	-- Saved cost centre
     -> Id
     -> StgRhs
-    -> FCode CgIdInfo
+    -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeRhs join_id local_cc bndr rhs =
-  do { (info, rhs_body) <- getCodeR $ cgLetNoEscapeRhsBody local_cc bndr rhs 
+  do { (info, rhs_code) <- cgLetNoEscapeRhsBody local_cc bndr rhs
      ; let (bid, _) = expectJust "cgLetNoEscapeRhs" $ maybeLetNoEscape info
-     ; emitOutOfLine bid $ rhs_body <*> mkBranch join_id
-     ; return info
+     ; let code = do { body <- getCode rhs_code
+                     ; emitOutOfLine bid (body <*> mkBranch join_id) }
+     ; return (info, code)
      }
 
 cgLetNoEscapeRhsBody
     :: Maybe LocalReg	-- Saved cost centre
     -> Id
     -> StgRhs
-    -> FCode CgIdInfo
+    -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
@@ -156,17 +158,18 @@ cgLetNoEscapeClosure
 	-> CostCentreStack   	-- XXX: *** NOT USED *** why not?
 	-> [NonVoid Id]		-- Args (as in \ args -> body)
     	-> StgExpr		-- Body (as in above)
-	-> FCode CgIdInfo
+        -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
-  = do  { arg_regs <- forkProc $ do	
-		{ restoreCurrentCostCentre cc_slot
-		; arg_regs <- bindArgsToRegs args
-                ; _ <- altHeapCheck arg_regs (cgExpr body)
+  = return ( lneIdInfo bndr args
+           , code )
+  where
+   code = forkProc $ do
+                  { restoreCurrentCostCentre cc_slot
+                  ; arg_regs <- bindArgsToRegs args
+                  ; void $ altHeapCheck arg_regs (cgExpr body) }
 			-- Using altHeapCheck just reduces
 			-- instructions to save on stack
-		; return arg_regs }
-	; return $ lneIdInfo bndr arg_regs}
 
 
 ------------------------------------------------------------------------
@@ -600,11 +603,12 @@ cgConApp con stg_args
 
   | otherwise	--  Boxed constructors; allocate and return
   = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
-    do	{ (idinfo, init) <- buildDynCon (dataConWorkId con) currentCCS con stg_args
+    do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con)
+                                     currentCCS con stg_args
 	   	-- The first "con" says that the name bound to this closure is
 		-- is "con", which is a bit of a fudge, but it only affects profiling
 
-        ; emit init
+        ; emit =<< fcode_init
 	; emitReturn [idInfoToAmode idinfo] }
 
 

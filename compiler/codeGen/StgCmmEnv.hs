@@ -18,7 +18,7 @@ module StgCmmEnv (
 
 	cgIdInfoId, cgIdInfoLF,
 
-	litIdInfo, lneIdInfo, regIdInfo,
+        litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
 	idInfoToAmode,
 
         NonVoid(..), isVoidId, nonVoidIds,
@@ -41,10 +41,10 @@ import StgCmmClosure
 
 import CLabel
 
+import MkGraph
 import BlockId
 import CmmExpr
 import CmmUtils
-import MkGraph (CmmAGraph, mkAssign)
 import FastString
 import Id
 import VarEnv
@@ -89,26 +89,24 @@ litIdInfo id lf lit
   where
     tag = lfDynTag lf
 
-lneIdInfo :: Id -> [LocalReg] -> CgIdInfo
+lneIdInfo :: Id -> [NonVoid Id] -> CgIdInfo
 lneIdInfo id regs 
   = CgIdInfo { cg_id = id, cg_lf = lf
-             , cg_loc = LneLoc blk_id regs
+             , cg_loc = LneLoc blk_id (map idToReg regs)
 	     , cg_tag = lfDynTag lf }
   where
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
 
--- Because the register may be spilled to the stack in untagged form, we
--- modify the initialization code 'init' to immediately tag the
--- register, and store a plain register in the CgIdInfo.  We allocate
--- a new register in order to keep single-assignment and help out the
--- inliner. -- EZY
-regIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> FCode (CgIdInfo, CmmAGraph)
-regIdInfo id lf_info expr
-  = do { reg <- newTemp (cmmExprType expr)
-       ; let init = mkAssign (CmmLocal reg)
-                             (addDynTag expr (lfDynTag lf_info))
-       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), init) }
+
+rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
+rhsIdInfo id lf_info
+  = do { reg <- newTemp gcWord
+       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg) }
+
+mkRhsInit :: LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
+mkRhsInit reg lf_info expr
+  = mkAssign (CmmLocal reg) (addDynTag expr (lfDynTag lf_info))
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
