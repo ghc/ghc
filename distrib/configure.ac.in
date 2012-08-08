@@ -33,6 +33,9 @@ AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
 
+Unregisterised="@Unregisterised@"
+AC_SUBST(Unregisterised)
+
 #
 dnl ** Check Perl installation **
 #
