@@ -55,6 +55,11 @@ cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
        ----------- Control-flow optimisations ----------------------------------
+
+       -- The first round of control-flow optimisation speeds up the
+       -- later passes by removing lots of empty blocks, so we do it
+       -- even when optimisation isn't turned on.
+       --
        g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOpts splitting_proc_points g
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
@@ -118,7 +123,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
      
             ----------- Control-flow optimisations -----------------------------
             gs <- {-# SCC "cmmCfgOpts(2)" #-}
-                  return $ map (cmmCfgOptsProc splitting_proc_points) gs
+                  return $ if optLevel dflags >= 1
+                             then map (cmmCfgOptsProc splitting_proc_points) gs
+                             else gs
             dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
             return (cafEnv, gs)
@@ -134,7 +141,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
      
             ----------- Control-flow optimisations -----------------------------
             g <- {-# SCC "cmmCfgOpts(2)" #-}
-                 return $ cmmCfgOptsProc splitting_proc_points g
+                 return $ if optLevel dflags >= 1
+                             then cmmCfgOptsProc splitting_proc_points g
+                             else g
             dump' Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
             return (cafEnv, [g])
