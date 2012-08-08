@@ -1,8 +1,8 @@
-def no_core_lint(opts):
+def no_lint(opts):
    opts.compiler_always_flags = \
-       filter(lambda opt: opt != '-dcore-lint', opts.compiler_always_flags)
+       filter(lambda opt: opt != '-dcore-lint' and opt != '-dcmm-lint', opts.compiler_always_flags)
 
-setTestOpts(no_core_lint)
+setTestOpts(no_lint)
 
 
 test('T1969',
