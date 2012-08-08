@@ -13,6 +13,7 @@ module CmmLint (
 import Hoopl
 import Cmm
 import CmmUtils
+import CmmLive
 import PprCmm ()
 import BlockId
 import FastString
@@ -53,7 +54,10 @@ lintCmmDecl (CmmData {})
 
 
 lintCmmGraph :: CmmGraph -> CmmLint ()
-lintCmmGraph g = mapM_ (lintCmmBlock labels) blocks
+lintCmmGraph g = cmmLiveness g `seq` mapM_ (lintCmmBlock labels) blocks
+                 -- cmmLiveness throws an error if there are registers
+                 -- live on entry to the graph (i.e. undefined
+                 -- variables)
   where
        blocks = toBlockList g
        labels = setFromList (map entryLabel blocks)

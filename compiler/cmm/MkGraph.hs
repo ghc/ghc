@@ -167,6 +167,7 @@ mkComment _   = nilOL
 
 ---------- Assignment and store
 mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
+mkAssign l (CmmReg r) | l == r  = mkNop
 mkAssign l r  = mkMiddle $ CmmAssign l r
 
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph

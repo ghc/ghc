@@ -19,7 +19,7 @@ module StgCmmProf (
 
 	-- Cost-centre Profiling
 	dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
-        enterCostCentreThunk,
+        enterCostCentreThunk, enterCostCentreFun,
         costCentreFrom,
         curCCS, storeCurCCS,
         emitSetCCC,
@@ -99,11 +99,11 @@ dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
 dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
 
-initUpdFrameProf :: CmmExpr -> FCode ()
+initUpdFrameProf :: ByteOff -> FCode ()
 -- Initialise the profiling field of an update frame
-initUpdFrameProf frame_amode 
+initUpdFrameProf frame_off
   = ifProfiling $	-- frame->header.prof.ccs = CCCS
-    emitStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS
+    emitStore (CmmStackSlot Old (frame_off - oFFSET_StgHeader_ccs)) curCCS
 	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
 	-- is unnecessary because it is not used anyhow.
 
@@ -190,6 +190,15 @@ enterCostCentreThunk closure =
   ifProfiling $ do 
     emit $ storeCurCCS (costCentreFrom closure)
 
+enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
+enterCostCentreFun ccs closure =
+  ifProfiling $ do
+    if isCurrentCCS ccs
+       then emitRtsCall rtsPackageId (fsLit "enterFunCCS")
+               [(CmmReg (CmmGlobal BaseReg), AddrHint),
+                (costCentreFrom closure, AddrHint)] False
+       else return () -- top-level function, nothing to do
+
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
   = do dflags <- getDynFlags
@@ -224,20 +233,19 @@ emitCostCentreDecl cc = do
                                         $ Module.moduleName
                                         $ cc_mod cc)
   ; dflags <- getDynFlags
-  ; loc <- newStringCLit (showPpr dflags (costCentreSrcSpan cc))
-           -- XXX should UTF-8 encode
-                -- All cost centres will be in the main package, since we
-                -- don't normally use -auto-all or add SCCs to other packages.
-                -- Hence don't emit the package name in the module here.
-  ; let lits = [ zero,    -- StgInt ccID,
-	      	 label,	  -- char *label,
-                 modl,    -- char *module,
-                 loc,     -- char *srcloc,
-                 zero64,  -- StgWord64 mem_alloc
-                 zero,    -- StgWord time_ticks
-                 is_caf,  -- StgInt is_caf
-                 zero     -- struct _CostCentre *link
-	       ] 
+  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+                   showPpr dflags (costCentreSrcSpan cc)
+           -- XXX going via FastString to get UTF-8 encoding is silly
+  ; let
+     lits = [ zero,   	-- StgInt ccID,
+	      label,	-- char *label,
+	      modl,	-- char *module,
+              loc,      -- char *srcloc,
+              zero64,   -- StgWord64 mem_alloc
+              zero,     -- StgWord time_ticks
+              is_caf,   -- StgInt is_caf
+              zero      -- struct _CostCentre *link
+	    ] 
   ; emitDataLits (mkCCLabel cc) lits
   }
   where
@@ -289,7 +297,7 @@ pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result AddrHint
 	rtsPackageId
-	(fsLit "PushCostCentre") [(ccs,AddrHint), 
+        (fsLit "pushCostCentre") [(ccs,AddrHint),
 				(CmmLit (mkCCostCentre cc), AddrHint)]
         False
 

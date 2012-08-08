@@ -432,8 +432,8 @@ cgCase scrut bndr alt_type alts
 -----------------
 maybeSaveCostCentre :: Bool -> FCode (Maybe LocalReg)
 maybeSaveCostCentre simple_scrut
-  | simple_scrut = saveCurrentCostCentre
-  | otherwise    = return Nothing
+  | simple_scrut = return Nothing
+  | otherwise    = saveCurrentCostCentre
 
 
 -----------------

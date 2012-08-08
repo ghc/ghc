@@ -15,7 +15,7 @@ module StgCmmHeap (
         mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
 
-        allocDynClosure, allocDynClosureReg, allocDynClosureCmm,
+        allocDynClosure, allocDynClosureCmm,
         emitSetDynHdr
     ) where
 
@@ -63,12 +63,7 @@ allocDynClosure
         -> [(NonVoid StgArg, VirtualHpOffset)]  -- Offsets from start of object
                                                 -- ie Info ptr has offset zero.
                                                 -- No void args in here
-        -> FCode (LocalReg, CmmAGraph)
-
-allocDynClosureReg
-        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
-        -> [(CmmExpr, VirtualHpOffset)]
-        -> FCode (LocalReg, CmmAGraph)
+        -> FCode CmmExpr -- returns Hp+n
 
 allocDynClosureCmm
         :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
@@ -81,30 +76,23 @@ allocDynClosureCmm
 -- returned LocalReg, which should point to the closure after executing
 -- the graph.
 
--- Note [Return a LocalReg]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- allocDynClosure returns a LocalReg, not a (Hp+8) CmmExpr.
--- Reason:
---      ...allocate object...
---      obj = Hp + 8
---      y = f(z)
---      ...here obj is still valid,
---         but Hp+8 means something quite different...
+-- allocDynClosure returns an (Hp+8) CmmExpr, and hence the result is
+-- only valid until Hp is changed.  The caller should assign the
+-- result to a LocalReg if it is required to remain live.
+--
+-- The reason we don't assign it to a LocalReg here is that the caller
+-- is often about to call regIdInfo, which immediately assigns the
+-- result of allocDynClosure to a new temp in order to add the tag.
+-- So by not generating a LocalReg here we avoid a common source of
+-- new temporaries and save some compile time.  This can be quite
+-- significant - see test T4801.
 
 
 allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureReg info_tbl lf_info
+        ; allocDynClosureCmm info_tbl lf_info
                              use_cc _blame_cc (zip cmm_args offsets)
-        }
-
-allocDynClosureReg  info_tbl lf_info use_cc _blame_cc amodes_w_offsets
-  = do  { hp_rel <- allocDynClosureCmm info_tbl lf_info
-                                       use_cc _blame_cc amodes_w_offsets
-
-        -- Note [Return a LocalReg]
-        ; getCodeR $ assignTemp hp_rel
         }
 
 allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
@@ -340,14 +328,13 @@ These are used in the following circumstances
 -- A heap/stack check at a function or thunk entry point.
 
 entryHeapCheck :: ClosureInfo
-               -> Int            -- Arg Offset
                -> Maybe LocalReg -- Function (closure environment)
                -> Int            -- Arity -- not same as len args b/c of voids
                -> [LocalReg]     -- Non-void args (empty for thunk)
                -> FCode ()
                -> FCode ()
 
-entryHeapCheck cl_info offset nodeSet arity args code
+entryHeapCheck cl_info nodeSet arity args code
   = do dflags <- getDynFlags
        let is_thunk = arity == 0
            is_fastf = case closureFunInfo cl_info of
@@ -355,25 +342,31 @@ entryHeapCheck cl_info offset nodeSet arity args code
                            _otherwise         -> True
 
            args' = map (CmmReg . CmmLocal) args
-           setN = case nodeSet of
-                          Just _  -> mkNop -- No need to assign R1, it already
-                                           -- points to the closure
-                          Nothing -> mkAssign nodeReg $
-                              CmmLit (CmmLabel $ staticClosureLabel cl_info)
+           node = case nodeSet of
+                      Just r  -> CmmReg (CmmLocal r)
+                      Nothing -> CmmLit (CmmLabel $ staticClosureLabel cl_info)
+           stg_gc_fun    = CmmReg (CmmGlobal GCFun)
+           stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
 
-           {- Thunks:          jump GCEnter1
-              Function (fast): Set R1 = node, jump GCFun
-              Function (slow): Set R1 = node, call generic_gc -}
-           gc_call upd = setN <*> gc_lbl upd
-           gc_lbl upd
-               | is_thunk  = mkDirectJump dflags (CmmReg $ CmmGlobal GCEnter1) [] sp
-               | is_fastf  = mkDirectJump dflags (CmmReg $ CmmGlobal GCFun) [] sp
-               | otherwise = mkForeignJump dflags Slow (CmmReg $ CmmGlobal GCFun) args' upd
-               where sp = max offset upd
-           {- DT (12/08/10) This is a little fishy, mainly the sp fix up amount.
-            - This is since the ncg inserts spills before the stack/heap check.
-            - This should be fixed up and then we won't need to fix up the Sp on
-            - GC calls, but until then this fishy code works -}
+           {- Thunks:          jump stg_gc_enter_1
+
+              Function (fast): call (NativeNode) stg_gc_fun(fun, args)
+
+              Function (slow): R1 = fun
+                               call (slow) stg_gc_fun(args)
+               XXX: this is a bit naughty, we should really pass R1 as an
+               argument and use a special calling convention.
+           -}
+           gc_call upd
+               | is_thunk
+                 = mkJump dflags stg_gc_enter1 [node] upd
+
+               | is_fastf
+                 = mkJump dflags stg_gc_fun (node : args') upd
+
+               | otherwise
+                 = mkAssign nodeReg node <*>
+                   mkForeignJump dflags Slow stg_gc_fun args' upd
 
        updfr_sz <- getUpdFrameOff
 

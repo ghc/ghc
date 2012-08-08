@@ -345,9 +345,11 @@ instance Eq GlobalReg where
    SpLim == SpLim = True
    Hp == Hp = True
    HpLim == HpLim = True
+   CCCS == CCCS = True
    CurrentTSO == CurrentTSO = True
    CurrentNursery == CurrentNursery = True
    HpAlloc == HpAlloc = True
+   EagerBlackholeInfo == EagerBlackholeInfo = True
    GCEnter1 == GCEnter1 = True
    GCFun == GCFun = True
    BaseReg == BaseReg = True

@@ -44,7 +44,7 @@ import CLabel
 import BlockId
 import CmmExpr
 import CmmUtils
-import MkGraph (CmmAGraph, mkAssign, (<*>))
+import MkGraph (CmmAGraph, mkAssign)
 import FastString
 import Id
 import VarEnv
@@ -103,13 +103,12 @@ lneIdInfo id regs
 -- register, and store a plain register in the CgIdInfo.  We allocate
 -- a new register in order to keep single-assignment and help out the
 -- inliner. -- EZY
-regIdInfo :: Id -> LambdaFormInfo -> LocalReg -> CmmAGraph -> FCode (CgIdInfo, CmmAGraph)
-regIdInfo id lf_info reg init 
-  = do { reg' <- newTemp (localRegType reg)
-       ; let init' = init <*> mkAssign (CmmLocal reg') 
-                                       (addDynTag (CmmReg (CmmLocal reg)) 
-                                                  (lfDynTag lf_info))
-       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg')), init') }
+regIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> FCode (CgIdInfo, CmmAGraph)
+regIdInfo id lf_info expr
+  = do { reg <- newTemp (cmmExprType expr)
+       ; let init = mkAssign (CmmLocal reg)
+                             (addDynTag expr (lfDynTag lf_info))
+       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), init) }
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer

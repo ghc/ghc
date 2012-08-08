@@ -26,8 +26,6 @@ import Util
 import DynFlags
 import FastString
 import Outputable
-import Data.Map (Map)
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
@@ -485,12 +483,11 @@ spOffsetForCall current_sp cont_stack args
 fixupStack :: StackMap -> StackMap -> [CmmNode O O]
 fixupStack old_stack new_stack = concatMap move new_locs
  where
-     old_map :: Map LocalReg ByteOff
-     old_map  = Map.fromList (stackSlotRegs old_stack)
+     old_map  = sm_regs old_stack
      new_locs = stackSlotRegs new_stack
 
      move (r,n)
-       | Just m <- Map.lookup r old_map, n == m = []
+       | Just (_,m) <- lookupUFM old_map r, n == m = []
        | otherwise = [CmmStore (CmmStackSlot Old n)
                                (CmmReg (CmmLocal r))]
 
