@@ -17,6 +17,7 @@ module GHC.Stack (
     -- * Call stack
     currentCallStack,
     whoCreated,
+    errorWithStackTrace,
 
     -- * Internals
     CostCentreStack,
@@ -40,6 +41,7 @@ import GHC.Base
 import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
+import GHC.Exception
 
 #define PROFILING
 #include "Rts.h"
@@ -106,3 +108,12 @@ whoCreated obj = do
 
 renderStack :: [String] -> String
 renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
+
+-- | Like the function 'error', but appends a stack trace to the error
+-- message if one is available.
+errorWithStackTrace :: String -> a
+errorWithStackTrace x = unsafeDupablePerformIO $ do
+   stack <- ccsToStrings =<< getCurrentCCS x
+   if null stack
+      then throwIO (ErrorCall x)
+      else throwIO (ErrorCall (x ++ '\n' : renderStack stack))
