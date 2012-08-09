@@ -465,6 +465,27 @@ data AbsMem
 -- Note that SpMem is invalidated if Sp is changed, but the definition
 -- of 'conflicts' above handles that.
 
+-- ToDo: this won't currently fix the following commonly occurring code:
+--    x1 = [R1 + 8]
+--    x2 = [R1 + 16]
+--    ..
+--    [Hp - 8] = x1
+--    [Hp - 16] = x2
+--    ..
+
+-- because [R1 + 8] and [Hp - 8] are both HeapMem.  We know that
+-- assignments to [Hp + n] do not conflict with any other heap memory,
+-- but this is tricky to nail down.  What if we had
+--
+--   x = Hp + n
+--   [x] = ...
+--
+--  the store to [x] should be "new heap", not "old heap".
+--  Furthermore, you could imagine that if we started inlining
+--  functions in Cmm then there might well be reads of heap memory
+--  that was written in the same basic block.  To take advantage of
+--  non-aliasing of heap memory we will have to be more clever.
+
 bothMems :: AbsMem -> AbsMem -> AbsMem
 bothMems NoMem    x         = x
 bothMems x        NoMem     = x
