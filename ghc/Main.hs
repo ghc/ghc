@@ -791,5 +791,10 @@ abiHash strs = do
 -- Util
 
 unknownFlagsErr :: [String] -> a
-unknownFlagsErr fs = ghcError (UsageError ("unrecognised flags: " ++ unwords fs))
-
+unknownFlagsErr fs = ghcError $ UsageError $ concatMap oneError fs
+  where
+    oneError f =
+        "unrecognised flag: " ++ f ++ "\n" ++
+        (case fuzzyMatch f (nub allFlags) of
+            [] -> ""
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
