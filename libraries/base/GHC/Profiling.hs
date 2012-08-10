@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module GHC.Profiling where
 
