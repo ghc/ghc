@@ -151,8 +151,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
                _otherwise -> l
 
      shouldConcatWith b block
-       | num_preds b == 1    = True  -- only one predecessor: go for it
        | okToDuplicate block = True  -- short enough to duplicate
+       | num_preds b == 1    = True  -- only one predecessor: go for it
        | otherwise           = False
        where num_preds bid = mapLookup bid backEdges `orElse` 0
 
@@ -166,7 +166,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
 
      backEdges :: BlockEnv Int -- number of predecessors for each block
      backEdges = mapInsertWith (+) entry_id 1 $ -- add 1 for the entry id
-                   mapMap setSize $ predMap blocks
+                   predMap blocks
 
      splice :: Block CmmNode C O -> CmmBlock -> CmmBlock
      splice head rest = head `blockAppend` snd (blockSplitHead rest)
@@ -253,12 +253,11 @@ mkCmmCondBranch p t f = if t == f then CmmBranch t else CmmCondBranch p t f
 ----------------------------------------------------------------
 -- Build a map from a block to its set of predecessors. Very useful.
 
-predMap :: [CmmBlock] -> BlockEnv BlockSet
+predMap :: [CmmBlock] -> BlockEnv Int
 predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
-  where add_preds block env = foldl (add (entryLabel block)) env (successors block)
-        add bid env b' =
-          mapInsert b' (setInsert bid (mapLookup b' env `orElse` setEmpty)) env
-
+  where
+    add_preds block env = foldr add env (successors block)
+      where add lbl env = mapInsertWith (+) lbl 1 env
 
 -----------------------------------------------------------------------------
 --

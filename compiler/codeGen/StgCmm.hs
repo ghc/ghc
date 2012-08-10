@@ -124,25 +124,24 @@ variable. -}
 cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> FCode ()
 cgTopBinding dflags (StgNonRec id rhs, _srts)
   = do	{ id' <- maybeExternaliseId dflags id
-	; info <- cgTopRhs id' rhs
-	; addBindC (cg_id info) info -- Add the *un-externalised* Id to the envt,
+        ; (info, fcode) <- cgTopRhs id' rhs
+        ; fcode
+        ; addBindC (cg_id info) info -- Add the *un-externalised* Id to the envt,
 				     -- so we find it when we look up occurrences
         }
 
 cgTopBinding dflags (StgRec pairs, _srts)
   = do	{ let (bndrs, rhss) = unzip pairs
-	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
+        ; bndrs' <- Prelude.mapM (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
-	; fixC_(\ new_binds -> do 
-		{ addBindsC new_binds
-		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
-        ; return () }
+        ; r <- sequence $ unzipWith cgTopRhs pairs'
+        ; let (infos, fcodes) = unzip r
+        ; addBindsC infos
+        ; sequence_ fcodes
+        }
 
--- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
--- to enclose the listFCs in cgTopBinding, but that tickled the
--- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
-cgTopRhs :: Id -> StgRhs -> FCode CgIdInfo
+cgTopRhs :: Id -> StgRhs -> FCode (CgIdInfo, FCode ())
 	-- The Id is passed along for setting up a binding...
 	-- It's already been externalised if necessary
 

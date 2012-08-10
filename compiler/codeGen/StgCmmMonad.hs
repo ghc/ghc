@@ -17,8 +17,8 @@
 module StgCmmMonad (
 	FCode,	-- type
 
-        initC, runC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
-	returnFC, fixC, fixC_, nopC, whenC, 
+        initC, runC, thenC, thenFC, listCs,
+        returnFC, nopC, whenC,
 	newUnique, newUniqSupply, 
 
         newLabelC, emitLabel,
@@ -93,10 +93,10 @@ infixr 9 `thenFC`
 --	The FCode monad and its types
 --------------------------------------------------------
 
-newtype FCode a = FCode (CgInfoDownwards -> CgState -> (a, CgState))
+newtype FCode a = FCode (CgInfoDownwards -> CgState -> (# a, CgState #))
 
 instance Functor FCode where
-  fmap f (FCode g) = FCode $ \i s -> let (a,s') = g i s in (f a, s')
+  fmap f (FCode g) = FCode $ \i s -> case g i s of (# a, s' #) -> (# f a, s' #)
 
 instance Monad FCode where
 	(>>=) = thenFC
@@ -111,15 +111,15 @@ initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
 runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
-runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
+runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
 
 returnFC :: a -> FCode a
-returnFC val = FCode (\_info_down state -> (val, state))
+returnFC val = FCode (\_info_down state -> (# val, state #))
 
 thenC :: FCode () -> FCode a -> FCode a
 thenC (FCode m) (FCode k) = 
-  	FCode (\info_down state -> let (_,new_state) = m info_down state in 
-  		k info_down new_state)
+        FCode $ \info_down state -> case m info_down state of
+                                     (# _,new_state #) -> k info_down new_state
 
 nopC :: FCode ()
 nopC = return ()
@@ -134,45 +134,13 @@ listCs (fc:fcs) = do
 	fc
 	listCs fcs
    	
-mapCs :: (a -> FCode ()) -> [a] -> FCode ()
-mapCs = mapM_
-
-thenFC	:: FCode a -> (a -> FCode c) -> FCode c
-thenFC (FCode m) k = FCode (
+thenFC  :: FCode a -> (a -> FCode c) -> FCode c
+thenFC (FCode m) k = FCode $
 	\info_down state ->
-		let 
-			(m_result, new_state) = m info_down state
-			(FCode kcode) = k m_result
-		in 
-			kcode info_down new_state
-	)
-    -- Note: this is a lazy monad.  We can't easily make it strict due
-    -- to the use of fixC for compiling recursive bindings (see Note
-    -- [cgBind rec]).  cgRhs returns a CgIdInfo which is fed back in
-    -- via the CgBindings, and making the monad strict means that we
-    -- can't look at the CgIdInfo too early.  Things seem to just
-    -- about work when the monad is lazy.  I hate this stuff --SDM
-
-
-listFCs :: [FCode a] -> FCode [a]
-listFCs = Prelude.sequence
-
-mapFCs :: (a -> FCode b) -> [a] -> FCode [b]
-mapFCs = mapM
-
-fixC :: (a -> FCode a) -> FCode a
-fixC fcode = FCode (
-	\info_down state -> 
-		let
-			FCode fc = fcode v
-			result@(v,_) = fc info_down state
-			--	    ^--------^
-		in
-			result
-	)
-
-fixC_ :: (a -> FCode a) -> FCode ()
-fixC_ fcode = fixC fcode >> return ()
+            case m info_down state of
+              (# m_result, new_state #) ->
+                 case k m_result of
+                   FCode kcode -> kcode info_down new_state
 
 --------------------------------------------------------
 --	The code generator environment
@@ -405,10 +373,10 @@ hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (state,state)
+getState = FCode $ \_info_down state -> (# state, state #)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> ((),state)
+setState state = FCode $ \_info_down _ -> (# (), state #)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -452,7 +420,8 @@ getStaticBinds = do
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state -> 
-	let (retval, state2) = fcode info_down newstate in ((retval,state2), state)
+  case fcode info_down newstate of
+    (# retval, state2 #) -> (# (retval,state2), state #)
 
 newUniqSupply :: FCode UniqSupply
 newUniqSupply = do
@@ -468,7 +437,7 @@ newUnique = do
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (info_down,state)
+getInfoDown = FCode $ \info_down state -> (# info_down,state #)
 
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
@@ -480,8 +449,9 @@ withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 
 
 doFCode :: FCode a -> CgInfoDownwards -> CgState -> (a,CgState)
-doFCode (FCode fcode) info_down state = fcode info_down state
-
+doFCode (FCode fcode) info_down state =
+  case fcode info_down state of
+    (# a, s #) -> ( a, s )
 
 -- ----------------------------------------------------------------------------
 -- Get the current module name
