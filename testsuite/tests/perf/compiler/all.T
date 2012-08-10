@@ -18,7 +18,7 @@ test('T1969',
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 34 (amd64/Linux)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 5000000,
+          compiler_stats_num_field('max_bytes_used', 4000000,
                                                      7000000)),
                              # expected value: 6707308 (x86/OS X)
                              #                 5717704 (x86/Windows 17/05/10)
@@ -31,7 +31,7 @@ test('T1969',
                                   # hence 15% range.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
-                                                      280000000)),
+                                                      290000000)),
                                     # expected value: 215582916 (x86/Windows)
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
@@ -65,7 +65,7 @@ else:
 
 test('T3294',
      [if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 14000000,
+          compiler_stats_num_field('max_bytes_used', 12000000,
                                                      20000000)),
                                    # expected value: 17725476 (x86/OS X)
 				   #                 14593500 (Windows)
@@ -91,7 +91,7 @@ test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 30, 10)),
+          compiler_stats_range_field('peak_megabytes_allocated', 30, 20)),
       if_wordsize(64, # sample from (amd64/Linux):
           compiler_stats_range_field('peak_megabytes_allocated', 50, 20)),
       # expected value: 58 (amd64/OS X):
@@ -108,7 +108,7 @@ test('T4801',
                                                       530000000)),
       if_wordsize(32,
       #                    expected value: x86/OS X:  9651948
-          compiler_stats_num_field('max_bytes_used',  9000000,
+          compiler_stats_num_field('max_bytes_used',  8000000,
                                                      12000000)),
       # expected value: 10290952 (windows)
       if_wordsize(64,
@@ -126,7 +126,7 @@ test('T3064',
      [# expect_broken( 3064 ),
       # expected value: 14 (x86/Linux 28-06-2012):
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 14, 10)),
+          compiler_stats_range_field('peak_megabytes_allocated', 14, 30)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),
@@ -139,7 +139,7 @@ test('T3064',
                                                       280000000)),
       # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
-          compiler_stats_range_field('max_bytes_used', 5511604, 10)),
+          compiler_stats_range_field('max_bytes_used', 5511604, 20)),
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 8000000,
