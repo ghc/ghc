@@ -1287,6 +1287,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getMonotonicNSec)                   \
       SymI_HasProto(lockFile)                           \
       SymI_HasProto(unlockFile)                         \
+      SymI_NeedsProto(startProfTimer)                   \
+      SymI_NeedsProto(stopProfTimer)                    \
       RTS_USER_SIGNALS_SYMBOLS                          \
       RTS_INTCHAR_SYMBOLS
 
