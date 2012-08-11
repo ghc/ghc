@@ -27,6 +27,7 @@ import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVa
 import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
+import Pair
 import Type       (mkTyConApp, mkAppTy, splitAppTys, getTyVar_maybe, isKindTy)
 import Kind
 import TysWiredIn (pairTyCon, tupleCon)
@@ -37,6 +38,7 @@ import Rules      (mkSpecInfo, roughTopNames)
 import Unique     (mkUniqueGrimily)
 import FastString (fsLit)
 import BasicTypes (TupleSort(..))
+import qualified State
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -483,15 +485,9 @@ isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (i
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
 msg mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
-    -- TODO: test for multiple solutions? Attempt to choose best?
-    -- FIXME: use the deterministic algorithm w/ unmarking
-    firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (heap_l, heap, heap_r), rn_r)) <- mres
-                      return ((deeds_l, heap_l, rn_l, k_l), (heap, k, qa), (deeds_r, heap_r, rn_r, k_r))
-                 | mrn2mk <- msgEC commons init_rn2 k_l k_r
-                 , mres <- prod (do (rn2, mk) <- mrn2mk
-                                    (msg_s, res@(_, (k_l, _, k_r))) <- runMSG msg_e msg_s (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2))
-                                    return (map (liftM ((,) res)) $ msgPureHeap mm rn2 msg_e msg_s heap_l heap_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
-                 ]
+    do (msg_s, qa) <- runMSG msg_e msg_s (msgAnned annedQA (msgQA init_rn2) qa_l qa_r)
+       let ((rn_l, rn_r), (heap_l, heap, heap_r), (k_l, k, k_r)) = msgLoop mm init_rn2 msg_e msg_s (heap_l, heap_r) (k_l, k_r)
+       return ((deeds_l, heap_l, rn_l, k_l), (heap, k, qa), (deeds_r, heap_r, rn_r, k_r))
   where
     -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
     -- binders allocated for rigid binders are *allowed* to shadow things bound in h_l/h_r.
@@ -502,15 +498,8 @@ msg mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> t
     -- binders often often have exactly the same uniques as their counterparts in the
     -- incoming states. This aids debugging.
     init_rn2 = mkRnEnv2 emptyInScopeSet
-    commons = msgCommonHeapVars mm
     msg_e = MSGEnv False mm
-    msg_s = MSGState commons emptyVarEnv emptyTM emptyTM []
-
-    firstSuccess :: [MSG' a] -> MSG' a
-    firstSuccess []   = Left "firstSuccess: no elements at all"
-    firstSuccess (Left _:next:nexts) = firstSuccess (next:nexts)
-    --firstSuccess [Left msg] | trace ("firstSuccess: " ++ msg) False = undefined
-    firstSuccess (it:_) = it
+    msg_s = MSGState (msgCommonHeapVars mm) emptyVarEnv emptyTM emptyTM []
 
 msgAnned :: (Tag -> b -> Anned b) -> (Tag -> a -> Tag -> a -> MSG b)
          -> Anned a -> Anned a -> MSG (Anned b)
@@ -781,7 +770,7 @@ msgTyVarBndr f rn2 a_l a_r k = do
     liftM2 f (msgTyVarBndrExtras rn2 a a_l a_r) $ k rn2'
 
 msgIdCoVarBndr :: (Id -> b -> c) -> RnEnv2 -> Id -> Id -> (RnEnv2 -> MSG b) -> MSG c
-msgIdCoVarBndr f rn2 x_l x_r k = msgIdCoVarBndrFlexible f rn2 x_l x_r (\rn2' -> liftM ((,) rn2') (k rn2'))
+msgIdCoVarBndr f rn2 x_l x_r k = msgIdCoVarBndrFlexible f rn2 x_l x_r (\rn2' -> liftM ((,) rn2) (k rn2'))
 
 msgIdCoVarBndrFlexible :: (Id -> b -> c) -> RnEnv2 -> Id -> Id -> (RnEnv2 -> MSG (RnEnv2, b)) -> MSG c
 msgIdCoVarBndrFlexible f rn2 x_l x_r k = do
@@ -930,264 +919,308 @@ msgIn :: (InScopeSet -> Renaming -> a -> a)
 msgIn rnm fvs mtch rn2 (rn_l, x_l) (rn_r, x_r) = liftM (\b -> (mkIdentityRenaming (fvs b), b)) $ mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
   where iss = rnInScopeSet rn2 -- NB: this line is one of the few things that relies on the RnEnv2 InScopeSet being correct
 
-msgEC :: InScopeSet -> RnEnv2 -> Stack -> Stack -> [MSG' (RnEnv2, RnEnv2 -> MSG (Stack, Stack, Stack))]
-msgEC commons init_rn2 = go init_rn2
-  where
-    splitCar _   (Car x xs) = return (x, xs)
-    splitCar msg (Loco _)   = Left ("splitCar: " ++ msg)
+msgStack :: RnEnv2 -> MSGEnv -> MSGState -> Stack -> Stack -> (MSGState, (Stack, Stack, Stack))
+msgStack rn2 msg_e msg_s k_l k_r
+  | Car (kf_l, k_l) <- k_l
+  , Car (kf_r, k_r) <- k_r
+  , Right (msg_s, kf) <- runMSG msg_e msg_s (msgStackFrame rn2 kf_l kf_r)
+  = second (\(k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) $ msgStack rn2 msg_e msg_s k_l k_r
+  | otherwise
+  = (msg_s, (k_l, Loco (stackGeneralised k_r), k_r)) -- Right biased generalisation flag
 
-    go rn2' k_l k_r
-      = prod (do (kf_l, k_l) <- splitCar "left" k_l
-                 (kf_r, k_r) <- splitCar "right" k_r
-                 (rn2'', mkf') <- msgECFrame commons rn2' kf_l kf_r
-                 return (map (liftM (second (\it rn2 -> liftM2 (\kf (k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) (mkf' rn2) (it rn2)))) $ go rn2'' k_l k_r)) ++
-        [return (rn2', \_ -> return (k_l, Loco (case k_r of Loco gen -> gen; _ -> True), k_r))] -- Right biased generalisation flag
+stackGeneralised :: Stack -> Generalised
+stackGeneralised k_lr = case k_lr of Loco gen -> gen; _ -> True
 
-msgECFrame :: InScopeSet -> RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG' (RnEnv2, RnEnv2 -> MSG (Tagged StackFrame))
-msgECFrame commons init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
+msgStackFrame :: RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG (Tagged StackFrame)
+msgStackFrame rn2 kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
   where
-    go :: StackFrame -> StackFrame -> MSG' (RnEnv2, RnEnv2 -> MSG StackFrame)
-    go (Apply x_l')                          (Apply x_r')                          = return (init_rn2,  \rn2 -> liftM Apply $ msgVar rn2 x_l' x_r')
-    go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2,  \rn2 -> liftM TyApply $ msgType rn2 ty_l' ty_r')
-    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2,  \rn2 -> liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r))
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2,  \rn2 -> guard "msgECFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedAnswer (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r))
-    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2,  \rn2 -> msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r)
-    go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2,  \rn2 -> liftM CastIt $ msgCoercion rn2 co_l' co_r')
-    go (Update x_l')                         (Update x_r')                         = return (init_rn2', \rn2 -> liftM Update $ msgIdCoVarBndrExtras rn2 x' x_l' x_r')
-      where (init_rn2', x') = rnBndr2'' (if x_l' == x_r' && x_r' `elemInScopeSet` commons then emptyInScopeSet else commons) init_rn2 x_l' x_r'
-    go _ _ = Left "msgECFrame"
+    go :: StackFrame -> StackFrame -> MSG StackFrame
+    go (Apply x_l')                          (Apply x_r')                          = liftM Apply $ msgVar rn2 x_l' x_r'
+    go (TyApply ty_l')                       (TyApply ty_r')                       = liftM TyApply $ msgType rn2 ty_l' ty_r'
+    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r)
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = guard "msgStackFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedAnswer (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r)
+    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+    go (CastIt co_l')                        (CastIt co_r')                        = liftM CastIt $ msgCoercion rn2 co_l' co_r'
+    go (Update x_l')                         (Update x_r')                         = liftM Update $ msgFlexiVar rn2 x_l' x_r' -- We treat this binding exactly like an occurrence: only special handling of update binders is in msgLoop
+    go _ _ = Left "msgStackFrame"
+
+-- Poor man's state monad
+type Looper a = Pair ((PureHeap, Stack, S.Set Var), -- Potentially uncopied heap bindings on each side, and their usage information (which expensive bindings are already copied into one of the heaps?)
+                      (VarEnv (Var, Var)),          -- Mapping from MSG variables on each side to MSG variables in the middle and the opposite side (only useful for those corresponding to "expensive" heap bindings)
+                      (Heap, Renaming, Stack))      -- Each side's unique information (renaming applied to common stuff when instantiated on the left/right)
+             -> PureHeap -> Stack                   -- Common information
+             -> a
+
+-- FIXME: we need to rotate the incoming state so that we see that values in the focus are cheap (and not update frame bound)
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
-msgPureHeap :: MSGMode -> RnEnv2 -> MSGEnv -> MSGState -> Heap -> Heap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (Renaming, (Heap, Heap, Heap), Renaming)]
-msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_ids_r) (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
-  = prod (do (used_l, h_l) <- sucks init_h_l k_bvs_l M.empty S.empty k_fvs_l
-             (used_r, h_r) <- sucks init_h_r k_bvs_r M.empty S.empty k_fvs_r
-             return $ go emptyRenaming emptyRenaming used_l used_r init_h_l init_h_r (Heap h_l init_ids_l) (Heap h_r init_ids_r) M.empty msg_s)
+msgLoop :: MSGMode -> RnEnv2 -> MSGEnv -> MSGState
+        -> (Heap, Heap) -> (Stack, Stack)
+        -> ((Renaming, Renaming), (Heap, PureHeap, Heap), (Stack, Stack, Stack))
+msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) (init_k_l, init_k_r)
+  = sucks (stackFreeVars k_l) (sucks (stackFreeVars k_r) (go msg_s'' . swap) . swap)
+          (Pair ((init_h_l, init_k_l, S.empty), l_to_r, (Heap M.empty init_ids_l, emptyRenaming, k_l))
+                ((init_h_r, init_k_r, S.empty), r_to_l, (Heap M.empty init_ids_r, emptyRenaming, k_r)))
+          M.empty k
   where
-    go :: Renaming  -- Renaming that should be applied to common stuff when instantiated on the left
-       -> Renaming  -- Renaming that should be applied to common stuff when instantiated on the right
-       -> S.Set Var -- Binding in left heap already copied into one of the heaps
-       -> S.Set Var -- Binding in left heap already copied into one of the heaps
-       -> PureHeap  -- Potentially uncopied left heap
-       -> PureHeap  -- Potentially uncopied right heap
-       -> Heap      -- Left heap
-       -> Heap      -- Right heap
-       -> PureHeap  -- Common heap
-       -> MSGState  -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
-       -> [MSG' (Renaming, (Heap, Heap, Heap), Renaming)]
-    go rn_l rn_r _ _ _ _ heap_l heap_r h (MSGState { msgPending = [], msgInScopeSet = ids })
-      -- NB: it is very important that the final InScopeSet includes not only the InScopeSet from the MSGState (which
-      -- will include all of the common *heap* bound variables) but also that from the RnEnv2 (which will include
-      -- all of the common *stack* bound variables).
-      = [return (rn_l, (heap_l, Heap h (ids `unionInScope` rnInScopeSet rn2), heap_r), rn_r)]
-    {-
-    go _ _ _ _ _ _ _ _ _ (MSGState { msgPending = ((x_common, next):_) })
-      | pprTrace "msgPureHeap" (ppr x_common $$ ppr next) False
-      = undefined
-    -}
-    go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
-      -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
-      | msg_s <- msg_s { msgPending = rest }
-      = prod (do (used_l, hb_l) <- mb_common_l
-                 (used_r, hb_r) <- mb_common_r
-                 hb_l_inj <- inject hb_l
-                 hb_r_inj <- inject hb_r
-                 (msg_s, hb) <- case (hb_l_inj, hb_r_inj) of
-                   (Just (let_bound_l, in_e_l), Just (let_bound_r, in_e_r))
-                     | let_bound_l == let_bound_r
-                     , not let_bound_r || (x_l == x_r && x_r == x_common) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
-                     , Right (msg_s, in_e) <- case () of
-                          -- Optimisation: attempt to match using the "common heap vars" trick.
-                          -- If this fails we can always try to match in a legit manner, but I
-                          -- expect this to shortcut the full term matching route almost all of
-                          -- the time if this guard succeeds.
-                          --
-                          -- The reason that this hack should almost always work is because I
-                          -- expect common-heap stuff to be mostly matched against *itself*
-                          -- first, so the assigned "common" var will be the same as the *input*
-                          -- variable. This allows us to safely use the *right hand* term as the
-                          -- *common* HeapBinding without any sort of changes to variables.
-                          _ | x_l == x_r, x_r `elemInScopeSet` msgCommonHeapVars mm
-                            , let l_fvs = inFreeVars annedTermFreeVars in_e_l
-                                  r_fvs = inFreeVars annedTermFreeVars in_e_r
-                            , l_fvs == r_fvs
-                            , Right res <- runMSG msg_e msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ()) r_fvs
-                                                                   return in_e_r -- Right biased
-                            -> Right res
-                            | otherwise
-                            -> runMSG msg_e msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
-                     -> return (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
-                   (Nothing, Nothing)
-                     | x_l == x_r && x_r == x_common -- Note [MSGing let-bounds]
-                     -> return (msg_s, hb_r) -- Right biased
-                   _ -> Left "msgPureHeap: non-unifiable heap bindings"
-                 -- If they match, we need to make a common heap binding
-                 return (go rn_l rn_r used_l used_r init_h_l init_h_r
-                            (Heap h_l ids_l) (Heap h_r ids_r) (M.insert x_common hb h) msg_s)) ++
-        -- If they don't match/either side is lambda-bound, we need to generalise
-        prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
-                 -- that binding refers to. If that is not possible, we have to fail.
-                 (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
-                 (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
-                 return $ go (insertVarRenaming rn_l x_common x_l) (insertVarRenaming rn_r x_common x_r) used_l' used_r' init_h_l init_h_r
-                             (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert x_common generalisedLambdaBound h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
-      where
-        (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
-        (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
-    go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((x_common, PendingTerm e_l e_r):rest) })
-      -- NB: I can try to avoid generalisation when e_l or e_r is just a heap-bound variable. We do this by floating the non-variable into a new heap binding
-      -- which looks just like it was in the inital heap on the left/right and then matching the variable pair we are left with as normal.
-      --
-      -- Note [Non-terminating instance matches]
-      -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      --
-      -- We need to carefully avoid termination issues that arise from terms like:
-      --  x |-> y
-      --  y |-> x  `msg`  a |-> True
-      --  x               a
-      --
-      -- Where we might go:
-      --  Does x match a?    It does if y matches True!
-      --  Does y match True? It does if x matches True!
-      --  Does x match True? It does if y matches True!
-      --  Does y match True? ...
-      --
-      -- That would be an infinite loop. In fact, instead we are floating the expression
-      -- (i.e. True) to a new (named) heap binding, but that *doesn't* mean that we benefit from
-      -- the standard termination benefits of the PendingVar memoisation stuff. We get:
-      --  Does x match a? It does if y matches True!
-      --  Give True the name b.
-      --  Does y match b? It does if x matches True!
-      --  Give True the name c.
-      --  Does x match c? It does if y matches True!
-      --  Give True the name d
-      --  Does y match d? ...
-      --
-      -- This is still an infinite loop :-(
-      --
-      -- You might think any loop like this must go through at least 1 cheap term, because for it to continue
-      -- we have to repeatedly copy a heap binding to the common heap under many different names. This *is* true
-      -- but it's not so easy to see -- don't forget that only a *portion* of a heap binding needs to be copied
-      -- up to the common heap many times, so we might potentially have a loop where we repeatedly give distinct
-      -- names to the (expensive) term (fib 100) from the heap-bound term (/\a -> fib 100). (Examples with a value
-      -- lambda won't demonstrate this because we don't float expensive stuff from those). This is still OK though,
-      -- because to float that portion out an infinite number of times we have to copy the enclosing cheap binding
-      -- an infinite number of times too.
-      --
-      -- Since the loop *does* always go through at least 1 cheap term, you might think a suitable solution to the
-      -- problem is to memoise PendingTerm pairs *iff* both sides of the pair are cheap (we CANNOT memoise these
-      -- pairs in general or we may increase sharing). Although that solves the termination issue, it isn't much
-      -- better. We get:
-      --  Does x match a? It does if y matches True!
-      --  Give True the name b.
-      --  Does y match b? It does if x matches True!
-      --  Give True the name c.
-      --  Does x match c? It does if y matches True, AND we've seen this before - reuse that decision.
-      --
-      -- So the MSGed term is:
-      --  d |-> e
-      --  e |-> d
-      --  d
-      --
-      -- This is clearly not instantiable to derive the RHS!
-      --
-      -- NB: this problem is not restricted to values/cheap stuff. We can also run into an infinite loop with e.g.:
-      --  a |-> a  `msg`  fib 100
-      --  a
-      --
-      -- We would get:
-      --  Does a match fib 100? It does if a matches fib 100, AND we've seen this before - reuse that decision.
-      --
-      -- Or without renaming but with introducing new names:
-      --  Does a match fib 100? It does if a matches fib 100!
-      --  Give fib 100 the name b.
-      --  Does a match b? It does if a matches fib 100!
-      --  ...
-      --
-      -- TODO: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches.
-      -- FIXME: carefully document the basis (if any) by which I believe it is OK to MSG stuff out like this
-      --        Naively it seems rather dangerous. Consider:
-      --        1. Supercompile (let f = \x. x in f)
-      --        2. Split to (\x. x)
-      --        3. MSG against the simple variable b (with the same tag, presumably)
-      --        4. Instance-split will drive (\x. x) as the next term, so we might tieback to get a loop :(
-      {-
-      | Just (x_l, e_r) <- varTermPair e_l e_r
-      , let (ids_r', x_r) = uniqAway' ids_r x_common
-      = go rn_l rn_r used_l used_r init_h_l (M.insert x_r (internallyBound (renamedTerm e_r)) init_h_r) (Heap h_l ids_l) (Heap h_r ids_r') h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
-      
-      | Just (x_r, e_l) <- varTermPair e_r e_l
-      , let (ids_l', x_l) = uniqAway' ids_l x_common
-      = go rn_l rn_r used_l used_r (M.insert x_l (internallyBound (renamedTerm e_l)) init_h_l) init_h_r (Heap h_l ids_l') (Heap h_r ids_r) h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
-      -}
+    -- We always begin by optimistically MSGing the stack together, though we might have to rollback later
+    (msg_s', (k_l, k, k_r)) = msgStack init_rn2 msg_e msg_s k_l k_r
+    (Pair l_to_r r_to_l, pending') = foldr go_stack (Pair emptyVarEnv emptyVarEnv, []) (msgPending msg_s')
+    msg_s'' = msg_s' { msgPending = pending' }
 
-      | msg_s <- msg_s { msgPending = rest }
-      -- We already know the terms don't match so we are going to generalise
-      --
-      -- NB: we rely on the fact that x_common always has no extra info here, because we need to effectively apply the left/right
-      -- hand side renaming to the Id extra info. If we don't then we end up having binders like (x :: genty) in the left/right heaps
-      -- when the left/right renaming contains a mapping like (genty |-> Int).
-      --
-      -- We can just barely get away with this in the type/coercion cases because the types/coercions don't get bindings per-se, they are just added to the renaming
-      = prod (do let (ids_l', x_common_l) = uniqAway' ids_l (x_common `setVarType` termType e_l)
-                     (ids_r', x_common_r) = uniqAway' ids_r (x_common `setVarType` termType e_r)
-                 (used_l', h_l') <- sucks init_h_l k_bvs_l (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) used_l (annedTermFreeVars e_l `unionVarSet` varBndrFreeVars x_common_l)
-                 (used_r', h_r') <- sucks init_h_r k_bvs_l (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) used_r (annedTermFreeVars e_r `unionVarSet` varBndrFreeVars x_common_r)
-                 return (go (insertIdRenaming rn_l x_common x_common_l) (insertIdRenaming rn_r x_common x_common_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalisedLambdaBound h) msg_s))
-    go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
-      -- NB: the heap only ever maps TyVars to lambdaBound/generalised, so there is no point trying to detect TyVars on either side
-      | msg_s <- msg_s { msgPending = rest }
-      -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
-      = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
-                 (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
-                 return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert a_common generalisedLambdaBound h) msg_s))
-    go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
-      -- TODO: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
-      -- the non-variable into a new heap binding which looks just like it was in the initial heap on the left/right and then matching the variable pair we are
-      -- left with as normal.
-      --
-      -- The only problem with this plan is that co_l and co_r are untagged, so I wouldn't know how to tag the new heap bindings. The best I can do given the current
-      -- supercompiler data types is to tag the new coercion HeapBindings with the tags of the *thing that they coerce*, which doesn't seem cool at all!
-      --
-      -- Doing this may also suffer from the standard problems with instance matching (see PendingTerm)
-      | msg_s <- msg_s { msgPending = rest }
-      -- We already know the coercions don't match so we are going to generalise
-      = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
-                 (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyCoVarsOfCo co_r)
-                 return (go (insertCoercionSubst rn_l q_common co_l) (insertCoercionSubst rn_r q_common co_r) used_l' used_r' init_h_l init_h_r
-                            (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert q_common generalisedLambdaBound h) msg_s))
+    k_bvs = stackBoundVars k
 
-    find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
+    -- Discharge all Pendings arising from commoned-up stack frames, so we don't have to worry about encountering them in "go" below
+    go_stack :: (Var, Pending) -> (Pair (VarEnv (Var, Var)), [(Var, Pending)])
+                               -> (Pair (VarEnv (Var, Var)), [(Var, Pending)])
+    go_stack (x_common, pending) (Pair l_to_r r_to_l, pendings) = case pending of
+      PendingVar x_l x_r | x_common `elemVarSet` k_bvs -> (Pair (insertVarEnv l_to_r x_l (x_common, x_r), insertVarEnv r_to_l x_r (x_common, x_l)), pendings)
+      _ -> (Pair l_to_r r_to_l, pending:pendings)
+
+    go :: MSGState  -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
+       -> Looper ((Renaming, Renaming), (Heap, Heap, Heap), (Stack, Stack, Stack))
+    go msg_s (Pair info_l@((init_h_l, used_l), l_to_r, (Heap h_l ids_l, rn_l, k_l))
+                   info_r@((init_h_r, used_r), r_to_l, (Heap h_r ids_r, rn_r, k_r))) h k
+      = case (case msg_s of MSGState { msgPending = [], msgInScopeSet = ids } -> Left ids; MSGState { msgPending = (v_common, pending):rest } -> Right (v_common, pending, msg_s { msgPending = rest })) of
+          -- NB: it is very important that the final InScopeSet includes not only the InScopeSet from the MSGState (which
+          -- will include all of the common *heap* bound variables) but also that from the RnEnv2 (which will include
+          -- all of the common *stack* bound variables).
+          Left ids -> ((rn_l, rn_r), (Heap h_l ids_l, Heap h (ids `unionInScope` rnInScopeSet rn2), Heap h_r ids_r), (k_l, k, k_r)) -- FIXME: rn2 should always have an empty in scope set, something is amiss/redundant here now
+          -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
+          Right (x_common, PendingVar x_l x_r, msg_s)
+            | Right res <- do (used_l, hb_l) <- mb_common_l -- FIXME: handle case where bound by the *same* update frames
+                              (used_r, hb_r) <- mb_common_r
+                              hb_l_inj <- inject hb_l
+                              hb_r_inj <- inject hb_r
+                              (msg_s, hb) <- case (hb_l_inj, hb_r_inj) of
+                                (Just (let_bound_l, in_e_l), Just (let_bound_r, in_e_r))
+                                  | let_bound_l == let_bound_r
+                                  , not let_bound_r || (x_l == x_r && x_r == x_common) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
+                                  , Right (msg_s, in_e) <- case () of
+                                       -- Optimisation: attempt to match using the "common heap vars" trick.
+                                       -- If this fails we can always try to match in a legit manner, but I
+                                       -- expect this to shortcut the full term matching route almost all of
+                                       -- the time if this guard succeeds.
+                                       --
+                                       -- The reason that this hack should almost always work is because I
+                                       -- expect common-heap stuff to be mostly matched against *itself*
+                                       -- first, so the assigned "common" var will be the same as the *input*
+                                       -- variable. This allows us to safely use the *right hand* term as the
+                                       -- *common* HeapBinding without any sort of changes to variables.
+                                       _ | x_l == x_r, x_r `elemInScopeSet` msgCommonHeapVars mm
+                                         , let l_fvs = inFreeVars annedTermFreeVars in_e_l
+                                               r_fvs = inFreeVars annedTermFreeVars in_e_r
+                                         , l_fvs == r_fvs
+                                         , Right res <- runMSG msg_e msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgLoop: shortcut" (x' == x) >> return ()) r_fvs
+                                                                                return in_e_r -- Right biased
+                                         -> Right res
+                                         | otherwise
+                                         -> runMSG msg_e msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                                  -> return (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
+                                (Nothing, Nothing)
+                                  | x_l == x_r && x_r == x_common -- Note [MSGing let-bounds]
+                                  -> return (msg_s, hb_r) -- Right biased
+                                _ -> Left "msgLoop: non-unifiable heap bindings"
+                              -- If they match, we need to make a common heap binding
+                              return $ go msg_s (Pair ((init_h_l, used_l), extendVarEnv l_to_r x_l (x_common, x_r), (Heap h_l ids_l, rn_l, k_l))
+                                                      ((init_h_r, used_r), extendVarEnv r_to_l x_r (x_common, x_l), (Heap h_r ids_r, rn_r, k_r)))
+                                                (M.insert x_common hb h) k
+            -> res
+            | otherwise
+               -- If they don't match/either side is lambda-bound, we need to generalise
+               -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
+               -- that binding refers to. If that is not possible, we have to fail.
+            -> suck (Just x_common) x_l (suck (Just x_common) x_r (go msg_s . swap) . swap) -- TODO: I'm not really feeling this (Just x_common) argument, do it the other way
+                    (Pair info_l info_r) (M.insert x_common generalisedLambdaBound h) k -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
+             where
+               (mb_common_l, _mb_individual_l) = find init_h_l init_k_l used_l h_l k_l x_l -- TODO: cleanup
+               (mb_common_r, _mb_individual_r) = find init_h_r init_k_r used_r h_r k_r x_r
+          -- NB: I can try to avoid generalisation when e_l or e_r is just a heap-bound variable. We do this by floating the non-variable into a new heap binding
+          -- which looks just like it was in the inital heap on the left/right and then matching the variable pair we are left with as normal.
+          --
+          -- Note [Non-terminating instance matches]
+          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          --
+          -- We need to carefully avoid termination issues that arise from terms like:
+          --  x |-> y
+          --  y |-> x  `msg`  a |-> True
+          --  x               a
+          --
+          -- Where we might go:
+          --  Does x match a?    It does if y matches True!
+          --  Does y match True? It does if x matches True!
+          --  Does x match True? It does if y matches True!
+          --  Does y match True? ...
+          --
+          -- That would be an infinite loop. In fact, instead we are floating the expression
+          -- (i.e. True) to a new (named) heap binding, but that *doesn't* mean that we benefit from
+          -- the standard termination benefits of the PendingVar memoisation stuff. We get:
+          --  Does x match a? It does if y matches True!
+          --  Give True the name b.
+          --  Does y match b? It does if x matches True!
+          --  Give True the name c.
+          --  Does x match c? It does if y matches True!
+          --  Give True the name d
+          --  Does y match d? ...
+          --
+          -- This is still an infinite loop :-(
+          --
+          -- You might think any loop like this must go through at least 1 cheap term, because for it to continue
+          -- we have to repeatedly copy a heap binding to the common heap under many different names. This *is* true
+          -- but it's not so easy to see -- don't forget that only a *portion* of a heap binding needs to be copied
+          -- up to the common heap many times, so we might potentially have a loop where we repeatedly give distinct
+          -- names to the (expensive) term (fib 100) from the heap-bound term (/\a -> fib 100). (Examples with a value
+          -- lambda won't demonstrate this because we don't float expensive stuff from those). This is still OK though,
+          -- because to float that portion out an infinite number of times we have to copy the enclosing cheap binding
+          -- an infinite number of times too.
+          --
+          -- Since the loop *does* always go through at least 1 cheap term, you might think a suitable solution to the
+          -- problem is to memoise PendingTerm pairs *iff* both sides of the pair are cheap (we CANNOT memoise these
+          -- pairs in general or we may increase sharing). Although that solves the termination issue, it isn't much
+          -- better. We get:
+          --  Does x match a? It does if y matches True!
+          --  Give True the name b.
+          --  Does y match b? It does if x matches True!
+          --  Give True the name c.
+          --  Does x match c? It does if y matches True, AND we've seen this before - reuse that decision.
+          --
+          -- So the MSGed term is:
+          --  d |-> e
+          --  e |-> d
+          --  d
+          --
+          -- This is clearly not instantiable to derive the RHS!
+          --
+          -- NB: this problem is not restricted to values/cheap stuff. We can also run into an infinite loop with e.g.:
+          --  a |-> a  `msg`  fib 100
+          --  a
+          --
+          -- We would get:
+          --  Does a match fib 100? It does if a matches fib 100, AND we've seen this before - reuse that decision.
+          --
+          -- Or without renaming but with introducing new names:
+          --  Does a match fib 100? It does if a matches fib 100!
+          --  Give fib 100 the name b.
+          --  Does a match b? It does if a matches fib 100!
+          --  ...
+          --
+          -- TODO: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches.
+          -- FIXME: carefully document the basis (if any) by which I believe it is OK to MSG stuff out like this
+          --        Naively it seems rather dangerous. Consider:
+          --        1. Supercompile (let f = \x. x in f)
+          --        2. Split to (\x. x)
+          --        3. MSG against the simple variable b (with the same tag, presumably)
+          --        4. Instance-split will drive (\x. x) as the next term, so we might tieback to get a loop :(
+          {-
+          | Just (x_l, e_r) <- varTermPair e_l e_r
+          , let (ids_r', x_r) = uniqAway' ids_r x_common
+          = go rn_l rn_r used_l used_r init_h_l (M.insert x_r (internallyBound (renamedTerm e_r)) init_h_r) (Heap h_l ids_l) (Heap h_r ids_r') h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
+          
+          | Just (x_r, e_l) <- varTermPair e_r e_l
+          , let (ids_l', x_l) = uniqAway' ids_l x_common
+          = go rn_l rn_r used_l used_r (M.insert x_l (internallyBound (renamedTerm e_l)) init_h_l) init_h_r (Heap h_l ids_l') (Heap h_r ids_r) h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
+          -}
+          Right (x_common, PendingTerm e_l e_r, msg_s)
+          -- We already know the terms don't match so we are going to generalise
+          --
+          -- NB: we rely on the fact that x_common always has no extra info here, because we need to effectively apply the left/right
+          -- hand side renaming to the Id extra info. If we don't then we end up having binders like (x :: genty) in the left/right heaps
+          -- when the left/right renaming contains a mapping like (genty |-> Int).
+          --
+          -- We can just barely get away with this in the type/coercion cases because the types/coercions don't get bindings per-se, they are just added to the renaming
+            -> sucks (annedTermFreeVars e_l `unionVarSet` varBndrFreeVars x_common_l) (sucks (annedTermFreeVars e_r `unionVarSet` varBndrFreeVars x_common_r) (go msg_s . swap) . swap)
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) ids_l', insertIdRenaming rn_l x_common x_common_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) ids_r', insertIdRenaming rn_r x_common x_common_r, k_r)))
+                     (M.insert x_common generalisedLambdaBound h) k
+            where (ids_l', x_common_l) = uniqAway' ids_l (x_common `setVarType` termType e_l)
+                  (ids_r', x_common_r) = uniqAway' ids_r (x_common `setVarType` termType e_r)
+          -- NB: the heap only ever maps TyVars to lambdaBound/generalised, so there is no point trying to detect TyVars on either side
+          Right (a_common, PendingType ty_l ty_r, msg_s)
+          -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
+            -> sucks (tyVarsOfType ty_l) (sucks (tyVarsOfType ty_r) (go msg_s . swap) . swap)
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, insertTypeSubst rn_l a_common ty_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, insertTypeSubst rn_r a_common ty_r, k_r)))
+                     (M.insert a_common generalisedLambdaBound h) k
+          -- TODO: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
+          -- the non-variable into a new heap binding which looks just like it was in the initial heap on the left/right and then matching the variable pair we are
+          -- left with as normal.
+          --
+          -- The only problem with this plan is that co_l and co_r are untagged, so I wouldn't know how to tag the new heap bindings. The best I can do given the current
+          -- supercompiler data types is to tag the new coercion HeapBindings with the tags of the *thing that they coerce*, which doesn't seem cool at all!
+          --
+          -- Doing this may also suffer from the standard problems with instance matching (see PendingTerm)
+          Right (q_common, PendingCoercion co_l co_r, msgS)
+          -- We already know the coercions don't match so we are going to generalise
+            -> sucks (tyCoVarsOfCo co_l) (sucks (tyCoVarsOfCo co_r) (go msg_s . swap) . swap)
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, insertCoercionSubst rn_l q_common co_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, insertCoercionSubst rn_r q_common co_r, k_r)))
+                     (M.insert q_common generalisedLambdaBound h) k
+
+    find :: PureHeap -> Stack -> S.Set Var -> PureHeap -> Stack
          -> Var -> (MSG' (S.Set Var, HeapBinding),
-                      -- Nothing ==> unavailable for common heap
-                      -- Just    ==> available for common heap with this usage
-                    MSG' (S.Set Var, Maybe HeapBinding))
+                      -- Nothing ==> unavailable for common heap/stack
+                      -- Just    ==> available for common heap/stack with this usage
+                    Maybe (Either (S.Set Var, HeapBinding, Bool) [Tagged StackFrame]))
+                      -- This action can never fail, though it might cause us to backtrack on our earlier commoning-up decisions...
+                      {-
                       -- Nothing      ==> unavailable for individual heap
                       -- Just Nothing ==> available for individual heap but already in it
                       -- Just Just    ==> available for individual heap and not in it yet
-    find init_h k_bvs h used x = second (\individual -> if x `M.member` h then return (used, Nothing) else liftM (second Just) individual) $ case M.lookup x init_h of
+                      -}
+    find init_h init_k used h k x = case M.lookup x init_h of
          -- Variable bound by the heap (vastly common case):
-        Just hb | S.notMember x used -> (return (used', hb),               return (used', hb))
-                | otherwise          -> (lft "used heap binding (common)", lft "used heap binding (individual)")
-          where used' | Just (_, e) <- heapBindingTerm hb
+        Just hb -> (common, individual)
+          where (common, must_rollback)
+                  | S.notMember x used = (return (used', hb),               False)
+                  | otherwise          = (lft "used heap binding (common)", True)
+                individual | x `M.member` h = Nothing
+                           | otherwise      = Just (Left (used', hb, must_rollback))
+                used' | Just (_, e) <- heapBindingTerm hb
                       , not (termIsCheap e)
                       = S.insert x used
                       | otherwise
                       = used
-         -- By a process of elimination, variable must be bound be the stack. Normally it will in fact be bound by the "instance" portion
-         -- of the stack because matches involving the common portion variables either already failed or were discharged by RnEnv2, but
-         -- if "find" is called by "sucks" then this may not necessarily be the case
-        Nothing -> (lft "used stack binding (common)", if x `elemVarSet` k_bvs then return (used, lambdaBound) else lft "used stack binding (individual)")
+         -- By a process of elimination, variables must be bound be the stack. We don't need to worry about returning a sensible answer
+         -- in the "common" case because we eagerly discharge all matches related to the stack that can possibly succeed before entering
+         -- the "go" loop. We do need to be careful about the individual portion because we may have to initiate rollback.
+        Nothing -> (lft "used stack binding (common)", case fst (splitByReverse (trainCars k) (trainCars init_k)) of
+                                                          Left _ -> panic "find: individual stack portion longer than a complete initial individual stack"
+                                                          Right init_k_common -> case dropWhile (\kf -> case tagee kf of Update x_kf -> x_kf /= x; _ -> True) init_k_common of
+                                                            -- In this case x was bound in the individual part and we are already done
+                                                            [] -> Nothing
+                                                            -- In this case we found x bound in the *common* part of the stack, must roll back
+                                                            init_k_after -> Just (Right init_k_after))
      where lft msg = Left (msg ++ ": " ++ showPpr x)
 
-    suck :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> MSG' (S.Set Var, PureHeap)
-    suck _      _     h _ (used, Nothing) = return (used, h)                                                                                   -- Already copied in
-    suck init_h k_bvs h x (used, Just hb) = sucks init_h k_bvs (M.insert x hb h) used (heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x) -- Not yet copied: put in and consider FVs
+    suck :: Maybe Var -> Var -> Looper a -> Looper a
+    suck mb_x_common x_lr kont (Pair ((init_h_lr, init_k_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, rn_lr0, k_lr)) info_rl) h k
+      = case snd (find init_h_lr init_k_lr used_lr h_lr k_lr x_lr) of
+          Nothing      -> kont (Pair ((init_h_lr, init_k_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, rn_lr1, k_lr)) info_rl) h k
+          Just ei_hb_k -> sucks (heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x_lr) kont'
+                                (Pair ((init_h_lr, init_k_lr, used_lr), lr_to_rl, (Heap h_lr' ids_lr, rn_lr2, k_lr)) info_rl) h' k'
+            where (used_lr', h', k', h_lr', rn_lr2, k_lr', kont') = case ei_hb_k of
+                    Left (used_lr, hb, must_rollback) | must_rollback -> (used_lr, M.insert x_common lambdaBound h, k, M.insert x_lr hb h_lr, insertVarRenaming rn_lr1 x_common x_lr, k_lr, suck (Just x_common) x_rl (kont . swap) . swap)
+                                                      | otherwise     -> (used_lr, h,                               k, M.insert x_lr hb h_lr, rn_lr1,                                 k_lr, kont)
+                    Right extra_k_lr -> (used_lr, h, fmapTail stackGeneralised (trainDropTailByList extra_k_lr k), h_lr, insertVarRenaming rn_lr1 x_common x_lr, foldr Car k_lr extra_k_lr, suck (Just x_common) x_rl (kont . swap) . swap) -- FIXME: common generalisation flag should come from right hand side, not a random side
+                  Just (x_common, x_rl) = lookupVarEnv lr_to_rl x_lr
+      where rn_lr1 = maybe rn_lr0 (\x_common -> insertVarRenaming rn_lr0 x_common x_lr) mb_x_common
 
-    sucks :: PureHeap -> BoundVars -> PureHeap -> S.Set Var -> FreeVars -> MSG' (S.Set Var, PureHeap)
-    sucks init_h k_bvs h used fvs = foldM (\(used, h) x -> snd (find init_h k_bvs h used x) >>= suck init_h k_bvs h x) (used, h) (varSetElems fvs)
+    sucks :: VarSet -> Looper a -> Looper a
+    sucks xs_lr kont = foldVarSet (suck Nothing) kont xs_lr
+
+    {-
+    suckl, suckr :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
+
+    suck :: (Var -> Var -> Var) -> PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
+    suck _   _      _     h _ (used, Nothing)          h_common k_common = return (used, h, h_common, k_common)                                                                                       -- Already copied in
+    suck sel init_h k_bvs h x (used, Just (hb, mb_rb)) h_common k_common = do
+      let h' = 
+      (h_common, k_common) <- maybe (return (h_common, k_common)) (\act -> act x_common h_common k_common >>= \(x_op, h_common, k_common) -> ) mb_rb
+      sucks sel init_h k_bvs h' used  h_common k_common -- Not yet copied: put in and consider FVs
+
+    sucks :: (Var -> Var -> Var) -> PureHeap -> BoundVars -> PureHeap -> S.Set Var -> FreeVars -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
+    sucks sel init_h k_bvs h used fvs h_common k_common = foldM (\(used, h, h_common, k_common) x -> suck sel init_h k_bvs h x (snd (find sel init_h k_bvs h used x)) h_common k_common) (used, h, h_common, k_common) (varSetElems fvs)
+    -}
 
     {-
     varTermPair :: AnnedTerm -> AnnedTerm -> Maybe (Var, AnnedTerm)
@@ -1201,7 +1234,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
     inject (HB { howBound = how_bound, heapBindingMeaning = meaning })
       | LambdaBound <- how_bound
       , Left _ <- meaning
-      = Left "msgPureHeap: lambda-bounds must be generalised"
+      = Left "msgLoop: lambda-bounds must be generalised"
       | LetBound <- how_bound
       , Left _ <- meaning
       = return Nothing
@@ -1212,11 +1245,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       , Right in_e <- meaning
       = return $ Just (let_bound, in_e)
       | otherwise
-      = pprPanic "msgPureHeap: unhandled heap binding format" (ppr how_bound $$ (case meaning of Left _ -> text "Left"; Right _ -> text "Right"))
-
-prod :: MSG' [MSG' a] -> [MSG' a]
-prod (Left msg)  = [Left msg]
-prod (Right mxs) = mxs
+      = pprPanic "msgLoop: unhandled heap binding format" (ppr how_bound $$ (case meaning of Left _ -> text "Left"; Right _ -> text "Right"))
 
 guardFloatable :: String -> (a -> FreeVars) -> RnEnv2 -> a -> a -> MSG ()
 guardFloatable msg fvs rn2 x_l x_r = guard (msg ++ ": unfloatable") (canFloat fvs (rnOccL_maybe rn2) x_l && canFloat fvs (rnOccR_maybe rn2) x_r)

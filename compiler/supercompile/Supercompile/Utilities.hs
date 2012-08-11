@@ -439,13 +439,14 @@ safeTail (_:xs) = xs
 expectHead :: String -> [a] -> a
 expectHead s = expectJust s . safeHead
 
-splitBy :: [b] -> [a] -> ([a], Either [b] [a])
+splitBy :: [b] -> [a] -> ([a], Either (b, [b]) [a])
 splitBy []     xs     = ([], Right xs)
-splitBy (y:ys) []     = ([], Left (y:ys))
+splitBy (y:ys) []     = ([], Left (y, ys))
 splitBy (_:ys) (x:xs) = first (x:) $ splitBy ys xs
 
-splitByReverse :: [b] -> [a] -> (Either [b] [a], [a])
-splitByReverse ys xs = case splitBy (reverse ys) (reverse xs) of (xs1, ei_ys1_xs2) -> (either (Left . reverse) (Right . reverse) ei_ys1_xs2, reverse xs1)
+splitByReverse :: [b] -> [a] -> (Either ([b], b) [a], [a])
+splitByReverse ys xs = case splitBy (reverse ys) (reverse xs) of (xs1, ei_ys1_xs2) -> (either (Left . first reverse . swp) (Right . reverse) ei_ys1_xs2, reverse xs1)
+  where swp = uncurry (flip (,))
 
 listContexts :: [a] -> [([a], a, [a])]
 listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs))
@@ -838,6 +839,27 @@ trainLeftExtensionBy f_car f_loco xs ys = do
 trainLength :: Train a b -> Int
 trainLength = trainCarFoldl' (\n _ -> n + 1) 0
 
+{-
+trainDropTailByList :: Train c d
+                    -> Train a b
+                    -> Train a (Train a b)
+trainDropTailByList cds abs = case go abs of Left cds -> Loco abs; Right abs -> abs
+  where go (Loco _)    = Left cds
+        go (Car a abs) = case go abs of
+          Left cds -> case cds of
+            Loco _    -> Right (Car a (Loco abs))
+            Car _ cds -> Left cds
+          Right abs' -> Right (Car a abs')
+
+trainUpTo :: (a -> Bool)
+          -> Train a b
+          -> Maybe ([a], a, Train a b)
+trainUpTo p = go
+  where go (Loco _)    = Nothing
+        go (Car a abs)
+          | p a       = Just ([], a, abs)
+          | otherwise = liftM (first3 (a:)) $ go abs
+-}
 
 data Stream a = a :< Stream a
 
