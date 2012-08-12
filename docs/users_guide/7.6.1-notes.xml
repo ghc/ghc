@@ -17,9 +17,31 @@
 
     <itemizedlist>
       <listitem>
-          <para>
-              TODO
-          </para>
+        <para>
+          Polymorphic kinds and data promotion are now fully implemented and
+          supported features: <xref linkend="kind-polymorphism" />.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Windows 64bit is now a supported platform.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to defer type errors until runtime using the
+          <literal>-fdefer-type-errors</literal> flag.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The RTS now supports changing the number of capabilities at runtime
+          with <literal>Control.Concurrent.setNumCapabilities</literal>: <xref
+            linkend="parallel-options" />.
+        </para>
       </listitem>
     </itemizedlist>
   </sect2>
@@ -29,75 +51,251 @@
     <sect3>
         <title>Language</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                    CAPI now supported (it was in 7.4, but not
-                    documented or officially supported).
-                </para>
-            </listitem>
+          <listitem>
+            <para>
+              There is a new extension <literal>ExplicitNamespaces</literal>
+              that allows to qualify the export of a type with the
+              <literal>type</literal> keyword.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              The behavior of the <literal>TypeOperator</literal> extension has
+              changed: previously, only type operators starting with ":" were
+              considered type constructors, and other operators were treated as
+              type variables. Now type operators are always constructors.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              It is now possible to explicitly annotate types with kind
+              variables (<ulink
+                url="http://hackage.haskell.org/trac/ghc/ticket/5862">#5862</ulink>).
+              You can now write, for example:
+<programlisting>
+class Category (c :: k -> k -> *) where
+  type Ob c :: k -> Constraint
+  id :: Ob c a => c a a
+  (.) :: (Ob c a, Ob c b, Ob c c) => c b c -> c a b -> c a c
+</programlisting>
+              and the variable <literal>k</literal>, ranging over kinds, is in scope within the
+              class declaration.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              It is now possible to derive instances of
+              <literal>Generic1</literal> automatically. See <xref
+                linkend="generic-programming" /> for more information.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new FFI calling convention <literal>capi</literal>,
+              enabled by the <literal>CAPI</literal> extension. For example,
+              given the following declaration:
+<programlisting>
+foreign import capi "header.h f" f :: CInt -> IO CInt
+</programlisting>
+              GHC will generate code to call <literal>f</literal> using the C
+              API defined in the header <literal>header.h</literal>. Thus
+              <literal>f</literal> can be called even if it may be defined as a
+              CPP <literal>#define</literal>, rather than a proper function.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new pragma <literal>CTYPE</literal>, which can be used
+              to specify the C type that a Haskell type corresponds to, when it
+              is used with the <literal>capi</literal> calling convention.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              Generic default methods are now allowed for multi-parameter type classes.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              A constructor of a GADT is now considered infix (by a derived
+              <literal>Show</literal> instance) if it is a two-argument
+              operator with a fixity declaration (<ulink
+                url="http://hackage.haskell.org/trac/ghc/ticket/5712">#5712</ulink>).
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new extension <literal>InstanceSigs</literal>, which
+              allows type signatures to be specified in instance declarations.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              GHC now supports numeric and string type literals (enabled by
+              <literal>DataKinds</literal>), of kind <literal>Nat</literal> and
+              <literal>Symbol</literal> respectively (see <xref
+                  linkend="promoted-literals" />).
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              The type <literal>Any</literal> can now be used as an argument
+              for <literal>foreign prim</literal> functions.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              The <literal>mdo</literal> keyword has been reintroduced. This
+              keyword can be used to create <literal>do</literal> expressions
+              with recursive bindings. The behavior of the
+              <literal>rec</literal> keyword has been changed, so that it does
+              not perform automatic segmentation in a <literal>do</literal>
+              expression anymore.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new syntactic construct (enabled by the <literal>LambdaCase</literal> extension)
+              for creating an anonymous function out of a <literal>case</literal> expression. For example,
+              the following expression:
+<programlisting>
+\case
+    Nothing -> 0
+    Just n  -> n
+</programlisting>
+              is equivalent to:
+<programlisting>
+\x -> case x of
+    Nothing -> 0
+    Just n  -> n
+</programlisting>
+              See <xref linkend="lambda-case" /> for more details.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new syntactic construct (enabled by the
+              <literal>MultiWayIf</literal> extension) to create conditional
+              expressions with multiple branches. For example, you can now
+              write:
+<programlisting>
+if | x == 0    -> [...]
+   | x &gt; 1     -> [...]
+   | x &lt; 0     -> [...]
+   | otherwise -> [...]
+</programlisting>
+              See <xref linkend="multi-way-if" /> for more information.
+            </para>
+          </listitem>
         </itemizedlist>
     </sect3>
 
     <sect3>
         <title>Compiler</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
+          <listitem>
+             <para>
+               The <literal>-package</literal> flag now correctly loads only
+               the most recent version of a package (<ulink
+                 url="http://hackage.haskell.org/trac/ghc/ticket/7030">#7030</ulink>).
+             </para>
+           </listitem>
+          <listitem>
+             <para>
+               In <literal>--make</literal> mode, GHC now gives an indication
+               of why a module is being recompiled.
+             </para>
+          </listitem>
+          <listitem>
+            <para>
+              There is a new flag <literal>-freg-liveness</literal> flag to control if
+                STG liveness information is used for optimisation. The flag is
+                enabled by default.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              Package database flags have been renamed from
+              <literal>-package-conf*</literal> to
+              <literal>-package-db*</literal>.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              It is now possible to hide the global package db, and specify the
+              order of the user and global package databases in the stack (see
+              <xref linkend="package-databases" />).
+            </para>
+          </listitem>
         </itemizedlist>
     </sect3>
 
     <sect3>
         <title>GHCi</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
+           <listitem>
+              <para>
+                Commands defined later have now precedence in the resolution of
+                abbreviated commands (<ulink
+                  url="http://hackage.haskell.org/trac/ghc/ticket/3858">#3858</ulink>).
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                It is now possible to specify a custom pretty-printing function
+                for expressions evaluated at the prompt using the
+                <literal>-interactive-print</literal> flag.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                GHCi now supports loading additional <literal>.ghci</literal>
+                files via the <literal>-ghci-script</literal> flag (<ulink
+                  url="http://hackage.haskell.org/trac/ghc/ticket/5265">#5265</ulink>).
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                A new <literal>:seti</literal> command has been introduced,
+                which sets an option that applies only at the prompt.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                Files are now reloaded after having been edited with the <literal>:edit</literal> command.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                <literal>default</literal> declarations can now be entered at the GHCi prompt.
+              </para>
+           </listitem>
         </itemizedlist>
     </sect3>
 
     <sect3>
         <title>Template Haskell</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
-        </itemizedlist>
-    </sect3>
-
-    <sect3>
-        <title>Profiling</title>
-        <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
-        </itemizedlist>
-    </sect3>
-
-    <sect3>
-        <title>Event logging</title>
-        <itemizedlist>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
+           <listitem>
+              <para>
+                Promoted kinds and kind polymorphism are now supported in
+                Template Haskell.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                It is now possible to create fixity declarations in Template
+                Haskell (<ulink
+                  url="http://hackage.haskell.org/trac/ghc/ticket/1541">#1541</ulink>).
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                Primitive byte-array literals can now be created with Template
+                Haskell (<ulink
+                  url="http://hackage.haskell.org/trac/ghc/ticket/5877">#5877</ulink>).
+              </para>
+           </listitem>
         </itemizedlist>
     </sect3>
 
@@ -105,9 +303,25 @@
         <title>Runtime system</title>
         <itemizedlist>
             <listitem>
-                <para>
-                    TODO
-                </para>
+              <para>
+                The presentation of parallel GC work balance in <literal>+RTS
+                  -s</literal> is now expressed as a percentage value (with
+                100% being "perfect") instead of a number from 1 to N, with N
+                being the number of capabilities.
+              </para>
+            </listitem>
+            <listitem>
+              <para>
+                The RTS now supports changing the number of capabilities at runtime
+                with <literal>Control.Concurrent.setNumCapabilities</literal>: <xref
+                  linkend="parallel-options" />.
+              </para>
+            </listitem>
+            <listitem>
+              <para>
+                The internal timer is now based on a monotonic clock in both
+                the threaded and non-threaded RTS, on all tier-1 platforms.
+              </para>
             </listitem>
         </itemizedlist>
     </sect3>
@@ -115,31 +329,22 @@
     <sect3>
         <title>Build system</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
+           <listitem>
+              <para>
+                GHC >= 7.0 is now required for bootstrapping.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                Windows 64bit is now a supported platform.
+              </para>
+           </listitem>
         </itemizedlist>
     </sect3>
   </sect2>
 
   <sect2>
     <title>Libraries</title>
-
-    <para>
-        TODO
-        There have been some changes that have effected multiple
-        libraries:
-    </para>
-
-    <itemizedlist>
-        <listitem>
-            <para>
-                TODO
-            </para>
-        </listitem>
-    </itemizedlist>
 
     <sect3>
         <title>array</title>
@@ -155,11 +360,143 @@
     <sect3>
         <title>base</title>
         <itemizedlist>
-            <listitem>
-                <para>
-                    Version number TODO (was TODO)
-                </para>
-            </listitem>
+           <listitem>
+              <para>
+                Version number 4.6.0.0 (was 4.5.1.0)
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The <literal>Text.Read</literal> module now exports functions
+<programlisting>
+readEither :: Read a => String -> Either String a
+readMaybe :: Read a => String -> Maybe a
+</programlisting>
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                An infix alias for <literal>mappend</literal> in <literal>Data.Monoid</literal> has been introduced:
+<programlisting>
+(&lt;&gt;) :: Monoid m => m -> m -> m
+</programlisting>
+
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The <literal>Bits</literal> class does not have a <literal>Num</literal> superclass anymore.
+              </para>
+              <para>
+                You can make code that works with both
+                Haskell98/Haskell2010 and GHC by:
+                <itemizedlist>
+                  <listitem>
+                    <para>
+                      Whenever you make a <literal>Bits</literal> instance
+                      of a type, also make <literal>Num</literal> instance, and
+                    </para>
+                  </listitem>
+                  <listitem>
+                    <para>
+                      Whenever you give a function, instance or class a
+                      <literal>Bits t</literal> constraint, also give it
+                      a <literal>Num t</literal> constraint.
+                    </para>
+                  </listitem>
+                </itemizedlist>
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                <literal>Applicative</literal> and
+                <literal>Alternative</literal> instances for the
+                <literal>ReadP</literal> and <literal>ReadPrec</literal> monads
+                have been added.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                <literal>foldl'</literal> and <literal>foldr'</literal> in
+                <literal>Data.Foldable</literal> are now methods of the
+                <literal>Foldable</literal> class.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The deprecated <literal>Control.OldException</literal> module has now been removed.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                Strict versions of <literal>modifyIORef</literal> and <literal>atomicModifyIORef</literal> have been added to the <literal>Data.IORef</literal> module:
+<programlisting>
+modifyIORef' :: IORef a -> (a -> a) -> IO ()
+atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
+</programlisting>
+              </para>
+              <para>
+                Similarly, a strict version of <literal>modifySTRef</literal>
+                has been added to <literal>Data.STRef</literal>.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                A bug in the fingerprint calculation for
+                <literal>TypeRep</literal> (<ulink
+                  url="http://hackage.haskell.org/trac/ghc/ticket/5962">#5962</ulink>)
+                has been fixed.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                A new function <literal>lookupEnv</literal> has been added to
+                <literal>System.Environment</literal>, which behaves like
+                <literal>getEnv</literal>, but returns
+                <literal>Nothing</literal> when the environment variable is
+                not defined, instead of throwing an exception.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                There is a new function <literal>getGCStatsEnabled</literal> in
+                <literal>GHC.Stats</literal>, which checks whether GC stats
+                have been enabled (for example, via the <literal>-T</literal>
+                RTS flag).
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                <literal>QSem</literal> in
+                <literal>Control.Concurrent</literal> is now deprecated, and
+                will be removed in GHC 7.8. Please use an alternative, e.g. the
+                SafeSemaphore package, instead.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                A new function <literal>getExecutablePath</literal> has been
+                added to <literal>System.Environment</literal>. This function
+                returns the full path of the current executable, as opposed to
+                <literal>getProgName</literal>, which only returns the base
+                name.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The <literal>Data.HashTable</literal> module is now deprecated,
+                and will be removed in GHC 7.8. Please use an alternative, e.g.
+                the hashtables package, instead.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The <literal>Data.Ord</literal> module now exports the
+                <literal>Down</literal> <literal>newtype</literal>, which
+                reverses the sort order of its argument.
+              </para>
+           </listitem>
+
         </itemizedlist>
     </sect3>
 
