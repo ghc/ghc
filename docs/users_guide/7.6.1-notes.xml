@@ -187,6 +187,31 @@ if | x == 0    -> [...]
               See <xref linkend="multi-way-if" /> for more information.
             </para>
           </listitem>
+          <listitem>
+            <para>
+              Some limitations on the usage of unboxed tuples have been lifted.
+              For example, when the <literal>UnboxedTuples</literal> extension
+              is on, an unboxed tuple can now be used as the type of a
+              constructor, function argument, or variable:
+<programlisting>
+data Foo = Foo (# Int, Int #)
+
+f :: (# Int, Int #) -&gt; (# Int, Int #)
+f x = x
+
+g :: (# Int, Int #) -&gt; Int
+g (# a,b #) = a
+
+h x = let y = (# x,x #) in ...
+</programlisting>
+            </para>
+            <para>
+              Unboxed tuple can now also be nested:
+<programlisting>
+f :: (# Int, (# Int, Int #), Bool #)
+</programlisting>
+            </para>
+          </listitem>
         </itemizedlist>
     </sect3>
 
