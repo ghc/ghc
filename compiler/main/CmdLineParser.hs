@@ -27,6 +27,7 @@ import Panic
 import Bag
 import SrcLoc
 
+import Data.Function
 import Data.List
 
 
@@ -194,11 +195,12 @@ processOneArg opt_kind rest arg args
 
 findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg =
-    case [ (removeSpaces rest, optKind)
-         | flag <- spec,
-           let optKind  = flagOptKind flag,
-           Just rest <- [stripPrefix (flagName flag) arg],
-           arg_ok optKind rest arg ]
+    case sortBy (compare `on` (length . fst)) -- prefer longest matching flag
+           [ (removeSpaces rest, optKind)
+           | flag <- spec,
+             let optKind  = flagOptKind flag,
+             Just rest <- [stripPrefix (flagName flag) arg],
+             arg_ok optKind rest arg ]
     of
         []      -> Nothing
         (one:_) -> Just one
