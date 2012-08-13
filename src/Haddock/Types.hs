@@ -59,10 +59,10 @@ type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 data Interface = Interface
   {
     -- | The module behind this interface.
-    ifaceMod             :: Module
+    ifaceMod             :: !Module
 
     -- | Original file name of the module.
-  , ifaceOrigFilename    :: FilePath
+  , ifaceOrigFilename    :: !FilePath
 
     -- | Textual information about the module.
   , ifaceInfo            :: !(HaddockModInfo Name)
@@ -71,7 +71,7 @@ data Interface = Interface
   , ifaceDoc             :: !(Documentation Name)
 
     -- | Documentation header with cross-reference information.
-  , ifaceRnDoc           :: Documentation DocName
+  , ifaceRnDoc           :: !(Documentation DocName)
 
     -- | Haddock options for this module (prune, ignore-exports, etc).
   , ifaceOptions         :: ![DocOption]
@@ -79,22 +79,22 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: Map Name [LHsDecl Name]
+  , ifaceDeclMap         :: !(Map Name [LHsDecl Name])
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
-  , ifaceDocMap          :: DocMap Name
-  , ifaceArgMap          :: ArgMap Name
+  , ifaceDocMap          :: !(DocMap Name)
+  , ifaceArgMap          :: !(ArgMap Name)
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
-  , ifaceRnDocMap        :: DocMap DocName
-  , ifaceRnArgMap        :: ArgMap DocName
+  , ifaceRnDocMap        :: !(DocMap DocName)
+  , ifaceRnArgMap        :: !(ArgMap DocName)
 
-  , ifaceSubMap          :: Map Name [Name]
+  , ifaceSubMap          :: !(Map Name [Name])
 
   , ifaceExportItems     :: ![ExportItem Name]
-  , ifaceRnExportItems   :: [ExportItem DocName]
+  , ifaceRnExportItems   :: ![ExportItem DocName]
 
     -- | All names exported by the module.
   , ifaceExports         :: ![Name]
@@ -105,14 +105,14 @@ data Interface = Interface
   , ifaceVisibleExports  :: ![Name]
 
     -- | Aliases of module imports as in @import A.B.C as C@.
-  , ifaceModuleAliases   :: AliasMap
+  , ifaceModuleAliases   :: !AliasMap
 
     -- | Instances exported by the module.
   , ifaceInstances       :: ![ClsInst]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
-  , ifaceHaddockCoverage :: (Int,Int)
+  , ifaceHaddockCoverage :: !(Int, Int)
   }
 
 
@@ -172,51 +172,51 @@ data ExportItem name
   = ExportDecl
       {
         -- | A declaration.
-        expItemDecl :: LHsDecl name
+        expItemDecl :: !(LHsDecl name)
 
         -- | Maybe a doc comment, and possibly docs for arguments (if this
         -- decl is a function or type-synonym).
-      , expItemMbDoc :: DocForDecl name
+      , expItemMbDoc :: !(DocForDecl name)
 
         -- | Subordinate names, possibly with documentation.
-      , expItemSubDocs :: [(name, DocForDecl name)]
+      , expItemSubDocs :: ![(name, DocForDecl name)]
 
         -- | Instances relevant to this declaration, possibly with
         -- documentation.
-      , expItemInstances :: [DocInstance name]
+      , expItemInstances :: ![DocInstance name]
       }
 
   -- | An exported entity for which we have no documentation (perhaps because it
   -- resides in another package).
   | ExportNoDecl
-      { expItemName :: name
+      { expItemName :: !name
 
         -- | Subordinate names.
-      , expItemSubs :: [name]
+      , expItemSubs :: ![name]
       }
 
   -- | A section heading. 
   | ExportGroup
       {
         -- | Section level (1, 2, 3, ...).
-        expItemSectionLevel :: Int
+        expItemSectionLevel :: !Int
 
         -- | Section id (for hyperlinks).
-      , expItemSectionId :: String
+      , expItemSectionId :: !String
 
         -- | Section heading text.
-      , expItemSectionText :: Doc name
+      , expItemSectionText :: !(Doc name)
       }
 
   -- | Some documentation.
-  | ExportDoc (Doc name)
+  | ExportDoc !(Doc name)
 
   -- | A cross-reference to another module.
-  | ExportModule Module
+  | ExportModule !Module
 
 data Documentation name = Documentation
   { documentationDoc :: Maybe (Doc name)
-  , documentationWarning :: Maybe (Doc name)
+  , documentationWarning :: !(Maybe (Doc name))
   } deriving Functor
 
 
@@ -355,11 +355,11 @@ data DocMarkup id a = Markup
 
 
 data HaddockModInfo name = HaddockModInfo
-  { hmi_description :: Maybe (Doc name)
-  , hmi_portability :: Maybe String
-  , hmi_stability   :: Maybe String
-  , hmi_maintainer  :: Maybe String
-  , hmi_safety      :: Maybe String
+  { hmi_description :: (Maybe (Doc name))
+  , hmi_portability :: (Maybe String)
+  , hmi_stability   :: (Maybe String)
+  , hmi_maintainer  :: (Maybe String)
+  , hmi_safety      :: (Maybe String)
   }
 
 

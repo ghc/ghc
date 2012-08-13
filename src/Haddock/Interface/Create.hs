@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, BangPatterns #-}
+{-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Create
@@ -27,6 +28,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Ord
 import Control.Applicative
+import Control.DeepSeq
 import Control.Monad
 import qualified Data.Traversable as T
 
@@ -48,13 +50,13 @@ import FastString (unpackFS)
 createInterface :: TypecheckedModule -> [Flag] -> IfaceMap -> InstIfaceMap -> ErrMsgGhc Interface
 createInterface tm flags modMap instIfaceMap = do
 
-  let ms            = pm_mod_summary . tm_parsed_module $ tm
-      mi            = moduleInfo tm
-      safety        = modInfoSafe mi
-      mdl           = ms_mod ms
-      dflags        = ms_hspp_opts ms
-      instances     = modInfoInstances mi
-      exportedNames = modInfoExports mi
+  let ms             = pm_mod_summary . tm_parsed_module $ tm
+      mi             = moduleInfo tm
+      !safety        = modInfoSafe mi
+      mdl            = ms_mod ms
+      dflags         = ms_hspp_opts ms
+      !instances     = modInfoInstances mi
+      !exportedNames = modInfoExports mi
 
       (TcGblEnv {tcg_rdr_env = gre, tcg_warns = warnings}, _) = tm_internals_ tm
 
@@ -72,13 +74,13 @@ createInterface tm flags modMap instIfaceMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  (info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
+  (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom mdl . getName) instances
 
-  maps@(docMap, argMap, subMap, declMap) <-
+  maps@(!docMap, !argMap, !subMap, !declMap) <-
     liftErrMsg $ mkMaps dflags gre localInsts declsWithDocs
 
   let exports0 = fmap (reverse . map unLoc) mayExports
@@ -92,24 +94,25 @@ createInterface tm flags modMap instIfaceMap = do
   exportItems <- mkExportItems modMap mdl warningMap gre exportedNames decls maps exports
                    instances instIfaceMap dflags
 
-  let visibleNames = mkVisibleNames exportItems opts
+  let !visibleNames = mkVisibleNames exportItems opts
 
   -- Measure haddock documentation coverage.
   let prunedExportItems0 = pruneExportItems exportItems
-      haddockable = 1 + length exportItems -- module + exports
-      haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
-      coverage = (haddockable, haddocked)
+      !haddockable = 1 + length exportItems -- module + exports
+      !haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
+      !coverage = (haddockable, haddocked)
 
   -- Prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
-  let prunedExportItems
+  let prunedExportItems'
         | OptPrune `elem` opts = prunedExportItems0
         | otherwise = exportItems
+      !prunedExportItems = seqList prunedExportItems' `seq` prunedExportItems'
 
-  let aliases =
+  let !aliases =
         mkAliasMap dflags $ tm_renamed_source tm
 
-  return Interface {
+  return $! Interface {
     ifaceMod             = mdl,
     ifaceOrigFilename    = msHsFilePath ms,
     ifaceInfo            = info,
@@ -179,7 +182,7 @@ moduleWarning ws =
   case ws of
     NoWarnings -> Nothing
     WarnSome _ -> Nothing
-    WarnAll w  -> Just (warnToDoc w)
+    WarnAll w  -> Just $! warnToDoc w
 
 
 warnToDoc :: WarningTxt -> Doc id
@@ -187,7 +190,8 @@ warnToDoc w = case w of
   (DeprecatedTxt msg) -> format "Deprecated: " msg
   (WarningTxt    msg) -> format "Warning: "    msg
   where
-    format x xs = DocWarning . DocParagraph . DocString . concat $ x : map unpackFS xs
+    format x xs = let !str = force $ concat (x : map unpackFS xs)
+                  in DocWarning $ DocParagraph $ DocString str
 
 
 -------------------------------------------------------------------------------
@@ -254,7 +258,12 @@ mkMaps dflags gre instances decls = do
           am = [ (n, args) | n <- ns ] ++ zip subNs subArgs
           sm = [ (n, subNs) | n <- ns ]
           cm = [ (n, [ldecl]) | n <- ns ++ subNs ]
-      return (dm, am, sm, cm)
+      seqList ns `seq`
+          seqList subNs `seq`
+          doc `seq`
+          seqList subDocs `seq`
+          seqList subArgs `seq`
+          return (dm, am, sm, cm)
 
     instanceMap :: Map SrcSpan Name
     instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
@@ -774,7 +783,8 @@ pruneExportItems = filter hasDoc
 mkVisibleNames :: [ExportItem Name] -> [DocOption] -> [Name]
 mkVisibleNames exports opts
   | OptHide `elem` opts = []
-  | otherwise = concatMap exportName exports
+  | otherwise = let ns = concatMap exportName exports
+                in seqList ns `seq` ns
   where
     exportName e@ExportDecl {} = getMainDeclBinder (unL $ expItemDecl e) ++ subs
       where subs = map fst (expItemSubDocs e)
@@ -782,6 +792,9 @@ mkVisibleNames exports opts
                                     -- we don't want links to go to them.
     exportName _ = []
 
+seqList :: [a] -> ()
+seqList [] = ()
+seqList (x : xs) = x `seq` seqList xs
 
 -- | Find a stand-alone documentation comment by its name.
 findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe HsDocString)

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wwarn #-}
+{-# LANGUAGE BangPatterns #-}
   -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
@@ -78,7 +80,8 @@ processModuleHeader dflags gre safety mayStr = do
             tell ["haddock module header parse failed: " ++ msg]
             return failure
           Right (hmi, doc) -> do
-            let hmi' = hmi { hmi_description = rename dflags gre <$> hmi_description hmi }
+            let !descr = rename dflags gre <$> hmi_description hmi
+                hmi' = hmi { hmi_description = descr }
                 doc' = rename dflags gre doc
             return (hmi', Just doc')
   return (hmi { hmi_safety = Just $ showPpr dflags safety }, doc)
