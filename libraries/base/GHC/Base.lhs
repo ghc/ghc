@@ -363,8 +363,10 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 
-{-# NOINLINE [1] map #-}
 map :: (a -> b) -> [a] -> [b]
+{-# NOINLINE [1] map #-}    -- We want the RULE to fire first.  
+                            -- It's recursive, so won't inline anyway, 
+                            -- but saying so is more explicit
 map _ []     = []
 map f (x:xs) = f x : map f xs
 
@@ -410,8 +412,10 @@ mapFB c f = \x ys -> c (f x) ys
 --
 -- If the first list is not finite, the result is the first list.
 
-{-# NOINLINE [1] (++) #-}
 (++) :: [a] -> [a] -> [a]
+{-# NOINLINE [1] (++) #-}    -- We want the RULE to fire first.  
+                             -- It's recursive, so won't inline anyway, 
+                             -- but saying so is more explicit
 (++) []     ys = ys
 (++) (x:xs) ys = x : xs ++ ys
 
