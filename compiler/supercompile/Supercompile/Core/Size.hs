@@ -18,7 +18,6 @@ type TaggedSizedFVedTerm = (O Tagged (O Sized FVed)) (TermF (O Tagged (O Sized F
 type TaggedSizedFVedAlt = AltF (O Tagged (O Sized FVed))
 type TaggedSizedFVedValue = ValueF (O Tagged (O Sized FVed))
 
-
 (termSize,                termSize',                altsSize,                valueSize,                valueSize')                = mkSize (\f (I e) -> f e)
 (fvedTermSize,            fvedTermSize',            fvedAltsSize,            fvedValueSize,            fvedValueSize')            = mkSize (\f (FVed _ e) -> f e)
 (sizedTermSize,           sizedTermSize',           sizedAltsSize,           sizedValueSize,           sizedValueSize')           = mkSize (\_ (Sized sz _) -> sz)
@@ -77,3 +76,11 @@ sizedFVedValue v = Comp (Sized (sizedFVedValueSize' v) (FVed (sizedFVedValueFree
 
 sizedFVedTerm :: TermF (O Sized FVed) -> SizedFVedTerm
 sizedFVedTerm e = Comp (Sized (sizedFVedTermSize' e) (FVed (sizedFVedTermFreeVars' e) e))
+
+
+castBySize :: CastBy -> Size
+castBySize (CastBy _ _) = 1
+castBySize Uncast       = 0
+
+coercedSize :: (a -> Size) -> Coerced a -> Size
+coercedSize sz (cast_by, e) = castBySize cast_by + sz e

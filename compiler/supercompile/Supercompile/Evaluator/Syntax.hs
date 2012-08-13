@@ -93,6 +93,9 @@ annedVar tg x = Comp (Tagged tg (Comp (Sized 1 (FVed (annedVarFreeVars' x) x))))
 annedAnswer :: Tag -> Answer -> Anned Answer
 annedAnswer tg a = Comp (Tagged tg (Comp (Sized (answerSize' a) (FVed (answerFreeVars' a) a))))
 
+annedCoercedAnswer :: Tag -> Coerced Answer -> Anned (Coerced Answer)
+annedCoercedAnswer tg cast_a = Comp (Tagged tg (Comp (Sized (coercedSize answerSize' cast_a) (FVed (coercedFreeVars answerFreeVars' cast_a) cast_a))))
+
 annedQA :: Tag -> QA -> Anned QA
 annedQA tg (Question x) = fmap Question (annedVar tg x)
 annedQA tg (Answer a)   = fmap Answer (annedAnswer tg a)
@@ -112,32 +115,25 @@ mkVarCastBy tg_y y' cast_by = (mkIdentityRenaming (castByFreeVars cast_by `exten
 --
 -- This means that if we want correct tag propagation we have to be very careful when we use an
 -- existing CastBy in the construction of an Answer.
-type AnswerG value = Coerced value
-type Answer = AnswerG (In AnnedValue)
 
 answerSize' :: Answer -> Size
-answerSize' = annedTermSize' . answerToAnnedTerm' emptyInScopeSet
+answerSize' = annedValueSize' . snd
 
 answerFreeVars' :: Answer -> FreeVars
-answerFreeVars' = annedTermFreeVars' . answerToAnnedTerm' emptyInScopeSet
+answerFreeVars' = inFreeVars annedValueFreeVars'
 
-termToAnswer :: InScopeSet -> In AnnedTerm -> Maybe (Anned Answer)
-termToAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) -> case e of
-    Value v          -> Just (Uncast, (rn, v))
-    Cast anned_e' co -> case extract anned_e' of
-        Value v -> Just (castBy (renameCoercion iss rn co) (annedTag anned_e'), (rn, v))
-        _       -> Nothing
-    _ -> Nothing
+type Question = Out Id
+type Answer = In AnnedValue
 
-data QAG value = Question (Out Id)
-               | Answer   (AnswerG value)
+data QAG answer = Question Question
+                | Answer   answer
 
-type QA = QAG (In AnnedValue)
+type QA = QAG Answer
 
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
 
-caseAnnedQA :: Anned QA -> Either (Anned (Out Id)) (Anned Answer)
+caseAnnedQA :: Anned QA -> Either (Anned Question) (Anned Answer)
 caseAnnedQA anned_qa = case extract anned_qa of
     Question anned_q -> Left  (fmap (const anned_q) anned_qa)
     Answer   anned_a -> Right (fmap (const anned_a) anned_qa)
@@ -145,25 +141,48 @@ caseAnnedQA anned_qa = case extract anned_qa of
 annedQAToInAnnedTerm :: InScopeSet -> Anned QA -> In AnnedTerm
 annedQAToInAnnedTerm iss anned_qa = case caseAnnedQA anned_qa of
     Left  anned_q -> (mkInScopeIdentityRenaming iss, fmap Var anned_q)
-    Right anned_a -> annedAnswerToInAnnedTerm iss anned_a
+    Right anned_a -> annedAnswerToInAnnedTerm anned_a
+
+termToCastAnswer :: InScopeSet -> In AnnedTerm -> Maybe (Anned (Coerced Answer))
+termToCastAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) -> case e of
+    Value v          -> Just (Uncast, (rn, v))
+    Cast anned_e' co -> case extract anned_e' of
+        Value v -> Just (castBy (renameCoercion iss rn co) (annedTag anned_e'), (rn, v))
+        _       -> Nothing
+    _ -> Nothing
+
+castAnswer :: InScopeSet -> Tag -> NormalCo -> Tagged (Coerced Answer) -> Tagged (Coerced Answer)
+castAnswer _   tg_co co (Tagged tg_a    (Uncast, a))          = Tagged tg_co (CastBy co tg_a, a)
+castAnswer ids tg_co co (Tagged _tg_co' (CastBy co' tg_a, a)) = Tagged tg_co (castBy (mkTransCo ids co co') tg_a, a)
+
+castByAnswer :: InScopeSet -> CastBy -> Tagged (Coerced Answer) -> Tagged (Coerced Answer)
+castByAnswer _   Uncast            cast_a = cast_a
+castByAnswer ids (CastBy co tg_co) cast_a = castAnswer ids tg_co co cast_a
+
+castAnswerSize :: Coerced Answer -> Size
+castAnswerSize = coercedSize answerSize'
 
 castAnnedQAToInAnnedTerm :: InScopeSet -> Anned QA -> CastBy -> In AnnedTerm
-castAnnedQAToInAnnedTerm iss anned_qa cast_by = case caseAnnedQA anned_qa of
-    Left  anned_q -> (mkInScopeIdentityRenaming iss, castAnnedTerm cast_by (fmap Var anned_q))
-    Right anned_a -> annedAnswerToInAnnedTerm iss (castAnnedAnswer iss anned_a cast_by)
+castAnnedQAToInAnnedTerm iss anned_qa cast_by = (mkInScopeIdentityRenaming iss, castAnnedTerm cast_by (renameIn (renameAnnedTerm iss) (annedQAToInAnnedTerm iss anned_qa)))
 
+annedAnswerToInAnnedTerm :: Anned Answer -> In AnnedTerm
+annedAnswerToInAnnedTerm = taggedAnswerToInAnnedTerm . annedToTagged
 
-annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
-annedAnswerToInAnnedTerm iss anned_a = case annee anned_a of
-  (Uncast,          (rn, v)) -> (rn,                                                                 fmap Value $ annedValue (annedTag anned_a) v)
-  (CastBy co co_tg, (rn, v)) -> (mkInScopeIdentityRenaming iss, annedTerm (annedTag anned_a) $ Cast (fmap Value $ annedValue co_tg            $ renameAnnedValue' iss rn v) co)
+taggedAnswerToInAnnedTerm :: Tagged Answer -> In AnnedTerm
+taggedAnswerToInAnnedTerm (Tagged tg_a (rn, v)) = (rn, fmap Value $ annedValue tg_a v)
+
+taggedCastAnswerToInAnnedTerm :: InScopeSet -> Tagged (Coerced Answer) -> In AnnedTerm
+taggedCastAnswerToInAnnedTerm _   (Tagged tg_a  (Uncast,         a)) = taggedAnswerToInAnnedTerm (Tagged tg_a a)
+taggedCastAnswerToInAnnedTerm iss (Tagged tg_co (CastBy co tg_a, a)) = (mkInScopeIdentityRenaming iss, annedTerm tg_co (renameIn (renameAnnedTerm iss) (taggedAnswerToInAnnedTerm (Tagged tg_a a)) `Cast` co))
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
-answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
-    Uncast       -> e'
-    CastBy co tg -> Cast (annedTerm tg e') co
-  where e' = Value $ renameAnnedValue' iss rn v
+answerToAnnedTerm' iss (rn, v) = Value $ renameAnnedValue' iss rn v
 
+coercedAnswerToAnnedTerm' :: InScopeSet -> Coerced Answer -> TermF Anned
+coercedAnswerToAnnedTerm' iss (Uncast,       e) = answerToAnnedTerm' iss e
+coercedAnswerToAnnedTerm' iss (CastBy co tg, e) = annedTerm tg (answerToAnnedTerm' iss e) `Cast` co
+
+{-
 -- TODO: callers are probably wrong for deeds
 castAnnedAnswer :: InScopeSet -> Anned Answer -> Out CastBy -> Anned Answer
 castAnnedAnswer _   anned_a Uncast           = anned_a
@@ -173,6 +192,7 @@ castTaggedAnswer :: InScopeSet -> Tagged Answer -> (NormalCo, Tag) -> (Maybe Tag
 castTaggedAnswer iss (Tagged tg (cast_by, in_v)) (co', tg') = (mb_dumped, annedAnswer tg' (castBy co'' tg, in_v))
   where (mb_dumped, co'') = case cast_by of Uncast              -> (Nothing,        co')
                                             CastBy co dumped_tg -> (Just dumped_tg, mkTransCo iss co co')
+-}
 
 castAnnedTerm :: CastBy -> AnnedTerm -> AnnedTerm
 castAnnedTerm Uncast         e = e
@@ -237,12 +257,8 @@ pPrintPrecAnnedValue prec in_e = pPrintPrec prec $ extract $ renameIn (renameAnn
 pPrintPrecAnnedTerm :: Rational -> In AnnedTerm -> SDoc
 pPrintPrecAnnedTerm prec in_e = pprPrec prec $ renameIn (renameAnnedTerm (mkInScopeSet (inFreeVars annedTermFreeVars in_e))) in_e
 
-pPrintPrecAnnedAnswer :: Rational -> Anned Answer -> SDoc
-pPrintPrecAnnedAnswer prec a = pprPrec prec $ fmap (\a -> PrettyFunction $ \prec -> pPrintPrecAnswer prec a) a
-
-pPrintPrecAnswer :: (Outputable a) => Rational -> (CastBy, a) -> SDoc
-pPrintPrecAnswer prec (Uncast,       v) = pPrintPrec prec v
-pPrintPrecAnswer prec (CastBy co tg, v) = pPrintPrecCast prec (Tagged tg v) co
+pPrintPrecAnnedCastAnswer :: Rational -> Anned (Coerced Answer) -> SDoc
+pPrintPrecAnnedCastAnswer prec a = pprPrec prec $ fmap (\a -> PrettyFunction $ \prec -> pPrintPrecCoerced prec a) a
 
 instance Outputable HeapBinding where
     pprPrec prec (HB how mb_in_e) = case how of
@@ -282,7 +298,7 @@ instance Outputable Heap where
 --  Update, Cast, Update
 -- NB: Cast, Update, Cast *is* allowed
 type Stack = Train (Tagged StackFrame) Generalised
-type StackFrame = StackFrameG (Anned Answer) (In AnnedTerm) (In [AnnedAlt])
+type StackFrame = StackFrameG (Anned (Coerced Answer)) (In AnnedTerm) (In [AnnedAlt])
 data StackFrameG answer term alts = TyApply (Out Type)
                                   | CoApply (Out NormalCo)
                                   | Apply (Out Id)
@@ -298,7 +314,7 @@ instance Outputable StackFrame where
         CoApply co'                    -> pPrintPrecApp prec (PrettyDoc $ text "[_]") co'
         Apply x'                       -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
         Scrutinise x' _ty in_alts      -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
-        PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop tys' (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
+        PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop tys' (map (PrettyFunction . flip pPrintPrecAnnedCastAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
         StrictLet x' in_e2             -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
         Update x'                      -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
         CastIt co'                     -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
@@ -319,7 +335,7 @@ stackFrameType' kf hole_ty = case kf of
     CoApply co                    -> hole_ty `applyFunTy` coercionType co
     Apply x                       -> hole_ty `applyFunTy` idType x
     Scrutinise _ ty _             -> ty
-    PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTy` hole_ty `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map (coercedType answerType . annee) in_as) `applyFunTy` hole_ty `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
     StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
     Update _                      -> hole_ty
     CastIt co                     -> pSnd (coercionKind co)
@@ -327,12 +343,15 @@ stackFrameType' kf hole_ty = case kf of
 qaType :: Anned QA -> Type
 qaType anned_qa = case caseAnnedQA anned_qa of
     Left  anned_q -> idType (extract anned_q)
-    Right anned_a -> answerType anned_a
+    Right anned_a -> answerType (extract anned_a)
 
-answerType :: Anned Answer -> Type
-answerType a = case annee a of
-    (CastBy co _, _)       -> pSnd (coercionKind co)
-    (Uncast,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
+coercedType :: (a -> Type)
+            -> Coerced a -> Type
+coercedType typ (Uncast,      e) = typ e
+coercedType _   (CastBy co _, _) = pSnd (coercionKind co)
+
+answerType :: Answer -> Type
+answerType (rn, v) = valueType (renameAnnedValue' (mkInScopeSet (inFreeVars annedValueFreeVars' (rn, v))) rn v)
 
 
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
@@ -408,20 +427,20 @@ releaseStateDeed :: State -> Deeds
 releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize a) h) k
 
 
--- This is used instead of isTrivialValueStack_maybe in a few places that expect to have both questions and answers in the focus
 isTrivialStack_maybe :: Stack -> Maybe (CastBy, Maybe (Tagged Var, CastBy))
-isTrivialStack_maybe (Tagged tg (CastIt co) `Car` k) = fmap ((,) (CastBy co tg)) $ isTrivialValueStack_maybe k
-isTrivialStack_maybe k                               = fmap ((,) Uncast)         $ isTrivialValueStack_maybe k
+isTrivialStack_maybe k = case k of
+    (Tagged tg (CastIt co) `Car` k) -> fmap ((,) (CastBy co tg)) $ isTrivialValueStack_maybe k
+    _                               -> fmap ((,) Uncast)         $ isTrivialValueStack_maybe k
+  where
+    isTrivialValueStack_maybe :: Stack -> Maybe (Maybe (Tagged Var, CastBy))
+    isTrivialValueStack_maybe k = case peelValueStack k of
+        (mb_peeled, Loco _) -> Just mb_peeled
+        _                   -> Nothing
 
-isTrivialValueStack_maybe :: Stack -> Maybe (Maybe (Tagged Var, CastBy))
-isTrivialValueStack_maybe k = case peelValueStack k of
-    (mb_peeled, Loco _) -> Just mb_peeled
-    _                   -> Nothing
-
-peelValueStack :: Stack -> (Maybe (Tagged Var, CastBy), Stack)
-peelValueStack (Tagged x_tg (Update x) `Car` Tagged co_tg (CastIt co) `Car` k) = (Just (Tagged x_tg x, CastBy co co_tg), k)
-peelValueStack (Tagged x_tg (Update x) `Car` k)                                = (Just (Tagged x_tg x, Uncast), k)
-peelValueStack k                                                               = (Nothing, k)
+    peelValueStack :: Stack -> (Maybe (Tagged Var, CastBy), Stack)
+    peelValueStack (Tagged x_tg (Update x) `Car` Tagged co_tg (CastIt co) `Car` k) = (Just (Tagged x_tg x, CastBy co co_tg), k)
+    peelValueStack (Tagged x_tg (Update x) `Car` k)                                = (Just (Tagged x_tg x, Uncast), k)
+    peelValueStack k                                                               = (Nothing, k)
 
 peelUpdateStack :: Stack -> (Maybe (CastBy, Tagged Var), Stack)
 peelUpdateStack (Tagged co_tg (CastIt co) `Car` Tagged x_tg (Update x) `Car` k) = (Just (CastBy co co_tg, Tagged x_tg x), k)

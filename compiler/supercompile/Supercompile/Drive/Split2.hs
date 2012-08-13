@@ -301,17 +301,21 @@ recurseFocus opt (QAFocus (Tagged tg_qa qa)) = case qa of
 recurseFocus opt (TermFocus state) = liftA (uncurry ((,,) emptyResidTags)) $ opt state
 recurseFocus _   (OpaqueFocus e)   = pure (emptyResidTags, emptyDeeds, e)
 
+recurseCoerced :: Applicative m
+               => (Tagged a -> m (ResidTags, Deeds, Out FVedTerm))
+               -> Tagged (Coerced a) -> m (ResidTags, Deeds, Out FVedTerm)
+recurseCoerced recurse (Tagged tg_a  (Uncast,         a)) = recurse (Tagged tg_a a)
+recurseCoerced recurse (Tagged tg_co (CastBy co tg_a, a)) = fmap (\(resid, deeds, e') -> (resid `plusResidTags` oneResidTag tg_co, deeds, e' `cast` co)) $ recurse (Tagged tg_a a)
+
 recurseAnswer :: Applicative m
               => (State -> m (Deeds, Out FVedTerm))
-              -> Tagged (AnswerG (ValueG State)) -> m (ResidTags, Deeds, Out FVedTerm)
-recurseAnswer opt (Tagged tg_a (cast_by, v)) = liftA (uncurry ((,,) (oneResidTag tg_a `plusResidTags` resid_tgs)) . second mk_cast) $ case v of
+              -> Tagged (ValueG State) -> m (ResidTags, Deeds, Out FVedTerm)
+recurseAnswer opt (Tagged tg_v v) = liftA (uncurry ((,,) (oneResidTag tg_v))) $ case v of
     Literal l          -> pure (emptyDeeds, value (Literal l))
     Coercion co        -> pure (emptyDeeds, value (Coercion co))
     Data dc tys cos xs -> pure (emptyDeeds, value (Data dc tys cos xs))
     TyLambda a state   -> liftA (second (value . TyLambda a)) $ opt state
     Lambda   x state   -> liftA (second (value . Lambda   x)) $ opt state
-  where (resid_tgs, mk_cast) = case cast_by of Uncast          -> (emptyResidTags,    id)
-                                               CastBy co tg_co -> (oneResidTag tg_co, (`cast` co))
 
 recurseStack :: (Applicative m, Monad m)
              => (State -> m (Deeds, Out FVedTerm))
@@ -323,7 +327,7 @@ recurseStack opt k (init_resid_tgs, init_deeds, init_e) = (\f -> foldM f (init_r
       Apply   x                   -> return (resid_tgs, deeds, xes, e `app`   x)
       Scrutinise x ty alts        -> liftM ((\(extra_deedss, alts') -> (resid_tgs, plusDeedss extra_deedss `plusDeeds` deeds, xes, case_ e x ty alts')) . unzip) $ forM alts $ \(alt_con, state) -> liftM (second ((,) alt_con)) $ opt state
       PrimApply pop tys as states -> (\(resid_tgss, as_deedss, as_es') (states_deedss, states_es') -> (plusResidTagss (resid_tgs:resid_tgss), plusDeedss as_deedss `plusDeeds` plusDeedss states_deedss `plusDeeds` deeds, xes, primOp pop tys (as_es' ++ e:states_es')))
-                                       <$> liftM unzip3 (mapM (recurseAnswer opt) as) <*> liftM unzip (mapM opt states)
+                                       <$> liftM unzip3 (mapM (recurseCoerced (recurseAnswer opt)) as) <*> liftM unzip (mapM opt states)
       StrictLet x state           -> liftM (\(extra_deeds, e') -> (resid_tgs, extra_deeds `plusDeeds` deeds, xes, let_ x e e')) $ opt state
       Update x                    -> return (resid_tgs, deeds, (x, e) : xes, var x)
       CastIt co                   -> return (resid_tgs, deeds, xes, e `cast` co)
@@ -442,7 +446,7 @@ data PushFocus qa term = QAFocus qa
                        | OpaqueFocus FVedTerm
 
 type PushedHeap  = M.Map (Out Var) State
-type PushedStack = [Tagged (StackFrameG (Tagged (AnswerG (ValueG State))) State [AltG State])]
+type PushedStack = [Tagged (StackFrameG (Tagged (Coerced (ValueG State))) State [AltG State])]
 type PushedFocus = PushFocus (Tagged (QAG (ValueG State))) State
 
 -- FIXME: deal with deeds in here
@@ -593,19 +597,21 @@ splitQA ids anned_qa = (M.singleton FocusContext $ M.insert (StackContext 0) Man
           Question x' -> (M.singleton (HeapContext x') ManyEntries, \_ -> Question x')
           Answer a    -> second (Answer .) $ splitAnswer ids a
 
-splitAnswer :: InScopeSet -> Answer -> (M.Map Context Entries,
-                                        PureHeap -> AnswerG (ValueG State))
-splitAnswer ids (cast_by, (rn, v)) = (plusEntered (varEdges ManyEntries (castByFreeVars cast_by)) v_verts, ((,) cast_by) . mk_v)
-  where
-    (v_verts, mk_v) = case renameValueG (,,) ids rn v of
-        -- The isOneShotBndr check is really necessary if we want to fuse a top-level non-value with some consuming context in the IO monad.
-        Lambda   x' ids_in_e  -> second (Lambda x' .)   $ split_lambda x' (if isOneShotBndr x' then OneEntry else ManyEntries) ids_in_e
-        TyLambda a' ids_in_e  -> second (TyLambda a' .) $ split_lambda a' OneEntry                                             ids_in_e
-        Literal l'            -> holeless_v $ Literal l'
-        Coercion co'          -> holeless_v $ Coercion co'
-        Data dc tys' cos' xs' -> holeless_v $ Data dc tys' cos' xs'
-      where holeless_v v' = (varEdges ManyEntries $ valueGFreeVars' (const emptyVarSet) v', \_ -> v')
+splitCoerced :: (a         -> (M.Map Context Entries, PureHeap ->         b))
+              -> Coerced a -> (M.Map Context Entries, PureHeap -> Coerced b)
+splitCoerced split (cast_by, a) = (plusEntered (varEdges ManyEntries (castByFreeVars cast_by)) *** (((,) cast_by) .)) $ split a
 
+splitAnswer :: InScopeSet -> Answer -> (M.Map Context Entries,
+                                        PureHeap -> ValueG State)
+splitAnswer ids (rn, v) = case renameValueG (,,) ids rn v of
+    -- The isOneShotBndr check is really necessary if we want to fuse a top-level non-value with some consuming context in the IO monad.
+    Lambda   x' ids_in_e  -> second (Lambda x' .)   $ split_lambda x' (if isOneShotBndr x' then OneEntry else ManyEntries) ids_in_e
+    TyLambda a' ids_in_e  -> second (TyLambda a' .) $ split_lambda a' OneEntry                                             ids_in_e
+    Literal l'            -> holeless_v $ Literal l'
+    Coercion co'          -> holeless_v $ Coercion co'
+    Data dc tys' cos' xs' -> holeless_v $ Data dc tys' cos' xs'
+  where
+    holeless_v v' = (varEdges ManyEntries $ valueGFreeVars' (const emptyVarSet) v', \_ -> v')
     split_lambda x' entries (ids', rn', e) = (varBndrEdges x' e_verts, mk_e . M.insert x' lambdaBound)
       where (e_verts, mk_e) = splitTerm ids' entries (rn', e)
 
@@ -721,7 +727,7 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
                                                       alt_bvs' = altConBoundVars alt_con' ]
           PrimApply pop tys' as in_es  -> (Nothing, Nothing, False, foldr multEntered M.empty (as_verts ++ es_verts),
                                            \h_prep _k_prep -> PrimApply pop tys' (map ($ h_prep) mk_as) (map ($ h_prep) mk_es))
-            where (as_verts, mk_as) = unzip $ map (\anned_a -> second (Tagged (annedTag anned_a) .) $ splitAnswer ids (annee anned_a)) as
+            where (as_verts, mk_as) = unzip $ map (\anned_a -> second (Tagged (annedTag anned_a) .) $ splitCoerced (splitAnswer ids) (annee anned_a)) as
                   (es_verts, mk_es) = unzip $ map (splitTerm ids OneEntry) in_es
           StrictLet x' in_e            -> (Nothing, Nothing, True, varBndrEdges x' e_verts,
                                            \h_prep k_prep -> StrictLet x' (mk_e (M.insert x' lambdaBound h_prep) k_prep))

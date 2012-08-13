@@ -170,8 +170,12 @@ instance (Functor ann, OutputableLambdas1 ann) => OutputableLambdas (TermF ann) 
         Case e x _ty alts -> ([], \prec -> pPrintPrecCase prec (asPrettyFunction1 e) x (map (second asPrettyFunction1) alts))
         Cast e co         -> ([], \prec -> pPrintPrecCast prec (asPrettyFunction1 e) co)
 
-pPrintPrecCast :: (Outputable a) => Rational -> a -> Coercion -> SDoc
+pPrintPrecCast :: Outputable a => Rational -> a -> Coercion -> SDoc
 pPrintPrecCast prec e co = prettyParen (prec > noPrec) $ pPrintPrec opPrec e <+> text "|>" <+> pPrintPrec appPrec co
+
+pPrintPrecCoerced :: Outputable a => Rational -> Coerced a -> SDoc
+pPrintPrecCoerced prec (CastBy co _, e) = pPrintPrecCast prec e co
+pPrintPrecCoerced prec (Uncast,      e) = pPrintPrec prec e
 
 pPrintPrecApp :: (Outputable a, Outputable b) => Rational -> a -> b -> SDoc
 pPrintPrecApp prec e1 e2 = prettyParen (prec >= appPrec) $ pPrintPrec opPrec e1 <+> pPrintPrec appPrec e2

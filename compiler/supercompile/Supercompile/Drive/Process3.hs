@@ -682,7 +682,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                      = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
     
                      | (_, _, k, qa) <- state -- NB: not safe to use reduced_state!
-                     , Just mb_update <- isTrivialValueStack_maybe k
+                     , Just (_, mb_update) <- isTrivialStack_maybe k
                      , Answer _ <- annee qa
                      = if isJust mb_update || eAGER_SPLIT_VALUES then Skip else CheckAndRemember
     

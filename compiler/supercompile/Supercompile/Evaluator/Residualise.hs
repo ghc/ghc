@@ -46,8 +46,8 @@ residualiseUnnormalisedState :: Symantics' ann => UnnormalisedState -> (Deeds, O
 residualiseUnnormalisedState (deeds, heap, k, in_e) = (deeds, floats_static, floats_nonstatic, e, gen)
   where (floats_static, floats_nonstatic, e, gen) = residualiseHeap heap (\ids -> residualiseStack ids k (residualiseTerm ids in_e))
 
-residualiseAnswer :: Symantics' ann => InScopeSet -> Anned Answer -> Out (ann (TermF ann))
-residualiseAnswer ids = inject . fmap (answerToAnnedTerm' ids)
+residualiseCoercedAnswer :: Symantics' ann => InScopeSet -> Anned (Coerced Answer) -> Out (ann (TermF ann))
+residualiseCoercedAnswer ids = inject . fmap (coercedAnswerToAnnedTerm' ids)
 
 residualiseTerm :: Symantics' ann => InScopeSet -> In AnnedTerm -> Out (ann (TermF ann))
 residualiseTerm ids = inject . renameIn (renameAnnedTerm ids)
@@ -74,7 +74,7 @@ residualiseStackFrame _   (TyApply ty')               e  = (([], []), e `tyApp` 
 residualiseStackFrame _   (CoApply co')               e  = (([], []), e `coApp` co')
 residualiseStackFrame _   (Apply x2')                 e1 = (([], []), e1 `app` x2')
 residualiseStackFrame ids (Scrutinise x' ty in_alts)  e  = (([], []), case_ e x' ty (map (second inject) $ renameIn (renameAnnedAlts ids) in_alts))
-residualiseStackFrame ids (PrimApply pop tys' as es') e  = (([], []), primOp pop tys' (map (residualiseAnswer ids) as ++ e : map (residualiseTerm ids) es'))
+residualiseStackFrame ids (PrimApply pop tys' as es') e  = (([], []), primOp pop tys' (map (residualiseCoercedAnswer ids) as ++ e : map (residualiseTerm ids) es'))
 residualiseStackFrame ids (StrictLet x' in_e2)        e1 = (([], []), let_ x' e1 (residualiseTerm ids in_e2))
 residualiseStackFrame _   (Update x')                 e  = (([], [(x', e)]), var x')
 residualiseStackFrame _   (CastIt co')                e  = (([], []), e `cast` co')

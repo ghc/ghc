@@ -8,7 +8,6 @@ module Supercompile.Drive.Split (
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 import Supercompile.Core.Syntax
-import Supercompile.Core.Tag (dataConTag, literalTag)
 
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Evaluate (normalise)
@@ -24,20 +23,16 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import CoreUtils (filterAlts)
-import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo, localiseId, isOneShotBndr)
+import Id        (idUnique, idType, isDeadBinder, localiseId, isOneShotBndr)
 import Var       (varUnique)
 import PrelNames (undefinedName, wildCardKey)
-import Type      (splitTyConApp_maybe)
 import Util      (zipWithEqual, zipWith3Equal, thirdOf3)
 import Digraph
 import UniqFM    (delListFromUFM_Directly)
 import VarEnv
-import State     (get, put, modify, evalState)
-import MonadUtils (concatMapM, mapMaybeM)
 
 import Data.Traversable (fmapDefault, foldMapDefault)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 
@@ -415,11 +410,11 @@ oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> 
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
   , Just (cast_by, mb_update) <- isTrivialStack_maybe k -- NB: this might find a cast even when we have an answer in the context since the state is unnormalised
-  , Just anned_a0 <- termToAnswer ids in_e -- NB: I could push extra heap into the bracketed_a1 using the mb_update if it is Just, but I don't think I usually need to
-  , let anned_a1 = castAnnedAnswer ids anned_a0 cast_by
+  , Just anned_a0 <- termToCastAnswer ids in_e -- NB: I could push extra heap into the bracketed_a1 using the mb_update if it is Just, but I don't think I usually need to
+  , let anned_a1 = castByAnswer ids cast_by (annedToTagged anned_a0)
         bracketed_a1 = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
                        modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
-                       splitAnswer ctxt_ids ids (annedToTagged anned_a1)
+                       splitCoerced (splitAnswer ctxt_ids ids) anned_a1
   = case mb_update of
       Nothing                          -> bracketed_a1
       Just (Tagged tg_x' x', cast_by') -> zipBracketeds (TailsUnknown shell [Hole { holeBvs = [x'], holeFiller = bracketed_a1 }])
@@ -879,7 +874,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (mb_anned_qa, brac
     h_cheap_and_phantom | (_, Tagged _ (Update x')) `Car` _ <- named_k -- NB: by normalisation, there can't be a cast before the update
                         , Just anned_qa <- mb_anned_qa
                         , Right anned_a <- caseAnnedQA anned_qa -- FIXME: having a question here might also be legit
-                        , let in_e@(_, e) = annedAnswerToInAnnedTerm ids anned_a
+                        , let in_e@(_, e) = annedAnswerToInAnnedTerm anned_a
                         = M.insert x' ((internallyBound in_e) { howBound = howToBindCheap e }) h_cheap_and_phantom0
                         | otherwise
                         = h_cheap_and_phantom0
@@ -1203,7 +1198,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             ctxt_idss1 = listSplitUniqSupply ctxt_ids1
             
             -- 1) Split every value and expression remaining apart
-            bracketed_vs = zipWith (\ctxt_ids in_v -> splitAnswer ctxt_ids ids (annedToTagged in_v)) ctxt_idss0 in_vs
+            bracketed_vs = zipWith (\ctxt_ids in_v -> splitCoerced (splitAnswer ctxt_ids ids) (annedToTagged in_v)) ctxt_idss0 in_vs
             bracketed_es  = zipWith (\ctxt_ids in_e -> let (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids in oneBracketed ctxt_ids0 (inTermType ids in_e) (Once ctxt_id, (Heap M.empty ids, Loco False, in_e))) ctxt_idss1 in_es)
   where
     tg = tag kf
@@ -1251,10 +1246,10 @@ splitLambdaLike rebuild entered ctxt_ids ids tg (rn, (x, e)) = zipBracketeds $ T
   where (ids', rn', x') = renameNonRecBinder ids rn x
         in_e = (rn', e)
 
-splitCoerced :: (Tag -> a -> Bracketed (Entered, UnnormalisedState))
-             -> Tag -> Coerced a -> Bracketed (Entered, UnnormalisedState)
-splitCoerced f tg (Uncast,         x) = f tg x
-splitCoerced f tg (CastBy co' tg', x) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f tg' x)]
+splitCoerced :: (Tagged a -> Bracketed (Entered, UnnormalisedState))
+             -> Tagged (Coerced a) -> Bracketed (Entered, UnnormalisedState)
+splitCoerced f (Tagged tg_a  (Uncast,         a)) = f (Tagged tg_a a)
+splitCoerced f (Tagged tg_co (CastBy co tg_a, a)) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg_co) (tyCoVarsOfCo co) $ \[e'] -> cast e' co) [Hole [] (f (Tagged tg_a a))]
  -- NB: the tg' in the CastBy is wrapped around the *x*, not the whole cast, so pass it down
 
 splitQA :: UniqSupply -> InScopeSet -> Tag -> QA -> Bracketed (Entered, UnnormalisedState)
@@ -1262,7 +1257,7 @@ splitQA _        _   tg (Question x') = noneBracketed tg (var x')
 splitQA ctxt_ids ids tg (Answer a)    = splitAnswer ctxt_ids ids (Tagged tg a)
 
 splitAnswer :: UniqSupply -> InScopeSet -> Tagged Answer -> Bracketed (Entered, UnnormalisedState)
-splitAnswer ctxt_ids ids (Tagged tg a) = splitCoerced (splitValue ctxt_ids ids) tg a
+splitAnswer ctxt_ids ids (Tagged tg a) = splitValue ctxt_ids ids tg a
 
 inTermType :: InScopeSet -> In AnnedTerm -> Type
 inTermType ids = renameIn (renameType ids) . fmap termType

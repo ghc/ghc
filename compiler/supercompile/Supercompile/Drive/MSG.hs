@@ -515,7 +515,7 @@ msgQA' rn2 tg_l (Answer in_v_l) tg_r (Answer in_v_r) = liftM Answer $ msgAnswer 
 msgQA' _ _ _ _ _ = fail "msgQA"
 
 msgAnswer :: RnEnv2 -> Tag -> Answer -> Tag -> Answer -> MSG Answer
-msgAnswer = msgCoerced (\rn2 tg_l a_l tg_r a_r -> msgIn renameAnnedValue' annedValueFreeVars' (\rn2 v_l v_r -> msgValue rn2 tg_l v_l tg_r v_r) rn2 a_l a_r)
+msgAnswer rn2 tg_l a_l tg_r a_r = msgIn renameAnnedValue' annedValueFreeVars' (\rn2 v_l v_r -> msgValue rn2 tg_l v_l tg_r v_r) rn2 a_l a_r
 
 msgCoerced :: (RnEnv2 -> Tag -> a -> Tag -> a -> MSG b)
            -> RnEnv2 -> Tag -> Coerced a -> Tag -> Coerced a -> MSG (Coerced b)
@@ -937,7 +937,7 @@ msgStackFrame rn2 kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee
     go (Apply x_l')                          (Apply x_r')                          = liftM Apply $ msgVar rn2 x_l' x_r'
     go (TyApply ty_l')                       (TyApply ty_r')                       = liftM TyApply $ msgType rn2 ty_l' ty_r'
     go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r)
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = guard "msgStackFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedAnswer (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r)
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = guard "msgStackFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedCoercedAnswer (msgCoerced msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r)
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
     go (CastIt co_l')                        (CastIt co_r')                        = liftM CastIt $ msgCoercion rn2 co_l' co_r'
     go (Update x_l')                         (Update x_r')                         = liftM Update $ msgFlexiVar rn2 x_l' x_r' -- We treat this binding exactly like an occurrence: only special handling of update binders is in msgLoop

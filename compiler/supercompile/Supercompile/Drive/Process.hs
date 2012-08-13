@@ -264,10 +264,10 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
         Lambda   _ e  -> (Nothing,        go_term ann e)
         Data dc _ _ _ -> (Just (show dc), IM.empty)
 
-    go_answer :: [String] -> Anned Answer -> TagAnnotations
-    go_answer ann a = insert ann (annedTag a) $ go_answer' ann (annee a)
+    go_cast_answer :: [String] -> Anned (Coerced Answer) -> TagAnnotations
+    go_cast_answer ann a = insert ann (annedTag a) $ go_answer' ann (snd (annee a))
 
-    go_answer' ann (_, (_, v)) = go_value' ann v
+    go_answer' ann (_, v) = go_value' ann v
 
     go_kf :: [String] -> Tagged StackFrame -> ([String], TagAnnotations)
     go_kf ann kf = second (insert' ann (tag kf)) $ go_kf' ann (tagee kf)
@@ -277,7 +277,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
       CoApply _ -> (ann, IM.empty)
       Apply _   -> (ann, IM.empty)
       Scrutinise x _ (_, alts) -> (extAnn x ann, IM.unions [go_term ann e | (_, e) <- alts])
-      PrimApply _ _ as es -> (ann, IM.unions [go_answer ann a | a <- as] `IM.union` IM.unions [go_term ann e | (_, e) <- es])
+      PrimApply _ _ as es -> (ann, IM.unions [go_cast_answer ann a | a <- as] `IM.union` IM.unions [go_term ann e | (_, e) <- es])
       StrictLet x (_, e)  -> (extAnn x ann, go_term ann e)
       Update x            -> (extAnn x ann, IM.empty)
       CastIt _            -> (ann, IM.empty)
@@ -438,8 +438,8 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
 eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
   (_, Heap h ids, k, anned_qa)
-    | Just mb_update <- isTrivialValueStack_maybe k
-    , Answer (a_cast, (rn, v)) <- extract anned_qa
+    | Just (a_cast, mb_update) <- isTrivialStack_maybe k
+    , Answer (rn, v) <- extract anned_qa
     , let accessor_e1 = case mb_update of
             Nothing               -> accessor_e0
             Just (_, Uncast)      -> accessor_e0

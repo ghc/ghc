@@ -160,7 +160,7 @@ matchQA rn2 tg_l (Answer in_v_l) _    (Question x_r') = matchVarR rn2 (annedTerm
 matchQA rn2 tg_l (Answer in_v_l) tg_r (Answer in_v_r) = matchAnswer rn2 tg_l in_v_l tg_r in_v_r
 
 matchAnswer :: RnEnv2 -> Tag -> Answer -> Tag -> Answer -> Match [MatchLR]
-matchAnswer = matchCoerced (\rn2 tg_l in_v_l tg_r in_v_r -> matchIn renameAnnedValue' (\rn2 v_l v_r -> matchValue rn2 tg_l v_l tg_r v_r) rn2 in_v_l in_v_r)
+matchAnswer rn2 tg_l in_v_l tg_r in_v_r = matchIn renameAnnedValue' (\rn2 v_l v_r -> matchValue rn2 tg_l v_l tg_r v_r) rn2 in_v_l in_v_r
 
 matchCoerced :: (RnEnv2 -> Tag -> a -> Tag -> a -> Match [MatchLR])
              -> RnEnv2 -> Tag -> Coerced a -> Tag -> Coerced a -> Match [MatchLR]
@@ -428,7 +428,7 @@ matchECFrame init_rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
     go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, \rn2 -> matchVar rn2 x_l' x_r')
     go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, \rn2 -> matchType rn2 ty_l' ty_r')
     go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, \rn2 -> liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr False rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r))
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, \rn2 -> guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r))
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, \rn2 -> guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchCoerced matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r))
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, \rn2 -> matchIdCoVarBndr False rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r)
     go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, \rn2 -> matchCoercion rn2 co_l' co_r')
     go (Update x_l')                         (Update x_r')                         = return (matchIdCoVarBndr' init_rn2 x_l' x_r')
