@@ -454,24 +454,14 @@ push :: S.Set Context
      -> (Heap, Stack, PushFocus (Anned QA) (In AnnedTerm))
      -> (PushedHeap, PushedStack, PushedFocus)
 push generalised (Heap h ids, k, focus) = (h', k', focus')
-  where -- NB: values or variables in focus which are immediately updated are a pain. We:
-        --  1. Construct a bit of graph from the update frame which overwrites the normal HeapContext binding from splitStack to ensure
-        --     that there is no edge from the variable to its update frame (we can just push the definition down, not the frame)
-        --  2. Explicitly ensure that the thing bound by the update frame is considered cheap and hence shorcutted through in the graph
-        --
-        -- NB: in this case we may end up marking the y' bound by the update frame but not the frame itself (at index 0 or 1)
-        (cheap_marked_k_head, h_k_head) = case fst (peelUpdateStack k) of
-          Just (cast_by, Tagged _tg_y' y') | QAFocus qa <- focus -> (S.singleton (HeapContext y'), M.singleton y' (internallyBound (castAnnedQAToInAnnedTerm ids qa cast_by)))
-          _                                                      -> (S.empty, M.empty)
-
-        -- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
+  where -- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
         --  < H | v | >
         -- and:
         --  < H, H' | v | update f >
         -- Since ideally instance splitting the second state should allow us to drive H' with the value binding f |-> v. A similar argument applies to questions in focus.
         mb_scrut = case focus of QAFocus qa | Question x' <- annee qa -> Just x'; _ -> Nothing
 
-        (verts_h,     prepare_h, mk_h)     = splitPureHeap ids (h `unionDisjoint` h_k_head)
+        (verts_h,     prepare_h, mk_h)     = splitPureHeap ids h
         (verts_k,     prepare_k, mk_k)     = splitStack    ids k     mb_scrut
         (verts_focus,            mk_focus) = splitFocus    ids focus (FocusContext `S.member` generalised)
 
@@ -494,11 +484,11 @@ push generalised (Heap h ids, k, focus) = (h', k', focus')
         -- forcing more things to be unmarked. In particular, we have to watch out for:
         --   1. Vertices originating from dead heap bindings
         --   2. Heap verticies originating from on-stack updates that bind dead variables
-        cheap_marked = (cheap_marked_k_head `S.union` S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, maybe True (termIsCheap . snd) (heapBindingTerm hb)]) S.\\ generalised
+        cheap_marked = S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, maybe True (termIsCheap . snd) (heapBindingTerm hb)] S.\\ generalised
         verts = trimUnreachable FocusContext $
                 shortcutEdges (`S.member` cheap_marked)
                               plusEntries (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
-                              (verts_h `M.union` (verts_k `unionDisjoint` verts_focus)) -- NB: verts_h might mention a heap binding bound by a leading update frame in verts_k: h takes precedence
+                              (verts_h `unionDisjoint` (verts_k `unionDisjoint` verts_focus))
         extra_marked = solve generalised verts
         marked = cheap_marked `S.union` extra_marked
 
