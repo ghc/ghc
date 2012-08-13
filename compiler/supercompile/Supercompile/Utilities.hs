@@ -839,18 +839,18 @@ trainLeftExtensionBy f_car f_loco xs ys = do
 trainLength :: Train a b -> Int
 trainLength = trainCarFoldl' (\n _ -> n + 1) 0
 
-{-
-trainDropTailByList :: Train c d
+trainDropTailByList :: [c]
                     -> Train a b
                     -> Train a (Train a b)
-trainDropTailByList cds abs = case go abs of Left cds -> Loco abs; Right abs -> abs
-  where go (Loco _)    = Left cds
+trainDropTailByList cs abs = case go abs of Left _cs -> Loco abs; Right abs -> abs
+  where go (Loco _)    = Left cs
         go (Car a abs) = case go abs of
-          Left cds -> case cds of
-            Loco _    -> Right (Car a (Loco abs))
-            Car _ cds -> Left cds
+          Left cs -> case cs of
+            []    -> Right (Car a (Loco abs))
+            _:cds -> Left cds
           Right abs' -> Right (Car a abs')
 
+{-
 trainUpTo :: (a -> Bool)
           -> Train a b
           -> Maybe ([a], a, Train a b)
