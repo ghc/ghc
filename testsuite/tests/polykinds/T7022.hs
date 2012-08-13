@@ -2,8 +2,8 @@
 
 module T7022 where
 
-import T7022a
+import T7022b
 
-data family Sing (a :: k)
+foo :: SList a -> Bool
+foo = undefined
 
-$( makeSList )

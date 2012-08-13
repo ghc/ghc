@@ -23,6 +23,7 @@ T6054:
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T6054.hs
 
 T7022:
-	$(RM) -f T7022.hi T7022.o T7022a.hi T7022a.o
+	$(RM) -f T7022.hi T7022.o T7022a.hi T7022a.o T7022b.hi T7022b.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7022a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7022b.hs -v0
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -v0 T7022.hs
