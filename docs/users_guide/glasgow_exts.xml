@@ -7041,6 +7041,94 @@ If you supply a type signature, then the flag has no effect.
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
 
+<sect1 id="defer-type-errors">
+<title>Deferring type errors to runtime</title>
+  <para>
+    While developing, sometimes it is desirable to allow compilation to succeed
+    even if there are type errors in the code. Consider the following case:
+<programlisting>
+module Main where
+
+a :: Int
+a = 'a'
+
+main = print "b"
+</programlisting>
+    Even though <literal>a</literal> is ill-typed, it is not used in the end, so if
+    all that we're interested in is <literal>main</literal> it can be useful to be
+    able to ignore the problems in <literal>a</literal>.
+  </para>
+  <para>
+    For more motivation and details please refer to the <ulink
+      url="http://hackage.haskell.org/trac/ghc/wiki/DeferErrorsToRuntime">HaskellWiki</ulink>
+    page or the <ulink
+      url="http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/">original
+      paper</ulink>.
+  </para>
+
+<sect2><title>Enabling deferring of type errors</title>
+  <para>
+    The flag <literal>-fdefer-type-errors</literal> controls whether type
+    errors are deferred to runtime. Type errors will still be emitted as
+    warnings, but will not prevent compilation.
+  </para>
+  <para>
+    At runtime, whenever a term containing a type error would need to be
+    evaluated, the error is converted into a runtime exception.
+    Note that type errors are deferred as much as possible during runtime, but
+    invalid coercions are never performed, even when they would ultimately
+    result in a value of the correct type. For example, given the following
+    code:
+<programlisting>
+x :: Int
+x = 0
+
+y :: Char
+y = x
+
+z :: Int
+z = y
+</programlisting>
+    evaluating <literal>x</literal> will result in a runtime type error.
+  </para>
+</sect2>
+<sect2><title>Deferred type errors in GHCi</title>
+  <para>
+    The flag <literal>-fdefer-type-errors</literal> works in GHCi as well, with
+    one exception: for "naked" expressions typed at the prompt, type
+    errors don't get delayed, so for example:
+<programlisting>
+Prelude> fst (True, 1 == 'a')
+
+&lt;interactive&gt;:2:12:
+    No instance for (Num Char) arising from the literal `1'
+    Possible fix: add an instance declaration for (Num Char)
+    In the first argument of `(==)', namely `1'
+    In the expression: 1 == 'a'
+    In the first argument of `fst', namely `(True, 1 == 'a')'
+</programlisting>
+Otherwise, in the common case of a simple type error such as 
+typing <literal>reverse True</literal> at the prompt, you would get a warning and then
+an immediately-following type error when the expression is evaluated.
+  </para>
+  <para>
+    This exception doesn't apply to statements, as the following example demonstrates:
+<programlisting>
+Prelude> let x = (True, 1 == 'a')
+
+&lt;interactive&gt;:3:16: Warning:
+    No instance for (Num Char) arising from the literal `1'
+    Possible fix: add an instance declaration for (Num Char)
+    In the first argument of `(==)', namely `1'
+    In the expression: 1 == 'a'
+    In the expression: (True, 1 == 'a')
+Prelude> fst x
+True
+</programlisting>
+  </para>
+</sect2>
+</sect1>
+
 <!-- ====================== TEMPLATE HASKELL =======================  -->
 
 <sect1 id="template-haskell">
