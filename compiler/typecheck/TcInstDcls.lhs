@@ -237,7 +237,7 @@ end up with non-inlined dictionaries that look like
     $df = $cop |> blah
 which adds an extra indirection to every use, which seems stupid.  See
 Trac #4138 for an example (although the regression reported there
-wasn't due to the indirction).
+wasn't due to the indirection).
 
 There is an awkward wrinkle though: we want to be very
 careful when we have

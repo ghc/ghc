@@ -988,8 +988,10 @@ tcTyClTyVars :: Name -> LHsTyVarBndrs Name	-- LHS of the type or class decl
 --
 -- No need to freshen the k's because they are just skolem 
 -- constants here, and we are at top level anyway.
-tcTyClTyVars tycon (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
-  = kcScopedKindVars kvs $
+tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
+  = kcScopedKindVars hs_kvs $ -- Bind scoped kind vars to fresh kind univ vars
+                              -- There may be fewer of these than the kvs of
+                              -- the type constructor, of course
     do { thing <- tcLookup tycon
        ; let { kind = case thing of
                         AThing kind -> kind
