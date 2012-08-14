@@ -29,7 +29,7 @@ module TcHsSyn (
 	zonkTopDecls, zonkTopExpr, zonkTopLExpr, 
 	zonkTopBndrs, zonkTyBndrsX,
         emptyZonkEnv, mkEmptyZonkEnv, mkTyVarZonkEnv, 
-        zonkTcTypeToType, zonkTcTypeToTypes
+        zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
   ) where
 
 #include "HsVersions.h"
