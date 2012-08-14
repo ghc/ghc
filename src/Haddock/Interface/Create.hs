@@ -1,5 +1,4 @@
 {-# LANGUAGE TupleSections, BangPatterns #-}
-{-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Create
