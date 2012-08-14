@@ -57,7 +57,8 @@ endif
 	  $$(foreach opt,$$($1_$2_v_ALL_HC_OPTS),--optghc=$$(opt)) \
 	  $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
 	  $$($1_$2_HS_SRCS) \
-	  $$($1_$2_EXTRA_HADDOCK_SRCS)
+	  $$($1_$2_EXTRA_HADDOCK_SRCS) \
+	  +RTS -t$$@.t --machine-readable
 
 # --no-tmp-comp-dir above is important: it saves a few minutes in a
 # validate.  This flag lets Haddock use the pre-compiled object files
