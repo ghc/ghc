@@ -568,11 +568,14 @@ tcTyClDecl1 _parent calc_isrec
 
           ; ctxt' <- tcHsContext ctxt
           ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'  
-                     -- Squeeze out any kind unification variables
-
+                  -- Squeeze out any kind unification variables
           ; fds'  <- mapM (addLocM tc_fundep) fundeps
           ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
+          ; env <- getLclTypeEnv
+          ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tvs' $$ ppr fds' $$  ppr env)
           ; return (tvs', ctxt', fds', sig_stuff, gen_dm_env) }
+
+
 
   ; clas <- fixM $ \ clas -> do
 	    { let 	-- This little knot is just so we can get
@@ -602,9 +605,17 @@ tcTyClDecl1 _parent calc_isrec
       --     tying the the type and class declaration type checking knot.
   }
   where
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcLookupTyVar tvs1 ;
-				; tvs2' <- mapM tcLookupTyVar tvs2 ;
+    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tc_fd_tyvar tvs1 ;
+				; tvs2' <- mapM tc_fd_tyvar tvs2 ;
 				; return (tvs1', tvs2') }
+    tc_fd_tyvar name   -- Scoped kind variables are bound to unification variables
+                       -- which are now fixed, so we can zonk
+      = do { tv <- tcLookupTyVar name
+           ; ty <- zonkTyVarOcc emptyZonkEnv tv
+                  -- Squeeze out any kind unification variables
+           ; case getTyVar_maybe ty of
+               Just tv' -> return tv'
+               Nothing  -> pprPanic "tc_fd_tyvar" (ppr name $$ ppr tv $$ ppr ty) }
 
 tcTyClDecl1 _ _
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
