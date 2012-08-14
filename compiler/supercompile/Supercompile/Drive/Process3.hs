@@ -33,6 +33,7 @@ import MkId       (nullAddrId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
 import Util       (sndOf3)
+import Pair
 import VarEnv     (varEnvElts)
 
 import Control.Monad (join)
@@ -309,7 +310,7 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
 
 tryMSG opt = bothWays $ \shallow_state state -> do
   -- FIXME: better? In particular, could rollback and then MSG
-  (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
+  (Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
   pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
                           pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ do

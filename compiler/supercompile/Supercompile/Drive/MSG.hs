@@ -62,9 +62,9 @@ rnBndr2' rn2 x_l x_r = MSG $ \_ s -> Right (s, rnBndr2'' (msgInScopeSet s) rn2 x
   -- BUT I don't want to just put ids_l/ids_r in the RnEnv2 because that will force common occurrence sites to rename (in msgPend) which
   -- which will make things drastically worse! Instead, rnBndr2' does the uniqAway manually.)
 
--- FIXME: rigid variable occurrences do not get correct type/info.
--- This probably dosent' matter for internal binders since the supercompiler's normal renaming mechanism
--- will propagate binding-site info down to the use sites, but it matters a TON for the stack binders!
+-- NB: rigid variable occurrences do not get correct type/info.
+-- This actually dosen't matter for internal binders since the supercompiler's normal renaming mechanism will
+-- propagate binding-site info down to the use sites, but it means we can't reuse the rigid-binders mechanismfor stack binders
 rnBndr2'' :: InScopeSet -> RnEnv2 -> Var -> Var -> (RnEnv2, Var)
 rnBndr2'' extra_iss rn2 x_l x_r = (rn2', x')
   where rn2' = rn2 { envL     = extendVarEnv (envL rn2) x_l x'
@@ -157,14 +157,15 @@ data MSGState = MSGState {
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
 msgPend rn2 x0 pending = do
-    x <- msgPend' rn2 x0 pending
-    MSG $ \_ s -> Right (s { msgPending = (x, pending) : msgPending s }, x)
+    (is_new, x) <- msgPend' rn2 x0 pending
+    when is_new $ MSG $ \_ s -> Right (s { msgPending = (x, pending) : msgPending s }, ())
+    return x
 
 -- NB: this variant doesn't actually record anything in the pending list: the caller must do that
-msgPend' :: RnEnv2 -> Var -> Pending -> MSG Var
+msgPend' :: RnEnv2 -> Var -> Pending -> MSG (Bool, Var)
 msgPend' rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
-    Right x                       -> Right (s0, x)
-    Left (mb_eq, binderise, mk_s) -> res
+    Right x                       -> Right (s0, (False, x))
+    Left (mb_eq, binderise, mk_s) -> fmap (second ((,) True)) res
       where -- The use of s here is necessary to ensure we only allocate a given common var once
             extra_iss | Just eq <- mb_eq
                       , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
@@ -180,8 +181,7 @@ msgPend' rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
             -- in the state even as we are binderising it. This is important since the variable's IdInfo might mention itself,
             -- as x_l and x_r will in fact be bound by the top-level letrec.
             s1 = mk_s x
-            s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x1, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
-                      msgPending = (x, pending) : msgPending s1 }
+            s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x1 } -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
             res = unMSG (binderise x1) (e { msgLostWorkSharing = False }) s2 -- This thing will be bound in the top letrec, outside any lambdas
             Right (_, x) = res
   where
@@ -328,7 +328,7 @@ data MSGMode = MSGMode {
     msgCommonHeapVars :: InScopeSet
   }
 
-type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deeds, Heap, Renaming, Stack))
+type MSGResult = (Pair (Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA))
 
 -- Note [Renaming via MSG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -432,7 +432,7 @@ data MSGMatchResult = RightIsInstance   Heap Renaming Stack
                     | RightGivesTypeGen Renaming State Renaming
 
 msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
-msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (deeds_r, heap_r@(Heap h_r _), rn_r, k_r))
+msgMatch inst_mtch (Pair (_, Heap h_l _, rn_l, k_l) (deeds_r, heap_r@(Heap h_r _), rn_r, k_r), (heap@(Heap _ ids), k, qa))
   -- Try to detect instantiation first
   --  1) Is the left-hand renaming invertible?
   | Just rn_l_inv@(rn_l_inv_xs, rn_l_inv_as, rn_l_inv_qs) <- invertRenaming ids rn_l
@@ -490,21 +490,7 @@ isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (i
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
 msg mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
-    do (msg_s, qa) <- runMSG msg_e msg_s (msgAnned annedQA (msgQA init_rn2) qa_l qa_r)
-       ((rn_l, rn_r), (heap_l, heap, heap_r), (k_l, k, k_r)) <- return $ msgLoop mm init_rn2 msg_e msg_s (heap_l, heap_r) (k_l, k_r)
-       return ((deeds_l, heap_l, rn_l, k_l), (heap, k, qa), (deeds_r, heap_r, rn_r, k_r))
-  where
-    -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
-    -- binders allocated for rigid binders are *allowed* to shadow things bound in h_l/h_r.
-    -- The only things they may not shadow are things bound in the eventual common heap,
-    -- but we will ensure that when we are choosing those binders in msgPend.
-    --
-    -- Indeed it is better to not include ids_l/ids_r so that the new common heap/stack
-    -- binders often often have exactly the same uniques as their counterparts in the
-    -- incoming states. This aids debugging.
-    init_rn2 = mkRnEnv2 emptyInScopeSet
-    msg_e = MSGEnv False mm
-    msg_s = MSGState (msgCommonHeapVars mm) emptyVarEnv emptyTM emptyTM []
+    liftM (first (liftA2 (\deeds (heap, rn, k) -> (deeds, heap, rn, k)) (Pair deeds_l deeds_r))) $ msgLoop mm (heap_l, heap_r) (qa_l, qa_r) (k_l, k_r)
 
 msgAnned :: (Tag -> b -> Anned b) -> (Tag -> a -> Tag -> a -> MSG b)
          -> Anned a -> Anned a -> MSG (Anned b)
@@ -930,65 +916,90 @@ heapBindingGeneralised = maybe True id . heapBindingLambdaBoundness
 stackGeneralised :: Stack -> Generalised
 stackGeneralised k_lr = case k_lr of Loco gen -> gen; _ -> True
 
-msgStack :: RnEnv2 -> MSGEnv -> MSGState -> Stack -> Stack -> (MSGState, (Pair (VarEnv (Var, Var)), (Stack, Stack, Stack)))
-msgStack rn2 msg_e msg_s k_l k_r
-  | Car kf_l k_l <- k_l
-  , Car kf_r k_r <- k_r
-  , Right (msg_s, (mb_xs, kf)) <- runMSG msg_e msg_s (msgStackFrame rn2 kf_l kf_r)
-  = second (\(Pair l_to_r r_to_l, (k_l, k, k_r)) -> (case mb_xs of Nothing            -> Pair l_to_r r_to_l
-                                                                   Just (x_l, x, x_r) -> Pair (extendVarEnv l_to_r x_l (x, x_r)) (extendVarEnv r_to_l x_r (x, x_l)),
-                                                     (k_l, kf `Car` k, k_r))) $ msgStack rn2 msg_e msg_s k_l k_r
-  | otherwise
-  = (msg_s, (Pair emptyVarEnv emptyVarEnv, (k_l, Loco (stackGeneralised k_r), k_r))) -- Right biased generalisation flag
+msgStack :: RnEnv2 -> MSGEnv -> MSGState -> Stack -> Stack -> (MSGState, (Pair (VarEnv Rollback), (Stack, Stack, Stack)))
+msgStack rn2 msg_e = go (Pair emptyVarEnv emptyVarEnv) id
+  where
+    go (Pair l_to_r r_to_l) mk_k {- "difference list" -} msg_s k_l k_r
+      | Car kf_l k_l' <- k_l
+      , Car kf_r k_r' <- k_r
+      , Right (msg_s, (mb_xs, kf)) <- runMSG msg_e msg_s (msgStackFrame rn2 kf_l kf_r)
+      , let l_to_rs = case mb_xs of
+              Nothing -> Pair l_to_r r_to_l
+              Just (x_l, x_common, x_r) -> (Pair (extendVarEnv l_to_r x_l (RB rb)) (extendVarEnv r_to_l x_r (RB (\kont -> rb (kont . swap) . swap))))
+                where rb kont infos h _ = sucks (stackFreeVars k_l) (sucks (stackFreeVars k_r) (kont . swap) . swap)
+                                                (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, rn_l, k_l))
+                                                      ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, rn_r, k_r)))
+                                                (M.insert x_common generalisedLambdaBound h) (mk_k (Loco True))
+                        where (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, rn_l, _))
+                                    ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, rn_r, _))) = rn x_common infos (Pair x_l x_r)
+      = go l_to_rs (\tl -> mk_k (kf `Car` tl)) msg_s k_l' k_r'
+      | otherwise
+      = (msg_s, (Pair l_to_r r_to_l, (k_l, mk_k (Loco (stackGeneralised k_r)), k_r))) -- Right biased generalisation flag
 
 msgStackFrame :: RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG (Maybe (Var, Var, Var), Tagged StackFrame)
-msgStackFrame rn2 kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
+msgStackFrame rn2 kf_l kf_r = liftM (second (Tagged (tag kf_r))) $ go (tagee kf_l) (tagee kf_r) -- Right biased
   where
-    go :: StackFrame -> StackFrame -> MSG StackFrame
+    go :: StackFrame -> StackFrame -> MSG (Maybe (Var, Var, Var), StackFrame)
     go (Apply x_l')                          (Apply x_r')                          = liftM ((,) Nothing . Apply) $ msgVar rn2 x_l' x_r'
     go (TyApply ty_l')                       (TyApply ty_r')                       = liftM ((,) Nothing . TyApply) $ msgType rn2 ty_l' ty_r'
     go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = liftM2 (\ty (x, in_alts) -> (Nothing, Scrutinise x ty in_alts)) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r)
     go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = guard "msgStackFrame: primop" (pop_l == pop_r) >> liftM3 (\tys as in_es -> (Nothing, PrimApply pop_r tys as in_es)) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedCoercedAnswer (msgCoerced msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r)
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = liftM ((,) Nothing) $ msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
     go (CastIt co_l')                        (CastIt co_r')                        = liftM ((,) Nothing . CastIt) $ msgCoercion rn2 co_l' co_r'
-    go (Update x_l')                         (Update x_r')                         = liftM (\x -> (Just (x_l, x, x_r), Update x)) $ msgPend' rn2 (zapVarExtraInfo x_r') (PendingVar x_l' x_r')
+    go (Update x_l')                         (Update x_r')                         = liftM (\(True, x) -> (Just (x_l', x, x_r'), Update x)) $ msgPend' rn2 (zapVarExtraInfo x_r') (PendingVar x_l' x_r')
       -- We treat update bindings almost like an occurrence: the difference between msgFlexiVar and what we are doing here is that we don't
       -- bother recording this Pending in the pending list since it is "implicitly" discharged by the fact we MSGed to this point in the stack.
       -- NB: msgPend' still takes care of MSGing the binder extra info for us
     go _ _ = fail "msgStackFrame"
 
 -- Poor man's state monad
-type Looper a = Pair ((PureHeap, Stack, S.Set Var), -- Potentially uncopied heap bindings on each side, and their usage information (which expensive bindings are already copied into one of the heaps?)
-                      (VarEnv (Var, Var)),          -- Mapping from MSG variables on each side to MSG variables in the middle and the opposite side (only useful for those corresponding to "expensive" heap bindings)
-                      (Heap, Renaming, Stack))      -- Each side's unique information (renaming applied to common stuff when instantiated on the left/right)
-             -> PureHeap -> Stack                   -- Common information
+type Looper a = Pair ((PureHeap, S.Set Var),   -- Potentially uncopied heap bindings on each side, and their usage information (which expensive bindings are already copied into one of the heaps?)
+                      (VarEnv Rollback),       -- Mapping from MSG variables on each side to MSG variables in the middle and the opposite side (only useful for those corresponding to "expensive" heap bindings)
+                      (Heap, Renaming, Stack)) -- Each side's unique information (renaming applied to common stuff when instantiated on the left/right)
+             -> PureHeap -> Stack              -- Common information
              -> a
 
+newtype Rollback = RB { unRB :: forall a. Looper a -> Looper a }
+
+rn x_common = liftA2 $ \((init_h_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, rn_lr0, k_lr)) x_lr -> ((init_h_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, insertVarRenaming rn_lr0 x_common x_lr, k_lr))
+
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
-msgLoop :: MSGMode -> RnEnv2 -> MSGEnv -> MSGState
-        -> (Heap, Heap) -> (Stack, Stack)
-        -> ((Renaming, Renaming), (Heap, Heap, Heap), (Stack, Stack, Stack))
-msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) (init_k_l, init_k_r)
-  = trace "msgLoop" $
-    sucks (stackFreeVars k_l) (sucks (stackFreeVars k_r) (go msg_s' . swap) . swap)
-          (Pair ((init_h_l, init_k_l, S.empty), l_to_r, (Heap M.empty init_ids_l, emptyRenaming, k_l))
-                ((init_h_r, init_k_r, S.empty), r_to_l, (Heap M.empty init_ids_r, emptyRenaming, k_r)))
+msgLoop :: MSGMode -> (Heap, Heap) -> (Anned QA, Anned QA) -> (Stack, Stack)
+        -> MSG' (Pair (Heap, Renaming, Stack), (Heap, Stack, Anned QA)) -- ((Renaming, Renaming), (Heap, Heap, Heap), (Stack, Stack, Stack))
+msgLoop mm (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) (qa_l, qa_r) (init_k_l, init_k_r)
+  = sucks (stackFreeVars k_l) (sucks (stackFreeVars k_r) (focus_kont . swap) . swap)
+          (Pair ((init_h_l, S.empty), l_to_r, (Heap M.empty init_ids_l, emptyRenaming, k_l))
+                ((init_h_r, S.empty), r_to_l, (Heap M.empty init_ids_r, emptyRenaming, k_r)))
           M.empty k
   where
+    focus_kont infos h k = liftM (\(msg_s, qa) -> second (\(heap, k) -> (heap, k, qa)) $ go msg_s infos h k) $
+                                 runMSG msg_e msg_s' (msgAnned annedQA (msgQA rn2) qa_l qa_r)
+
+    -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
+    -- binders allocated for rigid binders are *allowed* to shadow things bound in h_l/h_r.
+    -- The only things they may not shadow are things bound in the eventual common heap,
+    -- but we will ensure that when we are choosing those binders in msgPend.
+    --
+    -- Indeed it is better to not include ids_l/ids_r so that the new common heap/stack
+    -- binders often often have exactly the same uniques as their counterparts in the
+    -- incoming states. This aids debugging.
+    rn2 = mkRnEnv2 emptyInScopeSet
+    msg_e = MSGEnv False mm
+    msg_s = MSGState (msgCommonHeapVars mm) emptyVarEnv emptyTM emptyTM []
+
     -- We always begin by optimistically MSGing the stack together, though we might have to rollback later
+    -- NB: we *MUST* run this before MSGing the QAs or else valid stack binder pairs found by MSGing the QAs cannot be discharged!
     (msg_s', (Pair l_to_r r_to_l, (k_l, k, k_r))) = msgStack rn2 msg_e msg_s init_k_l init_k_r
 
-    k_bvs = stackBoundVars k
-
     go :: MSGState  -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
-       -> Looper ((Renaming, Renaming), (Heap, Heap, Heap), (Stack, Stack, Stack))
-    go msg_s (Pair info_l@((init_h_l, init_k_l, used_l), l_to_r, (Heap h_l ids_l, rn_l, k_l))
-                   info_r@((init_h_r, init_k_r, used_r), r_to_l, (Heap h_r ids_r, rn_r, k_r))) h k
+       -> Looper (Pair (Heap, Renaming, Stack), (Heap, Stack))
+    go msg_s (Pair info_l@((init_h_l, used_l), l_to_r, (Heap h_l ids_l, rn_l, k_l))
+                   info_r@((init_h_r, used_r), r_to_l, (Heap h_r ids_r, rn_r, k_r))) h k
       = case (case msg_s of MSGState { msgPending = [], msgInScopeSet = ids } -> Left ids; MSGState { msgPending = (v_common, pending):rest } -> Right (v_common, pending, msg_s { msgPending = rest })) of
           -- NB: it is very important that the final InScopeSet includes not only the InScopeSet from the MSGState (which
           -- will include all of the common *heap* bound variables) but also that from the RnEnv2 (which will include
           -- all of the common *stack* bound variables).
-          Left ids -> ((rn_l, rn_r), (Heap h_l ids_l, Heap h (ids `unionInScope` rnInScopeSet rn2), Heap h_r ids_r), (k_l, k, k_r)) -- FIXME: rn2 should always have an empty in scope set, something is amiss/redundant here now
+          Left ids -> (Pair (Heap h_l ids_l, rn_l, k_l) (Heap h_r ids_r, rn_r, k_r), (Heap h ids, k))
           -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
           Right (x_common, PendingVar x_l x_r, msg_s)
             | Right res <- do (used_l, hb_l) <- mb_common_l
@@ -1025,8 +1036,8 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
                                   -> return (msg_s, hb_r) -- Right biased
                                 _ -> Left "msgLoop: non-unifiable heap bindings"
                               -- If they match, we need to make a common heap binding
-                              return $ go msg_s (Pair ((init_h_l, init_k_l, used_l), extendVarEnv l_to_r x_l (x_common, x_r), (Heap h_l ids_l, rn_l, k_l))
-                                                      ((init_h_r, init_k_r, used_r), extendVarEnv r_to_l x_r (x_common, x_l), (Heap h_r ids_r, rn_r, k_r)))
+                              return $ go msg_s (Pair ((init_h_l, used_l), extendVarEnv l_to_r x_l (RB gen_res),                                 (Heap h_l ids_l, rn_l, k_l))
+                                                      ((init_h_r, used_r), extendVarEnv r_to_l x_r (RB (\kont -> gen_res (kont . swap) . swap)), (Heap h_r ids_r, rn_r, k_r)))
                                                 (M.insert x_common hb h) k
             -> res
             | otherwise
@@ -1035,12 +1046,15 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
                -- that binding refers to (potentially rolling back some stuff in the process).
             -> gen_res (go msg_s) (Pair info_l info_r) h k
              where
-               (mb_common_l, mb_individual_l) = find init_h_l init_k_l used_l h_l k_l x_l -- TODO: cleanup
-               (mb_common_r, mb_individual_r) = find init_h_r init_k_r used_r h_r k_r x_r
+               (mb_common_l, mb_individual_l) = findVar init_h_l used_l x_l
+               (mb_common_r, mb_individual_r) = findVar init_h_r used_r x_r
                
                lambda_bound_hb_common = case mb_common_r of Right (_, hb_l) | not (heapBindingGeneralised hb_l) -> lambdaBound; _ -> generalisedLambdaBound -- NB: right-biased
-               gen_res kont infos h k = suck' mb_individual_l (Just x_common) x_l (suck' mb_individual_r (Just x_common) x_r (kont . swap) . swap) -- TODO: I'm not really feeling this (Just x_common) argument, do it the other way
-                                              infos (M.insert x_common lambda_bound_hb_common h) k
+               gen_res kont infos h k = suck' mb_individual_l x_l (suck' mb_individual_r x_r (kont . swap) . swap)
+                                              (rn x_common infos (Pair x_l x_r)) (M.insert x_common lambda_bound_hb_common h) k
+                 -- NB: for gen_res to be useful as a rollback action, the suck' it calls must be "unconditional" inlinings that don't themselves roll back (or we will just loop)
+                 -- This would be established if isJust mb_common_lr ==> mb_individual_lr does not roll back (which is in fact true, see the definition of "find")
+
           -- NB: I can try to avoid generalisation when e_l or e_r is just a heap-bound variable. We do this by floating the non-variable into a new heap binding
           -- which looks just like it was in the inital heap on the left/right and then matching the variable pair we are left with as normal.
           --
@@ -1135,8 +1149,8 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
           --
           -- We can just barely get away with this in the type/coercion cases because the types/coercions don't get bindings per-se, they are just added to the renaming
             -> sucks (annedTermFreeVars e_l `unionVarSet` varBndrFreeVars x_common_l) (sucks (annedTermFreeVars e_r `unionVarSet` varBndrFreeVars x_common_r) (go msg_s . swap) . swap)
-                     (Pair ((init_h_l, init_k_l, used_l), l_to_r, (Heap (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) ids_l', insertIdRenaming rn_l x_common x_common_l, k_l))
-                           ((init_h_r, init_k_r, used_r), r_to_l, (Heap (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) ids_r', insertIdRenaming rn_r x_common x_common_r, k_r)))
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) ids_l', insertIdRenaming rn_l x_common x_common_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) ids_r', insertIdRenaming rn_r x_common x_common_r, k_r)))
                      (M.insert x_common generalisedLambdaBound h) k
             where (ids_l', x_common_l) = uniqAway' ids_l (x_common `setVarType` termType e_l)
                   (ids_r', x_common_r) = uniqAway' ids_r (x_common `setVarType` termType e_r)
@@ -1144,8 +1158,8 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
           Right (a_common, PendingType ty_l ty_r, msg_s)
           -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
             -> sucks (tyVarsOfType ty_l) (sucks (tyVarsOfType ty_r) (go msg_s . swap) . swap)
-                     (Pair ((init_h_l, init_k_l, used_l), l_to_r, (Heap h_l ids_l, insertTypeSubst rn_l a_common ty_l, k_l))
-                           ((init_h_r, init_k_r, used_r), r_to_l, (Heap h_r ids_r, insertTypeSubst rn_r a_common ty_r, k_r)))
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, insertTypeSubst rn_l a_common ty_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, insertTypeSubst rn_r a_common ty_r, k_r)))
                      (M.insert a_common generalisedLambdaBound h) k
           -- TODO: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
           -- the non-variable into a new heap binding which looks just like it was in the initial heap on the left/right and then matching the variable pair we are
@@ -1158,87 +1172,9 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
           Right (q_common, PendingCoercion co_l co_r, msg_s)
           -- We already know the coercions don't match so we are going to generalise
             -> sucks (tyCoVarsOfCo co_l) (sucks (tyCoVarsOfCo co_r) (go msg_s . swap) . swap)
-                     (Pair ((init_h_l, init_k_l, used_l), l_to_r, (Heap h_l ids_l, insertCoercionSubst rn_l q_common co_l, k_l))
-                           ((init_h_r, init_k_r, used_r), r_to_l, (Heap h_r ids_r, insertCoercionSubst rn_r q_common co_r, k_r)))
+                     (Pair ((init_h_l, used_l), l_to_r, (Heap h_l ids_l, insertCoercionSubst rn_l q_common co_l, k_l))
+                           ((init_h_r, used_r), r_to_l, (Heap h_r ids_r, insertCoercionSubst rn_r q_common co_r, k_r)))
                      (M.insert q_common generalisedLambdaBound h) k
-
-    find :: PureHeap -> Stack -> S.Set Var -> PureHeap -> Stack
-         -> Var -> (MSG' (S.Set Var, HeapBinding),
-                      -- Nothing ==> unavailable for common heap/stack
-                      -- Just    ==> available for common heap/stack with this usage
-                    Maybe (Either (S.Set Var, HeapBinding, Bool) [Tagged StackFrame]))
-                      -- This action can never fail, though it might cause us to backtrack on our earlier commoning-up decisions...
-                      {-
-                      -- Nothing      ==> unavailable for individual heap
-                      -- Just Nothing ==> available for individual heap but already in it
-                      -- Just Just    ==> available for individual heap and not in it yet
-                      -}
-    find init_h init_k used h k x = case M.lookup x init_h of
-         -- Variable bound by the heap (vastly common case):
-        Just hb -> (common, individual)
-          where (common, must_rollback)
-                  | S.notMember x used = (return (used', hb),               False)
-                  | otherwise          = (lft "used heap binding (common)", True)
-                individual | x `M.member` h = Nothing
-                           | otherwise      = Just (Left (used', hb, must_rollback))
-                used' | Just (_, e) <- heapBindingTerm hb
-                      , not (termIsCheap e)
-                      = S.insert x used
-                      | otherwise
-                      = used
-         -- By a process of elimination, variables must be bound be the stack. We don't need to worry about returning a sensible answer
-         -- in the "common" case because we eagerly discharge all matches related to the stack that can possibly succeed before entering
-         -- the "go" loop. We do need to be careful about the individual portion because we may have to initiate rollback.
-        Nothing -> (lft "used stack binding (common)", case fst (splitByReverse (trainCars k) (trainCars init_k)) of
-                                                          Left _ -> panic "find: individual stack portion longer than a complete initial individual stack"
-                                                          Right init_k_common -> case dropWhile (\kf -> case tagee kf of Update x_kf -> x_kf /= x; _ -> True) init_k_common of
-                                                            -- In this case x was bound in the individual part and we are already done
-                                                            [] -> Nothing
-                                                            -- In this case we found x bound in the *common* part of the stack, must roll back
-                                                            init_k_after -> Just (Right init_k_after))
-     where lft msg = Left (msg ++ ": " ++ showPpr x)
-
-    suck :: Maybe Var -> Var -> Looper a -> Looper a
-    suck mb_x_common x_lr kont (Pair info_lr@((init_h_lr, init_k_lr, used_lr), _, (Heap h_lr _, _, k_lr)) info_rl) h k
-      = suck' (snd (find init_h_lr init_k_lr used_lr h_lr k_lr x_lr)) mb_x_common x_lr kont (Pair info_lr info_rl) h k
-    
-    suck' find_res mb_x_common x_lr kont (Pair ((init_h_lr, init_k_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, rn_lr0, k_lr)) info_rl) h k
-      = case find_res of
-          Nothing      -> kont (Pair ((init_h_lr, init_k_lr, used_lr), lr_to_rl, (Heap h_lr ids_lr, rn_lr1, k_lr)) info_rl) h k
-          Just ei_hb_k -> sucks (hb_k_fvs `unionVarSet` varBndrFreeVars x_lr) kont'
-                                (Pair ((init_h_lr, init_k_lr, used_lr'), lr_to_rl, (Heap h_lr' ids_lr, rn_lr2, k_lr')) info_rl) h' k'
-            where (must_rollback, hb_k_fvs, used_lr', k', h_lr', k_lr') = case ei_hb_k of
-                    Left (used_lr', hb_lr, must_rollback) -> (must_rollback, heapBindingFreeVars hb_lr, used_lr', k, M.insert x_lr hb_lr h_lr, k_lr)
-                    Right extra_k_lr -> (True, unionVarSets (map (stackFrameFreeVars . tagee) extra_k_lr), used_lr, fmapLoco stackGeneralised (trainDropTailByList extra_k_lr k), h_lr, foldr Car k_lr extra_k_lr) -- FIXME: common generalisation flag should come from right hand side, not a random side
-                  (h', rn_lr2, kont') | must_rollback = (M.insert x_common lambdaBound h, insertVarRenaming rn_lr1 x_common x_lr, suck (Just x_common) x_rl (kont . swap) . swap)
-                                      | otherwise     = (h,                               rn_lr1,                                 kont)
-                  Just (x_common, x_rl) = lookupVarEnv lr_to_rl x_lr
-      where rn_lr1 = maybe rn_lr0 (\x_common -> insertVarRenaming rn_lr0 x_common x_lr) mb_x_common
-
-    sucks :: VarSet -> Looper a -> Looper a
-    sucks xs_lr kont = foldVarSet (suck Nothing) kont xs_lr
-
-    {-
-    suckl, suckr :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
-
-    suck :: (Var -> Var -> Var) -> PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
-    suck _   _      _     h _ (used, Nothing)          h_common k_common = return (used, h, h_common, k_common)                                                                                       -- Already copied in
-    suck sel init_h k_bvs h x (used, Just (hb, mb_rb)) h_common k_common = do
-      let h' = 
-      (h_common, k_common) <- maybe (return (h_common, k_common)) (\act -> act x_common h_common k_common >>= \(x_op, h_common, k_common) -> ) mb_rb
-      sucks sel init_h k_bvs h' used  h_common k_common -- Not yet copied: put in and consider FVs
-
-    sucks :: (Var -> Var -> Var) -> PureHeap -> BoundVars -> PureHeap -> S.Set Var -> FreeVars -> PureHeap -> Stack -> MSG (S.Set Var, PureHeap, PureHeap, Stack)
-    sucks sel init_h k_bvs h used fvs h_common k_common = foldM (\(used, h, h_common, k_common) x -> suck sel init_h k_bvs h x (snd (find sel init_h k_bvs h used x)) h_common k_common) (used, h, h_common, k_common) (varSetElems fvs)
-    -}
-
-    {-
-    varTermPair :: AnnedTerm -> AnnedTerm -> Maybe (Var, AnnedTerm)
-    varTermPair e_l e_r = case extract e_l of
-        Var   x_l                                     -> Just (x_l, e_r)
-        Value (Indirect x_l) | Value _ <- extract e_r -> Just (x_l, e_r) -- We also (sneakily) use PendingTerm to deal with indirection/value mismatches
-        _ -> Nothing
-    -}
 
     inject :: HeapBinding -> MSG' (Maybe (Bool, In AnnedTerm))
     inject (HB { howBound = how_bound, heapBindingMeaning = meaning })
@@ -1256,6 +1192,58 @@ msgLoop mm rn2 msg_e msg_s (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) 
       = return $ Just (let_bound, in_e)
       | otherwise
       = pprPanic "msgLoop: unhandled heap binding format" (ppr how_bound $$ (case meaning of Left _ -> text "Left"; Right _ -> text "Right"))
+
+findVar :: PureHeap -> S.Set Var
+        -> Var -> (MSG' (S.Set Var, HeapBinding),
+                     -- Nothing ==> unavailable for common heap/stack
+                     -- Just    ==> available for common heap/stack with this usage
+                   PureHeap -> Stack -> Maybe (VarSet, S.Set Var, PureHeap))
+                     -- If this "adding" action returns Nothing, it means that we already added the corresponding thing
+                     -- to the common part of the state, and the thing was not cheap. In this case we must use the information
+                     -- recorded at the point we successfully added it to the common part in order to remove it from the common
+                     -- part and add it to the individual parts
+                     --
+                     -- NB: if the individual part is Just, then this "adder" always succeeds
+findVar init_h used x = case M.lookup x init_h of
+     -- Variable bound by the heap (vastly common case):
+    Just hb -> (common, individual)
+      where (common, must_rollback)
+              | S.notMember x used = (return (used', hb),               False)
+              | otherwise          = (lft "used heap binding (common)", True)
+            individual h _ | x `M.member` h = Just (emptyVarSet,                                            used,  h)
+                           | must_rollback  = Nothing
+                           | otherwise      = Just (varBndrFreeVars x `unionVarSet` heapBindingFreeVars hb, used', M.insert x hb h)
+            used' | Just (_, e) <- heapBindingTerm hb
+                  , not (termIsCheap e)
+                  = S.insert x used
+                  | otherwise
+                  = used
+     -- By a process of elimination, variables must be bound be the stack. We don't need to worry about returning a sensible answer
+     -- in the "common" case because we eagerly discharge all matches related to the stack that can possibly succeed before entering
+     -- the "go" loop. We do need to be careful about the individual portion because we may have to initiate rollback.
+    Nothing -> (lft "used stack binding (common)", \h k -> case find (\kf -> case tagee kf of Update x_kf -> x_kf == x; _ -> False) (trainCars k) of
+                                                             -- In this case we found x bound in the *common* part of the stack, must roll back
+                                                             Nothing -> Nothing
+                                                             -- In this case x was bound in the individual part and we are already done
+                                                             Just _  -> Just (emptyVarSet, used, h))
+  where lft msg = Left (msg ++ ": " ++ showPpr x)
+
+suck :: Var -> Looper a -> Looper a
+suck x_lr kont (Pair info_lr@((init_h_lr, used_lr), _, _) info_rl) h k
+  = suck' (snd (findVar init_h_lr used_lr x_lr)) x_lr kont (Pair info_lr info_rl) h k
+
+suck' :: (PureHeap -> Stack -> Maybe (VarSet, S.Set Var, PureHeap))
+      -> Var -> Looper a -> Looper a
+suck' find_res x_lr kont (Pair info_lr@((init_h_lr, _), lr_to_rl, (Heap h_lr ids_lr, rn_lr, k_lr)) info_rl) h k
+  = case find_res h_lr k_lr of
+      -- NB: this "rollback" action is guaranteed to suck x_lr into the individual heap/stack along with any
+      -- partner x_rl or transitively needed x_lrs required to ensure that the newly lambda-bound x_common is instantiated correctl
+      Nothing -> unRB rollback_lr kont (Pair info_lr info_rl) h k
+        where Just rollback_lr = lookupVarEnv lr_to_rl x_lr
+      Just (fvs_lr, used_lr', h_lr') -> sucks fvs_lr kont (Pair ((init_h_lr, used_lr'), lr_to_rl, (Heap h_lr' ids_lr, rn_lr, k_lr)) info_rl) h k
+
+sucks :: VarSet -> Looper a -> Looper a
+sucks xs_lr kont = foldVarSet suck kont xs_lr
 
 guardFloatable :: String -> (a -> FreeVars) -> RnEnv2 -> a -> a -> MSG ()
 guardFloatable msg fvs rn2 x_l x_r = guard (msg ++ ": unfloatable") (canFloat fvs (rnOccL_maybe rn2) x_l && canFloat fvs (rnOccR_maybe rn2) x_r)
