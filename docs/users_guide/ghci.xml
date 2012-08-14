@@ -358,10 +358,10 @@ Prelude> 5+5
 </screen>
 </para>
 
-<sect2><title>I/O actions at the prompt</title>
+<sect2 id="actions-at-prompt"><title>I/O actions at the prompt</title>
 
 <para>GHCi does more than simple expression evaluation at the prompt.
-If you type something of type <literal>IO a</literal> for some
+If you enter an expression of type <literal>IO a</literal> for some
     <literal>a</literal>, then GHCi <emphasis>executes</emphasis> it
     as an IO-computation.
 <screen>
@@ -369,6 +369,12 @@ Prelude> "hello"
 "hello"
 Prelude> putStrLn "hello"
 hello
+</screen>
+This works even if the type of the expression is more general,
+provided it can be <emphasis>instantiated</emphasis> to <literal>IO a</literal>.  For example
+<screen>
+Prelude> return True
+True
 </screen>
 Furthermore, GHCi will print the result of the I/O action if (and only
 if):
@@ -1089,7 +1095,11 @@ def = toEnum 0
     <literal>Integer</literal> then ghci gives an error when running a
     printf.
    </para>
+   <para>See also <xref linkend="actions-at-prompt"/> for how the monad of a computational
+   expression defaults to <literal>IO</literal> if possible.
+   </para>
     </sect2>
+
    <sect2 id="ghci-interactive-print">
      <title>Using a custom interactive printing function</title>
      <para>[<emphasis role="bold">New in version 7.6.1</emphasis>]
