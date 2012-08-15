@@ -70,11 +70,12 @@
 #include <sys/wait.h>
 #endif
 
-#if !defined(powerpc_HOST_ARCH) && \
-    (   defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
+#if (defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) \
+ || (!defined(powerpc_HOST_ARCH) && \
+    (   defined(linux_HOST_OS)     || defined(freebsd_HOST_OS) || \
         defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
         defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
-        defined(kfreebsdgnu_HOST_OS) || defined(gnu_HOST_OS))
+        defined(kfreebsdgnu_HOST_OS) || defined(gnu_HOST_OS)))
 /* Don't use mmap on powerpc_HOST_ARCH as mmap doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
@@ -88,6 +89,16 @@
 #include <unistd.h>
 #endif
 
+#endif
+
+
+/* PowerPC has relative branch instructions with only 24 bit displacements
+ * and therefore needs jump islands contiguous with each object code module.
+ */
+#if (defined(USE_MMAP) && defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
+#define USE_CONTIGUOUS_MMAP 1
+#else
+#define USE_CONTIGUOUS_MMAP 0
 #endif
 
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
@@ -1287,6 +1298,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getMonotonicNSec)                   \
       SymI_HasProto(lockFile)                           \
       SymI_HasProto(unlockFile)                         \
+      SymI_NeedsProto(startProfTimer)                   \
+      SymI_NeedsProto(stopProfTimer)                    \
       RTS_USER_SIGNALS_SYMBOLS                          \
       RTS_INTCHAR_SYMBOLS
 
@@ -2797,8 +2810,26 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
      */
     if( m > n ) // we need to allocate more pages
     {
-        oc->symbol_extras = mmapForLinker(sizeof(SymbolExtra) * count,
+        if (USE_CONTIGUOUS_MMAP)
+        {
+            /* Keep image and symbol_extras contiguous */
+            void *new = mmapForLinker(n + (sizeof(SymbolExtra) * count),
+                                  MAP_ANONYMOUS, -1);
+            if (new)
+            {
+                memcpy(new, oc->image, oc->fileSize);
+                munmap(oc->image, n);
+                oc->image = new;
+                oc->symbol_extras = (SymbolExtra *) (oc->image + n);
+            }
+            else
+                oc->symbol_extras = NULL;
+        }
+        else
+        {
+            oc->symbol_extras = mmapForLinker(sizeof(SymbolExtra) * count,
                                           MAP_ANONYMOUS, -1);
+        }
     }
     else
     {

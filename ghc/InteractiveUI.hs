@@ -2035,7 +2035,9 @@ newDynFlags interactive_only minus_opts = do
         -- the new packages.
         dflags2 <- getDynFlags
         when (packageFlags dflags2 /= packageFlags dflags0) $ do
-          liftIO $ hPutStrLn stderr "package flags have changed, resetting and loading new packages..."
+          when (verbosity dflags2 > 0) $
+            liftIO . putStrLn $
+              "package flags have changed, resetting and loading new packages..."
           GHC.setTargets []
           _ <- GHC.load LoadAllTargets
           liftIO $ linkPackages dflags2 new_pkgs

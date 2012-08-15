@@ -71,17 +71,18 @@ documentation</ulink> describes all the libraries that come with GHC.
 <para>GHC is built on a raft of primitive data types and operations;
 "primitive" in the sense that they cannot be defined in Haskell itself.
 While you really can use this stuff to write fast code,
-  we generally find it a lot less painful, and more satisfying in the
-  long run, to use higher-level language features and libraries.  With
-  any luck, the code you write will be optimised to the efficient
-  unboxed version in any case.  And if it isn't, we'd like to know
-  about it.</para>
+we generally find it a lot less painful, and more satisfying in the
+long run, to use higher-level language features and libraries.  With
+any luck, the code you write will be optimised to the efficient
+unboxed version in any case.  And if it isn't, we'd like to know
+about it.</para>
 
 <para>All these primitive data types and operations are exported by the
 library <literal>GHC.Prim</literal>, for which there is
 <ulink url="&libraryGhcPrimLocation;/GHC-Prim.html">detailed online documentation</ulink>.
 (This documentation is generated from the file <filename>compiler/prelude/primops.txt.pp</filename>.)
 </para>
+
 <para>
 If you want to mention any of the primitive data types or operations in your
 program, you must first import <literal>GHC.Prim</literal> to bring them
@@ -94,8 +95,7 @@ and <link linkend="unboxed-tuples">unboxed tuples</link>, which
 we briefly summarise here. </para>
 
 <sect2 id="glasgow-unboxed">
-<title>Unboxed types
-</title>
+<title>Unboxed types</title>
 
 <para>
 <indexterm><primary>Unboxed types (Glasgow extension)</primary></indexterm>
@@ -202,8 +202,7 @@ since <literal>b</literal> has type <literal>Int#</literal>.
 </sect2>
 
 <sect2 id="unboxed-tuples">
-<title>Unboxed Tuples
-</title>
+<title>Unboxed tuples</title>
 
 <para>
 Unboxed tuples aren't really exported by <literal>GHC.Exts</literal>;
@@ -238,45 +237,18 @@ tuples to avoid unnecessary allocation during sequences of operations.
 </para>
 
 <para>
-There are some pretty stringent restrictions on the use of unboxed tuples:
+There are some restrictions on the use of unboxed tuples:
 <itemizedlist>
-<listitem>
 
+<listitem>
 <para>
 Values of unboxed tuple types are subject to the same restrictions as
 other unboxed types; i.e. they may not be stored in polymorphic data
 structures or passed to polymorphic functions.
-
 </para>
 </listitem>
+
 <listitem>
-
-<para>
-No variable can have an unboxed tuple type, nor may a constructor or function
-argument have an unboxed tuple type.  The following are all illegal:
-<programlisting>
-  data Foo = Foo (# Int, Int #)
-
-  f :: (# Int, Int #) -&#62; (# Int, Int #)
-  f x = x
-
-  g :: (# Int, Int #) -&#62; Int
-  g (# a,b #) = a
-
-  h x = let y = (# x,x #) in ...
-</programlisting>
-</para>
-</listitem>
-<listitem>
-<para>
-Unboxed tuples may not be nested. So this is illegal:
-<programlisting>
-f :: (# Int, (# Int, Int #), Bool #)
-</programlisting>
-</para>
-</listitem>
-</itemizedlist>
-</para>
 <para>
 The typical use of unboxed tuples is simply to return multiple values,
 binding those multiple results with a <literal>case</literal> expression, thus:
@@ -298,6 +270,10 @@ above example desugars like this:
         in ..body..
 </programlisting>
 Indeed, the bindings can even be recursive.
+</para>
+</listitem>
+</itemizedlist>
+
 </para>
 
 </sect2>
