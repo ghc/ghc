@@ -32,7 +32,8 @@
       <listitem>
         <para>
           It is now possible to defer type errors until runtime using the
-          <literal>-fdefer-type-errors</literal> flag.
+          <literal>-fdefer-type-errors</literal> flag: <xref
+              linkend="defer-type-errors" />.
         </para>
       </listitem>
 
