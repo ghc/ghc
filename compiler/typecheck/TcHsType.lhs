@@ -48,7 +48,6 @@ import {-# SOURCE #-}	TcSplice( tcSpliceType )
 import HsSyn
 import TcHsSyn ( zonkTcTypeToType, emptyZonkEnv )
 import TcRnMonad
-import RnEnv   ( dataKindsErr )
 import TcEvidence( HsWrapper )
 import TcEnv
 import TcMType
@@ -1436,6 +1435,11 @@ tc_kind_var_app name arg_kis
   where 
    tycon_err tc msg = failWithTc (quotes (ppr tc) <+> ptext (sLit "of kind")
                                   <+> quotes (ppr (tyConKind tc)) <+> ptext (sLit msg))
+
+dataKindsErr :: Name -> SDoc
+dataKindsErr name
+  = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr name))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
