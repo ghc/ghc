@@ -240,7 +240,8 @@ initProfilingLogFile(void)
 #endif
 
     if (RtsFlags.CcFlags.doCostCentres == 0 && 
-        RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER)
+        RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_RETAINER &&
+        RtsFlags.ProfFlags.retainerSelector == NULL)
     {
         /* No need for the <prog>.prof file */
         prof_filename = NULL;
