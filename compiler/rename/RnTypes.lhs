@@ -207,7 +207,7 @@ rnHsTyKi isType doc (HsFunTy ty1 ty2)
 
 rnHsTyKi isType doc listTy@(HsListTy ty)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr listTy))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType listTy))
        ; (ty', fvs) <- rnLHsTyKi isType doc ty
        ; return (HsListTy ty', fvs) }
 
@@ -228,7 +228,7 @@ rnHsTyKi isType doc (HsPArrTy ty)
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr tupleTy))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType tupleTy))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi isType doc) tys
        ; return (HsTupleTy tup_con tys', fvs) }
 
@@ -236,7 +236,7 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
 -- 2. Check that the integer is positive?
 rnHsTyKi isType _ tyLit@(HsTyLit t)
   = do { data_kinds <- xoptM Opt_DataKinds
-       ; unless (data_kinds || isType) (addErr (dataKindsErr tyLit))
+       ; unless (data_kinds || isType) (addErr (dataKindsErr isType tyLit))
        ; return (HsTyLit t, emptyFVs) }
 
 rnHsTyKi isType doc (HsAppTy ty1 ty2)
@@ -284,14 +284,18 @@ rnHsTyKi isType _ (HsCoreTy ty)
 rnHsTyKi _ _ (HsWrapTy {}) 
   = panic "rnHsTyKi"
 
-rnHsTyKi isType doc (HsExplicitListTy k tys)
+rnHsTyKi isType doc ty@(HsExplicitListTy k tys)
   = ASSERT( isType )
-    do { (tys', fvs) <- rnLHsTypes doc tys
+    do { data_kinds <- xoptM Opt_DataKinds
+       ; unless data_kinds (addErr (dataKindsErr isType ty))
+       ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitListTy k tys', fvs) }
 
-rnHsTyKi isType doc (HsExplicitTupleTy kis tys) 
+rnHsTyKi isType doc ty@(HsExplicitTupleTy kis tys) 
   = ASSERT( isType )
-    do { (tys', fvs) <- rnLHsTypes doc tys
+    do { data_kinds <- xoptM Opt_DataKinds
+       ; unless data_kinds (addErr (dataKindsErr isType ty))
+       ; (tys', fvs) <- rnLHsTypes doc tys
        ; return (HsExplicitTupleTy kis tys', fvs) }
 
 --------------
@@ -443,6 +447,14 @@ badSigErr is_type doc (L loc ty)
          | otherwise = ptext (sLit "kind")
     flag | is_type   = ptext (sLit "-XScopedTypeVariables")
          | otherwise = ptext (sLit "-XKindSignatures")
+
+dataKindsErr :: Bool -> HsType RdrName -> SDoc
+dataKindsErr is_type thing
+  = hang (ptext (sLit "Illegal") <+> what <> colon <+> quotes (ppr thing))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
+  where
+    what | is_type   = ptext (sLit "type")
+         | otherwise = ptext (sLit "kind")
 \end{code}
 
 Note [Renaming associated types] 

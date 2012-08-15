@@ -34,7 +34,7 @@ module RnEnv (
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
         warnUnusedMatches,
         warnUnusedTopBinds, warnUnusedLocalBinds,
-        dataTcOccs, unknownNameErr, kindSigErr, dataKindsErr, perhapsForallMsg,
+        dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg,
         HsDocContext(..), docOfHsDocContext
     ) where
 
@@ -1641,12 +1641,6 @@ kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
-
-dataKindsErr :: Outputable a => a -> SDoc
-dataKindsErr thing
-  = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
-
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
