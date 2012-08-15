@@ -388,8 +388,8 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
                                   , wc_insol = emptyBag }
 
               -- Step 6) Final candidates for quantification                
-       ; let final_quant_candidates :: Bag PredType
-             final_quant_candidates = mapBag ctPred $ 
+       ; let final_quant_candidates :: [PredType]
+             final_quant_candidates = map ctPred $ bagToList $
                                       keepWanted (wc_flat quant_candidates_transformed)
              -- NB: Already the fixpoint of any unifications that may have happened
                   
@@ -401,25 +401,27 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
               , ptext (sLit "gbl_tvs=") <+> ppr gbl_tvs
               , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs ]
          
-       ; let init_tvs 	     = zonked_tau_tvs `minusVarSet` gbl_tvs
-             poly_qtvs       = growPreds gbl_tvs id final_quant_candidates init_tvs
-             
-             pbound          = filterBag (quantifyMe poly_qtvs id) final_quant_candidates
+       ; let init_tvs  = zonked_tau_tvs `minusVarSet` gbl_tvs
+             poly_qtvs = growThetaTyVars final_quant_candidates init_tvs 
+                         `minusVarSet` gbl_tvs
+             pbound    = filter (quantifyMe poly_qtvs id) final_quant_candidates
              
        ; traceTc "simplifyWithApprox" $
-         vcat [ ptext (sLit "pbound =") <+> ppr pbound ]
+         vcat [ ptext (sLit "pbound =") <+> ppr pbound
+              , ptext (sLit "init_qtvs =") <+> ppr init_tvs 
+              , ptext (sLit "poly_qtvs =") <+> ppr poly_qtvs ]
          
 	     -- Monomorphism restriction
        ; let mr_qtvs  	     = init_tvs `minusVarSet` constrained_tvs
-             constrained_tvs = tyVarsOfBag tyVarsOfType final_quant_candidates
-	     mr_bites        = apply_mr && not (isEmptyBag pbound)
+             constrained_tvs = tyVarsOfTypes final_quant_candidates
+	     mr_bites        = apply_mr && not (null pbound)
 
              (qtvs, bound)
-                | mr_bites  = (mr_qtvs,   emptyBag)
+                | mr_bites  = (mr_qtvs,   [])
                 | otherwise = (poly_qtvs, pbound)
              
 
-       ; if isEmptyVarSet qtvs && isEmptyBag bound
+       ; if isEmptyVarSet qtvs && null bound
          then do { traceTc "} simplifyInfer/no quantification" empty                   
                  ; emitConstraints wanted_transformed
                     -- Includes insolubles (if -fdefer-type-errors)
@@ -431,7 +433,7 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
          ptext (sLit "bound are =") <+> ppr bound 
          
             -- Step 4, zonk quantified variables 
-       ; let minimal_flat_preds = mkMinimalBySCs $ bagToList bound
+       ; let minimal_flat_preds = mkMinimalBySCs bound
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
@@ -514,10 +516,7 @@ from superclass selection from Ord alpha. This minimization is what
 mkMinimalBySCs does. Then, simplifyInfer uses the minimal constraint
 to check the original wanted.
 
-
 \begin{code}
-
-
 approximateWC :: WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts 
 approximateWC wc = float_wc emptyVarSet wc
@@ -541,17 +540,6 @@ approximateWC wc = float_wc emptyVarSet wc
     do_bag f = foldrBag (unionBags.f) emptyBag
 
 
-\end{code}
-
-\begin{code}
-growPreds :: TyVarSet -> (a -> PredType) -> Bag a -> TyVarSet -> TyVarSet
-growPreds gbl_tvs get_pred items tvs
-  = foldrBag extend tvs items
-  where
-    extend item tvs = tvs `unionVarSet`
-                      (growPredTyVars (get_pred item) tvs `minusVarSet` gbl_tvs)
-
---------------------
 quantifyMe :: TyVarSet      -- Quantifying over these
 	   -> (a -> PredType)
 	   -> a -> Bool	    -- True <=> quantify over this wanted
