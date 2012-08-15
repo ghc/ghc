@@ -61,4 +61,5 @@ test('T7022', normal, run_command, ['$MAKE -s --no-print-directory T7022'])
 test('T7073', normal, compile,[''])
 test('T7128', normal, compile,[''])
 test('T7151', normal, compile_fail,[''])
+test('T7095', normal, compile,[''])
 
