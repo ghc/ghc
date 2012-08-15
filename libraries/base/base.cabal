@@ -92,6 +92,7 @@ Library {
             GHC.Num,
             GHC.PArr,
             GHC.Pack,
+            GHC.Profiling,
             GHC.Ptr,
             GHC.Read,
             GHC.Real,
