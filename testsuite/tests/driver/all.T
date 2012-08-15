@@ -361,3 +361,4 @@ test('T7060',
                   'T7060dump']),
      run_command,
      ['$MAKE -s --no-print-directory T7060'])
+test('T7130', normal, compile_fail, ['-fflul-laziness'])
