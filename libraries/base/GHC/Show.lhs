@@ -390,12 +390,12 @@ showMultiLineString :: String -> [String]
 --   * break the string into multiple lines
 --   * wrap the entire thing in double quotes
 -- Example:  @showMultiLineString "hello\ngoodbye\nblah"@
--- returns   @["\"hello\\", "\\goodbye\\", "\\blah\""]@
+-- returns   @["\"hello\\n\\", "\\goodbye\n\\", "\\blah\""]@
 showMultiLineString str
   = go '\"' str
   where
     go ch s = case break (== '\n') s of
-                (l, _:s'@(_:_)) -> (ch : showLitString l "\\") : go '\\' s'
+                (l, _:s'@(_:_)) -> (ch : showLitString l "\\n\\") : go '\\' s'
                 (l, _)          -> [ch : showLitString l "\""]
 
 isDec :: Char -> Bool
