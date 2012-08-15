@@ -1305,9 +1305,9 @@ Is every call to 'g' ambiguous?  After all, we might have
    intance C [a] where ...
 at the call site.  So maybe that type is ok!  Indeed even f's
 quintessentially ambiguous type might, just possibly be callable: 
-with -XUndecidableInstances we could have
+with -XFlexibleInstances we could have
   instance C a where ...
-and now a call could be legal after all!  (But only with  -XUndecidableInstances!)
+and now a call could be legal after all!  (But only with  -XFlexibleInstances!)
 
 What about things like this:
    class D a b | a -> b where ..
@@ -1333,7 +1333,7 @@ where
   * The constraints in 'Cambig' are all of form (C a b c) 
     where a,b,c are type variables
   * 'Cambig' is non-empty
-  * '-XUndecidableInstances' is not on.
+  * '-XFlexibleInstances' is not on.
 
 And that is what checkAmbiguity does.  See Trac #6134.
 
@@ -1375,8 +1375,8 @@ so we can take their type variables into account as part of the
 checkAmbiguity :: [TyVar] -> ThetaType -> TyVarSet -> TcM ()
 -- Note [The ambiguity check for type signatures]
 checkAmbiguity forall_tyvars theta tau_tyvars
-  = do { undecidable_instances <- xoptM Opt_UndecidableInstances
-       ; unless undecidable_instances $
+  = do { flexible_instances <- xoptM Opt_FlexibleInstances
+       ; unless flexible_instances $
          mapM_  ambigErr (filter is_ambig candidates) }
   where
 	-- See Note [Implicit parameters and ambiguity] in TcSimplify
