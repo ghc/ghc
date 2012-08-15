@@ -1040,10 +1040,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie ie@(IEThingAll rdr)
         = do name <- lookupGlobalOccRn rdr
              let kids = findChildren kids_env name
-                 mkKidRdrName = case isQual_maybe rdr of
-                                Nothing -> mkRdrUnqual
-                                Just (modName, _) -> mkRdrQual modName
-             addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
+             addUsedKids rdr kids
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null kids) $
                   if isTyConName name
@@ -1066,6 +1063,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                 then do addErr (exportItemErr ie)
                         return (IEThingWith name [], AvailTC name [name])
                 else do let names = catMaybes mb_names
+                        addUsedKids rdr names
                         optTyFam <- xoptM Opt_TypeFamilies
                         when (not optTyFam && any isTyConName names) $
                           addErr (typeItemErr ( head
@@ -1085,6 +1083,14 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
+    -- In an export item M.T(A,B,C), we want to treat the uses of
+    -- A,B,C as if they were M.A, M.B, M.C
+    addUsedKids parent_rdr kid_names
+       = addUsedRdrNames $ map (mk_kid_rdr . nameOccName) kid_names
+       where
+         mk_kid_rdr = case isQual_maybe parent_rdr of
+                         Nothing           -> mkRdrUnqual
+                         Just (modName, _) -> mkRdrQual modName
 
 isDoc :: IE RdrName -> Bool
 isDoc (IEDoc _)      = True
