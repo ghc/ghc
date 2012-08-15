@@ -246,3 +246,7 @@ test('T6005a', normal, compile, ['-v0'])
 test('T5737', normal, compile, ['-v0'])
 test('T6114', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('TH_StringPrimL', normal, compile_and_run, [''])
+test('T7064',
+     extra_clean(['T7064a.hi', 'T7064a.o']),
+     multimod_compile_and_run,
+     ['T7064.hs', '-v0'])
