@@ -299,6 +299,19 @@ data Bind b = NonRec b (Expr b)
   deriving (Data, Typeable)
 \end{code}
 
+Note [Shadowing]
+~~~~~~~~~~~~~~~~
+While various passes attempt to rename on-the-fly in a manner that
+avoids "shadowing" (thereby simplifying downstream optimizations),
+neither the simplifier nor any other pass GUARANTEES that shadowing is
+avoided. Thus, all passes SHOULD work fine even in the presence of
+arbitrary shadowing in their inputs.
+
+In particular, scrutinee variables `x` in expressions of the form
+`Case e x t` are often renamed to variables with a prefix
+"wild_". These "wild" variables may appear in the body of the
+case-expression, and further, may be shadowed within the body.
+
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Literal alternatives (LitAlt lit) are always for *un-lifted* literals.
