@@ -1752,7 +1752,11 @@ fbinds1 :: { ([HsRecField RdrName (LHsExpr RdrName)], Bool) }
         | '..'                          { ([],   True) }
   
 fbind   :: { HsRecField RdrName (LHsExpr RdrName) }
-        : qvar '=' exp  { HsRecField $1 $3                False }
+        : qvar '=' texp { HsRecField $1 $3                False }
+                        -- RHS is a 'texp', allowing view patterns (Trac #6038)
+                        -- and, incidentaly, sections.  Eg
+                        -- f (R { x = show -> s }) = ...
+
         | qvar          { HsRecField $1 placeHolderPunRhs True }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
