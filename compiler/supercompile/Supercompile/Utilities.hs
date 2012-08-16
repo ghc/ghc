@@ -27,7 +27,7 @@ import Outputable hiding (Depth)
 import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))
-import Control.Applicative (Applicative(..), (<$>), liftA, liftA2)
+import Control.Applicative (Applicative(..), (<$>), liftA, liftA2, liftA3)
 import Control.Exception (bracket)
 import Control.Monad hiding (join, forM_)
 
@@ -775,6 +775,12 @@ nullTrain (Loco _)  = True
 unconsTrain :: Train a b -> Maybe (a, Train a b)
 unconsTrain (Car a abs) = Just (a, abs)
 unconsTrain (Loco _)    = Nothing
+
+trainInit :: (a -> b -> b) -> Train a b -> Train a b
+trainInit _ (Loco _)    = error "trainInit"
+trainInit f (Car a abs) = go a abs
+  where go a (Loco b)     = Loco (f a b)
+        go a (Car a' abs) = Car a (go a' abs)
 
 trainToList :: Train a b -> ([a], b)
 trainToList (Car a abs) = first (a:) (trainToList abs)

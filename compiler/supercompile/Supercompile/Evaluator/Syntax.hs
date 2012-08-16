@@ -266,6 +266,9 @@ instance Outputable HeapBinding where
         LambdaBound     -> text "λ" <> angles (either (either (\gen -> if gen then text "?" else empty) (const empty)) (pPrintPrecAnnedTerm noPrec) mb_in_e)
         LetBound        -> text "l" <> angles (either (either (\gen -> if gen then text "?" else empty) (const empty)) (pPrintPrecAnnedTerm noPrec) mb_in_e)
 
+heapBindingCheap :: HeapBinding -> Bool
+heapBindingCheap = either (const True) (termIsCheap . snd) . heapBindingMeaning
+
 lambdaBound :: HeapBinding
 lambdaBound = HB LambdaBound (Left (Left False))
 
