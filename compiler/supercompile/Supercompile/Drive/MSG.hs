@@ -40,6 +40,12 @@ import FastString (fsLit)
 --import BasicTypes (TupleSort(..))
 import qualified State
 
+import Id (mkTemplateLocals)
+import Type (mkFunTy)
+import TysWiredIn
+import BasicTypes
+
+
 import Control.Monad (join)
 import Control.Monad.Fix
 import qualified Data.Foldable as Foldable
@@ -58,6 +64,28 @@ pprTraceSC msg doc a = traceSC (msg ++ ": " ++ showSDoc doc) a
 traceSC :: String -> a -> a
 traceSC _ = id
 --traceSC = trace
+
+
+-- Demonstrates rollback due to heap work duplication
+example1 :: SDoc
+example1 = pPrint $ msg (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
+  where
+    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (g, lambdaBound), (x, internallyBound (renamedTerm $ annedTerm 0 (annedTerm 0 (Var g) `App` y))), (y, lambdaBound)]) (mkInScopeSet (mkVarSet [f, g, x, y])), Tagged 0 (Apply x) `Car` Tagged 0 (Update y) `Car` Loco False, (annedQA 0 (Question f)))
+    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (x, lambdaBound), (y, lambdaBound)]) (mkInScopeSet (mkVarSet [f, x, y])), Tagged 0 (Apply x) `Car` Tagged 0 (Update y) `Car` Loco False, (annedQA 0 (Question f)))
+
+    [f, g, x, y] = mkTemplateLocals [boolTy `mkFunTy` intTy, intTy `mkFunTy` boolTy, boolTy, intTy]
+
+-- Demonstrates rollback due to stack "work duplication"
+example2 :: SDoc
+example2 = pPrint $ msg (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
+  where
+    expensive = internallyBound (renamedTerm $ annedTerm 0 (annedTerm 0 (Var f) `App` y))
+    pairDC = tupleCon BoxedTuple 2
+
+    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive)]) (mkInScopeSet (mkVarSet [f, y, a])), Loco False, annedQA 0 $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, a])
+    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive), (b, expensive)]) (mkInScopeSet (mkVarSet [f, y, a, b])), Loco False, annedQA 0 $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, b])
+
+    [a, b, f, y] = mkTemplateLocals [intTy, intTy, boolTy `mkFunTy` intTy, boolTy]
 
 
 rnBndr2' :: Applicative t => RnEnv2 -> Var -> Var -> MSGT t (RnEnv2, Var)
@@ -658,7 +686,8 @@ isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
-msg mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+msg = pprTrace "msg" example1 msg'
+msg' mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
     liftM (first (liftA2 (\deeds (heap, rn, k) -> (deeds, heap, rn, k)) (Pair deeds_l deeds_r))) $ msgLoop mm (heap_l, heap_r) (qa_l, qa_r) (k_l, k_r)
 
 msgAnned :: (Tag -> b -> Anned b) -> (Tag -> a -> Tag -> a -> MSG b)
