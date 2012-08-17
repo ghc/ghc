@@ -49,29 +49,29 @@ data Scope a b
 -- |The local environment.
 --
 data LocalEnv
-  = LocalEnv {
-        -- Mapping from local variables to their vectorised and lifted versions.
-            local_vars    :: VarEnv (Var, Var)
+        = LocalEnv
+        { local_vars      :: VarEnv (Var, Var)
+          -- ^Mapping from local variables to their vectorised and lifted versions.
 
-        -- In-scope type variables.
         , local_tyvars    :: [TyVar]
+          -- ^In-scope type variables.
 
-        -- Mapping from tyvars to their PA dictionaries.
         , local_tyvar_pa  :: VarEnv CoreExpr
+          -- ^Mapping from tyvars to their PA dictionaries.
 
-        -- Local binding name.
         , local_bind_name :: FastString
+          -- ^Local binding name.
         }
 
 -- |Create an empty local environment.
 --
 emptyLocalEnv :: LocalEnv
-emptyLocalEnv = LocalEnv {
-                   local_vars     = emptyVarEnv
-                 , local_tyvars   = []
-                 , local_tyvar_pa = emptyVarEnv
-                 , local_bind_name  = fsLit "fn"
-                 }
+emptyLocalEnv = LocalEnv
+                { local_vars      = emptyVarEnv
+                , local_tyvars    = []
+                , local_tyvar_pa  = emptyVarEnv
+                , local_bind_name = fsLit "fn"
+                }
 
 
 -- GlobalEnv ------------------------------------------------------------------
