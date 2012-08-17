@@ -163,18 +163,22 @@ data MSGState = MSGState {
     msgKnownTypes     :: TypeMap (TypeMap TyVar),         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
     msgKnownCoercions :: CoercionMap (CoercionMap CoVar), -- INVARIANT: all Vars in the range have extra information that has *already* been MSGed
     msgLR             :: Pair MSGLRState,
+    -- May only shrink:
+    msgSuckStack      :: IM.IntMap (MSGU ()),
+    -- May grow and then shrink, a bit chaotically:
     msgCommonHeap     :: PureHeap,
-    msgCommonStack    :: Stack,
-    msgSuckStack      :: IM.IntMap (MSGU ())
+    msgCommonStack    :: Stack
   }
 
 data MSGLRState = MSGLRState {
-    msgLRAvailableHeap  :: PureHeap,        -- Available heap
-    msgLRAvailableStack :: Stack,           -- Available stack
-    msgLRHeap           :: PureHeap,        -- Certainly-individual heap
-    msgLRStack          :: Stack,           -- Certainly-individual stack
-    msgLRRenaming       :: Renaming,        -- Certainly-individual renaming
-    msgLRSuckVar        :: VarEnv (MSGU ()) -- Can be called to ensure that the given var is in the individual state
+    -- May only shrink:
+    msgLRSuckVar        :: VarEnv (MSGU ()), -- Can be called to ensure that the given var is in the individual state
+    msgLRAvailableHeap  :: PureHeap,         -- Available heap
+    msgLRAvailableStack :: Stack,            -- Available stack
+    -- May only grow:
+    msgLRHeap           :: PureHeap,         -- Certainly-individual heap
+    msgLRStack          :: Stack,            -- Certainly-individual stack
+    msgLRRenaming       :: Renaming          -- Certainly-individual renaming
   }
 
 type StackInitM = State.State (InScopeSet, VarEnv (VarEnv Var))
