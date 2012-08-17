@@ -192,8 +192,8 @@ msgPendStackBinder x x_l x_r = State.state $ \(iss, known) -> let x0 = zapVarExt
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
 msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
-    Right x                              -> (s0, pure x)
-    Left (mb_eq, binderise, mspec, mk_s) -> res
+    Right x                       -> (s0, pure x)
+    Left (mb_eq, binderise, mk_s) -> res
       where -- The use of s here is necessary to ensure we only allocate a given common var once
             extra_iss | Just eq <- mb_eq
                       , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
@@ -210,21 +210,20 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
             -- as x_l and x_r will in fact be bound by the top-level letrec.
             s1 = mk_s x
             s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x1 } -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
-            res = unMSG (msgu (mspec x) >> msgLoseWorkSharing' False (binderise x1)) e s2 -- This thing will be bound in the top letrec, outside any lambdas
+            res = unMSG (msgLoseWorkSharing' False (binderise x1)) e s2 -- This thing will be bound in the top letrec, outside any lambdas
             (_, Right x) = res
   where
     lookupUpdatePending :: MSGState
                         -> Either (Maybe Var,       -- Are both sides equal vars, and if so what are they equal to?
-                                   Var -> MSG Var,  -- Produce a version of the variable suitable for use as a heap binder (with generalised info/type/kind)
-                                   Var -> MSGU (),  -- Following specialisation/generalisation, given the commoned-up binder to work with (FIXME: think carefully about the knot it will have!)
+                                   Var -> MSG Var,  -- Produce a version of the variable suitable for use as a heap binder (with generalised info/type/kind + any specialisation work done if reqd)
                                    Var -> MSGState) -- How to update the initial state with the variable for this pending item (only the "known" maps change)
                                   Var
     lookupUpdatePending s = case pending of
       -- TODO: binder matching can legitimately fail, in which case we might want to create a common "vanilla"
       -- binder with no non-MSGable info, leaving the non-unifiable specs/rules to the generalised versions?
-      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, binderiseVars      x_l  x_r,  \x -> specGenVars  x (Pair x_l  x_r),  \x -> s { msgKnownVars      = upd x })) $ lookupUpdateVE (msgKnownVars s)      x_l  x_r
-      PendingType     ty_l ty_r -> fmapLeft (\upd -> (Nothing,                                  binderiseTypes     ty_l ty_r, \x -> genTypes     x (Pair ty_l ty_r), \a -> s { msgKnownTypes     = upd a })) $ lookupUpdateTM (msgKnownTypes s)     ty_l ty_r
-      PendingCoercion co_l co_r -> fmapLeft (\upd -> (Nothing,                                  binderiseCoercions co_l co_r, \x -> genCoercions x (Pair co_l co_r), \q -> s { msgKnownCoercions = upd q })) $ lookupUpdateTM (msgKnownCoercions s) co_l co_r
+      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, binderiseVars      x_l  x_r,  \x -> s { msgKnownVars      = upd x })) $ lookupUpdateVE (msgKnownVars s)      x_l  x_r
+      PendingType     ty_l ty_r -> fmapLeft (\upd -> (Nothing,                                  binderiseTypes     ty_l ty_r, \a -> s { msgKnownTypes     = upd a })) $ lookupUpdateTM (msgKnownTypes s)     ty_l ty_r
+      PendingCoercion co_l co_r -> fmapLeft (\upd -> (Nothing,                                  binderiseCoercions co_l co_r, \q -> s { msgKnownCoercions = upd q })) $ lookupUpdateTM (msgKnownCoercions s) co_l co_r
       --PendingTerm     e_l  e_r  -> Left              (Nothing,                                  binderiseTerms     e_l  e_r,  \_ -> s)
       -- NB: the fact that we don't memoise multiple occurrences of identical (term, term) pairs is very delicate from a termination
       -- perspective. You might imagine that you can easily make the PureHeap matcher get into a loop where the work list continually
@@ -245,11 +244,20 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
       -- It looks like *every* possible loop always goes through a (Var, Var) pair eventually,
       -- so we don't get non-termination!  I'm not quite sure how to prove this yet, though.
 
-    binderiseVars x_l x_r x = msgBndrExtras rn2 x x_l x_r
+    binderiseVars x_l x_r x1 = do
+      x <- msgBndrExtras rn2 x1 x_l x_r
+      msgu $ specGenVars x1 x (Pair x_l x_r)
+      return x
 
-    binderiseTypes ty_l ty_r a = liftM (a `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r)
+    binderiseTypes ty_l ty_r a1 = do
+      a <- liftM (a1 `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r)
+      msgu $ genTypes a (Pair ty_l ty_r)
+      return a
 
-    binderiseCoercions co_l co_r q = liftM (q `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r)
+    binderiseCoercions co_l co_r q1 = do
+      q <- liftM (q1 `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r)
+      msgu $ genCoercions q (Pair co_l co_r)
+      return q
 
     --binderiseTerms e_l e_r x = liftM (x `setVarType`) $ msgType rn2 (termType e_l) (termType e_r)
 
@@ -292,8 +300,8 @@ genVars' x gen x_lrs = modify_ $ \s -> s { msgCommonHeap = M.insert x (if gen th
                                          , msgLR = liftA2 (\x_lr s_lr -> s_lr { msgLRRenaming = insertVarRenaming (msgLRRenaming s_lr) x x_lr }) x_lrs (msgLR s) }
 
 -- Assumption: both input vars MAY YET MSG, are flexi
-specGenVars :: Var -> Pair Var -> MSGU ()
-specGenVars x (Pair x_l x_r) = do
+specGenVars :: Var -> Var {- loop, don't pull on it - can use x1 if you only need the unique -} -> Pair Var -> MSGU ()
+specGenVars x1 x (Pair x_l x_r) = do
     Pair mb_hb_l mb_hb_r <- flip fmap get $ \s -> liftA2 (\x_lr lr_s -> M.lookup x_lr (msgLRAvailableHeap lr_s)) (Pair x_l x_r) (msgLR s)
     sucks <- liftA2 Pair (suck' pFst x_l) (suck' pSnd x_r)
     let hb_r_gen = maybe False heapBindingGeneralised mb_hb_r
@@ -312,7 +320,7 @@ specGenVars x (Pair x_l x_r) = do
              case (hb_l_inj, hb_r_inj) of
                (Just (let_bound_l, in_e_l), Just (let_bound_r, in_e_r))
                  | let_bound_l == let_bound_r
-                 , not let_bound_r || (x_l == x_r && x_r == x) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
+                 , not let_bound_r || (x_l == x_r && x_r == x1) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
                  -> do -- Ensure that we can't attempt to MSG either side's term again (if the term is cheap)
                        -- Also overwrite the sucker so it generalises this "x" before doing normal sucking
                        modify_ $ \s -> s { msgLR = liftA3 (\x_lr in_e_lr s_lr -> if termIsCheap (snd in_e_lr) then s_lr else s_lr { msgLRAvailableHeap = M.delete x_lr (msgLRAvailableHeap s_lr)
@@ -340,7 +348,7 @@ specGenVars x (Pair x_l x_r) = do
                           return in_e_r -- Right biased
                        return $ (if let_bound_r then letBound else internallyBound) in_e
                (Nothing, Nothing)
-                 | x_l == x_r && x_r == x -- Note [MSGing let-bounds]
+                 | x_l == x_r && x_r == x1 -- Note [MSGing let-bounds]
                  -> return hb_r -- Right biased
                _ -> fail "msgLoop: non-unifiable heap bindings"
       _ -> genVars x hb_r_gen (Pair x_l x_r)
