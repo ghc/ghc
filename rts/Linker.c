@@ -6177,8 +6177,13 @@ ocGetNames_MachO(ObjectCode* oc)
 
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
         {
+#ifdef USE_MMAP
+            char * zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS, -1);
+            memset(zeroFillArea, 0, sections[i].size);
+#else
             char * zeroFillArea = stgCallocBytes(1,sections[i].size,
                                       "ocGetNames_MachO(common symbols)");
+#endif
             sections[i].offset = zeroFillArea - image;
         }
 
