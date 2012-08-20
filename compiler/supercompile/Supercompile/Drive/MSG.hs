@@ -68,22 +68,25 @@ traceSC _ = id
 
 -- Demonstrates rollback due to heap work duplication
 example1 :: SDoc
-example1 = pPrint $ msg (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
+example1 = either text pPrint $ msg' (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
   where
-    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (g, lambdaBound), (x, internallyBound (renamedTerm $ annedTerm 0 (annedTerm 0 (Var g) `App` y))), (y, lambdaBound)]) (mkInScopeSet (mkVarSet [f, g, x, y])), Tagged 0 (Apply x) `Car` Tagged 0 (Update y) `Car` Loco False, (annedQA 0 (Question f)))
-    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (x, lambdaBound), (y, lambdaBound)]) (mkInScopeSet (mkVarSet [f, x, y])), Tagged 0 (Apply x) `Car` Tagged 0 (Update y) `Car` Loco False, (annedQA 0 (Question f)))
+    tg = mkTag 0
+
+    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (g, lambdaBound), (x, internallyBound (renamedTerm $ annedTerm tg (annedTerm tg (Var g) `App` y)))]) (mkInScopeSet (mkVarSet [f, g, x, y])), Tagged tg (Apply x) `Car` Tagged tg (Update y) `Car` Loco False, (annedQA tg (Question f)))
+    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (x, lambdaBound)]) (mkInScopeSet (mkVarSet [f, x, y])), Tagged tg (Apply x) `Car` Tagged tg (Update y) `Car` Loco False, (annedQA tg (Question f)))
 
     [f, g, x, y] = mkTemplateLocals [boolTy `mkFunTy` intTy, intTy `mkFunTy` boolTy, boolTy, intTy]
 
 -- Demonstrates rollback due to stack "work duplication"
 example2 :: SDoc
-example2 = pPrint $ msg (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
+example2 = either text pPrint $ msg' (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
   where
-    expensive = internallyBound (renamedTerm $ annedTerm 0 (annedTerm 0 (Var f) `App` y))
+    expensive = internallyBound (renamedTerm $ annedTerm tg (annedTerm tg (Var f) `App` y))
     pairDC = tupleCon BoxedTuple 2
+    tg = mkTag 0
 
-    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive)]) (mkInScopeSet (mkVarSet [f, y, a])), Loco False, annedQA 0 $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, a])
-    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive), (b, expensive)]) (mkInScopeSet (mkVarSet [f, y, a, b])), Loco False, annedQA 0 $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, b])
+    state1 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive)]) (mkInScopeSet (mkVarSet [f, y, a])), Loco False, annedQA tg $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, a])
+    state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive), (b, expensive)]) (mkInScopeSet (mkVarSet [f, y, a, b])), Loco False, annedQA tg $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, b])
 
     [a, b, f, y] = mkTemplateLocals [intTy, intTy, boolTy `mkFunTy` intTy, boolTy]
 
@@ -686,7 +689,7 @@ isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
-msg = pprTrace "msg" example1 msg'
+msg = pprTrace "examples" (example1 $$ example2) msg'
 msg' mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
     liftM (first (liftA2 (\deeds (heap, rn, k) -> (deeds, heap, rn, k)) (Pair deeds_l deeds_r))) $ msgLoop mm (heap_l, heap_r) (qa_l, qa_r) (k_l, k_r)
 
