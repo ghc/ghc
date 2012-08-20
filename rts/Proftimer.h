@@ -9,13 +9,13 @@
 #ifndef PROFTIMER_H
 #define PROFTIMER_H
 
+void stopProfTimer      ( void );
+void startProfTimer     ( void );
+
 #include "BeginPrivate.h"
 
 void initProfTimer      ( void );
 void handleProfTick     ( void );
-
-void stopProfTimer      ( void );
-void startProfTimer     ( void );
 
 void stopHeapProfTimer  ( void );
 void startHeapProfTimer ( void );

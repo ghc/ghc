@@ -28,6 +28,7 @@
 #include "Trace.h"
 #include "StgPrimFloat.h" // for __int_encodeFloat etc.
 #include "Stable.h"
+#include "Proftimer.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -1298,8 +1299,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getMonotonicNSec)                   \
       SymI_HasProto(lockFile)                           \
       SymI_HasProto(unlockFile)                         \
-      SymI_NeedsProto(startProfTimer)                   \
-      SymI_NeedsProto(stopProfTimer)                    \
+      SymI_HasProto(startProfTimer)                     \
+      SymI_HasProto(stopProfTimer)                      \
       RTS_USER_SIGNALS_SYMBOLS                          \
       RTS_INTCHAR_SYMBOLS
 
