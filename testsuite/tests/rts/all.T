@@ -149,3 +149,4 @@ test('T7037',
      ['$MAKE -s --no-print-directory T7037'])
 
 test('7087', exit_code(1), compile_and_run, [''])
+test('T7160', normal, compile_and_run, [''])
