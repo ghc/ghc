@@ -689,11 +689,13 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
                             LamPat mc -> PatSkol data_con mc
                             LetPat {} -> UnkSkol -- Doesn't matter
  
-        ; gadts_on <- xoptM Opt_GADTs
-	; checkTc (no_equalities || gadts_on)
-	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs"))
+        ; gadts_on    <- xoptM Opt_GADTs
+        ; families_on <- xoptM Opt_TypeFamilies
+	; checkTc (no_equalities || gadts_on || families_on)
+	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs or -XTypeFamilies"))
 		  -- Trac #2905 decided that a *pattern-match* of a GADT
-		  -- should require the GADT language flag
+		  -- should require the GADT language flag.  
+                  -- Re TypeFamilies see also #7156 
 
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
