@@ -148,10 +148,10 @@ test('T5205',
           stats_num_field('bytes allocated', 40000,
                                              60000)),
                            # expected value: 51320 (amd64/Linux)
-      only_ways(['normal'])
+      only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
-     ['-O'])
+     [''])
 
 test('T5549',
      [if_wordsize(32,
