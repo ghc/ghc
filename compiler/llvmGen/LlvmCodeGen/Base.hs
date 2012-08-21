@@ -85,8 +85,8 @@ widthToLlvmInt w = LMInt $ widthInBits w
 -- | GHC Call Convention for LLVM
 llvmGhcCC :: DynFlags -> LlvmCallConvention
 llvmGhcCC dflags
- | platformUnregisterised (targetPlatform dflags) = CC_Ncc 10
- | otherwise                                      = CC_Ccc
+ | platformUnregisterised (targetPlatform dflags) = CC_Ccc
+ | otherwise                                      = CC_Ncc 10
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: DynFlags -> LlvmType
