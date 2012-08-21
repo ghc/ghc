@@ -344,7 +344,9 @@ noMixing ftype0 r mkF = do
        return (null fs)
 
 foreignPtrFinalizer :: IORef (Finalizers, [IO ()]) -> IO ()
-foreignPtrFinalizer r = do (_, fs) <- readIORef r; sequence_ fs
+foreignPtrFinalizer r = do
+  fs <- atomicModifyIORef r $ \(f,fs) -> ((f,[]), fs) -- atomic, see #7170
+  sequence_ fs
 
 newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer that may be
@@ -409,10 +411,7 @@ castForeignPtr f = unsafeCoerce# f
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
-finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
-        (ftype, finalizers) <- readIORef refFinalizers
-        sequence_ finalizers
-        writeIORef refFinalizers (ftype, [])
+finalizeForeignPtr (ForeignPtr _ foreignPtr) = foreignPtrFinalizer refFinalizers
         where
                 refFinalizers = case foreignPtr of
                         (PlainForeignPtr ref) -> ref
