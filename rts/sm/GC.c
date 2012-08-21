@@ -166,11 +166,13 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
+   The collect_gen parameter is gotten by calling calcNeeded().
+
    Locks held: all capabilities are held throughout GarbageCollect().
    -------------------------------------------------------------------------- */
 
 void
-GarbageCollect (rtsBool force_major_gc, 
+GarbageCollect (nat collect_gen,
                 rtsBool do_heap_census,
                 nat gc_type USED_IF_THREADS,
                 Capability *cap)
@@ -234,7 +236,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   /* Figure out which generation to collect
    */
-  N = calcNeeded(force_major_gc, NULL);
+  N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
 #if defined(THREADED_RTS)
@@ -750,9 +752,6 @@ GarbageCollect (rtsBool force_major_gc,
   stat_endGC(cap, gct, allocated, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
              N, n_gc_threads, par_max_copied, par_tot_copied);
-
-  // Guess which generation we'll collect *next* time
-  N = calcNeeded(force_major_gc, NULL);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
