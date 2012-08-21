@@ -51,6 +51,17 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+#if i386_TARGET_ARCH == 0 && x86_64_TARGET_ARCH == 0
+-- Compiling for some arch other than Intel so we choose x86-64 as default.
+#undef arm_TARGET_ARCH
+#undef powerpc_TARGET_ARCH
+#undef powerpc64_TARGET_ARCH
+#undef sparc_TARGET_ARCH
+
+#undef x86_64_TARGET_ARCH
+#define x86_64_TARGET_ARCH 1
+#endif
+
 #include "../includes/stg/HaskellMachRegs.h"
 
 import Reg
@@ -411,8 +422,6 @@ allIntArgRegs           :: [Reg]
 allFPArgRegs            :: [Reg]
 callClobberedRegs       :: [Reg]
 
-#if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
-
 #if i386_TARGET_ARCH
 #define eax 0
 #define ebx 1
@@ -588,25 +597,23 @@ globalRegMaybe _                        = Nothing
 
 --
 
-#if defined(mingw32_HOST_OS) && x86_64_TARGET_ARCH
+#if defined(mingw32_HOST_OS)
 
 allArgRegs = zip (map regSingle [rcx,rdx,r8,r9])
                  (map regSingle [firstxmm ..])
 allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this platform"
 allFPArgRegs = panic "X86.Regs.allFPArgRegs: not defined for this platform"
 
+#elif i386_TARGET_ARCH
+
+allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
+allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
+
 #else
 
 allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
-
-# if   i386_TARGET_ARCH
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
-# elif x86_64_TARGET_ARCH
 allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
-# else
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this arch"
-# endif
-
 allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
 
 #endif
@@ -621,7 +628,7 @@ allHaskellArgRegs = [ RegReal r | Just r <- map globalRegMaybe globalArgRegs ]
 instrClobberedRegs :: [RealReg]
 #if   i386_TARGET_ARCH
 instrClobberedRegs = map RealRegSingle [ eax, ecx, edx ]
-#elif x86_64_TARGET_ARCH
+#else
 instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
 #endif
 
@@ -632,34 +639,11 @@ instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
 callClobberedRegs
   = map regSingle ([eax,ecx,edx]  ++ floatregnos)
 
-#elif x86_64_TARGET_ARCH
+#else
 -- all xmm regs are caller-saves
 -- caller-saves registers
 callClobberedRegs
   = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos)
-
-#else
-callClobberedRegs
-  = panic "X86.Regs.callClobberedRegs: not defined for this architecture"
-#endif
-
-#else /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
-
-
-
-freeReg _               = 0#
-globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
-
-allArgRegs              = panic "X86.Regs.allArgRegs: not defined"
-allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
-allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
-callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
-
-instrClobberedRegs :: [RealReg]
-instrClobberedRegs = panic "X86.Regs.instrClobberedRegs: not defined for this arch"
-
-allHaskellArgRegs :: [Reg]
-allHaskellArgRegs = panic "X86.Regs.allHaskellArgRegs: not defined for this arch"
 
 #endif
 
