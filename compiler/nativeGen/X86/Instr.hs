@@ -320,8 +320,8 @@ data Operand
 
 
 
-x86_regUsageOfInstr :: Instr -> RegUsage
-x86_regUsageOfInstr instr
+x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
+x86_regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
     MOVZxL _ src dst    -> usageRW src dst
@@ -359,8 +359,8 @@ x86_regUsageOfInstr instr
     JXX_GBL _ _         -> mkRU [] []
     JMP     op regs     -> mkRUR (use_R op regs)
     JMP_TBL op _ _ _    -> mkRUR (use_R op [])
-    CALL (Left _)  params   -> mkRU params callClobberedRegs
-    CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
+    CALL (Left _)  params   -> mkRU params (callClobberedRegs platform)
+    CALL (Right reg) params -> mkRU (reg:params) (callClobberedRegs platform)
     CLTD   _            -> mkRU [eax] [edx]
     NOP                 -> mkRU [] []
 

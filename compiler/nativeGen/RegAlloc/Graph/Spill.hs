@@ -20,6 +20,7 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Outputable
+import Platform
 
 import Data.List
 import Data.Maybe
@@ -40,7 +41,8 @@ import qualified Data.Set       as Set
 --
 regSpill
         :: Instruction instr
-        => [LiveCmmDecl statics instr]  -- ^ the code
+        => Platform
+        -> [LiveCmmDecl statics instr]  -- ^ the code
         -> UniqSet Int                  -- ^ available stack slots
         -> UniqSet VirtualReg           -- ^ the regs to spill
         -> UniqSM
@@ -48,7 +50,7 @@ regSpill
                 , UniqSet Int               -- left over slots
                 , SpillStats )              -- stats about what happened during spilling
 
-regSpill code slotsFree regs
+regSpill platform code slotsFree regs
 
         -- not enough slots to spill these regs
         | sizeUniqSet slotsFree < sizeUniqSet regs
@@ -68,7 +70,7 @@ regSpill code slotsFree regs
 
                 -- run the spiller on all the blocks
                 let (code', state')     =
-                        runState (mapM (regSpill_top regSlotMap) code)
+                        runState (mapM (regSpill_top platform regSlotMap) code)
                                  (initSpillS us)
 
                 return  ( code'
@@ -79,11 +81,12 @@ regSpill code slotsFree regs
 -- | Spill some registers to stack slots in a top-level thing.
 regSpill_top
         :: Instruction instr
-        => RegMap Int                   -- ^ map of vregs to slots they're being spilled to.
+        => Platform
+        -> RegMap Int                   -- ^ map of vregs to slots they're being spilled to.
         -> LiveCmmDecl statics instr    -- ^ the top level thing.
         -> SpillM (LiveCmmDecl statics instr)
 
-regSpill_top regSlotMap cmm
+regSpill_top platform regSlotMap cmm
  = case cmm of
         CmmData{}
          -> return cmm
@@ -110,7 +113,7 @@ regSpill_top regSlotMap cmm
                                 liveSlotsOnEntry'
 
                 -- Apply the spiller to all the basic blocks in the CmmProc.
-                sccs'           <- mapM (mapSCCM (regSpill_block regSlotMap)) sccs
+                sccs'           <- mapM (mapSCCM (regSpill_block platform regSlotMap)) sccs
 
                 return  $ CmmProc info' label sccs'
 
@@ -137,12 +140,13 @@ regSpill_top regSlotMap cmm
 -- | Spill some registers to stack slots in a basic block.
 regSpill_block
         :: Instruction instr
-        => UniqFM Int           -- ^ map of vregs to slots they're being spilled to.
+        => Platform
+        -> UniqFM Int -- ^ map of vregs to slots they're being spilled to.
         -> LiveBasicBlock instr
         -> SpillM (LiveBasicBlock instr)
 
-regSpill_block regSlotMap (BasicBlock i instrs)
- = do   instrss'        <- mapM (regSpill_instr regSlotMap) instrs
+regSpill_block platform regSlotMap (BasicBlock i instrs)
+ = do   instrss'        <- mapM (regSpill_instr platform regSlotMap) instrs
         return  $ BasicBlock i (concat instrss')
 
 
@@ -151,18 +155,19 @@ regSpill_block regSlotMap (BasicBlock i instrs)
 --   the appropriate RELOAD or SPILL meta instructions.
 regSpill_instr
         :: Instruction instr
-        => UniqFM Int           -- ^ map of vregs to slots they're being spilled to.
+        => Platform
+        -> UniqFM Int -- ^ map of vregs to slots they're being spilled to.
         -> LiveInstr instr
         -> SpillM [LiveInstr instr]
 
-regSpill_instr _ li@(LiveInstr _ Nothing)
+regSpill_instr _ _ li@(LiveInstr _ Nothing)
  = do   return [li]
 
-regSpill_instr regSlotMap
+regSpill_instr platform regSlotMap
         (LiveInstr instr (Just _))
  = do
         -- work out which regs are read and written in this instr
-        let RU rlRead rlWritten = regUsageOfInstr instr
+        let RU rlRead rlWritten = regUsageOfInstr platform instr
 
         -- sometimes a register is listed as being read more than once,
         --      nub this so we don't end up inserting two lots of spill code.

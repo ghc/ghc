@@ -221,8 +221,8 @@ data Instr
 -- 	consequences of control flow transfers, as far as register
 -- 	allocation goes, are taken care of by the register allocator.
 --
-sparc_regUsageOfInstr :: Instr -> RegUsage
-sparc_regUsageOfInstr instr 
+sparc_regUsageOfInstr :: Platform -> Instr -> RegUsage
+sparc_regUsageOfInstr _ instr
  = case instr of
     LD    _ addr reg  		-> usage (regAddr addr, 	[reg])
     ST    _ reg addr  		-> usage (reg : regAddr addr, 	[])

@@ -230,13 +230,13 @@ firstfake, lastfake :: RegNo
 firstfake = 16
 lastfake  = 21
 
-firstxmm, lastxmm :: RegNo
+firstxmm :: RegNo
 firstxmm  = 24
-#if i386_TARGET_ARCH
-lastxmm   = 31
-#else
-lastxmm   = 39
-#endif
+
+lastxmm :: Platform -> RegNo
+lastxmm platform
+ | target32Bit platform = 31
+ | otherwise            = 39
 
 lastint :: RegNo
 #if i386_TARGET_ARCH
@@ -245,11 +245,15 @@ lastint = 7 -- not %r8..%r15
 lastint = 15
 #endif
 
-intregnos, fakeregnos, xmmregnos, floatregnos :: [RegNo]
+intregnos, fakeregnos :: [RegNo]
 intregnos   = [0..lastint]
 fakeregnos  = [firstfake .. lastfake]
-xmmregnos   = [firstxmm  .. lastxmm]
-floatregnos = fakeregnos ++ xmmregnos;
+
+xmmregnos :: Platform -> [RegNo]
+xmmregnos platform = [firstxmm  .. lastxmm platform]
+
+floatregnos :: Platform -> [RegNo]
+floatregnos platform = fakeregnos ++ xmmregnos platform
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -259,8 +263,8 @@ argRegs :: RegNo -> [Reg]
 argRegs _       = panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
-allMachRegNos :: [RegNo]
-allMachRegNos  = intregnos ++ floatregnos
+allMachRegNos :: Platform -> [RegNo]
+allMachRegNos platform = intregnos ++ floatregnos platform
 
 -- | Take the class of a register.
 {-# INLINE classOfRealReg      #-}
@@ -420,7 +424,7 @@ globalRegMaybe          :: GlobalReg -> Maybe RealReg
 allArgRegs              :: [(Reg, Reg)]
 allIntArgRegs           :: [Reg]
 allFPArgRegs            :: [Reg]
-callClobberedRegs       :: [Reg]
+callClobberedRegs       :: Platform -> [Reg]
 
 #if i386_TARGET_ARCH
 #define eax 0
@@ -636,24 +640,24 @@ instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
 
 #if   i386_TARGET_ARCH
 -- caller-saves registers
-callClobberedRegs
-  = map regSingle ([eax,ecx,edx]  ++ floatregnos)
+callClobberedRegs platform
+  = map regSingle ([eax,ecx,edx]  ++ floatregnos platform)
 
 #else
 -- all xmm regs are caller-saves
 -- caller-saves registers
-callClobberedRegs
-  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos)
+callClobberedRegs platform
+  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos platform)
 
 #endif
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RealReg]
-allocatableRegs
+allocatableRegs :: Platform -> [RealReg]
+allocatableRegs platform
    = let isFree i = isFastTrue (freeReg i)
-     in  map RealRegSingle $ filter isFree allMachRegNos
+     in  map RealRegSingle $ filter isFree (allMachRegNos platform)
 
 {-
 Note [esi/edi not allocatable]

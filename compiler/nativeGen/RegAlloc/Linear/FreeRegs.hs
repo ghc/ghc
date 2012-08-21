@@ -44,7 +44,7 @@ import qualified X86.Instr
 class Show freeRegs => FR freeRegs where
     frAllocateReg :: RealReg -> freeRegs -> freeRegs
     frGetFreeRegs :: RegClass -> freeRegs -> [RealReg]
-    frInitFreeRegs :: freeRegs
+    frInitFreeRegs :: Platform -> freeRegs
     frReleaseReg :: RealReg -> freeRegs -> freeRegs
 
 instance FR X86.FreeRegs where
@@ -56,13 +56,13 @@ instance FR X86.FreeRegs where
 instance FR PPC.FreeRegs where
     frAllocateReg  = PPC.allocateReg
     frGetFreeRegs  = PPC.getFreeRegs
-    frInitFreeRegs = PPC.initFreeRegs
+    frInitFreeRegs = \_ -> PPC.initFreeRegs
     frReleaseReg   = PPC.releaseReg
 
 instance FR SPARC.FreeRegs where
     frAllocateReg  = SPARC.allocateReg
     frGetFreeRegs  = SPARC.getFreeRegs
-    frInitFreeRegs = SPARC.initFreeRegs
+    frInitFreeRegs = \_ -> SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
 
 maxSpillSlots :: Platform -> Int

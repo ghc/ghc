@@ -14,6 +14,7 @@ import X86.Regs
 import RegClass
 import Reg
 import Panic
+import Platform
 
 import Data.Word
 import Data.Bits
@@ -35,9 +36,9 @@ releaseReg (RealRegSingle n) f
 releaseReg _ _	
 	= panic "RegAlloc.Linear.X86.FreeRegs.realeaseReg: no reg"
 
-initFreeRegs :: FreeRegs
-initFreeRegs 
-	= foldr releaseReg noFreeRegs allocatableRegs
+initFreeRegs :: Platform -> FreeRegs
+initFreeRegs platform
+	= foldr releaseReg noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]	-- lazilly
 getFreeRegs cls f = go f 0

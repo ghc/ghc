@@ -68,7 +68,8 @@ class   Instruction instr where
         --      allocation goes, are taken care of by the register allocator.
         --
         regUsageOfInstr
-                :: instr
+                :: Platform
+                -> instr
                 -> RegUsage
 
 

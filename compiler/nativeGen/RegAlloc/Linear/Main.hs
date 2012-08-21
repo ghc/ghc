@@ -191,10 +191,10 @@ linearRegAlloc
 linearRegAlloc dflags first_id block_live sccs
  = let platform = targetPlatform dflags
    in case platformArch platform of
-      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
-      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
+      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)   first_id block_live sccs
+      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)   first_id block_live sccs
+      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs platform :: SPARC.FreeRegs) first_id block_live sccs
+      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs platform :: PPC.FreeRegs)   first_id block_live sccs
       ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
       ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
@@ -304,7 +304,7 @@ processBlock
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
 processBlock platform block_live (BasicBlock id instrs)
- = do   initBlock id block_live
+ = do   initBlock platform id block_live
         (instrs', fixups)
                 <- linearRA platform block_live [] [] id instrs
         return  $ BasicBlock id instrs' : fixups
@@ -312,8 +312,9 @@ processBlock platform block_live (BasicBlock id instrs)
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
-initBlock :: FR freeRegs => BlockId -> BlockMap RegSet -> RegM freeRegs ()
-initBlock id block_live
+initBlock :: FR freeRegs
+          => Platform -> BlockId -> BlockMap RegSet -> RegM freeRegs ()
+initBlock platform id block_live
  = do   block_assig     <- getBlockAssigR
         case mapLookup id block_assig of
                 -- no prior info about this block: we must consider
@@ -325,9 +326,9 @@ initBlock id block_live
                  -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
                         case mapLookup id block_live of
                           Nothing ->
-                            setFreeRegsR    frInitFreeRegs
+                            setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
-                            setFreeRegsR $ foldr frAllocateReg frInitFreeRegs [ r | RegReal r <- uniqSetToList live ]
+                            setFreeRegsR $ foldr frAllocateReg (frInitFreeRegs platform) [ r | RegReal r <- uniqSetToList live ]
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
@@ -447,7 +448,7 @@ genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
 genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
-    case regUsageOfInstr instr              of { RU read written ->
+    case regUsageOfInstr platform instr of { RU read written ->
     do
     let real_written    = [ rr  | (RegReal     rr) <- written ]
     let virt_written    = [ vr  | (RegVirtual  vr) <- written ]
@@ -822,7 +823,7 @@ allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
                                 [ text "allocating vreg:  " <> text (show r)
                                 , text "assignment:       " <> text (show $ ufmToList assig)
                                 , text "freeRegs:         " <> text (show freeRegs)
-                                , text "initFreeRegs:     " <> text (show (frInitFreeRegs `asTypeOf` freeRegs)) ]
+                                , text "initFreeRegs:     " <> text (show (frInitFreeRegs platform `asTypeOf` freeRegs)) ]
 
                 result
 

@@ -36,6 +36,7 @@ import UniqFM
 import UniqSet
 import Digraph		(flattenSCCs)
 import Outputable
+import Platform
 import State
 
 import Data.List	(nub, minimumBy)
@@ -70,10 +71,11 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --	and the number of instructions it was live on entry to (lifetime)
 --
 slurpSpillCostInfo :: (Outputable instr, Instruction instr)
-                   => LiveCmmDecl statics instr
+                   => Platform
+                   -> LiveCmmDecl statics instr
                    -> SpillCostInfo
 
-slurpSpillCostInfo cmm
+slurpSpillCostInfo platform cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
@@ -110,7 +112,7 @@ slurpSpillCostInfo cmm
 		mapM_ incLifetime $ uniqSetToList rsLiveEntry
 
 		-- increment counts for what regs were read/written from
-		let (RU read written)	= regUsageOfInstr instr
+		let (RU read written)	= regUsageOfInstr platform instr
 		mapM_ incUses	$ catMaybes $ map takeVirtualReg $ nub read
 		mapM_ incDefs 	$ catMaybes $ map takeVirtualReg $ nub written
 
