@@ -421,10 +421,25 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
-allArgRegs              :: [(Reg, Reg)]
-allIntArgRegs           :: [Reg]
-allFPArgRegs            :: [Reg]
 callClobberedRegs       :: Platform -> [Reg]
+
+allArgRegs :: Platform -> [(Reg, Reg)]
+allArgRegs platform
+ | platformOS platform == OSMinGW32 = zip [rcx,rdx,r8,r9]
+                                          (map regSingle [firstxmm ..])
+ | otherwise = panic "X86.Regs.allArgRegs: not defined for this arch"
+
+allIntArgRegs :: Platform -> [Reg]
+allIntArgRegs platform
+ | (platformOS platform == OSMinGW32) || target32Bit platform
+    = panic "X86.Regs.allIntArgRegs: not defined for this platform"
+ | otherwise = [rdi,rsi,rdx,rcx,r8,r9]
+
+allFPArgRegs :: Platform -> [Reg]
+allFPArgRegs platform
+ | platformOS platform == OSMinGW32
+    = panic "X86.Regs.allFPArgRegs: not defined for this platform"
+ | otherwise = map regSingle [firstxmm .. firstxmm+7]
 
 #if i386_TARGET_ARCH
 #define eax 0
@@ -600,27 +615,6 @@ globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery
 globalRegMaybe _                        = Nothing
 
 --
-
-#if defined(mingw32_HOST_OS)
-
-allArgRegs = zip (map regSingle [rcx,rdx,r8,r9])
-                 (map regSingle [firstxmm ..])
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this platform"
-allFPArgRegs = panic "X86.Regs.allFPArgRegs: not defined for this platform"
-
-#elif i386_TARGET_ARCH
-
-allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
-allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
-
-#else
-
-allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
-allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
-allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
-
-#endif
 
 -- All machine registers that are used for argument-passing to Haskell functions
 allHaskellArgRegs :: [Reg]
