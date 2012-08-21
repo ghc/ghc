@@ -178,7 +178,7 @@ getRegisterReg (CmmLocal (LocalReg u pk))
 
 getRegisterReg (CmmGlobal mid)
   = case globalRegMaybe mid of
-        Just reg -> reg
+        Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
         -- ones which map to a real machine register on this
