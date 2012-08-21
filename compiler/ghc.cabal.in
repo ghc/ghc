@@ -200,7 +200,7 @@ Library
         PprCmmDecl
         PprCmmExpr
         Bitmap
-        CodeGen.CallerSaves
+        CodeGen.Platform
         CodeGen.Platform.ARM
         CodeGen.Platform.NoRegs
         CodeGen.Platform.PPC

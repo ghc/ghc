@@ -1,5 +1,5 @@
 
-module CodeGen.CallerSaves (callerSaves) where
+module CodeGen.Platform (callerSaves, activeStgRegs) where
 
 import CmmExpr
 import Platform
@@ -29,4 +29,24 @@ callerSaves platform
        _        -> PPC.callerSaves
 
     | otherwise -> NoRegs.callerSaves
+
+-- | Here is where the STG register map is defined for each target arch.
+-- The order matters (for the llvm backend anyway)! We must make sure to
+-- maintain the order here with the order used in the LLVM calling conventions.
+-- Note that also, this isn't all registers, just the ones that are currently
+-- possbily mapped to real registers.
+activeStgRegs :: Platform -> [GlobalReg]
+activeStgRegs platform
+ = case platformArch platform of
+   ArchX86    -> X86.activeStgRegs
+   ArchX86_64 -> X86_64.activeStgRegs
+   ArchSPARC  -> SPARC.activeStgRegs
+   ArchARM {} -> ARM.activeStgRegs
+   arch
+    | arch `elem` [ArchPPC, ArchPPC_64] ->
+       case platformOS platform of
+       OSDarwin -> PPC_Darwin.activeStgRegs
+       _        -> PPC.activeStgRegs
+
+    | otherwise -> NoRegs.activeStgRegs
 

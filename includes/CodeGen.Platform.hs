@@ -79,3 +79,67 @@ callerSaves CurrentNursery    = True
 #endif
 callerSaves _                 = False
 
+activeStgRegs :: [GlobalReg]
+activeStgRegs = [
+#ifdef REG_Base
+    BaseReg
+#endif
+#ifdef REG_Sp
+    ,Sp
+#endif
+#ifdef REG_Hp
+    ,Hp
+#endif
+#ifdef REG_R1
+    ,VanillaReg 1 VGcPtr
+#endif
+#ifdef REG_R2
+    ,VanillaReg 2 VGcPtr
+#endif
+#ifdef REG_R3
+    ,VanillaReg 3 VGcPtr
+#endif
+#ifdef REG_R4
+    ,VanillaReg 4 VGcPtr
+#endif
+#ifdef REG_R5
+    ,VanillaReg 5 VGcPtr
+#endif
+#ifdef REG_R6
+    ,VanillaReg 6 VGcPtr
+#endif
+#ifdef REG_R7
+    ,VanillaReg 7 VGcPtr
+#endif
+#ifdef REG_R8
+    ,VanillaReg 8 VGcPtr
+#endif
+#ifdef REG_R9
+    ,VanillaReg 9 VGcPtr
+#endif
+#ifdef REG_R10
+    ,VanillaReg 10 VGcPtr
+#endif
+#ifdef REG_SpLim
+    ,SpLim
+#endif
+#ifdef REG_F1
+    ,FloatReg 1
+#endif
+#ifdef REG_F2
+    ,FloatReg 2
+#endif
+#ifdef REG_F3
+    ,FloatReg 3
+#endif
+#ifdef REG_F4
+    ,FloatReg 4
+#endif
+#ifdef REG_D1
+    ,DoubleReg 1
+#endif
+#ifdef REG_D2
+    ,DoubleReg 2
+#endif
+    ]
+

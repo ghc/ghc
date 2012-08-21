@@ -378,7 +378,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
-                fixStgRegisters cmm
+                fixStgRegisters platform cmm
 
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
