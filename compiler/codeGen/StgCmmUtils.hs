@@ -69,6 +69,7 @@ import Unique
 import DynFlags
 import FastString
 import Outputable
+import Platform
 
 import Data.Char
 import Data.List
@@ -251,11 +252,11 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
     regs_to_save = filter (callerSaves platform) system_regs
 
     callerSaveGlobalReg reg
-        = mkStore (get_GlobalReg_addr reg) (CmmReg (CmmGlobal reg))
+        = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal reg))
 
     callerRestoreGlobalReg reg
         = mkAssign (CmmGlobal reg)
-                    (CmmLoad (get_GlobalReg_addr reg) (globalRegType reg))
+                    (CmmLoad (get_GlobalReg_addr platform reg) (globalRegType reg))
 
 -- -----------------------------------------------------------------------------
 -- Global registers
@@ -266,10 +267,11 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 -- register table address for it.
 -- (See also get_GlobalReg_reg_or_addr in MachRegs)
 
-get_GlobalReg_addr              :: GlobalReg -> CmmExpr
-get_GlobalReg_addr BaseReg = regTableOffset 0
-get_GlobalReg_addr mid     = get_Regtable_addr_from_offset
-                                (globalRegType mid) (baseRegOffset mid)
+get_GlobalReg_addr :: Platform -> GlobalReg -> CmmExpr
+get_GlobalReg_addr _        BaseReg = regTableOffset 0
+get_GlobalReg_addr platform mid
+    = get_Regtable_addr_from_offset platform
+                                    (globalRegType mid) (baseRegOffset mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
@@ -277,13 +279,11 @@ regTableOffset :: Int -> CmmExpr
 regTableOffset n =
   CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
 
-get_Regtable_addr_from_offset :: CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset _rep offset =
-#ifdef REG_Base
-  CmmRegOff (CmmGlobal BaseReg) offset
-#else
-  regTableOffset offset
-#endif
+get_Regtable_addr_from_offset :: Platform -> CmmType -> Int -> CmmExpr
+get_Regtable_addr_from_offset platform _rep offset =
+    if haveRegBase platform
+    then CmmRegOff (CmmGlobal BaseReg) offset
+    else regTableOffset offset
 
 
 -- -----------------------------------------------------------------------------
