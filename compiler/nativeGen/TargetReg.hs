@@ -21,7 +21,6 @@ module TargetReg (
 	targetRealRegSqueeze,
 	targetClassOfRealReg,
 	targetMkVirtualReg,
-	targetWordSize,
 	targetRegDotColor,
 	targetClassOfReg
 )
@@ -34,7 +33,6 @@ import Reg
 import RegClass
 import Size
 
-import CmmType	(wordWidth)
 import Outputable
 import Unique
 import FastTypes
@@ -79,10 +77,6 @@ targetClassOfRealReg platform
       ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
-
--- TODO: This should look at targetPlatform too
-targetWordSize :: Size
-targetWordSize = intSize wordWidth
 
 targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
 targetMkVirtualReg platform
