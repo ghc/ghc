@@ -57,7 +57,7 @@ import StgCmmClosure
 import Cmm
 import BlockId
 import MkGraph
-import CallerSaves
+import CodeGen.CallerSaves
 import CLabel
 import CmmUtils
 

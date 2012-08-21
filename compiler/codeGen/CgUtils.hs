@@ -48,7 +48,7 @@ module CgUtils (
 #include "../includes/stg/HaskellMachRegs.h"
 
 import BlockId
-import CallerSaves
+import CodeGen.CallerSaves
 import CgMonad
 import TyCon
 import DataCon
