@@ -92,8 +92,8 @@ lnat     countNurseryBlocks   ( void );
 
 lnat    updateNurseriesStats (void);
 lnat    countLargeAllocated  (void);
-lnat    countOccupied  (bdescr *bd);
-lnat    calcNeeded     (void);
+lnat    countOccupied        (bdescr *bd);
+lnat    calcNeeded           (rtsBool force_major, lnat *blocks_needed);
 
 lnat    gcThreadLiveWords  (nat i, nat g);
 lnat    gcThreadLiveBlocks (nat i, nat g);

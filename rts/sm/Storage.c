@@ -1003,29 +1003,44 @@ lnat calcLiveBlocks (void)
     return live;
 }
 
-/* Approximate the number of blocks that will be needed at the next
- * garbage collection.
+/* Determine which generation will be collected next, and approximate
+ * the maximum amount of memory that will be required to do the GC,
+ * taking into account data that will be copied, and the space needed
+ * to store bitmaps and the mark stack.  Note: blocks_needed does not
+ * include the blocks in the nursery.
  *
  * Assume: all data currently live will remain live.  Generationss
  * that will be collected next time will therefore need twice as many
  * blocks since all the data will be copied.
  */
 extern lnat 
-calcNeeded(void)
+calcNeeded (rtsBool force_major, lnat *blocks_needed)
 {
-    lnat needed = 0;
-    nat g;
+    lnat needed = 0, blocks;
+    nat g, N;
     generation *gen;
     
+    if (force_major) {
+        N = RtsFlags.GcFlags.generations - 1;
+    } else {
+        N = 0;
+    }
+
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         gen = &generations[g];
 
+        blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
+               + gen->n_large_blocks;
+
         // we need at least this much space
-        needed += gen->n_blocks + gen->n_large_blocks;
+        needed += blocks;
         
-        // any additional space needed to collect this gen next time?
+        // are we collecting this gen?
         if (g == 0 || // always collect gen 0
-            (gen->n_blocks + gen->n_large_blocks > gen->max_blocks)) {
+            blocks > gen->max_blocks)
+        {
+            N = stg_max(N,g);
+
             // we will collect this gen next time
             if (gen->mark) {
                 //  bitmap:
@@ -1040,7 +1055,11 @@ calcNeeded(void)
             }
         }
     }
-    return needed;
+
+    if (blocks_needed != NULL) {
+        *blocks_needed = needed;
+    }
+    return N;
 }
 
 /* ----------------------------------------------------------------------------
