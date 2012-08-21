@@ -382,3 +382,5 @@ test('DfltProb2', normal, compile, [''])
 test('T6134', normal, compile, [''])
 test('TcLambdaCase', if_compiler_lt('ghc', '7.5', skip), compile, [''])
 test('T7147', normal, compile, [''])
+test('T7171',normal,run_command,
+     ['$MAKE -s --no-print-directory T5792'])
