@@ -414,10 +414,11 @@ extendGlobalRdrEnvRn avails new_fixities
 
               rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 gres
               fix_env' = foldl extend_fix_env     fix_env  gres
-              (rdr_env', dups) = findLocalDupsRdrEnv rdr_env3 new_occs
+              dups = findLocalDupsRdrEnv rdr_env3 new_occs
 
-              gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
+              gbl_env' = gbl_env { tcg_rdr_env = rdr_env3, tcg_fix_env = fix_env' }
 
+        ; traceRn (text "extendGlobalRdrEnvRn dups" <+> (ppr dups))
         ; mapM_ addDupDeclErr dups
 
         ; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
