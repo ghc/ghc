@@ -1088,7 +1088,6 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
           HpcTicks    -> HpcTick (this_mod env) c
           ProfNotes   -> ProfNote cc count True{-scopes-}
           Breakpoints -> Breakpoint c ids
-          _otherwise  -> panic "mkTickish: bad source span!"
     in
     ( tickish
     , fvs
