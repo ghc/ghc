@@ -348,7 +348,7 @@ allocGroup (nat n)
 #if 0  /* useful for debugging fragmentation */
         if ((W_)mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
              - (W_)((n_alloc_blocks - n) * BLOCK_SIZE_W) > (2*1024*1024)/sizeof(W_)) {
-            debugBelch("Fragmentation, wanted %d blocks:", n);
+            debugBelch("Fragmentation, wanted %d blocks, %ld MB free\n", n, ((mblocks_allocated * BLOCKS_PER_MBLOCK) - n_alloc_blocks) / BLOCKS_PER_MBLOCK);
             RtsFlags.DebugFlags.block_alloc = 1;
             checkFreeListSanity();
         }
