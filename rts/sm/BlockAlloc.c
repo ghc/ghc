@@ -389,6 +389,41 @@ finish:
     return bd;
 }
 
+//
+// Allocate a chunk of blocks that is at most a megablock in size.
+// This API is used by the nursery allocator that wants contiguous
+// memory preferably, but doesn't require it.  When memory is
+// fragmented we might have lots of large chunks that are less than a
+// full megablock, so allowing the nursery allocator to use these
+// reduces fragmentation considerably.  e.g. on a GHC build with +RTS
+// -H, I saw fragmentation go from 17MB down to 3MB on a single compile.
+//
+bdescr *
+allocLargeChunk (void)
+{
+    bdescr *bd;
+    nat ln;
+
+    ln = 5; // start in the 32-63 block bucket
+    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
+        ln++;
+    }
+    if (ln == MAX_FREE_LIST) {
+        return allocGroup(BLOCKS_PER_MBLOCK);
+    }
+    bd = free_list[ln];
+
+    n_alloc_blocks += bd->blocks;
+    if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
+
+    dbl_link_remove(bd, &free_list[ln]);
+    initGroup(bd);
+
+    IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(sanity, checkFreeListSanity());
+    return bd;
+}
+
 bdescr *
 allocGroup_lock(W_ n)
 {
