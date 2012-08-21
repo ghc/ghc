@@ -148,7 +148,9 @@ More details in Note [DefaultTyVar].
 simplifyAmbiguityCheck :: Name -> WantedConstraints -> TcM (Bag EvBind)
 simplifyAmbiguityCheck name wanteds
   = traceTc "simplifyAmbiguityCheck" (text "name =" <+> ppr name) >> 
-    simplifyCheck wanteds
+    simplifyTop wanteds  -- NB: must be simplifyTop not simplifyCheck, so that we
+                         --     do ambiguity resolution.  
+                         -- See Note [Impedence matching] in TcBinds.
  
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
@@ -404,7 +406,7 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
        ; let init_tvs  = zonked_tau_tvs `minusVarSet` gbl_tvs
              poly_qtvs = growThetaTyVars final_quant_candidates init_tvs 
                          `minusVarSet` gbl_tvs
-             pbound    = filter (quantifyMe poly_qtvs id) final_quant_candidates
+             pbound    = filter (quantifyPred poly_qtvs) final_quant_candidates
              
        ; traceTc "simplifyWithApprox" $
          vcat [ ptext (sLit "pbound =") <+> ppr pbound
@@ -469,8 +471,8 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
 \end{code}
 
 
-Note [Note [Default while Inferring]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Default while Inferring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Our current plan is that defaulting only happens at simplifyTop and
 not simplifyInfer.  This may lead to some insoluble deferred constraints
 Example:
@@ -538,16 +540,6 @@ approximateWC wc = float_wc emptyVarSet wc
         
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
-
-
-quantifyMe :: TyVarSet      -- Quantifying over these
-	   -> (a -> PredType)
-	   -> a -> Bool	    -- True <=> quantify over this wanted
-quantifyMe qtvs toPred ct
-  | isIPPred pred = True  -- Note [Inheriting implicit parameters]
-  | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
-  where
-    pred = toPred ct
 \end{code}
 
 Note [Avoid unecessary constraint simplification]
@@ -572,32 +564,6 @@ just notice that g isn't quantified over 't' and partition
 the contraints before simplifying.
 
 This only half-works, but then let-generalisation only half-works.
-
-
-Note [Inheriting implicit parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this:
-
-	f x = (x::Int) + ?y
-
-where f is *not* a top-level binding.
-From the RHS of f we'll get the constraint (?y::Int).
-There are two types we might infer for f:
-
-	f :: Int -> Int
-
-(so we get ?y from the context of f's definition), or
-
-	f :: (?y::Int) => Int -> Int
-
-At first you might think the first was better, becuase then
-?y behaves like a free variable of the definition, rather than
-having to be passed at each call site.  But of course, the WHOLE
-IDEA is that ?y should be passed at each call site (that's what
-dynamic binding means) so we'd better infer the second.
-
-BOTTOM LINE: when *inferring types* you *must* quantify 
-over implicit parameters. See the predicate isFreeWhenInferring.
 
 
 *********************************************************************************
