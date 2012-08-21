@@ -10,8 +10,9 @@ test('haddock.base',
                                                       143))
                                         # 2012-08-14: 144 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 87374568, 1))
+          stats_range_field('max_bytes_used', 87374568, 2))
                                 # 2012-08-14: 87374568 (amd64/Linux)
+                                # 2012-08-21: 86428216 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 45574928, 1))
                                 # 2012-08-14: 45574928 (x86/OSX)
@@ -54,9 +55,10 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [unless_in_tree_compiler(skip)
      ,if_wordsize(64,
-          stats_num_field('peak_megabytes_allocated', 1202,
+          stats_num_field('peak_megabytes_allocated', 1198,
                                                       1204))
                                         # 2012-08-14: 1203 (amd64/Linux)
+                                        # 2012-08-21: 1199 (amd64/Linux)
      ,if_wordsize(32,
           stats_num_field('peak_megabytes_allocated', 630,
                                                       632))
