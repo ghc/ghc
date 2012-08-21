@@ -238,15 +238,15 @@ lastxmm platform
  | target32Bit platform = 31
  | otherwise            = 39
 
-lastint :: RegNo
-#if i386_TARGET_ARCH
-lastint = 7 -- not %r8..%r15
-#else
-lastint = 15
-#endif
+lastint :: Platform -> RegNo
+lastint platform
+ | target32Bit platform = 7 -- not %r8..%r15
+ | otherwise            = 15
 
-intregnos, fakeregnos :: [RegNo]
-intregnos   = [0..lastint]
+intregnos :: Platform -> [RegNo]
+intregnos platform = [0 .. lastint platform]
+
+fakeregnos :: [RegNo]
 fakeregnos  = [firstfake .. lastfake]
 
 xmmregnos :: Platform -> [RegNo]
@@ -264,21 +264,21 @@ argRegs _       = panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
 allMachRegNos :: Platform -> [RegNo]
-allMachRegNos platform = intregnos ++ floatregnos platform
+allMachRegNos platform = intregnos platform ++ floatregnos platform
 
 -- | Take the class of a register.
-{-# INLINE classOfRealReg      #-}
-classOfRealReg :: RealReg -> RegClass
+{-# INLINE classOfRealReg #-}
+classOfRealReg :: Platform -> RealReg -> RegClass
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
-classOfRealReg reg
+classOfRealReg platform reg
  = case reg of
         RealRegSingle i
-          | i <= lastint  -> RcInteger
-          | i <= lastfake -> RcDouble
-          | otherwise     -> RcDoubleSSE
+          | i <= lastint platform -> RcInteger
+          | i <= lastfake         -> RcDouble
+          | otherwise             -> RcDoubleSSE
 
         RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 

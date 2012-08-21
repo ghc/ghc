@@ -40,12 +40,12 @@ initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
 	= foldr releaseReg noFreeRegs (allocatableRegs platform)
 
-getFreeRegs :: RegClass -> FreeRegs -> [RealReg]	-- lazilly
-getFreeRegs cls f = go f 0
+getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazilly
+getFreeRegs platform cls f = go f 0
 
   where go 0 _ = []
         go n m 
-	  | n .&. 1 /= 0 && classOfRealReg (RealRegSingle m) == cls
+	  | n .&. 1 /= 0 && classOfRealReg platform (RealRegSingle m) == cls
 	  = RealRegSingle m : (go (n `shiftR` 1) $! (m+1))
 
 	  | otherwise

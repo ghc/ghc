@@ -72,8 +72,8 @@ targetRealRegSqueeze platform
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
 targetClassOfRealReg platform
     = case platformArch platform of
-      ArchX86       -> X86.classOfRealReg
-      ArchX86_64    -> X86.classOfRealReg
+      ArchX86       -> X86.classOfRealReg platform
+      ArchX86_64    -> X86.classOfRealReg platform
       ArchPPC       -> PPC.classOfRealReg
       ArchSPARC     -> SPARC.classOfRealReg
       ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"

@@ -604,7 +604,7 @@ saveClobberedTemps platform clobbered dying
        = do
             freeRegs <- getFreeRegsR
             let regclass = targetClassOfRealReg platform reg
-                freeRegs_thisClass = frGetFreeRegs regclass freeRegs
+                freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs
 
             case filter (`notElem` clobbered) freeRegs_thisClass of
 
@@ -745,7 +745,7 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
 allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
  = do
         freeRegs                <- getFreeRegsR
-        let freeRegs_thisClass  = frGetFreeRegs (classOfVirtualReg r) freeRegs
+        let freeRegs_thisClass  = frGetFreeRegs platform (classOfVirtualReg r) freeRegs
 
         case freeRegs_thisClass of
 
