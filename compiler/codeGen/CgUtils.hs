@@ -45,7 +45,6 @@ module CgUtils (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/stg/HaskellMachRegs.h"
 
 import BlockId
 import CodeGen.Platform
