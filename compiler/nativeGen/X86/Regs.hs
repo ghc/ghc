@@ -421,7 +421,17 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
+
+-- | these are the regs which we cannot assume stay alive over a C call.
 callClobberedRegs       :: Platform -> [Reg]
+-- caller-saves registers
+callClobberedRegs platform
+ | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
+ | otherwise
+    -- all xmm regs are caller-saves
+    -- caller-saves registers
+    = [rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11]
+   ++ map regSingle (floatregnos platform)
 
 allArgRegs :: Platform -> [(Reg, Reg)]
 allArgRegs platform
@@ -628,21 +638,6 @@ instrClobberedRegs :: [RealReg]
 instrClobberedRegs = map RealRegSingle [ eax, ecx, edx ]
 #else
 instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
-#endif
-
--- | these are the regs which we cannot assume stay alive over a C call.
-
-#if   i386_TARGET_ARCH
--- caller-saves registers
-callClobberedRegs platform
-  = map regSingle ([eax,ecx,edx]  ++ floatregnos platform)
-
-#else
--- all xmm regs are caller-saves
--- caller-saves registers
-callClobberedRegs platform
-  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos platform)
-
 #endif
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
