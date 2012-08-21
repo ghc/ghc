@@ -1,5 +1,5 @@
 
-module CodeGen.Platform (callerSaves, activeStgRegs) where
+module CodeGen.Platform (callerSaves, activeStgRegs, haveRegBase) where
 
 import CmmExpr
 import Platform
@@ -49,4 +49,19 @@ activeStgRegs platform
        _        -> PPC.activeStgRegs
 
     | otherwise -> NoRegs.activeStgRegs
+
+haveRegBase :: Platform -> Bool
+haveRegBase platform
+ = case platformArch platform of
+   ArchX86    -> X86.haveRegBase
+   ArchX86_64 -> X86_64.haveRegBase
+   ArchSPARC  -> SPARC.haveRegBase
+   ArchARM {} -> ARM.haveRegBase
+   arch
+    | arch `elem` [ArchPPC, ArchPPC_64] ->
+       case platformOS platform of
+       OSDarwin -> PPC_Darwin.haveRegBase
+       _        -> PPC.haveRegBase
+
+    | otherwise -> NoRegs.haveRegBase
 

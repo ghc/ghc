@@ -143,3 +143,10 @@ activeStgRegs = [
 #endif
     ]
 
+haveRegBase :: Bool
+#ifdef REG_Base
+haveRegBase = True
+#else
+haveRegBase = False
+#endif
+
