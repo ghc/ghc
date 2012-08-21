@@ -926,6 +926,7 @@ getByteReg expr = do
 -- be modified by code to evaluate an arbitrary expression.
 getNonClobberedReg :: CmmExpr -> NatM (Reg, InstrBlock)
 getNonClobberedReg expr = do
+  dflags <- getDynFlags
   r <- getRegister expr
   case r of
     Any rep code -> do
@@ -933,8 +934,7 @@ getNonClobberedReg expr = do
         return (tmp, code tmp)
     Fixed rep reg code
         -- only certain regs can be clobbered
-        | RegReal real <- reg
-        , real `elem` instrClobberedRegs
+        | reg `elem` instrClobberedRegs (targetPlatform dflags)
         -> do
                 tmp <- getNewRegNat rep
                 return (tmp, code `snocOL` reg2reg rep reg tmp)

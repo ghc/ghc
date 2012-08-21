@@ -451,6 +451,14 @@ allFPArgRegs platform
     = panic "X86.Regs.allFPArgRegs: not defined for this platform"
  | otherwise = map regSingle [firstxmm .. firstxmm+7]
 
+-- Machine registers which might be clobbered by instructions that
+-- generate results into fixed registers, or need arguments in a fixed
+-- register.
+instrClobberedRegs :: Platform -> [Reg]
+instrClobberedRegs platform
+ | target32Bit platform = [ eax, ecx, edx ]
+ | otherwise            = [ rax, rcx, rdx ]
+
 #if i386_TARGET_ARCH
 #define eax 0
 #define ebx 1
@@ -629,16 +637,6 @@ globalRegMaybe _                        = Nothing
 -- All machine registers that are used for argument-passing to Haskell functions
 allHaskellArgRegs :: [Reg]
 allHaskellArgRegs = [ RegReal r | Just r <- map globalRegMaybe globalArgRegs ]
-
--- Machine registers which might be clobbered by instructions that
--- generate results into fixed registers, or need arguments in a fixed
--- register.
-instrClobberedRegs :: [RealReg]
-#if   i386_TARGET_ARCH
-instrClobberedRegs = map RealRegSingle [ eax, ecx, edx ]
-#else
-instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
-#endif
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
