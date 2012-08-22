@@ -190,7 +190,7 @@ mkTcCoVarCo ipv
   | otherwise        = TcCoVarCo ipv
   where
     (ty1, ty2) = case getEqPredTys_maybe (varType ipv) of
-        Nothing  -> pprPanic "mkCoVarLCo" (ppr ipv)
+        Nothing  -> pprPanic "mkCoVarLCo" (ppr ipv $$ ppr (varType ipv))
         Just tys -> tys
 \end{code}
 
