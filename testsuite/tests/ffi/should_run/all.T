@@ -211,3 +211,4 @@ test('capi_value',
      compile_and_run,
      ['capi_value_c.c'])
 
+test('7170', exit_code(1), compile_and_run, [''])

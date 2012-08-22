@@ -93,3 +93,4 @@ test('setByteArray', normal, compile_and_run, [''])
 
 test('6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])
+test('T7163', normal, compile_and_run, [''])

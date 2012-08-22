@@ -24,11 +24,11 @@ test('T1969',
                              #                 5717704 (x86/Windows 17/05/10)
                              #                 6149572 (x86/Linux, 31/12/09)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 10000000, 15)),
+          compiler_stats_range_field('max_bytes_used', 9000000, 10)),
                                   # looks like the peak is around 10M, but we're
                                   # unlikely to GC exactly on the peak.
                                   # varies quite a lot with CLEANUP and BINDIST,
-                                  # hence 15% range.
+                                  # hence 10% range.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
                                                       290000000)),
