@@ -64,6 +64,7 @@ class TrieMap m where
    emptyTM  :: m a
    lookupTM :: forall b. Key m -> m b -> Maybe b
    alterTM  :: forall b. Key m -> XT b -> m b -> m b
+   mapTM    :: (a->b) -> m a -> m b
 
    foldTM   :: (a -> b -> b) -> m a -> b -> b
       -- The unusual argument order here makes 
@@ -108,6 +109,7 @@ instance TrieMap IntMap.IntMap where
   lookupTM k m = IntMap.lookup k m
   alterTM = xtInt
   foldTM k m z = IntMap.fold k z m
+  mapTM f m = IntMap.map f m
 
 xtInt :: Int -> XT a -> IntMap.IntMap a -> IntMap.IntMap a
 xtInt k f m = IntMap.alter f k m
@@ -118,6 +120,7 @@ instance Ord k => TrieMap (Map.Map k) where
   lookupTM = Map.lookup
   alterTM k f m = Map.alter f k m
   foldTM k m z = Map.fold k z m
+  mapTM f m = Map.map f m
 
 instance TrieMap UniqFM where
   type Key UniqFM = Unique
@@ -125,6 +128,7 @@ instance TrieMap UniqFM where
   lookupTM k m = lookupUFM m k
   alterTM k f m = alterUFM f m k
   foldTM k m z = foldUFM k z m
+  mapTM f m = mapUFM f m
 \end{code}
 
 
@@ -146,6 +150,11 @@ instance TrieMap m => TrieMap (MaybeMap m) where
    lookupTM = lkMaybe lookupTM
    alterTM  = xtMaybe alterTM
    foldTM   = fdMaybe 
+   mapTM    = mapMb
+
+mapMb :: TrieMap m => (a->b) -> MaybeMap m a -> MaybeMap m b
+mapMb f (MM { mm_nothing = mn, mm_just = mj }) 
+  = MM { mm_nothing = fmap f mn, mm_just = mapTM f mj }
 
 lkMaybe :: TrieMap m => (forall b. k -> m b -> Maybe b)
         -> Maybe k -> MaybeMap m a -> Maybe a
@@ -170,8 +179,13 @@ instance TrieMap m => TrieMap (ListMap m) where
    type Key (ListMap m) = [Key m]
    emptyTM  = LM { lm_nil = Nothing, lm_cons = emptyTM }
    lookupTM = lkList lookupTM
-   alterTM = xtList alterTM
+   alterTM  = xtList alterTM
    foldTM   = fdList 
+   mapTM    = mapList
+
+mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
+mapList f (LM { lm_nil = mnil, lm_cons = mcons })
+  = LM { lm_nil = fmap f mnil, lm_cons = mapTM (mapTM f) mcons }
 
 lkList :: TrieMap m => (forall b. k -> m b -> Maybe b)
         -> [k] -> ListMap m a -> Maybe a
@@ -263,7 +277,7 @@ data CoreMap a
        , cm_co    :: CoercionMap a
        , cm_type  :: TypeMap a
        , cm_cast  :: CoreMap (CoercionMap a)
-       , cm_tick :: CoreMap (TickishMap a)
+       , cm_tick  :: CoreMap (TickishMap a)
        , cm_app   :: CoreMap (CoreMap a)
        , cm_lam   :: CoreMap (TypeMap a)    -- Note [Binders]
        , cm_letn  :: CoreMap (CoreMap (BndrMap a))
@@ -285,8 +299,25 @@ instance TrieMap CoreMap where
    type Key CoreMap = CoreExpr
    emptyTM  = EmptyCM
    lookupTM = lkE emptyCME
-   alterTM = xtE emptyCME
+   alterTM  = xtE emptyCME
    foldTM   = fdE
+   mapTM    = mapE
+
+--------------------------
+mapE :: (a->b) -> CoreMap a -> CoreMap b
+mapE _ EmptyCM = EmptyCM
+mapE f (CM { cm_var = cvar, cm_lit = clit
+           , cm_co = cco, cm_type = ctype
+ 	   , cm_cast = ccast , cm_app = capp
+ 	   , cm_lam = clam, cm_letn = cletn 
+ 	   , cm_letr = cletr, cm_case = ccase
+           , cm_ecase = cecase, cm_tick = ctick })
+  = CM { cm_var = mapTM f cvar, cm_lit = mapTM f clit 
+       , cm_co = mapTM f cco, cm_type = mapTM f ctype
+       , cm_cast = mapTM (mapTM f) ccast, cm_app = mapTM (mapTM f) capp
+       , cm_lam = mapTM (mapTM f) clam, cm_letn = mapTM (mapTM (mapTM f)) cletn 
+       , cm_letr = mapTM (mapTM (mapTM f)) cletr, cm_case = mapTM (mapTM f) ccase
+       , cm_ecase = mapTM (mapTM f) cecase, cm_tick = mapTM (mapTM f) ctick }
 
 --------------------------
 lookupCoreMap :: CoreMap a -> CoreExpr -> Maybe a
@@ -393,9 +424,16 @@ instance TrieMap AltMap where
                  , am_data = emptyNameEnv
                  , am_lit  = emptyLiteralMap }
    lookupTM = lkA emptyCME
-   alterTM = xtA emptyCME
-   foldTM = fdA
+   alterTM  = xtA emptyCME
+   foldTM   = fdA
+   mapTM    = mapA
 
+mapA :: (a->b) -> AltMap a -> AltMap b
+mapA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
+  = AM { am_deflt = mapTM f adeflt
+       , am_data = mapNameEnv (mapTM f) adata
+       , am_lit = mapTM (mapTM f) alit }
+ 
 lkA :: CmEnv -> CoreAlt -> AltMap a -> Maybe a
 lkA env (DEFAULT,    _, rhs)  = am_deflt >.> lkE env rhs
 lkA env (LitAlt lit, _, rhs)  = am_lit >.> lkLit lit >=> lkE env rhs
@@ -445,8 +483,28 @@ instance TrieMap CoercionMap where
    type Key CoercionMap = Coercion
    emptyTM  = EmptyKM
    lookupTM = lkC emptyCME
-   alterTM = xtC emptyCME
-   foldTM = fdC
+   alterTM  = xtC emptyCME
+   foldTM   = fdC
+   mapTM    = mapC
+
+mapC :: (a->b) -> CoercionMap a -> CoercionMap b
+mapC _ EmptyKM = EmptyKM
+mapC f (KM { km_refl = krefl, km_tc_app = ktc
+           , km_app = kapp, km_forall = kforall
+           , km_var = kvar, km_axiom = kax
+           , km_unsafe = kunsafe, km_sym = ksym, km_trans = ktrans
+           , km_nth = knth, km_inst = kinst })
+  = KM { km_refl   = mapTM f krefl
+       , km_tc_app = mapNameEnv (mapTM f) ktc
+       , km_app    = mapTM (mapTM f) kapp
+       , km_forall = mapTM (mapTM f) kforall
+       , km_var    = mapTM f kvar
+       , km_axiom  = mapNameEnv (mapTM f) kax
+       , km_unsafe = mapTM (mapTM f) kunsafe
+       , km_sym    = mapTM f ksym
+       , km_trans  = mapTM (mapTM f) ktrans
+       , km_nth    = IntMap.map (mapTM f) knth
+       , km_inst   = mapTM (mapTM f) kinst }
 
 lkC :: CmEnv -> Coercion -> CoercionMap a -> Maybe a
 lkC env co m 
@@ -532,8 +590,20 @@ instance TrieMap TypeMap where
    type Key TypeMap = Type
    emptyTM  = EmptyTM
    lookupTM = lkT emptyCME
-   alterTM = xtT emptyCME
-   foldTM = fdT
+   alterTM  = xtT emptyCME
+   foldTM   = fdT
+   mapTM    = mapT
+
+mapT :: (a->b) -> TypeMap a -> TypeMap b
+mapT _ EmptyTM = EmptyTM
+mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_fun = tfun
+           , tm_tc_app = ttcapp, tm_forall = tforall, tm_tylit = tlit })
+  = TM { tm_var    = mapTM f tvar
+       , tm_app    = mapTM (mapTM f) tapp
+       , tm_fun    = mapTM (mapTM f) tfun
+       , tm_tc_app = mapNameEnv (mapTM f) ttcapp
+       , tm_forall = mapTM (mapTM f) tforall
+       , tm_tylit  = mapTM f tlit }
 
 -----------------
 lkT :: CmEnv -> Type -> TypeMap a -> Maybe a
@@ -615,8 +685,20 @@ data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
                       , tlm_string :: Map.Map FastString a
                       }
 
+instance TrieMap TyLitMap where
+   type Key TyLitMap = TyLit
+   emptyTM  = emptyTyLitMap
+   lookupTM = lkTyLit
+   alterTM  = xtTyLit
+   foldTM   = foldTyLit
+   mapTM    = mapTyLit
+   
 emptyTyLitMap :: TyLitMap a
 emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = Map.empty }
+
+mapTyLit :: (a->b) -> TyLitMap a -> TyLitMap b
+mapTyLit f (TLM { tlm_number = tn, tlm_string = ts })
+  = TLM { tlm_number = Map.map f tn, tlm_string = Map.map f ts }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
@@ -677,10 +759,15 @@ data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
 
 instance TrieMap VarMap where
    type Key VarMap = Var
-   emptyTM = VM { vm_bvar = IntMap.empty, vm_fvar = emptyVarEnv }
+   emptyTM  = VM { vm_bvar = IntMap.empty, vm_fvar = emptyVarEnv }
    lookupTM = lkVar emptyCME
-   alterTM = xtVar emptyCME
-   foldTM = fdVar
+   alterTM  = xtVar emptyCME
+   foldTM   = fdVar
+   mapTM    = mapVar
+
+mapVar :: (a->b) -> VarMap a -> VarMap b
+mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
+  = VM { vm_bvar = mapTM f bv, vm_fvar = mapVarEnv f fv }
 
 lkVar :: CmEnv -> Var -> VarMap a -> Maybe a
 lkVar env v 
