@@ -1117,7 +1117,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
                    else NameNotInScope2
 
         | otherwise = NameNotInScope1   -- Can happen if 'f' is bound twice in the module
-	  	      			-- Eg  f = True; g = 0; f = False
+                                        -- Eg  f = True; g = 0; f = False
       where
         mod = nameModule name
         occ = nameOccName name
