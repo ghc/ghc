@@ -143,7 +143,8 @@ reportWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics }
   where
     env = cec_tidy ctxt
     tidy_insols = mapBag (tidyCt env) insols
-    tidy_flats  = mapBag (tidyCt env) flats
+    tidy_flats  = mapBag (tidyCt env) (keepWanted flats)
+                  -- See Note [Do not report derived but soluble errors]
 
 reportTidyWanteds :: ReportErrCtxt -> Bag Ct -> Bag Ct -> Bag Implication -> TcM ()
 reportTidyWanteds ctxt insols flats implics
@@ -371,6 +372,56 @@ getUserGivens (CEC {cec_encl = ctxt})
     [ (givens, loc) | Implic {ic_given = givens, ic_loc = loc} <- ctxt
                     , not (null givens) ]
 \end{code}
+
+Note [Do not report derived but soluble errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The wc_flats include Derived constraints that have not been solved, but are
+not insoluble (in that case they'd be in wc_insols).  We do not want to report
+these as errors:
+
+* Superclass constraints. If we have an unsolved [W] Ord a, we'll also have
+  an unsolved [D] Eq a, and we do not want to report that; it's just noise.
+
+* Functional dependencies.  For givens, consider
+      class C a b | a -> b
+      data T a where
+         MkT :: C a d => [d] -> T a
+      f :: C a b => T a -> F Int
+      f (MkT xs) = length xs
+  Then we get a [D] b~d.  But there *is* a legitimate call to
+  f, namely   f (MkT [True]) :: T Bool, in which b=d.  So we should
+  not reject the program.
+
+  For wanteds, something similar
+      data T a where
+        MkT :: C Int b => a -> b -> T a 
+      g :: C Int c => c -> ()
+      f :: T a -> ()
+      f (MkT x y) = g x
+  Here we get [G] C Int b, [W] C Int a, hence [D] a~b.
+  But again f (MkT True True) is a legitimate call.
+
+(We leave the Deriveds in wc_flat until reportErrors, so that we don't lose
+derived superclasses between iterations of the solver.)
+
+For functional dependencies, here is a real example, 
+stripped off from libraries/utf8-string/Codec/Binary/UTF8/Generic.hs
+
+  class C a b | a -> b
+  g :: C a b => a -> b -> () 
+  f :: C a b => a -> b -> () 
+  f xa xb = 
+      let loop = g xa 
+      in loop xb
+
+We will first try to infer a type for loop, and we will succeed:
+    C a b' => b' -> ()
+Subsequently, we will type check (loop xb) and all is good. But, 
+recall that we have to solve a final implication constraint: 
+    C a b => (C a b' => .... cts from body of loop .... )) 
+And now we have a problem as we will generate an equality b ~ b' and fail to 
+solve it. 
+
 
 %************************************************************************
 %*                  *
