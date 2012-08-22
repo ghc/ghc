@@ -245,11 +245,9 @@ coVarsOfTcCo tc_co
     go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
                                      -- to evVarsOfTerm in the DEBUG check of setEvBind
 
-    -- We expect only coercion bindings
+    -- We expect only coercion bindings, so use evTermCoercion 
     go_bind :: EvBind -> VarSet
-    go_bind (EvBind _ (EvCoercion co)) = go co
-    go_bind (EvBind _ (EvId v))        = unitVarSet v
-    go_bind other = pprPanic "coVarsOfTcCo:Bind" (ppr other)
+    go_bind (EvBind _ tm) = go (evTermCoercion tm)
 
     get_bndrs :: Bag EvBind -> VarSet
     get_bndrs = foldrBag (\ (EvBind b _) bs -> extendVarSet bs b) emptyVarSet 
