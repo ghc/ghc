@@ -1573,10 +1573,7 @@ mkCallUDs :: Id -> [CoreExpr] -> UsageDetails
 mkCallUDs f args
   | not (want_calls_for f)  -- Imported from elsewhere
   || null theta             -- Not overloaded
-  || not (all isClassPred theta)
-        -- Only specialise if all overloading is on class params.
-        -- In ptic, with implicit params, the type args
-        --  *don't* say what the value of the implicit param is!
+  || not (all type_determines_value theta)
   || not (spec_tys `lengthIs` n_tyvars)
   || not ( dicts   `lengthIs` n_dicts)
   || not (any interestingDict dicts)    -- Note [Interesting dictionary arguments]
@@ -1603,6 +1600,13 @@ mkCallUDs f args
         | otherwise                             = Nothing
 
     want_calls_for f = isLocalId f || isInlinablePragma (idInlinePragma f)
+
+    type_determines_value pred = isClassPred pred && not (isIPPred pred)
+        -- Only specialise if all overloading is on non-IP *class* params,
+        -- because these are the ones whose *type* determines their *value*.
+        -- In ptic, with implicit params, the type args
+        --  *don't* say what the value of the implicit param is!
+        -- See Trac #7101
 \end{code}
 
 Note [Interesting dictionary arguments]
