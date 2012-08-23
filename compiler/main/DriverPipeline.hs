@@ -1489,12 +1489,7 @@ mkExtraObj dflags extn xs
 --
 mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags = do
-   let have_rts_opts_flags =
-         isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
-                                        RtsOptsSafeOnly -> False
-                                        _ -> True
-
-   when (dopt Opt_NoHsMain dflags && have_rts_opts_flags) $ do
+   when (dopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
       log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
@@ -1881,7 +1876,13 @@ maybeCreateManifest dflags exe_filename
 
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
-linkDynLib dflags o_files dep_packages = do
+linkDynLib dflags o_files dep_packages
+ = do
+    when (haveRtsOptsFlags dflags) $ do
+      log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
+          (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
+           text "    Call hs_init_ghc() from your main() function to set these options.")
+
     let verbFlags = getVerbFlags dflags
     let o_file = outputFile dflags
 
@@ -2146,3 +2147,8 @@ touchObjectFile dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
   SysTools.touch dflags "Touching object file" path
 
+haveRtsOptsFlags :: DynFlags -> Bool
+haveRtsOptsFlags dflags =
+         isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
+                                        RtsOptsSafeOnly -> False
+                                        _ -> True
