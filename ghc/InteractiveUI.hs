@@ -1761,11 +1761,7 @@ checkAdd ii = do
        m <- GHC.lookupModule modname pkgqual
        when safe $ do
            t <- GHC.isModuleTrusted m
-           when (not t) $
-                ghcError $ CmdLineError $
-                 "can't import " ++ moduleNameString modname
-                                 ++ " as it isn't trusted."
-
+           when (not t) $ ghcError $ ProgramError $ ""
 
 -- -----------------------------------------------------------------------------
 -- Update the GHC API's view of the context
