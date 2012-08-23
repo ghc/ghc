@@ -20,6 +20,7 @@ import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 
 import Control.Monad
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.List
 import Data.Maybe
 import System.IO
@@ -284,7 +285,7 @@ generate config_args distdir directory
                                   Installed.haddockHTMLs = []
                               }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-              writeFileAtomic (distdir </> "inplace-pkg-config") (toUTF8 content)
+              writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
           _ -> error "Inconsistent lib components; can't happen?"
 
       let
