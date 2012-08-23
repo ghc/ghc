@@ -200,3 +200,4 @@ test('dodgy',
      [ extra_clean(['DodgyA.hi', 'DodgyA.o']) ],
      multimod_compile,
      ['dodgy', '-v0'])
+test('T7167', normal, compile, [''])
