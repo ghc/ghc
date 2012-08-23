@@ -1782,10 +1782,9 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
         -- level.  Reason: so that when we read it back in we'll
         -- construct the same ru_rough field as we have right now;
         -- see tcIfaceRule
-    do_arg (Type ty) = IfaceType (toIfaceType (deNoteType ty))
-    do_arg (Coercion co) = IfaceType (coToIfaceType co)
-                           
-    do_arg arg       = toIfaceExpr arg
+    do_arg (Type ty)     = IfaceType (toIfaceType (deNoteType ty))
+    do_arg (Coercion co) = IfaceCo   (coToIfaceType co)
+    do_arg arg           = toIfaceExpr arg
 
         -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
         -- A rule is an orphan only if none of the variables
