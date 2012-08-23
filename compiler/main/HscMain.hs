@@ -61,6 +61,7 @@ module HscMain
     , hscTcRcLookupName
     , hscTcRnGetInfo
     , hscCheckSafe
+    , hscGetSafe
 #ifdef GHCI
     , hscIsGHCiMonad
     , hscGetModuleInterface
@@ -1023,6 +1024,21 @@ hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     errs <- getWarnings
     return $ isEmptyBag errs
 
+-- | Return if a module is trusted and the pkgs it depends on to be trusted.
+hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, [PackageId])
+hscGetSafe hsc_env m l = runHsc hsc_env $ do
+    dflags       <- getDynFlags
+    (self, pkgs) <- hscCheckSafe' dflags m l
+    good         <- isEmptyBag `fmap` getWarnings
+    clearWarnings -- don't want them printed...
+    let pkgs' | Just p <- self = p:pkgs
+              | otherwise      = pkgs
+    return (good, pkgs')
+ 
+-- | Is a module trusted? If not, throw or log errors depending on the type.
+-- Return (regardless of trusted or not) if the trust type requires the modules
+-- own package be trusted and a list of other packages required to be trusted
+-- (these later ones haven't been checked) but the own package trust has been.
 hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe PackageId, [PackageId])
 hscCheckSafe' dflags m l = do
     (tw, pkgs) <- isModSafe m l
@@ -1031,10 +1047,6 @@ hscCheckSafe' dflags m l = do
         True | isHomePkg m -> return (Nothing, pkgs)
              | otherwise   -> return (Just $ modulePackageId m, pkgs)
   where
-    -- Is a module trusted? If not, throw or log errors depending on the type.
-    -- Return (regardless of trusted or not) if the trust type requires the
-    -- modules own package be trusted and a list of other packages required to
-    -- be trusted (these later ones haven't been checked)
     isModSafe :: Module -> SrcSpan -> Hsc (Bool, [PackageId])
     isModSafe m l = do
         iface <- lookup' m
@@ -1080,6 +1092,8 @@ hscCheckSafe' dflags m l = do
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.
     packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted Sf_None             _ _ = False -- shouldn't hit these cases
+    packageTrusted Sf_Unsafe           _ _ = False -- prefer for completeness.
     packageTrusted _ _ _
         | not (packageTrustOn dflags)      = True
     packageTrusted Sf_Safe         False _ = True
