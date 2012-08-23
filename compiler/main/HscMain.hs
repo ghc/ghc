@@ -1045,7 +1045,7 @@ hscCheckSafe' dflags m l = do
                            <> text ", to check that it can be safely imported"
 
             -- got iface, check trust
-            Just iface' -> do
+            Just iface' ->
                 let trust = getSafeMode $ mi_trust iface'
                     trust_own_pkg = mi_trust_pkg iface'
                     -- check module is trusted
@@ -1054,15 +1054,17 @@ hscCheckSafe' dflags m l = do
                     safeP = packageTrusted trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = map fst $ filter snd $ dep_pkgs $ mi_deps iface'
-                case (safeM, safeP) of
                     -- General errors we throw but Safe errors we log
-                    (True, True ) -> return (trust == Sf_Trustworthy, pkgRs)
-                    (True, False) -> liftIO . throwIO $ pkgTrustErr
-                    (False, _   ) -> logWarnings modTrustErr >>
-                                     return (trust == Sf_Trustworthy, pkgRs)
+                    errs = case (safeM, safeP) of
+                        (True, True ) -> emptyBag
+                        (True, False) -> pkgTrustErr
+                        (False, _   ) -> modTrustErr
+                in do
+                    logWarnings errs
+                    return (trust == Sf_Trustworthy, pkgRs)
 
                 where
-                    pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg dflags l $
+                    pkgTrustErr = unitBag $ mkPlainErrMsg dflags l $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package (" <> ppr (modulePackageId m)
