@@ -8,16 +8,15 @@
 import System.Random
 import Control.Concurrent
 import Control.Exception
+import Control.Monad
 
 n = 5000  -- no. of threads
 m = 3000  -- maximum delay
 
 main = do
-   s <- newQSemN n
-   (is :: [Int]) <- sequence (take n (repeat (getStdRandom (randomR (1,m)))))
-   mapM (fork_sleep s) is
-   waitQSemN s n
+   v <- newEmptyMVar
+   is <- replicateM n $ getStdRandom (randomR (1,m))
+   mapM_ (fork_sleep v) is
+   replicateM_ n (takeMVar v)
    where
-	fork_sleep s i = forkIO (do waitQSemN s 1
-			  	    threadDelay (i*1000)
-				    signalQSemN s 1)
+     fork_sleep v i = forkIO $ do threadDelay (i*1000); putMVar v ()
