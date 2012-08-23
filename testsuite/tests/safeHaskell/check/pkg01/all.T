@@ -24,13 +24,25 @@ test('ImpSafe01', normal, compile_fail, ['-fpackage-trust -distrust base'])
 # Succeed since we don't enable package trust
 test('ImpSafe02', normal, compile, ['-distrust base'])
 
-test('ImpSafeOnly01', [normal, alone], compile, ['-package-db local.db -trust base'])
+test('ImpSafeOnly01', [normal, alone], compile, ['-fpackage-trust -package-db local.db -trust base'])
 
-test('ImpSafeOnly02', [normal, alone], compile, ['-package-db local.db -trust base -trust safePkg01'])
+test('ImpSafeOnly02', [normal, alone], compile, ['-fpackage-trust -package-db local.db -trust base -trust safePkg01'])
 
-# Fail since we enable package trust
+# Fail since we enable package trust (and still need safePkg01 trusted)
 test('ImpSafeOnly03', [normal, alone], compile_fail, ['-fpackage-trust -package-db local.db -trust base'])
 
 # Succeed since we don't enable package trust
 test('ImpSafeOnly04', [normal, alone], compile, ['-package-db local.db -trust base'])
+
+# fail due to missing trust of safePkg01, next test succeeds.
+test('ImpSafeOnly05', [normal, alone], compile_fail, ['-fpackage-trust -package-db local.db -trust base'])
+test('ImpSafeOnly06', [normal, alone], compile, ['-fpackage-trust -package-db local.db -trust base -trust safePkg01'])
+
+# fail due to missing trust
+test('ImpSafeOnly07', [normal, alone], compile_fail, ['-fpackage-trust -package-db local.db -trust safePkg01'])
+test('ImpSafeOnly08', [normal, alone], compile_fail, ['-fpackage-trust -package-db local.db -trust safePkg01'])
+test('ImpSafeOnly09', [normal, alone], compile_fail, ['-fpackage-trust -package-db local.db -trust safePkg01'])
+
+# finally succeed
+test('ImpSafeOnly10', [normal, alone], compile, ['-fpackage-trust -package-db local.db -trust safePkg01 -trust base -trust bytestring'])
 

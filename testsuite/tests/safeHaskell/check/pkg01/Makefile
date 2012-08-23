@@ -25,7 +25,7 @@ safePkg01:
 	'$(TEST_HC)' --make -o setup Setup.hs -v0
 
 	'$(GHC_PKG)' init local.db
-	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -trust base' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
+	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	./setup register --inplace -v0
@@ -47,6 +47,15 @@ safePkg01:
 	echo 'M_SafePkg5'
 	'$(TEST_HC)' --show-iface dist/build/M_SafePkg5.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
+	echo 'M_SafePkg6'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg6.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	echo
+	echo 'M_SafePkg7'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg7.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	echo
+	echo 'M_SafePkg8'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg8.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	echo
 	echo 'Testing setting trust'
 	$(LGHC_PKG) trust safePkg01-1.0
 	$(LGHC_PKG) field safePkg01-1.0 trusted
@@ -54,3 +63,4 @@ safePkg01:
 	$(LGHC_PKG) field safePkg01-1.0 trusted
 	$(LGHC_PKG) distrust safePkg01-1.0
 	$(LGHC_PKG) field safePkg01-1.0 trusted
+
