@@ -5,12 +5,15 @@ License: BSD3
 Build-Type: Simple
 
 Library {
-    Build-Depends: base >= 4
+    Build-Depends: base, bytestring
     Exposed-Modules:
         M_SafePkg
         M_SafePkg2
         M_SafePkg3
         M_SafePkg4
         M_SafePkg5
+        M_SafePkg6
+        M_SafePkg7
+        M_SafePkg8
 }
 

@@ -24,7 +24,7 @@ test('T1969',
                              #                 5717704 (x86/Windows 17/05/10)
                              #                 6149572 (x86/Linux, 31/12/09)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 9000000, 10)),
+          compiler_stats_range_field('max_bytes_used', 9000000, 15)),
                                   # looks like the peak is around 10M, but we're
                                   # unlikely to GC exactly on the peak.
                                   # varies quite a lot with CLEANUP and BINDIST,
@@ -36,13 +36,14 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 595936240, 1)),
+          compiler_stats_range_field('bytes allocated', 606230880, 1)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
                                     # 05/08/2011:     561,382,568 (amd64/OS X)
                                     # 16/07/2012:     589,168,872 (amd64/Linux)
                                     # 20/07/2012:     595,936,240 (amd64/Linux)
+                                    # 23/08/2012:     606,230,880 (amd64/Linux)
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint')
           # Leave -dcore-lint on for this one test, so that we have something

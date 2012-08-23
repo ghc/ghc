@@ -2,8 +2,9 @@
 <no location info>:
     System.IO.Unsafe: Can't be safely imported!
     The module itself isn't safe.
-can't import System.IO.Unsafe as it isn't trusted.
+
 
 <no location info>:
     Data.ByteString: Can't be safely imported!
     The package (bytestring-0.10.0.0) the module resides in isn't trusted.
+
