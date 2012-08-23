@@ -1585,9 +1585,6 @@ argToPat :: ScEnv
 argToPat _env _in_scope _val_env arg@(Type {}) _arg_occ
   = return (False, arg)
     
-argToPat _env _in_scope _val_env arg@(Coercion {}) _arg_occ
-  = return (False, arg)
-
 argToPat env in_scope val_env (Tick _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
 	-- Note [Notes in call patterns]
@@ -1696,6 +1693,7 @@ argToPat env in_scope val_env (Var v) arg_occ
 	-- We don't want to specialise for that *particular* x,y
 
   -- The default case: make a wild-card
+  -- We use this for coercions too
 argToPat _env _in_scope _val_env arg _arg_occ
   = wildCardPat (exprType arg)
 
@@ -1703,7 +1701,7 @@ wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty
   = do { uniq <- getUniqueUs
        ; let id = mkSysLocal (fsLit "sc") uniq ty
-       ; return (False, Var id) }
+       ; return (False, varToCoreExpr id) }
 
 argsToPats :: ScEnv -> InScopeSet -> ValueEnv
 	   -> [CoreArg] -> [ArgOcc]  -- Should be same length
