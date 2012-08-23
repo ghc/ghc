@@ -548,14 +548,18 @@ mkExport :: PragFun
 
 mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
   = do  { mono_ty <- zonkTcType (idType mono_id)
-        ; let inferred_poly_ty = mkSigmaTy my_tvs theta mono_ty
-              my_tvs   = filter (`elemVarSet` used_tvs) qtvs
-              used_tvs = tyVarsOfTypes theta `unionVarSet` tyVarsOfType mono_ty
-
-              poly_id  = case mb_sig of
+        ; let poly_id  = case mb_sig of
                            Nothing  -> mkLocalId poly_name inferred_poly_ty
                            Just sig -> sig_id sig
                 -- poly_id has a zonked type
+
+              -- In the inference case (no signature) this stuff figures out
+              -- the right type variables and theta to quantify over
+              -- See Note [Impedence matching]
+              my_tv_set = growThetaTyVars theta (tyVarsOfType mono_ty)
+              my_tvs = filter (`elemVarSet` my_tv_set) qtvs   -- Maintain original order
+              my_theta = filter (quantifyPred my_tv_set) theta
+              inferred_poly_ty = mkSigmaTy my_tvs my_theta mono_ty
 
         ; poly_id <- addInlinePrags poly_id prag_sigs
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -571,6 +575,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
         -- Remember we are in the tcPolyInfer case, so the type envt is 
         -- closed (unless we are doing NoMonoLocalBinds in which case all bets
         -- are off)
+        -- See Note [Impedence matching]
         ; (wrap, wanted) <- addErrCtxtM (mk_msg poly_id) $
                             captureConstraints $
                             tcSubType origin sig_ctxt sel_poly_ty (idType poly_id)
@@ -599,8 +604,48 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
     prag_sigs = prag_fn poly_name
     origin    = AmbigOrigin poly_name
     sig_ctxt  = InfSigCtxt poly_name
+\end{code}
 
-------------------------
+Note [Impedence matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f 0 x = x
+   f n x = g [] (not x)
+
+   g [] y = f 10 y
+   g _  y = f 9  y
+
+After typechecking we'll get
+  f_mono_ty :: a -> Bool -> Bool   
+  g_mono_ty :: [b] -> Bool -> Bool 
+with constraints
+  (Eq a, Num a)
+
+Note that f is polymorphic in 'a' and g in 'b'; and these are not linked.
+The types we really want for f and g are
+   f :: forall a. (Eq a, Num a) => a -> Bool -> Bool
+   g :: forall b. [b] -> Bool -> Bool
+
+We can get these by "impedence matching":
+   tuple :: forall a b. (Eq a, Num a) => (a -> Bool -> Bool, [b] -> Bool -> Bool)
+   tuple a b d1 d1 = let ...bind f_mono, g_mono in (f_mono, g_mono)
+
+   f a d1 d2 = case tuple a Any d1 d2 of (f, g) -> f
+   g b = case tuple Integer b dEqInteger dNumInteger of (f,g) -> g
+
+Suppose the shared quantified tyvars are qtvs and constraints theta.
+Then we want to check that 
+   f's polytype  is more polymorphic than   forall qtvs. theta => f_mono_ty
+and the proof is the impedence matcher.  
+
+Notice that the impedence matcher may do defaulting.  See Trac #7173.
+
+It also cleverly does an ambiguity check; for example, rejecting
+   f :: F a -> a
+where F is a non-injective type function.
+
+
+\begin{code}
 type PragFun = Name -> [LSig Name]
 
 mkPragFun :: [LSig Name] -> LHsBinds Name -> PragFun

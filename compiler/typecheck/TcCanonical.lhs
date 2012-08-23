@@ -174,7 +174,7 @@ canonicalize :: Ct -> TcS StopOrContinue
 canonicalize ct@(CNonCanonical { cc_ev = fl, cc_depth  = d })
   = do { traceTcS "canonicalize (non-canonical)" (ppr ct)
        ; {-# SCC "canEvVar" #-}
-         canEvVar d fl (classifyPredType (ctPred ct)) }
+         canEvVar d fl }
 
 canonicalize (CDictCan { cc_depth  = d
                        , cc_ev = fl
@@ -205,11 +205,10 @@ canonicalize (CIrredEvCan { cc_ev = fl
 
 canEvVar :: SubGoalDepth 
          -> CtEvidence 
-         -> PredTree 
          -> TcS StopOrContinue
 -- Called only for non-canonical EvVars 
-canEvVar d fl pred_classifier 
-  = case pred_classifier of
+canEvVar d fl 
+  = case classifyPredType (ctEvPred fl) of
       ClassPred cls tys -> canClassNC d fl cls tys 
       EqPred ty1 ty2    -> canEqNC    d fl ty1 ty2 
       IrredPred ev_ty   -> canIrred   d fl ev_ty
@@ -234,7 +233,7 @@ canTuple d fl tys
        ; mapM_ add_to_work ctevs
        ; return Stop }
   where
-    add_to_work fl = addToWork $ canEvVar d fl (classifyPredType (ctEvPred fl))
+    add_to_work fl = addToWork $ canEvVar d fl
 \end{code}
 
 
@@ -425,9 +424,8 @@ canIrred d fl ty
                  -> continueWith $
                     CIrredEvCan { cc_ev = new_fl, cc_ty = xi, cc_depth = d }
                | otherwise
-                 -> canEvVar d new_fl (classifyPredType (ctEvPred new_fl))
+                 -> canEvVar d new_fl
              Nothing -> return Stop }
-
 \end{code}
 
 %************************************************************************
