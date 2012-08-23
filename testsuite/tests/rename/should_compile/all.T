@@ -196,3 +196,7 @@ test('T7085', normal, compile, [''])
 test('T7145a', normal, compile, ['-Wall -Werror'])
 test('T7145b', normal, compile, ['-Wall'])
 test('T6038', normal, compile, [''])
+test('dodgy',
+     [ extra_clean(['DodgyA.hi', 'DodgyA.o']) ],
+     multimod_compile,
+     ['dodgy', '-v0'])
