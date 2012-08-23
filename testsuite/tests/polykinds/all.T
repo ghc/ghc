@@ -62,5 +62,7 @@ test('T7073', normal, compile,[''])
 test('T7128', normal, compile,[''])
 test('T7151', normal, compile_fail,[''])
 test('T7095', normal, compile,[''])
+test('T7090', normal, compile,[''])
 test('T7176', expect_broken(7176), compile,[''])
+
 
