@@ -14,6 +14,10 @@
 -- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
 -- Jones /Lazy Functional State Threads/.
 --
+-- References (variables) that can be used within the @ST@ monad are
+-- provided by "Data.STRef", and arrays are provided by
+-- "Data.Array.ST".
+
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST (
