@@ -980,6 +980,12 @@ cmmExprNative referenceKind expr = do
            -> do args' <- mapM (cmmExprNative DataReference) args
                  return $ CmmMachOp mop args'
 
+        CmmLit (CmmBlock id)
+           -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
+           -- we must convert block Ids to CLabels here, because we
+           -- might have to do the PIC transformation.  Hence we must
+           -- not modify BlockIds beyond this point.
+
         CmmLit (CmmLabel lbl)
            -> do
                 cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl

@@ -54,7 +54,6 @@ import Reg
 import RegClass
 import Size
 
-import BlockId
 import OldCmm
 import CLabel           ( CLabel )
 import Unique
@@ -166,7 +165,6 @@ litToImm (CmmLabelDiffOff l1 l2 off)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
-litToImm (CmmBlock id)       = ImmCLbl (infoTblLbl id)
 litToImm _                   = panic "PPC.Regs.litToImm: no match"
 
 
