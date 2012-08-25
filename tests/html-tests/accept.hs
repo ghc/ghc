@@ -5,17 +5,24 @@ import System.Exit
 import System.Directory
 import Data.List
 import Control.Monad
+import Control.Applicative
 
 
 main = do
   args <- getArgs
   dir <- getCurrentDirectory
-  contents <- getDirectoryContents (dir </> "output")
+  contents <- filter (`notElem` ignore) <$> getDirectoryContents (dir </> "output")
   if not $ null args
     then
       mapM_ copy [ "output" </> file  | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
     else
       mapM_ copy [ "output" </> file | file <- contents, ".html" `isSuffixOf` file ]
+  where
+    ignore = [
+        "doc-index.html"
+      , "index-frames.html"
+      , "index.html"
+      ]
 
 
 copy file = do
