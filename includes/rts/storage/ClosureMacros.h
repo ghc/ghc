@@ -83,8 +83,10 @@ EXTERN_INLINE StgRetInfoTable *get_ret_itbl(StgClosure *c) {return RET_INFO_PTR_
 INLINE_HEADER StgFunInfoTable *get_fun_itbl(StgClosure *c);
 INLINE_HEADER StgFunInfoTable *get_fun_itbl(StgClosure *c) {return FUN_INFO_PTR_TO_STRUCT(c->header.info);}
 
-#define get_thunk_itbl(c) (THUNK_INFO_PTR_TO_STRUCT((c)->header.info))
-#define get_con_itbl(c) (CON_INFO_PTR_TO_STRUCT((c)->header.info))
+INLINE_HEADER StgThunkInfoTable *get_thunk_itbl(StgClosure *c);
+INLINE_HEADER StgThunkInfoTable *get_thunk_itbl(StgClosure *c) {return THUNK_INFO_PTR_TO_STRUCT(c->header.info);}
+
+INLINE_HEADER StgConInfoTable *get_con_itbl(StgClosure *c) {return CON_INFO_PTR_TO_STRUCT((c)->header.info);}
 
 /* -----------------------------------------------------------------------------
    Macros for building closures
