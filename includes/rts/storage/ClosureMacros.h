@@ -76,8 +76,13 @@
 
 EXTERN_INLINE StgInfoTable *get_itbl(StgClosure *c);
 EXTERN_INLINE StgInfoTable *get_itbl(StgClosure *c) {return INFO_PTR_TO_STRUCT(c->header.info);}
-#define get_ret_itbl(c) (RET_INFO_PTR_TO_STRUCT((c)->header.info))
-#define get_fun_itbl(c) (FUN_INFO_PTR_TO_STRUCT((c)->header.info))
+
+EXTERN_INLINE StgRetInfoTable *get_ret_itbl(StgClosure *c);
+EXTERN_INLINE StgRetInfoTable *get_ret_itbl(StgClosure *c) {return RET_INFO_PTR_TO_STRUCT(c->header.info);}
+
+INLINE_HEADER StgFunInfoTable *get_fun_itbl(StgClosure *c);
+INLINE_HEADER StgFunInfoTable *get_fun_itbl(StgClosure *c) {return FUN_INFO_PTR_TO_STRUCT(c->header.info);}
+
 #define get_thunk_itbl(c) (THUNK_INFO_PTR_TO_STRUCT((c)->header.info))
 #define get_con_itbl(c) (CON_INFO_PTR_TO_STRUCT((c)->header.info))
 
