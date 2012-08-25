@@ -328,12 +328,12 @@ checkClosure( StgClosure* p )
         // ASSERT(get_itbl(bq->bh)->type == BLACKHOLE);
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
 
-        ASSERT(get_itbl(bq->owner)->type == TSO);
+        ASSERT(get_itbl((StgClosure *)(bq->owner))->type == TSO);
         ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
                || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
         ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
-               get_itbl(bq->link)->type == IND ||
-               get_itbl(bq->link)->type == BLOCKING_QUEUE);
+               get_itbl((StgClosure *)(bq->link))->type == IND ||
+               get_itbl((StgClosure *)(bq->link))->type == BLOCKING_QUEUE);
 
         return sizeofW(StgBlockingQueue);
     }
@@ -567,7 +567,7 @@ checkGlobalTSOList (rtsBool checkTSOs)
       for (tso=generations[g].threads; tso != END_TSO_QUEUE; 
            tso = tso->global_link) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
-          ASSERT(get_itbl(tso)->type == TSO);
+          ASSERT(get_itbl((StgClosure *)tso)->type == TSO);
           if (checkTSOs)
               checkTSO(tso);
 

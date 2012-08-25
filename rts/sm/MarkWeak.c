@@ -127,7 +127,7 @@ traverseWeakPtrList(void)
 	      continue;
 	  }
 	  
-          info = get_itbl(w);
+          info = get_itbl((StgClosure *)w);
 	  switch (info->type) {
 
 	  case WEAK:
@@ -269,7 +269,7 @@ static rtsBool tidyThreadList (generation *gen)
             t = tmp;
         }
         
-        ASSERT(get_itbl(t)->type == TSO);
+        ASSERT(get_itbl((StgClosure *)t)->type == TSO);
         next = t->global_link;
         
         // if the thread is not masking exceptions but there are

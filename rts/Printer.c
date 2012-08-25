@@ -91,7 +91,7 @@ printThunkPayload( StgThunk *obj )
     StgWord i, j;
     const StgInfoTable* info;
 
-    info = get_itbl(obj);
+    info = get_itbl((StgClosure *)obj);
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
         debugBelch(", ");
         printPtr((StgPtr)obj->payload[i]);
