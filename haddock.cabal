@@ -149,6 +149,7 @@ library
     directory,
     pretty,
     containers,
+    deepseq,
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
