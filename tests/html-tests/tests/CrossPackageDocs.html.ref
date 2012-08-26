@@ -358,7 +358,11 @@ defined in the <a href=""
 		  ></td
 		><td class="doc"
 		><p
-		  >Filename of the executable
+		  >Filename of the executable (see <code
+		    ><a href=""
+		      >proc</a
+		      ></code
+		    > for details)
 </p
 		  ></td
 		></tr
