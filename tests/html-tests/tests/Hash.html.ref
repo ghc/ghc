@@ -113,9 +113,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	    >Hash</a
 	    > key) =&gt; key -&gt; val -&gt; <a href=""
 	    >IO</a
-	    > <a href=""
-	    >()</a
-	    ></li
+	    > ()</li
 	  ><li class="src short"
 	  ><a href=""
 	    >lookup</a
@@ -210,9 +208,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	    >Hash</a
 	    > key) =&gt; key -&gt; val -&gt; <a href=""
 	    >IO</a
-	    > <a href=""
-	    >()</a
-	    ></p
+	    > ()</p
 	  ><div class="doc"
 	  ><p
 	    >Inserts a new element into the hash table

@@ -105,9 +105,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_FunArgs.html");};
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <a href=""
-		  >()</a
-		  ></td
+		>-&gt; ()</td
 		><td class="doc"
 		><p
 		  >Result
