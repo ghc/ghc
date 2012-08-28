@@ -1277,12 +1277,14 @@ checkDupRdrNames rdr_names_w_loc
 
 checkDupNames :: [Name] -> RnM ()
 -- Check for duplicated names in a binding group
-checkDupNames names
+checkDupNames names = check_dup_names (filterOut isSystemName names)
+                -- See Note [Binders in Template Haskell] in Convert
+
+check_dup_names :: [Name] -> RnM ()
+check_dup_names names
   = mapM_ (dupNamesErr nameSrcSpan) dups
   where
-    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) $
-                filterOut isSystemName names
-                -- See Note [Binders in Template Haskell] in Convert
+    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
 
 ---------------------
 checkShadowedRdrNames :: [Located RdrName] -> RnM ()
@@ -1294,10 +1296,12 @@ checkShadowedRdrNames loc_rdr_names
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names
-  = do { checkDupNames names
+  = do { check_dup_names filtered_names
        ; checkShadowedOccs envs loc_occs }
   where
-    loc_occs = [(nameSrcSpan name, nameOccName name) | name <- names]
+    filtered_names = filterOut isSystemName names
+                -- See Note [Binders in Template Haskell] in Convert
+    loc_occs = [(nameSrcSpan name, nameOccName name) | name <- filtered_names]
 
 -------------------------------------
 checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
