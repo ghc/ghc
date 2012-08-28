@@ -250,3 +250,5 @@ test('T7064',
      extra_clean(['T7064a.hi', 'T7064a.o']),
      multimod_compile_and_run,
      ['T7064.hs', '-v0'])
+test('T7092', extra_clean(['T7092a.hi','T7092a.o']),
+              multimod_compile, ['T7092','-v0'])
