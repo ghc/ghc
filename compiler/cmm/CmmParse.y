@@ -47,6 +47,7 @@ import Lexer
 
 import ForeignCall
 import Module
+import Platform
 import Literal
 import Unique
 import UniqFM
@@ -858,6 +859,8 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
           "C--" -> return CmmCallConv
           _ -> fail ("unknown calling convention: " ++ conv_string)
         return $ do
+          dflags <- getDynFlags
+          let platform = targetPlatform dflags
           results <- sequence results_code
           expr <- expr_code
           args <- sequence args_code
@@ -865,7 +868,7 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
             -- Temporary hack so at least some functions are CmmSafe
             CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args ret))
             _ ->
-              let expr' = adjCallTarget convention expr args in
+              let expr' = adjCallTarget platform convention expr args in
               case safety of
               CmmUnsafe ->
                 code (emitForeignCall' PlayRisky results
@@ -877,16 +880,15 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                 code (emitForeignCall' PlayInterruptible results
                    (CmmCallee expr' convention) args vols NoC_SRT ret)
 
-adjCallTarget :: CCallConv -> CmmExpr -> [CmmHinted CmmExpr] -> CmmExpr
-#ifdef mingw32_TARGET_OS
+adjCallTarget :: Platform -> CCallConv -> CmmExpr -> [CmmHinted CmmExpr]
+              -> CmmExpr
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
-adjCallTarget StdCallConv (CmmLit (CmmLabel lbl)) args
+adjCallTarget (Platform { platformOS = OSMinGW32 }) StdCallConv (CmmLit (CmmLabel lbl)) args
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
   where size (CmmHinted e _) = max wORD_SIZE (widthInBytes (typeWidth (cmmExprType e)))
                  -- c.f. CgForeignCall.emitForeignCall
-#endif
-adjCallTarget _ expr _
+adjCallTarget _ _ expr _
   = expr
 
 primCall
