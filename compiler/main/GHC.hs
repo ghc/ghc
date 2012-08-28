@@ -91,6 +91,7 @@ module GHC (
         findModule, lookupModule,
 #ifdef GHCI
         isModuleTrusted,
+        moduleTrustReqs,
         setContext, getContext, 
         getNamesInScope,
         getRdrNamesInScope,
@@ -1334,6 +1335,11 @@ lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
 isModuleTrusted :: GhcMonad m => Module -> m Bool
 isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
+
+-- | Return if a module is trusted and the pkgs it depends on to be trusted.
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [PackageId])
+moduleTrustReqs m = withSession $ \hsc_env ->
+    liftIO $ hscGetSafe hsc_env m noSrcSpan
 
 -- | EXPERIMENTAL: DO NOT USE.
 -- 

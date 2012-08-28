@@ -89,6 +89,12 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                                           | tyCon <- tyCons ]
                       , density      = mkDensity dflags
                       , this_mod     = mod
+                      , tickishType  = case hscTarget dflags of
+                          HscInterpreted          -> Breakpoints
+                          _ | opt_Hpc             -> HpcTicks
+                            | dopt Opt_SccProfilingOn dflags
+                                                  -> ProfNotes
+                            | otherwise           -> error "addTicksToBinds: No way to annotate!"
                        })
                    (TT
                       { tickBoxCount = 0
@@ -910,9 +916,20 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , inScope      :: VarSet
                         , blackList    :: Map SrcSpan ()
                         , this_mod     :: Module
+                        , tickishType  :: TickishType
                         }
 
 --      deriving Show
+
+data TickishType = ProfNotes | HpcTicks | Breakpoints
+
+
+-- | Tickishs that only make sense when their source code location
+-- refers to the current file. This might not always be true due to
+-- LINE pragmas in the code - which would confuse at least HPC.
+tickSameFileOnly :: TickishType -> Bool
+tickSameFileOnly HpcTicks = True
+tickSameFileOnly _other   = False
 
 type FreeVars = OccEnv Id
 noFVs :: FreeVars
@@ -982,13 +999,22 @@ getPathEntry = declPath `liftM` getEnv
 getFileName :: TM FastString
 getFileName = fileName `liftM` getEnv
 
-sameFileName :: SrcSpan -> TM a -> TM a -> TM a
-sameFileName pos out_of_scope in_scope = do
+isGoodSrcSpan' :: SrcSpan -> Bool
+isGoodSrcSpan' pos@(RealSrcSpan _) = srcSpanStart pos /= srcSpanEnd pos
+isGoodSrcSpan' (UnhelpfulSpan _) = False
+
+isGoodTickSrcSpan :: SrcSpan -> TM Bool
+isGoodTickSrcSpan pos = do
   file_name <- getFileName
-  case srcSpanFileName_maybe pos of
-    Just file_name2
-      | file_name == file_name2 -> in_scope
-    _ -> out_of_scope
+  tickish <- tickishType `liftM` getEnv
+  let need_same_file = tickSameFileOnly tickish
+      same_file      = Just file_name == srcSpanFileName_maybe pos
+  return (isGoodSrcSpan' pos && (not need_same_file || same_file))
+
+ifGoodTickSrcSpan :: SrcSpan -> TM a -> TM a -> TM a
+ifGoodTickSrcSpan pos then_code else_code = do
+  good <- isGoodTickSrcSpan pos
+  if good then then_code else else_code
 
 bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
@@ -1007,23 +1033,23 @@ isBlackListed pos = TM $ \ env st ->
 -- expression argument to support nested box allocations
 allocTickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> TM (HsExpr Id)
              -> TM (LHsExpr Id)
-allocTickBox boxLabel countEntries topOnly pos m | isGoodSrcSpan' pos =
-  sameFileName pos (do e <- m; return (L pos e)) $ do
+allocTickBox boxLabel countEntries topOnly pos m =
+  ifGoodTickSrcSpan pos (do
     (fvs, e) <- getFreeVars m
     env <- getEnv
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
     return (L pos (HsTick tickish (L pos e)))
-allocTickBox _boxLabel _countEntries _topOnly pos m = do
-  e <- m
-  return (L pos e)
-
+  ) (do
+    e <- m
+    return (L pos e)
+  )
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations
 allocATickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> FreeVars
               -> TM (Maybe (Tickish Id))
-allocATickBox boxLabel countEntries topOnly  pos fvs | isGoodSrcSpan' pos =
-  sameFileName pos (return Nothing) $ do
+allocATickBox boxLabel countEntries topOnly  pos fvs =
+  ifGoodTickSrcSpan pos (do
     let
       mydecl_path = case boxLabel of
                       TopLevelBox x -> x
@@ -1031,8 +1057,7 @@ allocATickBox boxLabel countEntries topOnly  pos fvs | isGoodSrcSpan' pos =
                       _ -> panic "allocATickBox"
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs mydecl_path
     return (Just tickish)
-allocATickBox _boxLabel _countEntries _topOnly _pos _fvs =
-  return Nothing
+  ) (return Nothing)
 
 
 mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
@@ -1059,10 +1084,10 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
 
         count = countEntries && dopt Opt_ProfCountEntries dflags
 
-        tickish
-          | opt_Hpc                        = HpcTick (this_mod env) c
-          | dopt Opt_SccProfilingOn dflags = ProfNote cc count True{-scopes-}
-          | otherwise                      = Breakpoint c ids
+        tickish = case tickishType env of
+          HpcTicks    -> HpcTick (this_mod env) c
+          ProfNotes   -> ProfNote cc count True{-scopes-}
+          Breakpoints -> Breakpoint c ids
     in
     ( tickish
     , fvs
@@ -1072,11 +1097,18 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
 
 allocBinTickBox :: (Bool -> BoxLabel) -> SrcSpan -> TM (HsExpr Id)
                 -> TM (LHsExpr Id)
-allocBinTickBox boxLabel pos m
- | not opt_Hpc = allocTickBox (ExpBox False) False False pos m
- | isGoodSrcSpan' pos =
- do
- e <- m
+allocBinTickBox boxLabel pos m = do
+  env <- getEnv
+  case tickishType env of
+    HpcTicks -> do e <- liftM (L pos) m
+                   ifGoodTickSrcSpan pos
+                     (mkBinTickBoxHpc boxLabel pos e)
+                     (return e)
+    _other   -> allocTickBox (ExpBox False) False False pos m
+
+mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr Id
+                -> TM (LHsExpr Id)
+mkBinTickBoxHpc boxLabel pos e =
  TM $ \ env st ->
   let meT = (pos,declPath env, [],boxLabel True)
       meF = (pos,declPath env, [],boxLabel False)
@@ -1084,18 +1116,13 @@ allocBinTickBox boxLabel pos m
       c = tickBoxCount st
       mes = mixEntries st
   in
-             ( L pos $ HsTick (HpcTick (this_mod env) c) $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
+             ( L pos $ HsTick (HpcTick (this_mod env) c) $ L pos $ HsBinTick (c+1) (c+2) e
            -- notice that F and T are reversed,
            -- because we are building the list in
            -- reverse...
              , noFVs
              , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
              )
-allocBinTickBox _boxLabel pos m = do e <- m; return (L pos e)
-
-isGoodSrcSpan' :: SrcSpan -> Bool
-isGoodSrcSpan' pos@(RealSrcSpan _) = srcSpanStart pos /= srcSpanEnd pos
-isGoodSrcSpan' (UnhelpfulSpan _) = False
 
 mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos@(RealSrcSpan s)

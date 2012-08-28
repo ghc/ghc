@@ -306,7 +306,7 @@ check_target:
 
 	// ASSUMPTION: tso->block_info must always point to a
 	// closure.  In the threaded RTS it does.
-        switch (get_itbl(mvar)->type) {
+        switch (get_itbl((StgClosure *)mvar)->type) {
         case MVAR_CLEAN:
         case MVAR_DIRTY:
             break;

@@ -177,8 +177,8 @@ data Instr
 --	The consequences of control flow transfers, as far as register
 -- 	allocation goes, are taken care of by the register allocator.
 --
-ppc_regUsageOfInstr :: Instr -> RegUsage
-ppc_regUsageOfInstr instr 
+ppc_regUsageOfInstr :: Platform -> Instr -> RegUsage
+ppc_regUsageOfInstr _ instr
  = case instr of
     LD    _ reg addr  	-> usage (regAddr addr, [reg])
     LA    _ reg addr  	-> usage (regAddr addr, [reg])

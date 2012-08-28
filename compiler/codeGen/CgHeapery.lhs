@@ -526,8 +526,10 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl live
 \begin{code}
 hpChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 hpChkGen bytes liveness reentry
-  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns
-          stg_gc_gen (Just activeStgRegs)
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns
+                  stg_gc_gen (Just (activeStgRegs platform))
   where
     assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
                         mk_vanilla_assignment 10 reentry ]
@@ -542,8 +544,10 @@ hpChkNodePointsAssignSp0 bytes sp0
 
 stkChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 stkChkGen bytes liveness reentry
-  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns
-          stg_gc_gen (Just activeStgRegs)
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns
+                  stg_gc_gen (Just (activeStgRegs platform))
   where
     assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
                         mk_vanilla_assignment 10 reentry ]

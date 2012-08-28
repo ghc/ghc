@@ -1,53 +1,46 @@
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 1994-2004
--- 
+--
 -- -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PPC.Regs (
-	-- squeeze functions
-	virtualRegSqueeze,
-	realRegSqueeze,
+        -- squeeze functions
+        virtualRegSqueeze,
+        realRegSqueeze,
 
-	mkVirtualReg,
-	regDotColor,
+        mkVirtualReg,
+        regDotColor,
 
-	-- immediates
-	Imm(..),
-	strImmLit,
-	litToImm,
+        -- immediates
+        Imm(..),
+        strImmLit,
+        litToImm,
 
-	-- addressing modes
-	AddrMode(..),
-	addrOffset,
+        -- addressing modes
+        AddrMode(..),
+        addrOffset,
 
-	-- registers
-	spRel,
-	argRegs,
-	allArgRegs,
-	callClobberedRegs,
-	allMachRegNos,
-	classOfRealReg,
-	showReg,
-	
-	-- machine specific
-	allFPArgRegs,
-	fits16Bits,
-	makeImmediate,
-	fReg,
-	sp, r3, r4, r27, r28, f1, f20, f21,
+        -- registers
+        spRel,
+        argRegs,
+        allArgRegs,
+        callClobberedRegs,
+        allMachRegNos,
+        classOfRealReg,
+        showReg,
 
-	-- horrow show
-	freeReg,
-	globalRegMaybe,
-	allocatableRegs
+        -- machine specific
+        allFPArgRegs,
+        fits16Bits,
+        makeImmediate,
+        fReg,
+        sp, r3, r4, r27, r28, f1, f20, f21,
+
+        -- horrow show
+        freeReg,
+        globalRegMaybe,
+        allocatableRegs
 
 )
 
@@ -61,7 +54,6 @@ import Reg
 import RegClass
 import Size
 
-import BlockId
 import OldCmm
 import CLabel           ( CLabel )
 import Unique
@@ -71,31 +63,31 @@ import Constants
 import FastBool
 import FastTypes
 
-import Data.Word	( Word8, Word16, Word32 )
-import Data.Int 	( Int8, Int16, Int32 )
+import Data.Word        ( Word8, Word16, Word32 )
+import Data.Int         ( Int8, Int16, Int32 )
 
 
 -- squeese functions for the graph allocator -----------------------------------
 
 -- | regSqueeze_class reg
---	Calculuate the maximum number of register colors that could be
---	denied to a node of this class due to having this reg 
---	as a neighbour.
+--      Calculuate the maximum number of register colors that could be
+--      denied to a node of this class due to having this reg
+--      as a neighbour.
 --
 {-# INLINE virtualRegSqueeze #-}
 virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
 virtualRegSqueeze cls vr
  = case cls of
- 	RcInteger
-	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(1)
-		VirtualRegHi{}		-> _ILIT(1)
+        RcInteger
+         -> case vr of
+                VirtualRegI{}           -> _ILIT(1)
+                VirtualRegHi{}          -> _ILIT(1)
                 _other                  -> _ILIT(0)
 
-	RcDouble
-	 -> case vr of
-		VirtualRegD{}		-> _ILIT(1)
-		VirtualRegF{}		-> _ILIT(0)
+        RcDouble
+         -> case vr of
+                VirtualRegD{}           -> _ILIT(1)
+                VirtualRegF{}           -> _ILIT(0)
                 _other                  -> _ILIT(0)
 
         _other -> _ILIT(0)
@@ -104,21 +96,21 @@ virtualRegSqueeze cls vr
 realRegSqueeze :: RegClass -> RealReg -> FastInt
 realRegSqueeze cls rr
  = case cls of
- 	RcInteger
-	 -> case rr of
-	 	RealRegSingle regNo
-			| regNo	< 32	-> _ILIT(1)	-- first fp reg is 32 
-			| otherwise	-> _ILIT(0)
-			
-		RealRegPair{}		-> _ILIT(0)
+        RcInteger
+         -> case rr of
+                RealRegSingle regNo
+                        | regNo < 32    -> _ILIT(1)     -- first fp reg is 32
+                        | otherwise     -> _ILIT(0)
 
-	RcDouble
-	 -> case rr of
-	 	RealRegSingle regNo
-			| regNo	< 32	-> _ILIT(0)
-			| otherwise	-> _ILIT(1)
-			
-		RealRegPair{}		-> _ILIT(0)
+                RealRegPair{}           -> _ILIT(0)
+
+        RcDouble
+         -> case rr of
+                RealRegSingle regNo
+                        | regNo < 32    -> _ILIT(0)
+                        | otherwise     -> _ILIT(1)
+
+                RealRegPair{}           -> _ILIT(0)
 
         _other -> _ILIT(0)
 
@@ -142,18 +134,18 @@ regDotColor reg
 
 -- immediates ------------------------------------------------------------------
 data Imm
-	= ImmInt	Int
-	| ImmInteger	Integer	    -- Sigh.
-	| ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-	| ImmLit	SDoc	    -- Simple string
-	| ImmIndex    CLabel Int
-	| ImmFloat	Rational
-	| ImmDouble	Rational
-	| ImmConstantSum Imm Imm
-	| ImmConstantDiff Imm Imm
-	| LO Imm
-	| HI Imm
-	| HA Imm	{- high halfword adjusted -}
+        = ImmInt        Int
+        | ImmInteger    Integer     -- Sigh.
+        | ImmCLbl       CLabel      -- AbstractC Label (with baggage)
+        | ImmLit        SDoc        -- Simple string
+        | ImmIndex    CLabel Int
+        | ImmFloat      Rational
+        | ImmDouble     Rational
+        | ImmConstantSum Imm Imm
+        | ImmConstantDiff Imm Imm
+        | LO Imm
+        | HI Imm
+        | HA Imm        {- high halfword adjusted -}
 
 
 strImmLit :: String -> Imm
@@ -173,15 +165,14 @@ litToImm (CmmLabelDiffOff l1 l2 off)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
-litToImm (CmmBlock id)       = ImmCLbl (infoTblLbl id)
 litToImm _                   = panic "PPC.Regs.litToImm: no match"
 
 
 -- addressing modes ------------------------------------------------------------
 
 data AddrMode
-	= AddrRegReg	Reg Reg
-	| AddrRegImm	Reg Imm
+        = AddrRegReg    Reg Reg
+        | AddrRegImm    Reg Imm
 
 
 addrOffset :: AddrMode -> Int -> Maybe AddrMode
@@ -196,7 +187,7 @@ addrOffset addr off
        | fits16Bits n2 -> Just (AddrRegImm r (ImmInt (fromInteger n2)))
        | otherwise     -> Nothing
        where n2 = n + toInteger off
-       
+
       _ -> Nothing
 
 
@@ -205,10 +196,10 @@ addrOffset addr off
 -- temporaries and for excess call arguments.  @fpRel@, where
 -- applicable, is the same but for the frame pointer.
 
-spRel :: Int	-- desired stack offset in words, positive or negative
+spRel :: Int    -- desired stack offset in words, positive or negative
       -> AddrMode
 
-spRel n	= AddrRegImm sp (ImmInt (n * wORD_SIZE))
+spRel n = AddrRegImm sp (ImmInt (n * wORD_SIZE))
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -231,7 +222,7 @@ allArgRegs :: [Reg]
 allArgRegs = map regSingle [3..10]
 
 
--- these are the regs which we cannot assume stay alive over a C call.  
+-- these are the regs which we cannot assume stay alive over a C call.
 callClobberedRegs :: [Reg]
 #if   defined(darwin_TARGET_OS)
 callClobberedRegs
@@ -243,26 +234,26 @@ callClobberedRegs
 
 #else
 callClobberedRegs
-	= panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
+        = panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
 #endif
 
 
-allMachRegNos 	:: [RegNo]
-allMachRegNos	= [0..63]
+allMachRegNos   :: [RegNo]
+allMachRegNos   = [0..63]
 
 
 {-# INLINE classOfRealReg      #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-	| i < 32	= RcInteger 
-	| otherwise	= RcDouble
+        | i < 32        = RcInteger
+        | otherwise     = RcDouble
 
 classOfRealReg (RealRegPair{})
-	= panic "regClass(ppr): no reg pairs on this architecture"
+        = panic "regClass(ppr): no reg pairs on this architecture"
 
 showReg :: RegNo -> String
 showReg n
-    | n >= 0 && n <= 31	  = "%r" ++ show n
+    | n >= 0 && n <= 31   = "%r" ++ show n
     | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
     | otherwise           = "%unknown_powerpc_real_reg_" ++ show n
 
@@ -294,10 +285,10 @@ makeImmediate rep signed x = fmap ImmInt (toI16 rep signed)
         narrow W32 True  = fromIntegral (fromIntegral x :: Int32)
         narrow W16 True  = fromIntegral (fromIntegral x :: Int16)
         narrow W8  True  = fromIntegral (fromIntegral x :: Int8)
-	narrow _   _     = panic "PPC.Regs.narrow: no match"
-        
+        narrow _   _     = panic "PPC.Regs.narrow: no match"
+
         narrowed = narrow rep signed
-        
+
         toI16 W32 True
             | narrowed >= -32768 && narrowed < 32768 = Just narrowed
             | otherwise = Nothing
@@ -316,20 +307,20 @@ fReg :: Int -> RegNo
 fReg x = (32 + x)
 
 sp, r3, r4, r27, r28, f1, f20, f21 :: Reg
-sp 	= regSingle 1
-r3 	= regSingle 3
-r4 	= regSingle 4
-r27 	= regSingle 27
-r28 	= regSingle 28
-f1 	= regSingle $ fReg 1
-f20 	= regSingle $ fReg 20
-f21 	= regSingle $ fReg 21
+sp      = regSingle 1
+r3      = regSingle 3
+r4      = regSingle 4
+r27     = regSingle 27
+r28     = regSingle 28
+f1      = regSingle $ fReg 1
+f20     = regSingle $ fReg 20
+f21     = regSingle $ fReg 21
 
 
 
 -- horror show -----------------------------------------------------------------
 freeReg :: RegNo -> FastBool
-globalRegMaybe :: GlobalReg -> Maybe Reg
+globalRegMaybe :: GlobalReg -> Maybe RealReg
 
 
 #if powerpc_TARGET_ARCH
@@ -448,26 +439,26 @@ freeReg REG_Base = fastBool False
 #endif
 #ifdef REG_R1
 freeReg REG_R1   = fastBool False
-#endif	
-#ifdef REG_R2  
+#endif
+#ifdef REG_R2
 freeReg REG_R2   = fastBool False
-#endif	
-#ifdef REG_R3  
+#endif
+#ifdef REG_R3
 freeReg REG_R3   = fastBool False
-#endif	
-#ifdef REG_R4  
+#endif
+#ifdef REG_R4
 freeReg REG_R4   = fastBool False
-#endif	
-#ifdef REG_R5  
+#endif
+#ifdef REG_R5
 freeReg REG_R5   = fastBool False
-#endif	
-#ifdef REG_R6  
+#endif
+#ifdef REG_R6
 freeReg REG_R6   = fastBool False
-#endif	
-#ifdef REG_R7  
+#endif
+#ifdef REG_R7
 freeReg REG_R7   = fastBool False
-#endif	
-#ifdef REG_R8  
+#endif
+#ifdef REG_R8
 freeReg REG_R8   = fastBool False
 #endif
 #ifdef REG_R9
@@ -494,16 +485,16 @@ freeReg REG_D1 = fastBool False
 #ifdef REG_D2
 freeReg REG_D2 = fastBool False
 #endif
-#ifdef REG_Sp 
+#ifdef REG_Sp
 freeReg REG_Sp   = fastBool False
-#endif 
+#endif
 #ifdef REG_Su
 freeReg REG_Su   = fastBool False
-#endif 
-#ifdef REG_SpLim 
+#endif
+#ifdef REG_SpLim
 freeReg REG_SpLim = fastBool False
-#endif 
-#ifdef REG_Hp 
+#endif
+#ifdef REG_Hp
 freeReg REG_Hp   = fastBool False
 #endif
 #ifdef REG_HpLim
@@ -518,87 +509,87 @@ freeReg _               = fastBool True
 
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (regSingle REG_Base)
+globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (regSingle REG_R1)
-#endif 
-#ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (regSingle REG_R2)
-#endif 
-#ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (regSingle REG_R3)
-#endif 
-#ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (regSingle REG_R4)
-#endif 
-#ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (regSingle REG_R5)
-#endif 
-#ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (regSingle REG_R6)
-#endif 
-#ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (regSingle REG_R7)
-#endif 
-#ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (regSingle REG_R8)
+globalRegMaybe (VanillaReg 1 _)         = Just (RealRegSingle REG_R1)
 #endif
-#ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (regSingle REG_R9)
+#ifdef REG_R2
+globalRegMaybe (VanillaReg 2 _)         = Just (RealRegSingle REG_R2)
 #endif
-#ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (regSingle REG_R10)
+#ifdef REG_R3
+globalRegMaybe (VanillaReg 3 _)         = Just (RealRegSingle REG_R3)
+#endif
+#ifdef REG_R4
+globalRegMaybe (VanillaReg 4 _)         = Just (RealRegSingle REG_R4)
+#endif
+#ifdef REG_R5
+globalRegMaybe (VanillaReg 5 _)         = Just (RealRegSingle REG_R5)
+#endif
+#ifdef REG_R6
+globalRegMaybe (VanillaReg 6 _)         = Just (RealRegSingle REG_R6)
+#endif
+#ifdef REG_R7
+globalRegMaybe (VanillaReg 7 _)         = Just (RealRegSingle REG_R7)
+#endif
+#ifdef REG_R8
+globalRegMaybe (VanillaReg 8 _)         = Just (RealRegSingle REG_R8)
+#endif
+#ifdef REG_R9
+globalRegMaybe (VanillaReg 9 _)         = Just (RealRegSingle REG_R9)
+#endif
+#ifdef REG_R10
+globalRegMaybe (VanillaReg 10 _)        = Just (RealRegSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (regSingle REG_F1)
-#endif				 	
-#ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (regSingle REG_F2)
-#endif				 	
-#ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (regSingle REG_F3)
-#endif				 	
-#ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (regSingle REG_F4)
-#endif				 	
-#ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (regSingle REG_D1)
-#endif				 	
-#ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (regSingle REG_D2)
+globalRegMaybe (FloatReg 1)             = Just (RealRegSingle REG_F1)
 #endif
-#ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (regSingle REG_Sp)
+#ifdef REG_F2
+globalRegMaybe (FloatReg 2)             = Just (RealRegSingle REG_F2)
 #endif
-#ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (regSingle REG_Lng1)
-#endif				 	
-#ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (regSingle REG_Lng2)
+#ifdef REG_F3
+globalRegMaybe (FloatReg 3)             = Just (RealRegSingle REG_F3)
 #endif
-#ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (regSingle REG_SpLim)
-#endif	    				
-#ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (regSingle REG_Hp)
-#endif	    				
-#ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (regSingle REG_HpLim)
-#endif	    				
-#ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (regSingle REG_CurrentTSO)
-#endif	    				
-#ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (regSingle REG_CurrentNursery)
-#endif	    				
-globalRegMaybe _		   	= Nothing
+#ifdef REG_F4
+globalRegMaybe (FloatReg 4)             = Just (RealRegSingle REG_F4)
+#endif
+#ifdef REG_D1
+globalRegMaybe (DoubleReg 1)            = Just (RealRegSingle REG_D1)
+#endif
+#ifdef REG_D2
+globalRegMaybe (DoubleReg 2)            = Just (RealRegSingle REG_D2)
+#endif
+#ifdef REG_Sp
+globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
+#endif
+#ifdef REG_Lng1
+globalRegMaybe (LongReg 1)              = Just (RealRegSingle REG_Lng1)
+#endif
+#ifdef REG_Lng2
+globalRegMaybe (LongReg 2)              = Just (RealRegSingle REG_Lng2)
+#endif
+#ifdef REG_SpLim
+globalRegMaybe SpLim                    = Just (RealRegSingle REG_SpLim)
+#endif
+#ifdef REG_Hp
+globalRegMaybe Hp                       = Just (RealRegSingle REG_Hp)
+#endif
+#ifdef REG_HpLim
+globalRegMaybe HpLim                    = Just (RealRegSingle REG_HpLim)
+#endif
+#ifdef REG_CurrentTSO
+globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
+#endif
+#ifdef REG_CurrentNursery
+globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
+#endif
+globalRegMaybe _                        = Nothing
 
 
 #else  /* powerpc_TARGET_ARCH */
 
-freeReg _		= 0#
-globalRegMaybe _	= panic "PPC.Regs.globalRegMaybe: not defined"
+freeReg _               = 0#
+globalRegMaybe _        = panic "PPC.Regs.globalRegMaybe: not defined"
 
 #endif /* powerpc_TARGET_ARCH */
 

@@ -85,8 +85,8 @@ widthToLlvmInt w = LMInt $ widthInBits w
 -- | GHC Call Convention for LLVM
 llvmGhcCC :: DynFlags -> LlvmCallConvention
 llvmGhcCC dflags
- | platformUnregisterised (targetPlatform dflags) = CC_Ncc 10
- | otherwise                                      = CC_Ccc
+ | platformUnregisterised (targetPlatform dflags) = CC_Ccc
+ | otherwise                                      = CC_Ncc 10
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: DynFlags -> LlvmType
@@ -99,17 +99,20 @@ llvmFunSig env lbl link
 
 llvmFunSig' :: DynFlags -> LMString -> LlvmLinkageType -> LlvmFunctionDecl
 llvmFunSig' dflags lbl link
-  = let toParams x | isPointer x = (x, [NoAlias, NoCapture])
+  = let platform = targetPlatform dflags
+        toParams x | isPointer x = (x, [NoAlias, NoCapture])
                    | otherwise   = (x, [])
     in LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
-                        (map (toParams . getVarType) llvmFunArgs) llvmFunAlign
+                        (map (toParams . getVarType) (llvmFunArgs platform))
+                        llvmFunAlign
 
 -- | Create a Haskell function in LLVM.
 mkLlvmFunc :: LlvmEnv -> CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
            -> LlvmFunction
 mkLlvmFunc env lbl link sec blks
-  = let funDec = llvmFunSig env lbl link
-        funArgs = map (fsLit . getPlainName) llvmFunArgs
+  = let platform = targetPlatform $ getDflags env
+        funDec = llvmFunSig env lbl link
+        funArgs = map (fsLit . getPlainName) (llvmFunArgs platform)
     in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
 -- | Alignment to use for functions
@@ -121,8 +124,8 @@ llvmInfAlign :: LMAlign
 llvmInfAlign = Just wORD_SIZE
 
 -- | A Function's arguments
-llvmFunArgs :: [LlvmVar]
-llvmFunArgs = map lmGlobalRegArg activeStgRegs
+llvmFunArgs :: Platform -> [LlvmVar]
+llvmFunArgs platform = map lmGlobalRegArg (activeStgRegs platform)
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]

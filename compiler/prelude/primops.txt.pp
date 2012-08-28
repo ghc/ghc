@@ -1892,7 +1892,7 @@ primop  MakeStableNameOp "makeStableName#" GenPrimOp
    out_of_line      = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
-   StableName# a -> StableName# a -> Int#
+   StableName# a -> StableName# b -> Int#
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#

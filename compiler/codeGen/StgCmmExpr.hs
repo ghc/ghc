@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module StgCmmExpr ( cgExpr ) where
 
 #define FAST_STRING_NOT_NEEDED
@@ -44,7 +37,7 @@ import Id
 import PrimOp
 import TyCon
 import Type
-import CostCentre	( CostCentreStack, currentCCS )
+import CostCentre       ( CostCentreStack, currentCCS )
 import Maybes
 import Util
 import FastString
@@ -54,7 +47,7 @@ import UniqSupply
 import Control.Monad (when,void)
 
 ------------------------------------------------------------------------
---		cgExpr: the main function
+--              cgExpr: the main function
 ------------------------------------------------------------------------
 
 cgExpr  :: StgExpr -> FCode ReturnKind
@@ -87,16 +80,16 @@ cgExpr (StgCase expr _live_vars _save_vars bndr _srt alt_type alts) =
 cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 
 ------------------------------------------------------------------------
---		Let no escape
+--              Let no escape
 ------------------------------------------------------------------------
 
 {- Generating code for a let-no-escape binding, aka join point is very
 very similar to what we do for a case expression.  The duality is
 between
-	let-no-escape x = b
-	in e
+        let-no-escape x = b
+        in e
 and
-	case e of ... -> b
+        case e of ... -> b
 
 That is, the RHS of 'x' (ie 'b') will execute *later*, just like
 the alternative of the case; it needs to be compiled in an environment
@@ -124,7 +117,7 @@ cgLneBinds join_id (StgRec pairs)
 -------------------------
 cgLetNoEscapeRhs
     :: BlockId          -- join point for successor of let-no-escape
-    -> Maybe LocalReg	-- Saved cost centre
+    -> Maybe LocalReg   -- Saved cost centre
     -> Id
     -> StgRhs
     -> FCode (CgIdInfo, FCode ())
@@ -138,7 +131,7 @@ cgLetNoEscapeRhs join_id local_cc bndr rhs =
      }
 
 cgLetNoEscapeRhsBody
-    :: Maybe LocalReg	-- Saved cost centre
+    :: Maybe LocalReg   -- Saved cost centre
     -> Id
     -> StgRhs
     -> FCode (CgIdInfo, FCode ())
@@ -146,18 +139,18 @@ cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd _ args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc [] (StgConApp con args)
-	-- For a constructor RHS we want to generate a single chunk of 
-	-- code which can be jumped to from many places, which will 
-	-- return the constructor. It's easy; just behave as if it 
-	-- was an StgRhsClosure with a ConApp inside!
+        -- For a constructor RHS we want to generate a single chunk of 
+        -- code which can be jumped to from many places, which will 
+        -- return the constructor. It's easy; just behave as if it 
+        -- was an StgRhsClosure with a ConApp inside!
 
 -------------------------
 cgLetNoEscapeClosure
-	:: Id			-- binder
-	-> Maybe LocalReg	-- Slot for saved current cost centre
-	-> CostCentreStack   	-- XXX: *** NOT USED *** why not?
-	-> [NonVoid Id]		-- Args (as in \ args -> body)
-    	-> StgExpr		-- Body (as in above)
+        :: Id                   -- binder
+        -> Maybe LocalReg       -- Slot for saved current cost centre
+        -> CostCentreStack      -- XXX: *** NOT USED *** why not?
+        -> [NonVoid Id]         -- Args (as in \ args -> body)
+        -> StgExpr              -- Body (as in above)
         -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
@@ -168,12 +161,12 @@ cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
                   { restoreCurrentCostCentre cc_slot
                   ; arg_regs <- bindArgsToRegs args
                   ; void $ altHeapCheck arg_regs (cgExpr body) }
-			-- Using altHeapCheck just reduces
-			-- instructions to save on stack
+                        -- Using altHeapCheck just reduces
+                        -- instructions to save on stack
 
 
 ------------------------------------------------------------------------
---		Case expressions
+--              Case expressions
 ------------------------------------------------------------------------
 
 {- Note [Compiling case expressions]
@@ -185,11 +178,11 @@ trigger GC.
 
 A more interesting situation is this (a Plan-B situation)
 
-	!P!;
-	...P...
-	case x# of
-	  0#      -> !Q!; ...Q...
-	  default -> !R!; ...R...
+        !P!;
+        ...P...
+        case x# of
+          0#      -> !Q!; ...Q...
+          default -> !R!; ...R...
 
 where !x! indicates a possible heap-check point. The heap checks
 in the alternatives *can* be omitted, in which case the topmost
@@ -209,8 +202,8 @@ In favour of omitting !Q!, !R!:
 Against omitting !Q!, !R!
 
   - May put a heap-check into the inner loop.  Suppose 
-	the main loop is P -> R -> P -> R...
-	Q is the loop exit, and only it does allocation.
+        the main loop is P -> R -> P -> R...
+        Q is the loop exit, and only it does allocation.
     This only hurts us if P does no allocation.  If P allocates,
     then there is a heap check in the inner loop anyway.
 
@@ -227,14 +220,14 @@ Suppose the inner loop is P->R->P->R etc.  Then here is
 how many heap checks we get in the *inner loop* under various
 conditions
 
-  Alooc	  Heap check in branches (!Q!, !R!)?
-  P Q R	     yes     no (absorb to !P!)
+  Alooc   Heap check in branches (!Q!, !R!)?
+  P Q R      yes     no (absorb to !P!)
 --------------------------------------
-  n n n	     0		0
-  n y n	     0		1
-  n . y	     1		1
-  y . y	     2		1
-  y . n	     1		1
+  n n n      0          0
+  n y n      0          1
+  n . y      1          1
+  y . y      2          1
+  y . n      1          1
 
 Best choices: absorb heap checks from Q and R into !P! iff
   a) P itself does some allocation
@@ -247,18 +240,18 @@ single-branch cases, we may have lots of things live
 
 Hence: two basic plans for
 
-	case e of r { alts }
+        case e of r { alts }
 
 ------ Plan A: the general case ---------
 
-	...save current cost centre...
+        ...save current cost centre...
 
-	...code for e, 
-	   with sequel (SetLocals r)
+        ...code for e, 
+           with sequel (SetLocals r)
 
         ...restore current cost centre...
-	...code for alts...
-	...alts do their own heap checks
+        ...code for alts...
+        ...alts do their own heap checks
 
 ------ Plan B: special case when ---------
   (i)  e does not allocate or call GC
@@ -269,22 +262,22 @@ Hence: two basic plans for
   is absorbed by the upstream check.
   Very common example: primops on unboxed values
 
-	...code for e,
-	   with sequel (SetLocals r)...
+        ...code for e,
+           with sequel (SetLocals r)...
 
-	...code for alts...
-	...no heap check...
+        ...code for alts...
+        ...no heap check...
 -}
 
 
 
 -------------------------------------
 data GcPlan
-  = GcInAlts 		-- Put a GC check at the start the case alternatives,
-	[LocalReg] 	-- which binds these registers
+  = GcInAlts            -- Put a GC check at the start the case alternatives,
+        [LocalReg]      -- which binds these registers
   | NoGcInAlts          -- The scrutinee is a primitive value, or a call to a
-			-- primitive op which does no GC.  Absorb the allocation
-			-- of the case alternative(s) into the upstream check
+                        -- primitive op which does no GC.  Absorb the allocation
+                        -- of the case alternative(s) into the upstream check
 
 -------------------------------------
 cgCase :: StgExpr -> Id -> AltType -> [StgAlt] -> FCode ReturnKind
@@ -446,14 +439,14 @@ isSimpleScrut :: StgExpr -> AltType -> Bool
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
 --     when it does, you'll deeply mess up allocation
 isSimpleScrut (StgOpApp op _ _) _          = isSimpleOp op
-isSimpleScrut (StgLit _)       _           = True	-- case 1# of { 0# -> ..; ... }
-isSimpleScrut (StgApp _ [])    (PrimAlt _) = True	-- case x# of { 0# -> ..; ... }
-isSimpleScrut _		       _           = False
+isSimpleScrut (StgLit _)       _           = True       -- case 1# of { 0# -> ..; ... }
+isSimpleScrut (StgApp _ [])    (PrimAlt _) = True       -- case x# of { 0# -> ..; ... }
+isSimpleScrut _                _           = False
 
 isSimpleOp :: StgOp -> Bool
 -- True iff the op cannot block or allocate
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) = not (playSafe safe)
-isSimpleOp (StgPrimOp op)      			       = not (primOpOutOfLine op)
+isSimpleOp (StgPrimOp op)                              = not (primOpOutOfLine op)
 isSimpleOp (StgPrimCallOp _)                           = False
 
 -----------------
@@ -465,16 +458,16 @@ chooseReturnBndrs bndr (PrimAlt _) _alts
   = nonVoidIds [bndr]
 
 chooseReturnBndrs _bndr (UbxTupAlt _) [(_, ids, _, _)]
-  = nonVoidIds ids	-- 'bndr' is not assigned!
+  = nonVoidIds ids      -- 'bndr' is not assigned!
 
 chooseReturnBndrs bndr (AlgAlt _) _alts
-  = nonVoidIds [bndr]	-- Only 'bndr' is assigned
+  = nonVoidIds [bndr]   -- Only 'bndr' is assigned
 
 chooseReturnBndrs bndr PolyAlt _alts
-  = nonVoidIds [bndr]	-- Only 'bndr' is assigned
+  = nonVoidIds [bndr]   -- Only 'bndr' is assigned
 
 chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
-	-- UbxTupALt has only one alternative
+        -- UbxTupALt has only one alternative
 
 -------------------------------------
 cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [StgAlt]
@@ -485,26 +478,26 @@ cgAlts gc_plan _bndr PolyAlt [(_, _, _, rhs)]
 
 cgAlts gc_plan _bndr (UbxTupAlt _) [(_, _, _, rhs)]
   = maybeAltHeapCheck gc_plan (cgExpr rhs)
-	-- Here bndrs are *already* in scope, so don't rebind them
+        -- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
   = do  { tagged_cmms <- cgAltRhss gc_plan bndr alts
 
-	; let bndr_reg = CmmLocal (idToReg bndr)
-	      (DEFAULT,deflt) = head tagged_cmms
-		-- PrimAlts always have a DEFAULT case
-		-- and it always comes first
+        ; let bndr_reg = CmmLocal (idToReg bndr)
+              (DEFAULT,deflt) = head tagged_cmms
+                -- PrimAlts always have a DEFAULT case
+                -- and it always comes first
 
-	      tagged_cmms' = [(lit,code) 
-			     | (LitAlt lit, code) <- tagged_cmms]
+              tagged_cmms' = [(lit,code) 
+                             | (LitAlt lit, code) <- tagged_cmms]
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
         ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do  { (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
-	; let fam_sz   = tyConFamilySize tycon
-	      bndr_reg = CmmLocal (idToReg bndr)
+        ; let fam_sz   = tyConFamilySize tycon
+              bndr_reg = CmmLocal (idToReg bndr)
 
                     -- Is the constructor tag in the node reg?
         ; if isSmallFamily fam_sz
@@ -515,7 +508,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
                 return AssignedDirectly
 
-	   else 	-- No, get tag from info table
+           else         -- No, get tag from info table
                 do dflags <- getDynFlags
                    let -- Note that ptr _always_ has tag 1
                        -- when the family size is big enough
@@ -525,7 +518,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                    return AssignedDirectly }
 
 cgAlts _ _ _ _ = panic "cgAlts"
-	-- UbxTupAlt and PolyAlt have only one alternative
+        -- UbxTupAlt and PolyAlt have only one alternative
 
 
 -- Note [alg-alt heap check]
@@ -577,9 +570,9 @@ cgAltRhss gc_plan bndr alts
     base_reg = idToReg bndr
     cg_alt :: StgAlt -> FCode (AltCon, CmmAGraph)
     cg_alt (con, bndrs, _uses, rhs)
-      = getCodeR		  $
+      = getCodeR                  $
         maybeAltHeapCheck gc_plan $
-	do { _ <- bindConArgs con base_reg bndrs
+        do { _ <- bindConArgs con base_reg bndrs
            ; _ <- cgExpr rhs
            ; return con }
 
@@ -591,37 +584,37 @@ maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
   altHeapCheckReturnsTo regs lret off code
 
 -----------------------------------------------------------------------------
--- 	Tail calls
+--      Tail calls
 -----------------------------------------------------------------------------
 
 cgConApp :: DataCon -> [StgArg] -> FCode ReturnKind
 cgConApp con stg_args
-  | isUnboxedTupleCon con	-- Unboxed tuple: assign and return
+  | isUnboxedTupleCon con       -- Unboxed tuple: assign and return
   = do { arg_exprs <- getNonVoidArgAmodes stg_args
        ; tickyUnboxedTupleReturn (length arg_exprs)
        ; emitReturn arg_exprs }
 
-  | otherwise	--  Boxed constructors; allocate and return
+  | otherwise   --  Boxed constructors; allocate and return
   = ASSERT( stg_args `lengthIs` dataConRepRepArity con )
     do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con)
                                      currentCCS con stg_args
-	   	-- The first "con" says that the name bound to this closure is
-		-- is "con", which is a bit of a fudge, but it only affects profiling
+                -- The first "con" says that the name bound to this closure is
+                -- is "con", which is a bit of a fudge, but it only affects profiling
 
         ; emit =<< fcode_init
-	; emitReturn [idInfoToAmode idinfo] }
+        ; emitReturn [idInfoToAmode idinfo] }
 
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id [] | isVoidId fun_id = emitReturn []
 cgIdApp fun_id args
-  = do 	{ fun_info <- getCgIdInfo fun_id
+  = do  { fun_info <- getCgIdInfo fun_id
         ; case maybeLetNoEscape fun_info of
             Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
             Nothing -> cgTailCall fun_id fun_info args }
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ReturnKind
-cgLneJump blk_id lne_regs args	-- Join point; discard sequel
+cgLneJump blk_id lne_regs args  -- Join point; discard sequel
   = do  { adjustHpBackwards -- always do this before a tail-call
         ; cmm_args <- getNonVoidArgAmodes args
         ; emitMultiAssign lne_regs cmm_args
@@ -633,25 +626,25 @@ cgTailCall fun_id fun_info args = do
     dflags <- getDynFlags
     case (getCallMethod dflags fun_name (idCafInfo fun_id) lf_info (length args)) of
 
-	    -- A value in WHNF, so we can just return it.
-      	ReturnIt -> emitReturn [fun]	-- ToDo: does ReturnIt guarantee tagged?
+            -- A value in WHNF, so we can just return it.
+        ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
     
-      	EnterIt -> ASSERT( null args )	-- Discarding arguments
+        EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines
-      		{ tickySlowCall lf_info args
+                { tickySlowCall lf_info args
                 ; emitComment $ mkFastString "slowCall"
-      		; slowCall fun args }
+                ; slowCall fun args }
     
-      	-- A direct function call (possibly with some left-over arguments)
-      	DirectEntry lbl arity -> do
-		{ tickyDirectCall arity args
+        -- A direct function call (possibly with some left-over arguments)
+        DirectEntry lbl arity -> do
+                { tickyDirectCall arity args
                 ; if node_points dflags
                      then directCall NativeNodeCall   lbl arity (fun_arg:args)
                      else directCall NativeDirectCall lbl arity args }
 
-	JumpToIt {} -> panic "cgTailCall"	-- ???
+        JumpToIt {} -> panic "cgTailCall"       -- ???
 
   where
     fun_arg     = StgVarArg fun_id

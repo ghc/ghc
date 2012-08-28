@@ -348,7 +348,7 @@ allocGroup (nat n)
 #if 0  /* useful for debugging fragmentation */
         if ((W_)mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
              - (W_)((n_alloc_blocks - n) * BLOCK_SIZE_W) > (2*1024*1024)/sizeof(W_)) {
-            debugBelch("Fragmentation, wanted %d blocks:", n);
+            debugBelch("Fragmentation, wanted %d blocks, %ld MB free\n", n, ((mblocks_allocated * BLOCKS_PER_MBLOCK) - n_alloc_blocks) / BLOCKS_PER_MBLOCK);
             RtsFlags.DebugFlags.block_alloc = 1;
             checkFreeListSanity();
         }
@@ -384,6 +384,41 @@ allocGroup (nat n)
     }
 
 finish:
+    IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(sanity, checkFreeListSanity());
+    return bd;
+}
+
+//
+// Allocate a chunk of blocks that is at most a megablock in size.
+// This API is used by the nursery allocator that wants contiguous
+// memory preferably, but doesn't require it.  When memory is
+// fragmented we might have lots of large chunks that are less than a
+// full megablock, so allowing the nursery allocator to use these
+// reduces fragmentation considerably.  e.g. on a GHC build with +RTS
+// -H, I saw fragmentation go from 17MB down to 3MB on a single compile.
+//
+bdescr *
+allocLargeChunk (void)
+{
+    bdescr *bd;
+    nat ln;
+
+    ln = 5; // start in the 32-63 block bucket
+    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
+        ln++;
+    }
+    if (ln == MAX_FREE_LIST) {
+        return allocGroup(BLOCKS_PER_MBLOCK);
+    }
+    bd = free_list[ln];
+
+    n_alloc_blocks += bd->blocks;
+    if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
+
+    dbl_link_remove(bd, &free_list[ln]);
+    initGroup(bd);
+
     IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     return bd;

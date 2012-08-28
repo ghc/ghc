@@ -18,7 +18,15 @@ in instead of the defaults.
 void
 defaultsHook (void)
 {
+#if __GLASGOW_HASKELL__ >= 707
+    // This helps particularly with large compiles, but didn't work
+    // very well with earlier GHCs because it caused large amounts of
+    // fragmentation.  See rts/sm/BlockAlloc.c:allocLargeChunk().
+    RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsTrue;
+#else
     RtsFlags.GcFlags.heapSizeSuggestion = 6*1024*1024 / BLOCK_SIZE;
+#endif
+
     RtsFlags.GcFlags.maxStkSize         = 512*1024*1024 / sizeof(W_);
     RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
 

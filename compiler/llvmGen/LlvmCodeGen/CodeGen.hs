@@ -55,10 +55,11 @@ basicBlocksCodeGen :: LlvmEnv
                    -> ( [LlvmBasicBlock] , [LlvmCmmDecl] )
                    -> UniqSM (LlvmEnv, [LlvmBasicBlock] , [LlvmCmmDecl] )
 basicBlocksCodeGen env ([]) (blocks, tops)
-  = do let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
+  = do let platform = targetPlatform $ getDflags env
+       let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
        let ((BasicBlock id fstmts):rblks) = blocks'
-       let fblocks = (BasicBlock id $ funPrologue ++  allocs' ++ fstmts):rblks
+       let fblocks = (BasicBlock id $ funPrologue platform ++ allocs' ++ fstmts):rblks
        return (env, fblocks, tops)
 
 basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
@@ -1226,8 +1227,8 @@ genLit _ CmmHighStackMark
 --
 
 -- | Function prologue. Load STG arguments into variables for function.
-funPrologue :: [LlvmStatement]
-funPrologue = concat $ map getReg activeStgRegs
+funPrologue :: Platform -> [LlvmStatement]
+funPrologue platform = concat $ map getReg $ activeStgRegs platform
     where getReg rr =
             let reg   = lmGlobalRegVar rr
                 arg   = lmGlobalRegArg rr
@@ -1240,11 +1241,13 @@ funPrologue = concat $ map getReg activeStgRegs
 funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
 
 -- Have information and liveness optimisation is enabled
-funEpilogue env (Just live) | dopt Opt_RegLiveness (getDflags env) = do
-    loads <- mapM loadExpr activeStgRegs
+funEpilogue env (Just live) | dopt Opt_RegLiveness dflags = do
+    loads <- mapM loadExpr (activeStgRegs platform)
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
   where
+    dflags = getDflags env
+    platform = targetPlatform dflags
     loadExpr r | r `elem` alwaysLive || r `elem` live = do
         let reg  = lmGlobalRegVar r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
@@ -1254,11 +1257,13 @@ funEpilogue env (Just live) | dopt Opt_RegLiveness (getDflags env) = do
         return (LMLitVar $ LMUndefLit ty, unitOL Nop)
 
 -- don't do liveness optimisation
-funEpilogue _ _ = do
-    loads <- mapM loadExpr activeStgRegs
+funEpilogue env _ = do
+    loads <- mapM loadExpr (activeStgRegs platform)
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
   where
+    dflags = getDflags env
+    platform = targetPlatform dflags
     loadExpr r = do
         let reg  = lmGlobalRegVar r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
@@ -1277,8 +1282,9 @@ funEpilogue _ _ = do
 -- need are restored from the Cmm local var and the ones we don't need
 -- are fine to be trashed.
 trashStmts :: DynFlags -> LlvmStatements
-trashStmts dflags = concatOL $ map trashReg activeStgRegs
-    where trashReg r =
+trashStmts dflags = concatOL $ map trashReg $ activeStgRegs platform
+    where platform = targetPlatform dflags
+          trashReg r =
             let reg   = lmGlobalRegVar r
                 ty    = (pLower . getVarType) reg
                 trash = unitOL $ Store (LMLitVar $ LMUndefLit ty) reg

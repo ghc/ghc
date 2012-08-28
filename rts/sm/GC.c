@@ -137,7 +137,6 @@ DECLARE_GCT
 
 static void mark_root               (void *user, StgClosure **root);
 static void zero_static_object_list (StgClosure* first_static);
-static nat  initialise_N            (rtsBool force_major_gc);
 static void prepare_collected_gen   (generation *gen);
 static void prepare_uncollected_gen (generation *gen);
 static void init_gc_thread          (gc_thread *t);
@@ -167,11 +166,13 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
+   The collect_gen parameter is gotten by calling calcNeeded().
+
    Locks held: all capabilities are held throughout GarbageCollect().
    -------------------------------------------------------------------------- */
 
 void
-GarbageCollect (rtsBool force_major_gc, 
+GarbageCollect (nat collect_gen,
                 rtsBool do_heap_census,
                 nat gc_type USED_IF_THREADS,
                 Capability *cap)
@@ -235,7 +236,8 @@ GarbageCollect (rtsBool force_major_gc,
 
   /* Figure out which generation to collect
    */
-  n = initialise_N(force_major_gc);
+  N = collect_gen;
+  major_gc = (N == RtsFlags.GcFlags.generations-1);
 
 #if defined(THREADED_RTS)
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
@@ -269,8 +271,8 @@ GarbageCollect (rtsBool force_major_gc,
   n_gc_threads = 1;
 #endif
 
-  debugTrace(DEBUG_gc, "GC (gen %d): %d KB to collect, %ld MB in use, using %d thread(s)",
-        N, n * (BLOCK_SIZE / 1024), mblocks_allocated, n_gc_threads);
+  debugTrace(DEBUG_gc, "GC (gen %d, using %d thread(s))",
+             N, n_gc_threads);
 
 #ifdef RTS_GTK_FRONTPANEL
   if (RtsFlags.GcFlags.frontpanel) {
@@ -751,9 +753,6 @@ GarbageCollect (rtsBool force_major_gc,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
              N, n_gc_threads, par_max_copied, par_tot_copied);
 
-  // Guess which generation we'll collect *next* time
-  initialise_N(force_major_gc);
-
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
     // unblock signals again
@@ -764,47 +763,6 @@ GarbageCollect (rtsBool force_major_gc,
   RELEASE_SM_LOCK;
 
   SET_GCT(saved_gct);
-}
-
-/* -----------------------------------------------------------------------------
-   Figure out which generation to collect, initialise N and major_gc.
-
-   Also returns the total number of blocks in generations that will be
-   collected.
-   -------------------------------------------------------------------------- */
-
-static nat
-initialise_N (rtsBool force_major_gc)
-{
-    int g;
-    nat blocks, blocks_total;
-
-    blocks = 0;
-    blocks_total = 0;
-
-    if (force_major_gc) {
-        N = RtsFlags.GcFlags.generations - 1;
-    } else {
-        N = 0;
-    }
-
-    for (g = RtsFlags.GcFlags.generations - 1; g >= 0; g--) {
-
-        blocks = generations[g].n_words / BLOCK_SIZE_W
-               + generations[g].n_large_blocks;
-
-        if (blocks >= generations[g].max_blocks) {
-            N = stg_max(N,g);
-        }
-        if ((nat)g <= N) {
-            blocks_total += blocks;
-        }
-    }
-
-    blocks_total += countNurseryBlocks();
-
-    major_gc = (N == RtsFlags.GcFlags.generations-1);
-    return blocks_total;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1702,7 +1660,9 @@ resize_nursery (void)
 	if (RtsFlags.GcFlags.heapSizeSuggestion)
 	{
 	    long blocks;
-	    const nat needed = calcNeeded(); 	// approx blocks needed at next GC 
+            lnat needed;
+
+            calcNeeded(rtsFalse, &needed); // approx blocks needed at next GC
 	    
 	    /* Guess how much will be live in generation 0 step 0 next time.
 	     * A good approximation is obtained by finding the
@@ -1725,7 +1685,7 @@ resize_nursery (void)
 	     * close on average.
 	     *
 	     * Formula:            suggested - needed
-	     *                ----------------------------
+             *                ----------------------------
 	     *                    1 + g0_pcnt_kept/100
 	     *
 	     * where 'needed' is the amount of memory needed at the next

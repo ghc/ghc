@@ -140,7 +140,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
-    allocatableRegs           :: [RealReg],
+    allocatableRegs           :: Platform -> [RealReg],
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgMakeFarBranches        :: [NatBasicBlock instr] -> [NatBasicBlock instr]
@@ -179,7 +179,7 @@ nativeCodeGen dflags h us cmms
                          ,shortcutJump              = PPC.RegInfo.shortcutJump
                          ,pprNatCmmDecl              = PPC.Ppr.pprNatCmmDecl
                          ,maxSpillSlots             = PPC.Instr.maxSpillSlots
-                         ,allocatableRegs           = PPC.Regs.allocatableRegs
+                         ,allocatableRegs           = \_ -> PPC.Regs.allocatableRegs
                          ,ncg_x86fp_kludge          = id
                          ,ncgExpandTop              = id
                          ,ncgMakeFarBranches        = makeFarBranches
@@ -194,7 +194,7 @@ nativeCodeGen dflags h us cmms
                          ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
                          ,pprNatCmmDecl              = SPARC.Ppr.pprNatCmmDecl
                          ,maxSpillSlots             = SPARC.Instr.maxSpillSlots
-                         ,allocatableRegs           = SPARC.Regs.allocatableRegs
+                         ,allocatableRegs           = \_ -> SPARC.Regs.allocatableRegs
                          ,ncg_x86fp_kludge          = id
                          ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
                          ,ncgMakeFarBranches        = id
@@ -378,7 +378,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
-                fixStgRegisters cmm
+                fixStgRegisters platform cmm
 
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
@@ -402,7 +402,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
-                        $ mapM regLiveness
+                        $ mapM (regLiveness platform)
                         $ map natCmmTopToLive native
 
         dumpIfSet_dyn dflags
@@ -419,7 +419,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                         = foldr (\r -> plusUFM_C unionUniqSets
                                         $ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
                                 emptyUFM
-                        $ allocatableRegs ncgImpl
+                        $ allocatableRegs ncgImpl platform
 
                 -- do the graph coloring register allocation
                 let ((alloced, regAllocStats), usAlloc)
@@ -979,6 +979,12 @@ cmmExprNative referenceKind expr = do
         CmmMachOp mop args
            -> do args' <- mapM (cmmExprNative DataReference) args
                  return $ CmmMachOp mop args'
+
+        CmmLit (CmmBlock id)
+           -> cmmExprNative referenceKind (CmmLit (CmmLabel (infoTblLbl id)))
+           -- we must convert block Ids to CLabels here, because we
+           -- might have to do the PIC transformation.  Hence we must
+           -- not modify BlockIds beyond this point.
 
         CmmLit (CmmLabel lbl)
            -> do

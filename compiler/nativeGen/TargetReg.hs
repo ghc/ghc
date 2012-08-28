@@ -21,7 +21,6 @@ module TargetReg (
 	targetRealRegSqueeze,
 	targetClassOfRealReg,
 	targetMkVirtualReg,
-	targetWordSize,
 	targetRegDotColor,
 	targetClassOfReg
 )
@@ -34,7 +33,6 @@ import Reg
 import RegClass
 import Size
 
-import CmmType	(wordWidth)
 import Outputable
 import Unique
 import FastTypes
@@ -72,17 +70,13 @@ targetRealRegSqueeze platform
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
 targetClassOfRealReg platform
     = case platformArch platform of
-      ArchX86       -> X86.classOfRealReg
-      ArchX86_64    -> X86.classOfRealReg
+      ArchX86       -> X86.classOfRealReg platform
+      ArchX86_64    -> X86.classOfRealReg platform
       ArchPPC       -> PPC.classOfRealReg
       ArchSPARC     -> SPARC.classOfRealReg
       ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"
       ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
-
--- TODO: This should look at targetPlatform too
-targetWordSize :: Size
-targetWordSize = intSize wordWidth
 
 targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
 targetMkVirtualReg platform

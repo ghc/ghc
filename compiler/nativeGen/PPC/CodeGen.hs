@@ -178,7 +178,7 @@ getRegisterReg (CmmLocal (LocalReg u pk))
 
 getRegisterReg (CmmGlobal mid)
   = case globalRegMaybe mid of
-        Just reg -> reg
+        Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
         -- ones which map to a real machine register on this
@@ -320,15 +320,15 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
   (rlo,rhi) <- getNewRegPairNat II32
   let
         half0 = fromIntegral (fromIntegral i :: Word16)
-        half1 = fromIntegral ((fromIntegral i `shiftR` 16) :: Word16)
-        half2 = fromIntegral ((fromIntegral i `shiftR` 32) :: Word16)
-        half3 = fromIntegral ((fromIntegral i `shiftR` 48) :: Word16)
+        half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
+        half2 = fromIntegral (fromIntegral (i `shiftR` 32) :: Word16)
+        half3 = fromIntegral (fromIntegral (i `shiftR` 48) :: Word16)
 
         code = toOL [
                 LIS rlo (ImmInt half1),
                 OR rlo rlo (RIImm $ ImmInt half0),
                 LIS rhi (ImmInt half3),
-                OR rlo rlo (RIImm $ ImmInt half2)
+                OR rhi rhi (RIImm $ ImmInt half2)
                 ]
   return (ChildCode64 code rlo)
 

@@ -11,6 +11,8 @@
 
 #include "BeginPrivate.h"
 
+bdescr *allocLargeChunk (void);
+
 /* Debugging  -------------------------------------------------------------- */
 
 extern nat countBlocks       (bdescr *bd);

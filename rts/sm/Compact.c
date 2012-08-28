@@ -382,7 +382,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
 	    
-	    fun_info = FUN_INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)
+	    fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
                            get_threaded_info((StgPtr)ret_fun->fun)));
 	         // *before* threading it!
 	    thread(&ret_fun->fun);
@@ -404,7 +404,7 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     StgWord bitmap;
     StgFunInfoTable *fun_info;
 
-    fun_info = FUN_INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)
+    fun_info = FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)
                         get_threaded_info((StgPtr)fun)));
     ASSERT(fun_info->i.type != PAP);
 
@@ -818,7 +818,7 @@ update_fwd_compact( bdescr *blocks )
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
             iptr = get_threaded_info(p);
-	    info = INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)iptr));
+	    info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
 
 	    q = p;
 

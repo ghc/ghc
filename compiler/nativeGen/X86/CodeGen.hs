@@ -926,6 +926,7 @@ getByteReg expr = do
 -- be modified by code to evaluate an arbitrary expression.
 getNonClobberedReg :: CmmExpr -> NatM (Reg, InstrBlock)
 getNonClobberedReg expr = do
+  dflags <- getDynFlags
   r <- getRegister expr
   case r of
     Any rep code -> do
@@ -933,8 +934,7 @@ getNonClobberedReg expr = do
         return (tmp, code tmp)
     Fixed rep reg code
         -- only certain regs can be clobbered
-        | RegReal real <- reg
-        , real `elem` instrClobberedRegs
+        | reg `elem` instrClobberedRegs (targetPlatform dflags)
         -> do
                 tmp <- getNewRegNat rep
                 return (tmp, code `snocOL` reg2reg rep reg tmp)
@@ -1978,11 +1978,11 @@ genCCall64' platform target dest_regs args = do
     (stack_args, int_regs_used, fp_regs_used, load_args_code)
          <-
         if platformOS platform == OSMinGW32
-        then load_args_win args [] [] allArgRegs nilOL
+        then load_args_win args [] [] (allArgRegs platform) nilOL
         else do (stack_args, aregs, fregs, load_args_code)
-                    <- load_args args allIntArgRegs allFPArgRegs nilOL
-                let fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
-                    int_regs_used = reverse (drop (length aregs) (reverse allIntArgRegs))
+                    <- load_args args (allIntArgRegs platform) (allFPArgRegs platform) nilOL
+                let fp_regs_used  = reverse (drop (length fregs) (reverse (allFPArgRegs platform)))
+                    int_regs_used = reverse (drop (length aregs) (reverse (allIntArgRegs platform)))
                 return (stack_args, int_regs_used, fp_regs_used, load_args_code)
 
     let
@@ -1991,7 +1991,7 @@ genCCall64' platform target dest_regs args = do
                 -- for annotating the call instruction with
         sse_regs = length fp_regs_used
         arg_stack_slots = if platformOS platform == OSMinGW32
-                          then length stack_args + length allArgRegs
+                          then length stack_args + length (allArgRegs platform)
                           else length stack_args
         tot_arg_size = arg_size * arg_stack_slots
 
@@ -2014,7 +2014,7 @@ genCCall64' platform target dest_regs args = do
     -- On Win64, we also have to leave stack space for the arguments
     -- that we are passing in registers
     lss_code <- if platformOS platform == OSMinGW32
-                then leaveStackSpace (length allArgRegs)
+                then leaveStackSpace (length (allArgRegs platform))
                 else return nilOL
     delta <- getDeltaNat
 

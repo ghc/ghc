@@ -211,7 +211,7 @@ cleanForward platform blockId assoc acc (li : instrs)
 
 	-- writing to a reg changes its value.
 	| LiveInstr instr _	<- li
-	, RU _ written		<- regUsageOfInstr instr
+	, RU _ written		<- regUsageOfInstr platform instr
 	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
 	  in  cleanForward platform blockId assoc' (li : acc) instrs
 

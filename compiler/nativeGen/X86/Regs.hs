@@ -51,12 +51,22 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+#if i386_TARGET_ARCH == 0 && x86_64_TARGET_ARCH == 0
+-- Compiling for some arch other than Intel so we choose x86-64 as default.
+#undef arm_TARGET_ARCH
+#undef powerpc_TARGET_ARCH
+#undef powerpc64_TARGET_ARCH
+#undef sparc_TARGET_ARCH
+
+#undef x86_64_TARGET_ARCH
+#define x86_64_TARGET_ARCH 1
+#endif
+
 #include "../includes/stg/HaskellMachRegs.h"
 
 import Reg
 import RegClass
 
-import BlockId
 import OldCmm
 import CmmCallConv
 import CLabel           ( CLabel )
@@ -155,7 +165,6 @@ litToImm (CmmLabelDiffOff l1 l2 off)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
-litToImm (CmmBlock id)       = ImmCLbl (infoTblLbl id)
 litToImm _                   = panic "X86.Regs.litToImm: no match"
 
 -- addressing modes ------------------------------------------------------------
@@ -219,26 +228,30 @@ firstfake, lastfake :: RegNo
 firstfake = 16
 lastfake  = 21
 
-firstxmm, lastxmm :: RegNo
+firstxmm :: RegNo
 firstxmm  = 24
-#if i386_TARGET_ARCH
-lastxmm   = 31
-#else
-lastxmm   = 39
-#endif
 
-lastint :: RegNo
-#if i386_TARGET_ARCH
-lastint = 7 -- not %r8..%r15
-#else
-lastint = 15
-#endif
+lastxmm :: Platform -> RegNo
+lastxmm platform
+ | target32Bit platform = 31
+ | otherwise            = 39
 
-intregnos, fakeregnos, xmmregnos, floatregnos :: [RegNo]
-intregnos   = [0..lastint]
+lastint :: Platform -> RegNo
+lastint platform
+ | target32Bit platform = 7 -- not %r8..%r15
+ | otherwise            = 15
+
+intregnos :: Platform -> [RegNo]
+intregnos platform = [0 .. lastint platform]
+
+fakeregnos :: [RegNo]
 fakeregnos  = [firstfake .. lastfake]
-xmmregnos   = [firstxmm  .. lastxmm]
-floatregnos = fakeregnos ++ xmmregnos;
+
+xmmregnos :: Platform -> [RegNo]
+xmmregnos platform = [firstxmm  .. lastxmm platform]
+
+floatregnos :: Platform -> [RegNo]
+floatregnos platform = fakeregnos ++ xmmregnos platform
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
@@ -248,22 +261,22 @@ argRegs :: RegNo -> [Reg]
 argRegs _       = panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
-allMachRegNos :: [RegNo]
-allMachRegNos  = intregnos ++ floatregnos
+allMachRegNos :: Platform -> [RegNo]
+allMachRegNos platform = intregnos platform ++ floatregnos platform
 
 -- | Take the class of a register.
-{-# INLINE classOfRealReg      #-}
-classOfRealReg :: RealReg -> RegClass
+{-# INLINE classOfRealReg #-}
+classOfRealReg :: Platform -> RealReg -> RegClass
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
-classOfRealReg reg
+classOfRealReg platform reg
  = case reg of
         RealRegSingle i
-          | i <= lastint  -> RcInteger
-          | i <= lastfake -> RcDouble
-          | otherwise     -> RcDoubleSSE
+          | i <= lastint platform -> RcInteger
+          | i <= lastfake         -> RcDouble
+          | otherwise             -> RcDoubleSSE
 
         RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
@@ -406,12 +419,43 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
-allArgRegs              :: [(Reg, Reg)]
-allIntArgRegs           :: [Reg]
-allFPArgRegs            :: [Reg]
-callClobberedRegs       :: [Reg]
 
-#if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
+-- | these are the regs which we cannot assume stay alive over a C call.
+callClobberedRegs       :: Platform -> [Reg]
+-- caller-saves registers
+callClobberedRegs platform
+ | target32Bit platform = [eax,ecx,edx] ++ map regSingle (floatregnos platform)
+ | otherwise
+    -- all xmm regs are caller-saves
+    -- caller-saves registers
+    = [rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11]
+   ++ map regSingle (floatregnos platform)
+
+allArgRegs :: Platform -> [(Reg, Reg)]
+allArgRegs platform
+ | platformOS platform == OSMinGW32 = zip [rcx,rdx,r8,r9]
+                                          (map regSingle [firstxmm ..])
+ | otherwise = panic "X86.Regs.allArgRegs: not defined for this arch"
+
+allIntArgRegs :: Platform -> [Reg]
+allIntArgRegs platform
+ | (platformOS platform == OSMinGW32) || target32Bit platform
+    = panic "X86.Regs.allIntArgRegs: not defined for this platform"
+ | otherwise = [rdi,rsi,rdx,rcx,r8,r9]
+
+allFPArgRegs :: Platform -> [Reg]
+allFPArgRegs platform
+ | platformOS platform == OSMinGW32
+    = panic "X86.Regs.allFPArgRegs: not defined for this platform"
+ | otherwise = map regSingle [firstxmm .. firstxmm+7]
+
+-- Machine registers which might be clobbered by instructions that
+-- generate results into fixed registers, or need arguments in a fixed
+-- register.
+instrClobberedRegs :: Platform -> [Reg]
+instrClobberedRegs platform
+ | target32Bit platform = [ eax, ecx, edx ]
+ | otherwise            = [ rax, rcx, rdx ]
 
 #if i386_TARGET_ARCH
 #define eax 0
@@ -588,88 +632,17 @@ globalRegMaybe _                        = Nothing
 
 --
 
-#if defined(mingw32_HOST_OS) && x86_64_TARGET_ARCH
-
-allArgRegs = zip (map regSingle [rcx,rdx,r8,r9])
-                 (map regSingle [firstxmm ..])
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this platform"
-allFPArgRegs = panic "X86.Regs.allFPArgRegs: not defined for this platform"
-
-#else
-
-allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
-
-# if   i386_TARGET_ARCH
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
-# elif x86_64_TARGET_ARCH
-allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
-# else
-allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this arch"
-# endif
-
-allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
-
-#endif
-
 -- All machine registers that are used for argument-passing to Haskell functions
 allHaskellArgRegs :: [Reg]
 allHaskellArgRegs = [ RegReal r | Just r <- map globalRegMaybe globalArgRegs ]
 
--- Machine registers which might be clobbered by instructions that
--- generate results into fixed registers, or need arguments in a fixed
--- register.
-instrClobberedRegs :: [RealReg]
-#if   i386_TARGET_ARCH
-instrClobberedRegs = map RealRegSingle [ eax, ecx, edx ]
-#elif x86_64_TARGET_ARCH
-instrClobberedRegs = map RealRegSingle [ rax, rcx, rdx ]
-#endif
-
--- | these are the regs which we cannot assume stay alive over a C call.
-
-#if   i386_TARGET_ARCH
--- caller-saves registers
-callClobberedRegs
-  = map regSingle ([eax,ecx,edx]  ++ floatregnos)
-
-#elif x86_64_TARGET_ARCH
--- all xmm regs are caller-saves
--- caller-saves registers
-callClobberedRegs
-  = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos)
-
-#else
-callClobberedRegs
-  = panic "X86.Regs.callClobberedRegs: not defined for this architecture"
-#endif
-
-#else /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
-
-
-
-freeReg _               = 0#
-globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
-
-allArgRegs              = panic "X86.Regs.allArgRegs: not defined"
-allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
-allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
-callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
-
-instrClobberedRegs :: [RealReg]
-instrClobberedRegs = panic "X86.Regs.instrClobberedRegs: not defined for this arch"
-
-allHaskellArgRegs :: [Reg]
-allHaskellArgRegs = panic "X86.Regs.allHaskellArgRegs: not defined for this arch"
-
-#endif
-
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RealReg]
-allocatableRegs
+allocatableRegs :: Platform -> [RealReg]
+allocatableRegs platform
    = let isFree i = isFastTrue (freeReg i)
-     in  map RealRegSingle $ filter isFree allMachRegNos
+     in  map RealRegSingle $ filter isFree (allMachRegNos platform)
 
 {-
 Note [esi/edi not allocatable]

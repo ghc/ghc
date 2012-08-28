@@ -27,7 +27,6 @@ import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel,
 import DynFlags
 import FastString
 import ForeignCall
-import Outputable
 import Prelude hiding (succ)
 import SMRep (ByteOff)
 import UniqSupply
@@ -70,53 +69,65 @@ flattenCmmAGraph id stmts =
     CmmGraph { g_entry = id,
                g_graph = GMany NothingO body NothingO }
   where
-  (block, blocks) = flatten (fromOL stmts)
-  entry = blockJoinHead (CmmEntry id) block
-  body = foldr addBlock emptyBody (entry:blocks)
+  blocks = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry id) emptyBlock) []
+  body = foldr addBlock emptyBody blocks
 
-  flatten :: [CgStmt] -> (Block CmmNode O C, [Block CmmNode C C])
-  flatten [] = panic "flatten []"
+  --
+  -- flatten: turn a list of CgStmt into a list of Blocks.  We know
+  -- that any code before the first label is unreachable, so just drop
+  -- it.
+  --
+  -- NB. avoid the quadratic-append trap by passing in the tail of the
+  -- list.  This is important for Very Long Functions (e.g. in T783).
+  --
+  flatten :: [CgStmt] -> [Block CmmNode C C] -> [Block CmmNode C C]
+  flatten [] blocks = blocks
 
-  -- A label at the end of a function or fork: this label must not be reachable,
-  -- but it might be referred to from another BB that also isn't reachable.
-  -- Eliminating these has to be done with a dead-code analysis.  For now,
-  -- we just make it into a well-formed block by adding a recursive jump.
-  flatten [CgLabel id]
-    = (goto_id, [blockJoinHead (CmmEntry id) goto_id] )
-    where goto_id = blockJoinTail emptyBlock (CmmBranch id)
+  flatten (CgLabel id : stmts) blocks
+    = flatten1 stmts block blocks
+    where !block = blockJoinHead (CmmEntry id) emptyBlock
 
-  -- A jump/branch: throw away all the code up to the next label, because
-  -- it is unreachable.  Be careful to keep forks that we find on the way.
-  flatten (CgLast stmt : stmts)
-    = case dropWhile isOrdinaryStmt stmts of
-        [] ->
-            ( sing, [] )
-        [CgLabel id] ->
-            ( sing, [blockJoin (CmmEntry id) emptyBlock (CmmBranch id)] )
-        (CgLabel id : stmts) ->
-            ( sing, blockJoinHead (CmmEntry id) block : blocks )
-            where (block,blocks) = flatten stmts
-        (CgFork fork_id stmts : ss) -> 
-            flatten (CgFork fork_id stmts : CgLast stmt : ss)
-        _ -> panic "MkGraph.flatten"
-    where
-      sing = blockJoinTail emptyBlock stmt
+  flatten (CgFork fork_id stmts : rest) blocks
+    = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry fork_id) emptyBlock) $
+      flatten rest blocks
 
-  flatten (s:ss) = 
-        case s of
-          CgStmt stmt -> (blockCons stmt block, blocks)
-          CgLabel id  -> (blockJoinTail emptyBlock (CmmBranch id),
-                          blockJoinHead (CmmEntry id) block : blocks)
-          CgFork fork_id stmts -> 
-                (block, blockJoinHead (CmmEntry fork_id) fork_block : fork_blocks ++ blocks)
-                where (fork_block, fork_blocks) = flatten (fromOL stmts)
-          _ -> panic "MkGraph.flatten"
-    where (block,blocks) = flatten ss
+  flatten (CgLast _ : stmts) blocks = flatten stmts blocks
+  flatten (CgStmt _ : stmts) blocks = flatten stmts blocks
 
-isOrdinaryStmt :: CgStmt -> Bool
-isOrdinaryStmt (CgStmt _) = True
-isOrdinaryStmt (CgLast _) = True
-isOrdinaryStmt _          = False
+  --
+  -- flatten1: we have a partial block, collect statements until the
+  -- next last node to make a block, then call flatten to get the rest
+  -- of the blocks
+  --
+  flatten1 :: [CgStmt] -> Block CmmNode C O
+           -> [Block CmmNode C C] -> [Block CmmNode C C]
+
+  -- The current block falls through to the end of a function or fork:
+  -- this code should not be reachable, but it may be referenced by
+  -- other code that is not reachable.  We'll remove it later with
+  -- dead-code analysis, but for now we have to keep the graph
+  -- well-formed, so we terminate the block with a branch to the
+  -- beginning of the current block.
+  flatten1 [] block blocks
+    = blockJoinTail block (CmmBranch (entryLabel block)) : blocks
+
+  flatten1 (CgLast stmt : stmts) block blocks
+    = block' : flatten stmts blocks
+    where !block' = blockJoinTail block stmt
+
+  flatten1 (CgStmt stmt : stmts) block blocks
+    = flatten1 stmts block' blocks
+    where !block' = blockSnoc block stmt
+
+  flatten1 (CgFork fork_id stmts : rest) block blocks
+    = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry fork_id) emptyBlock) $
+      flatten1 rest block blocks
+
+  -- a label here means that we should start a new block, and the
+  -- current block should fall through to the new block.
+  flatten1 (CgLabel id : stmts) block blocks
+    = blockJoinTail block (CmmBranch id) :
+      flatten1 stmts (blockJoinHead (CmmEntry id) emptyBlock) blocks
 
 
 
