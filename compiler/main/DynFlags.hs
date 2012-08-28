@@ -2326,7 +2326,8 @@ optLevelFlags
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
-    , ([2],     Opt_RegsGraph)
+-- XXX disabled, see #7192
+--    , ([2],     Opt_RegsGraph)
     , ([0,1,2], Opt_LlvmTBAA)
     , ([0,1,2], Opt_RegLiveness)
     , ([1,2],   Opt_CmmSink)
