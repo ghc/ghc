@@ -908,7 +908,8 @@ genCCall' platform gcp target dest_regs argsAndHints
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
                                                         (zip args argReps)
-                                                        allArgRegs allFPArgRegs
+                                                        allArgRegs
+                                                        (allFPArgRegs platform)
                                                         initialStackOffset
                                                         (toOL []) []
 

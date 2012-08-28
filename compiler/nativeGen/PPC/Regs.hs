@@ -221,19 +221,12 @@ allArgRegs = map regSingle [3..10]
 
 
 -- these are the regs which we cannot assume stay alive over a C call.
-callClobberedRegs :: [Reg]
-#if   defined(darwin_TARGET_OS)
-callClobberedRegs
-  = map regSingle (0:[2..12] ++ map fReg [0..13])
-
-#elif defined(linux_TARGET_OS)
-callClobberedRegs
-  = map regSingle (0:[2..13] ++ map fReg [0..13])
-
-#else
-callClobberedRegs
-        = panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
-#endif
+callClobberedRegs :: Platform -> [Reg]
+callClobberedRegs platform
+  = case platformOS platform of
+    OSDarwin -> map regSingle (0:[2..12] ++ map fReg [0..13])
+    OSLinux  -> map regSingle (0:[2..13] ++ map fReg [0..13])
+    _        -> panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
 
 
 allMachRegNos   :: [RegNo]
@@ -259,17 +252,12 @@ showReg n
 
 -- machine specific ------------------------------------------------------------
 
-allFPArgRegs :: [Reg]
-#if    defined(darwin_TARGET_OS)
-allFPArgRegs = map (regSingle . fReg) [1..13]
-
-#elif  defined(linux_TARGET_OS)
-allFPArgRegs = map (regSingle . fReg) [1..8]
-
-#else
-allFPArgRegs = panic "PPC.Regs.allFPArgRegs: not defined for this architecture"
-
-#endif
+allFPArgRegs :: Platform -> [Reg]
+allFPArgRegs platform
+    = case platformOS platform of
+      OSDarwin -> map (regSingle . fReg) [1..13]
+      OSLinux  -> map (regSingle . fReg) [1..8]
+      _        -> panic "PPC.Regs.allFPArgRegs: not defined for this architecture"
 
 fits16Bits :: Integral a => a -> Bool
 fits16Bits x = x >= -32768 && x < 32768

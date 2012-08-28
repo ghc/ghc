@@ -194,8 +194,8 @@ ppc_regUsageOfInstr platform instr
     BCCFAR _ _		-> noUsage
     MTCTR reg		-> usage ([reg],[])
     BCTR  _ _		-> noUsage
-    BL    _ params	-> usage (params, callClobberedRegs)
-    BCTRL params	-> usage (params, callClobberedRegs)
+    BL    _ params	-> usage (params, callClobberedRegs platform)
+    BCTRL params	-> usage (params, callClobberedRegs platform)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     ADDC  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     ADDE  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
