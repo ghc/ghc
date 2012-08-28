@@ -800,9 +800,10 @@ pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
   = sep [ppr con <+> dcolon <+> pprHsForAll expl tvs cxt, 
          pprConDeclFields fields <+> arrow <+> ppr res_ty]
 
-pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyGADT {} })
-  = pprPanic "pprConDecl" (ppr con)
+pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {} })
+  = pprConDecl (decl { con_details = PrefixCon [ty1,ty2] })
         -- In GADT syntax we don't allow infix constructors
+        -- but the renamer puts them in this form (Note [Infix GADT constructors] in RnSource)
 \end{code}
 
 %************************************************************************
