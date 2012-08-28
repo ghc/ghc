@@ -710,11 +710,10 @@ x86_mkRegRegMoveInstr
 
 x86_mkRegRegMoveInstr platform src dst
  = case targetClassOfReg platform src of
-#if   i386_TARGET_ARCH
-        RcInteger -> MOV II32 (OpReg src) (OpReg dst)
-#else
-        RcInteger -> MOV II64 (OpReg src) (OpReg dst)
-#endif
+        RcInteger -> case platformArch platform of
+                     ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
+                     ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
+                     _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
         RcDouble    -> GMOV src dst
         RcDoubleSSE -> MOV FF64 (OpReg src) (OpReg dst)
         _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
