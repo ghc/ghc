@@ -339,7 +339,7 @@ openNursery = catAGraphs [
                   (CmmMachOp mo_wordMul [
                     CmmMachOp (MO_SS_Conv W32 wordWidth)
                       [CmmLoad nursery_bdescr_blocks b32],
-                    CmmLit (mkIntCLit bLOCK_SIZE)
+                    mkIntExpr bLOCK_SIZE
                    ])
                   (-1)
                 )

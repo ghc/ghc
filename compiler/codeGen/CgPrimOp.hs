@@ -89,7 +89,7 @@ emitPrimOp [res_r,res_c] IntAddCOp [aa,bb] _
                     CmmMachOp mo_wordNot [CmmMachOp mo_wordXor [aa,bb]],
                     CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
                 ],
-                CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
+                mkIntExpr (wORD_SIZE_IN_BITS - 1)
           ]
      ]
 
@@ -112,7 +112,7 @@ emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] _
                     CmmMachOp mo_wordXor [aa,bb],
                     CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
                 ],
-                CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
+                mkIntExpr (wORD_SIZE_IN_BITS - 1)
           ]
      ]
 

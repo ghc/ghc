@@ -459,7 +459,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; enterCostCentreFun cc
                     (CmmMachOp mo_wordSub
                          [ CmmReg nodeReg
-                         , CmmLit (mkIntCLit (funTag cl_info)) ])
+                         , mkIntExpr (funTag cl_info) ])
                 ; whenC node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 

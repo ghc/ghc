@@ -163,7 +163,7 @@ profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
     do dflags <- getDynFlags
-       profAlloc (CmmLit (mkIntCLit (heapClosureSize dflags rep))) ccs
+       profAlloc (mkIntExpr (heapClosureSize dflags rep)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -176,7 +176,7 @@ profAlloc words ccs
                        (cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
                        (CmmMachOp (MO_UU_Conv wordWidth (typeWidth alloc_rep)) $
                          [CmmMachOp mo_wordSub [words, 
-                                                CmmLit (mkIntCLit (profHdrSize dflags))]]))
+                                                mkIntExpr (profHdrSize dflags)]]))
                        -- subtract the "profiling overhead", which is the
                        -- profiling header in a closure.
  where 
@@ -324,7 +324,7 @@ staticLdvInit = zeroCLit
 dynLdvInit :: CmmExpr
 dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE  
   CmmMachOp mo_wordOr [
-      CmmMachOp mo_wordShl [loadEra, CmmLit (mkIntCLit lDV_SHIFT) ],
+      CmmMachOp mo_wordShl [loadEra, mkIntExpr lDV_SHIFT ],
       CmmLit (mkWordCLit lDV_STATE_CREATE)
   ]
         

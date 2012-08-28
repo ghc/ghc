@@ -512,7 +512,7 @@ mk_switch _tag_expr [(_tag,lbl)] Nothing _ _ _
 mk_switch tag_expr [(tag,lbl)] (Just deflt) _ _ _
   = return (mkCbranch cond deflt lbl)
   where
-    cond =  cmmNeWord tag_expr (CmmLit (mkIntCLit tag))
+    cond =  cmmNeWord tag_expr (mkIntExpr tag)
         -- We have lo_tag < hi_tag, but there's only one branch,
         -- so there must be a default
 
@@ -550,7 +550,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   = do stmts <- mk_switch tag_expr branches mb_deflt
                         lowest_branch hi_tag via_C
        mkCmmIfThenElse
-        (cmmULtWord tag_expr (CmmLit (mkIntCLit lowest_branch)))
+        (cmmULtWord tag_expr (mkIntExpr lowest_branch))
         (mkBranch deflt)
         stmts
 
@@ -558,7 +558,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   = do stmts <- mk_switch tag_expr branches mb_deflt
                         lo_tag highest_branch via_C
        mkCmmIfThenElse
-        (cmmUGtWord tag_expr (CmmLit (mkIntCLit highest_branch)))
+        (cmmUGtWord tag_expr (mkIntExpr highest_branch))
         (mkBranch deflt)
         stmts
 
@@ -568,7 +568,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        hi_stmts <- mk_switch tag_expr hi_branches mb_deflt
                              mid_tag hi_tag via_C
        mkCmmIfThenElse
-        (cmmUGeWord tag_expr (CmmLit (mkIntCLit mid_tag)))
+        (cmmUGeWord tag_expr (mkIntExpr mid_tag))
         hi_stmts
         lo_stmts
         -- we test (e >= mid_tag) rather than (e < mid_tag), because

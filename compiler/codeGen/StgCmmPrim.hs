@@ -182,7 +182,7 @@ emitPrimOp [res_r,res_c] IntAddCOp [aa,bb]
 		    CmmMachOp mo_wordNot [CmmMachOp mo_wordXor [aa,bb]],
 		    CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
 		], 
-	        CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
+                mkIntExpr (wORD_SIZE_IN_BITS - 1)
 	  ]
      ]
 
@@ -205,7 +205,7 @@ emitPrimOp [res_r,res_c] IntSubCOp [aa,bb]
 		    CmmMachOp mo_wordXor [aa,bb],
 		    CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
 		], 
-	        CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
+                mkIntExpr (wORD_SIZE_IN_BITS - 1)
 	  ]
      ]
 
@@ -913,7 +913,7 @@ doWritePtrArrayOp addr idx val
           (cmmOffsetExprW (cmmOffsetB addr (arrPtrsHdrSize dflags))
                          (loadArrPtrsSize dflags addr))
           (CmmMachOp mo_wordUShr [idx,
-                                  CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
+                                  mkIntExpr mUT_ARR_PTRS_CARD_BITS])
          ) (CmmLit (CmmInt 1 W8))
        
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
@@ -963,7 +963,7 @@ doCopyByteArrayOp = emitCopyByteArray copy
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
-        emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit 1))
+        emitMemcpyCall dst_p src_p bytes (mkIntExpr 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source
 -- array, a destination 'MutableByteArray#', an offset into the
@@ -979,8 +979,8 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit 1)),
-            getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit 1))
+            getCode $ emitMemmoveCall dst_p src_p bytes (mkIntExpr 1),
+            getCode $ emitMemcpyCall  dst_p src_p bytes (mkIntExpr 1)
             ]
         emit =<< mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
 
@@ -1005,7 +1005,7 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 doSetByteArrayOp ba off len c
     = do dflags <- getDynFlags
          p <- assignTempE $ cmmOffsetExpr (cmmOffsetB ba (arrWordsHdrSize dflags)) off
-         emitMemsetCall p c len (CmmLit (mkIntCLit 1))
+         emitMemsetCall p c len (mkIntExpr 1)
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
@@ -1035,7 +1035,7 @@ doCopyArrayOp = emitCopyArray copy
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
-        emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE))
+        emitMemcpyCall dst_p src_p bytes (mkIntExpr wORD_SIZE)
 
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
@@ -1051,8 +1051,8 @@ doCopyMutableArrayOp = emitCopyArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE)),
-            getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE))
+            getCode $ emitMemmoveCall dst_p src_p bytes (mkIntExpr wORD_SIZE),
+            getCode $ emitMemcpyCall  dst_p src_p bytes (mkIntExpr wORD_SIZE)
             ]
         emit =<< mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
 
@@ -1075,7 +1075,7 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
     dst_elems_p <- assignTempE $ cmmOffsetB dst (arrPtrsHdrSize dflags)
     dst_p <- assignTempE $ cmmOffsetExprW dst_elems_p dst_off
     src_p <- assignTempE $ cmmOffsetExprW (cmmOffsetB src (arrPtrsHdrSize dflags)) src_off
-    bytes <- assignTempE $ cmmMulWord n (CmmLit (mkIntCLit wORD_SIZE))
+    bytes <- assignTempE $ cmmMulWord n (mkIntExpr wORD_SIZE)
 
     copy src dst dst_p src_p bytes
 
@@ -1103,8 +1103,8 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
 
     arr_r <- newTemp bWord
     emitAllocateCall arr_r myCapability words
-    tickyAllocPrim (CmmLit (mkIntCLit (arrPtrsHdrSize dflags))) (n `cmmMulWord` wordSize)
-        (CmmLit $ mkIntCLit 0)
+    tickyAllocPrim (mkIntExpr (arrPtrsHdrSize dflags)) (n `cmmMulWord` wordSize)
+                   zeroExpr
 
     let arr = CmmReg (CmmLocal arr_r)
     emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
@@ -1117,18 +1117,17 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
     src_p <- assignTempE $ cmmOffsetExprW (cmmOffsetB src (arrPtrsHdrSize dflags))
              src_off
 
-    emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize) (CmmLit (mkIntCLit wORD_SIZE))
+    emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize) (mkIntExpr wORD_SIZE)
 
     emitMemsetCall (cmmOffsetExprW dst_p n)
-        (CmmLit (mkIntCLit 1))
+        (mkIntExpr 1)
         card_bytes
-        (CmmLit (mkIntCLit wORD_SIZE))
+        (mkIntExpr wORD_SIZE)
     emit $ mkAssign (CmmLocal res_r) arr
   where
-    arrPtrsHdrSizeW dflags = CmmLit $ mkIntCLit $ fixedHdrSize dflags +
-                                 (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE)
-    myCapability = CmmReg baseReg `cmmSubWord`
-                   CmmLit (mkIntCLit oFFSET_Capability_r)
+    arrPtrsHdrSizeW dflags = mkIntExpr (fixedHdrSize dflags +
+                                 (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE))
+    myCapability = CmmReg baseReg `cmmSubWord` mkIntExpr oFFSET_Capability_r
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
@@ -1137,24 +1136,24 @@ emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetCards dst_start dst_cards_start n = do
     start_card <- assignTempE $ card dst_start
     emitMemsetCall (dst_cards_start `cmmAddWord` start_card)
-        (CmmLit (mkIntCLit 1))
+        (mkIntExpr 1)
         (cardRoundUp n)
-        (CmmLit (mkIntCLit 1)) -- no alignment (1 byte)
+        (mkIntExpr 1) -- no alignment (1 byte)
 
 -- Convert an element index to a card index
 card :: CmmExpr -> CmmExpr
-card i = i `cmmUShrWord` (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS))
+card i = i `cmmUShrWord` mkIntExpr mUT_ARR_PTRS_CARD_BITS
 
 -- Convert a number of elements to a number of cards, rounding up
 cardRoundUp :: CmmExpr -> CmmExpr
-cardRoundUp i = card (i `cmmAddWord` (CmmLit (mkIntCLit ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS) - 1))))
+cardRoundUp i = card (i `cmmAddWord` (mkIntExpr ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS) - 1)))
 
 bytesToWordsRoundUp :: CmmExpr -> CmmExpr
-bytesToWordsRoundUp e = (e `cmmAddWord` CmmLit (mkIntCLit (wORD_SIZE - 1)))
+bytesToWordsRoundUp e = (e `cmmAddWord` mkIntExpr (wORD_SIZE - 1))
                         `cmmQuotWord` wordSize
 
 wordSize :: CmmExpr
-wordSize = CmmLit (mkIntCLit wORD_SIZE)
+wordSize = mkIntExpr wORD_SIZE
 
 -- | Emit a call to @memcpy@.
 emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()

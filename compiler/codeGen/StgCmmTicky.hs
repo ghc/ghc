@@ -186,14 +186,14 @@ registerTickyCtr ctr_lbl
     test = CmmMachOp (MO_Eq wordWidth)
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp)) bWord,
-               CmmLit (mkIntCLit 0)]
+               zeroExpr]
     register_stmts
       =	[ mkStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
 		   (CmmLoad ticky_entry_ctrs bWord)
 	, mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
 	, mkStore (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp))
-		   (CmmLit (mkIntCLit 1)) ]
+                   (mkIntExpr 1) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()

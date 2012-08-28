@@ -24,13 +24,14 @@ module CmmUtils(
 	typeCmmType, typeForeignHint,
 
 	-- CmmLit
-	zeroCLit, mkIntCLit, 
+        zeroCLit, mkIntCLit,
 	mkWordCLit, packHalfWordsCLit,
 	mkByteStringCLit, 
         mkDataLits, mkRODataLits,
 
 	-- CmmExpr
-	mkLblExpr,
+        mkIntExpr, zeroExpr,
+        mkLblExpr,
 	cmmRegOff,  cmmOffset,  cmmLabelOff,  cmmOffsetLit,  cmmOffsetExpr, 
 	cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
 	cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
@@ -128,8 +129,14 @@ typeForeignHint = primRepForeignHint . typePrimRep
 mkIntCLit :: Int -> CmmLit
 mkIntCLit i = CmmInt (toInteger i) wordWidth
 
+mkIntExpr :: Int -> CmmExpr
+mkIntExpr i = CmmLit $! mkIntCLit i
+
 zeroCLit :: CmmLit
 zeroCLit = CmmInt 0 wordWidth
+
+zeroExpr :: CmmExpr
+zeroExpr = CmmLit zeroCLit
 
 mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
 -- We have to make a top-level decl for the string, 
@@ -239,7 +246,7 @@ cmmIndexExpr width base idx =
   cmmOffsetExpr base byte_off
   where
     idx_w = cmmExprWidth idx
-    byte_off = CmmMachOp (MO_Shl idx_w) [idx, CmmLit (mkIntCLit (widthInLog width))]
+    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr (widthInLog width)]
 
 cmmLoadIndex :: CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex ty expr ix = CmmLoad (cmmIndex (typeWidth ty) expr ix) ty
@@ -299,6 +306,7 @@ cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
 cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
 cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
 cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
+cmmQuotWord e1 e2 = CmmMachOp mo_wordUQuot [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -306,7 +314,6 @@ cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprWidth e)) [e]
 
 blankWord :: CmmStatic
 blankWord = CmmUninitialised wORD_SIZE
-cmmQuotWord e1 e2 = CmmMachOp mo_wordUQuot [e1, e2]
 
 ---------------------------------------------------
 --
@@ -339,8 +346,8 @@ hasNoGlobalRegs _ = False
 -- Tag bits mask
 --cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
 cmmTagMask, cmmPointerMask :: CmmExpr
-cmmTagMask = CmmLit (mkIntCLit tAG_MASK)
-cmmPointerMask = CmmLit (mkIntCLit (complement tAG_MASK))
+cmmTagMask = mkIntExpr tAG_MASK
+cmmPointerMask = mkIntExpr (complement tAG_MASK)
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
@@ -354,10 +361,10 @@ cmmGetTag e = (e `cmmAndWord` cmmTagMask)
 -- Test if a closure pointer is untagged
 cmmIsTagged :: CmmExpr -> CmmExpr
 cmmIsTagged e = (e `cmmAndWord` cmmTagMask)
-                 `cmmNeWord` CmmLit zeroCLit
+                 `cmmNeWord` zeroExpr
 
 cmmConstrTag, cmmConstrTag1 :: CmmExpr -> CmmExpr
-cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` (CmmLit (mkIntCLit 1))
+cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` mkIntExpr 1
 -- Get constructor tag, but one based.
 cmmConstrTag1 e = e `cmmAndWord` cmmTagMask
 

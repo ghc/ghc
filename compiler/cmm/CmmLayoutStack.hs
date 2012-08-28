@@ -773,12 +773,12 @@ arguments.
 areaToSp :: ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
 areaToSp sp_old _sp_hwm area_off (CmmStackSlot area n) =
   cmmOffset (CmmReg spReg) (sp_old - area_off area - n)
-areaToSp _ sp_hwm _ (CmmLit CmmHighStackMark) = CmmLit (mkIntCLit sp_hwm)
+areaToSp _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr sp_hwm
 areaToSp _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
                       [CmmMachOp (MO_Sub _)
                               [ CmmReg (CmmGlobal Sp)
                               , CmmLit (CmmInt 0 _)],
-                       CmmReg (CmmGlobal SpLim)]) = CmmLit (CmmInt 0 wordWidth)
+                       CmmReg (CmmGlobal SpLim)]) = zeroExpr
 areaToSp _ _ _ other = other
 
 -- -----------------------------------------------------------------------------
@@ -968,7 +968,7 @@ callSuspendThread id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
              (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
-       [id] [CmmReg (CmmGlobal BaseReg), CmmLit (mkIntCLit (fromEnum intrbl))]
+       [id] [CmmReg (CmmGlobal BaseReg), mkIntExpr (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =

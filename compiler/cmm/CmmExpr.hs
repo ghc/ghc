@@ -62,7 +62,7 @@ instance Eq CmmExpr where	-- Equality ignores the types
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1               == _e2               = False
 
-data CmmReg 
+data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq, Ord )

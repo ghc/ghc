@@ -559,7 +559,7 @@ do_checks checkStack alloc do_gc = do
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
   where
-    alloc_lit = CmmLit (mkIntCLit (alloc*wORD_SIZE)) -- Bytes
+    alloc_lit = mkIntExpr (alloc*wORD_SIZE) -- Bytes
     bump_hp   = cmmOffsetExprB (CmmReg hpReg) alloc_lit
 
     -- Sp overflow if (Sp - CmmHighStack < SpLim)
