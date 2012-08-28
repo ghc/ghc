@@ -146,6 +146,7 @@ These data types are the heart of the compiler
 --      f_1 x_2 = let f_3 x_4 = x_4 + 1
 --                in f_3 (x_2 - 2)
 -- @
+--    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
 --    type class arguments) to yield a 'HsExpr.HsExpr' type that has 'Id.Id' as it's names.
@@ -311,6 +312,13 @@ In particular, scrutinee variables `x` in expressions of the form
 `Case e x t` are often renamed to variables with a prefix
 "wild_". These "wild" variables may appear in the body of the
 case-expression, and further, may be shadowed within the body.
+
+So the Unique in an Var is not really unique at all.  Still, it's very
+useful to give a constant-time equality/ordering for Vars, and to give
+a key that can be used to make sets of Vars (VarSet), or mappings from
+Vars to other things (VarEnv).   Moreover, if you do want to eliminate
+shadowing, you can give a new Unique to an Id without changing its
+printable name, which makes debugging easier.
 
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
