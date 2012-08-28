@@ -54,3 +54,6 @@ T7037:
 	"$(TEST_HC)" $(TEST_HC_OPTS) T7037.hs -v0
 	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
 	./T7037_main
+
+T7040_ghci_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7040_ghci_c.c

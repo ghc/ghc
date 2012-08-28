@@ -56,4 +56,4 @@ test('T5587', [ only_ways(['normal','optasm']), exit_code(1) ], compile_and_run,
 test('T5915', only_ways(['normal','optasm']), compile_and_run, [''])
 test('T5920', only_ways(['normal','optasm']), compile_and_run, [''])
 test('T5997', normal, compile_and_run, [''])
-
+test('T7101', normal, compile_and_run, [''])

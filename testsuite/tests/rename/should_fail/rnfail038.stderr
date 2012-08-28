@@ -1,2 +1,0 @@
-
-rnfail038.hs:4:27: Module `Data.List' does not export `wibble'
