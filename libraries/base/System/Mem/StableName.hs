@@ -37,6 +37,7 @@ module System.Mem.StableName (
   StableName,
   makeStableName,
   hashStableName,
+  eqStableName
   ) where
 
 import Prelude
@@ -119,6 +120,16 @@ instance Eq (StableName a) where
 	 0# -> False
 	 _  -> True
 #endif
+
+-- | Equality on 'StableName' that does not require that the types of
+-- the arguments match.
+eqStableName :: StableName a -> StableName b -> Bool
+eqStableName (StableName sn1) (StableName sn2) =
+       case eqStableName# sn1 sn2 of
+	 0# -> False
+	 _  -> True
+  -- Requested by Emil Axelsson on glasgow-haskell-users, who wants to
+  -- use it for implementing observable sharing.
 
 #endif /* __GLASGOW_HASKELL__ */
 
