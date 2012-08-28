@@ -355,12 +355,13 @@ users?
 
 classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
 classifyLdInput dflags f
-  | isObjectFilename f = return (Just (Object f))
-  | isDynLibFilename f = return (Just (DLLPath f))
+  | isObjectFilename platform f = return (Just (Object f))
+  | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
         log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
+    where platform = targetPlatform dflags
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
 preloadLib dflags lib_paths framework_paths lib_spec
