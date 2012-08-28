@@ -156,7 +156,7 @@ corePrepPgm :: DynFlags -> HscEnv -> CoreProgram -> [TyCon] -> IO CoreProgram
 corePrepPgm dflags hsc_env binds data_tycons = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
     let implicit_binds = mkDataConWorkers data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
@@ -174,7 +174,7 @@ corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags hsc_env expr = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
     let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
     dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" (ppr new_expr)
     return new_expr
@@ -1148,31 +1148,38 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
-data CorePrepEnv = CPE (IdEnv Id) -- Clone local Ids
-                       Id         -- mkIntegerId
+data CorePrepEnv = CPE {
+                       cpe_dynFlags    :: DynFlags,
+                       cpe_env         :: (IdEnv Id), -- Clone local Ids
+                       cpe_mkIntegerId :: Id
+                   }
 
-mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv hsc_env
+mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
+mkInitialCorePrepEnv dflags hsc_env
     = do mkIntegerId <- liftM tyThingId
                       $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
-         return $ CPE emptyVarEnv mkIntegerId
+         return $ CPE {
+                      cpe_dynFlags = dflags,
+                      cpe_env = emptyVarEnv,
+                      cpe_mkIntegerId = mkIntegerId
+                  }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv (CPE env mkIntegerId) id id'
-    = CPE (extendVarEnv env id id') mkIntegerId
+extendCorePrepEnv cpe id id'
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id id' }
 
 extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
-extendCorePrepEnvList (CPE env mkIntegerId) prs
-    = CPE (extendVarEnvList env prs) mkIntegerId
+extendCorePrepEnvList cpe prs
+    = cpe { cpe_env = extendVarEnvList (cpe_env cpe) prs }
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
-lookupCorePrepEnv (CPE env _) id
-  = case lookupVarEnv env id of
+lookupCorePrepEnv cpe id
+  = case lookupVarEnv (cpe_env cpe) id of
         Nothing  -> id
         Just id' -> id'
 
 getMkIntegerId :: CorePrepEnv -> Id
-getMkIntegerId (CPE _ mkIntegerId) = mkIntegerId
+getMkIntegerId = cpe_mkIntegerId
 
 ------------------------------------------------------------------------------
 -- Cloning binders
