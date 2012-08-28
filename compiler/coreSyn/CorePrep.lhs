@@ -46,6 +46,7 @@ import DynFlags
 import Util
 import Pair
 import Outputable
+import Platform
 import FastString
 import Config
 import Data.Bits
@@ -401,6 +402,8 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 
        ; return (floats3, bndr', rhs') }
   where
+    platform = targetPlatform (cpe_dynFlags env)
+
     arity = idArity bndr        -- We must match this arity
 
     ---------------------
@@ -422,7 +425,7 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
       = return (floats, rhs)
 
       -- So the top-level binding is marked NoCafRefs
-      | Just (floats', rhs') <- canFloatFromNoCaf floats rhs
+      | Just (floats', rhs') <- canFloatFromNoCaf platform floats rhs
       = return (floats', rhs')
 
       | otherwise
@@ -1069,9 +1072,9 @@ dropDeadCodeAlts alts = (alts', unionVarSets fvss)
           where !(e', fvs) = dropDeadCode e
 
 -------------------------------------------
-canFloatFromNoCaf ::  Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
+canFloatFromNoCaf :: Platform -> Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
        -- Note [CafInfo and floating]
-canFloatFromNoCaf (Floats ok_to_spec fs) rhs
+canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
   | OkToSpec <- ok_to_spec           -- Worth trying
   , Just (subst, fs') <- go (emptySubst, nilOL) (fromOL fs)
   = Just (Floats OkToSpec fs', subst_expr subst rhs)
@@ -1114,7 +1117,7 @@ canFloatFromNoCaf (Floats ok_to_spec fs) rhs
     -- We can only float to top level from a NoCaf thing if
     -- the new binding is static. However it can't mention
     -- any non-static things or it would *already* be Caffy
-    rhs_ok = rhsIsStatic (\_ -> False)
+    rhs_ok = rhsIsStatic platform (\_ -> False)
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs
