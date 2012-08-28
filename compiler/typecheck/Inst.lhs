@@ -25,11 +25,10 @@ module Inst (
        tcSyntaxName,
 
        -- Simple functions over evidence variables
-       hasEqualities, unitImplication,
+       hasEqualities, 
        
-       tyVarsOfWC, tyVarsOfBag, 
-       tyVarsOfEvVar, tyVarsOfEvVars, tyVarsOfImplication,
-       tyVarsOfCt, tyVarsOfCts, tyVarsOfCDict, tyVarsOfCDicts,
+       tyVarsOfZonkedWC, tyVarsOfBag, 
+       tyVarsOfCt, tyVarsOfCts, 
 
        tidyEvVar, tidyCt, tidyGivenLoc,
 
@@ -506,11 +505,6 @@ addClsInstsErr herald ispecs
 %************************************************************************
 
 \begin{code}
-unitImplication :: Implication -> Bag Implication
-unitImplication implic
-  | isEmptyWC (ic_wanted implic) = emptyBag
-  | otherwise                    = unitBag implic
-
 hasEqualities :: [EvVar] -> Bool
 -- Has a bunch of canonical constraints (all givens) got any equalities in it?
 hasEqualities givens = any (has_eq . evVarPred) givens
@@ -529,33 +523,23 @@ tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOf
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
 tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
-tyVarsOfCt (CNonCanonical { cc_ev = fl })           = tyVarsOfType (ctEvPred fl)
-
-tyVarsOfCDict :: Ct -> TcTyVarSet 
-tyVarsOfCDict (CDictCan { cc_tyargs = tys }) = tyVarsOfTypes tys
-tyVarsOfCDict _ct                            = emptyVarSet 
-
-tyVarsOfCDicts :: Cts -> TcTyVarSet 
-tyVarsOfCDicts = foldrBag (unionVarSet . tyVarsOfCDict) emptyVarSet
+tyVarsOfCt (CNonCanonical { cc_ev = fl })               = tyVarsOfType (ctEvPred fl)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
 
-tyVarsOfWC :: WantedConstraints -> TyVarSet
-tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+tyVarsOfZonkedWC :: WantedConstraints -> TyVarSet
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
+tyVarsOfZonkedWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
   = tyVarsOfCts flat `unionVarSet`
-    tyVarsOfBag tyVarsOfImplication implic `unionVarSet`
+    tyVarsOfBag tyVarsOfZonkedImplic implic `unionVarSet`
     tyVarsOfCts insol
 
-tyVarsOfImplication :: Implication -> TyVarSet
-tyVarsOfImplication (Implic { ic_skols = skols, ic_wanted = wanted })
-  = tyVarsOfWC wanted `delVarSetList` skols
-
-tyVarsOfEvVar :: EvVar -> TyVarSet
-tyVarsOfEvVar ev = tyVarsOfType $ evVarPred ev
-
-tyVarsOfEvVars :: [EvVar] -> TyVarSet
-tyVarsOfEvVars = foldr (unionVarSet . tyVarsOfEvVar) emptyVarSet
+tyVarsOfZonkedImplic :: Implication -> TyVarSet
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
+tyVarsOfZonkedImplic (Implic { ic_skols = skols, ic_given = givens, ic_wanted = wanted })
+  = (tyVarsOfZonkedWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
+    `delVarSetList` skols
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet

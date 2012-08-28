@@ -28,6 +28,9 @@ module TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
   TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
+  -- Untouchables
+  Untouchables(..), noUntouchables, pushUntouchables, isTouchable,
+
   --------------------------------
   -- MetaDetails
   UserTypeCtxt(..), pprUserTypeCtxt,
@@ -38,6 +41,7 @@ module TcType (
   isAmbiguousTyVar, metaTvRef, 
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
+  isTouchableMetaTyVar,
 
   --------------------------------
   -- Builders
@@ -118,7 +122,6 @@ module TcType (
   openTypeKind, constraintKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isSubOpenTypeKind, 
   tcIsSubKind, splitKindFunTys, defaultKind,
-  mkMetaKindVar,
 
   --------------------------------
   -- Rexported from Type
@@ -304,13 +307,35 @@ data TcTyVarDetails
            -- to represent a flattening skolem variable alpha
            -- identified with type ty.
           
-  | MetaTv MetaInfo (IORef MetaDetails)
+  | MetaTv { mtv_info  :: MetaInfo
+           , mtv_ref   :: IORef MetaDetails
+           , mtv_untch :: Untouchables }  -- See Note [Untouchable type variables]
+
 
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
 -- See Note [Binding when looking up instances] in InstEnv
 vanillaSkolemTv = SkolemTv False  -- Might be instantiated
 superSkolemTv   = SkolemTv True   -- Treat this as a completely distinct type
 
+-------------------------
+newtype Untouchables = Untouchables [Unique]
+
+noUntouchables :: Untouchables
+noUntouchables = Untouchables []   -- 0 = outermost level
+
+pushUntouchables :: Unique -> Untouchables -> Untouchables 
+pushUntouchables u (Untouchables us) = Untouchables (u:us)
+
+isTouchable :: Untouchables -> Untouchables -> Bool
+isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = case ctxt_untch of
+      []    -> True
+      (u:_) -> u `elem` tv_untch
+
+instance Outputable Untouchables where
+  ppr (Untouchables us) = pprWithCommas ppr us
+
+-----------------------------
 data MetaDetails
   = Flexi  -- Flexi type variables unify to become Indirects  
   | Indirect TcType
@@ -330,11 +355,6 @@ data MetaInfo
 		   --      see Note [Signature skolems]        
 		   --      The MetaDetails, if filled in, will 
 		   --      always be another SigTv or a SkolemTv
-
-   | TcsTv	   -- A MetaTv allocated by the constraint solver
-     		   -- Its particular property is that it is always "touchable"
-		   -- Nevertheless, the constraint solver has to try to guess
-		   -- what type to instantiate it to
 
 -------------------------------------
 -- UserTypeCtxt describes the origin of the polymorphic type
@@ -382,20 +402,6 @@ data UserTypeCtxt
 -- will become	type T = forall a. a->a
 --
 -- With gla-exts that's right, but for H98 we should complain. 
-
----------------------------------
--- Kind variables:
-\begin{code}
-mkKindName :: Unique -> Name
-mkKindName unique = mkSystemName unique kind_var_occ
-
-mkMetaKindVar :: Unique -> IORef MetaDetails -> MetaKindVar
-mkMetaKindVar u r
-  = mkTcTyVar (mkKindName u) superKind (MetaTv TauTv r)
-
-kind_var_occ :: OccName	-- Just one for all MetaKindVars
-			-- They may be jiggled by tidying
-kind_var_occ = mkOccName tvName "k"
 \end{code}
 
 %************************************************************************
@@ -411,9 +417,12 @@ pprTcTyVarDetails (SkolemTv True)  = ptext (sLit "ssk")
 pprTcTyVarDetails (SkolemTv False) = ptext (sLit "sk")
 pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
 pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
-pprTcTyVarDetails (MetaTv TauTv _) = ptext (sLit "tau")
-pprTcTyVarDetails (MetaTv TcsTv _) = ptext (sLit "tcs")
-pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_untch = untch })
+  = pp_info <> brackets (ppr untch)
+  where
+    pp_info = case info of
+                TauTv -> ptext (sLit "tau")
+                SigTv -> ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
@@ -683,8 +692,14 @@ exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
 %************************************************************************
 
 \begin{code}
-isImmutableTyVar :: TyVar -> Bool
+isTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
+isTouchableMetaTyVar ctxt_untch tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of 
+      MetaTv { mtv_untch = tv_untch } -> isTouchable ctxt_untch tv_untch
+      _ -> False
 
+isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv
   | isTcTyVar tv = isSkolemTyVar tv
   | otherwise    = True
@@ -698,8 +713,8 @@ isTyConableTyVar tv
 	-- not a SigTv
   = ASSERT( isTcTyVar tv) 
     case tcTyVarDetails tv of
-	MetaTv SigTv _ -> False
-	_              -> True
+	MetaTv { mtv_info = SigTv } -> False
+	_                           -> True
 	
 isSkolemTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
@@ -741,15 +756,15 @@ isSigTyVar :: Var -> Bool
 isSigTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	MetaTv SigTv _ -> True
-	_              -> False
+	MetaTv { mtv_info = SigTv } -> True
+	_                           -> False
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-	MetaTv _ ref -> ref
-	_          -> pprPanic "metaTvRef" (ppr tv)
+	MetaTv { mtv_ref = ref } -> ref
+	_ -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
 isFlexi Flexi = True

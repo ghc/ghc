@@ -424,11 +424,12 @@ newImplication :: SkolemInfo -> [TcTyVar]
 newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
-    do { ((result, untch), wanted) <- captureConstraints  $ 
+    do { let no_equalities = not (hasEqualities given)
+       ; ((result, untch), wanted) <- captureConstraints  $ 
                                       captureUntouchables $
                                       thing_inside
 
-       ; if isEmptyWC wanted && not (hasEqualities given)
+       ; if isEmptyWC wanted && no_equalities
        	    -- Optimisation : if there are no wanteds, and the givens
        	    -- are sufficiently simple, don't generate an implication
        	    -- at all.  Reason for the hasEqualities test:
@@ -443,6 +444,7 @@ newImplication skol_info skol_tvs given thing_inside
        ; emitImplication $ Implic { ic_untch = untch
              		     	  , ic_env = lcl_env
              		     	  , ic_skols = skol_tvs
+                                  , ic_fsks  = []
                              	  , ic_given = given
                                   , ic_wanted = wanted
                                   , ic_insol  = insolubleWC wanted
@@ -776,7 +778,7 @@ uUnfilledVar origin swapped tv1 details1 (TyVarTy tv2)
 
 uUnfilledVar origin swapped tv1 details1 non_var_ty2  -- ty2 is not a type variable
   = case details1 of
-      MetaTv TauTv ref1 
+      MetaTv { mtv_info = TauTv, mtv_ref = ref1 }
         -> do { mb_ty2' <- checkTauTvUpdate tv1 non_var_ty2
               ; case mb_ty2' of
                   Nothing   -> do { traceTc "Occ/kind defer" (ppr tv1); defer }
@@ -811,17 +813,18 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
 
        ; case (sub_kind, details1, details2) of
            -- k1 < k2, so update tv2
-           (LT, _, MetaTv _ ref2) -> updateMeta tv2 ref2 ty1
+           (LT, _, MetaTv { mtv_ref = ref2 }) -> updateMeta tv2 ref2 ty1
 
            -- k2 < k1, so update tv1
-           (GT, MetaTv _ ref1, _) -> updateMeta tv1 ref1 ty2
+           (GT, MetaTv { mtv_ref = ref1 }, _) -> updateMeta tv1 ref1 ty2
 
 	   -- k1 = k2, so we are free to update either way
-           (EQ, MetaTv i1 ref1, MetaTv i2 ref2)
+           (EQ, MetaTv { mtv_info = i1, mtv_ref = ref1 }, 
+                MetaTv { mtv_info = i2, mtv_ref = ref2 })
                 | nicer_to_update_tv1 i1 i2 -> updateMeta tv1 ref1 ty2
                 | otherwise                 -> updateMeta tv2 ref2 ty1
-           (EQ, MetaTv _ ref1, _) -> updateMeta tv1 ref1 ty2
-           (EQ, _, MetaTv _ ref2) -> updateMeta tv2 ref2 ty1
+           (EQ, MetaTv { mtv_ref = ref1 }, _) -> updateMeta tv1 ref1 ty2
+           (EQ, _, MetaTv { mtv_ref = ref2 }) -> updateMeta tv2 ref2 ty1
 
 	   -- Can't do it in-place, so defer
 	   -- This happens for skolems of all sorts
@@ -967,15 +970,16 @@ data LookupTyVarResult	-- The result of a lookupTcTyVar call
 
 lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
 lookupTcTyVar tyvar 
-  | MetaTv _ ref <- details
+  | MetaTv { mtv_ref = ref } <- details
   = do { meta_details <- readMutVar ref
        ; case meta_details of
            Indirect ty -> return (Filled ty)
-           Flexi -> do { is_untch <- isUntouchable tyvar
-                       ; let    -- Note [Unifying untouchables]
-                             ret_details | is_untch  = vanillaSkolemTv
-                                         | otherwise = details
-       	               ; return (Unfilled ret_details) } }
+           Flexi -> do { is_touchable <- isTouchableTcM tyvar
+                             -- Note [Unifying untouchables]
+                       ; if is_touchable then
+                            return (Unfilled details)
+                         else
+                            return (Unfilled vanillaSkolemTv) } }
   | otherwise
   = return (Unfilled details)
   where

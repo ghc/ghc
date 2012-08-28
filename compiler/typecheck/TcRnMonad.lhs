@@ -42,7 +42,6 @@ import NameSet
 import Bag
 import Outputable
 import UniqSupply
-import Unique
 import UniqFM
 import DynFlags
 import Maybes
@@ -78,7 +77,6 @@ initTc :: HscEnv
 
 initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
-        meta_var     <- newIORef initTyVarUnique ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
@@ -151,8 +149,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
-                tcl_meta       = meta_var,
-                tcl_untch      = initTyVarUnique
+                tcl_untch      = noUntouchables
              } ;
         } ;
 
@@ -345,16 +342,6 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 %************************************************************************
 
 \begin{code}
-newMetaUnique :: TcM Unique
--- The uniques for TcMetaTyVars are allocated specially
--- in guaranteed linear order, starting at zero for each module
-newMetaUnique
- = do { env <- getLclEnv
-      ; let meta_var = tcl_meta env
-      ; uniq <- readMutVar meta_var
-      ; writeMutVar meta_var (incrUnique uniq)
-      ; return uniq }
-
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv ;
@@ -1049,20 +1036,28 @@ captureConstraints thing_inside
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
   = do { env <- getLclEnv
-       ; low_meta <- readTcRef (tcl_meta env)
-       ; res <- setLclEnv (env { tcl_untch = low_meta })
+       ; uniq <- newUnique
+       ; let untch' = pushUntouchables uniq (tcl_untch env)
+       ; res <- setLclEnv (env { tcl_untch = untch' })
                 thing_inside
-       ; high_meta <- readTcRef (tcl_meta env)
-       ; return (res, TouchableRange low_meta high_meta) }
+       ; return (res, untch') }
 
-isUntouchable :: TcTyVar -> TcM Bool
-isUntouchable tv
+getUntouchables :: TcM Untouchables
+getUntouchables = do { env <- getLclEnv
+                     ; return (tcl_untch env) }
+
+setUntouchables :: Untouchables -> TcM a -> TcM a
+setUntouchables untch thing_inside 
+  = updLclEnv (\env -> env { tcl_untch = untch }) thing_inside
+
+isTouchableTcM :: TcTyVar -> TcM Bool
+isTouchableTcM tv
     -- Kind variables are always touchable
   | isSuperKind (tyVarKind tv) 
   = return False
   | otherwise 
   = do { env <- getLclEnv
-       ; return (varUnique tv < tcl_untch env) }
+       ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

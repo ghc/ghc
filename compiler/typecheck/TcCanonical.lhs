@@ -29,7 +29,6 @@ import Control.Monad    ( when )
 import MonadUtils
 import Control.Applicative ( (<|>) )
 
-import TrieMap
 import VarSet
 import TcSMonad
 import FastString
@@ -535,19 +534,20 @@ flatten d f fl (TyConApp tc tys)
   | otherwise
   = ASSERT( tyConArity tc <= length tys )	-- Type functions are saturated
       do { (xis, cos) <- flattenMany d f fl tys
-         ; let (xi_args, xi_rest)  = splitAt (tyConArity tc) xis
+         ; let (xi_args,  xi_rest)  = splitAt (tyConArity tc) xis
+               (cos_args, cos_rest) = splitAt (tyConArity tc) cos
 	       	 -- The type function might be *over* saturated
 		 -- in which case the remaining arguments should
 		 -- be dealt with by AppTys
                fam_ty = mkTyConApp tc xi_args
                
-         ; (ret_co, rhs_xi, ct) <-
+         ; (ret_co, rhs_xi) <-
              case f of 
                FMSubstOnly -> 
-                 return (mkTcReflCo fam_ty, fam_ty, [])
+                 return (mkTcReflCo fam_ty, fam_ty)
                FMFullFlatten -> 
-                 do { flat_cache <- getFlatCache
-                    ; case lookupTM fam_ty flat_cache of
+                 do { mb_ct <- lookupFlatEqn fam_ty
+                    ; case mb_ct of
                         Just ct 
                           | let ctev = cc_ev ct
                           , ctev `canRewrite` fl 
@@ -564,23 +564,25 @@ flatten d f fl (TyConApp tc tys)
                                ; (flat_rhs_xi,co) <- flatten (cc_depth ct) f ctev rhs_xi
                                ; let final_co = evTermCoercion (ctEvTerm ctev)
                                                 `mkTcTransCo` mkTcSymCo co
-                               ; return (final_co, flat_rhs_xi,[]) }
+                               ; return (final_co, flat_rhs_xi) }
                           
                         _ | isGiven fl -- Given: make new flatten skolem
                           -> do { traceTcS "flatten/flat-cache miss" $ empty 
-                                ; rhs_xi_var <- newFlattenSkolemTy fam_ty
-                                ; let co = mkTcReflCo fam_ty
+                                ; rhs_ty <- newFlattenSkolemTy fam_ty
+                                      -- Update the flat cache
+                                ; let co     = mkTcReflCo fam_ty
                                       new_fl = Given { ctev_gloc = ctev_gloc fl
-                                                     , ctev_pred = mkTcEqPred fam_ty rhs_xi_var
+                                                     , ctev_pred = mkTcEqPred fam_ty rhs_ty
                                                      , ctev_evtm = EvCoercion co }
                                       ct = CFunEqCan { cc_ev = new_fl
                                                      , cc_fun    = tc 
-                                                     , cc_tyargs = xi_args 
-                                                     , cc_rhs    = rhs_xi_var 
-                                                     , cc_depth  = d }
-                                      -- Update the flat cache
+                            			     , cc_tyargs = xi_args    
+                            			     , cc_rhs    = rhs_ty
+                            			     , cc_depth  = d }
                                 ; updFlatCache ct
-                                ; return (co, rhs_xi_var, [ct]) }
+                                ; updWorkListTcS $ extendWorkListEq ct
+                                ; return (co, rhs_ty) }
+
                          | otherwise -- Wanted or Derived: make new unification variable
                          -> do { traceTcS "flatten/flat-cache miss" $ empty 
                                ; rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
@@ -596,12 +598,11 @@ flatten d f fl (TyConApp tc tys)
                                                              , cc_depth  = d }
                                           -- Update the flat cache: just an optimisation!
                                         ; updFlatCache ct
-                                        ; return (evTermCoercion (ctEvTerm ctev), rhs_xi_var, [ct]) }
+                                        ; updWorkListTcS $ extendWorkListEq ct
+                                        ; return (evTermCoercion (ctEvTerm ctev), rhs_xi_var) }
                                    Cached {} -> panic "flatten TyConApp, var must be fresh!" } 
                     }
                   -- Emit the flat constraints
-         ; updWorkListTcS $ appendWorkListEqs ct
-         ; let (cos_args, cos_rest) = splitAt (tyConArity tc) cos
          ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
                                             --    cf Trac #5655
                   , mkTcAppCos (mkTcSymCo ret_co `mkTcTransCo` mkTcTyConAppCo tc cos_args) $
@@ -613,10 +614,28 @@ flatten d _f ctxt ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; (rho', co) <- flatten d FMSubstOnly ctxt rho
+       ; (rho', co) <- flatten d FMSubstOnly ctxt rho   
+                         -- Substitute only under a forall
+                         -- See Note [Flattening under a forall]
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
-
 \end{code}
+
+Note [Flattening under a forall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Under a forall, we
+  (a) MUST apply the inert subsitution
+  (b) MUST NOT flatten type family applications
+Hence FMSubstOnly.
+
+For (a) consider   c ~ a, a ~ T (forall b. (b, [c])
+If we don't apply the c~a substitution to the second constraint
+we won't see the occurs-check error.
+
+For (b) consider  (a ~ forall b. F a b), we don't want to flatten
+to     (a ~ forall b.fsk, F a b ~ fsk)
+because now the 'b' has escaped its scope.  We'd have to flatten to
+       (a ~ forall b. fsk b, forall b. F a b ~ fsk b)
+and we have not begun to think about how to make that work!
 
 \begin{code}
 flattenTyVar :: SubGoalDepth 
@@ -782,7 +801,7 @@ canEq d fl s1@(ForAllTy {}) s2@(ForAllTy {})
              ; return Stop } }
  | otherwise
  = do { traceTcS "Ommitting decomposition of given polytype equality" $ 
-        pprEq s1 s2
+        pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; return Stop }
 canEq d fl _ _  = canEqFailure d fl
 
@@ -874,6 +893,13 @@ emitKindConstraint ct
                          Given { ctev_gloc = gloc }   -> setCtLocOrigin gloc orig
          orig = TypeEqOrigin (UnifyOrigin ty1 ty2)
 \end{code}
+
+Note [Do not decompose given polytype equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider [G] (forall a. t1 ~ forall a. t2).  Can we decompose this?
+No -- what would the evidence look like.  So instead we simply discard
+this given evidence.   
+
 
 Note [Combining insoluble constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1017,18 +1043,14 @@ inert set is an idempotent subustitution...
 
 \begin{code}
 data TypeClassifier 
-  = FskCls TcTyVar      -- ^ Flatten skolem 
-  | VarCls TcTyVar      -- ^ Non-flatten-skolem variable 
+  = VarCls TcTyVar      -- ^ Type variable 
   | FunCls TyCon [Type] -- ^ Type function, exactly saturated
   | OtherCls TcType     -- ^ Neither of the above
 
 
 classify :: TcType -> TypeClassifier
 
-classify (TyVarTy tv) 
-  | isTcTyVar tv, 
-    FlatSkol {} <- tcTyVarDetails tv = FskCls tv
-  | otherwise                        = VarCls tv
+classify (TyVarTy tv) = ASSERT2( isTcTyVar tv, ppr tv ) VarCls tv
 classify (TyConApp tc tys) | isSynFamilyTyCon tc
                            , tyConArity tc == length tys
                            = FunCls tc tys
@@ -1047,7 +1069,6 @@ reOrient :: CtEvidence -> TypeClassifier -> TypeClassifier -> Bool
 --
 -- Postcondition: After re-orienting, first arg is not OTherCls
 reOrient _fl (OtherCls {}) (FunCls {})   = True
-reOrient _fl (OtherCls {}) (FskCls {})   = True
 reOrient _fl (OtherCls {}) (VarCls {})   = True
 reOrient _fl (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
 
@@ -1058,21 +1079,12 @@ reOrient _fl (FunCls {})   (VarCls _tv)  = False
 reOrient _fl (FunCls {}) _                = False             -- Fun/Other on rhs
 
 reOrient _fl (VarCls {}) (FunCls {})      = True 
-
-reOrient _fl (VarCls {}) (FskCls {})      = False
-
 reOrient _fl (VarCls {})  (OtherCls {})   = False
+
 reOrient _fl (VarCls tv1)  (VarCls tv2)  
   | isMetaTyVar tv2 && not (isMetaTyVar tv1) = True 
   | otherwise                                = False 
   -- Just for efficiency, see CTyEqCan invariants 
-
-reOrient _fl (FskCls {}) (VarCls tv2)     = isMetaTyVar tv2 
-  -- Just for efficiency, see CTyEqCan invariants
-
-reOrient _fl (FskCls {}) (FskCls {})     = False
-reOrient _fl (FskCls {}) (FunCls {})     = True 
-reOrient _fl (FskCls {}) (OtherCls {})   = False 
 
 ------------------
 

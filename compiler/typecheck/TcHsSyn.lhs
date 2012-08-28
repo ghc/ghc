@@ -1257,16 +1257,17 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
          SkolemTv {}    -> lookup_in_env
          RuntimeUnk {}  -> lookup_in_env
          FlatSkol ty    -> zonkTcTypeToType env ty
-         MetaTv _ ref   -> do { cts <- readMutVar ref
-           		      ; case cts of    
-           		           Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
-                                                         zonkTcTypeToType env (tyVarKind tv)
-                                               ; zonk_unbound_tyvar (setTyVarKind tv kind) }
-           		           Indirect ty -> do { zty <- zonkTcTypeToType env ty 
-                                                     -- Small optimisation: shortern-out indirect steps
-                                                     -- so that the old type may be more easily collected.
-                                                     ; writeMutVar ref (Indirect zty)
-                                                     ; return zty } }
+         MetaTv { mtv_ref = ref }  
+           -> do { cts <- readMutVar ref
+           	 ; case cts of    
+           	      Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
+                                            zonkTcTypeToType env (tyVarKind tv)
+                                  ; zonk_unbound_tyvar (setTyVarKind tv kind) }
+           	      Indirect ty -> do { zty <- zonkTcTypeToType env ty 
+                                        -- Small optimisation: shortern-out indirect steps
+                                        -- so that the old type may be more easily collected.
+                                        ; writeMutVar ref (Indirect zty)
+                                        ; return zty } }
   | otherwise
   = lookup_in_env
   where

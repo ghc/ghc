@@ -48,17 +48,15 @@ module TcRnTypes(
 	-- Arrows
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
-	-- Constraints
-        Untouchables(..), inTouchableRange, isNoUntouchables,
-
        -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, keepWanted,
+        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, dropDerivedWC,
         singleCt, extendCts, isEmptyCts, isCTyEqCan, isCFunEqCan,
         isCDictCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt, 
         isGivenCt, 
         ctWantedLoc, ctEvidence,
-        SubGoalDepth, mkNonCanonical, ctPred, ctEvPred, ctEvTerm, ctEvId,
+        SubGoalDepth, mkNonCanonical, mkNonCanonicalCt,
+        ctPred, ctEvPred, ctEvTerm, ctEvId,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, addFlats, addImplics, mkFlatWC,
@@ -113,7 +111,6 @@ import VarSet
 import ErrUtils
 import UniqFM
 import UniqSupply
-import Unique
 import BasicTypes
 import Bag
 import DynFlags
@@ -442,13 +439,7 @@ data TcLclEnv		-- Changes as we move inside an expression
                         -- Why mutable? see notes with tcGetGlobalTyVars
 
 	tcl_lie   :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-
-	-- TcMetaTyVars have 
-	tcl_meta  :: TcRef Unique,  -- The next free unique for TcMetaTyVars
-		     		    -- Guaranteed to be allocated linearly
-	tcl_untch :: Unique	    -- Any TcMetaTyVar with 
-		     		    --     unique >= tcl_untch is touchable
-		     		    --     unique <  tcl_untch is untouchable
+	tcl_untch :: Untouchables
     }
 
 type TcTypeEnv = NameEnv TcTyThing
@@ -918,6 +909,9 @@ built (in TcCanonical)
 mkNonCanonical :: CtEvidence -> Ct
 mkNonCanonical flav = CNonCanonical { cc_ev = flav, cc_depth = 0}
 
+mkNonCanonicalCt :: Ct -> Ct
+mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct, cc_depth = 0}
+
 ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
 
@@ -925,11 +919,12 @@ ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
 
-keepWanted :: Cts -> Cts
-keepWanted = filterBag isWantedCt
-    -- DV: there used to be a note here that read: 
-    -- ``Important: use fold*r*Bag to preserve the order of the evidence variables'' 
-    -- DV: Is this still relevant? 
+dropDerivedWC :: WantedConstraints -> WantedConstraints
+dropDerivedWC wc@(WC { wc_flat = flats })
+  = wc { wc_flat = filterBag isWantedCt flats }
+    -- Don't filter the insolubles, because derived 
+    -- insolubles should stay so that we report them.
+    -- The implications are (recursively) already filtered
 \end{code}
 
 
@@ -1079,38 +1074,6 @@ pprBag pp b = foldrBag (($$) . pp) empty b
 \end{code}
  
 
-\begin{code}
-data Untouchables = NoUntouchables
-                  | TouchableRange
-                          Unique  -- Low end
-                          Unique  -- High end
- -- A TcMetaTyvar is *touchable* iff its unique u satisfies
- --   u >= low
- --   u < high
-
-instance Outputable Untouchables where
-  ppr NoUntouchables = ptext (sLit "No untouchables")
-  ppr (TouchableRange low high) = ptext (sLit "Touchable range:") <+> 
-                                  ppr low <+> char '-' <+> ppr high
-
-isNoUntouchables :: Untouchables -> Bool
-isNoUntouchables NoUntouchables      = True
-isNoUntouchables (TouchableRange {}) = False
-
-inTouchableRange :: Untouchables -> TcTyVar -> Bool
-inTouchableRange NoUntouchables _ = True
-inTouchableRange (TouchableRange low high) tv 
-  = uniq >= low && uniq < high
-  where
-    uniq = varUnique tv
-
--- EvVar defined in module Var.lhs:
--- Evidence variables include all *quantifiable* constraints
---   dictionaries
---   implicit parameters
---   coercion variables
-\end{code}
-
 %************************************************************************
 %*									*
                 Implication constraints
@@ -1131,8 +1094,12 @@ data Implication
       ic_skols  :: [TcTyVar],    -- Introduced skolems 
       		   	         -- See Note [Skolems in an implication]
 
+      ic_fsks  :: [TcTyVar],   -- Extra flatten-skolems introduced by the flattening
+                               -- done by canonicalisation. 
+
       ic_given  :: [EvVar],      -- Given evidence variables
       		   		 --   (order does not matter)
+
       ic_loc   :: GivenLoc,      -- Binding location of the implication,
                                  --   which is also the location of all the
                                  --   given evidence variables
@@ -1145,12 +1112,14 @@ data Implication
     }
 
 instance Outputable Implication where
-  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_given = given
+  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_fsks = fsks
+              , ic_given = given
               , ic_wanted = wanted
               , ic_binds = binds, ic_loc = loc })
    = ptext (sLit "Implic") <+> braces 
      (sep [ ptext (sLit "Untouchables = ") <+> ppr untch
           , ptext (sLit "Skolems = ") <+> ppr skols
+          , ptext (sLit "Flatten-skolems = ") <+> ppr fsks
           , ptext (sLit "Given = ") <+> pprEvVars given
           , ptext (sLit "Wanted = ") <+> ppr wanted
           , ptext (sLit "Binds = ") <+> ppr binds

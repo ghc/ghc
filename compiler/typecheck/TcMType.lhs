@@ -28,7 +28,7 @@ module TcMType (
   mkTcTyVarName,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  isFilledMetaTyVar, isFlexiMetaTyVar,
+  newMetaDetails, isFilledMetaTyVar, isFlexiMetaTyVar,
 
   --------------------------------
   -- Creating new evidence variables
@@ -112,10 +112,18 @@ import Data.List        ( (\\), partition, mapAccumL )
 %************************************************************************
 
 \begin{code}
+mkKindName :: Unique -> Name
+mkKindName unique = mkSystemName unique kind_var_occ
+
+kind_var_occ :: OccName	-- Just one for all MetaKindVars
+			-- They may be jiggled by tidying
+kind_var_occ = mkOccName tvName "k"
+
 newMetaKindVar :: TcM TcKind
 newMetaKindVar = do { uniq <- newUnique
-		    ; ref <- newMutVar Flexi
-		    ; return (mkTyVarTy (mkMetaKindVar uniq ref)) }
+		    ; details <- newMetaDetails TauTv
+                    ; let kv = mkTcTyVar (mkKindName uniq) superKind details
+		    ; return (mkTyVarTy kv) }
 
 newMetaKindVars :: Int -> TcM [TcKind]
 newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
@@ -266,12 +274,18 @@ tcInstSigTyVar subst tv
 
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
-  = do { uniq <- newMetaUnique
-       ; ref <- newMutVar Flexi
+  = do { uniq <- newUnique
        ; let name' = setNameUnique name uniq
                       -- Use the same OccName so that the tidy-er
                       -- doesn't gratuitously rename 'a' to 'a0' etc
-       ; return (mkTcTyVar name' kind (MetaTv SigTv ref)) }
+       ; details <- newMetaDetails SigTv
+       ; return (mkTcTyVar name' kind details) }
+
+newMetaDetails :: MetaInfo -> TcM TcTyVarDetails
+newMetaDetails info 
+  = do { ref <- newMutVar Flexi
+       ; untch <- getUntouchables
+       ; return (MetaTv { mtv_info = info, mtv_ref = ref, mtv_untch = untch }) }
 \end{code}
 
 Note [Kind substitution when instantiating]
@@ -300,14 +314,13 @@ instead of the buggous
 newMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newMetaTyVar meta_info kind
-  = do	{ uniq <- newMetaUnique
- 	; ref <- newMutVar Flexi
+  = do	{ uniq <- newUnique
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
                         TauTv -> fsLit "t"
-                        TcsTv -> fsLit "u"
                         SigTv -> fsLit "a"
-	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
+        ; details <- newMetaDetails meta_info
+	; return (mkTcTyVar name kind details) }
 
 mkTcTyVarName :: Unique -> FastString -> Name
 -- Make sure that fresh TcTyVar names finish with a digit
@@ -323,7 +336,7 @@ isFilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a filled-in (Indirect) meta type variable
 isFilledMetaTyVar tv
   | not (isTcTyVar tv) = return False
-  | MetaTv _ ref <- tcTyVarDetails tv
+  | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
   = do 	{ details <- readMutVar ref
 	; return (isIndirect details) }
   | otherwise = return False
@@ -332,7 +345,7 @@ isFlexiMetaTyVar :: TyVar -> TcM Bool
 -- True of a un-filled-in (Flexi) meta type variable
 isFlexiMetaTyVar tv
   | not (isTcTyVar tv) = return False
-  | MetaTv _ ref <- tcTyVarDetails tv
+  | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
   = do 	{ details <- readMutVar ref
 	; return (isFlexi details) }
   | otherwise = return False
@@ -351,7 +364,7 @@ writeMetaTyVar tyvar ty
   = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
-  | MetaTv _ ref <- tcTyVarDetails tyvar
+  | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
@@ -433,11 +446,11 @@ tcInstTyVarX :: TvSubst -> TKVar -> TcM (TvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
 tcInstTyVarX subst tyvar
-  = do  { uniq <- newMetaUnique
-        ; ref <- newMutVar Flexi
+  = do  { uniq <- newUnique
+        ; details <- newMetaDetails TauTv
         ; let name   = mkSystemName uniq (getOccName tyvar)
               kind   = substTy subst (tyVarKind tyvar)
-              new_tv = mkTcTyVar name kind (MetaTv TauTv ref)
+              new_tv = mkTcTyVar name kind details 
         ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
 \end{code}
 
@@ -548,7 +561,7 @@ zonkQuantifiedTyVar tv
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
 
-      MetaTv _ ref ->
+      MetaTv { mtv_ref = ref } ->
           do when debugIsOn $ do
                  -- [Sept 04] Check for non-empty.
                  -- See note [Silly Type Synonym]
@@ -601,6 +614,7 @@ zonkImplication implic@(Implic { ic_given = given
        ; loc'    <- zonkGivenLoc loc
        ; wanted' <- zonkWC wanted
        ; return (implic { ic_given = given'
+                        , ic_fsks  = []  -- Zonking removes all FlatSkol tyvars
                         , ic_wanted = wanted'
                         , ic_loc = loc' }) }
 
@@ -778,10 +792,11 @@ zonkTcTyVar tv
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
       FlatSkol ty   -> zonkTcType ty
-      MetaTv _ ref  -> do { cts <- readMutVar ref
-                          ; case cts of
-		               Flexi       -> zonk_kind_and_return
-			       Indirect ty -> zonkTcType ty }
+      MetaTv { mtv_ref = ref }
+         -> do { cts <- readMutVar ref
+               ; case cts of
+	            Flexi       -> zonk_kind_and_return
+	            Indirect ty -> zonkTcType ty }
   where
     zonk_kind_and_return = do { z_tv <- zonkTyVarKind tv
                               ; return (TyVarTy z_tv) }

@@ -77,7 +77,7 @@ reportUnsolved runtimeCoercionErrors wanted
 
        ; errs_so_far <- ifErrsM (return True) (return False)
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
-             free_tvs = tyVarsOfWC wanted
+             free_tvs = tyVarsOfZonkedWC wanted
              err_ctxt = CEC { cec_encl  = []
                             , cec_insol = errs_so_far || insolubleWC wanted
                                           -- Don't report ambiguity errors if
@@ -143,7 +143,10 @@ reportWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics }
   where
     env = cec_tidy ctxt
     tidy_insols = mapBag (tidyCt env) insols
-    tidy_flats  = mapBag (tidyCt env) (keepWanted flats)
+    tidy_flats  = mapBag (tidyCt env) flats
+                  -- All the Derived ones have been filtered out alrady
+                  -- by the constraint solver. This is ok; we don't want
+                  -- to report unsolved Derived goals as error
                   -- See Note [Do not report derived but soluble errors]
 
 reportTidyWanteds :: ReportErrCtxt -> Bag Ct -> Bag Ct -> Bag Implication -> TcM ()
@@ -1085,14 +1088,13 @@ find_thing tidy_env ignore_it (ATyVar name tv)
 
 find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 
-warnDefaulting :: [Ct] -> Type -> TcM ()
+warnDefaulting :: Cts -> Type -> TcM ()
 warnDefaulting wanteds default_ty
   = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- tcInitTidyEnv
-       ; let wanted_bag = listToBag wanteds
-             tidy_env = tidyFreeTyVars env0 $
-                        tyVarsOfCts wanted_bag
-             tidy_wanteds = mapBag (tidyCt tidy_env) wanted_bag
+       ; let tidy_env = tidyFreeTyVars env0 $
+                        tyVarsOfCts wanteds
+             tidy_wanteds = mapBag (tidyCt tidy_env) wanteds
              (loc, ppr_wanteds) = pprWithArising (bagToList tidy_wanteds)
              warn_msg  = hang (ptext (sLit "Defaulting the following constraint(s) to type")
                                 <+> quotes (ppr default_ty))
@@ -1130,20 +1132,6 @@ solverDepthErrorTcS depth stack
     top_item = head stack
     msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int depth
                , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
-
-{- DV: Changing this because Derived's no longer have ids ... Kind of a corner case ...
-  = setCtFlavorLoc (cc_ev top_item) $
-    do { ev_vars <- mapM (zonkEvVar . cc_id) stack
-       ; env0 <- tcInitTidyEnv
-       ; let tidy_env = tidyFreeTyVars env0 (tyVarsOfEvVars ev_vars)
-             tidy_ev_vars = map (tidyEvVar tidy_env) ev_vars
-       ; failWithTcM (tidy_env, hang msg 2 (pprEvVars tidy_ev_vars)) }
-  where
-    top_item = head stack
-    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int depth
-               , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
--}
-
 
 flattenForAllErrorTcS :: CtEvidence -> TcType -> TcM a
 flattenForAllErrorTcS fl ty
