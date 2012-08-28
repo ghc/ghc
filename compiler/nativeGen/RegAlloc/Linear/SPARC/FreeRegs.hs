@@ -11,11 +11,12 @@ module RegAlloc.Linear.SPARC.FreeRegs
 where
 
 import SPARC.Regs
-import SPARC.RegPlate
 import RegClass
 import Reg
 
+import CodeGen.Platform
 import Outputable
+import Platform
 import FastBool
 
 import Data.Word
@@ -50,9 +51,9 @@ noFreeRegs = FreeRegs 0 0 0
 
 
 -- | The initial set of free regs.
-initFreeRegs :: FreeRegs
-initFreeRegs 
- = 	foldr releaseReg noFreeRegs allocatableRegs
+initFreeRegs :: Platform -> FreeRegs
+initFreeRegs platform
+ = 	foldr (releaseReg platform) noFreeRegs allocatableRegs
 
 			
 -- | Get all the free registers of this class.
@@ -75,13 +76,13 @@ getFreeRegs cls (FreeRegs g f d)
 
 
 -- | Grab a register.
-allocateReg :: RealReg -> FreeRegs -> FreeRegs
-allocateReg 
+allocateReg :: Platform -> RealReg -> FreeRegs -> FreeRegs
+allocateReg platform
 	 reg@(RealRegSingle r)
 	     (FreeRegs g f d)
 
 	-- can't allocate free regs
-	| not $ isFastTrue (freeReg r)
+	| not $ isFastTrue (freeReg platform r)
 	= pprPanic "SPARC.FreeRegs.allocateReg: not allocating pinned reg" (ppr reg)
 	
 	-- a general purpose reg
@@ -108,7 +109,7 @@ allocateReg
 	| otherwise
 	= pprPanic "SPARC.FreeRegs.releaseReg: not allocating bad reg" (ppr reg)
 			
-allocateReg
+allocateReg _
 	 reg@(RealRegPair r1 r2)
              (FreeRegs g f d)
 	
@@ -131,13 +132,13 @@ allocateReg
 --	The register liveness information says that most regs die after a C call, 
 --	but we still don't want to allocate to some of them.
 --
-releaseReg :: RealReg -> FreeRegs -> FreeRegs
-releaseReg 
+releaseReg :: Platform -> RealReg -> FreeRegs -> FreeRegs
+releaseReg platform
 	 reg@(RealRegSingle r) 
 	regs@(FreeRegs g f d)
 
 	-- don't release pinned reg
-	| not $ isFastTrue (freeReg r)
+	| not $ isFastTrue (freeReg platform r)
 	= regs
 
 	-- a general purpose reg
@@ -161,7 +162,7 @@ releaseReg
 	| otherwise
 	= pprPanic "SPARC.FreeRegs.releaseReg: not releasing bad reg" (ppr reg)
 	
-releaseReg 
+releaseReg _
 	 reg@(RealRegPair r1 r2) 
 	     (FreeRegs g f d)
 

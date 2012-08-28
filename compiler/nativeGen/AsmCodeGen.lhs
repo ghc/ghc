@@ -179,7 +179,7 @@ nativeCodeGen dflags h us cmms
                          ,shortcutJump              = PPC.RegInfo.shortcutJump
                          ,pprNatCmmDecl              = PPC.Ppr.pprNatCmmDecl
                          ,maxSpillSlots             = PPC.Instr.maxSpillSlots
-                         ,allocatableRegs           = \_ -> PPC.Regs.allocatableRegs
+                         ,allocatableRegs           = PPC.Regs.allocatableRegs
                          ,ncg_x86fp_kludge          = id
                          ,ncgExpandTop              = id
                          ,ncgMakeFarBranches        = makeFarBranches

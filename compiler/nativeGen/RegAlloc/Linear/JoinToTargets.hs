@@ -135,7 +135,7 @@ joinToTargets_first platform block_live new_blocks block_id instr dest dests
 
  = do	-- free up the regs that are not live on entry to this block.
   	freeregs 	<- getFreeRegsR
-	let freeregs' 	= foldr frReleaseReg freeregs to_free 
+	let freeregs' = foldr (frReleaseReg platform) freeregs to_free
 	
 	-- remember the current assignment on entry to this block.
 	setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)

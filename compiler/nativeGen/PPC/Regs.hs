@@ -37,9 +37,6 @@ module PPC.Regs (
         fReg,
         sp, r3, r4, r27, r28, f1, f20, f21,
 
-        -- horrow show
-        freeReg,
-        globalRegMaybe,
         allocatableRegs
 
 )
@@ -48,7 +45,6 @@ where
 
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
-#include "../includes/stg/HaskellMachRegs.h"
 
 import Reg
 import RegClass
@@ -58,10 +54,12 @@ import OldCmm
 import CLabel           ( CLabel )
 import Unique
 
+import CodeGen.Platform
 import Outputable
 import Constants
 import FastBool
 import FastTypes
+import Platform
 
 import Data.Word        ( Word8, Word16, Word32 )
 import Data.Int         ( Int8, Int16, Int32 )
@@ -316,288 +314,10 @@ f1      = regSingle $ fReg 1
 f20     = regSingle $ fReg 20
 f21     = regSingle $ fReg 21
 
-
-
--- horror show -----------------------------------------------------------------
-freeReg :: RegNo -> FastBool
-globalRegMaybe :: GlobalReg -> Maybe RealReg
-
-
-#if powerpc_TARGET_ARCH
-#define r0 0
-#define r1 1
-#define r2 2
-#define r3 3
-#define r4 4
-#define r5 5
-#define r6 6
-#define r7 7
-#define r8 8
-#define r9 9
-#define r10 10
-#define r11 11
-#define r12 12
-#define r13 13
-#define r14 14
-#define r15 15
-#define r16 16
-#define r17 17
-#define r18 18
-#define r19 19
-#define r20 20
-#define r21 21
-#define r22 22
-#define r23 23
-#define r24 24
-#define r25 25
-#define r26 26
-#define r27 27
-#define r28 28
-#define r29 29
-#define r30 30
-#define r31 31
-
-#ifdef darwin_TARGET_OS
-#define f0  32
-#define f1  33
-#define f2  34
-#define f3  35
-#define f4  36
-#define f5  37
-#define f6  38
-#define f7  39
-#define f8  40
-#define f9  41
-#define f10 42
-#define f11 43
-#define f12 44
-#define f13 45
-#define f14 46
-#define f15 47
-#define f16 48
-#define f17 49
-#define f18 50
-#define f19 51
-#define f20 52
-#define f21 53
-#define f22 54
-#define f23 55
-#define f24 56
-#define f25 57
-#define f26 58
-#define f27 59
-#define f28 60
-#define f29 61
-#define f30 62
-#define f31 63
-#else
-#define fr0  32
-#define fr1  33
-#define fr2  34
-#define fr3  35
-#define fr4  36
-#define fr5  37
-#define fr6  38
-#define fr7  39
-#define fr8  40
-#define fr9  41
-#define fr10 42
-#define fr11 43
-#define fr12 44
-#define fr13 45
-#define fr14 46
-#define fr15 47
-#define fr16 48
-#define fr17 49
-#define fr18 50
-#define fr19 51
-#define fr20 52
-#define fr21 53
-#define fr22 54
-#define fr23 55
-#define fr24 56
-#define fr25 57
-#define fr26 58
-#define fr27 59
-#define fr28 60
-#define fr29 61
-#define fr30 62
-#define fr31 63
-#endif
-
-
-
-freeReg 0 = fastBool False -- Hack: r0 can't be used in all insns, but it's actually free
-freeReg 1 = fastBool False -- The Stack Pointer
-#if !darwin_TARGET_OS
- -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
-freeReg 2 = fastBool False
-#endif
-
-#ifdef REG_Base
-freeReg REG_Base = fastBool False
-#endif
-#ifdef REG_R1
-freeReg REG_R1   = fastBool False
-#endif
-#ifdef REG_R2
-freeReg REG_R2   = fastBool False
-#endif
-#ifdef REG_R3
-freeReg REG_R3   = fastBool False
-#endif
-#ifdef REG_R4
-freeReg REG_R4   = fastBool False
-#endif
-#ifdef REG_R5
-freeReg REG_R5   = fastBool False
-#endif
-#ifdef REG_R6
-freeReg REG_R6   = fastBool False
-#endif
-#ifdef REG_R7
-freeReg REG_R7   = fastBool False
-#endif
-#ifdef REG_R8
-freeReg REG_R8   = fastBool False
-#endif
-#ifdef REG_R9
-freeReg REG_R9   = fastBool False
-#endif
-#ifdef REG_R10
-freeReg REG_R10  = fastBool False
-#endif
-#ifdef REG_F1
-freeReg REG_F1 = fastBool False
-#endif
-#ifdef REG_F2
-freeReg REG_F2 = fastBool False
-#endif
-#ifdef REG_F3
-freeReg REG_F3 = fastBool False
-#endif
-#ifdef REG_F4
-freeReg REG_F4 = fastBool False
-#endif
-#ifdef REG_D1
-freeReg REG_D1 = fastBool False
-#endif
-#ifdef REG_D2
-freeReg REG_D2 = fastBool False
-#endif
-#ifdef REG_Sp
-freeReg REG_Sp   = fastBool False
-#endif
-#ifdef REG_Su
-freeReg REG_Su   = fastBool False
-#endif
-#ifdef REG_SpLim
-freeReg REG_SpLim = fastBool False
-#endif
-#ifdef REG_Hp
-freeReg REG_Hp   = fastBool False
-#endif
-#ifdef REG_HpLim
-freeReg REG_HpLim = fastBool False
-#endif
-freeReg _               = fastBool True
-
-
---  | Returns 'Nothing' if this global register is not stored
--- in a real machine register, otherwise returns @'Just' reg@, where
--- reg is the machine register it is stored in.
-
-
-#ifdef REG_Base
-globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
-#endif
-#ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)         = Just (RealRegSingle REG_R1)
-#endif
-#ifdef REG_R2
-globalRegMaybe (VanillaReg 2 _)         = Just (RealRegSingle REG_R2)
-#endif
-#ifdef REG_R3
-globalRegMaybe (VanillaReg 3 _)         = Just (RealRegSingle REG_R3)
-#endif
-#ifdef REG_R4
-globalRegMaybe (VanillaReg 4 _)         = Just (RealRegSingle REG_R4)
-#endif
-#ifdef REG_R5
-globalRegMaybe (VanillaReg 5 _)         = Just (RealRegSingle REG_R5)
-#endif
-#ifdef REG_R6
-globalRegMaybe (VanillaReg 6 _)         = Just (RealRegSingle REG_R6)
-#endif
-#ifdef REG_R7
-globalRegMaybe (VanillaReg 7 _)         = Just (RealRegSingle REG_R7)
-#endif
-#ifdef REG_R8
-globalRegMaybe (VanillaReg 8 _)         = Just (RealRegSingle REG_R8)
-#endif
-#ifdef REG_R9
-globalRegMaybe (VanillaReg 9 _)         = Just (RealRegSingle REG_R9)
-#endif
-#ifdef REG_R10
-globalRegMaybe (VanillaReg 10 _)        = Just (RealRegSingle REG_R10)
-#endif
-#ifdef REG_F1
-globalRegMaybe (FloatReg 1)             = Just (RealRegSingle REG_F1)
-#endif
-#ifdef REG_F2
-globalRegMaybe (FloatReg 2)             = Just (RealRegSingle REG_F2)
-#endif
-#ifdef REG_F3
-globalRegMaybe (FloatReg 3)             = Just (RealRegSingle REG_F3)
-#endif
-#ifdef REG_F4
-globalRegMaybe (FloatReg 4)             = Just (RealRegSingle REG_F4)
-#endif
-#ifdef REG_D1
-globalRegMaybe (DoubleReg 1)            = Just (RealRegSingle REG_D1)
-#endif
-#ifdef REG_D2
-globalRegMaybe (DoubleReg 2)            = Just (RealRegSingle REG_D2)
-#endif
-#ifdef REG_Sp
-globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
-#endif
-#ifdef REG_Lng1
-globalRegMaybe (LongReg 1)              = Just (RealRegSingle REG_Lng1)
-#endif
-#ifdef REG_Lng2
-globalRegMaybe (LongReg 2)              = Just (RealRegSingle REG_Lng2)
-#endif
-#ifdef REG_SpLim
-globalRegMaybe SpLim                    = Just (RealRegSingle REG_SpLim)
-#endif
-#ifdef REG_Hp
-globalRegMaybe Hp                       = Just (RealRegSingle REG_Hp)
-#endif
-#ifdef REG_HpLim
-globalRegMaybe HpLim                    = Just (RealRegSingle REG_HpLim)
-#endif
-#ifdef REG_CurrentTSO
-globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
-#endif
-#ifdef REG_CurrentNursery
-globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
-#endif
-globalRegMaybe _                        = Nothing
-
-
-#else  /* powerpc_TARGET_ARCH */
-
-freeReg _               = 0#
-globalRegMaybe _        = panic "PPC.Regs.globalRegMaybe: not defined"
-
-#endif /* powerpc_TARGET_ARCH */
-
-
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
-allocatableRegs :: [RealReg]
-allocatableRegs
-   = let isFree i = isFastTrue (freeReg i)
+allocatableRegs :: Platform -> [RealReg]
+allocatableRegs platform
+   = let isFree i = isFastTrue (freeReg platform i)
      in  map RealRegSingle $ filter isFree allMachRegNos

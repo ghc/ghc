@@ -39,7 +39,7 @@ module SPARC.Regs (
 where
 
 
-import SPARC.RegPlate
+import CodeGen.Platform.SPARC
 import Reg
 import RegClass
 import Size

@@ -24,6 +24,7 @@ import Reg
 import TargetReg
 
 import BlockId
+import CodeGen.Platform
 import OldCmm
 import FastString
 import FastBool
@@ -449,16 +450,16 @@ x86_regUsageOfInstr platform instr
               use_index (EAIndex i _) tl = i : tl
 
     mkRUR src = src' `seq` RU src' []
-        where src' = filter interesting src
+        where src' = filter (interesting platform) src
 
     mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter interesting src
-              dst' = filter interesting dst
+        where src' = filter (interesting platform) src
+              dst' = filter (interesting platform) dst
 
-interesting :: Reg -> Bool
-interesting (RegVirtual _)              = True
-interesting (RegReal (RealRegSingle i)) = isFastTrue (freeReg i)
-interesting (RegReal (RealRegPair{}))   = panic "X86.interesting: no reg pairs on this arch"
+interesting :: Platform -> Reg -> Bool
+interesting _        (RegVirtual _)              = True
+interesting platform (RegReal (RealRegSingle i)) = isFastTrue (freeReg platform i)
+interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no reg pairs on this arch"
 
 
 
