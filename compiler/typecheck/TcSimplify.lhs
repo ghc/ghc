@@ -342,7 +342,8 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
        ; return (qtvs, [], False, emptyTcEvBinds) }
 
   | otherwise
-  = do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+  = TcRnMonad.setUntouchables untch $
+    do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
        ; gbl_tvs        <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
        ; zonked_wanteds <- zonkWC wanteds
@@ -798,17 +799,19 @@ solveNestedImplications implics
          vcat [ text "original inerts = " <+> ppr inerts
               , text "thinner_inerts  = " <+> ppr thinner_inerts ]
          
-       ; (implic_eqs, unsolved_implics)
+       ; (floated_eqs, unsolved_implics)
            <- flatMapBagPairM (solveImplication thinner_inerts) implics
+
+       ; floated_eqs <- promoteFloatedUnificationVars floated_eqs
 
        -- ... and we are back in the original TcS inerts 
        -- Notice that the original includes the _insoluble_flats so it was safe to ignore
        -- them in the beginning of this function.
        ; traceTcS "solveNestedImplications end }" $
-                  vcat [ text "implic_eqs ="       <+> ppr implic_eqs
+                  vcat [ text "all floated_eqs ="  <+> ppr floated_eqs
                        , text "unsolved_implics =" <+> ppr unsolved_implics ]
 
-       ; return (implic_eqs, unsolved_implics) }
+       ; return (floated_eqs, unsolved_implics) }
 
 solveImplication :: InertSet
                  -> Implication    -- Wanted
@@ -824,11 +827,7 @@ solveImplication inerts
                  , ic_given  = givens
                  , ic_wanted = wanteds
                  , ic_loc    = loc })
-  = -- shadowIPs givens $    -- See Note [Shadowing of Implicit Parameters]
---    recoverTcS (return (emptyBag, emptyBag)) $
-       -- Recover from nested failures.  Even the top level is
-       -- just a bunch of implications, so failing at the first one is bad
-    nestImplicTcS ev_binds untch inerts $
+  = nestImplicTcS ev_binds untch inerts $
     do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve the nested constraints
@@ -860,6 +859,30 @@ solveImplication inerts
 Note [Floating equalities]
 
 \begin{code}
+promoteFloatedUnificationVars :: Cts -> TcS Cts
+promoteFloatedUnificationVars cts
+  = do { untch <- TcSMonad.getUntouchables
+       ; let tvs = filter (isFloatedTouchableMetaTyVar untch) $
+                   varSetElems (tyVarsOfCts cts)
+       ; tv_eqs <- mapM promote_tv tvs
+       ; traceTcS "promoteFloated" (vcat [ text "Ctxt untoucables =" <+> ppr untch
+                                         , text "Floated eqs =" <+> ppr cts
+                                         , text "Promoted tvs =" <+> ppr tvs
+                                         , text "Promoted eqs =" <+> ppr tv_eqs])
+       ; return (cts `unionBags` listToBag tv_eqs) }
+  where
+    wloc = ctev_wloc (cc_ev (head (bagToList cts)))   -- Yuk, but not needed soon
+    promote_tv tv 
+      = do { rhs_ty <- newFlexiTcSTy (tyVarKind tv)
+           ; let refl_evtm = EvCoercion (mkTcReflCo rhs_ty)
+                 refl_pred = mkTcEqPred (mkTyVarTy tv) rhs_ty
+                 given_ev  = Given { ctev_gloc = mkGivenLoc wloc UnkSkol
+                                   , ctev_pred = refl_pred
+                                   , ctev_evtm = refl_evtm }
+           ; setWantedTyBind tv rhs_ty
+           ; return (CTyEqCan { cc_ev = given_ev, cc_tyvar = tv
+                              , cc_rhs = rhs_ty, cc_depth = 0 }) }
+
 floatEqualities :: [TcTyVar] -> [EvVar] -> WantedConstraints -> (Cts, WantedConstraints)
 -- Post: The returned FlavoredEvVar's are only Wanted or Derived
 -- and come from the input wanted ev vars or deriveds 
@@ -887,32 +910,6 @@ growSkols (WC { wc_flat = flats }) skols
   = growThetaTyVars theta skols
   where
     theta = foldrBag ((:) . ctPred) [] flats
-{-
-shadowIPs :: [EvVar] -> TcS a -> TcS a
-shadowIPs gs m
-  | null shadowed = m
-  | otherwise     = do is <- getTcSInerts
-                       doWithInert (purgeShadowed is) m
-  where
-  shadowed  = mapMaybe isIP gs
-
-  isIP g    = do p <- evVarPred_maybe g
-                 (x,_) <- isIPPred_maybe p
-                 return x
-
-  isShadowedCt ct = isShadowedEv (ctEvidence ct)
-  isShadowedEv ev = case isIPPred_maybe (ctEvPred ev) of
-                      Just (x,_) -> x `elem` shadowed
-                      _          -> False
-
-  purgeShadowed is = is { inert_cans = purgeCans (inert_cans is)
-                        , inert_solved = purgeSolved (inert_solved is)
-                        }
-
-  purgeDicts    = snd . partitionCCanMap isShadowedCt
-  purgeCans ics = ics { inert_dicts = purgeDicts (inert_dicts ics) }
-  purgeSolved   = filterSolved (not . isShadowedEv)
--}
 \end{code}
 
 Note [Float Equalities out of Implications]
@@ -1031,40 +1028,6 @@ The solution is to record the unification variables of the flats,
 and make them untouchables for the nested implication. In the 
 example above uf would become untouchable, so beta would be forced 
 to be unified as beta := uf.
-
-Note [Shadowing of Implicit Parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following example:
-
-f :: (?x :: Char) => Char
-f = let ?x = 'a' in ?x
-
-The "let ?x = ..." generates an implication constraint of the form:
-
-?x :: Char => ?x :: Char
-
-
-Furthermore, the signature for `f` also generates an implication
-constraint, so we end up with the following nested implication:
-
-?x :: Char => (?x :: Char => ?x :: Char)
-
-Note that the wanted (?x :: Char) constraint may be solved in
-two incompatible ways:  either by using the parameter from the
-signature, or by using the local definition.  Our intention is
-that the local definition should "shadow" the parameter of the
-signature, and we implement this as follows: when we nest implications,
-we remove any implicit parameters in the outer implication, that
-have the same name as givens of the inner implication.
-
-Here is another variation of the example:
-
-f :: (?x :: Int) => Char
-f = let ?x = 'x' in ?x
-
-This program should also be accepted: the two constraints `?x :: Int`
-and `?x :: Char` never exist in the same context, so they don't get to
-interact to cause failure.
 
 \begin{code}
 unFlattenWC :: WantedConstraints -> TcS WantedConstraints
