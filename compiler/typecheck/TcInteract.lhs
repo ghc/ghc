@@ -700,7 +700,7 @@ doInteractWithInert inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyarg
            -- Actual Functional Dependencies
            Just fd_work
                | cls1 `hasKey` ipClassNameKey
-               , isGiven fl1, isGiven fl2
+               , isGiven fl1, isGiven fl2  -- See Note [Shadowing of Implicit Parameters]
                -> return (IRReplace ("Replace IP"))
 
                -- Standard thing: create derived fds and keep on going. Importantly we don't
@@ -880,10 +880,46 @@ solveOneFromTheOther info ifl workItem
   = do { setEvBind ev_id (ctEvTerm wfl); return (IRInertConsumed ("Solved(g) " ++ info)) }
 
   | otherwise	   -- If both are Given, we already have evidence; no need to duplicate
+                   -- But the work item *overrides* the inert item (hence IRReplace)
+                   -- See Note [Shadowing of Implicit Parameters]
   = return (IRReplace ("Replace(gg) " ++ info))
   where 
      wfl = cc_ev workItem
 \end{code}
+
+Note [Shadowing of Implicit Parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example:
+
+f :: (?x :: Char) => Char
+f = let ?x = 'a' in ?x
+
+The "let ?x = ..." generates an implication constraint of the form:
+
+?x :: Char => ?x :: Char
+
+
+Furthermore, the signature for `f` also generates an implication
+constraint, so we end up with the following nested implication:
+
+?x :: Char => (?x :: Char => ?x :: Char)
+
+Note that the wanted (?x :: Char) constraint may be solved in
+two incompatible ways:  either by using the parameter from the
+signature, or by using the local definition.  Our intention is
+that the local definition should "shadow" the parameter of the
+signature, and we implement this as follows: when we nest implications,
+we remove any implicit parameters in the outer implication, that
+have the same name as givens of the inner implication.
+
+Here is another variation of the example:
+
+f :: (?x :: Int) => Char
+f = let ?x = 'x' in ?x
+
+This program should also be accepted: the two constraints `?x :: Int`
+and `?x :: Char` never exist in the same context, so they don't get to
+interact to cause failure.
 
 Note [Superclasses and recursive dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

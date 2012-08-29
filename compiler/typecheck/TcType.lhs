@@ -41,7 +41,7 @@ module TcType (
   isAmbiguousTyVar, metaTvRef, 
   isFlexi, isIndirect, isRuntimeUnkSkol,
   isTypeVar, isKindVar,
-  isTouchableMetaTyVar,
+  isTouchableMetaTyVar, isFloatedTouchableMetaTyVar,
 
   --------------------------------
   -- Builders
@@ -325,6 +325,14 @@ noUntouchables = Untouchables []   -- 0 = outermost level
 
 pushUntouchables :: Unique -> Untouchables -> Untouchables 
 pushUntouchables u (Untouchables us) = Untouchables (u:us)
+
+isFloatedTouchable :: Untouchables -> Untouchables -> Bool
+isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = case (ctxt_untch, tv_untch) of
+      (_,  [])     -> False
+      ([],  _)     -> True
+      (u:_, tv_u:tv_us) | u `elem` tv_us -> ASSERT2( u /= tv_u, ppr u <+> ppr tv_us ) True
+                        | otherwise      -> False
 
 isTouchable :: Untouchables -> Untouchables -> Bool
 isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
@@ -697,6 +705,13 @@ isTouchableMetaTyVar ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of 
       MetaTv { mtv_untch = tv_untch } -> isTouchable ctxt_untch tv_untch
+      _ -> False
+
+isFloatedTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
+isFloatedTouchableMetaTyVar ctxt_untch tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of 
+      MetaTv { mtv_untch = tv_untch } -> isFloatedTouchable ctxt_untch tv_untch
       _ -> False
 
 isImmutableTyVar :: TyVar -> Bool
