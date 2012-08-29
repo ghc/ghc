@@ -490,12 +490,13 @@ data EvLit
 
 \end{code}
 
-Note [Coecion evidence terms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Notice that a coercion variable (v :: t1 ~ t2) can be represented as an EvTerm
-in two different ways:
-   EvId v
-   EvCoercion (TcCoVarCo v)
+Note [Coercion evidence terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An evidence term for a coercion, of type (t1 ~ t2), always takes one of 
+these forms:
+   co_tm ::= EvId v
+           | EvCoercion co
+           | EvCast co_tm co
 
 An alternative would be 
 
@@ -506,12 +507,12 @@ An alternative would be
      mkEvCast (EvCoercion c1) c2 = EvCoercion (TcCastCo c1 c2)
      mkEvCast t c = EvCast t c
 
-We do quite often need to get a TcCoercion from an EvTerm; see
-'evTermCoercion'.  Notice that as well as EvId and EvCoercion it may see
-an EvCast.
-
 I don't think it matters much... but maybe we'll find a good reason to
-do one or the other.
+do one or the other.  But currently we allow any of the three forms.
+
+We do quite often need to get a TcCoercion from an EvTerm; see
+'evTermCoercion'.
+
 
 Note [EvKindCast] 
 ~~~~~~~~~~~~~~~~~ 
