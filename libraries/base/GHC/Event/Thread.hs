@@ -6,6 +6,8 @@ module GHC.Event.Thread
     , ensureIOManagerIsRunning
     , threadWaitRead
     , threadWaitWrite
+    , threadWaitReadSTM
+    , threadWaitWriteSTM
     , closeFdWith
     , threadDelay
     , registerDelay
@@ -18,7 +20,7 @@ import Foreign.Ptr (Ptr)
 import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, newTVar, sharedCAF,
-                      threadStatus, writeTVar)
+                      threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
@@ -94,6 +96,30 @@ threadWait evt fd = mask_ $ do
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
+
+
+threadWaitSTM :: Event -> Fd -> IO (STM ())
+threadWaitSTM evt fd = mask_ $ do
+  m <- newTVarIO Nothing
+  Just mgr <- getSystemEventManager 
+  registerFd mgr (\reg e -> unregisterFd_ mgr reg >> atomically (writeTVar m (Just e))) fd evt
+  return (do mevt <- readTVar m
+             case mevt of
+               Nothing -> retry
+               Just evt -> 
+                 if evt `eventIs` evtClose
+                 then throwSTM $ errnoToIOError "threadWait" eBADF Nothing Nothing
+                 else return ()
+         )
+
+threadWaitReadSTM :: Fd -> IO (STM ())
+threadWaitReadSTM = threadWaitSTM evtRead
+{-# INLINE threadWaitReadSTM #-}
+
+threadWaitWriteSTM :: Fd -> IO (STM ())
+threadWaitWriteSTM = threadWaitSTM evtWrite
+{-# INLINE threadWaitWriteSTM #-}
+
 
 -- | Retrieve the system event manager.
 --
