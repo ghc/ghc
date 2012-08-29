@@ -642,23 +642,36 @@ flattenTyVar :: SubGoalDepth
              -> FlattenMode 
              -> CtEvidence -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
+-- The substitution is actually the union of the substitution in the TyBinds
+-- for the unification variables that have been unified already with the inert
+-- equalities, see Note [Spontaneously solved in TyBinds] in TcInteract.
 flattenTyVar d f ctxt tv
-  = do { ieqs <- getInertEqs
-       ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
-       ; case mco of -- Done, but make sure the kind is zonked
-           Nothing -> 
-               do { let knd = tyVarKind tv
-                  ; (new_knd,_kind_co) <- flatten d f ctxt knd
-                  ; let ty = mkTyVarTy (setVarType tv new_knd)
-                  ; return (ty, mkTcReflCo ty) }
+  = do { ty_binds <- getTcSTyBindsMap
+       ; case lookupVarEnv ty_binds tv of
+           Nothing -> flatten_from_inerts
+           Just (_tv,ty) -> -- Recurse 
+             do { (ty_final,co') <- flatten d f ctxt ty
+                ; return (ty_final, co') } } 
+             -- NB: ty_binds coercions are all ReflCo,
+             -- so no need to transitively compose co' with another coercion,
+             -- unlike in 'flatten_from_inerts'
+  where
+    flatten_from_inerts
+      = do { ieqs <- getInertEqs
+           ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
+           ; case mco of -- Done, but make sure the kind is zonked
+               Nothing -> 
+                 do { let knd = tyVarKind tv
+                    ; (new_knd,_kind_co) <- flatten d f ctxt knd
+                    ; let ty = mkTyVarTy (setVarType tv new_knd)
+                    ; return (ty, mkTcReflCo ty) }
            -- NB recursive call. 
            -- Why? Because inert subst. non-idempotent, Note [Detailed InertCans Invariants]
            -- In fact, because of flavors, it couldn't possibly be idempotent,
            -- this is explained in Note [Non-idempotent inert substitution]
-           Just (co,ty) -> 
-               do { (ty_final,co') <- flatten d f ctxt ty
-                  ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }  
-  where 
+               Just (co,ty) -> 
+                 do { (ty_final,co') <- flatten d f ctxt ty
+                    ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }
     tv_eq_subst subst tv
        | Just ct <- lookupVarEnv subst tv
        , let ctev = cc_ev ct

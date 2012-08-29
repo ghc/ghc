@@ -287,55 +287,55 @@ spontaneousSolveStage :: SimplifierStage
 spontaneousSolveStage workItem
   = do { mSolve <- trySpontaneousSolve workItem
        ; spont_solve mSolve } 
-  where spont_solve SPCantSolve 
-          | isCTyEqCan workItem                    -- Unsolved equality
-          = do { kickOutRewritableInerts workItem  -- NB: will add workItem in inerts
+  where spont_solve SPCantSolve
+          | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
+          -- Unsolved equality
+          = do { wl <- modifyInertTcS $
+                       kickOutRewritable (fl `canRewrite`) (`canRewrite` fl) tv
+               ; traceTcS "kickOutRewritableInerts" $
+                 vcat [ text "WorkItem (unsolved) =" <+> ppr workItem
+                      , text "Kicked out =" <+> ppr wl ]
+               ; updWorkListTcS (unionWorkList wl)
+               ; insertInertItemTcS workItem
                ; return Stop }
           | otherwise
           = continueWith workItem
-        spont_solve (SPSolved workItem')           -- Post: workItem' must be equality
+        spont_solve (SPSolved new_tv)
+          -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
+          -- see Note [Spontaneously solved in TyBinds]
           = do { bumpStepCountTcS
                ; traceFireTcS (cc_depth workItem) $
-                 ptext (sLit "Spontaneous:") <+> ppr workItem
+                 ptext (sLit "Spontaneously solved:") <+> ppr workItem
+               ; wl <- modifyInertTcS $
+                       kickOutRewritable (const True) isGiven new_tv
 
-                 -- NB: will add the item in the inerts
-               ; kickOutRewritableInerts workItem'
-               -- .. and Stop
+               ; traceTcS "kickOutRewritableInerts" $ ptext (sLit "Kicked out =") <+> ppr wl
+               ; updWorkListTcS (unionWorkList wl) 
                ; return Stop }
 
-kickOutRewritableInerts :: Ct -> TcS () 
--- Pre:  ct is a CTyEqCan, and *fully rewritten* by the inert equalities
--- Post: The TcS monad is left with the thinner non-rewritable inerts; but which
---       contains the new constraint.
---       The rewritable end up in the worklist
-kickOutRewritableInerts new_ct
-  | CTyEqCan { cc_tyvar = new_tv, cc_ev = new_fl } <- new_ct
-  = {-# SCC "kickOutRewritableInerts" #-}
-    do { traceTcS "kickOutRewritableInerts start" $ text "workitem = " <+> ppr new_ct
+\end{code}
+Note [Spontaneously solved in TyBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we encounter a constraint ([W] alpha ~ tau) which can be spontaneously solved,
+we record the equality on the TyBinds of the TcSMonad. In the past, we used to also
+add a /given/ version of the constraint ([G] alpha ~ tau) to the inert
+canonicals -- and potentially kick out other equalities that mention alpha.
 
-         -- Step 1: kick out inerts that can be rewritten by the new constraint
-       ; wl <- {-# SCC "kick_out_rewritable" #-}
-               modifyInertTcS (kickOutRewritable new_tv new_fl)
-       ; updWorkListTcS (unionWorkList wl)
+Then, the flattener only had to look in the inert equalities during flattening of a
+type (TcCanonical.flattenTyVar).
 
-         -- Step 2: Add the new guy in
-       ; insertInertItemTcS new_ct
+However it is a bit silly to record these equalities /both/ in the inerts AND the
+TyBinds, so we have now eliminated spontaneously solved equalities from the inerts,
+and only record them in the TyBinds of the TcS monad. The flattener is now consulting
+these binds /and/ the inerts for potentially unsolved or other given equalities.
 
-       ; is <- getTcSInerts 
-       ; traceTcS "kickOutRewritableInerts end" $
-                  vcat [ text "Work item = " <+> ppr new_ct
-                       , text "Kicked out =" <+> ppr wl
-                       , text "Remaining inerts =" <+> ppr is ]
-       ; return () }
+\begin{code}
 
-  | otherwise
-  = pprPanic "kickOutRewritable" (ppr new_ct)   -- Must be a CTyEqCan
-
-kickOutRewritable :: TcTyVar -> CtEvidence -> InertSet -> (WorkList, InertSet)
--- Pre:  ct is a CTyEqCan, and *fully rewritten* by the inert equalities
--- Post: returns ALL inert equalities, to be dealt with later
-
-kickOutRewritable new_tv new_fl 
+kickOutRewritable :: (CtEvidence -> Bool) -- Can the new item rewrite a CtEvidence?
+                  -> (CtEvidence -> Bool) -- Can some CtEvidence rewrite the new item?
+                  -> TcTyVar
+                  -> InertSet -> (WorkList,InertSet)
+kickOutRewritable can_rewrite can_be_rewritten_by new_tv
        is@(IS { inert_cans = IC { inert_eqs    = tv_eqs
                                 , inert_eq_tvs = inscope
                                 , inert_dicts  = dictmap
@@ -367,7 +367,7 @@ kickOutRewritable new_tv new_fl
     (irs_out,   irs_in)     = partitionBag     kick_out irreds
     (fro_out,   fro_in)     = partitionBag     kick_out frozen
 
-    kick_out inert_ct = (new_fl `canRewrite` cc_ev inert_ct)  &&
+    kick_out inert_ct = can_rewrite (cc_ev inert_ct) &&
                         (new_tv `elemVarSet` tyVarsOfCt inert_ct) 
                     -- NB: tyVarsOfCt will return the type 
                     --     variables /and the kind variables/ that are 
@@ -378,7 +378,7 @@ kickOutRewritable new_tv new_fl
                     --     constraints that mention type variables whose
                     --     kinds could contain this variable!
 
-    kick_out_eq inert_ct = kick_out inert_ct && not (cc_ev inert_ct `canRewrite` new_fl) 
+    kick_out_eq inert_ct = kick_out inert_ct && not (can_be_rewritten_by (cc_ev inert_ct))
                -- If also the inert can rewrite the subst then there is no danger of 
                -- occurs check errors sor keep it there. No need to rewrite the inert equality
                -- (as we did in the past) because of point (8) of 
@@ -412,7 +412,8 @@ but this is no longer necessary see Note [Non-idempotent inert substitution].
 
 \begin{code}
 data SPSolveResult = SPCantSolve
-                   | SPSolved WorkItem 
+                   | SPSolved TcTyVar
+                     -- We solved this /unification/ variable to some type using reflexivity
 
 -- SPCantSolve means that we can't do the unification because e.g. the variable is untouchable
 -- SPSolved workItem' gives us a new *given* to go on 
@@ -558,7 +559,7 @@ solveWithIdentity :: SubGoalDepth
 --     arises from a CTyEqCan, a *canonical* constraint.  Its invariants
 --     say that in (a ~ xi), the type variable a does not appear in xi.
 --     See TcRnTypes.Ct invariants.
-solveWithIdentity d wd tv xi 
+solveWithIdentity _d wd tv xi 
   = do { let tv_ty = mkTyVarTy tv
        ; traceTcS "Sneaky unification:" $ 
                        vcat [text "Unifies:" <+> ppr tv <+> ptext (sLit ":=") <+> ppr xi,
@@ -573,18 +574,11 @@ solveWithIdentity d wd tv xi
 
        ; setWantedTyBind tv xi'
        ; let refl_evtm = EvCoercion (mkTcReflCo xi')
-             refl_pred = mkTcEqPred tv_ty xi'
 
        ; when (isWanted wd) $ 
               setEvBind (ctev_evar wd) refl_evtm
 
-       ; let given_fl = Given { ctev_gloc = mkGivenLoc (ctev_wloc wd) UnkSkol
-                              , ctev_pred = refl_pred
-                              , ctev_evtm = refl_evtm }
-             
-       ; return $ 
-         SPSolved (CTyEqCan { cc_ev = given_fl
-                            , cc_tyvar  = tv, cc_rhs = xi', cc_depth = d }) }
+       ; return (SPSolved tv) }
 \end{code}
 
 
