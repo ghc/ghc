@@ -526,16 +526,6 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
-# Work around #5453, which causes the stage1 compiler to segfault when
-# built with 7.2.1.
-ifeq "$(GhcVersion)" "7.2.1"
-CONF_HC_OPTS_STAGE0 += -fno-full-laziness
-compiler/cmm/Bitmap_HC_OPTS += -ffull-laziness
-# urgh.  Compiling cmm/Bitmap.hs with -fno-full-laziness results in 
-#   "gmp: overflow in mpz type"
-# for some unknown reason, so turn full-laziness back on for this module.
-endif
-
 GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
 #-----------------------------------------------------------------------------
