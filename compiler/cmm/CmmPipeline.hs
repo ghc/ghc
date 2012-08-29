@@ -105,6 +105,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
+       dumpIfSet_dyn dflags Opt_D_dump_cmmz "CAFEnv" (ppr cafEnv)
 
        if splitting_proc_points
           then do
