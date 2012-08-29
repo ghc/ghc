@@ -10,6 +10,7 @@
 #include "Rts.h"
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
+#include "sm/Storage.h"
 #include "Printer.h"
 #include "RtsUtils.h"
 
@@ -352,6 +353,10 @@ printClosure( StgClosure *obj )
       debugBelch("TSO("); 
       debugBelch("%lu (%p)",(unsigned long)(((StgTSO*)obj)->id), (StgTSO*)obj);
       debugBelch(")\n"); 
+      break;
+
+    case STACK:
+      debugBelch("STACK");
       break;
 
 #if 0
@@ -938,12 +943,18 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 void
 findPtr(P_ p, int follow)
 {
-  nat g;
+  nat g, n;
   bdescr *bd;
   const int arr_size = 1024;
   StgPtr arr[arr_size];
   int i = 0;
   searched = 0;
+
+  for (n = 0; n < n_capabilities; n++) {
+      bd = nurseries[i].blocks;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
+  }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
