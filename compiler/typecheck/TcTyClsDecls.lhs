@@ -147,11 +147,12 @@ tcTyClGroup boot_details tyclds
            -- expects well-formed TyCons
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
-       ; mapM_ (recoverM (return ()) . addLocM checkValidTyCl) 
+       ; checkNoErrs $
+         mapM_ (recoverM (return ()) . addLocM checkValidTyCl) 
                (flattenTyClDecls tyclds)
            -- We recover, which allows us to report multiple validity errors
-           -- even from successive groups.  But we stop after all groups are
-           -- processed if we find any errors.
+           -- but we then fail if any are wrong.  Lacking the checkNoErrs
+           -- we get Trac #7175
 
            -- Step 4: Add the implicit things;
            -- we want them in the environment because

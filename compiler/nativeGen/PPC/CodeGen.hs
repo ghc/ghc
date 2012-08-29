@@ -25,6 +25,7 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import CodeGen.Platform
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs
@@ -171,13 +172,13 @@ swizzleRegisterRep (Any _ codefn)     size = Any   size codefn
 
 
 -- | Grab the Reg for a CmmReg
-getRegisterReg :: CmmReg -> Reg
+getRegisterReg :: Platform -> CmmReg -> Reg
 
-getRegisterReg (CmmLocal (LocalReg u pk))
+getRegisterReg _ (CmmLocal (LocalReg u pk))
   = RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
 
-getRegisterReg (CmmGlobal mid)
-  = case globalRegMaybe mid of
+getRegisterReg platform (CmmGlobal mid)
+  = case globalRegMaybe platform mid of
         Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
@@ -368,9 +369,9 @@ getRegister' _ (CmmReg (CmmGlobal PicBaseReg))
       reg <- getPicBaseNat archWordSize
       return (Fixed archWordSize reg nilOL)
 
-getRegister' _ (CmmReg reg)
+getRegister' dflags (CmmReg reg)
   = return (Fixed (cmmTypeSize (cmmRegType reg))
-                  (getRegisterReg reg) nilOL)
+                  (getRegisterReg (targetPlatform dflags) reg) nilOL)
 
 getRegister' dflags tree@(CmmRegOff _ _)
   = getRegister' dflags (mangleIndexTree tree)
@@ -763,12 +764,12 @@ assignMem_IntCode pk addr src = do
 -- dst is a reg, but src could be anything
 assignReg_IntCode _ reg src
     = do
+        dflags <- getDynFlags
+        let dst = getRegisterReg (targetPlatform dflags) reg
         r <- getRegister src
         return $ case r of
             Any _ code         -> code dst
             Fixed _ freg fcode -> fcode `snocOL` MR dst freg
-    where
-        dst = getRegisterReg reg
 
 
 
@@ -841,15 +842,17 @@ genCCall :: CmmCallTarget            -- function to call
          -> NatM InstrBlock
 genCCall target dest_regs argsAndHints
  = do dflags <- getDynFlags
-      case platformOS (targetPlatform dflags) of
-          OSLinux    -> genCCall' GCPLinux  target dest_regs argsAndHints
-          OSDarwin   -> genCCall' GCPDarwin target dest_regs argsAndHints
+      let platform = targetPlatform dflags
+      case platformOS platform of
+          OSLinux    -> genCCall' platform GCPLinux  target dest_regs argsAndHints
+          OSDarwin   -> genCCall' platform GCPDarwin target dest_regs argsAndHints
           _ -> panic "PPC.CodeGen.genCCall: not defined for this os"
 
 data GenCCallPlatform = GCPLinux | GCPDarwin
 
 genCCall'
-    :: GenCCallPlatform
+    :: Platform
+    -> GenCCallPlatform
     -> CmmCallTarget            -- function to call
     -> [HintedCmmFormal]        -- where to put the result
     -> [HintedCmmActual]        -- arguments (of mixed type)
@@ -893,19 +896,20 @@ genCCall'
 -}
 
 
-genCCall' _ (CmmPrim MO_WriteBarrier _) _ _
+genCCall' _ _ (CmmPrim MO_WriteBarrier _) _ _
  = return $ unitOL LWSYNC
 
-genCCall' _ (CmmPrim _ (Just stmts)) _ _
+genCCall' _ _ (CmmPrim _ (Just stmts)) _ _
     = stmtsToInstrs stmts
 
-genCCall' gcp target dest_regs argsAndHints
+genCCall' platform gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
                                                         (zip args argReps)
-                                                        allArgRegs allFPArgRegs
+                                                        allArgRegs
+                                                        (allFPArgRegs platform)
                                                         initialStackOffset
                                                         (toOL []) []
 
@@ -1086,7 +1090,7 @@ genCCall' gcp target dest_regs argsAndHints
                                           MR r_dest r4]
                     | otherwise -> unitOL (MR r_dest r3)
                     where rep = cmmRegType (CmmLocal dest)
-                          r_dest = getRegisterReg (CmmLocal dest)
+                          r_dest = getRegisterReg platform (CmmLocal dest)
                 _ -> panic "genCCall' moveResult: Bad dest_regs"
 
         outOfLineMachOp mop =

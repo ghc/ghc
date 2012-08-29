@@ -191,12 +191,12 @@ assignMem_IntCode pk addr src = do
 
 assignReg_IntCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_IntCode _ reg src = do
+    dflags <- getDynFlags
     r <- getRegister src
+    let dst = getRegisterReg (targetPlatform dflags) reg
     return $ case r of
         Any _ code         -> code dst
         Fixed _ freg fcode -> fcode `snocOL` OR False g0 (RIReg freg) dst
-    where
-      dst = getRegisterReg reg
 
 
 
@@ -218,8 +218,10 @@ assignMem_FltCode pk addr src = do
 -- Floating point assignment to a register/temporary
 assignReg_FltCode :: Size -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignReg_FltCode pk dstCmmReg srcCmmExpr = do
+    dflags <- getDynFlags
+    let platform = targetPlatform dflags
     srcRegister <- getRegister srcCmmExpr
-    let dstReg  = getRegisterReg dstCmmReg
+    let dstReg  = getRegisterReg platform dstCmmReg
 
     return $ case srcRegister of
         Any _ code                  -> code dstReg
@@ -537,7 +539,7 @@ assign_code _ [] = nilOL
 assign_code platform [CmmHinted dest _hint]
  = let  rep     = localRegType dest
         width   = typeWidth rep
-        r_dest  = getRegisterReg (CmmLocal dest)
+        r_dest  = getRegisterReg platform (CmmLocal dest)
 
         result
                 | isFloatType rep

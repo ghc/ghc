@@ -844,13 +844,14 @@ ds_tc_coercion subst tc_co
 
     ds_scc :: CvSubst -> SCC EvBind -> CvSubst
     ds_scc subst (AcyclicSCC (EvBind v ev_term))
-      = extendCvSubstAndInScope subst v (ds_ev_term subst ev_term)
+      = extendCvSubstAndInScope subst v (ds_co_term subst ev_term)
     ds_scc _ (CyclicSCC other) = pprPanic "ds_scc:cyclic" (ppr other $$ ppr tc_co)
 
-    ds_ev_term :: CvSubst -> EvTerm -> Coercion
-    ds_ev_term subst (EvCoercion tc_co) = ds_tc_coercion subst tc_co
-    ds_ev_term subst (EvId v)           = ds_ev_id subst v
-    ds_ev_term _ other = pprPanic "ds_ev_term" (ppr other $$ ppr tc_co)
+    ds_co_term :: CvSubst -> EvTerm -> Coercion
+    ds_co_term subst (EvCoercion tc_co) = ds_tc_coercion subst tc_co
+    ds_co_term subst (EvId v)           = ds_ev_id subst v
+    ds_co_term subst (EvCast tm co)     = mkCoCast (ds_co_term subst tm) (ds_tc_coercion subst co)
+    ds_co_term _ other = pprPanic "ds_co_term" (ppr other $$ ppr tc_co)
 
     ds_ev_id :: CvSubst -> EqVar -> Coercion
     ds_ev_id subst v

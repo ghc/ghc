@@ -15,6 +15,7 @@ import RegClass
 import Reg
 
 import Outputable
+import Platform
 
 import Data.Word
 import Data.Bits
@@ -45,8 +46,8 @@ releaseReg (RealRegSingle r) (FreeRegs g f)
 releaseReg _ _
 	= panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
     
-initFreeRegs :: FreeRegs
-initFreeRegs = foldr releaseReg noFreeRegs allocatableRegs
+initFreeRegs :: Platform -> FreeRegs
+initFreeRegs platform = foldr releaseReg noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]	-- lazilly
 getFreeRegs cls (FreeRegs g f)

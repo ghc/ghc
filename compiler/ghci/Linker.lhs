@@ -51,6 +51,7 @@ import qualified Maybes
 import UniqSet
 import FastString
 import Config
+import Platform
 import SysTools
 import PrelNames
 
@@ -302,12 +303,13 @@ reallyInitDynLinker dflags =
         ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
 
           -- (e) Link any MacOS frameworks
-        ; let framework_paths
-               | isDarwinTarget = frameworkPaths dflags
-               | otherwise      = []
-        ; let frameworks
-               | isDarwinTarget = cmdlineFrameworks dflags
-               | otherwise      = []
+        ; let platform = targetPlatform dflags
+        ; let framework_paths = case platformOS platform of
+                                OSDarwin -> frameworkPaths dflags
+                                _        -> []
+        ; let frameworks = case platformOS platform of
+                           OSDarwin -> cmdlineFrameworks dflags
+                           _        -> []
           -- Finally do (c),(d),(e)
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
                                ++ libspecs
@@ -353,12 +355,13 @@ users?
 
 classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
 classifyLdInput dflags f
-  | isObjectFilename f = return (Just (Object f))
-  | isDynLibFilename f = return (Just (DLLPath f))
+  | isObjectFilename platform f = return (Just (Object f))
+  | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
         log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
+    where platform = targetPlatform dflags
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
 preloadLib dflags lib_paths framework_paths lib_spec
@@ -375,7 +378,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
                                                 else "not found")
 
           DLL dll_unadorned
-             -> do maybe_errstr <- loadDLL (mkSOName dll_unadorned)
+             -> do maybe_errstr <- loadDLL (mkSOName platform dll_unadorned)
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
@@ -386,15 +389,18 @@ preloadLib dflags lib_paths framework_paths lib_spec
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
 
-          Framework framework
-           | isDarwinTarget
-             -> do maybe_errstr <- loadFramework framework_paths framework
+          Framework framework ->
+              case platformOS (targetPlatform dflags) of
+              OSDarwin ->
+                do maybe_errstr <- loadFramework framework_paths framework
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm framework_paths lib_spec
-           | otherwise -> panic "preloadLib Framework"
+              _ -> panic "preloadLib Framework"
 
   where
+    platform = targetPlatform dflags
+
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
        = do maybePutStr dflags "failed.\n"
@@ -968,7 +974,7 @@ data LibrarySpec
 -- just to get the DLL handle into the list.
 partOfGHCi :: [PackageName]
 partOfGHCi
- | isWindowsTarget || isDarwinTarget = []
+ | isWindowsHost || isDarwinHost = []
  | otherwise = map PackageName
                    ["base", "template-haskell", "editline"]
 
@@ -1033,7 +1039,8 @@ linkPackages' dflags new_pks pls = do
 linkPackage :: DynFlags -> PackageConfig -> IO ()
 linkPackage dflags pkg
    = do
-        let dirs      =  Packages.libraryDirs pkg
+        let platform  = targetPlatform dflags
+            dirs      =  Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
@@ -1070,8 +1077,8 @@ linkPackage dflags pkg
 
         -- See comments with partOfGHCi
         when (packageName pkg `notElem` partOfGHCi) $ do
-            loadFrameworks pkg
-            mapM_ load_dyn (known_dlls ++ map mkSOName dlls)
+            loadFrameworks platform pkg
+            mapM_ load_dyn (known_dlls ++ map (mkSOName platform) dlls)
 
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1096,10 +1103,11 @@ load_dyn dll = do r <- loadDLL dll
                     Just err -> ghcError (CmdLineError ("can't load .so/.DLL for: "
                                                               ++ dll ++ " (" ++ err ++ ")" ))
 
-loadFrameworks :: InstalledPackageInfo_ ModuleName -> IO ()
-loadFrameworks pkg
- | isDarwinTarget = mapM_ load frameworks
- | otherwise = return ()
+loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
+loadFrameworks platform pkg
+    = case platformOS platform of
+      OSDarwin -> mapM_ load frameworks
+      _        -> return ()
   where
     fw_dirs    = Packages.frameworkDirs pkg
     frameworks = Packages.frameworks pkg
@@ -1142,9 +1150,9 @@ locateLib dflags is_hs dirs lib
      mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_hs_dyn_lib_path dir = dir </> mkSOName hs_dyn_lib_name
+     mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
 
-     so_name = mkSOName lib
+     so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name
 
      findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
@@ -1160,6 +1168,8 @@ locateLib dflags is_hs dirs lib
                            Just x -> return x
                            Nothing -> g
 
+     platform = targetPlatform dflags
+
 searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do
    str <- askCc dflags (map (FileOption "-L") dirs
@@ -1174,11 +1184,12 @@ searchForLibUsingGcc dflags so dirs = do
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
-mkSOName :: FilePath -> FilePath
-mkSOName root
- | isDarwinTarget  = ("lib" ++ root) <.> "dylib"
- | isWindowsTarget = root <.> "dll"
- | otherwise       = ("lib" ++ root) <.> "so"
+mkSOName :: Platform -> FilePath -> FilePath
+mkSOName platform root
+    = case platformOS platform of
+      OSDarwin  -> ("lib" ++ root) <.> "dylib"
+      OSMinGW32 ->           root  <.> "dll"
+      _         -> ("lib" ++ root) <.> "so"
 
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same

@@ -10,7 +10,7 @@ module Util (
         -- * Flags dependent on the compiler build
         ghciSupported, debugIsOn, ncgDebugIsOn,
         ghciTablesNextToCode, isDynamicGhcLib,
-        isWindowsHost, isWindowsTarget, isDarwinTarget,
+        isWindowsHost, isDarwinHost,
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -192,18 +192,11 @@ isWindowsHost = True
 isWindowsHost = False
 #endif
 
-isWindowsTarget :: Bool
-#ifdef mingw32_TARGET_OS
-isWindowsTarget = True
+isDarwinHost :: Bool
+#ifdef darwin_HOST_OS
+isDarwinHost = True
 #else
-isWindowsTarget = False
-#endif
-
-isDarwinTarget :: Bool
-#ifdef darwin_TARGET_OS
-isDarwinTarget = True
-#else
-isDarwinTarget = False
+isDarwinHost = False
 #endif
 \end{code}
 

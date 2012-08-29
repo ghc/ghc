@@ -32,6 +32,7 @@ import Reg
 import OldCmm
 
 import Control.Monad (liftM)
+import DynFlags
 import OrdList
 import Outputable
 
@@ -54,8 +55,10 @@ getSomeReg expr = do
 getRegister :: CmmExpr -> NatM Register
 
 getRegister (CmmReg reg) 
-  = return (Fixed (cmmTypeSize (cmmRegType reg)) 
-		  (getRegisterReg reg) nilOL)
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       return (Fixed (cmmTypeSize (cmmRegType reg))
+              (getRegisterReg platform reg) nilOL)
 
 getRegister tree@(CmmRegOff _ _) 
   = getRegister (mangleIndexTree tree)
