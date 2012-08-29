@@ -502,14 +502,13 @@ tcPolyInfer
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId], TopLevelFlag)
 tcPolyInfer mono closed tc_sig_fn prag_fn rec_tc bind_list
-  = do { (((binds', mono_infos), untch), wanted)
+  = do { ((binds', mono_infos), wanted)
              <- captureConstraints $
-                captureUntouchables $
                 tcMonoBinds tc_sig_fn LetLclBndr rec_tc bind_list
 
        ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
        ; (qtvs, givens, mr_bites, ev_binds) <- 
-                          simplifyInfer closed mono name_taus (untch,wanted)
+                          simplifyInfer closed mono name_taus wanted
 
        ; theta <- zonkTcThetaType (map evVarPred givens)
        ; exports <- checkNoErrs $ mapM (mkExport prag_fn qtvs theta) mono_infos

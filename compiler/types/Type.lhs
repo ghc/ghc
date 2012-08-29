@@ -875,7 +875,7 @@ Make PredTypes
 -- | Creates a type equality predicate
 mkEqPred :: Type -> Type -> PredType
 mkEqPred ty1 ty2
-  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 $$ ppr k $$ ppr (typeKind ty2) )
     TyConApp eqTyCon [k, ty1, ty2]
   where 
     k = typeKind ty1

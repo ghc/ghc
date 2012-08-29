@@ -38,9 +38,10 @@ module TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), 
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isAmbiguousTyVar, metaTvRef, 
+  isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
-  isTypeVar, isKindVar,
+  isTypeVar, isKindVar, 
+  metaTyVarUntouchables, setMetaTyVarUntouchables, 
   isTouchableMetaTyVar, isFloatedTouchableMetaTyVar,
 
   --------------------------------
@@ -766,6 +767,27 @@ isAmbiguousTyVar tv
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv
 isMetaTyVarTy _            = False
+
+metaTyVarInfo :: TcTyVar -> MetaInfo
+metaTyVarInfo tv
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+      MetaTv { mtv_info = info } -> info
+      _ -> pprPanic "metaTyVarInfo" (ppr tv)
+
+metaTyVarUntouchables :: TcTyVar -> Untouchables
+metaTyVarUntouchables tv
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+      MetaTv { mtv_untch = untch } -> untch
+      _ -> pprPanic "metaTyVarUntouchables" (ppr tv)
+
+setMetaTyVarUntouchables :: TcTyVar -> Untouchables -> TcTyVar
+setMetaTyVarUntouchables tv untch
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+      details@(MetaTv {}) -> setTcTyVarDetails tv (details { mtv_untch = untch })
+      _ -> pprPanic "metaTyVarUntouchables" (ppr tv)
 
 isSigTyVar :: Var -> Bool
 isSigTyVar tv 

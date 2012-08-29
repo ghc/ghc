@@ -324,14 +324,14 @@ simplifyInfer :: Bool
               -> Bool                  -- Apply monomorphism restriction
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
-              -> (Untouchables, WantedConstraints)
+              -> WantedConstraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints
 		      Bool,	    -- The monomorphism restriction did something
 		      		    --   so the results type is not as general as
 				    --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
+simplifyInfer _top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
@@ -342,8 +342,7 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
        ; return (qtvs, [], False, emptyTcEvBinds) }
 
   | otherwise
-  = TcRnMonad.setUntouchables untch $
-    do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+  = do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
        ; gbl_tvs        <- tcGetGlobalTyVars
        ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
        ; zonked_wanteds <- zonkWC wanteds
@@ -355,7 +354,6 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
              , ptext (sLit "gbl_tvs =") <+> ppr gbl_tvs
              , ptext (sLit "closed =") <+> ppr _top_lvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
-             , ptext (sLit "untch =") <+> ppr untch
              , ptext (sLit "wanted =") <+> ppr zonked_wanteds
              ]
 
@@ -453,7 +451,9 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
        ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
-       ; let implic = Implic { ic_untch    = untch 
+       ; untch <- TcRnMonad.getUntouchables
+       ; uniq  <- TcRnMonad.newUnique
+       ; let implic = Implic { ic_untch    = pushUntouchables uniq untch 
                              , ic_env      = lcl_env
                              , ic_skols    = qtvs_to_return
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
@@ -802,7 +802,9 @@ solveNestedImplications implics
        ; (floated_eqs, unsolved_implics)
            <- flatMapBagPairM (solveImplication thinner_inerts) implics
 
-       ; floated_eqs <- promoteFloatedUnificationVars floated_eqs
+       ; promoteFloatedUnificationVars floated_eqs
+           -- Performs some unifications, adding to monadically-carried ty_binds
+           -- These will be used when processing floated_eqs later
 
        -- ... and we are back in the original TcS inerts 
        -- Notice that the original includes the _insoluble_flats so it was safe to ignore
@@ -859,29 +861,23 @@ solveImplication inerts
 Note [Floating equalities]
 
 \begin{code}
-promoteFloatedUnificationVars :: Cts -> TcS Cts
+promoteFloatedUnificationVars :: Cts -> TcS ()
 promoteFloatedUnificationVars cts
   = do { untch <- TcSMonad.getUntouchables
        ; let tvs = filter (isFloatedTouchableMetaTyVar untch) $
                    varSetElems (tyVarsOfCts cts)
-       ; tv_eqs <- mapM promote_tv tvs
+       ; mapM_ (promote_tv untch) tvs
+       ; ty_binds <- getTcSTyBindsMap
        ; traceTcS "promoteFloated" (vcat [ text "Ctxt untoucables =" <+> ppr untch
                                          , text "Floated eqs =" <+> ppr cts
                                          , text "Promoted tvs =" <+> ppr tvs
-                                         , text "Promoted eqs =" <+> ppr tv_eqs])
-       ; return (cts `unionBags` listToBag tv_eqs) }
+                                         , text "Ty binds =" <+> ppr ty_binds])
+       ; return () }
   where
-    wloc = ctev_wloc (cc_ev (head (bagToList cts)))   -- Yuk, but not needed soon
-    promote_tv tv 
-      = do { rhs_ty <- newFlexiTcSTy (tyVarKind tv)
-           ; let refl_evtm = EvCoercion (mkTcReflCo rhs_ty)
-                 refl_pred = mkTcEqPred (mkTyVarTy tv) rhs_ty
-                 given_ev  = Given { ctev_gloc = mkGivenLoc wloc UnkSkol
-                                   , ctev_pred = refl_pred
-                                   , ctev_evtm = refl_evtm }
-           ; setWantedTyBind tv rhs_ty
-           ; return (CTyEqCan { cc_ev = given_ev, cc_tyvar = tv
-                              , cc_rhs = rhs_ty, cc_depth = 0 }) }
+    promote_tv untch tv 
+      = do { cloned_tv <- TcSMonad.cloneMetaTyVar tv
+           ; let rhs_tv = setMetaTyVarUntouchables cloned_tv untch
+           ; setWantedTyBind tv (mkTyVarTy rhs_tv) }
 
 floatEqualities :: [TcTyVar] -> [EvVar] -> WantedConstraints -> (Cts, WantedConstraints)
 -- Post: The returned FlavoredEvVar's are only Wanted or Derived
@@ -1166,7 +1162,6 @@ applyDefaultingRules wanteds
 
 Note [tryTcS in defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 defaultTyVar and disambigGroup create new evidence variables for
 default equations, and hence update the EvVar cache. However, after
 applyDefaultingRules we will try to solve these default equations
@@ -1189,51 +1184,28 @@ in the cache!
 
 
 \begin{code}
-------------------
-touchablesOfWC :: WantedConstraints -> TcTyVarSet
--- See Note [Extra Tcs Untouchables] to see why we carry a Untouchables 
--- instead of just using the Untouchable range have in our hands.
-touchablesOfWC 
-  = go noUntouchables
-  where 
-    go :: Untouchables -> WantedConstraints -> TcTyVarSet
-    go untch (WC { wc_flat = flats, wc_impl = impls }) 
-      = filterVarSet is_touchable flat_tvs `unionVarSet`
-        foldrBag (unionVarSet . go_impl) emptyVarSet impls 
-      where 
-         is_touchable = isTouchableMetaTyVar untch
-         flat_tvs = tyVarsOfCts flats
-
-    go_impl implic = go (ic_untch implic) (ic_wanted implic)
-
 applyTyVarDefaulting :: WantedConstraints -> TcM Cts
-applyTyVarDefaulting wc = runTcS do_dflt >>= (return . fst)
-  where 
-    do_dflt = do { tv_cts <- mapM defaultTyVar $ 
-                             varSetElems (touchablesOfWC wc)
-                 ; return (unionManyBags tv_cts) }
+applyTyVarDefaulting wc 
+  = do { tv_cts <- mapM defaultTyVar $ 
+                   varSetElems (tyVarsOfWC wc)
+       ; return (unionManyBags tv_cts) }
 
-defaultTyVar :: TcTyVar -> TcS Cts
+defaultTyVar :: TcTyVar -> TcM Cts
 -- Precondition: a touchable meta-variable
 defaultTyVar the_tv
   | not (k `eqKind` default_k)
-  -- Why tryTcS? See Note [tryTcS in defaulting]
-  = tryTcS $
-    do { let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
-       ; ty_k <- instFlexiTcSHelperTcS (tyVarName the_tv) default_k
-       ; let derived_pred = mkTcEqPred (mkTyVarTy the_tv) ty_k
+  = do { tv' <- TcMType.cloneMetaTyVar the_tv
+       ; let rhs_ty = mkTyVarTy (setTyVarKind tv' default_k)
+             loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
+             derived_pred = mkTcEqPred (mkTyVarTy the_tv) rhs_ty
              -- Why not directly derived_pred = mkTcEqPred k default_k? 
              -- See Note [DefaultTyVar]
-             derived_cts = unitBag $ mkNonCanonical $
+             derived_cts = mkNonCanonical $
                            Derived { ctev_wloc = loc
                                    , ctev_pred = derived_pred } 
        
-       ; implics_from_defaulting <- solveInteract derived_cts
-       ; MASSERT (isEmptyBag implics_from_defaulting)
-         
-       ; all_solved <- checkAllSolved
-       ; if all_solved then return derived_cts
-         else return emptyBag }
+       ; return (unitBag derived_cts) }
+
   | otherwise = return emptyBag	 -- The common case
   where
     k = tyVarKind the_tv

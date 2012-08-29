@@ -27,7 +27,7 @@ module Inst (
        -- Simple functions over evidence variables
        hasEqualities, 
        
-       tyVarsOfZonkedWC, tyVarsOfBag, 
+       tyVarsOfWC, tyVarsOfBag, 
        tyVarsOfCt, tyVarsOfCts, 
 
        tidyEvVar, tidyCt, tidyGivenLoc,
@@ -528,18 +528,19 @@ tyVarsOfCt (CNonCanonical { cc_ev = fl })               = tyVarsOfType (ctEvPred
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
 
-tyVarsOfZonkedWC :: WantedConstraints -> TyVarSet
+tyVarsOfWC :: WantedConstraints -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfZonkedWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
   = tyVarsOfCts flat `unionVarSet`
-    tyVarsOfBag tyVarsOfZonkedImplic implic `unionVarSet`
+    tyVarsOfBag tyVarsOfImplic implic `unionVarSet`
     tyVarsOfCts insol
 
-tyVarsOfZonkedImplic :: Implication -> TyVarSet
+tyVarsOfImplic :: Implication -> TyVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyVarsOfZonkedImplic (Implic { ic_skols = skols, ic_given = givens, ic_wanted = wanted })
-  = (tyVarsOfZonkedWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
-    `delVarSetList` skols
+tyVarsOfImplic (Implic { ic_skols = skols, ic_fsks = fsks
+                             , ic_given = givens, ic_wanted = wanted })
+  = (tyVarsOfWC wanted `unionVarSet` tyVarsOfTypes (map evVarPred givens))
+    `delVarSetList` skols `delVarSetList` fsks
 
 tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
 tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet

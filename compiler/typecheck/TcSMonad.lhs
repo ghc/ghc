@@ -76,6 +76,7 @@ module TcSMonad (
 
     instDFunType,                              -- Instantiation
     newFlexiTcSTy, instFlexiTcS, instFlexiTcSHelperTcS,
+    cloneMetaTyVar,
 
     compatKind, mkKindErrorCtxtTcS,
 
@@ -1349,6 +1350,9 @@ instDFunType dfun_id mb_inst_tys
 
 newFlexiTcSTy :: Kind -> TcS TcType  
 newFlexiTcSTy knd = wrapTcS (TcM.newFlexiTyVarTy knd)
+
+cloneMetaTyVar :: TcTyVar -> TcS TcTyVar
+cloneMetaTyVar tv = wrapTcS (TcM.cloneMetaTyVar tv)
 
 instFlexiTcS :: [TKVar] -> TcS (TvSubst, [TcType])
 instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTvSubst tvs)

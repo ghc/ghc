@@ -25,7 +25,7 @@ module TcMType (
   newFlexiTyVarTy,		-- Kind -> TcM TcType
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newMetaKindVar, newMetaKindVars, mkKindSigVar,
-  mkTcTyVarName,
+  mkTcTyVarName, cloneMetaTyVar, 
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isFlexiMetaTyVar,
@@ -321,6 +321,17 @@ newMetaTyVar meta_info kind
                         SigTv -> fsLit "a"
         ; details <- newMetaDetails meta_info
 	; return (mkTcTyVar name kind details) }
+
+cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
+cloneMetaTyVar tv
+  = ASSERT( isTcTyVar tv )
+    do	{ uniq <- newUnique
+        ; ref  <- newMutVar Flexi
+        ; let name'    = setNameUnique (tyVarName tv) uniq
+              details' = case tcTyVarDetails tv of 
+                           details@(MetaTv {}) -> details { mtv_ref = ref }
+                           _ -> pprPanic "cloneMetaTyVar" (ppr tv)
+        ; return (mkTcTyVar name' (tyVarKind tv) details') }
 
 mkTcTyVarName :: Unique -> FastString -> Name
 -- Make sure that fresh TcTyVar names finish with a digit

@@ -77,7 +77,7 @@ reportUnsolved runtimeCoercionErrors wanted
 
        ; errs_so_far <- ifErrsM (return True) (return False)
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
-             free_tvs = tyVarsOfZonkedWC wanted
+             free_tvs = tyVarsOfWC wanted
              err_ctxt = CEC { cec_encl  = []
                             , cec_insol = errs_so_far || insolubleWC wanted
                                           -- Don't report ambiguity errors if
