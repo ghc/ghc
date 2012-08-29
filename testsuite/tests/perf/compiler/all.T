@@ -36,7 +36,7 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 606230880, 1)),
+          compiler_stats_range_field('bytes allocated', 633332520, 1)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
@@ -44,6 +44,8 @@ test('T1969',
                                     # 16/07/2012:     589,168,872 (amd64/Linux)
                                     # 20/07/2012:     595,936,240 (amd64/Linux)
                                     # 23/08/2012:     606,230,880 (amd64/Linux)
+                                    # 29/08/2012:     633,334,184 (amd64/Linux)
+                                    #                 (new codegen)
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint')
           # Leave -dcore-lint on for this one test, so that we have something
@@ -71,18 +73,19 @@ test('T3294',
                                    # expected value: 17725476 (x86/OS X)
 				   #                 14593500 (Windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 25753192, 15)),
-                                   # Improved with the new codegen merge,
-                                   # because we now do stg->cmm->NCG for one
-                                   # top-level binding at a time.
+          compiler_stats_range_field('max_bytes_used', 37724352, 15)),
+                                   # prev:           25753192 (amd64/Linux)
+                                   # 29/08/2012:     37724352 (amd64/Linux)
+                                   #  (increase due to new codegen, see #7198)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 650000000,
                                                       750000000)),
                                     # expected value: 815479800  (x86/Linux)
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 1200000000,
-                                                      1500000000)),
-                                    # expected value: 1357587088 (amd64/Linux)
+          compiler_stats_range_field('bytes allocated', 2961778696, 5)),
+                                   # old:        1,357,587,088 (amd64/Linux)
+                                   # 29/08/2012: 2,961,778,696 (amd64/Linux)
+                                   #   (increase due to new codegen, see #7198)
       conf_3294
       ],
      compile,
@@ -113,8 +116,9 @@ test('T4801',
                                                      12000000)),
       # expected value: 10290952 (windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 17629176, 15)),
-      # expected value: 20486256 (amd64/OS X):
+          compiler_stats_range_field('max_bytes_used', 18500000, 15)),
+                # prev:       20486256 (amd64/OS X)
+                # 30/08/2012: 17305600--20391920 (varies a lot)
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('max_bytes_used', 20000000,
                                                      23000000)),
@@ -200,10 +204,11 @@ test('T783',
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 125000000,
                                                       225000000)),
-      # sample: 349263216 (amd64/Linux)
-      # sample: 384479856 (amd64/Linux, 7/8/2012)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 384479856, 10))
+          compiler_stats_range_field('bytes allocated', 436927840, 10))
+                           # prev:       349,263,216 (amd64/Linux)
+                           # 07/08/2012: 384,479,856 (amd64/Linux)
+                           # 29/08/2012: 436,927,840 (amd64/Linux)
       ],
       compile,[''])
 
@@ -213,7 +218,10 @@ test('T5321Fun',
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 296657384, 10)),
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 585521080, 10))
+          compiler_stats_range_field('bytes allocated', 713385808, 10))
+                                         # prev:       585,521,080
+                                         # 29/08/2012: 713,385,808
+                                         #  (increase due to new codegen)
       ],
       compile,[''])
 
@@ -223,7 +231,10 @@ test('T5321FD',
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 213380256, 10)),
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 418306336, 10))
+          compiler_stats_range_field('bytes allocated', 492905640, 10))
+                                         # prev:       418,306,336
+                                         # 29/08/2012: 492,905,640
+                                         #  (increase due to new codegen)
       ],
       compile,[''])
 

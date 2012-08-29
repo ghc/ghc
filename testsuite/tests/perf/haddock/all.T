@@ -29,25 +29,28 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless_in_tree_compiler(skip)
      ,if_wordsize(64,
-          stats_num_field('peak_megabytes_allocated', 201,
-                                                      203))
-                                        # 2012-08-14: 202 (amd64/Linux)
+          stats_num_field('peak_megabytes_allocated', 209,
+                                                      213))
+                             # 2012-08-14: 202 (amd64/Linux)
+                             # 2012-08-29: 211 (amd64/Linux, new codegen)
      ,if_wordsize(32,
           stats_num_field('peak_megabytes_allocated', 115,
                                                       117))
                                         # 2012-08-14: 116 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 74119424, 1))
-                                # 2012-08-14: 74119424 (amd64/Linux)
+          stats_range_field('max_bytes_used', 77992512, 1))
+                             # 2012-08-14: 74119424 (amd64/Linux)
+                             # 2012-08-29: 77992512 (amd64/Linux, new codegen)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 47461532, 1))
-                                # 2012-08-14: 47461532 (x86/OSX)
+                             # 2012-08-14: 47461532 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('bytes allocated', 3255435248, 1))
-                                 # 2012-08-14: 3255435248 (amd64/Linux)
+          stats_range_field('bytes allocated', 3324606664, 1))
+                             # 2012-08-14: 3255435248 (amd64/Linux)
+                             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
      ,if_wordsize(32,
           stats_range_field('bytes allocated', 1648610180, 1))
-                                 # 2012-08-14: 1648610180 (x86/OSX)
+                             # 2012-08-14: 1648610180 (x86/OSX)
       ],
      stats,
      ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
@@ -70,8 +73,9 @@ test('haddock.compiler',
           stats_range_field('max_bytes_used', 231064920, 1))
                                 # 2012-08-14: 231064920 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('bytes allocated', 26070600504, 1))
-                                 # 2012-08-14: 26070600504 (amd64/Linux)
+          stats_range_field('bytes allocated', 26353100288, 1))
+                              # 2012-08-14: 26,070,600,504 (amd64/Linux)
+                              # 2012-08-29: 26,353,100,288 (amd64/Linux, new CG)
      ,if_wordsize(32,
           stats_range_field('bytes allocated', 13471797488, 1))
                                  # 2012-08-14: 13471797488 (x86/OSX)
