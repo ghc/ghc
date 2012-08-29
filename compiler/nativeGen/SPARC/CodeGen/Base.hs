@@ -25,12 +25,13 @@ import SPARC.Instr
 import SPARC.Cond
 import SPARC.AddrMode
 import SPARC.Regs
-import SPARC.RegPlate
 import Size
 import Reg
 
+import CodeGen.Platform
 import OldCmm
 import OldPprCmm ()
+import Platform
 
 import Outputable
 import OrdList
@@ -98,13 +99,13 @@ setSizeOfRegister reg size
 
 --------------------------------------------------------------------------------
 -- | Grab the Reg for a CmmReg
-getRegisterReg :: CmmReg -> Reg
+getRegisterReg :: Platform -> CmmReg -> Reg
 
-getRegisterReg (CmmLocal (LocalReg u pk))
+getRegisterReg _ (CmmLocal (LocalReg u pk))
   	= RegVirtual $ mkVirtualReg u (cmmTypeSize pk)
 
-getRegisterReg (CmmGlobal mid)
-  = case globalRegMaybe mid of
+getRegisterReg platform (CmmGlobal mid)
+  = case globalRegMaybe platform mid of
         Just reg -> RegReal reg
         Nothing  -> pprPanic
                         "SPARC.CodeGen.Base.getRegisterReg: global is in memory"

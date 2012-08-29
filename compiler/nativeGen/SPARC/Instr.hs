@@ -36,7 +36,6 @@ import SPARC.Imm
 import SPARC.AddrMode
 import SPARC.Cond
 import SPARC.Regs
-import SPARC.RegPlate
 import SPARC.Base
 import TargetReg
 import Instruction
@@ -45,6 +44,7 @@ import Reg
 import Size
 
 import CLabel
+import CodeGen.Platform
 import BlockId
 import OldCmm
 import FastString
@@ -222,7 +222,7 @@ data Instr
 -- 	allocation goes, are taken care of by the register allocator.
 --
 sparc_regUsageOfInstr :: Platform -> Instr -> RegUsage
-sparc_regUsageOfInstr _ instr
+sparc_regUsageOfInstr platform instr
  = case instr of
     LD    _ addr reg  		-> usage (regAddr addr, 	[reg])
     ST    _ reg addr  		-> usage (reg : regAddr addr, 	[])
@@ -266,7 +266,8 @@ sparc_regUsageOfInstr _ instr
 
   where
     usage (src, dst) 
-     = RU (filter interesting src) (filter interesting dst)
+     = RU (filter (interesting platform) src)
+          (filter (interesting platform) dst)
 
     regAddr (AddrRegReg r1 r2)	= [r1, r2]
     regAddr (AddrRegImm r1 _)	= [r1]
@@ -277,12 +278,12 @@ sparc_regUsageOfInstr _ instr
 
 -- | Interesting regs are virtuals, or ones that are allocatable 
 --	by the register allocator.
-interesting :: Reg -> Bool
-interesting reg
+interesting :: Platform -> Reg -> Bool
+interesting platform reg
  = case reg of
 	RegVirtual _			-> True
-	RegReal (RealRegSingle r1)	-> isFastTrue (freeReg r1)
-	RegReal (RealRegPair r1 _)	-> isFastTrue (freeReg r1)
+	RegReal (RealRegSingle r1)	-> isFastTrue (freeReg platform r1)
+	RegReal (RealRegPair r1 _)	-> isFastTrue (freeReg platform r1)
 
 
 

@@ -46,6 +46,7 @@ import DynFlags
 import Util
 import Pair
 import Outputable
+import Platform
 import FastString
 import Config
 import Data.Bits
@@ -156,7 +157,7 @@ corePrepPgm :: DynFlags -> HscEnv -> CoreProgram -> [TyCon] -> IO CoreProgram
 corePrepPgm dflags hsc_env binds data_tycons = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
     let implicit_binds = mkDataConWorkers data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
@@ -174,7 +175,7 @@ corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags hsc_env expr = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
     let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
     dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" (ppr new_expr)
     return new_expr
@@ -401,6 +402,8 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 
        ; return (floats3, bndr', rhs') }
   where
+    platform = targetPlatform (cpe_dynFlags env)
+
     arity = idArity bndr        -- We must match this arity
 
     ---------------------
@@ -422,7 +425,7 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
       = return (floats, rhs)
 
       -- So the top-level binding is marked NoCafRefs
-      | Just (floats', rhs') <- canFloatFromNoCaf floats rhs
+      | Just (floats', rhs') <- canFloatFromNoCaf platform floats rhs
       = return (floats', rhs')
 
       | otherwise
@@ -1069,9 +1072,9 @@ dropDeadCodeAlts alts = (alts', unionVarSets fvss)
           where !(e', fvs) = dropDeadCode e
 
 -------------------------------------------
-canFloatFromNoCaf ::  Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
+canFloatFromNoCaf :: Platform -> Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
        -- Note [CafInfo and floating]
-canFloatFromNoCaf (Floats ok_to_spec fs) rhs
+canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
   | OkToSpec <- ok_to_spec           -- Worth trying
   , Just (subst, fs') <- go (emptySubst, nilOL) (fromOL fs)
   = Just (Floats OkToSpec fs', subst_expr subst rhs)
@@ -1114,7 +1117,7 @@ canFloatFromNoCaf (Floats ok_to_spec fs) rhs
     -- We can only float to top level from a NoCaf thing if
     -- the new binding is static. However it can't mention
     -- any non-static things or it would *already* be Caffy
-    rhs_ok = rhsIsStatic (\_ -> False)
+    rhs_ok = rhsIsStatic platform (\_ -> False)
 
 wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
 wantFloatNested is_rec strict_or_unlifted floats rhs
@@ -1148,31 +1151,38 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
-data CorePrepEnv = CPE (IdEnv Id) -- Clone local Ids
-                       Id         -- mkIntegerId
+data CorePrepEnv = CPE {
+                       cpe_dynFlags    :: DynFlags,
+                       cpe_env         :: (IdEnv Id), -- Clone local Ids
+                       cpe_mkIntegerId :: Id
+                   }
 
-mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv hsc_env
+mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
+mkInitialCorePrepEnv dflags hsc_env
     = do mkIntegerId <- liftM tyThingId
                       $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
-         return $ CPE emptyVarEnv mkIntegerId
+         return $ CPE {
+                      cpe_dynFlags = dflags,
+                      cpe_env = emptyVarEnv,
+                      cpe_mkIntegerId = mkIntegerId
+                  }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv (CPE env mkIntegerId) id id'
-    = CPE (extendVarEnv env id id') mkIntegerId
+extendCorePrepEnv cpe id id'
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id id' }
 
 extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
-extendCorePrepEnvList (CPE env mkIntegerId) prs
-    = CPE (extendVarEnvList env prs) mkIntegerId
+extendCorePrepEnvList cpe prs
+    = cpe { cpe_env = extendVarEnvList (cpe_env cpe) prs }
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
-lookupCorePrepEnv (CPE env _) id
-  = case lookupVarEnv env id of
+lookupCorePrepEnv cpe id
+  = case lookupVarEnv (cpe_env cpe) id of
         Nothing  -> id
         Just id' -> id'
 
 getMkIntegerId :: CorePrepEnv -> Id
-getMkIntegerId (CPE _ mkIntegerId) = mkIntegerId
+getMkIntegerId = cpe_mkIntegerId
 
 ------------------------------------------------------------------------------
 -- Cloning binders

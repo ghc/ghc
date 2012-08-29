@@ -33,6 +33,7 @@ import TargetReg
 import RegClass
 import Reg
 
+import CodeGen.Platform
 import Constants	(rESERVED_C_STACK_BYTES)
 import BlockId
 import OldCmm
@@ -178,7 +179,7 @@ data Instr
 -- 	allocation goes, are taken care of by the register allocator.
 --
 ppc_regUsageOfInstr :: Platform -> Instr -> RegUsage
-ppc_regUsageOfInstr _ instr
+ppc_regUsageOfInstr platform instr
  = case instr of
     LD    _ reg addr  	-> usage (regAddr addr, [reg])
     LA    _ reg addr  	-> usage (regAddr addr, [reg])
@@ -193,8 +194,8 @@ ppc_regUsageOfInstr _ instr
     BCCFAR _ _		-> noUsage
     MTCTR reg		-> usage ([reg],[])
     BCTR  _ _		-> noUsage
-    BL    _ params	-> usage (params, callClobberedRegs)
-    BCTRL params	-> usage (params, callClobberedRegs)
+    BL    _ params	-> usage (params, callClobberedRegs platform)
+    BCTRL params	-> usage (params, callClobberedRegs platform)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     ADDC  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
     ADDE  reg1 reg2 reg3-> usage ([reg2,reg3], [reg1])
@@ -230,21 +231,21 @@ ppc_regUsageOfInstr _ instr
     FETCHPC reg         -> usage ([], [reg])
     _ 	    	    	-> noUsage
   where
-    usage (src, dst) = RU (filter interesting src)
-    	    	    	  (filter interesting dst)
+    usage (src, dst) = RU (filter (interesting platform) src)
+    	    	    	  (filter (interesting platform) dst)
     regAddr (AddrRegReg r1 r2) = [r1, r2]
     regAddr (AddrRegImm r1 _)  = [r1]
 
     regRI (RIReg r) = [r]
     regRI  _	= []
 
-interesting :: Reg -> Bool
-interesting (RegVirtual _) 		= True
-interesting (RegReal (RealRegSingle i))	
-	= isFastTrue (freeReg i)
+interesting :: Platform -> Reg -> Bool
+interesting _        (RegVirtual _)              = True
+interesting platform (RegReal (RealRegSingle i))
+    = isFastTrue (freeReg platform i)
 
-interesting (RegReal (RealRegPair{}))	
-	= panic "PPC.Instr.interesting: no reg pairs on this arch"
+interesting _        (RegReal (RealRegPair{}))
+    = panic "PPC.Instr.interesting: no reg pairs on this arch"
 
 
 

@@ -39,10 +39,6 @@ module X86.Regs (
         ripRel,
         allFPArgRegs,
 
-        -- horror show
-        freeReg,
-        globalRegMaybe,
-
         allocatableRegs
 )
 
@@ -51,19 +47,7 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
-#if i386_TARGET_ARCH == 0 && x86_64_TARGET_ARCH == 0
--- Compiling for some arch other than Intel so we choose x86-64 as default.
-#undef arm_TARGET_ARCH
-#undef powerpc_TARGET_ARCH
-#undef powerpc64_TARGET_ARCH
-#undef sparc_TARGET_ARCH
-
-#undef x86_64_TARGET_ARCH
-#define x86_64_TARGET_ARCH 1
-#endif
-
-#include "../includes/stg/HaskellMachRegs.h"
-
+import CodeGen.Platform
 import Reg
 import RegClass
 
@@ -416,10 +400,6 @@ xmm n = regSingle (firstxmm+n)
 
 
 
--- horror show -----------------------------------------------------------------
-freeReg                 :: RegNo -> FastBool
-globalRegMaybe          :: GlobalReg -> Maybe RealReg
-
 -- | these are the regs which we cannot assume stay alive over a C call.
 callClobberedRegs       :: Platform -> [Reg]
 -- caller-saves registers
@@ -457,203 +437,17 @@ instrClobberedRegs platform
  | target32Bit platform = [ eax, ecx, edx ]
  | otherwise            = [ rax, rcx, rdx ]
 
-#if i386_TARGET_ARCH
-#define eax 0
-#define ebx 1
-#define ecx 2
-#define edx 3
-#define esi 4
-#define edi 5
-#define ebp 6
-#define esp 7
-#endif
-
-#if x86_64_TARGET_ARCH
-#define rax   0
-#define rbx   1
-#define rcx   2
-#define rdx   3
-#define rsi   4
-#define rdi   5
-#define rbp   6
-#define rsp   7
-#define r8    8
-#define r9    9
-#define r10   10
-#define r11   11
-#define r12   12
-#define r13   13
-#define r14   14
-#define r15   15
-#endif
-
-#define fake0 16
-#define fake1 17
-#define fake2 18
-#define fake3 19
-#define fake4 20
-#define fake5 21
-
-#define xmm0  24
-#define xmm1  25
-#define xmm2  26
-#define xmm3  27
-#define xmm4  28
-#define xmm5  29
-#define xmm6  30
-#define xmm7  31
-#define xmm8  32
-#define xmm9  33
-#define xmm10 34
-#define xmm11 35
-#define xmm12 36
-#define xmm13 37
-#define xmm14 38
-#define xmm15 39
-
-#if i386_TARGET_ARCH
-freeReg esp = fastBool False  --        %esp is the C stack pointer
-#endif
-
-#if i386_TARGET_ARCH
-freeReg esi = fastBool False -- Note [esi/edi not allocatable]
-freeReg edi = fastBool False
-#endif
-
-#if x86_64_TARGET_ARCH
-freeReg rsp = fastBool False  --        %rsp is the C stack pointer
-#endif
-
--- split patterns in two functions to prevent overlaps
-freeReg r         = freeRegBase r
-
-freeRegBase :: RegNo -> FastBool
-
-#ifdef REG_Base
-freeRegBase REG_Base = fastBool False
-#endif
-#ifdef REG_Sp
-freeRegBase REG_Sp   = fastBool False
-#endif
-#ifdef REG_SpLim
-freeRegBase REG_SpLim = fastBool False
-#endif
-#ifdef REG_Hp
-freeRegBase REG_Hp   = fastBool False
-#endif
-#ifdef REG_HpLim
-freeRegBase REG_HpLim = fastBool False
-#endif
-
--- All other regs are considered to be "free", because we can track
--- their liveness accurately.
-freeRegBase _ = fastBool True
-
---  | Returns 'Nothing' if this global register is not stored
--- in a real machine register, otherwise returns @'Just' reg@, where
--- reg is the machine register it is stored in.
-
-#ifdef REG_Base
-globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
-#endif
-#ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)         = Just (RealRegSingle REG_R1)
-#endif
-#ifdef REG_R2
-globalRegMaybe (VanillaReg 2 _)         = Just (RealRegSingle REG_R2)
-#endif
-#ifdef REG_R3
-globalRegMaybe (VanillaReg 3 _)         = Just (RealRegSingle REG_R3)
-#endif
-#ifdef REG_R4
-globalRegMaybe (VanillaReg 4 _)         = Just (RealRegSingle REG_R4)
-#endif
-#ifdef REG_R5
-globalRegMaybe (VanillaReg 5 _)         = Just (RealRegSingle REG_R5)
-#endif
-#ifdef REG_R6
-globalRegMaybe (VanillaReg 6 _)         = Just (RealRegSingle REG_R6)
-#endif
-#ifdef REG_R7
-globalRegMaybe (VanillaReg 7 _)         = Just (RealRegSingle REG_R7)
-#endif
-#ifdef REG_R8
-globalRegMaybe (VanillaReg 8 _)         = Just (RealRegSingle REG_R8)
-#endif
-#ifdef REG_R9
-globalRegMaybe (VanillaReg 9 _)         = Just (RealRegSingle REG_R9)
-#endif
-#ifdef REG_R10
-globalRegMaybe (VanillaReg 10 _)        = Just (RealRegSingle REG_R10)
-#endif
-#ifdef REG_F1
-globalRegMaybe (FloatReg 1)             = Just (RealRegSingle REG_F1)
-#endif
-#ifdef REG_F2
-globalRegMaybe (FloatReg 2)             = Just (RealRegSingle REG_F2)
-#endif
-#ifdef REG_F3
-globalRegMaybe (FloatReg 3)             = Just (RealRegSingle REG_F3)
-#endif
-#ifdef REG_F4
-globalRegMaybe (FloatReg 4)             = Just (RealRegSingle REG_F4)
-#endif
-#ifdef REG_D1
-globalRegMaybe (DoubleReg 1)            = Just (RealRegSingle REG_D1)
-#endif
-#ifdef REG_D2
-globalRegMaybe (DoubleReg 2)            = Just (RealRegSingle REG_D2)
-#endif
-#ifdef REG_Sp
-globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
-#endif
-#ifdef REG_Lng1
-globalRegMaybe (LongReg 1)              = Just (RealRegSingle REG_Lng1)
-#endif
-#ifdef REG_Lng2
-globalRegMaybe (LongReg 2)              = Just (RealRegSingle REG_Lng2)
-#endif
-#ifdef REG_SpLim
-globalRegMaybe SpLim                    = Just (RealRegSingle REG_SpLim)
-#endif
-#ifdef REG_Hp
-globalRegMaybe Hp                       = Just (RealRegSingle REG_Hp)
-#endif
-#ifdef REG_HpLim
-globalRegMaybe HpLim                    = Just (RealRegSingle REG_HpLim)
-#endif
-#ifdef REG_CurrentTSO
-globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
-#endif
-#ifdef REG_CurrentNursery
-globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
-#endif
-globalRegMaybe _                        = Nothing
-
 --
 
 -- All machine registers that are used for argument-passing to Haskell functions
-allHaskellArgRegs :: [Reg]
-allHaskellArgRegs = [ RegReal r | Just r <- map globalRegMaybe globalArgRegs ]
+allHaskellArgRegs :: Platform -> [Reg]
+allHaskellArgRegs platform = [ RegReal r | Just r <- map (globalRegMaybe platform) globalArgRegs ]
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.
 allocatableRegs :: Platform -> [RealReg]
 allocatableRegs platform
-   = let isFree i = isFastTrue (freeReg i)
+   = let isFree i = isFastTrue (freeReg platform i)
      in  map RealRegSingle $ filter isFree (allMachRegNos platform)
 
-{-
-Note [esi/edi not allocatable]
-
-%esi is mapped to R1, so %esi would normally be allocatable while it
-is not being used for R1.  However, %esi has no 8-bit version on x86,
-and the linear register allocator is not sophisticated enough to
-handle this irregularity (we need more RegClasses).  The
-graph-colouring allocator also cannot handle this - it was designed
-with more flexibility in mind, but the current implementation is
-restricted to the same set of classes as the linear allocator.
-
-Hence, on x86 esi and edi are treated as not allocatable.
--}

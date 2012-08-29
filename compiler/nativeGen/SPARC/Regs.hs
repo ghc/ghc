@@ -39,12 +39,10 @@ module SPARC.Regs (
 where
 
 
-import SPARC.RegPlate
+import CodeGen.Platform.SPARC
 import Reg
 import RegClass
 import Size
-
--- import PprCmm ()
 
 import Unique
 import Outputable
@@ -274,129 +272,3 @@ regDotColor reg
 	RcFloat		-> text "red"
 	_other          -> text "green"
 
-
-
-
--- Hard coded freeReg / globalRegMaybe -----------------------------------------
--- This isn't being used at the moment because we're generating
---	these functions from the information in
---	includes/stg/MachRegs.hs via RegPlate.hs
-	
--- | Check whether a machine register is free for allocation.
---	This needs to match the info in includes/stg/MachRegs.h
---	otherwise modules compiled with the NCG won't be compatible
---	with via-C ones.
---
-{-
-freeReg :: RegNo -> FastBool
-freeReg regno
- = case regno of
-	-- %g0(r0) is always 0.
- 	0	-> fastBool False	
-
- 	-- %g1(r1) - %g4(r4) are allocable -----------------
-
-	-- %g5(r5) - %g7(r7) 
-	--	are reserved for the OS
-	5	-> fastBool False
-	6	-> fastBool False
-	7	-> fastBool False
-
-	-- %o0(r8) - %o5(r13) are allocable ----------------
-
-	-- %o6(r14) 
-	--	is the C stack pointer
-	14	-> fastBool False
-
-	-- %o7(r15) 
-	--	holds C return addresses (???)
-	15	-> fastBool False
-
-	-- %l0(r16) is allocable ---------------------------
-
-	-- %l1(r17) - %l5(r21) 
-	--	are STG regs R1 - R5
-	17	-> fastBool False
-	18	-> fastBool False
-	19	-> fastBool False
-	20	-> fastBool False
-	21	-> fastBool False
-	
-	-- %l6(r22) - %l7(r23) are allocable --------------
-	
-	-- %i0(r24) - %i5(r29)
-	--	are STG regs Sp, Base, SpLim, Hp, R6
-	24	-> fastBool False
-	25	-> fastBool False
-	26	-> fastBool False
-	27	-> fastBool False
-
-	-- %i5(r28) is allocable --------------------------
-
-	29	-> fastBool False
-	
-	-- %i6(r30) 
-	--	is the C frame pointer
-	30	-> fastBool False
-
-	-- %i7(r31) 
-	--	is used for C return addresses
-	31	-> fastBool False
-	
-	-- %f0(r32) - %f1(r33)
-	--	are C fp return registers
-	32	-> fastBool False
-	33	-> fastBool False
-
-	-- %f2(r34) - %f5(r37)
-	--	are STG regs D1 - D2
-	34	-> fastBool False
-	35	-> fastBool False
-	36	-> fastBool False
-	37	-> fastBool False
-
-	-- %f22(r54) - %f25(r57)
-	--	are STG regs F1 - F4
-	54	-> fastBool False
-	55	-> fastBool False
-	56	-> fastBool False
-	57	-> fastBool False
-
-	-- regs not matched above are allocable.
-	_	-> fastBool True
-
--}
-
--- | Returns Just the real register that a global register is stored in.
---	Returns Nothing if the global has no real register, and is stored
---	in the in-memory register table instead.
---
-{-
-globalRegMaybe  :: GlobalReg -> Maybe Reg
-globalRegMaybe gg
- = case gg of
-	-- Argument and return regs
-	VanillaReg 1 _	-> Just (RealReg 17)	-- %l1
-	VanillaReg 2 _	-> Just (RealReg 18)	-- %l2
-	VanillaReg 3 _	-> Just (RealReg 19)	-- %l3
-	VanillaReg 4 _	-> Just (RealReg 20)	-- %l4
-	VanillaReg 5 _	-> Just (RealReg 21)	-- %l5
-	VanillaReg 6 _	-> Just (RealReg 29)	-- %i5
-
-	FloatReg 1	-> Just (RealReg 54)	-- %f22
-	FloatReg 2	-> Just (RealReg 55)	-- %f23
-	FloatReg 3	-> Just (RealReg 56)	-- %f24
-	FloatReg 4	-> Just (RealReg 57)	-- %f25
-
-	DoubleReg 1	-> Just (RealReg 34)	-- %f2
-	DoubleReg 2	-> Just (RealReg 36)	-- %f4
-
-	-- STG Regs
-	Sp		-> Just (RealReg 24)	-- %i0
-	SpLim		-> Just (RealReg 26)	-- %i2
-	Hp		-> Just (RealReg 27)	-- %i3
-
-	BaseReg		-> Just (RealReg 25)	-- %i1
-		
-	_		-> Nothing 	
--}

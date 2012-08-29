@@ -130,9 +130,6 @@ import Data.Maybe
 import Data.List
 import Control.Monad
 
-#include "../includes/stg/HaskellMachRegs.h"
-
-
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
 
@@ -328,7 +325,7 @@ initBlock platform id block_live
                           Nothing ->
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
-                            setFreeRegsR $ foldr frAllocateReg (frInitFreeRegs platform) [ r | RegReal r <- uniqSetToList live ]
+                            setFreeRegsR $ foldr (frAllocateReg platform) (frInitFreeRegs platform) [ r | RegReal r <- uniqSetToList live ]
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
@@ -488,10 +485,10 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
-    releaseRegs r_dying
+    releaseRegs platform r_dying
 
     -- (f) Mark regs which are clobbered as unallocatable
-    clobberRegs real_written
+    clobberRegs platform real_written
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
@@ -499,7 +496,7 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 
     -- (h) Release registers for temps which are written here and not
     -- used again.
-    releaseRegs w_dying
+    releaseRegs platform w_dying
 
     let
         -- (i) Patch the instruction
@@ -542,19 +539,19 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
-releaseRegs regs = do
+releaseRegs :: FR freeRegs => Platform -> [Reg] -> RegM freeRegs ()
+releaseRegs platform regs = do
   assig <- getAssigR
   free <- getFreeRegsR
   loop assig free regs
  where
   loop _     free _ | free `seq` False = undefined
   loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
-  loop assig free (RegReal rr : rs) = loop assig (frReleaseReg rr free) rs
+  loop assig free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
   loop assig free (r:rs) =
      case lookupUFM assig r of
-        Just (InBoth real _) -> loop (delFromUFM assig r) (frReleaseReg real free) rs
-        Just (InReg real) -> loop (delFromUFM assig r) (frReleaseReg real free) rs
+        Just (InBoth real _) -> loop (delFromUFM assig r) (frReleaseReg platform real free) rs
+        Just (InReg real) -> loop (delFromUFM assig r) (frReleaseReg platform real free) rs
         _other            -> loop (delFromUFM assig r) free rs
 
 
@@ -612,7 +609,7 @@ saveClobberedTemps platform clobbered dying
               -- clobbered by this instruction; use it to save the
               -- clobbered value.
               (my_reg : _) -> do
-                  setFreeRegsR (frAllocateReg my_reg freeRegs)
+                  setFreeRegsR (frAllocateReg platform my_reg freeRegs)
 
                   let new_assign = addToUFM assig temp (InReg my_reg)
                   let instr = mkRegRegMoveInstr platform
@@ -636,14 +633,14 @@ saveClobberedTemps platform clobbered dying
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --
-clobberRegs :: FR freeRegs => [RealReg] -> RegM freeRegs ()
-clobberRegs []
+clobberRegs :: FR freeRegs => Platform -> [RealReg] -> RegM freeRegs ()
+clobberRegs _ []
         = return ()
 
-clobberRegs clobbered
+clobberRegs platform clobbered
  = do
         freeregs        <- getFreeRegsR
-        setFreeRegsR $! foldr frAllocateReg freeregs clobbered
+        setFreeRegsR $! foldr (frAllocateReg platform) freeregs clobbered
 
         assig           <- getAssigR
         setAssigR $! clobber assig (ufmToList assig)
@@ -754,7 +751,7 @@ allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
            do   spills'   <- loadTemp platform r spill_loc my_reg spills
 
                 setAssigR       (addToUFM assig r $! newLocation spill_loc my_reg)
-                setFreeRegsR $  frAllocateReg my_reg freeRegs
+                setFreeRegsR $  frAllocateReg platform my_reg freeRegs
 
                 allocateRegsAndSpill platform reading keep spills' (my_reg : alloc) rs
 
