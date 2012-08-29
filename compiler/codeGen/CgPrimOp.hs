@@ -424,12 +424,21 @@ emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] live =
 emitPrimOp [] SetByteArrayOp [ba,off,len,c] live =
     doSetByteArrayOp ba off len c live
 
--- Population count
-emitPrimOp [res] PopCnt8Op [w] live = emitPopCntCall res w W8 live
-emitPrimOp [res] PopCnt16Op [w] live = emitPopCntCall res w W16 live
-emitPrimOp [res] PopCnt32Op [w] live = emitPopCntCall res w W32 live
-emitPrimOp [res] PopCnt64Op [w] live = emitPopCntCall res w W64 live
-emitPrimOp [res] PopCntOp [w] live = emitPopCntCall res w wordWidth live
+-- Population count.
+-- The type of the primop takes a Word#, so we have to be careful to narrow
+-- to the correct width before calling the primop.  Otherwise this can result
+-- in a crash e.g. when calling the helper hs_popcnt8() which assumes that the
+-- argument is <=0xff.
+emitPrimOp [res] PopCnt8Op [w] live =
+  emitPopCntCall res (CmmMachOp mo_WordTo8 [w]) W8 live
+emitPrimOp [res] PopCnt16Op [w] live =
+  emitPopCntCall res (CmmMachOp mo_WordTo16 [w]) W16 live
+emitPrimOp [res] PopCnt32Op [w] live =
+  emitPopCntCall res (CmmMachOp mo_WordTo32 [w]) W32 live
+emitPrimOp [res] PopCnt64Op [w] live =
+  emitPopCntCall res (CmmMachOp mo_WordTo64 [w]) W64 live
+emitPrimOp [res] PopCntOp [w] live =
+  emitPopCntCall res w wordWidth live
 
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg] _

@@ -13,7 +13,7 @@ module CmmMachOp
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
-    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32
+    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
 
     -- CallishMachOp
     , CallishMachOp(..)
@@ -124,7 +124,7 @@ mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
-    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32
+    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
     :: MachOp
 
 mo_wordAdd      = MO_Add wordWidth
@@ -171,6 +171,7 @@ mo_u_32ToWord   = MO_UU_Conv W32 wordWidth
 mo_WordTo8      = MO_UU_Conv wordWidth W8
 mo_WordTo16     = MO_UU_Conv wordWidth W16
 mo_WordTo32     = MO_UU_Conv wordWidth W32
+mo_WordTo64     = MO_UU_Conv wordWidth W64
 
 mo_32To8        = MO_UU_Conv W32 W8
 mo_32To16       = MO_UU_Conv W32 W16
