@@ -652,14 +652,14 @@ zonkCts :: Cts -> TcM Cts
 zonkCts = mapBagM zonkCt
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
-zonkCtEvidence ctev@(Given { ctev_gloc = loc, ctev_pred = pred }) 
+zonkCtEvidence ctev@(CtGiven { ctev_gloc = loc, ctev_pred = pred }) 
   = do { loc' <- zonkGivenLoc loc
        ; pred' <- zonkTcType pred
        ; return (ctev { ctev_gloc = loc', ctev_pred = pred'}) }
-zonkCtEvidence ctev@(Wanted { ctev_pred = pred })
+zonkCtEvidence ctev@(CtWanted { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred' }) }
-zonkCtEvidence ctev@(Derived { ctev_pred = pred })
+zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred' }) }
 

@@ -166,7 +166,7 @@ reportTidyWanteds ctxt insols flats implics
 deferToRuntime :: EvBindsVar -> ReportErrCtxt -> (ReportErrCtxt -> Ct -> TcM ErrMsg) 
                -> Ct -> TcM ()
 deferToRuntime ev_binds_var ctxt mk_err_msg ct 
-  | Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev_id } <- cc_ev ct
+  | CtWanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev_id } <- cc_ev ct
   = do { err <- setCtLoc loc $
                 mk_err_msg ctxt ct
        ; dflags <- getDynFlags
@@ -332,9 +332,9 @@ groupErrs mk_err (ct1 : rest)
    is_friend friend  = cc_ev friend `same_group` flavor
 
    same_group :: CtEvidence -> CtEvidence -> Bool
-   same_group (Given   {ctev_gloc = l1}) (Given   {ctev_gloc = l2}) = same_loc l1 l2
-   same_group (Wanted  {ctev_wloc = l1}) (Wanted  {ctev_wloc = l2}) = same_loc l1 l2
-   same_group (Derived {ctev_wloc = l1}) (Derived {ctev_wloc = l2}) = same_loc l1 l2
+   same_group (CtGiven   {ctev_gloc = l1}) (CtGiven   {ctev_gloc = l2}) = same_loc l1 l2
+   same_group (CtWanted  {ctev_wloc = l1}) (CtWanted  {ctev_wloc = l2}) = same_loc l1 l2
+   same_group (CtDerived {ctev_wloc = l1}) (CtDerived {ctev_wloc = l2}) = same_loc l1 l2
    same_group _ _ = False
 
    same_loc :: CtLoc o -> CtLoc o -> Bool
@@ -496,7 +496,7 @@ mkEqErr1 ctxt ct
 
     flav = cc_ev ct
 
-    inaccessible_msg (Given { ctev_gloc = loc }) 
+    inaccessible_msg (CtGiven { ctev_gloc = loc }) 
        = hang (ptext (sLit "Inaccessible code in"))
             2 (ppr (ctLocOrigin loc))
     -- If a Solved then we should not report inaccessible code
@@ -1151,9 +1151,9 @@ flattenForAllErrorTcS fl ty
 
 \begin{code}
 setCtFlavorLoc :: CtEvidence -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  { ctev_wloc = loc }) thing = setCtLoc loc thing
-setCtFlavorLoc (Derived { ctev_wloc = loc }) thing = setCtLoc loc thing
-setCtFlavorLoc (Given   { ctev_gloc = loc }) thing = setCtLoc loc thing
+setCtFlavorLoc (CtWanted  { ctev_wloc = loc }) thing = setCtLoc loc thing
+setCtFlavorLoc (CtDerived { ctev_wloc = loc }) thing = setCtLoc loc thing
+setCtFlavorLoc (CtGiven   { ctev_gloc = loc }) thing = setCtLoc loc thing
 \end{code}
 
 %************************************************************************

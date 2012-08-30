@@ -73,6 +73,7 @@ module TcRnTypes(
         mkGivenLoc,
         isWanted, isGiven,
         isDerived, getWantedLoc, getGivenLoc, canSolve, canRewrite,
+        CtFlavour(..), ctEvFlavour, ctFlavour,
 
 	-- Pretty printing
         pprEvVarTheta, pprWantedsWithLocs,
@@ -1205,42 +1206,57 @@ may be un-zonked.
 
 \begin{code}
 data CtEvidence 
-  = Given { ctev_gloc :: GivenLoc
-          , ctev_pred :: TcPredType
-          , ctev_evtm :: EvTerm }          -- See Note [Evidence field of CtEvidence]
+  = CtGiven { ctev_gloc :: GivenLoc
+            , ctev_pred :: TcPredType
+            , ctev_evtm :: EvTerm }          -- See Note [Evidence field of CtEvidence]
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
     
-  | Wanted { ctev_wloc :: WantedLoc
-           , ctev_pred :: TcPredType
-           , ctev_evar :: EvVar }          -- See Note [Evidence field of CtEvidence]
+  | CtWanted { ctev_wloc :: WantedLoc
+             , ctev_pred :: TcPredType
+             , ctev_evar :: EvVar }          -- See Note [Evidence field of CtEvidence]
     -- Wanted goal 
     
-  | Derived { ctev_wloc :: WantedLoc 
-            , ctev_pred :: TcPredType }
+  | CtDerived { ctev_wloc :: WantedLoc 
+              , ctev_pred :: TcPredType }
     -- A goal that we don't really have to solve and can't immediately 
     -- rewrite anything other than a derived (there's no evidence!) 
     -- but if we do manage to solve it may help in solving other goals.
+
+data CtFlavour = Given | Wanted | Derived
+
+ctFlavour :: Ct -> CtFlavour
+ctFlavour ct = ctEvFlavour (cc_ev ct)
+
+ctEvFlavour :: CtEvidence -> CtFlavour
+ctEvFlavour (CtGiven {})   = Given
+ctEvFlavour (CtWanted {})  = Wanted
+ctEvFlavour (CtDerived {}) = Derived
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
 ctEvPred = ctev_pred
 
 ctEvTerm :: CtEvidence -> EvTerm
-ctEvTerm (Given   { ctev_evtm = tm }) = tm
-ctEvTerm (Wanted  { ctev_evar = ev }) = EvId ev
-ctEvTerm ctev@(Derived {}) = pprPanic "ctEvTerm: derived constraint cannot have id" 
+ctEvTerm (CtGiven   { ctev_evtm = tm }) = tm
+ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
+ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id" 
                                       (ppr ctev)
 
 ctEvId :: CtEvidence -> TcId
-ctEvId (Wanted  { ctev_evar = ev }) = ev
+ctEvId (CtWanted  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
+
+instance Outputable CtFlavour where
+  ppr Given   = ptext (sLit "[G]")
+  ppr Wanted  = ptext (sLit "[W]")
+  ppr Derived = ptext (sLit "[D]")
 
 instance Outputable CtEvidence where
   ppr fl = case fl of
-             Given {}   -> ptext (sLit "[G]") <+> ppr (ctev_evtm fl) <+> ppr_pty
-             Wanted {}  -> ptext (sLit "[W]") <+> ppr (ctev_evar fl) <+> ppr_pty
-             Derived {} -> ptext (sLit "[D]") <+> text "_" <+> ppr_pty
+             CtGiven {}   -> ptext (sLit "[G]") <+> ppr (ctev_evtm fl) <+> ppr_pty
+             CtWanted {}  -> ptext (sLit "[W]") <+> ppr (ctev_evar fl) <+> ppr_pty
+             CtDerived {} -> ptext (sLit "[D]") <+> text "_" <+> ppr_pty
          where ppr_pty = dcolon <+> ppr (ctEvPred fl)
 
 getWantedLoc :: CtEvidence -> WantedLoc
@@ -1252,23 +1268,23 @@ getGivenLoc :: CtEvidence -> GivenLoc
 getGivenLoc fl = ctev_gloc fl
 
 pprFlavorArising :: CtEvidence -> SDoc
-pprFlavorArising (Given { ctev_gloc = gl }) = pprArisingAt gl
-pprFlavorArising ctev                       = pprArisingAt (ctev_wloc ctev)
+pprFlavorArising (CtGiven { ctev_gloc = gl }) = pprArisingAt gl
+pprFlavorArising ctev                         = pprArisingAt (ctev_wloc ctev)
 
 
 isWanted :: CtEvidence -> Bool
-isWanted (Wanted {}) = True
+isWanted (CtWanted {}) = True
 isWanted _ = False
 
 isGiven :: CtEvidence -> Bool
-isGiven (Given {})  = True
+isGiven (CtGiven {})  = True
 isGiven _ = False
 
 isDerived :: CtEvidence -> Bool
-isDerived (Derived {}) = True
-isDerived _             = False
+isDerived (CtDerived {}) = True
+isDerived _              = False
 
-canSolve :: CtEvidence -> CtEvidence -> Bool
+canSolve :: CtFlavour -> CtFlavour -> Bool
 -- canSolve ctid1 ctid2 
 -- The constraint ctid1 can be used to solve ctid2 
 -- "to solve" means a reaction where the active parts of the two constraints match.
@@ -1279,13 +1295,13 @@ canSolve :: CtEvidence -> CtEvidence -> Bool
 --
 -- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
 -----------------------------------------
-canSolve (Given {})   _            = True 
-canSolve (Wanted {})  (Derived {}) = True
-canSolve (Wanted {})  (Wanted {})  = True
-canSolve (Derived {}) (Derived {}) = True  -- Derived can't solve wanted/given
+canSolve Given   _       = True 
+canSolve Wanted  Derived = True
+canSolve Wanted  Wanted  = True
+canSolve Derived Derived = True  -- Derived can't solve wanted/given
 canSolve _ _ = False  	       	     	   -- No evidence for a derived, anyway
 
-canRewrite :: CtEvidence -> CtEvidence -> Bool 
+canRewrite :: CtFlavour -> CtFlavour -> Bool 
 -- canRewrite ct1 ct2 
 -- The equality constraint ct1 can be used to rewrite inside ct2 
 canRewrite = canSolve 

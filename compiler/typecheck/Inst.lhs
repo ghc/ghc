@@ -85,7 +85,7 @@ emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred 
   = do { loc <- getCtLoc origin
        ; ev  <- newWantedEvVar pred
-       ; emitFlat (mkNonCanonical (Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev }))
+       ; emitFlat (mkNonCanonical (CtWanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev }))
        ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -557,12 +557,12 @@ tidyCt env ct
     tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 
      --     show it in error messages
-    tidy_flavor env ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
+    tidy_flavor env ctev@(CtGiven { ctev_gloc = gloc, ctev_pred = pred })
       = ctev { ctev_gloc = tidyGivenLoc env gloc
              , ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(Wanted { ctev_pred = pred })
+    tidy_flavor env ctev@(CtWanted { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(Derived { ctev_pred = pred })
+    tidy_flavor env ctev@(CtDerived { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
 
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
@@ -624,14 +624,14 @@ substEvVar :: TvSubst -> EvVar -> EvVar
 substEvVar subst var = setVarType var (substTy subst (varType var))
 
 substFlavor :: TvSubst -> CtEvidence -> CtEvidence
-substFlavor subst ctev@(Given { ctev_gloc = gloc, ctev_pred = pred })
+substFlavor subst ctev@(CtGiven { ctev_gloc = gloc, ctev_pred = pred })
   = ctev { ctev_gloc = substGivenLoc subst gloc
           , ctev_pred = substTy subst pred }
 
-substFlavor subst ctev@(Wanted { ctev_pred = pred })
+substFlavor subst ctev@(CtWanted { ctev_pred = pred })
   = ctev  { ctev_pred = substTy subst pred }
 
-substFlavor subst ctev@(Derived { ctev_pred = pty })
+substFlavor subst ctev@(CtDerived { ctev_pred = pty })
   = ctev { ctev_pred = substTy subst pty }
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc

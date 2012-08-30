@@ -99,16 +99,14 @@ solveInteractGiven gloc fsks givens
                       -- See Note [Do not decompose given polytype equalities]
                       -- in TcCanonical
   where 
-    given_bag = listToBag [ CNonCanonical { cc_ev = Given { ctev_gloc = gloc 
-                                                          , ctev_evtm = EvId ev_id
-                                                          , ctev_pred = evVarPred ev_id }
-                                          , cc_depth = 0 }
+    given_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_gloc = gloc 
+                                                     , ctev_evtm = EvId ev_id
+                                                     , ctev_pred = evVarPred ev_id }
                           | ev_id <- givens ]
 
-    fsk_bag = listToBag [ CNonCanonical { cc_ev = Given { ctev_gloc = gloc 
-                                                        , ctev_evtm = EvCoercion (mkTcReflCo tv_ty)
-                                                        , ctev_pred = pred  }
-                                        , cc_depth = 0 }
+    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_gloc = gloc 
+                                                   , ctev_evtm = EvCoercion (mkTcReflCo tv_ty)
+                                                   , ctev_pred = pred  }
                         | tv <- fsks
                         , let FlatSkol fam_ty = tcTyVarDetails tv
                               tv_ty = mkTyVarTy tv
@@ -237,7 +235,7 @@ thePipeline = [ ("lookup-in-inerts",        lookupInInertsStage)
 --------------------------------------------------------------------
 lookupInInertsStage :: SimplifierStage
 lookupInInertsStage ct
-  | Wanted { ctev_evar = ev_id, ctev_pred = pred } <- cc_ev ct
+  | CtWanted { ctev_evar = ev_id, ctev_pred = pred } <- cc_ev ct
   = do { mb_ct <- lookupInInerts pred
        ; case mb_ct of
            Just ctev
@@ -290,12 +288,11 @@ spontaneousSolveStage workItem
   where spont_solve SPCantSolve
           | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
           -- Unsolved equality
-          = do { wl <- modifyInertTcS $
-                       kickOutRewritable (fl `canRewrite`) (`canRewrite` fl) tv
+          = do { wl <- modifyInertTcS (kickOutRewritable (ctEvFlavour fl) tv)
                ; traceTcS "kickOutRewritableInerts" $
                  vcat [ text "WorkItem (unsolved) =" <+> ppr workItem
                       , text "Kicked out =" <+> ppr wl ]
-               ; updWorkListTcS (unionWorkList wl)
+               ; updWorkListTcS (appendWorkList wl)
                ; insertInertItemTcS workItem
                ; return Stop }
           | otherwise
@@ -306,11 +303,10 @@ spontaneousSolveStage workItem
           = do { bumpStepCountTcS
                ; traceFireTcS (cc_depth workItem) $
                  ptext (sLit "Spontaneously solved:") <+> ppr workItem
-               ; wl <- modifyInertTcS $
-                       kickOutRewritable (const True) isGiven new_tv
+               ; wl <- modifyInertTcS (kickOutRewritable Given new_tv)
 
                ; traceTcS "kickOutRewritableInerts" $ ptext (sLit "Kicked out =") <+> ppr wl
-               ; updWorkListTcS (unionWorkList wl) 
+               ; updWorkListTcS (appendWorkList wl) 
                ; return Stop }
 
 \end{code}
@@ -331,11 +327,11 @@ these binds /and/ the inerts for potentially unsolved or other given equalities.
 
 \begin{code}
 
-kickOutRewritable :: (CtEvidence -> Bool) -- Can the new item rewrite a CtEvidence?
-                  -> (CtEvidence -> Bool) -- Can some CtEvidence rewrite the new item?
-                  -> TcTyVar
+kickOutRewritable :: CtFlavour    -- Flavour of the equality that is 
+                                  -- being added to the inert set
+                  -> TcTyVar      -- The new equality is tv ~ ty
                   -> InertSet -> (WorkList,InertSet)
-kickOutRewritable can_rewrite can_be_rewritten_by new_tv
+kickOutRewritable new_flav new_tv
        is@(IS { inert_cans = IC { inert_eqs    = tv_eqs
                                 , inert_eq_tvs = inscope
                                 , inert_dicts  = dictmap
@@ -346,7 +342,7 @@ kickOutRewritable can_rewrite can_be_rewritten_by new_tv
   where
     rest_out = fro_out `andCts` dicts_out `andCts` irs_out
     kicked_out = WorkList { wl_eqs    = varEnvElts tv_eqs_out
-                          , wl_funeqs = bagToList feqs_out
+                          , wl_funeqs = foldrBag insertDeque emptyDeque feqs_out
                           , wl_rest   = bagToList rest_out }
   
     remaining = is { inert_cans = IC { inert_eqs = tv_eqs_in
@@ -367,7 +363,7 @@ kickOutRewritable can_rewrite can_be_rewritten_by new_tv
     (irs_out,   irs_in)     = partitionBag     kick_out irreds
     (fro_out,   fro_in)     = partitionBag     kick_out frozen
 
-    kick_out inert_ct = can_rewrite (cc_ev inert_ct) &&
+    kick_out inert_ct = new_flav `canRewrite` (ctFlavour inert_ct) &&
                         (new_tv `elemVarSet` tyVarsOfCt inert_ct) 
                     -- NB: tyVarsOfCt will return the type 
                     --     variables /and the kind variables/ that are 
@@ -378,7 +374,7 @@ kickOutRewritable can_rewrite can_be_rewritten_by new_tv
                     --     constraints that mention type variables whose
                     --     kinds could contain this variable!
 
-    kick_out_eq inert_ct = kick_out inert_ct && not (can_be_rewritten_by (cc_ev inert_ct))
+    kick_out_eq inert_ct = kick_out inert_ct && not (ctFlavour inert_ct `canRewrite` new_flav)
                -- If also the inert can rewrite the subst then there is no danger of 
                -- occurs check errors sor keep it there. No need to rewrite the inert equality
                -- (as we did in the past) because of point (8) of 
@@ -719,9 +715,9 @@ doInteractWithInert (CIrredEvCan { cc_ev = ifl, cc_ty = ty1 })
   | ty1 `eqType` ty2
   = solveOneFromTheOther "Irred/Irred" ifl workItem
 
-doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
+doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_depth = d1 }) 
-                    wi@(CFunEqCan { cc_ev = fl2, cc_fun = tc2
+                    wi@(CFunEqCan { cc_ev = ev2, cc_fun = tc2
                                   , cc_tyargs = args2, cc_rhs = xi2, cc_depth = d2 })
   | fl1 `canSolve` fl2 && lhss_match
   = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
@@ -735,7 +731,7 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
              -- xdecomp : (F args ~ xi2) -> [(xi2 ~ xi1)]                 
              xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
 
-       ; ctevs <- xCtFlavor_cache False fl2 [mkTcEqPred xi2 xi1] xev
+       ; ctevs <- xCtFlavor_cache False ev2 [mkTcEqPred xi2 xi1] xev
                          -- Why not simply xCtFlavor? See Note [Cache-caused loops]
                          -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
        ; add_to_work d2 ctevs 
@@ -753,7 +749,7 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
              -- xdecomp : (F args ~ xi1) -> [(xi2 ~ xi1)]
              xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` evTermCoercion x)]
 
-       ; ctevs <- xCtFlavor_cache False fl1 [mkTcEqPred xi2 xi1] xev 
+       ; ctevs <- xCtFlavor_cache False ev1 [mkTcEqPred xi2 xi1] xev 
                           -- Why not simply xCtFlavor? See Note [Cache-caused loops]
                           -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
@@ -765,9 +761,11 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = fl1, cc_fun = tc1
     add_to_work _ _ = return ()
 
     lhss_match = tc1 == tc2 && eqTypes args1 args2 
-    co1 = evTermCoercion $ ctEvTerm fl1
-    co2 = evTermCoercion $ ctEvTerm fl2
+    co1 = evTermCoercion $ ctEvTerm ev1
+    co2 = evTermCoercion $ ctEvTerm ev2
     mk_sym_co x = mkTcSymCo (evTermCoercion x)
+    fl1 = ctEvFlavour ev1
+    fl2 = ctEvFlavour ev2
     
 doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 
@@ -873,10 +871,10 @@ solveOneFromTheOther info ifl workItem
 		  -- so it's safe to continue on from this point
   = return (IRInertConsumed ("Solved[DI] " ++ info))
   
-  | Wanted { ctev_evar = ev_id } <- wfl
+  | CtWanted { ctev_evar = ev_id } <- wfl
   = do { setEvBind ev_id (ctEvTerm ifl); return (IRWorkItemConsumed ("Solved(w) " ++ info)) }
 
-  | Wanted { ctev_evar = ev_id } <- ifl
+  | CtWanted { ctev_evar = ev_id } <- ifl
   = do { setEvBind ev_id (ctEvTerm wfl); return (IRInertConsumed ("Solved(g) " ++ info)) }
 
   | otherwise	   -- If both are Given, we already have evidence; no need to duplicate
@@ -1300,8 +1298,8 @@ rewriteWithFunDeps eqn_pred_locs fl
       ; if null fd_ev_pos then return Nothing
         else return (Just (map snd fd_ev_pos)) }
  where 
-   wloc | Given { ctev_gloc = gl } <- fl = setCtLocOrigin gl FunDepOrigin
-        | otherwise                      = ctev_wloc fl
+   wloc | CtGiven { ctev_gloc = gl } <- fl = setCtLocOrigin gl FunDepOrigin
+        | otherwise                        = ctev_wloc fl
 
 instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,CtEvidence)]
 -- Post: Returns the position index as well as the corresponding FunDep equality
@@ -1341,7 +1339,7 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 emitFDWorkAsDerived :: [CtEvidence]   -- All Derived
                     -> SubGoalDepth -> TcS () 
 emitFDWorkAsDerived evlocs d 
-  = updWorkListTcS $ appendWorkListEqs (map mk_fd_ct evlocs)
+  = updWorkListTcS $ extendWorkListEqs (map mk_fd_ct evlocs)
   where 
     mk_fd_ct der_ev = CNonCanonical { cc_ev = der_ev, cc_depth = d }
 \end{code}
@@ -1452,7 +1450,7 @@ doTopReactDict inerts workItem fl cls xis depth
              ; let mk_new_wanted ev
                        = CNonCanonical { cc_ev   = ev
                                        , cc_depth = depth + 1 }
-             ; updWorkListTcS (appendWorkListCt (map mk_new_wanted evs))
+             ; updWorkListTcS (extendWorkListCts (map mk_new_wanted evs))
              ; return $
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
                           , tir_new_item = Stop } }
@@ -1460,8 +1458,8 @@ doTopReactDict inerts workItem fl cls xis depth
 --------------------
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> SubGoalDepth -> TcS TopInteractResult
-doTopReactFunEq ct fl tc args xi d
-  = ASSERT (isSynFamilyTyCon tc) -- No associated data families have 
+doTopReactFunEq ct fl fun_tc args xi d
+  = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
                                  -- reached that far 
 
     -- First look in the cache of solved funeqs
@@ -1469,12 +1467,12 @@ doTopReactFunEq ct fl tc args xi d
        ; case lookupFamHead fun_eq_cache fam_ty of {
             Just (CFunEqCan { cc_ev = ctev, cc_rhs = rhs_ty })
                 -> ASSERT( not (isDerived ctev) )
-                   succeed_with (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
+                   succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
             Just {}  -> pprPanic "doTopReactFunEq" (ppr ct) ;
             Nothing -> 
 
     -- No cached solved, so look up in top-level instances
-    do { match_res <- matchFam tc args   -- See Note [MATCHING-SYNONYMS]
+    do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> return NoTopInt ;
            Just (famInst, rep_tys) -> 
@@ -1484,13 +1482,13 @@ doTopReactFunEq ct fl tc args xi d
          unless (isDerived fl) (addSolvedFunEq ct fam_ty)
 
        ; let coe_ax = famInstAxiom famInst 
-       ; succeed_with (mkTcAxInstCo coe_ax rep_tys)
+       ; succeed_with "Fun/Top"(mkTcAxInstCo coe_ax rep_tys)
                       (mkAxInstRHS coe_ax rep_tys) } } } } }
   where
-    fam_ty = mkTyConApp tc args
+    fam_ty = mkTyConApp fun_tc args
 
-    succeed_with :: TcCoercion -> TcType -> TcS TopInteractResult
-    succeed_with coe rhs_ty 
+    succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
+    succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty
       = do { ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
@@ -1498,11 +1496,11 @@ doTopReactFunEq ct fl tc args xi d
                                        , cc_depth  = d+1 }
                ctevs -> -- No subgoal (because it's cached)
                         ASSERT( null ctevs) return () 
-           ; return $ SomeTopInt { tir_rule = "Fun/Top"
+           ; return $ SomeTopInt { tir_rule = str
                                  , tir_new_item = Stop } }
       where
-        xdecomp x = [EvCoercion (mkTcSymCo coe `mkTcTransCo` evTermCoercion x)]
-        xcomp [x] = EvCoercion (coe `mkTcTransCo` evTermCoercion x)
+        xdecomp x = [EvCoercion (mkTcSymCo co `mkTcTransCo` evTermCoercion x)]
+        xcomp [x] = EvCoercion (co `mkTcTransCo` evTermCoercion x)
         xcomp _   = panic "No more goals!"
         xev = XEvTerm xcomp xdecomp
 \end{code}

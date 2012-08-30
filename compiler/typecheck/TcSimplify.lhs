@@ -1056,9 +1056,9 @@ unFlattenWC wc
 
           ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
       where
-        solve_one (Wanted { ctev_evar = cv }, tv, ty) 
+        solve_one (CtWanted { ctev_evar = cv }, tv, ty) 
           = setWantedTyBind tv ty >> setEvBind cv (EvCoercion (mkTcReflCo ty))
-        solve_one (Derived {}, tv, ty)
+        solve_one (CtDerived {}, tv, ty)
           = setWantedTyBind tv ty
         solve_one arg
           = pprPanic "solveCTyFunEqs: can't solve a /given/ family equation!" $ ppr arg
@@ -1201,8 +1201,8 @@ defaultTyVar the_tv
              -- Why not directly derived_pred = mkTcEqPred k default_k? 
              -- See Note [DefaultTyVar]
              derived_cts = mkNonCanonical $
-                           Derived { ctev_wloc = loc
-                                   , ctev_pred = derived_pred } 
+                           CtDerived { ctev_wloc = loc
+                                     , ctev_pred = derived_pred } 
        
        ; return (unitBag derived_cts) }
 
@@ -1302,8 +1302,8 @@ disambigGroup (default_ty:default_tys) group
        ; success <- tryTcS $ -- Why tryTcS? See Note [tryTcS in defaulting]
                     do { let derived_pred = mkTcEqPred (mkTyVarTy the_tv) default_ty
                              derived_cts = unitBag $ mkNonCanonical $
-                                           Derived { ctev_wloc = the_loc
-                                                   , ctev_pred = derived_pred }
+                                           CtDerived { ctev_wloc = the_loc
+                                                     , ctev_pred = derived_pred }
                             
                        ; traceTcS "disambigGroup (solving) {" $
                          text "trying to solve constraints along with default equations ..."
@@ -1366,9 +1366,8 @@ newFlatWanteds orig theta
   where 
     inst_to_wanted loc pty 
           = do { v <- TcMType.newWantedEvVar pty 
-               ; return $ 
-                 CNonCanonical { cc_ev = Wanted { ctev_evar = v
-                                                , ctev_wloc = loc
-                                                , ctev_pred = pty }
-                               , cc_depth = 0 } }
+               ; return $ mkNonCanonical $
+                 CtWanted { ctev_evar = v
+                          , ctev_wloc = loc
+                          , ctev_pred = pty } }
 \end{code}
