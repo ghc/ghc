@@ -1,6 +1,6 @@
 
 T7010.hs:44:27:
-    Couldn't match type `Serial (IO Float)' with `IO Float'
+    Couldn't match type `IO Float' with `Serial t0'
     Expected type: (Float, ValueTuple Vector)
       Actual type: (Float, ValueTuple Float)
     In the first argument of `withArgs', namely `plug'
