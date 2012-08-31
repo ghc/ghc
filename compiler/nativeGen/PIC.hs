@@ -65,6 +65,7 @@ import Reg
 import NCGMonad
 
 
+import Hoopl
 import OldCmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
@@ -752,18 +753,37 @@ initializePicBase_x86
 	-> NatM [NatCmmDecl (Alignment, CmmStatics) X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg 
-	(CmmProc info lab (ListGraph blocks) : statics)
+        (CmmProc info lab (ListGraph blocks) : statics)
     | osElfTarget os
-    = return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
-    where BasicBlock bID insns = head blocks
-          b' = BasicBlock bID (X86.FETCHGOT picReg : insns)
+    = return (CmmProc info lab (ListGraph blocks') : statics)
+    where blocks' = case blocks of
+                     [] -> []
+                     (b:bs) -> fetchGOT b : map maybeFetchGOT bs
+
+          -- we want to add a FETCHGOT instruction to the beginning of
+          -- every block that is an entry point, which corresponds to
+          -- the blocks that have entries in the info-table mapping.
+          maybeFetchGOT b@(BasicBlock bID _)
+            | bID `mapMember` info = fetchGOT b
+            | otherwise            = b
+
+          fetchGOT (BasicBlock bID insns) =
+             BasicBlock bID (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 ArchX86 OSDarwin picReg
 	(CmmProc info lab (ListGraph blocks) : statics)
-	= return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
+        = return (CmmProc info lab (ListGraph blocks') : statics)
 
-	where 	BasicBlock bID insns = head blocks
-          	b' = BasicBlock bID (X86.FETCHPC picReg : insns)
+    where blocks' = case blocks of
+                     [] -> []
+                     (b:bs) -> fetchPC b : map maybeFetchPC bs
+
+          maybeFetchPC b@(BasicBlock bID _)
+            | bID `mapMember` info = fetchPC b
+            | otherwise            = b
+
+          fetchPC (BasicBlock bID insns) =
+             BasicBlock bID (X86.FETCHPC picReg : insns)
 
 initializePicBase_x86 _ _ _ _
 	= panic "initializePicBase_x86: not needed"
