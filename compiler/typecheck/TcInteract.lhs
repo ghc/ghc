@@ -353,7 +353,7 @@ kickOutRewritable new_flav new_tv
                                      , inert_irreds = irs_in }
                    , inert_frozen = fro_in } 
                 -- NB: Notice that don't rewrite 
-                -- inert_solved, inert_flat_cache and inert_solved_funeqs
+                -- inert_solved_dicts, and inert_solved_funeqs
                 -- optimistically. But when we lookup we have to take the 
                 -- subsitution into account
 
@@ -731,10 +731,10 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              -- xdecomp : (F args ~ xi2) -> [(xi2 ~ xi1)]                 
              xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
 
-       ; ctevs <- xCtFlavor_cache False ev2 [mkTcEqPred xi2 xi1] xev
-                         -- Why not simply xCtFlavor? See Note [Cache-caused loops]
+       ; ctevs <- xCtFlavor ev2 [mkTcEqPred xi2 xi1] xev
+                         -- No caching!  See Note [Cache-caused loops]
                          -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
-       ; add_to_work d2 ctevs 
+       ; emitWorkNC d2 ctevs 
        ; return (IRWorkItemConsumed "FunEq/FunEq") }
 
   | fl2 `canSolve` fl1 && lhss_match
@@ -749,17 +749,12 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              -- xdecomp : (F args ~ xi1) -> [(xi2 ~ xi1)]
              xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` evTermCoercion x)]
 
-       ; ctevs <- xCtFlavor_cache False ev1 [mkTcEqPred xi2 xi1] xev 
-                          -- Why not simply xCtFlavor? See Note [Cache-caused loops]
-                          -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+       ; ctevs <- xCtFlavor ev1 [mkTcEqPred xi2 xi1] xev 
+                  -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
-       ; add_to_work d1 ctevs 
+       ; emitWorkNC d1 ctevs 
        ; return (IRInertConsumed "FunEq/FunEq") }
   where
-    add_to_work d [ctev] = updWorkListTcS $ extendWorkListEq $
-                           CNonCanonical {cc_ev = ctev, cc_depth = d}
-    add_to_work _ _ = return ()
-
     lhss_match = tc1 == tc2 && eqTypes args1 args2 
     co1 = evTermCoercion $ ctEvTerm ev1
     co2 = evTermCoercion $ ctEvTerm ev2
@@ -1421,8 +1416,8 @@ doTopReactDict inerts workItem fl cls xis depth
              | isWanted fl 
              -> do { lkup_inst_res  <- matchClassInst inerts cls xis (getWantedLoc fl)
                    ; case lkup_inst_res of
-                       GenInst wtvs ev_term -> 
-                         addToSolved fl >> doSolveFromInstance wtvs ev_term
+                       GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                                  ; doSolveFromInstance wtvs ev_term }
                        NoInstance -> return NoTopInt }
              | otherwise
              -> return NoTopInt }
@@ -1490,6 +1485,7 @@ doTopReactFunEq ct fl fun_tc args xi d
     succeed_with :: String -> TcCoercion -> TcType -> TcS TopInteractResult
     succeed_with str co rhs_ty    -- co :: fun_tc args ~ rhs_ty
       = do { ctevs <- xCtFlavor fl [mkTcEqPred rhs_ty xi] xev
+           ; traceTcS ("doTopReactFunEq " ++ str) (ppr ctevs)
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
                          CNonCanonical { cc_ev = ctev

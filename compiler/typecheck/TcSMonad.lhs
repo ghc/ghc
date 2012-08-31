@@ -36,7 +36,7 @@ module TcSMonad (
     wrapErrTcS, wrapWarnTcS,
 
     -- Getting and setting the flattening cache
-    addToSolved, addSolvedFunEq, getFlattenSkols,
+    addSolvedDict, addSolvedFunEq, getFlattenSkols,
     
     deferTcSForAllEq, 
     
@@ -44,11 +44,10 @@ module TcSMonad (
     XEvTerm(..),
     MaybeNew (..), isFresh, freshGoals, getEvTerms,
 
-    xCtFlavor, -- Transform a CtEvidence during a step 
-    rewriteCtFlavor,          -- Specialized version of xCtFlavor for coercions
+    xCtFlavor,        -- Transform a CtEvidence during a step 
+    rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
     newWantedEvVar, instDFunConstraints,
     newDerived,
-    xCtFlavor_cache, rewriteCtFlavor_cache,
     
        -- Creation of evidence variables
     setWantedTyBind,
@@ -396,6 +395,12 @@ instance Outputable a => Outputable (PredMap a) where
 instance Outputable a => Outputable (FamHeadMap a) where
    ppr (FamHeadMap m) = ppr (foldTM (:) m [])
 
+sizePredMap :: PredMap a -> Int
+sizePredMap (PredMap m) = foldTypeMap (\_ x -> x+1) 0 m
+
+sizeFamHeadMap :: FamHeadMap a -> Int
+sizeFamHeadMap (FamHeadMap m) = foldTypeMap (\_ x -> x+1) 0 m
+
 ctTypeMapCts :: TypeMap Ct -> Cts
 ctTypeMapCts ctmap = foldTM (\ct cts -> extendCts cts ct) ctmap emptyCts
 
@@ -544,12 +549,12 @@ data InertSet
               -- Always the result of using a top-level family axiom F xis ~ tau
               -- No Deriveds 
 
-       , inert_solved        :: PredMap CtEvidence 
-       	      -- These two fields constitute a cache of solved (only!) constraints
+       , inert_solved_dicts   :: PredMap CtEvidence 
+       	      -- Of form ev :: C t1 .. tn
+              -- Always the result of using a top-level instance declaration
               -- See Note [Solved constraints]
-       	      -- - Superset of inert_solved_funeqs
-       	      -- - Used to avoid creating a new EvVar when we have a new goal that we
-       	      --   have solvedin the past
+       	      -- - Used to avoid creating a new EvVar when we have a new goal 
+       	      --   that we have solved in the past
        	      -- - Stored not necessarily as fully rewritten 
        	      --   (ToDo: rewrite lazily when we lookup)
        }
@@ -571,10 +576,8 @@ instance Outputable InertSet where
   ppr is = vcat [ ppr $ inert_cans is
                 , text "Frozen errors =" <+> -- Clearly print frozen errors
                     braces (vcat (map ppr (Bag.bagToList $ inert_frozen is)))
-                , text "Solved and cached" <+>
-                    int (foldTypeMap (\_ x -> x+1) 0 
-                             (unPredMap $ inert_solved is)) <+> 
-                    text "more constraints" ]
+                , text "Solved dicts"  <+> int (sizePredMap (inert_solved_dicts is))
+                , text "Solved funeqs" <+> int (sizeFamHeadMap (inert_solved_funeqs is))]
 
 emptyInert :: InertSet
 emptyInert
@@ -585,19 +588,8 @@ emptyInert
                          , inert_irreds = emptyCts }
        , inert_frozen        = emptyCts
        , inert_fsks          = []
-       , inert_solved        = PredMap emptyTM 
+       , inert_solved_dicts  = PredMap emptyTM 
        , inert_solved_funeqs = FamHeadMap emptyTM }
-
-updSolvedSet :: CtEvidence -> InertSet -> InertSet 
-updSolvedSet item is
-  = let pty = ctEvPred item
-        upd_solved Nothing = Just item
-        upd_solved (Just _existing_solved) = Just item 
-               -- .. or Just existing_solved? Is this even possible to happen?
-    in is { inert_solved = 
-               PredMap $ 
-               alterTM pty upd_solved (unPredMap $ inert_solved is) }
-
 
 insertInertItem :: Ct -> InertSet -> InertSet 
 -- Add a new inert element to the inert set. 
@@ -655,26 +647,25 @@ insertInertItemTcS item
                         
        ; traceTcS "insertInertItemTcS }" $ empty }
 
-addToSolved :: CtEvidence -> TcS ()
+addSolvedDict :: CtEvidence -> TcS ()
 -- Add a new item in the solved set of the monad
-addToSolved item
+addSolvedDict item
   | isIPPred (ctEvPred item)    -- Never cache "solved" implicit parameters (not sure why!)
   = return () 
   | otherwise
-  = do { traceTcS "updSolvedSetTcs {" $ 
-         text "Trying to insert new solved item:" <+> ppr item
-
-       ; updInertTcS (updSolvedSet item)
-                        
-       ; traceTcS "updSolvedSetTcs }" $ empty }
+  = do { traceTcS "updSolvedSetTcs:" $ ppr item
+       ; updInertTcS upd_solved_dicts }
+  where
+    upd_solved_dicts is 
+      = is { inert_solved_dicts = PredMap $ alterTM pred upd_solved $ 
+                                  unPredMap $ inert_solved_dicts is }
+    pred = ctEvPred item
+    upd_solved _ = Just item
 
 addSolvedFunEq :: Ct -> TcType -> TcS ()
 addSolvedFunEq fun_eq fam_ty
-  = updInertTcS (upd_solved_funeqs . upd_solved)
-    -- Update both inert_solved and inert_solved_funeqs
-    -- The former is a superset of the latter
+  = updInertTcS upd_solved_funeqs
   where 
-    upd_solved = updSolvedSet (cc_ev fun_eq)  
     upd_solved_funeqs inert 
       = inert { inert_solved_funeqs = insertFamHead (inert_solved_funeqs inert) fam_ty fun_eq }
 
@@ -852,7 +843,7 @@ lookupFlatEqn fam_ty
 lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet
 lookupInInerts pty
-  = do { IS { inert_solved = solved, inert_cans = ics } <- getTcSInerts
+  = do { IS { inert_solved_dicts = solved, inert_cans = ics } <- getTcSInerts
        ; case lookupInSolved solved pty of
            Just ctev -> return (Just ctev)
            Nothing   -> return (lookupInInertCans ics pty) }
@@ -1476,15 +1467,8 @@ xCtFlavor :: CtEvidence              -- Original flavor
           -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
-xCtFlavor = xCtFlavor_cache True          
 
-xCtFlavor_cache :: Bool            -- True = if wanted add to the solved bag!    
-          -> CtEvidence            -- Original flavor   
-          -> [TcPredType]          -- New predicate types
-          -> XEvTerm               -- Instructions about how to manipulate evidence
-          -> TcS [CtEvidence]
-
-xCtFlavor_cache _ (CtGiven { ctev_gloc = gl, ctev_evtm = tm }) ptys xev
+xCtFlavor (CtGiven { ctev_gloc = gl, ctev_evtm = tm }) ptys xev
   = ASSERT( equalLength ptys (ev_decomp xev tm) )
     zipWithM (newGivenEvVar gl) ptys (ev_decomp xev tm)
     -- For Givens we make new EvVars and bind them immediately. We don't worry
@@ -1496,16 +1480,12 @@ xCtFlavor_cache _ (CtGiven { ctev_gloc = gl, ctev_evtm = tm }) ptys xev
     -- But that superclass selector can't (yet) appear in a coercion
     -- (see evTermCoercion), so the easy thing is to bind it to an Id
   
-xCtFlavor_cache cache ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar }) ptys xev
+xCtFlavor ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar }) ptys xev
   = do { new_evars <- mapM (newWantedEvVar wl) ptys
        ; setEvBind evar (ev_comp xev (getEvTerms new_evars))
-
-           -- Add the now-solved wanted constraint to the cache
-       ; when cache $ addToSolved ctev
-
        ; return (freshGoals new_evars) }
     
-xCtFlavor_cache _ (CtDerived { ctev_wloc = wl }) ptys _xev
+xCtFlavor (CtDerived { ctev_wloc = wl }) ptys _xev
   = do { ders <- mapM (newDerived wl) ptys
        ; return (catMaybes ders) }
 
@@ -1514,6 +1494,9 @@ rewriteCtFlavor :: CtEvidence
                 -> TcPredType   -- new predicate
                 -> TcCoercion   -- new ~ old     
                 -> TcS (Maybe CtEvidence)
+-- Returns Just new_fl iff either (i)  'co' is reflexivity
+--                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
+-- In either case, there is nothing new to do with new_fl
 {- 
      rewriteCtFlavor old_fl new_pred co
 Main purpose: create new evidence for new_pred;
@@ -1534,28 +1517,19 @@ Main purpose: create new evidence for new_pred;
                         Not                            Just new_evidence
 -}
 
-rewriteCtFlavor = rewriteCtFlavor_cache True
--- Returns Just new_fl iff either (i)  'co' is reflexivity
---                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
--- In either case, there is nothing new to do with new_fl
-
-rewriteCtFlavor_cache :: Bool 
-                -> CtEvidence   -- old evidence
-                -> TcPredType   -- new predicate
-                -> TcCoercion   -- new ~ old     
-                -> TcS (Maybe CtEvidence)
 -- If derived, don't even look at the coercion
 -- NB: this allows us to sneak away with ``error'' thunks for 
 -- coercions that come from derived ids (which don't exist!) 
-rewriteCtFlavor_cache _cache (CtDerived { ctev_wloc = wl }) pty_new _co
+
+rewriteCtFlavor (CtDerived { ctev_wloc = wl }) pty_new _co
   = newDerived wl pty_new
         
-rewriteCtFlavor_cache _cache (CtGiven { ctev_gloc = gl, ctev_evtm = old_tm }) pty_new co
+rewriteCtFlavor (CtGiven { ctev_gloc = gl, ctev_evtm = old_tm }) pty_new co
   = return (Just (CtGiven { ctev_gloc = gl, ctev_pred = pty_new, ctev_evtm = new_tm }))
   where
     new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCase optimises ReflCo
   
-rewriteCtFlavor_cache cache ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar, ctev_pred = old_pred }) 
+rewriteCtFlavor ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar, ctev_pred = old_pred }) 
                       new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
   = return (Just (if old_pred `eqType` new_pred
@@ -1570,10 +1544,6 @@ rewriteCtFlavor_cache cache ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar, c
   | otherwise
   = do { new_evar <- newWantedEvVar wl new_pred
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) co)
-
-           -- Add the now-solved wanted constraint to the cache
-       ; when cache $ addToSolved ctev
-
        ; case new_evar of
             Fresh ctev -> return (Just ctev) 
             _          -> return Nothing }
