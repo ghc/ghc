@@ -1376,10 +1376,10 @@ reify_kc_app :: TyCon -> [TypeRep.Kind] -> TcM TH.Kind
 reify_kc_app kc kis
   = fmap (foldl TH.AppT r_kc) (mapM reifyKind kis)
   where
-    r_kc | isPromotedTyCon kc &&
-           isTupleTyCon (promotedTyCon kc)  = TH.TupleT (tyConArity kc)
-         | kc `hasKey` listTyConKey         = TH.ListT
-         | otherwise                        = TH.ConT (reifyName kc)
+    r_kc | Just tc <- isPromotedTyCon_maybe kc
+         , isTupleTyCon tc          = TH.TupleT (tyConArity kc)
+         | kc `hasKey` listTyConKey = TH.ListT
+         | otherwise                = TH.ConT (reifyName kc)
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
@@ -1410,8 +1410,8 @@ reify_tc_app tc tys
   where
     arity = tyConArity tc
     r_tc | isTupleTyCon tc            = if isPromotedDataCon tc
-                                          then TH.PromotedTupleT arity
-                                          else TH.TupleT arity
+                                        then TH.PromotedTupleT arity
+                                        else TH.TupleT arity
          | tc `hasKey` listTyConKey   = TH.ListT
          | tc `hasKey` nilDataConKey  = TH.PromotedNilT
          | tc `hasKey` consDataConKey = TH.PromotedConsT

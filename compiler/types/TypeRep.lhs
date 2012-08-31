@@ -53,7 +53,7 @@ module TypeRep (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DataCon( DataCon, dataConName )
+import {-# SOURCE #-} DataCon( DataCon, dataConTyCon, dataConName )
 import {-# SOURCE #-} Type( noParenPred, isPredTy ) -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
@@ -668,8 +668,19 @@ pprTcApp p pp tc tys
   = pprPromotionQuote tc <>
     tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
 
+  | Just dc <- isPromotedDataCon_maybe tc
+  , let dc_tc = dataConTyCon dc
+  , isTupleTyCon dc_tc 
+  , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
+        ty_args = drop arity tys    -- Drop the kind args
+  , ty_args `lengthIs` arity        -- Result is saturated
+  = pprPromotionQuote tc <>
+    (tupleParens (tupleTyConSort dc_tc) $
+     sep (punctuate comma (map (pp TopPrec) ty_args)))
+
   | not opt_PprStyle_Debug
-  , tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
+  , getUnique tc `elem` [eqTyConKey, eqPrimTyConKey] 
+                           -- We need to special case the type equality TyCons because
   , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
                            -- With -dppr-debug switch this off so we can see the kind
   = pprInfixApp p pp (ppr tc) ty1 ty2

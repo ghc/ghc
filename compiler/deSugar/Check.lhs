@@ -529,7 +529,7 @@ similar) at the same time that we create the constructors.
 
 You can tell tuple constructors using
 \begin{verbatim}
-        Id.isTupleCon
+        Id.isTupleDataCon
 \end{verbatim}
 You can see if one constructor is infix with this clearer code :-))))))))))
 \begin{verbatim}

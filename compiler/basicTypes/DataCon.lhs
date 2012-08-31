@@ -37,7 +37,7 @@ module DataCon (
 	dataConRepStrictness,
 	
 	-- ** Predicates on DataCons
-	isNullarySrcDataCon, isNullaryRepDataCon, isTupleCon, isUnboxedTupleCon,
+	isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
 	isVanillaDataCon, classDataCon, dataConCannotMatch,
 
         -- * Splitting product types
@@ -838,8 +838,8 @@ dataConIdentity dc = bytesFS (packageIdFS (modulePackageId mod)) ++
 \end{code}
 
 \begin{code}
-isTupleCon :: DataCon -> Bool
-isTupleCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
+isTupleDataCon :: DataCon -> Bool
+isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 	
 isUnboxedTupleCon :: DataCon -> Bool
 isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc

@@ -42,6 +42,7 @@ module TyCon(
         isDecomposableTyCon,
         isForeignTyCon, 
         isPromotedDataCon, isPromotedTyCon,
+        isPromotedDataCon_maybe, isPromotedTyCon_maybe,
 
         isInjectiveTyCon,
         isDataTyCon, isProductTyCon, isEnumerationTyCon,
@@ -71,7 +72,6 @@ module TyCon(
         algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
-        promotedDataCon, promotedTyCon,
 
         -- ** Manipulating TyCons
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -1183,25 +1183,25 @@ isForeignTyCon :: TyCon -> Bool
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon _                                   = False
 
--- | Is this a PromotedDataCon?
-isPromotedDataCon :: TyCon -> Bool
-isPromotedDataCon (PromotedDataCon {}) = True
-isPromotedDataCon _                    = False
-
 -- | Is this a PromotedTyCon?
 isPromotedTyCon :: TyCon -> Bool
 isPromotedTyCon (PromotedTyCon {}) = True
 isPromotedTyCon _                  = False
 
--- | Retrieves the promoted DataCon if this is a PromotedDataTyCon;
--- Panics otherwise
-promotedDataCon :: TyCon -> DataCon
-promotedDataCon = dataCon
+-- | Retrieves the promoted TyCon if this is a PromotedTyCon;
+isPromotedTyCon_maybe :: TyCon -> Maybe TyCon
+isPromotedTyCon_maybe (PromotedTyCon { ty_con = tc }) = Just tc
+isPromotedTyCon_maybe _ = Nothing
 
--- | Retrieves the promoted TypeCon if this is a PromotedTypeTyCon;
--- Panics otherwise
-promotedTyCon :: TyCon -> TyCon
-promotedTyCon = ty_con
+-- | Is this a PromotedDataCon?
+isPromotedDataCon :: TyCon -> Bool
+isPromotedDataCon (PromotedDataCon {}) = True
+isPromotedDataCon _                    = False
+
+-- | Retrieves the promoted DataCon if this is a PromotedDataCon;
+isPromotedDataCon_maybe :: TyCon -> Maybe DataCon
+isPromotedDataCon_maybe (PromotedDataCon { dataCon = dc }) = Just dc
+isPromotedDataCon_maybe _ = Nothing
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
