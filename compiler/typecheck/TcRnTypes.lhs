@@ -859,10 +859,10 @@ data Ct
 
   | CIrredEvCan {  -- These stand for yet-unknown predicates
       cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_ty     :: Xi, -- cc_ty is flat hence it may only be of the form (tv xi1 xi2 ... xin)
-                       -- Since, if it were a type constructor application, that'd make the
-                       -- whole constraint a CDictCan, or CTyEqCan. And it can't be
-                       -- a type family application either because it's a Xi type.
+      cc_ty :: Xi, -- cc_ty is flat hence it may only be of the form (tv xi1 xi2 ... xin)
+                   -- Since, if it were a type constructor application, that'd make the
+                   -- whole constraint a CDictCan, or CTyEqCan. And it can't be
+                   -- a type family application either because it's a Xi type.
       cc_depth :: SubGoalDepth -- See Note [WorkList]
     }
 
@@ -882,7 +882,7 @@ data Ct
   | CFunEqCan {  -- F xis ~ xi  
                  -- Invariant: * isSynFamilyTyCon cc_fun 
                  --            * typeKind (F xis) `compatKind` typeKind xi
-      cc_ev :: CtEvidence,      -- See Note [Ct/evidence invariant]
+      cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,	-- A type function
       cc_tyargs :: [Xi],	-- Either under-saturated or exactly saturated
       cc_rhs    :: Xi,      	--    *never* over-saturated (because if so
@@ -893,8 +893,8 @@ data Ct
     }
 
   | CNonCanonical { -- See Note [NonCanonical Semantics] 
-      cc_ev :: CtEvidence, 
-      cc_depth  :: SubGoalDepth
+      cc_ev    :: CtEvidence, 
+      cc_depth :: SubGoalDepth
     }
 \end{code}
 
@@ -1094,6 +1094,7 @@ data Implication
 
       ic_skols  :: [TcTyVar],    -- Introduced skolems 
       		   	         -- See Note [Skolems in an implication]
+                                 -- See Note [Shadowing in a constraint]
 
       ic_fsks  :: [TcTyVar],   -- Extra flatten-skolems introduced by the flattening
                                -- done by canonicalisation. 
@@ -1127,6 +1128,18 @@ instance Outputable Implication where
           , pprSkolInfo (ctLocOrigin loc)
           , ppr (ctLocSpan loc) ])
 \end{code}
+
+Note [Shadowing in a constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We assume NO SHADOWING in a constraint.  Specifically
+ * The unification variables are all implicitly quantified at top
+   level, and are all unique
+ * The skolem varibles bound in ic_skols are all freah when the
+   implication is created.
+So we can safely substitute. For example, if we have
+   forall a.  a~Int => ...(forall b. ...a...)...
+we can push the (a~Int) constraint inwards in the "givens" without
+worrying that 'b' might clash.
 
 Note [Skolems in an implication]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

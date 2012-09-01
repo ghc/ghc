@@ -139,27 +139,25 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
 
 reportWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
 reportWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
-  = reportTidyWanteds ctxt tidy_insols tidy_flats implics
+  = reportTidyWanteds ctxt tidy_all implics
   where
     env = cec_tidy ctxt
-    tidy_insols = mapBag (tidyCt env) insols
-    tidy_flats  = mapBag (tidyCt env) flats
+    tidy_all = mapBag (tidyCt env) (insols `unionBags` flats)
                   -- All the Derived ones have been filtered out alrady
                   -- by the constraint solver. This is ok; we don't want
                   -- to report unsolved Derived goals as error
                   -- See Note [Do not report derived but soluble errors]
 
-reportTidyWanteds :: ReportErrCtxt -> Bag Ct -> Bag Ct -> Bag Implication -> TcM ()
-reportTidyWanteds ctxt insols flats implics
+reportTidyWanteds :: ReportErrCtxt -> Cts -> Bag Implication -> TcM ()
+reportTidyWanteds ctxt flats implics
   | Just ev_binds_var <- cec_defer ctxt
   = do { -- Defer errors to runtime
          -- See Note [Deferring coercion errors to runtime] in TcSimplify
-         mapBagM_ (deferToRuntime ev_binds_var ctxt mkFlatErr) 
-                  (flats `unionBags` insols)
+         mapBagM_ (deferToRuntime ev_binds_var ctxt mkFlatErr) flats
        ; mapBagM_ (reportImplic ctxt) implics }
 
   | otherwise
-  = do { reportInsolsAndFlats ctxt insols flats
+  = do { reportFlats ctxt flats
        ; mapBagM_ (reportImplic ctxt) implics }
              
 
@@ -183,8 +181,8 @@ deferToRuntime ev_binds_var ctxt mk_err_msg ct
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()   
 
-reportInsolsAndFlats :: ReportErrCtxt -> Cts -> Cts -> TcM ()
-reportInsolsAndFlats ctxt insols flats
+reportFlats :: ReportErrCtxt -> Cts -> TcM ()
+reportFlats ctxt flats    -- Here 'flats' includes insolble goals
   = tryReporters 
       [ -- First deal with things that are utterly wrong
         -- Like Int ~ Bool (incl nullary TyCons)
@@ -198,7 +196,7 @@ reportInsolsAndFlats ctxt insols flats
 
       , ("Unambiguous",          unambiguous,     reportFlatErrs ctxt) ]
       (reportAmbigErrs ctxt)
-      (bagToList (insols `unionBags` flats))
+      (bagToList flats)
   where
     utterly_wrong, skolem_eq, unambiguous :: Ct -> PredTree -> Bool
 

@@ -283,32 +283,25 @@ Case 2: Functional Dependencies
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
 spontaneousSolveStage workItem
-  = do { mSolve <- trySpontaneousSolve workItem
-       ; spont_solve mSolve } 
-  where spont_solve SPCantSolve
-          | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
-          -- Unsolved equality
-          = do { wl <- modifyInertTcS (kickOutRewritable (ctEvFlavour fl) tv)
-               ; traceTcS "kickOutRewritableInerts" $
-                 vcat [ text "WorkItem (unsolved) =" <+> ppr workItem
-                      , text "Kicked out =" <+> ppr wl ]
-               ; updWorkListTcS (appendWorkList wl)
-               ; insertInertItemTcS workItem
-               ; return Stop }
-          | otherwise
-          = continueWith workItem
-        spont_solve (SPSolved new_tv)
-          -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
-          -- see Note [Spontaneously solved in TyBinds]
-          = do { bumpStepCountTcS
-               ; traceFireTcS (cc_depth workItem) $
-                 ptext (sLit "Spontaneously solved:") <+> ppr workItem
-               ; wl <- modifyInertTcS (kickOutRewritable Given new_tv)
+  = do { mb_solved <- trySpontaneousSolve workItem
+       ; case mb_solved of
+           SPCantSolve
+              | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
+              -- Unsolved equality
+              -> do { kickOutRewritable (ctEvFlavour fl) tv
+                    ; insertInertItemTcS workItem
+                    ; return Stop }
+              | otherwise
+              -> continueWith workItem
 
-               ; traceTcS "kickOutRewritableInerts" $ ptext (sLit "Kicked out =") <+> ppr wl
-               ; updWorkListTcS (appendWorkList wl) 
-               ; return Stop }
-
+           SPSolved new_tv
+              -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
+              -- see Note [Spontaneously solved in TyBinds]
+              -> do { bumpStepCountTcS
+                   ; traceFireTcS (cc_depth workItem) $
+                     ptext (sLit "Spontaneously solved:") <+> ppr workItem
+                   ; kickOutRewritable Given new_tv
+                   ; return Stop } }
 \end{code}
 Note [Spontaneously solved in TyBinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -326,45 +319,44 @@ and only record them in the TyBinds of the TcS monad. The flattener is now consu
 these binds /and/ the inerts for potentially unsolved or other given equalities.
 
 \begin{code}
-
 kickOutRewritable :: CtFlavour    -- Flavour of the equality that is 
                                   -- being added to the inert set
                   -> TcTyVar      -- The new equality is tv ~ ty
-                  -> InertSet -> (WorkList,InertSet)
+                  -> TcS ()
 kickOutRewritable new_flav new_tv
-       is@(IS { inert_cans = IC { inert_eqs    = tv_eqs
-                                , inert_eq_tvs = inscope
-                                , inert_dicts  = dictmap
-                                , inert_funeqs = funeqmap
-                                , inert_irreds = irreds }
-               , inert_frozen = frozen })
-  = (kicked_out, remaining)
+  = do { wl <- modifyInertTcS kick_out
+       ; traceTcS "kickOutRewritable" $ 
+            vcat [ text "tv = " <+> ppr new_tv  
+                 , ptext (sLit "Kicked out =") <+> ppr wl]
+       ; updWorkListTcS (appendWorkList wl) }
   where
-    rest_out = fro_out `andCts` dicts_out `andCts` irs_out
-    kicked_out = WorkList { wl_eqs    = varEnvElts tv_eqs_out
-                          , wl_funeqs = foldrBag insertDeque emptyDeque feqs_out
-                          , wl_rest   = bagToList rest_out }
-  
-    remaining = is { inert_cans = IC { inert_eqs = tv_eqs_in
-                                     , inert_eq_tvs = inscope 
-                                       -- keep the same, safe and cheap
-                                     , inert_dicts = dicts_in
-                                     , inert_funeqs = feqs_in
-                                     , inert_irreds = irs_in }
-                   , inert_frozen = fro_in } 
+    kick_out :: InertSet -> (WorkList, InertSet)
+    kick_out (is@(IS { inert_cans = IC { inert_eqs = tv_eqs
+                     , inert_dicts  = dictmap
+                     , inert_funeqs = funeqmap
+                     , inert_irreds = irreds } }))
+       = (kicked_out, is { inert_cans = inert_cans_in })
                 -- NB: Notice that don't rewrite 
                 -- inert_solved_dicts, and inert_solved_funeqs
                 -- optimistically. But when we lookup we have to take the 
                 -- subsitution into account
+       where
+         inert_cans_in = IC { inert_eqs = tv_eqs_in
+                            , inert_dicts = dicts_in
+                            , inert_funeqs = feqs_in
+                            , inert_irreds = irs_in }
 
-    (tv_eqs_out, tv_eqs_in) = partitionVarEnv  kick_out_eq tv_eqs
-    (feqs_out,  feqs_in)    = partCtFamHeadMap kick_out funeqmap
-    (dicts_out, dicts_in)   = partitionCCanMap kick_out dictmap
-    (irs_out,   irs_in)     = partitionBag     kick_out irreds
-    (fro_out,   fro_in)     = partitionBag     kick_out frozen
+         kicked_out = WorkList { wl_eqs    = varEnvElts tv_eqs_out
+                               , wl_funeqs = foldrBag insertDeque emptyDeque feqs_out
+                               , wl_rest   = bagToList (dicts_out `andCts` irs_out) }
+  
+         (tv_eqs_out, tv_eqs_in) = partitionVarEnv  kick_out_eq tv_eqs
+         (feqs_out,  feqs_in)    = partCtFamHeadMap kick_out_ct funeqmap
+         (dicts_out, dicts_in)   = partitionCCanMap kick_out_ct dictmap
+         (irs_out,   irs_in)     = partitionBag     kick_out_ct irreds
 
-    kick_out inert_ct = new_flav `canRewrite` (ctFlavour inert_ct) &&
-                        (new_tv `elemVarSet` tyVarsOfCt inert_ct) 
+    kick_out_ct inert_ct = new_flav `canRewrite` (ctFlavour inert_ct) &&
+                          (new_tv `elemVarSet` tyVarsOfCt inert_ct) 
                     -- NB: tyVarsOfCt will return the type 
                     --     variables /and the kind variables/ that are 
                     --     directly visible in the type. Hence we will
@@ -374,7 +366,8 @@ kickOutRewritable new_flav new_tv
                     --     constraints that mention type variables whose
                     --     kinds could contain this variable!
 
-    kick_out_eq inert_ct = kick_out inert_ct && not (ctFlavour inert_ct `canRewrite` new_flav)
+    kick_out_eq inert_ct = kick_out_ct inert_ct && 
+                           not (ctFlavour inert_ct `canRewrite` new_flav)
                -- If also the inert can rewrite the subst then there is no danger of 
                -- occurs check errors sor keep it there. No need to rewrite the inert equality
                -- (as we did in the past) because of point (8) of 

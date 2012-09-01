@@ -641,7 +641,7 @@ flattenTyVar d f ctxt tv
   where
     flatten_from_inerts
       = do { ieqs <- getInertEqs
-           ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
+           ; let mco = tv_eq_subst ieqs tv  -- co : v ~ ty
            ; case mco of -- Done, but make sure the kind is zonked
                Nothing -> 
                  do { let knd = tyVarKind tv
@@ -818,7 +818,7 @@ canEqAppTy d fl s1 t1 s2 t2
        ; canEvVarsCreated d ctevs }
 
 canEqFailure :: SubGoalDepth -> CtEvidence -> TcS StopOrContinue
-canEqFailure d fl = emitFrozenError fl d >> return Stop
+canEqFailure d fl = do { emitFrozenError fl d; return Stop }
 
 ------------------------
 emitKindConstraint :: Ct -> TcS StopOrContinue

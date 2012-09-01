@@ -454,8 +454,6 @@ data InertCans
               --   a |-> ct,co
               -- Then ct = CTyEqCan { cc_tyvar = a, cc_rhs = xi } 
               -- And  co : a ~ xi
-       , inert_eq_tvs :: InScopeSet
-              -- Superset of the type variables of inert_eqs
        , inert_dicts :: CCanMap Class
               -- Dictionaries only, index is the class
               -- NB: index is /not/ the whole type because FD reactions 
@@ -535,7 +533,7 @@ data InertSet
               -- Canonical Given, Wanted, Derived (no Solved)
 	      -- Sometimes called "the inert set"
 
-       , inert_frozen :: Cts       
+       , inert_insols :: Cts       
               -- Frozen errors (as non-canonicals)
                                
        , inert_fsks :: [TcTyVar]  -- Flatten-skolems allocated in this local scope
@@ -575,18 +573,17 @@ instance Outputable InertCans where
 instance Outputable InertSet where 
   ppr is = vcat [ ppr $ inert_cans is
                 , text "Frozen errors =" <+> -- Clearly print frozen errors
-                    braces (vcat (map ppr (Bag.bagToList $ inert_frozen is)))
+                    braces (vcat (map ppr (Bag.bagToList $ inert_insols is)))
                 , text "Solved dicts"  <+> int (sizePredMap (inert_solved_dicts is))
                 , text "Solved funeqs" <+> int (sizeFamHeadMap (inert_solved_funeqs is))]
 
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans = IC { inert_eqs    = emptyVarEnv
-                         , inert_eq_tvs = emptyInScopeSet
                          , inert_dicts  = emptyCCanMap
                          , inert_funeqs = FamHeadMap emptyTM 
                          , inert_irreds = emptyCts }
-       , inert_frozen        = emptyCts
+       , inert_insols        = emptyCts
        , inert_fsks          = []
        , inert_solved_dicts  = PredMap emptyTM 
        , inert_solved_funeqs = FamHeadMap emptyTM }
@@ -594,14 +591,10 @@ emptyInert
 insertInertItem :: Ct -> InertSet -> InertSet 
 -- Add a new inert element to the inert set. 
 insertInertItem item is
-  | isCNonCanonical item 
-    -- NB: this may happen if we decide to kick some frozen error 
-    -- out to rewrite him. Frozen errors are just NonCanonicals
-  = is { inert_frozen = inert_frozen is `Bag.snocBag` item }
-    
-  | otherwise  
-    -- A canonical Given, Wanted, or Derived
-  = is { inert_cans = upd_inert_cans (inert_cans is) item }
+  = -- A canonical Given, Wanted, or Derived
+    ASSERT2( not (isCNonCanonical item), ppr item )
+        -- Can't be CNonCanonical, because they only land in inert_insols
+    is { inert_cans = upd_inert_cans (inert_cans is) item }
   
   where upd_inert_cans :: InertCans -> Ct -> InertCans
         -- Precondition: item /is/ canonical
@@ -614,10 +607,8 @@ insertInertItem item is
         
                 eqs'     = extendVarEnv_C upd_err (inert_eqs ics) 
                                                   (cc_tyvar item) item        
-                inscope' = extendInScopeSetSet (inert_eq_tvs ics)
-                                               (tyVarsOfCt item)
-                
-            in ics { inert_eqs = eqs', inert_eq_tvs = inscope' }
+
+            in ics { inert_eqs = eqs' }
 
           | isCIrredEvCan item                  -- Presently-irreducible evidence
           = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item }
@@ -689,17 +680,15 @@ updInertTcS upd
 prepareInertsForImplications :: InertSet -> InertSet
 -- See Note [Preparing inert set for implications]
 prepareInertsForImplications is
-  = is { inert_cans = getGivens (inert_cans is)
-       , inert_fsks = []
-       , inert_frozen = emptyCts }
+  = is { inert_cans   = getGivens (inert_cans is)
+       , inert_fsks   = []
+       , inert_insols = emptyCts }
   where
-    getGivens (IC { inert_eq_tvs = eq_tvs
-                  , inert_eqs    = eqs
+    getGivens (IC { inert_eqs    = eqs
                   , inert_irreds = irreds
                   , inert_funeqs = FamHeadMap funeqs
                   , inert_dicts  = dicts })
-      = IC { inert_eq_tvs = eq_tvs
-           , inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs 
+      = IC { inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs 
            , inert_funeqs = FamHeadMap (mapTM given_from_wanted funeqs)
            , inert_irreds = Bag.filterBag isGivenCt irreds
            , inert_dicts  = keepGivenCMap dicts }
@@ -759,10 +748,9 @@ alpha.  (In general we can't float class constraints out just in case
 
 
 \begin{code}
-getInertEqs :: TcS (TyVarEnv Ct, InScopeSet)
+getInertEqs :: TcS (TyVarEnv Ct)
 getInertEqs = do { inert <- getTcSInerts
-                 ; let ics = inert_cans inert
-                 ; return (inert_eqs ics, inert_eq_tvs ics) }
+                 ; return (inert_eqs (inert_cans inert)) }
 
 getInertUnsolved :: TcS (Cts, Cts)
 -- Return (unsolved-wanteds, insolubles)
@@ -779,7 +767,7 @@ getInertUnsolved
             unsolved_flats = unsolved_eqs `unionBags` unsolved_irreds `unionBags` 
                              unsolved_dicts `unionBags` unsolved_funeqs
 
-      ; return (unsolved_flats, inert_frozen is) }
+      ; return (unsolved_flats, inert_insols is) }
   where
     add_if_unsolved ct cts
       | is_unsolved ct = cts `extendCts` ct
@@ -801,7 +789,7 @@ checkAllSolved
 
       ; return (not (unsolved_eqs || unsolved_irreds
                      || unsolved_dicts || unsolved_funeqs
-                     || not (isEmptyBag (inert_frozen is)))) }
+                     || not (isEmptyBag (inert_insols is)))) }
 
 extractRelevantInerts :: Ct -> TcS Cts
 -- Returns the constraints from the inert set that are 'relevant' to react with 
@@ -958,6 +946,9 @@ panicTcS doc = pprPanic "TcCanonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
+
+instance HasDynFlags TcS where
+    getDynFlags = wrapTcS getDynFlags
 
 bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
@@ -1157,21 +1148,17 @@ emitFrozenError :: CtEvidence -> SubGoalDepth -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts. 
 emitFrozenError fl depth 
   = do { traceTcS "Emit frozen error" (ppr (ctEvPred fl))
-       ; inert_ref <- getTcSInertsRef 
-       ; wrapTcS $ do
-       { inerts <- TcM.readTcRef inert_ref
-       ; let old_insols = inert_frozen inerts
-             ct = CNonCanonical { cc_ev = fl, cc_depth = depth } 
-             inerts_new = inerts { inert_frozen = extendCts old_insols ct } 
-             this_pred = ctEvPred fl
-             already_there = not (isWanted fl) && anyBag (eqType this_pred . ctPred) old_insols
+       ; updInertTcS add_insol }
+  where
+    add_insol inerts@(IS { inert_insols = old_insols })
+      | already_there = inerts
+      | otherwise     = inerts { inert_insols = extendCts old_insols insol_ct }
+      where
+        already_there = not (isWanted fl) && anyBag (eqType this_pred . ctPred) old_insols
 	     -- See Note [Do not add duplicate derived insolubles]
-       ; unless already_there $
-         TcM.writeTcRef inert_ref inerts_new } }
 
-instance HasDynFlags TcS where
-    getDynFlags = wrapTcS getDynFlags
-
+    insol_ct = CNonCanonical { cc_ev = fl, cc_depth = depth } 
+    this_pred = ctEvPred fl
 
 getTcEvBinds :: TcS EvBindsVar
 getTcEvBinds = TcS (return . tcs_ev_binds) 

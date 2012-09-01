@@ -802,10 +802,6 @@ solveNestedImplications implics
        ; (floated_eqs, unsolved_implics)
            <- flatMapBagPairM (solveImplication thinner_inerts) implics
 
-       ; promoteFloatedUnificationVars floated_eqs
-           -- Performs some unifications, adding to monadically-carried ty_binds
-           -- These will be used when processing floated_eqs later
-
        -- ... and we are back in the original TcS inerts 
        -- Notice that the original includes the _insoluble_flats so it was safe to ignore
        -- them in the beginning of this function.
@@ -829,64 +825,57 @@ solveImplication inerts
                  , ic_given  = givens
                  , ic_wanted = wanteds
                  , ic_loc    = loc })
-  = nestImplicTcS ev_binds untch inerts $
+  = 
     do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve the nested constraints
-       ; solveInteractGiven loc old_fsks givens 
-       ; residual_wanted <- solve_wanteds wanteds
-       ; new_fsks <- getFlattenSkols
+         -- NB: 'inerts' has empty inert_fsks
+       ; (new_fsks, residual_wanted) 
+            <- nestImplicTcS ev_binds untch inerts $
+               do { solveInteractGiven loc old_fsks givens 
+                  ; residual_wanted <- solve_wanteds wanteds
+                  ; more_fsks <- getFlattenSkols
+                  ; return (more_fsks ++ old_fsks, residual_wanted) }
 
-       ; let all_fsks = new_fsks ++ old_fsks
-             (floated_eqs, final_wanted)
-                 = floatEqualities (skols ++ all_fsks) givens residual_wanted
+       ; (floated_eqs, final_wanted)
+             <- floatEqualities (skols ++ new_fsks) givens residual_wanted
 
-             res_implic | isEmptyWC final_wanted 
+       ; let res_implic | isEmptyWC final_wanted 
                         = emptyBag
                         | otherwise
-                        = unitBag imp { ic_fsks   = all_fsks
-                                      , ic_wanted = dropDerivedWC final_wanted
-                                      , ic_insol  = insolubleWC final_wanted }
+                        = unitBag (imp { ic_fsks   = new_fsks
+                                       , ic_wanted = dropDerivedWC final_wanted
+                                       , ic_insol  = insolubleWC final_wanted })
 
        ; evbinds <- getTcEvBindsMap
        ; traceTcS "solveImplication end }" $ vcat
              [ text "floated_eqs =" <+> ppr floated_eqs
-             , text "new_fsks =" <+> ppr all_fsks
+             , text "new_fsks =" <+> ppr new_fsks
              , text "res_implic =" <+> ppr res_implic
              , text "implication evbinds = " <+> ppr (evBindMapBinds evbinds) ]
 
        ; return (floated_eqs, res_implic) }
 \end{code}
 
-Note [Floating equalities]
 
 \begin{code}
-promoteFloatedUnificationVars :: Cts -> TcS ()
-promoteFloatedUnificationVars cts
-  = do { untch <- TcSMonad.getUntouchables
-       ; let tvs = filter (isFloatedTouchableMetaTyVar untch) $
-                   varSetElems (tyVarsOfCts cts)
-       ; mapM_ (promote_tv untch) tvs
-       ; ty_binds <- getTcSTyBindsMap
-       ; traceTcS "promoteFloated" (vcat [ text "Ctxt untoucables =" <+> ppr untch
-                                         , text "Floated eqs =" <+> ppr cts
-                                         , text "Promoted tvs =" <+> ppr tvs
-                                         , text "Ty binds =" <+> ppr ty_binds])
-       ; return () }
-  where
-    promote_tv untch tv 
-      = do { cloned_tv <- TcSMonad.cloneMetaTyVar tv
-           ; let rhs_tv = setMetaTyVarUntouchables cloned_tv untch
-           ; setWantedTyBind tv (mkTyVarTy rhs_tv) }
-
-floatEqualities :: [TcTyVar] -> [EvVar] -> WantedConstraints -> (Cts, WantedConstraints)
+floatEqualities :: [TcTyVar] -> [EvVar] -> WantedConstraints 
+                -> TcS (Cts, WantedConstraints)
 -- Post: The returned FlavoredEvVar's are only Wanted or Derived
 -- and come from the input wanted ev vars or deriveds 
+-- Also performs some unifications, adding to monadically-carried ty_binds
+-- These will be used when processing floated_eqs later
 floatEqualities skols can_given wanteds@(WC { wc_flat = flats })
   | hasEqualities can_given 
-  = (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
+  = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
   | otherwise 
-  = (float_eqs, wanteds { wc_flat = remaining_flats })
+  = do { untch <- TcSMonad.getUntouchables
+       ; mapM_ (promote_tv untch) (varSetElems (tyVarsOfCts float_eqs))
+       ; ty_binds <- getTcSTyBindsMap
+       ; traceTcS "floatEqualities" (vcat [ text "Ctxt untoucables =" <+> ppr untch
+                                          , text "Floated eqs =" <+> ppr float_eqs
+                                          , text "Ty binds =" <+> ppr ty_binds])
+       ; return (float_eqs, wanteds { wc_flat = remaining_flats }) }
   where 
     (float_eqs, remaining_flats) = partitionBag is_floatable flats
     skol_set = growSkols wanteds (mkVarSet skols)
@@ -896,6 +885,14 @@ floatEqualities skols can_given wanteds@(WC { wc_flat = flats })
        = isEqPred pred && skol_set `disjointVarSet` tyVarsOfType pred
        where
          pred = ctPred ct
+
+    promote_tv untch tv 
+      | isFloatedTouchableMetaTyVar untch tv
+      = do { cloned_tv <- TcSMonad.cloneMetaTyVar tv
+           ; let rhs_tv = setMetaTyVarUntouchables cloned_tv untch
+           ; setWantedTyBind tv (mkTyVarTy rhs_tv) }
+      | otherwise
+      = return ()
 
 growSkols :: WantedConstraints -> VarSet -> VarSet
 -- Find all the type variables that might possibly be unified

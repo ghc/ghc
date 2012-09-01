@@ -319,6 +319,31 @@ vanillaSkolemTv = SkolemTv False  -- Might be instantiated
 superSkolemTv   = SkolemTv True   -- Treat this as a completely distinct type
 
 -------------------------
+newtype Untouchables = Untouchables Int
+
+noUntouchables :: Untouchables
+noUntouchables = Untouchables 0   -- 0 = outermost level
+
+pushUntouchables :: Unique -> Untouchables -> Untouchables 
+pushUntouchables _ (Untouchables us) = Untouchables (us+1)
+
+isFloatedTouchable :: Untouchables -> Untouchables -> Bool
+isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch < tv_untch
+
+isTouchable :: Untouchables -> Untouchables -> Bool
+isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch == tv_untch   -- NB: invariant ctxt_untch >= tv_untch
+                             --     So <= would be equivalent
+
+checkTouchableInvariant :: Untouchables -> Untouchables -> Bool
+checkTouchableInvariant (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch >= tv_untch
+
+instance Outputable Untouchables where
+  ppr (Untouchables us) = ppr us
+
+{-   OLD
 newtype Untouchables = Untouchables [Unique]
 
 noUntouchables :: Untouchables
@@ -343,6 +368,8 @@ isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch)
 
 instance Outputable Untouchables where
   ppr (Untouchables us) = pprWithCommas ppr us
+-}
+
 
 -----------------------------
 data MetaDetails
@@ -705,7 +732,10 @@ isTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_untch tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of 
-      MetaTv { mtv_untch = tv_untch } -> isTouchable ctxt_untch tv_untch
+      MetaTv { mtv_untch = tv_untch } 
+        -> ASSERT2( checkTouchableInvariant ctxt_untch tv_untch, 
+                    ppr tv $$ ppr tv_untch $$ ppr ctxt_untch )
+           isTouchable ctxt_untch tv_untch
       _ -> False
 
 isFloatedTouchableMetaTyVar :: Untouchables -> TcTyVar -> Bool
