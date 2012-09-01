@@ -515,7 +515,8 @@ thLevel (Brack s _ _) = thLevel s + 1
 -- Arrow-notation context
 ---------------------------
 
-{-
+{- Note [Escaping the arrow scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In arrow notation, a variable bound by a proc (or enclosed let/kappa)
 is not in scope to the left of an arrow tail (-<) or the head of (|..|).
 For example
@@ -532,6 +533,9 @@ Here, x and z are in scope in e1, but y is not.  We implement this by
 recording the environment when passing a proc (using newArrowScope),
 and returning to that (using escapeArrowScope) on the left of -< and the
 head of (|..|).
+
+All this can be dealt with by the *renamer*; by the time we get to 
+the *type checker* we have sorted out the scopes
 -}
 
 data ArrowCtxt

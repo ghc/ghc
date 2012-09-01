@@ -558,8 +558,10 @@ uType origin ty1 ty2  -- Push a new item on the origin stack
 --------------
 -- unify_np (short for "no push" on the origin stack) does the work
 uType_np origin orig_ty1 orig_ty2
-  = do { traceTc "u_tys " $ vcat 
-              [ sep [ ppr orig_ty1, text "~", ppr orig_ty2]
+  = do { untch <- getUntouchables
+       ; traceTc "u_tys " $ vcat 
+              [ text "untch" <+> ppr untch
+              , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
               , ppr origin]
        ; co <- go orig_ty1 orig_ty2
        ; if isTcReflCo co
