@@ -3057,6 +3057,7 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
 Prelude> :seti
 base language is: Haskell2010
 with the following modifiers:
+  -XNoMonomorphismRestriction
   -XNoDatatypeContexts
   -XNondecreasingIndentation
   -XExtendedDefaultRules
@@ -3065,7 +3066,6 @@ other dynamic, non-language, flag settings:
   -fimplicit-import-qualified
 warning settings:
 </screen>
-
       <para>
         Note that the option <option>-XExtendedDefaultRules</option>
         is on, because we apply special defaulting rules to
@@ -3074,18 +3074,21 @@ warning settings:
       </para>
 
       <para>
-        It is often useful to change the language options for
-        expressions typed at the prompt only, without having that
-        option apply to loaded modules too.  A good example is
+        Furthermore, the Monomorphism Restriction is disabled by default in
+        GHCi (see <xref linkend="monomorphism" />).
+      </para>
+
+      <para>
+        It is often useful to change the language options for expressions typed
+        at the prompt only, without having that option apply to loaded modules
+        too.  For example
 <screen>
-:seti -XNoMonomorphismRestriction
+:seti -XMonoLocalBinds
 </screen>
-        It would be undesirable if
-        <option>-XNoMonomorphismRestriction</option> were to apply to
-        loaded modules too: that might cause a compilation error, but
-        more commonly it will cause extra recompilation, because GHC
-        will think that it needs to recompile the module because the
-        flags have changed.
+        It would be undesirable if <option>-XMonoLocalBinds</option> were to
+        apply to loaded modules too: that might cause a compilation error, but
+        more commonly it will cause extra recompilation, because GHC will think
+        that it needs to recompile the module because the flags have changed.
       </para>
 
       <para>

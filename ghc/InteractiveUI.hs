@@ -359,9 +359,13 @@ interactiveUI config srcs maybe_exprs = do
    initInterpBuffering
 
    -- The initial set of DynFlags used for interactive evaluation is the same
-   -- as the global DynFlags, plus -XExtendedDefaultRules
+   -- as the global DynFlags, plus -XExtendedDefaultRules and
+   -- -XNoMonomorphismRestriction.
    dflags <- getDynFlags
-   GHC.setInteractiveDynFlags (xopt_set dflags Opt_ExtendedDefaultRules)
+   let dflags' = (`xopt_set` Opt_ExtendedDefaultRules)
+               . (`xopt_unset` Opt_MonomorphismRestriction)
+               $ dflags
+   GHC.setInteractiveDynFlags dflags'
 
    liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
