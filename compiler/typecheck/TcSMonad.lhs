@@ -462,6 +462,9 @@ data InertCans
               -- Family equations, index is the whole family head type.
        , inert_irreds :: Cts       
               -- Irreducible predicates
+
+       , inert_insols :: Cts       
+              -- Frozen errors (as non-canonicals)
        }
     
                      
@@ -533,9 +536,6 @@ data InertSet
               -- Canonical Given, Wanted, Derived (no Solved)
 	      -- Sometimes called "the inert set"
 
-       , inert_insols :: Cts       
-              -- Frozen errors (as non-canonicals)
-                               
        , inert_fsks :: [TcTyVar]  -- Flatten-skolems allocated in this local scope
               -- All ``flattening equations'' are kept here. 
               -- Always canonical CTyFunEqs (Given or Wanted only!)
@@ -568,12 +568,12 @@ instance Outputable InertCans where
                    <+> vcat (map ppr (Bag.bagToList $ cCanMapToBag (inert_dicts ics)))
                  , ptext (sLit "Irreds:")
                    <+> vcat (map ppr (Bag.bagToList $ inert_irreds ics))
+                 , text "Insolubles =" <+> -- Clearly print frozen errors
+                    braces (vcat (map ppr (Bag.bagToList $ inert_insols ics)))
                  ]
             
 instance Outputable InertSet where 
   ppr is = vcat [ ppr $ inert_cans is
-                , text "Frozen errors =" <+> -- Clearly print frozen errors
-                    braces (vcat (map ppr (Bag.bagToList $ inert_insols is)))
                 , text "Solved dicts"  <+> int (sizePredMap (inert_solved_dicts is))
                 , text "Solved funeqs" <+> int (sizeFamHeadMap (inert_solved_funeqs is))]
 
@@ -582,8 +582,8 @@ emptyInert
   = IS { inert_cans = IC { inert_eqs    = emptyVarEnv
                          , inert_dicts  = emptyCCanMap
                          , inert_funeqs = FamHeadMap emptyTM 
-                         , inert_irreds = emptyCts }
-       , inert_insols        = emptyCts
+                         , inert_irreds = emptyCts
+                         , inert_insols = emptyCts }
        , inert_fsks          = []
        , inert_solved_dicts  = PredMap emptyTM 
        , inert_solved_funeqs = FamHeadMap emptyTM }
@@ -681,8 +681,7 @@ prepareInertsForImplications :: InertSet -> InertSet
 -- See Note [Preparing inert set for implications]
 prepareInertsForImplications is
   = is { inert_cans   = getGivens (inert_cans is)
-       , inert_fsks   = []
-       , inert_insols = emptyCts }
+       , inert_fsks   = [] }
   where
     getGivens (IC { inert_eqs    = eqs
                   , inert_irreds = irreds
@@ -691,7 +690,8 @@ prepareInertsForImplications is
       = IC { inert_eqs    = filterVarEnv_Directly (\_ ct -> isGivenCt ct) eqs 
            , inert_funeqs = FamHeadMap (mapTM given_from_wanted funeqs)
            , inert_irreds = Bag.filterBag isGivenCt irreds
-           , inert_dicts  = keepGivenCMap dicts }
+           , inert_dicts  = keepGivenCMap dicts
+           , inert_insols = emptyCts }
 
     given_from_wanted funeq   -- This is where the magic processing happens 
       | isGiven ev = funeq    -- for type-function equalities
@@ -767,7 +767,7 @@ getInertUnsolved
             unsolved_flats = unsolved_eqs `unionBags` unsolved_irreds `unionBags` 
                              unsolved_dicts `unionBags` unsolved_funeqs
 
-      ; return (unsolved_flats, inert_insols is) }
+      ; return (unsolved_flats, inert_insols icans) }
   where
     add_if_unsolved ct cts
       | is_unsolved ct = cts `extendCts` ct
@@ -789,7 +789,7 @@ checkAllSolved
 
       ; return (not (unsolved_eqs || unsolved_irreds
                      || unsolved_dicts || unsolved_funeqs
-                     || not (isEmptyBag (inert_insols is)))) }
+                     || not (isEmptyBag (inert_insols icans)))) }
 
 extractRelevantInerts :: Ct -> TcS Cts
 -- Returns the constraints from the inert set that are 'relevant' to react with 
@@ -1144,9 +1144,9 @@ emitFrozenError fl depth
   = do { traceTcS "Emit frozen error" (ppr (ctEvPred fl))
        ; updInertTcS add_insol }
   where
-    add_insol inerts@(IS { inert_insols = old_insols })
-      | already_there = inerts
-      | otherwise     = inerts { inert_insols = extendCts old_insols insol_ct }
+    add_insol is@(IS { inert_cans = ics@(IC { inert_insols = old_insols }) })
+      | already_there = is
+      | otherwise     = is { inert_cans = ics { inert_insols = extendCts old_insols insol_ct } }
       where
         already_there = not (isWanted fl) && anyBag (eqType this_pred . ctPred) old_insols
 	     -- See Note [Do not add duplicate derived insolubles]
@@ -1181,7 +1181,8 @@ setWantedTyBind :: TcTyVar -> TcType -> TcS ()
 -- Add a type binding
 -- We never do this twice!
 setWantedTyBind tv ty 
-  = do { ref <- getTcSTyBinds
+  = ASSERT2( isMetaTyVar tv, ppr tv )
+    do { ref <- getTcSTyBinds
        ; wrapTcS $ 
          do { ty_binds <- TcM.readTcRef ref
             ; when debugIsOn $
