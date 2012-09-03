@@ -66,7 +66,6 @@ module StaticFlags (
 	-- misc opts
 	opt_ErrorSpans,
 	opt_HistorySize,
-	v_Ld_inputs,
         opt_StubDeadValues,
 
     -- For the parser
@@ -293,20 +292,9 @@ opt_UF_DearOp            = ( 40 :: Int)
 opt_ErrorSpans :: Bool
 opt_ErrorSpans			= lookUp (fsLit "-ferror-spans")
 
--- object files and libraries to be linked in are collected here.
--- ToDo: perhaps this could be done without a global, it wasn't obvious
--- how to do it though --SDM.
-GLOBAL_VAR(v_Ld_inputs,	[],      [String])
-
 -----------------------------------------------------------------------------
 -- Tunneling our global variables into a new instance of the GHC library
 
--- Ignore the v_Ld_inputs global because:
---  a) It is mutated even once GHC has been initialised, which means that I'd
---     have to add another layer of indirection to truly share the value
---  b) We can get away without sharing it because it only affects the link,
---     and is mutated by the GHC exe. Users who load up a new copy of the GHC
---     library while another is running almost certainly won't actually access it.
 saveStaticFlagGlobals :: IO (Bool, [String])
 saveStaticFlagGlobals = liftM2 (,) (readIORef v_opt_C_ready) (readIORef v_opt_C)
 

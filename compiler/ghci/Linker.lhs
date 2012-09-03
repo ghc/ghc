@@ -44,7 +44,6 @@ import BasicTypes
 import Outputable
 import Panic
 import Util
-import StaticFlags
 import ErrUtils
 import SrcLoc
 import qualified Maybes
@@ -264,7 +263,7 @@ showLinkerState dflags
 --     @-l@ options in @v_Opt_l@,
 --
 --  d) Loading any @.o\/.dll@ files specified on the command line, now held
---     in @v_Ld_inputs@,
+--     in @ldInputs@,
 --
 --  e) Loading any MacOS frameworks.
 --
@@ -298,7 +297,7 @@ reallyInitDynLinker dflags =
         ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
           -- (d) Link .o files from the command-line
-        ; cmdline_ld_inputs <- readIORef v_Ld_inputs
+        ; let cmdline_ld_inputs = ldInputs dflags
 
         ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
 

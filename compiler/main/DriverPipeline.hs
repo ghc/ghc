@@ -39,7 +39,6 @@ import Module
 import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags      ( v_Ld_inputs )
 import Config
 import Panic
 import Util
@@ -357,7 +356,7 @@ linkingNeeded dflags linkables pkg_deps = do
     Left _  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
-        extra_ld_inputs <- readIORef v_Ld_inputs
+        let extra_ld_inputs = ldInputs dflags
         e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
         let (errs,extra_times) = splitEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
@@ -1557,7 +1556,7 @@ getLinkInfo dflags dep_packages = do
    pkg_frameworks <- case platformOS (targetPlatform dflags) of
                      OSDarwin -> getPackageFrameworks dflags dep_packages
                      _        -> return []
-   extra_ld_inputs <- readIORef v_Ld_inputs
+   let extra_ld_inputs = ldInputs dflags
    let
       link_info = (package_link_opts,
                    pkg_frameworks,
@@ -1715,7 +1714,7 @@ linkBinary dflags o_files dep_packages = do
             return []
 
         -- probably _stub.o files
-    extra_ld_inputs <- readIORef v_Ld_inputs
+    let extra_ld_inputs = ldInputs dflags
 
         -- opts from -optl-<blah> (including -l<blah> options)
     let extra_ld_opts = getOpts dflags opt_l
@@ -1913,7 +1912,7 @@ linkDynLib dflags o_files dep_packages
     let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
 
         -- probably _stub.o files
-    extra_ld_inputs <- readIORef v_Ld_inputs
+    let extra_ld_inputs = ldInputs dflags
 
     let extra_ld_opts = getOpts dflags opt_l
 

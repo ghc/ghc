@@ -182,11 +182,6 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ showBanner postLoadMode dflags2
 
-  -- we've finished manipulating the DynFlags, update the session
-  _ <- GHC.setSessionDynFlags dflags2
-  dflags3 <- GHC.getSessionDynFlags
-  hsc_env <- GHC.getSession
-
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right
      -- away - e.g., for win32 platforms, backslashes are converted
@@ -194,9 +189,12 @@ main' postLoadMode dflags0 args flagWarnings = do
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-  -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on
-  --       the command-line.
-  liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse objs)
+    dflags2a = dflags2 { ldInputs = objs ++ ldInputs dflags2 }
+
+  -- we've finished manipulating the DynFlags, update the session
+  _ <- GHC.setSessionDynFlags dflags2a
+  dflags3 <- GHC.getSessionDynFlags
+  hsc_env <- GHC.getSession
 
         ---------------- Display configuration -----------
   when (verbosity dflags3 >= 4) $
@@ -251,7 +249,7 @@ partition_args (arg:args) srcs objs
 
     {-
       We split out the object files (.o, .dll) and add them
-      to v_Ld_inputs for use by the linker.
+      to ldInputs for use by the linker.
 
       The following things should be considered compilation manager inputs:
 
@@ -639,7 +637,9 @@ doMake srcs  = do
 
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
-    liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse o_files)
+    dflags <- GHC.getSessionDynFlags
+    let dflags' = dflags { ldInputs = o_files ++ ldInputs dflags }
+    _ <- GHC.setSessionDynFlags dflags'
 
     targets <- mapM (uncurry GHC.guessTarget) hs_srcs
     GHC.setTargets targets

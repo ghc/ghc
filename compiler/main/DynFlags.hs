@@ -563,6 +563,8 @@ data DynFlags = DynFlags {
   --    Set by @-ddump-file-prefix@
   dumpPrefixForce       :: Maybe FilePath,
 
+  ldInputs              :: [String],
+
   includePaths          :: [String],
   libraryPaths          :: [String],
   frameworkPaths        :: [String],    -- used on darwin only
@@ -1130,6 +1132,7 @@ defaultDynFlags mySettings =
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
+        ldInputs                = [],
         includePaths            = [],
         libraryPaths            = [],
         frameworkPaths          = [],
