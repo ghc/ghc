@@ -1597,14 +1597,13 @@ deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
             skol_info = UnifyForAllSkol skol_tvs phi1
         ; mev <- newWantedEvVar loc (mkTcEqPred phi1 phi2)
         ; untch <- getUntouchables
-        ; uniq  <- wrapTcS TcM.newUnique  -- Clumsy
         ; coe_inside <- case mev of
             Cached ev_tm -> return (evTermCoercion ev_tm)
             Fresh ctev   -> do { ev_binds_var <- wrapTcS $ TcM.newTcEvBinds
                                ; let ev_binds = TcEvBinds ev_binds_var
                                      new_ct = mkNonCanonical ctev
               			     new_co = evTermCoercion (ctEvTerm ctev)
-                                     new_untch = pushUntouchables uniq untch
+                                     new_untch = pushUntouchables untch
                                ; lcl_env <- wrapTcS $ TcM.getLclTypeEnv
                                ; loc <- wrapTcS $ TcM.getCtLoc skol_info
                                ; let wc = WC { wc_flat  = singleCt new_ct 

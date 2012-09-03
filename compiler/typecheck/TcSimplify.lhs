@@ -440,8 +440,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
        ; untch <- TcRnMonad.getUntouchables
-       ; uniq  <- TcRnMonad.newUnique
-       ; let implic = Implic { ic_untch    = pushUntouchables uniq untch 
+       ; let implic = Implic { ic_untch    = pushUntouchables untch 
                              , ic_env      = lcl_env
                              , ic_skols    = qtvs_to_return
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds

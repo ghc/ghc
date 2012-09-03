@@ -324,8 +324,8 @@ newtype Untouchables = Untouchables Int
 noUntouchables :: Untouchables
 noUntouchables = Untouchables 0   -- 0 = outermost level
 
-pushUntouchables :: Unique -> Untouchables -> Untouchables 
-pushUntouchables _ (Untouchables us) = Untouchables (us+1)
+pushUntouchables :: Untouchables -> Untouchables 
+pushUntouchables (Untouchables us) = Untouchables (us+1)
 
 isFloatedTouchable :: Untouchables -> Untouchables -> Bool
 isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
@@ -342,34 +342,6 @@ checkTouchableInvariant (Untouchables ctxt_untch) (Untouchables tv_untch)
 
 instance Outputable Untouchables where
   ppr (Untouchables us) = ppr us
-
-{-   OLD
-newtype Untouchables = Untouchables [Unique]
-
-noUntouchables :: Untouchables
-noUntouchables = Untouchables []   -- 0 = outermost level
-
-pushUntouchables :: Unique -> Untouchables -> Untouchables 
-pushUntouchables u (Untouchables us) = Untouchables (u:us)
-
-isFloatedTouchable :: Untouchables -> Untouchables -> Bool
-isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
-  = case (ctxt_untch, tv_untch) of
-      (_,  [])     -> False
-      ([],  _)     -> True
-      (u:_, tv_u:tv_us) | u `elem` tv_us -> ASSERT2( u /= tv_u, ppr u <+> ppr tv_us ) True
-                        | otherwise      -> False
-
-isTouchable :: Untouchables -> Untouchables -> Bool
-isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
-  = case ctxt_untch of
-      []    -> True
-      (u:_) -> u `elem` tv_untch
-
-instance Outputable Untouchables where
-  ppr (Untouchables us) = pprWithCommas ppr us
--}
-
 
 -----------------------------
 data MetaDetails

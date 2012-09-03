@@ -1036,8 +1036,7 @@ captureConstraints thing_inside
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
   = do { env <- getLclEnv
-       ; uniq <- newUnique
-       ; let untch' = pushUntouchables uniq (tcl_untch env)
+       ; let untch' = pushUntouchables (tcl_untch env)
        ; res <- setLclEnv (env { tcl_untch = untch' })
                 thing_inside
        ; return (res, untch') }
