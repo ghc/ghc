@@ -65,7 +65,6 @@ module StaticFlags (
 
 	-- misc opts
 	opt_ErrorSpans,
-	opt_HistorySize,
 
     -- For the parser
     addOpt, removeOpt, v_opt_C_ready,
@@ -245,9 +244,6 @@ opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_MaxWorkerArgs :: Int
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
-
-opt_HistorySize :: Int
-opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool

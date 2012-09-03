@@ -2864,7 +2864,7 @@
           <row>
             <entry><option>-fhistory-size</option></entry>
             <entry>Set simplification history size</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

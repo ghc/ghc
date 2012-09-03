@@ -142,7 +142,6 @@ isStaticFlag f =
   || any (`isPrefixOf` f) [
     "fliberate-case-threshold",
     "fmax-worker-args",
-    "fhistory-size",
     "funfolding-creation-threshold",
     "funfolding-dict-threshold",
     "funfolding-use-threshold",
