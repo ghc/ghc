@@ -981,47 +981,50 @@ wayDesc WayPar      = "Parallel"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
-wayOpts :: Way -> DynP ()
-wayOpts WayThreaded = do
-#if defined(freebsd_TARGET_OS)
---        "-optc-pthread"
---      , "-optl-pthread"
+wayOpts :: Platform -> Way -> DynP ()
+wayOpts platform WayThreaded = do
         -- FreeBSD's default threading library is the KSE-based M:N libpthread,
         -- which GHC has some problems with.  It's currently not clear whether
         -- the problems are our fault or theirs, but it seems that using the
         -- alternative 1:1 threading library libthr works around it:
-          upd $ addOptl "-lthr"
-#elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-          upd $ addOptc "-pthread"
-          upd $ addOptl "-pthread"
-#elif defined(solaris2_TARGET_OS)
-          upd $ addOptl "-lrt"
-#endif
-          return ()
-wayOpts WayDebug = return ()
-wayOpts WayDyn = do
+          let os = platformOS platform
+          case os of
+              OSFreeBSD -> upd $ addOptl "-lthr"
+              OSSolaris2 -> upd $ addOptl "-lrt"
+              _
+               | os `elem` [OSOpenBSD, OSNetBSD] ->
+                  do upd $ addOptc "-pthread"
+                     upd $ addOptl "-pthread"
+              _ ->
+                  return ()
+wayOpts _ WayDebug = return ()
+wayOpts platform WayDyn = do
         upd $ addOptP "-DDYNAMIC"
         upd $ addOptc "-DDYNAMIC"
-#if defined(mingw32_TARGET_OS)
-        -- On Windows, code that is to be linked into a dynamic library must be compiled
-        --      with -fPIC. Labels not in the current package are assumed to be in a DLL
-        --      different from the current one.
-        setFPIC
-#elif defined(darwin_TARGET_OS)
-        setFPIC
-#elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-        -- Without this, linking the shared libHSffi fails because
-        -- it uses pthread mutexes.
-        upd $ addOptl "-optl-pthread"
-#endif
-wayOpts WayProf = do
+        let os = platformOS platform
+        case os of
+            OSMinGW32 ->
+                -- On Windows, code that is to be linked into a dynamic
+                -- library must be compiled with -fPIC. Labels not in
+                -- the current package are assumed to be in a DLL
+                -- different from the current one.
+                setFPIC
+            OSDarwin ->
+                setFPIC
+            _ | os `elem` [OSOpenBSD, OSNetBSD] ->
+                -- Without this, linking the shared libHSffi fails
+                -- because it uses pthread mutexes.
+                upd $ addOptl "-optl-pthread"
+            _ ->
+                return ()
+wayOpts _ WayProf = do
         setDynFlag Opt_SccProfilingOn
         upd $ addOptP "-DPROFILING"
         upd $ addOptc "-DPROFILING"
-wayOpts WayEventLog = do
+wayOpts _ WayEventLog = do
         upd $ addOptP "-DTRACING"
         upd $ addOptc "-DTRACING"
-wayOpts WayPar = do
+wayOpts _ WayPar = do
         setDynFlag Opt_Parallel
         upd $ addOptP "-D__PARALLEL_HASKELL__"
         upd $ addOptc "-DPAR"
@@ -1053,12 +1056,12 @@ wayOpts WayPar =
         , "-optl-lpvm3"
         , "-optl-lgpvm3" ]
 -}
-wayOpts WayGran = do
+wayOpts _ WayGran = do
         setDynFlag Opt_GranMacros
         upd $ addOptP "-D__GRANSIM__"
         upd $ addOptc "-DGRAN"
         exposePackage "concurrent"
-wayOpts WayNDP = do
+wayOpts _ WayNDP = do
         setExtensionFlag Opt_ParallelArrays
         setDynFlag Opt_Vectorise
 
@@ -2722,7 +2725,8 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 --------------------------
 addWay :: Way -> DynP ()
 addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
-              wayOpts w
+              dfs <- liftEwM getCmdLineState
+              wayOpts (targetPlatform dfs) w
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
