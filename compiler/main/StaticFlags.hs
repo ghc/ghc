@@ -66,7 +66,6 @@ module StaticFlags (
 	-- misc opts
 	opt_ErrorSpans,
 	opt_HistorySize,
-        opt_StubDeadValues,
 
     -- For the parser
     addOpt, removeOpt, v_opt_C_ready,
@@ -249,9 +248,6 @@ opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
-
-opt_StubDeadValues  :: Bool
-opt_StubDeadValues		= lookUp  (fsLit "-dstub-dead-values")
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool
