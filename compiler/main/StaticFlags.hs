@@ -60,9 +60,6 @@ module StaticFlags (
 	opt_UF_KeenessFactor,
 	opt_UF_DearOp,
 
-	-- Optimization fuel controls
-	opt_Fuel,
-
 	-- misc opts
 	opt_ErrorSpans,
 
@@ -218,9 +215,6 @@ opt_SuppressUniques
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")
-
-opt_Fuel            :: Int
-opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
 
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")

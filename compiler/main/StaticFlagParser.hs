@@ -100,7 +100,6 @@ flagsStatic = [
   , Flag "dsuppress-idinfo"            (PassFlag addOpt)
   , Flag "dsuppress-var-kinds"         (PassFlag addOpt)
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
-  , Flag "dopt-fuel"                   (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
