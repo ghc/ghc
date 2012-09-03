@@ -1183,7 +1183,9 @@ in the cache!
 \begin{code}
 applyTyVarDefaulting :: WantedConstraints -> TcS ()
 applyTyVarDefaulting wc 
-  = do { let tvs = varSetElems (tyVarsOfWC wc) 
+  = do { let tvs = filter isMetaTyVar (varSetElems (tyVarsOfWC wc))
+                   -- We might have runtime-skolems in GHCi, and 
+                   -- we definitely don't want to try to assign to those!
        ; traceTcS "applyTyVarDefaulting {" (ppr tvs)
        ; mapM_ defaultTyVar tvs
        ; traceTcS "applyTyVarDefaulting end }" empty }
@@ -1250,6 +1252,8 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     find_unary cc 
         | Just (cls,[ty]) <- getClassPredTys_maybe (ctPred cc)
         , Just tv <- tcGetTyVar_maybe ty
+        , isMetaTyVar tv  -- We might have runtime-skolems in GHCi, and 
+                          -- we definitely don't want to try to assign to those!
         = Left (cc, cls, tv)
     find_unary cc = Right cc  -- Non unary or non dictionary 
 
