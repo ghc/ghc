@@ -331,6 +331,11 @@ rnExpr (HsArrApp arrow arg _ ho rtl)
     return (HsArrApp arrow' arg' placeHolderType ho rtl,
 	     fvArrow `plusFV` fvArg)
   where
+        -- See Note [Escaping the arrow scope] in TcRnTypes
+	-- Before renaming 'arrow', use the environment of the enclosing
+	-- proc for the (-<) case.  
+	-- Local bindings, inside the enclosing proc, are not in scope 
+	-- inside 'arrow'.  In the higher-order case (-<<), they are.
     select_arrow_scope tc = case ho of
         HsHigherOrderApp -> tc
         HsFirstOrderApp  -> escapeArrowScope tc
