@@ -102,7 +102,6 @@ flagsStatic = [
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
   , Flag "dopt-fuel"                   (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
-  , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
         ----- RTS opts ------------------------------------------------------
