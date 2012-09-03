@@ -1145,8 +1145,8 @@ defaultDynFlags mySettings =
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
         ways                    = [],
-        buildTag                = panic "defaultDynFlags: No buildTag",
-        rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
+        buildTag                = mkBuildTag [],
+        rtsBuildTag             = mkBuildTag [],
         splitInfo               = Nothing,
         settings                = mySettings,
         -- ghc -M values
