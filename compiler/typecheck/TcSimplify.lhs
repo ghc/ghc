@@ -9,7 +9,8 @@
 module TcSimplify( 
        simplifyInfer, simplifyAmbiguityCheck,
        simplifyDefault, simplifyDeriv, 
-       simplifyRule, simplifyTop, simplifyInteractive
+       simplifyRule, simplifyTop, simplifyInteractive,
+       solveWantedsTcM
   ) where
 
 #include "HsVersions.h"
@@ -55,8 +56,6 @@ import DynFlags
 
 
 \begin{code}
-
-
 simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- Simplify top-level constraints
 -- Usually these will be implications,
@@ -144,7 +143,7 @@ More details in Note [DefaultTyVar].
 simplifyAmbiguityCheck :: Name -> WantedConstraints -> TcM (Bag EvBind)
 simplifyAmbiguityCheck name wanteds
   = traceTc "simplifyAmbiguityCheck" (text "name =" <+> ppr name) >> 
-    simplifyTop wanteds  -- NB: must be simplifyTop not simplifyCheck, so that we
+    simplifyTop wanteds  -- NB: must be simplifyTop so that we
                          --     do ambiguity resolution.  
                          -- See Note [Impedence matching] in TcBinds.
  
@@ -160,7 +159,14 @@ simplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 simplifyDefault theta
   = do { traceTc "simplifyInteractive" empty
        ; wanted <- newFlatWanteds DefaultOrigin theta
-       ; _ignored_ev_binds <- simplifyCheck (mkFlatWC wanted)
+       ; (unsolved, _binds) <- solveWantedsTcM (mkFlatWC wanted)
+
+       ; traceTc "reportUnsolved {" empty
+       -- See Note [Deferring coercion errors to runtime]
+       ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+       ; _ <- reportUnsolved runtimeCoercionErrors unsolved 
+       ; traceTc "reportUnsolved }" empty
+
        ; return () }
 \end{code}
 
@@ -461,7 +467,6 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
-    where 
 \end{code}
 
 
@@ -566,12 +571,9 @@ simplifyRule :: RuleName
              -> TcM ([EvVar], WantedConstraints)   -- LHS evidence varaibles
 -- See Note [Simplifying RULE constraints] in TcRule
 simplifyRule name lhs_wanted rhs_wanted
-  = do { zonked_all <- zonkWC (lhs_wanted `andWC` rhs_wanted)
-       ; let doc = ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
-             
-             	 -- We allow ourselves to unify environment 
+  = do {      	 -- We allow ourselves to unify environment 
 		 -- variables: runTcS runs with NoUntouchables
-       ; (resid_wanted, _) <- solveWantedsTcM zonked_all
+         (resid_wanted, _) <- solveWantedsTcM (lhs_wanted `andWC` rhs_wanted)
 
        ; zonked_lhs <- zonkWC lhs_wanted
 
@@ -589,7 +591,7 @@ simplifyRule name lhs_wanted rhs_wanted
                = True
              
        ; traceTc "simplifyRule" $
-         vcat [ doc
+         vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
               , text "zonked_lhs" <+> ppr zonked_lhs 
               , text "q_cts"      <+> ppr q_cts ]
 
@@ -604,43 +606,8 @@ simplifyRule name lhs_wanted rhs_wanted
 *                                                                                 *
 ***********************************************************************************
 
-\begin{code}
-simplifyCheck :: WantedConstraints	-- Wanted
-              -> TcM (Bag EvBind)
--- Solve a single, top-level implication constraint
--- e.g. typically one created from a top-level type signature
--- 	    f :: forall a. [a] -> [a]
---          f x = rhs
--- We do this even if the function has no polymorphism:
---    	    g :: Int -> Int
-
---          g y = rhs
--- (whereas for *nested* bindings we would not create
---  an implication constraint for g at all.)
---
--- Fails if can't solve something in the input wanteds
-simplifyCheck wanteds
-  = do { wanteds <- zonkWC wanteds
-
-       ; traceTc "simplifyCheck {" (vcat
-             [ ptext (sLit "wanted =") <+> ppr wanteds ])
-
-       ; (unsolved, eb1) <- solveWantedsTcM wanteds
-
-       ; traceTc "simplifyCheck }" $ ptext (sLit "unsolved =") <+> ppr unsolved
-
-       ; traceTc "reportUnsolved {" empty
-       -- See Note [Deferring coercion errors to runtime]
-       ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
-       ; eb2 <- reportUnsolved runtimeCoercionErrors unsolved 
-       ; traceTc "reportUnsolved }" empty
-
-       ; return (eb1 `unionBags` eb2) }
-\end{code}
-
 Note [Deferring coercion errors to runtime]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 While developing, sometimes it is desirable to allow compilation to succeed even
 if there are type errors in the code. Consider the following case:
 
@@ -679,9 +646,15 @@ compilation. The errors are turned into warnings in `reportUnsolved`.
 \begin{code}
 
 solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
+-- Zonk the input constraints, and simplify them
 -- Return the evidence binds in the BagEvBinds result
 -- Discards all Derived stuff in result
-solveWantedsTcM wanted = runTcS (solve_wanteds_and_drop wanted)
+solveWantedsTcM wanted 
+  = do { zonked_wanted <- zonkWC wanted
+       ; traceTc "solveWantedsTcM {" (ppr zonked_wanted)
+       ; (wanteds', binds) <- runTcS (solve_wanteds_and_drop zonked_wanted)
+       ; traceTc "solveWantedsTcM end }" (ppr wanteds') 
+       ; return (wanteds', binds) }
 
 solveWantedsWithEvBinds :: EvBindsVar -> WantedConstraints -> TcM WantedConstraints
 -- Side-effect the EvBindsVar argument to add new bindings from solving
