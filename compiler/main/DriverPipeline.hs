@@ -39,7 +39,7 @@ import Module
 import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags      ( v_Ld_inputs, opt_Static, Way(..) )
+import StaticFlags      ( v_Ld_inputs )
 import Config
 import Panic
 import Util
@@ -1352,9 +1352,9 @@ runPhase LlvmLlc input_fn dflags
 
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
-        rmodel | dopt Opt_PIC dflags = "pic"
-               | not opt_Static = "dynamic-no-pic"
-               | otherwise      = "static"
+        rmodel | dopt Opt_PIC dflags          = "pic"
+               | not (dopt Opt_Static dflags) = "dynamic-no-pic"
+               | otherwise                    = "static"
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
              | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
@@ -1448,7 +1448,7 @@ maybeMergeStub
 
 runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool
 runPhase_MoveBinary dflags input_fn
-    | WayPar `elem` ways dflags && not opt_Static =
+    | WayPar `elem` ways dflags && not (dopt Opt_Static dflags) =
         panic ("Don't know how to combine PVM wrapper and dynamic wrapper")
     | WayPar `elem` ways dflags = do
         let sysMan = pgm_sysman dflags
@@ -1668,7 +1668,7 @@ linkBinary dflags o_files dep_packages = do
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           not opt_Static
+           not (dopt Opt_Static dflags)
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
          | otherwise = ["-L" ++ l]
 
@@ -1891,7 +1891,7 @@ linkDynLib dflags o_files dep_packages
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS (targetPlatform dflags)) &&
            dynLibLoader dflags == SystemDependent &&
-           not opt_Static
+           not (dopt Opt_Static dflags)
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
          | otherwise = ["-L" ++ l]
 

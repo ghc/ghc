@@ -23,9 +23,6 @@ module StaticFlags (
 	staticFlags,
         initStaticOpts,
 
-	-- Ways
-	Way(..), v_Ways, mkBuildTag, wayRTSOnly,
-
 	-- Output style options
 	opt_PprStyle_Debug,
         opt_NoDebugOutput,
@@ -66,18 +63,14 @@ module StaticFlags (
 	-- Optimization fuel controls
 	opt_Fuel,
 
-	-- Related to linking
-	opt_Static,
-
 	-- misc opts
 	opt_ErrorSpans,
 	opt_HistorySize,
 	v_Ld_inputs,
         opt_StubDeadValues,
-        opt_Ticky,
 
     -- For the parser
-    addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready,
+    addOpt, removeOpt, v_opt_C_ready,
 
     -- Saving/restoring globals
     saveStaticFlagGlobals, restoreStaticFlagGlobals
@@ -90,7 +83,7 @@ import Util
 import Maybes		( firstJusts )
 import Panic
 
-import Control.Monad    ( liftM3 )
+import Control.Monad
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Data.List
@@ -104,9 +97,6 @@ initStaticOpts = writeIORef v_opt_C_ready True
 addOpt :: String -> IO ()
 addOpt = consIORef v_opt_C
 
-addWay :: Way -> IO ()
-addWay = consIORef v_Ways
-
 removeOpt :: String -> IO ()
 removeOpt f = do
   fs <- readIORef v_opt_C
@@ -119,7 +109,7 @@ lookup_str       :: String -> Maybe String
 
 -- holds the static opts while they're being collected, before
 -- being unsafely read by unpacked_static_opts below.
-GLOBAL_VAR(v_opt_C, defaultStaticOpts, [String])
+GLOBAL_VAR(v_opt_C, [], [String])
 GLOBAL_VAR(v_opt_C_ready, False, Bool)
 
 staticFlags :: [String]
@@ -128,10 +118,6 @@ staticFlags = unsafePerformIO $ do
   if (not ready)
         then panic "Static flags have not been initialised!\n        Please call GHC.newSession or GHC.parseStaticFlags early enough."
         else readIORef v_opt_C
-
--- -static is the default
-defaultStaticOpts :: [String]
-defaultStaticOpts = ["-static"]
 
 packed_static_opts :: [FastString]
 packed_static_opts   = map mkFastString staticFlags
@@ -303,205 +289,14 @@ opt_UF_KeenessFactor	 = lookup_def_float "-funfolding-keeness-factor"   (1.5::Fl
 opt_UF_DearOp            = ( 40 :: Int)
 
 
--- Related to linking
-opt_Static :: Bool
-opt_Static			= lookUp  (fsLit "-static")
-
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans :: Bool
 opt_ErrorSpans			= lookUp (fsLit "-ferror-spans")
-
-opt_Ticky :: Bool
-opt_Ticky                       = lookUp (fsLit "-ticky")
 
 -- object files and libraries to be linked in are collected here.
 -- ToDo: perhaps this could be done without a global, it wasn't obvious
 -- how to do it though --SDM.
 GLOBAL_VAR(v_Ld_inputs,	[],      [String])
-
------------------------------------------------------------------------------
--- Ways
-
--- The central concept of a "way" is that all objects in a given
--- program must be compiled in the same "way".  Certain options change
--- parameters of the virtual machine, eg. profiling adds an extra word
--- to the object header, so profiling objects cannot be linked with
--- non-profiling objects.
-
--- After parsing the command-line options, we determine which "way" we
--- are building - this might be a combination way, eg. profiling+threaded.
-
--- We then find the "build-tag" associated with this way, and this
--- becomes the suffix used to find .hi files and libraries used in
--- this compilation.
-
-data Way
-  = WayThreaded
-  | WayDebug
-  | WayProf
-  | WayEventLog
-  | WayPar
-  | WayGran
-  | WayNDP
-  | WayDyn
-  deriving (Eq,Ord)
-
-GLOBAL_VAR(v_Ways, [] ,[Way])
-
-allowed_combination :: [Way] -> Bool
-allowed_combination way = and [ x `allowedWith` y
-			      | x <- way, y <- way, x < y ]
-  where
-	-- Note ordering in these tests: the left argument is
-	-- <= the right argument, according to the Ord instance
-	-- on Way above.
-
-	-- dyn is allowed with everything
-	_ `allowedWith` WayDyn  		= True
-	WayDyn `allowedWith` _		        = True
-
-	-- debug is allowed with everything
-	_ `allowedWith` WayDebug		= True
-	WayDebug `allowedWith` _		= True
-
-	WayProf `allowedWith` WayNDP		= True
-	WayThreaded `allowedWith` WayProf	= True
-	WayThreaded `allowedWith` WayEventLog	= True
-	_ `allowedWith` _ 			= False
-
-
-getWayFlags :: IO [String]  -- new options
-getWayFlags = do
-  unsorted <- readIORef v_Ways
-  let ways = sort $ nub $ unsorted
-  writeIORef v_Ways ways
-
-  if not (allowed_combination ways)
-      then ghcError (CmdLineError $
-      		    "combination not supported: "  ++
-      		    foldr1 (\a b -> a ++ '/':b)
-      		    (map wayDesc ways))
-      else
-      	   return (concatMap wayOpts ways)
-
-mkBuildTag :: [Way] -> String
-mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
-
-wayTag :: Way -> String
-wayTag WayThreaded = "thr"
-wayTag WayDebug    = "debug"
-wayTag WayDyn      = "dyn"
-wayTag WayProf     = "p"
-wayTag WayEventLog = "l"
-wayTag WayPar      = "mp"
--- wayTag WayPar      = "mt"
--- wayTag WayPar      = "md"
-wayTag WayGran     = "mg"
-wayTag WayNDP      = "ndp"
-
-wayRTSOnly :: Way -> Bool
-wayRTSOnly WayThreaded = True
-wayRTSOnly WayDebug    = True
-wayRTSOnly WayDyn      = False
-wayRTSOnly WayProf     = False
-wayRTSOnly WayEventLog = True
-wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
-wayRTSOnly WayGran     = False
-wayRTSOnly WayNDP      = False
-
-wayDesc :: Way -> String
-wayDesc WayThreaded = "Threaded"
-wayDesc WayDebug    = "Debug"
-wayDesc WayDyn      = "Dynamic"
-wayDesc WayProf     = "Profiling"
-wayDesc WayEventLog = "RTS Event Logging"
-wayDesc WayPar      = "Parallel"
--- wayDesc WayPar      = "Parallel ticky profiling"
--- wayDesc WayPar      = "Distributed"
-wayDesc WayGran     = "GranSim"
-wayDesc WayNDP      = "Nested data parallelism"
-
-wayOpts :: Way -> [String]
-wayOpts WayThreaded = [
-#if defined(freebsd_TARGET_OS)
---        "-optc-pthread"
---      , "-optl-pthread"
-        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
-        -- which GHC has some problems with.  It's currently not clear whether
-        -- the problems are our fault or theirs, but it seems that using the
-        -- alternative 1:1 threading library libthr works around it:
-          "-optl-lthr"
-#elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-          "-optc-pthread"
-        , "-optl-pthread"
-#elif defined(solaris2_TARGET_OS)
-          "-optl-lrt"
-#endif
-        ]
-wayOpts WayDebug = []
-wayOpts WayDyn =
-        [ "-DDYNAMIC"
-        , "-optc-DDYNAMIC"
-#if defined(mingw32_TARGET_OS)
-        -- On Windows, code that is to be linked into a dynamic library must be compiled
-        --      with -fPIC. Labels not in the current package are assumed to be in a DLL
-        --      different from the current one.
-        , "-fPIC"
-#elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-        -- Without this, linking the shared libHSffi fails because
-        -- it uses pthread mutexes.
-        , "-optl-pthread"
-#endif
-        ]
-wayOpts WayProf =
-        [ "-fscc-profiling"
-        , "-DPROFILING"
-        , "-optc-DPROFILING" ]
-wayOpts WayEventLog =
-        [ "-DTRACING"
-        , "-optc-DTRACING" ]
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-optc-DPAR"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
-{-
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DPAR_TICKY"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-D__DISTRIBUTED_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DDIST"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
--}
-wayOpts WayGran =
-        [ "-fgransim"
-        , "-D__GRANSIM__"
-        , "-optc-DGRAN"
-        , "-package concurrent" ]
-wayOpts WayNDP =
-        [ "-XParr"
-        , "-fvectorise"]
 
 -----------------------------------------------------------------------------
 -- Tunneling our global variables into a new instance of the GHC library
@@ -512,12 +307,11 @@ wayOpts WayNDP =
 --  b) We can get away without sharing it because it only affects the link,
 --     and is mutated by the GHC exe. Users who load up a new copy of the GHC
 --     library while another is running almost certainly won't actually access it.
-saveStaticFlagGlobals :: IO (Bool, [String], [Way])
-saveStaticFlagGlobals = liftM3 (,,) (readIORef v_opt_C_ready) (readIORef v_opt_C) (readIORef v_Ways)
+saveStaticFlagGlobals :: IO (Bool, [String])
+saveStaticFlagGlobals = liftM2 (,) (readIORef v_opt_C_ready) (readIORef v_opt_C)
 
-restoreStaticFlagGlobals :: (Bool, [String], [Way]) -> IO ()
-restoreStaticFlagGlobals (c_ready, c, ways) = do
+restoreStaticFlagGlobals :: (Bool, [String]) -> IO ()
+restoreStaticFlagGlobals (c_ready, c) = do
     writeIORef v_opt_C_ready c_ready
     writeIORef v_opt_C c
-    writeIORef v_Ways ways
 

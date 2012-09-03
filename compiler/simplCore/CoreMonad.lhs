@@ -720,7 +720,7 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
-        cr_globals :: ((Bool, [String], [Way]),
+        cr_globals :: ((Bool, [String]),
 #ifdef GHCI
                        (MVar PersistentLinkerState, Bool))
 #else

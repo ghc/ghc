@@ -75,7 +75,6 @@ import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
 import CLabel           ( mkForeignLabel )
 
 
-import StaticFlags	( opt_Static )
 import BasicTypes
 
 import Outputable
@@ -161,7 +160,7 @@ cmmMakePicReference dflags lbl
 	= CmmLit $ CmmLabel lbl
 
 
-	| (dopt Opt_PIC dflags || not opt_Static) && absoluteLabel lbl 
+	| (dopt Opt_PIC dflags || not (dopt Opt_Static dflags)) && absoluteLabel lbl 
 	= CmmMachOp (MO_Add wordWidth) 
 		[ CmmReg (CmmGlobal PicBaseReg)
 		, CmmLit $ picRelative 
@@ -214,14 +213,14 @@ howToAccessLabel
 -- To access the function at SYMBOL from our local module, we just need to
 -- dereference the local __imp_SYMBOL.
 --
--- If opt_Static is set then we assume that all our code will be linked
+-- If Opt_Static is set then we assume that all our code will be linked
 -- into the same .exe file. In this case we always access symbols directly, 
 -- and never use __imp_SYMBOL.
 --
 howToAccessLabel dflags _ OSMinGW32 _ lbl
 
 	-- Assume all symbols will be in the same PE, so just access them directly.
-	| opt_Static
+	| dopt Opt_Static dflags
 	= AccessDirectly
 	
 	-- If the target symbol is in another PE we need to access it via the
@@ -307,7 +306,7 @@ howToAccessLabel dflags _ os _ _
 	--           if we don't dynamically link to Haskell code,
 	--           it actually manages to do so without messing thins up.
 	| osElfTarget os
-	, not (dopt Opt_PIC dflags) && opt_Static 
+	, not (dopt Opt_PIC dflags) && dopt Opt_Static dflags
 	= AccessDirectly
 
 howToAccessLabel dflags arch os DataReference lbl
@@ -429,12 +428,12 @@ needImportedSymbols dflags arch os
 	-- PowerPC Linux: -fPIC or -dynamic
 	| osElfTarget os
 	, arch	== ArchPPC
-	= dopt Opt_PIC dflags || not opt_Static
+	= dopt Opt_PIC dflags || not (dopt Opt_Static dflags)
 
 	-- i386 (and others?): -dynamic but not -fPIC
 	| osElfTarget os
 	, arch	/= ArchPPC_64
-	= not opt_Static && not (dopt Opt_PIC dflags)
+	= not (dopt Opt_Static dflags) && not (dopt Opt_PIC dflags)
 
 	| otherwise
 	= False
@@ -623,7 +622,7 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --    section.
 --    The "official" GOT mechanism (label@got) isn't intended to be used
 --    in position dependent code, so we have to create our own "fake GOT"
---    when not Opt_PIC && not opt_Static.
+--    when not Opt_PIC && not (dopt Opt_Static dflags).
 --
 -- 2) PowerPC Linux is just plain broken.
 --    While it's theoretically possible to use GOT offsets larger

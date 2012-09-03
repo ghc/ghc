@@ -37,7 +37,6 @@ where
 
 import PackageConfig
 import DynFlags
-import StaticFlags
 import Config           ( cProjectVersion )
 import Name             ( Name, nameModule_maybe )
 import UniqFM
@@ -896,7 +895,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
         rts_tag = mkBuildTag ways2
 
-        mkDynName | opt_Static = id
+        mkDynName | dopt Opt_Static dflags = id
                   | otherwise = (++ ("-ghc" ++ cProjectVersion))
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
@@ -1031,12 +1030,12 @@ missingDependencyMsg (Just parent)
 -- -----------------------------------------------------------------------------
 
 -- | Will the 'Name' come from a dynamically linked library?
-isDllName :: PackageId -> Name -> Bool
+isDllName :: DynFlags -> PackageId -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName this_pkg name
-  | opt_Static = False
+isDllName dflags this_pkg name
+  | dopt Opt_Static dflags = False
   | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg
   | otherwise = False  -- no, it is not even an external name
 

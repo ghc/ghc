@@ -104,7 +104,6 @@ module CLabel (
     ) where
 
 import IdInfo
-import StaticFlags
 import BasicTypes
 import Packages
 import DataCon
@@ -808,15 +807,15 @@ labelDynamic :: DynFlags -> PackageId -> CLabel -> Bool
 labelDynamic dflags this_pkg lbl =
   case lbl of
    -- is the RTS in a DLL or not?
-   RtsLabel _           -> not opt_Static && (this_pkg /= rtsPackageId)
+   RtsLabel _           -> not (dopt Opt_Static dflags) && (this_pkg /= rtsPackageId)
 
-   IdLabel n _ _        -> isDllName this_pkg n
+   IdLabel n _ _        -> isDllName dflags this_pkg n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
     | os == OSMinGW32 ->
-       not opt_Static && (this_pkg /= pkg)
+       not (dopt Opt_Static dflags) && (this_pkg /= pkg)
     | otherwise ->
        True
 
@@ -834,14 +833,14 @@ labelDynamic dflags this_pkg lbl =
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
-                (not opt_Static) && (this_pkg /= pkgId)
+                (not (dopt Opt_Static dflags)) && (this_pkg /= pkgId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
             -- libraries
             True
 
-   PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
+   PlainModuleInitLabel m -> not (dopt Opt_Static dflags) && this_pkg /= (modulePackageId m)
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
