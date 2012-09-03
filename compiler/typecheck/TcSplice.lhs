@@ -348,7 +348,7 @@ tcBracket brack res_ty
           -- We will type check this bracket again at its usage site.
           --
           -- We build a single implication constraint with a BracketSkol;
-          -- that in turn tells simplifyCheck to report only definite
+          -- that in turn tells simplifyTop to report only definite
           -- errors
        ; (_,lie) <- captureConstraints $
                     newImplication BracketSkol [] [] $
