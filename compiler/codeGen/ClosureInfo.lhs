@@ -689,7 +689,7 @@ getCallMethod _dflags _name _caf (LFThunk _ _ _updatable _std_form_info is_fun) 
     -- So the right thing to do is just to enter the thing
 
 -- Old version:
---  | updatable || doingTickyProfiling dflags -- to catch double entry
+--  | updatable || dopt Opt_Ticky dflags -- to catch double entry
 --  = EnterIt
 --  | otherwise	-- Jump direct to code for single-entry thunks
 --  = JumpToIt (thunkEntryLabel name caf std_form_info updatable)

@@ -84,7 +84,6 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setPackageName,
-        doingTickyProfiling,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -854,9 +853,6 @@ data GhcLink
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
-
-doingTickyProfiling :: DynFlags -> Bool
-doingTickyProfiling dflags = dopt Opt_Ticky dflags
 
 data PackageFlag
   = ExposePackage   String
