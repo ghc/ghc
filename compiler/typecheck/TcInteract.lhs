@@ -334,7 +334,8 @@ kickOutRewritable new_flav new_tv
     kick_out (is@(IS { inert_cans = IC { inert_eqs = tv_eqs
                      , inert_dicts  = dictmap
                      , inert_funeqs = funeqmap
-                     , inert_irreds = irreds } }))
+                     , inert_irreds = irreds
+                     , inert_insols = insols } }))
        = (kicked_out, is { inert_cans = inert_cans_in })
                 -- NB: Notice that don't rewrite 
                 -- inert_solved_dicts, and inert_solved_funeqs
@@ -344,16 +345,20 @@ kickOutRewritable new_flav new_tv
          inert_cans_in = IC { inert_eqs = tv_eqs_in
                             , inert_dicts = dicts_in
                             , inert_funeqs = feqs_in
-                            , inert_irreds = irs_in }
+                            , inert_irreds = irs_in
+                            , inert_insols = insols_in }
 
          kicked_out = WorkList { wl_eqs    = varEnvElts tv_eqs_out
                                , wl_funeqs = foldrBag insertDeque emptyDeque feqs_out
-                               , wl_rest   = bagToList (dicts_out `andCts` irs_out) }
+                               , wl_rest   = bagToList (dicts_out `andCts` irs_out 
+                                                        `andCts` insols_out) }
   
-         (tv_eqs_out, tv_eqs_in) = partitionVarEnv  kick_out_eq tv_eqs
-         (feqs_out,  feqs_in)    = partCtFamHeadMap kick_out_ct funeqmap
-         (dicts_out, dicts_in)   = partitionCCanMap kick_out_ct dictmap
-         (irs_out,   irs_in)     = partitionBag     kick_out_ct irreds
+         (tv_eqs_out,  tv_eqs_in) = partitionVarEnv  kick_out_eq tv_eqs
+         (feqs_out,   feqs_in)    = partCtFamHeadMap kick_out_ct funeqmap
+         (dicts_out,  dicts_in)   = partitionCCanMap kick_out_ct dictmap
+         (irs_out,    irs_in)     = partitionBag     kick_out_ct irreds
+         (insols_out, insols_in)  = partitionBag     kick_out_ct insols
+           -- Kick out even insolubles; see Note [Kick out insolubles]
 
     kick_out_ct inert_ct = new_flav `canRewrite` (ctFlavour inert_ct) &&
                           (new_tv `elemVarSet` tyVarsOfCt inert_ct) 
@@ -374,6 +379,15 @@ kickOutRewritable new_flav new_tv
                -- See Note [Detailed InertCans Invariants] 
                -- and Note [Delicate equality kick-out]
 \end{code}
+
+Note [Kick out insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have an insoluble alpha ~ [alpha], which is insoluble
+because an occurs check.  And then we unify alpha := [Int].  
+Then we really want to rewrite the insouluble to [Int] ~ [[Int].
+Now it can be decomposed.  Otherwise we end up with a "Can't match
+[Int] ~ [[Int]]" which is true, but a bit confusing because the
+outer type constructors match. 
 
 Note [Delicate equality kick-out]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
