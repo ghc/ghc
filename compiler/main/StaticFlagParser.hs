@@ -18,7 +18,7 @@ module StaticFlagParser (
 #include "HsVersions.h"
 
 import qualified StaticFlags as SF
-import StaticFlags ( v_opt_C_ready, getWayFlags, WayName(..)
+import StaticFlags ( v_opt_C_ready, getWayFlags, Way(..)
                    , opt_SimplExcessPrecision )
 import CmdLineParser
 import SrcLoc
@@ -203,7 +203,7 @@ type StaticP = EwM IO
 addOpt :: String -> StaticP ()
 addOpt = liftEwM . SF.addOpt
 
-addWay :: WayName -> StaticP ()
+addWay :: Way -> StaticP ()
 addWay = liftEwM . SF.addWay
 
 removeOpt :: String -> StaticP ()

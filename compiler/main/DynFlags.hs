@@ -45,7 +45,7 @@ module DynFlags (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
-        wayNames, dynFlagDependencies,
+        dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
 
         printOutputForUser, printInfoForUser,
@@ -765,9 +765,6 @@ opt_lo dflags = sOpt_lo (settings dflags)
 opt_lc                :: DynFlags -> [String]
 opt_lc dflags = sOpt_lc (settings dflags)
 
-wayNames :: DynFlags -> [WayName]
-wayNames = map wayName . ways
-
 -- | The target code type of the compilation (if any).
 --
 -- Whenever you change the target, also make sure to set 'ghcLink' to
@@ -1420,7 +1417,7 @@ getStgToDo dflags
 
         todo1 = if stg_stats then [D_stg_stats] else []
 
-        todo2 | WayProf `elem` wayNames dflags
+        todo2 | WayProf `elem` ways dflags
               = StgDoMassageForProfiling : todo1
               | otherwise
               = todo1

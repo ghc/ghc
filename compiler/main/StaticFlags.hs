@@ -24,7 +24,7 @@ module StaticFlags (
         initStaticOpts,
 
 	-- Ways
-	WayName(..), Way(..), v_Ways, isRTSWay, mkBuildTag,
+	Way(..), v_Ways, mkBuildTag, wayRTSOnly,
 
 	-- Output style options
 	opt_PprStyle_Debug,
@@ -91,8 +91,6 @@ import Maybes		( firstJusts )
 import Panic
 
 import Control.Monad    ( liftM3 )
-import Data.Function
-import Data.Maybe       ( listToMaybe )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Data.List
@@ -106,8 +104,8 @@ initStaticOpts = writeIORef v_opt_C_ready True
 addOpt :: String -> IO ()
 addOpt = consIORef v_opt_C
 
-addWay :: WayName -> IO ()
-addWay = consIORef v_Ways . lkupWay
+addWay :: Way -> IO ()
+addWay = consIORef v_Ways
 
 removeOpt :: String -> IO ()
 removeOpt f = do
@@ -337,7 +335,7 @@ GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 -- becomes the suffix used to find .hi files and libraries used in
 -- this compilation.
 
-data WayName
+data Way
   = WayThreaded
   | WayDebug
   | WayProf
@@ -350,7 +348,7 @@ data WayName
 
 GLOBAL_VAR(v_Ways, [] ,[Way])
 
-allowed_combination :: [WayName] -> Bool
+allowed_combination :: [Way] -> Bool
 allowed_combination way = and [ x `allowedWith` y
 			      | x <- way, y <- way, x < y ]
   where
@@ -375,11 +373,10 @@ allowed_combination way = and [ x `allowedWith` y
 getWayFlags :: IO [String]  -- new options
 getWayFlags = do
   unsorted <- readIORef v_Ways
-  let ways = sortBy (compare `on` wayName) $
-             nubBy  ((==) `on` wayName) $ unsorted
+  let ways = sort $ nub $ unsorted
   writeIORef v_Ways ways
 
-  if not (allowed_combination (map wayName ways))
+  if not (allowed_combination ways)
       then ghcError (CmdLineError $
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b)
@@ -390,112 +387,121 @@ getWayFlags = do
 mkBuildTag :: [Way] -> String
 mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
 
-lkupWay :: WayName -> Way
-lkupWay w =
-   case listToMaybe (filter ((==) w . wayName) way_details) of
-	Nothing -> error "findBuildTag"
-	Just details -> details
+wayTag :: Way -> String
+wayTag WayThreaded = "thr"
+wayTag WayDebug    = "debug"
+wayTag WayDyn      = "dyn"
+wayTag WayProf     = "p"
+wayTag WayEventLog = "l"
+wayTag WayPar      = "mp"
+-- wayTag WayPar      = "mt"
+-- wayTag WayPar      = "md"
+wayTag WayGran     = "mg"
+wayTag WayNDP      = "ndp"
 
-isRTSWay :: WayName -> Bool
-isRTSWay = wayRTSOnly . lkupWay
+wayRTSOnly :: Way -> Bool
+wayRTSOnly WayThreaded = True
+wayRTSOnly WayDebug    = True
+wayRTSOnly WayDyn      = False
+wayRTSOnly WayProf     = False
+wayRTSOnly WayEventLog = True
+wayRTSOnly WayPar      = False
+-- wayRTSOnly WayPar      = False
+-- wayRTSOnly WayPar      = False
+wayRTSOnly WayGran     = False
+wayRTSOnly WayNDP      = False
 
-data Way = Way {
-  wayName    :: WayName,
-  wayTag     :: String,
-  wayRTSOnly :: Bool,
-  wayDesc    :: String,
-  wayOpts    :: [String]
-  }
+wayDesc :: Way -> String
+wayDesc WayThreaded = "Threaded"
+wayDesc WayDebug    = "Debug"
+wayDesc WayDyn      = "Dynamic"
+wayDesc WayProf     = "Profiling"
+wayDesc WayEventLog = "RTS Event Logging"
+wayDesc WayPar      = "Parallel"
+-- wayDesc WayPar      = "Parallel ticky profiling"
+-- wayDesc WayPar      = "Distributed"
+wayDesc WayGran     = "GranSim"
+wayDesc WayNDP      = "Nested data parallelism"
 
-way_details :: [ Way ]
-way_details =
-  [ Way WayThreaded "thr" True "Threaded" [
+wayOpts :: Way -> [String]
+wayOpts WayThreaded = [
 #if defined(freebsd_TARGET_OS)
---	  "-optc-pthread"
+--        "-optc-pthread"
 --      , "-optl-pthread"
-	-- FreeBSD's default threading library is the KSE-based M:N libpthread,
-	-- which GHC has some problems with.  It's currently not clear whether
-	-- the problems are our fault or theirs, but it seems that using the
-	-- alternative 1:1 threading library libthr works around it:
-	  "-optl-lthr"
+        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
+        -- which GHC has some problems with.  It's currently not clear whether
+        -- the problems are our fault or theirs, but it seems that using the
+        -- alternative 1:1 threading library libthr works around it:
+          "-optl-lthr"
 #elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-	  "-optc-pthread"
-	, "-optl-pthread"
+          "-optc-pthread"
+        , "-optl-pthread"
 #elif defined(solaris2_TARGET_OS)
           "-optl-lrt"
 #endif
-	],
-
-    Way WayDebug "debug" True "Debug" [],
-
-    Way WayDyn "dyn" False "Dynamic"
-	[ "-DDYNAMIC"
-	, "-optc-DDYNAMIC"
+        ]
+wayOpts WayDebug = []
+wayOpts WayDyn =
+        [ "-DDYNAMIC"
+        , "-optc-DDYNAMIC"
 #if defined(mingw32_TARGET_OS)
-	-- On Windows, code that is to be linked into a dynamic library must be compiled
-	--	with -fPIC. Labels not in the current package are assumed to be in a DLL
-	--	different from the current one.
-	, "-fPIC"
+        -- On Windows, code that is to be linked into a dynamic library must be compiled
+        --      with -fPIC. Labels not in the current package are assumed to be in a DLL
+        --      different from the current one.
+        , "-fPIC"
 #elif defined(openbsd_TARGET_OS) || defined(netbsd_TARGET_OS)
-	-- Without this, linking the shared libHSffi fails because
-	-- it uses pthread mutexes.
-	, "-optl-pthread"
+        -- Without this, linking the shared libHSffi fails because
+        -- it uses pthread mutexes.
+        , "-optl-pthread"
 #endif
-	],
-
-    Way WayProf "p" False "Profiling"
-	[ "-fscc-profiling"
-	, "-DPROFILING"
-	, "-optc-DPROFILING" ],
-
-    Way WayEventLog "l" True "RTS Event Logging"
-	[ "-DTRACING"
-	, "-optc-DTRACING" ],
-
-    Way WayPar "mp" False "Parallel"
-	[ "-fparallel"
-	, "-D__PARALLEL_HASKELL__"
-	, "-optc-DPAR"
-	, "-package concurrent"
+        ]
+wayOpts WayProf =
+        [ "-fscc-profiling"
+        , "-DPROFILING"
+        , "-optc-DPROFILING" ]
+wayOpts WayEventLog =
+        [ "-DTRACING"
+        , "-optc-DTRACING" ]
+wayOpts WayPar =
+        [ "-fparallel"
+        , "-D__PARALLEL_HASKELL__"
+        , "-optc-DPAR"
+        , "-package concurrent"
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ],
-
-    -- at the moment we only change the RTS and could share compiler and libs!
-    Way WayPar "mt" False "Parallel ticky profiling"
-	[ "-fparallel"
-	, "-D__PARALLEL_HASKELL__"
-	, "-optc-DPAR"
-	, "-optc-DPAR_TICKY"
-	, "-package concurrent"
+        , "-optl-lgpvm3" ]
+{-
+wayOpts WayPar =
+        [ "-fparallel"
+        , "-D__PARALLEL_HASKELL__"
+        , "-optc-DPAR"
+        , "-optc-DPAR_TICKY"
+        , "-package concurrent"
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ],
-
-    Way WayPar "md" False "Distributed"
-	[ "-fparallel"
-	, "-D__PARALLEL_HASKELL__"
-	, "-D__DISTRIBUTED_HASKELL__"
-	, "-optc-DPAR"
-	, "-optc-DDIST"
-	, "-package concurrent"
+        , "-optl-lgpvm3" ]
+wayOpts WayPar =
+        [ "-fparallel"
+        , "-D__PARALLEL_HASKELL__"
+        , "-D__DISTRIBUTED_HASKELL__"
+        , "-optc-DPAR"
+        , "-optc-DDIST"
+        , "-package concurrent"
         , "-optc-w"
         , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
         , "-optl-lpvm3"
-        , "-optl-lgpvm3" ],
-
-    Way WayGran "mg" False "GranSim"
-	[ "-fgransim"
-	, "-D__GRANSIM__"
-	, "-optc-DGRAN"
-	, "-package concurrent" ],
-
-    Way WayNDP "ndp" False "Nested data parallelism"
-	[ "-XParr"
-	, "-fvectorise"]
-  ]
+        , "-optl-lgpvm3" ]
+-}
+wayOpts WayGran =
+        [ "-fgransim"
+        , "-D__GRANSIM__"
+        , "-optc-DGRAN"
+        , "-package concurrent" ]
+wayOpts WayNDP =
+        [ "-XParr"
+        , "-fvectorise"]
 
 -----------------------------------------------------------------------------
 -- Tunneling our global variables into a new instance of the GHC library

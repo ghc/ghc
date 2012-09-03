@@ -883,13 +883,13 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
         ways0 = ways dflags
 
-        ways1 = filter ((/= WayDyn) . wayName) ways0
+        ways1 = filter (/= WayDyn) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
         -- debug RTS includes support for -eventlog
-        ways2 | WayDebug `elem` map wayName ways1
-              = filter ((/= WayEventLog) . wayName) ways1
+        ways2 | WayDebug `elem` ways1
+              = filter (/= WayEventLog) ways1
               | otherwise
               = ways1
 

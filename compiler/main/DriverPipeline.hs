@@ -39,7 +39,7 @@ import Module
 import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags      ( v_Ld_inputs, opt_Static, WayName(..) )
+import StaticFlags      ( v_Ld_inputs, opt_Static, Way(..) )
 import Config
 import Panic
 import Util
@@ -1448,9 +1448,9 @@ maybeMergeStub
 
 runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool
 runPhase_MoveBinary dflags input_fn
-    | WayPar `elem` (wayNames dflags) && not opt_Static =
+    | WayPar `elem` ways dflags && not opt_Static =
         panic ("Don't know how to combine PVM wrapper and dynamic wrapper")
-    | WayPar `elem` (wayNames dflags) = do
+    | WayPar `elem` ways dflags = do
         let sysMan = pgm_sysman dflags
         pvm_root <- getEnv "PVM_ROOT"
         pvm_arch <- getEnv "PVM_ARCH"
@@ -1720,13 +1720,11 @@ linkBinary dflags o_files dep_packages = do
         -- opts from -optl-<blah> (including -l<blah> options)
     let extra_ld_opts = getOpts dflags opt_l
 
-    let ways = wayNames dflags
-
     -- Here are some libs that need to be linked at the *end* of
     -- the command line, because they contain symbols that are referred to
     -- by the RTS.  We can't therefore use the ordinary way opts for these.
     let
-        debug_opts | WayDebug `elem` ways = [
+        debug_opts | WayDebug `elem` ways dflags = [
 #if defined(HAVE_LIBBFD)
                         "-lbfd", "-liberty"
 #endif
@@ -1734,7 +1732,7 @@ linkBinary dflags o_files dep_packages = do
                    | otherwise            = []
 
     let
-        thread_opts | WayThreaded `elem` ways = [
+        thread_opts | WayThreaded `elem` ways dflags = [
 #if !defined(mingw32_TARGET_OS) && !defined(freebsd_TARGET_OS) && !defined(openbsd_TARGET_OS) && !defined(netbsd_TARGET_OS) && !defined(haiku_TARGET_OS)
                         "-lpthread"
 #endif
