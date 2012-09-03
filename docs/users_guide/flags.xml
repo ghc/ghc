@@ -1847,7 +1847,7 @@
           <row>
             <entry><option>-fhpc</option></entry>
             <entry>Turn on Haskell program coverage instrumentation</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
           <row>

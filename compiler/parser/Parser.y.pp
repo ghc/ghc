@@ -53,7 +53,6 @@ import OccName          ( varName, dataName, tcClsName, tvName )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
-import StaticFlags      ( opt_Hpc )
 import Kind             ( Kind, liftedTypeKind, unliftedTypeKind, mkArrowKind )
 import Class            ( FunDep )
 import BasicTypes
@@ -1416,9 +1415,10 @@ exp10 :: { LHsExpr RdrName }
                                           ; return $ LL $ if on
                                                           then HsSCC (unLoc $1) $2
                                                           else HsPar $2 } }
-        | hpc_annot exp                         { LL $ if opt_Hpc
-                                                        then HsTickPragma (unLoc $1) $2
-                                                        else HsPar $2 }
+        | hpc_annot exp                         {% do { on <- extension hpcEnabled
+                                                      ; return $ LL $ if on
+                                                                      then HsTickPragma (unLoc $1) $2
+                                                                      else HsPar $2 } }
 
         | 'proc' aexp '->' exp  
                         {% checkPattern $2 >>= \ p -> 

@@ -327,6 +327,7 @@ data DynFlag
    | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Static
+   | Opt_Hpc
 
    -- output style opts
    | Opt_PprCaseAsLet
@@ -2275,7 +2276,8 @@ fFlags = [
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
-  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop )
+  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
+  ( "hpc",                              Opt_Hpc, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

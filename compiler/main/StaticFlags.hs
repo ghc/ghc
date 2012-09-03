@@ -37,9 +37,6 @@ module StaticFlags (
 	opt_SuppressTypeSignatures,
         opt_SuppressVarKinds,
 
-        -- Hpc opts
-	opt_Hpc,
-
 	-- language opts
 	opt_DictsStrict,
 
@@ -218,10 +215,6 @@ opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")
 
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
-
--- Hpc opts
-opt_Hpc :: Bool
-opt_Hpc				= lookUp (fsLit "-fhpc")
 
 -- language opts
 opt_DictsStrict :: Bool

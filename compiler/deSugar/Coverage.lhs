@@ -23,7 +23,6 @@ import VarSet
 import Data.List
 import FastString
 import HscTypes
-import StaticFlags
 import TyCon
 import Unique
 import BasicTypes
@@ -91,7 +90,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                       , this_mod     = mod
                       , tickishType  = case hscTarget dflags of
                           HscInterpreted          -> Breakpoints
-                          _ | opt_Hpc             -> HpcTicks
+                          _ | dopt Opt_Hpc dflags -> HpcTicks
                             | dopt Opt_SccProfilingOn dflags
                                                   -> ProfNotes
                             | otherwise           -> error "addTicksToBinds: No way to annotate!"
@@ -146,7 +145,7 @@ mkModBreaks count entries = do
 
 writeMixEntries :: DynFlags -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
 writeMixEntries dflags mod count entries filename
-  | not opt_Hpc = return 0
+  | not (dopt Opt_Hpc dflags) = return 0
   | otherwise   = do
         let
             hpc_dir = hpcDir dflags
@@ -184,7 +183,7 @@ data TickDensity
 
 mkDensity :: DynFlags -> TickDensity
 mkDensity dflags
-  | opt_Hpc                              = TickForCoverage
+  | dopt Opt_Hpc dflags                  = TickForCoverage
   | HscInterpreted  <- hscTarget dflags  = TickForBreakPoints
   | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
   | ProfAutoTop     <- profAuto dflags   = TickTopFunctions

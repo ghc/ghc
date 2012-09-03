@@ -17,7 +17,7 @@ import Module
 import CmmUtils
 import StgCmmUtils
 import HscTypes
-import StaticFlags
+import DynFlags
 
 mkTickBox :: Module -> Int -> CmmAGraph
 mkTickBox mod n 
@@ -35,9 +35,10 @@ initHpc :: Module -> HpcInfo -> FCode ()
 initHpc _ (NoHpcInfo {})
   = return ()
 initHpc this_mod (HpcInfo tickCount _hashNo)
-  = whenC opt_Hpc $
-    do  { emitDataLits (mkHpcTicksLabel this_mod)
-                       [ (CmmInt 0 W64)
-                       | _ <- take tickCount [0::Int ..]
-                       ]
-       }
+  = do dflags <- getDynFlags
+       whenC (dopt Opt_Hpc dflags) $
+           do emitDataLits (mkHpcTicksLabel this_mod)
+                           [ (CmmInt 0 W64)
+                           | _ <- take tickCount [0 :: Int ..]
+                           ]
+
