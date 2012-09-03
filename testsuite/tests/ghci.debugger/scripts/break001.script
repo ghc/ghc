@@ -1,7 +1,7 @@
 :l ../Test2
 :b 3
 :b 5
-f 1
+f (1 :: Integer)
 :st
 :st
 :st

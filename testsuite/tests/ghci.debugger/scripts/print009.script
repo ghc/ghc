@@ -2,7 +2,7 @@
 -- Testing collisions
 
 let _t1 = "user value"
-let li = map Just [1..4]
+let li = map Just [1::Integer .. 4]
 :p li
 _t1
 _t2
