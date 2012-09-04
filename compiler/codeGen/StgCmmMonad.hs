@@ -39,8 +39,7 @@ module StgCmmMonad (
         Sequel(..), ReturnKind(..),
 	withSequel, getSequel,
 
-	setSRTLabel, getSRTLabel, 
-	setTickyCtrLabel, getTickyCtrLabel,
+        setTickyCtrLabel, getTickyCtrLabel,
 
 	withUpdFrameOff, getUpdFrameOff, initUpdFrameOff,
 
@@ -155,8 +154,7 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_dflags     :: DynFlags,
 	cgd_mod        :: Module,	  -- Module being compiled
 	cgd_statics    :: CgBindings,	  -- [Id -> info] : static environment
-	cgd_srt_lbl    :: CLabel,	  -- Label of the current top-level SRT
-	cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
+        cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
 	cgd_ticky      :: CLabel,	  -- Current destination for ticky counts
 	cgd_sequel     :: Sequel	  -- What to do at end of basic block
   }
@@ -285,8 +283,7 @@ initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags    = dflags,
 			cgd_mod       = mod,
 			cgd_statics   = emptyVarEnv,
-			cgd_srt_lbl   = error "initC: srt_lbl",
-			cgd_updfr_off = initUpdFrameOff,
+                        cgd_updfr_off = initUpdFrameOff,
 			cgd_ticky     = mkTopTickyCtrLabel,
 			cgd_sequel    = initSequel }
 
@@ -470,22 +467,6 @@ withSequel sequel code
 getSequel :: FCode Sequel
 getSequel = do  { info <- getInfoDown
 		; return (cgd_sequel info) }
-
--- ----------------------------------------------------------------------------
--- Get/set the current SRT label
-
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTLabel :: FCode CLabel	-- Used only by cgPanic
-getSRTLabel = do info  <- getInfoDown
-		 return (cgd_srt_lbl info)
-
-setSRTLabel :: CLabel -> FCode a -> FCode a
-setSRTLabel srt_lbl code
-  = do  info <- getInfoDown
-	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
 
 -- ----------------------------------------------------------------------------
 -- Get/set the size of the update frame

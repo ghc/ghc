@@ -32,10 +32,9 @@ import Bitmap
 import CLabel
 import Cmm
 import CmmUtils
-import IdInfo
 import Data.List
 import Maybes
-import Name
+import Module
 import Outputable
 import SMRep
 import UniqSupply
@@ -137,9 +136,9 @@ instance Outputable TopSRT where
                    <+> ppr elts
                    <+> ppr eltmap
 
-emptySRT :: MonadUnique m => m TopSRT
-emptySRT =
-  do top_lbl <- getUniqueM >>= \ u -> return $ mkSRTLabel (mkFCallName u "srt") NoCafRefs
+emptySRT :: MonadUnique m => Maybe Module -> m TopSRT
+emptySRT mb_mod =
+  do top_lbl <- getUniqueM >>= \ u -> return $ mkModSRTLabel mb_mod u
      return TopSRT { lbl = top_lbl, next_elt = 0, rev_elts = [], elt_map = Map.empty }
 
 cafMember :: TopSRT -> CLabel -> Bool
