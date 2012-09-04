@@ -1002,7 +1002,7 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
     src_off <- assignTemp_ src_off0
     n <- assignTemp_ n0
 
-    card_words <- assignTemp $ cardRoundUp n
+    card_bytes <- assignTemp $ cardRoundUp n
     size <- assignTemp $ n `cmmAddWord` bytesToWordsRoundUp card_bytes
     words <- assignTemp $ arrPtrsHdrSizeW `cmmAddWord` size
 
