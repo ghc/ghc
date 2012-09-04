@@ -43,7 +43,7 @@ module CmmUtils(
 	cmmNegate, 
   	cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
   	cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
-  	cmmUShrWord, cmmAddWord, cmmMulWord,
+  	cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord,
 
 	isTrivialCmmExpr, hasNoGlobalRegs,
 	
@@ -290,7 +290,7 @@ cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
 -----------------------
 cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
   cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
-  cmmUShrWord, cmmAddWord, cmmMulWord
+  cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord
   :: CmmExpr -> CmmExpr -> CmmExpr
 cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
 cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
@@ -304,6 +304,7 @@ cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
 cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
 cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
 cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
+cmmQuotWord e1 e2 = CmmMachOp mo_wordUQuot [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)

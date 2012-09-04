@@ -34,6 +34,7 @@ import FastString
 import StaticFlags
 
 import Control.Monad
+import Data.Bits
 
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
@@ -829,8 +830,7 @@ doWritePtrArrayOp addr idx val
           cmmOffsetExpr
            (cmmOffsetExprW (cmmOffsetB addr arrPtrsHdrSize)
                           (loadArrPtrsSize addr))
-           (CmmMachOp mo_wordUShr [idx,
-                                   CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
+           (card idx)
           ) (CmmLit (CmmInt 1 W8))
 
 loadArrPtrsSize :: CmmExpr -> CmmExpr
@@ -1002,10 +1002,8 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
     src_off <- assignTemp_ src_off0
     n <- assignTemp_ n0
 
-    card_words <- assignTemp $ (n `cmmUShrWord`
-                                (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)))
-                  `cmmAddWord` CmmLit (mkIntCLit 1)
-    size <- assignTemp $ n `cmmAddWord` card_words
+    card_words <- assignTemp $ cardRoundUp n
+    size <- assignTemp $ n `cmmAddWord` bytesToWordsRoundUp card_bytes
     words <- assignTemp $ arrPtrsHdrSizeW `cmmAddWord` size
 
     arr_r <- newTemp bWord
@@ -1029,14 +1027,13 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
 
     emitMemsetCall (cmmOffsetExprW dst_p n)
         (CmmLit (mkIntCLit 1))
-        (card_words `cmmMulWord` wordSize)
+        card_bytes
         (CmmLit (mkIntCLit wORD_SIZE))
         live
     stmtC $ CmmAssign (CmmLocal res_r) arr
   where
     arrPtrsHdrSizeW = CmmLit $ mkIntCLit $ fixedHdrSize +
                       (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE)
-    wordSize = CmmLit (mkIntCLit wORD_SIZE)
     myCapability = CmmReg baseReg `cmmSubWord`
                    CmmLit (mkIntCLit oFFSET_Capability_r)
 
@@ -1048,13 +1045,24 @@ emitSetCards dst_start dst_cards_start n live = do
     start_card <- assignTemp $ card dst_start
     emitMemsetCall (dst_cards_start `cmmAddWord` start_card)
         (CmmLit (mkIntCLit 1))
-        ((card (dst_start `cmmAddWord` n) `cmmSubWord` start_card)
-         `cmmAddWord` CmmLit (mkIntCLit 1))
-        (CmmLit (mkIntCLit wORD_SIZE))
+        (cardRoundUp n)
+        (CmmLit (mkIntCLit 1)) -- no alignment (1 byte)
         live
-  where
-    -- Convert an element index to a card index
-    card i = i `cmmUShrWord` (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS))
+
+-- Convert an element index to a card index
+card :: CmmExpr -> CmmExpr
+card i = i `cmmUShrWord` (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS))
+
+-- Convert a number of elements to a number of cards, rounding up
+cardRoundUp :: CmmExpr -> CmmExpr
+cardRoundUp i = card (i `cmmAddWord` (CmmLit (mkIntCLit ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS) - 1))))
+
+bytesToWordsRoundUp :: CmmExpr -> CmmExpr
+bytesToWordsRoundUp e = (e `cmmAddWord` CmmLit (mkIntCLit (wORD_SIZE - 1)))
+                        `cmmQuotWord` wordSize
+
+wordSize :: CmmExpr
+wordSize = CmmLit (mkIntCLit wORD_SIZE)
 
 -- | Emit a call to @memcpy@.
 emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> StgLiveVars
