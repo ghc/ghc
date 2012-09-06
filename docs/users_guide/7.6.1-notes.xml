@@ -590,7 +590,7 @@ atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.10.1.0 (was 0.9.2.1)
+                    Version number 0.10.0.0 (was 0.9.2.1)
                 </para>
             </listitem>
             <listitem>
