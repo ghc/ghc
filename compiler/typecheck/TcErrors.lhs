@@ -62,17 +62,22 @@ now?
 type ErrEnv = VarEnv [ErrMsg]
 
 reportUnsolved :: Bool -> WantedConstraints -> TcM (Bag EvBind)
+-- Important precondition:
+-- WantedConstraints are fully zonked and unflattened, that is,
+-- zonkWC has already been applied to these constraints.
 reportUnsolved runtimeCoercionErrors wanted
   | isEmptyWC wanted
   = return emptyBag
   | otherwise
-  = do {   -- Zonk to un-flatten any flatten-skols
-         wanted  <- zonkWC wanted
+  = do { traceTc "reportUnsolved (before unflattening)" (ppr wanted)
 
        ; env0 <- tcInitTidyEnv
+                 
+            -- If we are deferring we are going to need /all/ evidence around,
+            -- including the evidence produced by unflattening (zonkWC)
        ; defer <- if runtimeCoercionErrors 
-                  then do { ev <- newTcEvBinds
-                          ; return (Just ev) }
+                  then do { ev_binds_var <- newTcEvBinds
+                          ; return (Just ev_binds_var) }
                   else return Nothing
 
        ; errs_so_far <- ifErrsM (return True) (return False)
@@ -87,14 +92,15 @@ reportUnsolved runtimeCoercionErrors wanted
                             , cec_tidy  = tidy_env
                             , cec_defer = defer }
 
-       ; traceTc "reportUnsolved:" (vcat [ pprTvBndrs (varSetElems free_tvs)
-                                         , ppr wanted ])
+       ; traceTc "reportUnsolved (after unflattening):" $ 
+         vcat [ pprTvBndrs (varSetElems free_tvs)
+              , ppr wanted ]
 
        ; reportWanteds err_ctxt wanted
 
        ; case defer of
-           Nothing -> return emptyBag
-           Just ev -> getTcEvBinds ev }
+            Nothing -> return emptyBag
+            Just ev_binds_var -> getTcEvBinds ev_binds_var }
 
 --------------------------------------------
 --      Internal functions

@@ -440,8 +440,10 @@ trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
   | otherwise
   = do { tch1 <- isTouchableMetaTyVarTcS tv1
        ; if tch1 then trySpontaneousEqOneWay d gw tv1 xi
-                 else do { traceTcS "Untouchable LHS, can't spontaneously solve workitem:" $
-                           ppr workItem 
+                 else do { untch <- getUntouchables
+                         ; traceTcS "Untouchable LHS, can't spontaneously solve workitem" $
+                           vcat [text "Untouchables =" <+> ppr untch
+                                , text "Workitem =" <+> ppr workItem ]
                          ; return SPCantSolve }
        }
 
