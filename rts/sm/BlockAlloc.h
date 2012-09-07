@@ -11,17 +11,17 @@
 
 #include "BeginPrivate.h"
 
-bdescr *allocLargeChunk (nat min, nat max);
+bdescr *allocLargeChunk (W_ min, W_ max);
 
 /* Debugging  -------------------------------------------------------------- */
 
-extern nat countBlocks       (bdescr *bd);
-extern nat countAllocdBlocks (bdescr *bd);
+extern W_ countBlocks       (bdescr *bd);
+extern W_ countAllocdBlocks (bdescr *bd);
 extern void returnMemoryToOS(nat n);
 
 #ifdef DEBUG
 void checkFreeListSanity(void);
-nat  countFreeList(void);
+W_   countFreeList(void);
 void markBlocks (bdescr *bd);
 void reportUnmarkedBlocks (void);
 #endif

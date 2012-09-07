@@ -488,7 +488,7 @@ GarbageCollect (nat collect_gen,
     // Count the mutable list as bytes "copied" for the purposes of
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
-	nat mut_list_size = 0;
+        W_ mut_list_size = 0;
         for (n = 0; n < n_capabilities; n++) {
             mut_list_size += countOccupied(capabilities[n].mut_lists[g]);
         }
@@ -710,7 +710,7 @@ GarbageCollect (nat collect_gen,
   ACQUIRE_SM_LOCK;
 
   if (major_gc) {
-      nat need, got;
+      W_ need, got;
       need = BLOCKS_TO_MBLOCKS(n_alloc_blocks);
       got = mblocks_allocated;
       /* If the amount of data remains constant, next major GC we'll
@@ -1511,8 +1511,8 @@ resize_generations (void)
 
     if (major_gc && RtsFlags.GcFlags.generations > 1) {
         W_ live, size, min_alloc, words;
-        const nat max  = RtsFlags.GcFlags.maxHeapSize;
-	const nat gens = RtsFlags.GcFlags.generations;
+        const W_ max  = RtsFlags.GcFlags.maxHeapSize;
+        const W_ gens = RtsFlags.GcFlags.generations;
 	
 	// live in the oldest generations
         if (oldest_gen->live_estimate != 0) {
@@ -1608,7 +1608,7 @@ resize_nursery (void)
 
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:
-	nat blocks;
+        W_ blocks;
     
 	/* set up a new nursery.  Allocate a nursery size based on a
 	 * function of the amount of live data (by default a factor of 2)
@@ -1703,7 +1703,7 @@ resize_nursery (void)
 		blocks = min_nursery;
 	    }
 	    
-	    resizeNurseries((nat)blocks);
+            resizeNurseries((W_)blocks);
 	}
 	else
 	{

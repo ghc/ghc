@@ -41,8 +41,8 @@ StgClosure    *caf_list         = NULL;
 StgClosure    *revertible_caf_list = NULL;
 rtsBool       keepCAFs;
 
-nat large_alloc_lim;    /* GC if n_large_blocks in any nursery
-                         * reaches this. */
+W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
+                        * reaches this. */
 
 bdescr *exec_block;
 
@@ -425,10 +425,10 @@ newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf, StgClosure *bh)
    -------------------------------------------------------------------------- */
 
 static bdescr *
-allocNursery (bdescr *tail, nat blocks)
+allocNursery (bdescr *tail, W_ blocks)
 {
     bdescr *bd = NULL;
-    nat i, n;
+    W_ i, n;
 
     // We allocate the nursery as a single contiguous block and then
     // divide it into single blocks manually.  This way we guarantee
@@ -541,10 +541,10 @@ countNurseryBlocks (void)
 }
 
 static void
-resizeNursery (nursery *nursery, nat blocks)
+resizeNursery (nursery *nursery, W_ blocks)
 {
   bdescr *bd;
-  nat nursery_blocks;
+  W_ nursery_blocks;
 
   nursery_blocks = nursery->n_blocks;
   if (nursery_blocks == blocks) return;
@@ -584,7 +584,7 @@ resizeNursery (nursery *nursery, nat blocks)
 // Resize each of the nurseries to the specified size.
 //
 void
-resizeNurseriesFixed (nat blocks)
+resizeNurseriesFixed (W_ blocks)
 {
     nat i;
     for (i = 0; i < n_capabilities; i++) {
@@ -596,7 +596,7 @@ resizeNurseriesFixed (nat blocks)
 // Resize the nurseries to the total specified size.
 //
 void
-resizeNurseries (nat blocks)
+resizeNurseries (W_ blocks)
 {
     // If there are multiple nurseries, then we just divide the number
     // of available blocks between them.
@@ -1096,7 +1096,7 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
 // because it knows how to work around the restrictions put in place
 // by SELinux.
 
-void *allocateExec (nat bytes, void **exec_ret)
+void *allocateExec (W_ bytes, void **exec_ret)
 {
     void **ret, **exec;
     ACQUIRE_SM_LOCK;
@@ -1120,10 +1120,10 @@ void freeExec (void *addr)
 
 #else
 
-void *allocateExec (nat bytes, void **exec_ret)
+void *allocateExec (W_ bytes, void **exec_ret)
 {
     void *ret;
-    nat n;
+    W_ n;
 
     ACQUIRE_SM_LOCK;
 

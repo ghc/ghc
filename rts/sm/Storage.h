@@ -37,7 +37,7 @@ doYouWantToGC( Capability *cap )
 }
 
 /* for splitting blocks groups in two */
-bdescr * splitLargeBlock (bdescr *bd, nat blocks);
+bdescr * splitLargeBlock (bdescr *bd, W_ blocks);
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
@@ -81,10 +81,10 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
 extern nursery *nurseries;
 
 void     resetNurseries       ( void );
-W_     clearNursery         ( Capability *cap );
-void     resizeNurseries      ( nat blocks );
-void     resizeNurseriesFixed ( nat blocks );
-W_     countNurseryBlocks   ( void );
+W_       clearNursery         ( Capability *cap );
+void     resizeNurseries      ( W_ blocks );
+void     resizeNurseriesFixed ( W_ blocks );
+W_       countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff

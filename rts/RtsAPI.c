@@ -380,7 +380,7 @@ INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
 }
 
 StgTSO *
-createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
+createGenThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
@@ -390,7 +390,7 @@ createGenThread (Capability *cap, nat stack_size,  StgClosure *closure)
 }
 
 StgTSO *
-createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
+createIOThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
@@ -406,7 +406,7 @@ createIOThread (Capability *cap, nat stack_size,  StgClosure *closure)
  */
 
 StgTSO *
-createStrictIOThread(Capability *cap, nat stack_size,  StgClosure *closure)
+createStrictIOThread(Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread(cap, stack_size);
