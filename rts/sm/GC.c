@@ -1528,7 +1528,11 @@ resize_generations (void)
 		       RtsFlags.GcFlags.minOldGenSize);
 	
         if (RtsFlags.GcFlags.heapSizeSuggestionAuto) {
-            RtsFlags.GcFlags.heapSizeSuggestion = size;
+            if (max > 0) {
+                RtsFlags.GcFlags.heapSizeSuggestion = stg_min(max, size);
+            } else {
+                RtsFlags.GcFlags.heapSizeSuggestion = size;
+            }
         }
 
 	// minimum size for generation zero
