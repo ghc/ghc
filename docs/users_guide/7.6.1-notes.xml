@@ -93,7 +93,7 @@ class Category (c :: k -> k -> *) where
           <listitem>
             <para>
               There is a new FFI calling convention <literal>capi</literal>,
-              enabled by the <literal>CAPI</literal> extension. For example,
+              enabled by the <literal>CApiFFI</literal> extension. For example,
               given the following declaration:
 <programlisting>
 foreign import capi "header.h f" f :: CInt -> IO CInt
