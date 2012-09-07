@@ -404,6 +404,10 @@ GarbageCollect (nat collect_gen,
       break;
   }
 
+  if (n_gc_threads != 1) {
+      gct->allocated = clearNursery(cap);
+  }
+
   shutdown_gc_threads(gct->thread_index);
 
   // Now see which stable names are still alive.
@@ -636,9 +640,15 @@ GarbageCollect (nat collect_gen,
           allocated += clearNursery(&capabilities[n]);
       }
   } else {
-      gct->allocated = clearNursery(cap);
+      // When doing parallel GC, clearNursery() is called by the
+      // worker threads, and the value returned is stored in
+      // gct->allocated.
       for (n = 0; n < n_capabilities; n++) {
-          allocated += gc_threads[n]->allocated;
+          if (gc_threads[n]->idle) {
+              allocated += clearNursery(&capabilities[n]);
+          } else {
+              allocated += gc_threads[n]->allocated;
+          }
       }
   }
 
