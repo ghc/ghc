@@ -98,7 +98,7 @@ main = do
            Left err -> die err
         (_,_,errors) -> do
            prog <- getProgramName
-           die (concat errors ++ usageInfo (usageHeader prog) flags)
+           die (concat errors ++ shortUsage prog)
 
 -- -----------------------------------------------------------------------------
 -- Command-line syntax
@@ -184,6 +184,9 @@ deprecFlags = [
 
 ourCopyright :: String
 ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
+
+shortUsage :: String -> String
+shortUsage prog = "For usage information see '" ++ prog ++ " --help'."
 
 usageHeader :: String -> String
 usageHeader prog = substProg prog $
@@ -408,11 +411,9 @@ runit verbosity cli nonopts = do
         recache verbosity cli
 
     [] -> do
-        die ("missing command\n" ++
-                usageInfo (usageHeader prog) flags)
+        die ("missing command\n" ++ shortUsage prog)
     (_cmd:_) -> do
-        die ("command-line syntax error\n" ++
-                usageInfo (usageHeader prog) flags)
+        die ("command-line syntax error\n" ++ shortUsage prog)
 
 parseCheck :: ReadP a a -> String -> String -> IO a
 parseCheck parser str what =
