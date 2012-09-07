@@ -43,9 +43,6 @@
 
 /*
  * First, platform-dependent definitions of size-specific integers.
- * Assume for now that the int type is 32 bits.
- * NOTE: Synch the following definitions with MachDeps.h!
- * ToDo: move these into a platform-dependent file.
  */
 
 typedef signed   char            StgInt8;
@@ -89,12 +86,6 @@ typedef unsigned long long int StgWord64;
 /*
  * Define the standard word size we'll use on this machine: make it
  * big enough to hold a pointer.
- *
- * It's useful if StgInt/StgWord are always the same as long, so that
- * we can use a consistent printf format specifier without warnings on
- * any platform.  Fortunately this works at the moement; if it breaks
- * in the future we'll have to start using macros for format
- * specifiers (c.f. FMT_StgWord64 in Rts.h).
  */
 
 #if SIZEOF_VOID_P == 8
@@ -138,10 +129,11 @@ typedef void*		   StgStablePtr;
 typedef StgWord8*          StgByteArray;
 
 /*
-  Types for the generated C functions
-  take no arguments
-  return a pointer to the next function to be called
-  use: Ptr to Fun that returns a Ptr to Fun which returns Ptr to void
+  Types for generated C functions when compiling via C.
+
+  The C functions take no arguments, and return a pointer to the next
+  function to be called use: Ptr to Fun that returns a Ptr to Fun
+  which returns Ptr to void
 
   Note: Neither StgFunPtr not StgFun is quite right (that is, 
   StgFunPtr != StgFun*).  So, the functions we define all have type
