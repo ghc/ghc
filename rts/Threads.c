@@ -247,7 +247,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         msg->tso = tso;
         sendMessage(cap, tso->cap, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
-                      (lnat)tso->id, tso->cap->no);
+                      (W_)tso->id, tso->cap->no);
         return;
     }
 #endif
@@ -272,7 +272,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         unlockClosure(tso->block_info.closure, i);
         if (i != &stg_MSG_NULL_info) {
             debugTraceCap(DEBUG_sched, cap, "thread %ld still blocked on throwto (%p)",
-                          (lnat)tso->id, tso->block_info.throwto->header.info);
+                          (W_)tso->id, tso->block_info.throwto->header.info);
             return;
         }
 
@@ -375,7 +375,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
 
     debugTraceCap(DEBUG_sched, cap,
                   "collision occurred; checking blocking queues for thread %ld",
-                  (lnat)tso->id);
+                  (W_)tso->id);
     
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
@@ -494,7 +494,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 {
     StgStack *new_stack, *old_stack;
     StgUnderflowFrame *frame;
-    lnat chunk_size;
+    W_ chunk_size;
 
     IF_DEBUG(sanity,checkTSO(tso));
 

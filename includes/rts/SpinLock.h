@@ -34,7 +34,7 @@ typedef struct SpinLock_
 typedef StgWord SpinLock;
 #endif
 
-typedef lnat SpinLockCount;
+typedef StgWord SpinLockCount;
 
 #if defined(PROF_SPIN)
 

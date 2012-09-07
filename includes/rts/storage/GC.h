@@ -149,8 +149,8 @@ extern generation * oldest_gen;
 
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate        ( Capability *cap, lnat n );
-StgPtr  allocatePinned  ( Capability *cap, lnat n );
+StgPtr  allocate        ( Capability *cap, W_ n );
+StgPtr  allocatePinned  ( Capability *cap, W_ n );
 
 /* memory allocator for executable memory */
 void * allocateExec(unsigned int len, void **exec_addr);
