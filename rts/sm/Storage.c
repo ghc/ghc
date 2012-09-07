@@ -437,8 +437,10 @@ allocNursery (bdescr *tail, nat blocks)
     // tiny optimisation (~0.5%), but it's free.
 
     while (blocks > 0) {
-        if (blocks >= BLOCKS_PER_MBLOCK) {
-            bd = allocLargeChunk(); // see comment with allocLargeChunk()
+        if (blocks >= BLOCKS_PER_MBLOCK / 4) {
+            n = stg_min(BLOCKS_PER_MBLOCK, blocks);
+            bd = allocLargeChunk(16, n); // see comment with allocLargeChunk()
+            // NB. we want a nice power of 2 for the minimum here
             n = bd->blocks;
         } else {
             bd = allocGroup(blocks);

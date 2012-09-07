@@ -390,34 +390,50 @@ finish:
 }
 
 //
-// Allocate a chunk of blocks that is at most a megablock in size.
-// This API is used by the nursery allocator that wants contiguous
-// memory preferably, but doesn't require it.  When memory is
-// fragmented we might have lots of large chunks that are less than a
-// full megablock, so allowing the nursery allocator to use these
-// reduces fragmentation considerably.  e.g. on a GHC build with +RTS
-// -H, I saw fragmentation go from 17MB down to 3MB on a single compile.
+// Allocate a chunk of blocks that is at least min and at most max
+// blocks in size. This API is used by the nursery allocator that
+// wants contiguous memory preferably, but doesn't require it.  When
+// memory is fragmented we might have lots of large chunks that are
+// less than a full megablock, so allowing the nursery allocator to
+// use these reduces fragmentation considerably.  e.g. on a GHC build
+// with +RTS -H, I saw fragmentation go from 17MB down to 3MB on a
+// single compile.
 //
 bdescr *
-allocLargeChunk (void)
+allocLargeChunk (nat min, nat max)
 {
     bdescr *bd;
-    nat ln;
+    nat ln, lnmax;
 
-    ln = 5; // start in the 32-63 block bucket
-    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
+    if (min >= BLOCKS_PER_MBLOCK) {
+        return allocGroup(max);
+    }
+
+    ln = log_2_ceil(min);
+    lnmax = log_2_ceil(max); // tops out at MAX_FREE_LIST
+
+    while (ln < lnmax && free_list[ln] == NULL) {
         ln++;
     }
-    if (ln == MAX_FREE_LIST) {
-        return allocGroup(BLOCKS_PER_MBLOCK);
+    if (ln == lnmax) {
+        return allocGroup(max);
     }
     bd = free_list[ln];
 
+    if (bd->blocks <= max)              // exactly the right size!
+    {
+        dbl_link_remove(bd, &free_list[ln]);
+        initGroup(bd);
+    }
+    else   // block too big...
+    {                              
+        bd = split_free_block(bd, max, ln);
+        ASSERT(bd->blocks == max);
+        initGroup(bd);
+    }
+
     n_alloc_blocks += bd->blocks;
     if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
-
-    dbl_link_remove(bd, &free_list[ln]);
-    initGroup(bd);
 
     IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
