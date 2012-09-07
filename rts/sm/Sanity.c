@@ -906,7 +906,7 @@ memInventory (rtsBool show)
   live_blocks += nursery_blocks + 
                + retainer_blocks + arena_blocks + exec_blocks;
 
-#define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+#define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
 
   leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
 
@@ -918,20 +918,20 @@ memInventory (rtsBool show)
           debugBelch("Memory inventory:\n");
       }
       for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	  debugBelch("  gen %d blocks : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", g, 
+          debugBelch("  gen %d blocks : %5" FMT_SizeT " blocks (%6.1lf MB)\n", g,
                      gen_blocks[g], MB(gen_blocks[g]));
       }
-      debugBelch("  nursery      : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
+      debugBelch("  nursery      : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  nursery_blocks, MB(nursery_blocks));
-      debugBelch("  retainer     : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
+      debugBelch("  retainer     : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  retainer_blocks, MB(retainer_blocks));
-      debugBelch("  arena blocks : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
+      debugBelch("  arena blocks : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  arena_blocks, MB(arena_blocks));
-      debugBelch("  exec         : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
+      debugBelch("  exec         : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  exec_blocks, MB(exec_blocks));
-      debugBelch("  free         : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
+      debugBelch("  free         : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  free_blocks, MB(free_blocks));
-      debugBelch("  total        : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n",
+      debugBelch("  total        : %5" FMT_SizeT " blocks (%6.1lf MB)\n",
                  live_blocks + free_blocks, MB(live_blocks+free_blocks));
       if (leak) {
           debugBelch("\n  in system    : %5" FMT_SizeT " blocks (%" FMT_SizeT " MB)\n", 
