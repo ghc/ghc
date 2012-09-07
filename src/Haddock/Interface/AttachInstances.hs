@@ -186,3 +186,4 @@ isInstanceHidden expInfo cls tys =
         TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
         FunTy t1 t2 -> typeHidden t1 || typeHidden t2
         ForAllTy _ ty -> typeHidden ty
+        LitTy _ -> False
