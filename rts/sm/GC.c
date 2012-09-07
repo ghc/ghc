@@ -1510,7 +1510,7 @@ resize_generations (void)
     nat g;
 
     if (major_gc && RtsFlags.GcFlags.generations > 1) {
-	nat live, size, min_alloc, words;
+        lnat live, size, min_alloc, words;
 	const nat max  = RtsFlags.GcFlags.maxHeapSize;
 	const nat gens = RtsFlags.GcFlags.generations;
 	
