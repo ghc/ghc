@@ -168,7 +168,7 @@ STATIC_INLINE void
 initGroup(bdescr *head)
 {
   bdescr *bd;
-  nat i, n;
+  W_ i, n;
 
   n = head->blocks;
   head->free   = head->start;
@@ -184,9 +184,9 @@ initGroup(bdescr *head)
 // usually small, and MAX_FREE_LIST is also small, so the loop version
 // might well be the best choice here.
 STATIC_INLINE nat
-log_2_ceil(nat n)
+log_2_ceil(W_ n)
 {
-    nat i, x;
+    W_ i, x;
     x = 1;
     for (i=0; i < MAX_FREE_LIST; i++) {
         if (x >= n) return i;
@@ -196,9 +196,9 @@ log_2_ceil(nat n)
 }
 
 STATIC_INLINE nat
-log_2(nat n)
+log_2(W_ n)
 {
-    nat i, x;
+    W_ i, x;
     x = n;
     for (i=0; i < MAX_FREE_LIST; i++) {
         x = x >> 1;
@@ -244,7 +244,7 @@ setup_tail (bdescr *bd)
 // Take a free block group bd, and split off a group of size n from
 // it.  Adjust the free list as necessary, and return the new group.
 static bdescr *
-split_free_block (bdescr *bd, nat n, nat ln)
+split_free_block (bdescr *bd, W_ n, nat ln)
 {
     bdescr *fg; // free group
 
@@ -311,7 +311,7 @@ alloc_mega_group (nat mblocks)
 }
 
 bdescr *
-allocGroup (nat n)
+allocGroup (W_ n)
 {
     bdescr *bd, *rem;
     nat ln;
@@ -390,7 +390,7 @@ finish:
 }
 
 bdescr *
-allocGroup_lock(nat n)
+allocGroup_lock(W_ n)
 {
     bdescr *bd;
     ACQUIRE_SM_LOCK;
@@ -602,10 +602,10 @@ initMBlock(void *mblock)
    Stats / metrics
    -------------------------------------------------------------------------- */
 
-nat
+W_
 countBlocks(bdescr *bd)
 {
-    nat n;
+    W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
 	n += bd->blocks;
     }
@@ -617,10 +617,10 @@ countBlocks(bdescr *bd)
 // that would be taken up by block descriptors in the second and
 // subsequent megablock.  This is so we can tally the count with the
 // number of blocks allocated in the system, for memInventory().
-nat
+W_
 countAllocdBlocks(bdescr *bd)
 {
-    nat n;
+    W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
 	n += bd->blocks;
 	// hack for megablock groups: see (*1) above
@@ -755,7 +755,7 @@ checkFreeListSanity(void)
     }
 }
 
-nat /* BLOCKS */
+W_ /* BLOCKS */
 countFreeList(void)
 {
   bdescr *bd;
