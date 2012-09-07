@@ -16,13 +16,13 @@
 
 typedef struct alloc_rec_ {
     char* base;     /* non-aligned base address, directly from VirtualAlloc */
-    lnat size;       /* Size in bytes */
+    W_ size;       /* Size in bytes */
     struct alloc_rec_* next;
 } alloc_rec;
 
 typedef struct block_rec_ {
     char* base;         /* base address, non-MBLOCK-aligned */
-    lnat size;           /* size in bytes */
+    W_ size;           /* size in bytes */
     struct block_rec_* next;
 } block_rec;
 
@@ -46,7 +46,7 @@ alloc_rec*
 allocNew(nat n) {
     alloc_rec* rec;
     rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
-    rec->size = ((lnat)n+1)*MBLOCK_SIZE;
+    rec->size = ((W_)n+1)*MBLOCK_SIZE;
     rec->base =
         VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
     if(rec->base==0) {
@@ -76,7 +76,7 @@ allocNew(nat n) {
 
 static
 void
-insertFree(char* alloc_base, lnat alloc_size) {
+insertFree(char* alloc_base, W_ alloc_size) {
     block_rec temp;
     block_rec* it;
     block_rec* prev;
@@ -116,7 +116,7 @@ findFreeBlocks(nat n) {
     block_rec temp;
     block_rec* prev;
 
-    lnat required_size;
+    W_ required_size;
     it=free_blocks;
     required_size = n*MBLOCK_SIZE;
     temp.next=free_blocks; temp.base=0; temp.size=0;
@@ -124,7 +124,7 @@ findFreeBlocks(nat n) {
     /* TODO: Don't just take first block, find smallest sufficient block */
     for( ; it!=0 && it->size<required_size; prev=it, it=it->next ) {}
     if(it!=0) {
-        if( (((lnat)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
+        if( (((W_)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
             ret = (void*)it->base;
             if(it->size==required_size) {
                 prev->next=it->next;
@@ -137,7 +137,7 @@ findFreeBlocks(nat n) {
             char* need_base;
             block_rec* next;
             int new_size;
-            need_base = (char*)(((lnat)it->base) & ((lnat)~MBLOCK_MASK)) + MBLOCK_SIZE;
+            need_base = (char*)(((W_)it->base) & ((W_)~MBLOCK_MASK)) + MBLOCK_SIZE;
             next = (block_rec*)stgMallocBytes(
                     sizeof(block_rec)
                     , "getMBlocks: findFreeBlocks: splitting");
@@ -158,12 +158,12 @@ findFreeBlocks(nat n) {
    so we might need to do many VirtualAlloc MEM_COMMITs.  We simply walk the
    (ordered) allocated blocks. */
 static void
-commitBlocks(char* base, lnat size) {
+commitBlocks(char* base, W_ size) {
     alloc_rec* it;
     it=allocs;
     for( ; it!=0 && (it->base+it->size)<=base; it=it->next ) {}
     for( ; it!=0 && size>0; it=it->next ) {
-        lnat size_delta;
+        W_ size_delta;
         void* temp;
         size_delta = it->size - (base-it->base);
         if(size_delta>size) size_delta=size;
@@ -199,7 +199,7 @@ osGetMBlocks(nat n) {
             barf("getMBlocks: misaligned block returned");
         }
 
-        commitBlocks(ret, (lnat)MBLOCK_SIZE*n);
+        commitBlocks(ret, (W_)MBLOCK_SIZE*n);
     }
 
     return ret;
@@ -208,7 +208,7 @@ osGetMBlocks(nat n) {
 void osFreeMBlocks(char *addr, nat n)
 {
     alloc_rec *p;
-    lnat nBytes = (lnat)n * MBLOCK_SIZE;
+    W_ nBytes = (W_)n * MBLOCK_SIZE;
 
     insertFree(addr, nBytes);
 
@@ -229,7 +229,7 @@ void osFreeMBlocks(char *addr, nat n)
             nBytes = 0;
         }
         else {
-            lnat bytesToFree = p->base + p->size - addr;
+            W_ bytesToFree = p->base + p->size - addr;
             if (!VirtualFree(addr, bytesToFree, MEM_DECOMMIT)) {
                 sysErrorBelch("osFreeMBlocks: VirtualFree MEM_DECOMMIT failed");
                 stg_exit(EXIT_FAILURE);
@@ -365,9 +365,9 @@ osFreeAllMBlocks(void)
     }
 }
 
-lnat getPageSize (void)
+W_ getPageSize (void)
 {
-    static lnat pagesize = 0;
+    static W_ pagesize = 0;
     if (pagesize) {
         return pagesize;
     } else {
@@ -378,7 +378,7 @@ lnat getPageSize (void)
     }
 }
 
-void setExecutable (void *p, lnat len, rtsBool exec)
+void setExecutable (void *p, W_ len, rtsBool exec)
 {
     DWORD dwOldProtect = 0;
     if (VirtualProtect (p, len,

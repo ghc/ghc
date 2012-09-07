@@ -35,7 +35,7 @@
 REGPARM1 void evacuate  (StgClosure **p);
 REGPARM1 void evacuate1 (StgClosure **p);
 
-extern lnat thunk_selector_depth;
+extern W_ thunk_selector_depth;
 
 #include "EndPrivate.h"
 

@@ -419,20 +419,20 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
    -------------------------------------------------------------------------- */
 
 // The number of card bytes needed
-INLINE_HEADER lnat mutArrPtrsCards (lnat elems)
+INLINE_HEADER W_ mutArrPtrsCards (W_ elems)
 {
-    return (lnat)((elems + (1 << MUT_ARR_PTRS_CARD_BITS) - 1)
+    return (W_)((elems + (1 << MUT_ARR_PTRS_CARD_BITS) - 1)
                            >> MUT_ARR_PTRS_CARD_BITS);
 }
 
 // The number of words in the card table
-INLINE_HEADER lnat mutArrPtrsCardTableSize (lnat elems)
+INLINE_HEADER W_ mutArrPtrsCardTableSize (W_ elems)
 {
     return ROUNDUP_BYTES_TO_WDS(mutArrPtrsCards(elems));
 }
 
 // The address of the card for a particular card number
-INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
+INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 {
     return ((StgWord8 *)&(a->payload[a->ptrs]) + n);
 }

@@ -296,7 +296,7 @@ numLabel( GtkWidget *lbl, nat n )
 }
 
 void
-updateFrontPanelAfterGC( nat N, lnat live )
+updateFrontPanelAfterGC( nat N, W_ live )
 {
     char buf[1000];
 

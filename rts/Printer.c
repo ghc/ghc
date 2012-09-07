@@ -299,21 +299,21 @@ printClosure( StgClosure *obj )
             StgWord i;
             debugBelch("ARR_WORDS(\"");
 	    for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
-	      debugBelch("%" FMT_SizeT, (lnat)((StgArrWords *)obj)->payload[i]);
+	      debugBelch("%" FMT_SizeT, (W_)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }
 
     case MUT_ARR_PTRS_CLEAN:
-	debugBelch("MUT_ARR_PTRS_CLEAN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_CLEAN(size=%" FMT_SizeT ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_DIRTY:
-	debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_SizeT ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
-	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_SizeT ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MVAR_CLEAN:
@@ -426,7 +426,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 	    printPtr((P_)payload[i]);
 	    debugBelch("\n");
 	} else {
-	    debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
+	    debugBelch("Word# %" FMT_SizeT "\n", (W_)payload[i]);
 	}
     }
 }
@@ -442,12 +442,12 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 	StgWord bitmap = large_bitmap->bitmap[bmp];
 	j = 0;
 	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    debugBelch("   stk[%" FMT_SizeT "] (%p) = ", (lnat)(spBottom-(payload+i)), payload+i);
+	    debugBelch("   stk[%" FMT_SizeT "] (%p) = ", (W_)(spBottom-(payload+i)), payload+i);
 	    if ((bitmap & 1) == 0) {
 		printPtr((P_)payload[i]);
 		debugBelch("\n");
 	    } else {
-		debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
+		debugBelch("Word# %" FMT_SizeT "\n", (W_)payload[i]);
 	    }
 	}
     }

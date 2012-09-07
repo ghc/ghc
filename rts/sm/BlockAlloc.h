@@ -24,8 +24,8 @@ void markBlocks (bdescr *bd);
 void reportUnmarkedBlocks (void);
 #endif
 
-extern lnat n_alloc_blocks;   // currently allocated blocks
-extern lnat hw_alloc_blocks;  // high-water allocated blocks
+extern W_ n_alloc_blocks;   // currently allocated blocks
+extern W_ hw_alloc_blocks;  // high-water allocated blocks
 
 #include "EndPrivate.h"
 

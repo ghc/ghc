@@ -142,8 +142,8 @@ static bdescr *free_mblock_list;
 // To find the free list in which to place a block, use log_2(size).
 // To find a free block of the right size, use log_2_ceil(size).
 
-lnat n_alloc_blocks;   // currently allocated blocks
-lnat hw_alloc_blocks;  // high-water allocated blocks
+W_ n_alloc_blocks;   // currently allocated blocks
+W_ hw_alloc_blocks;  // high-water allocated blocks
 
 /* -----------------------------------------------------------------------------
    Initialisation
@@ -759,7 +759,7 @@ nat /* BLOCKS */
 countFreeList(void)
 {
   bdescr *bd;
-  lnat total_blocks = 0;
+  W_ total_blocks = 0;
   nat ln;
 
   for (ln=0; ln < MAX_FREE_LIST; ln++) {

@@ -825,7 +825,7 @@ void postWallClockTime (EventCapsetID capset)
 void postHeapEvent (Capability    *cap,
                     EventTypeNum   tag,
                     EventCapsetID  heap_capset,
-                    lnat           info1)
+                    W_           info1)
 {
     EventsBuf *eb;
 
@@ -855,10 +855,10 @@ void postHeapEvent (Capability    *cap,
 
 void postEventHeapInfo (EventCapsetID heap_capset,
                         nat           gens,
-                        lnat          maxHeapSize,
-                        lnat          allocAreaSize,
-                        lnat          mblockSize,
-                        lnat          blockSize)
+                        W_          maxHeapSize,
+                        W_          allocAreaSize,
+                        W_          mblockSize,
+                        W_          blockSize)
 {
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -884,12 +884,12 @@ void postEventHeapInfo (EventCapsetID heap_capset,
 void postEventGcStats  (Capability    *cap,
                         EventCapsetID  heap_capset,
                         nat            gen,
-                        lnat           copied,
-                        lnat           slop,
-                        lnat           fragmentation,
+                        W_           copied,
+                        W_           slop,
+                        W_           fragmentation,
                         nat            par_n_threads,
-                        lnat           par_max_copied,
-                        lnat           par_tot_copied)
+                        W_           par_max_copied,
+                        W_           par_tot_copied)
 {
     EventsBuf *eb;
 
