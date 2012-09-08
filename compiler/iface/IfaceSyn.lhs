@@ -55,7 +55,7 @@ import TysWiredIn ( eqTyConName )
 import Fingerprint
 import Binary
 
-import System.IO.Unsafe
+import GHC.IO (unsafeDupablePerformIO)
 
 infixl 3 &&&
 \end{code}
