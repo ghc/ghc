@@ -84,7 +84,8 @@ class SingI a where
 
 --------------------------------------------------------------------------------
 -- | Comparsion of type-level naturals.
-class (m :: Nat) <= (n :: Nat)
+class (m <=? n) ~ True => (m :: Nat) <= (n :: Nat)
+instance ((m <=? n) ~ True) => m <= n
 
 type family (m :: Nat) <=? (n :: Nat) :: Bool
 
