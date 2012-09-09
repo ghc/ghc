@@ -7089,7 +7089,7 @@ y = x
 z :: Int
 z = y
 </programlisting>
-    evaluating <literal>x</literal> will result in a runtime type error.
+    evaluating <literal>z</literal> will result in a runtime type error.
   </para>
 </sect2>
 <sect2><title>Deferred type errors in GHCi</title>
