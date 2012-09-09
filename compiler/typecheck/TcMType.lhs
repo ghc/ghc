@@ -593,14 +593,17 @@ skolemiseSigTv tv
 
 \begin{code}
 zonkImplication :: Implication -> TcM Implication
-zonkImplication implic@(Implic { ic_given = given 
+zonkImplication implic@(Implic { ic_skols  = skols
+                               , ic_given = given 
                                , ic_wanted = wanted
                                , ic_loc = loc })
-  = do {    -- No need to zonk the skolems
+  = do { skols'  <- mapM zonkTcTyVarBndr skols  -- Need to zonk their kinds!
+                                                -- as Trac #7230 showed
        ; given'  <- mapM zonkEvVar given
        ; loc'    <- zonkGivenLoc loc
        ; wanted' <- zonkWC wanted
-       ; return (implic { ic_given = given'
+       ; return (implic { ic_skols = skols'
+                        , ic_given = given'
                         , ic_wanted = wanted'
                         , ic_loc = loc' }) }
 
@@ -765,10 +768,18 @@ zonkTcType ty
 		       | otherwise	 = TyVarTy <$> updateTyVarKindM go tyvar
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
-    go (ForAllTy tyvar ty) = ASSERT2( isImmutableTyVar tyvar, ppr tyvar ) do
-                             ty' <- go ty
-                             tyvar' <- updateTyVarKindM go tyvar
-                             return (ForAllTy tyvar' ty')
+    go (ForAllTy tv ty) = do { tv' <- zonkTcTyVarBndr tv
+                             ; ty' <- go ty
+                             ; return (ForAllTy tv' ty') }
+
+zonkTcTyVarBndr :: TcTyVar -> TcM TcTyVar
+-- A tyvar binder is never a unification variable (MetaTv),
+-- rather it is always a skolems.  BUT it may have a kind 
+-- that has not yet been zonked, and may include kind
+-- unification variables.
+zonkTcTyVarBndr tyvar
+  = ASSERT2( isImmutableTyVar tyvar, ppr tyvar ) do
+    updateTyVarKindM zonkTcType tyvar
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis
