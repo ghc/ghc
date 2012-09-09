@@ -18,7 +18,7 @@ T4464:
 	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
 	$(RM) T4464H_stub.c T4464H_stub.h T4464H_stub.o
 	$(RM) HS4464.dll HS4464.dll.a t4464.exe
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -shared T4464H.hs T4464B.c -optc-DRTSOPTS=RtsOptsSafeOnly -o HS4464.dll
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -shared T4464H.hs T4464B.c -optc-DRTSOPTS=RtsOptsSafeOnly -o HS4464.dll
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 T4464C.c HS4464.dll.a -o t4464.exe -no-hs-main
 	-./t4464.exe
 	echo "====="
@@ -26,7 +26,7 @@ T4464:
 	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
 	$(RM) T4464H_stub.c T4464H_stub.h T4464H_stub.o
 	$(RM) HS4464.dll HS4464.dll.a t4464.exe
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -shared T4464H.hs T4464B.c  -optc-DRTSOPTS=RtsOptsAll -o HS4464.dll
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -shared T4464H.hs T4464B.c  -optc-DRTSOPTS=RtsOptsAll -o HS4464.dll
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 T4464C.c HS4464.dll.a -o t4464.exe -no-hs-main
 	./t4464.exe
 
