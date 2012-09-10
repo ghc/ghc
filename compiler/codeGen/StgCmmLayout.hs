@@ -609,16 +609,18 @@ getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
 getConstrTag dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv halfWordWidth wordWidth) [infoTableConstrTag dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) wordWidth) [infoTableConstrTag dflags info_table]
   where
+    platform = targetPlatform dflags
     info_table = infoTable dflags (closureInfoPtr closure_ptr)
 
 cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the closure type
 -- obtained from the info table
 cmmGetClosureType dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv halfWordWidth wordWidth) [infoTableClosureType dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) wordWidth) [infoTableClosureType dflags info_table]
   where
+    platform = targetPlatform dflags
     info_table = infoTable dflags (closureInfoPtr closure_ptr)
 
 infoTable :: DynFlags -> CmmExpr -> CmmExpr
@@ -638,21 +640,21 @@ infoTableSrtBitmap :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the srt_bitmap
 -- field of the info table
 infoTableSrtBitmap dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdSrtBitmapOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord (targetPlatform dflags))
 
 infoTableClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the closure type
 -- field of the info table.
 infoTableClosureType dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdClosureTypeOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB info_tbl (stdClosureTypeOffset dflags)) (bHalfWord (targetPlatform dflags))
 
 infoTablePtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTablePtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdPtrsOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB info_tbl (stdPtrsOffset dflags)) (bHalfWord (targetPlatform dflags))
 
 infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTableNonPtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdNonPtrsOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB info_tbl (stdNonPtrsOffset dflags)) (bHalfWord (targetPlatform dflags))
 
 funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the info pointer of a function,

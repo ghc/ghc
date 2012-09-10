@@ -20,6 +20,7 @@ where
 import Constants
 import FastString
 import Outputable
+import Platform
 
 import Data.Word
 import Data.Int
@@ -95,10 +96,14 @@ f32    = cmmFloat W32
 f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
-bWord, bHalfWord, gcWord :: CmmType
-bWord     = cmmBits wordWidth
-bHalfWord = cmmBits halfWordWidth
-gcWord    = CmmType GcPtrCat wordWidth
+bWord :: CmmType
+bWord = cmmBits wordWidth
+
+bHalfWord :: Platform -> CmmType
+bHalfWord platform = cmmBits (halfWordWidth platform)
+
+gcWord :: CmmType
+gcWord = CmmType GcPtrCat wordWidth
 
 cInt, cLong :: CmmType
 cInt  = cmmBits cIntWidth
@@ -155,14 +160,16 @@ mrStr W80  = sLit("W80")
 
 
 -------- Common Widths  ------------
-wordWidth, halfWordWidth :: Width
+wordWidth :: Width
 wordWidth | wORD_SIZE == 4 = W32
           | wORD_SIZE == 8 = W64
           | otherwise      = panic "MachOp.wordRep: Unknown word size"
 
-halfWordWidth | wORD_SIZE == 4 = W16
-              | wORD_SIZE == 8 = W32
-              | otherwise      = panic "MachOp.halfWordRep: Unknown word size"
+halfWordWidth :: Platform -> Width
+halfWordWidth _
+ | wORD_SIZE == 4 = W16
+ | wORD_SIZE == 8 = W32
+ | otherwise      = panic "MachOp.halfWordRep: Unknown word size"
 
 halfWordMask :: Integer
 halfWordMask | wORD_SIZE == 4 = 0xFFFF

@@ -630,8 +630,18 @@ genericWordQuotRem2Op _ _ = panic "genericWordQuotRem2Op"
 
 genericWordAdd2Op :: GenericOp
 genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
-  = do r1 <- newTemp (cmmExprType arg_x)
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       r1 <- newTemp (cmmExprType arg_x)
        r2 <- newTemp (cmmExprType arg_x)
+       let topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
+           toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
+           bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
+           add x y = CmmMachOp (MO_Add wordWidth) [x, y]
+           or x y = CmmMachOp (MO_Or wordWidth) [x, y]
+           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
+                                wordWidth)
+           hwm = CmmLit (CmmInt halfWordMask wordWidth)
        emit $ catAGraphs
           [mkAssign (CmmLocal r1)
                (add (bottomHalf arg_x) (bottomHalf arg_y)),
@@ -643,25 +653,29 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
            mkAssign (CmmLocal res_l)
                (or (toTopHalf (CmmReg (CmmLocal r2)))
                    (bottomHalf (CmmReg (CmmLocal r1))))]
-   where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
-         toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
-         bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
-         add x y = CmmMachOp (MO_Add wordWidth) [x, y]
-         or x y = CmmMachOp (MO_Or wordWidth) [x, y]
-         hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
-                              wordWidth)
-         hwm = CmmLit (CmmInt halfWordMask wordWidth)
 genericWordAdd2Op _ _ = panic "genericWordAdd2Op"
 
 genericWordMul2Op :: GenericOp
 genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
- = do let t = cmmExprType arg_x
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          t = cmmExprType arg_x
       xlyl <- liftM CmmLocal $ newTemp t
       xlyh <- liftM CmmLocal $ newTemp t
       xhyl <- liftM CmmLocal $ newTemp t
       r    <- liftM CmmLocal $ newTemp t
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
+      let topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
+          toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
+          bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
+          add x y = CmmMachOp (MO_Add wordWidth) [x, y]
+          sum = foldl1 add
+          mul x y = CmmMachOp (MO_Mul wordWidth) [x, y]
+          or x y = CmmMachOp (MO_Or wordWidth) [x, y]
+          hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
+                               wordWidth)
+          hwm = CmmLit (CmmInt halfWordMask wordWidth)
       emit $ catAGraphs
              [mkAssign xlyl
                   (mul (bottomHalf arg_x) (bottomHalf arg_y)),
@@ -681,16 +695,6 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
                         topHalf (CmmReg xhyl),
                         topHalf (CmmReg xlyh),
                         topHalf (CmmReg r)])]
-   where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
-         toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
-         bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
-         add x y = CmmMachOp (MO_Add wordWidth) [x, y]
-         sum = foldl1 add
-         mul x y = CmmMachOp (MO_Mul wordWidth) [x, y]
-         or x y = CmmMachOp (MO_Or wordWidth) [x, y]
-         hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
-                              wordWidth)
-         hwm = CmmLit (CmmInt halfWordMask wordWidth)
 genericWordMul2Op _ _ = panic "genericWordMul2Op"
 
 -- These PrimOps are NOPs in Cmm

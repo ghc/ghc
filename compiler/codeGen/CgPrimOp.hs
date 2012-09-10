@@ -544,7 +544,9 @@ emitPrimOp [res_q, res_r] WordQuotRem2Op [arg_x_high, arg_x_low, arg_y] _
          stmtC stmt
 
 emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
- = do r1 <- newLocalReg (cmmExprType arg_x)
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+      r1 <- newLocalReg (cmmExprType arg_x)
       r2 <- newLocalReg (cmmExprType arg_x)
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
@@ -564,7 +566,7 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
                      bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
                      add x y = CmmMachOp (MO_Add wordWidth) [x, y]
                      or x y = CmmMachOp (MO_Or wordWidth) [x, y]
-                     hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
+                     hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                           wordWidth)
                      hwm = CmmLit (CmmInt halfWordMask wordWidth)
           stmt = CmmCall (CmmPrim (MO_Add2 wordWidth) (Just genericImpl))
@@ -575,7 +577,9 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
                          CmmMayReturn
       stmtC stmt
 emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
- = do let t = cmmExprType arg_x
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          t = cmmExprType arg_x
       xlyl <- liftM CmmLocal $ newLocalReg t
       xlyh <- liftM CmmLocal $ newLocalReg t
       xhyl <- liftM CmmLocal $ newLocalReg t
@@ -608,7 +612,7 @@ emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
                      sum = foldl1 add
                      mul x y = CmmMachOp (MO_Mul wordWidth) [x, y]
                      or x y = CmmMachOp (MO_Or wordWidth) [x, y]
-                     hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
+                     hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                           wordWidth)
                      hwm = CmmLit (CmmInt halfWordMask wordWidth)
           stmt = CmmCall (CmmPrim (MO_U_Mul2 wordWidth) (Just genericImpl))
