@@ -226,7 +226,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         haiku)
             test -z "[$]2" || eval "[$]2=OSHaiku"
             ;;
-        dragonfly|osf1|osf3|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
+        osf3)
+            test -z "[$]2" || eval "[$]2=OSOsf3"
+            ;;
+        dragonfly|osf1|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)
