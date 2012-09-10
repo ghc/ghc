@@ -106,9 +106,10 @@ import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.Stats
 import RegAlloc.Linear.JoinToTargets
-import qualified RegAlloc.Linear.PPC.FreeRegs   as PPC
-import qualified RegAlloc.Linear.SPARC.FreeRegs as SPARC
-import qualified RegAlloc.Linear.X86.FreeRegs   as X86
+import qualified RegAlloc.Linear.PPC.FreeRegs    as PPC
+import qualified RegAlloc.Linear.SPARC.FreeRegs  as SPARC
+import qualified RegAlloc.Linear.X86.FreeRegs    as X86
+import qualified RegAlloc.Linear.X86_64.FreeRegs as X86_64
 import TargetReg
 import RegAlloc.Liveness
 import Instruction
@@ -188,10 +189,10 @@ linearRegAlloc
 linearRegAlloc dflags first_id block_live sccs
  = let platform = targetPlatform dflags
    in case platformArch platform of
-      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)   first_id block_live sccs
-      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)   first_id block_live sccs
-      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs platform :: SPARC.FreeRegs) first_id block_live sccs
-      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs platform :: PPC.FreeRegs)   first_id block_live sccs
+      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)    first_id block_live sccs
+      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs platform :: X86_64.FreeRegs) first_id block_live sccs
+      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs platform :: SPARC.FreeRegs)  first_id block_live sccs
+      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs platform :: PPC.FreeRegs)    first_id block_live sccs
       ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
       ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"

@@ -542,6 +542,7 @@ Library
             RegAlloc.Linear.StackMap
             RegAlloc.Linear.Base
             RegAlloc.Linear.X86.FreeRegs
+            RegAlloc.Linear.X86_64.FreeRegs
             RegAlloc.Linear.PPC.FreeRegs
             RegAlloc.Linear.SPARC.FreeRegs
 
