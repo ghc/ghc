@@ -611,7 +611,10 @@ cgIdApp fun_id args
   = do  { fun_info <- getCgIdInfo fun_id
         ; case maybeLetNoEscape fun_info of
             Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
-            Nothing -> cgTailCall fun_id fun_info args }
+            Nothing -> cgTailCall (cg_id fun_info) fun_info args }
+            -- NB. use (cg_id fun_info) instead of fun_id, because the former
+            -- may be externalised for -split-objs.
+            -- See StgCmm.maybeExternaliseId.
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ReturnKind
 cgLneJump blk_id lne_regs args  -- Join point; discard sequel

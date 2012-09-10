@@ -321,7 +321,11 @@ tc_hs_type :: HsType Name -> ExpKind -> TcM TcType
 tc_hs_type (HsParTy ty)        exp_kind = tc_lhs_type ty exp_kind
 tc_hs_type (HsDocTy ty _)      exp_kind = tc_lhs_type ty exp_kind
 tc_hs_type (HsQuasiQuoteTy {}) _ = panic "tc_hs_type: qq"	-- Eliminated by renamer
-tc_hs_type (HsBangTy {})       _ = panic "tc_hs_type: bang"   -- Unwrapped by con decls
+tc_hs_type ty@(HsBangTy {})    _
+    -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
+    -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
+    -- bangs are invalid, so fail. (#7210)
+    = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
 tc_hs_type (HsRecTy _)         _ = panic "tc_hs_type: record" -- Unwrapped by con decls
       -- Record types (which only show up temporarily in constructor 
       -- signatures) should have been removed by now

@@ -57,7 +57,7 @@ static StgThreadID next_thread_id = 1;
    currently pri (priority) is only used in a GRAN setup -- HWL
    ------------------------------------------------------------------------ */
 StgTSO *
-createThread(Capability *cap, nat size)
+createThread(Capability *cap, W_ size)
 {
     StgTSO *tso;
     StgStack *stack;
@@ -247,7 +247,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         msg->tso = tso;
         sendMessage(cap, tso->cap, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
-                      (lnat)tso->id, tso->cap->no);
+                      (W_)tso->id, tso->cap->no);
         return;
     }
 #endif
@@ -272,7 +272,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         unlockClosure(tso->block_info.closure, i);
         if (i != &stg_MSG_NULL_info) {
             debugTraceCap(DEBUG_sched, cap, "thread %ld still blocked on throwto (%p)",
-                          (lnat)tso->id, tso->block_info.throwto->header.info);
+                          (W_)tso->id, tso->block_info.throwto->header.info);
             return;
         }
 
@@ -375,7 +375,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
 
     debugTraceCap(DEBUG_sched, cap,
                   "collision occurred; checking blocking queues for thread %ld",
-                  (lnat)tso->id);
+                  (W_)tso->id);
     
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
@@ -494,7 +494,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 {
     StgStack *new_stack, *old_stack;
     StgUnderflowFrame *frame;
-    lnat chunk_size;
+    W_ chunk_size;
 
     IF_DEBUG(sanity,checkTSO(tso));
 
@@ -586,7 +586,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
     {
         StgWord *sp;
-        nat chunk_words, size;
+        W_ chunk_words, size;
 
         // find the boundary of the chunk of old stack we're going to
         // copy to the new stack.  We skip over stack frames until we
@@ -659,7 +659,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
    Stack underflow - called from the stg_stack_underflow_info frame
    ------------------------------------------------------------------------ */
 
-nat // returns offset to the return address
+W_ // returns offset to the return address
 threadStackUnderflow (Capability *cap, StgTSO *tso)
 {
     StgStack *new_stack, *old_stack;
@@ -681,7 +681,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
     if (retvals != 0)
     {
         // we have some return values to copy to the old stack
-        if ((nat)(new_stack->sp - new_stack->stack) < retvals)
+        if ((W_)(new_stack->sp - new_stack->stack) < retvals)
         {
             barf("threadStackUnderflow: not enough space for return values");
         }

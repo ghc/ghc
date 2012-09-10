@@ -22,17 +22,17 @@
 // 
 // Creating threads
 //
-StgTSO *createThread (Capability *cap, nat stack_size);
+StgTSO *createThread (Capability *cap, W_ stack_size);
 
 void scheduleWaitThread (/* in    */ StgTSO *tso,
                          /* out   */ HaskellObj* ret,
                          /* inout */ Capability **cap);
 
-StgTSO *createGenThread       (Capability *cap, nat stack_size,  
+StgTSO *createGenThread       (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
-StgTSO *createIOThread        (Capability *cap, nat stack_size,  
+StgTSO *createIOThread        (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
-StgTSO *createStrictIOThread  (Capability *cap, nat stack_size,  
+StgTSO *createStrictIOThread  (Capability *cap, W_ stack_size,
 			       StgClosure *closure);
 
 // Suspending/resuming threads around foreign calls

@@ -498,11 +498,16 @@ emitPrimOp [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
 
 -- Population count
-emitPrimOp [res] PopCnt8Op [w] = emitPopCntCall res w W8
-emitPrimOp [res] PopCnt16Op [w] = emitPopCntCall res w W16
-emitPrimOp [res] PopCnt32Op [w] = emitPopCntCall res w W32
-emitPrimOp [res] PopCnt64Op [w] = emitPopCntCall res w W64
-emitPrimOp [res] PopCntOp [w] = emitPopCntCall res w wordWidth
+emitPrimOp [res] PopCnt8Op [w] =
+  emitPopCntCall res (CmmMachOp mo_WordTo8 [w]) W8
+emitPrimOp [res] PopCnt16Op [w] =
+  emitPopCntCall res (CmmMachOp mo_WordTo16 [w]) W16
+emitPrimOp [res] PopCnt32Op [w] =
+  emitPopCntCall res (CmmMachOp mo_WordTo32 [w]) W32
+emitPrimOp [res] PopCnt64Op [w] =
+  emitPopCntCall res w W64 -- arg always has type W64, no need to narrow
+emitPrimOp [res] PopCntOp [w] =
+  emitPopCntCall res w wordWidth
 
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg]

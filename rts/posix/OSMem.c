@@ -75,7 +75,7 @@ void osMemInit(void)
 // the mmap() interface.
 
 static void *
-my_mmap (void *addr, lnat size)
+my_mmap (void *addr, W_ size)
 {
     void *ret;
 
@@ -136,7 +136,7 @@ my_mmap (void *addr, lnat size)
 // mblocks.
 
 static void *
-gen_map_mblocks (lnat size)
+gen_map_mblocks (W_ size)
 {
     int slop;
     StgWord8 *ret;
@@ -177,7 +177,7 @@ void *
 osGetMBlocks(nat n)
 {
   caddr_t ret;
-  lnat size = MBLOCK_SIZE * (lnat)n;
+  W_ size = MBLOCK_SIZE * (W_)n;
 
   if (next_request == 0) {
       // use gen_map_mblocks the first time.
@@ -226,9 +226,9 @@ void osFreeAllMBlocks(void)
     }
 }
 
-lnat getPageSize (void)
+W_ getPageSize (void)
 {
-    static lnat pageSize = 0;
+    static W_ pageSize = 0;
     if (pageSize) {
 	return pageSize;
     } else {
@@ -241,7 +241,7 @@ lnat getPageSize (void)
     }
 }
 
-void setExecutable (void *p, lnat len, rtsBool exec)
+void setExecutable (void *p, W_ len, rtsBool exec)
 {
     StgWord pageSize = getPageSize();
 
