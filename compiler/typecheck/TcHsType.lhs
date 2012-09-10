@@ -570,7 +570,12 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
        ; thing <- tcLookup name
        ; traceTc "lk2" (ppr name <+> ppr thing)
        ; case thing of
-           ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+           ATyVar _ tv 
+              | isKindVar tv
+              -> failWithTc (ptext (sLit "Kind variable") <+> quotes (ppr tv)
+                             <+> ptext (sLit "used as a type"))
+              | otherwise
+              -> return (mkTyVarTy tv, tyVarKind tv)
 
            AThing kind -> do { tc <- get_loopy_tc name
                              ; inst_tycon (mkNakedTyConApp tc) kind }
@@ -1350,7 +1355,7 @@ tc_lhs_kind (L span ki) = setSrcSpan span (tc_hs_kind ki)
 
 -- The main worker
 tc_hs_kind :: HsKind Name -> TcM Kind
-tc_hs_kind k@(HsTyVar _)   = tc_kind_app k []
+tc_hs_kind (HsTyVar tc)    = tc_kind_var_app tc []
 tc_hs_kind k@(HsAppTy _ _) = tc_kind_app k []
 
 tc_hs_kind (HsParTy ki) = tc_lhs_kind ki
