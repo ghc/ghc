@@ -85,12 +85,12 @@ Note [Basic Simplifier Plan]
 If in Step 1 no such element exists, we have exceeded our context-stack 
 depth and will simply fail.
 \begin{code}
-solveInteractGiven :: GivenLoc -> [TcTyVar] -> [EvVar] -> TcS ()
+solveInteractGiven :: CtLoc -> [TcTyVar] -> [EvVar] -> TcS ()
 -- In principle the givens can kick out some wanteds from the inert
 -- resulting in solving some more wanted goals here which could emit
 -- implications. That's why I return a bag of implications. Not sure
 -- if this can happen in practice though.
-solveInteractGiven gloc fsks givens
+solveInteractGiven loc fsks givens
   = do { implics <- solveInteract (fsk_bag `unionBags` given_bag)
        ; ASSERT( isEmptyBag implics )
          return () }  -- We do not decompose *given* polymorphic equalities
@@ -99,14 +99,12 @@ solveInteractGiven gloc fsks givens
                       -- See Note [Do not decompose given polytype equalities]
                       -- in TcCanonical
   where 
-    given_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_gloc = gloc 
-                                                     , ctev_evtm = EvId ev_id
-                                                     , ctev_pred = evVarPred ev_id }
+    given_bag = listToBag [ mkNonCanonical loc $ CtGiven { ctev_evtm = EvId ev_id
+                                                         , ctev_pred = evVarPred ev_id }
                           | ev_id <- givens ]
 
-    fsk_bag = listToBag [ mkNonCanonical $ CtGiven { ctev_gloc = gloc 
-                                                   , ctev_evtm = EvCoercion (mkTcReflCo tv_ty)
-                                                   , ctev_pred = pred  }
+    fsk_bag = listToBag [ mkNonCanonical loc $ CtGiven { ctev_evtm = EvCoercion (mkTcReflCo tv_ty)
+                                                       , ctev_pred = pred  }
                         | tv <- fsks
                         , let FlatSkol fam_ty = tcTyVarDetails tv
                               tv_ty = mkTyVarTy tv
@@ -131,7 +129,7 @@ solveInteract cts
               NoWorkRemaining     -- Done, successfuly (modulo frozen)
                 -> return ()
               MaxDepthExceeded ct -- Failure, depth exceeded
-                -> wrapErrTcS $ solverDepthErrorTcS (cc_depth ct) [ct]
+                -> wrapErrTcS $ solverDepthErrorTcS ct
               NextWorkItem ct     -- More work, loop around!
                 -> do { runSolverPipeline thePipeline ct; solve_loop max_depth } }
 
@@ -153,14 +151,15 @@ selectNextWorkItem max_depth
   = updWorkListTcS_return pick_next
   where 
     pick_next :: WorkList -> (SelectWorkItem, WorkList)
-    pick_next wl = case selectWorkItem wl of
-                     (Nothing,_) 
-                         -> (NoWorkRemaining,wl)           -- No more work
-                     (Just ct, new_wl) 
-                         | cc_depth ct > max_depth         -- Depth exceeded
-                         -> (MaxDepthExceeded ct,new_wl)
-                     (Just ct, new_wl) 
-                         -> (NextWorkItem ct, new_wl)      -- New workitem and worklist
+    pick_next wl 
+      = case selectWorkItem wl of
+          (Nothing,_) 
+              -> (NoWorkRemaining,wl)           -- No more work
+          (Just ct, new_wl) 
+              | ctLocDepth (cc_loc ct) > max_depth  -- Depth exceeded
+              -> (MaxDepthExceeded ct,new_wl)
+          (Just ct, new_wl) 
+              -> (NextWorkItem ct, new_wl)      -- New workitem and worklist
 
 runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline 
                   -> WorkItem                   -- The work item 
@@ -298,7 +297,7 @@ spontaneousSolveStage workItem
               -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
               -- see Note [Spontaneously solved in TyBinds]
               -> do { bumpStepCountTcS
-                   ; traceFireTcS (cc_depth workItem) $
+                   ; traceFireTcS workItem $
                      ptext (sLit "Spontaneously solved:") <+> ppr workItem
                    ; kickOutRewritable Given new_tv
                    ; return Stop } }
@@ -426,7 +425,7 @@ data SPSolveResult = SPCantSolve
 --     	    See Note [Touchables and givens] 
 trySpontaneousSolve :: WorkItem -> TcS SPSolveResult
 trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
-                                       , cc_tyvar = tv1, cc_rhs = xi, cc_depth = d })
+                                       , cc_tyvar = tv1, cc_rhs = xi, cc_loc = d })
   | isGiven gw
   = return SPCantSolve
   | Just tv2 <- tcGetTyVar_maybe xi
@@ -453,8 +452,8 @@ trySpontaneousSolve workItem@(CTyEqCan { cc_ev = gw
 trySpontaneousSolve _ = return SPCantSolve
 
 ----------------
-trySpontaneousEqOneWay :: SubGoalDepth 
-                       -> CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
+trySpontaneousEqOneWay :: CtLoc -> CtEvidence 
+                       -> TcTyVar -> Xi -> TcS SPSolveResult
 -- tv is a MetaTyVar, not untouchable
 trySpontaneousEqOneWay d gw tv xi
   | not (isSigTyVar tv) || isTyVarTy xi
@@ -463,8 +462,8 @@ trySpontaneousEqOneWay d gw tv xi
   = return SPCantSolve
 
 ----------------
-trySpontaneousEqTwoWay :: SubGoalDepth 
-                       -> CtEvidence -> TcTyVar -> TcTyVar -> TcS SPSolveResult
+trySpontaneousEqTwoWay :: CtLoc -> CtEvidence 
+                       -> TcTyVar -> TcTyVar -> TcS SPSolveResult
 -- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here
 
 trySpontaneousEqTwoWay d gw tv1 tv2
@@ -550,8 +549,7 @@ unification variables as RHS of type family equations: F xis ~ alpha.
 \begin{code}
 ----------------
 
-solveWithIdentity :: SubGoalDepth 
-                  -> CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
+solveWithIdentity :: CtLoc -> CtEvidence -> TcTyVar -> Xi -> TcS SPSolveResult
 -- Solve with the identity coercion 
 -- Precondition: kind(xi) is a sub-kind of kind(tv)
 -- Precondition: CtEvidence is Wanted or Derived
@@ -649,19 +647,18 @@ interactWithInertsStage wi
                ; case ir of 
                    IRWorkItemConsumed { ir_fire = rule } 
                        -> do { bumpStepCountTcS
-                             ; traceFireTcS (cc_depth wi) 
-                                            (mk_msg rule (text "WorkItemConsumed"))
+                             ; traceFireTcS wi (mk_msg rule (text "WorkItemConsumed"))
                              ; insertInertItemTcS atomic_inert
                              ; return Stop } 
                    IRReplace { ir_fire = rule }
                        -> do { bumpStepCountTcS
-                             ; traceFireTcS (cc_depth atomic_inert) 
+                             ; traceFireTcS atomic_inert 
                                             (mk_msg rule (text "InertReplace"))
                              ; insertInertItemTcS wi
                              ; return Stop } 
                    IRInertConsumed { ir_fire = rule }
                        -> do { bumpStepCountTcS
-                             ; traceFireTcS (cc_depth atomic_inert) 
+                             ; traceFireTcS atomic_inert 
                                             (mk_msg rule (text "InertItemConsumed"))
                              ; return (ContinueWith wi) }
                    IRKeepGoing {} -- Should we do a bumpStepCountTcS? No for now.
@@ -675,16 +672,16 @@ interactWithInertsStage wi
 
 doInteractWithInert :: Ct -> Ct -> TcS InteractResult
 -- Identical class constraints.
-doInteractWithInert inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyargs = tys1 })
-                     workItem@(CDictCan { cc_ev = fl2, cc_class = cls2, cc_tyargs = tys2 })
+doInteractWithInert inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyargs = tys1, cc_loc = loc1 })
+                     workItem@(CDictCan { cc_ev = fl2, cc_class = cls2, cc_tyargs = tys2, cc_loc = loc2 })
   | cls1 == cls2  
   = do { let pty1 = mkClassPred cls1 tys1
              pty2 = mkClassPred cls2 tys2
-             inert_pred_loc     = (pty1, pprFlavorArising fl1)
-             work_item_pred_loc = (pty2, pprFlavorArising fl2)
+             inert_pred_loc     = (pty1, pprArisingAt loc1)
+             work_item_pred_loc = (pty2, pprArisingAt loc2)
 
        ; let fd_eqns = improveFromAnother inert_pred_loc work_item_pred_loc
-       ; any_fundeps <- rewriteWithFunDeps fd_eqns fl2
+       ; fd_work <- rewriteWithFunDeps fd_eqns loc2
                 -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                 -- NB: We do create FDs for given to report insoluble equations that arise
                 -- from pairs of Givens, and also because of floating when we approximate
@@ -694,24 +691,22 @@ doInteractWithInert inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyarg
        ; traceTcS "doInteractWithInert:dict" 
                   (vcat [ text "inertItem =" <+> ppr inertItem
                         , text "workItem  =" <+> ppr workItem
-                        , text "fundeps =" <+> ppr any_fundeps ])
+                        , text "fundeps =" <+> ppr fd_work ])
  
-       ; case any_fundeps of
+       ; case fd_work of
            -- No Functional Dependencies 
-           Nothing             
-               | eqTypes tys1 tys2 -> solveOneFromTheOther "Cls/Cls" fl1 workItem
+           []  | eqTypes tys1 tys2 -> solveOneFromTheOther "Cls/Cls" fl1 workItem
                | otherwise         -> return (IRKeepGoing "NOP")
 
            -- Actual Functional Dependencies
-           Just fd_work
-               | cls1 `hasKey` ipClassNameKey
+           _   | cls1 `hasKey` ipClassNameKey
                , isGiven fl1, isGiven fl2  -- See Note [Shadowing of Implicit Parameters]
                -> return (IRReplace ("Replace IP"))
 
                -- Standard thing: create derived fds and keep on going. Importantly we don't
                -- throw workitem back in the worklist because this can cause loops. See #5236.
                | otherwise 
-               -> do { emitFDWorkAsDerived fd_work (cc_depth workItem)
+               -> do { updWorkListTcS (extendWorkListEqs fd_work)
                      ; return (IRKeepGoing "Cls/Cls (new fundeps)") } -- Just keep going without droping the inert 
        }
  
@@ -725,9 +720,9 @@ doInteractWithInert (CIrredEvCan { cc_ev = ifl, cc_ty = ty1 })
   = solveOneFromTheOther "Irred/Irred" ifl workItem
 
 doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
-                                  , cc_tyargs = args1, cc_rhs = xi1, cc_depth = d1 }) 
+                                  , cc_tyargs = args1, cc_rhs = xi1, cc_loc = d1 }) 
                     wi@(CFunEqCan { cc_ev = ev2, cc_fun = tc2
-                                  , cc_tyargs = args2, cc_rhs = xi2, cc_depth = d2 })
+                                  , cc_tyargs = args2, cc_rhs = xi2, cc_loc = d2 })
   | fl1 `canSolve` fl2 && lhss_match
   = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
@@ -1287,45 +1282,36 @@ To achieve this required some refactoring of FunDeps.lhs (nicer
 now!).  
 
 \begin{code}
-rewriteWithFunDeps :: [Equation]
-                   -> CtEvidence
-                   -> TcS (Maybe [CtEvidence]) 
-                                           -- Not quite a WantedEvVar unfortunately
-                                           -- Because our intention could be to make 
-                                           -- it derived at the end of the day
--- NB: The flavor of the returned EvVars will be decided by the caller
+rewriteWithFunDeps :: [Equation] -> CtLoc -> TcS [Ct] 
+-- NB: The returned constraints are all Derived
 -- Post: returns no trivial equalities (identities) and all EvVars returned are fresh
-rewriteWithFunDeps eqn_pred_locs fl
- = do { fd_ev_poss <- mapM (instFunDepEqn wloc) eqn_pred_locs
-      ; let fd_ev_pos :: [(Int,CtEvidence)]
-            fd_ev_pos = concat fd_ev_poss
-      ; if null fd_ev_pos then return Nothing
-        else return (Just (map snd fd_ev_pos)) }
- where 
-   wloc | CtGiven { ctev_gloc = gl } <- fl = setCtLocOrigin gl FunDepOrigin
-        | otherwise                        = ctev_wloc fl
+rewriteWithFunDeps eqn_pred_locs loc
+ = do { fd_cts <- mapM (instFunDepEqn loc) eqn_pred_locs
+      ; return (concat fd_cts) }
 
-instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,CtEvidence)]
+instFunDepEqn :: CtLoc -> Equation -> TcS [Ct]
 -- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn wl (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
-                        , fd_pred1 = d1, fd_pred2 = d2 })
+instFunDepEqn loc (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
+                         , fd_pred1 = d1, fd_pred2 = d2 })
   = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
        ; foldM (do_one subst) [] eqs }
   where 
-    do_one subst ievs (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
-       = let sty1 = Type.substTy subst ty1 
-             sty2 = Type.substTy subst ty2 
-         in if eqType sty1 sty2 then return ievs -- Return no trivial equalities
-            else do { mb_eqv <- newDerived (push_ctx wl) (mkTcEqPred sty1 sty2)
-                    ; case mb_eqv of
-                         Just ctev -> return $ (i,ctev):ievs
-                         Nothing   -> return ievs }
-                           -- We are eventually going to emit FD work back in the work list so 
-                           -- it is important that we only return the /freshly created/ and not 
-                           -- some existing equality!
-    push_ctx :: WantedLoc -> WantedLoc 
-    push_ctx loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
+    der_loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
 
+    do_one subst ievs (FDEq { fd_ty_left = ty1, fd_ty_right = ty2 })
+       | eqType sty1 sty2 
+       = return ievs -- Return no trivial equalities
+       | otherwise
+       = do { mb_eqv <- newDerived (mkTcEqPred sty1 sty2)
+            ; case mb_eqv of
+                 Just ev -> return (mkNonCanonical der_loc ev : ievs)
+                 Nothing -> return ievs }
+                   -- We are eventually going to emit FD work back in the work list so 
+                   -- it is important that we only return the /freshly created/ and not 
+                   -- some existing equality!
+       where
+         sty1 = Type.substTy subst ty1 
+         sty2 = Type.substTy subst ty2 
 
 mkEqnMsg :: (TcPredType, SDoc) 
          -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
@@ -1338,14 +1324,6 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 			  nest 2 (sep [ppr tpred1 <> comma, nest 2 from1]), 
 			  nest 2 (sep [ppr tpred2 <> comma, nest 2 from2])]
 	; return (tidy_env, msg) }
-
-        
-emitFDWorkAsDerived :: [CtEvidence]   -- All Derived
-                    -> SubGoalDepth -> TcS () 
-emitFDWorkAsDerived evlocs d 
-  = updWorkListTcS $ extendWorkListEqs (map mk_fd_ct evlocs)
-  where 
-    mk_fd_ct der_ev = CNonCanonical { cc_ev = der_ev, cc_depth = d }
 \end{code}
 
 
@@ -1358,7 +1336,6 @@ emitFDWorkAsDerived evlocs d
 *********************************************************************************
 
 \begin{code}
-
 topReactionsStage :: SimplifierStage 
 topReactionsStage workItem 
  = tryTopReact workItem 
@@ -1372,7 +1349,7 @@ tryTopReact wi
           NoTopInt -> return (ContinueWith wi)
           SomeTopInt rule what_next 
                    -> do { bumpStepCountTcS 
-                         ; traceFireTcS (cc_depth wi) $
+                         ; traceFireTcS wi $
                            vcat [ ptext (sLit "Top react:") <+> text rule
                                 , text "WorkItem =" <+> ppr wi ]
                          ; return what_next } }
@@ -1397,11 +1374,11 @@ doTopReact inerts workItem
   = do { traceTcS "doTopReact" (ppr workItem)
        ; case workItem of
       	   CDictCan { cc_ev = fl, cc_class = cls, cc_tyargs = xis
-      	            , cc_depth = d }
+      	            , cc_loc = d }
       	      -> doTopReactDict inerts workItem fl cls xis d
 
       	   CFunEqCan { cc_ev = fl, cc_fun = tc, cc_tyargs = args
-      	             , cc_rhs = xi, cc_depth = d }
+      	             , cc_rhs = xi, cc_loc = d }
       	      -> doTopReactFunEq workItem fl tc args xi d
 
       	   _  -> -- Any other work item does not react with any top-level equations
@@ -1409,32 +1386,28 @@ doTopReact inerts workItem
 
 --------------------
 doTopReactDict :: InertSet -> WorkItem -> CtEvidence -> Class -> [Xi]
-               -> SubGoalDepth -> TcS TopInteractResult
-doTopReactDict inerts workItem fl cls xis depth
+               -> CtLoc -> TcS TopInteractResult
+doTopReactDict inerts workItem fl cls xis loc
   = do { instEnvs <- getInstEnvs 
        ; let fd_eqns = improveFromInstEnv instEnvs 
                            (mkClassPred cls xis, arising_sdoc)
              
-       ; m <- rewriteWithFunDeps fd_eqns fl
-       ; case m of
-           Just fd_work ->
-               do { emitFDWorkAsDerived fd_work depth
-                  ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
-                                      , tir_new_item = ContinueWith workItem } }
-           Nothing 
-             | isWanted fl 
-             -> do { lkup_inst_res  <- matchClassInst inerts cls xis (getWantedLoc fl)
-                   ; case lkup_inst_res of
-                       GenInst wtvs ev_term -> do { addSolvedDict fl 
-                                                  ; doSolveFromInstance wtvs ev_term }
-                       NoInstance -> return NoTopInt }
-             | otherwise
-             -> return NoTopInt }
+       ; fd_work <- rewriteWithFunDeps fd_eqns loc
+       ; if not (null fd_work) then
+            do { updWorkListTcS (extendWorkListEqs fd_work)
+               ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
+                                    , tir_new_item = ContinueWith workItem } }
+         else -- No fundeps
+         if isWanted fl then
+            do { lkup_inst_res  <- matchClassInst inerts cls xis loc
+               ; case lkup_inst_res of
+                   GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                              ; doSolveFromInstance wtvs ev_term }
+                   NoInstance -> return NoTopInt }
+         else 
+            return NoTopInt }
    where 
-     arising_sdoc
-       | isGiven fl = pprArisingAt $ getGivenLoc fl
-       | otherwise  = pprArisingAt $ getWantedLoc fl
-     
+     arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
      
      doSolveFromInstance :: [CtEvidence] -> EvTerm -> TcS TopInteractResult
@@ -1452,8 +1425,8 @@ doTopReactDict inerts workItem fl cls xis depth
                ppr dict_id
              ; setEvBind dict_id ev_term
              ; let mk_new_wanted ev
-                       = CNonCanonical { cc_ev   = ev
-                                       , cc_depth = depth + 1 }
+                       = CNonCanonical { cc_ev  = ev
+                                       , cc_loc = bumpCtLocDepth loc }
              ; updWorkListTcS (extendWorkListCts (map mk_new_wanted evs))
              ; return $
                SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
@@ -1461,8 +1434,8 @@ doTopReactDict inerts workItem fl cls xis depth
 
 --------------------
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
-                -> SubGoalDepth -> TcS TopInteractResult
-doTopReactFunEq ct fl fun_tc args xi d
+                -> CtLoc -> TcS TopInteractResult
+doTopReactFunEq ct fl fun_tc args xi loc
   = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
                                  -- reached that far 
 
@@ -1498,7 +1471,7 @@ doTopReactFunEq ct fl fun_tc args xi d
            ; case ctevs of
                [ctev] -> updWorkListTcS $ extendWorkListEq $
                          CNonCanonical { cc_ev = ctev
-                                       , cc_depth  = d+1 }
+                                       , cc_loc  = bumpCtLocDepth loc }
                ctevs -> -- No subgoal (because it's cached)
                         ASSERT( null ctevs) return () 
            ; return $ SomeTopInt { tir_rule = str
@@ -1714,7 +1687,7 @@ data LookupInstResult
   = NoInstance
   | GenInst [CtEvidence] EvTerm 
 
-matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResult
+matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
 
 matchClassInst _ clas [ _, ty ] _
   | className clas == singIClassName
@@ -1757,7 +1730,7 @@ matchClassInst inerts clas tys loc
                  ; if null theta then
                        return (GenInst [] (EvDFunApp dfun_id tys []))
                    else do
-                     { evc_vars <- instDFunConstraints loc theta
+                     { evc_vars <- instDFunConstraints theta
                      ; let new_ev_vars = freshGoals evc_vars
                            -- new_ev_vars are only the real new variables that can be emitted 
                            dfun_app = EvDFunApp dfun_id tys (getEvTerms evc_vars)

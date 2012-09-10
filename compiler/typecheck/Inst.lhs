@@ -30,9 +30,7 @@ module Inst (
        tyVarsOfWC, tyVarsOfBag, 
        tyVarsOfCt, tyVarsOfCts, 
 
-       tidyEvVar, tidyCt, tidyGivenLoc,
-
-       substEvVar, substImplication, substCt
+       tidyEvVar, tidyCt, tidySkolemInfo
     ) where
 
 #include "HsVersions.h"
@@ -85,7 +83,7 @@ emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred 
   = do { loc <- getCtLoc origin
        ; ev  <- newWantedEvVar pred
-       ; emitFlat (mkNonCanonical (CtWanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev }))
+       ; emitFlat (mkNonCanonical loc (CtWanted { ctev_pred = pred, ctev_evar = ev }))
        ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -555,14 +553,13 @@ tidyCt env ct
   = case ct of
      CHoleCan {} -> ct { cc_ev = tidy_flavor env (cc_ev ct) }
      _ -> CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
-                        , cc_depth  = cc_depth ct }
+                        , cc_loc  = cc_loc ct }
   where 
     tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 
      --     show it in error messages
-    tidy_flavor env ctev@(CtGiven { ctev_gloc = gloc, ctev_pred = pred })
-      = ctev { ctev_gloc = tidyGivenLoc env gloc
-             , ctev_pred = tidyType env pred }
+    tidy_flavor env ctev@(CtGiven { ctev_pred = pred })
+      = ctev { ctev_pred = tidyType env pred }
     tidy_flavor env ctev@(CtWanted { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
     tidy_flavor env ctev@(CtDerived { ctev_pred = pred })
@@ -571,78 +568,26 @@ tidyCt env ct
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
-tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
-tidyGivenLoc env (CtLoc skol lcl) 
-  = CtLoc (tidySkolemInfo env skol) lcl
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> (TidyEnv, SkolemInfo)
+tidySkolemInfo env (SigSkol cx ty) 
+  = (env', SigSkol cx ty')
+  where
+    (env', ty') = tidyOpenType env ty
 
-tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
-tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
-tidySkolemInfo env (InferSkol ids) = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfo env (InferSkol ids) 
+  = (env', InferSkol ids')
+  where
+    (env', ids') = mapAccumL do_one env ids
+    do_one env (name, ty) = (env', (name, ty'))
+       where
+         (env', ty') = tidyOpenType env ty
+
 tidySkolemInfo env (UnifyForAllSkol skol_tvs ty) 
-  = UnifyForAllSkol (map tidy_tv skol_tvs) (tidyType env ty)
+  = (env1, UnifyForAllSkol skol_tvs' ty')
   where
-    tidy_tv tv = case getTyVar_maybe ty' of
-                   Just tv' -> tv'
-                   Nothing  -> pprPanic "ticySkolemInfo" (ppr tv <+> ppr ty')
-               where
-                 ty' = tidyTyVarOcc env tv
-tidySkolemInfo _   info            = info
+    env1 = tidyFreeTyVars env (tyVarsOfType ty `delVarSetList` skol_tvs)
+    (env2, skol_tvs') = tidyTyVarBndrs env1 skol_tvs
+    ty'               = tidyType env2 ty
 
----------------- Substitution -------------------------
--- This is used only in TcSimpify, for substituations that are *also* 
--- reflected in the unification variables.  So we don't substitute
--- in the evidence.
-
-substCt :: TvSubst -> Ct -> Ct 
--- Conservatively converts it to non-canonical:
--- Postcondition: if the constraint does not get rewritten
-substCt subst ct
-  | pty <- ctPred ct
-  , sty <- substTy subst pty 
-  = if sty `eqType` pty then 
-        ct { cc_ev = substFlavor subst (cc_ev ct) }
-    else 
-        CNonCanonical { cc_ev = substFlavor subst (cc_ev ct)
-                      , cc_depth  = cc_depth ct }
-
-substWC :: TvSubst -> WantedConstraints -> WantedConstraints
-substWC subst (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = WC { wc_flat  = mapBag (substCt subst) flat
-       , wc_impl  = mapBag (substImplication subst) implic
-       , wc_insol = mapBag (substCt subst) insol }
-
-substImplication :: TvSubst -> Implication -> Implication
-substImplication subst implic@(Implic { ic_skols = tvs
-                                      , ic_given = given
-                                      , ic_wanted = wanted
-                                      , ic_loc = loc })
-  = implic { ic_skols  = tvs'
-           , ic_given  = map (substEvVar subst1) given
-           , ic_wanted = substWC subst1 wanted
-           , ic_loc    = substGivenLoc subst1 loc }
-  where
-   (subst1, tvs') = mapAccumL substTyVarBndr subst tvs
-
-substEvVar :: TvSubst -> EvVar -> EvVar
-substEvVar subst var = setVarType var (substTy subst (varType var))
-
-substFlavor :: TvSubst -> CtEvidence -> CtEvidence
-substFlavor subst ctev@(CtGiven { ctev_gloc = gloc, ctev_pred = pred })
-  = ctev { ctev_gloc = substGivenLoc subst gloc
-          , ctev_pred = substTy subst pred }
-
-substFlavor subst ctev@(CtWanted { ctev_pred = pred })
-  = ctev  { ctev_pred = substTy subst pred }
-
-substFlavor subst ctev@(CtDerived { ctev_pred = pty })
-  = ctev { ctev_pred = substTy subst pty }
-
-substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
-substGivenLoc subst (CtLoc skol lcl) 
-  = CtLoc (substSkolemInfo subst skol) lcl
-
-substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
-substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)
-substSkolemInfo subst (InferSkol ids) = InferSkol (mapSnd (substTy subst) ids)
-substSkolemInfo _     info            = info
+tidySkolemInfo env info = (env, info)
 \end{code}

@@ -177,7 +177,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                   ])
 
            -- Simplify the RHS constraints
-       ; loc           <- getCtLoc (RuleSkol name)
+       ; lcl_env <- getLclEnv
        ; rhs_binds_var <- newTcEvBinds
        ; emitImplication $ Implic { ic_untch  = noUntouchables
                                   , ic_skols  = qtkvs
@@ -186,7 +186,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                   , ic_wanted = rhs_wanted
                                   , ic_insol  = insolubleWC rhs_wanted
                                   , ic_binds  = rhs_binds_var
-                                  , ic_loc    = loc } 
+                                  , ic_info   = RuleSkol name
+                                  , ic_env    = lcl_env } 
 
            -- For the LHS constraints we must solve the remaining constraints
            -- (a) so that we report insoluble ones
@@ -199,7 +200,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                   , ic_wanted = other_lhs_wanted
                                   , ic_insol  = insolubleWC other_lhs_wanted
                                   , ic_binds  = lhs_binds_var
-                                  , ic_loc    = loc } 
+                                  , ic_info   = RuleSkol name
+                                  , ic_env    = lcl_env } 
 
        ; return (HsRule name act
 		    (map (RuleBndr . noLoc) (qtkvs ++ tpl_ids))

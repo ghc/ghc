@@ -66,7 +66,7 @@ module TcMType (
   zonkTcType, zonkTcTypes, zonkTcThetaType,
 
   zonkTcKind, defaultKindVarToStar,
-  zonkEvVar, zonkWC, zonkId, zonkCt,
+  zonkEvVar, zonkWC, zonkId, zonkCt, zonkSkolemInfo,
 
   tcGetGlobalTyVars, 
   ) where
@@ -623,17 +623,17 @@ zonkImplication implic@(Implic { ic_untch  = untch
                                , ic_skols  = skols
                                , ic_given  = given
                                , ic_wanted = wanted
-                               , ic_loc = loc })
+                               , ic_info   = info })
   = do { skols'  <- mapM zonkTcTyVarBndr skols  -- Need to zonk their kinds!
                                                 -- as Trac #7230 showed
        ; given'  <- mapM zonkEvVar given
-       ; loc'    <- zonkGivenLoc loc
+       ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec binds_var untch wanted
        ; return (implic { ic_skols = skols'
                         , ic_given = given'
                         , ic_fsks  = []  -- Zonking removes all FlatSkol tyvars
                         , ic_wanted = wanted'
-                        , ic_loc = loc' }) }
+                        , ic_info = info' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)
@@ -643,7 +643,8 @@ zonkEvVar var = do { ty' <- zonkTcType (varType var)
 zonkWC :: EvBindsVar -- May add new bindings for wanted family equalities in here
        -> WantedConstraints -> TcM WantedConstraints
 zonkWC binds_var wc
-  = zonkWCRec binds_var noUntouchables wc
+  = do { untch <- getUntouchables
+       ; zonkWCRec binds_var untch wc }
 
 zonkWCRec :: EvBindsVar
           -> Untouchables
@@ -732,25 +733,18 @@ zonkCt ct
   | otherwise   = do { fl' <- zonkCtEvidence (cc_ev ct)
                      ; return $
                          CNonCanonical { cc_ev = fl'
-                                       , cc_depth = cc_depth ct } }
+                                       , cc_loc = cc_loc ct } }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
-zonkCtEvidence ctev@(CtGiven { ctev_gloc = loc, ctev_pred = pred }) 
-  = do { loc' <- zonkGivenLoc loc
-       ; pred' <- zonkTcType pred
-       ; return (ctev { ctev_gloc = loc', ctev_pred = pred'}) }
+zonkCtEvidence ctev@(CtGiven { ctev_pred = pred }) 
+  = do { pred' <- zonkTcType pred
+       ; return (ctev { ctev_pred = pred'}) }
 zonkCtEvidence ctev@(CtWanted { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred' }) }
 zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
   = do { pred' <- zonkTcType pred
        ; return (ctev { ctev_pred = pred' }) }
-
-zonkGivenLoc :: GivenLoc -> TcM GivenLoc
--- GivenLocs may have unification variables inside them!
-zonkGivenLoc (CtLoc skol_info lcl)
-  = do { skol_info' <- zonkSkolemInfo skol_info
-       ; return (CtLoc skol_info' lcl) }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
 zonkSkolemInfo (SigSkol cx ty)  = do { ty' <- zonkTcType ty

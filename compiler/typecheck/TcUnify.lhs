@@ -439,7 +439,7 @@ newImplication skol_info skol_tvs given thing_inside
             return (emptyTcEvBinds, result)
          else do
        { ev_binds_var <- newTcEvBinds
-       ; loc <- getCtLoc skol_info
+       ; env <- getLclEnv
        ; emitImplication $ Implic { ic_untch = untch
              		     	  , ic_skols = skol_tvs
                                   , ic_fsks  = []
@@ -447,7 +447,8 @@ newImplication skol_info skol_tvs given thing_inside
                                   , ic_wanted = wanted
                                   , ic_insol  = insolubleWC wanted
                                   , ic_binds = ev_binds_var
-             		     	  , ic_loc = loc }
+             		     	  , ic_env = env
+                                  , ic_info = skol_info }
 
        ; return (TcEvBinds ev_binds_var, result) } }
 \end{code}
@@ -533,9 +534,9 @@ uType_defer items ty1 ty2
   = ASSERT( not (null items) )
     do { eqv <- newEq ty1 ty2
        ; loc <- getCtLoc (TypeEqOrigin (last items))
-       ; let ctev = CtWanted { ctev_wloc = loc, ctev_evar = eqv
+       ; let ctev = CtWanted { ctev_evar = eqv
                              , ctev_pred = mkTcEqPred ty1 ty2 }
-       ; emitFlat $ mkNonCanonical ctev 
+       ; emitFlat $ mkNonCanonical loc ctev 
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on, because

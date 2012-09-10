@@ -815,13 +815,14 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
-getCtLoc :: orig -> TcM (CtLoc orig)
+getCtLoc :: CtOrigin -> TcM CtLoc
 getCtLoc origin
-  = do { env <- getLclEnv ; return (CtLoc origin env) }
+  = do { env <- getLclEnv 
+       ; return (CtLoc { ctl_origin = origin, ctl_env =  env, ctl_depth = 0 }) }
 
-setCtLoc :: CtLoc orig -> TcM a -> TcM a
+setCtLoc :: CtLoc -> TcM a -> TcM a
 -- Set the SrcSpan and error context from the CtLoc
-setCtLoc (CtLoc _ lcl) thing_inside
+setCtLoc (CtLoc { ctl_env = lcl }) thing_inside
   = updLclEnv (\env -> env { tcl_loc = tcl_loc lcl
                            , tcl_bndrs = tcl_bndrs lcl
                            , tcl_ctxt = tcl_ctxt lcl }) 

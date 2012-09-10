@@ -587,20 +587,11 @@ tidyOpenTyVar env@(_, subst) tyvar
 	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
 
 ---------------
-tidyTyVarOcc :: TidyEnv -> TyVar -> Type
-tidyTyVarOcc env@(_, subst) tv
+tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar
+tidyTyVarOcc (_, subst) tv
   = case lookupVarEnv subst tv of
-	Nothing  -> expand tv
-	Just tv' -> expand tv'
-  where
-    -- Expand FlatSkols, the skolems introduced by flattening process
-    -- We don't want to show them in type error messages
-    expand tv | isTcTyVar tv
-              , FlatSkol ty <- tcTyVarDetails tv
-              = WARN( True, text "I DON'T THINK THIS SHOULD EVER HAPPEN" <+> ppr tv <+> ppr ty )
-                tidyType env ty
-              | otherwise
-              = TyVarTy tv
+	Nothing  -> tv
+	Just tv' -> tv'
 
 ---------------
 tidyTypes :: TidyEnv -> [Type] -> [Type]
@@ -609,7 +600,7 @@ tidyTypes env tys = map (tidyType env) tys
 ---------------
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)            = LitTy n
-tidyType env (TyVarTy tv)	  = tidyTyVarOcc env tv
+tidyType env (TyVarTy tv)	  = TyVarTy (tidyTyVarOcc env tv)
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
  		                    in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)	  = (AppTy $! (tidyType env fun)) $! (tidyType env arg)

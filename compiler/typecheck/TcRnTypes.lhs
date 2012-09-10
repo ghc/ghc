@@ -54,25 +54,26 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt, 
         isGivenCt, isHoleCt,
-        ctWantedLoc, ctEvidence,
+        ctEvidence,
         SubGoalDepth, mkNonCanonical, mkNonCanonicalCt,
-        ctPred, ctEvPred, ctEvTerm, ctEvId, ctEvEnv,
+        ctPred, ctEvPred, ctEvTerm, ctEvId, 
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, unionsWC, addFlats, addImplics, mkFlatWC, addInsols,
 
         Implication(..),
-        CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin, setCtLocOrigin,
+        CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin, 
+        ctLocDepth, bumpCtLocDepth,
+        setCtLocOrigin,
 	CtOrigin(..), EqOrigin(..), 
-        WantedLoc, GivenLoc, pushErrCtxt, 
-        pushErrCtxtSameOrigin,
+        pushErrCtxt, pushErrCtxtSameOrigin,
 
 	SkolemInfo(..),
 
-        CtEvidence(..), pprFlavorArising,
+        CtEvidence(..),
         mkGivenLoc,
         isWanted, isGiven,
-        isDerived, getWantedLoc, getGivenLoc, canSolve, canRewrite,
+        isDerived, canSolve, canRewrite,
         CtFlavour(..), ctEvFlavour, ctFlavour,
 
 	-- Pretty printing
@@ -118,7 +119,6 @@ import DynFlags
 import Outputable
 import ListSetOps
 import FastString
-import Util
 
 import Data.Set (Set)
 \end{code}
@@ -848,9 +848,6 @@ type Xi = Type       -- In many comments, "xi" ranges over Xi
 
 type Cts = Bag Ct
 
-type SubGoalDepth = Int -- An ever increasing number used to restrict 
-                        -- simplifier iterations. Bounded by -fcontext-stack.
-
 data Ct
   -- Atomic canonical constraints 
   = CDictCan {  -- e.g.  Num xi
@@ -858,8 +855,7 @@ data Ct
       cc_class  :: Class,   
       cc_tyargs :: [Xi],
 
-      cc_depth  :: SubGoalDepth -- Simplification depth of this constraint
-                       -- See Note [WorkList]
+      cc_loc  :: CtLoc
     }
 
   | CIrredEvCan {  -- These stand for yet-unknown predicates
@@ -868,7 +864,7 @@ data Ct
                    -- Since, if it were a type constructor application, that'd make the
                    -- whole constraint a CDictCan, or CTyEqCan. And it can't be
                    -- a type family application either because it's a Xi type.
-      cc_depth :: SubGoalDepth -- See Note [WorkList]
+      cc_loc :: CtLoc
     }
 
   | CTyEqCan {  -- tv ~ xi	(recall xi means function free)
@@ -880,8 +876,7 @@ data Ct
       cc_ev :: CtEvidence,    -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar, 
       cc_rhs    :: Xi,
-
-      cc_depth :: SubGoalDepth -- See Note [WorkList] 
+      cc_loc    :: CtLoc
     }
 
   | CFunEqCan {  -- F xis ~ xi  
@@ -893,21 +888,20 @@ data Ct
       cc_rhs    :: Xi,      	--    *never* over-saturated (because if so
       		      		--    we should have decomposed)
 
-      cc_depth  :: SubGoalDepth -- See Note [WorkList]
+      cc_loc  :: CtLoc
                    
     }
 
   | CNonCanonical { -- See Note [NonCanonical Semantics] 
-      cc_ev    :: CtEvidence, 
-      cc_depth :: SubGoalDepth
+      cc_ev  :: CtEvidence, 
+      cc_loc :: CtLoc
     }
 
   | CHoleCan {
       cc_ev       :: CtEvidence,
       cc_hole_ty  :: TcTauType, -- Not a Xi! See same not as above
-      cc_depth    :: SubGoalDepth        -- See Note [WorkList]
+      cc_loc      :: CtLoc
     }
-
 \end{code}
 
 Note [Ct/evidence invariant]
@@ -919,11 +913,11 @@ This holds by construction; look at the unique place where CDictCan is
 built (in TcCanonical)
 
 \begin{code}
-mkNonCanonical :: CtEvidence -> Ct
-mkNonCanonical flav = CNonCanonical { cc_ev = flav, cc_depth = 0}
+mkNonCanonical :: CtLoc -> CtEvidence -> Ct
+mkNonCanonical loc ev = CNonCanonical { cc_ev = ev, cc_loc = loc }
 
 mkNonCanonicalCt :: Ct -> Ct
-mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct, cc_depth = 0}
+mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct, cc_loc = cc_loc ct }
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev
@@ -949,11 +943,6 @@ dropDerivedWC wc@(WC { wc_flat = flats })
 %************************************************************************
 
 \begin{code}
-ctWantedLoc :: Ct -> WantedLoc
--- Only works for Wanted/Derived
-ctWantedLoc ct = ASSERT2( not (isGiven (cc_ev ct)), ppr ct )
-                 getWantedLoc (cc_ev ct)
-
 isWantedCt :: Ct -> Bool
 isWantedCt = isWanted . cc_ev 
 
@@ -996,8 +985,7 @@ isHoleCt _ = False
 
 \begin{code}
 instance Outputable Ct where
-  ppr ct = ppr (cc_ev ct) <+> 
-           braces (ppr (cc_depth ct)) <+> parens (text ct_sort)
+  ppr ct = ppr (cc_ev ct) <+> parens (text ct_sort)
          where ct_sort = case ct of 
                            CTyEqCan {}      -> "CTyEqCan"
                            CFunEqCan {}     -> "CFunEqCan"
@@ -1113,7 +1101,7 @@ data Implication
                                 -- free in the environment
 
       ic_skols  :: [TcTyVar],    -- Introduced skolems 
-      		   	         -- See Note [Skolems in an implication]
+      ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
 
       ic_fsks  :: [TcTyVar],   -- Extra flatten-skolems introduced by the flattening
@@ -1122,9 +1110,9 @@ data Implication
       ic_given  :: [EvVar],      -- Given evidence variables
       		   		 --   (order does not matter)
 
-      ic_loc   :: GivenLoc,      -- Binding location of the implication,
-                                 --   which is also the location of all the
-                                 --   given evidence variables
+      ic_env   :: TcLclEnv,      -- Gives the source location and error context
+                                 -- for the implicatdion, and hence for all the
+                                 -- given evidence variables
 
       ic_wanted :: WantedConstraints,  -- The wanted
       ic_insol  :: Bool,               -- True iff insolubleWC ic_wanted is true
@@ -1137,7 +1125,7 @@ instance Outputable Implication where
   ppr (Implic { ic_untch = untch, ic_skols = skols, ic_fsks = fsks
               , ic_given = given
               , ic_wanted = wanted
-              , ic_binds = binds, ic_loc = loc })
+              , ic_binds = binds, ic_info = info })
    = ptext (sLit "Implic") <+> braces 
      (sep [ ptext (sLit "Untouchables = ") <+> ppr untch
           , ptext (sLit "Skolems = ") <+> ppr skols
@@ -1145,8 +1133,7 @@ instance Outputable Implication where
           , ptext (sLit "Given = ") <+> pprEvVars given
           , ptext (sLit "Wanted = ") <+> ppr wanted
           , ptext (sLit "Binds = ") <+> ppr binds
-          , pprSkolInfo (ctLocOrigin loc)
-          , ppr (ctLocSpan loc) ])
+          , pprSkolInfo info ])
 \end{code}
 
 Note [Shadowing in a constraint]
@@ -1227,7 +1214,7 @@ pprWantedsWithLocs wcs
 
 %************************************************************************
 %*									*
-            CtLoc
+            CtEvidence
 %*									*
 %************************************************************************
 
@@ -1239,19 +1226,16 @@ may be un-zonked.
 
 \begin{code}
 data CtEvidence 
-  = CtGiven { ctev_gloc :: GivenLoc
-            , ctev_pred :: TcPredType
+  = CtGiven { ctev_pred :: TcPredType
             , ctev_evtm :: EvTerm }          -- See Note [Evidence field of CtEvidence]
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
     
-  | CtWanted { ctev_wloc :: WantedLoc
-             , ctev_pred :: TcPredType
+  | CtWanted { ctev_pred :: TcPredType
              , ctev_evar :: EvVar }          -- See Note [Evidence field of CtEvidence]
     -- Wanted goal 
     
-  | CtDerived { ctev_wloc :: WantedLoc 
-              , ctev_pred :: TcPredType }
+  | CtDerived { ctev_pred :: TcPredType }
     -- A goal that we don't really have to solve and can't immediately 
     -- rewrite anything other than a derived (there's no evidence!) 
     -- but if we do manage to solve it may help in solving other goals.
@@ -1276,11 +1260,6 @@ ctEvTerm (CtWanted  { ctev_evar = ev }) = EvId ev
 ctEvTerm ctev@(CtDerived {}) = pprPanic "ctEvTerm: derived constraint cannot have id" 
                                       (ppr ctev)
 
-ctEvEnv :: CtEvidence -> TcLclEnv
-ctEvEnv (CtWanted  { ctev_wloc = loc }) = ctLocEnv loc
-ctEvEnv (CtDerived { ctev_wloc = loc }) = ctLocEnv loc
-ctEvEnv (CtGiven   { ctev_gloc = loc }) = ctLocEnv loc
-
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted  { ctev_evar = ev }) = ev
 ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
@@ -1296,19 +1275,6 @@ instance Outputable CtEvidence where
              CtWanted {}  -> ptext (sLit "[W]") <+> ppr (ctev_evar fl) <+> ppr_pty
              CtDerived {} -> ptext (sLit "[D]") <+> text "_" <+> ppr_pty
          where ppr_pty = dcolon <+> ppr (ctEvPred fl)
-
-getWantedLoc :: CtEvidence -> WantedLoc
--- Precondition: Wanted or Derived
-getWantedLoc fl = ctev_wloc fl
-
-getGivenLoc :: CtEvidence -> GivenLoc 
--- Precondition: Given
-getGivenLoc fl = ctev_gloc fl
-
-pprFlavorArising :: CtEvidence -> SDoc
-pprFlavorArising (CtGiven { ctev_gloc = gl }) = pprArisingAt gl
-pprFlavorArising ctev                         = pprArisingAt (ctev_wloc ctev)
-
 
 isWanted :: CtEvidence -> Bool
 isWanted (CtWanted {}) = True
@@ -1343,9 +1309,6 @@ canRewrite :: CtFlavour -> CtFlavour -> Bool
 -- canRewrite ct1 ct2 
 -- The equality constraint ct1 can be used to rewrite inside ct2 
 canRewrite = canSolve 
-
-mkGivenLoc :: WantedLoc -> SkolemInfo -> GivenLoc
-mkGivenLoc wl sk = setCtLocOrigin wl sk
 \end{code}
 
 %************************************************************************
@@ -1360,35 +1323,49 @@ dictionaries don't appear in the original source code.
 type will evolve...
 
 \begin{code}
-data CtLoc orig = CtLoc orig TcLclEnv
+data CtLoc = CtLoc { ctl_origin :: CtOrigin
+                   , ctl_env ::  TcLclEnv
+                   , ctl_depth :: SubGoalDepth }
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: SrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: [TcIdBinders]
 
-type WantedLoc = CtLoc CtOrigin    -- Instantiation for wanted constraints
-type GivenLoc  = CtLoc SkolemInfo  -- Instantiation for given constraints
+type SubGoalDepth = Int -- An ever increasing number used to restrict 
+                        -- simplifier iterations. Bounded by -fcontext-stack.
+                        -- See Note [WorkList]
 
-ctLocEnv :: CtLoc o -> TcLclEnv
-ctLocEnv (CtLoc _ lcl) = lcl
+mkGivenLoc :: SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc skol_info env = CtLoc { ctl_origin = GivenOrigin skol_info
+                                 , ctl_env = env
+                                 , ctl_depth = 0 }
 
-ctLocSpan :: CtLoc o -> SrcSpan
-ctLocSpan (CtLoc _ lcl) = tcl_loc lcl
+ctLocEnv :: CtLoc -> TcLclEnv
+ctLocEnv = ctl_env
 
-ctLocOrigin :: CtLoc o -> o
-ctLocOrigin (CtLoc o _) = o
+ctLocDepth :: CtLoc -> SubGoalDepth
+ctLocDepth = ctl_depth
 
-setCtLocOrigin :: CtLoc o -> o' -> CtLoc o'
-setCtLocOrigin (CtLoc _ lcl) o = CtLoc o lcl
+ctLocOrigin :: CtLoc -> CtOrigin
+ctLocOrigin = ctl_origin
 
-pushErrCtxt :: orig -> ErrCtxt -> CtLoc orig -> CtLoc orig
-pushErrCtxt o err (CtLoc _ lcl) 
-  = CtLoc o (lcl { tcl_ctxt = err : tcl_ctxt lcl })
+ctLocSpan :: CtLoc -> SrcSpan
+ctLocSpan (CtLoc { ctl_env = lcl}) = tcl_loc lcl
 
-pushErrCtxtSameOrigin :: ErrCtxt -> CtLoc orig -> CtLoc orig
+bumpCtLocDepth :: CtLoc -> CtLoc
+bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = d+1 }
+
+setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
+setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
+
+pushErrCtxt :: CtOrigin -> ErrCtxt -> CtLoc -> CtLoc
+pushErrCtxt o err loc@(CtLoc { ctl_env = lcl }) 
+  = loc { ctl_origin = o, ctl_env = lcl { tcl_ctxt = err : tcl_ctxt lcl } }
+
+pushErrCtxtSameOrigin :: ErrCtxt -> CtLoc -> CtLoc
 -- Just add information w/o updating the origin!
-pushErrCtxtSameOrigin err (CtLoc o lcl) 
-  = CtLoc o (lcl { tcl_ctxt = err : tcl_ctxt lcl })
+pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
+  = loc { ctl_env = lcl { tcl_ctxt = err : tcl_ctxt lcl } }
 
 pprArising :: CtOrigin -> SDoc
 -- Used for the main, top-level error message
@@ -1397,9 +1374,10 @@ pprArising (TypeEqOrigin {}) = empty
 pprArising FunDepOrigin      = empty
 pprArising orig              = text "arising from" <+> ppr orig
 
-pprArisingAt :: Outputable o => CtLoc o -> SDoc
-pprArisingAt (CtLoc o lcl) = sep [ text "arising from" <+> ppr o
-                                 , text "at" <+> ppr (tcl_loc lcl)]
+pprArisingAt :: CtLoc -> SDoc
+pprArisingAt (CtLoc { ctl_origin = o, ctl_env = lcl}) 
+  = sep [ text "arising from" <+> ppr o
+        , text "at" <+> ppr (tcl_loc lcl)]
 \end{code}
 
 %************************************************************************
@@ -1491,9 +1469,11 @@ pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "Unk
 %************************************************************************
 
 \begin{code}
--- CtOrigin gives the origin of *wanted* constraints
 data CtOrigin
-  = OccurrenceOf Name		-- Occurrence of an overloaded identifier
+  = GivenOrigin SkolemInfo
+
+  -- All the others are for *wanted* constraints
+  | OccurrenceOf Name		-- Occurrence of an overloaded identifier
   | AppOrigin	 		-- An application of some kind
 
   | SpecPragOrigin Name		-- Specialisation pragma for identifier
@@ -1537,6 +1517,7 @@ instance Outputable CtOrigin where
   ppr orig = pprO orig
 
 pprO :: CtOrigin -> SDoc
+pprO (GivenOrigin sk)      = ppr sk
 pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
 pprO AppOrigin             = ptext (sLit "an application")
 pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]

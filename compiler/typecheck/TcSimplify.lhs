@@ -445,9 +445,8 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
             -- Step 7) Emit an implication
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
-       ; gloc <- getCtLoc skol_info
-       ; untch <- TcRnMonad.getUntouchables
-       ; let implic = Implic { ic_untch    = pushUntouchables untch 
+       ; lcl_env <- TcRnMonad.getLclEnv
+       ; let implic = Implic { ic_untch    = pushUntouchables (tcl_untch lcl_env)
                              , ic_skols    = qtvs_to_return
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
                                                  -- hence no flatten-skolems (which come from givens)
@@ -455,7 +454,8 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                              , ic_wanted   = wanted_transformed 
                              , ic_insol    = False
                              , ic_binds    = ev_binds_var
-                             , ic_loc      = gloc }
+                             , ic_info     = skol_info
+                             , ic_env      = lcl_env }
        ; emitImplication implic
          
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
@@ -657,15 +657,19 @@ and does not fail if -fwarn-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
 
 \begin{code}
-
 solveWantedsTcMWithEvBinds :: EvBindsVar
                            -> WantedConstraints
                            -> (WantedConstraints -> TcS WantedConstraints)
                            -> TcM WantedConstraints
+-- Returns a *zonked* result
+-- We zonk when we finish primarily to un-flatten out any
+-- flatten-skolems etc introduced by canonicalisation of
+-- types involving type funuctions.  Happily the result 
+-- is typically much smaller than the input, indeed it is 
+-- often empty.
 solveWantedsTcMWithEvBinds ev_binds_var wc tcs_action
-  = do { wc1 <- zonkWC ev_binds_var wc
-       ; traceTc "solveWantedsTcMWithEvBinds" $ text "zonked wanted=" <+> ppr wc1
-       ; wc2 <- runTcSWithEvBinds ev_binds_var (tcs_action wc1)
+  = do { traceTc "solveWantedsTcMWithEvBinds" $ text "wanted=" <+> ppr wc
+       ; wc2 <- runTcSWithEvBinds ev_binds_var (tcs_action wc)
        ; zonkWC ev_binds_var wc2 }
 
 solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
@@ -781,7 +785,8 @@ solveImplication inerts
                  , ic_fsks   = old_fsks
                  , ic_given  = givens
                  , ic_wanted = wanteds
-                 , ic_loc    = loc })
+                 , ic_info   = info
+                 , ic_env    = env })
   = 
     do { traceTcS "solveImplication {" (ppr imp) 
 
@@ -789,7 +794,7 @@ solveImplication inerts
          -- NB: 'inerts' has empty inert_fsks
        ; (new_fsks, residual_wanted) 
             <- nestImplicTcS ev_binds untch inerts $
-               do { solveInteractGiven loc old_fsks givens 
+               do { solveInteractGiven (mkGivenLoc info env) old_fsks givens 
                   ; residual_wanted <- solve_wanteds wanteds
                   ; more_fsks <- getFlattenSkols
                   ; return (more_fsks ++ old_fsks, residual_wanted) }
@@ -1230,8 +1235,7 @@ newFlatWanteds orig theta
   where 
     inst_to_wanted loc pty 
           = do { v <- TcMType.newWantedEvVar pty 
-               ; return $ mkNonCanonical $
+               ; return $ mkNonCanonical loc $
                  CtWanted { ctev_evar = v
-                          , ctev_wloc = loc
                           , ctev_pred = pty } }
 \end{code}
