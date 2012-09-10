@@ -641,7 +641,7 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
            or x y = CmmMachOp (MO_Or wordWidth) [x, y]
            hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                 wordWidth)
-           hwm = CmmLit (CmmInt halfWordMask wordWidth)
+           hwm = CmmLit (CmmInt (halfWordMask platform) wordWidth)
        emit $ catAGraphs
           [mkAssign (CmmLocal r1)
                (add (bottomHalf arg_x) (bottomHalf arg_y)),
@@ -675,7 +675,7 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
           or x y = CmmMachOp (MO_Or wordWidth) [x, y]
           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                wordWidth)
-          hwm = CmmLit (CmmInt halfWordMask wordWidth)
+          hwm = CmmLit (CmmInt (halfWordMask platform) wordWidth)
       emit $ catAGraphs
              [mkAssign xlyl
                   (mul (bottomHalf arg_x) (bottomHalf arg_y)),

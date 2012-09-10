@@ -568,7 +568,7 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
                      or x y = CmmMachOp (MO_Or wordWidth) [x, y]
                      hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                           wordWidth)
-                     hwm = CmmLit (CmmInt halfWordMask wordWidth)
+                     hwm = CmmLit (CmmInt (halfWordMask platform) wordWidth)
           stmt = CmmCall (CmmPrim (MO_Add2 wordWidth) (Just genericImpl))
                          [CmmHinted res_h NoHint,
                           CmmHinted res_l NoHint]
@@ -614,7 +614,7 @@ emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
                      or x y = CmmMachOp (MO_Or wordWidth) [x, y]
                      hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth platform)))
                                           wordWidth)
-                     hwm = CmmLit (CmmInt halfWordMask wordWidth)
+                     hwm = CmmLit (CmmInt (halfWordMask platform) wordWidth)
           stmt = CmmCall (CmmPrim (MO_U_Mul2 wordWidth) (Just genericImpl))
                          [CmmHinted res_h NoHint,
                           CmmHinted res_l NoHint]
