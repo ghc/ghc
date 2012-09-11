@@ -6,37 +6,30 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CgProf (
-	mkCCostCentre, mkCCostCentreStack,
+        mkCCostCentre, mkCCostCentreStack,
 
-	-- Cost-centre Profiling
+        -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk,
         enterCostCentreFun,
         costCentreFrom,
         curCCS, storeCurCCS,
-	emitCostCentreDecl, emitCostCentreStackDecl, 
+        emitCostCentreDecl, emitCostCentreStackDecl,
         emitSetCCC,
 
-	-- Lag/drag/void stuff
-	ldvEnter, ldvEnterClosure, ldvRecordCreate
+        -- Lag/drag/void stuff
+        ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
 
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
  -- For WORD_SIZE_IN_BITS only.
 #include "../includes/rts/Constants.h"
-	-- For LDV_CREATE_MASK, LDV_STATE_USE
-	-- which are StgWords
+        -- For LDV_CREATE_MASK, LDV_STATE_USE
+        -- which are StgWords
 #include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
+        -- For REP_xxx constants, which are MachReps
 
 import ClosureInfo
 import CgUtils
@@ -52,7 +45,7 @@ import CostCentre
 import DynFlags
 import FastString
 import Module
-import Constants	-- Lots of field offsets
+import Constants        -- Lots of field offsets
 import Outputable
 
 import Data.Char
@@ -77,8 +70,8 @@ mkCCostCentre cc = CmmLabel (mkCCLabel cc)
 mkCCostCentreStack :: CostCentreStack -> CmmLit
 mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 
-costCentreFrom :: CmmExpr 	-- A closure pointer
-	       -> CmmExpr	-- The cost centre from that closure
+costCentreFrom :: CmmExpr       -- A closure pointer
+               -> CmmExpr       -- The cost centre from that closure
 costCentreFrom cl = CmmLoad (cmmOffsetB cl oFFSET_StgHeader_ccs) bWord
 
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
@@ -93,11 +86,11 @@ dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
 
 initUpdFrameProf :: CmmExpr -> Code
 -- Initialise the profiling field of an update frame
-initUpdFrameProf frame_amode 
-  = ifProfiling $	-- frame->header.prof.ccs = CCCS
+initUpdFrameProf frame_amode
+  = ifProfiling $       -- frame->header.prof.ccs = CCCS
     stmtC (CmmStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS)
-	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
-	-- is unnecessary because it is not used anyhow.
+        -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
+        -- is unnecessary because it is not used anyhow.
 
 -- -----------------------------------------------------------------------------
 -- Recording allocation in a cost centre
@@ -127,15 +120,15 @@ profAlloc words ccs
                                             mkIntExpr (profHdrSize dflags)]]))
                    -- subtract the "profiling overhead", which is the
                    -- profiling header in a closure.
- where 
+ where
    alloc_rep = typeWidth REP_CostCentreStack_mem_alloc
 
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
 
 enterCostCentreThunk :: CmmExpr -> Code
-enterCostCentreThunk closure = 
-  ifProfiling $ do 
+enterCostCentreThunk closure =
+  ifProfiling $ do
     stmtC $ storeCurCCS (costCentreFrom closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> [GlobalReg] -> Code
@@ -163,7 +156,7 @@ ifProfilingL dflags xs
 emitCostCentreDecl
    :: CostCentre
    -> Code
-emitCostCentreDecl cc = do 
+emitCostCentreDecl cc = do
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   { label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
   ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
@@ -177,15 +170,15 @@ emitCostCentreDecl cc = do
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
-     lits = [ zero,   	-- StgInt ccID,
-	      label,	-- char *label,
-	      modl,	-- char *module,
+     lits = [ zero,     -- StgInt ccID,
+              label,    -- char *label,
+              modl,     -- char *module,
               loc,      -- char *srcloc,
               zero64,   -- StgWord64 mem_alloc
               zero,     -- StgWord time_ticks
               is_caf,   -- StgInt is_caf
               zero      -- struct _CostCentre *link
-	    ] 
+            ]
   ; emitDataLits (mkCCLabel cc) lits
   }
   where
@@ -196,15 +189,15 @@ emitCostCentreDecl cc = do
 emitCostCentreStackDecl
    :: CostCentreStack
    -> Code
-emitCostCentreStackDecl ccs 
+emitCostCentreStackDecl ccs
   | Just cc <- maybeSingletonCCS ccs = do
   { let
-	-- Note: to avoid making any assumptions about how the
-	-- C compiler (that compiles the RTS, in particular) does
-	-- layouts of structs containing long-longs, simply
-	-- pad out the struct with zero words until we hit the
-	-- size of the overall struct (which we get via DerivedConstants.h)
-	--
+        -- Note: to avoid making any assumptions about how the
+        -- C compiler (that compiles the RTS, in particular) does
+        -- layouts of structs containing long-longs, simply
+        -- pad out the struct with zero words until we hit the
+        -- size of the overall struct (which we get via DerivedConstants.h)
+        --
      lits = zero : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) zero
   ; emitDataLits (mkCCSLabel ccs) lits
   }
@@ -216,7 +209,7 @@ zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
 sizeof_ccs_words :: Int
-sizeof_ccs_words 
+sizeof_ccs_words
     -- round up to the next word.
   | ms == 0   = ws
   | otherwise = ws + 1
@@ -239,18 +232,18 @@ emitSetCCC cc tick push
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result AddrHint
-	rtsPackageId 
+        rtsPackageId
         (fsLit "pushCostCentre") [CmmHinted ccs AddrHint,
                                   CmmHinted (CmmLit (mkCCostCentre cc)) AddrHint]
 
 bumpSccCount :: CmmExpr -> CmmStmt
 bumpSccCount ccs
   = addToMem (typeWidth REP_CostCentreStack_scc_count)
-	 (cmmOffsetB ccs oFFSET_CostCentreStack_scc_count) 1
+         (cmmOffsetB ccs oFFSET_CostCentreStack_scc_count) 1
 
 -----------------------------------------------------------------------------
 --
---		Lag/drag/void stuff
+--              Lag/drag/void stuff
 --
 -----------------------------------------------------------------------------
 
@@ -264,12 +257,12 @@ staticLdvInit = zeroCLit
 -- Initial value of the LDV field in a dynamic closure
 --
 dynLdvInit :: CmmExpr
-dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE  
+dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp mo_wordOr [
       CmmMachOp mo_wordShl [loadEra, mkIntExpr lDV_SHIFT ],
       CmmLit (mkWordCLit lDV_STATE_CREATE)
   ]
-        
+
 --
 -- Initialise the LDV word of a new closure
 --
@@ -286,7 +279,7 @@ ldvEnterClosure :: ClosureInfo -> Code
 ldvEnterClosure closure_info = ldvEnter (cmmOffsetB (CmmReg nodeReg) (-tag))
   where tag = funTag closure_info
         -- don't forget to substract node's tag
-  
+
 ldvEnter :: CmmExpr -> Code
 -- Argument is a closure pointer
 ldvEnter cl_ptr
@@ -295,20 +288,20 @@ ldvEnter cl_ptr
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
      --                era | LDV_STATE_USE }
     emitIf (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
-	   (stmtC (CmmStore ldv_wd new_ldv_wd))
+           (stmtC (CmmStore ldv_wd new_ldv_wd))
   where
         -- don't forget to substract node's tag
     ldv_wd = ldvWord cl_ptr
     new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd bWord)
-				       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
-		 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
+                                       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
+                 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
 
-loadEra :: CmmExpr 
+loadEra :: CmmExpr
 loadEra = CmmMachOp (MO_UU_Conv cIntWidth wordWidth)
-	  [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
+          [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
 
 ldvWord :: CmmExpr -> CmmExpr
--- Takes the address of a closure, and returns 
+-- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
 ldvWord closure_ptr = cmmOffsetB closure_ptr oFFSET_StgHeader_ldvw
 
