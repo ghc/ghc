@@ -547,6 +547,7 @@ void setupRtsFlags (int *argc, char *argv[],
     procRtsOpts(rts_argc0, rtsOptsEnabled);
 
     appendRtsArg((char *)0);
+    rts_argc--; // appendRtsArg will have bumped it for the NULL (#7227)
 
     normaliseRtsOpts();
 
