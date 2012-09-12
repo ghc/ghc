@@ -102,8 +102,9 @@ lneIdInfo dflags id regs
 
 rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
-  = do { reg <- newTemp gcWord
-       ; return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg) }
+  = do dflags <- getDynFlags
+       reg <- newTemp (gcWord dflags)
+       return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
 mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit dflags reg lf_info expr

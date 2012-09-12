@@ -133,7 +133,7 @@ cmmLitType dflags (CmmHighStackMark)   = bWord dflags
 
 cmmLabelType :: DynFlags -> CLabel -> CmmType
 cmmLabelType dflags lbl
- | isGcPtrLabel lbl = gcWord
+ | isGcPtrLabel lbl = gcWord dflags
  | otherwise        = bWord dflags
 
 cmmExprWidth :: DynFlags -> CmmExpr -> Width
@@ -415,11 +415,12 @@ node :: GlobalReg
 node = VanillaReg 1 VGcPtr
 
 globalRegType :: DynFlags -> GlobalReg -> CmmType
-globalRegType _      (VanillaReg _ VGcPtr)    = gcWord
+globalRegType dflags (VanillaReg _ VGcPtr)    = gcWord dflags
 globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
 globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
-globalRegType _      Hp                = gcWord    -- The initialiser for all
+globalRegType dflags Hp                = gcWord dflags
+                                            -- The initialiser for all
                                             -- dynamically allocated closures
 globalRegType dflags _                 = bWord dflags

@@ -652,9 +652,10 @@ genStore_slow env addr val meta = do
         other ->
             pprPanic "genStore: ptr not right type!"
                     (PprCmm.pprExpr addr <+> text (
-                        "Size of Ptr: " ++ show llvmPtrBits ++
+                        "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
                         ", Size of var: " ++ show (llvmWidthInBits other) ++
                         ", Var: " ++ show vaddr))
+    where dflags = getDflags env
 
 
 -- | Unconditional branch
@@ -1130,10 +1131,10 @@ genLoad_slow env e ty meta = do
 
          other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                         (PprCmm.pprExpr e <+> text (
-                            "Size of Ptr: " ++ show llvmPtrBits ++
+                            "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
                             ", Size of var: " ++ show (llvmWidthInBits other) ++
                             ", Var: " ++ show iptr))
-
+    where dflags = getDflags env
 
 -- | Handle CmmReg expression
 --

@@ -231,7 +231,7 @@ mkReturn dflags e actuals updfr_off =
 mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple dflags actuals updfr_off =
   mkReturn dflags e actuals updfr_off
-  where e = CmmLoad (CmmStackSlot Old updfr_off) gcWord
+  where e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)

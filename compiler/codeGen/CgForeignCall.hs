@@ -256,7 +256,7 @@ emitOpenNursery =
    do dflags <- getDynFlags
       stmtsC [
         -- Hp = CurrentNursery->free - 1;
-        CmmAssign hp (cmmOffsetW dflags (CmmLoad (nursery_bdescr_free dflags) gcWord) (-1)),
+        CmmAssign hp (cmmOffsetW dflags (CmmLoad (nursery_bdescr_free dflags) (gcWord dflags)) (-1)),
 
         -- HpLim = CurrentNursery->start +
         --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;

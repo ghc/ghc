@@ -266,7 +266,7 @@ instance Outputable CgRep where
     ppr DoubleArg = ptext (sLit "D_")
 
 argMachRep :: DynFlags -> CgRep -> CmmType
-argMachRep _      PtrArg    = gcWord
+argMachRep dflags PtrArg    = gcWord dflags
 argMachRep dflags NonPtrArg = bWord dflags
 argMachRep _      LongArg   = b64
 argMachRep _      FloatArg  = f32

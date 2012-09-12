@@ -102,8 +102,8 @@ bWord _ = cmmBits wordWidth
 bHalfWord :: DynFlags -> CmmType
 bHalfWord dflags = cmmBits (halfWordWidth dflags)
 
-gcWord :: CmmType
-gcWord = CmmType GcPtrCat wordWidth
+gcWord :: DynFlags -> CmmType
+gcWord _ = CmmType GcPtrCat wordWidth
 
 cInt, cLong :: CmmType
 cInt  = cmmBits cIntWidth

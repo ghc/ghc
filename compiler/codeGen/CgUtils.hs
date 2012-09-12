@@ -184,7 +184,7 @@ addToMemE width ptr n
 
 tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
 tagToClosure dflags tycon tag
-  = CmmLoad (cmmOffsetExprW dflags closure_tbl tag) gcWord
+  = CmmLoad (cmmOffsetExprW dflags closure_tbl tag) (gcWord dflags)
   where closure_tbl = CmmLit (CmmLabel lbl)
         lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 

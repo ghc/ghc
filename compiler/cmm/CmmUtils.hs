@@ -89,7 +89,7 @@ import Hoopl
 
 primRepCmmType :: DynFlags -> PrimRep -> CmmType
 primRepCmmType _      VoidRep    = panic "primRepCmmType:VoidRep"
-primRepCmmType _      PtrRep     = gcWord
+primRepCmmType dflags PtrRep     = gcWord dflags
 primRepCmmType dflags IntRep     = bWord dflags
 primRepCmmType dflags WordRep    = bWord dflags
 primRepCmmType _      Int64Rep   = b64

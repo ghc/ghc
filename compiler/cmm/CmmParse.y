@@ -611,7 +611,7 @@ typenot8 :: { CmmType }
         | 'bits64'              { b64 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
-        | 'gcptr'               { gcWord }
+        | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
 {
 section :: String -> Section
 section "text"      = Text

@@ -167,7 +167,7 @@ emitPrimOp _      [res] GetCurrentCCSOp [_dummy_arg] _live
    = stmtC (CmmAssign (CmmLocal res) curCCS)
 
 emitPrimOp dflags [res] ReadMutVarOp [mutv] _
-   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSize dflags) gcWord))
+   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSize dflags) (gcWord dflags)))
 
 emitPrimOp dflags [] WriteMutVarOp [mutv,var] live
    = do stmtC (CmmStore (cmmOffsetW dflags mutv (fixedHdrSize dflags)) var)
@@ -818,7 +818,7 @@ doIndexByteArrayOp _ _ _ _
 doReadPtrArrayOp :: LocalReg -> CmmExpr -> CmmExpr -> Code
 doReadPtrArrayOp res addr idx
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing gcWord res addr idx
+        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr idx
 
 
 doWriteOffAddrOp, doWriteByteArrayOp

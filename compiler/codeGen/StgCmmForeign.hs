@@ -292,7 +292,7 @@ emitSaveThreadState bid = do
 
   -- CurrentTSO->stackobj->sp = Sp;
   emitStore (cmmOffset dflags (CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags))
-                 (CmmStackSlot (Young bid) (widthInBytes (typeWidth gcWord)))
+                 (CmmStackSlot (Young bid) (widthInBytes (typeWidth (gcWord dflags))))
   emit $ closeNursery dflags
   -- and save the current cost centre stack in the TSO when profiling:
   when (dopt Opt_SccProfilingOn dflags) $
@@ -304,8 +304,8 @@ closeNursery dflags = mkStore (nursery_bdescr_free dflags) (cmmOffsetW dflags st
 
 loadThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
 loadThreadState dflags tso stack = do
-  -- tso <- newTemp gcWord -- TODO FIXME NOW
-  -- stack <- newTemp gcWord -- TODO FIXME NOW
+  -- tso <- newTemp (gcWord dflags) -- TODO FIXME NOW
+  -- stack <- newTemp (gcWord dflags) -- TODO FIXME NOW
   catAGraphs [
         -- tso = CurrentTSO;
         mkAssign (CmmLocal tso) stgCurrentTSO,
