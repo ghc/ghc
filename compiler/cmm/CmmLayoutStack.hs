@@ -120,7 +120,7 @@ cmmLayoutStack dflags procpoints entry_args
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
-            layout procpoints liveness entry entry_args
+            layout dflags procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
     new_blocks' <- mapM (lowerSafeForeignCall dflags) new_blocks
@@ -130,7 +130,8 @@ cmmLayoutStack dflags procpoints entry_args
 
 
 
-layout :: BlockSet                      -- proc points
+layout :: DynFlags
+       -> BlockSet                      -- proc points
        -> BlockEnv CmmLive              -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
@@ -146,7 +147,7 @@ layout :: BlockSet                      -- proc points
           , [CmmBlock]                  -- [out] new blocks
           )
 
-layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
+layout dflags procpoints liveness entry entry_args final_stackmaps final_hwm blocks
   = go blocks init_stackmap entry_args []
   where
     (updfr, cont_info)  = collectContInfo blocks
@@ -187,7 +188,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        --     each of the successor blocks.  See handleLastNode for
        --     details.
        (middle2, sp_off, last1, fixup_blocks, out)
-           <- handleLastNode procpoints liveness cont_info
+           <- handleLastNode dflags procpoints liveness cont_info
                              acc_stackmaps stack1 middle0 last0
     
        -- pprTrace "layout(out)" (ppr out) $ return ()
@@ -210,7 +211,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
               -- beginning of a proc, and we don't modify Sp before the
               -- check.
 
-           final_blocks = manifestSp final_stackmaps stack0 sp0 sp_high entry0
+           final_blocks = manifestSp dflags final_stackmaps stack0 sp0 sp_high entry0
                               middle_pre sp_off last1 fixup_blocks
 
            acc_stackmaps' = mapUnion acc_stackmaps out
@@ -317,7 +318,7 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
+   :: DynFlags -> ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
    -> BlockEnv StackMap -> StackMap
    -> Block CmmNode O O
    -> CmmNode O C
@@ -329,7 +330,7 @@ handleLastNode
       , BlockEnv StackMap  -- stackmaps for the continuations
       )
 
-handleLastNode procpoints liveness cont_info stackmaps
+handleLastNode dflags procpoints liveness cont_info stackmaps
                stack0@StackMap { sm_sp = sp0 } middle last
  = case last of
     --  At each return / tail call,
@@ -428,7 +429,7 @@ handleLastNode procpoints liveness cont_info stackmaps
         | Just stack2 <- mapLookup l stackmaps
         = do
              let assigs = fixupStack stack0 stack2
-             (tmp_lbl, block) <- makeFixupBlock sp0 l stack2 assigs
+             (tmp_lbl, block) <- makeFixupBlock dflags sp0 l stack2 assigs
              return (l, tmp_lbl, stack2, block)
 
         --   (b) if the successor is a proc point, save everything
@@ -442,7 +443,7 @@ handleLastNode procpoints liveness cont_info stackmaps
                       setupStackFrame l liveness (sm_ret_off stack0)
                                                        cont_args stack0
              --
-             (tmp_lbl, block) <- makeFixupBlock sp0 l stack2 assigs
+             (tmp_lbl, block) <- makeFixupBlock dflags sp0 l stack2 assigs
              return (l, tmp_lbl, stack2, block)
 
         --   (c) otherwise, the current StackMap is the StackMap for
@@ -456,14 +457,15 @@ handleLastNode procpoints liveness cont_info stackmaps
               is_live (r,_) = r `elemRegSet` live
 
 
-makeFixupBlock :: ByteOff -> Label -> StackMap -> [CmmNode O O] -> UniqSM (Label, [CmmBlock])
-makeFixupBlock sp0 l stack assigs
+makeFixupBlock :: DynFlags -> ByteOff -> Label -> StackMap -> [CmmNode O O]
+               -> UniqSM (Label, [CmmBlock])
+makeFixupBlock dflags sp0 l stack assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do
     tmp_lbl <- liftM mkBlockId $ getUniqueM
     let sp_off = sp0 - sm_sp stack
         block = blockJoin (CmmEntry tmp_lbl)
-                          (maybeAddSpAdj sp_off (blockFromList assigs))
+                          (maybeAddSpAdj dflags sp_off (blockFromList assigs))
                           (CmmBranch l)
     return (tmp_lbl, [block])
 
@@ -705,7 +707,8 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
 -- middle_post, because the Sp adjustment intervenes.
 --
 manifestSp
-   :: BlockEnv StackMap  -- StackMaps for other blocks
+   :: DynFlags
+   -> BlockEnv StackMap  -- StackMaps for other blocks
    -> StackMap           -- StackMap for this block
    -> ByteOff            -- Sp on entry to the block
    -> ByteOff            -- SpHigh
@@ -716,17 +719,17 @@ manifestSp
    -> [CmmBlock]         -- new blocks
    -> [CmmBlock]         -- final blocks with Sp manifest
 
-manifestSp stackmaps stack0 sp0 sp_high
+manifestSp dflags stackmaps stack0 sp0 sp_high
            first middle_pre sp_off last fixup_blocks
   = final_block : fixup_blocks'
   where
     area_off = getAreaOff stackmaps
 
     adj_pre_sp, adj_post_sp :: CmmNode e x -> CmmNode e x
-    adj_pre_sp  = mapExpDeep (areaToSp sp0            sp_high area_off)
-    adj_post_sp = mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
+    adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
+    adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
 
-    final_middle = maybeAddSpAdj sp_off $
+    final_middle = maybeAddSpAdj dflags sp_off $
                    blockFromList $
                    map adj_pre_sp $
                    elimStackStores stack0 stackmaps area_off $
@@ -747,10 +750,10 @@ getAreaOff stackmaps (Young l) =
     Nothing -> pprPanic "getAreaOff" (ppr l)
 
 
-maybeAddSpAdj :: ByteOff -> Block CmmNode O O -> Block CmmNode O O
-maybeAddSpAdj 0      block = block
-maybeAddSpAdj sp_off block
-   = block `blockSnoc` CmmAssign spReg (cmmOffset (CmmReg spReg) sp_off)
+maybeAddSpAdj :: DynFlags -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
+maybeAddSpAdj _      0      block = block
+maybeAddSpAdj dflags sp_off block
+   = block `blockSnoc` CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
 
 
 {-
@@ -770,16 +773,16 @@ arguments.
    to be Sp + Sp(L) - Sp(L')
 -}
 
-areaToSp :: ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
-areaToSp sp_old _sp_hwm area_off (CmmStackSlot area n) =
-  cmmOffset (CmmReg spReg) (sp_old - area_off area - n)
-areaToSp _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr sp_hwm
-areaToSp _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
+areaToSp :: DynFlags -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
+areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n) =
+  cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
+areaToSp _ _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr sp_hwm
+areaToSp _ _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
                       [CmmMachOp (MO_Sub _)
                               [ CmmReg (CmmGlobal Sp)
                               , CmmLit (CmmInt 0 _)],
                        CmmReg (CmmGlobal SpLim)]) = zeroExpr
-areaToSp _ _ _ other = other
+areaToSp _ _ _ _ other = other
 
 -- -----------------------------------------------------------------------------
 -- Note [null stack check]
@@ -910,8 +913,8 @@ lowerSafeForeignCall dflags block
   = do
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
-    id <- newTemp bWord
-    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
+    id <- newTemp (bWord dflags)
+    new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
     load_tso <- newTemp gcWord
     load_stack <- newTemp gcWord
@@ -935,7 +938,7 @@ lowerSafeForeignCall dflags block
         -- received an exception during the call, then the stack might be
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
-        jump = CmmCall { cml_target    = CmmLoad (CmmReg spReg) bWord
+        jump = CmmCall { cml_target    = CmmLoad (CmmReg spReg) (bWord dflags)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes wordWidth

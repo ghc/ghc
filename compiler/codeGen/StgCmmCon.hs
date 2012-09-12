@@ -56,13 +56,13 @@ cgTopRhsCon :: Id               -- Name of thing bound to this RHS
             -> [StgArg]         -- Args
             -> FCode (CgIdInfo, FCode ())
 cgTopRhsCon id con args
-  = return ( id_info, gen_code )
+  = do dflags <- getDynFlags
+       let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
+       return ( id_info, gen_code )
   where
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
-
-   id_info = litIdInfo id (mkConLFInfo con) (CmmLabel closure_label)
 
    gen_code =
      do { dflags <- getDynFlags
@@ -149,8 +149,8 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon' _ _ binder _cc con []
-  = return (litIdInfo binder (mkConLFInfo con)
+buildDynCon' dflags _ binder _cc con []
+  = return (litIdInfo dflags binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             return mkNop)
 
@@ -191,7 +191,7 @@ buildDynCon' dflags platform binder _cc con [arg]
               offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = cmmLabelOffW intlike_lbl offsetW
-        ; return ( litIdInfo binder (mkConLFInfo con) intlike_amode
+        ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
 buildDynCon' dflags platform binder _cc con [arg]
@@ -205,7 +205,7 @@ buildDynCon' dflags platform binder _cc con [arg]
               offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = cmmLabelOffW charlike_lbl offsetW
-        ; return ( litIdInfo binder (mkConLFInfo con) charlike_amode
+        ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
                  , return mkNop) }
 
 -------- buildDynCon': the general case -----------
@@ -225,7 +225,7 @@ buildDynCon' dflags _ binder ccs con args
                                 ptr_wds nonptr_wds
           ; hp_plus_n <- allocDynClosure info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
-          ; return (mkRhsInit reg lf_info hp_plus_n) }
+          ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
         | isCurrentCCS ccs = curCCS
@@ -255,7 +255,8 @@ bindConArgs (DataAlt con) base args
           -- when accessing the constructor field.
     bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
     bind_arg (arg, offset)
-        = do { emit $ mkTaggedObjectLoad (idToReg arg) base offset tag
+        = do { dflags <- getDynFlags
+             ; emit $ mkTaggedObjectLoad dflags (idToReg dflags arg) base offset tag
              ; bindArgToReg arg }
 
 bindConArgs _other_con _base args

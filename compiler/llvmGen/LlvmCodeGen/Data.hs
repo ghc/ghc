@@ -38,11 +38,12 @@ structStr = fsLit "_struct"
 -- done by 'resolveLlvmData'.
 genLlvmData :: LlvmEnv -> (Section, CmmStatics) -> LlvmUnresData
 genLlvmData env (sec, Statics lbl xs) =
-    let static  = map genData xs
+    let dflags  = getDflags env
+        static  = map genData xs
         label   = strCLabel_llvm env lbl
 
         types   = map getStatTypes static
-        getStatTypes (Left  x) = cmmToLlvmType $ cmmLitType x
+        getStatTypes (Left  x) = cmmToLlvmType $ cmmLitType dflags x
         getStatTypes (Right x) = getStatType x
 
         strucTy = LMStruct types
@@ -106,9 +107,10 @@ resData :: LlvmEnv -> UnresStatic -> (LlvmEnv, LlvmStatic, [LMGlobal])
 resData env (Right stat) = (env, stat, [])
 
 resData env (Left cmm@(CmmLabel l)) =
-    let label = strCLabel_llvm env l
+    let dflags = getDflags env
+        label = strCLabel_llvm env l
         ty = funLookup label env
-        lmty = cmmToLlvmType $ cmmLitType cmm
+        lmty = cmmToLlvmType $ cmmLitType dflags cmm
     in case ty of
             -- Make generic external label defenition and then pointer to it
             Nothing ->

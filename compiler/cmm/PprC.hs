@@ -167,7 +167,9 @@ pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
 
 pprStmt :: CmmStmt -> SDoc
 
-pprStmt stmt = case stmt of
+pprStmt stmt =
+    sdocWithDynFlags $ \dflags ->
+    case stmt of
     CmmReturn    -> panic "pprStmt: return statement should have been cps'd away"
     CmmNop       -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
@@ -187,7 +189,7 @@ pprStmt stmt = case stmt of
         | otherwise
         -> hsep [ pprExpr (CmmLoad dest rep), equals, pprExpr src <> semi ]
         where
-          rep = cmmExprType src
+          rep = cmmExprType dflags src
 
     CmmCall (CmmCallee fn cconv) results args ret ->
         maybe_proto $$
@@ -262,15 +264,15 @@ pprForeignCall fn cconv results args = (proto, fn_call)
 
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
-  = res_type ress <+>
-    parens (ccallConvAttribute cconv <> ppr_fn) <>
-    parens (commafy (map arg_type args))
-  where
-        res_type [] = ptext (sLit "void")
+  = sdocWithDynFlags $ \dflags ->
+    let res_type [] = ptext (sLit "void")
         res_type [CmmHinted one hint] = machRepHintCType (localRegType one) hint
         res_type _ = panic "pprCFunType: only void or 1 return value supported"
 
-        arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprType expr) hint
+        arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprType dflags expr) hint
+    in res_type ress <+>
+       parens (ccallConvAttribute cconv <> ppr_fn) <>
+       parens (commafy (map arg_type args))
 
 -- ---------------------------------------------------------------------
 -- unconditional branches
@@ -423,8 +425,10 @@ pprMachOpApp' mop args
 
   where
         -- Cast needed for signed integer ops
-    pprArg e | signedOp    mop = cCast (machRep_S_CType (typeWidth (cmmExprType e))) e
-             | needsFCasts mop = cCast (machRep_F_CType (typeWidth (cmmExprType e))) e
+    pprArg e | signedOp    mop = sdocWithDynFlags $ \dflags ->
+                                 cCast (machRep_S_CType (typeWidth (cmmExprType dflags e))) e
+             | needsFCasts mop = sdocWithDynFlags $ \dflags ->
+                                 cCast (machRep_F_CType (typeWidth (cmmExprType dflags e))) e
              | otherwise    = pprExpr1 e
     needsFCasts (MO_F_Eq _)   = False
     needsFCasts (MO_F_Ne _)   = False
@@ -480,7 +484,8 @@ pprStatics (CmmStaticLit (CmmFloat f W32) : rest)
   = pprLit1 (floatToWord f) : pprStatics rest
   | otherwise
   = pprPanic "pprStatics: float" (vcat (map ppr' rest))
-    where ppr' (CmmStaticLit l) = ppr (cmmLitType l)
+    where ppr' (CmmStaticLit l) = sdocWithDynFlags $ \dflags ->
+                                  ppr (cmmLitType dflags l)
           ppr' _other           = ptext (sLit "bad static!")
 pprStatics (CmmStaticLit (CmmFloat f W64) : rest)
   = map pprLit1 (doubleToWords f) ++ pprStatics rest
@@ -846,7 +851,8 @@ pprCall ppr_fn cconv results args
         = cCast (ptext (sLit "void *")) expr
         -- see comment by machRepHintCType below
      pprArg (CmmHinted expr SignedHint)
-        = cCast (machRep_S_CType $ typeWidth $ cmmExprType expr) expr
+        = sdocWithDynFlags $ \dflags ->
+          cCast (machRep_S_CType $ typeWidth $ cmmExprType dflags expr) expr
      pprArg (CmmHinted expr _other)
         = pprExpr expr
 

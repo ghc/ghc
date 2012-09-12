@@ -243,10 +243,12 @@ genCall env (CmmPrim _ (Just stmts)) _ _ _
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
 
+    let dflags = getDflags env
+
     -- parameter types
     let arg_type (CmmHinted _ AddrHint) = i8Ptr
         -- cast pointers to i8*. Llvm equivalent of void*
-        arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType expr
+        arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType dflags expr
 
     -- ret type
     let ret_type ([]) = LMVoid
@@ -755,11 +757,12 @@ exprToVarOpt env opt e = case e of
         -> genMachOp env opt op exprs
 
     CmmRegOff r i
-        -> exprToVar env $ expandCmmReg (r, i)
+        -> exprToVar env $ expandCmmReg dflags (r, i)
 
     CmmStackSlot _ _
         -> panic "exprToVar: CmmStackSlot not supported!"
 
+  where dflags = getDflags env
 
 -- | Handle CmmMachOp expressions
 genMachOp :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
@@ -1171,9 +1174,10 @@ genLit env (CmmFloat r w)
               nilOL, [])
 
 genLit env cmm@(CmmLabel l)
-  = let label = strCLabel_llvm env l
+  = let dflags = getDflags env
+        label = strCLabel_llvm env l
         ty = funLookup label env
-        lmty = cmmToLlvmType $ cmmLitType cmm
+        lmty = cmmToLlvmType $ cmmLitType dflags cmm
     in case ty of
             -- Make generic external label definition and then pointer to it
             Nothing -> do
@@ -1340,9 +1344,9 @@ doExpr ty expr = do
 
 
 -- | Expand CmmRegOff
-expandCmmReg :: (CmmReg, Int) -> CmmExpr
-expandCmmReg (reg, off)
-  = let width = typeWidth (cmmRegType reg)
+expandCmmReg :: DynFlags -> (CmmReg, Int) -> CmmExpr
+expandCmmReg dflags (reg, off)
+  = let width = typeWidth (cmmRegType dflags reg)
         voff  = CmmLit $ CmmInt (fromIntegral off) width
     in CmmMachOp (MO_Add width) [CmmReg reg, voff]
 

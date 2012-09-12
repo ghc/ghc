@@ -183,7 +183,7 @@ dumpGraph dflags flag name g = do
   when (dopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
-  do_lint g = case cmmLintGraph g of
+  do_lint g = case cmmLintGraph dflags g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }

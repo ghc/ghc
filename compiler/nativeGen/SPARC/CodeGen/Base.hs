@@ -29,6 +29,7 @@ import Size
 import Reg
 
 import CodeGen.Platform
+import DynFlags
 import OldCmm
 import OldPprCmm ()
 import Platform
@@ -114,13 +115,13 @@ getRegisterReg platform (CmmGlobal mid)
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
 -- CmmExprs into CmmRegOff?
-mangleIndexTree :: CmmExpr -> CmmExpr
+mangleIndexTree :: DynFlags -> CmmExpr -> CmmExpr
 
-mangleIndexTree (CmmRegOff reg off)
+mangleIndexTree dflags (CmmRegOff reg off)
 	= CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-	where width = typeWidth (cmmRegType reg)
+	where width = typeWidth (cmmRegType dflags reg)
 
-mangleIndexTree _
+mangleIndexTree _ _
 	= panic "SPARC.CodeGen.Base.mangleIndexTree: no match"
 
 

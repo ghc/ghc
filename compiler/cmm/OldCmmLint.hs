@@ -24,7 +24,7 @@ import Outputable
 import OldPprCmm()
 import Constants
 import FastString
-import Platform
+import DynFlags
 
 import Data.Maybe
 
@@ -32,15 +32,15 @@ import Data.Maybe
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-        => Platform -> GenCmmGroup d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLint platform tops = runCmmLint platform (mapM_ (lintCmmDecl platform)) tops
+        => DynFlags -> GenCmmGroup d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint dflags tops = runCmmLint dflags (mapM_ (lintCmmDecl dflags)) tops
 
 cmmLintTop :: (Outputable d, Outputable h)
-           => Platform -> GenCmmDecl d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLintTop platform top = runCmmLint platform (lintCmmDecl platform) top
+           => DynFlags -> GenCmmDecl d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLintTop dflags top = runCmmLint dflags (lintCmmDecl dflags) top
 
 runCmmLint :: Outputable a
-           => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+           => DynFlags -> (a -> CmmLint b) -> a -> Maybe SDoc
 runCmmLint _ l p =
    case unCL (l p) of
    Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
@@ -49,19 +49,20 @@ runCmmLint _ l p =
                            nest 2 (ppr p)])
    Right _  -> Nothing
 
-lintCmmDecl :: Platform -> (GenCmmDecl h i (ListGraph CmmStmt)) -> CmmLint ()
-lintCmmDecl platform (CmmProc _ lbl (ListGraph blocks))
+lintCmmDecl :: DynFlags -> (GenCmmDecl h i (ListGraph CmmStmt)) -> CmmLint ()
+lintCmmDecl dflags (CmmProc _ lbl (ListGraph blocks))
   = addLintInfo (text "in proc " <> pprCLabel platform lbl) $
         let labels = foldl (\s b -> setInsert (blockId b) s) setEmpty blocks
-	in  mapM_ (lintCmmBlock platform labels) blocks
+        in  mapM_ (lintCmmBlock dflags labels) blocks
+    where platform = targetPlatform dflags
 
 lintCmmDecl _ (CmmData {})
   = return ()
 
-lintCmmBlock :: Platform -> BlockSet -> GenBasicBlock CmmStmt -> CmmLint ()
-lintCmmBlock platform labels (BasicBlock id stmts)
+lintCmmBlock :: DynFlags -> BlockSet -> GenBasicBlock CmmStmt -> CmmLint ()
+lintCmmBlock dflags labels (BasicBlock id stmts)
   = addLintInfo (text "in basic block " <> ppr id) $
-	mapM_ (lintCmmStmt platform labels) stmts
+	mapM_ (lintCmmStmt dflags labels) stmts
 
 -- -----------------------------------------------------------------------------
 -- lintCmmExpr
@@ -69,32 +70,32 @@ lintCmmBlock platform labels (BasicBlock id stmts)
 -- Checks whether a CmmExpr is "type-correct", and check for obvious-looking
 -- byte/word mismatches.
 
-lintCmmExpr :: Platform -> CmmExpr -> CmmLint CmmType
-lintCmmExpr platform (CmmLoad expr rep) = do
-  _ <- lintCmmExpr platform expr
+lintCmmExpr :: DynFlags -> CmmExpr -> CmmLint CmmType
+lintCmmExpr dflags (CmmLoad expr rep) = do
+  _ <- lintCmmExpr dflags expr
   -- Disabled, if we have the inlining phase before the lint phase,
   -- we can have funny offsets due to pointer tagging. -- EZY
   -- when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
   --   cmmCheckWordAddress expr
   return rep
-lintCmmExpr platform expr@(CmmMachOp op args) = do
-  tys <- mapM (lintCmmExpr platform) args
-  if map (typeWidth . cmmExprType) args == machOpArgReps op
-  	then cmmCheckMachOp op args tys
-	else cmmLintMachOpErr expr (map cmmExprType args) (machOpArgReps op)
-lintCmmExpr platform (CmmRegOff reg offset)
-  = lintCmmExpr platform (CmmMachOp (MO_Add rep)
+lintCmmExpr dflags expr@(CmmMachOp op args) = do
+  tys <- mapM (lintCmmExpr dflags) args
+  if map (typeWidth . cmmExprType dflags) args == machOpArgReps op
+  	then cmmCheckMachOp dflags op args tys
+	else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps op)
+lintCmmExpr dflags (CmmRegOff reg offset)
+  = lintCmmExpr dflags (CmmMachOp (MO_Add rep)
 		[CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
-  where rep = typeWidth (cmmRegType reg)
-lintCmmExpr _ expr =
-  return (cmmExprType expr)
+  where rep = typeWidth (cmmRegType dflags reg)
+lintCmmExpr dflags expr =
+  return (cmmExprType dflags expr)
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
-cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
-cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
-  = cmmCheckMachOp op [reg, lit] tys
-cmmCheckMachOp op _ tys
-  = return (machOpResultType op tys)
+cmmCheckMachOp   :: DynFlags -> MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
+cmmCheckMachOp dflags op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
+  = cmmCheckMachOp dflags op [reg, lit] tys
+cmmCheckMachOp dflags op _ tys
+  = return (machOpResultType dflags op tys)
 
 isOffsetOp :: MachOp -> Bool
 isOffsetOp (MO_Add _) = True
@@ -119,43 +120,43 @@ notNodeReg :: CmmExpr -> Bool
 notNodeReg (CmmReg reg) | reg == nodeReg = False
 notNodeReg _                             = True
 
-lintCmmStmt :: Platform -> BlockSet -> CmmStmt -> CmmLint ()
-lintCmmStmt platform labels = lint
+lintCmmStmt :: DynFlags -> BlockSet -> CmmStmt -> CmmLint ()
+lintCmmStmt dflags labels = lint
     where lint (CmmNop) = return ()
           lint (CmmComment {}) = return ()
           lint stmt@(CmmAssign reg expr) = do
-            erep <- lintCmmExpr platform expr
-	    let reg_ty = cmmRegType reg
+            erep <- lintCmmExpr dflags expr
+            let reg_ty = cmmRegType dflags reg
             if (erep `cmmEqType_ignoring_ptrhood` reg_ty)
                 then return ()
                 else cmmLintAssignErr stmt erep reg_ty
           lint (CmmStore l r) = do
-            _ <- lintCmmExpr platform l
-            _ <- lintCmmExpr platform r
+            _ <- lintCmmExpr dflags l
+            _ <- lintCmmExpr dflags r
             return ()
           lint (CmmCall target _res args _) =
-              do lintTarget platform labels target
-                 mapM_ (lintCmmExpr platform . hintlessCmm) args
-          lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr platform e >> checkCond e
+              do lintTarget dflags labels target
+                 mapM_ (lintCmmExpr dflags . hintlessCmm) args
+          lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr dflags e >> checkCond e
           lint (CmmSwitch e branches) = do
             mapM_ checkTarget $ catMaybes branches
-            erep <- lintCmmExpr platform e
-            if (erep `cmmEqType_ignoring_ptrhood` bWord)
+            erep <- lintCmmExpr dflags e
+            if (erep `cmmEqType_ignoring_ptrhood` bWord dflags)
               then return ()
               else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e <>
                                text " :: " <> ppr erep)
-          lint (CmmJump e _) = lintCmmExpr platform e >> return ()
+          lint (CmmJump e _) = lintCmmExpr dflags e >> return ()
           lint (CmmReturn) = return ()
           lint (CmmBranch id)    = checkTarget id
           checkTarget id = if setMember id labels then return ()
                            else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
-lintTarget :: Platform -> BlockSet -> CmmCallTarget -> CmmLint ()
-lintTarget platform _      (CmmCallee e _) = do _ <- lintCmmExpr platform e
-                                                return ()
-lintTarget _        _      (CmmPrim _ Nothing) = return ()
-lintTarget platform labels (CmmPrim _ (Just stmts))
-    = mapM_ (lintCmmStmt platform labels) stmts
+lintTarget :: DynFlags -> BlockSet -> CmmCallTarget -> CmmLint ()
+lintTarget dflags _      (CmmCallee e _) = do _ <- lintCmmExpr dflags e
+                                              return ()
+lintTarget _      _      (CmmPrim _ Nothing) = return ()
+lintTarget dflags labels (CmmPrim _ (Just stmts))
+    = mapM_ (lintCmmStmt dflags labels) stmts
 
 
 checkCond :: CmmExpr -> CmmLint ()

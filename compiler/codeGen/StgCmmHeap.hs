@@ -140,9 +140,9 @@ emitSetDynHdr base info_ptr ccs
 hpStore :: CmmExpr -> [CmmExpr] -> [VirtualHpOffset] -> FCode ()
 -- Store the item (expr,off) in base[off]
 hpStore base vals offs
-  = emit (catAGraphs (zipWith mk_store vals offs))
-  where
-    mk_store val off = mkStore (cmmOffsetW base off) val
+  = do dflags <- getDynFlags
+       let mk_store val off = mkStore (cmmOffsetW dflags base off) val
+       emit (catAGraphs (zipWith mk_store vals offs))
 
 
 -----------------------------------------------------------
@@ -206,7 +206,7 @@ mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
-  ++ concatMap padLitToWord payload
+  ++ concatMap (padLitToWord dflags) payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
@@ -219,9 +219,9 @@ mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info
 
 -- JD: Simon had ellided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
-padLitToWord :: CmmLit -> [CmmLit]
-padLitToWord lit = lit : padding pad_length
-  where width = typeWidth (cmmLitType lit)
+padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
+padLitToWord dflags lit = lit : padding pad_length
+  where width = typeWidth (cmmLitType dflags lit)
         pad_length = wORD_SIZE - widthInBytes width :: Int
 
         padding n | n <= 0 = []
@@ -542,11 +542,13 @@ do_checks :: Bool       -- Should we check the stack?
 do_checks checkStack alloc do_gc = do
   gc_id <- newLabelC
 
-  when checkStack $
-     emit =<< mkCmmIfGoto sp_oflo gc_id
+  when checkStack $ do
+     dflags <- getDynFlags
+     emit =<< mkCmmIfGoto (sp_oflo dflags) gc_id
 
   when (alloc /= 0) $ do
-     emitAssign hpReg bump_hp
+     dflags <- getDynFlags
+     emitAssign hpReg (bump_hp dflags)
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
 
   emitOutOfLine gc_id $
@@ -560,11 +562,12 @@ do_checks checkStack alloc do_gc = do
                 -- confuse the LDV profiler.
   where
     alloc_lit = mkIntExpr (alloc*wORD_SIZE) -- Bytes
-    bump_hp   = cmmOffsetExprB (CmmReg hpReg) alloc_lit
+    bump_hp dflags = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
 
     -- Sp overflow if (Sp - CmmHighStack < SpLim)
-    sp_oflo = CmmMachOp mo_wordULt
-                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType spReg)))
+    sp_oflo dflags
+            = CmmMachOp mo_wordULt
+                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType dflags spReg)))
                              [CmmReg spReg, CmmLit CmmHighStackMark],
                    CmmReg spLimReg]
 

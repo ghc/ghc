@@ -317,7 +317,7 @@ emitSpecPushUpdateFrame lbl frame_addr updatee = do
 	stmtsC [  -- Set the info word
 		  CmmStore frame_addr (mkLblExpr lbl)
 		, -- And the updatee
-		  CmmStore (cmmOffsetB frame_addr (off_updatee dflags)) updatee ]
+		  CmmStore (cmmOffsetB dflags frame_addr (off_updatee dflags)) updatee ]
 	initUpdFrameProf frame_addr
 
 off_updatee :: DynFlags -> ByteOff

@@ -235,7 +235,7 @@ cgDataCon data_con
                 do { _ <- ticky_code
                    ; ldvEnter (CmmReg nodeReg)
                    ; tickyReturnOldCon (length arg_things)
-                   ; void $ emitReturn [cmmOffsetB (CmmReg nodeReg)
+                   ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg)
                                             (tagForCon data_con)]
                    }
                         -- The case continuation code expects a tagged pointer

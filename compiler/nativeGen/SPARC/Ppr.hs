@@ -338,7 +338,8 @@ pprSectionHeader seg
 -- | Pretty print a data item.
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
-  = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
+  = sdocWithDynFlags $ \dflags ->
+    vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
     where
         imm = litToImm lit
 

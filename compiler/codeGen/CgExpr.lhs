@@ -146,10 +146,11 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 
 cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
-    do	{ (_rep,amode) <- getArgAmode arg
+    do	{ dflags <- getDynFlags
+        ; (_rep,amode) <- getArgAmode arg
 	; amode' <- assignTemp amode	-- We're going to use it twice,
 					-- so save in a temp if non-trivial
-	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
+	; stmtC (CmmAssign nodeReg (tagToClosure dflags tycon amode'))
 	; performReturn $ emitReturnInstr (Just [node]) }
    where
 	  -- If you're reading this code in the attempt to figure
@@ -177,7 +178,8 @@ cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
 	     performReturn $ emitReturnInstr (Just [])
 
   | ReturnsPrim rep <- result_info
-	= do res <- newTemp (typeCmmType res_ty)
+        = do dflags <- getDynFlags
+             res <- newTemp (typeCmmType dflags res_ty)
              cgPrimOp [res] primop args emptyVarSet
 	     performPrimReturn (primRepToCgRep rep) (CmmReg (CmmLocal res))
 
@@ -188,10 +190,11 @@ cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
 
   | ReturnsAlg tycon <- result_info, isEnumerationTyCon tycon
 	-- c.f. cgExpr (...TagToEnumOp...)
-	= do tag_reg <- newTemp bWord	-- The tag is a word
+	= do dflags <- getDynFlags
+	     tag_reg <- newTemp (bWord dflags) -- The tag is a word
 	     cgPrimOp [tag_reg] primop args emptyVarSet
 	     stmtC (CmmAssign nodeReg
-                    (tagToClosure tycon
+                    (tagToClosure dflags tycon
                      (CmmReg (CmmLocal tag_reg))))
              -- ToDo: STG Live -- worried about this
 	     performReturn $ emitReturnInstr (Just [node])
@@ -481,14 +484,14 @@ Little helper for primitives that return unboxed tuples.
 
 \begin{code}
 newUnboxedTupleRegs :: Type -> FCode ([CgRep], [LocalReg], [ForeignHint])
-newUnboxedTupleRegs res_ty =
+newUnboxedTupleRegs res_ty = do
+   dflags <- getDynFlags
    let
 	UbxTupleRep ty_args = repType res_ty
 	(reps,hints) = unzip [ (rep, typeForeignHint ty) | ty <- ty_args,
 					   	    let rep = typeCgRep ty,
 					 	    nonVoidArg rep ]
-	make_new_temp rep = newTemp (argMachRep rep)
-   in do
+	make_new_temp rep = newTemp (argMachRep dflags rep)
    regs <- mapM make_new_temp reps
    return (reps,regs,hints)
 \end{code}

@@ -18,9 +18,9 @@ where
 #include "HsVersions.h"
 
 import Constants
+import DynFlags
 import FastString
 import Outputable
-import Platform
 
 import Data.Word
 import Data.Int
@@ -96,11 +96,11 @@ f32    = cmmFloat W32
 f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
-bWord :: CmmType
-bWord = cmmBits wordWidth
+bWord :: DynFlags -> CmmType
+bWord _ = cmmBits wordWidth
 
-bHalfWord :: Platform -> CmmType
-bHalfWord platform = cmmBits (halfWordWidth platform)
+bHalfWord :: DynFlags -> CmmType
+bHalfWord dflags = cmmBits (halfWordWidth dflags)
 
 gcWord :: CmmType
 gcWord = CmmType GcPtrCat wordWidth
@@ -165,13 +165,13 @@ wordWidth | wORD_SIZE == 4 = W32
           | wORD_SIZE == 8 = W64
           | otherwise      = panic "MachOp.wordRep: Unknown word size"
 
-halfWordWidth :: Platform -> Width
+halfWordWidth :: DynFlags -> Width
 halfWordWidth _
  | wORD_SIZE == 4 = W16
  | wORD_SIZE == 8 = W32
  | otherwise      = panic "MachOp.halfWordRep: Unknown word size"
 
-halfWordMask :: Platform -> Integer
+halfWordMask :: DynFlags -> Integer
 halfWordMask _
  | wORD_SIZE == 4 = 0xFFFF
  | wORD_SIZE == 8 = 0xFFFFFFFF

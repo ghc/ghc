@@ -133,7 +133,7 @@ cmmMakeDynamicReference' dflags addImport referenceKind lbl
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
-              return $ CmmLoad (cmmMakePicReference dflags symbolPtr) bWord
+              return $ CmmLoad (cmmMakePicReference dflags symbolPtr) (bWord dflags)
 
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:

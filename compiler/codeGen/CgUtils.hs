@@ -69,7 +69,6 @@ import Util
 import DynFlags
 import FastString
 import Outputable
-import Platform
 
 import Data.Char
 import Data.Word
@@ -115,12 +114,12 @@ mkSimpleLit (MachStr _) = panic "mkSimpleLit: MachStr"
 -- should have converted them all to a real core representation.
 mkSimpleLit (LitInteger {}) = panic "mkSimpleLit: LitInteger"
 
-mkLtOp :: Literal -> MachOp
+mkLtOp :: DynFlags -> Literal -> MachOp
 -- On signed literals we must do a signed comparison
-mkLtOp (MachInt _)    = MO_S_Lt wordWidth
-mkLtOp (MachFloat _)  = MO_F_Lt W32
-mkLtOp (MachDouble _) = MO_F_Lt W64
-mkLtOp lit            = MO_U_Lt (typeWidth (cmmLitType (mkSimpleLit lit)))
+mkLtOp _      (MachInt _)    = MO_S_Lt wordWidth
+mkLtOp _      (MachFloat _)  = MO_F_Lt W32
+mkLtOp _      (MachDouble _) = MO_F_Lt W64
+mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLit lit)))
 
 
 ---------------------------------------------------
@@ -154,8 +153,8 @@ tagForCon con = tag
         | otherwise              = 1
 
 --Tag an expression, to do: refactor, this appears in some other module.
-tagCons :: DataCon -> CmmExpr -> CmmExpr
-tagCons con expr = cmmOffsetB expr (tagForCon con)
+tagCons :: DynFlags -> DataCon -> CmmExpr -> CmmExpr
+tagCons dflags con expr = cmmOffsetB dflags expr (tagForCon con)
 
 --------------------------------------------------------------------------
 --
@@ -183,9 +182,9 @@ addToMemE width ptr n
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: TyCon -> CmmExpr -> CmmExpr
-tagToClosure tycon tag
-  = CmmLoad (cmmOffsetExprW closure_tbl tag) gcWord
+tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure dflags tycon tag
+  = CmmLoad (cmmOffsetExprW dflags closure_tbl tag) gcWord
   where closure_tbl = CmmLit (CmmLabel lbl)
         lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 
@@ -307,15 +306,15 @@ callerSaveVolatileRegs dflags vols = (caller_save, caller_load)
 
     callerSaveGlobalReg reg next
         | callerSaves platform reg =
-                CmmStore (get_GlobalReg_addr platform reg)
+                CmmStore (get_GlobalReg_addr dflags reg)
                          (CmmReg (CmmGlobal reg)) : next
         | otherwise = next
 
     callerRestoreGlobalReg reg next
         | callerSaves platform reg =
                 CmmAssign (CmmGlobal reg)
-                          (CmmLoad (get_GlobalReg_addr platform reg)
-                                   (globalRegType reg))
+                          (CmmLoad (get_GlobalReg_addr dflags reg)
+                                   (globalRegType dflags reg))
                         : next
         | otherwise = next
 
@@ -402,9 +401,10 @@ assignTemp :: CmmExpr -> FCode CmmExpr
 -- variable and assign the expression to it
 assignTemp e
   | isTrivialCmmExpr e = return e
-  | otherwise          = do { reg <- newTemp (cmmExprType e)
-                            ; stmtC (CmmAssign (CmmLocal reg) e)
-                            ; return (CmmReg (CmmLocal reg)) }
+  | otherwise          = do dflags <- getDynFlags
+                            reg <- newTemp (cmmExprType dflags e)
+                            stmtC (CmmAssign (CmmLocal reg) e)
+                            return (CmmReg (CmmLocal reg))
 
 -- | If the expression is trivial and doesn't refer to a global
 -- register, return it.  Otherwise, assign the expression to a
@@ -414,7 +414,8 @@ assignTemp_ :: CmmExpr -> FCode CmmExpr
 assignTemp_ e
     | isTrivialCmmExpr e && hasNoGlobalRegs e = return e
     | otherwise = do
-        reg <- newTemp (cmmExprType e)
+        dflags <- getDynFlags
+        reg <- newTemp (cmmExprType dflags e)
         stmtC (CmmAssign (CmmLocal reg) e)
         return (CmmReg (CmmLocal reg))
 
@@ -499,7 +500,8 @@ mk_switch tag_expr [(tag,stmts)] (Just deflt) _lo_tag _hi_tag _via_C
 --
 mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   | use_switch  -- Use a switch
-  = do  { branch_ids <- mapM forkCgStmts (map snd branches)
+  = do  { dflags <- getDynFlags
+        ; branch_ids <- mapM forkCgStmts (map snd branches)
         ; let
                 tagged_blk_ids = zip (map fst branches) (map Just branch_ids)
 
@@ -511,7 +513,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
                 -- tag of a real branch is real_lo_tag (not lo_tag).
                 arms = [ find_branch i | i <- [real_lo_tag..real_hi_tag]]
 
-                switch_stmt = CmmSwitch (cmmOffset tag_expr (- real_lo_tag)) arms
+                switch_stmt = CmmSwitch (cmmOffset dflags tag_expr (- real_lo_tag)) arms
 
         ; ASSERT(not (all isNothing arms))
           return (oneCgStmt switch_stmt)
@@ -604,8 +606,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 assignTemp' :: CmmExpr -> FCode (CmmStmt, CmmExpr)
 assignTemp' e
   | isTrivialCmmExpr e = return (CmmNop, e)
-  | otherwise          = do { reg <- newTemp (cmmExprType e)
-                            ; return (CmmAssign (CmmLocal reg) e, CmmReg (CmmLocal reg)) }
+  | otherwise          = do dflags <- getDynFlags
+                            reg <- newTemp (cmmExprType dflags e)
+                            return (CmmAssign (CmmLocal reg) e, CmmReg (CmmLocal reg))
 
 emitLitSwitch :: CmmExpr                        -- Tag to switch on
               -> [(Literal, CgStmts)]           -- Tagged branches
@@ -628,19 +631,20 @@ mk_lit_switch :: CmmExpr -> BlockId
               -> [(Literal,CgStmts)]
               -> FCode CgStmts
 mk_lit_switch scrut deflt_blk_id [(lit,blk)]
-  = return (consCgStmt if_stmt blk)
-  where
-    cmm_lit = mkSimpleLit lit
-    rep     = cmmLitType cmm_lit
-    ne      = if isFloatType rep then MO_F_Ne else MO_Ne
-    cond    = CmmMachOp (ne (typeWidth rep)) [scrut, CmmLit cmm_lit]
-    if_stmt = CmmCondBranch cond deflt_blk_id
+  = do dflags <- getDynFlags
+       let cmm_lit = mkSimpleLit lit
+           rep     = cmmLitType dflags cmm_lit
+           ne      = if isFloatType rep then MO_F_Ne else MO_Ne
+           cond    = CmmMachOp (ne (typeWidth rep)) [scrut, CmmLit cmm_lit]
+           if_stmt = CmmCondBranch cond deflt_blk_id
+       return (consCgStmt if_stmt blk)
 
 mk_lit_switch scrut deflt_blk_id branches
-  = do  { hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
+  = do  { dflags <- getDynFlags
+        ; hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
         ; lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
         ; lo_blk_id <- forkCgStmts lo_blk
-        ; let if_stmt = CmmCondBranch cond lo_blk_id
+        ; let if_stmt = CmmCondBranch (cond dflags) lo_blk_id
         ; return (if_stmt `consCgStmt` hi_blk) }
   where
     n_branches = length branches
@@ -650,8 +654,8 @@ mk_lit_switch scrut deflt_blk_id branches
     (lo_branches, hi_branches) = span is_lo branches
     is_lo (t,_) = t < mid_lit
 
-    cond    = CmmMachOp (mkLtOp mid_lit)
-                        [scrut, CmmLit (mkSimpleLit mid_lit)]
+    cond dflags = CmmMachOp (mkLtOp dflags mid_lit)
+                            [scrut, CmmLit (mkSimpleLit mid_lit)]
 
 -------------------------------------------------------------------------
 --
@@ -687,13 +691,14 @@ emitSimultaneously stmts
       stmt_list -> doSimultaneously1 (zip [(1::Int)..] stmt_list)
 
 doSimultaneously1 :: [CVertex] -> Code
-doSimultaneously1 vertices
-  = let
+doSimultaneously1 vertices = do
+    dflags <- getDynFlags
+    let
         edges = [ (vertex, key1, edges_from stmt1)
                 | vertex@(key1, stmt1) <- vertices
                 ]
         edges_from stmt1 = [ key2 | (key2, stmt2) <- vertices,
-                                    stmt1 `mustFollow` stmt2
+                                    mustFollow dflags stmt1 stmt2
                            ]
         components = stronglyConnCompFromEdgedVertices edges
 
@@ -712,23 +717,24 @@ doSimultaneously1 vertices
                 ; stmtC from_temp }
 
         go_via_temp (CmmAssign dest src)
-          = do  { tmp <- newTemp (cmmRegType dest) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
+          = do  { dflags <- getDynFlags
+                ; tmp <- newTemp (cmmRegType dflags dest) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
                 ; stmtC (CmmAssign (CmmLocal tmp) src)
                 ; return (CmmAssign dest (CmmReg (CmmLocal tmp))) }
         go_via_temp (CmmStore dest src)
-          = do  { tmp <- newTemp (cmmExprType src) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
+          = do  { tmp <- newTemp (cmmExprType dflags src) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
                 ; stmtC (CmmAssign (CmmLocal tmp) src)
                 ; return (CmmStore dest (CmmReg (CmmLocal tmp))) }
         go_via_temp _ = panic "doSimultaneously1: go_via_temp"
-    in
     mapCs do_component components
 
-mustFollow :: CmmStmt -> CmmStmt -> Bool
-CmmAssign reg _  `mustFollow` stmt = anySrc (reg `regUsedIn`) stmt
-CmmStore loc e   `mustFollow` stmt = anySrc (locUsedIn loc (cmmExprType e)) stmt
-CmmNop           `mustFollow` _    = False
-CmmComment _     `mustFollow` _    = False
-_                `mustFollow` _    = panic "mustFollow"
+mustFollow :: DynFlags -> CmmStmt -> CmmStmt -> Bool
+mustFollow dflags x y = x `mustFollow'` y
+    where CmmAssign reg _  `mustFollow'` stmt = anySrc (reg `regUsedIn`) stmt
+          CmmStore loc e   `mustFollow'` stmt = anySrc (locUsedIn loc (cmmExprType dflags e)) stmt
+          CmmNop           `mustFollow'` _    = False
+          CmmComment _     `mustFollow'` _    = False
+          _                `mustFollow'` _    = panic "mustFollow"
 
 
 anySrc :: (CmmExpr -> Bool) -> CmmStmt -> Bool
@@ -810,11 +816,11 @@ srt_escape = -1
 -- to real machine registers or stored as offsets from BaseReg.  Given
 -- a GlobalReg, get_GlobalReg_addr always produces the
 -- register table address for it.
-get_GlobalReg_addr :: Platform -> GlobalReg -> CmmExpr
-get_GlobalReg_addr _        BaseReg = regTableOffset 0
-get_GlobalReg_addr platform mid
-    = get_Regtable_addr_from_offset platform
-                                    (globalRegType mid) (baseRegOffset mid)
+get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
+get_GlobalReg_addr _      BaseReg = regTableOffset 0
+get_GlobalReg_addr dflags mid
+    = get_Regtable_addr_from_offset dflags
+                                    (globalRegType dflags mid) (baseRegOffset mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
@@ -822,68 +828,69 @@ regTableOffset :: Int -> CmmExpr
 regTableOffset n =
   CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
 
-get_Regtable_addr_from_offset :: Platform -> CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset platform _ offset =
-    if haveRegBase platform
+get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
+get_Regtable_addr_from_offset dflags _ offset =
+    if haveRegBase (targetPlatform dflags)
     then CmmRegOff (CmmGlobal BaseReg) offset
     else regTableOffset offset
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.
-fixStgRegisters :: Platform -> RawCmmDecl -> RawCmmDecl
+fixStgRegisters :: DynFlags -> RawCmmDecl -> RawCmmDecl
 fixStgRegisters _ top@(CmmData _ _) = top
 
-fixStgRegisters platform (CmmProc info lbl (ListGraph blocks)) =
-  let blocks' = map (fixStgRegBlock platform) blocks
+fixStgRegisters dflags (CmmProc info lbl (ListGraph blocks)) =
+  let blocks' = map (fixStgRegBlock dflags) blocks
   in CmmProc info lbl $ ListGraph blocks'
 
-fixStgRegBlock :: Platform -> CmmBasicBlock -> CmmBasicBlock
-fixStgRegBlock platform (BasicBlock id stmts) =
-  let stmts' = map (fixStgRegStmt platform) stmts
+fixStgRegBlock :: DynFlags -> CmmBasicBlock -> CmmBasicBlock
+fixStgRegBlock dflags (BasicBlock id stmts) =
+  let stmts' = map (fixStgRegStmt dflags) stmts
   in BasicBlock id stmts'
 
-fixStgRegStmt :: Platform -> CmmStmt -> CmmStmt
-fixStgRegStmt platform stmt
+fixStgRegStmt :: DynFlags -> CmmStmt -> CmmStmt
+fixStgRegStmt dflags stmt
   = case stmt of
         CmmAssign (CmmGlobal reg) src ->
-            let src' = fixStgRegExpr platform src
-                baseAddr = get_GlobalReg_addr platform reg
+            let src' = fixStgRegExpr dflags src
+                baseAddr = get_GlobalReg_addr dflags reg
             in case reg `elem` activeStgRegs platform of
                 True  -> CmmAssign (CmmGlobal reg) src'
                 False -> CmmStore baseAddr src'
 
         CmmAssign reg src ->
-            let src' = fixStgRegExpr platform src
+            let src' = fixStgRegExpr dflags src
             in CmmAssign reg src'
 
-        CmmStore addr src -> CmmStore (fixStgRegExpr platform addr) (fixStgRegExpr platform src)
+        CmmStore addr src -> CmmStore (fixStgRegExpr dflags addr) (fixStgRegExpr dflags src)
 
         CmmCall target regs args returns ->
             let target' = case target of
-                    CmmCallee e conv -> CmmCallee (fixStgRegExpr platform e) conv
+                    CmmCallee e conv -> CmmCallee (fixStgRegExpr dflags e) conv
                     CmmPrim op mStmts ->
-                        CmmPrim op (fmap (map (fixStgRegStmt platform)) mStmts)
+                        CmmPrim op (fmap (map (fixStgRegStmt dflags)) mStmts)
                 args' = map (\(CmmHinted arg hint) ->
-                                (CmmHinted (fixStgRegExpr platform arg) hint)) args
+                                (CmmHinted (fixStgRegExpr dflags arg) hint)) args
             in CmmCall target' regs args' returns
 
-        CmmCondBranch test dest -> CmmCondBranch (fixStgRegExpr platform test) dest
+        CmmCondBranch test dest -> CmmCondBranch (fixStgRegExpr dflags test) dest
 
-        CmmSwitch expr ids -> CmmSwitch (fixStgRegExpr platform expr) ids
+        CmmSwitch expr ids -> CmmSwitch (fixStgRegExpr dflags expr) ids
 
-        CmmJump addr live -> CmmJump (fixStgRegExpr platform addr) live
+        CmmJump addr live -> CmmJump (fixStgRegExpr dflags addr) live
 
         -- CmmNop, CmmComment, CmmBranch, CmmReturn
         _other -> stmt
+    where platform = targetPlatform dflags
 
 
-fixStgRegExpr :: Platform -> CmmExpr ->  CmmExpr
-fixStgRegExpr platform expr
+fixStgRegExpr :: DynFlags -> CmmExpr -> CmmExpr
+fixStgRegExpr dflags expr
   = case expr of
-        CmmLoad addr ty -> CmmLoad (fixStgRegExpr platform addr) ty
+        CmmLoad addr ty -> CmmLoad (fixStgRegExpr dflags addr) ty
 
         CmmMachOp mop args -> CmmMachOp mop args'
-            where args' = map (fixStgRegExpr platform) args
+            where args' = map (fixStgRegExpr dflags) args
 
         CmmReg (CmmGlobal reg) ->
             -- Replace register leaves with appropriate StixTrees for
@@ -895,11 +902,11 @@ fixStgRegExpr platform expr
             case reg `elem` activeStgRegs platform of
                 True  -> expr
                 False ->
-                    let baseAddr = get_GlobalReg_addr platform reg
+                    let baseAddr = get_GlobalReg_addr dflags reg
                     in case reg of
-                        BaseReg -> fixStgRegExpr platform baseAddr
-                        _other  -> fixStgRegExpr platform
-                                    (CmmLoad baseAddr (globalRegType reg))
+                        BaseReg -> fixStgRegExpr dflags baseAddr
+                        _other  -> fixStgRegExpr dflags
+                                    (CmmLoad baseAddr (globalRegType dflags reg))
 
         CmmRegOff (CmmGlobal reg) offset ->
             -- RegOf leaves are just a shorthand form. If the reg maps
@@ -907,11 +914,12 @@ fixStgRegExpr platform expr
             -- expand it and defer to the above code.
             case reg `elem` activeStgRegs platform of
                 True  -> expr
-                False -> fixStgRegExpr platform (CmmMachOp (MO_Add wordWidth) [
+                False -> fixStgRegExpr dflags (CmmMachOp (MO_Add wordWidth) [
                                     CmmReg (CmmGlobal reg),
                                     CmmLit (CmmInt (fromIntegral offset)
                                                 wordWidth)])
 
         -- CmmLit, CmmReg (CmmLocal), CmmStackSlot
         _other -> expr
+    where platform = targetPlatform dflags
 

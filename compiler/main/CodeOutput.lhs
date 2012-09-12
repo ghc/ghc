@@ -62,7 +62,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
 
               do_lint cmm = do
                 { showPass dflags "CmmLint"
-                ; case cmmLint (targetPlatform dflags) cmm of
+                ; case cmmLint dflags cmm of
                         Just err -> do { log_action dflags dflags SevDump noSrcSpan defaultDumpStyle err
                                        ; ghcExit dflags 1
                                        }

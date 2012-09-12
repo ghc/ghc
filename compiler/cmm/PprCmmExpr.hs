@@ -73,11 +73,12 @@ instance Outputable GlobalReg where
 
 pprExpr :: CmmExpr -> SDoc
 pprExpr e
-    = case e of
+    = sdocWithDynFlags $ \dflags ->
+      case e of
         CmmRegOff reg i ->
                 pprExpr (CmmMachOp (MO_Add rep)
                            [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-                where rep = typeWidth (cmmRegType reg)
+                where rep = typeWidth (cmmRegType dflags reg)
         CmmLit lit -> pprLit lit
         _other     -> pprExpr1 e
 

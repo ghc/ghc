@@ -371,11 +371,11 @@ mkSlowEntryCode dflags cl_info reg_args
      load_assts = zipWithEqual "mk_load" mk_load reps_w_regs stk_offsets
      mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg) 
 					  (CmmLoad (cmmRegOffW spReg offset)
-						   (argMachRep rep))
+						   (argMachRep dflags rep))
 
      save_assts = zipWithEqual "mk_save" mk_save reps_w_regs stk_offsets
-     mk_save (rep,reg) offset = ASSERT( argMachRep rep `cmmEqType` globalRegType reg )
-				CmmStore (cmmRegOffW spReg offset) 
+     mk_save (rep,reg) offset = ASSERT( argMachRep dflags rep `cmmEqType` globalRegType dflags reg )
+				CmmStore (cmmRegOffW spReg offset)
 					 (CmmReg (CmmGlobal reg))
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
@@ -490,7 +490,7 @@ emitBlackHoleCode is_single_entry = do
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
     stmtsC [
-       CmmStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
+       CmmStore (cmmOffsetW dflags (CmmReg nodeReg) (fixedHdrSize dflags))
                 (CmmReg (CmmGlobal CurrentTSO)),
        CmmCall (CmmPrim MO_WriteBarrier Nothing) [] [] CmmMayReturn,
        CmmStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -576,11 +576,11 @@ link_caf :: ClosureInfo
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
 link_caf cl_info _is_upd = do
-  { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
-  ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
+  { dflags    <- getDynFlags
+    -- Alloc black hole specifying CC_HDR(Node) as the cost centre
+  ; let	use_cc   = costCentreFrom dflags (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
-  ; dflags    <- getDynFlags
   ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc
                                  [(tso, fixedHdrSize dflags)]
   ; hp_rel    <- getHpRelOffset hp_offset
@@ -589,7 +589,7 @@ link_caf cl_info _is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
-  ; ret <- newTemp bWord
+  ; ret <- newTemp (bWord dflags)
   ; emitRtsCallGen [CmmHinted ret NoHint] rtsPackageId (fsLit "newCAF")
       [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
         CmmHinted (CmmReg nodeReg) AddrHint,
@@ -602,7 +602,7 @@ link_caf cl_info _is_upd = do
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-        let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
+        let target = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg)) in
         stmtC (CmmJump target $ Just [node])
 
   ; returnFC hp_rel }

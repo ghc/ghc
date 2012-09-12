@@ -527,13 +527,12 @@ emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> ((Int, LocalReg, [LocalReg]) -> FCode ()) -- function body
                             -> FCode ()
 emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
- = do   {
+ = do   { dflags <- getDynFlags
         -- Bind the binder itself, but only if it's not a top-level
         -- binding. We need non-top let-bindings to refer to the
         -- top-level binding, which this binding would incorrectly shadow.
-        ; node <- if top_lvl then return $ idToReg (NonVoid bndr)
+        ; node <- if top_lvl then return $ idToReg dflags (NonVoid bndr)
                   else bindToReg (NonVoid bndr) lf_info
-        ; dflags <- getDynFlags
         ; let node_points = nodeMustPointToIt dflags lf_info
         ; arg_regs <- bindArgsToRegs args
         ; let args' = if node_points then (node : arg_regs) else arg_regs
@@ -592,16 +591,16 @@ stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE + hALF_WORD_SIZ
 --
 -------------------------------------------------------------------------
 
-closureInfoPtr :: CmmExpr -> CmmExpr
+closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer and returns the info table pointer
-closureInfoPtr e = CmmLoad e bWord
+closureInfoPtr dflags e = CmmLoad e (bWord dflags)
 
 entryCode :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns its entry code
 entryCode dflags e
  | tablesNextToCode dflags = e
- | otherwise               = CmmLoad e bWord
+ | otherwise               = CmmLoad e (bWord dflags)
 
 getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the *zero-indexed*
@@ -609,27 +608,25 @@ getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
 getConstrTag dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) wordWidth) [infoTableConstrTag dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) wordWidth) [infoTableConstrTag dflags info_table]
   where
-    platform = targetPlatform dflags
-    info_table = infoTable dflags (closureInfoPtr closure_ptr)
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 
 cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the closure type
 -- obtained from the info table
 cmmGetClosureType dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth platform) wordWidth) [infoTableClosureType dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) wordWidth) [infoTableClosureType dflags info_table]
   where
-    platform = targetPlatform dflags
-    info_table = infoTable dflags (closureInfoPtr closure_ptr)
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 
 infoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns a pointer to the first word of the standard-form
 -- info table, excluding the entry-code word (if present)
 infoTable dflags info_ptr
-  | tablesNextToCode dflags = cmmOffsetB info_ptr (- stdInfoTableSizeB dflags)
-  | otherwise               = cmmOffsetW info_ptr 1 -- Past the entry code pointer
+  | tablesNextToCode dflags = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags)
+  | otherwise               = cmmOffsetW dflags info_ptr 1 -- Past the entry code pointer
 
 infoTableConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the constr tag
@@ -640,21 +637,21 @@ infoTableSrtBitmap :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the srt_bitmap
 -- field of the info table
 infoTableSrtBitmap dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord (targetPlatform dflags))
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord dflags)
 
 infoTableClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the closure type
 -- field of the info table.
 infoTableClosureType dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdClosureTypeOffset dflags)) (bHalfWord (targetPlatform dflags))
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdClosureTypeOffset dflags)) (bHalfWord dflags)
 
 infoTablePtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTablePtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdPtrsOffset dflags)) (bHalfWord (targetPlatform dflags))
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdPtrsOffset dflags)) (bHalfWord dflags)
 
 infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTableNonPtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdNonPtrsOffset dflags)) (bHalfWord (targetPlatform dflags))
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdNonPtrsOffset dflags)) (bHalfWord dflags)
 
 funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the info pointer of a function,
@@ -662,8 +659,8 @@ funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- in the info table.
 funInfoTable dflags info_ptr
   | tablesNextToCode dflags
-  = cmmOffsetB info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev)
+  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev)
   | otherwise
-  = cmmOffsetW info_ptr (1 + stdInfoTableSizeW dflags)
+  = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
 				-- Past the entry code pointer
 

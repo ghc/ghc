@@ -226,8 +226,9 @@ getSequelAmode :: FCode CmmExpr
 getSequelAmode
   = do  { EndOfBlockInfo virt_sp sequel <- getEndOfBlockInfo
         ; case sequel of
-            OnStack -> do { sp_rel <- getSpRelOffset virt_sp
-                          ; returnFC (CmmLoad sp_rel bWord) }
+            OnStack -> do { dflags <- getDynFlags
+                          ; sp_rel <- getSpRelOffset virt_sp
+                          ; returnFC (CmmLoad sp_rel (bWord dflags)) }
 
             CaseAlts lbl _ _  -> returnFC (CmmLit (CmmLabel lbl))
         }

@@ -265,13 +265,13 @@ instance Outputable CgRep where
     ppr FloatArg  = ptext (sLit "F_")
     ppr DoubleArg = ptext (sLit "D_")
 
-argMachRep :: CgRep -> CmmType
-argMachRep PtrArg    = gcWord
-argMachRep NonPtrArg = bWord
-argMachRep LongArg   = b64
-argMachRep FloatArg  = f32
-argMachRep DoubleArg = f64
-argMachRep VoidArg   = panic "argMachRep:VoidRep"
+argMachRep :: DynFlags -> CgRep -> CmmType
+argMachRep _      PtrArg    = gcWord
+argMachRep dflags NonPtrArg = bWord dflags
+argMachRep _      LongArg   = b64
+argMachRep _      FloatArg  = f32
+argMachRep _      DoubleArg = f64
+argMachRep _      VoidArg   = panic "argMachRep:VoidRep"
 
 primRepToCgRep :: PrimRep -> CgRep
 primRepToCgRep VoidRep    = VoidArg

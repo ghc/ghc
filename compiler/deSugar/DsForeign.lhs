@@ -141,6 +141,7 @@ dsCImport :: Id
           -> Maybe Header
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
+   dflags <- getDynFlags
    let ty = pFst $ coercionKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
@@ -152,7 +153,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
     let
         rhs = foRhs (Lit (MachLabel cid stdcall_info fod))
         rhs' = Cast rhs co
-        stdcall_info = fun_type_arg_stdcall_info cconv ty
+        stdcall_info = fun_type_arg_stdcall_info dflags cconv ty
     in
     return ([(id, rhs')], empty, empty)
 
@@ -166,15 +167,15 @@ dsCImport id co CWrapper cconv _ _
 -- For stdcall labels, if the type was a FunPtr or newtype thereof,
 -- then we need to calculate the size of the arguments in order to add
 -- the @n suffix to the label.
-fun_type_arg_stdcall_info :: CCallConv -> Type -> Maybe Int
-fun_type_arg_stdcall_info StdCallConv ty
+fun_type_arg_stdcall_info :: DynFlags -> CCallConv -> Type -> Maybe Int
+fun_type_arg_stdcall_info dflags StdCallConv ty
   | Just (tc,[arg_ty]) <- splitTyConApp_maybe ty,
     tyConUnique tc == funPtrTyConKey
   = let
        (_tvs,sans_foralls)        = tcSplitForAllTys arg_ty
        (fe_arg_tys, _orig_res_ty) = tcSplitFunTys sans_foralls
-    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType . getPrimTyOf) fe_arg_tys)
-fun_type_arg_stdcall_info _other_conv _
+    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType dflags . getPrimTyOf) fe_arg_tys)
+fun_type_arg_stdcall_info _ _other_conv _
   = Nothing
 \end{code}
 
@@ -519,7 +520,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 (arg_cname n stg_type,
                  stg_type,
                  ty,
-                 typeCmmType (getPrimTyOf ty))
+                 typeCmmType dflags (getPrimTyOf ty))
               | (ty,n) <- zip arg_htys [1::Int ..] ]
 
   arg_cname n stg_ty
@@ -546,7 +547,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   stable_ptr_arg =
         (text "the_stableptr", text "StgStablePtr", undefined,
-         typeCmmType (mkStablePtrPrimTy alphaTy))
+         typeCmmType dflags (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `eqType` unitTy     -- Look through any newtypes
@@ -735,7 +736,7 @@ insertRetAddr dflags CCallConv args
           -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
-              go 4 args = ret_addr_arg : args
+              go 4 args = ret_addr_arg dflags : args
               go n (arg:args) = arg : go (n+1) args
               go _ [] = []
           in go 0 args
@@ -746,20 +747,20 @@ insertRetAddr dflags CCallConv args
           -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
-              go 6 args = ret_addr_arg : args
+              go 6 args = ret_addr_arg dflags : args
               go n (arg@(_,_,_,rep):args)
                | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
                | otherwise  = arg : go n     args
               go _ [] = []
           in go 0 args
       _ ->
-          ret_addr_arg : args
+          ret_addr_arg dflags : args
     where platform = targetPlatform dflags
 insertRetAddr _ _ args = args
 
-ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
-ret_addr_arg = (text "original_return_addr", text "void*", undefined,
-                typeCmmType addrPrimTy)
+ret_addr_arg :: DynFlags -> (SDoc, SDoc, Type, CmmType)
+ret_addr_arg dflags = (text "original_return_addr", text "void*", undefined,
+                       typeCmmType dflags addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).

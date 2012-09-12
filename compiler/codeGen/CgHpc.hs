@@ -18,7 +18,8 @@ import HscTypes
 
 cgTickBox :: Module -> Int -> Code
 cgTickBox mod n = do
-       let tick_box = (cmmIndex W64
+       dflags <- getDynFlags
+       let tick_box = (cmmIndex dflags W64
                        (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
                        n
                       )

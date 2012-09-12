@@ -25,6 +25,7 @@ where
 
 import CmmType
 import Outputable
+import DynFlags
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -283,8 +284,8 @@ maybeInvertComparison op
 {- |
 Returns the MachRep of the result of a MachOp.
 -}
-machOpResultType :: MachOp -> [CmmType] -> CmmType
-machOpResultType mop tys =
+machOpResultType :: DynFlags -> MachOp -> [CmmType] -> CmmType
+machOpResultType dflags mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
     MO_Sub {}           -> ty1  -- of first arg
@@ -297,29 +298,29 @@ machOpResultType mop tys =
     MO_U_Quot r         -> cmmBits r
     MO_U_Rem  r         -> cmmBits r
 
-    MO_Eq {}            -> comparisonResultRep
-    MO_Ne {}            -> comparisonResultRep
-    MO_S_Ge {}          -> comparisonResultRep
-    MO_S_Le {}          -> comparisonResultRep
-    MO_S_Gt {}          -> comparisonResultRep
-    MO_S_Lt {}          -> comparisonResultRep
+    MO_Eq {}            -> comparisonResultRep dflags
+    MO_Ne {}            -> comparisonResultRep dflags
+    MO_S_Ge {}          -> comparisonResultRep dflags
+    MO_S_Le {}          -> comparisonResultRep dflags
+    MO_S_Gt {}          -> comparisonResultRep dflags
+    MO_S_Lt {}          -> comparisonResultRep dflags
 
-    MO_U_Ge {}          -> comparisonResultRep
-    MO_U_Le {}          -> comparisonResultRep
-    MO_U_Gt {}          -> comparisonResultRep
-    MO_U_Lt {}          -> comparisonResultRep
+    MO_U_Ge {}          -> comparisonResultRep dflags
+    MO_U_Le {}          -> comparisonResultRep dflags
+    MO_U_Gt {}          -> comparisonResultRep dflags
+    MO_U_Lt {}          -> comparisonResultRep dflags
 
     MO_F_Add r          -> cmmFloat r
     MO_F_Sub r          -> cmmFloat r
     MO_F_Mul r          -> cmmFloat r
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
-    MO_F_Eq  {}         -> comparisonResultRep
-    MO_F_Ne  {}         -> comparisonResultRep
-    MO_F_Ge  {}         -> comparisonResultRep
-    MO_F_Le  {}         -> comparisonResultRep
-    MO_F_Gt  {}         -> comparisonResultRep
-    MO_F_Lt  {}         -> comparisonResultRep
+    MO_F_Eq  {}         -> comparisonResultRep dflags
+    MO_F_Ne  {}         -> comparisonResultRep dflags
+    MO_F_Ge  {}         -> comparisonResultRep dflags
+    MO_F_Le  {}         -> comparisonResultRep dflags
+    MO_F_Gt  {}         -> comparisonResultRep dflags
+    MO_F_Lt  {}         -> comparisonResultRep dflags
 
     MO_And {}           -> ty1  -- Used for pointer masking
     MO_Or {}            -> ty1
@@ -337,7 +338,7 @@ machOpResultType mop tys =
   where
     (ty1:_) = tys
 
-comparisonResultRep :: CmmType
+comparisonResultRep :: DynFlags -> CmmType
 comparisonResultRep = bWord  -- is it?
 
 

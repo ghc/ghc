@@ -88,12 +88,12 @@ cgLit (MachStr s) = newByteStringCLit (bytesFB s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = return (mkSimpleLit other_lit)
 
-mkLtOp :: Literal -> MachOp
+mkLtOp :: DynFlags -> Literal -> MachOp
 -- On signed literals we must do a signed comparison
-mkLtOp (MachInt _)    = MO_S_Lt wordWidth
-mkLtOp (MachFloat _)  = MO_F_Lt W32
-mkLtOp (MachDouble _) = MO_F_Lt W64
-mkLtOp lit            = MO_U_Lt (typeWidth (cmmLitType (mkSimpleLit lit)))
+mkLtOp _      (MachInt _)    = MO_S_Lt wordWidth
+mkLtOp _      (MachFloat _)  = MO_F_Lt W32
+mkLtOp _      (MachDouble _) = MO_F_Lt W64
+mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLit lit)))
                                 -- ToDo: seems terribly indirect!
 
 mkSimpleLit :: Literal -> CmmLit
@@ -142,13 +142,14 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-mkTaggedObjectLoad :: LocalReg -> LocalReg -> WordOff -> DynTag -> CmmAGraph
+mkTaggedObjectLoad :: DynFlags -> LocalReg -> LocalReg -> WordOff -> DynTag -> CmmAGraph
 -- (loadTaggedObjectField reg base off tag) generates assignment
 --      reg = bitsK[ base + off - tag ]
 -- where K is fixed by 'reg'
-mkTaggedObjectLoad reg base offset tag
+mkTaggedObjectLoad dflags reg base offset tag
   = mkAssign (CmmLocal reg)
-             (CmmLoad (cmmOffsetB (CmmReg (CmmLocal base))
+             (CmmLoad (cmmOffsetB dflags
+                                  (CmmReg (CmmLocal base))
                                   (wORD_SIZE*offset - tag))
                       (localRegType reg))
 
@@ -159,9 +160,9 @@ mkTaggedObjectLoad reg base offset tag
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: TyCon -> CmmExpr -> CmmExpr
-tagToClosure tycon tag
-  = CmmLoad (cmmOffsetExprW closure_tbl tag) bWord
+tagToClosure :: DynFlags -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure dflags tycon tag
+  = CmmLoad (cmmOffsetExprW dflags closure_tbl tag) (bWord dflags)
   where closure_tbl = CmmLit (CmmLabel lbl)
         lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 
@@ -251,11 +252,11 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
     regs_to_save = filter (callerSaves platform) system_regs
 
     callerSaveGlobalReg reg
-        = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal reg))
+        = mkStore (get_GlobalReg_addr dflags reg) (CmmReg (CmmGlobal reg))
 
     callerRestoreGlobalReg reg
         = mkAssign (CmmGlobal reg)
-                    (CmmLoad (get_GlobalReg_addr platform reg) (globalRegType reg))
+                    (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType dflags reg))
 
 -- -----------------------------------------------------------------------------
 -- Global registers
@@ -266,11 +267,11 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 -- register table address for it.
 -- (See also get_GlobalReg_reg_or_addr in MachRegs)
 
-get_GlobalReg_addr :: Platform -> GlobalReg -> CmmExpr
-get_GlobalReg_addr _        BaseReg = regTableOffset 0
-get_GlobalReg_addr platform mid
-    = get_Regtable_addr_from_offset platform
-                                    (globalRegType mid) (baseRegOffset mid)
+get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
+get_GlobalReg_addr _      BaseReg = regTableOffset 0
+get_GlobalReg_addr dflags mid
+    = get_Regtable_addr_from_offset (targetPlatform dflags)
+                                    (globalRegType dflags mid) (baseRegOffset mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
@@ -344,8 +345,9 @@ assignTemp :: CmmExpr -> FCode LocalReg
 -- due to them being trashed on foreign calls--though it means
 -- the optimization pass doesn't have to do as much work)
 assignTemp (CmmReg (CmmLocal reg)) = return reg
-assignTemp e = do { uniq <- newUnique
-                  ; let reg = LocalReg uniq (cmmExprType e)
+assignTemp e = do { dflags <- getDynFlags
+                  ; uniq <- newUnique
+                  ; let reg = LocalReg uniq (cmmExprType dflags e)
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
@@ -360,8 +362,9 @@ newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_ty
   = ASSERT( isUnboxedTupleType res_ty )
-    do  { sequel <- getSequel
-        ; regs <- choose_regs sequel
+    do  { dflags <- getDynFlags
+        ; sequel <- getSequel
+        ; regs <- choose_regs dflags sequel
         ; ASSERT( regs `equalLength` reps )
           return (regs, map primRepForeignHint reps) }
   where
@@ -370,8 +373,8 @@ newUnboxedTupleRegs res_ty
            | ty <- ty_args
            , let rep = typePrimRep ty
            , not (isVoidRep rep) ]
-    choose_regs (AssignTo regs _) = return regs
-    choose_regs _other            = mapM (newTemp . primRepCmmType) reps
+    choose_regs _ (AssignTo regs _) = return regs
+    choose_regs dflags _            = mapM (newTemp . primRepCmmType dflags) reps
 
 
 
@@ -423,17 +426,18 @@ unscramble vertices = mapM_ do_component components
                 -- Cyclic?  Then go via temporaries.  Pick one to
                 -- break the loop and try again with the rest.
         do_component (CyclicSCC ((_,first_stmt) : rest)) = do
+            dflags <- getDynFlags
             u <- newUnique
-            let (to_tmp, from_tmp) = split u first_stmt
+            let (to_tmp, from_tmp) = split dflags u first_stmt
             mk_graph to_tmp
             unscramble rest
             mk_graph from_tmp
 
-        split :: Unique -> Stmt -> (Stmt, Stmt)
-        split uniq (reg, rhs)
+        split :: DynFlags -> Unique -> Stmt -> (Stmt, Stmt)
+        split dflags uniq (reg, rhs)
           = ((tmp, rhs), (reg, CmmReg (CmmLocal tmp)))
           where
-            rep = cmmExprType rhs
+            rep = cmmExprType dflags rhs
             tmp = LocalReg uniq rep
 
         mk_graph :: Stmt -> FCode ()
@@ -531,7 +535,7 @@ mk_switch tag_expr [(tag,lbl)] (Just deflt) _ _ _
 --
 mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   | use_switch  -- Use a switch
-  = let
+  = do let
         find_branch :: ConTagZ -> Maybe BlockId
         find_branch i = case (assocMaybe branches i) of
                           Just lbl -> Just lbl
@@ -542,8 +546,8 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
         -- tag of a real branch is real_lo_tag (not lo_tag).
         arms :: [Maybe BlockId]
         arms = [ find_branch i | i <- [real_lo_tag..real_hi_tag]]
-    in
-    return (mkSwitch (cmmOffset tag_expr (- real_lo_tag)) arms)
+       dflags <- getDynFlags
+       return (mkSwitch (cmmOffset dflags tag_expr (- real_lo_tag)) arms)
 
   -- if we can knock off a bunch of default cases with one if, then do so
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
@@ -649,17 +653,20 @@ mk_lit_switch :: CmmExpr -> BlockId
               -> [(Literal,BlockId)]
               -> FCode CmmAGraph
 mk_lit_switch scrut deflt [(lit,blk)]
-  = return (mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk)
-  where
+  = do
+  dflags <- getDynFlags
+  let
     cmm_lit = mkSimpleLit lit
-    cmm_ty  = cmmLitType cmm_lit
+    cmm_ty  = cmmLitType dflags cmm_lit
     rep     = typeWidth cmm_ty
     ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
+  return (mkCbranch (CmmMachOp ne [scrut, CmmLit cmm_lit]) deflt blk)
 
 mk_lit_switch scrut deflt_blk_id branches
-  = do lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
+  = do dflags <- getDynFlags
+       lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
        hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
-       mkCmmIfThenElse cond lo_blk hi_blk
+       mkCmmIfThenElse (cond dflags) lo_blk hi_blk
   where
     n_branches = length branches
     (mid_lit,_) = branches !! (n_branches `div` 2)
@@ -668,8 +675,8 @@ mk_lit_switch scrut deflt_blk_id branches
     (lo_branches, hi_branches) = span is_lo branches
     is_lo (t,_) = t < mid_lit
 
-    cond = CmmMachOp (mkLtOp mid_lit)
-                        [scrut, CmmLit (mkSimpleLit mid_lit)]
+    cond dflags = CmmMachOp (mkLtOp dflags mid_lit)
+                            [scrut, CmmLit (mkSimpleLit mid_lit)]
 
 
 --------------
@@ -705,7 +712,8 @@ assignTemp' :: CmmExpr -> FCode CmmExpr
 assignTemp' e
   | isTrivialCmmExpr e = return e
   | otherwise = do
-       lreg <- newTemp (cmmExprType e)
+       dflags <- getDynFlags
+       lreg <- newTemp (cmmExprType dflags e)
        let reg = CmmLocal lreg
        emitAssign reg e
        return (CmmReg reg)

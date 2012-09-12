@@ -356,7 +356,7 @@ cgReturnDataCon con amodes = do
     node_live   = Just [node]
     enter_it dflags
                 = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
-                           CmmJump (entryCode dflags $ closureInfoPtr $ CmmReg nodeReg)
+                           CmmJump (entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg)
                                    node_live
                          ]
     jump_to lbl = stmtC $ CmmJump (CmmLit lbl) node_live
@@ -478,7 +478,7 @@ cgDataCon data_con
                              tickyReturnOldCon (length arg_things)
                            -- The case continuation code is expecting a tagged pointer
                            ; stmtC (CmmAssign nodeReg
-                                              (tagCons data_con (CmmReg nodeReg)))
+                                              (tagCons dflags data_con (CmmReg nodeReg)))
                            ; performReturn $ emitReturnInstr (Just []) }
                                 -- noStmts: Ptr to thing already in Node
 

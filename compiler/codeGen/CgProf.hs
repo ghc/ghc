@@ -70,9 +70,11 @@ mkCCostCentre cc = CmmLabel (mkCCLabel cc)
 mkCCostCentreStack :: CostCentreStack -> CmmLit
 mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 
-costCentreFrom :: CmmExpr       -- A closure pointer
+costCentreFrom :: DynFlags
+               -> CmmExpr       -- A closure pointer
                -> CmmExpr       -- The cost centre from that closure
-costCentreFrom cl = CmmLoad (cmmOffsetB cl oFFSET_StgHeader_ccs) bWord
+costCentreFrom dflags cl
+    = CmmLoad (cmmOffsetB dflags cl oFFSET_StgHeader_ccs) (bWord dflags)
 
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
@@ -88,7 +90,8 @@ initUpdFrameProf :: CmmExpr -> Code
 -- Initialise the profiling field of an update frame
 initUpdFrameProf frame_amode
   = ifProfiling $       -- frame->header.prof.ccs = CCCS
-    stmtC (CmmStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS)
+    do dflags <- getDynFlags
+       stmtC (CmmStore (cmmOffsetB dflags frame_amode oFFSET_StgHeader_ccs) curCCS)
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 
@@ -114,7 +117,7 @@ profAlloc words ccs
   = ifProfiling $
     do dflags <- getDynFlags
        stmtC (addToMemE alloc_rep
-                   (cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
+                   (cmmOffsetB dflags ccs oFFSET_CostCentreStack_mem_alloc)
                    (CmmMachOp (MO_UU_Conv wordWidth alloc_rep) $
                      [CmmMachOp mo_wordSub [words,
                                             mkIntExpr (profHdrSize dflags)]]))
@@ -129,15 +132,17 @@ profAlloc words ccs
 enterCostCentreThunk :: CmmExpr -> Code
 enterCostCentreThunk closure =
   ifProfiling $ do
-    stmtC $ storeCurCCS (costCentreFrom closure)
+    dflags <- getDynFlags
+    stmtC $ storeCurCCS (costCentreFrom dflags closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> [GlobalReg] -> Code
 enterCostCentreFun ccs closure vols =
   ifProfiling $ do
     if isCurrentCCS ccs
-       then emitRtsCallWithVols rtsPackageId (fsLit "enterFunCCS")
-               [CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
-                CmmHinted (costCentreFrom closure) AddrHint] vols
+       then do dflags <- getDynFlags
+               emitRtsCallWithVols rtsPackageId (fsLit "enterFunCCS")
+                   [CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
+                    CmmHinted (costCentreFrom dflags closure) AddrHint] vols
        else return () -- top-level function, nothing to do
 
 ifProfiling :: Code -> Code
@@ -223,9 +228,9 @@ emitSetCCC :: CostCentre -> Bool -> Bool -> Code
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
       if dopt Opt_SccProfilingOn dflags
-          then do tmp <- newTemp bWord -- TODO FIXME NOW
+          then do tmp <- newTemp (bWord dflags) -- TODO FIXME NOW
                   pushCostCentre tmp curCCS cc
-                  when tick $ stmtC (bumpSccCount (CmmReg (CmmLocal tmp)))
+                  when tick $ stmtC (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
                   when push $ stmtC (storeCurCCS (CmmReg (CmmLocal tmp)))
           else nopC
 
@@ -236,10 +241,10 @@ pushCostCentre result ccs cc
         (fsLit "pushCostCentre") [CmmHinted ccs AddrHint,
                                   CmmHinted (CmmLit (mkCCostCentre cc)) AddrHint]
 
-bumpSccCount :: CmmExpr -> CmmStmt
-bumpSccCount ccs
+bumpSccCount :: DynFlags -> CmmExpr -> CmmStmt
+bumpSccCount dflags ccs
   = addToMem (typeWidth REP_CostCentreStack_scc_count)
-         (cmmOffsetB ccs oFFSET_CostCentreStack_scc_count) 1
+         (cmmOffsetB dflags ccs oFFSET_CostCentreStack_scc_count) 1
 
 -----------------------------------------------------------------------------
 --
@@ -267,7 +272,8 @@ dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
 -- Initialise the LDV word of a new closure
 --
 ldvRecordCreate :: CmmExpr -> Code
-ldvRecordCreate closure = stmtC $ CmmStore (ldvWord closure) dynLdvInit
+ldvRecordCreate closure = do dflags <- getDynFlags
+                             stmtC $ CmmStore (ldvWord dflags closure) dynLdvInit
 
 --
 -- Called when a closure is entered, marks the closure as having been "used".
@@ -276,34 +282,37 @@ ldvRecordCreate closure = stmtC $ CmmStore (ldvWord closure) dynLdvInit
 -- profiling.
 --
 ldvEnterClosure :: ClosureInfo -> Code
-ldvEnterClosure closure_info = ldvEnter (cmmOffsetB (CmmReg nodeReg) (-tag))
+ldvEnterClosure closure_info
+    = do dflags <- getDynFlags
+         ldvEnter (cmmOffsetB dflags (CmmReg nodeReg) (-tag))
   where tag = funTag closure_info
         -- don't forget to substract node's tag
 
 ldvEnter :: CmmExpr -> Code
 -- Argument is a closure pointer
-ldvEnter cl_ptr
-  =  ifProfiling $
+ldvEnter cl_ptr = do
+  dflags <- getDynFlags
+  let
+        -- don't forget to substract node's tag
+    ldv_wd = ldvWord dflags cl_ptr
+    new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd (bWord dflags))
+                                       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
+                 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
+  ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
      --                era | LDV_STATE_USE }
     emitIf (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
            (stmtC (CmmStore ldv_wd new_ldv_wd))
-  where
-        -- don't forget to substract node's tag
-    ldv_wd = ldvWord cl_ptr
-    new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd bWord)
-                                       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
-                 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
 
 loadEra :: CmmExpr
 loadEra = CmmMachOp (MO_UU_Conv cIntWidth wordWidth)
           [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
 
-ldvWord :: CmmExpr -> CmmExpr
+ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
-ldvWord closure_ptr = cmmOffsetB closure_ptr oFFSET_StgHeader_ldvw
+ldvWord dflags closure_ptr = cmmOffsetB dflags closure_ptr oFFSET_StgHeader_ldvw
 
 -- LDV constants, from ghc/includes/Constants.h
 lDV_SHIFT :: Int

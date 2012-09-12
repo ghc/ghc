@@ -73,6 +73,7 @@ import Outputable
 import Unique
 import UniqSupply
 import Constants( wORD_SIZE, tAG_MASK )
+import DynFlags
 import Util
 
 import Data.Word
@@ -86,19 +87,19 @@ import Hoopl
 --
 ---------------------------------------------------
 
-primRepCmmType :: PrimRep -> CmmType
-primRepCmmType VoidRep    = panic "primRepCmmType:VoidRep"
-primRepCmmType PtrRep     = gcWord
-primRepCmmType IntRep     = bWord
-primRepCmmType WordRep    = bWord
-primRepCmmType Int64Rep   = b64
-primRepCmmType Word64Rep  = b64
-primRepCmmType AddrRep    = bWord
-primRepCmmType FloatRep   = f32
-primRepCmmType DoubleRep  = f64
+primRepCmmType :: DynFlags -> PrimRep -> CmmType
+primRepCmmType _      VoidRep    = panic "primRepCmmType:VoidRep"
+primRepCmmType _      PtrRep     = gcWord
+primRepCmmType dflags IntRep     = bWord dflags
+primRepCmmType dflags WordRep    = bWord dflags
+primRepCmmType _      Int64Rep   = b64
+primRepCmmType _      Word64Rep  = b64
+primRepCmmType dflags AddrRep    = bWord dflags
+primRepCmmType _      FloatRep   = f32
+primRepCmmType _      DoubleRep  = f64
 
-typeCmmType :: UnaryType -> CmmType
-typeCmmType ty = primRepCmmType (typePrimRep ty)
+typeCmmType :: DynFlags -> UnaryType -> CmmType
+typeCmmType dflags ty = primRepCmmType dflags (typePrimRep ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
 primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
@@ -182,10 +183,10 @@ packHalfWordsCLit lower_half_word upper_half_word
 mkLblExpr :: CLabel -> CmmExpr
 mkLblExpr lbl = CmmLit (CmmLabel lbl)
 
-cmmOffsetExpr :: CmmExpr -> CmmExpr -> CmmExpr
+cmmOffsetExpr :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 -- assumes base and offset have the same CmmType
-cmmOffsetExpr e (CmmLit (CmmInt n _)) = cmmOffset e (fromInteger n)
-cmmOffsetExpr e byte_off = CmmMachOp (MO_Add (cmmExprWidth e)) [e, byte_off]
+cmmOffsetExpr dflags e (CmmLit (CmmInt n _)) = cmmOffset dflags e (fromInteger n)
+cmmOffsetExpr dflags e byte_off = CmmMachOp (MO_Add (cmmExprWidth dflags e)) [e, byte_off]
 
 -- NB. Do *not* inspect the value of the offset in these smart constructors!!!
 -- because the offset is sometimes involved in a loop in the code generator
@@ -194,18 +195,18 @@ cmmOffsetExpr e byte_off = CmmMachOp (MO_Add (cmmExprWidth e)) [e, byte_off]
 -- stage; they're eliminated later instead (either during printing or
 -- a later optimisation step on Cmm).
 --
-cmmOffset :: CmmExpr -> Int -> CmmExpr
-cmmOffset e                 0        = e
-cmmOffset (CmmReg reg)      byte_off = cmmRegOff reg byte_off
-cmmOffset (CmmRegOff reg m) byte_off = cmmRegOff reg (m+byte_off)
-cmmOffset (CmmLit lit)      byte_off = CmmLit (cmmOffsetLit lit byte_off)
-cmmOffset (CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]) byte_off2
+cmmOffset :: DynFlags -> CmmExpr -> Int -> CmmExpr
+cmmOffset _ e                 0        = e
+cmmOffset _ (CmmReg reg)      byte_off = cmmRegOff reg byte_off
+cmmOffset _ (CmmRegOff reg m) byte_off = cmmRegOff reg (m+byte_off)
+cmmOffset _ (CmmLit lit)      byte_off = CmmLit (cmmOffsetLit lit byte_off)
+cmmOffset _ (CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]) byte_off2
   = CmmMachOp (MO_Add rep)
               [expr, CmmLit (CmmInt (byte_off1 + toInteger byte_off2) rep)]
-cmmOffset expr byte_off
+cmmOffset dflags expr byte_off
   = CmmMachOp (MO_Add width) [expr, CmmLit (CmmInt (toInteger byte_off) width)]
   where
-    width = cmmExprWidth expr
+    width = cmmExprWidth dflags expr
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
@@ -224,35 +225,37 @@ cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
 
 -- | Useful for creating an index into an array, with a staticaly known offset.
 -- The type is the element type; used for making the multiplier
-cmmIndex :: Width       -- Width w
+cmmIndex :: DynFlags
+         -> Width       -- Width w
          -> CmmExpr     -- Address of vector of items of width w
          -> Int         -- Which element of the vector (0 based)
          -> CmmExpr     -- Address of i'th element
-cmmIndex width base idx = cmmOffset base (idx * widthInBytes width)
+cmmIndex dflags width base idx = cmmOffset dflags base (idx * widthInBytes width)
 
 -- | Useful for creating an index into an array, with an unknown offset.
-cmmIndexExpr :: Width           -- Width w
+cmmIndexExpr :: DynFlags
+             -> Width           -- Width w
              -> CmmExpr         -- Address of vector of items of width w
              -> CmmExpr         -- Which element of the vector (0 based)
              -> CmmExpr         -- Address of i'th element
-cmmIndexExpr width base (CmmLit (CmmInt n _)) = cmmIndex width base (fromInteger n)
-cmmIndexExpr width base idx =
-  cmmOffsetExpr base byte_off
+cmmIndexExpr dflags width base (CmmLit (CmmInt n _)) = cmmIndex dflags width base (fromInteger n)
+cmmIndexExpr dflags width base idx =
+  cmmOffsetExpr dflags base byte_off
   where
-    idx_w = cmmExprWidth idx
+    idx_w = cmmExprWidth dflags idx
     byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr (widthInLog width)]
 
-cmmLoadIndex :: CmmType -> CmmExpr -> Int -> CmmExpr
-cmmLoadIndex ty expr ix = CmmLoad (cmmIndex (typeWidth ty) expr ix) ty
+cmmLoadIndex :: DynFlags -> CmmType -> CmmExpr -> Int -> CmmExpr
+cmmLoadIndex dflags ty expr ix = CmmLoad (cmmIndex dflags (typeWidth ty) expr ix) ty
 
 -- The "B" variants take byte offsets
 cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
 cmmRegOffB = cmmRegOff
 
-cmmOffsetB :: CmmExpr -> ByteOff -> CmmExpr
+cmmOffsetB :: DynFlags -> CmmExpr -> ByteOff -> CmmExpr
 cmmOffsetB = cmmOffset
 
-cmmOffsetExprB :: CmmExpr -> CmmExpr -> CmmExpr
+cmmOffsetExprB :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 cmmOffsetExprB = cmmOffsetExpr
 
 cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
@@ -263,13 +266,13 @@ cmmOffsetLitB = cmmOffsetLit
 
 -----------------------
 -- The "W" variants take word offsets
-cmmOffsetExprW :: CmmExpr -> CmmExpr -> CmmExpr
+cmmOffsetExprW :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 -- The second arg is a *word* offset; need to change it to bytes
-cmmOffsetExprW e (CmmLit (CmmInt n _)) = cmmOffsetW e (fromInteger n)
-cmmOffsetExprW e wd_off = cmmIndexExpr wordWidth e wd_off
+cmmOffsetExprW dflags  e (CmmLit (CmmInt n _)) = cmmOffsetW dflags e (fromInteger n)
+cmmOffsetExprW dflags e wd_off = cmmIndexExpr dflags wordWidth e wd_off
 
-cmmOffsetW :: CmmExpr -> WordOff -> CmmExpr
-cmmOffsetW e n = cmmOffsetB e (wORD_SIZE * n)
+cmmOffsetW :: DynFlags -> CmmExpr -> WordOff -> CmmExpr
+cmmOffsetW dflags e n = cmmOffsetB dflags e (wORD_SIZE * n)
 
 cmmRegOffW :: CmmReg -> WordOff -> CmmExpr
 cmmRegOffW reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE)
@@ -280,8 +283,8 @@ cmmOffsetLitW lit wd_off = cmmOffsetLitB lit (wORD_SIZE * wd_off)
 cmmLabelOffW :: CLabel -> WordOff -> CmmLit
 cmmLabelOffW lbl wd_off = cmmLabelOffB lbl (wORD_SIZE * wd_off)
 
-cmmLoadIndexW :: CmmExpr -> Int -> CmmType -> CmmExpr
-cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
+cmmLoadIndexW :: DynFlags -> CmmExpr -> Int -> CmmType -> CmmExpr
+cmmLoadIndexW dflags base off ty = CmmLoad (cmmOffsetW dflags base off) ty
 
 -----------------------
 cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
@@ -302,9 +305,9 @@ cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
 cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
 cmmQuotWord e1 e2 = CmmMachOp mo_wordUQuot [e1, e2]
 
-cmmNegate :: CmmExpr -> CmmExpr
-cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
-cmmNegate e                       = CmmMachOp (MO_S_Neg (cmmExprWidth e)) [e]
+cmmNegate :: DynFlags -> CmmExpr -> CmmExpr
+cmmNegate _      (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
+cmmNegate dflags e                       = CmmMachOp (MO_S_Neg (cmmExprWidth dflags e)) [e]
 
 blankWord :: CmmStatic
 blankWord = CmmUninitialised wORD_SIZE

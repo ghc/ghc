@@ -23,6 +23,7 @@ import CmmType
 import CmmMachOp
 import BlockId
 import CLabel
+import DynFlags
 import Unique
 
 import Data.Set (Set)
@@ -111,31 +112,32 @@ data CmmLit
   | CmmHighStackMark -- stands for the max stack space used during a procedure
   deriving Eq
 
-cmmExprType :: CmmExpr -> CmmType
-cmmExprType (CmmLit lit)        = cmmLitType lit
-cmmExprType (CmmLoad _ rep)     = rep
-cmmExprType (CmmReg reg)        = cmmRegType reg
-cmmExprType (CmmMachOp op args) = machOpResultType op (map cmmExprType args)
-cmmExprType (CmmRegOff reg _)   = cmmRegType reg
-cmmExprType (CmmStackSlot _ _)  = bWord -- an address
+cmmExprType :: DynFlags -> CmmExpr -> CmmType
+cmmExprType dflags (CmmLit lit)        = cmmLitType dflags lit
+cmmExprType _      (CmmLoad _ rep)     = rep
+cmmExprType dflags (CmmReg reg)        = cmmRegType dflags reg
+cmmExprType dflags (CmmMachOp op args) = machOpResultType dflags op (map (cmmExprType dflags) args)
+cmmExprType dflags (CmmRegOff reg _)   = cmmRegType dflags reg
+cmmExprType dflags (CmmStackSlot _ _)  = bWord dflags -- an address
 -- Careful though: what is stored at the stack slot may be bigger than
 -- an address
 
-cmmLitType :: CmmLit -> CmmType
-cmmLitType (CmmInt _ width)     = cmmBits  width
-cmmLitType (CmmFloat _ width)   = cmmFloat width
-cmmLitType (CmmLabel lbl)       = cmmLabelType lbl
-cmmLitType (CmmLabelOff lbl _)  = cmmLabelType lbl
-cmmLitType (CmmLabelDiffOff {}) = bWord
-cmmLitType (CmmBlock _)         = bWord
-cmmLitType (CmmHighStackMark)   = bWord
+cmmLitType :: DynFlags -> CmmLit -> CmmType
+cmmLitType _      (CmmInt _ width)     = cmmBits  width
+cmmLitType _      (CmmFloat _ width)   = cmmFloat width
+cmmLitType dflags (CmmLabel lbl)       = cmmLabelType dflags lbl
+cmmLitType dflags (CmmLabelOff lbl _)  = cmmLabelType dflags lbl
+cmmLitType dflags (CmmLabelDiffOff {}) = bWord dflags
+cmmLitType dflags (CmmBlock _)         = bWord dflags
+cmmLitType dflags (CmmHighStackMark)   = bWord dflags
 
-cmmLabelType :: CLabel -> CmmType
-cmmLabelType lbl | isGcPtrLabel lbl = gcWord
-                 | otherwise        = bWord
+cmmLabelType :: DynFlags -> CLabel -> CmmType
+cmmLabelType dflags lbl
+ | isGcPtrLabel lbl = gcWord
+ | otherwise        = bWord dflags
 
-cmmExprWidth :: CmmExpr -> Width
-cmmExprWidth e = typeWidth (cmmExprType e)
+cmmExprWidth :: DynFlags -> CmmExpr -> Width
+cmmExprWidth dflags e = typeWidth (cmmExprType dflags e)
 
 --------
 --- Negation for conditional branches
@@ -164,9 +166,9 @@ instance Ord LocalReg where
 instance Uniquable LocalReg where
   getUnique (LocalReg uniq _) = uniq
 
-cmmRegType :: CmmReg -> CmmType
-cmmRegType (CmmLocal  reg) = localRegType reg
-cmmRegType (CmmGlobal reg) = globalRegType reg
+cmmRegType :: DynFlags -> CmmReg -> CmmType
+cmmRegType _      (CmmLocal  reg) = localRegType reg
+cmmRegType dflags (CmmGlobal reg) = globalRegType dflags reg
 
 localRegType :: LocalReg -> CmmType
 localRegType (LocalReg _ rep) = rep
@@ -412,12 +414,12 @@ nodeReg = CmmGlobal node
 node :: GlobalReg
 node = VanillaReg 1 VGcPtr
 
-globalRegType :: GlobalReg -> CmmType
-globalRegType (VanillaReg _ VGcPtr)    = gcWord
-globalRegType (VanillaReg _ VNonGcPtr) = bWord
-globalRegType (FloatReg _)      = cmmFloat W32
-globalRegType (DoubleReg _)     = cmmFloat W64
-globalRegType (LongReg _)       = cmmBits W64
-globalRegType Hp                = gcWord    -- The initialiser for all
+globalRegType :: DynFlags -> GlobalReg -> CmmType
+globalRegType _      (VanillaReg _ VGcPtr)    = gcWord
+globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
+globalRegType _      (FloatReg _)      = cmmFloat W32
+globalRegType _      (DoubleReg _)     = cmmFloat W64
+globalRegType _      (LongReg _)       = cmmBits W64
+globalRegType _      Hp                = gcWord    -- The initialiser for all
                                             -- dynamically allocated closures
-globalRegType _                 = bWord
+globalRegType dflags _                 = bWord dflags

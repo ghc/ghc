@@ -127,7 +127,7 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- Node must always point to things we enter
 	    EnterIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts) 
-		; let target       = entryCode dflags (closureInfoPtr (CmmReg nodeReg))
+		; let target       = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
                       enterClosure = stmtC (CmmJump target node_live)
                       -- If this is a scrutinee
                       -- let's check if the closure is a constructor

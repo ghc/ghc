@@ -367,7 +367,7 @@ copyOutOflow dflags conv transfer area actuals updfr_off
     arg_offset = init_offset + extra_stack_off
 
     args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
-    args = assignArgumentsPos dflags conv cmmExprType actuals
+    args = assignArgumentsPos dflags conv (cmmExprType dflags) actuals
 
     args' = foldl adjust setRA args
       where adjust rst   (v, StackParam off)  = (v, StackParam (off + arg_offset)) : rst

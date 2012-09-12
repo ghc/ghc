@@ -65,9 +65,10 @@ cgTopRhsClosure :: Id
                 -> FCode (CgIdInfo, FCode ())
 
 cgTopRhsClosure id ccs _ upd_flag args body
- = do { lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
+ = do { dflags <- getDynFlags
+      ; lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
       ; let closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
-            cg_id_info = litIdInfo id lf_info (CmmLabel closure_label)
+            cg_id_info = litIdInfo dflags id lf_info (CmmLabel closure_label)
       ; return (cg_id_info, gen_code lf_info closure_label)
       }
   where
@@ -340,7 +341,7 @@ mkRhsClosure _ bndr cc _ fvs upd_flag args body
                                          (map toVarArg fv_details)
 
         -- RETURN
-        ; return (mkRhsInit reg lf_info hp_plus_n) }
+        ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
 
 
 -- Use with care; if used inappropriately, it could break invariants.
@@ -381,7 +382,7 @@ cgRhsStdThunk bndr lf_info payload
                                    use_cc blame_cc payload_w_offsets
 
         -- RETURN
-  ; return (mkRhsInit reg lf_info hp_plus_n) }
+  ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
 
 
 mkClosureLFInfo :: Id           -- The binder
@@ -481,7 +482,8 @@ bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, WordOff)] -> FCode ()
 load_fvs node lf_info = mapM_ (\ (reg, off) ->
-      emit $ mkTaggedObjectLoad reg node off tag)
+   do dflags <- getDynFlags
+      emit $ mkTaggedObjectLoad dflags reg node off tag)
   where tag = lfDynTag lf_info
 
 -----------------------------------------
@@ -580,7 +582,7 @@ emitBlackHoleCode is_single_entry = do
 
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
-    emitStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
+    emitStore (cmmOffsetW dflags (CmmReg nodeReg) (fixedHdrSize dflags))
                   (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
     emitStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -686,7 +688,7 @@ link_caf :: LocalReg           -- pointer to the closure
 link_caf node _is_upd = do
   { dflags <- getDynFlags
     -- Alloc black hole specifying CC_HDR(Node) as the cost centre
-  ; let use_cc   = costCentreFrom (CmmReg nodeReg)
+  ; let use_cc   = costCentreFrom dflags (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
 
@@ -703,7 +705,7 @@ link_caf node _is_upd = do
         -- so that the garbage collector can find them
         -- This must be done *before* the info table pointer is overwritten,
         -- because the old info table ptr is needed for reversion
-  ; ret <- newTemp bWord
+  ; ret <- newTemp (bWord dflags)
   ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
         (CmmReg (CmmLocal node), AddrHint),
@@ -718,7 +720,7 @@ link_caf node _is_upd = do
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-       (let target = entryCode dflags (closureInfoPtr (CmmReg (CmmLocal node))) in
+       (let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node))) in
         mkJump dflags target [] updfr)
 
   ; return hp_rel }

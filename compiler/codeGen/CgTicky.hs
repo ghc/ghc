@@ -177,21 +177,21 @@ registerTickyCtr :: CLabel -> Code
 --	    ticky_entry_ctrs = & (f_ct);	/* mark it as "registered" */
 --	    f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl
-  = emitIf test (stmtsC register_stmts)
-  where
-    -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq wordWidth)
-              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) bWord,
-               CmmLit (mkIntCLit 0)]
-    register_stmts
-      =	[ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
-		   (CmmLoad ticky_entry_ctrs bWord)
-	, CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
-	, CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp))
-		   (CmmLit (mkIntCLit 1)) ]
-    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+  = do dflags <- getDynFlags
+       let -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
+           test = CmmMachOp (MO_Eq wordWidth)
+                     [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
+                                       oFFSET_StgEntCounter_registeredp)) (bWord dflags),
+                      CmmLit (mkIntCLit 0)]
+           register_stmts
+             = [ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
+                          (CmmLoad ticky_entry_ctrs (bWord dflags))
+               , CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
+               , CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
+                                       oFFSET_StgEntCounter_registeredp))
+                          (CmmLit (mkIntCLit 1)) ]
+           ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+       emitIf test (stmtsC register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: Arity -> Code
 tickyReturnOldCon arity 
