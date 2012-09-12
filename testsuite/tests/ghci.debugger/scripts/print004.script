@@ -4,7 +4,7 @@ let a = False
 :sp a 
 :p a
 
-let b = map Just [1..4]
+let b = map Just [1::Integer .. 4]
 :p b
 head b
 :p b

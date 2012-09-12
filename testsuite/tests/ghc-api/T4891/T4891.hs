@@ -50,6 +50,7 @@ doit = do
 
 chaseConstructor :: (GhcMonad m) => HValue -> m ()
 chaseConstructor !hv = do
+  dflags <- getDynFlags
   liftIO $ putStrLn "====="
   closure <- liftIO $ getClosureData hv
   case tipe closure  of
@@ -60,12 +61,8 @@ chaseConstructor !hv = do
         case eDcname of
           Left _       -> return ()
           Right dcName -> do
-            liftIO $ putStrLn $ "Name: "      ++ showPpr dcName
+            liftIO $ putStrLn $ "Name: "      ++ showPpr dflags dcName
             liftIO $ putStrLn $ "OccString: " ++ "'" ++ getOccString dcName ++ "'"
             dc <- tcLookupDataCon dcName
-            liftIO $ putStrLn $ "DataCon: "   ++ showPpr dc
+            liftIO $ putStrLn $ "DataCon: "   ++ showPpr dflags dc
     _ -> return ()
-
-initTcForLookup :: HscEnv -> TcM a -> IO a
-initTcForLookup hsc_env = liftM (\(msg, mValue) -> fromMaybe (error . show . bagToList . snd $ msg) mValue) . initTc hsc_env HsSrcFile False iNTERACTIVE
-

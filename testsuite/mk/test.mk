@@ -129,7 +129,6 @@ RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
 	-e 'config.confdir="$(CONFIGDIR)"' \
 	-e 'config.compiler="$(TEST_HC)"' \
-	-e 'config.compiler_always_flags.append("$(EXTRA_HC_OPTS)")' \
 	-e 'config.ghc_pkg="$(GHC_PKG)"' \
 	-e 'config.hp2ps="$(HP2PS_ABS)"' \
 	-e 'config.hpc="$(HPC)"' \

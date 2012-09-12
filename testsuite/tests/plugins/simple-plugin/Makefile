@@ -6,10 +6,11 @@ LOCAL_PKGCONF=local.package.conf
 PKG_NAME=simple-plugin
 
 clean:
-	rm setup
+	rm -f setup
 	rm -f $(LOCAL_PKGCONF)
 	rm -rf dist
 	rm -rf install
+	rm -f Setup.hi Setup.o
 
 PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))

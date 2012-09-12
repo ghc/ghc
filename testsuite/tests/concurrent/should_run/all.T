@@ -60,7 +60,9 @@ test('allowinterrupt001', normal, compile_and_run, [''])
 # try hard to provoke the error by running the test 100 times
 test('5558',
      [ only_ways(['threaded2']),
-       cmd_wrapper(lambda c: 'for i in `seq 1 100`; do ' + c + ' || break; done') ],
+       cmd_wrapper(
+         lambda c: "for i in %s; do %s || break; done"  %
+           (" ".join(str(i) for i in range(1,101)), c)) ],
      compile_and_run, [''])
 
 test('5421', normal, compile_and_run, [''])

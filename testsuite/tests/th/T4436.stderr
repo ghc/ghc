@@ -2,10 +2,10 @@ T4436.hs:5:7-56: Splicing expression
     return
       (LitE
          (StringL
-            "hello\
-            \goodbye\
+            "hello\n\
+            \goodbye\n\
             \and then"))
   ======>
-    "hello\
-    \goodbye\
+    "hello\n\
+    \goodbye\n\
     \and then"

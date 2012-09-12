@@ -202,12 +202,13 @@ test('Capi_Ctype_002',
      ['$MAKE -s --no-print-directory Capi_Ctype_002'])
 
 test('ffi_parsing_001',
-     extra_clean(['ffi_parsing_001_c.o']),
+     [omit_ways(['ghci']), extra_clean(['ffi_parsing_001_c.o'])],
      compile_and_run,
      ['ffi_parsing_001_c.c'])
 
 test('capi_value',
-     extra_clean(['capi_value_c.o']),
+     [omit_ways(['ghci']), extra_clean(['capi_value_c.o'])],
      compile_and_run,
      ['capi_value_c.c'])
 
+test('7170', exit_code(1), compile_and_run, [''])

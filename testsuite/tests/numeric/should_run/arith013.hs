@@ -1,12 +1,9 @@
--- Test gcdInt/gcdInteger
-
-import GHC.Real ( gcdInt )
-import GHC.Integer.GMP.Internals ( gcdInteger )
+-- Test gcd
 
 main :: IO ()
 main = do
-   test gcdInt     [                       -42, 0, 105             ]
-   test gcdInteger [-12193263111263526900, -42, 0, 105, 1234567890 ]
+   test gcd ([                       -42, 0, 105             ] :: [Int])
+   test gcd ([-12193263111263526900, -42, 0, 105, 1234567890 ] :: [Integer])
 
 
 test :: (Show a, Integral a) => (a -> a -> a) -> [a] -> IO ()

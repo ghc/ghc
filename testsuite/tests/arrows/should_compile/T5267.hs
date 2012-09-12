@@ -1,5 +1,5 @@
 
-{-# LANGUAGE Arrows, TypeOperators, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Arrows, GeneralizedNewtypeDeriving #-}
 
 module T5267 where
 
@@ -7,11 +7,11 @@ import Prelude
 import Control.Arrow
 import Control.Category
 
-newtype A (~>) b c = A { unA :: b ~> c }
-    deriving (Arrow, Category)
+newtype A a b c = A { unA :: a b c }
+    deriving (Category, Arrow)
 
-ite :: ArrowChoice (~>)
-    => (env ~> Bool) -> A (~>) env d -> A (~>) env d -> A (~>) env d
+ite :: ArrowChoice a
+    => a env Bool -> A a env d -> A a env d -> A a env d
 ite iA tA eA = A $ proc env ->
   do i <- iA -< env
      if i then unA tA -< env else unA eA -< env

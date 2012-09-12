@@ -59,3 +59,7 @@ test('mul2', normal, compile_and_run, ['-fobject-code'])
 test('quotRem2', normal, compile_and_run, ['-fobject-code'])
 test('T5863', normal, compile_and_run, [''])
 
+test('T7014',
+     extra_clean(['T7014.simpl']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7014'])

@@ -6,9 +6,3 @@ T5691.hs:14:9:
     In the pattern: f :: p a
     In an equation for `test': test (f :: p a) = MkPRI $ printRule_ f
     In the instance declaration for `Test PrintRuleInterp'
-
-T5691.hs:24:10:
-    No instance for (Monad RecDecParser)
-      arising from the superclasses of an instance declaration
-    Possible fix: add an instance declaration for (Monad RecDecParser)
-    In the instance declaration for `MonadPlus RecDecParser'

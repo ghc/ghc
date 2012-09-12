@@ -5,6 +5,7 @@
 module Foo where
 
 foo :: (forall m. Monad m => Maybe (m a) -> Maybe (m a)) -> Maybe a -> Maybe a
+{-# NOINLINE [1] foo #-}
 foo _ x = x
 
 {-# RULES

@@ -1,6 +1,6 @@
 
 T5716a.hs:10:27:
-    You can't use data constructor `Bar' here
+    Data constructor `Bar' cannot be used here
       (it comes from a data family instance)
     In the type `Bar a'
     In the definition of data constructor `Bar'

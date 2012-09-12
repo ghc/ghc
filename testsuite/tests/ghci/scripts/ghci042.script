@@ -2,7 +2,7 @@
 data T = A {a :: Int}
 :i A
 :i a
-let a = 3
+let a = 3 :: Integer
 :i a
 a
 data R = B {a :: Int}

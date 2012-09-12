@@ -1,6 +1,6 @@
 -- Printing of lists
 
-let li = map Just [0..5]
+let li = map Just [0::Integer .. 5]
 :p li
 head li
 :p li

@@ -1,0 +1,12 @@
+and#
+or#
+uncheckedShift.*#
+\+#
+\-#
+\*#
+quotInt#
+remInt#
+plusFloat#
+minusFloat#
+timesFloat#
+divideFloat#

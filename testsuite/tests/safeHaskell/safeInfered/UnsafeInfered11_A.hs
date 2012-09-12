@@ -15,6 +15,8 @@ lookupx ((t,a):xs) t' | t == t'   = Just a
                       | otherwise = lookupx xs t'
 
 {-# RULES "lookupx/T" lookupx = tLookup #-}
+{-# NOINLINE [1] lookupx #-}
+
 tLookup :: [(T,a)] -> T -> Maybe a
 tLookup [] _                      = Nothing
 tLookup ((t,a):xs) t' | t /= t'   = Just a

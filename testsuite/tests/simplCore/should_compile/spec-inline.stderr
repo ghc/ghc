@@ -6,7 +6,7 @@ Roman.foo3 :: GHC.Types.Int
 [GblId, Str=DmdType b]
 Roman.foo3 =
   Control.Exception.Base.patError
-    @ GHC.Types.Int "spec-inline.hs:(19,5)-(29,25)|function go"
+    @ GHC.Types.Int "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 Rec {
 Roman.foo_$s$wgo [Occ=LoopBreaker]

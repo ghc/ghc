@@ -28,6 +28,21 @@ package dependencies: base* ghc-prim integer-gmp
 trusted: safe-inferred
 require own pkg trusted: True
 
+M_SafePkg6
+package dependencies: array-0.4.0.1 base* bytestring-0.10.1.0*
+trusted: trustworthy
+require own pkg trusted: False
+
+M_SafePkg7
+package dependencies: array-0.4.0.1 base* bytestring-0.10.1.0*
+trusted: safe
+require own pkg trusted: False
+
+M_SafePkg8
+package dependencies: array-0.4.0.1 base bytestring-0.10.1.0*
+trusted: trustworthy
+require own pkg trusted: False
+
 Testing setting trust
 trusted: True
 trusted: False

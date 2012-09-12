@@ -2,7 +2,7 @@
 
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
-let a = map (MkT2 . MkT) [1..2]
+let a = map (MkT2 . MkT) [1::Integer .. 2]
 :p a
 seq _t1 ()
 :p a

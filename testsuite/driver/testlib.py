@@ -971,6 +971,11 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
 def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
+def stats( name, way, stats_file ):
+    opts = getTestOpts()
+    return checkStats(stats_file, opts.stats_range_fields
+                                , opts.stats_num_fields)
+
 # -----------------------------------------------------------------------------
 # Check -t stats info
 

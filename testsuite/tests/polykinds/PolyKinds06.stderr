@@ -1,4 +1,5 @@
 
 PolyKinds06.hs:9:11:
-    Promoted kind `A' used in a mutually recursive group
+    Type constructor `A' cannot be used here
+      (it is defined and used in the same recursive group)
     In the kind `A -> *'

@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
-{-# OPTIONS_GHC -O0 #-}
 
 import Foreign.C
 import Data.Word

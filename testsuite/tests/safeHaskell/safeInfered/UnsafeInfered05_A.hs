@@ -5,6 +5,7 @@
 module UnsafeInfered05_A where
 
 {-# RULES "f" f = undefined #-}
+{-# NOINLINE [1] f #-}
 f :: Int
 f = 1
 

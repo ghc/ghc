@@ -1,5 +1,3 @@
--- Bug doesn't show up on -O0
-{-# OPTIONS_GHC -O #-}
 module Cgrun067A (miscompiledFn) where
 
 import Foreign.C

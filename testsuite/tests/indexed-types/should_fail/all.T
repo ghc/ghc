@@ -75,5 +75,6 @@ test('T5515', normal, compile_fail, [''])
 test('T5763', expect_broken(5673), compile_fail, [''])
 test('T5934', normal, compile_fail, [''])
 test('T6123', normal, compile_fail, [''])
-
 test('ExtraTcsUntch', normal, compile_fail, [''])
+test('T7010', normal, compile_fail, [''])
+test('T7194', expect_broken(7194), compile_fail, [''])

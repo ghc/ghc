@@ -6,4 +6,5 @@ module ShouldCompile where
 -- Instead, the NoMonomorphismRestriction language
 bar = show ?c
 
-foo = let { ?c = 'x' } in bar
+foo1 = let { ?c = 'x' } in bar
+foo2 = let { ?c = True } in bar

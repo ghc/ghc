@@ -1,20 +1,24 @@
 TYPE SIGNATURES
-    foo :: forall s b chain.
-           Zork s (Z [Char]) b =>
-           Q s (Z [Char]) chain -> ST s ()
-    s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
+  foo ::
+    forall s b chain.
+    Zork s (Z [Char]) b =>
+    Q s (Z [Char]) chain -> ST s ()
+  s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
+  Q :: * -> * -> * -> *
   data Q s a chain
       No C type associated
       RecFlag NonRecursive
       = Node :: forall s a chain. s -> a -> chain -> Q s a chain
             Stricts: _ _ _
       FamilyInstance: none
+  Z :: * -> *
   data Z a
       No C type associated
       RecFlag NonRecursive
       = Z :: forall a. a -> Z a Stricts: _
       FamilyInstance: none
+  Zork :: * -> * -> * -> Constraint
   class Zork s a b | a -> b
       RecFlag NonRecursive
       huh :: forall chain. Q s a chain -> ST s ()

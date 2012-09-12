@@ -1,2 +1,2 @@
 
-readFail047.hs:6:5: parse error (possibly incorrect indentation)
+readFail047.hs:6:5: parse error (possibly incorrect indentation or mismatched brackets)

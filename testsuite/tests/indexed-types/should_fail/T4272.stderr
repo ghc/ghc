@@ -1,13 +1,13 @@
 
-T4272.hs:11:26:
+T4272.hs:15:26:
     Could not deduce (a ~ TermFamily a a)
     from the context (TermLike a)
       bound by the type signature for
                  laws :: TermLike a => TermFamily a a -> b
-      at T4272.hs:10:9-53
+      at T4272.hs:14:9-53
       `a' is a rigid type variable bound by
           the type signature for laws :: TermLike a => TermFamily a a -> b
-          at T4272.hs:10:16
+          at T4272.hs:14:16
     Expected type: TermFamily a (TermFamily a a)
       Actual type: TermFamily a a
     In the first argument of `terms', namely

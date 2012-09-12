@@ -1,9 +1,9 @@
 
-RnFail055.hs:1:73:
-    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+RnFail055.hs:1:73: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-RnFail055.hs-boot:1:73:
-    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+RnFail055.hs-boot:1:73: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 RnFail055.hs-boot:4:1:
     Identifier `f1' has conflicting definitions in the module and its hs-boot file
@@ -17,8 +17,8 @@ RnFail055.hs-boot:6:6:
 
 RnFail055.hs-boot:8:6:
     Type constructor `S2' has conflicting definitions in the module and its hs-boot file
-    Main module: type S2 a b = forall a. (a, b)
-    Boot file:   type S2 a b = forall b. (a, b)
+    Main module: type S2 a b = forall a1. (a1, b)
+    Boot file:   type S2 a b = forall b1. (a, b1)
 
 RnFail055.hs-boot:12:6:
     Type constructor `T1' has conflicting definitions in the module and its hs-boot file
@@ -83,7 +83,7 @@ RnFail055.hs-boot:25:6:
     Main module: data T7 a
                      No C type associated
                      RecFlag Recursive
-                     = T7 :: forall a a. a -> T7 a Stricts: _
+                     = T7 :: forall a a1. a1 -> T7 a Stricts: _
                      FamilyInstance: none
     Boot file:   data T7 a
                      No C type associated

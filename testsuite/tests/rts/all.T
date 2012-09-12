@@ -143,3 +143,18 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  # needs it.
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
+test('T7037',
+     [ extra_clean(['T7037_main.o','T7037_main']) ],
+     run_command,
+     ['$MAKE -s --no-print-directory T7037'])
+
+test('7087', exit_code(1), compile_and_run, [''])
+test('T7160', normal, compile_and_run, [''])
+
+test('T7040', [ extra_clean(['T7040_c.o']), omit_ways(['ghci']) ],
+     compile_and_run, ['T7040_c.c'])
+
+test('T7040_ghci', [ only_ways(['ghci']),
+                      cmd_prefix('$MAKE T7040_ghci_setup && '),
+                      extra_clean(['T7040_ghci_c.o']) ],
+                    compile_and_run, ['T7040_ghci_c.o'])
