@@ -320,10 +320,11 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
 
         -- Do the business
   ; funWrapper cl_info reg_args reg_save_code $ do
-	{ tickyEnterFun cl_info
+        { dflags <- getDynFlags
+        ; tickyEnterFun cl_info
         ; enterCostCentreFun cc
-              (CmmMachOp mo_wordSub [ CmmReg nodeReg
-                                    , mkIntExpr (funTag cl_info) ])
+              (CmmMachOp (mo_wordSub dflags) [ CmmReg nodeReg
+                                             , mkIntExpr dflags (funTag cl_info) ])
               (node : map snd reg_args) -- live regs
 
         ; cgExpr body }
@@ -429,7 +430,7 @@ funWrapper closure_info arg_regs reg_save_code fun_body = do
   ; whenC (tag /= 0 && node_points) $ do
         l <- newLabelC
         stmtC (CmmCondBranch (CmmMachOp mo_wordEq [cmmGetTag (CmmReg nodeReg),
-                                                   mkIntExpr tag)]) l)
+                                                   mkIntExpr dflags tag)]) l)
         stmtC (CmmStore (CmmLit (mkWordCLit 0)) (mkWordExpr 0))
         labelC l
   -}
@@ -598,7 +599,7 @@ link_caf cl_info _is_upd = do
 	-- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
-  ; emitIf (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), zeroExpr]) $
+  ; emitIf (CmmMachOp (mo_wordEq dflags) [ CmmReg (CmmLocal ret), zeroExpr dflags]) $
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.

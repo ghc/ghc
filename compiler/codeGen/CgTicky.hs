@@ -98,14 +98,14 @@ emitTickyCounter cl_info args on_stk
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
 -- panic and disorder.
-	    [ mkIntCLit 0,
-	      mkIntCLit (length args),-- Arity
-	      mkIntCLit on_stk,	-- Words passed on stack
+	    [ mkIntCLit dflags 0,
+	      mkIntCLit dflags (length args),-- Arity
+	      mkIntCLit dflags on_stk,	-- Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
-	      zeroCLit, 		-- Entry count
-	      zeroCLit, 		-- Allocs
-	      zeroCLit 			-- Link
+	      zeroCLit dflags, 		-- Entry count
+	      zeroCLit dflags, 		-- Allocs
+	      zeroCLit dflags 			-- Link
 	    ] }
   where
     name = closureName cl_info
@@ -179,17 +179,17 @@ registerTickyCtr :: CLabel -> Code
 registerTickyCtr ctr_lbl
   = do dflags <- getDynFlags
        let -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-           test = CmmMachOp (MO_Eq wordWidth)
+           test = CmmMachOp (MO_Eq (wordWidth dflags))
                      [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
                                        oFFSET_StgEntCounter_registeredp)) (bWord dflags),
-                      CmmLit (mkIntCLit 0)]
+                      CmmLit (mkIntCLit dflags 0)]
            register_stmts
              = [ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
                           (CmmLoad ticky_entry_ctrs (bWord dflags))
                , CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
                , CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
                                        oFFSET_StgEntCounter_registeredp))
-                          (CmmLit (mkIntCLit 1)) ]
+                          (CmmLit (mkIntCLit dflags 1)) ]
            ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
        emitIf test (stmtsC register_stmts)
 

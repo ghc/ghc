@@ -165,9 +165,9 @@ temporary, then do the other computation, and then use the temporary:
 
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: Maybe BlockId -> CmmStatic
-jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
+jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
+jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
@@ -324,8 +324,8 @@ genSwitch dflags expr ids
 
 generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
-generateJumpTableForInstr _ (JMP_TBL _ ids label) =
-        let jumpTable = map jumpTableEntry ids
+generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
+        let jumpTable = map (jumpTableEntry dflags) ids
         in Just (CmmData ReadOnlyData (Statics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 

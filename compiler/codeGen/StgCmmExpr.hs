@@ -515,7 +515,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
         ; if isSmallFamily fam_sz
           then do
                 let   -- Yes, bndr_reg has constr. tag in ls bits
-                   tag_expr = cmmConstrTag1 (CmmReg bndr_reg)
+                   tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
                 return AssignedDirectly
@@ -688,7 +688,7 @@ emitEnter fun = do
       Return _ -> do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkForeignJump dflags NativeNodeCall entry
-                    [cmmUntag fun] updfr_off
+                    [cmmUntag dflags fun] updfr_off
         ; return AssignedDirectly
         }
 
@@ -732,7 +732,7 @@ emitEnter fun = do
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged (CmmReg nodeReg)) lret lcall <*>
+           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg)) lret lcall <*>
            outOfLine lcall the_call <*>
            mkLabel lret <*>
            copyin

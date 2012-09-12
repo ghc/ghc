@@ -1053,9 +1053,9 @@ doSwitch mb_range scrut arms deflt
 initEnv :: DynFlags -> Env
 initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE)) wordWidth) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE)) (wordWidth dflags)) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) wordWidth) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)

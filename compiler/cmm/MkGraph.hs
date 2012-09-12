@@ -306,7 +306,7 @@ copyIn dflags oflow conv area formals =
   where ci (reg, RegisterParam r) (n, ms) =
           (n, CmmAssign (CmmLocal reg) (CmmReg $ CmmGlobal r) : ms)
         ci (r, StackParam off) (n, ms) = oflow area (r, off) (n, ms)
-        init_offset = widthInBytes wordWidth -- infotable
+        init_offset = widthInBytes (wordWidth dflags) -- infotable
         args  = assignArgumentsPos dflags conv localRegType formals
         args' = foldl adjust [] args
           where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
@@ -356,10 +356,10 @@ copyOutOflow dflags conv transfer area actuals updfr_off
                   case transfer of
                      Call ->
                        ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                       widthInBytes wordWidth)
+                       widthInBytes (wordWidth dflags))
                      JumpRet ->
                        ([],
-                       widthInBytes wordWidth)
+                       widthInBytes (wordWidth dflags))
                      _other ->
                        ([], 0)
             Old -> ([], updfr_off)

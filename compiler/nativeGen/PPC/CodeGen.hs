@@ -206,9 +206,9 @@ temporary, then do the other computation, and then use the temporary:
 
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: Maybe BlockId -> CmmStatic
-jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
+jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
+jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
@@ -1197,9 +1197,9 @@ generateJumpTableForInstr :: DynFlags -> Instr
 generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
     let jumpTable
             | dopt Opt_PIC dflags = map jumpTableEntryRel ids
-            | otherwise = map jumpTableEntry ids
+            | otherwise = map (jumpTableEntry dflags) ids
                 where jumpTableEntryRel Nothing
-                        = CmmStaticLit (CmmInt 0 wordWidth)
+                        = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                             where blockLabel = mkAsmTempLabel (getUnique blockid)

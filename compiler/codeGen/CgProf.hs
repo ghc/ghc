@@ -80,11 +80,11 @@ staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
 -- Was SET_STATIC_PROF_HDR
 staticProfHdr dflags ccs = ifProfilingL dflags [mkCCostCentreStack ccs,
-                                                staticLdvInit]
+                                                staticLdvInit dflags]
 
 dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
-dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
+dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit dflags]
 
 initUpdFrameProf :: CmmExpr -> Code
 -- Initialise the profiling field of an update frame
@@ -104,7 +104,7 @@ profDynAlloc :: ClosureInfo -> CmmExpr -> Code
 profDynAlloc cl_info ccs
   = ifProfiling $
     do dflags <- getDynFlags
-       profAlloc (mkIntExpr (closureSize dflags cl_info)) ccs
+       profAlloc (mkIntExpr dflags (closureSize dflags cl_info)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -118,9 +118,9 @@ profAlloc words ccs
     do dflags <- getDynFlags
        stmtC (addToMemE alloc_rep
                    (cmmOffsetB dflags ccs oFFSET_CostCentreStack_mem_alloc)
-                   (CmmMachOp (MO_UU_Conv wordWidth alloc_rep) $
-                     [CmmMachOp mo_wordSub [words,
-                                            mkIntExpr (profHdrSize dflags)]]))
+                   (CmmMachOp (MO_UU_Conv (wordWidth dflags) alloc_rep) $
+                     [CmmMachOp (mo_wordSub dflags) [words,
+                                                     mkIntExpr dflags (profHdrSize dflags)]]))
                    -- subtract the "profiling overhead", which is the
                    -- profiling header in a closure.
  where
@@ -175,20 +175,19 @@ emitCostCentreDecl cc = do
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
-     lits = [ zero,     -- StgInt ccID,
+     is_caf | isCafCC cc = mkIntCLit dflags (ord 'c') -- 'c' == is a CAF
+            | otherwise  = zero dflags
+     lits = [ zero dflags,     -- StgInt ccID,
               label,    -- char *label,
               modl,     -- char *module,
               loc,      -- char *srcloc,
               zero64,   -- StgWord64 mem_alloc
-              zero,     -- StgWord time_ticks
+              zero dflags,     -- StgWord time_ticks
               is_caf,   -- StgInt is_caf
-              zero      -- struct _CostCentre *link
+              zero dflags      -- struct _CostCentre *link
             ]
   ; emitDataLits (mkCCLabel cc) lits
   }
-  where
-     is_caf | isCafCC cc = mkIntCLit (ord 'c') -- 'c' == is a CAF
-            | otherwise  = zero
 
 
 emitCostCentreStackDecl
@@ -196,20 +195,21 @@ emitCostCentreStackDecl
    -> Code
 emitCostCentreStackDecl ccs
   | Just cc <- maybeSingletonCCS ccs = do
-  { let
+  { dflags <- getDynFlags
+  ; let
         -- Note: to avoid making any assumptions about how the
         -- C compiler (that compiles the RTS, in particular) does
         -- layouts of structs containing long-longs, simply
         -- pad out the struct with zero words until we hit the
         -- size of the overall struct (which we get via DerivedConstants.h)
         --
-     lits = zero : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) zero
+     lits = zero dflags : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) (zero dflags)
   ; emitDataLits (mkCCSLabel ccs) lits
   }
   | otherwise = pprPanic "emitCostCentreStackDecl" (ppr ccs)
 
-zero :: CmmLit
-zero = mkIntCLit 0
+zero :: DynFlags -> CmmLit
+zero dflags = mkIntCLit dflags 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
@@ -255,17 +255,17 @@ bumpSccCount dflags ccs
 --
 -- Initial value for the LDV field in a static closure
 --
-staticLdvInit :: CmmLit
+staticLdvInit :: DynFlags -> CmmLit
 staticLdvInit = zeroCLit
 
 --
 -- Initial value of the LDV field in a dynamic closure
 --
-dynLdvInit :: CmmExpr
-dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
-  CmmMachOp mo_wordOr [
-      CmmMachOp mo_wordShl [loadEra, mkIntExpr lDV_SHIFT ],
-      CmmLit (mkWordCLit lDV_STATE_CREATE)
+dynLdvInit :: DynFlags -> CmmExpr
+dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
+  CmmMachOp (mo_wordOr dflags) [
+      CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags lDV_SHIFT ],
+      CmmLit (mkWordCLit dflags lDV_STATE_CREATE)
   ]
 
 --
@@ -273,7 +273,7 @@ dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
 --
 ldvRecordCreate :: CmmExpr -> Code
 ldvRecordCreate closure = do dflags <- getDynFlags
-                             stmtC $ CmmStore (ldvWord dflags closure) dynLdvInit
+                             stmtC $ CmmStore (ldvWord dflags closure) (dynLdvInit dflags)
 
 --
 -- Called when a closure is entered, marks the closure as having been "used".
@@ -295,19 +295,19 @@ ldvEnter cl_ptr = do
   let
         -- don't forget to substract node's tag
     ldv_wd = ldvWord dflags cl_ptr
-    new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd (bWord dflags))
-                                       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
-                 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
+    new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
+                                                     (CmmLit (mkWordCLit dflags lDV_CREATE_MASK)))
+                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags lDV_STATE_USE)))
   ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
      --                era | LDV_STATE_USE }
-    emitIf (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
+    emitIf (CmmMachOp (mo_wordUGt dflags) [loadEra dflags, CmmLit (zeroCLit dflags)])
            (stmtC (CmmStore ldv_wd new_ldv_wd))
 
-loadEra :: CmmExpr
-loadEra = CmmMachOp (MO_UU_Conv cIntWidth wordWidth)
-          [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
+loadEra :: DynFlags -> CmmExpr
+loadEra dflags = CmmMachOp (MO_UU_Conv cIntWidth (wordWidth dflags))
+                           [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
 
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns

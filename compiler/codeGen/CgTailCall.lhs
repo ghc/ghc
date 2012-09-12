@@ -193,7 +193,7 @@ performTailCall fun_info arg_amodes pending_assts
     fun_name  = idName fun_id
     lf_info   = cgIdInfoLF fun_info
     fun_has_cafs = idCafInfo fun_id
-    untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
+    untag_node dflags = CmmAssign nodeReg (cmmUntag dflags (CmmReg nodeReg))
     -- Test if closure is a constructor
     maybeSwitchOnCons dflags enterClosure eob
               | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
@@ -203,7 +203,7 @@ performTailCall fun_info arg_amodes pending_assts
               = do { is_constr <- newLabelC
                    -- Is the pointer tagged?
                    -- Yes, jump to switch statement
-                   ; stmtC (CmmCondBranch (cmmIsTagged (CmmReg nodeReg)) 
+                   ; stmtC (CmmCondBranch (cmmIsTagged dflags (CmmReg nodeReg)) 
                                 is_constr)
                    -- No, enter the closure.
                    ; enterClosure
@@ -232,7 +232,7 @@ performTailCall fun_info arg_amodes pending_assts
 -}
               -- No case expression involved, enter the closure.
               | otherwise
-              = do { stmtC untag_node
+              = do { stmtC $ untag_node dflags
                    ; enterClosure
                    }
         where

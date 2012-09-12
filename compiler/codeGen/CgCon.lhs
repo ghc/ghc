@@ -355,7 +355,7 @@ cgReturnDataCon con amodes = do
   where
     node_live   = Just [node]
     enter_it dflags
-                = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
+                = stmtsC [ CmmAssign nodeReg (cmmUntag dflags (CmmReg nodeReg)),
                            CmmJump (entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg)
                                    node_live
                          ]

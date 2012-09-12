@@ -458,9 +458,9 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                       node' = if node_points then Just node else Nothing
                 ; tickyEnterFun cl_info
                 ; enterCostCentreFun cc
-                    (CmmMachOp mo_wordSub
+                    (CmmMachOp (mo_wordSub dflags)
                          [ CmmReg nodeReg
-                         , mkIntExpr (funTag cl_info) ])
+                         , mkIntExpr dflags (funTag cl_info) ])
                 ; whenC node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 
@@ -508,7 +508,7 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
            jump = mkDirectJump dflags
                                (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
-                               initUpdFrameOff
+                               (initUpdFrameOff dflags)
        emitProcWithConvention Slow Nothing slow_lbl arg_regs jump
   | otherwise = return ()
 
@@ -716,7 +716,7 @@ link_caf node _is_upd = do
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
   ; updfr  <- getUpdFrameOff
   ; emit =<< mkCmmIfThen
-      (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit])
+      (CmmMachOp (mo_wordEq dflags) [ CmmReg (CmmLocal ret), CmmLit (zeroCLit dflags)])
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.

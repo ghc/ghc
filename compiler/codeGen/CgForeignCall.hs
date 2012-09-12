@@ -152,7 +152,7 @@ emitForeignCall' safety results target args vols _srt ret
     stmtC (CmmCall (CmmCallee suspendThread CCallConv)
                         [ CmmHinted id AddrHint ]
                         [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
-                        , CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) wordWidth)) NoHint]
+                        , CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) (wordWidth dflags))) NoHint]
                         ret)
     stmtC (CmmCall temp_target results temp_args ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv)
@@ -243,7 +243,7 @@ emitLoadThreadState = do
         -- HpAlloc = 0;
         --   HpAlloc is assumed to be set to non-zero only by a failed
         --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
-        CmmAssign hpAlloc (CmmLit zeroCLit)
+        CmmAssign hpAlloc (CmmLit (zeroCLit dflags))
     ]
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
@@ -264,10 +264,10 @@ emitOpenNursery =
             (cmmOffsetExpr dflags
                 (CmmLoad (nursery_bdescr_start dflags) (bWord dflags))
                 (cmmOffset dflags
-                  (CmmMachOp mo_wordMul [
-                    CmmMachOp (MO_SS_Conv W32 wordWidth)
+                  (CmmMachOp (mo_wordMul dflags) [
+                    CmmMachOp (MO_SS_Conv W32 (wordWidth dflags))
                       [CmmLoad (nursery_bdescr_blocks dflags) b32],
-                    mkIntExpr bLOCK_SIZE
+                    mkIntExpr dflags bLOCK_SIZE
                    ])
                   (-1)
                 )

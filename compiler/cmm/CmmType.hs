@@ -97,13 +97,13 @@ f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
 bWord :: DynFlags -> CmmType
-bWord _ = cmmBits wordWidth
+bWord dflags = cmmBits (wordWidth dflags)
 
 bHalfWord :: DynFlags -> CmmType
 bHalfWord dflags = cmmBits (halfWordWidth dflags)
 
 gcWord :: DynFlags -> CmmType
-gcWord _ = CmmType GcPtrCat wordWidth
+gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
 
 cInt, cLong :: CmmType
 cInt  = cmmBits cIntWidth
@@ -160,10 +160,11 @@ mrStr W80  = sLit("W80")
 
 
 -------- Common Widths  ------------
-wordWidth :: Width
-wordWidth | wORD_SIZE == 4 = W32
-          | wORD_SIZE == 8 = W64
-          | otherwise      = panic "MachOp.wordRep: Unknown word size"
+wordWidth :: DynFlags -> Width
+wordWidth _
+ | wORD_SIZE == 4 = W32
+ | wORD_SIZE == 8 = W64
+ | otherwise      = panic "MachOp.wordRep: Unknown word size"
 
 halfWordWidth :: DynFlags -> Width
 halfWordWidth _

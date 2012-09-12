@@ -93,33 +93,34 @@ addIdReps ids = [(idCgRep id, id) | id <- ids]
 
 cgLit :: Literal -> FCode CmmLit
 cgLit (MachStr s) = newByteStringCLit (bytesFB s)
-cgLit other_lit   = return (mkSimpleLit other_lit)
+cgLit other_lit   = do dflags <- getDynFlags
+                       return (mkSimpleLit dflags other_lit)
 
-mkSimpleLit :: Literal -> CmmLit
-mkSimpleLit (MachChar   c)    = CmmInt (fromIntegral (ord c)) wordWidth
-mkSimpleLit MachNullAddr      = zeroCLit
-mkSimpleLit (MachInt i)       = CmmInt i wordWidth
-mkSimpleLit (MachInt64 i)     = CmmInt i W64
-mkSimpleLit (MachWord i)      = CmmInt i wordWidth
-mkSimpleLit (MachWord64 i)    = CmmInt i W64
-mkSimpleLit (MachFloat r)     = CmmFloat r W32
-mkSimpleLit (MachDouble r)    = CmmFloat r W64
-mkSimpleLit (MachLabel fs ms fod)
+mkSimpleLit :: DynFlags -> Literal -> CmmLit
+mkSimpleLit dflags (MachChar   c)    = CmmInt (fromIntegral (ord c)) (wordWidth dflags)
+mkSimpleLit dflags MachNullAddr      = zeroCLit dflags
+mkSimpleLit dflags (MachInt i)       = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (MachInt64 i)     = CmmInt i W64
+mkSimpleLit dflags (MachWord i)      = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (MachWord64 i)    = CmmInt i W64
+mkSimpleLit _      (MachFloat r)     = CmmFloat r W32
+mkSimpleLit _      (MachDouble r)    = CmmFloat r W64
+mkSimpleLit _      (MachLabel fs ms fod)
         = CmmLabel (mkForeignLabel fs ms labelSrc fod)
         where
                 -- TODO: Literal labels might not actually be in the current package...
                 labelSrc = ForeignLabelInThisPackage
-mkSimpleLit (MachStr _) = panic "mkSimpleLit: MachStr"
+mkSimpleLit _ (MachStr _) = panic "mkSimpleLit: MachStr"
 -- No LitInteger's should be left by the time this is called. CorePrep
 -- should have converted them all to a real core representation.
-mkSimpleLit (LitInteger {}) = panic "mkSimpleLit: LitInteger"
+mkSimpleLit _ (LitInteger {}) = panic "mkSimpleLit: LitInteger"
 
 mkLtOp :: DynFlags -> Literal -> MachOp
 -- On signed literals we must do a signed comparison
-mkLtOp _      (MachInt _)    = MO_S_Lt wordWidth
+mkLtOp dflags (MachInt _)    = MO_S_Lt (wordWidth dflags)
 mkLtOp _      (MachFloat _)  = MO_F_Lt W32
 mkLtOp _      (MachDouble _) = MO_F_Lt W64
-mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLit lit)))
+mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLit dflags lit)))
 
 
 ---------------------------------------------------
@@ -478,12 +479,13 @@ mk_switch _tag_expr [(_tag,stmts)] Nothing _lo_tag _hi_tag _via_C
         -- can't happen, so no need to test
 
 -- SINGLETON BRANCH: one equality check to do
-mk_switch tag_expr [(tag,stmts)] (Just deflt) _lo_tag _hi_tag _via_C
-  = return (CmmCondBranch cond deflt `consCgStmt` stmts)
-  where
-    cond  =  cmmNeWord tag_expr (CmmLit (mkIntCLit tag))
+mk_switch tag_expr [(tag,stmts)] (Just deflt) _lo_tag _hi_tag _via_C = do
+  dflags <- getDynFlags
+  let
+    cond  =  cmmNeWord dflags tag_expr (CmmLit (mkIntCLit dflags tag))
         -- We have lo_tag < hi_tag, but there's only one branch,
         -- so there must be a default
+  return (CmmCondBranch cond deflt `consCgStmt` stmts)
 
 -- ToDo: we might want to check for the two branch case, where one of
 -- the branches is the tag 0, because comparing '== 0' is likely to be
@@ -521,8 +523,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 
   -- if we can knock off a bunch of default cases with one if, then do so
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
-       ; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit lowest_branch))
+  = do { dflags <- getDynFlags
+       ; (assign_tag, tag_expr') <- assignTemp' tag_expr
+       ; let cond = cmmULtWord dflags tag_expr' (CmmLit (mkIntCLit dflags lowest_branch))
              branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt
                         lowest_branch hi_tag via_C
@@ -530,8 +533,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
-       ; let cond = cmmUGtWord tag_expr' (CmmLit (mkIntCLit highest_branch))
+  = do { dflags <- getDynFlags
+       ; (assign_tag, tag_expr') <- assignTemp' tag_expr
+       ; let cond = cmmUGtWord dflags tag_expr' (CmmLit (mkIntCLit dflags highest_branch))
              branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt
                         lo_tag highest_branch via_C
@@ -539,14 +543,15 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | otherwise   -- Use an if-tree
-  = do  { (assign_tag, tag_expr') <- assignTemp' tag_expr
+  = do  { dflags <- getDynFlags
+        ; (assign_tag, tag_expr') <- assignTemp' tag_expr
                 -- To avoid duplication
         ; lo_stmts <- mk_switch tag_expr' lo_branches mb_deflt
                                 lo_tag (mid_tag-1) via_C
         ; hi_stmts <- mk_switch tag_expr' hi_branches mb_deflt
                                 mid_tag hi_tag via_C
         ; hi_id <- forkCgStmts hi_stmts
-        ; let cond = cmmUGeWord tag_expr' (CmmLit (mkIntCLit mid_tag))
+        ; let cond = cmmUGeWord dflags tag_expr' (CmmLit (mkIntCLit dflags mid_tag))
               branch_stmt = CmmCondBranch cond hi_id
         ; return (assign_tag `consCgStmt` (branch_stmt `consCgStmt` lo_stmts))
         }
@@ -632,7 +637,7 @@ mk_lit_switch :: CmmExpr -> BlockId
               -> FCode CgStmts
 mk_lit_switch scrut deflt_blk_id [(lit,blk)]
   = do dflags <- getDynFlags
-       let cmm_lit = mkSimpleLit lit
+       let cmm_lit = mkSimpleLit dflags lit
            rep     = cmmLitType dflags cmm_lit
            ne      = if isFloatType rep then MO_F_Ne else MO_Ne
            cond    = CmmMachOp (ne (typeWidth rep)) [scrut, CmmLit cmm_lit]
@@ -655,7 +660,7 @@ mk_lit_switch scrut deflt_blk_id branches
     is_lo (t,_) = t < mid_lit
 
     cond dflags = CmmMachOp (mkLtOp dflags mid_lit)
-                            [scrut, CmmLit (mkSimpleLit mid_lit)]
+                            [scrut, CmmLit (mkSimpleLit dflags mid_lit)]
 
 -------------------------------------------------------------------------
 --
@@ -782,6 +787,7 @@ possiblySameLoc _  _    _          _    = True  -- Conservative
 
 getSRTInfo :: FCode C_SRT
 getSRTInfo = do
+  dflags <- getDynFlags
   srt_lbl <- getSRTLabel
   srt <- getSRT
   case srt of
@@ -795,8 +801,8 @@ getSRTInfo = do
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
              ( cmmLabelOffW srt_lbl off
-               : mkWordCLit (fromIntegral len)
-               : map mkWordCLit bmp)
+               : mkWordCLit dflags (fromIntegral len)
+               : map (mkWordCLit dflags) bmp)
             return (C_SRT srt_desc_lbl 0 srt_escape)
 
       | otherwise
@@ -914,10 +920,10 @@ fixStgRegExpr dflags expr
             -- expand it and defer to the above code.
             case reg `elem` activeStgRegs platform of
                 True  -> expr
-                False -> fixStgRegExpr dflags (CmmMachOp (MO_Add wordWidth) [
+                False -> fixStgRegExpr dflags (CmmMachOp (MO_Add (wordWidth dflags)) [
                                     CmmReg (CmmGlobal reg),
                                     CmmLit (CmmInt (fromIntegral offset)
-                                                wordWidth)])
+                                                (wordWidth dflags))])
 
         -- CmmLit, CmmReg (CmmLocal), CmmStackSlot
         _other -> expr

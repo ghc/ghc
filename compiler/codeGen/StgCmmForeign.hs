@@ -222,7 +222,7 @@ emitForeignCall safety results target args _ret
     let (off, copyout) = copyInOflow dflags NativeReturn (Young k) results
        -- see Note [safe foreign call convention]
     emit $
-           (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
+           (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth dflags)))
                         (CmmLit (CmmBlock k))
             <*> mkLast (CmmForeignCall { tgt  = temp_target
                                        , res  = results
@@ -337,10 +337,10 @@ openNursery dflags = catAGraphs [
             (cmmOffsetExpr dflags
                 (CmmLoad (nursery_bdescr_start dflags) (bWord dflags))
                 (cmmOffset dflags
-                  (CmmMachOp mo_wordMul [
-                    CmmMachOp (MO_SS_Conv W32 wordWidth)
+                  (CmmMachOp (mo_wordMul dflags) [
+                    CmmMachOp (MO_SS_Conv W32 (wordWidth dflags))
                       [CmmLoad (nursery_bdescr_blocks dflags) b32],
-                    mkIntExpr bLOCK_SIZE
+                    mkIntExpr dflags bLOCK_SIZE
                    ])
                   (-1)
                 )

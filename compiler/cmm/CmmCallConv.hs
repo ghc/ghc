@@ -78,9 +78,9 @@ assignArgumentsPos dflags conv arg_ty reps = assignments
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
-                      (_, (v:vs, fs, ds, ls)) | widthInBits w <= widthInBits wordWidth
+                      (_, (v:vs, fs, ds, ls)) | widthInBits w <= widthInBits (wordWidth dflags)
                           -> k (RegisterParam (v gcp), (vs, fs, ds, ls))
-                      (_, (vs, fs, ds, l:ls)) | widthInBits w > widthInBits wordWidth
+                      (_, (vs, fs, ds, l:ls)) | widthInBits w > widthInBits (wordWidth dflags)
                           -> k (RegisterParam l, (vs, fs, ds, ls))
                       _   -> (assts, (r:rs))
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'

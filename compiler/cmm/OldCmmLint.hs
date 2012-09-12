@@ -80,9 +80,9 @@ lintCmmExpr dflags (CmmLoad expr rep) = do
   return rep
 lintCmmExpr dflags expr@(CmmMachOp op args) = do
   tys <- mapM (lintCmmExpr dflags) args
-  if map (typeWidth . cmmExprType dflags) args == machOpArgReps op
+  if map (typeWidth . cmmExprType dflags) args == machOpArgReps dflags op
   	then cmmCheckMachOp dflags op args tys
-	else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps op)
+	else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps dflags op)
 lintCmmExpr dflags (CmmRegOff reg offset)
   = lintCmmExpr dflags (CmmMachOp (MO_Add rep)
 		[CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
@@ -137,7 +137,7 @@ lintCmmStmt dflags labels = lint
           lint (CmmCall target _res args _) =
               do lintTarget dflags labels target
                  mapM_ (lintCmmExpr dflags . hintlessCmm) args
-          lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr dflags e >> checkCond e
+          lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr dflags e >> checkCond dflags e
           lint (CmmSwitch e branches) = do
             mapM_ checkTarget $ catMaybes branches
             erep <- lintCmmExpr dflags e
@@ -159,10 +159,10 @@ lintTarget dflags labels (CmmPrim _ (Just stmts))
     = mapM_ (lintCmmStmt dflags labels) stmts
 
 
-checkCond :: CmmExpr -> CmmLint ()
-checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
-checkCond (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth = return () -- constant values
-checkCond expr
+checkCond :: DynFlags -> CmmExpr -> CmmLint ()
+checkCond _      (CmmMachOp mop _) | isComparisonMachOp mop = return ()
+checkCond dflags (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth dflags = return () -- constant values
+checkCond _      expr
     = cmmLintErr (hang (text "expression is not a conditional:") 2
                        (ppr expr))
 

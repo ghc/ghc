@@ -181,7 +181,7 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
 
     padding
         | not is_caf = []
-        | otherwise  = ASSERT(null payload) [mkIntCLit 0]
+        | otherwise  = ASSERT(null payload) [mkIntCLit dflags 0]
 
     static_link_field
         | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
@@ -190,15 +190,15 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
         = []
 
     saved_info_field
-        | is_caf     = [mkIntCLit 0]
+        | is_caf     = [mkIntCLit dflags 0]
         | otherwise  = []
 
         -- For a static constructor which has NoCafRefs, we set the
         -- static link field to a non-zero value so the garbage
         -- collector will ignore it.
     static_link_value
-        | mayHaveCafRefs caf_refs  = mkIntCLit 0
-        | otherwise                = mkIntCLit 1  -- No CAF refs
+        | mayHaveCafRefs caf_refs  = mkIntCLit dflags 0
+        | otherwise                = mkIntCLit dflags 1  -- No CAF refs
 
 
 mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
@@ -401,9 +401,9 @@ entryHeapCheck cl_info nodeSet arity args code
                               W32 -> Just (sLit "stg_gc_f1")
                               W64 -> Just (sLit "stg_gc_d1")
                               _other -> Nothing
-        | width == wordWidth = Just (mkGcLabel "stg_gc_unbx_r1")
-        | width == W64       = Just (mkGcLabel "stg_gc_l1")
-        | otherwise          = Nothing
+        | width == wordWidth dflags = Just (mkGcLabel "stg_gc_unbx_r1")
+        | width == W64              = Just (mkGcLabel "stg_gc_l1")
+        | otherwise                 = Nothing
         where
           ty = localRegType reg
           width = typeWidth ty
@@ -437,11 +437,11 @@ entryHeapCheck cl_info nodeSet arity args code
 --           else we do a normal call to stg_gc_noregs
 
 altHeapCheck :: [LocalReg] -> FCode a -> FCode a
-altHeapCheck regs code
-  = case cannedGCEntryPoint regs of
+altHeapCheck regs code = do
+    dflags <- getDynFlags
+    case cannedGCEntryPoint dflags regs of
       Nothing -> genericGC code
       Just gc -> do
-        dflags <- getDynFlags
         lret <- newLabelC
         let (off, copyin) = copyInOflow dflags NativeReturn (Young lret) regs
         lcont <- newLabelC
@@ -451,9 +451,10 @@ altHeapCheck regs code
 
 altHeapCheckReturnsTo :: [LocalReg] -> Label -> ByteOff -> FCode a -> FCode a
 altHeapCheckReturnsTo regs lret off code
-  = case cannedGCEntryPoint regs of
-      Nothing -> genericGC code
-      Just gc -> cannedGCReturnsTo True gc regs lret off code
+  = do dflags <- getDynFlags
+       case cannedGCEntryPoint dflags regs of
+           Nothing -> genericGC code
+           Just gc -> cannedGCReturnsTo True gc regs lret off code
 
 cannedGCReturnsTo :: Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
                   -> FCode a
@@ -478,8 +479,8 @@ genericGC code
        call <- mkCall generic_gc (GC, GC) [] [] updfr_sz (0,[])
        heapCheck False (call <*> mkBranch lretry) code
 
-cannedGCEntryPoint :: [LocalReg] -> Maybe CmmExpr
-cannedGCEntryPoint regs
+cannedGCEntryPoint :: DynFlags -> [LocalReg] -> Maybe CmmExpr
+cannedGCEntryPoint dflags regs
   = case regs of
       []  -> Just (mkGcLabel "stg_gc_noregs")
       [reg]
@@ -489,9 +490,9 @@ cannedGCEntryPoint regs
                                   W64       -> Just (mkGcLabel "stg_gc_d1")
                                   _         -> Nothing
         
-          | width == wordWidth -> Just (mkGcLabel "stg_gc_unbx_r1")
-          | width == W64       -> Just (mkGcLabel "stg_gc_l1")
-          | otherwise          -> Nothing
+          | width == wordWidth dflags -> Just (mkGcLabel "stg_gc_unbx_r1")
+          | width == W64              -> Just (mkGcLabel "stg_gc_l1")
+          | otherwise                 -> Nothing
           where
               ty = localRegType reg
               width = typeWidth ty
@@ -540,15 +541,31 @@ do_checks :: Bool       -- Should we check the stack?
           -> CmmAGraph  -- What to do on failure
           -> FCode ()
 do_checks checkStack alloc do_gc = do
+  dflags <- getDynFlags
+  let
+    alloc_lit = mkIntExpr dflags (alloc*wORD_SIZE) -- Bytes
+    bump_hp = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
+
+    -- Sp overflow if (Sp - CmmHighStack < SpLim)
+    sp_oflo = CmmMachOp (mo_wordULt dflags)
+                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType dflags spReg)))
+                             [CmmReg spReg, CmmLit CmmHighStackMark],
+                   CmmReg spLimReg]
+
+    -- Hp overflow if (Hp > HpLim)
+    -- (Hp has been incremented by now)
+    -- HpLim points to the LAST WORD of valid allocation space.
+    hp_oflo = CmmMachOp (mo_wordUGt dflags)
+                        [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
+
+    alloc_n = mkAssign (CmmGlobal HpAlloc) alloc_lit
   gc_id <- newLabelC
 
   when checkStack $ do
-     dflags <- getDynFlags
-     emit =<< mkCmmIfGoto (sp_oflo dflags) gc_id
+     emit =<< mkCmmIfGoto sp_oflo gc_id
 
   when (alloc /= 0) $ do
-     dflags <- getDynFlags
-     emitAssign hpReg (bump_hp dflags)
+     emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
 
   emitOutOfLine gc_id $
@@ -560,24 +577,6 @@ do_checks checkStack alloc do_gc = do
                 -- stack check succeeds.  Otherwise we might end up
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
-  where
-    alloc_lit = mkIntExpr (alloc*wORD_SIZE) -- Bytes
-    bump_hp dflags = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
-
-    -- Sp overflow if (Sp - CmmHighStack < SpLim)
-    sp_oflo dflags
-            = CmmMachOp mo_wordULt
-                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType dflags spReg)))
-                             [CmmReg spReg, CmmLit CmmHighStackMark],
-                   CmmReg spLimReg]
-
-    -- Hp overflow if (Hp > HpLim)
-    -- (Hp has been incremented by now)
-    -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp mo_wordUGt
-                  [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
-
-    alloc_n = mkAssign (CmmGlobal HpAlloc) alloc_lit
 
 {-
 

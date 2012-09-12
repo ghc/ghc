@@ -776,12 +776,12 @@ arguments.
 areaToSp :: DynFlags -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
 areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n) =
   cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
-areaToSp _ _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr sp_hwm
-areaToSp _ _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
-                      [CmmMachOp (MO_Sub _)
-                              [ CmmReg (CmmGlobal Sp)
-                              , CmmLit (CmmInt 0 _)],
-                       CmmReg (CmmGlobal SpLim)]) = zeroExpr
+areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark) = mkIntExpr dflags sp_hwm
+areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
+                          [CmmMachOp (MO_Sub _)
+                                  [ CmmReg (CmmGlobal Sp)
+                                  , CmmLit (CmmInt 0 _)],
+                           CmmReg (CmmGlobal SpLim)]) = zeroExpr dflags
 areaToSp _ _ _ _ other = other
 
 -- -----------------------------------------------------------------------------
@@ -920,7 +920,7 @@ lowerSafeForeignCall dflags block
     load_stack <- newTemp (gcWord dflags)
     let suspend = saveThreadState dflags <*>
                   caller_save <*>
-                  mkMiddle (callSuspendThread id intrbl)
+                  mkMiddle (callSuspendThread dflags id intrbl)
         midCall = mkUnsafeCall tgt res args
         resume  = mkMiddle (callResumeThread new_base id) <*>
                   -- Assign the result to BaseReg: we
@@ -941,7 +941,7 @@ lowerSafeForeignCall dflags block
         jump = CmmCall { cml_target    = CmmLoad (CmmReg spReg) (bWord dflags)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
-                       , cml_args      = widthInBytes wordWidth
+                       , cml_args      = widthInBytes (wordWidth dflags)
                        , cml_ret_args  = ret_args
                        , cml_ret_off   = updfr }
 
@@ -966,12 +966,12 @@ foreignLbl name = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId name))
 newTemp :: CmmType -> UniqSM LocalReg
 newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
 
-callSuspendThread :: LocalReg -> Bool -> CmmNode O O
-callSuspendThread id intrbl =
+callSuspendThread :: DynFlags -> LocalReg -> Bool -> CmmNode O O
+callSuspendThread dflags id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
              (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
-       [id] [CmmReg (CmmGlobal BaseReg), mkIntExpr (fromEnum intrbl)]
+       [id] [CmmReg (CmmGlobal BaseReg), mkIntExpr dflags (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =

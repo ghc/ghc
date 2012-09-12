@@ -161,7 +161,7 @@ cmmMakePicReference dflags lbl
 
 
 	| (dopt Opt_PIC dflags || not (dopt Opt_Static dflags)) && absoluteLabel lbl 
-	= CmmMachOp (MO_Add wordWidth) 
+	= CmmMachOp (MO_Add (wordWidth dflags)) 
 		[ CmmReg (CmmGlobal PicBaseReg)
 		, CmmLit $ picRelative 
 				(platformArch 	$ targetPlatform dflags)
@@ -641,11 +641,11 @@ pprImportedSymbol _ platform@(Platform { platformArch = ArchPPC_64 }) _
 	| osElfTarget (platformOS platform)
 	= empty
 
-pprImportedSymbol _ platform importedLbl
+pprImportedSymbol dflags platform importedLbl
 	| osElfTarget (platformOS platform)
 	= case dynamicLinkerLabelInfo importedLbl of
 	    Just (SymbolPtr, lbl)
-	      -> let symbolSize = case wordWidth of
+	      -> let symbolSize = case wordWidth dflags of
 		         W32 -> sLit "\t.long"
 		         W64 -> sLit "\t.quad"
 		         _ -> panic "Unknown wordRep in pprImportedSymbol"
@@ -703,8 +703,9 @@ initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab (ListGraph blocks) : statics)
     | osElfTarget os
     = do
+        dflags <- getDynFlags
         gotOffLabel <- getNewLabelNat
-        tmp <- getNewRegNat $ intSize wordWidth
+        tmp <- getNewRegNat $ intSize (wordWidth dflags)
         let 
             gotOffset = CmmData Text $ Statics gotOffLabel [
 			    CmmStaticLit (CmmLabelDiffOff gotLabel

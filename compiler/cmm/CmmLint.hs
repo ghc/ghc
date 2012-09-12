@@ -88,9 +88,9 @@ lintCmmExpr (CmmLoad expr rep) = do
 lintCmmExpr expr@(CmmMachOp op args) = do
   dflags <- getDynFlags
   tys <- mapM lintCmmExpr args
-  if map (typeWidth . cmmExprType dflags) args == machOpArgReps op
+  if map (typeWidth . cmmExprType dflags) args == machOpArgReps dflags op
         then cmmCheckMachOp op args tys
-        else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps op)
+        else cmmLintMachOpErr expr (map (cmmExprType dflags) args) (machOpArgReps dflags op)
 lintCmmExpr (CmmRegOff reg offset)
   = do dflags <- getDynFlags
        let rep = typeWidth (cmmRegType dflags reg)
@@ -158,9 +158,10 @@ lintCmmLast labels node = case node of
   CmmBranch id -> checkTarget id
 
   CmmCondBranch e t f -> do
+            dflags <- getDynFlags
             mapM_ checkTarget [t,f]
             _ <- lintCmmExpr e
-            checkCond e
+            checkCond dflags e
 
   CmmSwitch e branches -> do
             dflags <- getDynFlags
@@ -190,10 +191,10 @@ lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
 lintTarget (PrimTarget {})     = return ()
 
 
-checkCond :: CmmExpr -> CmmLint ()
-checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
-checkCond (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth = return () -- constant values
-checkCond expr
+checkCond :: DynFlags -> CmmExpr -> CmmLint ()
+checkCond _ (CmmMachOp mop _) | isComparisonMachOp mop = return ()
+checkCond dflags (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth dflags = return () -- constant values
+checkCond _ expr
     = cmmLintErr (hang (text "expression is not a conditional:") 2
                          (ppr expr))
 

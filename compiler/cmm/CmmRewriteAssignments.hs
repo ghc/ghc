@@ -22,7 +22,6 @@ import StgCmmUtils
 
 import DynFlags
 import UniqSupply
-import Platform
 import UniqFM
 import Unique
 import BlockId
@@ -38,7 +37,6 @@ import Prelude hiding (succ, zip)
 
 rewriteAssignments :: DynFlags -> CmmGraph -> UniqSM CmmGraph
 rewriteAssignments dflags g = do
-  let platform = targetPlatform dflags
   -- Because we need to act on forwards and backwards information, we
   -- first perform usage analysis and bake this information into the
   -- graph (backwards transform), and then do a forwards transform
@@ -47,7 +45,7 @@ rewriteAssignments dflags g = do
   g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
                                      analRewFwd assignmentLattice
                                                 (assignmentTransfer dflags)
-                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite platform)
+                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite dflags)
   return (modifyGraph eraseRegUsage g'')
 
 ----------------------------------------------------------------
@@ -615,8 +613,8 @@ assignmentRewrite = mkFRewrite3 first middle last
 -- in literals, which we can inline more aggressively, and inlining
 -- gives us opportunities for more folding.  However, we don't need any
 -- facts to do MachOp folding.
-machOpFoldRewrite :: Platform -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
-machOpFoldRewrite platform = mkFRewrite3 first middle last
+machOpFoldRewrite :: DynFlags -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite dflags = mkFRewrite3 first middle last
   where first _ _ = return Nothing
         middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O
         middle (Plain m) _ = return (fmap (mkMiddle . Plain) (foldNode m))
@@ -626,7 +624,7 @@ machOpFoldRewrite platform = mkFRewrite3 first middle last
         last (Plain l) _ = return (fmap (mkLast . Plain) (foldNode l))
         foldNode :: CmmNode e x -> Maybe (CmmNode e x)
         foldNode n = mapExpDeepM foldExp n
-        foldExp (CmmMachOp op args) = cmmMachOpFoldM platform op args
+        foldExp (CmmMachOp op args) = cmmMachOpFoldM dflags op args
         foldExp _ = Nothing
 
 -- ToDo: Outputable instance for UsageMap and AssignmentMap

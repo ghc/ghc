@@ -123,59 +123,62 @@ mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
     , mo_wordSGe, mo_wordSLe, mo_wordSGt, mo_wordSLt, mo_wordUGe
     , mo_wordULe, mo_wordUGt, mo_wordULt
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
-    , mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
-    , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
+    , mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
+    :: DynFlags -> MachOp
+
+mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
+    , mo_32To8, mo_32To16
     :: MachOp
 
-mo_wordAdd      = MO_Add wordWidth
-mo_wordSub      = MO_Sub wordWidth
-mo_wordEq       = MO_Eq  wordWidth
-mo_wordNe       = MO_Ne  wordWidth
-mo_wordMul      = MO_Mul wordWidth
-mo_wordSQuot    = MO_S_Quot wordWidth
-mo_wordSRem     = MO_S_Rem wordWidth
-mo_wordSNeg     = MO_S_Neg wordWidth
-mo_wordUQuot    = MO_U_Quot wordWidth
-mo_wordURem     = MO_U_Rem wordWidth
+mo_wordAdd      dflags = MO_Add (wordWidth dflags)
+mo_wordSub      dflags = MO_Sub (wordWidth dflags)
+mo_wordEq       dflags = MO_Eq  (wordWidth dflags)
+mo_wordNe       dflags = MO_Ne  (wordWidth dflags)
+mo_wordMul      dflags = MO_Mul (wordWidth dflags)
+mo_wordSQuot    dflags = MO_S_Quot (wordWidth dflags)
+mo_wordSRem     dflags = MO_S_Rem (wordWidth dflags)
+mo_wordSNeg     dflags = MO_S_Neg (wordWidth dflags)
+mo_wordUQuot    dflags = MO_U_Quot (wordWidth dflags)
+mo_wordURem     dflags = MO_U_Rem (wordWidth dflags)
 
-mo_wordSGe      = MO_S_Ge  wordWidth
-mo_wordSLe      = MO_S_Le  wordWidth
-mo_wordSGt      = MO_S_Gt  wordWidth
-mo_wordSLt      = MO_S_Lt  wordWidth
+mo_wordSGe      dflags = MO_S_Ge  (wordWidth dflags)
+mo_wordSLe      dflags = MO_S_Le  (wordWidth dflags)
+mo_wordSGt      dflags = MO_S_Gt  (wordWidth dflags)
+mo_wordSLt      dflags = MO_S_Lt  (wordWidth dflags)
 
-mo_wordUGe      = MO_U_Ge  wordWidth
-mo_wordULe      = MO_U_Le  wordWidth
-mo_wordUGt      = MO_U_Gt  wordWidth
-mo_wordULt      = MO_U_Lt  wordWidth
+mo_wordUGe      dflags = MO_U_Ge  (wordWidth dflags)
+mo_wordULe      dflags = MO_U_Le  (wordWidth dflags)
+mo_wordUGt      dflags = MO_U_Gt  (wordWidth dflags)
+mo_wordULt      dflags = MO_U_Lt  (wordWidth dflags)
 
-mo_wordAnd      = MO_And wordWidth
-mo_wordOr       = MO_Or  wordWidth
-mo_wordXor      = MO_Xor wordWidth
-mo_wordNot      = MO_Not wordWidth
-mo_wordShl      = MO_Shl wordWidth
-mo_wordSShr     = MO_S_Shr wordWidth
-mo_wordUShr     = MO_U_Shr wordWidth
+mo_wordAnd      dflags = MO_And (wordWidth dflags)
+mo_wordOr       dflags = MO_Or  (wordWidth dflags)
+mo_wordXor      dflags = MO_Xor (wordWidth dflags)
+mo_wordNot      dflags = MO_Not (wordWidth dflags)
+mo_wordShl      dflags = MO_Shl (wordWidth dflags)
+mo_wordSShr     dflags = MO_S_Shr (wordWidth dflags)
+mo_wordUShr     dflags = MO_U_Shr (wordWidth dflags)
 
-mo_u_8To32      = MO_UU_Conv W8 W32
-mo_s_8To32      = MO_SS_Conv W8 W32
-mo_u_16To32     = MO_UU_Conv W16 W32
-mo_s_16To32     = MO_SS_Conv W16 W32
+mo_u_8To32             = MO_UU_Conv W8 W32
+mo_s_8To32             = MO_SS_Conv W8 W32
+mo_u_16To32            = MO_UU_Conv W16 W32
+mo_s_16To32            = MO_SS_Conv W16 W32
 
-mo_u_8ToWord    = MO_UU_Conv W8  wordWidth
-mo_s_8ToWord    = MO_SS_Conv W8  wordWidth
-mo_u_16ToWord   = MO_UU_Conv W16 wordWidth
-mo_s_16ToWord   = MO_SS_Conv W16 wordWidth
-mo_s_32ToWord   = MO_SS_Conv W32 wordWidth
-mo_u_32ToWord   = MO_UU_Conv W32 wordWidth
+mo_u_8ToWord    dflags = MO_UU_Conv W8  (wordWidth dflags)
+mo_s_8ToWord    dflags = MO_SS_Conv W8  (wordWidth dflags)
+mo_u_16ToWord   dflags = MO_UU_Conv W16 (wordWidth dflags)
+mo_s_16ToWord   dflags = MO_SS_Conv W16 (wordWidth dflags)
+mo_s_32ToWord   dflags = MO_SS_Conv W32 (wordWidth dflags)
+mo_u_32ToWord   dflags = MO_UU_Conv W32 (wordWidth dflags)
 
-mo_WordTo8      = MO_UU_Conv wordWidth W8
-mo_WordTo16     = MO_UU_Conv wordWidth W16
-mo_WordTo32     = MO_UU_Conv wordWidth W32
-mo_WordTo64     = MO_UU_Conv wordWidth W64
+mo_WordTo8      dflags = MO_UU_Conv (wordWidth dflags) W8
+mo_WordTo16     dflags = MO_UU_Conv (wordWidth dflags) W16
+mo_WordTo32     dflags = MO_UU_Conv (wordWidth dflags) W32
+mo_WordTo64     dflags = MO_UU_Conv (wordWidth dflags) W64
 
-mo_32To8        = MO_UU_Conv W32 W8
-mo_32To16       = MO_UU_Conv W32 W16
+mo_32To8               = MO_UU_Conv W32 W8
+mo_32To16              = MO_UU_Conv W32 W16
 
 
 -- ----------------------------------------------------------------------------
@@ -350,8 +353,8 @@ comparisonResultRep = bWord  -- is it?
 -- its arguments are the same as the MachOp expects.  This is used when
 -- linting a CmmExpr.
 
-machOpArgReps :: MachOp -> [Width]
-machOpArgReps op =
+machOpArgReps :: DynFlags -> MachOp -> [Width]
+machOpArgReps dflags op =
   case op of
     MO_Add    r         -> [r,r]
     MO_Sub    r         -> [r,r]
@@ -392,9 +395,9 @@ machOpArgReps op =
     MO_Or    r          -> [r,r]
     MO_Xor   r          -> [r,r]
     MO_Not   r          -> [r]
-    MO_Shl   r          -> [r,wordWidth]
-    MO_U_Shr r          -> [r,wordWidth]
-    MO_S_Shr r          -> [r,wordWidth]
+    MO_Shl   r          -> [r, wordWidth dflags]
+    MO_U_Shr r          -> [r, wordWidth dflags]
+    MO_S_Shr r          -> [r, wordWidth dflags]
 
     MO_SS_Conv from _   -> [from]
     MO_UU_Conv from _   -> [from]

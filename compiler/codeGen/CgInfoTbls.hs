@@ -214,15 +214,15 @@ emitAlgReturnTarget
 	-> FCode (CLabel, SemiTaggingStuff)
 
 emitAlgReturnTarget name branches mb_deflt fam_sz
-  = do  { blks <- getCgStmts $
+  = do  { blks <- getCgStmts $ do
                     -- is the constructor tag in the node reg?
+                    dflags <- getDynFlags
                     if isSmallFamily fam_sz
                         then do -- yes, node has constr. tag
-                          let tag_expr = cmmConstrTag1 (CmmReg nodeReg)
+                          let tag_expr = cmmConstrTag1 dflags (CmmReg nodeReg)
                               branches' = [(tag+1,branch)|(tag,branch)<-branches]
                           emitSwitch tag_expr branches' mb_deflt 1 fam_sz
                         else do -- no, get tag from info table
-                          dflags <- getDynFlags
                           let -- Note that ptr _always_ has tag 1
                               -- when the family size is big enough
                               untagged_ptr = cmmRegOffB nodeReg (-1)
@@ -296,7 +296,7 @@ getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
 getConstrTag dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) wordWidth) [infoTableConstrTag dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableConstrTag dflags info_table]
   where
     info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 
@@ -304,7 +304,7 @@ cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the closure type
 -- obtained from the info table
 cmmGetClosureType dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) wordWidth) [infoTableClosureType dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableClosureType dflags info_table]
   where
     info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 

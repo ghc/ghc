@@ -121,17 +121,17 @@ typeForeignHint = primRepForeignHint . typePrimRep
 --
 ---------------------------------------------------
 
-mkIntCLit :: Int -> CmmLit
-mkIntCLit i = CmmInt (toInteger i) wordWidth
+mkIntCLit :: DynFlags -> Int -> CmmLit
+mkIntCLit dflags i = CmmInt (toInteger i) (wordWidth dflags)
 
-mkIntExpr :: Int -> CmmExpr
-mkIntExpr i = CmmLit $! mkIntCLit i
+mkIntExpr :: DynFlags -> Int -> CmmExpr
+mkIntExpr dflags i = CmmLit $! mkIntCLit dflags i
 
-zeroCLit :: CmmLit
-zeroCLit = CmmInt 0 wordWidth
+zeroCLit :: DynFlags -> CmmLit
+zeroCLit dflags = CmmInt 0 (wordWidth dflags)
 
-zeroExpr :: CmmExpr
-zeroExpr = CmmLit zeroCLit
+zeroExpr :: DynFlags -> CmmExpr
+zeroExpr dflags = CmmLit (zeroCLit dflags)
 
 mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
 -- We have to make a top-level decl for the string,
@@ -156,21 +156,21 @@ mkRODataLits lbl lits
     needsRelocation (CmmLabelOff _ _) = True
     needsRelocation _                 = False
 
-mkWordCLit :: StgWord -> CmmLit
-mkWordCLit wd = CmmInt (fromIntegral wd) wordWidth
+mkWordCLit :: DynFlags -> StgWord -> CmmLit
+mkWordCLit dflags wd = CmmInt (fromIntegral wd) (wordWidth dflags)
 
-packHalfWordsCLit :: (Integral a, Integral b) => a -> b -> CmmLit
+packHalfWordsCLit :: (Integral a, Integral b) => DynFlags -> a -> b -> CmmLit
 -- Make a single word literal in which the lower_half_word is
 -- at the lower address, and the upper_half_word is at the
 -- higher address
 -- ToDo: consider using half-word lits instead
 --       but be careful: that's vulnerable when reversed
-packHalfWordsCLit lower_half_word upper_half_word
+packHalfWordsCLit dflags lower_half_word upper_half_word
 #ifdef WORDS_BIGENDIAN
-   = mkWordCLit ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
+   = mkWordCLit dflags ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
                  .|. fromIntegral upper_half_word)
 #else
-   = mkWordCLit ((fromIntegral lower_half_word)
+   = mkWordCLit dflags ((fromIntegral lower_half_word)
                  .|. (fromIntegral upper_half_word `shiftL` hALF_WORD_SIZE_IN_BITS))
 #endif
 
@@ -243,7 +243,7 @@ cmmIndexExpr dflags width base idx =
   cmmOffsetExpr dflags base byte_off
   where
     idx_w = cmmExprWidth dflags idx
-    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr (widthInLog width)]
+    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr dflags (widthInLog width)]
 
 cmmLoadIndex :: DynFlags -> CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex dflags ty expr ix = CmmLoad (cmmIndex dflags (typeWidth ty) expr ix) ty
@@ -269,7 +269,7 @@ cmmOffsetLitB = cmmOffsetLit
 cmmOffsetExprW :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
 -- The second arg is a *word* offset; need to change it to bytes
 cmmOffsetExprW dflags  e (CmmLit (CmmInt n _)) = cmmOffsetW dflags e (fromInteger n)
-cmmOffsetExprW dflags e wd_off = cmmIndexExpr dflags wordWidth e wd_off
+cmmOffsetExprW dflags e wd_off = cmmIndexExpr dflags (wordWidth dflags) e wd_off
 
 cmmOffsetW :: DynFlags -> CmmExpr -> WordOff -> CmmExpr
 cmmOffsetW dflags e n = cmmOffsetB dflags e (wORD_SIZE * n)
@@ -290,20 +290,20 @@ cmmLoadIndexW dflags base off ty = CmmLoad (cmmOffsetW dflags base off) ty
 cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
   cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
   cmmUShrWord, cmmAddWord, cmmMulWord, cmmQuotWord
-  :: CmmExpr -> CmmExpr -> CmmExpr
-cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
-cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
-cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
-cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
-cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
-cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
-cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
---cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
-cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
-cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
-cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
-cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
-cmmQuotWord e1 e2 = CmmMachOp mo_wordUQuot [e1, e2]
+  :: DynFlags -> CmmExpr -> CmmExpr -> CmmExpr
+cmmOrWord dflags  e1 e2 = CmmMachOp (mo_wordOr dflags)  [e1, e2]
+cmmAndWord dflags e1 e2 = CmmMachOp (mo_wordAnd dflags) [e1, e2]
+cmmNeWord dflags  e1 e2 = CmmMachOp (mo_wordNe dflags)  [e1, e2]
+cmmEqWord dflags  e1 e2 = CmmMachOp (mo_wordEq dflags)  [e1, e2]
+cmmULtWord dflags e1 e2 = CmmMachOp (mo_wordULt dflags) [e1, e2]
+cmmUGeWord dflags e1 e2 = CmmMachOp (mo_wordUGe dflags) [e1, e2]
+cmmUGtWord dflags e1 e2 = CmmMachOp (mo_wordUGt dflags) [e1, e2]
+--cmmShlWord dflags e1 e2 = CmmMachOp (mo_wordShl dflags) [e1, e2]
+cmmUShrWord dflags e1 e2 = CmmMachOp (mo_wordUShr dflags) [e1, e2]
+cmmAddWord dflags e1 e2 = CmmMachOp (mo_wordAdd dflags) [e1, e2]
+cmmSubWord dflags e1 e2 = CmmMachOp (mo_wordSub dflags) [e1, e2]
+cmmMulWord dflags e1 e2 = CmmMachOp (mo_wordMul dflags) [e1, e2]
+cmmQuotWord dflags e1 e2 = CmmMachOp (mo_wordUQuot dflags) [e1, e2]
 
 cmmNegate :: DynFlags -> CmmExpr -> CmmExpr
 cmmNegate _      (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -342,28 +342,27 @@ hasNoGlobalRegs _ = False
 
 -- Tag bits mask
 --cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
-cmmTagMask, cmmPointerMask :: CmmExpr
-cmmTagMask = mkIntExpr tAG_MASK
-cmmPointerMask = mkIntExpr (complement tAG_MASK)
+cmmTagMask, cmmPointerMask :: DynFlags -> CmmExpr
+cmmTagMask dflags = mkIntExpr dflags tAG_MASK
+cmmPointerMask dflags = mkIntExpr dflags (complement tAG_MASK)
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
-cmmUntag, cmmGetTag :: CmmExpr -> CmmExpr
-cmmUntag e@(CmmLit (CmmLabel _)) = e
+cmmUntag, cmmGetTag :: DynFlags -> CmmExpr -> CmmExpr
+cmmUntag _ e@(CmmLit (CmmLabel _)) = e
 -- Default case
-cmmUntag e = (e `cmmAndWord` cmmPointerMask)
+cmmUntag dflags e = cmmAndWord dflags e (cmmPointerMask dflags)
 
-cmmGetTag e = (e `cmmAndWord` cmmTagMask)
+cmmGetTag dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 
 -- Test if a closure pointer is untagged
-cmmIsTagged :: CmmExpr -> CmmExpr
-cmmIsTagged e = (e `cmmAndWord` cmmTagMask)
-                 `cmmNeWord` zeroExpr
+cmmIsTagged :: DynFlags -> CmmExpr -> CmmExpr
+cmmIsTagged dflags e = cmmNeWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (zeroExpr dflags)
 
-cmmConstrTag, cmmConstrTag1 :: CmmExpr -> CmmExpr
-cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` mkIntExpr 1
+cmmConstrTag, cmmConstrTag1 :: DynFlags -> CmmExpr -> CmmExpr
+cmmConstrTag dflags e = cmmSubWord dflags (cmmAndWord dflags e (cmmTagMask dflags)) (mkIntExpr dflags 1)
 -- Get constructor tag, but one based.
-cmmConstrTag1 e = e `cmmAndWord` cmmTagMask
+cmmConstrTag1 dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 
 
 --------------------------------------------

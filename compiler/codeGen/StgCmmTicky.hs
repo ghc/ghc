@@ -106,14 +106,14 @@ emitTickyCounter cl_info args
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
 -- panic and disorder.
-	    [ mkIntCLit 0,
-	      mkIntCLit (length args),	-- Arity
-	      mkIntCLit 0,		-- XXX: we no longer know this!  Words passed on stack
+	    [ mkIntCLit dflags 0,
+	      mkIntCLit dflags (length args),	-- Arity
+	      mkIntCLit dflags 0,		-- XXX: we no longer know this!  Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
-	      zeroCLit, 		-- Entry count
-	      zeroCLit, 		-- Allocs
-	      zeroCLit 			-- Link
+	      zeroCLit dflags, 		-- Entry count
+	      zeroCLit dflags, 		-- Allocs
+	      zeroCLit dflags 			-- Link
 	    ] }
 
 -- When printing the name of a thing in a ticky file, we want to
@@ -183,17 +183,17 @@ registerTickyCtr ctr_lbl = do
   dflags <- getDynFlags
   let
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq wordWidth)
+    test = CmmMachOp (MO_Eq (wordWidth dflags))
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
                                 oFFSET_StgEntCounter_registeredp)) (bWord dflags),
-               zeroExpr]
+               zeroExpr dflags]
     register_stmts
       = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
                    (CmmLoad ticky_entry_ctrs (bWord dflags))
         , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
                                 oFFSET_StgEntCounter_registeredp))
-                   (mkIntExpr 1) ]
+                   (mkIntExpr dflags 1) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 

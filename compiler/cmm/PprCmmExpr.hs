@@ -187,10 +187,11 @@ infixMachOp mop
 --  has the natural machine word size, we do not append the type
 --
 pprLit :: CmmLit -> SDoc
-pprLit lit = case lit of
+pprLit lit = sdocWithDynFlags $ \dflags ->
+             case lit of
     CmmInt i rep ->
         hcat [ (if i < 0 then parens else id)(integer i)
-             , ppUnless (rep == wordWidth) $
+             , ppUnless (rep == wordWidth dflags) $
                space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]

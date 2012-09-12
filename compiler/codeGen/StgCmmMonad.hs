@@ -283,15 +283,15 @@ initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags    = dflags,
 			cgd_mod       = mod,
 			cgd_statics   = emptyVarEnv,
-                        cgd_updfr_off = initUpdFrameOff,
+                        cgd_updfr_off = initUpdFrameOff dflags,
 			cgd_ticky     = mkTopTickyCtrLabel,
 			cgd_sequel    = initSequel }
 
 initSequel :: Sequel
 initSequel = Return False
 
-initUpdFrameOff :: UpdFrameOffset
-initUpdFrameOff = widthInBytes wordWidth -- space for the RA
+initUpdFrameOff :: DynFlags -> UpdFrameOffset
+initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
 
 
 --------------------------------------------------------
@@ -518,11 +518,12 @@ forkClosureBody :: FCode () -> FCode ()
 -- C-- from the fork is incorporated.
 
 forkClosureBody body_code
-  = do	{ info <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info <- getInfoDown
 	; us   <- newUniqSupply
 	; state <- getState
    	; let	body_info_down = info { cgd_sequel    = initSequel
-                                      , cgd_updfr_off = initUpdFrameOff }
+                                      , cgd_updfr_off = initUpdFrameOff dflags }
 		fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
 		((),fork_state_out)
 		    = doFCode body_code body_info_down fork_state_in
@@ -534,12 +535,13 @@ forkStatics :: FCode a -> FCode a
 -- The Abstract~C returned is attached to the current state, but the
 -- bindings and usage information is otherwise unchanged.
 forkStatics body_code
-  = do	{ info  <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info  <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
 	; let	rhs_info_down = info { cgd_statics = cgs_binds state
 				     , cgd_sequel  = initSequel 
-			             , cgd_updfr_off = initUpdFrameOff }
+			             , cgd_updfr_off = initUpdFrameOff dflags }
 		(result, fork_state_out) = doFCode body_code rhs_info_down 
 						   (initCgState us)
 	; setState (state `addCodeBlocksFrom` fork_state_out)
@@ -680,7 +682,7 @@ emitProcWithConvention conv mb_info lbl args blocks
         ; us <- newUniqSupply
         ; let (offset, entry) = mkCallEntry dflags conv args
               blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
-        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
+        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just (initUpdFrameOff dflags)}
               tinfo = TopInfo {info_tbls = infos, stack_info=sinfo}
               proc_block = CmmProc tinfo lbl blks
 

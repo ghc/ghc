@@ -275,9 +275,9 @@ is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
 
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: Maybe BlockId -> CmmStatic
-jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
+jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
+jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
@@ -2075,7 +2075,7 @@ genCCall64' dflags target dest_regs args = do
                     -- stdcall has callee do it, but is not supported on
                     -- x86_64 target (see #3336)
                   (if real_size==0 then [] else
-                   [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
+                   [ADD (intSize (wordWidth dflags)) (OpImm (ImmInt real_size)) (OpReg esp)])
                   ++
                   [DELTA (delta + real_size)]
                )
@@ -2171,7 +2171,7 @@ genCCall64' dflags target dest_regs args = do
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
              let code' = code `appOL` arg_code `appOL` toOL [
-                            SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
+                            SUB (intSize (wordWidth dflags)) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
                             DELTA (delta-arg_size),
                             MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel platform 0))]
              push_args rest code'
@@ -2292,7 +2292,7 @@ genSwitch dflags expr ids
 
         return $ if target32Bit (targetPlatform dflags)
                  then e_code `appOL` t_code `appOL` toOL [
-                                ADD (intSize wordWidth) op (OpReg tableReg),
+                                ADD (intSize (wordWidth dflags)) op (OpReg tableReg),
                                 JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
                        ]
                  else case platformOS (targetPlatform dflags) of
@@ -2305,7 +2305,7 @@ genSwitch dflags expr ids
                           -- if L0 is not preceded by a non-anonymous
                           -- label in its section.
                           e_code `appOL` t_code `appOL` toOL [
-                                   ADD (intSize wordWidth) op (OpReg tableReg),
+                                   ADD (intSize (wordWidth dflags)) op (OpReg tableReg),
                                    JMP_TBL (OpReg tableReg) ids Text lbl
                            ]
                       _ ->
@@ -2319,7 +2319,7 @@ genSwitch dflags expr ids
                           -- once binutils 2.17 is standard.
                           e_code `appOL` t_code `appOL` toOL [
                                    MOVSxL II32 op (OpReg reg),
-                                   ADD (intSize wordWidth) (OpReg reg) (OpReg tableReg),
+                                   ADD (intSize (wordWidth dflags)) (OpReg reg) (OpReg tableReg),
                                    JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
                            ]
   | otherwise
@@ -2343,12 +2343,12 @@ createJumpTable dflags ids section lbl
     = let jumpTable
             | dopt Opt_PIC dflags =
                   let jumpTableEntryRel Nothing
-                          = CmmStaticLit (CmmInt 0 wordWidth)
+                          = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
                           = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                           where blockLabel = mkAsmTempLabel (getUnique blockid)
                   in map jumpTableEntryRel ids
-            | otherwise = map jumpTableEntry ids
+            | otherwise = map (jumpTableEntry dflags) ids
       in CmmData section (1, Statics lbl jumpTable)
 
 -- -----------------------------------------------------------------------------
