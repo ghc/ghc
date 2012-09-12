@@ -27,6 +27,9 @@
 #include "Capability.h"
 
 #include <stdio.h>
+#include <string.h>
+
+enum Mode { Gen_Haskell, Gen_Header } mode;
 
 #define str(a,b) #a "_" #b
 
@@ -36,38 +39,51 @@
 
 #pragma GCC poison sizeof
 
-#if defined(GEN_HASKELL)
-#define def_offset(str, offset)                          \
-    printf("oFFSET_" str " :: Int\n");                   \
-    printf("oFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset);
-#else
-#define def_offset(str, offset) \
-    printf("#define OFFSET_" str " %" FMT_SizeT "\n", (size_t)offset);
-#endif
+#define def_offset(str, offset)                                             \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        printf("oFFSET_" str " :: Int\n");                                  \
+        printf("oFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset);        \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define OFFSET_" str " %" FMT_SizeT "\n", (size_t)offset);  \
+        break;                                                              \
+    }
 
-#if defined(GEN_HASKELL)
-#define ctype(type) /* nothing */
-#else
-#define ctype(type) \
-    printf("#define SIZEOF_" #type " %" FMT_SizeT "\n", (size_t)TYPE_SIZE(type));
-#endif
+#define ctype(type)                                                         \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define SIZEOF_" #type " %" FMT_SizeT "\n",                 \
+               (size_t)TYPE_SIZE(type));                                    \
+        break;                                                              \
+    }
 
-#if defined(GEN_HASKELL)
-#define field_type_(str, s_type, field) /* nothing */
-#define field_type_gcptr_(str, s_type, field) /* nothing */
-#else
 /* Defining REP_x to be b32 etc
    These are both the C-- types used in a load
       e.g.  b32[addr]
    and the names of the CmmTypes in the compiler
       b32 :: CmmType
 */
-#define field_type_(str, s_type, field) \
-    printf("#define REP_" str " b"); \
-    printf("%" FMT_SizeT "\n", FIELD_SIZE(s_type, field) * 8);
-#define field_type_gcptr_(str, s_type, field) \
-    printf("#define REP_" str " gcptr\n");
-#endif
+#define field_type_(str, s_type, field)                                     \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define REP_" str " b");                                    \
+        printf("%" FMT_SizeT "\n", FIELD_SIZE(s_type, field) * 8);          \
+        break;                                                              \
+    }
+
+#define field_type_gcptr_(str, s_type, field)                               \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define REP_" str " gcptr\n");                              \
+        break;                                                              \
+    }
 
 #define field_type(s_type, field) \
     field_type_(str(s_type,field),s_type,field);
@@ -79,12 +95,14 @@
     field_offset_(str(s_type,field),s_type,field);
 
 /* An access macro for use in C-- sources. */
-#if defined(GEN_HASKELL)
-#define struct_field_macro(str) /* nothing */
-#else
-#define struct_field_macro(str) \
-    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+OFFSET_" str "]\n");
-#endif
+#define struct_field_macro(str)                                             \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define " str "(__ptr__)  REP_" str "[__ptr__+OFFSET_" str "]\n"); \
+        break;                                                              \
+    }
 
 /* Outputs the byte offset and MachRep for a field */
 #define struct_field(s_type, field)		\
@@ -97,21 +115,25 @@
     field_type_(str, s_type, field);		\
     struct_field_macro(str)
 
-#if defined(GEN_HASKELL)
-#define def_size(str, size)                \
-    printf("sIZEOF_" str " :: Int\n");     \
-    printf("sIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size);
-#else
-#define def_size(str, size) \
-    printf("#define SIZEOF_" str " %" FMT_SizeT "\n", (size_t)size);
-#endif
+#define def_size(str, size)                                                 \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        printf("sIZEOF_" str " :: Int\n");                                  \
+        printf("sIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size);          \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define SIZEOF_" str " %" FMT_SizeT "\n", (size_t)size);    \
+        break;                                                              \
+    }
 
-#if defined(GEN_HASKELL)
-#define def_closure_size(str, size) /* nothing */
-#else
-#define def_closure_size(str, size) \
-    printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%" FMT_SizeT ")\n", (size_t)size);
-#endif
+#define def_closure_size(str, size)                                         \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%" FMT_SizeT ")\n", (size_t)size); \
+        break;                                                              \
+    }
 
 #define struct_size(s_type) \
     def_size(#s_type, TYPE_SIZE(s_type));
@@ -129,12 +151,14 @@
     closure_size(s_type)
 
 /* An access macro for use in C-- sources. */
-#if defined(GEN_HASKELL)
-#define closure_field_macro(str) /* nothing */
-#else
-#define closure_field_macro(str) \
-    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n");
-#endif
+#define closure_field_macro(str)                                            \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n"); \
+        break;                                                              \
+    }
 
 #define closure_field_offset_(str, s_type,field) \
     def_offset(str, OFFSET(s_type,field) - TYPE_SIZE(StgHeader));
@@ -142,12 +166,14 @@
 #define closure_field_offset(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field)
 
-#if defined(GEN_HASKELL)
-#define closure_payload_macro(str) /* nothing */
-#else
-#define closure_payload_macro(str) \
-    printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgHeader+OFFSET_" str " + WDS(__ix__)]\n");
-#endif
+#define closure_payload_macro(str)                                          \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgHeader+OFFSET_" str " + WDS(__ix__)]\n"); \
+        break;                                                              \
+    }
 
 #define closure_payload(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field); \
@@ -176,39 +202,45 @@
     def_offset(str(s_type,field), OFFSET(s_type,field) - TYPE_SIZE(StgHeader) - TYPE_SIZE(StgTSOProfInfo));
 
 /* Full byte offset for a TSO field, for use from Cmm */
-#if defined(GEN_HASKELL)
-#define tso_field_offset_macro(str) /* nothing */
-#else
-#define tso_field_offset_macro(str) \
-    printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+OFFSET_" str ")\n");
-#endif
+#define tso_field_offset_macro(str)                                         \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+OFFSET_" str ")\n"); \
+        break;                                                              \
+    }
 
 #define tso_field_offset(s_type, field) \
     tso_payload_offset(s_type, field);  	\
     tso_field_offset_macro(str(s_type,field));
 
-#if defined(GEN_HASKELL)
-#define tso_field_macro(str) /* nothing */
-#else
-#define tso_field_macro(str) \
-    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n")
-#endif
+#define tso_field_macro(str)                                                \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n") \
+        break;                                                              \
+    }
 
 #define tso_field(s_type, field)		\
     field_type(s_type, field);			\
     tso_field_offset(s_type,field);		\
     tso_field_macro(str(s_type,field))
   
-#if defined(GEN_HASKELL)
-#define opt_struct_size(s_type, option) /* nothing */
-#else
-#define opt_struct_size(s_type, option)					\
-    printf("#ifdef " #option "\n");					\
-    printf("#define SIZEOF_OPT_" #s_type " SIZEOF_" #s_type "\n");	\
-    printf("#else\n");							\
-    printf("#define SIZEOF_OPT_" #s_type " 0\n");			\
-    printf("#endif\n\n");
-#endif
+#define opt_struct_size(s_type, option)					                    \
+    switch (mode) {                                                         \
+    case Gen_Haskell:                                                       \
+        break;                                                              \
+    case Gen_Header:                                                        \
+        printf("#ifdef " #option "\n");					                    \
+        printf("#define SIZEOF_OPT_" #s_type " SIZEOF_" #s_type "\n");	    \
+        printf("#else\n");							                        \
+        printf("#define SIZEOF_OPT_" #s_type " 0\n");			            \
+        printf("#endif\n\n");                                               \
+        break;                                                              \
+    }
 
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 
@@ -216,20 +248,41 @@
 int
 main(int argc, char *argv[])
 {
-#ifndef GEN_HASKELL
-    printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
+    if (argc == 1) {
+        mode = Gen_Header;
+    }
+    else if (argc == 2) {
+        if (0 == strcmp("--gen-haskell", argv[1])) {
+            mode = Gen_Haskell;
+        }
+        else {
+            printf("Bad args\n");
+            exit(1);
+        }
+    }
+    else {
+        printf("Bad args\n");
+        exit(1);
+    }
 
-    printf("#define STD_HDR_SIZE   %" FMT_SizeT "\n", (size_t)sizeofW(StgHeader) - sizeofW(StgProfHeader));
-    /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
-    printf("#define PROF_HDR_SIZE  %" FMT_SizeT "\n", (size_t)sizeofW(StgProfHeader));
+    switch (mode) {
+    case Gen_Haskell:
+        break;
+    case Gen_Header:
+        printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
 
-    printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
-    printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
-    printf("#define BLOCKS_PER_MBLOCK  %" FMT_SizeT "\n", (W_)BLOCKS_PER_MBLOCK);
-    // could be derived, but better to save doing the calculation twice
+        printf("#define STD_HDR_SIZE   %" FMT_SizeT "\n", (size_t)sizeofW(StgHeader) - sizeofW(StgProfHeader));
+        /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
+        printf("#define PROF_HDR_SIZE  %" FMT_SizeT "\n", (size_t)sizeofW(StgProfHeader));
 
-    printf("\n\n");
-#endif
+        printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
+        printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
+        printf("#define BLOCKS_PER_MBLOCK  %" FMT_SizeT "\n", (W_)BLOCKS_PER_MBLOCK);
+        // could be derived, but better to save doing the calculation twice
+
+        printf("\n\n");
+        break;
+    }
 
     field_offset(StgRegTable, rR1);
     field_offset(StgRegTable, rR2);

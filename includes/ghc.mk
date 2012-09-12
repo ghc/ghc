@@ -131,10 +131,15 @@ endif
 # Make DerivedConstants.h for the compiler
 
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
+includes_GHCCONSTANTS = includes/dist-derivedconstants/header/GHCConstants.h
 
 ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
 
 DerivedConstants.h :
+	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
+	@exit 1
+
+$(includes_GHCCONSTANTS) :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
 	@exit 1
 
@@ -160,42 +165,10 @@ ifeq "$(AlienScript)" ""
 else
 	$(AlienScript) run ./$< >$@
 endif
-endif
 
-endif
-
-# -----------------------------------------------------------------------------
-#
-
-includes_GHCCONSTANTS = includes/dist-ghcconstants/header/GHCConstants.h
-
-ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
-
-$(includes_GHCCONSTANTS) :
-	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
-	@exit 1
-
-else
-
-includes_dist-ghcconstants_C_SRCS = mkDerivedConstants.c
-includes_dist-ghcconstants_PROG   = mkGHCConstants$(exeext)
-includes_dist-ghcconstants_CC_OPTS = -DGEN_HASKELL
-
-$(eval $(call build-prog,includes,dist-ghcconstants,0))
-
-ifneq "$(BINDIST)" "YES"
-$(includes_dist-ghcconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_FILES) $$(rts_H_FILES)
-
-includes/dist-ghcconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
-
-ifneq "$(AlienScript)" ""
-$(INPLACE_BIN)/mkGHCConstants$(exeext): includes/$(includes_dist-ghcconstants_C_SRCS) | $$(dir $$@)/.
-	$(WhatGccIsCalled) -o $@ $< $(CFLAGS) $(includes_CC_OPTS) $(includes_dist-ghcconstants_CC_OPTS)
-endif
-
-$(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkGHCConstants$(exeext) | $$(dir $$@)/.
+$(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
 ifeq "$(AlienScript)" ""
-	./$< >$@
+	./$< --gen-haskell >$@
 else
 	$(AlienScript) run ./$< >$@
 endif
