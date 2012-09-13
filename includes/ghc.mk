@@ -135,6 +135,8 @@ includes_GHCCONSTANTS = includes/dist-derivedconstants/header/GHCConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
 
+INSTALL_LIBS += includes/dist-derivedconstants/header/platformConstants
+
 ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
 
 DerivedConstants.h :
