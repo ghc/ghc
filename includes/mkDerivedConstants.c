@@ -570,10 +570,15 @@ main(int argc, char *argv[])
     struct_field(snEntry,addr);
 
 #ifdef mingw32_HOST_OS
-    struct_size(StgAsyncIOResult);
-    struct_field(StgAsyncIOResult, reqID);
-    struct_field(StgAsyncIOResult, len);
-    struct_field(StgAsyncIOResult, errCode);
+    /* Note that this conditional part only affects the C headers.
+       That's important, as it means we get the same PlatformConstants
+       type on all platforms. */
+    if (mode == Gen_Header) {
+        struct_size(StgAsyncIOResult);
+        struct_field(StgAsyncIOResult, reqID);
+        struct_field(StgAsyncIOResult, len);
+        struct_field(StgAsyncIOResult, errCode);
+    }
 #endif
 
     switch (mode) {
