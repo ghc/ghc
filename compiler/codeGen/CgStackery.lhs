@@ -322,7 +322,7 @@ emitSpecPushUpdateFrame lbl frame_addr updatee = do
 
 off_updatee :: DynFlags -> ByteOff
 off_updatee dflags
-    = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgUpdateFrame_updatee
+    = fixedHdrSize dflags * wORD_SIZE + (oFFSET_StgUpdateFrame_updatee dflags)
 \end{code}
 
 

@@ -636,7 +636,7 @@ pushUpdateFrame lbl updatee body
        let
            hdr         = fixedHdrSize dflags * wORD_SIZE
            frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
-           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee
+           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
        --
        emitStore (CmmStackSlot Old frame) (mkLblExpr lbl)
        emitStore (CmmStackSlot Old (frame - off_updatee)) updatee

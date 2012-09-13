@@ -74,7 +74,7 @@ costCentreFrom :: DynFlags
                -> CmmExpr       -- A closure pointer
                -> CmmExpr       -- The cost centre from that closure
 costCentreFrom dflags cl
-    = CmmLoad (cmmOffsetB dflags cl oFFSET_StgHeader_ccs) (bWord dflags)
+    = CmmLoad (cmmOffsetB dflags cl (oFFSET_StgHeader_ccs dflags)) (bWord dflags)
 
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
@@ -91,7 +91,7 @@ initUpdFrameProf :: CmmExpr -> Code
 initUpdFrameProf frame_amode
   = ifProfiling $       -- frame->header.prof.ccs = CCCS
     do dflags <- getDynFlags
-       stmtC (CmmStore (cmmOffsetB dflags frame_amode oFFSET_StgHeader_ccs) curCCS)
+       stmtC (CmmStore (cmmOffsetB dflags frame_amode (oFFSET_StgHeader_ccs dflags)) curCCS)
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 
@@ -117,7 +117,7 @@ profAlloc words ccs
   = ifProfiling $
     do dflags <- getDynFlags
        stmtC (addToMemE alloc_rep
-                   (cmmOffsetB dflags ccs oFFSET_CostCentreStack_mem_alloc)
+                   (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_mem_alloc dflags))
                    (CmmMachOp (MO_UU_Conv (wordWidth dflags) alloc_rep) $
                      [CmmMachOp (mo_wordSub dflags) [words,
                                                      mkIntExpr dflags (profHdrSize dflags)]]))
@@ -244,7 +244,7 @@ pushCostCentre result ccs cc
 bumpSccCount :: DynFlags -> CmmExpr -> CmmStmt
 bumpSccCount dflags ccs
   = addToMem (typeWidth REP_CostCentreStack_scc_count)
-         (cmmOffsetB dflags ccs oFFSET_CostCentreStack_scc_count) 1
+         (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
 
 -----------------------------------------------------------------------------
 --
@@ -312,7 +312,8 @@ loadEra dflags = CmmMachOp (MO_UU_Conv cIntWidth (wordWidth dflags))
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
-ldvWord dflags closure_ptr = cmmOffsetB dflags closure_ptr oFFSET_StgHeader_ldvw
+ldvWord dflags closure_ptr
+    = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
 
 -- LDV constants, from ghc/includes/Constants.h
 lDV_SHIFT :: Int

@@ -42,8 +42,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 #define def_offset(str, offset)                                             \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
-        printf("oFFSET_" str " :: Int\n");                                  \
-        printf("oFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset);        \
         break;                                                              \
     case Gen_Haskell_Type:                                                  \
         printf("    , pc_OFFSET_" str " :: Int\n");                         \
@@ -52,11 +50,11 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
         printf("    , pc_OFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset); \
         break;                                                              \
     case Gen_Haskell_Wrappers:                                              \
-        printf("-- oFFSET_" str " :: DynFlags -> Int\n");                      \
-        printf("-- oFFSET_" str " dflags = pc_OFFSET_" str " (sPlatformConstants (settings dflags))\n"); \
+        printf("oFFSET_" str " :: DynFlags -> Int\n");                      \
+        printf("oFFSET_" str " dflags = pc_OFFSET_" str " (sPlatformConstants (settings dflags))\n"); \
         break;                                                              \
     case Gen_Haskell_Exports:                                               \
-        printf("--     oFFSET_" str ",\n");                                    \
+        printf("    oFFSET_" str ",\n");                                    \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define OFFSET_" str " %" FMT_SizeT "\n", (size_t)offset);  \

@@ -65,7 +65,6 @@ import Name
 import Id
 import BasicTypes
 import FastString
-import Constants
 import Outputable
 
 import DynFlags
@@ -164,10 +163,11 @@ tickyUpdateBhCaf cl_info
 tickyEnterFun :: ClosureInfo -> FCode ()
 tickyEnterFun cl_info
   = ifTicky $ 
-    do 	{ bumpTickyCounter ctr
+    do  { dflags <- getDynFlags
+        ; bumpTickyCounter ctr
 	; fun_ctr_lbl <- getTickyCtrLabel
 	; registerTickyCtr fun_ctr_lbl
-	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
+	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl (oFFSET_StgEntCounter_entry_count dflags))
         }
   where
     ctr | isStaticClosure cl_info = (fsLit "ENT_STATIC_FUN_DIRECT_ctr")
@@ -185,14 +185,14 @@ registerTickyCtr ctr_lbl = do
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
     test = CmmMachOp (MO_Eq (wordWidth dflags))
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
-                                oFFSET_StgEntCounter_registeredp)) (bWord dflags),
+                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord dflags),
                zeroExpr dflags]
     register_stmts
-      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
+      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
                    (CmmLoad ticky_entry_ctrs (bWord dflags))
         , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
-                                oFFSET_StgEntCounter_registeredp))
+                                (oFFSET_StgEntCounter_registeredp dflags)))
                    (mkIntExpr dflags 1) ]
     ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
@@ -315,14 +315,15 @@ tickyAllocHeap :: VirtualHpOffset -> FCode ()
 -- Must be lazy in the amount of allocation!
 tickyAllocHeap hp
   = ifTicky $
-    do	{ ticky_ctr <- getTickyCtrLabel
+    do  { dflags <- getDynFlags
+        ; ticky_ctr <- getTickyCtrLabel
 	; emit $ catAGraphs $
 	  if hp == 0 then [] 	-- Inside the emitMiddle to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
 	    addToMem REP_StgEntCounter_allocs 
 			(CmmLit (cmmLabelOffB ticky_ctr 
-				oFFSET_StgEntCounter_allocs)) hp,
+				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr
 	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
 		-- Bump ALLOC_HEAP_tot

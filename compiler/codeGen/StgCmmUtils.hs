@@ -68,7 +68,6 @@ import Unique
 import DynFlags
 import FastString
 import Outputable
-import Platform
 
 import Data.Char
 import Data.List
@@ -269,41 +268,41 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 -- (See also get_GlobalReg_reg_or_addr in MachRegs)
 
 get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
-get_GlobalReg_addr _      BaseReg = regTableOffset 0
+get_GlobalReg_addr dflags BaseReg = regTableOffset dflags 0
 get_GlobalReg_addr dflags mid
-    = get_Regtable_addr_from_offset (targetPlatform dflags)
-                                    (globalRegType dflags mid) (baseRegOffset mid)
+    = get_Regtable_addr_from_offset dflags
+                                    (globalRegType dflags mid) (baseRegOffset dflags mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
-regTableOffset :: Int -> CmmExpr
-regTableOffset n =
-  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
+regTableOffset :: DynFlags -> Int -> CmmExpr
+regTableOffset dflags n =
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r dflags + n))
 
-get_Regtable_addr_from_offset :: Platform -> CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset platform _rep offset =
-    if haveRegBase platform
+get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
+get_Regtable_addr_from_offset dflags _rep offset =
+    if haveRegBase (targetPlatform dflags)
     then CmmRegOff (CmmGlobal BaseReg) offset
-    else regTableOffset offset
+    else regTableOffset dflags offset
 
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers
 
-baseRegOffset :: GlobalReg -> Int
+baseRegOffset :: DynFlags -> GlobalReg -> Int
 
-baseRegOffset Sp                  = oFFSET_StgRegTable_rSp
-baseRegOffset SpLim               = oFFSET_StgRegTable_rSpLim
-baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
-baseRegOffset Hp                  = oFFSET_StgRegTable_rHp
-baseRegOffset HpLim               = oFFSET_StgRegTable_rHpLim
-baseRegOffset CCCS                = oFFSET_StgRegTable_rCCCS
-baseRegOffset CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO
-baseRegOffset CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery
-baseRegOffset HpAlloc             = oFFSET_StgRegTable_rHpAlloc
-baseRegOffset GCEnter1            = oFFSET_stgGCEnter1
-baseRegOffset GCFun               = oFFSET_stgGCFun
-baseRegOffset reg                 = pprPanic "baseRegOffset:" (ppr reg)
+baseRegOffset dflags Sp             = oFFSET_StgRegTable_rSp dflags
+baseRegOffset dflags SpLim          = oFFSET_StgRegTable_rSpLim dflags
+baseRegOffset dflags (LongReg 1)    = oFFSET_StgRegTable_rL1 dflags
+baseRegOffset dflags Hp             = oFFSET_StgRegTable_rHp dflags
+baseRegOffset dflags HpLim          = oFFSET_StgRegTable_rHpLim dflags
+baseRegOffset dflags CCCS           = oFFSET_StgRegTable_rCCCS dflags
+baseRegOffset dflags CurrentTSO     = oFFSET_StgRegTable_rCurrentTSO dflags
+baseRegOffset dflags CurrentNursery = oFFSET_StgRegTable_rCurrentNursery dflags
+baseRegOffset dflags HpAlloc        = oFFSET_StgRegTable_rHpAlloc dflags
+baseRegOffset dflags GCEnter1       = oFFSET_stgGCEnter1 dflags
+baseRegOffset dflags GCFun          = oFFSET_stgGCFun dflags
+baseRegOffset _      reg            = pprPanic "baseRegOffset:" (ppr reg)
 
 -------------------------------------------------------------------------
 --

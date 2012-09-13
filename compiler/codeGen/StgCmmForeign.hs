@@ -351,15 +351,15 @@ emitOpenNursery = do dflags <- getDynFlags
                      emit $ openNursery dflags
 
 nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: DynFlags -> CmmExpr
-nursery_bdescr_free   dflags = cmmOffset dflags stgCurrentNursery oFFSET_bdescr_free
-nursery_bdescr_start  dflags = cmmOffset dflags stgCurrentNursery oFFSET_bdescr_start
-nursery_bdescr_blocks dflags = cmmOffset dflags stgCurrentNursery oFFSET_bdescr_blocks
+nursery_bdescr_free   dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_free dflags)
+nursery_bdescr_start  dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_start dflags)
+nursery_bdescr_blocks dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_blocks dflags)
 
 tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: DynFlags -> ByteOff
-tso_stackobj dflags = closureField dflags oFFSET_StgTSO_stackobj
-tso_CCCS     dflags = closureField dflags oFFSET_StgTSO_cccs
-stack_STACK  dflags = closureField dflags oFFSET_StgStack_stack
-stack_SP     dflags = closureField dflags oFFSET_StgStack_sp
+tso_stackobj dflags = closureField dflags (oFFSET_StgTSO_stackobj dflags)
+tso_CCCS     dflags = closureField dflags (oFFSET_StgTSO_cccs dflags)
+stack_STACK  dflags = closureField dflags (oFFSET_StgStack_stack dflags)
+stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
 
 
 closureField :: DynFlags -> ByteOff -> ByteOff

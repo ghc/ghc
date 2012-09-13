@@ -323,42 +323,42 @@ callerSaveVolatileRegs dflags vols = (caller_save, caller_load)
 -- -----------------------------------------------------------------------------
 -- Information about global registers
 
-baseRegOffset :: GlobalReg -> Int
+baseRegOffset :: DynFlags -> GlobalReg -> Int
 
-baseRegOffset (VanillaReg 1 _)    = oFFSET_StgRegTable_rR1
-baseRegOffset (VanillaReg 2 _)    = oFFSET_StgRegTable_rR2
-baseRegOffset (VanillaReg 3 _)    = oFFSET_StgRegTable_rR3
-baseRegOffset (VanillaReg 4 _)    = oFFSET_StgRegTable_rR4
-baseRegOffset (VanillaReg 5 _)    = oFFSET_StgRegTable_rR5
-baseRegOffset (VanillaReg 6 _)    = oFFSET_StgRegTable_rR6
-baseRegOffset (VanillaReg 7 _)    = oFFSET_StgRegTable_rR7
-baseRegOffset (VanillaReg 8 _)    = oFFSET_StgRegTable_rR8
-baseRegOffset (VanillaReg 9 _)    = oFFSET_StgRegTable_rR9
-baseRegOffset (VanillaReg 10 _)   = oFFSET_StgRegTable_rR10
-baseRegOffset (VanillaReg n _)    = panic ("Registers above R10 are not supported (tried to use R" ++ show n ++ ")")
-baseRegOffset (FloatReg  1)       = oFFSET_StgRegTable_rF1
-baseRegOffset (FloatReg  2)       = oFFSET_StgRegTable_rF2
-baseRegOffset (FloatReg  3)       = oFFSET_StgRegTable_rF3
-baseRegOffset (FloatReg  4)       = oFFSET_StgRegTable_rF4
-baseRegOffset (FloatReg  n)       = panic ("Registers above F4 are not supported (tried to use F" ++ show n ++ ")")
-baseRegOffset (DoubleReg 1)       = oFFSET_StgRegTable_rD1
-baseRegOffset (DoubleReg 2)       = oFFSET_StgRegTable_rD2
-baseRegOffset (DoubleReg n)       = panic ("Registers above D2 are not supported (tried to use D" ++ show n ++ ")")
-baseRegOffset Sp                  = oFFSET_StgRegTable_rSp
-baseRegOffset SpLim               = oFFSET_StgRegTable_rSpLim
-baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
-baseRegOffset (LongReg n)         = panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
-baseRegOffset Hp                  = oFFSET_StgRegTable_rHp
-baseRegOffset HpLim               = oFFSET_StgRegTable_rHpLim
-baseRegOffset CCCS                = oFFSET_StgRegTable_rCCCS
-baseRegOffset CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO
-baseRegOffset CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery
-baseRegOffset HpAlloc             = oFFSET_StgRegTable_rHpAlloc
-baseRegOffset EagerBlackholeInfo  = oFFSET_stgEagerBlackholeInfo
-baseRegOffset GCEnter1            = oFFSET_stgGCEnter1
-baseRegOffset GCFun               = oFFSET_stgGCFun
-baseRegOffset BaseReg             = panic "baseRegOffset:BaseReg"
-baseRegOffset PicBaseReg          = panic "baseRegOffset:PicBaseReg"
+baseRegOffset dflags (VanillaReg 1 _)    = oFFSET_StgRegTable_rR1 dflags
+baseRegOffset dflags (VanillaReg 2 _)    = oFFSET_StgRegTable_rR2 dflags
+baseRegOffset dflags (VanillaReg 3 _)    = oFFSET_StgRegTable_rR3 dflags
+baseRegOffset dflags (VanillaReg 4 _)    = oFFSET_StgRegTable_rR4 dflags
+baseRegOffset dflags (VanillaReg 5 _)    = oFFSET_StgRegTable_rR5 dflags
+baseRegOffset dflags (VanillaReg 6 _)    = oFFSET_StgRegTable_rR6 dflags
+baseRegOffset dflags (VanillaReg 7 _)    = oFFSET_StgRegTable_rR7 dflags
+baseRegOffset dflags (VanillaReg 8 _)    = oFFSET_StgRegTable_rR8 dflags
+baseRegOffset dflags (VanillaReg 9 _)    = oFFSET_StgRegTable_rR9 dflags
+baseRegOffset dflags (VanillaReg 10 _)   = oFFSET_StgRegTable_rR10 dflags
+baseRegOffset _      (VanillaReg n _)    = panic ("Registers above R10 are not supported (tried to use R" ++ show n ++ ")")
+baseRegOffset dflags (FloatReg  1)       = oFFSET_StgRegTable_rF1 dflags
+baseRegOffset dflags (FloatReg  2)       = oFFSET_StgRegTable_rF2 dflags
+baseRegOffset dflags (FloatReg  3)       = oFFSET_StgRegTable_rF3 dflags
+baseRegOffset dflags (FloatReg  4)       = oFFSET_StgRegTable_rF4 dflags
+baseRegOffset _      (FloatReg  n)       = panic ("Registers above F4 are not supported (tried to use F" ++ show n ++ ")")
+baseRegOffset dflags (DoubleReg 1)       = oFFSET_StgRegTable_rD1 dflags
+baseRegOffset dflags (DoubleReg 2)       = oFFSET_StgRegTable_rD2 dflags
+baseRegOffset _      (DoubleReg n)       = panic ("Registers above D2 are not supported (tried to use D" ++ show n ++ ")")
+baseRegOffset dflags Sp                  = oFFSET_StgRegTable_rSp dflags
+baseRegOffset dflags SpLim               = oFFSET_StgRegTable_rSpLim dflags
+baseRegOffset dflags (LongReg 1)         = oFFSET_StgRegTable_rL1 dflags
+baseRegOffset _      (LongReg n)         = panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
+baseRegOffset dflags Hp                  = oFFSET_StgRegTable_rHp dflags
+baseRegOffset dflags HpLim               = oFFSET_StgRegTable_rHpLim dflags
+baseRegOffset dflags CCCS                = oFFSET_StgRegTable_rCCCS dflags
+baseRegOffset dflags CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO dflags
+baseRegOffset dflags CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery dflags
+baseRegOffset dflags HpAlloc             = oFFSET_StgRegTable_rHpAlloc dflags
+baseRegOffset dflags EagerBlackholeInfo  = oFFSET_stgEagerBlackholeInfo dflags
+baseRegOffset dflags GCEnter1            = oFFSET_stgGCEnter1 dflags
+baseRegOffset dflags GCFun               = oFFSET_stgGCFun dflags
+baseRegOffset _      BaseReg             = panic "baseRegOffset:BaseReg"
+baseRegOffset _      PicBaseReg          = panic "baseRegOffset:PicBaseReg"
 
 
 -------------------------------------------------------------------------
@@ -823,22 +823,22 @@ srt_escape = -1
 -- a GlobalReg, get_GlobalReg_addr always produces the
 -- register table address for it.
 get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
-get_GlobalReg_addr _      BaseReg = regTableOffset 0
+get_GlobalReg_addr dflags BaseReg = regTableOffset dflags 0
 get_GlobalReg_addr dflags mid
     = get_Regtable_addr_from_offset dflags
-                                    (globalRegType dflags mid) (baseRegOffset mid)
+                                    (globalRegType dflags mid) (baseRegOffset dflags mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
-regTableOffset :: Int -> CmmExpr
-regTableOffset n =
-  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
+regTableOffset :: DynFlags -> Int -> CmmExpr
+regTableOffset dflags n =
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r dflags + n))
 
 get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
 get_Regtable_addr_from_offset dflags _ offset =
     if haveRegBase (targetPlatform dflags)
     then CmmRegOff (CmmGlobal BaseReg) offset
-    else regTableOffset offset
+    else regTableOffset dflags offset
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.

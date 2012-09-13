@@ -362,7 +362,7 @@ emitPrimOp _      []  WriteArrayArrayOp_ArrayArray        [obj,ix,v] = doWritePt
 emitPrimOp _      []  WriteArrayArrayOp_MutableArrayArray [obj,ix,v] = doWritePtrArrayOp obj ix v
 
 emitPrimOp dflags [res] SizeofArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs) (bWord dflags))
+   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags) (bWord dflags))
 emitPrimOp dflags [res] SizeofMutableArrayOp [arg]
    = emitPrimOp dflags [res] SizeofArrayOp [arg]
 emitPrimOp dflags [res] SizeofArrayArrayOp [arg]
@@ -919,7 +919,7 @@ doWritePtrArrayOp addr idx val
        
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
 loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
- where off = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs
+ where off = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs dflags
 
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType
 		   -> LocalReg -> CmmExpr -> CmmExpr -> FCode ()
@@ -1102,7 +1102,7 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
     dflags <- getDynFlags
     let arrPtrsHdrSizeW dflags = mkIntExpr dflags (fixedHdrSize dflags +
                                      (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE))
-        myCapability = cmmSubWord dflags (CmmReg baseReg) (mkIntExpr dflags oFFSET_Capability_r)
+        myCapability = cmmSubWord dflags (CmmReg baseReg) (mkIntExpr dflags (oFFSET_Capability_r dflags))
     -- Passed as arguments (be careful)
     src     <- assignTempE src0
     src_off <- assignTempE src_off0
@@ -1120,9 +1120,9 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
     let arr = CmmReg (CmmLocal arr_r)
     emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
     emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE +
-                                           oFFSET_StgMutArrPtrs_ptrs)) n
+                                           oFFSET_StgMutArrPtrs_ptrs dflags)) n
     emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE +
-                                           oFFSET_StgMutArrPtrs_size)) size
+                                           oFFSET_StgMutArrPtrs_size dflags)) size
 
     dst_p <- assignTempE $ cmmOffsetB dflags arr (arrPtrsHdrSize dflags)
     src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags))
