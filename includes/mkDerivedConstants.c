@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum Mode { Gen_Haskell, Gen_Header } mode;
+enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Header } mode;
 
 #define str(a,b) #a "_" #b
 
@@ -45,6 +45,12 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
         printf("oFFSET_" str " :: Int\n");                                  \
         printf("oFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset);        \
         break;                                                              \
+    case Gen_Haskell_Type:                                                  \
+        printf("    , pc_OFFSET_" str " :: Int\n");                         \
+        break;                                                              \
+    case Gen_Haskell_Value:                                                 \
+        printf("    , pc_OFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset); \
+        break;                                                              \
     case Gen_Header:                                                        \
         printf("#define OFFSET_" str " %" FMT_SizeT "\n", (size_t)offset);  \
         break;                                                              \
@@ -53,6 +59,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define ctype(type)                                                         \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define SIZEOF_" #type " %" FMT_SizeT "\n",                 \
@@ -69,6 +77,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define field_type_(str, s_type, field)                                     \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define REP_" str " b");                                    \
@@ -79,6 +89,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define field_type_gcptr_(str, s_type, field)                               \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define REP_" str " gcptr\n");                              \
@@ -98,6 +110,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define struct_field_macro(str)                                             \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define " str "(__ptr__)  REP_" str "[__ptr__+OFFSET_" str "]\n"); \
@@ -121,6 +135,12 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
         printf("sIZEOF_" str " :: Int\n");                                  \
         printf("sIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size);          \
         break;                                                              \
+    case Gen_Haskell_Type:                                                  \
+        printf("    , pc_SIZEOF_" str " :: Int\n");                         \
+        break;                                                              \
+    case Gen_Haskell_Value:                                                 \
+        printf("    , pc_SIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size); \
+        break;                                                              \
     case Gen_Header:                                                        \
         printf("#define SIZEOF_" str " %" FMT_SizeT "\n", (size_t)size);    \
         break;                                                              \
@@ -129,6 +149,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define def_closure_size(str, size)                                         \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%" FMT_SizeT ")\n", (size_t)size); \
@@ -154,6 +176,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define closure_field_macro(str)                                            \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n"); \
@@ -169,6 +193,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define closure_payload_macro(str)                                          \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define " str "(__ptr__,__ix__)  W_[__ptr__+SIZEOF_StgHeader+OFFSET_" str " + WDS(__ix__)]\n"); \
@@ -205,6 +231,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define tso_field_offset_macro(str)                                         \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define TSO_OFFSET_" str " (SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+OFFSET_" str ")\n"); \
@@ -218,6 +246,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define tso_field_macro(str)                                                \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+TSO_OFFSET_" str "]\n") \
@@ -232,6 +262,8 @@ enum Mode { Gen_Haskell, Gen_Header } mode;
 #define opt_struct_size(s_type, option)					                    \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
+    case Gen_Haskell_Type:                                                  \
+    case Gen_Haskell_Value:                                                 \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#ifdef " #option "\n");					                    \
@@ -255,6 +287,12 @@ main(int argc, char *argv[])
         if (0 == strcmp("--gen-haskell", argv[1])) {
             mode = Gen_Haskell;
         }
+        else if (0 == strcmp("--gen-haskell-type", argv[1])) {
+            mode = Gen_Haskell_Type;
+        }
+        else if (0 == strcmp("--gen-haskell-value", argv[1])) {
+            mode = Gen_Haskell_Value;
+        }
         else {
             printf("Bad args\n");
             exit(1);
@@ -267,6 +305,16 @@ main(int argc, char *argv[])
 
     switch (mode) {
     case Gen_Haskell:
+        break;
+    case Gen_Haskell_Type:
+        printf("data PlatformConstants = PlatformConstants {\n");
+        /* Now a kludge that allows the real entries to all start with a
+           comma, which makes life a little easier */
+        printf("    pc_platformConstants :: ()\n");
+        break;
+    case Gen_Haskell_Value:
+        printf("PlatformConstants {\n");
+        printf("    pc_platformConstants = ()\n");
         break;
     case Gen_Header:
         printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
@@ -527,6 +575,19 @@ main(int argc, char *argv[])
     struct_field(StgAsyncIOResult, len);
     struct_field(StgAsyncIOResult, errCode);
 #endif
+
+    switch (mode) {
+    case Gen_Haskell:
+        break;
+    case Gen_Haskell_Type:
+        printf("  } deriving (Read, Show)\n");
+        break;
+    case Gen_Haskell_Value:
+        printf("  }\n");
+        break;
+    case Gen_Header:
+        break;
+    }
 
     return 0;
 }

@@ -20,6 +20,7 @@ module DynFlags (
         WarningFlag(..),
         ExtensionFlag(..),
         Language(..),
+        PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
@@ -705,8 +706,9 @@ data Settings = Settings {
   sOpt_l                 :: [String],
   sOpt_windres           :: [String],
   sOpt_lo                :: [String], -- LLVM: llvm optimiser
-  sOpt_lc                :: [String]  -- LLVM: llc static compiler
+  sOpt_lc                :: [String], -- LLVM: llc static compiler
 
+  sPlatformConstants     :: PlatformConstants
  }
 
 targetPlatform :: DynFlags -> Platform
@@ -3137,4 +3139,6 @@ compilerInfo dflags
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags)
       ]
+
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs"
 
