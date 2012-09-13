@@ -568,8 +568,8 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                                        -> pure (liftM snd $ opt Nothing state, s)
                                                        | otherwise
                                                        -> pure (remember opt)
-      where (state_did_reduce, reduced_state) = reduceForMatch state
-            
+      where (_state_did_reduce, reduced_state) = reduceForMatch state
+
             -- Prefer more exact matches (see Note [Instance matching and loops]: it is essential to choose exact matches over instances)
             bestChoice :: [(Promise, MSGMatchResult)]
                        -> Maybe (Bool, (Promise, MSGMatchResult))
@@ -600,95 +600,28 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                     isEmptyRenaming (_, tv_subst, co_subst) = all isTyVarTy (varEnvElts tv_subst) && all isCoVarCo (varEnvElts co_subst)
                     isCoVarCo = isJust . getCoVar_maybe
 
-            -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
-            -- this, we tend to do things like:
+            -- I do not currently know how to prevent the supercompiler from building loops when doing float-to-match
+            -- (i.e. instance matching where we match var-to-term, not just var-to-var) is on. With it, we tend to do things like:
             --
             --  [a] h0 = D[let f = v in f] = let f = h1 in f
             --      h1 = D[let f = v in v] = h0
             --
-            -- This fix is inspired by Peter's supercompiler where matching (and indeed termination checking) is only
-            -- performed when the focus of evaluation is the name of a top level function. I haven't yet proved that
-            -- this is safe in my setting (FIXME). This might be problematic because Peter does not have a private
-            -- history for "reduce" like I do.
+            -- In standard supercompilation, we still need to skip some tieback attempts for reasons of correctness:
+            -- our correctness proof does not work if we try to memo values. Luckily, this doesn't hurt us at all because
+            -- it doesn't sacrifice termination of the supercompiler. See the thesis for details.
             --
+            -- The main example we are worried about when we discuss correctness is this:
             --
-            -- Version 2 of this change **prevents** tieback when the focus is an indirection. I'm reasonably
-            -- sure this is safe because of the way the splitter is defined and the fact that we have the invariant
-            -- that indirections never occur in the stack, and only occur in the heap as the whole HB RHS. This,
-            -- combined with the fact that they are acyclic seems to be enough to say that any sequence of splits
-            -- only has an indirection in the focus a finite number of times. (FIXME: it's OK that we don't check
-            -- the termination condition for those states where the stack is empty since reduce won't change the term.
-            -- But it's less clear that it is actually OK to skip termination check when we skip tieback in the other case!!)
+            --  [a] h0 = D[let x = True in x] = let x = h1 in x
+            --      h1 = D[True] = h0
             --
-            --
-            -- Version 3 of this fix is to "eagerly" split values in the splitter: when creating a Bracket for a term,
-            -- we split immediately if the term is a value. This is sufficient to fix the problem above, and it should
-            -- save even *more* memoisations!
-            --
-            -- The reason this works is critically dependant on the fact that indirections always point to *manifest values*,
-            -- and normalised states have "maximum update frames". If this wasn't the case, we could accidentally build a loop
-            -- via this route:
-            --      h0 = D[let f = e in f] = let f = h1 in f
-            --      h1 = D[e] = h0
-            --
-            -- FIXME: in fact, generalisation can throw away an outer update frame like this! This doesn't cause problems
-            -- because the matcher doesn't use update frames to do instance matching, but it *could* if we changed that...
-            --
-            --
-            -- In version 4 I didn't check for tieback on unreducable states if we eagerly split values.
-            -- Because if we don't eagerly split values this can lead to divergence with e.g.
-            --   [b] let xs = x:xs in x:xs => let xs = x:xs in x:xs => ...
-            -- (NB: this examples is an infinite chain which is entirely irreducible after normalisation)
-            --
-            -- But then I found that this diverged:
-            --   [c] let xs = \k -> k x xs in \k -> k x xs => let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in \k -> k x xs => ...
-            -- And with eager value splitting on, this diverges:
-            --   [d] let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in k x xs => ...
-            --
-            -- We also have to be careful with examples where intermediate states are reducible, like:
-            --   [e] let f = \x -> f x in f x => let f = \x -> f x in \x -> f x => let f = \x -> f x in f x => ...
-            -- And with eager value splitting:
-            --   [f] let f = \x -> f x in f x => let f = \x -> f x in f x => ...
-            --
-            -- So version 5 is as follows:
-            --  1. If state is already an answer:
-            --     a) If the answer is an indirection, skip (just like V2)
-            --     b) Otherwise, check and remember (just like V3 and not like V4)
-            --  2. If the state is not an answer then proceed like V5:
-            --     a) If the state is irreducible, skip (it might make sense to CheckOnly in this case, not sure)
-            --     b) If the state is reducible, check and remember
-            --
-            -- Now [a], [b], [c], and [e] above will converge even without eager value splitting.
-            -- In fact, if we turn eager value splitting on the supercompiler will diverge because [d] won't be halted by this version!
-            -- So version 5 is incompatible with eager value splitting.
-            --
-            --
-            -- Version 5a is an alternative to version 5 that is usable when eager value splitting is on. In this case:
-            --  1. If the state is already an answer, skip tieback (!)
-            --  2. Otherwise, check and remember (we can't Skip if the state is reducible because otherwise [f] will diverge)
-            --
-            -- This can only be used when eagerly splitting values or examples like [b] will diverge (note that [c] will still converge)
+            -- (Note that the meaning of h1 is cost equivalent to the meaning of h0, so superficially this tieback is justified!
+            --  If x bound a lambda instead then we would be able to make an argument that the tieback was not cost equivalent.)
+            memo_how | isStateIrreducible state
+                     = Skip
 
-            -- I've disabled all this nonsense because it is causing non-termination with the new evaluator. Consider:
-            --  let a:1 = I# ago1
-            --      ago1 = a:1 : a:2
-            --  in ago1
-            -- With eager value splitting on, this splits to exactly the same term.
-            --
-            -- TODO: think about if it actualy makes sense to fix and reenable this
-            memo_how | {- False -} True
-                     = CheckAndRemember
-
-                     | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
-                     = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
-    
-                     | (_, _, k, qa) <- state -- NB: not safe to use reduced_state!
-                     , Just (_, mb_update) <- isTrivialStack_maybe k
-                     , Answer _ <- annee qa
-                     = if isJust mb_update || eAGER_SPLIT_VALUES then Skip else CheckAndRemember
-    
                      | otherwise
-                     = if state_did_reduce || eAGER_SPLIT_VALUES then CheckAndRemember else Skip
+                     = CheckAndRemember
 
 data MemoHow = Skip | CheckOnly | CheckAndRemember
 
@@ -713,7 +646,8 @@ data MemoHow = Skip | CheckOnly | CheckAndRemember
 --  2. GC *after* reduction in the main codepath.
 --  3. Not eliminate dead update frames when GCing
 reduceForMatch :: State -> (Bool, State)
-reduceForMatch state = {- second gc $ -} reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+reduceForMatch state | rEDUCE_BEFORE_MATCH = {- second gc $ -} reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+                     | otherwise           = (False, state)
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)

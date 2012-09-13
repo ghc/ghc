@@ -361,7 +361,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 -- However, this is important so that speculation is able to turn partial applications into explicit values
                 | (_, _, k, qa) <- s'
                 , Answer _ <- annee qa
-                , Just _ <- isTrivialStack_maybe k -- Might be a trailing update, (update, cast) or (cast, update, cast)
+                , Just _ <- isCastStack_maybe k -- Might be a trailing cast
                 -> True
                 -- If the result is actually smaller, accept it (this catches manifest values)
                 -- NB: garbage collect before comparison in case we inlined an internallyBound thing

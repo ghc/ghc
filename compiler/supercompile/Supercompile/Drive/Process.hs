@@ -436,15 +436,11 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 -- I won't go as far as using "speculate" because in that case "eta" could potentially yield an infinite list
 -- (for some non-HM-typeable programs).
 eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
-eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
+eta heap accessor_e1 in_e = (heap, accessor_e1, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
   (_, Heap h ids, k, anned_qa)
-    | Just (a_cast, mb_update) <- isTrivialStack_maybe k
-    , Answer (rn, v) <- extract anned_qa
-    , let accessor_e1 = case mb_update of
-            Nothing               -> accessor_e0
-            Just (_, Uncast)      -> accessor_e0
-            Just (_, CastBy co _) -> accessor_e0 `cast` mkSymCo ids co
-          accessor_e2 = case a_cast of
+    | Answer (rn, v) <- extract anned_qa
+    , Just a_cast <- isCastStack_maybe k
+    , let accessor_e2 = case a_cast of
             Uncast      -> accessor_e1
             CastBy co _ -> accessor_e1 `cast` mkSymCo ids co
           mb_res@(~(Just (_, x, _))) = case v of

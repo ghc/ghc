@@ -635,6 +635,7 @@ msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
 msgMatch inst_mtch (Pair (_, Heap h_l _, rn_l, k_l) (deeds_r, heap_r@(Heap h_r _), rn_r, k_r), (heap@(Heap _ ids), k, qa))
   -- Try to detect instantiation first
   --  1) Is the left-hand renaming invertible?
+  -- FIXME: trim the renaming to the FVs of the common state so that "dead" substitutions don't cause the inversion check to fail
   | Just rn_l_inv@(rn_l_inv_xs, rn_l_inv_as, rn_l_inv_qs) <- invertRenaming ids rn_l
   --  2) Is the left-hand stack empty, and if has been instantiated on the right, was that valid?
   , Loco gen_k_l <- k_l
@@ -1087,7 +1088,7 @@ msgVarL :: RnEnv2 -> Out Id -> Out AnnedTerm -> MSG [MSGLR]
 msgVarL rn2 x_l e_r = fmap maybeToList (msgVarL_maybe rn2 x_l e_r)
 
 msgVarL_maybe :: RnEnv2 -> Out Id -> Out AnnedTerm -> MSG (Maybe MSGLR)
-msgVarL_maybe rn2 x_l e_r = guard "msgVarL_maybe: no instance msging"  iNSTANCE_MATCHING >> case rnOccL_maybe rn2 x_l of
+msgVarL_maybe rn2 x_l e_r = guard "msgVarL_maybe: no floating" fLOAT_TO_MATCH >> case rnOccL_maybe rn2 x_l of
      -- Left rigidly bound: msging is impossible (assume we already tried msgVar_maybe)
     Just _  -> fail "msgVar: rigid"
      -- Both bound by let: defer decision about msging
@@ -1097,7 +1098,7 @@ msgVarR :: RnEnv2 -> Out AnnedTerm -> Out Id -> MSG [MSGLR]
 msgVarR rn2 e_l x_r = fmap maybeToList (msgVarR_maybe rn2 e_l x_r)
 
 msgVarR_maybe :: RnEnv2 -> Out AnnedTerm -> Out Id -> MSG (Maybe MSGLR)
-msgVarR_maybe rn2 e_l x_r = guard "msgVarR_maybe: no instance msging" iNSTANCE_MATCHING >> case rnOccR_maybe rn2 x_r of
+msgVarR_maybe rn2 e_l x_r = guard "msgVarR_maybe: no floating" fLOAT_TO_MATCH >> case rnOccR_maybe rn2 x_r of
      -- Right rigidly bound: msging is impossible (assume we already tried msgVar_maybe)
     Just _  -> fail "msgVar: rigid"
      -- Both bound by let: defer decision about msging

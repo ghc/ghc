@@ -400,6 +400,18 @@ unnormalisedStateSize :: UnnormalisedState -> Size
 unnormalisedStateSize (_, h, k, (_, e)) = heapSize h + stackSize k + annedSize e
 
 
+-- Detects three kinds of state:
+--  1. < H | v | >
+--  2. < H, x |-> v | x | >
+--  3. < H | x | K > (x \notin |dom|(H))
+--
+-- Note that in the final case it is OK for x to either be free or to be bound by the stack
+isStateIrreducible :: State -> Bool
+isStateIrreducible (_, Heap h _, k, anned_qa) = case annee anned_qa of
+    Answer _    -> stack_empty
+    Question x' -> maybe True (\hb -> case heapBindingMeaning hb of Left _ -> True; Right (_, e) -> termIsValue e && stack_empty) $ M.lookup x' h
+  where stack_empty = isJust $ isCastStack_maybe k
+
 isStackEmpty :: Stack -> Bool
 isStackEmpty (Loco _) = True
 isStackEmpty _        = False
@@ -429,6 +441,9 @@ releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (r
 releaseStateDeed :: State -> Deeds
 releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize a) h) k
 
+
+isCastStack_maybe :: Stack -> Maybe CastBy
+isCastStack_maybe = fmap fst . isTrivialStack_maybe
 
 isTrivialStack_maybe :: Stack -> Maybe (CastBy, Maybe (Tagged Var, CastBy))
 isTrivialStack_maybe k = case k of

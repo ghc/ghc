@@ -22,8 +22,16 @@ sUPERINLINABILITY = parseEnum "-fsupercompiler-superinlinability" ForRecursion [
 iNSTANCE_MATCHING :: Bool
 iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"
 
+-- This is not remotely safe:
+fLOAT_TO_MATCH :: Bool
+fLOAT_TO_MATCH = False
+
+-- This is also not safe as implemented. It could be made safe with some fiddling, but it's not worth it:
+rEDUCE_BEFORE_MATCH :: Bool
+rEDUCE_BEFORE_MATCH = False
+
 eAGER_SPLIT_VALUES :: Bool
-eAGER_SPLIT_VALUES = not $ lookUp $ fsLit "-fsupercompiler-no-eager-split-values"
+eAGER_SPLIT_VALUES = lookUp $ fsLit "-fsupercompiler-eager-split-values"
 
 rEFINE_ALTS :: Bool
 rEFINE_ALTS = not $ lookUp $ fsLit "-fsupercompiler-no-refine-alts"

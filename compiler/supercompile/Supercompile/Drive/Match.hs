@@ -256,7 +256,7 @@ matchIdCoVarBndr lambdaish rn2 x_l x_r k = liftM (\((), eqs) -> eqs) $ matchIdCo
 matchIdCoVarBndrFlexible :: Bool -> RnEnv2 -> Id -> Id -> (RnEnv2 -> Match (RnEnv2, a, [MatchLR])) -> Match (a, [MatchLR])
 matchIdCoVarBndrFlexible lambdaish rn2 x_l x_r k = do
     (rn2, a, eqs1) <- k rn2'
-    eqs1 <- (if iNSTANCE_MATCHING then mapM (checkMatchLR lambdaish x_l x_r) else return) eqs1
+    eqs1 <- (if fLOAT_TO_MATCH then mapM (checkMatchLR lambdaish x_l x_r) else return) eqs1
     eqs2 <- mk_match_x rn2
     return (a, eqs1 ++ eqs2)
   where (rn2', mk_match_x) = matchIdCoVarBndr' rn2 x_l x_r
@@ -386,7 +386,7 @@ matchVarL :: RnEnv2 -> Out Id -> Out AnnedTerm -> Match [MatchLR]
 matchVarL rn2 x_l e_r = fmap maybeToList (matchVarL_maybe rn2 x_l e_r)
 
 matchVarL_maybe :: RnEnv2 -> Out Id -> Out AnnedTerm -> Match (Maybe MatchLR)
-matchVarL_maybe rn2 x_l e_r = guard "matchVarL_maybe: no instance matching"  iNSTANCE_MATCHING >> case rnOccL_maybe rn2 x_l of
+matchVarL_maybe rn2 x_l e_r = guard "matchVarL_maybe: no float-to-match"  fLOAT_TO_MATCH >> case rnOccL_maybe rn2 x_l of
      -- Left rigidly bound: matching is impossible (assume we already tried matchVar_maybe)
     Just _  -> fail "matchVar: rigid"
      -- Both bound by let: defer decision about matching
@@ -396,7 +396,7 @@ matchVarR :: RnEnv2 -> Out AnnedTerm -> Out Id -> Match [MatchLR]
 matchVarR rn2 e_l x_r = fmap maybeToList (matchVarR_maybe rn2 e_l x_r)
 
 matchVarR_maybe :: RnEnv2 -> Out AnnedTerm -> Out Id -> Match (Maybe MatchLR)
-matchVarR_maybe rn2 e_l x_r = guard "matchVarR_maybe: no instance matching" iNSTANCE_MATCHING >> case rnOccR_maybe rn2 x_r of
+matchVarR_maybe rn2 e_l x_r = guard "matchVarR_maybe: no float-to-match" fLOAT_TO_MATCH >> case rnOccR_maybe rn2 x_r of
      -- Right rigidly bound: matching is impossible (assume we already tried matchVar_maybe)
     Just _  -> fail "matchVar: rigid"
      -- Both bound by let: defer decision about matching
