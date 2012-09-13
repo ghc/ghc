@@ -246,7 +246,7 @@ GHC note: the number of capabilities is specified by the @+RTS -N@
 option when the program is started.  Capabilities can be fixed to
 actual processor cores with @+RTS -qa@ if the underlying operating
 system supports that, although in practice this is usually unnecessary
-(and may actually degrade perforamnce in some cases - experimentation
+(and may actually degrade performance in some cases - experimentation
 is recommended).
 -}
 forkOn :: Int -> IO () -> IO ThreadId
