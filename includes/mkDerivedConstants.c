@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haskell_Exports, Gen_Header } mode;
+enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haskell_Exports, Gen_Header } mode;
 
 #define str(a,b) #a "_" #b
 
@@ -41,8 +41,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define def_offset(str, offset)                                             \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
-        break;                                                              \
     case Gen_Haskell_Type:                                                  \
         printf("    , pc_OFFSET_" str " :: Int\n");                         \
         break;                                                              \
@@ -63,7 +61,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define ctype(type)                                                         \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -83,7 +80,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 */
 #define field_type_(str, s_type, field)                                     \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -97,7 +93,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define field_type_gcptr_(str, s_type, field)                               \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -120,7 +115,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 /* An access macro for use in C-- sources. */
 #define struct_field_macro(str)                                             \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -144,8 +138,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define def_size(str, size)                                                 \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
-        break;                                                              \
     case Gen_Haskell_Type:                                                  \
         printf("    , pc_SIZEOF_" str " :: Int\n");                         \
         break;                                                              \
@@ -166,7 +158,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define def_closure_size(str, size)                                         \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -195,7 +186,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 /* An access macro for use in C-- sources. */
 #define closure_field_macro(str)                                            \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -214,7 +204,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define closure_payload_macro(str)                                          \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -254,7 +243,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 /* Full byte offset for a TSO field, for use from Cmm */
 #define tso_field_offset_macro(str)                                         \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -271,7 +259,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 
 #define tso_field_macro(str)                                                \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -289,7 +276,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
   
 #define opt_struct_size(s_type, option)					                    \
     switch (mode) {                                                         \
-    case Gen_Haskell:                                                       \
     case Gen_Haskell_Type:                                                  \
     case Gen_Haskell_Value:                                                 \
     case Gen_Haskell_Wrappers:                                              \
@@ -314,10 +300,7 @@ main(int argc, char *argv[])
         mode = Gen_Header;
     }
     else if (argc == 2) {
-        if (0 == strcmp("--gen-haskell", argv[1])) {
-            mode = Gen_Haskell;
-        }
-        else if (0 == strcmp("--gen-haskell-type", argv[1])) {
+        if (0 == strcmp("--gen-haskell-type", argv[1])) {
             mode = Gen_Haskell_Type;
         }
         else if (0 == strcmp("--gen-haskell-value", argv[1])) {
@@ -340,8 +323,6 @@ main(int argc, char *argv[])
     }
 
     switch (mode) {
-    case Gen_Haskell:
-        break;
     case Gen_Haskell_Type:
         printf("data PlatformConstants = PlatformConstants {\n");
         /* Now a kludge that allows the real entries to all start with a
@@ -621,8 +602,6 @@ main(int argc, char *argv[])
 #endif
 
     switch (mode) {
-    case Gen_Haskell:
-        break;
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");
         break;

@@ -131,7 +131,6 @@ endif
 # Make DerivedConstants.h for the compiler
 
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
-includes_GHCCONSTANTS = includes/dist-derivedconstants/header/GHCConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
 includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
@@ -142,10 +141,6 @@ INSTALL_LIBS += includes/dist-derivedconstants/header/platformConstants
 ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
 
 DerivedConstants.h :
-	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
-	@exit 1
-
-$(includes_GHCCONSTANTS) :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
 	@exit 1
 
@@ -170,13 +165,6 @@ ifeq "$(AlienScript)" ""
 	./$< >$@
 else
 	$(AlienScript) run ./$< >$@
-endif
-
-$(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< --gen-haskell >$@
-else
-	$(AlienScript) run ./$< --gen-haskell >$@
 endif
 
 $(includes_GHCCONSTANTS_HASKELL_TYPE) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
@@ -215,11 +203,11 @@ endif
 
 $(eval $(call clean-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
-  $(includes_GHCCONSTANTS) $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
+  $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
 
 $(eval $(call all-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
-  $(includes_GHCCONSTANTS) $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
+  $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes
 
@@ -230,5 +218,5 @@ install_includes :
 	    $(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)/$d") && \
 	    $(call INSTALL_HEADER,$(INSTALL_OPTS),includes/$d/*.h,"$(DESTDIR)$(ghcheaderdir)/$d/") && \
 	) true
-	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS),"$(DESTDIR)$(ghcheaderdir)/")
+	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_DERIVEDCONSTANTS),"$(DESTDIR)$(ghcheaderdir)/")
 
