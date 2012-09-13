@@ -134,6 +134,8 @@ includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstan
 includes_GHCCONSTANTS = includes/dist-derivedconstants/header/GHCConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
+includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
+includes_GHCCONSTANTS_HASKELL_EXPORTS = includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs
 
 INSTALL_LIBS += includes/dist-derivedconstants/header/platformConstants
 
@@ -189,6 +191,20 @@ ifeq "$(AlienScript)" ""
 	./$< --gen-haskell-value >$@
 else
 	$(AlienScript) run ./$< --gen-haskell-value >$@
+endif
+
+$(includes_GHCCONSTANTS_HASKELL_WRAPPERS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
+ifeq "$(AlienScript)" ""
+	./$< --gen-haskell-wrappers >$@
+else
+	$(AlienScript) run ./$< --gen-haskell-wrappers >$@
+endif
+
+$(includes_GHCCONSTANTS_HASKELL_EXPORTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
+ifeq "$(AlienScript)" ""
+	./$< --gen-haskell-exports >$@
+else
+	$(AlienScript) run ./$< --gen-haskell-exports >$@
 endif
 endif
 

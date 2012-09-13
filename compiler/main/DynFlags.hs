@@ -116,6 +116,8 @@ module DynFlags (
 #endif
         -- ** Only for use in the tracing functions in Outputable
         tracingDynFlags,
+
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
   ) where
 
 #include "HsVersions.h"
@@ -3141,4 +3143,5 @@ compilerInfo dflags
       ]
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs"
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
