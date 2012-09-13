@@ -289,7 +289,7 @@ pushSpecUpdateFrame lbl updatee code
     	; MASSERT(case sequel of { OnStack -> True; _ -> False}) }
 	; dflags <- getDynFlags
 	; allocStackTop (fixedHdrSize dflags + 
-			   sIZEOF_StgUpdateFrame_NoHdr `quot` wORD_SIZE)
+			   sIZEOF_StgUpdateFrame_NoHdr dflags `quot` wORD_SIZE)
 	; vsp <- getVirtSp
 	; setStackFrame vsp
 	; frame_addr <- getSpRelOffset vsp

@@ -659,7 +659,7 @@ funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- in the info table.
 funInfoTable dflags info_ptr
   | tablesNextToCode dflags
-  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev)
+  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
   | otherwise
   = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
 				-- Past the entry code pointer

@@ -1101,7 +1101,7 @@ emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
 emitCloneArray info_p res_r src0 src_off0 n0 = do
     dflags <- getDynFlags
     let arrPtrsHdrSizeW dflags = mkIntExpr dflags (fixedHdrSize dflags +
-                                     (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE))
+                                     (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE))
         myCapability = cmmSubWord dflags (CmmReg baseReg) (mkIntExpr dflags oFFSET_Capability_r)
     -- Passed as arguments (be careful)
     src     <- assignTempE src0

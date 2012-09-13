@@ -235,17 +235,17 @@ minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr dflags
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr dflags
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: DynFlags -> WordOff
 thunkHdrSize dflags = fixedHdrSize dflags + smp_hdr
-        where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
+        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE
 
 
 nonHdrSize :: SMRep -> WordOff

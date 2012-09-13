@@ -147,8 +147,6 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
 #define def_size(str, size)                                                 \
     switch (mode) {                                                         \
     case Gen_Haskell:                                                       \
-        printf("sIZEOF_" str " :: Int\n");                                  \
-        printf("sIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size);          \
         break;                                                              \
     case Gen_Haskell_Type:                                                  \
         printf("    , pc_SIZEOF_" str " :: Int\n");                         \
@@ -157,11 +155,11 @@ enum Mode { Gen_Haskell, Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappe
         printf("    , pc_SIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size); \
         break;                                                              \
     case Gen_Haskell_Wrappers:                                              \
-        printf("-- sIZEOF_" str " :: DynFlags -> Int\n");                      \
-        printf("-- sIZEOF_" str " dflags = pc_SIZEOF_" str " (sPlatformConstants (settings dflags))\n"); \
+        printf("sIZEOF_" str " :: DynFlags -> Int\n");                      \
+        printf("sIZEOF_" str " dflags = pc_SIZEOF_" str " (sPlatformConstants (settings dflags))\n"); \
         break;                                                              \
     case Gen_Haskell_Exports:                                               \
-        printf("--     sIZEOF_" str ",\n");                                    \
+        printf("    sIZEOF_" str ",\n");                                    \
         break;                                                              \
     case Gen_Header:                                                        \
         printf("#define SIZEOF_" str " %" FMT_SizeT "\n", (size_t)size);    \

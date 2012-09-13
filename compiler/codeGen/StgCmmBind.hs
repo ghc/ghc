@@ -635,7 +635,7 @@ pushUpdateFrame lbl updatee body
        dflags <- getDynFlags
        let
            hdr         = fixedHdrSize dflags * wORD_SIZE
-           frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr
+           frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
            off_updatee = hdr + oFFSET_StgUpdateFrame_updatee
        --
        emitStore (CmmStackSlot Old frame) (mkLblExpr lbl)
