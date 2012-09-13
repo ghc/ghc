@@ -34,16 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH :: Int
 mAX_CONTEXT_REDUCTION_DEPTH = 200
   -- Increase to 200; see Trac #5395
 
--- specialised fun/thunk/constr closure types
-mAX_SPEC_THUNK_SIZE :: Int
-mAX_SPEC_THUNK_SIZE = MAX_SPEC_THUNK_SIZE
-
-mAX_SPEC_FUN_SIZE :: Int
-mAX_SPEC_FUN_SIZE = MAX_SPEC_FUN_SIZE
-
-mAX_SPEC_CONSTR_SIZE :: Int
-mAX_SPEC_CONSTR_SIZE = MAX_SPEC_CONSTR_SIZE
-
 -- pre-compiled thunk types
 mAX_SPEC_SELECTEE_SIZE :: Int
 mAX_SPEC_SELECTEE_SIZE = MAX_SPEC_SELECTEE_SIZE
@@ -111,9 +101,6 @@ dOUBLE_SIZE = SIZEOF_DOUBLE
 
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
-
-iNT64_SIZE :: Int
-iNT64_SIZE = wORD64_SIZE
 
 -- This tells the native code generator the size of the spill
 -- area is has available.
