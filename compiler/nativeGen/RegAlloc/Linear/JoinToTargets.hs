@@ -19,8 +19,8 @@ import Reg
 import BlockId
 import OldCmm  hiding (RegSet)
 import Digraph
+import DynFlags
 import Outputable
-import Platform
 import Unique
 import UniqFM
 import UniqSet
@@ -31,8 +31,7 @@ import UniqSet
 --
 joinToTargets
         :: (FR freeRegs, Instruction instr)
-        => Platform
-        -> BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> BlockId                      -- ^ id of the current block
@@ -44,20 +43,19 @@ joinToTargets
                                                 -- patched to jump
                                                 -- to a fixup block first.
 
-joinToTargets platform block_live id instr
+joinToTargets block_live id instr
 
         -- we only need to worry about jump instructions.
         | not $ isJumpishInstr instr
         = return ([], instr)
 
         | otherwise
-        = joinToTargets' platform block_live [] id instr (jumpDestsOfInstr instr)
+        = joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
 
 -----
 joinToTargets'
         :: (FR freeRegs, Instruction instr)
-        => Platform
-        -> BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> [NatBasicBlock instr]        -- ^ acc blocks of fixup code.
@@ -70,11 +68,11 @@ joinToTargets'
         -> RegM freeRegs ([NatBasicBlock instr], instr)
 
 -- no more targets to consider. all done.
-joinToTargets' _        _          new_blocks _ instr []
+joinToTargets' _          new_blocks _ instr []
         = return (new_blocks, instr)
 
 -- handle a branch target.
-joinToTargets' platform block_live new_blocks block_id instr (dest:dests)
+joinToTargets' block_live new_blocks block_id instr (dest:dests)
  = do
         -- get the map of where the vregs are stored on entry to each basic block.
         block_assig     <- getBlockAssigR
@@ -97,19 +95,18 @@ joinToTargets' platform block_live new_blocks block_id instr (dest:dests)
         case mapLookup dest block_assig of
          Nothing
           -> joinToTargets_first
-                        platform block_live new_blocks block_id instr dest dests
+                        block_live new_blocks block_id instr dest dests
                         block_assig adjusted_assig to_free
 
          Just (_, dest_assig)
           -> joinToTargets_again
-                        platform block_live new_blocks block_id instr dest dests
+                        block_live new_blocks block_id instr dest dests
                         adjusted_assig dest_assig
 
 
 -- this is the first time we jumped to this block.
 joinToTargets_first :: (FR freeRegs, Instruction instr)
-                    => Platform
-                    -> BlockMap RegSet
+                    => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr
@@ -119,24 +116,26 @@ joinToTargets_first :: (FR freeRegs, Instruction instr)
                     -> RegMap Loc
                     -> [RealReg]
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
-joinToTargets_first platform block_live new_blocks block_id instr dest dests
+joinToTargets_first block_live new_blocks block_id instr dest dests
         block_assig src_assig
         to_free
 
- = do   -- free up the regs that are not live on entry to this block.
+ = do   dflags <- getDynFlags
+        let platform = targetPlatform dflags
+
+        -- free up the regs that are not live on entry to this block.
         freeregs        <- getFreeRegsR
         let freeregs' = foldr (frReleaseReg platform) freeregs to_free
 
         -- remember the current assignment on entry to this block.
         setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)
 
-        joinToTargets' platform block_live new_blocks block_id instr dests
+        joinToTargets' block_live new_blocks block_id instr dests
 
 
 -- we've jumped to this block before
 joinToTargets_again :: (Instruction instr, FR freeRegs)
-                    => Platform
-                    -> BlockMap RegSet
+                    => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr
@@ -146,12 +145,12 @@ joinToTargets_again :: (Instruction instr, FR freeRegs)
                     -> UniqFM Loc
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_again
-    platform block_live new_blocks block_id instr dest dests
+    block_live new_blocks block_id instr dest dests
     src_assig dest_assig
 
         -- the assignments already match, no problem.
         | ufmToList dest_assig == ufmToList src_assig
-        = joinToTargets' platform block_live new_blocks block_id instr dests
+        = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
         | otherwise
@@ -186,7 +185,7 @@ joinToTargets_again
                         (return ())
 -}
                 delta           <- getDeltaR
-                fixUpInstrs_    <- mapM (handleComponent platform delta instr) sccs
+                fixUpInstrs_    <- mapM (handleComponent delta instr) sccs
                 let fixUpInstrs = concat fixUpInstrs_
 
                 -- make a new basic block containing the fixup code.
@@ -204,7 +203,7 @@ joinToTargets_again
 -}
                 -- if we didn't need any fixups, then don't include the block
                 case fixUpInstrs of
-                 []     -> joinToTargets' platform block_live new_blocks block_id instr dests
+                 []     -> joinToTargets' block_live new_blocks block_id instr dests
 
                  -- patch the original branch instruction so it goes to our
                  --     fixup block instead.
@@ -213,7 +212,7 @@ joinToTargets_again
                                                                 then mkBlockId fixup_block_id
                                                                 else bid) -- no change!
 
-                           in   joinToTargets' platform block_live (block : new_blocks) block_id instr' dests
+                           in   joinToTargets' block_live (block : new_blocks) block_id instr' dests
 
 
 -- | Construct a graph of register\/spill movements.
@@ -277,15 +276,15 @@ expandNode vreg src dst
 --
 handleComponent
         :: Instruction instr
-        => Platform -> Int -> instr -> SCC (Unique, Loc, [Loc])
+        => Int -> instr -> SCC (Unique, Loc, [Loc])
         -> RegM freeRegs [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --      In this case we can just do the moves directly, and avoid having to
 --      go via a spill slot.
 --
-handleComponent platform delta _  (AcyclicSCC (vreg, src, dsts))
-        = mapM (makeMove platform delta vreg src) dsts
+handleComponent delta _  (AcyclicSCC (vreg, src, dsts))
+        = mapM (makeMove delta vreg src) dsts
 
 
 -- Handle some cyclic moves.
@@ -303,7 +302,7 @@ handleComponent platform delta _  (AcyclicSCC (vreg, src, dsts))
 --      are allocated exclusively for a virtual register and therefore can not
 --      require a fixup.
 --
-handleComponent platform delta instr
+handleComponent delta instr
         (CyclicSCC ((vreg, InReg sreg, (InReg dreg: _)) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
@@ -314,14 +313,14 @@ handleComponent platform delta instr
         -- reload into destination reg
         instrLoad       <- loadR (RegReal dreg) slot
 
-        remainingFixUps <- mapM (handleComponent platform delta instr)
+        remainingFixUps <- mapM (handleComponent delta instr)
                                 (stronglyConnCompFromEdgedVerticesR rest)
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.
         return ([instrSpill] ++ concat remainingFixUps ++ [instrLoad])
 
-handleComponent _ _ _ (CyclicSCC _)
+handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
 
@@ -329,29 +328,31 @@ handleComponent _ _ _ (CyclicSCC _)
 --
 makeMove
     :: Instruction instr
-    => Platform
-    -> Int      -- ^ current C stack delta.
+    => Int      -- ^ current C stack delta.
     -> Unique   -- ^ unique of the vreg that we're moving.
     -> Loc      -- ^ source location.
     -> Loc      -- ^ destination location.
     -> RegM freeRegs instr  -- ^ move instruction.
 
-makeMove platform _     vreg (InReg src) (InReg dst)
- = do recordSpill (SpillJoinRR vreg)
-      return $ mkRegRegMoveInstr platform (RegReal src) (RegReal dst)
+makeMove delta vreg src dst
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
 
-makeMove platform delta vreg (InMem src) (InReg dst)
- = do recordSpill (SpillJoinRM vreg)
-      return $ mkLoadInstr platform (RegReal dst) delta src
-
-makeMove platform delta vreg (InReg src) (InMem dst)
- = do recordSpill (SpillJoinRM vreg)
-      return $ mkSpillInstr platform (RegReal src) delta dst
-
--- we don't handle memory to memory moves.
---      they shouldn't happen because we don't share stack slots between vregs.
-makeMove _        _     vreg src dst
-        = panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
-                ++ show dst ++ ")"
-                ++ " we don't handle mem->mem moves."
+      case (src, dst) of
+          (InReg s, InReg d) ->
+              do recordSpill (SpillJoinRR vreg)
+                 return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
+          (InMem s, InReg d) ->
+              do recordSpill (SpillJoinRM vreg)
+                 return $ mkLoadInstr platform (RegReal d) delta s
+          (InReg s, InMem d) ->
+              do recordSpill (SpillJoinRM vreg)
+                 return $ mkSpillInstr platform (RegReal s) delta d
+          _ ->
+              -- we don't handle memory to memory moves.
+              -- they shouldn't happen because we don't share
+              -- stack slots between vregs.
+              panic ("makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
+                  ++ show dst ++ ")"
+                  ++ " we don't handle mem->mem moves.")
 

@@ -480,7 +480,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- these dead regs might in fact be live in the jump targets (they're
     -- only dead in the code that follows in the current basic block).
     (fixup_blocks, adjusted_instr)
-        <- joinToTargets platform block_live block_id instr
+        <- joinToTargets block_live block_id instr
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
