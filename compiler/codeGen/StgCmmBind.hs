@@ -243,7 +243,7 @@ mkRhsClosure    dflags bndr _cc _bi
                             (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee                -- Scrutinee is the only free variable
   && maybeToBool maybe_offset           -- Selectee is a component of the tuple
-  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE  -- Offset is small enough
+  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative
     -- is the only possible case and eliminated the others, even if there are
@@ -272,7 +272,7 @@ mkRhsClosure    dflags bndr _cc _bi
   | args `lengthIs` (arity-1)
         && all (isGcPtrRep . idPrimRep . stripNV) fvs
         && isUpdatable upd_flag
-        && arity <= mAX_SPEC_AP_SIZE
+        && arity <= mAX_SPEC_AP_SIZE dflags
         && not (dopt Opt_SccProfilingOn dflags)
                                   -- not when profiling: we don't want to
                                   -- lose information about this particular

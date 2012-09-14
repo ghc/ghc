@@ -293,6 +293,26 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
 
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 
+void constantInt(char *name, intptr_t val) {
+    switch (mode) {
+    case Gen_Haskell_Type:
+        printf("    , pc_%s :: Int\n", name);
+        break;
+    case Gen_Haskell_Value:
+        printf("    , pc_%s = %" PRIdPTR "\n", name, val);
+        break;
+    case Gen_Haskell_Wrappers:
+        printf("%s :: DynFlags -> Int\n", name);
+        printf("%s dflags = pc_%s (sPlatformConstants (settings dflags))\n",
+               name, name);
+        break;
+    case Gen_Haskell_Exports:
+        printf("    %s,\n", name);
+        break;
+    case Gen_Header:
+        break;
+    }
+}
 
 int
 main(int argc, char *argv[])
@@ -601,6 +621,10 @@ main(int argc, char *argv[])
         struct_field(StgAsyncIOResult, errCode);
     }
 #endif
+
+    // pre-compiled thunk types
+    constantInt("mAX_SPEC_SELECTEE_SIZE", MAX_SPEC_SELECTEE_SIZE);
+    constantInt("mAX_SPEC_AP_SIZE", MAX_SPEC_AP_SIZE);
 
     switch (mode) {
     case Gen_Haskell_Type:

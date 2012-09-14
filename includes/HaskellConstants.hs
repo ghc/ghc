@@ -34,13 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH :: Int
 mAX_CONTEXT_REDUCTION_DEPTH = 200
   -- Increase to 200; see Trac #5395
 
--- pre-compiled thunk types
-mAX_SPEC_SELECTEE_SIZE :: Int
-mAX_SPEC_SELECTEE_SIZE = MAX_SPEC_SELECTEE_SIZE
-
-mAX_SPEC_AP_SIZE :: Int
-mAX_SPEC_AP_SIZE = MAX_SPEC_AP_SIZE
-
 -- closure sizes: these do NOT include the header (see below for header sizes)
 mIN_PAYLOAD_SIZE ::Int
 mIN_PAYLOAD_SIZE = MIN_PAYLOAD_SIZE
