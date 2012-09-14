@@ -673,6 +673,16 @@ main(int argc, char *argv[])
     constantInt("mAX_Real_Double_REG",  MAX_REAL_DOUBLE_REG);
     constantInt("mAX_Real_Long_REG",    MAX_REAL_LONG_REG);
 
+    // This tells the native code generator the size of the spill
+    // area is has available.
+    constantInt("rESERVED_C_STACK_BYTES", RESERVED_C_STACK_BYTES);
+    // The amount of (Haskell) stack to leave free for saving registers when
+    // returning to the scheduler.
+    constantInt("rESERVED_STACK_WORDS", RESERVED_STACK_WORDS);
+    // Continuations that need more than this amount of stack should do their
+    // own stack check (see bug #1466).
+    constantInt("aP_STACK_SPLIM", AP_STACK_SPLIM);
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");

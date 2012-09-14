@@ -96,9 +96,9 @@ spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs (instr, Int)
 
 spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
-  let platform = targetPlatform (ra_DynFlags s)
+  let dflags = ra_DynFlags s
       (stack',slot) = getStackSlotFor stack temp
-      instr  = mkSpillInstr platform reg delta slot
+      instr  = mkSpillInstr dflags reg delta slot
   in
   (# s{ra_stack=stack'}, (instr,slot) #)
 
@@ -107,8 +107,8 @@ loadR :: Instruction instr
       => Reg -> Int -> RegM freeRegs instr
 
 loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
-  let platform = targetPlatform (ra_DynFlags s)
-  in (# s, mkLoadInstr platform reg delta slot #)
+  let dflags = ra_DynFlags s
+  in (# s, mkLoadInstr dflags reg delta slot #)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->

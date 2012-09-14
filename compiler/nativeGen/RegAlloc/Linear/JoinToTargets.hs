@@ -344,10 +344,10 @@ makeMove delta vreg src dst
                  return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
           (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkLoadInstr platform (RegReal d) delta s
+                 return $ mkLoadInstr dflags (RegReal d) delta s
           (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkSpillInstr platform (RegReal s) delta d
+                 return $ mkSpillInstr dflags (RegReal s) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share

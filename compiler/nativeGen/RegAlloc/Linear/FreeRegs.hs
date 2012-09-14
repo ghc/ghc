@@ -18,6 +18,7 @@ where
 import Reg
 import RegClass
 
+import DynFlags
 import Panic
 import Platform
 
@@ -72,13 +73,13 @@ instance FR SPARC.FreeRegs where
     frInitFreeRegs = SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
 
-maxSpillSlots :: Platform -> Int
-maxSpillSlots platform
-              = case platformArch platform of
-                ArchX86       -> X86.Instr.maxSpillSlots True  -- 32bit
-                ArchX86_64    -> X86.Instr.maxSpillSlots False -- not 32bit
-                ArchPPC       -> PPC.Instr.maxSpillSlots
-                ArchSPARC     -> SPARC.Instr.maxSpillSlots
+maxSpillSlots :: DynFlags -> Int
+maxSpillSlots dflags
+              = case platformArch (targetPlatform dflags) of
+                ArchX86       -> X86.Instr.maxSpillSlots dflags
+                ArchX86_64    -> X86.Instr.maxSpillSlots dflags
+                ArchPPC       -> PPC.Instr.maxSpillSlots dflags
+                ArchSPARC     -> SPARC.Instr.maxSpillSlots dflags
                 ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
                 ArchPPC_64    -> panic "maxSpillSlots ArchPPC_64"
                 ArchUnknown   -> panic "maxSpillSlots ArchUnknown"

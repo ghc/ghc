@@ -139,7 +139,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
-    maxSpillSlots             :: Int,
+    maxSpillSlots             :: DynFlags -> Int,
     allocatableRegs           :: Platform -> [RealReg],
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
@@ -160,7 +160,7 @@ nativeCodeGen dflags h us cmms
                         ,shortcutStatics           = X86.Instr.shortcutStatics
                         ,shortcutJump              = X86.Instr.shortcutJump
                         ,pprNatCmmDecl              = X86.Ppr.pprNatCmmDecl
-                        ,maxSpillSlots             = X86.Instr.maxSpillSlots (target32Bit platform)
+                        ,maxSpillSlots             = X86.Instr.maxSpillSlots
                         ,allocatableRegs           = X86.Regs.allocatableRegs
                         ,ncg_x86fp_kludge          = id
                         ,ncgExpandTop              = id
@@ -428,7 +428,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                           $ Color.regAlloc
                                 dflags
                                 alloc_regs
-                                (mkUniqSet [0 .. maxSpillSlots ncgImpl])
+                                (mkUniqSet [0 .. maxSpillSlots ncgImpl dflags])
                                 withLiveness
 
                 -- dump out what happened during register allocation

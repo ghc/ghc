@@ -208,9 +208,8 @@ linearRegAlloc'
 
 linearRegAlloc' dflags initFreeRegs first_id block_live sccs
  = do   us      <- getUs
-        let platform = targetPlatform dflags
-            (_, _, stats, blocks) =
-                runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap platform) us
+        let (_, _, stats, blocks) =
+                runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap dflags) us
                     $ linearRA_SCCs first_id block_live [] sccs
         return  (blocks, stats)
 

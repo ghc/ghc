@@ -315,7 +315,7 @@ loadThreadState dflags tso stack = do
         mkAssign sp (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_SP dflags)) (bWord dflags)),
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
         mkAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
-                                    rESERVED_STACK_WORDS),
+                                    (rESERVED_STACK_WORDS dflags)),
         openNursery dflags,
         -- and load the current cost centre stack from the TSO when profiling:
         if dopt Opt_SccProfilingOn dflags then

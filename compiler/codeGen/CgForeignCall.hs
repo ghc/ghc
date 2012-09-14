@@ -239,7 +239,7 @@ emitLoadThreadState = do
                               (bWord dflags)),
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
         CmmAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
-                                    rESERVED_STACK_WORDS),
+                                    (rESERVED_STACK_WORDS dflags)),
         -- HpAlloc = 0;
         --   HpAlloc is assumed to be set to non-zero only by a failed
         --   a heap check, see HeapStackCheck.cmm:GC_GENERIC

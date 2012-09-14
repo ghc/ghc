@@ -42,24 +42,6 @@ dOUBLE_SIZE = SIZEOF_DOUBLE
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
 
--- This tells the native code generator the size of the spill
--- area is has available.
-
-rESERVED_C_STACK_BYTES :: Int
-rESERVED_C_STACK_BYTES = RESERVED_C_STACK_BYTES
-
--- The amount of (Haskell) stack to leave free for saving registers when
--- returning to the scheduler.
-
-rESERVED_STACK_WORDS :: Int
-rESERVED_STACK_WORDS = RESERVED_STACK_WORDS
-
--- Continuations that need more than this amount of stack should do their
--- own stack check (see bug #1466).
-
-aP_STACK_SPLIM :: Int
-aP_STACK_SPLIM = AP_STACK_SPLIM
-
 -- Size of a word, in bytes
 
 wORD_SIZE :: Int
