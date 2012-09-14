@@ -34,36 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH :: Int
 mAX_CONTEXT_REDUCTION_DEPTH = 200
   -- Increase to 200; see Trac #5395
 
--- A section of code-generator-related MAGIC CONSTANTS.
-
-mAX_Vanilla_REG :: Int
-mAX_Vanilla_REG = MAX_VANILLA_REG
-
-mAX_Float_REG :: Int
-mAX_Float_REG = MAX_FLOAT_REG
-
-mAX_Double_REG :: Int
-mAX_Double_REG = MAX_DOUBLE_REG
-
-mAX_Long_REG :: Int
-mAX_Long_REG = MAX_LONG_REG
-
-mAX_Real_Vanilla_REG :: Int
-mAX_Real_Vanilla_REG = MAX_REAL_VANILLA_REG
-
-mAX_Real_Float_REG :: Int
-mAX_Real_Float_REG = MAX_REAL_FLOAT_REG
-
-mAX_Real_Double_REG :: Int
-mAX_Real_Double_REG     = MAX_REAL_DOUBLE_REG
-
-mAX_Real_Long_REG :: Int
-#ifdef MAX_REAL_LONG_REG
-mAX_Real_Long_REG = MAX_REAL_LONG_REG
-#else
-mAX_Real_Long_REG = 0
-#endif
-
 -- Closure header sizes.
 
 sTD_HDR_SIZE :: Int

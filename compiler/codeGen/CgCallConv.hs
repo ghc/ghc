@@ -34,7 +34,6 @@ import SMRep
 import OldCmm
 import CLabel
 
-import Constants
 import CgStackery
 import ClosureInfo( CgRep(..), nonVoidArg, idCgRep, cgRepSizeW, isFollowableArg )
 import OldCmmUtils
@@ -264,7 +263,7 @@ type AssignRegs a = [(CgRep,a)]          -- Arg or result values to assign
                      [(CgRep,a)])        -- Leftover arg or result values
 
 assignCallRegs       :: DynFlags -> AssignRegs a
-assignPrimOpCallRegs ::             AssignRegs a
+assignPrimOpCallRegs :: DynFlags -> AssignRegs a
 assignReturnRegs     :: DynFlags -> AssignRegs a
 
 assignCallRegs dflags args
@@ -273,8 +272,8 @@ assignCallRegs dflags args
         -- never uses Node for argument passing; instead
         -- Node points to the function closure itself
 
-assignPrimOpCallRegs args
- = assign_regs args (mkRegTbl_allRegs [])
+assignPrimOpCallRegs dflags args
+ = assign_regs args (mkRegTbl_allRegs dflags [])
         -- For primops, *all* arguments must be passed in registers
 
 assignReturnRegs dflags args
@@ -334,19 +333,19 @@ assign_reg _         _                  = Nothing
 useVanillaRegs :: DynFlags -> Int
 useVanillaRegs dflags
  | platformUnregisterised (targetPlatform dflags) = 0
- | otherwise                                      = mAX_Real_Vanilla_REG
+ | otherwise                                      = mAX_Real_Vanilla_REG dflags
 useFloatRegs :: DynFlags -> Int
 useFloatRegs dflags
  | platformUnregisterised (targetPlatform dflags) = 0
- | otherwise                                      = mAX_Real_Float_REG
+ | otherwise                                      = mAX_Real_Float_REG dflags
 useDoubleRegs :: DynFlags -> Int
 useDoubleRegs dflags
  | platformUnregisterised (targetPlatform dflags) = 0
- | otherwise                                      = mAX_Real_Double_REG
+ | otherwise                                      = mAX_Real_Double_REG dflags
 useLongRegs :: DynFlags -> Int
 useLongRegs dflags
  | platformUnregisterised (targetPlatform dflags) = 0
- | otherwise                                      = mAX_Real_Long_REG
+ | otherwise                                      = mAX_Real_Long_REG dflags
 
 vanillaRegNos, floatRegNos, doubleRegNos, longRegNos :: DynFlags -> [Int]
 vanillaRegNos dflags = regList $ useVanillaRegs dflags
@@ -354,11 +353,12 @@ floatRegNos   dflags = regList $ useFloatRegs   dflags
 doubleRegNos  dflags = regList $ useDoubleRegs  dflags
 longRegNos    dflags = regList $ useLongRegs    dflags
 
-allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos :: [Int]
-allVanillaRegNos = regList mAX_Vanilla_REG
-allFloatRegNos   = regList mAX_Float_REG
-allDoubleRegNos  = regList mAX_Double_REG
-allLongRegNos    = regList mAX_Long_REG
+allVanillaRegNos, allFloatRegNos, allDoubleRegNos, allLongRegNos
+    :: DynFlags -> [Int]
+allVanillaRegNos dflags = regList $ mAX_Vanilla_REG dflags
+allFloatRegNos   dflags = regList $ mAX_Float_REG   dflags
+allDoubleRegNos  dflags = regList $ mAX_Double_REG  dflags
+allLongRegNos    dflags = regList $ mAX_Long_REG    dflags
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
@@ -371,25 +371,29 @@ type AvailRegs = ( [Int]   -- available vanilla regs.
 
 mkRegTbl :: DynFlags -> [GlobalReg] -> AvailRegs
 mkRegTbl dflags regs_in_use
-  = mkRegTbl' regs_in_use (vanillaRegNos dflags)
-                          (floatRegNos   dflags)
-                          (doubleRegNos  dflags)
-                          (longRegNos    dflags)
+  = mkRegTbl' dflags regs_in_use
+              vanillaRegNos floatRegNos doubleRegNos longRegNos
 
-mkRegTbl_allRegs :: [GlobalReg] -> AvailRegs
-mkRegTbl_allRegs regs_in_use
-  = mkRegTbl' regs_in_use allVanillaRegNos allFloatRegNos allDoubleRegNos allLongRegNos
+mkRegTbl_allRegs :: DynFlags -> [GlobalReg] -> AvailRegs
+mkRegTbl_allRegs dflags regs_in_use
+  = mkRegTbl' dflags regs_in_use
+              allVanillaRegNos allFloatRegNos allDoubleRegNos allLongRegNos
 
-mkRegTbl' :: [GlobalReg] -> [Int] -> [Int] -> [Int] -> [Int]
+mkRegTbl' :: DynFlags -> [GlobalReg]
+          -> (DynFlags -> [Int])
+          -> (DynFlags -> [Int])
+          -> (DynFlags -> [Int])
+          -> (DynFlags -> [Int])
           -> ([Int], [Int], [Int], [Int])
-mkRegTbl' regs_in_use vanillas floats doubles longs
+mkRegTbl' dflags regs_in_use vanillas floats doubles longs
   = (ok_vanilla, ok_float, ok_double, ok_long)
   where
-    ok_vanilla = mapCatMaybes (select (\i -> VanillaReg i VNonGcPtr)) vanillas
+    ok_vanilla = mapCatMaybes (select (\i -> VanillaReg i VNonGcPtr))
+                              (vanillas dflags)
                     -- ptrhood isn't looked at, hence we can use any old rep.
-    ok_float   = mapCatMaybes (select FloatReg)   floats
-    ok_double  = mapCatMaybes (select DoubleReg)  doubles
-    ok_long    = mapCatMaybes (select LongReg)    longs
+    ok_float   = mapCatMaybes (select FloatReg)  (floats  dflags)
+    ok_double  = mapCatMaybes (select DoubleReg) (doubles dflags)
+    ok_long    = mapCatMaybes (select LongReg)   (longs   dflags)
 
     select :: (Int -> GlobalReg) -> Int{-cand-} -> Maybe Int
         -- one we've unboxed the Int, we make a GlobalReg

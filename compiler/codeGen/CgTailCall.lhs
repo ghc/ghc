@@ -413,11 +413,12 @@ tailCallPrimCall primcall
 
 tailCallPrim :: CLabel -> [StgArg] -> Code
 tailCallPrim lbl args
- = do	{	-- We're going to perform a normal-looking tail call, 
+ = do { dflags <- getDynFlags
+        -- We're going to perform a normal-looking tail call, 
 		-- except that *all* the arguments will be in registers.
 		-- Hence the ASSERT( null leftovers )
-	  arg_amodes <- getArgAmodes args
-	; let (arg_regs, leftovers) = assignPrimOpCallRegs arg_amodes
+	; arg_amodes <- getArgAmodes args
+	; let (arg_regs, leftovers) = assignPrimOpCallRegs dflags arg_amodes
               live_regs = Just $ map snd arg_regs
 	      jump_to_primop = jumpToLbl lbl live_regs
 

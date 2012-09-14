@@ -299,11 +299,11 @@ callerSaveVolatileRegs dflags vols = (caller_save, caller_load)
 
     vol_list = case vols of Nothing -> all_of_em; Just regs -> regs
 
-    all_of_em = [ VanillaReg n VNonGcPtr | n <- [0..mAX_Vanilla_REG] ]
+    all_of_em = [ VanillaReg n VNonGcPtr | n <- [0 .. mAX_Vanilla_REG dflags] ]
                         -- The VNonGcPtr is a lie, but I don't think it matters
-             ++ [ FloatReg   n | n <- [0..mAX_Float_REG] ]
-             ++ [ DoubleReg  n | n <- [0..mAX_Double_REG] ]
-             ++ [ LongReg    n | n <- [0..mAX_Long_REG] ]
+             ++ [ FloatReg   n | n <- [0 .. mAX_Float_REG dflags] ]
+             ++ [ DoubleReg  n | n <- [0 .. mAX_Double_REG dflags] ]
+             ++ [ LongReg    n | n <- [0 .. mAX_Long_REG dflags] ]
 
     callerSaveGlobalReg reg next
         | callerSaves platform reg =

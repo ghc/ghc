@@ -652,6 +652,22 @@ main(int argc, char *argv[])
 
     constantInt("mUT_ARR_PTRS_CARD_BITS", MUT_ARR_PTRS_CARD_BITS);
 
+    // A section of code-generator-related MAGIC CONSTANTS.
+    constantInt("mAX_Vanilla_REG",      MAX_VANILLA_REG);
+    constantInt("mAX_Float_REG",        MAX_FLOAT_REG);
+    constantInt("mAX_Double_REG",       MAX_DOUBLE_REG);
+    constantInt("mAX_Long_REG",         MAX_LONG_REG);
+    constantInt("mAX_Real_Vanilla_REG", MAX_REAL_VANILLA_REG);
+    constantInt("mAX_Real_Float_REG",   MAX_REAL_FLOAT_REG);
+    constantInt("mAX_Real_Double_REG",  MAX_REAL_DOUBLE_REG);
+    constantInt("mAX_Real_Long_REG",
+#ifdef MAX_REAL_LONG_REG
+                                        MAX_REAL_LONG_REG
+#else
+                                        0
+#endif
+                                        );
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");
