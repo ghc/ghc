@@ -660,13 +660,7 @@ main(int argc, char *argv[])
     constantInt("mAX_Real_Vanilla_REG", MAX_REAL_VANILLA_REG);
     constantInt("mAX_Real_Float_REG",   MAX_REAL_FLOAT_REG);
     constantInt("mAX_Real_Double_REG",  MAX_REAL_DOUBLE_REG);
-    constantInt("mAX_Real_Long_REG",
-#ifdef MAX_REAL_LONG_REG
-                                        MAX_REAL_LONG_REG
-#else
-                                        0
-#endif
-                                        );
+    constantInt("mAX_Real_Long_REG",    MAX_REAL_LONG_REG);
 
     switch (mode) {
     case Gen_Haskell_Type:
