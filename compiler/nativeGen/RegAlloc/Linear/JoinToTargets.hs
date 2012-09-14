@@ -318,10 +318,10 @@ handleComponent platform delta instr
  = do
 	-- spill the source into its slot
 	(instrSpill, slot) 
-			<- spillR platform (RegReal sreg) vreg
+			<- spillR (RegReal sreg) vreg
 
 	-- reload into destination reg
-	instrLoad	<- loadR platform (RegReal dreg) slot
+	instrLoad	<- loadR (RegReal dreg) slot
 	
 	remainingFixUps <- mapM (handleComponent platform delta instr) 
 				(stronglyConnCompFromEdgedVerticesR rest)

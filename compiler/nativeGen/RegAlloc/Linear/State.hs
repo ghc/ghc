@@ -37,7 +37,6 @@ import Instruction
 import Reg
 
 import DynFlags
-import Platform
 import Unique
 import UniqSupply
 
@@ -94,20 +93,22 @@ makeRAStats state
 
 
 spillR :: Instruction instr
-       => Platform -> Reg -> Unique -> RegM freeRegs (instr, Int)
+       => Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR platform reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
-  let (stack',slot) = getStackSlotFor stack temp
+spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
+  let platform = targetPlatform (ra_DynFlags s)
+      (stack',slot) = getStackSlotFor stack temp
       instr  = mkSpillInstr platform reg delta slot
   in
   (# s{ra_stack=stack'}, (instr,slot) #)
 
 
 loadR :: Instruction instr
-      => Platform -> Reg -> Int -> RegM freeRegs instr
+      => Reg -> Int -> RegM freeRegs instr
 
-loadR platform reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
-  (# s, mkLoadInstr platform reg delta slot #)
+loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
+  let platform = targetPlatform (ra_DynFlags s)
+  in (# s, mkLoadInstr platform reg delta slot #)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->

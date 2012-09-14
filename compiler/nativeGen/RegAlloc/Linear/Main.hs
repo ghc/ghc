@@ -473,7 +473,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
         allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
 
     -- (c) save any temporaries which will be clobbered by this instruction
-    clobber_saves <- saveClobberedTemps platform real_written r_dying
+    clobber_saves <- saveClobberedTemps real_written r_dying
 
     -- (d) Update block map for new destinations
     -- NB. do this before removing dead regs from the assignment, because
@@ -487,7 +487,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     releaseRegs r_dying
 
     -- (f) Mark regs which are clobbered as unallocatable
-    clobberRegs platform real_written
+    clobberRegs real_written
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
@@ -573,16 +573,15 @@ releaseRegs regs = do
 
 saveClobberedTemps
         :: (Outputable instr, Instruction instr, FR freeRegs)
-        => Platform
-        -> [RealReg]            -- real registers clobbered by this instruction
+        => [RealReg]            -- real registers clobbered by this instruction
         -> [Reg]                -- registers which are no longer live after this insn
         -> RegM freeRegs [instr]         -- return: instructions to spill any temps that will
                                 -- be clobbered.
 
-saveClobberedTemps _ [] _
+saveClobberedTemps [] _
         = return []
 
-saveClobberedTemps platform clobbered dying
+saveClobberedTemps clobbered dying
  = do
         assig   <- getAssigR
         let to_spill
@@ -600,7 +599,9 @@ saveClobberedTemps platform clobbered dying
             = return (instrs, assig)
 
      clobber assig instrs ((temp, reg) : rest)
-       = do
+       = do dflags <- getDynFlags
+            let platform = targetPlatform dflags
+
             freeRegs <- getFreeRegsR
             let regclass = targetClassOfRealReg platform reg
                 freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs
@@ -621,7 +622,7 @@ saveClobberedTemps platform clobbered dying
 
               -- (2) no free registers: spill the value
               [] -> do
-                  (spill, slot)   <- spillR platform (RegReal reg) temp
+                  (spill, slot)   <- spillR (RegReal reg) temp
      
                   -- record why this reg was spilled for profiling
                   recordSpill (SpillClobber temp)
@@ -635,12 +636,14 @@ saveClobberedTemps platform clobbered dying
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --
-clobberRegs :: FR freeRegs => Platform -> [RealReg] -> RegM freeRegs ()
-clobberRegs _ []
+clobberRegs :: FR freeRegs => [RealReg] -> RegM freeRegs ()
+clobberRegs []
         = return ()
 
-clobberRegs platform clobbered
- = do
+clobberRegs clobbered
+ = do   dflags <- getDynFlags
+        let platform = targetPlatform dflags
+
         freeregs        <- getFreeRegsR
         setFreeRegsR $! foldr (frAllocateReg platform) freeregs clobbered
 
@@ -749,7 +752,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
 
          -- case (2): we have a free register
          (my_reg : _) ->
-           do   spills'   <- loadTemp platform r spill_loc my_reg spills
+           do   spills'   <- loadTemp r spill_loc my_reg spills
 
                 setAssigR       (addToUFM assig r $! newLocation spill_loc my_reg)
                 setFreeRegsR $  frAllocateReg platform my_reg freeRegs
@@ -781,7 +784,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         -- we have a temporary that is in both register and mem,
                         -- just free up its register for use.
                         | (temp, my_reg, slot) : _      <- candidates_inBoth
-                        = do    spills' <- loadTemp platform r spill_loc my_reg spills
+                        = do    spills' <- loadTemp r spill_loc my_reg spills
                                 let assig1  = addToUFM assig temp (InMem slot)
                                 let assig2  = addToUFM assig1 r $! newLocation spill_loc my_reg
 
@@ -793,7 +796,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         | (temp_to_push_out, (my_reg :: RealReg)) : _
                                         <- candidates_inReg
                         = do
-                                (spill_insn, slot) <- spillR platform (RegReal my_reg) temp_to_push_out
+                                (spill_insn, slot) <- spillR (RegReal my_reg) temp_to_push_out
                                 let spill_store  = (if reading then id else reverse)
                                                         [ -- COMMENT (fsLit "spill alloc")
                                                            spill_insn ]
@@ -807,7 +810,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                                 setAssigR assig2
 
                                 -- if need be, load up a spilled temp into the reg we've just freed up.
-                                spills' <- loadTemp platform r spill_loc my_reg spills
+                                spills' <- loadTemp r spill_loc my_reg spills
 
                                 allocateRegsAndSpill reading keep
                                         (spill_store ++ spills')
@@ -836,19 +839,18 @@ newLocation _ my_reg = InReg my_reg
 -- | Load up a spilled temporary if we need to (read from memory).
 loadTemp
         :: (Outputable instr, Instruction instr)
-        => Platform
-        -> VirtualReg   -- the temp being loaded
+        => VirtualReg   -- the temp being loaded
         -> SpillLoc     -- the current location of this temp
         -> RealReg      -- the hreg to load the temp into
         -> [instr]
         -> RegM freeRegs [instr]
 
-loadTemp platform vreg (ReadMem slot) hreg spills
+loadTemp vreg (ReadMem slot) hreg spills
  = do
-        insn <- loadR platform (RegReal hreg) slot
+        insn <- loadR (RegReal hreg) slot
         recordSpill (SpillLoad $ getUnique vreg)
         return  $  {- COMMENT (fsLit "spill load") : -} insn : spills
 
-loadTemp _ _ _ _ spills =
+loadTemp _ _ _ spills =
    return spills
 
