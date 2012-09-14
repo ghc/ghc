@@ -113,7 +113,7 @@ import Data.List        ( (\\), partition, mapAccumL )
 
 \begin{code}
 newMetaKindVar :: TcM TcKind
-newMetaKindVar = do { uniq <- newUnique
+newMetaKindVar = do { uniq <- newMetaUnique
 		    ; ref <- newMutVar Flexi
 		    ; return (mkTyVarTy (mkMetaKindVar uniq ref)) }
 
