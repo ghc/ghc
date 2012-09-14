@@ -153,7 +153,7 @@ getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
     *nsec = ((unsigned long)(unixtime.QuadPart % 10000000ull)) * 100ul;
 }
 
-nat
+W_
 getPageFaults(void)
 {
   /* ToDo (on NT): better, get this via the performance data
