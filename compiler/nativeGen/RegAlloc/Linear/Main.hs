@@ -189,27 +189,28 @@ linearRegAlloc
 linearRegAlloc dflags first_id block_live sccs
  = let platform = targetPlatform dflags
    in case platformArch platform of
-      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs platform :: X86.FreeRegs)    first_id block_live sccs
-      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs platform :: X86_64.FreeRegs) first_id block_live sccs
-      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs platform :: SPARC.FreeRegs)  first_id block_live sccs
-      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs platform :: PPC.FreeRegs)    first_id block_live sccs
+      ArchX86       -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86.FreeRegs)    first_id block_live sccs
+      ArchX86_64    -> linearRegAlloc' dflags (frInitFreeRegs platform :: X86_64.FreeRegs) first_id block_live sccs
+      ArchSPARC     -> linearRegAlloc' dflags (frInitFreeRegs platform :: SPARC.FreeRegs)  first_id block_live sccs
+      ArchPPC       -> linearRegAlloc' dflags (frInitFreeRegs platform :: PPC.FreeRegs)    first_id block_live sccs
       ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
       ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => Platform
+        => DynFlags
         -> freeRegs
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats)
 
-linearRegAlloc' platform initFreeRegs first_id block_live sccs
+linearRegAlloc' dflags initFreeRegs first_id block_live sccs
  = do   us      <- getUs
-        let (_, _, stats, blocks) =
-                runR emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap platform) us
+        let platform = targetPlatform dflags
+            (_, _, stats, blocks) =
+                runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap platform) us
                     $ linearRA_SCCs platform first_id block_live [] sccs
         return  (blocks, stats)
 

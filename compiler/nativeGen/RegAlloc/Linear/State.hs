@@ -3,8 +3,6 @@
 --      Here we keep all the state that the register allocator keeps track
 --      of as it walks the instructions in a basic block.
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module RegAlloc.Linear.State (
         RA_State(..),
         RegM,
@@ -38,9 +36,15 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
+import DynFlags
 import Platform
 import Unique
 import UniqSupply
+
+
+-- | The register allocator monad type.
+newtype RegM freeRegs a
+        = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
 
 
 -- | The RegM Monad
@@ -48,9 +52,13 @@ instance Monad (RegM freeRegs) where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
   return a  =  RegM $ \s -> (# s, a #)
 
+instance HasDynFlags (RegM a) where
+    getDynFlags = RegM $ \s -> (# s, ra_DynFlags s #)
+
 
 -- | Run a computation in the RegM register allocator monad.
-runR    :: BlockAssignment freeRegs
+runR    :: DynFlags
+        -> BlockAssignment freeRegs
         -> freeRegs
         -> RegMap Loc
         -> StackMap
@@ -58,7 +66,7 @@ runR    :: BlockAssignment freeRegs
         -> RegM freeRegs a
         -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
 
-runR block_assig freeregs assig stack us thing =
+runR dflags block_assig freeregs assig stack us thing =
   case unReg thing
         (RA_State
                 { ra_blockassig = block_assig
@@ -67,7 +75,8 @@ runR block_assig freeregs assig stack us thing =
                 , ra_delta      = 0{-???-}
                 , ra_stack      = stack
                 , ra_us         = us
-                , ra_spills     = [] })
+                , ra_spills     = []
+                , ra_DynFlags   = dflags })
    of
         (# state'@RA_State
                 { ra_blockassig = block_assig
