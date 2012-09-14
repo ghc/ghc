@@ -530,7 +530,9 @@ a bit complicated:
 	let x = 3 in
 	proc y -> (proc z -> e1) -< e2
 
-Here, x and z are in scope in e1, but y is not.  We implement this by
+Here, x and z are in scope in e1, but y is not.  
+
+We implement this by
 recording the environment when passing a proc (using newArrowScope),
 and returning to that (using escapeArrowScope) on the left of -< and the
 head of (|..|).
@@ -860,7 +862,8 @@ data Ct
 
   | CIrredEvCan {  -- These stand for yet-unknown predicates
       cc_ev :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_ty :: Xi, -- cc_ty is flat hence it may only be of the form (tv xi1 xi2 ... xin)
+                   -- In CIrredEvCan, the ctev_pred of the evidence is flat 
+                   -- and hence it may only be of the form (tv xi1 xi2 ... xin)
                    -- Since, if it were a type constructor application, that'd make the
                    -- whole constraint a CDictCan, or CTyEqCan. And it can't be
                    -- a type family application either because it's a Xi type.
@@ -898,9 +901,8 @@ data Ct
     }
 
   | CHoleCan {
-      cc_ev       :: CtEvidence,
-      cc_hole_ty  :: TcTauType, -- Not a Xi! See same not as above
-      cc_loc      :: CtLoc
+      cc_ev  :: CtEvidence,
+      cc_loc :: CtLoc
     }
 \end{code}
 

@@ -192,12 +192,10 @@ canonicalize (CFunEqCan { cc_loc = d
     canEqLeafFunEq d ev (fn,xis1) xi2
 
 canonicalize (CIrredEvCan { cc_ev = ev
-                          , cc_loc = d
-                          , cc_ty = xi })
-  = canIrred d ev xi
-canonicalize ct@(CHoleCan {})
-  = do { emitInsoluble ct
-       ; return Stop }
+                          , cc_loc = d })
+  = canIrred d ev
+canonicalize (CHoleCan { cc_ev = ev, cc_loc = d })
+  = canHole d ev
 
 canEvNC :: CtLoc -> CtEvidence -> TcS StopOrContinue
 -- Called only for non-canonical EvVars 
@@ -205,8 +203,8 @@ canEvNC d ev
   = case classifyPredType (ctEvPred ev) of
       ClassPred cls tys -> canClassNC d ev cls tys 
       EqPred ty1 ty2    -> canEqNC    d ev ty1 ty2 
-      IrredPred ev_ty   -> canIrred   d ev ev_ty
       TuplePred tys     -> canTuple   d ev tys
+      IrredPred {}      -> canIrred   d ev 
 \end{code}
 
 
@@ -388,24 +386,35 @@ is_improvement_pty ty = go (classifyPredType ty)
 
 
 \begin{code}
-canIrred :: CtLoc -> CtEvidence -> TcType -> TcS StopOrContinue
+canIrred :: CtLoc -> CtEvidence -> TcS StopOrContinue
 -- Precondition: ty not a tuple and no other evidence form
-canIrred d ev ty 
-  = do { traceTcS "can_pred" (text "IrredPred = " <+> ppr ty) 
+canIrred d ev
+  = do { let ty = ctEvPred ev
+       ; traceTcS "can_pred" (text "IrredPred = " <+> ppr ty) 
        ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
        ; let no_flattening = xi `eqType` ty 
-                             -- In this particular case it is not safe to 
-                             -- say 'isTcReflCo' because the new constraint may
-                             -- be reducible!
+             -- We can't use isTcReflCo, because even if the coercion is
+             -- Refl, the output type might have had a substitution 
+             -- applied to it.  For example  'a' might now be 'C b'
+
+       ; if no_flattening then
+           continueWith $
+           CIrredEvCan { cc_ev = ev, cc_loc = d }
+         else do
+       { mb <- rewriteCtFlavor ev xi co 
+       ; case mb of
+             Just new_ev -> canEvNC d new_ev  -- Re-classify and try again
+             Nothing     -> return Stop } }   -- Found a cached copy
+
+canHole :: CtLoc -> CtEvidence -> TcS StopOrContinue
+canHole d ev 
+  = do { let ty = ctEvPred ev
+       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
        ; mb <- rewriteCtFlavor ev xi co 
        ; case mb of
-             Just new_ev 
-               | no_flattening
-                 -> continueWith $
-                    CIrredEvCan { cc_ev = new_ev, cc_ty = xi, cc_loc = d }
-               | otherwise
-                 -> canEvNC d new_ev
-             Nothing -> return Stop }
+             Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_loc = d})
+             Nothing     -> return ()   -- Found a cached copy; won't happen
+       ; return Stop } 
 \end{code}
 
 %************************************************************************

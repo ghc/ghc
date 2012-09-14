@@ -236,7 +236,7 @@ tcExpr HsHole res_ty
       ; traceTc "tcExpr.HsHole" (ppr ty)
       ; ev <- mkSysLocalM (mkFastString "_") ty
       ; loc <- getCtLoc HoleOrigin
-      ; let can = CHoleCan { cc_ev = CtWanted ty ev, cc_hole_ty = ty, cc_loc = loc }
+      ; let can = CHoleCan { cc_ev = CtWanted ty ev, cc_loc = loc }
       ; traceTc "tcExpr.HsHole emitting" (ppr can)
       ; emitInsoluble can
       ; tcWrapResult (HsVar ev) ty res_ty }

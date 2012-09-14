@@ -517,12 +517,13 @@ hasEqualities givens = any (has_eq . evVarPred) givens
 
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet
+-- NB: the 
 tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOfType xi) tv
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
-tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
-tyVarsOfCt (CHoleCan { cc_hole_ty = ty })               = tyVarsOfType ty
-tyVarsOfCt (CNonCanonical { cc_ev = fl })               = tyVarsOfType (ctEvPred fl)
+tyVarsOfCt (CIrredEvCan { cc_ev = ev })                 = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CHoleCan { cc_ev = ev })                    = tyVarsOfType (ctEvPred ev)
+tyVarsOfCt (CNonCanonical { cc_ev = ev })               = tyVarsOfType (ctEvPred ev)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
 tyVarsOfCts = foldrBag (unionVarSet . tyVarsOfCt) emptyVarSet
@@ -551,18 +552,19 @@ tidyCt :: TidyEnv -> Ct -> Ct
 -- Also converts it to non-canonical
 tidyCt env ct 
   = case ct of
-     CHoleCan {} -> ct { cc_ev = tidy_flavor env (cc_ev ct) }
-     _ -> CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
+     CHoleCan { cc_ev = ev }
+       -> ct { cc_ev = tidy_ev env ev }
+     _ -> CNonCanonical { cc_ev = tidy_ev env (cc_ev ct)
                         , cc_loc  = cc_loc ct }
   where 
-    tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
+    tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 
      --     show it in error messages
-    tidy_flavor env ctev@(CtGiven { ctev_pred = pred })
+    tidy_ev env ctev@(CtGiven { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(CtWanted { ctev_pred = pred })
+    tidy_ev env ctev@(CtWanted { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
-    tidy_flavor env ctev@(CtDerived { ctev_pred = pred })
+    tidy_ev env ctev@(CtDerived { ctev_pred = pred })
       = ctev { ctev_pred = tidyType env pred }
 
 tidyEvVar :: TidyEnv -> EvVar -> EvVar

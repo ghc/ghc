@@ -493,7 +493,7 @@ mkHoleError ctxt ct@(CHoleCan {})
   = do { let tyvars = varSetElems (tyVarsOfCt ct)
              tyvars_msg = map loc_msg tyvars
              msg = (text "Found hole" <+> quotes (text "_") 
-                    <+> text "with type") <+> pprType (cc_hole_ty ct)
+                    <+> text "with type") <+> pprType (ctEvPred (cc_ev ct))
                    $$ (if null tyvars_msg then empty else text "Where:" <+> vcat tyvars_msg)
        ; (ctxt, binds_doc) <- relevantBindings ctxt ct
        ; mkErrorMsg ctxt ct (msg $$ binds_doc) }

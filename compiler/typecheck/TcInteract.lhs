@@ -714,9 +714,9 @@ doInteractWithInert inertItem@(CDictCan { cc_ev = fl1, cc_class = cls1, cc_tyarg
 -- we can rewrite them. We can never improve using this: 
 -- if we want ty1 :: Constraint and have ty2 :: Constraint it clearly does not 
 -- mean that (ty1 ~ ty2)
-doInteractWithInert (CIrredEvCan { cc_ev = ifl, cc_ty = ty1 })
-           workItem@(CIrredEvCan { cc_ty = ty2 })
-  | ty1 `eqType` ty2
+doInteractWithInert (CIrredEvCan { cc_ev = ifl })
+           workItem@(CIrredEvCan { cc_ev = wfl })
+  | ctEvPred ifl `eqType` ctEvPred wfl
   = solveOneFromTheOther "Irred/Irred" ifl workItem
 
 doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1

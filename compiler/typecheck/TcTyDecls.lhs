@@ -195,17 +195,6 @@ calcClassCycles cls
     expandTheta _    _    []           = id
     expandTheta seen path (pred:theta) = expandType seen path pred . expandTheta seen path theta
 
-    {-
-    expandTree seen path (ClassPred cls tys)
-      | cls `elemUniqSet` seen = 
-      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) 
-                                             (substTysWith (classTyVars cls) tys (classSCTheta cls))
-    expandTree seen path (TuplePred ts)      = flip (foldr (expandTree seen path)) ts
-    expandTree _    _    (EqPred _ _)        = id
-    expandTree _    _    (IPPred _ _)        = id
-    expandTree seen path (IrredPred pred)    = expandType seen path pred
-    -}
-
     expandType seen path (TyConApp tc tys)
       -- Expand unsaturated classes to their superclass theta if they are yet unseen.
       -- If they have already been seen then we have detected an error!

@@ -727,13 +727,13 @@ variables.
 
 \begin{code}
 zonkCt :: Ct -> TcM Ct
+zonkCt ct@(CHoleCan { cc_ev = ev })
+  = do { ev' <- zonkCtEvidence ev
+       ; return $ ct { cc_ev = ev' } }
 zonkCt ct
-  | isHoleCt ct = do { fl' <- zonkCtEvidence (cc_ev ct)
-                     ; return $ ct { cc_ev = fl' } }
-  | otherwise   = do { fl' <- zonkCtEvidence (cc_ev ct)
-                     ; return $
-                         CNonCanonical { cc_ev = fl'
-                                       , cc_loc = cc_loc ct } }
+  = do { fl' <- zonkCtEvidence (cc_ev ct)
+       ; return (CNonCanonical { cc_ev = fl'
+                               , cc_loc = cc_loc ct }) }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
 zonkCtEvidence ctev@(CtGiven { ctev_pred = pred }) 

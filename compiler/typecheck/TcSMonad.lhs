@@ -867,7 +867,7 @@ lookupInInertCans ics pty
 
       IrredPred {} -> findEvidence (\ct -> ctEvPred ct `eqType` pty) (inert_irreds ics)
     
-      _other -> Nothing -- NB: No caching for IPs
+      _other -> Nothing -- NB: No caching for IPs or holes
 \end{code}
 
 
