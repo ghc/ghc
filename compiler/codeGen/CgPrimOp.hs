@@ -91,7 +91,7 @@ emitPrimOp dflags [res_r,res_c] IntAddCOp [aa,bb] _
                     CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
                     CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS - 1)
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
           ]
      ]
 
@@ -114,7 +114,7 @@ emitPrimOp dflags [res_r,res_c] IntSubCOp [aa,bb] _
                     CmmMachOp (mo_wordXor dflags) [aa,bb],
                     CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr dflags (wORD_SIZE_IN_BITS - 1)
+                mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
           ]
      ]
 

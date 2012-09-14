@@ -220,7 +220,7 @@ procpointSRT dflags top_srt top_table entries =
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = P.last bitmap_entries + 1
-    bitmap = intsToBitmap len bitmap_entries
+    bitmap = intsToBitmap dflags len bitmap_entries
 
 maxBmpSize :: DynFlags -> Int
 maxBmpSize dflags = widthInBits (wordWidth dflags) `div` 2

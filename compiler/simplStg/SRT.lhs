@@ -18,34 +18,35 @@ import VarEnv
 import Maybes           ( orElse, expectJust )
 import Bitmap
 
+import DynFlags
 import Outputable
 
 import Data.List
 \end{code}
 
 \begin{code}
-computeSRTs :: [StgBinding] -> [(StgBinding,[(Id,[Id])])]
+computeSRTs :: DynFlags -> [StgBinding] -> [(StgBinding,[(Id,[Id])])]
   -- The incoming bindingd are filled with SRTEntries in their SRT slots
   -- the outgoing ones have NoSRT/SRT values instead
 
-computeSRTs binds = srtTopBinds emptyVarEnv binds
+computeSRTs dflags binds = srtTopBinds dflags emptyVarEnv binds
 
 -- --------------------------------------------------------------------------
 -- Top-level Bindings
 
-srtTopBinds :: IdEnv Id -> [StgBinding] -> [(StgBinding, [(Id,[Id])])]
+srtTopBinds :: DynFlags -> IdEnv Id -> [StgBinding] -> [(StgBinding, [(Id,[Id])])]
 
-srtTopBinds _   [] = []
-srtTopBinds env (StgNonRec b rhs : binds) =
-  (StgNonRec b rhs', [(b,srt')]) : srtTopBinds env' binds
+srtTopBinds _ _   [] = []
+srtTopBinds dflags env (StgNonRec b rhs : binds) =
+  (StgNonRec b rhs', [(b,srt')]) : srtTopBinds dflags env' binds
   where
-    (rhs', srt) = srtTopRhs b rhs
+    (rhs', srt) = srtTopRhs dflags b rhs
     env' = maybeExtendEnv env b rhs
     srt' = applyEnvList env srt
-srtTopBinds env (StgRec bs : binds) =
-  (StgRec (zip bndrs rhss), zip bndrs srts') : srtTopBinds env binds
+srtTopBinds dflags env (StgRec bs : binds) =
+  (StgRec (zip bndrs rhss), zip bndrs srts') : srtTopBinds dflags env binds
   where
-    (rhss, srts) = unzip [ srtTopRhs b r | (b,r) <- bs ]
+    (rhss, srts) = unzip [ srtTopRhs dflags b r | (b,r) <- bs ]
     bndrs = map fst bs
     srts' = map (applyEnvList env) srts
 
@@ -74,75 +75,75 @@ applyEnv env id = lookupVarEnv env id `orElse` id
 
 -- ----  Top-level right hand sides:
 
-srtTopRhs :: Id -> StgRhs -> (StgRhs, [Id])
+srtTopRhs :: DynFlags -> Id -> StgRhs -> (StgRhs, [Id])
 
-srtTopRhs _ rhs@(StgRhsCon _ _ _) = (rhs, [])
-srtTopRhs _ rhs@(StgRhsClosure _ _ _ _  (SRTEntries cafs) _ _)
-  = (srtRhs table rhs, elems)
+srtTopRhs _ _ rhs@(StgRhsCon _ _ _) = (rhs, [])
+srtTopRhs dflags _ rhs@(StgRhsClosure _ _ _ _  (SRTEntries cafs) _ _)
+  = (srtRhs dflags table rhs, elems)
   where
         elems = varSetElems cafs
         table = mkVarEnv (zip elems [0..])
-srtTopRhs _ (StgRhsClosure _ _ _ _  NoSRT _ _) = panic "srtTopRhs NoSRT"
-srtTopRhs _ (StgRhsClosure _ _ _ _  (SRT _ _ _) _ _) = panic "srtTopRhs SRT"
+srtTopRhs _ _ (StgRhsClosure _ _ _ _  NoSRT _ _) = panic "srtTopRhs NoSRT"
+srtTopRhs _ _ (StgRhsClosure _ _ _ _  (SRT _ _ _) _ _) = panic "srtTopRhs SRT"
 
 -- ---- Binds:
 
-srtBind :: IdEnv Int -> StgBinding -> StgBinding
+srtBind :: DynFlags -> IdEnv Int -> StgBinding -> StgBinding
 
-srtBind table (StgNonRec binder rhs) = StgNonRec binder (srtRhs table rhs)
-srtBind table (StgRec pairs) = StgRec [ (b, srtRhs table r) | (b,r) <- pairs ]
+srtBind dflags table (StgNonRec binder rhs) = StgNonRec binder (srtRhs dflags table rhs)
+srtBind dflags table (StgRec pairs) = StgRec [ (b, srtRhs dflags table r) | (b,r) <- pairs ]
 
 -- ---- Right Hand Sides:
 
-srtRhs :: IdEnv Int -> StgRhs -> StgRhs
+srtRhs :: DynFlags -> IdEnv Int -> StgRhs -> StgRhs
 
-srtRhs _     e@(StgRhsCon _ _ _) = e
-srtRhs table (StgRhsClosure cc bi free_vars u srt args body)
-  = StgRhsClosure cc bi free_vars u (constructSRT table srt) args
-        $! (srtExpr table body)
+srtRhs _      _     e@(StgRhsCon _ _ _) = e
+srtRhs dflags table (StgRhsClosure cc bi free_vars u srt args body)
+  = StgRhsClosure cc bi free_vars u (constructSRT dflags table srt) args
+        $! (srtExpr dflags table body)
 
 -- ---------------------------------------------------------------------------
 -- Expressions
 
-srtExpr :: IdEnv Int -> StgExpr -> StgExpr
+srtExpr :: DynFlags -> IdEnv Int -> StgExpr -> StgExpr
 
-srtExpr _ e@(StgApp _ _)       = e
-srtExpr _ e@(StgLit _)         = e
-srtExpr _ e@(StgConApp _ _)    = e
-srtExpr _ e@(StgOpApp _ _ _)   = e
+srtExpr _ _ e@(StgApp _ _)       = e
+srtExpr _ _ e@(StgLit _)         = e
+srtExpr _ _ e@(StgConApp _ _)    = e
+srtExpr _ _ e@(StgOpApp _ _ _)   = e
 
-srtExpr table (StgSCC cc tick push expr) = StgSCC cc tick push $! srtExpr table expr
+srtExpr dflags table (StgSCC cc tick push expr) = StgSCC cc tick push $! srtExpr dflags table expr
 
-srtExpr table (StgTick m n expr) = StgTick m n $! srtExpr table expr
+srtExpr dflags table (StgTick m n expr) = StgTick m n $! srtExpr dflags table expr
 
-srtExpr table (StgCase scrut live1 live2 uniq srt alt_type alts)
+srtExpr dflags table (StgCase scrut live1 live2 uniq srt alt_type alts)
  = StgCase expr' live1 live2 uniq srt' alt_type alts'
  where
-   expr' = srtExpr table scrut
-   srt'  = constructSRT table srt
-   alts' = map (srtAlt table) alts
+   expr' = srtExpr dflags table scrut
+   srt'  = constructSRT dflags table srt
+   alts' = map (srtAlt dflags table) alts
 
-srtExpr table (StgLet bind body)
-  = srtBind table bind =: \ bind' ->
-    srtExpr table body             =: \ body' ->
+srtExpr dflags table (StgLet bind body)
+  = srtBind dflags table bind =: \ bind' ->
+    srtExpr dflags table body             =: \ body' ->
     StgLet bind' body'
 
-srtExpr table (StgLetNoEscape live1 live2 bind body)
-  = srtBind table bind =: \ bind' ->
-    srtExpr table body             =: \ body' ->
+srtExpr dflags table (StgLetNoEscape live1 live2 bind body)
+  = srtBind dflags table bind =: \ bind' ->
+    srtExpr dflags table body             =: \ body' ->
     StgLetNoEscape live1 live2 bind' body'
 
-srtExpr _table expr = pprPanic "srtExpr" (ppr expr)
+srtExpr _ _table expr = pprPanic "srtExpr" (ppr expr)
 
-srtAlt :: IdEnv Int -> StgAlt -> StgAlt
-srtAlt table (con,args,used,rhs)
-  = (,,,) con args used $! srtExpr table rhs
+srtAlt :: DynFlags -> IdEnv Int -> StgAlt -> StgAlt
+srtAlt dflags table (con,args,used,rhs)
+  = (,,,) con args used $! srtExpr dflags table rhs
 
 -----------------------------------------------------------------------------
 -- Construct an SRT bitmap.
 
-constructSRT :: IdEnv Int -> SRT -> SRT
-constructSRT table (SRTEntries entries)
+constructSRT :: DynFlags -> IdEnv Int -> SRT -> SRT
+constructSRT dflags table (SRTEntries entries)
  | isEmptyVarSet entries = NoSRT
  | otherwise  = seqBitmap bitmap $ SRT offset len bitmap
   where
@@ -152,9 +153,9 @@ constructSRT table (SRTEntries entries)
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = last bitmap_entries + 1
-    bitmap = intsToBitmap len bitmap_entries
-constructSRT _ NoSRT = panic "constructSRT NoSRT"
-constructSRT _ (SRT {}) = panic "constructSRT SRT"
+    bitmap = intsToBitmap dflags len bitmap_entries
+constructSRT _ _ NoSRT = panic "constructSRT NoSRT"
+constructSRT _ _ (SRT {}) = panic "constructSRT SRT"
 
 -- ---------------------------------------------------------------------------
 -- Misc stuff

@@ -119,6 +119,7 @@ module DynFlags (
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
+        wORD_SIZE_IN_BITS,
   ) where
 
 #include "HsVersions.h"
@@ -3148,4 +3149,7 @@ compilerInfo dflags
 
 bLOCK_SIZE_W :: DynFlags -> Int
 bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE
+
+wORD_SIZE_IN_BITS :: DynFlags -> Int
+wORD_SIZE_IN_BITS _ = wORD_SIZE * 8
 

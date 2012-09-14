@@ -47,9 +47,6 @@ wORD64_SIZE = 8
 wORD_SIZE :: Int
 wORD_SIZE = SIZEOF_HSWORD
 
-wORD_SIZE_IN_BITS :: Int
-wORD_SIZE_IN_BITS = wORD_SIZE * 8
-
 -- Define a fixed-range integral type equivalent to the target Int/Word
 
 #if SIZEOF_HSWORD == 4

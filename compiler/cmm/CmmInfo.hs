@@ -315,7 +315,7 @@ mkLivenessBits dflags liveness
     n_bits = length liveness
 
     bitmap :: Bitmap
-    bitmap = mkBitmap liveness
+    bitmap = mkBitmap dflags liveness
 
     small_bitmap = case bitmap of 
 		     []  -> 0
