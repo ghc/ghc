@@ -914,7 +914,7 @@ doWritePtrArrayOp addr idx val
           (cmmOffsetExprW dflags (cmmOffsetB dflags addr (arrPtrsHdrSize dflags))
                          (loadArrPtrsSize dflags addr))
           (CmmMachOp (mo_wordUShr dflags) [idx,
-                                           mkIntExpr dflags mUT_ARR_PTRS_CARD_BITS])
+                                           mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags)])
          ) (CmmLit (CmmInt 1 W8))
        
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
@@ -1150,11 +1150,11 @@ emitSetCards dst_start dst_cards_start n = do
 
 -- Convert an element index to a card index
 card :: DynFlags -> CmmExpr -> CmmExpr
-card dflags i = cmmUShrWord dflags i (mkIntExpr dflags mUT_ARR_PTRS_CARD_BITS)
+card dflags i = cmmUShrWord dflags i (mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags))
 
 -- Convert a number of elements to a number of cards, rounding up
 cardRoundUp :: DynFlags -> CmmExpr -> CmmExpr
-cardRoundUp dflags i = card dflags (cmmAddWord dflags i (mkIntExpr dflags ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS) - 1)))
+cardRoundUp dflags i = card dflags (cmmAddWord dflags i (mkIntExpr dflags ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1)))
 
 bytesToWordsRoundUp :: DynFlags -> CmmExpr -> CmmExpr
 bytesToWordsRoundUp dflags e = cmmQuotWord dflags (cmmAddWord dflags e (mkIntExpr dflags (wORD_SIZE - 1)))

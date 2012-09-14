@@ -31,7 +31,6 @@ import MkGraph
 import SMRep
 import CostCentre
 import Module
-import Constants
 import DataCon
 import DynFlags
 import FastString
@@ -184,11 +183,11 @@ buildDynCon' dflags platform binder _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , StgLitArg (MachInt val) <- arg
-  , val <= fromIntegral mAX_INTLIKE     -- Comparisons at type Integer!
-  , val >= fromIntegral mIN_INTLIKE     -- ...ditto...
+  , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
+  , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
   = do  { let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
               val_int = fromIntegral val :: Int
-              offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = cmmLabelOffW intlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
@@ -199,10 +198,10 @@ buildDynCon' dflags platform binder _cc con [arg]
   , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , StgLitArg (MachChar val) <- arg
   , let val_int = ord val :: Int
-  , val_int <= mAX_CHARLIKE
-  , val_int >= mIN_CHARLIKE
+  , val_int <= mAX_CHARLIKE dflags
+  , val_int >= mIN_CHARLIKE dflags
   = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
-              offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = cmmLabelOffW charlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode

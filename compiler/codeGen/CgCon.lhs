@@ -36,7 +36,6 @@ import OldCmmUtils
 import OldCmm
 import SMRep
 import CostCentre
-import Constants
 import TyCon
 import DataCon
 import Id
@@ -189,9 +188,9 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
-  , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
+  , val_int <= mAX_INTLIKE dflags && val_int >= mIN_INTLIKE dflags
   = do  { let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
-              offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
@@ -201,9 +200,9 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
-  , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
+  , val_int <= mAX_CHARLIKE dflags && val_int >= mIN_CHARLIKE dflags
   = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
-              offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize dflags + 1)
+              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }

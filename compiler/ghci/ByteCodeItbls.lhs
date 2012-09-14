@@ -27,7 +27,7 @@ import ClosureInfo
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Type             ( flattenRepType, repType )
-import Constants        ( mIN_PAYLOAD_SIZE, wORD_SIZE )
+import Constants        ( wORD_SIZE )
 import CgHeapery        ( mkVirtHeapOffsets )
 import Util
 
@@ -106,8 +106,8 @@ make_constr_itbls dflags cons
                ptrs'  = ptr_wds
                nptrs' = tot_wds - ptr_wds
                nptrs_really
-                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE = nptrs'
-                  | otherwise = mIN_PAYLOAD_SIZE - ptrs'
+                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
+                  | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
                code' = mkJumpToAddr entry_addr
                itbl  = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE

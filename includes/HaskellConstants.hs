@@ -34,21 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH :: Int
 mAX_CONTEXT_REDUCTION_DEPTH = 200
   -- Increase to 200; see Trac #5395
 
--- closure sizes: these do NOT include the header (see below for header sizes)
-mIN_PAYLOAD_SIZE ::Int
-mIN_PAYLOAD_SIZE = MIN_PAYLOAD_SIZE
-
-mIN_INTLIKE, mAX_INTLIKE :: Int
-mIN_INTLIKE = MIN_INTLIKE
-mAX_INTLIKE = MAX_INTLIKE
-
-mIN_CHARLIKE, mAX_CHARLIKE :: Int
-mIN_CHARLIKE = MIN_CHARLIKE
-mAX_CHARLIKE = MAX_CHARLIKE
-
-mUT_ARR_PTRS_CARD_BITS :: Int
-mUT_ARR_PTRS_CARD_BITS = MUT_ARR_PTRS_CARD_BITS
-
 -- A section of code-generator-related MAGIC CONSTANTS.
 
 mAX_Vanilla_REG :: Int

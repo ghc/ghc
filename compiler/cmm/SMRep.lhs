@@ -231,7 +231,7 @@ profHdrSize dflags
 -- | The garbage collector requires that every closure is at least as
 --   big as this.
 minClosureSize :: DynFlags -> WordOff
-minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE
+minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags

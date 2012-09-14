@@ -1079,11 +1079,11 @@ emitSetCards dst_start dst_cards_start n live = do
 
 -- Convert an element index to a card index
 card :: DynFlags -> CmmExpr -> CmmExpr
-card dflags i = cmmUShrWord dflags i (CmmLit (mkIntCLit dflags mUT_ARR_PTRS_CARD_BITS))
+card dflags i = cmmUShrWord dflags i (CmmLit (mkIntCLit dflags (mUT_ARR_PTRS_CARD_BITS dflags)))
 
 -- Convert a number of elements to a number of cards, rounding up
 cardRoundUp :: DynFlags -> CmmExpr -> CmmExpr
-cardRoundUp dflags i = card dflags (cmmAddWord dflags i (CmmLit (mkIntCLit dflags ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS) - 1))))
+cardRoundUp dflags i = card dflags (cmmAddWord dflags i (CmmLit (mkIntCLit dflags ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1))))
 
 bytesToWordsRoundUp :: DynFlags -> CmmExpr -> CmmExpr
 bytesToWordsRoundUp dflags e

@@ -640,6 +640,18 @@ main(int argc, char *argv[])
     constantInt("mAX_SPEC_SELECTEE_SIZE", MAX_SPEC_SELECTEE_SIZE);
     constantInt("mAX_SPEC_AP_SIZE", MAX_SPEC_AP_SIZE);
 
+    // closure sizes: these do NOT include the header (see below for
+    // header sizes)
+    constantInt("mIN_PAYLOAD_SIZE", MIN_PAYLOAD_SIZE);
+
+    constantInt("mIN_INTLIKE", MIN_INTLIKE);
+    constantInt("mAX_INTLIKE", MAX_INTLIKE);
+
+    constantInt("mIN_CHARLIKE", MIN_CHARLIKE);
+    constantInt("mAX_CHARLIKE", MAX_CHARLIKE);
+
+    constantInt("mUT_ARR_PTRS_CARD_BITS", MUT_ARR_PTRS_CARD_BITS);
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");
