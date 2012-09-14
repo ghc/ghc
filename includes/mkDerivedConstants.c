@@ -294,6 +294,20 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 
 void constantInt(char *name, intptr_t val) {
+    /* If the value is larger than 2^28 or smaller than -2^28, then fail.
+       This test is a bit conservative, but if any constants are roughly
+       maxBoun or minBound then we probably need them to be Integer
+       rather than Int so that cross-compiling between 32bit and 64bit
+       platforms works. */
+    if (val > 268435456) {
+        printf("Value too large for constantInt: %" PRIdPTR "\n", val);
+        exit(1);
+    }
+    if (val < -268435456) {
+        printf("Value too small for constantInt: %" PRIdPTR "\n", val);
+        exit(1);
+    }
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("    , pc_%s :: Int\n", name);
