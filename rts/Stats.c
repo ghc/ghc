@@ -381,12 +381,12 @@ stat_endGC (Capability *cap, gc_thread *gct,
         gc_cpu = cpu - gct->gc_start_cpu;
 
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
-	    nat faults = getPageFaults();
+	    W_ faults = getPageFaults();
 	    
 	    statsPrintf("%9" FMT_SizeT " %9" FMT_SizeT " %9" FMT_SizeT,
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_SizeT " %4" FMT_SizeT "  (Gen: %2d)\n",
+            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_Word " %4" FMT_Word "  (Gen: %2d)\n",
                     TimeToSecondsDbl(gc_cpu),
 		    TimeToSecondsDbl(gc_elapsed),
 		    TimeToSecondsDbl(cpu),
@@ -666,7 +666,7 @@ stat_exit(int alloc)
             if ( residency_samples > 0 ) {
 		showStgWord64(max_residency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
-		statsPrintf("%16s bytes maximum residency (%" FMT_SizeT " sample(s))\n",
+		statsPrintf("%16s bytes maximum residency (%" FMT_Word " sample(s))\n",
 			temp, residency_samples);
 	    }
 
@@ -896,12 +896,12 @@ statDescribeGens(void)
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
 
-      debugBelch("%5d %7" FMT_SizeT " %9d", g, (W_)gen->max_blocks, mut);
+      debugBelch("%5d %7" FMT_Word " %9d", g, (W_)gen->max_blocks, mut);
 
       gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 
-      debugBelch("%8" FMT_SizeT " %8d %8" FMT_SizeT " %8" FMT_SizeT "\n", gen_blocks, lge,
-                 gen_live*sizeof(W_), gen_slop*sizeof(W_));
+      debugBelch("%8" FMT_Word " %8d %8" FMT_Word " %8" FMT_Word "\n", gen_blocks, lge,
+                 gen_live*(W_)sizeof(W_), gen_slop*(W_)sizeof(W_));
       tot_live += gen_live;
       tot_slop += gen_slop;
   }

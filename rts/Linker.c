@@ -1900,7 +1900,7 @@ mmap_again:
                     MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
    if (result == MAP_FAILED) {
-       sysErrorBelch("mmap %" FMT_SizeT " bytes at %p",(W_)size,map_addr);
+       sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        stg_exit(EXIT_FAILURE);
    }
@@ -1943,7 +1943,7 @@ mmap_again:
    }
 #endif
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %" FMT_SizeT " bytes starting at %p\n", (W_)size, result));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %" FMT_Word " bytes starting at %p\n", (W_)size, result));
    IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
    return result;
 }
