@@ -293,7 +293,7 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
 
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 
-void constantInt(char *name, intptr_t val) {
+void constantIntC(char *cName, char *haskellName, intptr_t val) {
     /* If the value is larger than 2^28 or smaller than -2^28, then fail.
        This test is a bit conservative, but if any constants are roughly
        maxBoun or minBound then we probably need them to be Integer
@@ -310,22 +310,29 @@ void constantInt(char *name, intptr_t val) {
 
     switch (mode) {
     case Gen_Haskell_Type:
-        printf("    , pc_%s :: Int\n", name);
+        printf("    , pc_%s :: Int\n", haskellName);
         break;
     case Gen_Haskell_Value:
-        printf("    , pc_%s = %" PRIdPTR "\n", name, val);
+        printf("    , pc_%s = %" PRIdPTR "\n", haskellName, val);
         break;
     case Gen_Haskell_Wrappers:
-        printf("%s :: DynFlags -> Int\n", name);
+        printf("%s :: DynFlags -> Int\n", haskellName);
         printf("%s dflags = pc_%s (sPlatformConstants (settings dflags))\n",
-               name, name);
+               haskellName, haskellName);
         break;
     case Gen_Haskell_Exports:
-        printf("    %s,\n", name);
+        printf("    %s,\n", haskellName);
         break;
     case Gen_Header:
+        if (cName != NULL) {
+            printf("#define %s %" PRIdPTR "\n", cName, val);
+        }
         break;
     }
+}
+
+void constantInt(char *name, intptr_t val) {
+    constantIntC (NULL, name, val);
 }
 
 int
@@ -374,18 +381,22 @@ main(int argc, char *argv[])
     case Gen_Header:
         printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
 
-        printf("#define STD_HDR_SIZE   %" FMT_SizeT "\n", (size_t)sizeofW(StgHeader) - sizeofW(StgProfHeader));
-        /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
-        printf("#define PROF_HDR_SIZE  %" FMT_SizeT "\n", (size_t)sizeofW(StgProfHeader));
-
-        printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
-        printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
-        printf("#define BLOCKS_PER_MBLOCK  %" FMT_Word "\n", (W_)BLOCKS_PER_MBLOCK);
-        // could be derived, but better to save doing the calculation twice
-
-        printf("\n\n");
         break;
     }
+
+    // Closure header sizes.
+    constantIntC("STD_HDR_SIZE", "sTD_HDR_SIZE",
+                 sizeofW(StgHeader) - sizeofW(StgProfHeader));
+    /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
+    constantIntC("PROF_HDR_SIZE", "pROF_HDR_SIZE", sizeofW(StgProfHeader));
+
+    // Size of a storage manager block (in bytes).
+    constantIntC("BLOCK_SIZE", "bLOCK_SIZE", BLOCK_SIZE);
+    constantIntC("MBLOCK_SIZE", "mBLOCK_SIZE", MBLOCK_SIZE);
+    // blocks that fit in an MBlock, leaving space for the block descriptors
+    constantIntC("BLOCKS_PER_MBLOCK", "bLOCKS_PER_MBLOCK", BLOCKS_PER_MBLOCK);
+    // could be derived, but better to save doing the calculation twice
+
 
     field_offset(StgRegTable, rR1);
     field_offset(StgRegTable, rR2);

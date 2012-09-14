@@ -34,14 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH :: Int
 mAX_CONTEXT_REDUCTION_DEPTH = 200
   -- Increase to 200; see Trac #5395
 
--- Closure header sizes.
-
-sTD_HDR_SIZE :: Int
-sTD_HDR_SIZE = STD_HDR_SIZE
-
-pROF_HDR_SIZE :: Int
-pROF_HDR_SIZE = PROF_HDR_SIZE
-
 -- Size of a double in StgWords.
 
 dOUBLE_SIZE :: Int
@@ -117,18 +109,6 @@ cLONG_SIZE = SIZEOF_LONG
 
 cLONG_LONG_SIZE :: Int
 cLONG_LONG_SIZE = SIZEOF_LONG_LONG
-
--- Size of a storage manager block (in bytes).
-
-bLOCK_SIZE :: Int
-bLOCK_SIZE = BLOCK_SIZE
-bLOCK_SIZE_W :: Int
-bLOCK_SIZE_W = bLOCK_SIZE `quot` wORD_SIZE
-
--- blocks that fit in an MBlock, leaving space for the block descriptors
-
-bLOCKS_PER_MBLOCK :: Int
-bLOCKS_PER_MBLOCK = BLOCKS_PER_MBLOCK
 
 -- Number of bits to shift a bitfield left by in an info table.
 

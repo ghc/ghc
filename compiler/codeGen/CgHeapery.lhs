@@ -452,20 +452,18 @@ do_checks :: WordOff           -- Stack headroom
           -> Code
 do_checks 0 0 _ _ _ = nopC
 
-do_checks _ hp _ _ _
-  | hp > bLOCKS_PER_MBLOCK * bLOCK_SIZE_W
-  = sorry (unlines [
-            "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK * bLOCK_SIZE) ++ " bytes.",
-            "",
-            "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
-            "Suggestion: read data from a file instead of having large static data",
-            "structures in the code."])
-
 do_checks stk hp reg_save_code rts_lbl live
   = do dflags <- getDynFlags
-       do_checks' (mkIntExpr dflags (stk*wORD_SIZE))
-                  (mkIntExpr dflags (hp*wORD_SIZE))
-           (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
+       if hp > bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE_W dflags
+           then sorry (unlines [
+                    "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE dflags) ++ " bytes.",
+                    "",
+                    "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
+                    "Suggestion: read data from a file instead of having large static data",
+                    "structures in the code."])
+           else do_checks' (mkIntExpr dflags (stk * wORD_SIZE))
+                           (mkIntExpr dflags (hp * wORD_SIZE))
+                    (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
 
 -- The offsets are now in *bytes*
 do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr

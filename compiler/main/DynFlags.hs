@@ -118,6 +118,7 @@ module DynFlags (
         tracingDynFlags,
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
+        bLOCK_SIZE_W,
   ) where
 
 #include "HsVersions.h"
@@ -130,7 +131,7 @@ import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
-import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
+import Constants
 import Panic
 import Util
 import Maybes           ( orElse )
@@ -3144,4 +3145,7 @@ compilerInfo dflags
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs"
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
+
+bLOCK_SIZE_W :: DynFlags -> Int
+bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE
 

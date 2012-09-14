@@ -267,7 +267,7 @@ emitOpenNursery =
                   (CmmMachOp (mo_wordMul dflags) [
                     CmmMachOp (MO_SS_Conv W32 (wordWidth dflags))
                       [CmmLoad (nursery_bdescr_blocks dflags) b32],
-                    mkIntExpr dflags bLOCK_SIZE
+                    mkIntExpr dflags (bLOCK_SIZE dflags)
                    ])
                   (-1)
                 )
