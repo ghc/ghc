@@ -211,31 +211,30 @@ linearRegAlloc' dflags initFreeRegs first_id block_live sccs
         let platform = targetPlatform dflags
             (_, _, stats, blocks) =
                 runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap platform) us
-                    $ linearRA_SCCs platform first_id block_live [] sccs
+                    $ linearRA_SCCs first_id block_live [] sccs
         return  (blocks, stats)
 
 
 linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)
-              => Platform
-              -> BlockId
+              => BlockId
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs _ _ _ blocksAcc []
+linearRA_SCCs _ _ blocksAcc []
         = return $ reverse blocksAcc
 
-linearRA_SCCs platform first_id block_live blocksAcc (AcyclicSCC block : sccs)
- = do   blocks' <- processBlock platform block_live block
-        linearRA_SCCs platform first_id block_live
+linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs)
+ = do   blocks' <- processBlock block_live block
+        linearRA_SCCs first_id block_live
                 ((reverse blocks') ++ blocksAcc)
                 sccs
 
-linearRA_SCCs platform first_id block_live blocksAcc (CyclicSCC blocks : sccs)
+linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
-        blockss' <- process platform first_id block_live blocks [] (return []) False
-        linearRA_SCCs platform first_id block_live
+        blockss' <- process first_id block_live blocks [] (return []) False
+        linearRA_SCCs first_id block_live
                 (reverse (concat blockss') ++ blocksAcc)
                 sccs
 
@@ -252,8 +251,7 @@ linearRA_SCCs platform first_id block_live blocksAcc (CyclicSCC blocks : sccs)
 -}
 
 process :: (FR freeRegs, Instruction instr, Outputable instr)
-        => Platform
-        -> BlockId
+        => BlockId
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
         -> [GenBasicBlock (LiveInstr instr)]
@@ -261,10 +259,10 @@ process :: (FR freeRegs, Instruction instr, Outputable instr)
         -> Bool
         -> RegM freeRegs [[NatBasicBlock instr]]
 
-process _ _ _ [] []         accum _
+process _ _ [] []         accum _
         = return $ reverse accum
 
-process platform first_id block_live [] next_round accum madeProgress
+process first_id block_live [] next_round accum madeProgress
         | not madeProgress
 
           {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
@@ -274,10 +272,10 @@ process platform first_id block_live [] next_round accum madeProgress
         = return $ reverse accum
 
         | otherwise
-        = process platform first_id block_live
+        = process first_id block_live
                   next_round [] accum False
 
-process platform first_id block_live (b@(BasicBlock id _) : blocks)
+process first_id block_live (b@(BasicBlock id _) : blocks)
         next_round accum madeProgress
  = do
         block_assig <- getBlockAssigR
@@ -285,11 +283,11 @@ process platform first_id block_live (b@(BasicBlock id _) : blocks)
         if isJust (mapLookup id block_assig)
              || id == first_id
          then do
-                b'  <- processBlock platform block_live b
-                process platform first_id block_live blocks
+                b'  <- processBlock block_live b
+                process first_id block_live blocks
                         next_round (b' : accum) True
 
-         else   process platform first_id block_live blocks
+         else   process first_id block_live blocks
                         (b : next_round) accum madeProgress
 
 
@@ -297,24 +295,25 @@ process platform first_id block_live (b@(BasicBlock id _) : blocks)
 --
 processBlock
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => Platform
-        -> BlockMap RegSet              -- ^ live regs on entry to each basic block
+        => BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
-processBlock platform block_live (BasicBlock id instrs)
- = do   initBlock platform id block_live
+processBlock block_live (BasicBlock id instrs)
+ = do   initBlock id block_live
         (instrs', fixups)
-                <- linearRA platform block_live [] [] id instrs
+                <- linearRA block_live [] [] id instrs
         return  $ BasicBlock id instrs' : fixups
 
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
 initBlock :: FR freeRegs
-          => Platform -> BlockId -> BlockMap RegSet -> RegM freeRegs ()
-initBlock platform id block_live
- = do   block_assig     <- getBlockAssigR
+          => BlockId -> BlockMap RegSet -> RegM freeRegs ()
+initBlock id block_live
+ = do   dflags <- getDynFlags
+        let platform = targetPlatform dflags
+        block_assig     <- getBlockAssigR
         case mapLookup id block_assig of
                 -- no prior info about this block: we must consider
                 -- any fixed regs to be allocated, but we can ignore
@@ -339,8 +338,7 @@ initBlock platform id block_live
 -- | Do allocation for a sequence of instructions.
 linearRA
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => Platform
-        -> BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
+        => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
         -> BlockId                              -- ^ id of the current block, for debugging.
@@ -351,25 +349,23 @@ linearRA
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
 
 
-linearRA _        _          accInstr accFixup _ []
+linearRA _          accInstr accFixup _ []
         = return
                 ( reverse accInstr              -- instrs need to be returned in the correct order.
                 , accFixup)                     -- it doesn't matter what order the fixup blocks are returned in.
 
 
-linearRA platform block_live accInstr accFixups id (instr:instrs)
+linearRA block_live accInstr accFixups id (instr:instrs)
  = do
-        (accInstr', new_fixups)
-                <- raInsn platform block_live accInstr id instr
+        (accInstr', new_fixups) <- raInsn block_live accInstr id instr
 
-        linearRA platform block_live accInstr' (new_fixups ++ accFixups) id instrs
+        linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
 
 
 -- | Do allocation for a single instruction.
 raInsn
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => Platform
-        -> BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
+        => BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
@@ -377,17 +373,17 @@ raInsn
                 ( [instr]                       -- new instructions
                 , [NatBasicBlock instr])        -- extra fixup blocks
 
-raInsn _ _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _     new_instrs _ (LiveInstr ii Nothing)
         | Just n        <- takeDeltaInstr ii
         = do    setDeltaR n
                 return (new_instrs, [])
 
-raInsn _ _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _     new_instrs _ (LiveInstr ii Nothing)
         | isMetaInstr ii
         = return (new_instrs, [])
 
 
-raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
+raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
  = do
     assig    <- getAssigR
 
@@ -422,12 +418,12 @@ raInsn platform block_live new_instrs id (LiveInstr (Instr instr) (Just live))
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn platform block_live new_instrs id instr
+        _ -> genRaInsn block_live new_instrs id instr
                         (uniqSetToList $ liveDieRead live)
                         (uniqSetToList $ liveDieWrite live)
 
 
-raInsn _ _ _ _ instr
+raInsn _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)
 
 
@@ -437,8 +433,7 @@ isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
 
 
 genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
-          => Platform
-          -> BlockMap RegSet
+          => BlockMap RegSet
           -> [instr]
           -> BlockId
           -> instr
@@ -446,8 +441,10 @@ genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
           -> [Reg]
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
-    case regUsageOfInstr platform instr of { RU read written ->
+genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
+  dflags <- getDynFlags
+  let platform = targetPlatform dflags
+  case regUsageOfInstr platform instr of { RU read written ->
     do
     let real_written    = [ rr  | (RegReal     rr) <- written ]
     let virt_written    = [ vr  | (RegVirtual  vr) <- written ]
@@ -473,7 +470,7 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 
     -- (a), (b) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <-
-        allocateRegsAndSpill platform True{-reading-} virt_read [] [] virt_read
+        allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
 
     -- (c) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps platform real_written r_dying
@@ -487,18 +484,18 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
-    releaseRegs platform r_dying
+    releaseRegs r_dying
 
     -- (f) Mark regs which are clobbered as unallocatable
     clobberRegs platform real_written
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
-        allocateRegsAndSpill platform False{-writing-} virt_written [] [] virt_written
+        allocateRegsAndSpill False{-writing-} virt_written [] [] virt_written
 
     -- (h) Release registers for temps which are written here and not
     -- used again.
-    releaseRegs platform w_dying
+    releaseRegs w_dying
 
     let
         -- (i) Patch the instruction
@@ -541,20 +538,23 @@ genRaInsn platform block_live new_instrs block_id instr r_dying w_dying =
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: FR freeRegs => Platform -> [Reg] -> RegM freeRegs ()
-releaseRegs platform regs = do
+releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
+releaseRegs regs = do
+  dflags <- getDynFlags
+  let platform = targetPlatform dflags
   assig <- getAssigR
   free <- getFreeRegsR
+  let loop _     free _ | free `seq` False = undefined
+      loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
+      loop assig free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
+      loop assig free (r:rs) =
+         case lookupUFM assig r of
+         Just (InBoth real _) -> loop (delFromUFM assig r)
+                                      (frReleaseReg platform real free) rs
+         Just (InReg real)    -> loop (delFromUFM assig r)
+                                      (frReleaseReg platform real free) rs
+         _                    -> loop (delFromUFM assig r) free rs
   loop assig free regs
- where
-  loop _     free _ | free `seq` False = undefined
-  loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
-  loop assig free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
-  loop assig free (r:rs) =
-     case lookupUFM assig r of
-        Just (InBoth real _) -> loop (delFromUFM assig r) (frReleaseReg platform real free) rs
-        Just (InReg real) -> loop (delFromUFM assig r) (frReleaseReg platform real free) rs
-        _other            -> loop (delFromUFM assig r) free rs
 
 
 -- -----------------------------------------------------------------------------
@@ -686,24 +686,23 @@ data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
 
 allocateRegsAndSpill
         :: (FR freeRegs, Outputable instr, Instruction instr)
-        => Platform
-        -> Bool                 -- True <=> reading (load up spilled regs)
+        => Bool                 -- True <=> reading (load up spilled regs)
         -> [VirtualReg]         -- don't push these out
         -> [instr]              -- spill insns
         -> [RealReg]            -- real registers allocated (accum.)
         -> [VirtualReg]         -- temps to allocate
         -> RegM freeRegs ( [instr] , [RealReg])
 
-allocateRegsAndSpill _        _       _    spills alloc []
+allocateRegsAndSpill _       _    spills alloc []
         = return (spills, reverse alloc)
 
-allocateRegsAndSpill platform reading keep spills alloc (r:rs)
+allocateRegsAndSpill reading keep spills alloc (r:rs)
  = do   assig <- getAssigR
-        let doSpill = allocRegsAndSpill_spill platform reading keep spills alloc r rs assig
+        let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
         case lookupUFM assig r of
                 -- case (1a): already in a register
                 Just (InReg my_reg) ->
-                        allocateRegsAndSpill platform reading keep spills (my_reg:alloc) rs
+                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
                 -- case (1b): already in a register (and memory)
                 -- NB1. if we're writing this register, update its assignment to be
@@ -712,7 +711,7 @@ allocateRegsAndSpill platform reading keep spills alloc (r:rs)
                 -- are also read by the same instruction.
                 Just (InBoth my_reg _)
                  -> do  when (not reading) (setAssigR (addToUFM assig r (InReg my_reg)))
-                        allocateRegsAndSpill platform reading keep spills (my_reg:alloc) rs
+                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
                 -- Not already in a register, so we need to find a free one...
                 Just (InMem slot) | reading   -> doSpill (ReadMem slot)
@@ -731,8 +730,7 @@ allocateRegsAndSpill platform reading keep spills alloc (r:rs)
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
-                        => Platform
-                        -> Bool
+                        => Bool
                         -> [VirtualReg]
                         -> [instr]
                         -> [RealReg]
@@ -741,8 +739,9 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
                         -> UniqFM Loc
                         -> SpillLoc
                         -> RegM freeRegs ([instr], [RealReg])
-allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
- = do
+allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
+ = do   dflags <- getDynFlags
+        let platform = targetPlatform dflags
         freeRegs                <- getFreeRegsR
         let freeRegs_thisClass  = frGetFreeRegs platform (classOfVirtualReg r) freeRegs
 
@@ -755,7 +754,7 @@ allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
                 setAssigR       (addToUFM assig r $! newLocation spill_loc my_reg)
                 setFreeRegsR $  frAllocateReg platform my_reg freeRegs
 
-                allocateRegsAndSpill platform reading keep spills' (my_reg : alloc) rs
+                allocateRegsAndSpill reading keep spills' (my_reg : alloc) rs
 
 
           -- case (3): we need to push something out to free up a register
@@ -787,7 +786,7 @@ allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
                                 let assig2  = addToUFM assig1 r $! newLocation spill_loc my_reg
 
                                 setAssigR assig2
-                                allocateRegsAndSpill platform reading keep spills' (my_reg:alloc) rs
+                                allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
 
                         -- otherwise, we need to spill a temporary that currently
                         -- resides in a register.
@@ -810,7 +809,7 @@ allocRegsAndSpill_spill platform reading keep spills alloc r rs assig spill_loc
                                 -- if need be, load up a spilled temp into the reg we've just freed up.
                                 spills' <- loadTemp platform r spill_loc my_reg spills
 
-                                allocateRegsAndSpill platform reading keep
+                                allocateRegsAndSpill reading keep
                                         (spill_store ++ spills')
                                         (my_reg:alloc) rs
 
