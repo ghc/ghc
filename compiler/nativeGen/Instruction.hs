@@ -13,6 +13,7 @@ where
 import Reg
 
 import BlockId
+import DynFlags
 import OldCmm
 import Platform
 
@@ -105,7 +106,7 @@ class   Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: Platform
+                :: DynFlags
                 -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
@@ -114,7 +115,7 @@ class   Instruction instr where
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: Platform
+                :: DynFlags
                 -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use

@@ -43,7 +43,7 @@ cmmPipeline hsc_env topSRT prog =
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     (topSRT, cmms) <- {-# SCC "doSRTs" #-} doSRTs topSRT tops
+     (topSRT, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags topSRT tops
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
 
      return (topSRT, cmms)
@@ -183,7 +183,7 @@ dumpGraph dflags flag name g = do
   when (dopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
-  do_lint g = case cmmLintGraph g of
+  do_lint g = case cmmLintGraph dflags g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }

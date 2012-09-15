@@ -185,7 +185,8 @@ pprNode node = pp_node <+> pp_debug
       -- rep[lv] = expr;
       CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
           where
-            rep = ppr ( cmmExprType expr )
+            rep = sdocWithDynFlags $ \dflags ->
+                  ppr ( cmmExprType dflags expr )
 
       -- call "ccall" foo(x, y)[r1, r2];
       -- ToDo ppr volatile

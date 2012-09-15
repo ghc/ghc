@@ -54,6 +54,7 @@ import RegClass
 import OldCmm
 import CmmCallConv
 import CLabel           ( CLabel )
+import DynFlags
 import Outputable
 import Platform
 import FastTypes
@@ -440,8 +441,9 @@ instrClobberedRegs platform
 --
 
 -- All machine registers that are used for argument-passing to Haskell functions
-allHaskellArgRegs :: Platform -> [Reg]
-allHaskellArgRegs platform = [ RegReal r | Just r <- map (globalRegMaybe platform) globalArgRegs ]
+allHaskellArgRegs :: DynFlags -> [Reg]
+allHaskellArgRegs dflags = [ RegReal r | Just r <- map (globalRegMaybe platform) (globalArgRegs dflags) ]
+    where platform = targetPlatform dflags
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the

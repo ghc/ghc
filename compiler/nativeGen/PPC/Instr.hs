@@ -34,8 +34,8 @@ import RegClass
 import Reg
 
 import CodeGen.Platform
-import Constants	(rESERVED_C_STACK_BYTES)
 import BlockId
+import DynFlags
 import OldCmm
 import FastString
 import CLabel
@@ -355,14 +355,15 @@ ppc_patchJumpInstr insn patchF
 
 -- | An instruction to spill a register into a spill slot.
 ppc_mkSpillInstr
-   :: Platform
+   :: DynFlags
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkSpillInstr platform reg delta slot
-  = let	off     = spillSlotToOffset slot
+ppc_mkSpillInstr dflags reg delta slot
+  = let platform = targetPlatform dflags
+        off      = spillSlotToOffset dflags slot
     in
     let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
@@ -372,14 +373,15 @@ ppc_mkSpillInstr platform reg delta slot
 
 
 ppc_mkLoadInstr
-   :: Platform
+   :: DynFlags
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkLoadInstr platform reg delta slot
-  = let off     = spillSlotToOffset slot
+ppc_mkLoadInstr dflags reg delta slot
+  = let platform = targetPlatform dflags
+        off     = spillSlotToOffset dflags slot
     in
     let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
@@ -391,20 +393,21 @@ ppc_mkLoadInstr platform reg delta slot
 spillSlotSize :: Int
 spillSlotSize = 8
 
-maxSpillSlots :: Int
-maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
+maxSpillSlots :: DynFlags -> Int
+maxSpillSlots dflags
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize) - 1
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-   | slot >= 0 && slot < maxSpillSlots
+spillSlotToOffset :: DynFlags -> Int -> Int
+spillSlotToOffset dflags slot
+   | slot >= 0 && slot < maxSpillSlots dflags
    = 64 + spillSlotSize * slot
    | otherwise
    = pprPanic "spillSlotToOffset:" 
               (   text "invalid spill location: " <> int slot
-	      $$  text "maxSpillSlots:          " <> int maxSpillSlots)
+	      $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
 
 
 --------------------------------------------------------------------------------

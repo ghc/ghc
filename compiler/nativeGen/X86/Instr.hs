@@ -30,10 +30,10 @@ import FastString
 import FastBool
 import Outputable
 import Platform
-import Constants        (rESERVED_C_STACK_BYTES)
 
 import BasicTypes       (Alignment)
 import CLabel
+import DynFlags
 import UniqSet
 import Unique
 
@@ -613,14 +613,14 @@ x86_patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 x86_mkSpillInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- register to spill
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkSpillInstr platform reg delta slot
-  = let off     = spillSlotToOffset is32Bit slot
+x86_mkSpillInstr dflags reg delta slot
+  = let off     = spillSlotToOffset dflags slot
     in
     let off_w = (off - delta) `div` (if is32Bit then 4 else 8)
     in case targetClassOfReg platform reg of
@@ -629,18 +629,19 @@ x86_mkSpillInstr platform reg delta slot
            RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
            RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
            _         -> panic "X86.mkSpillInstr: no match"
-    where is32Bit = target32Bit platform
+    where platform = targetPlatform dflags
+          is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkLoadInstr platform reg delta slot
-  = let off     = spillSlotToOffset is32Bit slot
+x86_mkLoadInstr dflags reg delta slot
+  = let off     = spillSlotToOffset dflags slot
     in
         let off_w = (off-delta) `div` (if is32Bit then 4 else 8)
         in case targetClassOfReg platform reg of
@@ -649,26 +650,28 @@ x86_mkLoadInstr platform reg delta slot
               RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
               RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
-    where is32Bit = target32Bit platform
+    where platform = targetPlatform dflags
+          is32Bit = target32Bit platform
 
-spillSlotSize :: Bool -> Int
-spillSlotSize is32Bit = if is32Bit then 12 else 8
+spillSlotSize :: DynFlags -> Int
+spillSlotSize dflags = if is32Bit then 12 else 8
+    where is32Bit = target32Bit (targetPlatform dflags)
 
-maxSpillSlots :: Bool -> Int
-maxSpillSlots is32Bit
-    = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize is32Bit) - 1
+maxSpillSlots :: DynFlags -> Int
+maxSpillSlots dflags
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize dflags) - 1
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
-spillSlotToOffset :: Bool -> Int -> Int
-spillSlotToOffset is32Bit slot
-   | slot >= 0 && slot < maxSpillSlots is32Bit
-   = 64 + spillSlotSize is32Bit * slot
+spillSlotToOffset :: DynFlags -> Int -> Int
+spillSlotToOffset dflags slot
+   | slot >= 0 && slot < maxSpillSlots dflags
+   = 64 + spillSlotSize dflags * slot
    | otherwise
    = pprPanic "spillSlotToOffset:"
               (   text "invalid spill location: " <> int slot
-              $$  text "maxSpillSlots:          " <> int (maxSpillSlots is32Bit))
+              $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
 
 --------------------------------------------------------------------------------
 

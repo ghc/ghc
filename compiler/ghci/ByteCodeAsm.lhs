@@ -133,7 +133,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
       -- Remember that the first insn starts at offset
       --     sizeOf Word / sizeOf Word16
       -- since offset 0 (eventually) will hold the total # of insns.
-      initial_offset = largeArg16s
+      initial_offset = largeArg16s dflags
 
       -- Jump instructions are variable-sized, there are long and short variants
       -- depending on the magnitude of the offset.  However, we can't tell what
@@ -143,9 +143,9 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
       -- and if the final size is indeed small enough for short jumps, we are
       -- done.  Otherwise, we repeat the calculation, and we force all jumps in
       -- this BCO to be long.
-      (n_insns0, lbl_map0) = inspectAsm False initial_offset asm
+      (n_insns0, lbl_map0) = inspectAsm dflags False initial_offset asm
       ((n_insns, lbl_map), long_jumps)
-        | isLarge n_insns0 = (inspectAsm True initial_offset asm, True)
+        | isLarge n_insns0 = (inspectAsm dflags True initial_offset asm, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
       env :: Word16 -> Word
@@ -154,9 +154,9 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
         (Map.lookup lbl lbl_map)
 
   -- pass 2: run assembler and generate instructions, literals and pointers
-  let initial_insns = addListToSS emptySS $ largeArg n_insns
+  let initial_insns = addListToSS emptySS $ largeArg dflags n_insns
   let initial_state = (initial_insns, emptySS, emptySS)
-  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm long_jumps env asm
+  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm dflags long_jumps env asm
 
   -- precomputed size should be equal to final size
   ASSERT (n_insns == sizeSS final_insns) return ()
@@ -250,8 +250,8 @@ largeOp long_jumps op = case op of
   Op w      -> isLarge w
   LabelOp _ -> long_jumps
 
-runAsm :: Bool -> LabelEnv -> Assembler a -> State AsmState IO a
-runAsm long_jumps e = go
+runAsm :: DynFlags -> Bool -> LabelEnv -> Assembler a -> State AsmState IO a
+runAsm dflags long_jumps e = go
   where
     go (NullAsm x) = return x
     go (AllocPtr p_io k) = do
@@ -273,9 +273,9 @@ runAsm long_jumps e = go
             | otherwise = w
           words = concatMap expand ops
           expand (SmallOp w) = [w]
-          expand (LargeOp w) = largeArg w
+          expand (LargeOp w) = largeArg dflags w
           expand (LabelOp w) = expand (Op (e w))
-          expand (Op w) = if largeOps then largeArg w else [fromIntegral w]
+          expand (Op w) = if largeOps then largeArg dflags w else [fromIntegral w]
       State $ \(st_i0,st_l0,st_p0) -> do
         let st_i1 = addListToSS st_i0 (opcode : words)
         return ((st_i1,st_l0,st_p0), ())
@@ -290,8 +290,8 @@ data InspectState = InspectState
   , lblEnv :: LabelEnvMap
   }
 
-inspectAsm :: Bool -> Word -> Assembler a -> (Word, LabelEnvMap)
-inspectAsm long_jumps initial_offset
+inspectAsm :: DynFlags -> Bool -> Word -> Assembler a -> (Word, LabelEnvMap)
+inspectAsm dflags long_jumps initial_offset
   = go (InspectState initial_offset 0 0 Map.empty)
   where
     go s (NullAsm _) = (instrCount s, lblEnv s)
@@ -307,9 +307,9 @@ inspectAsm long_jumps initial_offset
         size = sum (map count ops) + 1
         largeOps = any (largeOp long_jumps) ops
         count (SmallOp _) = 1
-        count (LargeOp _) = largeArg16s
+        count (LargeOp _) = largeArg16s dflags
         count (LabelOp _) = count (Op 0)
-        count (Op _) = if largeOps then largeArg16s else 1
+        count (Op _) = if largeOps then largeArg16s dflags else 1
 
 -- Bring in all the bci_ bytecode constants.
 #include "rts/Bytecodes.h"
@@ -317,21 +317,21 @@ inspectAsm long_jumps initial_offset
 largeArgInstr :: Word16 -> Word16
 largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
 
-largeArg :: Word -> [Word16]
-largeArg w
- | wORD_SIZE_IN_BITS == 64
+largeArg :: DynFlags -> Word -> [Word16]
+largeArg dflags w
+ | wORD_SIZE_IN_BITS dflags == 64
            = [fromIntegral (w `shiftR` 48),
               fromIntegral (w `shiftR` 32),
               fromIntegral (w `shiftR` 16),
               fromIntegral w]
- | wORD_SIZE_IN_BITS == 32
+ | wORD_SIZE_IN_BITS dflags == 32
            = [fromIntegral (w `shiftR` 16),
               fromIntegral w]
  | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
 
-largeArg16s :: Word
-largeArg16s | wORD_SIZE_IN_BITS == 64  = 4
-            | otherwise                = 2
+largeArg16s :: DynFlags -> Word
+largeArg16s dflags | wORD_SIZE_IN_BITS dflags == 64 = 4
+                   | otherwise                      = 2
 
 assembleI :: DynFlags
           -> BCInstr

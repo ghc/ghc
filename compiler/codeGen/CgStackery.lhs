@@ -289,7 +289,7 @@ pushSpecUpdateFrame lbl updatee code
     	; MASSERT(case sequel of { OnStack -> True; _ -> False}) }
 	; dflags <- getDynFlags
 	; allocStackTop (fixedHdrSize dflags + 
-			   sIZEOF_StgUpdateFrame_NoHdr `quot` wORD_SIZE)
+			   sIZEOF_StgUpdateFrame_NoHdr dflags `quot` wORD_SIZE)
 	; vsp <- getVirtSp
 	; setStackFrame vsp
 	; frame_addr <- getSpRelOffset vsp
@@ -317,12 +317,12 @@ emitSpecPushUpdateFrame lbl frame_addr updatee = do
 	stmtsC [  -- Set the info word
 		  CmmStore frame_addr (mkLblExpr lbl)
 		, -- And the updatee
-		  CmmStore (cmmOffsetB frame_addr (off_updatee dflags)) updatee ]
+		  CmmStore (cmmOffsetB dflags frame_addr (off_updatee dflags)) updatee ]
 	initUpdFrameProf frame_addr
 
 off_updatee :: DynFlags -> ByteOff
 off_updatee dflags
-    = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgUpdateFrame_updatee
+    = fixedHdrSize dflags * wORD_SIZE + (oFFSET_StgUpdateFrame_updatee dflags)
 \end{code}
 
 

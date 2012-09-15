@@ -219,33 +219,33 @@ isStaticNoCafCon _                           = False
 
 -- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
 fixedHdrSize :: DynFlags -> WordOff
-fixedHdrSize dflags = sTD_HDR_SIZE + profHdrSize dflags
+fixedHdrSize dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
 
 -- | Size of the profiling part of a closure header
 -- (StgProfHeader in includes/rts/storage/Closures.h)
 profHdrSize  :: DynFlags -> WordOff
 profHdrSize dflags
- | dopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE
+ | dopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE dflags
  | otherwise                      = 0
 
 -- | The garbage collector requires that every closure is at least as
 --   big as this.
 minClosureSize :: DynFlags -> WordOff
-minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE
+minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr dflags
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
+ = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr dflags
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: DynFlags -> WordOff
 thunkHdrSize dflags = fixedHdrSize dflags + smp_hdr
-        where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
+        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE
 
 
 nonHdrSize :: SMRep -> WordOff

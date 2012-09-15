@@ -146,7 +146,7 @@ cmmLlvmGen :: DynFlags -> UniqSupply -> LlvmEnv -> RawCmmDecl
 cmmLlvmGen dflags us env cmm = do
     -- rewrite assignments to global regs
     let fixed_cmm = {-# SCC "llvm_fix_regs" #-}
-                    fixStgRegisters (targetPlatform dflags) cmm
+                    fixStgRegisters dflags cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm"
         (pprCmmGroup [fixed_cmm])

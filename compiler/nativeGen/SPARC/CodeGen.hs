@@ -111,7 +111,9 @@ stmtsToInstrs stmts
 
 
 stmtToInstrs :: CmmStmt -> NatM InstrBlock
-stmtToInstrs stmt = case stmt of
+stmtToInstrs stmt = do
+  dflags <- getDynFlags
+  case stmt of
     CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
 
@@ -119,14 +121,14 @@ stmtToInstrs stmt = case stmt of
       | isFloatType ty  -> assignReg_FltCode size reg src
       | isWord64 ty     -> assignReg_I64Code      reg src
       | otherwise       -> assignReg_IntCode size reg src
-        where ty = cmmRegType reg
+        where ty = cmmRegType dflags reg
               size = cmmTypeSize ty
 
     CmmStore addr src
       | isFloatType ty  -> assignMem_FltCode size addr src
       | isWord64 ty     -> assignMem_I64Code      addr src
       | otherwise       -> assignMem_IntCode size addr src
-        where ty = cmmExprType src
+        where ty = cmmExprType dflags src
               size = cmmTypeSize ty
 
     CmmCall target result_regs args _
@@ -163,9 +165,9 @@ temporary, then do the other computation, and then use the temporary:
 
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: Maybe BlockId -> CmmStatic
-jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
+jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
+jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
     where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
@@ -203,11 +205,12 @@ assignReg_IntCode _ reg src = do
 -- Floating point assignment to memory
 assignMem_FltCode :: Size -> CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_FltCode pk addr src = do
+    dflags <- getDynFlags
     Amode dst__2 code1 <- getAmode addr
     (src__2, code2) <- getSomeReg src
     tmp1 <- getNewRegNat pk
     let
-        pk__2   = cmmExprType src
+        pk__2   = cmmExprType dflags src
         code__2 = code1 `appOL` code2 `appOL`
             if   sizeToWidth pk == typeWidth pk__2
             then unitOL (ST pk src__2 dst__2)
@@ -321,8 +324,8 @@ genSwitch dflags expr ids
 
 generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
-generateJumpTableForInstr _ (JMP_TBL _ ids label) =
-        let jumpTable = map jumpTableEntry ids
+generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
+        let jumpTable = map (jumpTableEntry dflags) ids
         in Just (CmmData ReadOnlyData (Statics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
@@ -458,17 +461,21 @@ genCCall target dest_regs argsAndHints
 -- | Generate code to calculate an argument, and move it into one
 --      or two integer vregs.
 arg_to_int_vregs :: CmmExpr -> NatM (OrdList Instr, [Reg])
-arg_to_int_vregs arg
+arg_to_int_vregs arg = do dflags <- getDynFlags
+                          arg_to_int_vregs' dflags arg
+
+arg_to_int_vregs' :: DynFlags -> CmmExpr -> NatM (OrdList Instr, [Reg])
+arg_to_int_vregs' dflags arg
 
         -- If the expr produces a 64 bit int, then we can just use iselExpr64
-        | isWord64 (cmmExprType arg)
+        | isWord64 (cmmExprType dflags arg)
         = do    (ChildCode64 code r_lo) <- iselExpr64 arg
                 let r_hi                = getHiVRegFromLo r_lo
                 return (code, [r_hi, r_lo])
 
         | otherwise
         = do    (src, code)     <- getSomeReg arg
-                let pk          = cmmExprType arg
+                let pk          = cmmExprType dflags arg
 
                 case cmmTypeSize pk of
 

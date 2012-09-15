@@ -57,14 +57,14 @@ static Time HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 // current = current as of last GC
-static lnat current_residency = 0; // in words; for stats only
-static lnat max_residency     = 0;
-static lnat cumulative_residency = 0;
-static lnat residency_samples = 0; // for stats only
-static lnat current_slop      = 0;
-static lnat max_slop          = 0;
+static W_ current_residency = 0; // in words; for stats only
+static W_ max_residency     = 0;
+static W_ cumulative_residency = 0;
+static W_ residency_samples = 0; // for stats only
+static W_ current_slop      = 0;
+static W_ max_slop          = 0;
 
-static lnat GC_end_faults = 0;
+static W_ GC_end_faults = 0;
 
 static Time *GC_coll_cpu = NULL;
 static Time *GC_coll_elapsed = NULL;
@@ -340,8 +340,8 @@ stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
 
 void
 stat_endGC (Capability *cap, gc_thread *gct,
-            lnat alloc, lnat live, lnat copied, lnat slop, nat gen,
-            nat par_n_threads, lnat par_max_copied, lnat par_tot_copied)
+            W_ alloc, W_ live, W_ copied, W_ slop, nat gen,
+            nat par_n_threads, W_ par_max_copied, W_ par_tot_copied)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         RtsFlags.ProfFlags.doHeapProfile)
@@ -381,12 +381,12 @@ stat_endGC (Capability *cap, gc_thread *gct,
         gc_cpu = cpu - gct->gc_start_cpu;
 
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
-	    nat faults = getPageFaults();
+	    W_ faults = getPageFaults();
 	    
 	    statsPrintf("%9" FMT_SizeT " %9" FMT_SizeT " %9" FMT_SizeT,
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_SizeT " %4" FMT_SizeT "  (Gen: %2d)\n",
+            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_Word " %4" FMT_Word "  (Gen: %2d)\n",
                     TimeToSecondsDbl(gc_cpu),
 		    TimeToSecondsDbl(gc_elapsed),
 		    TimeToSecondsDbl(cpu),
@@ -419,8 +419,8 @@ stat_endGC (Capability *cap, gc_thread *gct,
 	 *       to calculate the total
 	 */
         {
-            lnat tot_alloc = 0;
-            lnat n;
+            W_ tot_alloc = 0;
+            W_ n;
             for (n = 0; n < n_capabilities; n++) {
                 tot_alloc += capabilities[n].total_allocated;
                 traceEventHeapAllocated(&capabilities[n],
@@ -627,7 +627,7 @@ stat_exit(int alloc)
 	if (tot_elapsed == 0.0) tot_elapsed = 1;
 	
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	    statsPrintf("%9" FMT_SizeT " %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
+	    statsPrintf("%9" FMT_SizeT " %9.9s %9.9s", (W_)alloc*sizeof(W_), "", "");
 	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
 	}
 
@@ -666,7 +666,7 @@ stat_exit(int alloc)
             if ( residency_samples > 0 ) {
 		showStgWord64(max_residency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
-		statsPrintf("%16s bytes maximum residency (%" FMT_SizeT " sample(s))\n",
+		statsPrintf("%16s bytes maximum residency (%" FMT_Word " sample(s))\n",
 			temp, residency_samples);
 	    }
 
@@ -675,7 +675,7 @@ stat_exit(int alloc)
 
 	    statsPrintf("%16" FMT_SizeT " MB total memory in use (%" FMT_SizeT " MB lost due to fragmentation)\n\n", 
                         peak_mblocks_allocated * MBLOCK_SIZE_W / (1024 * 1024 / sizeof(W_)),
-                        (lnat)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
+                        (W_)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
             statsPrintf("                                    Tot time (elapsed)  Avg pause  Max pause\n");
@@ -856,9 +856,9 @@ void
 statDescribeGens(void)
 {
   nat g, mut, lge, i;
-  lnat gen_slop;
-  lnat tot_live, tot_slop;
-  lnat gen_live, gen_blocks;
+  W_ gen_slop;
+  W_ tot_live, tot_slop;
+  W_ gen_live, gen_blocks;
   bdescr *bd;
   generation *gen;
   
@@ -896,12 +896,12 @@ statDescribeGens(void)
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
 
-      debugBelch("%5d %7" FMT_SizeT " %9d", g, (lnat)gen->max_blocks, mut);
+      debugBelch("%5d %7" FMT_Word " %9d", g, (W_)gen->max_blocks, mut);
 
       gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 
-      debugBelch("%8" FMT_SizeT " %8d %8" FMT_SizeT " %8" FMT_SizeT "\n", gen_blocks, lge,
-                 gen_live*sizeof(W_), gen_slop*sizeof(W_));
+      debugBelch("%8" FMT_Word " %8d %8" FMT_Word " %8" FMT_Word "\n", gen_blocks, lge,
+                 gen_live*(W_)sizeof(W_), gen_slop*(W_)sizeof(W_));
       tot_live += gen_live;
       tot_slop += gen_slop;
   }

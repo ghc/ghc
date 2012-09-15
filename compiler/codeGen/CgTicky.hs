@@ -59,7 +59,6 @@ import Id
 import IdInfo
 import BasicTypes
 import FastString
-import Constants
 import Outputable
 import Module
 
@@ -98,14 +97,14 @@ emitTickyCounter cl_info args on_stk
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
 -- panic and disorder.
-	    [ mkIntCLit 0,
-	      mkIntCLit (length args),-- Arity
-	      mkIntCLit on_stk,	-- Words passed on stack
+	    [ mkIntCLit dflags 0,
+	      mkIntCLit dflags (length args),-- Arity
+	      mkIntCLit dflags on_stk,	-- Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
-	      zeroCLit, 		-- Entry count
-	      zeroCLit, 		-- Allocs
-	      zeroCLit 			-- Link
+	      zeroCLit dflags, 		-- Entry count
+	      zeroCLit dflags, 		-- Allocs
+	      zeroCLit dflags 			-- Link
 	    ] }
   where
     name = closureName cl_info
@@ -161,10 +160,11 @@ tickyUpdateBhCaf cl_info
 tickyEnterFun :: ClosureInfo -> Code
 tickyEnterFun cl_info
   = ifTicky $ 
-    do 	{ bumpTickyCounter ctr
+    do  { dflags <- getDynFlags
+        ; bumpTickyCounter ctr
 	; fun_ctr_lbl <- getTickyCtrLabel
 	; registerTickyCtr fun_ctr_lbl
-	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
+	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl (oFFSET_StgEntCounter_entry_count dflags))
         }
   where
     ctr | isStaticClosure cl_info = fsLit "ENT_STATIC_FUN_DIRECT_ctr"
@@ -177,21 +177,21 @@ registerTickyCtr :: CLabel -> Code
 --	    ticky_entry_ctrs = & (f_ct);	/* mark it as "registered" */
 --	    f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl
-  = emitIf test (stmtsC register_stmts)
-  where
-    -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq wordWidth)
-              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) bWord,
-               CmmLit (mkIntCLit 0)]
-    register_stmts
-      =	[ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
-		   (CmmLoad ticky_entry_ctrs bWord)
-	, CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
-	, CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp))
-		   (CmmLit (mkIntCLit 1)) ]
-    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+  = do dflags <- getDynFlags
+       let -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
+           test = CmmMachOp (MO_Eq (wordWidth dflags))
+                     [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
+                                       (oFFSET_StgEntCounter_registeredp dflags))) (bWord dflags),
+                      CmmLit (mkIntCLit dflags 0)]
+           register_stmts
+             = [ CmmStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
+                          (CmmLoad ticky_entry_ctrs (bWord dflags))
+               , CmmStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
+               , CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
+                                       (oFFSET_StgEntCounter_registeredp dflags)))
+                          (CmmLit (mkIntCLit dflags 1)) ]
+           ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsPackageId (fsLit "ticky_entry_ctrs"))
+       emitIf test (stmtsC register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: Arity -> Code
 tickyReturnOldCon arity 
@@ -292,14 +292,15 @@ tickyAllocHeap :: VirtualHpOffset -> Code
 -- Called when doing a heap check [TICK_ALLOC_HEAP]
 tickyAllocHeap hp
   = ifTicky $
-    do	{ ticky_ctr <- getTickyCtrLabel
+    do  { dflags <- getDynFlags
+        ; ticky_ctr <- getTickyCtrLabel
 	; stmtsC $
 	  if hp == 0 then [] 	-- Inside the stmtC to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
 	    addToMem (typeWidth REP_StgEntCounter_allocs)
 			(CmmLit (cmmLabelOffB ticky_ctr 
-				oFFSET_StgEntCounter_allocs)) hp,
+				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr
 	    addToMemLbl cLongWidth (mkCmmDataLabel rtsPackageId $ fsLit "ALLOC_HEAP_ctr") 1,
   		-- Bump ALLOC_HEAP_tot

@@ -25,6 +25,7 @@ module Bitmap (
 
 import SMRep
 import Constants
+import DynFlags
 import Util
 
 import Data.Bits
@@ -37,10 +38,10 @@ generated code which need to be emitted as sequences of StgWords.
 type Bitmap = [StgWord]
 
 -- | Make a bitmap from a sequence of bits
-mkBitmap :: [Bool] -> Bitmap
-mkBitmap [] = []
-mkBitmap stuff = chunkToBitmap chunk : mkBitmap rest
-  where (chunk, rest) = splitAt wORD_SIZE_IN_BITS stuff
+mkBitmap :: DynFlags -> [Bool] -> Bitmap
+mkBitmap _ [] = []
+mkBitmap dflags stuff = chunkToBitmap chunk : mkBitmap dflags rest
+  where (chunk, rest) = splitAt (wORD_SIZE_IN_BITS dflags) stuff
 
 chunkToBitmap :: [Bool] -> StgWord
 chunkToBitmap chunk = 
@@ -50,31 +51,31 @@ chunkToBitmap chunk =
 -- eg. @[0,1,3], size 4 ==> 0xb@.
 --
 -- The list of @Int@s /must/ be already sorted.
-intsToBitmap :: Int -> [Int] -> Bitmap
-intsToBitmap size slots{- must be sorted -}
+intsToBitmap :: DynFlags -> Int -> [Int] -> Bitmap
+intsToBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
   | otherwise = 
     (foldr (.|.) 0 (map (1 `shiftL`) these)) : 
-	intsToBitmap (size - wORD_SIZE_IN_BITS) 
-	     (map (\x -> x - wORD_SIZE_IN_BITS) rest)
-   where (these,rest) = span (<wORD_SIZE_IN_BITS) slots
+        intsToBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
+             (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
+   where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
 
 -- | Make a bitmap where the slots specified are the /zeros/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
 -- just to make the bitmap easier to read).
 --
 -- The list of @Int@s /must/ be already sorted and duplicate-free.
-intsToReverseBitmap :: Int -> [Int] -> Bitmap
-intsToReverseBitmap size slots{- must be sorted -}
+intsToReverseBitmap :: DynFlags -> Int -> [Int] -> Bitmap
+intsToReverseBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
   | otherwise = 
-    (foldr xor init (map (1 `shiftL`) these)) : 
-	intsToReverseBitmap (size - wORD_SIZE_IN_BITS) 
-	     (map (\x -> x - wORD_SIZE_IN_BITS) rest)
-   where (these,rest) = span (<wORD_SIZE_IN_BITS) slots
-	 init
-	   | size >= wORD_SIZE_IN_BITS = complement 0
-	   | otherwise                 = (1 `shiftL` size) - 1
+    (foldr xor init (map (1 `shiftL`) these)) :
+        intsToReverseBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
+             (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
+   where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
+         init
+           | size >= wORD_SIZE_IN_BITS dflags = complement 0
+           | otherwise                        = (1 `shiftL` size) - 1
 
 {- |
 Magic number, must agree with @BITMAP_BITS_SHIFT@ in InfoTables.h.

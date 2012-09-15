@@ -231,7 +231,7 @@ mkReturn dflags e actuals updfr_off =
 mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple dflags actuals updfr_off =
   mkReturn dflags e actuals updfr_off
-  where e = CmmLoad (CmmStackSlot Old updfr_off) gcWord
+  where e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)
@@ -306,7 +306,7 @@ copyIn dflags oflow conv area formals =
   where ci (reg, RegisterParam r) (n, ms) =
           (n, CmmAssign (CmmLocal reg) (CmmReg $ CmmGlobal r) : ms)
         ci (r, StackParam off) (n, ms) = oflow area (r, off) (n, ms)
-        init_offset = widthInBytes wordWidth -- infotable
+        init_offset = widthInBytes (wordWidth dflags) -- infotable
         args  = assignArgumentsPos dflags conv localRegType formals
         args' = foldl adjust [] args
           where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
@@ -356,10 +356,10 @@ copyOutOflow dflags conv transfer area actuals updfr_off
                   case transfer of
                      Call ->
                        ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                       widthInBytes wordWidth)
+                       widthInBytes (wordWidth dflags))
                      JumpRet ->
                        ([],
-                       widthInBytes wordWidth)
+                       widthInBytes (wordWidth dflags))
                      _other ->
                        ([], 0)
             Old -> ([], updfr_off)
@@ -367,7 +367,7 @@ copyOutOflow dflags conv transfer area actuals updfr_off
     arg_offset = init_offset + extra_stack_off
 
     args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
-    args = assignArgumentsPos dflags conv cmmExprType actuals
+    args = assignArgumentsPos dflags conv (cmmExprType dflags) actuals
 
     args' = foldl adjust setRA args
       where adjust rst   (v, StackParam off)  = (v, StackParam (off + arg_offset)) : rst

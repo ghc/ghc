@@ -127,7 +127,7 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- Node must always point to things we enter
 	    EnterIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts) 
-		; let target       = entryCode dflags (closureInfoPtr (CmmReg nodeReg))
+		; let target       = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
                       enterClosure = stmtC (CmmJump target node_live)
                       -- If this is a scrutinee
                       -- let's check if the closure is a constructor
@@ -193,7 +193,7 @@ performTailCall fun_info arg_amodes pending_assts
     fun_name  = idName fun_id
     lf_info   = cgIdInfoLF fun_info
     fun_has_cafs = idCafInfo fun_id
-    untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
+    untag_node dflags = CmmAssign nodeReg (cmmUntag dflags (CmmReg nodeReg))
     -- Test if closure is a constructor
     maybeSwitchOnCons dflags enterClosure eob
               | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
@@ -203,7 +203,7 @@ performTailCall fun_info arg_amodes pending_assts
               = do { is_constr <- newLabelC
                    -- Is the pointer tagged?
                    -- Yes, jump to switch statement
-                   ; stmtC (CmmCondBranch (cmmIsTagged (CmmReg nodeReg)) 
+                   ; stmtC (CmmCondBranch (cmmIsTagged dflags (CmmReg nodeReg)) 
                                 is_constr)
                    -- No, enter the closure.
                    ; enterClosure
@@ -232,7 +232,7 @@ performTailCall fun_info arg_amodes pending_assts
 -}
               -- No case expression involved, enter the closure.
               | otherwise
-              = do { stmtC untag_node
+              = do { stmtC $ untag_node dflags
                    ; enterClosure
                    }
         where
@@ -413,11 +413,12 @@ tailCallPrimCall primcall
 
 tailCallPrim :: CLabel -> [StgArg] -> Code
 tailCallPrim lbl args
- = do	{	-- We're going to perform a normal-looking tail call, 
+ = do { dflags <- getDynFlags
+        -- We're going to perform a normal-looking tail call, 
 		-- except that *all* the arguments will be in registers.
 		-- Hence the ASSERT( null leftovers )
-	  arg_amodes <- getArgAmodes args
-	; let (arg_regs, leftovers) = assignPrimOpCallRegs arg_amodes
+	; arg_amodes <- getArgAmodes args
+	; let (arg_regs, leftovers) = assignPrimOpCallRegs dflags arg_amodes
               live_regs = Just $ map snd arg_regs
 	      jump_to_primop = jumpToLbl lbl live_regs
 

@@ -65,9 +65,10 @@ cgTopRhsClosure :: Id
                 -> FCode (CgIdInfo, FCode ())
 
 cgTopRhsClosure id ccs _ upd_flag args body
- = do { lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
+ = do { dflags <- getDynFlags
+      ; lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
       ; let closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
-            cg_id_info = litIdInfo id lf_info (CmmLabel closure_label)
+            cg_id_info = litIdInfo dflags id lf_info (CmmLabel closure_label)
       ; return (cg_id_info, gen_code lf_info closure_label)
       }
   where
@@ -242,7 +243,7 @@ mkRhsClosure    dflags bndr _cc _bi
                             (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee                -- Scrutinee is the only free variable
   && maybeToBool maybe_offset           -- Selectee is a component of the tuple
-  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE  -- Offset is small enough
+  && offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative
     -- is the only possible case and eliminated the others, even if there are
@@ -271,7 +272,7 @@ mkRhsClosure    dflags bndr _cc _bi
   | args `lengthIs` (arity-1)
         && all (isGcPtrRep . idPrimRep . stripNV) fvs
         && isUpdatable upd_flag
-        && arity <= mAX_SPEC_AP_SIZE
+        && arity <= mAX_SPEC_AP_SIZE dflags
         && not (dopt Opt_SccProfilingOn dflags)
                                   -- not when profiling: we don't want to
                                   -- lose information about this particular
@@ -340,7 +341,7 @@ mkRhsClosure _ bndr cc _ fvs upd_flag args body
                                          (map toVarArg fv_details)
 
         -- RETURN
-        ; return (mkRhsInit reg lf_info hp_plus_n) }
+        ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
 
 
 -- Use with care; if used inappropriately, it could break invariants.
@@ -381,7 +382,7 @@ cgRhsStdThunk bndr lf_info payload
                                    use_cc blame_cc payload_w_offsets
 
         -- RETURN
-  ; return (mkRhsInit reg lf_info hp_plus_n) }
+  ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
 
 
 mkClosureLFInfo :: Id           -- The binder
@@ -457,9 +458,9 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                       node' = if node_points then Just node else Nothing
                 ; tickyEnterFun cl_info
                 ; enterCostCentreFun cc
-                    (CmmMachOp mo_wordSub
+                    (CmmMachOp (mo_wordSub dflags)
                          [ CmmReg nodeReg
-                         , mkIntExpr (funTag cl_info) ])
+                         , mkIntExpr dflags (funTag cl_info) ])
                 ; whenC node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 
@@ -481,7 +482,8 @@ bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
 
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, WordOff)] -> FCode ()
 load_fvs node lf_info = mapM_ (\ (reg, off) ->
-      emit $ mkTaggedObjectLoad reg node off tag)
+   do dflags <- getDynFlags
+      emit $ mkTaggedObjectLoad dflags reg node off tag)
   where tag = lfDynTag lf_info
 
 -----------------------------------------
@@ -506,7 +508,7 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
            jump = mkDirectJump dflags
                                (mkLblExpr fast_lbl)
                                (map (CmmReg . CmmLocal) arg_regs)
-                               initUpdFrameOff
+                               (initUpdFrameOff dflags)
        emitProcWithConvention Slow Nothing slow_lbl arg_regs jump
   | otherwise = return ()
 
@@ -580,7 +582,7 @@ emitBlackHoleCode is_single_entry = do
 
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
-    emitStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
+    emitStore (cmmOffsetW dflags (CmmReg nodeReg) (fixedHdrSize dflags))
                   (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
     emitStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -633,8 +635,8 @@ pushUpdateFrame lbl updatee body
        dflags <- getDynFlags
        let
            hdr         = fixedHdrSize dflags * wORD_SIZE
-           frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr
-           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee
+           frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
+           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
        --
        emitStore (CmmStackSlot Old frame) (mkLblExpr lbl)
        emitStore (CmmStackSlot Old (frame - off_updatee)) updatee
@@ -686,7 +688,7 @@ link_caf :: LocalReg           -- pointer to the closure
 link_caf node _is_upd = do
   { dflags <- getDynFlags
     -- Alloc black hole specifying CC_HDR(Node) as the cost centre
-  ; let use_cc   = costCentreFrom (CmmReg nodeReg)
+  ; let use_cc   = costCentreFrom dflags (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
 
@@ -703,7 +705,7 @@ link_caf node _is_upd = do
         -- so that the garbage collector can find them
         -- This must be done *before* the info table pointer is overwritten,
         -- because the old info table ptr is needed for reversion
-  ; ret <- newTemp bWord
+  ; ret <- newTemp (bWord dflags)
   ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
         (CmmReg (CmmLocal node), AddrHint),
@@ -714,11 +716,11 @@ link_caf node _is_upd = do
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
   ; updfr  <- getUpdFrameOff
   ; emit =<< mkCmmIfThen
-      (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit])
+      (CmmMachOp (mo_wordEq dflags) [ CmmReg (CmmLocal ret), CmmLit (zeroCLit dflags)])
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-       (let target = entryCode dflags (closureInfoPtr (CmmReg (CmmLocal node))) in
+       (let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node))) in
         mkJump dflags target [] updfr)
 
   ; return hp_rel }

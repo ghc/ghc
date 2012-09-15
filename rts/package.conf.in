@@ -53,7 +53,7 @@ extra-libraries:
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR PAPI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-ghcconstants/header" TOP"/includes/dist-derivedconstants/header"
+include-dirs:           TOP"/rts/dist/build" TOP"/includes" TOP"/includes/dist-derivedconstants/header"
 #endif
 
 includes:		Stg.h

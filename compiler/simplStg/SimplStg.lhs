@@ -58,7 +58,7 @@ stg2stg dflags module_name binds
         ; let un_binds = unarise us1 processed_binds
         ; let srt_binds
                | dopt Opt_TryNewCodeGen dflags = zip un_binds (repeat [])
-               | otherwise = computeSRTs un_binds
+               | otherwise = computeSRTs dflags un_binds
 
 	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
 	     		(pprStgBindingsWithSRTs srt_binds)

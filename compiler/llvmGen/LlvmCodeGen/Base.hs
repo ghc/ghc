@@ -137,8 +137,8 @@ tysToParams :: [LlvmType] -> [LlvmParameter]
 tysToParams = map (\ty -> (ty, []))
 
 -- | Pointer width
-llvmPtrBits :: Int
-llvmPtrBits = widthInBits $ typeWidth gcWord
+llvmPtrBits :: DynFlags -> Int
+llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 
 -- ----------------------------------------------------------------------------
 -- * Llvm Version

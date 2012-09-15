@@ -34,6 +34,7 @@ import PprBase
 
 import BlockId
 import BasicTypes       (Alignment)
+import DynFlags
 import OldCmm
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
@@ -419,12 +420,13 @@ pprSectionHeader seg
 
 
 pprDataItem :: CmmLit -> SDoc
-pprDataItem lit = sdocWithPlatform $ \platform -> pprDataItem' platform lit
+pprDataItem lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags lit
 
-pprDataItem' :: Platform -> CmmLit -> SDoc
-pprDataItem' platform lit
-  = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
+pprDataItem' :: DynFlags -> CmmLit -> SDoc
+pprDataItem' dflags lit
+  = vcat (ppr_item (cmmTypeSize $ cmmLitType dflags lit) lit)
     where
+        platform = targetPlatform dflags
         imm = litToImm lit
 
         -- These seem to be common:

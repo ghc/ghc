@@ -205,10 +205,17 @@ untagNodeIdInfo id offset    lf_info tag
 
 
 idInfoToAmode :: CgIdInfo -> FCode CmmExpr
-idInfoToAmode info
-  = case cg_vol info of {
+idInfoToAmode info = do
+    dflags <- getDynFlags
+    let mach_rep = argMachRep dflags (cg_rep info)
+
+        maybeTag amode  -- add the tag, if we have one
+          | tag == 0   = amode
+          | otherwise  = cmmOffsetB dflags amode tag
+          where tag = cg_tag info
+    case cg_vol info of {
       RegLoc reg        -> returnFC (CmmReg reg) ;
-      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetB (CmmReg nodeReg) nd_off)
+      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetB dflags (CmmReg nodeReg) nd_off)
                                              mach_rep) ;
       VirHpLoc hp_off   -> do { off <- getHpRelOffset hp_off
                               ; return $! maybeTag off };
@@ -228,13 +235,6 @@ idInfoToAmode info
 
       NoStableLoc -> pprPanic "idInfoToAmode: no loc" (ppr (cg_id info))
     }
-  where
-    mach_rep = argMachRep (cg_rep info)
-
-    maybeTag amode  -- add the tag, if we have one
-      | tag == 0   = amode
-      | otherwise  = cmmOffsetB amode tag
-      where tag = cg_tag info
 
 cgIdInfoId :: CgIdInfo -> Id
 cgIdInfoId = cg_id 
@@ -451,13 +451,13 @@ bindNewToUntagNode id offset lf_info tag
 -- temporary.
 bindNewToTemp :: Id -> FCode LocalReg
 bindNewToTemp id
-  = do  addBindC id (regIdInfo id (CmmLocal temp_reg) lf_info)
+  = do  dflags <- getDynFlags
+        let uniq     = getUnique id
+            temp_reg = LocalReg uniq (argMachRep dflags (idCgRep id))
+            lf_info  = mkLFArgument id  -- Always used of things we
+                                        -- know nothing about
+        addBindC id (regIdInfo id (CmmLocal temp_reg) lf_info)
         return temp_reg
-  where
-    uniq     = getUnique id
-    temp_reg = LocalReg uniq (argMachRep (idCgRep id))
-    lf_info  = mkLFArgument id  -- Always used of things we
-                                -- know nothing about
 
 bindNewToReg :: Id -> CmmReg -> LambdaFormInfo -> Code
 bindNewToReg name reg lf_info

@@ -244,11 +244,11 @@ extern void initBlockAllocator(void);
 
 /* Allocation -------------------------------------------------------------- */
 
-bdescr *allocGroup(nat n);
+bdescr *allocGroup(W_ n);
 bdescr *allocBlock(void);
 
 // versions that take the storage manager lock for you:
-bdescr *allocGroup_lock(nat n);
+bdescr *allocGroup_lock(W_ n);
 bdescr *allocBlock_lock(void);
 
 /* De-Allocation ----------------------------------------------------------- */

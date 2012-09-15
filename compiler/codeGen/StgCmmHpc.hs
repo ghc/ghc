@@ -19,14 +19,14 @@ import StgCmmUtils
 import HscTypes
 import DynFlags
 
-mkTickBox :: Module -> Int -> CmmAGraph
-mkTickBox mod n 
+mkTickBox :: DynFlags -> Module -> Int -> CmmAGraph
+mkTickBox dflags mod n
   = mkStore tick_box (CmmMachOp (MO_Add W64)
                                 [ CmmLoad tick_box b64
                                 , CmmLit (CmmInt 1 W64)
                                 ])
   where
-    tick_box = cmmIndex W64
+    tick_box = cmmIndex dflags W64
                         (CmmLit $ CmmLabel $ mkHpcTicksLabel $ mod)
                         n
 

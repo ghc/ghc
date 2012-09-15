@@ -33,6 +33,7 @@ import CLabel
 import Cmm
 import CmmUtils
 import Data.List
+import DynFlags
 import Maybes
 import Module
 import Outputable
@@ -166,17 +167,17 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
-buildSRT :: TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
-buildSRT topSRT cafs =
+buildSRT :: DynFlags -> TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+buildSRT dflags topSRT cafs =
   do let
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
            let cafs = Set.elems localCafs
                mkSRT topSRT =
-                 do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
+                 do localSRTs <- procpointSRT dflags (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
-           in if length cafs > maxBmpSize then
+           in if length cafs > maxBmpSize dflags then
                 mkSRT (foldl add_if_missing topSRT cafs)
               else -- make sure all the cafs are near the bottom of the srt
                 mkSRT (add_if_too_far topSRT cafs)
@@ -196,7 +197,7 @@ buildSRT topSRT cafs =
                add srt [] = srt
                add srt@(TopSRT {next_elt = next}) (caf : rst) =
                  case cafOffset srt caf of
-                   Just ix -> if next - ix > maxBmpSize then
+                   Just ix -> if next - ix > maxBmpSize dflags then
                                 add (addCAF caf srt) rst
                               else srt
                    Nothing -> add (addCAF caf srt) rst
@@ -206,12 +207,12 @@ buildSRT topSRT cafs =
 
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
-procpointSRT :: CLabel -> Map CLabel Int -> [CLabel] ->
+procpointSRT :: DynFlags -> CLabel -> Map CLabel Int -> [CLabel] ->
                 UniqSM (Maybe CmmDecl, C_SRT)
-procpointSRT _ _ [] =
+procpointSRT _ _ _ [] =
  return (Nothing, NoC_SRT)
-procpointSRT top_srt top_table entries =
- do (top, srt) <- bitmap `seq` to_SRT top_srt offset len bitmap
+procpointSRT dflags top_srt top_table entries =
+ do (top, srt) <- bitmap `seq` to_SRT dflags top_srt offset len bitmap
     return (top, srt)
   where
     ints = map (expectJust "constructSRT" . flip Map.lookup top_table) entries
@@ -219,22 +220,22 @@ procpointSRT top_srt top_table entries =
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
     len = P.last bitmap_entries + 1
-    bitmap = intsToBitmap len bitmap_entries
+    bitmap = intsToBitmap dflags len bitmap_entries
 
-maxBmpSize :: Int
-maxBmpSize = widthInBits wordWidth `div` 2
+maxBmpSize :: DynFlags -> Int
+maxBmpSize dflags = widthInBits (wordWidth dflags) `div` 2
 
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
-to_SRT :: CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
-to_SRT top_srt off len bmp
-  | len > maxBmpSize || bmp == [fromIntegral srt_escape]
+to_SRT :: DynFlags -> CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
+to_SRT dflags top_srt off len bmp
+  | len > maxBmpSize dflags || bmp == [fromIntegral srt_escape]
   = do id <- getUniqueM
        let srt_desc_lbl = mkLargeSRTLabel id
            tbl = CmmData RelocatableReadOnlyData $
                    Statics srt_desc_lbl $ map CmmStaticLit
                      ( cmmLabelOffW top_srt off
-                     : mkWordCLit (fromIntegral len)
-                     : map mkWordCLit bmp)
+                     : mkWordCLit dflags (fromIntegral len)
+                     : map (mkWordCLit dflags) bmp)
        return (Just tbl, C_SRT srt_desc_lbl 0 srt_escape)
   | otherwise
   = return (Nothing, C_SRT top_srt off (fromIntegral (head bmp)))
@@ -318,11 +319,12 @@ flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
      localCAFs = unzipWith localCAFInfo zipped
      flatmap   = mkTopCAFInfo localCAFs -- transitive closure of localCAFs
 
-doSRTs :: TopSRT
+doSRTs :: DynFlags
+       -> TopSRT
        -> [(CAFEnv, [CmmDecl])]
        -> IO (TopSRT, [CmmDecl])
 
-doSRTs topSRT tops
+doSRTs dflags topSRT tops
   = do
      let caf_decls = flattenCAFSets tops
      us <- mkSplitUniqSupply 'u'
@@ -330,19 +332,19 @@ doSRTs topSRT tops
      return (topSRT', reverse gs' {- Note [reverse gs] -})
   where
     setSRT (topSRT, rst) (caf_map, decl@(CmmProc{})) = do
-       (topSRT, srt_tables, srt_env) <- buildSRTs topSRT caf_map
+       (topSRT, srt_tables, srt_env) <- buildSRTs dflags topSRT caf_map
        let decl' = updInfoSRTs srt_env decl
        return (topSRT, decl': srt_tables ++ rst)
     setSRT (topSRT, rst) (_, decl) =
       return (topSRT, decl : rst)
 
-buildSRTs :: TopSRT -> BlockEnv CAFSet
+buildSRTs :: DynFlags -> TopSRT -> BlockEnv CAFSet
           -> UniqSM (TopSRT, [CmmDecl], BlockEnv C_SRT)
-buildSRTs top_srt caf_map
+buildSRTs dflags top_srt caf_map
   = foldM doOne (top_srt, [], mapEmpty) (mapToList caf_map)
   where
   doOne (top_srt, decls, srt_env) (l, cafs)
-    = do (top_srt, mb_decl, srt) <- buildSRT top_srt cafs
+    = do (top_srt, mb_decl, srt) <- buildSRT dflags top_srt cafs
          return ( top_srt, maybeToList mb_decl ++ decls
                 , mapInsert l srt srt_env )
 

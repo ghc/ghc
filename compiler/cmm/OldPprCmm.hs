@@ -93,9 +93,10 @@ pprStmt stmt = case stmt of
     CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
 
     -- rep[lv] = expr;
-    CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
-        where
-          rep = ppr ( cmmExprType expr )
+    CmmStore lv expr ->
+        sdocWithDynFlags $ \dflags ->
+        let rep = ppr ( cmmExprType dflags expr )
+        in rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
 
     -- call "ccall" foo(x, y)[r1, r2];
     -- ToDo ppr volatile

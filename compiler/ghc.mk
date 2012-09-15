@@ -461,9 +461,18 @@ $(compiler_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
 $(compiler_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
 $(compiler_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
 
-$(compiler_stage1_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
-$(compiler_stage2_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
-$(compiler_stage3_depfile_haskell) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_GHCCONSTANTS) $(includes_DERIVEDCONSTANTS) $(PRIMOP_BITS)
+COMPILER_INCLUDES_DEPS += $(includes_H_CONFIG)
+COMPILER_INCLUDES_DEPS += $(includes_H_PLATFORM)
+COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)
+COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_TYPE)
+COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
+COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
+COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
+COMPILER_INCLUDES_DEPS += $(PRIMOP_BITS)
+
+$(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
+$(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
+$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
 
 # Every Constants.o object file depends on includes/GHCConstants.h:
 $(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS) includes/HaskellConstants.hs))

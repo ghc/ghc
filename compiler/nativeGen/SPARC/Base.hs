@@ -25,7 +25,7 @@ module SPARC.Base (
 
 where
 
-import qualified Constants
+import DynFlags
 import Panic
 
 import Data.Int
@@ -40,9 +40,9 @@ wordLengthInBits
 	= wordLength * 8
 
 -- Size of the available spill area
-spillAreaLength :: Int
+spillAreaLength :: DynFlags -> Int
 spillAreaLength
-	= Constants.rESERVED_C_STACK_BYTES
+	= rESERVED_C_STACK_BYTES
 
 -- | We need 8 bytes because our largest registers are 64 bit.
 spillSlotSize :: Int

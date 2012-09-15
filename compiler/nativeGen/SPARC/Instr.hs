@@ -46,6 +46,7 @@ import Size
 import CLabel
 import CodeGen.Platform
 import BlockId
+import DynFlags
 import OldCmm
 import FastString
 import FastBool
@@ -372,15 +373,16 @@ sparc_patchJumpInstr insn patchF
 -- | Make a spill instruction.
 -- 	On SPARC we spill below frame pointer leaving 2 words/spill
 sparc_mkSpillInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkSpillInstr platform reg _ slot
- = let	off     = spillSlotToOffset slot
-        off_w	= 1 + (off `div` 4)
+sparc_mkSpillInstr dflags reg _ slot
+ = let  platform = targetPlatform dflags
+        off      = spillSlotToOffset dflags slot
+        off_w    = 1 + (off `div` 4)
         sz 	= case targetClassOfReg platform reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
@@ -392,14 +394,15 @@ sparc_mkSpillInstr platform reg _ slot
 
 -- | Make a spill reload instruction.
 sparc_mkLoadInstr
-    :: Platform
+    :: DynFlags
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkLoadInstr platform reg _ slot
-  = let off     = spillSlotToOffset slot
+sparc_mkLoadInstr dflags reg _ slot
+  = let platform = targetPlatform dflags
+        off      = spillSlotToOffset dflags slot
 	off_w	= 1 + (off `div` 4)
         sz	= case targetClassOfReg platform reg of
 			RcInteger -> II32
