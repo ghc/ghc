@@ -611,14 +611,14 @@ newtype at outermost level; and bale out if we see it again.
 
 Note [Nullary unboxed tuple]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We represent the nullary unboxed tuple as the unary (but void) type
+State# RealWorld.  The reason for this is that the ReprArity is never
+less than the Arity (as it would otherwise be for a function type like
+(# #) -> Int).
 
-We represent the nullary unboxed tuple as the unary (but void) type State# RealWorld.
-The reason for this is that the ReprArity is never less than the Arity (as it would
-otherwise be for a function type like (# #) -> Int).
-
-As a result, ReprArity is always strictly positive if Arity is. This is important
-because it allows us to distinguish at runtime between a thunk and a function
- takes a nullary unboxed tuple as an argument!
+As a result, ReprArity is always strictly positive if Arity is. This
+is important because it allows us to distinguish at runtime between a
+thunk and a function takes a nullary unboxed tuple as an argument!
 
 \begin{code}
 type UnaryType = Type
