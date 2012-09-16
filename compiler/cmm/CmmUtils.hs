@@ -72,7 +72,6 @@ import CLabel
 import Outputable
 import Unique
 import UniqSupply
-import Constants( tAG_MASK )
 import DynFlags
 import Util
 
@@ -343,8 +342,8 @@ hasNoGlobalRegs _ = False
 -- Tag bits mask
 --cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
 cmmTagMask, cmmPointerMask :: DynFlags -> CmmExpr
-cmmTagMask dflags = mkIntExpr dflags tAG_MASK
-cmmPointerMask dflags = mkIntExpr dflags (complement tAG_MASK)
+cmmTagMask dflags = mkIntExpr dflags (tAG_MASK dflags)
+cmmPointerMask dflags = mkIntExpr dflags (complement (tAG_MASK dflags))
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged

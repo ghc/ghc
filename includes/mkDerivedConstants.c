@@ -697,6 +697,9 @@ main(int argc, char *argv[])
     // Number of bits to shift a bitfield left by in an info table.
     constantInt("bITMAP_BITS_SHIFT", BITMAP_BITS_SHIFT);
 
+    // Amount of pointer bits used for semi-tagging constructor closures
+    constantInt("tAG_BITS", TAG_BITS);
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");

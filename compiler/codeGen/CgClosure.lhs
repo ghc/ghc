@@ -84,7 +84,7 @@ cgTopRhsClosure id ccs binder_info upd_flag args body = do
   ; let descr         = closureDescription dflags mod_name name
 	closure_info  = mkClosureInfo dflags True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name $ idCafInfo id
-    	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
+    	cg_id_info    = stableIdInfo dflags id (mkLblExpr closure_label) lf_info
 	closure_rep   = mkStaticClosureFields dflags closure_info ccs True []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
@@ -136,7 +136,7 @@ cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
   ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
-  ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
+  ; returnFC (bndr, heapIdInfo dflags bndr heap_offset lf_info) }
 \end{code}
 
 Here's the general case.
@@ -188,7 +188,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 	  let 
               -- A function closure pointer may be tagged, so we
               -- must take it into account when accessing the free variables.
-              mbtag       = tagForArity (length args)
+              mbtag       = tagForArity dflags (length args)
               bind_fv (info, offset)
                 | Just tag <- mbtag
                 = bindNewToUntagNode (cgIdInfoId info) offset (cgIdInfoLF info) tag
@@ -211,7 +211,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
-  ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
+  ; returnFC (bndr, heapIdInfo dflags bndr heap_offset lf_info) }
 
 
 mkClosureLFInfo :: Id		-- The binder
@@ -324,7 +324,7 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
         ; tickyEnterFun cl_info
         ; enterCostCentreFun cc
               (CmmMachOp (mo_wordSub dflags) [ CmmReg nodeReg
-                                             , mkIntExpr dflags (funTag cl_info) ])
+                                             , mkIntExpr dflags (funTag dflags cl_info) ])
               (node : map snd reg_args) -- live regs
 
         ; cgExpr body }

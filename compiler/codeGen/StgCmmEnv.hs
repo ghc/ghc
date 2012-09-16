@@ -76,11 +76,11 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 --	Manipulating CgIdInfo
 -------------------------------------
 
-mkCgIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
-mkCgIdInfo id lf expr
+mkCgIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
+mkCgIdInfo dflags id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr, 
-	       cg_tag = lfDynTag lf }
+               cg_tag = lfDynTag dflags lf }
 
 litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo dflags id lf lit
@@ -88,13 +88,13 @@ litIdInfo dflags id lf lit
              , cg_loc = CmmLoc (addDynTag dflags (CmmLit lit) tag) 
 	     , cg_tag = tag }
   where
-    tag = lfDynTag lf
+    tag = lfDynTag dflags lf
 
 lneIdInfo :: DynFlags -> Id -> [NonVoid Id] -> CgIdInfo
 lneIdInfo dflags id regs
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = LneLoc blk_id (map (idToReg dflags) regs)
-	     , cg_tag = lfDynTag lf }
+             , cg_tag = lfDynTag dflags lf }
   where
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
@@ -104,11 +104,11 @@ rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
   = do dflags <- getDynFlags
        reg <- newTemp (gcWord dflags)
-       return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
+       return (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)), reg)
 
 mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit dflags reg lf_info expr
-  = mkAssign (CmmLocal reg) (addDynTag dflags expr (lfDynTag lf_info))
+  = mkAssign (CmmLocal reg) (addDynTag dflags expr (lfDynTag dflags lf_info))
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
@@ -217,7 +217,7 @@ bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do dflags <- getDynFlags
        let reg = idToReg dflags nvid
-       addBindC id (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
+       addBindC id (mkCgIdInfo dflags id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
 rebindToReg :: NonVoid Id -> FCode LocalReg

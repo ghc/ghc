@@ -162,7 +162,8 @@ cgLetNoEscapeClosure
     in
     -- saveVolatileVarsAndRegs done earlier in cgExpr.
 
-    do  { (vSp, _) <- forkEvalHelp rhs_eob_info
+    do  { dflags <- getDynFlags
+        ; (vSp, _) <- forkEvalHelp rhs_eob_info
 
 		(do { allocStackTop retAddrSizeW
 		    ; nukeDeadBindings full_live_in_rhss })
@@ -176,7 +177,7 @@ cgLetNoEscapeClosure
 		    ; _ <- emitReturnTarget (idName bndr) abs_c
 		    ; return () })
 
-	; returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info) }
+	; returnFC (bndr, letNoEscapeIdInfo dflags bndr vSp lf_info) }
 \end{code}
 
 \begin{code}

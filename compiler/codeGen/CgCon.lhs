@@ -98,7 +98,7 @@ cgTopRhsCon id con args
         ; emitDataLits closure_label closure_rep
 
                 -- RETURN
-        ; returnFC (id, taggedStableIdInfo id (mkLblExpr closure_label) lf_info con) }
+        ; returnFC (id, taggedStableIdInfo dflags id (mkLblExpr closure_label) lf_info con) }
 \end{code}
 
 %************************************************************************
@@ -148,8 +148,8 @@ which have exclusively size-zero (VoidRep) args, we generate no code
 at all.
 
 \begin{code}
-buildDynCon' _ _ binder _ con []
-  = returnFC (taggedStableIdInfo binder
+buildDynCon' dflags _ binder _ con []
+  = returnFC (taggedStableIdInfo dflags binder
                            (mkLblExpr (mkClosureLabel (dataConName con)
                                       (idCafInfo binder)))
                            (mkConLFInfo con)
@@ -193,7 +193,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = CmmLit (cmmLabelOffW dflags intlike_lbl offsetW)
-        ; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
+        ; returnFC (taggedStableIdInfo dflags binder intlike_amode (mkConLFInfo con) con) }
 
 buildDynCon' dflags platform binder _ con [arg_amode]
   | maybeCharLikeCon con
@@ -205,7 +205,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = CmmLit (cmmLabelOffW dflags charlike_lbl offsetW)
-        ; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }
+        ; returnFC (taggedStableIdInfo dflags binder charlike_amode (mkConLFInfo con) con) }
 
 \end{code}
 
@@ -218,7 +218,7 @@ buildDynCon' dflags _ binder ccs con args
             (closure_info, amodes_w_offsets) = layOutDynConstr dflags con args
 
         ; hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
-        ; returnFC (taggedHeapIdInfo binder hp_off lf_info con) }
+        ; returnFC (taggedHeapIdInfo dflags binder hp_off lf_info con) }
   where
     lf_info = mkConLFInfo con
 
@@ -249,7 +249,7 @@ bindConArgs con args
        let
           -- The binding below forces the masking out of the tag bits
           -- when accessing the constructor field.
-          bind_arg (arg, offset) = bindNewToUntagNode arg offset (mkLFArgument arg) (tagForCon con)
+          bind_arg (arg, offset) = bindNewToUntagNode arg offset (mkLFArgument arg) (tagForCon dflags con)
           (_, args_w_offsets)    = layOutDynConstr dflags con (addIdReps args)
         --
        ASSERT(not (isUnboxedTupleCon con)) return ()
@@ -418,7 +418,8 @@ closures predeclared.
 \begin{code}
 cgTyCon :: TyCon -> FCode CmmGroup  -- each constructor gets a separate CmmGroup
 cgTyCon tycon
-  = do  { constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
+  = do  { dflags <- getDynFlags
+        ; constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
 
             -- Generate a table of static closures for an enumeration type
             -- Put the table after the data constructor decls, because the
@@ -431,7 +432,7 @@ cgTyCon tycon
         ; extra <-
            if isEnumerationTyCon tycon then do
                 tbl <- getCmm (emitRODataLits "cgTyCon" (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
-                           [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs) (tagForCon con)
+                           [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs) (tagForCon dflags con)
                            | con <- tyConDataCons tycon])
                 return [tbl]
            else

@@ -86,7 +86,6 @@ import TcType
 import TyCon
 import BasicTypes
 import Outputable
-import Constants
 import DynFlags
 import Util
 
@@ -299,32 +298,33 @@ Big families only use the tag value 1 to represent evaluatedness.
 We don't have very many tag bits: for example, we have 2 bits on
 x86-32 and 3 bits on x86-64. -}
 
-isSmallFamily :: Int -> Bool
-isSmallFamily fam_size = fam_size <= mAX_PTR_TAG
+isSmallFamily :: DynFlags -> Int -> Bool
+isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
 -- We keep the *zero-indexed* tag in the srt_len field of the info
 -- table of a data constructor.
 dataConTagZ :: DataCon -> ConTagZ
 dataConTagZ con = dataConTag con - fIRST_TAG
 
-tagForCon :: DataCon -> DynTag
-tagForCon con 
-  | isSmallFamily fam_size = con_tag + 1
-  | otherwise		   = 1
+tagForCon :: DynFlags -> DataCon -> DynTag
+tagForCon dflags con
+  | isSmallFamily dflags fam_size = con_tag + 1
+  | otherwise                     = 1
   where
     con_tag  = dataConTagZ con
     fam_size = tyConFamilySize (dataConTyCon con)
 
-tagForArity :: RepArity -> DynTag
-tagForArity arity | isSmallFamily arity = arity
-                  | otherwise           = 0
+tagForArity :: DynFlags -> RepArity -> DynTag
+tagForArity dflags arity
+ | isSmallFamily dflags arity = arity
+ | otherwise                  = 0
 
-lfDynTag :: LambdaFormInfo -> DynTag
+lfDynTag :: DynFlags -> LambdaFormInfo -> DynTag
 -- Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
-lfDynTag (LFCon con)               = tagForCon con
-lfDynTag (LFReEntrant _ arity _ _) = tagForArity arity
-lfDynTag _other                    = 0
+lfDynTag dflags (LFCon con)               = tagForCon dflags con
+lfDynTag dflags (LFReEntrant _ arity _ _) = tagForArity dflags arity
+lfDynTag _      _other                    = 0
 
 
 -----------------------------------------------------------------------------
@@ -755,8 +755,9 @@ lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
 lfFunInfo _                                 = Nothing
 
-funTag :: ClosureInfo -> DynTag
-funTag (ClosureInfo { closureLFInfo = lf_info }) = lfDynTag lf_info
+funTag :: DynFlags -> ClosureInfo -> DynTag
+funTag dflags (ClosureInfo { closureLFInfo = lf_info })
+    = lfDynTag dflags lf_info
 
 isToplevClosure :: ClosureInfo -> Bool
 isToplevClosure (ClosureInfo { closureLFInfo = lf_info })

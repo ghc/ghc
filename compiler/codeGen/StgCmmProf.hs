@@ -347,8 +347,8 @@ ldvRecordCreate closure = do dflags <- getDynFlags
 --
 ldvEnterClosure :: ClosureInfo -> FCode ()
 ldvEnterClosure closure_info = do dflags <- getDynFlags
+                                  let tag = funTag dflags closure_info
                                   ldvEnter (cmmOffsetB dflags (CmmReg nodeReg) (-tag))
-  where tag = funTag closure_info
         -- don't forget to substract node's tag
   
 ldvEnter :: CmmExpr -> FCode ()

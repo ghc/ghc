@@ -1,5 +1,4 @@
 
-import Data.Bits (shiftL)
 import Data.Word
 import Data.Int
 
@@ -56,15 +55,4 @@ tARGET_MAX_WORD = fromIntegral (maxBound :: TargetWord)
 
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff
-
--- Amount of pointer bits used for semi-tagging constructor closures
-
-tAG_BITS :: Int
-tAG_BITS = TAG_BITS
-
-tAG_MASK :: Int
-tAG_MASK = (1 `shiftL` tAG_BITS) - 1
-
-mAX_PTR_TAG :: Int
-mAX_PTR_TAG = tAG_MASK
 

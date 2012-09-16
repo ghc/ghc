@@ -217,7 +217,7 @@ emitAlgReturnTarget name branches mb_deflt fam_sz
   = do  { blks <- getCgStmts $ do
                     -- is the constructor tag in the node reg?
                     dflags <- getDynFlags
-                    if isSmallFamily fam_sz
+                    if isSmallFamily dflags fam_sz
                         then do -- yes, node has constr. tag
                           let tag_expr = cmmConstrTag1 dflags (CmmReg nodeReg)
                               branches' = [(tag+1,branch)|(tag,branch)<-branches]

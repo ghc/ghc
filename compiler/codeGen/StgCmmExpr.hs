@@ -512,7 +512,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               bndr_reg = CmmLocal (idToReg dflags bndr)
 
                     -- Is the constructor tag in the node reg?
-        ; if isSmallFamily fam_sz
+        ; if isSmallFamily dflags fam_sz
           then do
                 let   -- Yes, bndr_reg has constr. tag in ls bits
                    tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)

@@ -205,9 +205,10 @@ mkModuleInit cost_centre_info this_mod hpc_info
 
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
-  = emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
+  = do dflags <- getDynFlags
+       emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
-                           (tagForCon con)
+                           (tagForCon dflags con)
              | con <- tyConDataCons tycon]
 
 
@@ -236,7 +237,7 @@ cgDataCon data_con
                    ; ldvEnter (CmmReg nodeReg)
                    ; tickyReturnOldCon (length arg_things)
                    ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg)
-                                            (tagForCon data_con)]
+                                            (tagForCon dflags data_con)]
                    }
                         -- The case continuation code expects a tagged pointer
 

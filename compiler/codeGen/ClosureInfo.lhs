@@ -927,25 +927,27 @@ lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
 lfFunInfo _                                 = Nothing
 
-funTag :: ClosureInfo -> Int
-funTag (ClosureInfo { closureLFInfo = lf_info }) = funTagLFInfo lf_info
-funTag _ = 0
+funTag :: DynFlags -> ClosureInfo -> Int
+funTag dflags (ClosureInfo { closureLFInfo = lf_info })
+    = funTagLFInfo dflags lf_info
+funTag _ _ = 0
 
 -- maybe this should do constructor tags too?
-funTagLFInfo :: LambdaFormInfo -> Int
-funTagLFInfo lf
+funTagLFInfo :: DynFlags -> LambdaFormInfo -> Int
+funTagLFInfo dflags lf
     -- A function is tagged with its arity
   | Just (arity,_) <- lfFunInfo lf,
-    Just tag <- tagForArity arity
+    Just tag <- tagForArity dflags arity
   = tag
 
     -- other closures (and unknown ones) are not tagged
   | otherwise
   = 0
 
-tagForArity :: RepArity -> Maybe Int
-tagForArity i | i <= mAX_PTR_TAG = Just i
-              | otherwise        = Nothing
+tagForArity :: DynFlags -> RepArity -> Maybe Int
+tagForArity dflags i
+ | i <= mAX_PTR_TAG dflags = Just i
+ | otherwise               = Nothing
 
 clHasCafRefs :: ClosureInfo -> CafInfo
 clHasCafRefs (ClosureInfo {closureSRT = srt}) = 

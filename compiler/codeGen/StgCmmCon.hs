@@ -246,17 +246,15 @@ bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
     do dflags <- getDynFlags
        let (_, _, args_w_offsets) = mkVirtConstrOffsets dflags (addIdReps args)
-       mapM bind_arg args_w_offsets
-  where
-    tag = tagForCon con
+           tag = tagForCon dflags con
 
-          -- The binding below forces the masking out of the tag bits
-          -- when accessing the constructor field.
-    bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
-    bind_arg (arg, offset)
-        = do { dflags <- getDynFlags
-             ; emit $ mkTaggedObjectLoad dflags (idToReg dflags arg) base offset tag
-             ; bindArgToReg arg }
+           -- The binding below forces the masking out of the tag bits
+           -- when accessing the constructor field.
+           bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
+           bind_arg (arg, offset)
+               = do emit $ mkTaggedObjectLoad dflags (idToReg dflags arg) base offset tag
+                    bindArgToReg arg
+       mapM bind_arg args_w_offsets
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []
