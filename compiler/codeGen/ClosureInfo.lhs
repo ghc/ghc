@@ -343,14 +343,14 @@ separateByPtrFollowness things
 
 \begin{code}
 cgRepSizeB :: DynFlags -> CgRep -> ByteOff
-cgRepSizeB _      DoubleArg = dOUBLE_SIZE
+cgRepSizeB dflags DoubleArg = dOUBLE_SIZE dflags
 cgRepSizeB _      LongArg   = wORD64_SIZE
 cgRepSizeB _      VoidArg   = 0
 cgRepSizeB dflags _         = wORD_SIZE dflags
 
 cgRepSizeW :: DynFlags -> CgRep -> ByteOff
-cgRepSizeW dflags DoubleArg = dOUBLE_SIZE `quot` wORD_SIZE dflags
-cgRepSizeW dflags LongArg   = wORD64_SIZE `quot` wORD_SIZE dflags
+cgRepSizeW dflags DoubleArg = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
+cgRepSizeW dflags LongArg   = wORD64_SIZE        `quot` wORD_SIZE dflags
 cgRepSizeW _      VoidArg   = 0
 cgRepSizeW _      _         = 1
 

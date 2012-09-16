@@ -24,7 +24,6 @@ import qualified Stream
 import Hoopl
 
 import Maybes
-import Constants
 import DynFlags
 import Panic
 import UniqSupply
@@ -323,7 +322,7 @@ mkLivenessBits dflags liveness
                      [b] -> b
 		     _   -> panic "mkLiveness"
     bitmap_word = fromIntegral n_bits
-              .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT)
+              .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT dflags)
 
     lits = mkWordCLit dflags (fromIntegral n_bits) : map (mkWordCLit dflags) bitmap
       -- The first word is the size.  The structure must match

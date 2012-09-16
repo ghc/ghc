@@ -387,8 +387,8 @@ argRepSizeW :: DynFlags -> ArgRep -> WordOff                -- Size in words
 argRepSizeW _      N = 1
 argRepSizeW _      P = 1
 argRepSizeW _      F = 1
-argRepSizeW dflags L = wORD64_SIZE `quot` wORD_SIZE dflags
-argRepSizeW dflags D = dOUBLE_SIZE `quot` wORD_SIZE dflags
+argRepSizeW dflags L = wORD64_SIZE        `quot` wORD_SIZE dflags
+argRepSizeW dflags D = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
 argRepSizeW _      V = 0
 
 idArgRep :: Id -> ArgRep

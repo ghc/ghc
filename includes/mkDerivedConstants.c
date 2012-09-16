@@ -686,6 +686,17 @@ main(int argc, char *argv[])
     // Size of a word, in bytes
     constantInt("wORD_SIZE", SIZEOF_HSWORD);
 
+    // Size of a double in StgWords.
+    constantInt("dOUBLE_SIZE", SIZEOF_DOUBLE);
+
+    // Size of a C int, in bytes. May be smaller than wORD_SIZE.
+    constantInt("cINT_SIZE", SIZEOF_INT);
+    constantInt("cLONG_SIZE", SIZEOF_LONG);
+    constantInt("cLONG_LONG_SIZE", SIZEOF_LONG_LONG);
+
+    // Number of bits to shift a bitfield left by in an info table.
+    constantInt("bITMAP_BITS_SHIFT", BITMAP_BITS_SHIFT);
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");

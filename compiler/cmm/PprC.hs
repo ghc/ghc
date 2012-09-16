@@ -31,7 +31,6 @@ import OldCmm
 import OldPprCmm ()
 
 -- Utils
-import Constants
 import CPrim
 import DynFlags
 import FastString
@@ -1126,11 +1125,11 @@ pprHexVal w rep
         -- times values are unsigned.  This also helps eliminate occasional
         -- warnings about integer overflow from gcc.
 
-      repsuffix W64
-       | cINT_SIZE       == 8 = char 'U'
-       | cLONG_SIZE      == 8 = ptext (sLit "UL")
-       | cLONG_LONG_SIZE == 8 = ptext (sLit "ULL")
-       | otherwise            = panic "pprHexVal: Can't find a 64-bit type"
+      repsuffix W64 = sdocWithDynFlags $ \dflags ->
+               if cINT_SIZE       dflags == 8 then char 'U'
+          else if cLONG_SIZE      dflags == 8 then ptext (sLit "UL")
+          else if cLONG_LONG_SIZE dflags == 8 then ptext (sLit "ULL")
+          else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
       go 0 = empty
