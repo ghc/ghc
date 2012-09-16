@@ -625,9 +625,9 @@ x86_mkSpillInstr dflags reg delta slot
     let off_w = (off - delta) `div` (if is32Bit then 4 else 8)
     in case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordSize is32Bit)
-                              (OpReg reg) (OpAddr (spRel platform off_w))
-           RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
-           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
+                              (OpReg reg) (OpAddr (spRel dflags off_w))
+           RcDouble    -> GST FF80 reg (spRel dflags off_w) {- RcFloat/RcDouble -}
+           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off_w))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -646,9 +646,9 @@ x86_mkLoadInstr dflags reg delta slot
         let off_w = (off-delta) `div` (if is32Bit then 4 else 8)
         in case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordSize is32Bit)
-                               (OpAddr (spRel platform off_w)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
+                               (OpAddr (spRel dflags off_w)) (OpReg reg)
+              RcDouble  -> GLD FF80 (spRel dflags off_w) reg {- RcFloat/RcDouble -}
+              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off_w)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform

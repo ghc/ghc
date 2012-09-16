@@ -42,11 +42,6 @@ dOUBLE_SIZE = SIZEOF_DOUBLE
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
 
--- Size of a word, in bytes
-
-wORD_SIZE :: Int
-wORD_SIZE = SIZEOF_HSWORD
-
 -- Define a fixed-range integral type equivalent to the target Int/Word
 
 #if SIZEOF_HSWORD == 4

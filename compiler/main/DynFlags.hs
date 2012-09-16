@@ -3148,8 +3148,8 @@ compilerInfo dflags
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
-bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE
+bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
 
 wORD_SIZE_IN_BITS :: DynFlags -> Int
-wORD_SIZE_IN_BITS _ = wORD_SIZE * 8
+wORD_SIZE_IN_BITS dflags = wORD_SIZE dflags * 8
 

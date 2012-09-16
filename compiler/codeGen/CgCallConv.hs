@@ -66,18 +66,18 @@ import Data.Bits
 -------------------------
 mkArgDescr :: Name -> [Id] -> FCode ArgDescr
 mkArgDescr _nm args
-  = case stdPattern arg_reps of
-        Just spec_id -> return (ArgSpec spec_id)
-        Nothing      -> return (ArgGen arg_bits)
-  where
-    arg_bits = argBits arg_reps
-    arg_reps = filter nonVoidArg (map idCgRep args)
-        -- Getting rid of voids eases matching of standard patterns
+  = do dflags <- getDynFlags
+       let arg_bits = argBits dflags arg_reps
+           arg_reps = filter nonVoidArg (map idCgRep args)
+           -- Getting rid of voids eases matching of standard patterns
+       case stdPattern arg_reps of
+           Just spec_id -> return (ArgSpec spec_id)
+           Nothing      -> return (ArgGen arg_bits)
 
-argBits :: [CgRep] -> [Bool]    -- True for non-ptr, False for ptr
-argBits []              = []
-argBits (PtrArg : args) = False : argBits args
-argBits (arg    : args) = take (cgRepSizeW arg) (repeat True) ++ argBits args
+argBits :: DynFlags -> [CgRep] -> [Bool]    -- True for non-ptr, False for ptr
+argBits _      []              = []
+argBits dflags (PtrArg : args) = False : argBits dflags args
+argBits dflags (arg    : args) = take (cgRepSizeW dflags arg) (repeat True) ++ argBits dflags args
 
 stdPattern :: [CgRep] -> Maybe StgHalfWord
 stdPattern []          = Just ARG_NONE  -- just void args, probably

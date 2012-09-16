@@ -18,7 +18,6 @@ import PprCmm ()
 import BlockId
 import FastString
 import Outputable
-import Constants
 import DynFlags
 
 import Data.Maybe
@@ -108,6 +107,7 @@ cmmCheckMachOp op _ tys
   = do dflags <- getDynFlags
        return (machOpResultType dflags op tys)
 
+{-
 isOffsetOp :: MachOp -> Bool
 isOffsetOp (MO_Add _) = True
 isOffsetOp (MO_Sub _) = True
@@ -117,10 +117,10 @@ isOffsetOp _ = False
 -- check for funny-looking sub-word offsets.
 _cmmCheckWordAddress :: CmmExpr -> CmmLint ()
 _cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress _
   = return ()
@@ -130,6 +130,7 @@ _cmmCheckWordAddress _
 notNodeReg :: CmmExpr -> Bool
 notNodeReg (CmmReg reg) | reg == nodeReg = False
 notNodeReg _                             = True
+-}
 
 lintCmmMiddle :: CmmNode O O -> CmmLint ()
 lintCmmMiddle node = case node of
@@ -239,7 +240,10 @@ cmmLintAssignErr stmt e_ty r_ty
                               text "Rhs ty:" <+> ppr e_ty]))
 
 
+{-
 cmmLintDubiousWordOffset :: CmmExpr -> CmmLint a
 cmmLintDubiousWordOffset expr
    = cmmLintErr (text "offset is not a multiple of words: " $$
                  nest 2 (ppr expr))
+-}
+

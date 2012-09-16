@@ -800,7 +800,7 @@ getSRTInfo = do
       -> do id <- newUnique
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
-             ( cmmLabelOffW srt_lbl off
+             ( cmmLabelOffW dflags srt_lbl off
                : mkWordCLit dflags (fromIntegral len)
                : map (mkWordCLit dflags) bmp)
             return (C_SRT srt_desc_lbl 0 srt_escape)

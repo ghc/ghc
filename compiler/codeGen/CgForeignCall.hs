@@ -30,7 +30,6 @@ import OldCmm
 import OldCmmUtils
 import SMRep
 import ForeignCall
-import Constants
 import DynFlags
 import Outputable
 import Module
@@ -103,7 +102,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live = do
         | otherwise            = Nothing
 
         -- ToDo: this might not be correct for 64-bit API
-      arg_size rep = max (widthInBytes (typeWidth rep)) wORD_SIZE
+      arg_size rep = max (widthInBytes (typeWidth rep)) (wORD_SIZE dflags)
   vols <- getVolatileRegs live
   srt <- getSRTInfo
   emitForeignCall' safety results
@@ -286,7 +285,7 @@ stack_STACK  dflags = closureField dflags (oFFSET_StgStack_stack dflags)
 stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
 
 closureField :: DynFlags -> ByteOff -> ByteOff
-closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE
+closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE dflags
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp             = CmmReg sp

@@ -72,7 +72,7 @@ import CLabel
 import Outputable
 import Unique
 import UniqSupply
-import Constants( wORD_SIZE, tAG_MASK )
+import Constants( tAG_MASK )
 import DynFlags
 import Util
 
@@ -272,16 +272,16 @@ cmmOffsetExprW dflags  e (CmmLit (CmmInt n _)) = cmmOffsetW dflags e (fromIntege
 cmmOffsetExprW dflags e wd_off = cmmIndexExpr dflags (wordWidth dflags) e wd_off
 
 cmmOffsetW :: DynFlags -> CmmExpr -> WordOff -> CmmExpr
-cmmOffsetW dflags e n = cmmOffsetB dflags e (wORD_SIZE * n)
+cmmOffsetW dflags e n = cmmOffsetB dflags e (wORD_SIZE dflags * n)
 
-cmmRegOffW :: CmmReg -> WordOff -> CmmExpr
-cmmRegOffW reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE)
+cmmRegOffW :: DynFlags -> CmmReg -> WordOff -> CmmExpr
+cmmRegOffW dflags reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE dflags)
 
-cmmOffsetLitW :: CmmLit -> WordOff -> CmmLit
-cmmOffsetLitW lit wd_off = cmmOffsetLitB lit (wORD_SIZE * wd_off)
+cmmOffsetLitW :: DynFlags -> CmmLit -> WordOff -> CmmLit
+cmmOffsetLitW dflags lit wd_off = cmmOffsetLitB lit (wORD_SIZE dflags * wd_off)
 
-cmmLabelOffW :: CLabel -> WordOff -> CmmLit
-cmmLabelOffW lbl wd_off = cmmLabelOffB lbl (wORD_SIZE * wd_off)
+cmmLabelOffW :: DynFlags -> CLabel -> WordOff -> CmmLit
+cmmLabelOffW dflags lbl wd_off = cmmLabelOffB lbl (wORD_SIZE dflags * wd_off)
 
 cmmLoadIndexW :: DynFlags -> CmmExpr -> Int -> CmmType -> CmmExpr
 cmmLoadIndexW dflags base off ty = CmmLoad (cmmOffsetW dflags base off) ty
@@ -309,8 +309,8 @@ cmmNegate :: DynFlags -> CmmExpr -> CmmExpr
 cmmNegate _      (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
 cmmNegate dflags e                       = CmmMachOp (MO_S_Neg (cmmExprWidth dflags e)) [e]
 
-blankWord :: CmmStatic
-blankWord = CmmUninitialised wORD_SIZE
+blankWord :: DynFlags -> CmmStatic
+blankWord dflags = CmmUninitialised (wORD_SIZE dflags)
 
 ---------------------------------------------------
 --
@@ -371,15 +371,15 @@ cmmConstrTag1 dflags e = cmmAndWord dflags e (cmmTagMask dflags)
 --
 ---------------------------------------------
 
-mkLiveness :: [Maybe LocalReg] -> Liveness
-mkLiveness [] = []
-mkLiveness (reg:regs)
-  = take sizeW bits ++ mkLiveness regs
+mkLiveness :: DynFlags -> [Maybe LocalReg] -> Liveness
+mkLiveness _      [] = []
+mkLiveness dflags (reg:regs)
+  = take sizeW bits ++ mkLiveness dflags regs
   where
     sizeW = case reg of
               Nothing -> 1
-              Just r -> (widthInBytes (typeWidth (localRegType r)) + wORD_SIZE - 1)
-                        `quot` wORD_SIZE
+              Just r -> (widthInBytes (typeWidth (localRegType r)) + wORD_SIZE dflags - 1)
+                        `quot` wORD_SIZE dflags
                         -- number of words, rounded up
     bits = repeat $ is_non_ptr reg -- True <=> Non Ptr
 

@@ -31,7 +31,6 @@ import LlvmCodeGen.Regs
 
 import CLabel
 import CgUtils ( activeStgRegs )
-import Constants
 import DynFlags
 import FastString
 import OldCmm
@@ -103,7 +102,7 @@ llvmFunSig' dflags lbl link
                    | otherwise   = (x, [])
     in LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
                         (map (toParams . getVarType) (llvmFunArgs dflags))
-                        llvmFunAlign
+                        (llvmFunAlign dflags)
 
 -- | Create a Haskell function in LLVM.
 mkLlvmFunc :: LlvmEnv -> CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
@@ -115,12 +114,12 @@ mkLlvmFunc env lbl link sec blks
     in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
 -- | Alignment to use for functions
-llvmFunAlign :: LMAlign
-llvmFunAlign = Just wORD_SIZE
+llvmFunAlign :: DynFlags -> LMAlign
+llvmFunAlign dflags = Just (wORD_SIZE dflags)
 
 -- | Alignment to use for into tables
-llvmInfAlign :: LMAlign
-llvmInfAlign = Just wORD_SIZE
+llvmInfAlign :: DynFlags -> LMAlign
+llvmInfAlign dflags = Just (wORD_SIZE dflags)
 
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> [LlvmVar]

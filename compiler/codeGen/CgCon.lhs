@@ -192,7 +192,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   = do  { let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
-              intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
+              intlike_amode = CmmLit (cmmLabelOffW dflags intlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
 
 buildDynCon' dflags platform binder _ con [arg_amode]
@@ -204,7 +204,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
-              charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
+              charlike_amode = CmmLit (cmmLabelOffW dflags charlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }
 
 \end{code}
@@ -284,8 +284,8 @@ bindUnboxedTupleComponents args
                 -- Allocate the rest on the stack
                 -- The real SP points to the return address, above which any
                 -- leftover unboxed-tuple components will be allocated
-              (ptr_sp,  ptr_offsets)  = mkVirtStkOffsets rsp    ptr_args
-              (nptr_sp, nptr_offsets) = mkVirtStkOffsets ptr_sp nptr_args
+              (ptr_sp,  ptr_offsets)  = mkVirtStkOffsets dflags rsp    ptr_args
+              (nptr_sp, nptr_offsets) = mkVirtStkOffsets dflags ptr_sp nptr_args
               ptrs  = ptr_sp  - rsp
               nptrs = nptr_sp - ptr_sp
 

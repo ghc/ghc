@@ -1379,10 +1379,10 @@ coerceInt2FP fromRep toRep x = do
                                  [CmmStaticLit (CmmInt 0x43300000 W32),
                                   CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),
-                ST II32 itmp (spRel 3),
+                ST II32 itmp (spRel dflags 3),
                 LIS itmp (ImmInt 0x4330),
-                ST II32 itmp (spRel 2),
-                LD FF64 ftmp (spRel 2)
+                ST II32 itmp (spRel dflags 2),
+                LD FF64 ftmp (spRel dflags 2)
             ] `appOL` addr_code `appOL` toOL [
                 LD FF64 dst addr,
                 FSUB FF64 dst ftmp dst
@@ -1404,6 +1404,7 @@ coerceInt2FP fromRep toRep x = do
 
 coerceFP2Int :: Width -> Width -> CmmExpr -> NatM Register
 coerceFP2Int _ toRep x = do
+    dflags <- getDynFlags
     -- the reps don't really matter: F*->FF64 and II32->I* are no-ops
     (src, code) <- getSomeReg x
     tmp <- getNewRegNat FF64
@@ -1412,7 +1413,7 @@ coerceFP2Int _ toRep x = do
                 -- convert to int in FP reg
             FCTIWZ tmp src,
                 -- store value (64bit) from FP to stack
-            ST FF64 tmp (spRel 2),
+            ST FF64 tmp (spRel dflags 2),
                 -- read low word of value (high word is undefined)
-            LD II32 dst (spRel 3)]
+            LD II32 dst (spRel dflags 3)]
     return (Any (intSize toRep) code')

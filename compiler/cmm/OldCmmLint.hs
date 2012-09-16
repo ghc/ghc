@@ -22,7 +22,6 @@ import OldCmm
 import CLabel
 import Outputable
 import OldPprCmm()
-import Constants
 import FastString
 import DynFlags
 
@@ -97,6 +96,7 @@ cmmCheckMachOp dflags op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)] tys
 cmmCheckMachOp dflags op _ tys
   = return (machOpResultType dflags op tys)
 
+{-
 isOffsetOp :: MachOp -> Bool
 isOffsetOp (MO_Add _) = True
 isOffsetOp (MO_Sub _) = True
@@ -106,10 +106,10 @@ isOffsetOp _ = False
 -- check for funny-looking sub-word offsets.
 _cmmCheckWordAddress :: CmmExpr -> CmmLint ()
 _cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
-  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral (wORD_SIZE dflags) /= 0
   = cmmLintDubiousWordOffset e
 _cmmCheckWordAddress _
   = return ()
@@ -119,6 +119,7 @@ _cmmCheckWordAddress _
 notNodeReg :: CmmExpr -> Bool
 notNodeReg (CmmReg reg) | reg == nodeReg = False
 notNodeReg _                             = True
+-}
 
 lintCmmStmt :: DynFlags -> BlockSet -> CmmStmt -> CmmLint ()
 lintCmmStmt dflags labels = lint
@@ -204,7 +205,10 @@ cmmLintAssignErr stmt e_ty r_ty
 			 
 					
 
+{-
 cmmLintDubiousWordOffset :: CmmExpr -> CmmLint a
 cmmLintDubiousWordOffset expr
    = cmmLintErr (text "offset is not a multiple of words: " $$
 			nest 2 (ppr expr))
+-}
+

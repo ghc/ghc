@@ -72,7 +72,6 @@ import Outputable
 import FastString
 import Bag
 import Fingerprint
-import Constants
 import TcEnv (InstInfo)
 
 import Data.List        ( partition, intersperse )
@@ -1192,8 +1191,8 @@ we generate
 We are passed the Typeable2 class as well as T
 
 \begin{code}
-gen_Typeable_binds :: SrcSpan -> TyCon -> LHsBinds RdrName
-gen_Typeable_binds loc tycon
+gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_Typeable_binds dflags loc tycon
   = unitBag $
 	mk_easy_FunBind loc 
 		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
@@ -1219,8 +1218,8 @@ gen_Typeable_binds loc tycon
     Fingerprint high low = fingerprintString hashThis
 
     int64
-      | wORD_SIZE == 4 = HsWord64Prim . fromIntegral
-      | otherwise      = HsWordPrim . fromIntegral
+      | wORD_SIZE dflags == 4 = HsWord64Prim . fromIntegral
+      | otherwise             = HsWordPrim . fromIntegral
 
 
 mk_typeOf_RDR :: TyCon -> RdrName

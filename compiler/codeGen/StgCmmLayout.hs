@@ -219,7 +219,7 @@ direct_call caller call_conv lbl arity args
        emitCallWithExtraStack (call_conv, NativeReturn)
                               target
                               (nonVArgs fast_args)
-                              (mkStkOffsets (stack_args dflags))
+                              (mkStkOffsets dflags (stack_args dflags))
   where
     target = CmmLit (CmmLabel lbl)
     (fast_args, rest_args) = splitAt real_arity args
@@ -329,10 +329,11 @@ slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 -- See Note [over-saturated calls].
 
 mkStkOffsets
-  :: [(ArgRep, Maybe CmmExpr)]    -- things to make offsets for
+  :: DynFlags
+  -> [(ArgRep, Maybe CmmExpr)]    -- things to make offsets for
   -> ( ByteOff                    -- OUTPUTS: Topmost allocated word
      , [(CmmExpr, ByteOff)] )     -- things with offsets (voids filtered out)
-mkStkOffsets things
+mkStkOffsets dflags things
     = loop 0 [] (reverse things)
   where
     loop offset offs [] = (offset,offs)
@@ -341,7 +342,7 @@ mkStkOffsets things
     loop offset offs ((rep,Just thing):things)
         = loop thing_off ((thing, thing_off):offs) things
 	where
-          thing_off = offset + argRepSizeW rep * wORD_SIZE
+          thing_off = offset + argRepSizeW dflags rep * wORD_SIZE dflags
 	    -- offset of thing is offset+size, because we're 
 	    -- growing the stack *downwards* as the offsets increase.
 
@@ -382,13 +383,13 @@ isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
 
-argRepSizeW :: ArgRep -> WordOff                -- Size in words
-argRepSizeW N = 1
-argRepSizeW P = 1
-argRepSizeW F = 1
-argRepSizeW L = wORD64_SIZE `quot` wORD_SIZE
-argRepSizeW D = dOUBLE_SIZE `quot` wORD_SIZE
-argRepSizeW V = 0
+argRepSizeW :: DynFlags -> ArgRep -> WordOff                -- Size in words
+argRepSizeW _      N = 1
+argRepSizeW _      P = 1
+argRepSizeW _      F = 1
+argRepSizeW dflags L = wORD64_SIZE `quot` wORD_SIZE dflags
+argRepSizeW dflags D = dOUBLE_SIZE `quot` wORD_SIZE dflags
+argRepSizeW _      V = 0
 
 idArgRep :: Id -> ArgRep
 idArgRep = toArgRep . idPrimRep
@@ -405,8 +406,9 @@ hpRel hp off = off - hp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
 getHpRelOffset virtual_offset
-  = do	{ hp_usg <- getHpUsage
-	; return (cmmRegOffW hpReg (hpRel (realHp hp_usg) virtual_offset)) }
+  = do dflags <- getDynFlags
+       hp_usg <- getHpUsage
+       return (cmmRegOffW dflags hpReg (hpRel (realHp hp_usg) virtual_offset))
 
 mkVirtHeapOffsets
   :: DynFlags
@@ -438,7 +440,7 @@ mkVirtHeapOffsets dflags is_thunk things
              | otherwise  = fixedHdrSize dflags
 
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + argRepSizeW (toArgRep rep), 
+      = (wds_so_far + argRepSizeW dflags (toArgRep rep), 
 	 (NonVoid thing, hdr_size + wds_so_far))
 
 mkVirtConstrOffsets :: DynFlags -> [(PrimRep,a)] -> (WordOff, WordOff, [(NonVoid a, VirtualHpOffset)])
@@ -462,19 +464,20 @@ mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
 #include "../includes/rts/storage/FunTypes.h"
 
 mkArgDescr :: Name -> [Id] -> FCode ArgDescr
-mkArgDescr _nm args 
-  = case stdPattern arg_reps of
-	Just spec_id -> return (ArgSpec spec_id)
-	Nothing      -> return (ArgGen arg_bits)
-  where
-    arg_bits = argBits arg_reps
-    arg_reps = filter isNonV (map idArgRep args)
-	-- Getting rid of voids eases matching of standard patterns
+mkArgDescr _nm args
+  = do dflags <- getDynFlags
+       let arg_bits = argBits dflags arg_reps
+           arg_reps = filter isNonV (map idArgRep args)
+           -- Getting rid of voids eases matching of standard patterns
+       case stdPattern arg_reps of
+           Just spec_id -> return (ArgSpec spec_id)
+           Nothing      -> return (ArgGen arg_bits)
 
-argBits :: [ArgRep] -> [Bool]	-- True for non-ptr, False for ptr
-argBits [] 		= []
-argBits (P   : args) = False : argBits args
-argBits (arg : args) = take (argRepSizeW arg) (repeat True) ++ argBits args
+argBits :: DynFlags -> [ArgRep] -> [Bool]	-- True for non-ptr, False for ptr
+argBits _      []           = []
+argBits dflags (P   : args) = False : argBits dflags args
+argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
+                    ++ argBits dflags args
 
 ----------------------
 stdPattern :: [ArgRep] -> Maybe StgHalfWord
@@ -570,7 +573,7 @@ stdInfoTableSizeW dflags
 	      | otherwise	   = 0
 
 stdInfoTableSizeB  :: DynFlags -> ByteOff
-stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE :: ByteOff
+stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
@@ -579,11 +582,11 @@ stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word 
-stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE
+stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
-stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE + hALF_WORD_SIZE
+stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE
 
 -------------------------------------------------------------------------
 --

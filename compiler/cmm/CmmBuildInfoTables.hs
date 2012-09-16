@@ -233,7 +233,7 @@ to_SRT dflags top_srt off len bmp
        let srt_desc_lbl = mkLargeSRTLabel id
            tbl = CmmData RelocatableReadOnlyData $
                    Statics srt_desc_lbl $ map CmmStaticLit
-                     ( cmmLabelOffW top_srt off
+                     ( cmmLabelOffW dflags top_srt off
                      : mkWordCLit dflags (fromIntegral len)
                      : map (mkWordCLit dflags) bmp)
        return (Just tbl, C_SRT srt_desc_lbl 0 srt_escape)

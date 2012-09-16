@@ -43,7 +43,6 @@ import Module
 import ListSetOps
 import Util
 import BasicTypes
-import Constants
 import Outputable
 import FastString
 import Maybes
@@ -634,7 +633,7 @@ pushUpdateFrame lbl updatee body
        updfr  <- getUpdFrameOff
        dflags <- getDynFlags
        let
-           hdr         = fixedHdrSize dflags * wORD_SIZE
+           hdr         = fixedHdrSize dflags * wORD_SIZE dflags
            frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
            off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
        --

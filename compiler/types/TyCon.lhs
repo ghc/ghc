@@ -93,6 +93,7 @@ import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
 import Var
 import Class
 import BasicTypes
+import DynFlags
 import ForeignCall
 import Name
 import PrelNames
@@ -777,16 +778,16 @@ instance Outputable PrimRep where
   ppr r = text (show r)
 
 -- | Find the size of a 'PrimRep', in words
-primRepSizeW :: PrimRep -> Int
-primRepSizeW IntRep   = 1
-primRepSizeW WordRep  = 1
-primRepSizeW Int64Rep = wORD64_SIZE `quot` wORD_SIZE
-primRepSizeW Word64Rep= wORD64_SIZE `quot` wORD_SIZE
-primRepSizeW FloatRep = 1    -- NB. might not take a full word
-primRepSizeW DoubleRep= dOUBLE_SIZE `quot` wORD_SIZE
-primRepSizeW AddrRep  = 1
-primRepSizeW PtrRep   = 1
-primRepSizeW VoidRep  = 0
+primRepSizeW :: DynFlags -> PrimRep -> Int
+primRepSizeW _      IntRep   = 1
+primRepSizeW _      WordRep  = 1
+primRepSizeW dflags Int64Rep = wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW dflags Word64Rep= wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW _      FloatRep = 1    -- NB. might not take a full word
+primRepSizeW dflags DoubleRep= dOUBLE_SIZE `quot` wORD_SIZE dflags
+primRepSizeW _      AddrRep  = 1
+primRepSizeW _      PtrRep   = 1
+primRepSizeW _      VoidRep  = 0
 \end{code}
 
 %************************************************************************

@@ -173,7 +173,7 @@ mkInfoTableContents dflags
 
   | StackRep frame <- smrep
   = do { (prof_lits, prof_data) <- mkProfLits dflags prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits dflags frame
        ; let
              std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
@@ -186,7 +186,7 @@ mkInfoTableContents dflags
   | HeapRep _ ptrs nonptrs closure_type <- smrep
   = do { let layout  = packHalfWordsCLit dflags ptrs nonptrs
        ; (prof_lits, prof_data) <- mkProfLits dflags prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
        ; let std_info = mkStdInfoTable dflags prof_lits
@@ -233,11 +233,12 @@ mkInfoTableContents dflags
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
-mkSRTLit :: C_SRT
+mkSRTLit :: DynFlags
+         -> C_SRT
          -> ([CmmLit],    -- srt_label, if any
              StgHalfWord) -- srt_bitmap
-mkSRTLit NoC_SRT                = ([], 0)
-mkSRTLit (C_SRT lbl off bitmap) = ([cmmLabelOffW lbl off], bitmap)
+mkSRTLit _      NoC_SRT                = ([], 0)
+mkSRTLit dflags (C_SRT lbl off bitmap) = ([cmmLabelOffW dflags lbl off], bitmap)
 
 
 -------------------------------------------------------------------------
@@ -303,7 +304,7 @@ mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
               --   2. Large bitmap CmmData if needed
 
 mkLivenessBits dflags liveness
-  | n_bits > mAX_SMALL_BITMAP_SIZE    -- does not fit in one word
+  | n_bits > mAX_SMALL_BITMAP_SIZE dflags -- does not fit in one word
   = do { uniq <- getUniqueUs
        ; let bitmap_lbl = mkBitmapLabel uniq
        ; return (CmmLabel bitmap_lbl, 

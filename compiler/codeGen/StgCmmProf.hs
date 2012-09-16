@@ -54,7 +54,6 @@ import CostCentre
 import DynFlags
 import FastString
 import Module
-import Constants        -- Lots of field offsets
 import Outputable
 
 import Control.Monad
@@ -263,7 +262,7 @@ emitCostCentreStackDecl ccs
         do dflags <- getDynFlags
            let mk_lits cc = zero dflags :
                             mkCCostCentre cc :
-                            replicate (sizeof_ccs_words - 2) (zero dflags)
+                            replicate (sizeof_ccs_words dflags - 2) (zero dflags)
                 -- Note: to avoid making any assumptions about how the
                 -- C compiler (that compiles the RTS, in particular) does
                 -- layouts of structs containing long-longs, simply
@@ -277,13 +276,13 @@ zero dflags = mkIntCLit dflags 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
-sizeof_ccs_words :: Int
-sizeof_ccs_words 
+sizeof_ccs_words :: DynFlags -> Int
+sizeof_ccs_words dflags
     -- round up to the next word.
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
+   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE dflags
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack

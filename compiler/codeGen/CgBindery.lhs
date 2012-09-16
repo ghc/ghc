@@ -38,8 +38,8 @@ import CgStackery
 import CgUtils
 import CLabel
 import ClosureInfo
-import Constants
 
+import DynFlags
 import OldCmm
 import PprCmm           ( {- instance Outputable -} )
 import SMRep
@@ -184,8 +184,8 @@ letNoEscapeIdInfo id sp lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLNE sp) lf_
 stackIdInfo :: Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
 stackIdInfo id sp       lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLoc sp) lf_info
 
-nodeIdInfo :: Id -> Int -> LambdaFormInfo -> CgIdInfo
-nodeIdInfo id offset    lf_info = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset)) NoStableLoc lf_info
+nodeIdInfo :: DynFlags -> Id -> Int -> LambdaFormInfo -> CgIdInfo
+nodeIdInfo dflags id offset lf_info = mkCgIdInfo id (VirNodeLoc (wORD_SIZE dflags * offset)) NoStableLoc lf_info
 
 regIdInfo :: Id -> CmmReg -> LambdaFormInfo -> CgIdInfo
 regIdInfo id reg        lf_info = mkCgIdInfo id (RegLoc reg) NoStableLoc lf_info
@@ -199,9 +199,9 @@ taggedHeapIdInfo :: Id -> VirtualHpOffset -> LambdaFormInfo -> DataCon
 taggedHeapIdInfo id offset lf_info con
   = mkTaggedCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info con
 
-untagNodeIdInfo :: Id -> Int -> LambdaFormInfo -> Int -> CgIdInfo
-untagNodeIdInfo id offset    lf_info tag
-  = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset - tag)) NoStableLoc lf_info
+untagNodeIdInfo :: DynFlags -> Id -> Int -> LambdaFormInfo -> Int -> CgIdInfo
+untagNodeIdInfo dflags id offset lf_info tag
+  = mkCgIdInfo id (VirNodeLoc (wORD_SIZE dflags * offset - tag)) NoStableLoc lf_info
 
 
 idInfoToAmode :: CgIdInfo -> FCode CmmExpr
@@ -440,11 +440,13 @@ bindArgsToRegs args
 
 bindNewToNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Code
 bindNewToNode id offset lf_info
-  = addBindC id (nodeIdInfo id offset lf_info)
+  = do dflags <- getDynFlags
+       addBindC id (nodeIdInfo dflags id offset lf_info)
 
 bindNewToUntagNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Int -> Code
 bindNewToUntagNode id offset lf_info tag
-  = addBindC id (untagNodeIdInfo id offset lf_info tag)
+  = do dflags <- getDynFlags
+       addBindC id (untagNodeIdInfo dflags id offset lf_info tag)
 
 -- Create a new temporary whose unique is that in the id,
 -- bind the id to it, and return the addressing mode for the
@@ -497,9 +499,10 @@ Probably *naughty* to look inside monad...
 nukeDeadBindings :: StgLiveVars  -- All the *live* variables
                  -> Code
 nukeDeadBindings live_vars = do
+        dflags <- getDynFlags
         binds <- getBinds
         let (dead_stk_slots, bs') =
-                dead_slots live_vars 
+                dead_slots dflags live_vars
                         [] []
                         [ (cg_id b, b) | b <- varEnvElts binds ]
         setBinds $ mkVarEnv bs'
@@ -509,7 +512,8 @@ nukeDeadBindings live_vars = do
 Several boring auxiliary functions to do the dirty work.
 
 \begin{code}
-dead_slots :: StgLiveVars
+dead_slots :: DynFlags
+           -> StgLiveVars
            -> [(Id,CgIdInfo)]
            -> [VirtualSpOffset]
            -> [(Id,CgIdInfo)]
@@ -517,12 +521,12 @@ dead_slots :: StgLiveVars
 
 -- dead_slots carries accumulating parameters for
 --      filtered bindings, dead slots
-dead_slots _ fbs ds []
+dead_slots _ _ fbs ds []
   = (ds, reverse fbs) -- Finished; rm the dups, if any
 
-dead_slots live_vars fbs ds ((v,i):bs)
+dead_slots dflags live_vars fbs ds ((v,i):bs)
   | v `elementOfUniqSet` live_vars
-    = dead_slots live_vars ((v,i):fbs) ds bs
+    = dead_slots dflags live_vars ((v,i):fbs) ds bs
           -- Live, so don't record it in dead slots
           -- Instead keep it in the filtered bindings
 
@@ -530,12 +534,12 @@ dead_slots live_vars fbs ds ((v,i):bs)
     = case cg_stb i of
         VirStkLoc offset
          | size > 0
-         -> dead_slots live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
+         -> dead_slots dflags live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
 
-        _ -> dead_slots live_vars fbs ds bs
+        _ -> dead_slots dflags live_vars fbs ds bs
   where
     size :: WordOff
-    size = cgRepSizeW (cg_rep i)
+    size = cgRepSizeW dflags (cg_rep i)
 
 getLiveStackSlots :: FCode [VirtualSpOffset]
 -- Return the offsets of slots in stack containig live pointers

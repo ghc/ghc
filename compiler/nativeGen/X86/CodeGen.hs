@@ -52,7 +52,6 @@ import Outputable
 import Unique
 import FastString
 import FastBool         ( isFastTrue )
-import Constants        ( wORD_SIZE )
 import DynFlags
 import Util
 
@@ -1766,9 +1765,9 @@ genCCall32' dflags target dest_regs args = do
             -- alignment of 16n - word_size on procedure entry. Which we
             -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
             sizes               = map (arg_size . cmmExprType dflags . hintlessCmm) (reverse args)
-            raw_arg_size        = sum sizes + wORD_SIZE
+            raw_arg_size        = sum sizes + wORD_SIZE dflags
             arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
-            tot_arg_size        = raw_arg_size + arg_pad_size - wORD_SIZE
+            tot_arg_size        = raw_arg_size + arg_pad_size - wORD_SIZE dflags
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
@@ -2026,14 +2025,14 @@ genCCall64' dflags target dest_regs args = do
     -- alignment of 16n - word_size on procedure entry. Which we
     -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
     (real_size, adjust_rsp) <-
-        if (tot_arg_size + wORD_SIZE) `rem` 16 == 0
+        if (tot_arg_size + wORD_SIZE dflags) `rem` 16 == 0
             then return (tot_arg_size, nilOL)
             else do -- we need to adjust...
                 delta <- getDeltaNat
-                setDeltaNat (delta - wORD_SIZE)
-                return (tot_arg_size + wORD_SIZE, toOL [
-                                SUB II64 (OpImm (ImmInt wORD_SIZE)) (OpReg rsp),
-                                DELTA (delta - wORD_SIZE) ])
+                setDeltaNat (delta - wORD_SIZE dflags)
+                return (tot_arg_size + wORD_SIZE dflags, toOL [
+                                SUB II64 (OpImm (ImmInt (wORD_SIZE dflags))) (OpReg rsp),
+                                DELTA (delta - wORD_SIZE dflags) ])
 
     -- push the stack args, right to left
     push_code <- push_args (reverse stack_args) nilOL
@@ -2173,7 +2172,7 @@ genCCall64' dflags target dest_regs args = do
              let code' = code `appOL` arg_code `appOL` toOL [
                             SUB (intSize (wordWidth dflags)) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
                             DELTA (delta-arg_size),
-                            MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel platform 0))]
+                            MOV (floatSize width) (OpReg arg_reg) (OpAddr (spRel dflags 0))]
              push_args rest code'
 
            | otherwise = do
@@ -2196,7 +2195,7 @@ genCCall64' dflags target dest_regs args = do
              delta <- getDeltaNat
              setDeltaNat (delta - n * arg_size)
              return $ toOL [
-                         SUB II64 (OpImm (ImmInt (n * wORD_SIZE))) (OpReg rsp),
+                         SUB II64 (OpImm (ImmInt (n * wORD_SIZE dflags))) (OpReg rsp),
                          DELTA (delta - n * arg_size)]
 
 -- | We're willing to inline and unroll memcpy/memset calls that touch
@@ -2288,7 +2287,7 @@ genSwitch dflags expr ids
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
-                                       (EAIndex reg wORD_SIZE) (ImmInt 0))
+                                       (EAIndex reg (wORD_SIZE dflags)) (ImmInt 0))
 
         return $ if target32Bit (targetPlatform dflags)
                  then e_code `appOL` t_code `appOL` toOL [
@@ -2326,7 +2325,7 @@ genSwitch dflags expr ids
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
-        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
+        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (wORD_SIZE dflags)) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
                     JMP_TBL op ids ReadOnlyData lbl
                  ]

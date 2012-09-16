@@ -18,7 +18,6 @@ import SMRep
 import Cmm (Convention(..))
 import PprCmm ()
 
-import Constants
 import qualified Data.List as L
 import DynFlags
 import Outputable
@@ -92,7 +91,7 @@ assignArgumentsPos dflags conv arg_ty reps = assignments
       assign_stk _      assts [] = assts
       assign_stk offset assts (r:rs) = assign_stk off' ((r, StackParam off') : assts) rs
         where w    = typeWidth (arg_ty r)
-              size = (((widthInBytes w - 1) `div` wORD_SIZE) + 1) * wORD_SIZE
+              size = (((widthInBytes w - 1) `div` wORD_SIZE dflags) + 1) * wORD_SIZE dflags
               off' = offset + size
 
 -----------------------------------------------------------------------------

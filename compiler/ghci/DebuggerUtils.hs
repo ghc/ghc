@@ -14,7 +14,6 @@ import Module
 import OccName
 import Name
 import Outputable
-import Constants
 import MonadUtils ()
 import Util
 
@@ -95,7 +94,7 @@ dataConInfoPtrToName x = do
    getConDescAddress :: DynFlags -> Ptr StgInfoTable -> IO (Ptr Word8)
    getConDescAddress dflags ptr
     | ghciTablesNextToCode = do
-       offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
+       offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE dflags)
        return $ (ptr `plusPtr` stdInfoTableSizeB dflags) `plusPtr` (fromIntegral (offsetToString :: StgWord))
     | otherwise =
        peek $ intPtrToPtr $ ptrToIntPtr ptr + fromIntegral (stdInfoTableSizeB dflags)

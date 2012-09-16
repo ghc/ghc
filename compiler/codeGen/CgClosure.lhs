@@ -279,7 +279,7 @@ closureCodeBody _binder_info cl_info cc args body
 	-- eg. if we're compiling a let-no-escape).
   ; vSp <- getVirtSp
   ; let (reg_args, other_args) = assignCallRegs dflags (addIdReps args)
-	(sp_top, stk_args)     = mkVirtStkOffsets vSp other_args
+	(sp_top, stk_args)     = mkVirtStkOffsets dflags vSp other_args
 
 	-- Allocate the global ticky counter
   ; let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) (clHasCafRefs cl_info)
@@ -365,22 +365,22 @@ mkSlowEntryCode dflags cl_info reg_args
      reps_w_regs :: [(CgRep,GlobalReg)]
      reps_w_regs = [(idCgRep id, reg) | (id,reg) <- reverse reg_args]
      (final_stk_offset, stk_offsets)
-	= mapAccumL (\off (rep,_) -> (off + cgRepSizeW rep, off))
+	= mapAccumL (\off (rep,_) -> (off + cgRepSizeW dflags rep, off))
 		    0 reps_w_regs
 
 
      load_assts = zipWithEqual "mk_load" mk_load reps_w_regs stk_offsets
      mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg) 
-					  (CmmLoad (cmmRegOffW spReg offset)
+					  (CmmLoad (cmmRegOffW dflags spReg offset)
 						   (argMachRep dflags rep))
 
      save_assts = zipWithEqual "mk_save" mk_save reps_w_regs stk_offsets
      mk_save (rep,reg) offset = ASSERT( argMachRep dflags rep `cmmEqType` globalRegType dflags reg )
-				CmmStore (cmmRegOffW spReg offset)
+				CmmStore (cmmRegOffW dflags spReg offset)
 					 (CmmReg (CmmGlobal reg))
 
-     stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
-     stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
+     stk_adj_pop   = CmmAssign spReg (cmmRegOffW dflags spReg final_stk_offset)
+     stk_adj_push  = CmmAssign spReg (cmmRegOffW dflags spReg (- final_stk_offset))
      live_regs     = Just $ map snd reps_w_regs
      jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI dflags cl_info)) live_regs
 \end{code}

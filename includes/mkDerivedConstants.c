@@ -683,6 +683,9 @@ main(int argc, char *argv[])
     // own stack check (see bug #1466).
     constantInt("aP_STACK_SPLIM", AP_STACK_SPLIM);
 
+    // Size of a word, in bytes
+    constantInt("wORD_SIZE", SIZEOF_HSWORD);
+
     switch (mode) {
     case Gen_Haskell_Type:
         printf("  } deriving (Read, Show)\n");

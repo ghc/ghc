@@ -45,7 +45,6 @@ import CostCentre
 import DynFlags
 import FastString
 import Module
-import Constants        -- Lots of field offsets
 import Outputable
 
 import Data.Char
@@ -203,7 +202,9 @@ emitCostCentreStackDecl ccs
         -- pad out the struct with zero words until we hit the
         -- size of the overall struct (which we get via DerivedConstants.h)
         --
-     lits = zero dflags : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) (zero dflags)
+     lits = zero dflags
+          : mkCCostCentre cc
+          : replicate (sizeof_ccs_words dflags - 2) (zero dflags)
   ; emitDataLits (mkCCSLabel ccs) lits
   }
   | otherwise = pprPanic "emitCostCentreStackDecl" (ppr ccs)
@@ -213,13 +214,13 @@ zero dflags = mkIntCLit dflags 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
-sizeof_ccs_words :: Int
-sizeof_ccs_words
+sizeof_ccs_words :: DynFlags -> Int
+sizeof_ccs_words dflags
     -- round up to the next word.
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
+   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE dflags
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
