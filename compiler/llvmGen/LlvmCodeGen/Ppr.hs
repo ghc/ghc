@@ -28,10 +28,10 @@ import Unique
 
 -- | Header code for LLVM modules
 pprLlvmHeader :: SDoc
-pprLlvmHeader =
+pprLlvmHeader = sdocWithDynFlags $ \dflags ->
     moduleLayout
     $+$ text ""
-    $+$ ppLlvmFunctionDecls (map snd ghcInternalFunctions)
+    $+$ ppLlvmFunctionDecls (map snd (ghcInternalFunctions dflags))
     $+$ ppLlvmMetas stgTBAA
     $+$ text ""
 
