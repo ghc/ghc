@@ -155,6 +155,10 @@ extern HsWord64 getMonotonicUSec(void);
 #include <sys/select.h>
 #endif
 
+#if HAVE_SYS_EVENT_H
+#include <sys/event.h>
+#endif
+
 /* in inputReady.c */
 extern int fdReady(int fd, int write, int msecs, int isSock);
 
@@ -540,6 +544,15 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 	return open(file,how,mode);
 }
 #endif
+
+#ifdef HAVE_KEVENT
+INLINE int __hscore_kevent(int kq, const struct kevent *changelist,
+                           size_t nchanges, struct kevent *eventlist,
+                           size_t nevents, const struct timespec *timeout) {
+	return kevent(kq, changelist, nchanges, eventlist, nevents, timeout);
+}
+#endif
+
 
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
