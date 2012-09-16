@@ -22,7 +22,10 @@ import ByteCodeAsm
 import ByteCodeLink
 import LibFFI
 
+import Constants
+import DynFlags
 import Outputable
+import Platform
 import Name
 import MkId
 import Id
@@ -40,7 +43,6 @@ import TyCon
 import Util
 import VarSet
 import TysPrim
-import DynFlags
 import ErrUtils
 import Unique
 import FastString
@@ -1032,8 +1034,9 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
             void marshall_code ( StgWord* ptr_to_top_of_stack )
          -}
          -- resolve static address
-         get_target_info
-            = case target of
+         get_target_info = do
+             dflags <- getDynFlags
+             case target of
                  DynamicTarget
                     -> return (False, panic "ByteCodeGen.generateCCall(dyn)")
 
@@ -1044,11 +1047,10 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                           return (True, res)
                    where
                       stdcall_adj_target
-#ifdef mingw32_TARGET_OS
-                          | StdCallConv <- cconv
+                          | OSMinGW32 <- platformOS (targetPlatform dflags)
+                          , StdCallConv <- cconv
                           = let size = fromIntegral a_reps_sizeW * wORD_SIZE in
                             mkFastString (unpackFS target ++ '@':show size)
-#endif
                           | otherwise
                           = target
 
