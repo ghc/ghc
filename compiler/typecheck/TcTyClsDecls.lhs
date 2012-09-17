@@ -1042,7 +1042,9 @@ tcConArg new_or_data bty
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsConArgType new_or_data bty
         ; traceTc "tcConArg 2" (ppr bty)
-        ; strict_mark <- chooseBoxingStrategy arg_ty (getBangStrictness bty)
+        ; dflags <- getDynFlags
+        ; let strict_mark = chooseBoxingStrategy dflags arg_ty (getBangStrictness bty)
+                            -- Must be computed lazily
 	; return (arg_ty, strict_mark) }
 
 tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
@@ -1178,28 +1180,29 @@ conRepresentibleWithH98Syntax
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: TcType -> HsBang -> TcM HsBang
-chooseBoxingStrategy arg_ty bang
-  = case bang of
-	HsNoBang -> return HsNoBang
-	HsStrict -> do { unbox_strict <- doptM Opt_UnboxStrictFields
-                       ; if unbox_strict then return (can_unbox HsStrict arg_ty)
-                                         else return HsStrict }
-	HsNoUnpack -> return HsStrict
-	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
-                       ; let bang = can_unbox HsUnpackFailed arg_ty
-                       ; if omit_prags && bang == HsUnpack
-                            then return HsStrict
-                            else return bang }
-            -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
-	    -- See Trac #5252: unpacking means we must not conceal the
-	    --                 representation of the argument type
-            -- However: even when OmitInterfacePragmas is on, we still want
-            -- to know if we have HsUnpackFailed, because we omit a
-            -- warning in that case (#3966)
-        HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
-		       	  -- Source code never has shtes
+chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
+chooseBoxingStrategy dflags arg_ty bang
+  = case initial_choice of
+      HsUnpack | dopt Opt_OmitInterfacePragmas dflags
+               -> HsStrict
+      _other   -> initial_choice
+       -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
+       -- See Trac #5252: unpacking means we must not conceal the
+       --                 representation of the argument type
+       -- However: even when OmitInterfacePragmas is on, we still want
+       -- to know if we have HsUnpackFailed, because we omit a
+       -- warning in that case (#3966)
   where
+    initial_choice = case bang of
+	               HsNoBang -> HsNoBang
+	               HsStrict | dopt Opt_UnboxStrictFields dflags
+                                -> can_unbox HsStrict arg_ty
+                                | otherwise -> HsStrict
+                       HsNoUnpack -> HsStrict
+	               HsUnpack   -> can_unbox HsUnpackFailed arg_ty
+                       HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
+		                    	  -- Source code never has HsUnpackFailed
+
     can_unbox :: HsBang -> TcType -> HsBang
     -- Returns   HsUnpack  if we can unpack arg_ty
     -- 		 fail_bang if we know what arg_ty is but we can't unpack it
