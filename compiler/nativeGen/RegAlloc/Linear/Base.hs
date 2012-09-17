@@ -13,7 +13,6 @@ module RegAlloc.Linear.Base (
 
         -- the allocator monad
         RA_State(..),
-        RegM(..)
 )
 
 where
@@ -22,6 +21,7 @@ import RegAlloc.Linear.StackMap
 import RegAlloc.Liveness
 import Reg
 
+import DynFlags
 import Outputable
 import Unique
 import UniqFM
@@ -126,11 +126,7 @@ data RA_State freeRegs
         -- | Record why things were spilled, for -ddrop-asm-stats.
         --      Just keep a list here instead of a map of regs -> reasons.
         --      We don't want to slow down the allocator if we're not going to emit the stats.
-        , ra_spills     :: [SpillReason] }
-
-
--- | The register allocator monad type.
-newtype RegM freeRegs a
-        = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
+        , ra_spills     :: [SpillReason]
+        , ra_DynFlags   :: DynFlags }
 
 

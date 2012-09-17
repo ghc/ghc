@@ -142,8 +142,8 @@ static bdescr *free_mblock_list;
 // To find the free list in which to place a block, use log_2(size).
 // To find a free block of the right size, use log_2_ceil(size).
 
-lnat n_alloc_blocks;   // currently allocated blocks
-lnat hw_alloc_blocks;  // high-water allocated blocks
+W_ n_alloc_blocks;   // currently allocated blocks
+W_ hw_alloc_blocks;  // high-water allocated blocks
 
 /* -----------------------------------------------------------------------------
    Initialisation
@@ -168,7 +168,7 @@ STATIC_INLINE void
 initGroup(bdescr *head)
 {
   bdescr *bd;
-  nat i, n;
+  W_ i, n;
 
   n = head->blocks;
   head->free   = head->start;
@@ -184,9 +184,9 @@ initGroup(bdescr *head)
 // usually small, and MAX_FREE_LIST is also small, so the loop version
 // might well be the best choice here.
 STATIC_INLINE nat
-log_2_ceil(nat n)
+log_2_ceil(W_ n)
 {
-    nat i, x;
+    W_ i, x;
     x = 1;
     for (i=0; i < MAX_FREE_LIST; i++) {
         if (x >= n) return i;
@@ -196,9 +196,9 @@ log_2_ceil(nat n)
 }
 
 STATIC_INLINE nat
-log_2(nat n)
+log_2(W_ n)
 {
-    nat i, x;
+    W_ i, x;
     x = n;
     for (i=0; i < MAX_FREE_LIST; i++) {
         x = x >> 1;
@@ -244,7 +244,7 @@ setup_tail (bdescr *bd)
 // Take a free block group bd, and split off a group of size n from
 // it.  Adjust the free list as necessary, and return the new group.
 static bdescr *
-split_free_block (bdescr *bd, nat n, nat ln)
+split_free_block (bdescr *bd, W_ n, nat ln)
 {
     bdescr *fg; // free group
 
@@ -311,7 +311,7 @@ alloc_mega_group (nat mblocks)
 }
 
 bdescr *
-allocGroup (nat n)
+allocGroup (W_ n)
 {
     bdescr *bd, *rem;
     nat ln;
@@ -390,34 +390,50 @@ finish:
 }
 
 //
-// Allocate a chunk of blocks that is at most a megablock in size.
-// This API is used by the nursery allocator that wants contiguous
-// memory preferably, but doesn't require it.  When memory is
-// fragmented we might have lots of large chunks that are less than a
-// full megablock, so allowing the nursery allocator to use these
-// reduces fragmentation considerably.  e.g. on a GHC build with +RTS
-// -H, I saw fragmentation go from 17MB down to 3MB on a single compile.
+// Allocate a chunk of blocks that is at least min and at most max
+// blocks in size. This API is used by the nursery allocator that
+// wants contiguous memory preferably, but doesn't require it.  When
+// memory is fragmented we might have lots of large chunks that are
+// less than a full megablock, so allowing the nursery allocator to
+// use these reduces fragmentation considerably.  e.g. on a GHC build
+// with +RTS -H, I saw fragmentation go from 17MB down to 3MB on a
+// single compile.
 //
 bdescr *
-allocLargeChunk (void)
+allocLargeChunk (W_ min, W_ max)
 {
     bdescr *bd;
-    nat ln;
+    nat ln, lnmax;
 
-    ln = 5; // start in the 32-63 block bucket
-    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
+    if (min >= BLOCKS_PER_MBLOCK) {
+        return allocGroup(max);
+    }
+
+    ln = log_2_ceil(min);
+    lnmax = log_2_ceil(max); // tops out at MAX_FREE_LIST
+
+    while (ln < lnmax && free_list[ln] == NULL) {
         ln++;
     }
-    if (ln == MAX_FREE_LIST) {
-        return allocGroup(BLOCKS_PER_MBLOCK);
+    if (ln == lnmax) {
+        return allocGroup(max);
     }
     bd = free_list[ln];
 
+    if (bd->blocks <= max)              // exactly the right size!
+    {
+        dbl_link_remove(bd, &free_list[ln]);
+        initGroup(bd);
+    }
+    else   // block too big...
+    {                              
+        bd = split_free_block(bd, max, ln);
+        ASSERT(bd->blocks == max);
+        initGroup(bd);
+    }
+
     n_alloc_blocks += bd->blocks;
     if (n_alloc_blocks > hw_alloc_blocks) hw_alloc_blocks = n_alloc_blocks;
-
-    dbl_link_remove(bd, &free_list[ln]);
-    initGroup(bd);
 
     IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
@@ -425,7 +441,7 @@ allocLargeChunk (void)
 }
 
 bdescr *
-allocGroup_lock(nat n)
+allocGroup_lock(W_ n)
 {
     bdescr *bd;
     ACQUIRE_SM_LOCK;
@@ -637,10 +653,10 @@ initMBlock(void *mblock)
    Stats / metrics
    -------------------------------------------------------------------------- */
 
-nat
+W_
 countBlocks(bdescr *bd)
 {
-    nat n;
+    W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
 	n += bd->blocks;
     }
@@ -652,10 +668,10 @@ countBlocks(bdescr *bd)
 // that would be taken up by block descriptors in the second and
 // subsequent megablock.  This is so we can tally the count with the
 // number of blocks allocated in the system, for memInventory().
-nat
+W_
 countAllocdBlocks(bdescr *bd)
 {
-    nat n;
+    W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
 	n += bd->blocks;
 	// hack for megablock groups: see (*1) above
@@ -790,11 +806,11 @@ checkFreeListSanity(void)
     }
 }
 
-nat /* BLOCKS */
+W_ /* BLOCKS */
 countFreeList(void)
 {
   bdescr *bd;
-  lnat total_blocks = 0;
+  W_ total_blocks = 0;
   nat ln;
 
   for (ln=0; ln < MAX_FREE_LIST; ln++) {

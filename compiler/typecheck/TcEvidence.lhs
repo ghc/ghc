@@ -492,27 +492,26 @@ data EvLit
 
 Note [Coercion evidence terms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An evidence term for a coercion, of type (t1 ~ t2), always takes one of 
-these forms:
-   co_tm ::= EvId v
+A "coercion evidence term" takes one of these forms
+   co_tm ::= EvId v           where v :: t1 ~ t2
            | EvCoercion co
            | EvCast co_tm co
-
-An alternative would be 
-
-* To establish the invariant that coercions are represented only 
-   by EvCoercion
-
-* To maintain the invariant by smart constructors.  Eg
-     mkEvCast (EvCoercion c1) c2 = EvCoercion (TcCastCo c1 c2)
-     mkEvCast t c = EvCast t c
-
-I don't think it matters much... but maybe we'll find a good reason to
-do one or the other.  But currently we allow any of the three forms.
 
 We do quite often need to get a TcCoercion from an EvTerm; see
 'evTermCoercion'.
 
+INVARIANT: The evidence for any constraint with type (t1~t2) is 
+a coercion evidence term.  Consider for example
+    [G] g :: F Int a
+If we have
+    ax7 a :: F Int a ~ (a ~ Bool)
+then we do NOT generate the constraint
+    [G} (g |> ax7 a) :: a ~ Bool
+because that does not satisfy the invariant.  Instead we make a binding
+    g1 :: a~Bool = g |> ax7 a
+and the constraint
+    [G] g1 :: a~Bool
+See Trac [7238]
 
 Note [EvKindCast] 
 ~~~~~~~~~~~~~~~~~ 

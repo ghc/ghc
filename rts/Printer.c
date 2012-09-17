@@ -10,6 +10,7 @@
 #include "Rts.h"
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
+#include "sm/Storage.h"
 #include "Printer.h"
 #include "RtsUtils.h"
 
@@ -299,21 +300,21 @@ printClosure( StgClosure *obj )
             StgWord i;
             debugBelch("ARR_WORDS(\"");
 	    for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
-	      debugBelch("%" FMT_SizeT, (lnat)((StgArrWords *)obj)->payload[i]);
+	      debugBelch("%" FMT_Word, (W_)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }
 
     case MUT_ARR_PTRS_CLEAN:
-	debugBelch("MUT_ARR_PTRS_CLEAN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_CLEAN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_DIRTY:
-	debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
-	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MVAR_CLEAN:
@@ -352,6 +353,10 @@ printClosure( StgClosure *obj )
       debugBelch("TSO("); 
       debugBelch("%lu (%p)",(unsigned long)(((StgTSO*)obj)->id), (StgTSO*)obj);
       debugBelch(")\n"); 
+      break;
+
+    case STACK:
+      debugBelch("STACK");
       break;
 
 #if 0
@@ -426,7 +431,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 	    printPtr((P_)payload[i]);
 	    debugBelch("\n");
 	} else {
-	    debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
+	    debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
 	}
     }
 }
@@ -442,12 +447,12 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 	StgWord bitmap = large_bitmap->bitmap[bmp];
 	j = 0;
 	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    debugBelch("   stk[%" FMT_SizeT "] (%p) = ", (lnat)(spBottom-(payload+i)), payload+i);
+	    debugBelch("   stk[%" FMT_Word "] (%p) = ", (W_)(spBottom-(payload+i)), payload+i);
 	    if ((bitmap & 1) == 0) {
 		printPtr((P_)payload[i]);
 		debugBelch("\n");
 	    } else {
-		debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
+		debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
 	    }
 	}
     }
@@ -938,12 +943,18 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 void
 findPtr(P_ p, int follow)
 {
-  nat g;
+  nat g, n;
   bdescr *bd;
   const int arr_size = 1024;
   StgPtr arr[arr_size];
   int i = 0;
   searched = 0;
+
+  for (n = 0; n < n_capabilities; n++) {
+      bd = nurseries[i].blocks;
+      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
+  }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;

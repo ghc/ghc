@@ -530,25 +530,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        -- to assign fingerprints to all the OccNames that it binds, to
        -- use when referencing those OccNames in later declarations.
        --
-       -- We better give each name bound by the declaration a
-       -- different fingerprint!  So we calculate the fingerprint of
-       -- each binder by combining the fingerprint of the whole
-       -- declaration with the name of the binder. (#5614)
        extend_hash_env :: OccEnv (OccName,Fingerprint)
                        -> (Fingerprint,IfaceDecl)
                        -> IO (OccEnv (OccName,Fingerprint))
        extend_hash_env env0 (hash,d) = do
-          let
-            sub_bndrs = ifaceDeclImplicitBndrs d
-            fp_sub_bndr occ = computeFingerprint putNameLiterally (hash,occ)
-          --
-          sub_fps <- mapM fp_sub_bndr sub_bndrs
-          return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env1
-                        (zip sub_bndrs sub_fps))
-        where
-          decl_name = ifName d
-          item = (decl_name, hash)
-          env1 = extendOccEnv env0 decl_name item
+          return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env0
+                 (ifaceDeclFingerprints hash d))
 
    --
    (local_env, decls_w_hashes) <- 

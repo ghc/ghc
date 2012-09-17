@@ -1847,7 +1847,7 @@
           <row>
             <entry><option>-fhpc</option></entry>
             <entry>Turn on Haskell program coverage instrumentation</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
           <row>
@@ -2864,7 +2864,7 @@
           <row>
             <entry><option>-fhistory-size</option></entry>
             <entry>Set simplification history size</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

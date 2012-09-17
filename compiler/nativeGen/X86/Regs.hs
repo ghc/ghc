@@ -54,11 +54,11 @@ import RegClass
 import OldCmm
 import CmmCallConv
 import CLabel           ( CLabel )
+import DynFlags
 import Outputable
 import Platform
 import FastTypes
 import FastBool
-import Constants
 
 
 -- | regSqueeze_class reg
@@ -195,14 +195,14 @@ addrModeRegs _ = []
 -- applicable, is the same but for the frame pointer.
 
 
-spRel :: Platform
+spRel :: DynFlags
       -> Int -- ^ desired stack offset in words, positive or negative
       -> AddrMode
-spRel platform n
- | target32Bit platform
-    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE))
+spRel dflags n
+ | target32Bit (targetPlatform dflags)
+    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
  | otherwise
-    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE))
+    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
 
 -- The register numbers must fit into 32 bits on x86, so that we can
 -- use a Word32 to represent the set of free registers in the register
@@ -440,8 +440,9 @@ instrClobberedRegs platform
 --
 
 -- All machine registers that are used for argument-passing to Haskell functions
-allHaskellArgRegs :: Platform -> [Reg]
-allHaskellArgRegs platform = [ RegReal r | Just r <- map (globalRegMaybe platform) globalArgRegs ]
+allHaskellArgRegs :: DynFlags -> [Reg]
+allHaskellArgRegs dflags = [ RegReal r | Just r <- map (globalRegMaybe platform) (globalArgRegs dflags) ]
+    where platform = targetPlatform dflags
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the

@@ -38,8 +38,8 @@ import CgStackery
 import CgUtils
 import CLabel
 import ClosureInfo
-import Constants
 
+import DynFlags
 import OldCmm
 import PprCmm           ( {- instance Outputable -} )
 import SMRep
@@ -87,8 +87,8 @@ data CgIdInfo
         , cg_tag :: {-# UNPACK #-} !Int  -- tag to be added in idInfoToAmode
          }
 
-mkCgIdInfo :: Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> CgIdInfo
-mkCgIdInfo id vol stb lf
+mkCgIdInfo :: DynFlags -> Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> CgIdInfo
+mkCgIdInfo dflags id vol stb lf
   = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
                cg_lf = lf, cg_rep = idCgRep id, cg_tag = tag }
   where
@@ -100,10 +100,10 @@ mkCgIdInfo id vol stb lf
              If yes, we assume that the constructor is evaluated and can
              be tagged.
            -}
-      = tagForCon con
+      = tagForCon dflags con
 
       | otherwise
-      = funTagLFInfo lf
+      = funTagLFInfo dflags lf
 
 voidIdInfo :: Id -> CgIdInfo
 voidIdInfo id = CgIdInfo { cg_id = id, cg_vol = NoVolatileLoc
@@ -120,11 +120,11 @@ data VolatileLoc        -- These locations die across a call
                                    -- NB. Byte offset, because we subtract R1's
                                    -- tag from the offset.
 
-mkTaggedCgIdInfo :: Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> DataCon
+mkTaggedCgIdInfo :: DynFlags -> Id -> VolatileLoc -> StableLoc -> LambdaFormInfo -> DataCon
                  -> CgIdInfo
-mkTaggedCgIdInfo id vol stb lf con
+mkTaggedCgIdInfo dflags id vol stb lf con
   = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
-               cg_lf = lf, cg_rep = idCgRep id, cg_tag = tagForCon con }
+               cg_lf = lf, cg_rep = idCgRep id, cg_tag = tagForCon dflags con }
 \end{code}
 
 @StableLoc@ encodes where an Id can be found, used by
@@ -172,43 +172,52 @@ instance Outputable StableLoc where
 %************************************************************************
 
 \begin{code}
-stableIdInfo :: Id -> CmmExpr -> LambdaFormInfo -> CgIdInfo
-stableIdInfo id amode   lf_info = mkCgIdInfo id NoVolatileLoc (StableLoc amode) lf_info
+stableIdInfo :: DynFlags -> Id -> CmmExpr -> LambdaFormInfo -> CgIdInfo
+stableIdInfo dflags id amode lf_info = mkCgIdInfo dflags id NoVolatileLoc (StableLoc amode) lf_info
 
-heapIdInfo :: Id -> VirtualHpOffset -> LambdaFormInfo -> CgIdInfo
-heapIdInfo id offset    lf_info = mkCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info
+heapIdInfo :: DynFlags -> Id -> VirtualHpOffset -> LambdaFormInfo -> CgIdInfo
+heapIdInfo dflags id offset lf_info = mkCgIdInfo dflags id (VirHpLoc offset) NoStableLoc lf_info
 
-letNoEscapeIdInfo :: Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
-letNoEscapeIdInfo id sp lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLNE sp) lf_info
+letNoEscapeIdInfo :: DynFlags -> Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
+letNoEscapeIdInfo dflags id sp lf_info
+    = mkCgIdInfo dflags id NoVolatileLoc (VirStkLNE sp) lf_info
 
-stackIdInfo :: Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
-stackIdInfo id sp       lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLoc sp) lf_info
+stackIdInfo :: DynFlags -> Id -> VirtualSpOffset -> LambdaFormInfo -> CgIdInfo
+stackIdInfo dflags id sp lf_info
+    = mkCgIdInfo dflags id NoVolatileLoc (VirStkLoc sp) lf_info
 
-nodeIdInfo :: Id -> Int -> LambdaFormInfo -> CgIdInfo
-nodeIdInfo id offset    lf_info = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset)) NoStableLoc lf_info
+nodeIdInfo :: DynFlags -> Id -> Int -> LambdaFormInfo -> CgIdInfo
+nodeIdInfo dflags id offset lf_info = mkCgIdInfo dflags id (VirNodeLoc (wORD_SIZE dflags * offset)) NoStableLoc lf_info
 
-regIdInfo :: Id -> CmmReg -> LambdaFormInfo -> CgIdInfo
-regIdInfo id reg        lf_info = mkCgIdInfo id (RegLoc reg) NoStableLoc lf_info
+regIdInfo :: DynFlags -> Id -> CmmReg -> LambdaFormInfo -> CgIdInfo
+regIdInfo dflags id reg lf_info = mkCgIdInfo dflags id (RegLoc reg) NoStableLoc lf_info
 
-taggedStableIdInfo :: Id -> CmmExpr -> LambdaFormInfo -> DataCon -> CgIdInfo
-taggedStableIdInfo id amode lf_info con
-  = mkTaggedCgIdInfo id NoVolatileLoc (StableLoc amode) lf_info con
+taggedStableIdInfo :: DynFlags -> Id -> CmmExpr -> LambdaFormInfo -> DataCon -> CgIdInfo
+taggedStableIdInfo dflags id amode lf_info con
+  = mkTaggedCgIdInfo dflags id NoVolatileLoc (StableLoc amode) lf_info con
 
-taggedHeapIdInfo :: Id -> VirtualHpOffset -> LambdaFormInfo -> DataCon
+taggedHeapIdInfo :: DynFlags -> Id -> VirtualHpOffset -> LambdaFormInfo -> DataCon
                  -> CgIdInfo
-taggedHeapIdInfo id offset lf_info con
-  = mkTaggedCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info con
+taggedHeapIdInfo dflags id offset lf_info con
+  = mkTaggedCgIdInfo dflags id (VirHpLoc offset) NoStableLoc lf_info con
 
-untagNodeIdInfo :: Id -> Int -> LambdaFormInfo -> Int -> CgIdInfo
-untagNodeIdInfo id offset    lf_info tag
-  = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset - tag)) NoStableLoc lf_info
+untagNodeIdInfo :: DynFlags -> Id -> Int -> LambdaFormInfo -> Int -> CgIdInfo
+untagNodeIdInfo dflags id offset lf_info tag
+  = mkCgIdInfo dflags id (VirNodeLoc (wORD_SIZE dflags * offset - tag)) NoStableLoc lf_info
 
 
 idInfoToAmode :: CgIdInfo -> FCode CmmExpr
-idInfoToAmode info
-  = case cg_vol info of {
+idInfoToAmode info = do
+    dflags <- getDynFlags
+    let mach_rep = argMachRep dflags (cg_rep info)
+
+        maybeTag amode  -- add the tag, if we have one
+          | tag == 0   = amode
+          | otherwise  = cmmOffsetB dflags amode tag
+          where tag = cg_tag info
+    case cg_vol info of {
       RegLoc reg        -> returnFC (CmmReg reg) ;
-      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetB (CmmReg nodeReg) nd_off)
+      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetB dflags (CmmReg nodeReg) nd_off)
                                              mach_rep) ;
       VirHpLoc hp_off   -> do { off <- getHpRelOffset hp_off
                               ; return $! maybeTag off };
@@ -228,13 +237,6 @@ idInfoToAmode info
 
       NoStableLoc -> pprPanic "idInfoToAmode: no loc" (ppr (cg_id info))
     }
-  where
-    mach_rep = argMachRep (cg_rep info)
-
-    maybeTag amode  -- add the tag, if we have one
-      | tag == 0   = amode
-      | otherwise  = cmmOffsetB amode tag
-      where tag = cg_tag info
 
 cgIdInfoId :: CgIdInfo -> Id
 cgIdInfoId = cg_id 
@@ -283,7 +285,8 @@ modifyBindC name mangle_fn = do
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do  {       -- Try local bindings first
+  = do  { dflags <- getDynFlags
+        ; -- Try local bindings first
         ; local_binds  <- getBinds
         ; case lookupVarEnv local_binds id of {
             Just info -> return info ;
@@ -301,7 +304,7 @@ getCgIdInfo id
         in
         if isExternalName name then do
             let ext_lbl = CmmLit (CmmLabel (mkClosureLabel name $ idCafInfo id))
-            return (stableIdInfo id ext_lbl (mkLFImported id))
+            return (stableIdInfo dflags id ext_lbl (mkLFImported id))
         else
         if isVoidArg (idCgRep id) then
                 -- Void things are never in the environment
@@ -428,9 +431,9 @@ getArgAmodes (atom:atoms)
 \begin{code}
 bindArgsToStack :: [(Id, VirtualSpOffset)] -> Code
 bindArgsToStack args
-  = mapCs bind args
-  where
-    bind(id, offset) = addBindC id (stackIdInfo id offset (mkLFArgument id))
+  = do dflags <- getDynFlags
+       let bind (id, offset) = addBindC id (stackIdInfo dflags id offset (mkLFArgument id))
+       mapCs bind args
 
 bindArgsToRegs :: [(Id, GlobalReg)] -> Code
 bindArgsToRegs args
@@ -440,30 +443,32 @@ bindArgsToRegs args
 
 bindNewToNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Code
 bindNewToNode id offset lf_info
-  = addBindC id (nodeIdInfo id offset lf_info)
+  = do dflags <- getDynFlags
+       addBindC id (nodeIdInfo dflags id offset lf_info)
 
 bindNewToUntagNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Int -> Code
 bindNewToUntagNode id offset lf_info tag
-  = addBindC id (untagNodeIdInfo id offset lf_info tag)
+  = do dflags <- getDynFlags
+       addBindC id (untagNodeIdInfo dflags id offset lf_info tag)
 
 -- Create a new temporary whose unique is that in the id,
 -- bind the id to it, and return the addressing mode for the
 -- temporary.
 bindNewToTemp :: Id -> FCode LocalReg
 bindNewToTemp id
-  = do  addBindC id (regIdInfo id (CmmLocal temp_reg) lf_info)
+  = do  dflags <- getDynFlags
+        let uniq     = getUnique id
+            temp_reg = LocalReg uniq (argMachRep dflags (idCgRep id))
+            lf_info  = mkLFArgument id  -- Always used of things we
+                                        -- know nothing about
+        addBindC id (regIdInfo dflags id (CmmLocal temp_reg) lf_info)
         return temp_reg
-  where
-    uniq     = getUnique id
-    temp_reg = LocalReg uniq (argMachRep (idCgRep id))
-    lf_info  = mkLFArgument id  -- Always used of things we
-                                -- know nothing about
 
 bindNewToReg :: Id -> CmmReg -> LambdaFormInfo -> Code
 bindNewToReg name reg lf_info
-  = addBindC name info
-  where
-    info = mkCgIdInfo name (RegLoc reg) NoStableLoc lf_info
+  = do dflags <- getDynFlags
+       let info = mkCgIdInfo dflags name (RegLoc reg) NoStableLoc lf_info
+       addBindC name info
 
 rebindToStack :: Id -> VirtualSpOffset -> Code
 rebindToStack name offset
@@ -497,9 +502,10 @@ Probably *naughty* to look inside monad...
 nukeDeadBindings :: StgLiveVars  -- All the *live* variables
                  -> Code
 nukeDeadBindings live_vars = do
+        dflags <- getDynFlags
         binds <- getBinds
         let (dead_stk_slots, bs') =
-                dead_slots live_vars 
+                dead_slots dflags live_vars
                         [] []
                         [ (cg_id b, b) | b <- varEnvElts binds ]
         setBinds $ mkVarEnv bs'
@@ -509,7 +515,8 @@ nukeDeadBindings live_vars = do
 Several boring auxiliary functions to do the dirty work.
 
 \begin{code}
-dead_slots :: StgLiveVars
+dead_slots :: DynFlags
+           -> StgLiveVars
            -> [(Id,CgIdInfo)]
            -> [VirtualSpOffset]
            -> [(Id,CgIdInfo)]
@@ -517,12 +524,12 @@ dead_slots :: StgLiveVars
 
 -- dead_slots carries accumulating parameters for
 --      filtered bindings, dead slots
-dead_slots _ fbs ds []
+dead_slots _ _ fbs ds []
   = (ds, reverse fbs) -- Finished; rm the dups, if any
 
-dead_slots live_vars fbs ds ((v,i):bs)
+dead_slots dflags live_vars fbs ds ((v,i):bs)
   | v `elementOfUniqSet` live_vars
-    = dead_slots live_vars ((v,i):fbs) ds bs
+    = dead_slots dflags live_vars ((v,i):fbs) ds bs
           -- Live, so don't record it in dead slots
           -- Instead keep it in the filtered bindings
 
@@ -530,12 +537,12 @@ dead_slots live_vars fbs ds ((v,i):bs)
     = case cg_stb i of
         VirStkLoc offset
          | size > 0
-         -> dead_slots live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
+         -> dead_slots dflags live_vars fbs ([offset-size+1 .. offset] ++ ds) bs
 
-        _ -> dead_slots live_vars fbs ds bs
+        _ -> dead_slots dflags live_vars fbs ds bs
   where
     size :: WordOff
-    size = cgRepSizeW (cg_rep i)
+    size = cgRepSizeW dflags (cg_rep i)
 
 getLiveStackSlots :: FCode [VirtualSpOffset]
 -- Return the offsets of slots in stack containig live pointers

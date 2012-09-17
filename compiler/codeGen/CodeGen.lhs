@@ -35,7 +35,6 @@ import OldPprCmm ()
 import StgSyn
 import PrelNames
 import DynFlags
-import StaticFlags
 
 import HscTypes
 import CostCentre
@@ -101,7 +100,7 @@ mkModuleInit
 
 mkModuleInit dflags cost_centre_info this_mod hpc_info
   = do  { -- Allocate the static boolean that records if this
-        ; whenC (opt_Hpc) $
+        ; whenC (dopt Opt_Hpc dflags) $
               hpcTable this_mod hpc_info
 
         ; whenC (dopt Opt_SccProfilingOn dflags) $ do

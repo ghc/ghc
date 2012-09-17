@@ -61,7 +61,9 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args)  = cgConApp con args
 cgExpr (StgSCC cc tick push expr) = do { emitSetCCC cc tick push; cgExpr expr }
-cgExpr (StgTick m n expr) = do { emit (mkTickBox m n); cgExpr expr }
+cgExpr (StgTick m n expr) = do dflags <- getDynFlags
+                               emit (mkTickBox dflags m n)
+                               cgExpr expr
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]
 
@@ -154,8 +156,9 @@ cgLetNoEscapeClosure
         -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
-  = return ( lneIdInfo bndr args
-           , code )
+  = do dflags <- getDynFlags
+       return ( lneIdInfo dflags bndr args
+              , code )
   where
    code = forkProc $ do
                   { restoreCurrentCostCentre cc_slot
@@ -289,9 +292,10 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
        -- If the binder is not dead, convert the tag to a constructor
        -- and assign it.
        ; when (not (isDeadBinder bndr)) $ do
-            { tmp_reg <- bindArgToReg (NonVoid bndr)
+            { dflags <- getDynFlags
+            ; tmp_reg <- bindArgToReg (NonVoid bndr)
             ; emitAssign (CmmLocal tmp_reg)
-                         (tagToClosure tycon tag_expr) }
+                         (tagToClosure dflags tycon tag_expr) }
 
        ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
@@ -303,7 +307,8 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
     do_enum_primop TagToEnumOp [arg]  -- No code!
       = getArgAmode (NonVoid arg)
     do_enum_primop primop args
-      = do tmp <- newTemp bWord
+      = do dflags <- getDynFlags
+           tmp <- newTemp (bWord dflags)
            cgPrimOp [tmp] primop args
            return (CmmReg (CmmLocal tmp))
 
@@ -362,10 +367,11 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   | isUnLiftedType (idType v)
   || reps_compatible
   = -- assignment suffices for unlifted types
-    do { when (not reps_compatible) $
+    do { dflags <- getDynFlags
+       ; when (not reps_compatible) $
            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
        ; v_info <- getCgIdInfo v
-       ; emitAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info)
+       ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr))) (idInfoToAmode v_info)
        ; _ <- bindArgsToRegs [NonVoid bndr]
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
@@ -373,8 +379,9 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
 
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = -- fail at run-time, not compile-time
-    do { mb_cc <- maybeSaveCostCentre True
-       ; _ <- withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
+    do { dflags <- getDynFlags
+       ; mb_cc <- maybeSaveCostCentre True
+       ; _ <- withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newLabelC
@@ -401,9 +408,10 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
 
 cgCase scrut bndr alt_type alts
   = -- the general case
-    do { up_hp_usg <- getVirtHp        -- Upstream heap usage
+    do { dflags <- getDynFlags
+       ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
-             alt_regs  = map idToReg ret_bndrs
+             alt_regs  = map (idToReg dflags) ret_bndrs
              simple_scrut = isSimpleScrut scrut alt_type
              do_gc  | not simple_scrut = True
                     | isSingleton alts = False
@@ -481,9 +489,11 @@ cgAlts gc_plan _bndr (UbxTupAlt _) [(_, _, _, rhs)]
         -- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
-  = do  { tagged_cmms <- cgAltRhss gc_plan bndr alts
+  = do  { dflags <- getDynFlags
 
-        ; let bndr_reg = CmmLocal (idToReg bndr)
+        ; tagged_cmms <- cgAltRhss gc_plan bndr alts
+
+        ; let bndr_reg = CmmLocal (idToReg dflags bndr)
               (DEFAULT,deflt) = head tagged_cmms
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
@@ -494,16 +504,18 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
-  = do  { (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
+  = do  { dflags <- getDynFlags
+
+        ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
         ; let fam_sz   = tyConFamilySize tycon
-              bndr_reg = CmmLocal (idToReg bndr)
+              bndr_reg = CmmLocal (idToReg dflags bndr)
 
                     -- Is the constructor tag in the node reg?
-        ; if isSmallFamily fam_sz
+        ; if isSmallFamily dflags fam_sz
           then do
                 let   -- Yes, bndr_reg has constr. tag in ls bits
-                   tag_expr = cmmConstrTag1 (CmmReg bndr_reg)
+                   tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
                 return AssignedDirectly
@@ -564,10 +576,10 @@ cgAlgAltRhss gc_plan bndr alts
 -------------------
 cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
           -> FCode [(AltCon, CmmAGraph)]
-cgAltRhss gc_plan bndr alts
-  = forkAlts (map cg_alt alts)
-  where
-    base_reg = idToReg bndr
+cgAltRhss gc_plan bndr alts = do
+  dflags <- getDynFlags
+  let
+    base_reg = idToReg dflags bndr
     cg_alt :: StgAlt -> FCode (AltCon, CmmAGraph)
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR                  $
@@ -575,6 +587,7 @@ cgAltRhss gc_plan bndr alts
         do { _ <- bindConArgs con base_reg bndrs
            ; _ <- cgExpr rhs
            ; return con }
+  forkAlts (map cg_alt alts)
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code
@@ -611,7 +624,10 @@ cgIdApp fun_id args
   = do  { fun_info <- getCgIdInfo fun_id
         ; case maybeLetNoEscape fun_info of
             Just (blk_id, lne_regs) -> cgLneJump blk_id lne_regs args
-            Nothing -> cgTailCall fun_id fun_info args }
+            Nothing -> cgTailCall (cg_id fun_info) fun_info args }
+            -- NB. use (cg_id fun_info) instead of fun_id, because the former
+            -- may be externalised for -split-objs.
+            -- See StgCmm.maybeExternaliseId.
 
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ReturnKind
 cgLneJump blk_id lne_regs args  -- Join point; discard sequel
@@ -670,9 +686,9 @@ emitEnter fun = do
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
       Return _ -> do
-        { let entry = entryCode dflags $ closureInfoPtr $ CmmReg nodeReg
+        { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkForeignJump dflags NativeNodeCall entry
-                    [cmmUntag fun] updfr_off
+                    [cmmUntag dflags fun] updfr_off
         ; return AssignedDirectly
         }
 
@@ -712,11 +728,11 @@ emitEnter fun = do
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode dflags (closureInfoPtr (CmmReg nodeReg))
+       ; let entry = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged (CmmReg nodeReg)) lret lcall <*>
+           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg)) lret lcall <*>
            outOfLine lcall the_call <*>
            mkLabel lret <*>
            copyin

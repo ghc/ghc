@@ -1448,6 +1448,20 @@ Example
                                      , ev_decomp = \c. [nth 1 c, nth 2 c] })
               (\fresh-goals.  stuff)
 
+Note [Bind new Givens immediately]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For Givens we make new EvVars and bind them immediately. We don't worry
+about caching, but we don't expect complicated calculations among Givens.
+It is important to bind each given:
+      class (a~b) => C a b where ....
+      f :: C a b => ....
+Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
+But that superclass selector can't (yet) appear in a coercion
+(see evTermCoercion), so the easy thing is to bind it to an Id.
+
+See Note [Coercion evidence terms] in TcEvidence.
+
+
 \begin{code}
 xCtFlavor :: CtEvidence              -- Original flavor   
           -> [TcPredType]          -- New predicate types
@@ -1457,14 +1471,7 @@ xCtFlavor :: CtEvidence              -- Original flavor
 xCtFlavor (CtGiven { ctev_gloc = gl, ctev_evtm = tm }) ptys xev
   = ASSERT( equalLength ptys (ev_decomp xev tm) )
     zipWithM (newGivenEvVar gl) ptys (ev_decomp xev tm)
-    -- For Givens we make new EvVars and bind them immediately. We don't worry
-    -- about caching, but we don't expect complicated calculations among Givens.
-    -- It is important to bind each given:
-    --       class (a~b) => C a b where ....
-    --       f :: C a b => ....
-    -- Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
-    -- But that superclass selector can't (yet) appear in a coercion
-    -- (see evTermCoercion), so the easy thing is to bind it to an Id
+    -- See Note [Bind new Givens immediately]
   
 xCtFlavor ctev@(CtWanted { ctev_wloc = wl, ctev_evar = evar }) ptys xev
   = do { new_evars <- mapM (newWantedEvVar wl) ptys
@@ -1511,7 +1518,8 @@ rewriteCtFlavor (CtDerived { ctev_wloc = wl }) pty_new _co
   = newDerived wl pty_new
         
 rewriteCtFlavor (CtGiven { ctev_gloc = gl, ctev_evtm = old_tm }) pty_new co
-  = return (Just (CtGiven { ctev_gloc = gl, ctev_pred = pty_new, ctev_evtm = new_tm }))
+  = do { new_ev <- newGivenEvVar gl pty_new new_tm  -- See Note [Bind new Givens immediately]
+       ; return (Just new_ev) }
   where
     new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCase optimises ReflCo
   

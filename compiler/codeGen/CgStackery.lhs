@@ -37,7 +37,6 @@ import SMRep
 import OldCmm
 import OldCmmUtils
 import CLabel
-import Constants
 import DynFlags
 import Util
 import OrdList
@@ -101,8 +100,9 @@ setRealSp new_real_sp
 
 getSpRelOffset :: VirtualSpOffset -> FCode CmmExpr
 getSpRelOffset virtual_offset
-  = do	{ real_sp <- getRealSp
-	; return (cmmRegOffW spReg (spRel real_sp virtual_offset)) }
+  = do dflags <- getDynFlags
+       real_sp <- getRealSp
+       return (cmmRegOffW dflags spReg (spRel real_sp virtual_offset))
 \end{code}
 
 
@@ -118,12 +118,13 @@ increase towards the top of stack).
 
 \begin{code}
 mkVirtStkOffsets
-	  :: VirtualSpOffset 	-- Offset of the last allocated thing
+	  :: DynFlags
+	  -> VirtualSpOffset 	-- Offset of the last allocated thing
 	  -> [(CgRep,a)]		-- things to make offsets for
 	  -> (VirtualSpOffset,		-- OUTPUTS: Topmost allocated word
 	      [(a, VirtualSpOffset)])	-- things with offsets (voids filtered out)
 
-mkVirtStkOffsets init_Sp_offset things
+mkVirtStkOffsets dflags init_Sp_offset things
     = loop init_Sp_offset [] (reverse things)
   where
     loop offset offs [] = (offset,offs)
@@ -132,7 +133,7 @@ mkVirtStkOffsets init_Sp_offset things
     loop offset offs ((rep,t):things)
 	= loop thing_slot ((t,thing_slot):offs) things
 	where
-	  thing_slot = offset + cgRepSizeW rep
+	  thing_slot = offset + cgRepSizeW dflags rep
 	    -- offset of thing is offset+size, because we're 
 	    -- growing the stack *downwards* as the offsets increase.
 
@@ -149,12 +150,13 @@ mkStkAmodes
 	          CmmStmts)	    -- Assignments to appropriate stk slots
 
 mkStkAmodes tail_Sp things
-  = do	{ rSp <- getRealSp
-	; let (last_Sp_offset, offsets) = mkVirtStkOffsets tail_Sp things
-	      abs_cs = [ CmmStore (cmmRegOffW spReg (spRel rSp offset)) amode
-		       | (amode, offset) <- offsets
-		       ]
-	; returnFC (last_Sp_offset, toOL abs_cs) }
+  = do dflags <- getDynFlags
+       rSp <- getRealSp
+       let (last_Sp_offset, offsets) = mkVirtStkOffsets dflags tail_Sp things
+           abs_cs = [ CmmStore (cmmRegOffW dflags spReg (spRel rSp offset)) amode
+                    | (amode, offset) <- offsets
+                    ]
+       returnFC (last_Sp_offset, toOL abs_cs)
 \end{code}
 
 %************************************************************************
@@ -167,7 +169,11 @@ Allocate a virtual offset for something.
 
 \begin{code}
 allocPrimStack :: CgRep -> FCode VirtualSpOffset
-allocPrimStack rep
+allocPrimStack rep = do dflags <- getDynFlags
+                        allocPrimStack' dflags rep
+
+allocPrimStack' :: DynFlags -> CgRep -> FCode VirtualSpOffset
+allocPrimStack' dflags rep
   = do	{ stk_usg <- getStkUsage
 	; let free_stk = freeStk stk_usg
 	; case find_block free_stk of
@@ -183,7 +189,7 @@ allocPrimStack rep
 	}
   where
     size :: WordOff
-    size = cgRepSizeW rep
+    size = cgRepSizeW dflags rep
 
 	-- Find_block looks for a contiguous chunk of free slots
 	-- returning the offset of its topmost word
@@ -289,7 +295,7 @@ pushSpecUpdateFrame lbl updatee code
     	; MASSERT(case sequel of { OnStack -> True; _ -> False}) }
 	; dflags <- getDynFlags
 	; allocStackTop (fixedHdrSize dflags + 
-			   sIZEOF_StgUpdateFrame_NoHdr `quot` wORD_SIZE)
+			   sIZEOF_StgUpdateFrame_NoHdr dflags `quot` wORD_SIZE dflags)
 	; vsp <- getVirtSp
 	; setStackFrame vsp
 	; frame_addr <- getSpRelOffset vsp
@@ -317,12 +323,12 @@ emitSpecPushUpdateFrame lbl frame_addr updatee = do
 	stmtsC [  -- Set the info word
 		  CmmStore frame_addr (mkLblExpr lbl)
 		, -- And the updatee
-		  CmmStore (cmmOffsetB frame_addr (off_updatee dflags)) updatee ]
+		  CmmStore (cmmOffsetB dflags frame_addr (off_updatee dflags)) updatee ]
 	initUpdFrameProf frame_addr
 
 off_updatee :: DynFlags -> ByteOff
 off_updatee dflags
-    = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgUpdateFrame_updatee
+    = fixedHdrSize dflags * wORD_SIZE dflags + oFFSET_StgUpdateFrame_updatee dflags
 \end{code}
 
 

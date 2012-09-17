@@ -127,12 +127,19 @@ all_ghc_stage3 : $(GHC_STAGE3)
 $(INPLACE_LIB)/settings : settings
 	"$(CP)" $< $@
 
+$(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
+	"$(CP)" $< $@
+
 # The GHC programs need to depend on all the helper programs they might call,
 # and the settings files they use
 
-$(GHC_STAGE1) : | $(UNLIT) $(INPLACE_LIB)/settings
-$(GHC_STAGE2) : | $(UNLIT) $(INPLACE_LIB)/settings
-$(GHC_STAGE3) : | $(UNLIT) $(INPLACE_LIB)/settings
+GHC_DEPENDENCIES += $(UNLIT)
+GHC_DEPENDENCIES += $(INPLACE_LIB)/settings
+GHC_DEPENDENCIES += $(INPLACE_LIB)/platformConstants
+
+$(GHC_STAGE1) : | $(GHC_DEPENDENCIES)
+$(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
+$(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
 
 ifeq "$(GhcUnregisterised)" "NO"
 $(GHC_STAGE1) : | $(SPLIT)

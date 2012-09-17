@@ -20,6 +20,7 @@ module OldCmmUtils(
 import OldCmm
 import CmmUtils
 import OrdList
+import DynFlags
 import Unique
 
 ---------------------------------------------------
@@ -77,23 +78,23 @@ cheapEqReg _ _                = False
 --
 ---------------------------------------------------
 
-loadArgsIntoTemps :: [Unique]
+loadArgsIntoTemps :: DynFlags -> [Unique]
                   -> [HintedCmmActual]
                   -> ([Unique], [CmmStmt], [HintedCmmActual])
-loadArgsIntoTemps uniques [] = (uniques, [], [])
-loadArgsIntoTemps uniques ((CmmHinted e hint):args) =
+loadArgsIntoTemps _      uniques [] = (uniques, [], [])
+loadArgsIntoTemps dflags uniques ((CmmHinted e hint):args) =
     (uniques'',
      new_stmts ++ remaining_stmts,
      (CmmHinted new_e hint) : remaining_e)
     where
-      (uniques', new_stmts, new_e) = maybeAssignTemp uniques e
+      (uniques', new_stmts, new_e) = maybeAssignTemp dflags uniques e
       (uniques'', remaining_stmts, remaining_e) =
-          loadArgsIntoTemps uniques' args
+          loadArgsIntoTemps dflags uniques' args
 
 
-maybeAssignTemp :: [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
-maybeAssignTemp uniques e
+maybeAssignTemp :: DynFlags -> [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
+maybeAssignTemp dflags uniques e
     | hasNoGlobalRegs e = (uniques, [], e)
     | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
-    where local = CmmLocal (LocalReg (head uniques) (cmmExprType e))
+    where local = CmmLocal (LocalReg (head uniques) (cmmExprType dflags e))
 

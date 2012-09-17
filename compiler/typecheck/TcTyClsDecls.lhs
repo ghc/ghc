@@ -1180,25 +1180,28 @@ conRepresentibleWithH98Syntax
 -- and reboxing more complicated
 chooseBoxingStrategy :: TcType -> HsBang -> TcM HsBang
 chooseBoxingStrategy arg_ty bang
-  = case bang of
-	HsNoBang -> return HsNoBang
-	HsStrict -> do { unbox_strict <- doptM Opt_UnboxStrictFields
-                       ; if unbox_strict then return (can_unbox HsStrict arg_ty)
-                                         else return HsStrict }
-	HsNoUnpack -> return HsStrict
-	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
-                       ; let bang = can_unbox HsUnpackFailed arg_ty
-                       ; if omit_prags && bang == HsUnpack
-                            then return HsStrict
-                            else return bang }
+  = do { dflags <- getDynFlags
+       ; let choice = case bang of
+	               HsNoBang -> HsNoBang
+	               HsStrict | dopt Opt_UnboxStrictFields dflags
+                                -> can_unbox HsStrict arg_ty
+                                | otherwise -> HsStrict
+                       HsNoUnpack -> HsStrict
+	               HsUnpack   -> can_unbox HsUnpackFailed arg_ty
+                       HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
+		                    	  -- Source code never has HsUnpackFailed
+
+       ; case choice of
+           HsUnpack | dopt Opt_OmitInterfacePragmas dflags
+                    -> return HsStrict
+           _other   -> return choice
             -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
 	    -- See Trac #5252: unpacking means we must not conceal the
 	    --                 representation of the argument type
             -- However: even when OmitInterfacePragmas is on, we still want
             -- to know if we have HsUnpackFailed, because we omit a
             -- warning in that case (#3966)
-        HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
-		       	  -- Source code never has shtes
+       }
   where
     can_unbox :: HsBang -> TcType -> HsBang
     -- Returns   HsUnpack  if we can unpack arg_ty

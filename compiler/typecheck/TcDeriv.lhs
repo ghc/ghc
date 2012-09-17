@@ -1554,7 +1554,8 @@ genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon
               -> TcM (LHsBinds RdrName, BagDerivStuff)
 genDerivStuff loc fix_env clas name tycon comaux_maybe
   | className clas `elem` typeableClassNames
-  = return (gen_Typeable_binds loc tycon, emptyBag)
+  = do dflags <- getDynFlags
+       return (gen_Typeable_binds dflags loc tycon, emptyBag)
 
   | ck `elem` [genClassKey, gen1ClassKey]   -- Special case because monadic
   = let gk =  if ck == genClassKey then Gen0 else Gen1 -- TODO NSF: correctly identify when we're building Both instead of One

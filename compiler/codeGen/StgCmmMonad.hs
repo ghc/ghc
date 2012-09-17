@@ -39,8 +39,7 @@ module StgCmmMonad (
         Sequel(..), ReturnKind(..),
 	withSequel, getSequel,
 
-	setSRTLabel, getSRTLabel, 
-	setTickyCtrLabel, getTickyCtrLabel,
+        setTickyCtrLabel, getTickyCtrLabel,
 
 	withUpdFrameOff, getUpdFrameOff, initUpdFrameOff,
 
@@ -155,8 +154,7 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_dflags     :: DynFlags,
 	cgd_mod        :: Module,	  -- Module being compiled
 	cgd_statics    :: CgBindings,	  -- [Id -> info] : static environment
-	cgd_srt_lbl    :: CLabel,	  -- Label of the current top-level SRT
-	cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
+        cgd_updfr_off  :: UpdFrameOffset, -- Size of current update frame
 	cgd_ticky      :: CLabel,	  -- Current destination for ticky counts
 	cgd_sequel     :: Sequel	  -- What to do at end of basic block
   }
@@ -285,16 +283,15 @@ initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags    = dflags,
 			cgd_mod       = mod,
 			cgd_statics   = emptyVarEnv,
-			cgd_srt_lbl   = error "initC: srt_lbl",
-			cgd_updfr_off = initUpdFrameOff,
+                        cgd_updfr_off = initUpdFrameOff dflags,
 			cgd_ticky     = mkTopTickyCtrLabel,
 			cgd_sequel    = initSequel }
 
 initSequel :: Sequel
 initSequel = Return False
 
-initUpdFrameOff :: UpdFrameOffset
-initUpdFrameOff = widthInBytes wordWidth -- space for the RA
+initUpdFrameOff :: DynFlags -> UpdFrameOffset
+initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
 
 
 --------------------------------------------------------
@@ -472,22 +469,6 @@ getSequel = do  { info <- getInfoDown
 		; return (cgd_sequel info) }
 
 -- ----------------------------------------------------------------------------
--- Get/set the current SRT label
-
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTLabel :: FCode CLabel	-- Used only by cgPanic
-getSRTLabel = do info  <- getInfoDown
-		 return (cgd_srt_lbl info)
-
-setSRTLabel :: CLabel -> FCode a -> FCode a
-setSRTLabel srt_lbl code
-  = do  info <- getInfoDown
-	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
-
--- ----------------------------------------------------------------------------
 -- Get/set the size of the update frame
 
 -- We keep track of the size of the update frame so that we
@@ -537,11 +518,12 @@ forkClosureBody :: FCode () -> FCode ()
 -- C-- from the fork is incorporated.
 
 forkClosureBody body_code
-  = do	{ info <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info <- getInfoDown
 	; us   <- newUniqSupply
 	; state <- getState
    	; let	body_info_down = info { cgd_sequel    = initSequel
-                                      , cgd_updfr_off = initUpdFrameOff }
+                                      , cgd_updfr_off = initUpdFrameOff dflags }
 		fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
 		((),fork_state_out)
 		    = doFCode body_code body_info_down fork_state_in
@@ -553,12 +535,13 @@ forkStatics :: FCode a -> FCode a
 -- The Abstract~C returned is attached to the current state, but the
 -- bindings and usage information is otherwise unchanged.
 forkStatics body_code
-  = do	{ info  <- getInfoDown
+  = do	{ dflags <- getDynFlags
+      	; info  <- getInfoDown
 	; us    <- newUniqSupply
 	; state <- getState
 	; let	rhs_info_down = info { cgd_statics = cgs_binds state
 				     , cgd_sequel  = initSequel 
-			             , cgd_updfr_off = initUpdFrameOff }
+			             , cgd_updfr_off = initUpdFrameOff dflags }
 		(result, fork_state_out) = doFCode body_code rhs_info_down 
 						   (initCgState us)
 	; setState (state `addCodeBlocksFrom` fork_state_out)
@@ -699,7 +682,7 @@ emitProcWithConvention conv mb_info lbl args blocks
         ; us <- newUniqSupply
         ; let (offset, entry) = mkCallEntry dflags conv args
               blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
-        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
+        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just (initUpdFrameOff dflags)}
               tinfo = TopInfo {info_tbls = infos, stack_info=sinfo}
               proc_block = CmmProc tinfo lbl blks
 

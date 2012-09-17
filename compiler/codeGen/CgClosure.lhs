@@ -84,7 +84,7 @@ cgTopRhsClosure id ccs binder_info upd_flag args body = do
   ; let descr         = closureDescription dflags mod_name name
 	closure_info  = mkClosureInfo dflags True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name $ idCafInfo id
-    	cg_id_info    = stableIdInfo id (mkLblExpr closure_label) lf_info
+    	cg_id_info    = stableIdInfo dflags id (mkLblExpr closure_label) lf_info
 	closure_rep   = mkStaticClosureFields dflags closure_info ccs True []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
@@ -136,7 +136,7 @@ cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
   ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
-  ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
+  ; returnFC (bndr, heapIdInfo dflags bndr heap_offset lf_info) }
 \end{code}
 
 Here's the general case.
@@ -188,7 +188,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 	  let 
               -- A function closure pointer may be tagged, so we
               -- must take it into account when accessing the free variables.
-              mbtag       = tagForArity (length args)
+              mbtag       = tagForArity dflags (length args)
               bind_fv (info, offset)
                 | Just tag <- mbtag
                 = bindNewToUntagNode (cgIdInfoId info) offset (cgIdInfoLF info) tag
@@ -211,7 +211,7 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
-  ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
+  ; returnFC (bndr, heapIdInfo dflags bndr heap_offset lf_info) }
 
 
 mkClosureLFInfo :: Id		-- The binder
@@ -279,7 +279,7 @@ closureCodeBody _binder_info cl_info cc args body
 	-- eg. if we're compiling a let-no-escape).
   ; vSp <- getVirtSp
   ; let (reg_args, other_args) = assignCallRegs dflags (addIdReps args)
-	(sp_top, stk_args)     = mkVirtStkOffsets vSp other_args
+	(sp_top, stk_args)     = mkVirtStkOffsets dflags vSp other_args
 
 	-- Allocate the global ticky counter
   ; let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) (clHasCafRefs cl_info)
@@ -320,10 +320,11 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
 
         -- Do the business
   ; funWrapper cl_info reg_args reg_save_code $ do
-	{ tickyEnterFun cl_info
+        { dflags <- getDynFlags
+        ; tickyEnterFun cl_info
         ; enterCostCentreFun cc
-              (CmmMachOp mo_wordSub [ CmmReg nodeReg
-                                    , CmmLit (mkIntCLit (funTag cl_info)) ])
+              (CmmMachOp (mo_wordSub dflags) [ CmmReg nodeReg
+                                             , mkIntExpr dflags (funTag dflags cl_info) ])
               (node : map snd reg_args) -- live regs
 
         ; cgExpr body }
@@ -364,22 +365,22 @@ mkSlowEntryCode dflags cl_info reg_args
      reps_w_regs :: [(CgRep,GlobalReg)]
      reps_w_regs = [(idCgRep id, reg) | (id,reg) <- reverse reg_args]
      (final_stk_offset, stk_offsets)
-	= mapAccumL (\off (rep,_) -> (off + cgRepSizeW rep, off))
+	= mapAccumL (\off (rep,_) -> (off + cgRepSizeW dflags rep, off))
 		    0 reps_w_regs
 
 
      load_assts = zipWithEqual "mk_load" mk_load reps_w_regs stk_offsets
      mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg) 
-					  (CmmLoad (cmmRegOffW spReg offset)
-						   (argMachRep rep))
+					  (CmmLoad (cmmRegOffW dflags spReg offset)
+						   (argMachRep dflags rep))
 
      save_assts = zipWithEqual "mk_save" mk_save reps_w_regs stk_offsets
-     mk_save (rep,reg) offset = ASSERT( argMachRep rep `cmmEqType` globalRegType reg )
-				CmmStore (cmmRegOffW spReg offset) 
+     mk_save (rep,reg) offset = ASSERT( argMachRep dflags rep `cmmEqType` globalRegType dflags reg )
+				CmmStore (cmmRegOffW dflags spReg offset)
 					 (CmmReg (CmmGlobal reg))
 
-     stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
-     stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
+     stk_adj_pop   = CmmAssign spReg (cmmRegOffW dflags spReg final_stk_offset)
+     stk_adj_push  = CmmAssign spReg (cmmRegOffW dflags spReg (- final_stk_offset))
      live_regs     = Just $ map snd reps_w_regs
      jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI dflags cl_info)) live_regs
 \end{code}
@@ -429,8 +430,8 @@ funWrapper closure_info arg_regs reg_save_code fun_body = do
   ; whenC (tag /= 0 && node_points) $ do
         l <- newLabelC
         stmtC (CmmCondBranch (CmmMachOp mo_wordEq [cmmGetTag (CmmReg nodeReg),
-                                                   CmmLit (mkIntCLit tag)]) l)
-        stmtC (CmmStore (CmmLit (mkWordCLit 0)) (CmmLit (mkWordCLit 0)))
+                                                   mkIntExpr dflags tag)]) l)
+        stmtC (CmmStore (CmmLit (mkWordCLit 0)) (mkWordExpr 0))
         labelC l
   -}
 
@@ -490,7 +491,7 @@ emitBlackHoleCode is_single_entry = do
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
     stmtsC [
-       CmmStore (cmmOffsetW (CmmReg nodeReg) (fixedHdrSize dflags))
+       CmmStore (cmmOffsetW dflags (CmmReg nodeReg) (fixedHdrSize dflags))
                 (CmmReg (CmmGlobal CurrentTSO)),
        CmmCall (CmmPrim MO_WriteBarrier Nothing) [] [] CmmMayReturn,
        CmmStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
@@ -576,11 +577,11 @@ link_caf :: ClosureInfo
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
 link_caf cl_info _is_upd = do
-  { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
-  ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
+  { dflags    <- getDynFlags
+    -- Alloc black hole specifying CC_HDR(Node) as the cost centre
+  ; let	use_cc   = costCentreFrom dflags (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
-  ; dflags    <- getDynFlags
   ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc
                                  [(tso, fixedHdrSize dflags)]
   ; hp_rel    <- getHpRelOffset hp_offset
@@ -589,7 +590,7 @@ link_caf cl_info _is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
-  ; ret <- newTemp bWord
+  ; ret <- newTemp (bWord dflags)
   ; emitRtsCallGen [CmmHinted ret NoHint] rtsPackageId (fsLit "newCAF")
       [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
         CmmHinted (CmmReg nodeReg) AddrHint,
@@ -598,11 +599,11 @@ link_caf cl_info _is_upd = do
 	-- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
-  ; emitIf (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit]) $
+  ; emitIf (CmmMachOp (mo_wordEq dflags) [ CmmReg (CmmLocal ret), zeroExpr dflags]) $
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-        let target = entryCode dflags (closureInfoPtr (CmmReg nodeReg)) in
+        let target = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg)) in
         stmtC (CmmJump target $ Just [node])
 
   ; returnFC hp_rel }

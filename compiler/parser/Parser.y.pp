@@ -24,6 +24,16 @@ to inline certain key external functions, so we instruct GHC not to
 throw away inlinings as it would normally do in -O0 mode.
 -}
 
+-- CPP tricks because we want the directives in the output of the
+-- first CPP pass.
+#define __IF_GHC_77__ #if __GLASGOW_HASKELL__ >= 707
+#define __ENDIF__     #endif
+__IF_GHC_77__
+-- Required on x86 to avoid the register allocator running out of
+-- stack slots when compiling this module with -fPIC -dynamic.
+{-# OPTIONS_GHC -fcmm-sink #-}
+__ENDIF__
+
 module Parser ( parseModule, parseStmt, parseIdentifier, parseType,
                 parseHeader ) where
 
@@ -43,7 +53,6 @@ import OccName          ( varName, dataName, tcClsName, tvName )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
-import StaticFlags      ( opt_Hpc )
 import Kind             ( Kind, liftedTypeKind, unliftedTypeKind, mkArrowKind )
 import Class            ( FunDep )
 import BasicTypes
@@ -1406,9 +1415,10 @@ exp10 :: { LHsExpr RdrName }
                                           ; return $ LL $ if on
                                                           then HsSCC (unLoc $1) $2
                                                           else HsPar $2 } }
-        | hpc_annot exp                         { LL $ if opt_Hpc
-                                                        then HsTickPragma (unLoc $1) $2
-                                                        else HsPar $2 }
+        | hpc_annot exp                         {% do { on <- extension hpcEnabled
+                                                      ; return $ LL $ if on
+                                                                      then HsTickPragma (unLoc $1) $2
+                                                                      else HsPar $2 } }
 
         | 'proc' aexp '->' exp  
                         {% checkPattern $2 >>= \ p -> 

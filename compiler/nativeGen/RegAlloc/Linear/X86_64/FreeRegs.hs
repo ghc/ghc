@@ -1,6 +1,6 @@
 
--- | Free regs map for i386
-module RegAlloc.Linear.X86.FreeRegs
+-- | Free regs map for x86_64
+module RegAlloc.Linear.X86_64.FreeRegs
 where
 
 import X86.Regs
@@ -12,7 +12,7 @@ import Platform
 import Data.Word
 import Data.Bits
 
-newtype FreeRegs = FreeRegs Word32
+newtype FreeRegs = FreeRegs Word64
     deriving Show
 
 noFreeRegs :: FreeRegs
@@ -23,7 +23,7 @@ releaseReg (RealRegSingle n) (FreeRegs f)
         = FreeRegs (f .|. (1 `shiftL` n))
 
 releaseReg _ _
-        = panic "RegAlloc.Linear.X86.FreeRegs.releaseReg: no reg"
+        = panic "RegAlloc.Linear.X86_64.FreeRegs.releaseReg: no reg"
 
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
@@ -47,5 +47,6 @@ allocateReg (RealRegSingle r) (FreeRegs f)
         = FreeRegs (f .&. complement (1 `shiftL` r))
 
 allocateReg _ _
-        = panic "RegAlloc.Linear.X86.FreeRegs.allocateReg: no reg"
+        = panic "RegAlloc.Linear.X86_64.FreeRegs.allocateReg: no reg"
+
 

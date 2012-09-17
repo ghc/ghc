@@ -31,7 +31,6 @@ import LlvmCodeGen.Regs
 
 import CLabel
 import CgUtils ( activeStgRegs )
-import Constants
 import DynFlags
 import FastString
 import OldCmm
@@ -99,33 +98,33 @@ llvmFunSig env lbl link
 
 llvmFunSig' :: DynFlags -> LMString -> LlvmLinkageType -> LlvmFunctionDecl
 llvmFunSig' dflags lbl link
-  = let platform = targetPlatform dflags
-        toParams x | isPointer x = (x, [NoAlias, NoCapture])
+  = let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                    | otherwise   = (x, [])
     in LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
-                        (map (toParams . getVarType) (llvmFunArgs platform))
-                        llvmFunAlign
+                        (map (toParams . getVarType) (llvmFunArgs dflags))
+                        (llvmFunAlign dflags)
 
 -- | Create a Haskell function in LLVM.
 mkLlvmFunc :: LlvmEnv -> CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
            -> LlvmFunction
 mkLlvmFunc env lbl link sec blks
-  = let platform = targetPlatform $ getDflags env
+  = let dflags = getDflags env
         funDec = llvmFunSig env lbl link
-        funArgs = map (fsLit . getPlainName) (llvmFunArgs platform)
+        funArgs = map (fsLit . getPlainName) (llvmFunArgs dflags)
     in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
 -- | Alignment to use for functions
-llvmFunAlign :: LMAlign
-llvmFunAlign = Just wORD_SIZE
+llvmFunAlign :: DynFlags -> LMAlign
+llvmFunAlign dflags = Just (wORD_SIZE dflags)
 
 -- | Alignment to use for into tables
-llvmInfAlign :: LMAlign
-llvmInfAlign = Just wORD_SIZE
+llvmInfAlign :: DynFlags -> LMAlign
+llvmInfAlign dflags = Just (wORD_SIZE dflags)
 
 -- | A Function's arguments
-llvmFunArgs :: Platform -> [LlvmVar]
-llvmFunArgs platform = map lmGlobalRegArg (activeStgRegs platform)
+llvmFunArgs :: DynFlags -> [LlvmVar]
+llvmFunArgs dflags = map (lmGlobalRegArg dflags) (activeStgRegs platform)
+    where platform = targetPlatform dflags
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]
@@ -137,8 +136,8 @@ tysToParams :: [LlvmType] -> [LlvmParameter]
 tysToParams = map (\ty -> (ty, []))
 
 -- | Pointer width
-llvmPtrBits :: Int
-llvmPtrBits = widthInBits $ typeWidth gcWord
+llvmPtrBits :: DynFlags -> Int
+llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 
 -- ----------------------------------------------------------------------------
 -- * Llvm Version
@@ -169,19 +168,19 @@ type LlvmEnvMap = UniqFM LlvmType
 -- | Get initial Llvm environment.
 initLlvmEnv :: DynFlags -> LlvmEnv
 initLlvmEnv dflags = LlvmEnv (initFuncs, emptyUFM, defaultLlvmVersion, dflags)
-    where initFuncs = listToUFM $ [ (n, LMFunction ty) | (n, ty) <- ghcInternalFunctions ]
+    where initFuncs = listToUFM $ [ (n, LMFunction ty) | (n, ty) <- ghcInternalFunctions dflags ]
 
 -- | Here we pre-initialise some functions that are used internally by GHC
 -- so as to make sure they have the most general type in the case that
 -- user code also uses these functions but with a different type than GHC
 -- internally. (Main offender is treating return type as 'void' instead of
 -- 'void *'. Fixes trac #5486.
-ghcInternalFunctions :: [(LMString, LlvmFunctionDecl)]
-ghcInternalFunctions =
-    [ mk "memcpy" i8Ptr [i8Ptr, i8Ptr, llvmWord]
-    , mk "memmove" i8Ptr [i8Ptr, i8Ptr, llvmWord]
-    , mk "memset" i8Ptr [i8Ptr, llvmWord, llvmWord]
-    , mk "newSpark" llvmWord [i8Ptr, i8Ptr]
+ghcInternalFunctions :: DynFlags -> [(LMString, LlvmFunctionDecl)]
+ghcInternalFunctions dflags =
+    [ mk "memcpy" i8Ptr [i8Ptr, i8Ptr, llvmWord dflags]
+    , mk "memmove" i8Ptr [i8Ptr, i8Ptr, llvmWord dflags]
+    , mk "memset" i8Ptr [i8Ptr, llvmWord dflags, llvmWord dflags]
+    , mk "newSpark" (llvmWord dflags) [i8Ptr, i8Ptr]
     ]
   where
     mk n ret args =
@@ -244,12 +243,12 @@ strCLabel_llvm env l = {-# SCC "llvm_strCLabel" #-}
 
 -- | Create an external definition for a 'CLabel' defined in another module.
 genCmmLabelRef :: LlvmEnv -> CLabel -> LMGlobal
-genCmmLabelRef env = genStringLabelRef . strCLabel_llvm env
+genCmmLabelRef env = genStringLabelRef (getDflags env) . strCLabel_llvm env
 
 -- | As above ('genCmmLabelRef') but taking a 'LMString', not 'CLabel'.
-genStringLabelRef :: LMString -> LMGlobal
-genStringLabelRef cl
-  = let ty = LMPointer $ LMArray 0 llvmWord
+genStringLabelRef :: DynFlags -> LMString -> LMGlobal
+genStringLabelRef dflags cl
+  = let ty = LMPointer $ LMArray 0 (llvmWord dflags)
     in (LMGlobalVar cl ty External Nothing Nothing False, Nothing)
 
 -- ----------------------------------------------------------------------------

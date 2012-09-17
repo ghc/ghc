@@ -80,7 +80,7 @@ disInstr ( StgBCO *bco, int pc )
          pc += 1; break;
      case bci_STKCHECK:  {
          StgWord stk_words_reqd = BCO_GET_LARGE_ARG + 1;
-         debugBelch("STKCHECK %" FMT_SizeT "\n", (lnat)stk_words_reqd );
+         debugBelch("STKCHECK %" FMT_Word "\n", (W_)stk_words_reqd );
          break;
      }
       case bci_PUSH_L: 
