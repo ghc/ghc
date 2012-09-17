@@ -3,10 +3,9 @@
 
 module GHC.Constants where
 
-import Prelude
+import Prelude ()
 
--- We use stage1 here, because that's guaranteed to exist
-#include "../../../compiler/stage1/ghc_boot_platform.h"
-
-#include "../../../includes/HaskellConstants.hs"
+-- TODO: This used to include HaskellConstants.hs, but that has now gone.
+-- We probably want to include the constants in platformConstants somehow
+-- instead.
 
