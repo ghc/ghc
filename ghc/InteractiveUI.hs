@@ -2589,12 +2589,13 @@ breakSyntax = ghcError (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet md lookupTickTree = do
+   dflags <- getDynFlags
    tickArray <- getTickArray md
    (breakArray, _) <- getModBreak md
    case lookupTickTree tickArray of
       Nothing  -> liftIO $ putStrLn $ "No breakpoints found at that location."
       Just (tick, pan) -> do
-         success <- liftIO $ setBreakFlag True breakArray tick
+         success <- liftIO $ setBreakFlag dflags True breakArray tick
          if success
             then do
                (alreadySet, nm) <-
@@ -2877,8 +2878,9 @@ deleteBreak identity = do
 
 turnOffBreak :: BreakLocation -> GHCi Bool
 turnOffBreak loc = do
+  dflags <- getDynFlags
   (arr, _) <- getModBreak (breakModule loc)
-  liftIO $ setBreakFlag False arr (breakTick loc)
+  liftIO $ setBreakFlag dflags False arr (breakTick loc)
 
 getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak m = do
@@ -2888,10 +2890,10 @@ getModBreak m = do
    let ticks      = GHC.modBreaks_locs  modBreaks
    return (arr, ticks)
 
-setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool
-setBreakFlag toggle arr i
-   | toggle    = GHC.setBreakOn arr i
-   | otherwise = GHC.setBreakOff arr i
+setBreakFlag :: DynFlags -> Bool -> GHC.BreakArray -> Int -> IO Bool
+setBreakFlag dflags toggle arr i
+   | toggle    = GHC.setBreakOn  dflags arr i
+   | otherwise = GHC.setBreakOff dflags arr i
 
 
 -- ---------------------------------------------------------------------------

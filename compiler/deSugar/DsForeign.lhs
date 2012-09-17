@@ -44,7 +44,6 @@ import FastString
 import DynFlags
 import Platform
 import Config
-import Constants
 import OrdList
 import Pair
 import Util
@@ -533,10 +532,10 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   type_string
       -- libffi needs to know the result type too:
-      | libffi    = primTyDescChar res_hty : arg_type_string
+      | libffi    = primTyDescChar dflags res_hty : arg_type_string
       | otherwise = arg_type_string
 
-  arg_type_string = [primTyDescChar ty | (_,_,ty,_) <- arg_info]
+  arg_type_string = [primTyDescChar dflags ty | (_,_,ty,_) <- arg_info]
                 -- just the real args
 
   -- add some auxiliary args; the stable ptr in the wrapper case, and
@@ -782,8 +781,8 @@ getPrimTyOf ty
 -- represent a primitive type as a Char, for building a string that
 -- described the foreign function type.  The types are size-dependent,
 -- e.g. 'W' is a signed 32-bit integer.
-primTyDescChar :: Type -> Char
-primTyDescChar ty
+primTyDescChar :: DynFlags -> Type -> Char
+primTyDescChar dflags ty
  | ty `eqType` unitTy = 'v'
  | otherwise
  = case typePrimRep (getPrimTyOf ty) of
@@ -797,7 +796,7 @@ primTyDescChar ty
      _           -> pprPanic "primTyDescChar" (ppr ty)
   where
     (signed_word, unsigned_word)
-       | wORD_SIZE == 4  = ('W','w')
-       | wORD_SIZE == 8  = ('L','l')
-       | otherwise       = panic "primTyDescChar"
+       | wORD_SIZE dflags == 4  = ('W','w')
+       | wORD_SIZE dflags == 8  = ('L','l')
+       | otherwise              = panic "primTyDescChar"
 \end{code}

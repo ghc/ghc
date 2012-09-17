@@ -44,7 +44,6 @@ import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
-import Constants
 import Util
 
 import Control.Monad (when)
@@ -222,7 +221,7 @@ mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info
 padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
 padLitToWord dflags lit = lit : padding pad_length
   where width = typeWidth (cmmLitType dflags lit)
-        pad_length = wORD_SIZE - widthInBytes width :: Int
+        pad_length = wORD_SIZE dflags - widthInBytes width :: Int
 
         padding n | n <= 0 = []
                   | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
@@ -543,7 +542,7 @@ do_checks :: Bool       -- Should we check the stack?
 do_checks checkStack alloc do_gc = do
   dflags <- getDynFlags
   let
-    alloc_lit = mkIntExpr dflags (alloc*wORD_SIZE) -- Bytes
+    alloc_lit = mkIntExpr dflags (alloc * wORD_SIZE dflags) -- Bytes
     bump_hp = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
 
     -- Sp overflow if (Sp - CmmHighStack < SpLim)

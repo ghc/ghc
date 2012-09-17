@@ -57,7 +57,6 @@ import ForeignCall
 import IdInfo
 import Type
 import TyCon
-import Constants
 import SMRep
 import Module
 import Literal
@@ -150,7 +149,7 @@ mkTaggedObjectLoad dflags reg base offset tag
   = mkAssign (CmmLocal reg)
              (CmmLoad (cmmOffsetB dflags
                                   (CmmReg (CmmLocal base))
-                                  (wORD_SIZE*offset - tag))
+                                  (wORD_SIZE dflags * offset - tag))
                       (localRegType reg))
 
 -------------------------------------------------------------------------

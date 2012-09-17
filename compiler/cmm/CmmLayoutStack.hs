@@ -17,7 +17,6 @@ import CmmLive
 import CmmProcPoint
 import SMRep
 import Hoopl
-import Constants
 import UniqSupply
 import Maybes
 import UniqFM
@@ -345,7 +344,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
        return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
 
     CmmForeignCall{ succ = cont_lbl, .. } -> do
-       return $ lastCall cont_lbl wORD_SIZE wORD_SIZE (sm_ret_off stack0)
+       return $ lastCall cont_lbl (wORD_SIZE dflags) (wORD_SIZE dflags) (sm_ret_off stack0)
             -- one word each for args and results: the return address
 
     CmmBranch{..}     ->  handleBranches
@@ -381,7 +380,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
        = (save_assignments, new_cont_stack)
        where
         (new_cont_stack, save_assignments)
-           = setupStackFrame lbl liveness cml_ret_off cml_ret_args stack0
+           = setupStackFrame dflags lbl liveness cml_ret_off cml_ret_args stack0
 
 
      -- For other last nodes (branches), if any of the targets is a
@@ -404,7 +403,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
              out = mapFromList [ (l', cont_stack)
                                | l' <- successors last ]
          return ( assigs
-                , spOffsetForCall sp0 cont_stack wORD_SIZE
+                , spOffsetForCall sp0 cont_stack (wORD_SIZE dflags)
                 , last
                 , []
                 , out)
@@ -440,7 +439,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
                  (stack2, assigs) =
                       --pprTrace "first visit to proc point"
                       --             (ppr l <+> ppr stack1) $
-                      setupStackFrame l liveness (sm_ret_off stack0)
+                      setupStackFrame dflags l liveness (sm_ret_off stack0)
                                                        cont_args stack0
              --
              (tmp_lbl, block) <- makeFixupBlock dflags sp0 l stack2 assigs
@@ -496,14 +495,15 @@ fixupStack old_stack new_stack = concatMap move new_locs
 
 
 setupStackFrame
-             :: BlockId                 -- label of continuation
+             :: DynFlags
+             -> BlockId                 -- label of continuation
              -> BlockEnv CmmLive        -- liveness
              -> ByteOff      -- updfr
              -> ByteOff      -- bytes of return values on stack
              -> StackMap     -- current StackMap
              -> (StackMap, [CmmNode O O])
 
-setupStackFrame lbl liveness updfr_off ret_args stack0
+setupStackFrame dflags lbl liveness updfr_off ret_args stack0
   = (cont_stack, assignments)
   where
       -- get the set of LocalRegs live in the continuation
@@ -519,7 +519,7 @@ setupStackFrame lbl liveness updfr_off ret_args stack0
 
       -- everything up to updfr_off is off-limits
       -- stack1 contains updfr_off, plus everything we need to save
-      (stack1, assignments) = allocate updfr_off live stack0
+      (stack1, assignments) = allocate dflags updfr_off live stack0
 
       -- And the Sp at the continuation is:
       --   sm_sp stack1 + ret_args
@@ -600,9 +600,10 @@ futureContinuation middle = foldBlockNodesB f middle Nothing
 -- on the stack and return the new StackMap and the assignments to do
 -- the saving.
 --
-allocate :: ByteOff -> RegSet -> StackMap -> (StackMap, [CmmNode O O])
-allocate ret_off live stackmap@StackMap{ sm_sp = sp0
-                                       , sm_regs = regs0 }
+allocate :: DynFlags -> ByteOff -> RegSet -> StackMap
+         -> (StackMap, [CmmNode O O])
+allocate dflags ret_off live stackmap@StackMap{ sm_sp = sp0
+                                              , sm_regs = regs0 }
  =
   -- pprTrace "allocate" (ppr live $$ ppr stackmap) $
 
@@ -613,37 +614,37 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
 
    -- make a map of the stack
    let stack = reverse $ Array.elems $
-               accumArray (\_ x -> x) Empty (1, toWords (max sp0 ret_off)) $
+               accumArray (\_ x -> x) Empty (1, toWords dflags (max sp0 ret_off)) $
                  ret_words ++ live_words
             where ret_words =
                    [ (x, Occupied)
-                   | x <- [ 1 .. toWords ret_off] ]
+                   | x <- [ 1 .. toWords dflags ret_off] ]
                   live_words =
-                   [ (toWords x, Occupied)
+                   [ (toWords dflags x, Occupied)
                    | (r,off) <- eltsUFM regs1,
-                     let w = localRegBytes r,
-                     x <- [ off, off-wORD_SIZE .. off - w + 1] ]
+                     let w = localRegBytes dflags r,
+                     x <- [ off, off - wORD_SIZE dflags .. off - w + 1] ]
    in
 
    -- Pass over the stack: find slots to save all the new live variables,
    -- choosing the oldest slots first (hence a foldr).
    let
        save slot ([], stack, n, assigs, regs) -- no more regs to save
-          = ([], slot:stack, n `plusW` 1, assigs, regs)
+          = ([], slot:stack, plusW dflags n 1, assigs, regs)
        save slot (to_save, stack, n, assigs, regs)
           = case slot of
-               Occupied ->  (to_save, Occupied:stack, n `plusW` 1, assigs, regs)
+               Occupied ->  (to_save, Occupied:stack, plusW dflags n 1, assigs, regs)
                Empty
                  | Just (stack', r, to_save') <-
                        select_save to_save (slot:stack)
                  -> let assig = CmmStore (CmmStackSlot Old n')
                                          (CmmReg (CmmLocal r))
-                        n' = n `plusW` 1
+                        n' = plusW dflags n 1
                    in
                         (to_save', stack', n', assig : assigs, (r,(r,n')):regs)
 
                  | otherwise
-                 -> (to_save, slot:stack, n `plusW` 1, assigs, regs)
+                 -> (to_save, slot:stack, plusW dflags n 1, assigs, regs)
 
        -- we should do better here: right now we'll fit the smallest first,
        -- but it would make more sense to fit the biggest first.
@@ -656,7 +657,7 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
                  = Just (replicate words Occupied ++ rest, r, rs++no_fit)
                  | otherwise
                  = go rs (r:no_fit)
-                 where words = localRegWords r
+                 where words = localRegWords dflags r
 
        -- fill in empty slots as much as possible
        (still_to_save, save_stack, n, save_assigs, save_regs)
@@ -669,14 +670,14 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
               push r (n, assigs, regs)
                 = (n', assig : assigs, (r,(r,n')) : regs)
                 where
-                  n' = n + localRegBytes r
+                  n' = n + localRegBytes dflags r
                   assig = CmmStore (CmmStackSlot Old n')
                                    (CmmReg (CmmLocal r))
 
        trim_sp
           | not (null push_regs) = push_sp
           | otherwise
-          = n `plusW` (- length (takeWhile isEmpty save_stack))
+          = plusW dflags n (- length (takeWhile isEmpty save_stack))
 
        final_regs = regs1 `addListToUFM` push_regs
                           `addListToUFM` save_regs
@@ -685,7 +686,7 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
   -- XXX should be an assert
    if ( n /= max sp0 ret_off ) then pprPanic "allocate" (ppr n <+> ppr sp0 <+> ppr ret_off) else
 
-   if (trim_sp .&. (wORD_SIZE - 1)) /= 0  then pprPanic "allocate2" (ppr trim_sp <+> ppr final_regs <+> ppr push_sp) else
+   if (trim_sp .&. (wORD_SIZE dflags - 1)) /= 0  then pprPanic "allocate2" (ppr trim_sp <+> ppr final_regs <+> ppr push_sp) else
 
    ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
    , push_assigs ++ save_assigs )
@@ -843,8 +844,8 @@ elimStackStores stackmap stackmaps area_off nodes
 -- Update info tables to include stack liveness
 
 
-setInfoTableStackMap :: BlockEnv StackMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap stackmaps (CmmProc top_info@TopInfo{..} l g)
+setInfoTableStackMap :: DynFlags -> BlockEnv StackMap -> CmmDecl -> CmmDecl
+setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l g)
   = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
@@ -855,18 +856,18 @@ setInfoTableStackMap stackmaps (CmmProc top_info@TopInfo{..} l g)
     get_liveness lbl
       = case mapLookup lbl stackmaps of
           Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> ppr info_tbls)
-          Just sm -> stackMapToLiveness sm
+          Just sm -> stackMapToLiveness dflags sm
 
-setInfoTableStackMap _ d = d
+setInfoTableStackMap _ _ d = d
 
 
-stackMapToLiveness :: StackMap -> Liveness
-stackMapToLiveness StackMap{..} =
+stackMapToLiveness :: DynFlags -> StackMap -> Liveness
+stackMapToLiveness dflags StackMap{..} =
    reverse $ Array.elems $
-        accumArray (\_ x -> x) True (toWords sm_ret_off + 1,
-                                     toWords (sm_sp - sm_args)) live_words
+        accumArray (\_ x -> x) True (toWords dflags sm_ret_off + 1,
+                                     toWords dflags (sm_sp - sm_args)) live_words
    where
-     live_words =  [ (toWords off, False)
+     live_words =  [ (toWords dflags off, False)
                    | (r,off) <- eltsUFM sm_regs, isGcPtrType (localRegType r) ]
 
 
@@ -982,8 +983,8 @@ callResumeThread new_base id =
 
 -- -----------------------------------------------------------------------------
 
-plusW :: ByteOff -> WordOff -> ByteOff
-plusW b w = b + w * wORD_SIZE
+plusW :: DynFlags -> ByteOff -> WordOff -> ByteOff
+plusW dflags b w = b + w * wORD_SIZE dflags
 
 dropEmpty :: WordOff -> [StackSlot] -> Maybe [StackSlot]
 dropEmpty 0 ss           = Just ss
@@ -994,14 +995,15 @@ isEmpty :: StackSlot -> Bool
 isEmpty Empty = True
 isEmpty _ = False
 
-localRegBytes :: LocalReg -> ByteOff
-localRegBytes r = roundUpToWords (widthInBytes (typeWidth (localRegType r)))
+localRegBytes :: DynFlags -> LocalReg -> ByteOff
+localRegBytes dflags r
+    = roundUpToWords dflags (widthInBytes (typeWidth (localRegType r)))
 
-localRegWords :: LocalReg -> WordOff
-localRegWords = toWords . localRegBytes
+localRegWords :: DynFlags -> LocalReg -> WordOff
+localRegWords dflags = toWords dflags . localRegBytes dflags
 
-toWords :: ByteOff -> WordOff
-toWords x = x `quot` wORD_SIZE
+toWords :: DynFlags -> ByteOff -> WordOff
+toWords dflags x = x `quot` wORD_SIZE dflags
 
 
 insertReloads :: StackMap -> [CmmNode O O]

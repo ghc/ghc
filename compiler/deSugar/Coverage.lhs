@@ -104,7 +104,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
 
      let count = tickBoxCount st
      hashNo <- writeMixEntries dflags mod count entries orig_file2
-     modBreaks <- mkModBreaks count entries
+     modBreaks <- mkModBreaks dflags count entries
 
      doIfSet_dyn dflags Opt_D_dump_ticked $
          log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
@@ -126,9 +126,9 @@ guessSourceFile binds orig_file =
         _ -> orig_file
 
 
-mkModBreaks :: Int -> [MixEntry_] -> IO ModBreaks
-mkModBreaks count entries = do
-  breakArray <- newBreakArray $ length entries
+mkModBreaks :: DynFlags -> Int -> [MixEntry_] -> IO ModBreaks
+mkModBreaks dflags count entries = do
+  breakArray <- newBreakArray dflags $ length entries
   let
          locsTicks = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
          varsTicks = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]

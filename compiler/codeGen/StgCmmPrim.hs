@@ -42,7 +42,6 @@ import CLabel
 import CmmUtils
 import PrimOp
 import SMRep
-import Constants
 import Module
 import FastString
 import Outputable
@@ -919,7 +918,7 @@ doWritePtrArrayOp addr idx val
        
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
 loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
- where off = fixedHdrSize dflags * wORD_SIZE + oFFSET_StgMutArrPtrs_ptrs dflags
+ where off = fixedHdrSize dflags * wORD_SIZE dflags + oFFSET_StgMutArrPtrs_ptrs dflags
 
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType
 		   -> LocalReg -> CmmExpr -> CmmExpr -> FCode ()
@@ -1042,7 +1041,7 @@ doCopyArrayOp = emitCopyArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do dflags <- getDynFlags
-           emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags wORD_SIZE)
+           emitMemcpyCall dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags))
 
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
@@ -1059,8 +1058,8 @@ doCopyMutableArrayOp = emitCopyArray copy
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
         [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes (mkIntExpr dflags wORD_SIZE),
-            getCode $ emitMemcpyCall  dst_p src_p bytes (mkIntExpr dflags wORD_SIZE)
+            getCode $ emitMemmoveCall dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags)),
+            getCode $ emitMemcpyCall  dst_p src_p bytes (mkIntExpr dflags (wORD_SIZE dflags))
             ]
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
@@ -1083,7 +1082,7 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
     dst_elems_p <- assignTempE $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
     dst_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p dst_off
     src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
-    bytes <- assignTempE $ cmmMulWord dflags n (mkIntExpr dflags wORD_SIZE)
+    bytes <- assignTempE $ cmmMulWord dflags n (mkIntExpr dflags (wORD_SIZE dflags))
 
     copy src dst dst_p src_p bytes
 
@@ -1101,7 +1100,7 @@ emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
 emitCloneArray info_p res_r src0 src_off0 n0 = do
     dflags <- getDynFlags
     let arrPtrsHdrSizeW dflags = mkIntExpr dflags (fixedHdrSize dflags +
-                                     (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE))
+                                     (sIZEOF_StgMutArrPtrs_NoHdr dflags `div` wORD_SIZE dflags))
         myCapability = cmmSubWord dflags (CmmReg baseReg) (mkIntExpr dflags (oFFSET_Capability_r dflags))
     -- Passed as arguments (be careful)
     src     <- assignTempE src0
@@ -1119,21 +1118,21 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
 
     let arr = CmmReg (CmmLocal arr_r)
     emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
-    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE +
+    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE dflags +
                                            oFFSET_StgMutArrPtrs_ptrs dflags)) n
-    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE +
+    emit $ mkStore (cmmOffsetB dflags arr (fixedHdrSize dflags * wORD_SIZE dflags +
                                            oFFSET_StgMutArrPtrs_size dflags)) size
 
     dst_p <- assignTempE $ cmmOffsetB dflags arr (arrPtrsHdrSize dflags)
     src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags))
              src_off
 
-    emitMemcpyCall dst_p src_p (cmmMulWord dflags n (wordSize dflags)) (mkIntExpr dflags wORD_SIZE)
+    emitMemcpyCall dst_p src_p (cmmMulWord dflags n (wordSize dflags)) (mkIntExpr dflags (wORD_SIZE dflags))
 
     emitMemsetCall (cmmOffsetExprW dflags dst_p n)
         (mkIntExpr dflags 1)
         card_bytes
-        (mkIntExpr dflags wORD_SIZE)
+        (mkIntExpr dflags (wORD_SIZE dflags))
     emit $ mkAssign (CmmLocal res_r) arr
 
 -- | Takes and offset in the destination array, the base address of
@@ -1157,11 +1156,11 @@ cardRoundUp :: DynFlags -> CmmExpr -> CmmExpr
 cardRoundUp dflags i = card dflags (cmmAddWord dflags i (mkIntExpr dflags ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1)))
 
 bytesToWordsRoundUp :: DynFlags -> CmmExpr -> CmmExpr
-bytesToWordsRoundUp dflags e = cmmQuotWord dflags (cmmAddWord dflags e (mkIntExpr dflags (wORD_SIZE - 1)))
+bytesToWordsRoundUp dflags e = cmmQuotWord dflags (cmmAddWord dflags e (mkIntExpr dflags (wORD_SIZE dflags - 1)))
                                                   (wordSize dflags)
 
 wordSize :: DynFlags -> CmmExpr
-wordSize dflags = mkIntExpr dflags wORD_SIZE
+wordSize dflags = mkIntExpr dflags (wORD_SIZE dflags)
 
 -- | Emit a call to @memcpy@.
 emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()

@@ -340,9 +340,10 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
                 -- closure type, live regs
                 {% withThisPackage $ \pkg ->
-                   do live <- sequence (map (liftM Just) $7)
+                   do dflags <- getDynFlags
+                      live <- sequence (map (liftM Just) $7)
                       let prof = NoProfilingInfo
-                          bitmap = mkLiveness live
+                          bitmap = mkLiveness dflags live
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
@@ -888,7 +889,7 @@ adjCallTarget :: DynFlags -> CCallConv -> CmmExpr -> [CmmHinted CmmExpr]
 adjCallTarget dflags StdCallConv (CmmLit (CmmLabel lbl)) args
  | platformOS (targetPlatform dflags) == OSMinGW32
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (CmmHinted e _) = max wORD_SIZE (widthInBytes (typeWidth (cmmExprType dflags e)))
+  where size (CmmHinted e _) = max (wORD_SIZE dflags) (widthInBytes (typeWidth (cmmExprType dflags e)))
                  -- c.f. CgForeignCall.emitForeignCall
 adjCallTarget _ _ expr _
   = expr
@@ -943,8 +944,8 @@ emitRetUT args = do
   emitSimultaneously stmts -- NB. the args might overlap with the stack slots
                            -- or regs that we assign to, so better use
                            -- simultaneous assignments here (#3546)
-  when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC $ CmmJump (entryCode dflags (CmmLoad (cmmRegOffW spReg sp) (bWord dflags))) (Just live)
+  when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW dflags spReg (-sp)))
+  stmtC $ CmmJump (entryCode dflags (CmmLoad (cmmRegOffW dflags spReg sp) (bWord dflags))) (Just live)
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions
@@ -1053,7 +1054,7 @@ doSwitch mb_range scrut arms deflt
 initEnv :: DynFlags -> Env
 initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE)) (wordWidth dflags)) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE dflags)) (wordWidth dflags)) )),
   ( fsLit "SIZEOF_StgInfoTable",
     VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
   ]

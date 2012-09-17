@@ -43,7 +43,6 @@ import CLabel
 import Name
 import Unique
 
-import Constants
 import DynFlags
 import Util
 import Outputable
@@ -94,16 +93,17 @@ emitReturnTarget
    -> CgStmts			-- The direct-return code (if any)
    -> FCode CLabel
 emitReturnTarget name stmts
-  = do	{ srt_info   <- getSRTInfo
-	; blks <- cgStmtsToBlocks stmts
-        ; frame <- mkStackLayout
-        ; let smrep    = mkStackRep (mkLiveness frame)
-              info     = CmmInfoTable { cit_lbl  = info_lbl
-                                      , cit_prof = NoProfilingInfo
-                                      , cit_rep  = smrep
-                                      , cit_srt  = srt_info }
-        ; emitInfoTableAndCode entry_lbl info args blks
-	; return info_lbl }
+  = do dflags <- getDynFlags
+       srt_info   <- getSRTInfo
+       blks <- cgStmtsToBlocks stmts
+       frame <- mkStackLayout
+       let smrep    = mkStackRep (mkLiveness dflags frame)
+           info     = CmmInfoTable { cit_lbl  = info_lbl
+                                   , cit_prof = NoProfilingInfo
+                                   , cit_rep  = smrep
+                                   , cit_srt  = srt_info }
+       emitInfoTableAndCode entry_lbl info args blks
+       return info_lbl
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
     uniq      = getUnique name
@@ -173,7 +173,7 @@ stack_layout _ [] sizeW = replicate sizeW Nothing
 stack_layout dflags ((off, bind):binds) sizeW | off == sizeW - 1 =
   (Just stack_bind) : (stack_layout dflags binds (sizeW - rep_size))
   where
-    rep_size = cgRepSizeW (cgIdInfoArgRep bind)
+    rep_size = cgRepSizeW dflags (cgIdInfoArgRep bind)
     stack_bind = LocalReg unique machRep
     unique = getUnique (cgIdInfoId bind)
     machRep = argMachRep dflags (cgIdInfoArgRep bind)
@@ -217,7 +217,7 @@ emitAlgReturnTarget name branches mb_deflt fam_sz
   = do  { blks <- getCgStmts $ do
                     -- is the constructor tag in the node reg?
                     dflags <- getDynFlags
-                    if isSmallFamily fam_sz
+                    if isSmallFamily dflags fam_sz
                         then do -- yes, node has constr. tag
                           let tag_expr = cmmConstrTag1 dflags (CmmReg nodeReg)
                               branches' = [(tag+1,branch)|(tag,branch)<-branches]
@@ -258,7 +258,7 @@ stdInfoTableSizeW dflags
               | otherwise                      = 0
 
 stdInfoTableSizeB :: DynFlags -> ByteOff
-stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE
+stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
@@ -267,11 +267,11 @@ stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word 
-stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE
+stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
-stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE + hALF_WORD_SIZE
+stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE
 
 -------------------------------------------------------------------------
 --

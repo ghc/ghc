@@ -31,7 +31,6 @@ import OldCmm
 import OldPprCmm ()
 
 -- Utils
-import Constants
 import CPrim
 import DynFlags
 import FastString
@@ -374,7 +373,7 @@ pprLoad dflags e ty
                       -> char '*' <> pprAsPtrReg r
 
         CmmRegOff r off | isPtrReg r && width == wordWidth dflags
-                        , off `rem` wORD_SIZE == 0 && not (isFloatType ty)
+                        , off `rem` wORD_SIZE dflags == 0 && not (isFloatType ty)
         -- ToDo: check that the offset is a word multiple?
         --       (For tagging to work, I had to avoid unaligned loads. --ARY)
                         -> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift dflags))
@@ -480,9 +479,9 @@ pprStatics :: DynFlags -> [CmmStatic] -> [SDoc]
 pprStatics _ [] = []
 pprStatics dflags (CmmStaticLit (CmmFloat f W32) : rest)
   -- floats are padded to a word, see #1852
-  | wORD_SIZE == 8, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
+  | wORD_SIZE dflags == 8, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
   = pprLit1 (floatToWord dflags f) : pprStatics dflags rest'
-  | wORD_SIZE == 4
+  | wORD_SIZE dflags == 4
   = pprLit1 (floatToWord dflags f) : pprStatics dflags rest
   | otherwise
   = pprPanic "pprStatics: float" (vcat (map ppr' rest))
@@ -721,7 +720,7 @@ pprAssign _ r1 (CmmReg r2)
 
 -- dest is a reg, rhs is a CmmRegOff
 pprAssign dflags r1 (CmmRegOff r2 off)
-   | isPtrReg r1 && isPtrReg r2 && (off `rem` wORD_SIZE == 0)
+   | isPtrReg r1 && isPtrReg r2 && (off `rem` wORD_SIZE dflags == 0)
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, op, int off', semi ]
   where
         off1 = off `shiftR` wordShift dflags
@@ -911,7 +910,7 @@ pprExternDecl _in_srt lbl
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz = sdocWithDynFlags $ \dflags ->
         ptext (sLit "extern __attribute__((stdcall)) void ") <> ppr lbl
-        <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRep_U_CType (wordWidth dflags))))
+        <> parens (commafy (replicate (sz `quot` wORD_SIZE dflags) (machRep_U_CType (wordWidth dflags))))
         <> semi
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
@@ -1059,10 +1058,10 @@ pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
 -- This is a hack to turn the floating point numbers into ints that we
 -- can safely initialise to static locations.
 
-big_doubles :: Bool
-big_doubles
-  | widthInBytes W64 == 2 * wORD_SIZE  = True
-  | widthInBytes W64 == wORD_SIZE      = False
+big_doubles :: DynFlags -> Bool
+big_doubles dflags
+  | widthInBytes W64 == 2 * wORD_SIZE dflags = True
+  | widthInBytes W64 == wORD_SIZE dflags     = False
   | otherwise = panic "big_doubles"
 
 castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
@@ -1084,7 +1083,7 @@ floatToWord dflags r
 
 doubleToWords :: DynFlags -> Rational -> [CmmLit]
 doubleToWords dflags r
-  | big_doubles                         -- doubles are 2 words
+  | big_doubles dflags                  -- doubles are 2 words
   = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 (fromRational r)
@@ -1126,11 +1125,11 @@ pprHexVal w rep
         -- times values are unsigned.  This also helps eliminate occasional
         -- warnings about integer overflow from gcc.
 
-      repsuffix W64
-       | cINT_SIZE       == 8 = char 'U'
-       | cLONG_SIZE      == 8 = ptext (sLit "UL")
-       | cLONG_LONG_SIZE == 8 = ptext (sLit "ULL")
-       | otherwise            = panic "pprHexVal: Can't find a 64-bit type"
+      repsuffix W64 = sdocWithDynFlags $ \dflags ->
+               if cINT_SIZE       dflags == 8 then char 'U'
+          else if cLONG_SIZE      dflags == 8 then ptext (sLit "UL")
+          else if cLONG_LONG_SIZE dflags == 8 then ptext (sLit "ULL")
+          else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
       go 0 = empty

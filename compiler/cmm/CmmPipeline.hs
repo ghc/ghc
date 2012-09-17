@@ -119,7 +119,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
      
             ------------- Populate info tables with stack info -----------------
             gs <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ map (setInfoTableStackMap stackmaps) gs
+                  return $ map (setInfoTableStackMap dflags stackmaps) gs
             dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
      
             ----------- Control-flow optimisations -----------------------------
@@ -137,7 +137,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
             ------------- Populate info tables with stack info -----------------
             g <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ setInfoTableStackMap stackmaps g
+                  return $ setInfoTableStackMap dflags stackmaps g
             dump' Opt_D_dump_cmmz_info "after setInfoTableStackMap" g
      
             ----------- Control-flow optimisations -----------------------------

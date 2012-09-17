@@ -27,7 +27,6 @@ import NameSet
 import Literal
 import TyCon
 import PrimOp
-import Constants
 import FastString
 import SMRep
 import ClosureInfo -- CgRep stuff
@@ -432,9 +431,9 @@ assembleI dflags i = case i of
     litlabel fs = lit [BCONPtrLbl fs]
     addr = words . mkLitPtr
     float = words . mkLitF
-    double = words . mkLitD
+    double = words . mkLitD dflags
     int = words . mkLitI
-    int64 = words . mkLitI64
+    int64 = words . mkLitI64 dflags
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]
 
@@ -460,11 +459,11 @@ return_ubx PtrArg    = bci_RETURN_P
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
-mkLitI   :: Int    -> [Word]
-mkLitF   :: Float  -> [Word]
-mkLitD   :: Double -> [Word]
-mkLitPtr :: Ptr () -> [Word]
-mkLitI64 :: Int64  -> [Word]
+mkLitI   ::             Int    -> [Word]
+mkLitF   ::             Float  -> [Word]
+mkLitD   :: DynFlags -> Double -> [Word]
+mkLitPtr ::             Ptr () -> [Word]
+mkLitI64 :: DynFlags -> Int64  -> [Word]
 
 mkLitF f
    = runST (do
@@ -475,8 +474,8 @@ mkLitF f
         return [w0 :: Word]
      )
 
-mkLitD d
-   | wORD_SIZE == 4
+mkLitD dflags d
+   | wORD_SIZE dflags == 4
    = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 d
@@ -485,7 +484,7 @@ mkLitD d
         w1 <- readArray d_arr 1
         return [w0 :: Word, w1]
      )
-   | wORD_SIZE == 8
+   | wORD_SIZE dflags == 8
    = runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 d
@@ -496,8 +495,8 @@ mkLitD d
    | otherwise
    = panic "mkLitD: Bad wORD_SIZE"
 
-mkLitI64 ii
-   | wORD_SIZE == 4
+mkLitI64 dflags ii
+   | wORD_SIZE dflags == 4
    = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 ii
@@ -506,7 +505,7 @@ mkLitI64 ii
         w1 <- readArray d_arr 1
         return [w0 :: Word,w1]
      )
-   | wORD_SIZE == 8
+   | wORD_SIZE dflags == 8
    = runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 ii

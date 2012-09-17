@@ -53,7 +53,6 @@ import TyCon
 import DataCon
 import Id
 import IdInfo
-import Constants
 import SMRep
 import OldCmm
 import OldCmmUtils
@@ -142,20 +141,20 @@ mkLtOp dflags lit            = MO_U_Lt (typeWidth (cmmLitType dflags (mkSimpleLi
    Big families only use the tag value 1 to represent
    evaluatedness.
 -}
-isSmallFamily :: Int -> Bool
-isSmallFamily fam_size = fam_size <= mAX_PTR_TAG
+isSmallFamily :: DynFlags -> Int -> Bool
+isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
-tagForCon :: DataCon -> ConTagZ
-tagForCon con = tag
+tagForCon :: DynFlags -> DataCon -> ConTagZ
+tagForCon dflags con = tag
     where
     con_tag           = dataConTagZ con
     fam_size   = tyConFamilySize (dataConTyCon con)
-    tag | isSmallFamily fam_size = con_tag + 1
-        | otherwise              = 1
+    tag | isSmallFamily dflags fam_size = con_tag + 1
+        | otherwise                     = 1
 
 --Tag an expression, to do: refactor, this appears in some other module.
 tagCons :: DynFlags -> DataCon -> CmmExpr -> CmmExpr
-tagCons dflags con expr = cmmOffsetB dflags expr (tagForCon con)
+tagCons dflags con expr = cmmOffsetB dflags expr (tagForCon dflags con)
 
 --------------------------------------------------------------------------
 --
@@ -800,7 +799,7 @@ getSRTInfo = do
       -> do id <- newUnique
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
-             ( cmmLabelOffW srt_lbl off
+             ( cmmLabelOffW dflags srt_lbl off
                : mkWordCLit dflags (fromIntegral len)
                : map (mkWordCLit dflags) bmp)
             return (C_SRT srt_desc_lbl 0 srt_escape)

@@ -42,7 +42,6 @@ import TyCon
 import CostCentre
 import Util
 import Module
-import Constants
 import Outputable
 import DynFlags
 import FastString
@@ -103,8 +102,9 @@ setRealHp new_realHp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
 getHpRelOffset virtual_offset
-  = do  { hp_usg <- getHpUsage
-        ; return (cmmRegOffW hpReg (hpRel (realHp hp_usg) virtual_offset)) }
+  = do  { dflags <- getDynFlags
+        ; hp_usg <- getHpUsage
+        ; return (cmmRegOffW dflags hpReg (hpRel (realHp hp_usg) virtual_offset)) }
 \end{code}
 
 
@@ -165,7 +165,7 @@ mkVirtHeapOffsets dflags is_thunk things
                 | otherwise  = fixedHdrSize dflags
 
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + cgRepSizeW rep, (thing, hdr_size + wds_so_far))
+      = (wds_so_far + cgRepSizeW dflags rep, (thing, hdr_size + wds_so_far))
 \end{code}
 
 
@@ -244,7 +244,7 @@ mkStaticClosure dflags info_lbl ccs payload padding_wds static_link_field saved_
 padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
 padLitToWord dflags lit = lit : padding pad_length
   where width = typeWidth (cmmLitType dflags lit)
-        pad_length = wORD_SIZE - widthInBytes width :: Int
+        pad_length = wORD_SIZE dflags - widthInBytes width :: Int
 
         padding n | n <= 0 = []
                   | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
@@ -461,8 +461,8 @@ do_checks stk hp reg_save_code rts_lbl live
                     "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
                     "Suggestion: read data from a file instead of having large static data",
                     "structures in the code."])
-           else do_checks' (mkIntExpr dflags (stk * wORD_SIZE))
-                           (mkIntExpr dflags (hp * wORD_SIZE))
+           else do_checks' (mkIntExpr dflags (stk * wORD_SIZE dflags))
+                           (mkIntExpr dflags (hp * wORD_SIZE dflags))
                     (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
 
 -- The offsets are now in *bytes*

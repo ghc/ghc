@@ -457,7 +457,7 @@ linkExpr hsc_env span root_ul_bco
          ce = closure_env pls
 
      -- Link the necessary packages and linkables
-   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce [root_ul_bco]
+   ; (_, (root_hval:_)) <- linkSomeBCOs dflags False ie ce [root_ul_bco]
    ; return (pls, root_hval)
    }}}
    where
@@ -665,7 +665,7 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
         ce = closure_env pls
 
     -- Link the necessary packages and linkables
-    (final_gce, _) <- linkSomeBCOs False ie ce unlinkedBCOs
+    (final_gce, _) <- linkSomeBCOs dflags False ie ce unlinkedBCOs
     let pls2 = pls { closure_env = final_gce,
                      itbl_env    = ie }
     return (pls2, ()) --hvals)
@@ -724,7 +724,7 @@ linkModules dflags pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs pls1 bcos
+                pls2 <- dynLinkBCOs dflags pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -804,8 +804,9 @@ rmDupLinkables already ls
 %************************************************************************
 
 \begin{code}
-dynLinkBCOs :: PersistentLinkerState -> [Linkable] -> IO PersistentLinkerState
-dynLinkBCOs pls bcos = do
+dynLinkBCOs :: DynFlags -> PersistentLinkerState -> [Linkable]
+            -> IO PersistentLinkerState
+dynLinkBCOs dflags pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -821,7 +822,7 @@ dynLinkBCOs pls bcos = do
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        (final_gce, _linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
+        (final_gce, _linked_bcos) <- linkSomeBCOs dflags True final_ie gce ul_bcos
                 -- XXX What happens to these linked_bcos?
 
         let pls2 = pls1 { closure_env = final_gce,
@@ -830,7 +831,8 @@ dynLinkBCOs pls bcos = do
         return pls2
 
 -- Link a bunch of BCOs and return them + updated closure env.
-linkSomeBCOs :: Bool    -- False <=> add _all_ BCOs to returned closure env
+linkSomeBCOs :: DynFlags
+             -> Bool    -- False <=> add _all_ BCOs to returned closure env
                         -- True  <=> add only toplevel BCOs to closure env
              -> ItblEnv
              -> ClosureEnv
@@ -840,11 +842,11 @@ linkSomeBCOs :: Bool    -- False <=> add _all_ BCOs to returned closure env
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs toplevs_only ie ce_in ul_bcos
+linkSomeBCOs dflags toplevs_only ie ce_in ul_bcos
    = do let nms = map unlinkedBCOName ul_bcos
         hvals <- fixIO
                     ( \ hvs -> let ce_out = extendClosureEnv ce_in (zipLazy nms hvs)
-                               in  mapM (linkBCO ie ce_out) ul_bcos )
+                               in  mapM (linkBCO dflags ie ce_out) ul_bcos )
         let ce_all_additions = zip nms hvals
             ce_top_additions = filter (isExternalName.fst) ce_all_additions
             ce_additions     = if toplevs_only then ce_top_additions

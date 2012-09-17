@@ -24,7 +24,6 @@ module Bitmap (
 #include "../includes/MachDeps.h"
 
 import SMRep
-import Constants
 import DynFlags
 import Util
 
@@ -84,9 +83,10 @@ possible, or fall back to an external pointer when the bitmap is too
 large.  This value represents the largest size of bitmap that can be
 packed into a single word.
 -}
-mAX_SMALL_BITMAP_SIZE :: Int
-mAX_SMALL_BITMAP_SIZE  | wORD_SIZE == 4 = 27
-		       | otherwise      = 58
+mAX_SMALL_BITMAP_SIZE :: DynFlags -> Int
+mAX_SMALL_BITMAP_SIZE dflags
+ | wORD_SIZE dflags == 4 = 27
+ | otherwise             = 58
 
 seqBitmap :: Bitmap -> a -> a
 seqBitmap = seqList

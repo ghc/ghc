@@ -34,7 +34,6 @@ import TysPrim
 import CLabel
 import SMRep
 import ForeignCall
-import Constants
 import DynFlags
 import Maybes
 import Outputable
@@ -66,7 +65,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
 
               -- ToDo: this might not be correct for 64-bit API
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType dflags arg)
-                                     wORD_SIZE
+                                     (wORD_SIZE dflags)
         ; cmm_args <- getFCallArgs stg_args
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
@@ -363,7 +362,7 @@ stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
 
 
 closureField :: DynFlags -> ByteOff -> ByteOff
-closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE
+closureField dflags off = off + fixedHdrSize dflags * wORD_SIZE dflags
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp             = CmmReg sp

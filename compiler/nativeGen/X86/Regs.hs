@@ -59,7 +59,6 @@ import Outputable
 import Platform
 import FastTypes
 import FastBool
-import Constants
 
 
 -- | regSqueeze_class reg
@@ -196,14 +195,14 @@ addrModeRegs _ = []
 -- applicable, is the same but for the frame pointer.
 
 
-spRel :: Platform
+spRel :: DynFlags
       -> Int -- ^ desired stack offset in words, positive or negative
       -> AddrMode
-spRel platform n
- | target32Bit platform
-    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE))
+spRel dflags n
+ | target32Bit (targetPlatform dflags)
+    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
  | otherwise
-    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE))
+    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
 
 -- The register numbers must fit into 32 bits on x86, so that we can
 -- use a Word32 to represent the set of free registers in the register

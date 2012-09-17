@@ -114,7 +114,7 @@ resData env (Left cmm@(CmmLabel l)) =
     in case ty of
             -- Make generic external label defenition and then pointer to it
             Nothing ->
-                let glob@(var, _) = genStringLabelRef label
+                let glob@(var, _) = genStringLabelRef dflags label
                     env' =  funInsert label (pLower $ getVarType var) env
                     ptr  = LMStaticPointer var
                 in  (env', LMPtoI ptr lmty, [glob])
@@ -127,15 +127,17 @@ resData env (Left cmm@(CmmLabel l)) =
                 in (env, LMPtoI ptr lmty, [])
 
 resData env (Left (CmmLabelOff label off)) =
-    let (env', var, glob) = resData env (Left (CmmLabel label))
-        offset = LMStaticLit $ LMIntLit (toInteger off) llvmWord
+    let dflags = getDflags env
+        (env', var, glob) = resData env (Left (CmmLabel label))
+        offset = LMStaticLit $ LMIntLit (toInteger off) (llvmWord dflags)
     in (env', LMAdd var offset, glob)
 
 resData env (Left (CmmLabelDiffOff l1 l2 off)) =
-    let (env1, var1, glob1) = resData env (Left (CmmLabel l1))
+    let dflags = getDflags env
+        (env1, var1, glob1) = resData env (Left (CmmLabel l1))
         (env2, var2, glob2) = resData env1 (Left (CmmLabel l2))
         var = LMSub var1 var2
-        offset = LMStaticLit $ LMIntLit (toInteger off) llvmWord
+        offset = LMStaticLit $ LMIntLit (toInteger off) (llvmWord dflags)
     in (env2, LMAdd var offset, glob1 ++ glob2)
 
 resData _ _ = panic "resData: Non CLabel expr as left type!"

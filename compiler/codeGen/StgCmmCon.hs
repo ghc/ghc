@@ -189,7 +189,7 @@ buildDynCon' dflags platform binder _cc con [arg]
               val_int = fromIntegral val :: Int
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
-              intlike_amode = cmmLabelOffW intlike_lbl offsetW
+              intlike_amode = cmmLabelOffW dflags intlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
@@ -203,7 +203,7 @@ buildDynCon' dflags platform binder _cc con [arg]
   = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
-              charlike_amode = cmmLabelOffW charlike_lbl offsetW
+              charlike_amode = cmmLabelOffW dflags charlike_lbl offsetW
         ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
                  , return mkNop) }
 
@@ -246,17 +246,15 @@ bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
     do dflags <- getDynFlags
        let (_, _, args_w_offsets) = mkVirtConstrOffsets dflags (addIdReps args)
-       mapM bind_arg args_w_offsets
-  where
-    tag = tagForCon con
+           tag = tagForCon dflags con
 
-          -- The binding below forces the masking out of the tag bits
-          -- when accessing the constructor field.
-    bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
-    bind_arg (arg, offset)
-        = do { dflags <- getDynFlags
-             ; emit $ mkTaggedObjectLoad dflags (idToReg dflags arg) base offset tag
-             ; bindArgToReg arg }
+           -- The binding below forces the masking out of the tag bits
+           -- when accessing the constructor field.
+           bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
+           bind_arg (arg, offset)
+               = do emit $ mkTaggedObjectLoad dflags (idToReg dflags arg) base offset tag
+                    bindArgToReg arg
+       mapM bind_arg args_w_offsets
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []

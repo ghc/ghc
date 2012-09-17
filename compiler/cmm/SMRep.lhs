@@ -45,7 +45,6 @@ module SMRep (
 #include "../includes/MachDeps.h"
 
 import DynFlags
-import Constants
 import Outputable
 import FastString
 
@@ -65,8 +64,8 @@ import Data.Bits
 type WordOff = Int -- Word offset, or word count
 type ByteOff = Int -- Byte offset, or byte count
 
-roundUpToWords :: ByteOff -> ByteOff
-roundUpToWords n = (n + (wORD_SIZE - 1)) .&. (complement (wORD_SIZE - 1))
+roundUpToWords :: DynFlags -> ByteOff -> ByteOff
+roundUpToWords dflags n = (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
 \end{code}
 
 StgWord is a type representing an StgWord on the target platform.
@@ -235,17 +234,17 @@ minClosureSize dflags = fixedHdrSize dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgArrWords_NoHdr dflags
+ = fixedHdrSize dflags * wORD_SIZE dflags + sIZEOF_StgArrWords_NoHdr dflags
 
 arrPtrsHdrSize :: DynFlags -> ByteOff
 arrPtrsHdrSize dflags
- = fixedHdrSize dflags * wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr dflags
+ = fixedHdrSize dflags * wORD_SIZE dflags + sIZEOF_StgMutArrPtrs_NoHdr dflags
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
 thunkHdrSize :: DynFlags -> WordOff
 thunkHdrSize dflags = fixedHdrSize dflags + smp_hdr
-        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE
+        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot` wORD_SIZE dflags
 
 
 nonHdrSize :: SMRep -> WordOff

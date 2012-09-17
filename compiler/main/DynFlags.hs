@@ -120,6 +120,8 @@ module DynFlags (
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
         wORD_SIZE_IN_BITS,
+        tAG_MASK,
+        mAX_PTR_TAG,
   ) where
 
 #include "HsVersions.h"
@@ -151,6 +153,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Control.Monad
 
+import Data.Bits
 import Data.Char
 import Data.List
 import Data.Map (Map)
@@ -3148,8 +3151,14 @@ compilerInfo dflags
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
-bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE
+bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
 
 wORD_SIZE_IN_BITS :: DynFlags -> Int
-wORD_SIZE_IN_BITS _ = wORD_SIZE * 8
+wORD_SIZE_IN_BITS dflags = wORD_SIZE dflags * 8
+
+tAG_MASK :: DynFlags -> Int
+tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
+
+mAX_PTR_TAG :: DynFlags -> Int
+mAX_PTR_TAG = tAG_MASK
 
