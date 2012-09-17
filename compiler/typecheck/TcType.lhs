@@ -312,36 +312,10 @@ data TcTyVarDetails
            , mtv_ref   :: IORef MetaDetails
            , mtv_untch :: Untouchables }  -- See Note [Untouchable type variables]
 
-
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
 -- See Note [Binding when looking up instances] in InstEnv
 vanillaSkolemTv = SkolemTv False  -- Might be instantiated
 superSkolemTv   = SkolemTv True   -- Treat this as a completely distinct type
-
--------------------------
-newtype Untouchables = Untouchables Int
-
-noUntouchables :: Untouchables
-noUntouchables = Untouchables 0   -- 0 = outermost level
-
-pushUntouchables :: Untouchables -> Untouchables 
-pushUntouchables (Untouchables us) = Untouchables (us+1)
-
-isFloatedTouchable :: Untouchables -> Untouchables -> Bool
-isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
-  = ctxt_untch < tv_untch
-
-isTouchable :: Untouchables -> Untouchables -> Bool
-isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
-  = ctxt_untch == tv_untch   -- NB: invariant ctxt_untch >= tv_untch
-                             --     So <= would be equivalent
-
-checkTouchableInvariant :: Untouchables -> Untouchables -> Bool
-checkTouchableInvariant (Untouchables ctxt_untch) (Untouchables tv_untch) 
-  = ctxt_untch >= tv_untch
-
-instance Outputable Untouchables where
-  ppr (Untouchables us) = ppr us
 
 -----------------------------
 data MetaDetails
@@ -410,7 +384,92 @@ data UserTypeCtxt
 -- will become	type T = forall a. a->a
 --
 -- With gla-exts that's right, but for H98 we should complain. 
+
+
+%************************************************************************
+%*									*
+		Untoucable type variables
+%*									*
+%************************************************************************
+
+Note [Untouchable type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Each unification variable (MetaTv) 
+  and each Implication
+  has a level number (of type Untouchables)
+ 
+* INVARIANTS.  In a tree of Implications, 
+
+    (ImplicInv) The level number of an Implication is 
+                STRICTLY GREATER THAN that of its parent
+
+    (MetaTvInv) The level number of a unification variable is 
+                LESS THAN OR EQUAL TO that of its parent 
+                implication
+
+* A unification variable is *touchable* if its level number
+  is EQUAL TO that of its immediate parent implication.
+
+Note [Skolem escape prevention]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We only unify touchable unification variables.  Because of
+(MetaTvInv), there can be no occurrences of he variable further out,
+so the unification can't cause the kolems to escape. Example:
+     data T = forall a. MkT a (a->Int)
+     f x (MkT v f) = length [v,x]
+We decide (x::alpha), and generate an implication like
+      [1]forall a. (a ~ alpha[0])
+But we must not unify alpha:=a, because the skolem would escape.
+
+For the cases where we DO want to unify, we rely on floating the
+equality.   Example (with same T)
+     g x (MkT v f) = x && True
+We decide (x::alpha), and generate an implication like
+      [1]forall a. (Bool ~ alpha[0])
+We do NOT unify directly, bur rather float out (if the constraint
+does not memtion 'a') to get
+      (Bool ~ alpha[0]) /\ [1]forall a.()
+and NOW we can unify alpha.
+
+The same idea of only unifying touchables solves another problem.
+Suppose we had
+   (F Int ~ uf[0])  /\  [1](forall a. C a => F Int ~ beta[1]) 
+In this example, beta is touchable inside the implication. The 
+first solveInteract step leaves 'uf' un-unified. Then we move inside 
+the implication where a new constraint
+       uf  ~  beta  
+emerges. If we (wrongly) spontaneously solved it to get uf := beta, 
+the whole implication disappears but when we pop out again we are left with 
+(F Int ~ uf) which will be unified by our final solveCTyFunEqs stage and
+uf will get unified *once more* to (F Int).
+
+\begin{code}
+newtype Untouchables = Untouchables Int
+
+noUntouchables :: Untouchables
+noUntouchables = Untouchables 0   -- 0 = outermost level
+
+pushUntouchables :: Untouchables -> Untouchables 
+pushUntouchables (Untouchables us) = Untouchables (us+1)
+
+isFloatedTouchable :: Untouchables -> Untouchables -> Bool
+isFloatedTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch < tv_untch
+
+isTouchable :: Untouchables -> Untouchables -> Bool
+isTouchable (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch == tv_untch   -- NB: invariant ctxt_untch >= tv_untch
+                             --     So <= would be equivalent
+
+checkTouchableInvariant :: Untouchables -> Untouchables -> Bool
+-- Checks (MetaTvInv) from Note [Untouchable type variables]
+checkTouchableInvariant (Untouchables ctxt_untch) (Untouchables tv_untch) 
+  = ctxt_untch >= tv_untch
+
+instance Outputable Untouchables where
+  ppr (Untouchables us) = ppr us
 \end{code}
+
 
 %************************************************************************
 %*									*
