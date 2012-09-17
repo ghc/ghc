@@ -1198,9 +1198,11 @@ def simple_run( name, way, prog, args ):
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        if not opts.combined_output and not check_stderr_ok(name):
+        bad_stderr = not opts.combined_output and not check_stderr_ok(name)
+        bad_stdout = not check_stdout_ok(name)
+        if bad_stderr:
             return failBecause('bad stderr')
-        if not check_stdout_ok(name):
+        if bad_stdout:
             return failBecause('bad stdout')
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
