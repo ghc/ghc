@@ -66,7 +66,7 @@ module TcMType (
   zonkTcType, zonkTcTypes, zonkTcThetaType,
 
   zonkTcKind, defaultKindVarToStar,
-  zonkEvVar, zonkWC, zonkId, zonkCt, zonkSkolemInfo,
+  zonkEvVar, zonkWC, zonkId, zonkCt, zonkCts, zonkSkolemInfo,
 
   tcGetGlobalTyVars, 
   ) where
@@ -652,52 +652,44 @@ zonkWCRec :: EvBindsVar
 zonkWCRec binds_var untch (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
   = do { flat'   <- zonkFlats binds_var untch flat
        ; implic' <- mapBagM zonkImplication implic
-       ; insol'  <- mapBagM zonkCt insol -- No need to do the more elaborate zonkFlats thing
+       ; insol'  <- zonkCts insol -- No need to do the more elaborate zonkFlats thing
        ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
 
 zonkFlats :: EvBindsVar -> Untouchables -> Cts -> TcM Cts
 -- This zonks and unflattens a bunch of flat constraints
 -- See Note [Unflattening while zonking]
-zonkFlats binds_var untch cts =
-  foldrBagM unflatten_one emptyCts cts >>= mapBagM zonkCt
-  -- Do the unflattening one-by one and then zonk all the rest in this bag
+zonkFlats binds_var untch cts
+  = do { -- See Note [How to unflatten]
+         cts <- foldrBagM unflatten_one emptyCts cts
+       ; zonkCts cts }
   where
     unflatten_one orig_ct cts
-      = do { zct <- zonkCt orig_ct        -- First we need to fully zonk 
-           ; mct <- try_zonk_fun_eq zct   -- Then try to solve if family equation
+      = do { zct <- zonkCt orig_ct                -- First we need to fully zonk 
+           ; mct <- try_zonk_fun_eq orig_ct zct   -- Then try to solve if family equation
            ; return $ maybe cts (`consBag` cts) mct }
-      where try_zonk_fun_eq zct
-              -- Original looks like wanted/derived family equation
-              | CFunEqCan {} <- orig_ct
-              , not (isGivenCt orig_ct)
-              -- New guy still looks like (lhs_ty ~ tv') so check if we can do a unification
-              , EqPred ty_lhs ty_rhs <- classifyPredType (ctPred zct)
-              , Just tv' <- getTyVar_maybe ty_rhs
-              = do { let b1 = isTouchableMetaTyVar untch tv' ||
-                              isFloatedTouchableMetaTyVar untch tv'
-                         b2 = typeKind ty_lhs `tcIsSubKind` tyVarKind tv'
-                         b3 = not (tv' `elemVarSet` tyVarsOfType ty_lhs)
-                   ; traceTc "try_zonk_fun_eq" $
-                     vcat [ text "orig_ct =" <+> ppr orig_ct
-                          , text "zct =" <+> ppr zct
-                          , text "current untouchables =" <+> ppr untch
-                          , text "touchable =" <+> ppr b1
-                          , text "kinds compatible=" <+> ppr b2
-                          , text "occurs ok=" <+> ppr b3 ]
-                   ; if b1 && b2 && b3 then 
-                       do { writeMetaTyVar tv' ty_lhs
-                          ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
-                                evvar  = ctev_evar (cc_ev zct)
-                          ; when (isWantedCt orig_ct) $ addTcEvBind binds_var evvar evterm
-                          ; traceTc "zonkFlats/unflattening" $
-                            vcat [ text "zct = " <+> ppr zct,
-                                   text "binds_var = " <+> ppr binds_var ]
-                          ; return Nothing }
-                     else return (Just zct) }
-              | otherwise
-              = return (Just zct)
-                    
-                    
+
+    try_zonk_fun_eq orig_ct zct   -- See Note [How to unflatten]
+      | EqPred ty_lhs ty_rhs <- classifyPredType (ctPred zct)
+          -- NB: zonking de-classifies the constraint,
+          --     so we can't look for CFunEqCan
+      , Just tv <- getTyVar_maybe ty_rhs
+      , ASSERT2( not (isFloatedTouchableMetaTyVar untch tv), ppr tv )
+        isTouchableMetaTyVar untch tv
+      , typeKind ty_lhs `tcIsSubKind` tyVarKind tv
+      , not (tv `elemVarSet` tyVarsOfType ty_lhs)
+--       , Just ty_lhs' <- occurCheck tv ty_lhs
+      = ASSERT2( isWantedCt orig_ct, ppr orig_ct )
+        ASSERT2( case orig_ct of { CFunEqCan {} -> True; _ -> False }, ppr orig_ct )
+        do { writeMetaTyVar tv ty_lhs
+           ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
+                 evvar  = ctev_evar (cc_ev zct)
+           ; addTcEvBind binds_var evvar evterm
+           ; traceTc "zonkFlats/unflattening" $
+             vcat [ text "zct = " <+> ppr zct,
+                    text "binds_var = " <+> ppr binds_var ]
+           ; return Nothing }
+      | otherwise
+      = return (Just zct)
 \end{code}
 
 Note [Unflattening while zonking]
@@ -710,7 +702,7 @@ These are ordinary wanted constraints and can/should be solved by
 ordinary unification alpha := F taus. However the constraint solving
 algorithm does not do that, as their 'inert' form is F taus ~ alpha.
 
-We then must have some extra step to 'unflatten' these equations by
+Hence, we need an extra step to 'unflatten' these equations by
 performing unification. This unification, if it happens at the end of
 constraint solving, cannot produce any more interactions in the
 constraint solver so it is safe to do it as the very very last step.
@@ -720,12 +712,34 @@ zonkFlats. This is in analgoy to the zonking of given flatten skolems
 which are eliminated in favor of the underlying type that they are
 equal to.
 
-Note that, because we now have to affect evidence while zonking
+Note that, because we now have to affect *evidence* while zonking
 (setting some evidence binds to identities), we have to pass to the
 zonkWC function an evidence variable to collect all the extra
 variables.
 
+Note [How to unflatten]
+~~~~~~~~~~~~~~~~~~~~~~~
+How do we unflatten during zonking.  Consider a bunch of flat constraints.
+Consider them one by one.  For each such constraint C
+  * Zonk C (to apply current substitution)
+  * If C is of form F tys ~ alpha, 
+       where alpha is touchable
+       and   alpha is not mentioned in tys
+    then unify alpha := F tys
+         and discard C
+
+After processing all the flat constraints, zonk them again to propagate
+the inforamtion from later ones to earlier ones.  Eg
+  Start:  (F alpha ~ beta, G Int ~ alpha)
+  Then we get beta := F alpha
+              alpha := G Int
+  but we must apply the second unification to the first constraint.
+
+
 \begin{code}
+zonkCts :: Cts -> TcM Cts
+zonkCts = mapBagM zonkCt
+
 zonkCt :: Ct -> TcM Ct
 zonkCt ct@(CHoleCan { cc_ev = ev })
   = do { ev' <- zonkCtEvidence ev
