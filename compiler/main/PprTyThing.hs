@@ -165,13 +165,13 @@ pprTypeForUser print_foralls ty
 
 pprTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprTyCon pefas ss tyCon
-  | GHC.isSynTyCon tyCon
-  = if GHC.isFamilyTyCon tyCon
-    then pprTyConHdr pefas tyCon <+> dcolon <+> 
-	 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
-    else
-      let rhs_type = GHC.synTyConType tyCon
-      in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprTypeForUser pefas rhs_type)
+  | Just syn_rhs <- GHC.synTyConRhs_maybe tyCon
+  = case syn_rhs of
+      SynFamilyTyCon {} -> pprTyConHdr pefas tyCon <+> dcolon <+> 
+                           pprTypeForUser pefas (GHC.synTyConResKind tyCon)
+      SynonymTyCon rhs_ty -> hang (pprTyConHdr pefas tyCon <+> equals) 
+                                2 (pprTypeForUser pefas rhs_ty)
+
   | Just cls <- GHC.tyConClass_maybe tyCon
   = pprClass pefas ss cls
   | otherwise

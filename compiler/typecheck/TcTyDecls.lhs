@@ -211,9 +211,8 @@ calcClassCycles cls
       -- For synonyms, try to expand them: some arguments might be
       -- phantoms, after all. We can expand with impunity because at
       -- this point the type synonym cycle check has already happened.
-      | isSynTyCon tc
-      , SynonymTyCon rhs <- synTyConRhs tc
-      , let (env, remainder) = papp (tyConTyVars tc) tys
+      | Just (tvs, rhs) <- synTyConDefn_maybe tc
+      , let (env, remainder) = papp tvs tys
             rest_tys = either (const []) id remainder
       = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) 
         . flip (foldr (expandType seen path)) rest_tys

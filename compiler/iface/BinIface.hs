@@ -1404,6 +1404,18 @@ instance Binary IfaceDecl where
                     occ <- return $! mkOccNameFS tcName a1
                     return (IfaceAxiom occ a2 a3 a4)
 
+instance Binary ty => Binary (SynTyConRhs ty) where
+    put_ bh (SynFamilyTyCon a b) = putByte bh 0 >> put_ bh a >> put_ bh b
+    put_ bh (SynonymTyCon ty)    = putByte bh 1 >> put_ bh ty
+
+    get bh = do { h <- getByte bh
+                ; case h of
+                    0 -> do { a <- get bh
+                            ; b <- get bh
+                            ; return (SynFamilyTyCon a b) }
+                    _ -> do { ty <- get bh
+                            ; return (SynonymTyCon ty) } }
+
 instance Binary IfaceClsInst where
     put_ bh (IfaceClsInst cls tys dfun flag orph) = do
         put_ bh cls

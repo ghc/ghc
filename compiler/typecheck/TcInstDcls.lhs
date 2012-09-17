@@ -560,7 +560,6 @@ tcFamInstDecl top_lvl decl
        -- Look up the family TyCon and check for validity including
        -- check that toplevel type instances are not for associated types.
        ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; when (isTopLevel top_lvl && isTyConAssoc fam_tc)
               (addErr $ assocInClassErr fam_tc_lname)
 
@@ -573,7 +572,11 @@ tcFamInstDecl1 :: TyCon -> FamInstDecl Name -> TcM FamInst
   -- "type instance"
 tcFamInstDecl1 fam_tc decl@(FamInstDecl { fid_tycon = fam_tc_name
                                         , fid_defn = TySynonym {} })
-  = do { -- (1) do the work of verifying the synonym
+  = do { -- (0) Check it's an open type family
+         checkTc (isOpenSynFamilyTyCon fam_tc)
+                 (notOpenFamily fam_tc)
+
+         -- (1) do the work of verifying the synonym
        ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc decl
 
          -- (2) check the well-formedness of the instance
@@ -1445,4 +1448,8 @@ badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
+
+notOpenFamily :: TyCon -> SDoc
+notOpenFamily tc
+  = ptext (sLit "Illegal instance for closed family") <+> quotes (ppr tc)
 \end{code}

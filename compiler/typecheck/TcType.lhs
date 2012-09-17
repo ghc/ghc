@@ -916,8 +916,8 @@ isTauTy _    		  = False
 isTauTyCon :: TyCon -> Bool
 -- Returns False for type synonyms whose expansion is a polytype
 isTauTyCon tc 
-  | isClosedSynTyCon tc = isTauTy (snd (synTyConDefn tc))
-  | otherwise           = True
+  | Just (_, rhs) <- synTyConDefn_maybe tc = isTauTy rhs
+  | otherwise                              = True
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1375,6 +1375,7 @@ orphNamesOfCo (UnsafeCo ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNa
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
 orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
+orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co ty)        = orphNamesOfCo co `unionNameSets` orphNamesOfType ty
 
 orphNamesOfCos :: [Coercion] -> NameSet

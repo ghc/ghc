@@ -771,19 +771,20 @@ checkBootTyCon tc1 tc2
         eqListBy eqSig op_stuff1 op_stuff2 &&
         eqListBy eqAT ats1 ats2)
 
-  | isSynTyCon tc1 && isSynTyCon tc2
+  | Just syn_rhs1 <- synTyConRhs_maybe tc1
+  , Just syn_rhs2 <- synTyConRhs_maybe tc2
   = ASSERT(tc1 == tc2)
     let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
         env = rnBndrs2 env0 tvs1 tvs2
 
-        eqSynRhs SynFamilyTyCon SynFamilyTyCon
-            = True
+        eqSynRhs (SynFamilyTyCon a1 b1) (SynFamilyTyCon a2 b2)
+            = a1 == a2 && b1 == b2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
     equalLength tvs1 tvs2 &&
-    eqSynRhs (synTyConRhs tc1) (synTyConRhs tc2)
+    eqSynRhs syn_rhs1 syn_rhs2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   = ASSERT(tc1 == tc2)

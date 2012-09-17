@@ -474,9 +474,9 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
-     tc_syn_rhs Nothing   = return SynFamilyTyCon
-     tc_syn_rhs (Just ty) = do { rhs_ty <- tcIfaceType ty
-                               ; return (SynonymTyCon rhs_ty) }
+     tc_syn_rhs (SynFamilyTyCon a b) = return (SynFamilyTyCon a b)
+     tc_syn_rhs (SynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
+                                          ; return (SynonymTyCon rhs_ty) }
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,

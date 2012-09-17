@@ -533,7 +533,8 @@ tcTyClDecl1 parent _calc_isrec
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent
+  ; let syn_rhs = SynFamilyTyCon { synf_open = True, synf_injective = False }
+  ; tycon <- buildSynTyCon tc_name tvs' syn_rhs kind parent
   ; return [ATyCon tycon] }
 
   -- "data family" declaration
@@ -1306,8 +1307,8 @@ checkValidTyCon tc
   | Just cl <- tyConClass_maybe tc
   = checkValidClass cl
 
-  | isSynTyCon tc 
-  = case synTyConRhs tc of
+  | Just syn_rhs <- synTyConRhs_maybe tc 
+  = case syn_rhs of
       SynFamilyTyCon {} -> return ()
       SynonymTyCon ty   -> checkValidType syn_ctxt ty
 

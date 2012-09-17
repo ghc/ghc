@@ -1227,9 +1227,8 @@ reifyTyCon tc
                     (TH.FamilyD flavour (reifyName tc) tvs' kind')
                     instances) }
 
-  | isSynTyCon tc
-  = do { let (tvs, rhs) = synTyConDefn tc
-       ; rhs' <- reifyType rhs
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
+  = do { rhs' <- reifyType rhs
        ; tvs' <- reifyTyVars tvs
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
