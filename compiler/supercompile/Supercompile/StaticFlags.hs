@@ -30,8 +30,9 @@ fLOAT_TO_MATCH = False
 rEDUCE_BEFORE_MATCH :: Bool
 rEDUCE_BEFORE_MATCH = False
 
+-- At the moment, this HAS to be on for termination to be assured:
 eAGER_SPLIT_VALUES :: Bool
-eAGER_SPLIT_VALUES = lookUp $ fsLit "-fsupercompiler-eager-split-values"
+eAGER_SPLIT_VALUES = not $ lookUp $ fsLit "-fsupercompiler-no-eager-split-values"
 
 rEFINE_ALTS :: Bool
 rEFINE_ALTS = not $ lookUp $ fsLit "-fsupercompiler-no-refine-alts"

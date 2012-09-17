@@ -617,7 +617,24 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
             --
             -- (Note that the meaning of h1 is cost equivalent to the meaning of h0, so superficially this tieback is justified!
             --  If x bound a lambda instead then we would be able to make an argument that the tieback was not cost equivalent.)
-            memo_how | isStateIrreducible state
+            memo_how -- If eager value splitting is on, we'll always check, which
+                     -- is certainly terminating (even without EVS) and is also safe (this is due to EVS).
+                     --
+                     -- Even with EVS, it is not safe to skip memoisation if the state in the focus is a value, an indirection, or stuck
+                     -- on a free variable. Examples that prove each case incorrect are:
+                     --  1. let f = \x -> C f in C f
+                     --     (a value state, eager-splits to itself)
+                     --  2. let f = \x -> f |> co in f |> co
+                     --     (an indirection, eager-splits to itself)
+                     --  3. let f = \x -> g f x in g f x
+                     --     (blocked on FV, eager-splits to itself)
+                     | eAGER_SPLIT_VALUES
+                     = CheckAndRemember
+
+                     -- If eager value splitting is off, we do this, which is sufficient to avoid non-correct output
+                     -- but not enough to avoid non-termination (consider the input let xs = 1:xs in 1:xs, which splits to
+                     -- itself and is always irreducible)
+                     | isStateIrreducible state
                      = Skip
 
                      | otherwise

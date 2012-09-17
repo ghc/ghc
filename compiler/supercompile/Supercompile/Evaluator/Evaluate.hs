@@ -156,6 +156,7 @@ step s = guard reduced >> return result
 
 step' :: Bool -> Either State UnnormalisedState -> (Bool, State) -- The flag indicates whether we managed to reduce any steps *at all*
 step' normalising ei_state = {-# SCC "step'" #-}
+    -- pprTrace "step'" (either (pPrintFullState quietStatePrettiness) (pPrintFullUnnormalisedState quietStatePrettiness) ei_state) $
     (\res@(_reduced, stepped_state) -> let _deeds = either releaseStateDeed releaseUnnormalisedStateDeed ei_state
                                            _doc = either (pPrintFullState quietStatePrettiness) (pPrintFullUnnormalisedState quietStatePrettiness) ei_state
                                            _fvs = either stateFreeVars unnormalisedStateFreeVars ei_state in
@@ -239,7 +240,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
             deeds1 <- if howBound hb == InternallyBound
                        then return deeds0
                        else claimDeeds deeds0 (annedSize anned_cast_a)
-            unwind' deeds1 (Heap h ids) k (Just x') (annedToTagged anned_cast_a) (if dUPLICATE_VALUES_EVALUATOR then in_e else (mkIdentityRenaming (unitVarSet x'), fmap Var $ annedVar tg x'))
+            unwind' deeds1 (Heap h ids) k (Just (x', (mkIdentityRenaming (unitVarSet x'), annedTerm tg (Var x'))))
+                                          (annedToTagged anned_cast_a)
+                                          (if dUPLICATE_VALUES_EVALUATOR then in_e else (mkIdentityRenaming (unitVarSet x'), fmap Var $ annedVar tg x'))
           Nothing -> do
             -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
             guard (howBound hb == InternallyBound)
@@ -296,7 +299,13 @@ step' normalising ei_state = {-# SCC "step'" #-}
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe State
     unwind deeds heap k tg_a a = unwind' deeds heap k Nothing (Tagged tg_a (Uncast, a)) (taggedAnswerToInAnnedTerm (Tagged tg_a a))
 
-    unwind' deeds heap@(Heap h ids) k mb_x' (Tagged tg_a cast_a@(mb_co, (rn, v))) in_e = case k of
+    unwind' :: Deeds -> Heap -> Stack
+            -> Maybe (Var,             -- Variable name of thing in focus, for normalisation check/SUPERINLINABLE purposes
+                      In AnnedTerm)    -- Version of the focus that should go into *focus* (useful if we are reducing <x = v | x | update y >, we want x in the focus in next step, not y!)
+            -> Tagged (Coerced Answer) -- "Meaning" of the focus, in value terms
+            -> In AnnedTerm            -- Version of the focus that should go into heap (may just be a variable reference to a value)
+            -> Maybe State
+    unwind' deeds heap@(Heap h ids) k mb_x' (Tagged tg_a cast_a@(mb_co, (rn, v))) in_e_heap = case k of
      Loco _ -> Nothing
      Car kf k -> case tagee kf of
         TyApply ty'                    ->                  tyApply    (deeds `releaseDeeds` 1)          ty'
@@ -306,12 +315,16 @@ step' normalising ei_state = {-# SCC "step'" #-}
         PrimApply pop tys' in_vs in_es -> fmap normalise $ primop     deeds                    (tag kf) pop tys' in_vs in_es
         StrictLet x' in_e2             -> fmap normalise $ strictLet  (deeds `releaseDeeds` 1)          x' in_e2
         -- NB: since there are never two adjacent casts on the stack, our reference expressions will always have at most 1 coercion
-        CastIt co'                     -> unwind' deeds heap k mb_x' (castAnswer ids (tag kf) co' (Tagged tg_a cast_a)) (mkInScopeIdentityRenaming ids, annedTerm (tag kf) (renameIn (renameAnnedTerm ids) in_e `Cast` co')) -- TODO: can potentially release deeds from cast_a double-cast here
+        CastIt co'                     -> unwind' deeds heap k (fmap (second cast_e) mb_x') (castAnswer ids (tag kf) co' (Tagged tg_a cast_a)) (cast_e in_e_heap) -- TODO: can potentially release deeds from cast_a double-cast here
+          where cast_e in_e = (mkInScopeIdentityRenaming ids, annedTerm (tag kf) (renameIn (renameAnnedTerm ids) in_e `Cast` co'))
         Update x'                      -> do
             -- If duplicating values, we ensure normalisation by not executing updates
             guard (not normalising || not dUPLICATE_VALUES_EVALUATOR)
-            return $ normalise (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, k, (mkIdentityRenaming (unitVarSet x'), fmap Var $ annedVar (tag kf) x'))
-          where Just deeds' = claimDeeds (deeds `releaseDeeds` castAnswerSize cast_a) (annedTermSize (snd in_e))
+            return $ normalise (deeds', Heap (M.insert x' (internallyBound in_e_heap) h) ids, k, in_e')
+          where Just deeds' = claimDeeds (deeds `releaseDeeds` castAnswerSize cast_a) (annedTermSize (snd in_e_heap))
+                in_e' = case mb_x' of
+                          Nothing              -> (mkIdentityRenaming (unitVarSet x'), fmap Var $ annedVar (tag kf) x')
+                          Just (_, in_e_focus) -> in_e_focus
       where
         -- Should check this is not Nothing before using the "meaning" a
         checkShouldExposeUnfolding = case mb_x' of
@@ -319,7 +332,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                      Nothing -> Just True
                      -- We have to check this here (not just when preparing unfoldings) because
                      -- we would like to also exclude local recursive loops, not just top-level ones
-                     Just x' -> case shouldExposeUnfolding x' of
+                     Just (x', _) -> case shouldExposeUnfolding x' of
                        Right super  -> Just super
                        Left why_not -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
                                        fail why_not
@@ -370,13 +383,13 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 | stateSize (gc s') <= either (stateSize . gc) unnormalisedStateSize ei_state
                 -> True
                 -- It might still be OK to get larger if GHC's inlining heuristics say we should
-                | Just x' <- mb_x'
+                | Just (x', _) <- mb_x'
                 , ghcHeuristics x' (annedTerm tg_a (coercedAnswerToAnnedTerm' ids cast_a)) k_summary -- NB: the tag is irrelevant
                 -> True
                 -- Otherwise, we don't want to beta-reduce
                 | otherwise
                 -> pprTrace "Unwanted:" (pPrint (coercedAnswerToAnnedTerm' ids cast_a)) False
-            (case mb_x' of Just x' -> pprTrace "Inlining" (ppr x'); Nothing -> id) $
+            (case mb_x' of Just (x', _) -> pprTrace "Inlining" (ppr x'); Nothing -> id) $
               return s'
 
         tyApply :: Deeds -> Out Type -> Maybe State
@@ -492,8 +505,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 deeds0 = deeds_init `releaseDeeds` castAnswerSize cast_a
                 (deeds1, h1) | isDeadBinder wild' = (deeds0,                         h)
                              | otherwise          = (deeds0', M.insert wild' wild_hb h)
-                               where wild_hb = internallyBound in_e
-                                     Just deeds0' = claimDeeds deeds0 (annedTermSize (snd in_e))
+                               where wild_hb = internallyBound in_e_heap
+                                     Just deeds0' = claimDeeds deeds0 (annedTermSize (snd in_e_heap))
                                      -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
         -- NB: this actually duplicates the answer "a" into the answers field of the PrimApply, even if that "a" is update-bound
@@ -512,8 +525,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
             []           -> Nothing
 
         strictLet :: Deeds -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
-        strictLet deeds x' in_e2 = Just (deeds', Heap (M.insert x' (internallyBound in_e) h) ids, k, in_e2)
-          where Just deeds' = claimDeeds (deeds `releaseDeeds` castAnswerSize cast_a) (annedTermSize (snd in_e))
+        strictLet deeds x' in_e2 = Just (deeds', Heap (M.insert x' (internallyBound in_e_heap) h) ids, k, in_e2)
+          where Just deeds' = claimDeeds (deeds `releaseDeeds` castAnswerSize cast_a) (annedTermSize (snd in_e_heap))
 
 
 -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.

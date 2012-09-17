@@ -625,7 +625,7 @@ msgMaybe :: MSGMode -- ^ How to match
          -> State   -- ^ Tieback semantics
          -> State   -- ^ This semantics
          -> Maybe MSGResult -- ^ Renaming from left to right
-msgMaybe mm s_l s_r = runMSG' (msg mm s_l s_r)
+msgMaybe mm s_l s_r = {- s_l `seq` s_r `seq` (trace "msgMaybe" $ (\res -> res `seq` trace "msgMaybe'" res) $ -} runMSG' (msg mm s_l s_r)
 
 
 data MSGMatchResult = RightIsInstance   Heap Renaming Stack
@@ -690,7 +690,7 @@ isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
-msg = pprTrace "examples" (example1 $$ example2) msg'
+msg = {- pprTrace "examples" (example1 $$ example2) -} msg'
 msg' mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
     liftM (first (liftA2 (\deeds (heap, rn, k) -> (deeds, heap, rn, k)) (Pair deeds_l deeds_r))) $ msgLoop mm (heap_l, heap_r) (qa_l, qa_r) (k_l, k_r)
 
@@ -1198,10 +1198,10 @@ suck :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU ()
 suck sel x = join $ suck' sel x
 
 suck' :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU (MSGU ())
-suck' sel x = flip fmap get $ \s -> lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x
+suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x
 
 suckStack :: Int -> MSGU ()
-suckStack i = join $ flip fmap get $ \s -> IM.findWithDefault (return ()) i (msgSuckStack s)
+suckStack i = {- trace ("suckStack:" ++ show i) $ -} join $ flip fmap get $ \s -> IM.findWithDefault (return ()) i (msgSuckStack s)
 
 msgStackFrame :: Tagged StackFrame -> Tagged StackFrame -> MSG (Tagged StackFrame)
 msgStackFrame kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_r) -- Right biased

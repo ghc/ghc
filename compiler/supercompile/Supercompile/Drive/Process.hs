@@ -584,7 +584,7 @@ speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M
                     Stop (_gced_old_state, old_parents', rb)
                       -> spec_trace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness (gc state) $$ pPrintFullState quietStatePrettiness _gced_old_state -})
                          (no_change, {- speculation_failure Nothing -} if any (`isSuffixOf` old_parents') forbidden then speculation_failure Nothing else rb) -- Don't allow rollback to rolled back region
-                    Continue hist -> case reduceWithStats state of
+                    Continue hist -> {- spec_trace "continue" (pPrintFullState quietStatePrettiness state) $ -} case reduceWithStats state of
                         (extra_stats, (deeds, Heap h_speculated_ok' ids, k, qa))
                           -- I used to insist that evaluation should reach an *answer*, but actually it's really good if we
                           -- get any cheap thing -- so questions are OK, and even cast questions are permissible (cast answers
