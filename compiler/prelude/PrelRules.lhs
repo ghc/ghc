@@ -45,6 +45,7 @@ import FastString
 import StaticFlags ( opt_SimplExcessPrecision )
 import Constants
 import BasicTypes
+import DynFlags
 import Util
 
 import Control.Monad
@@ -439,7 +440,7 @@ mkBasicRule op_name n_args rm
   = BuiltinRule { ru_name = occNameFS (nameOccName op_name),
                   ru_fn = op_name,
                   ru_nargs = n_args,
-                  ru_try = \_ -> runRuleM rm }
+                  ru_try = \_ _ -> runRuleM rm }
 
 newtype RuleM r = RuleM
   { runRuleM :: IdUnfoldingFun -> [CoreExpr] -> Maybe r }
@@ -716,11 +717,11 @@ builtinRules :: [CoreRule]
 builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = \_ -> match_append_lit },
+                   ru_nargs = 4, ru_try = \_ _ -> match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
-                   ru_nargs = 2, ru_try = \_ -> match_eq_string },
+                   ru_nargs = 2, ru_try = \_ _ -> match_eq_string },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
-                   ru_nargs = 2, ru_try = \_ -> match_inline }]
+                   ru_nargs = 2, ru_try = \_ _ -> match_inline }]
  ++ builtinIntegerRules
 
 builtinIntegerRules :: [CoreRule]
@@ -889,98 +890,106 @@ match_inline _ _ = Nothing
 --   wordToInteger (79::Word#) = 79::Integer   
 -- Similarly Int64, Word64
 
-match_IntToInteger :: Id
+match_IntToInteger :: DynFlags
+                   -> Id
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_IntToInteger id id_unf [xl]
+match_IntToInteger _ id id_unf [xl]
   | Just (MachInt x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
     _ ->
         panic "match_IntToInteger: Id has the wrong type"
-match_IntToInteger _ _ _ = Nothing
+match_IntToInteger _ _ _ _ = Nothing
 
-match_WordToInteger :: Id
+match_WordToInteger :: DynFlags
+                    -> Id
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_WordToInteger id id_unf [xl]
+match_WordToInteger _ id id_unf [xl]
   | Just (MachWord x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
     _ ->
         panic "match_WordToInteger: Id has the wrong type"
-match_WordToInteger _ _ _ = Nothing
+match_WordToInteger _ _ _ _ = Nothing
 
-match_Int64ToInteger :: Id
+match_Int64ToInteger :: DynFlags
+                     -> Id
                      -> IdUnfoldingFun
                      -> [Expr CoreBndr]
                      -> Maybe (Expr CoreBndr)
-match_Int64ToInteger id id_unf [xl]
+match_Int64ToInteger _ id id_unf [xl]
   | Just (MachInt64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
     _ ->
         panic "match_Int64ToInteger: Id has the wrong type"
-match_Int64ToInteger _ _ _ = Nothing
+match_Int64ToInteger _ _ _ _ = Nothing
 
-match_Word64ToInteger :: Id
+match_Word64ToInteger :: DynFlags
+                      -> Id
                       -> IdUnfoldingFun
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
-match_Word64ToInteger id id_unf [xl]
+match_Word64ToInteger _ id id_unf [xl]
   | Just (MachWord64 x) <- exprIsLiteral_maybe id_unf xl
   = case idType id of
     FunTy _ integerTy ->
         Just (Lit (LitInteger x integerTy))
     _ ->
         panic "match_Word64ToInteger: Id has the wrong type"
-match_Word64ToInteger _ _ _ = Nothing
+match_Word64ToInteger _ _ _ _ = Nothing
 
 -------------------------------------------------
 match_Integer_convert :: Num a
                       => (a -> Expr CoreBndr)
+                      -> DynFlags
                       -> Id
                       -> IdUnfoldingFun
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
-match_Integer_convert convert _ id_unf [xl]
+match_Integer_convert convert _ _ id_unf [xl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   = Just (convert (fromInteger x))
-match_Integer_convert _ _ _ _ = Nothing
+match_Integer_convert _ _ _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer)
+                   -> DynFlags
                    -> Id
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_Integer_unop unop _ id_unf [xl]
+match_Integer_unop unop _ _ id_unf [xl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   = Just (Lit (LitInteger (unop x) i))
-match_Integer_unop _ _ _ _ = Nothing
+match_Integer_unop _ _ _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer)
+                    -> DynFlags
                     -> Id
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_Integer_binop binop _ id_unf [xl,yl]
+match_Integer_binop binop _ _ id_unf [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just (Lit (LitInteger (x `binop` y) i))
-match_Integer_binop _ _ _ _ = Nothing
+match_Integer_binop _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
 match_Integer_divop_both :: (Integer -> Integer -> (Integer, Integer))
+                         -> DynFlags
                          -> Id
                          -> IdUnfoldingFun
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
-match_Integer_divop_both divop _ id_unf [xl,yl]
+match_Integer_divop_both divop _ _ id_unf [xl,yl]
   | Just (LitInteger x t) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
@@ -990,74 +999,80 @@ match_Integer_divop_both divop _ id_unf [xl,yl]
                      Type t,
                      Lit (LitInteger r t),
                      Lit (LitInteger s t)]
-match_Integer_divop_both _ _ _ _ = Nothing
+match_Integer_divop_both _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
 match_Integer_divop_one :: (Integer -> Integer -> Integer)
+                        -> DynFlags
                         -> Id
                         -> IdUnfoldingFun
                         -> [Expr CoreBndr]
                         -> Maybe (Expr CoreBndr)
-match_Integer_divop_one divop _ id_unf [xl,yl]
+match_Integer_divop_one divop _ _ id_unf [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   = Just (Lit (LitInteger (x `divop` y) i))
-match_Integer_divop_one _ _ _ _ = Nothing
+match_Integer_divop_one _ _ _ _ _ = Nothing
 
 match_Integer_Int_binop :: (Integer -> Int -> Integer)
+                        -> DynFlags
                         -> Id
                         -> IdUnfoldingFun
                         -> [Expr CoreBndr]
                         -> Maybe (Expr CoreBndr)
-match_Integer_Int_binop binop _ id_unf [xl,yl]
+match_Integer_Int_binop binop _ _ id_unf [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
-match_Integer_Int_binop _ _ _ _ = Nothing
+match_Integer_Int_binop _ _ _ _ _ = Nothing
 
 match_Integer_binop_Bool :: (Integer -> Integer -> Bool)
+                         -> DynFlags
                          -> Id
                          -> IdUnfoldingFun
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
-match_Integer_binop_Bool binop _ id_unf [xl, yl]
+match_Integer_binop_Bool binop _ _ id_unf [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just (if x `binop` y then trueVal else falseVal)
-match_Integer_binop_Bool _ _ _ _ = Nothing
+match_Integer_binop_Bool _ _ _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering)
+                             -> DynFlags
                              -> Id
                              -> IdUnfoldingFun
                              -> [Expr CoreBndr]
                              -> Maybe (Expr CoreBndr)
-match_Integer_binop_Ordering binop _ id_unf [xl, yl]
+match_Integer_binop_Ordering binop _ _ id_unf [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just $ case x `binop` y of
              LT -> ltVal
              EQ -> eqVal
              GT -> gtVal
-match_Integer_binop_Ordering _ _ _ _ = Nothing
+match_Integer_binop_Ordering _ _ _ _ _ = Nothing
 
 match_Integer_Int_encodeFloat :: RealFloat a
                               => (a -> Expr CoreBndr)
+                              -> DynFlags
                               -> Id
                               -> IdUnfoldingFun
                               -> [Expr CoreBndr]
                               -> Maybe (Expr CoreBndr)
-match_Integer_Int_encodeFloat mkLit _ id_unf [xl,yl]
+match_Integer_Int_encodeFloat mkLit _ _ id_unf [xl,yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
-match_Integer_Int_encodeFloat _ _ _ _ = Nothing
+match_Integer_Int_encodeFloat _ _ _ _ _ = Nothing
 
-match_decodeDouble :: Id
+match_decodeDouble :: DynFlags
+                   -> Id
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_decodeDouble fn id_unf [xl]
+match_decodeDouble _ fn id_unf [xl]
   | Just (MachDouble x) <- exprIsLiteral_maybe id_unf xl
   = case idType fn of
     FunTy _ (TyConApp _ [integerTy, intHashTy]) ->
@@ -1070,25 +1085,27 @@ match_decodeDouble fn id_unf [xl]
                              Lit (MachInt (toInteger z))]
     _ ->
         panic "match_decodeDouble: Id has the wrong type"
-match_decodeDouble _ _ _ = Nothing
+match_decodeDouble _ _ _ _ = Nothing
 
 match_XToIntegerToX :: Name
+                    -> DynFlags
                     -> Id
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_XToIntegerToX n _ _ [App (Var x) y]
+match_XToIntegerToX n _ _ _ [App (Var x) y]
   | idName x == n
   = Just y
-match_XToIntegerToX _ _ _ _ = Nothing
+match_XToIntegerToX _ _ _ _ _ = Nothing
 
 match_smallIntegerTo :: PrimOp
+                     -> DynFlags
                      -> Id
                      -> IdUnfoldingFun
                      -> [Expr CoreBndr]
                      -> Maybe (Expr CoreBndr)
-match_smallIntegerTo primOp _ _ [App (Var x) y]
+match_smallIntegerTo primOp _ _ _ [App (Var x) y]
   | idName x == smallIntegerName
   = Just $ App (Var (mkPrimOpId primOp)) y
-match_smallIntegerTo _ _ _ _ = Nothing
+match_smallIntegerTo _ _ _ _ _ = Nothing
 \end{code}

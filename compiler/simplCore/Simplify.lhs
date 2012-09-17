@@ -1553,7 +1553,8 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
   | otherwise
-  = do { case lookupRule (activeRule env) (getUnfoldingInRuleMatch env)
+  = do { dflags <- getDynFlags
+       ; case lookupRule dflags (activeRule env) (getUnfoldingInRuleMatch env)
                          (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
