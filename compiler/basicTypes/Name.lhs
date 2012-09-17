@@ -45,7 +45,7 @@ module Name (
 
 	-- ** Creating 'Name's
 	mkSystemName, mkSystemNameAt,
-        mkInternalName, mkDerivedInternalName, 
+        mkInternalName, mkClonedInternalName, mkDerivedInternalName, 
 	mkSystemVarName, mkSysTvName, 
         mkFCallName,
         mkExternalName, mkWiredInName,
@@ -265,6 +265,11 @@ mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq
 	--	  uniques if you get confused
         --      * for interface files we tidyCore first, which makes
         --        the OccNames distinct when they need to be
+
+mkClonedInternalName :: Unique -> Name -> Name
+mkClonedInternalName uniq (Name { n_occ = occ, n_loc = loc })
+  = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal
+         , n_occ = occ, n_loc = loc }
 
 mkDerivedInternalName :: (OccName -> OccName) -> Unique -> Name -> Name
 mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })

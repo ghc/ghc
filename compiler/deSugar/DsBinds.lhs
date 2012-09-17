@@ -440,8 +440,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
   | otherwise
   = putSrcSpanDs loc $ 
-    do { let poly_name = idName poly_id
-       ; spec_name <- newLocalName poly_name
+    do { uniq <- newUnique
+       ; let poly_name = idName poly_id
+             spec_name = mkClonedInternalName uniq poly_name
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
