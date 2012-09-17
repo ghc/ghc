@@ -43,15 +43,15 @@ import Name        ( Name, nameOccName )
 import Outputable
 import FastString
 import StaticFlags ( opt_SimplExcessPrecision )
-import Constants
 import BasicTypes
 import DynFlags
+import Platform
 import Util
 
 import Control.Monad
 import Data.Bits as Bits
-import Data.Int    ( Int64 )
-import Data.Word   ( Word, Word64 )
+import Data.Int
+import Data.Word
 \end{code}
 
 
@@ -424,12 +424,18 @@ isMaxBound _              = False
 -- would yield a warning. Instead we simply squash the value into the
 -- *target* Int/Word range.
 intResult :: DynFlags -> Integer -> Maybe CoreExpr
-intResult dflags result
-  = Just (mkIntVal dflags (toInteger (fromInteger result :: TargetInt)))
+intResult dflags result = Just (mkIntVal dflags result')
+    where result' = case platformWordSize (targetPlatform dflags) of
+                    4 -> toInteger (fromInteger result :: Int32)
+                    8 -> toInteger (fromInteger result :: Int64)
+                    w -> panic ("intResult: Unknown platformWordSize: " ++ show w)
 
 wordResult :: DynFlags -> Integer -> Maybe CoreExpr
-wordResult dflags result
-  = Just (mkWordVal dflags (toInteger (fromInteger result :: TargetWord)))
+wordResult dflags result = Just (mkWordVal dflags result')
+    where result' = case platformWordSize (targetPlatform dflags) of
+                    4 -> toInteger (fromInteger result :: Word32)
+                    8 -> toInteger (fromInteger result :: Word64)
+                    w -> panic ("wordResult: Unknown platformWordSize: " ++ show w)
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
 inversePrimOp primop = do

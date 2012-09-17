@@ -1,5 +1,4 @@
 
-import Data.Word
 import Data.Int
 
 -- This magical #include brings in all the everybody-knows-these magic
@@ -35,18 +34,6 @@ mAX_CONTEXT_REDUCTION_DEPTH = 200
 
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
-
--- Define a fixed-range integral type equivalent to the target Int/Word
-
-#if SIZEOF_HSWORD == 4
-type TargetInt  = Int32
-type TargetWord = Word32
-#elif SIZEOF_HSWORD == 8
-type TargetInt  = Int64
-type TargetWord = Word64
-#else
-#error unknown SIZEOF_HSWORD
-#endif
 
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff
