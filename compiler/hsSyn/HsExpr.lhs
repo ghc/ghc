@@ -294,6 +294,7 @@ data HsExpr id
 
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
+  |  HsHole
   deriving (Data, Typeable)
 
 -- HsTupArg is used for tuple sections
@@ -559,6 +560,8 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <> ptext (sLit "|)"))
+ppr_expr HsHole
+  = ptext $ sLit "_"
 
 pprCmdArg :: OutputableBndr id => HsCmdTop id -> SDoc
 pprCmdArg (HsCmdTop cmd@(L _ (HsArrForm _ Nothing [])) _ _ _)

@@ -439,10 +439,8 @@ newImplication skol_info skol_tvs given thing_inside
             return (emptyTcEvBinds, result)
          else do
        { ev_binds_var <- newTcEvBinds
-       ; lcl_env <- getLclTypeEnv
        ; loc <- getCtLoc skol_info
        ; emitImplication $ Implic { ic_untch = untch
-             		     	  , ic_env = lcl_env
              		     	  , ic_skols = skol_tvs
                                   , ic_fsks  = []
                              	  , ic_given = given

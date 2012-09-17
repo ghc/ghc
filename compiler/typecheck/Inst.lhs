@@ -356,14 +356,14 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 
 syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
-syntaxNameCtxt name orig ty tidy_env = do
-    inst_loc <- getCtLoc orig
-    let
-	msg = vcat [ptext (sLit "When checking that") <+> quotes (ppr name) <+> 
-				ptext (sLit "(needed by a syntactic construct)"),
-		    nest 2 (ptext (sLit "has the required type:") <+> ppr (tidyType tidy_env ty)),
-		    nest 2 (pprArisingAt inst_loc)]
-    return (tidy_env, msg)
+syntaxNameCtxt name orig ty tidy_env
+  = do { inst_loc <- getCtLoc orig
+       ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
+			  <+> ptext (sLit "(needed by a syntactic construct)")
+		        , nest 2 (ptext (sLit "has the required type:")
+                                  <+> ppr (tidyType tidy_env ty))
+		        , nest 2 (pprArisingAt inst_loc) ]
+       ; return (tidy_env, msg) }
 \end{code}
 
 
@@ -523,6 +523,7 @@ tyVarsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (tyVarsOf
 tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
 tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
+tyVarsOfCt (CHoleCan { cc_hole_ty = ty })               = tyVarsOfType ty
 tyVarsOfCt (CNonCanonical { cc_ev = fl })               = tyVarsOfType (ctEvPred fl)
 
 tyVarsOfCts :: Cts -> TcTyVarSet
@@ -551,8 +552,10 @@ tidyCt :: TidyEnv -> Ct -> Ct
 -- Used only in error reporting
 -- Also converts it to non-canonical
 tidyCt env ct 
-  = CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
-                  , cc_depth  = cc_depth ct } 
+  = case ct of
+     CHoleCan {} -> ct { cc_ev = tidy_flavor env (cc_ev ct) }
+     _ -> CNonCanonical { cc_ev = tidy_flavor env (cc_ev ct)
+                        , cc_depth  = cc_depth ct }
   where 
     tidy_flavor :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evtm/var field because we don't 
@@ -569,8 +572,8 @@ tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
 tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
-tidyGivenLoc env (CtLoc skol span ctxt) 
-  = CtLoc (tidySkolemInfo env skol) span ctxt
+tidyGivenLoc env (CtLoc skol lcl) 
+  = CtLoc (tidySkolemInfo env skol) lcl
 
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
 tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
@@ -635,8 +638,8 @@ substFlavor subst ctev@(CtDerived { ctev_pred = pty })
   = ctev { ctev_pred = substTy subst pty }
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
-substGivenLoc subst (CtLoc skol span ctxt) 
-  = CtLoc (substSkolemInfo subst skol) span ctxt
+substGivenLoc subst (CtLoc skol lcl) 
+  = CtLoc (substSkolemInfo subst skol) lcl
 
 substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
 substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)

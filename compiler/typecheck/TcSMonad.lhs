@@ -22,7 +22,7 @@ module TcSMonad (
     updTcSImplics, 
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts, 
-    emitFrozenError,
+    emitInsoluble,
 
     isWanted, isDerived, 
     isGivenCt, isWantedCt, isDerivedCt, pprFlavorArising,
@@ -88,7 +88,6 @@ module TcSMonad (
 
     matchClass, matchFam, MatchInstResult (..), 
     checkWellStagedDFun, 
-    warnTcS,
     pprEq                                    -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the 
                                              -- instance matcher in TcSimplify. I am wondering
@@ -305,6 +304,9 @@ data CCanMap a
 
 keepGivenCMap :: CCanMap a -> CCanMap a
 keepGivenCMap cc = emptyCCanMap { cts_given = cts_given cc }
+
+instance Outputable (CCanMap a) where
+  ppr (CCanMap given derived wanted) = ptext (sLit "CCanMap") <+> (ppr given) <+> (ppr derived) <+> (ppr wanted)
 
 cCanMapToBag :: CCanMap a -> Cts 
 cCanMapToBag cmap = foldUFM unionBags rest_wder (cts_given cmap)
@@ -592,8 +594,6 @@ insertInertItem :: Ct -> InertSet -> InertSet
 -- Add a new inert element to the inert set. 
 insertInertItem item is
   = -- A canonical Given, Wanted, or Derived
-    ASSERT2( not (isCNonCanonical item), ppr item )
-        -- Can't be CNonCanonical, because they only land in inert_insols
     is { inert_cans = upd_inert_cans (inert_cans is) item }
   
   where upd_inert_cans :: InertCans -> Ct -> InertCans
@@ -626,7 +626,9 @@ insertInertItem item is
                                          (unFamHeadMap $ inert_funeqs ics)) }
           | otherwise
           = pprPanic "upd_inert set: can't happen! Inserting " $ 
-            ppr item 
+            ppr item   -- Can't be CNonCanonical, CHoleCan, 
+                       -- because they only land in inert_insols
+
 
 insertInertItemTcS :: Ct -> TcS ()
 -- Add a new item in the inerts of the monad
@@ -812,6 +814,10 @@ extractRelevantInerts wi
             = (emptyCts, ics)
             where
               fam_head = mkTyConApp (cc_fun ct) (cc_tyargs ct)
+
+        extract_ics_relevants (CHoleCan {}) ics
+            = pprPanic "extractRelevantInerts" (ppr wi)
+              -- Holes are put straight into inert_frozen, so never get here
 
         extract_ics_relevants (CIrredEvCan { }) ics = 
             let cts = inert_irreds ics 
@@ -1138,21 +1144,20 @@ updTcSImplics f
       ; wrapTcS $ do { implics <- TcM.readTcRef impl_ref
                      ; TcM.writeTcRef impl_ref (f implics) } }
 
-emitFrozenError :: CtEvidence -> SubGoalDepth -> TcS ()
+emitInsoluble :: Ct -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts. 
-emitFrozenError fl depth 
-  = do { traceTcS "Emit frozen error" (ppr (ctEvPred fl))
+emitInsoluble ct
+  = do { traceTcS "Emit insoluble" (ppr ct)
        ; updInertTcS add_insol }
   where
     add_insol is@(IS { inert_cans = ics@(IC { inert_insols = old_insols }) })
       | already_there = is
-      | otherwise     = is { inert_cans = ics { inert_insols = extendCts old_insols insol_ct } }
+      | otherwise     = is { inert_cans = ics { inert_insols = extendCts old_insols ct } }
       where
-        already_there = not (isWanted fl) && anyBag (eqType this_pred . ctPred) old_insols
+        already_there = not (isWantedCt ct) && anyBag (eqType this_pred . ctPred) old_insols
 	     -- See Note [Do not add duplicate derived insolubles]
 
-    insol_ct = CNonCanonical { cc_ev = fl, cc_depth = depth } 
-    this_pred = ctEvPred fl
+    this_pred = ctPred ct
 
 getTcSImplicsRef :: TcS (IORef (Bag Implication))
 getTcSImplicsRef = TcS (return . tcs_implics) 
@@ -1195,11 +1200,6 @@ setWantedTyBind tv ty
 \end{code}
 
 \begin{code}
-warnTcS :: CtLoc orig -> Bool -> SDoc -> TcS ()
-warnTcS loc warn_if doc 
-  | warn_if   = wrapTcS $ TcM.setCtLoc loc $ TcM.addWarnTc doc
-  | otherwise = return ()
-
 getDefaultInfo ::  TcS ([Type], (Bool, Bool))
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
@@ -1613,13 +1613,11 @@ deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
                                      new_ct = mkNonCanonical ctev
               			     new_co = evTermCoercion (ctEvTerm ctev)
                                      new_untch = pushUntouchables untch
-                               ; lcl_env <- wrapTcS $ TcM.getLclTypeEnv
                                ; loc <- wrapTcS $ TcM.getCtLoc skol_info
                                ; let wc = WC { wc_flat  = singleCt new_ct 
                                              , wc_impl  = emptyBag
                                              , wc_insol = emptyCts }
                                      imp = Implic { ic_untch  = new_untch
-                                                  , ic_env    = lcl_env
                                                   , ic_skols  = skol_tvs
                                                   , ic_fsks   = []
                                                   , ic_given  = []

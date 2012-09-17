@@ -725,12 +725,14 @@ zonkWC function an evidence variable to collect all the extra
 variables.
 
 \begin{code}
-
 zonkCt :: Ct -> TcM Ct
 zonkCt ct
-  = do { fl' <- zonkCtEvidence (cc_ev ct)
-       ; return (CNonCanonical { cc_ev = fl'
-                               , cc_depth = cc_depth ct }) }
+  | isHoleCt ct = do { fl' <- zonkCtEvidence (cc_ev ct)
+                     ; return $ ct { cc_ev = fl' } }
+  | otherwise   = do { fl' <- zonkCtEvidence (cc_ev ct)
+                     ; return $
+                         CNonCanonical { cc_ev = fl'
+                                       , cc_depth = cc_depth ct } }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
 zonkCtEvidence ctev@(CtGiven { ctev_gloc = loc, ctev_pred = pred }) 
@@ -746,9 +748,9 @@ zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
 
 zonkGivenLoc :: GivenLoc -> TcM GivenLoc
 -- GivenLocs may have unification variables inside them!
-zonkGivenLoc (CtLoc skol_info span ctxt)
+zonkGivenLoc (CtLoc skol_info lcl)
   = do { skol_info' <- zonkSkolemInfo skol_info
-       ; return (CtLoc skol_info' span ctxt) }
+       ; return (CtLoc skol_info' lcl) }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
 zonkSkolemInfo (SigSkol cx ty)  = do { ty' <- zonkTcType ty

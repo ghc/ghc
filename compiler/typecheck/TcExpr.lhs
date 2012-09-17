@@ -231,6 +231,15 @@ tcExpr (HsType ty) _
 	-- so it's not enabled yet.
 	-- Can't eliminate it altogether from the parser, because the
 	-- same parser parses *patterns*.
+tcExpr HsHole res_ty
+  = do { ty <- newFlexiTyVarTy liftedTypeKind
+      ; traceTc "tcExpr.HsHole" (ppr ty)
+      ; ev <- mkSysLocalM (mkFastString "_") ty
+      ; loc <- getCtLoc HoleOrigin
+      ; let can = CHoleCan { cc_ev = CtWanted loc ty ev, cc_hole_ty = ty, cc_depth = 0 }
+      ; traceTc "tcExpr.HsHole emitting" (ppr can)
+      ; emitInsoluble can
+      ; tcWrapResult (HsVar ev) ty res_ty }
 \end{code}
 
 

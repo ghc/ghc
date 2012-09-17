@@ -54,7 +54,8 @@ module Type (
 	isDictLikeTy,
         mkEqPred, mkPrimEqPred,
         mkClassPred,
-        noParenPred, isClassPred, isEqPred, isIPPred, isIPPred_maybe,
+        noParenPred, isClassPred, isEqPred, 
+        isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
         
         -- Deconstructing predicate types
         PredTree(..), predTreePredType, classifyPredType,
@@ -152,7 +153,7 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, mkBoxedTupleTy )
-import PrelNames	         ( eqTyConKey, ipClassName )
+import PrelNames	         ( eqTyConKey, ipClassNameKey )
 
 -- others
 import Unique		( Unique, hasKey )
@@ -857,13 +858,20 @@ isEqPred ty = case tyConAppTyCon_maybe ty of
     _          -> False
 
 isIPPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon -> tyConName tyCon == ipClassName
-    _          -> False
+    Just tc -> isIPTyCon tc
+    _       -> False
+
+isIPTyCon :: TyCon -> Bool
+isIPTyCon tc = tc `hasKey` ipClassNameKey
+
+isIPClass :: Class -> Bool
+isIPClass cls = cls `hasKey` ipClassNameKey
+  -- Class and it corresponding TyCon have the same Unique
 
 isIPPred_maybe :: Type -> Maybe (FastString, Type)
 isIPPred_maybe ty =
   do (tc,[t1,t2]) <- splitTyConApp_maybe ty
-     guard (tyConName tc == ipClassName)
+     guard (isIPTyCon tc)
      x <- isStrLitTy t1
      return (x,t2)
 \end{code}

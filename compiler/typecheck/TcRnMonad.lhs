@@ -146,6 +146,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_th_ctxt    = topStage,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_bndrs      = [],
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
@@ -366,21 +367,19 @@ newUniqueSupply
         writeMutVar u_var us1 ;
         return us2 }}}
 
-newLocalName :: Name -> TcRnIf gbl lcl Name
-newLocalName name       -- Make a clone
-  = do  { uniq <- newUnique
-        ; return (mkInternalName uniq (nameOccName name) (getSrcSpan name)) }
-
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
-newSysLocalIds fs tys
-  = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+newLocalName :: Name -> TcM Name
+newLocalName name = newName (nameOccName name)
 
 newName :: OccName -> TcM Name
 newName occ
   = do { uniq <- newUnique
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
+
+newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds fs tys
+  = do  { us <- newUniqueSupply
+        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -818,12 +817,15 @@ popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
 getCtLoc :: orig -> TcM (CtLoc orig)
 getCtLoc origin
-  = do { loc <- getSrcSpanM ; env <- getLclEnv ;
-         return (CtLoc origin loc (tcl_ctxt env)) }
+  = do { env <- getLclEnv ; return (CtLoc origin env) }
 
 setCtLoc :: CtLoc orig -> TcM a -> TcM a
-setCtLoc (CtLoc _ src_loc ctxt) thing_inside
-  = setSrcSpan src_loc (setErrCtxt ctxt thing_inside)
+-- Set the SrcSpan and error context from the CtLoc
+setCtLoc (CtLoc _ lcl) thing_inside
+  = updLclEnv (\env -> env { tcl_loc = tcl_loc lcl
+                           , tcl_bndrs = tcl_bndrs lcl
+                           , tcl_ctxt = tcl_ctxt lcl }) 
+              thing_inside
 \end{code}
 
 %************************************************************************
@@ -1023,6 +1025,13 @@ emitImplications :: Bag Implication -> TcM ()
 emitImplications ct
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addImplics` ct) }
+
+emitInsoluble :: Ct -> TcM ()
+emitInsoluble ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addInsols` unitBag ct) ;
+         v <- readTcRef lie_var ;
+         traceTc "emitInsoluble" (ppr v) }
 
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates

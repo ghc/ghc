@@ -39,11 +39,9 @@ import PrelInfo
 import PrelNames
 import Class		( classKey )
 import BasicTypes       ( RuleName )
-import Control.Monad    ( when )
 import Outputable
 import FastString
 import TrieMap () -- DV: for now
-import DynFlags
 \end{code}
 
 
@@ -67,9 +65,7 @@ simplifyTop wanteds
        ; traceTc "End simplifyTop }" empty
 
        ; traceTc "reportUnsolved {" empty
-                 -- See Note [Deferring coercion errors to runtime]
-       ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
-       ; binds2 <- reportUnsolved runtimeCoercionErrors zonked_final_wc
+       ; binds2 <- reportUnsolved zonked_final_wc
        ; traceTc "reportUnsolved }" empty
          
        ; return (binds1 `unionBags` binds2) }
@@ -162,11 +158,10 @@ simplifyDefault theta
 
        ; traceTc "reportUnsolved {" empty
        -- See Note [Deferring coercion errors to runtime]
-       ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
+       ; reportAllUnsolved unsolved 
          -- Postcondition of solveWantedsTcM is that returned
          -- constraints are zonked. So Precondition of reportUnsolved
          -- is true.
-       ; _ <- reportUnsolved runtimeCoercionErrors unsolved 
        ; traceTc "reportUnsolved }" empty
 
        ; return () }
@@ -220,7 +215,7 @@ simplifyDeriv orig pred tvs theta
 
        -- We never want to defer these errors because they are errors in the
        -- compiler! Hence the `False` below
-       ; _ev_binds2 <- reportUnsolved False (residual_wanted { wc_flat = bad })
+       ; reportAllUnsolved (residual_wanted { wc_flat = bad })
 
        ; let min_theta = mkMinimalBySCs (bagToList good)
        ; return (substTheta subst_skol min_theta) }
@@ -343,17 +338,13 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; return (qtvs, [], False, emptyTcEvBinds) }
 
   | otherwise
-  = do { runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
-       ; gbl_tvs        <- tcGetGlobalTyVars
-       ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
+  = do { zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
 
        ; ev_binds_var <- newTcEvBinds
-                           
        ; traceTc "simplifyInfer {"  $ vcat
              [ ptext (sLit "names =") <+> ppr (map fst name_taus)
              , ptext (sLit "taus =") <+> ppr (map snd name_taus)
              , ptext (sLit "tau_tvs (zonked) =") <+> ppr zonked_tau_tvs
-             , ptext (sLit "gbl_tvs =") <+> ppr gbl_tvs
              , ptext (sLit "closed =") <+> ppr _top_lvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
              , ptext (sLit "(unzonked) wanted =") <+> ppr wanteds
@@ -377,11 +368,6 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                                solve_wanteds_and_drop
                                -- Post: wanted_transformed are zonked
 
-              -- Step 3) Fail fast if there is an insoluble constraint,
-              -- unless we are deferring errors to runtime
-       ; when (not runtimeCoercionErrors && insolubleWC wanted_transformed) $ 
-         do { _ev_binds <- reportUnsolved False wanted_transformed; failM }
-
               -- Step 4) Candidates for quantification are an approximation of wanted_transformed
               -- NB: Already the fixpoint of any unifications that may have happened                                
               -- NB: We do not do any defaulting when inferring a type, this can lead
@@ -393,18 +379,21 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
               -- care aout it
 
        ; (quant_pred_candidates, _extra_binds)   
-             <- runTcS $ do { let quant_candidates = approximateWC wanted_transformed
-                            ; traceTcS "simplifyWithApprox" $
-                              text "quant_candidates = " <+> ppr quant_candidates
-                            ; promoteTyVars quant_candidates
-                            ; _implics <- solveInteract quant_candidates
-                            ; (flats, _insols) <- getInertUnsolved
-                            -- NB: Dimitrios is slightly worried that we will get
-                            -- family equalities (F Int ~ alpha) in the quantification
-                            -- candidates, as we have performed no further unflattening
-                            -- at this point. Nothing bad, but inferred contexts might
-                            -- look complicated.
-                            ; return (map ctPred $ filter isWantedCt (bagToList flats)) }
+             <- if insolubleWC wanted_transformed 
+                then return ([], emptyBag)   -- See Note [Quantification with errors]
+                else runTcS $ 
+                do { let quant_candidates = approximateWC wanted_transformed
+                   ; traceTcS "simplifyWithApprox" $
+                     text "quant_candidates = " <+> ppr quant_candidates
+                   ; promoteTyVars quant_candidates
+                   ; _implics <- solveInteract quant_candidates
+                   ; (flats, _insols) <- getInertUnsolved
+                   -- NB: Dimitrios is slightly worried that we will get
+                   -- family equalities (F Int ~ alpha) in the quantification
+                   -- candidates, as we have performed no further unflattening
+                   -- at this point. Nothing bad, but inferred contexts might
+                   -- look complicated.
+                   ; return (map ctPred $ filter isWantedCt (bagToList flats)) }
 
              -- NB: quant_pred_candidates is already the fixpoint of any 
              --     unifications that may have happened
@@ -456,11 +445,9 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
             -- Step 7) Emit an implication
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
-       ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
        ; untch <- TcRnMonad.getUntouchables
        ; let implic = Implic { ic_untch    = pushUntouchables untch 
-                             , ic_env      = lcl_env
                              , ic_skols    = qtvs_to_return
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
                                                  -- hence no flatten-skolems (which come from givens)
@@ -482,6 +469,15 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                 , mr_bites,  TcEvBinds ev_binds_var) } }
 \end{code}
 
+Note [Quantification with errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we find that the RHS of the definition has some absolutely-insoluble
+constraints, we abandon all attempts to find a context to quantify
+over, and instead make the function fully-polymorphic in whatever
+type we have found.  For two reasons
+  a) Minimise downstream errors
+  b) Avoid spurious errors from this function
+   
 
 Note [Default while Inferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -846,6 +842,9 @@ floatEqualities skols can_given wanteds@(WC { wc_flat = flats })
          pred = ctPred ct
 
 promoteTyVars :: Cts -> TcS ()
+-- When we float a constraint out of an implication we
+-- must restore (MetaTvInv) in Note [Untouchable type variables]
+-- in TcType
 promoteTyVars cts
   = do { untch <- TcSMonad.getUntouchables
        ; mapM_ (promote_tv untch) (varSetElems (tyVarsOfCts cts)) }
@@ -938,10 +937,15 @@ Consequence: classes with functional dependencies don't matter (since there is
 no evidence for a fundep equality), but equality superclasses do matter (since 
 they carry evidence).
 
-Notice that, due to Note [Extra TcSTv Untouchables], the free unification variables 
-of an equality that is floated out of an implication become effectively untouchables
-for the leftover implication. This is absolutely necessary. Consider the following 
-example. We start with two implications and a class with a functional dependency. 
+Note [Promoting unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we float an equality out of an implication we must "promote" free
+unification variables of the equality, in order to maintain Invariant
+(MetaTvInv) from Note [Untouchable type variables] in TcType.  for the
+leftover implication.
+
+This is absolutely necessary. Consider the following example. We start
+with two implications and a class with a functional dependency.
 
     class C x y | x -> y
     instance C [a] [a]
@@ -975,40 +979,6 @@ beta! Concrete example is in indexed_types/should_fail/ExtraTcsUntch.hs:
             g2 z = case z of TEx y -> (h [[undefined]], op x [y])
         in (g1 '3', g2 undefined)
 
-Note [Extra TcsTv untouchables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Whenever we are solving a bunch of flat constraints, they may contain 
-the following sorts of 'touchable' unification variables:
-   
-   (i)   Born-touchables in that scope
- 
-   (ii)  Simplifier-generated unification variables, such as unification 
-         flatten variables
-
-   (iii) Touchables that have been floated out from some nested 
-         implications, see Note [Float Equalities out of Implications]. 
-
-Now, once we are done with solving these flats and have to move inwards to 
-the nested implications (perhaps for a second time), we must consider all the
-extra variables (categories (ii) and (iii) above) as untouchables for the 
-implication. Otherwise we have the danger or double unifications, as well
-as the danger of not ``seeing'' some unification. Example (from Trac #4494):
-
-   (F Int ~ uf)  /\  [untch=beta](forall a. C a => F Int ~ beta) 
-
-In this example, beta is touchable inside the implication. The 
-first solveInteract step leaves 'uf' ununified. Then we move inside 
-the implication where a new constraint
-       uf  ~  beta  
-emerges. We may spontaneously solve it to get uf := beta, so the whole
-implication disappears but when we pop out again we are left with (F
-Int ~ uf) which will be unified by our final solveCTyFunEqs stage and
-uf will get unified *once more* to (F Int).
-
-The solution is to record the unification variables of the flats, 
-and make them untouchables for the nested implication. In the 
-example above uf would become untouchable, so beta would be forced 
-to be unified as beta := uf.
 
 
 Note [Solving Family Equations] 

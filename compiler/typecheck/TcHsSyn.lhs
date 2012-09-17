@@ -713,6 +713,9 @@ zonkExpr env (HsWrap co_fn expr)
     zonkExpr env1 expr	`thenM` \ new_expr ->
     return (HsWrap new_co_fn new_expr)
 
+zonkExpr _ HsHole
+  = return HsHole
+
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
 zonkCmdTop :: ZonkEnv -> LHsCmdTop TcId -> TcM (LHsCmdTop Id)
