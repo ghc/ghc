@@ -585,12 +585,8 @@ simplifyRule name lhs_wanted rhs_wanted
          (resid_wanted, _) <- solveWantedsTcM (lhs_wanted `andWC` rhs_wanted)
                               -- Post: these are zonked and unflattened
 
-       -- Dimitrios would be happy if we could avoid this zonking here. But
-       -- I am afraid that if we do not zonk, we will quantify over the wrong things.
-       ; _ev_binds_var <- newTcEvBinds 
-       ; zonked_lhs <- zonkWC _ev_binds_var lhs_wanted -- Don't care about binds
-
-       ; let (q_cts, non_q_cts) = partitionBag quantify_me (wc_flat zonked_lhs)
+       ; zonked_lhs_flats <- zonkCts (wc_flat lhs_wanted)
+       ; let (q_cts, non_q_cts) = partitionBag quantify_me zonked_lhs_flats
              quantify_me  -- Note [RULE quantification over equalities]
                | insolubleWC resid_wanted = quantify_insol
                | otherwise                = quantify_normal
@@ -605,11 +601,11 @@ simplifyRule name lhs_wanted rhs_wanted
              
        ; traceTc "simplifyRule" $
          vcat [ ptext (sLit "LHS of rule") <+> doubleQuotes (ftext name)
-              , text "zonked_lhs" <+> ppr zonked_lhs 
+              , text "zonked_lhs_flats" <+> ppr zonked_lhs_flats 
               , text "q_cts"      <+> ppr q_cts ]
 
        ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
-                , zonked_lhs { wc_flat = non_q_cts }) }
+                , lhs_wanted { wc_flat = non_q_cts }) }
 \end{code}
 
 
@@ -656,6 +652,16 @@ in TcErrors (with ErrEnv). TcErrors.reportTidyWanteds does not print the errors
 and does not fail if -fwarn-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
 
+Note [Zonk after solving]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We zonk the result immediately after constraint solving, for two reasons:
+
+a) because zonkWC generates evidence, and this is the moment when we
+   have a suitable evidence variable to hand.
+
+Note that *after* solving the constraints are typically small, so the
+overhead is not great.
+
 \begin{code}
 solveWantedsTcMWithEvBinds :: EvBindsVar
                            -> WantedConstraints
@@ -671,6 +677,7 @@ solveWantedsTcMWithEvBinds ev_binds_var wc tcs_action
   = do { traceTc "solveWantedsTcMWithEvBinds" $ text "wanted=" <+> ppr wc
        ; wc2 <- runTcSWithEvBinds ev_binds_var (tcs_action wc)
        ; zonkWC ev_binds_var wc2 }
+         -- See Note [Zonk after solving]
 
 solveWantedsTcM :: WantedConstraints -> TcM (WantedConstraints, Bag EvBind)
 -- Zonk the input constraints, and simplify them
@@ -796,6 +803,9 @@ solveImplication inerts
             <- nestImplicTcS ev_binds untch inerts $
                do { solveInteractGiven (mkGivenLoc info env) old_fsks givens 
                   ; residual_wanted <- solve_wanteds wanteds
+                        -- solve_wanteds, *not* solve_wanteds_and_drop, because
+                        -- we want to retain derived equalities so we can float
+                        -- them out in floatEqualities
                   ; more_fsks <- getFlattenSkols
                   ; return (more_fsks ++ old_fsks, residual_wanted) }
 
@@ -1006,7 +1016,7 @@ When is it ok to do so?
     3) Notice that 'beta' can't be bound in ty binds already because we rewrite RHS 
        of type family equations. See Inert Set invariants in TcInteract.
 
-This solving is now happening during zonking, see Note [Unflattening during zonking]
+This solving is now happening during zonking, see Note [Unflattening while zonking]
 in TcMType.
 
 
