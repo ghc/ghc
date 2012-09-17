@@ -346,8 +346,7 @@ specGenVars x (Pair x_l x_r) = do
     Pair mb_hb_l mb_hb_r <- flip fmap get $ \s -> liftA2 (\x_lr lr_s -> M.lookup x_lr (msgLRAvailableHeap lr_s)) (Pair x_l x_r) (msgLR s)
     sucks <- liftA2 Pair (suck' pFst x_l) (suck' pSnd x_r)
     let hb_r_gen = maybe False heapBindingGeneralised mb_hb_r
-        gen = do modify_ $ \s -> s { msgCommonHeap = M.delete x (msgCommonHeap s) }
-                 genVars' x hb_r_gen (Pair x_l x_r)
+        gen = do genVars' x hb_r_gen (Pair x_l x_r)
                  Foldable.sequenceA_ sucks
     case (mb_hb_l, mb_hb_r) of
       (Just hb_l, Just hb_r)
@@ -1148,12 +1147,12 @@ initStack xs i (Car kf_l k_l) (Car kf_r k_r) = do
         (x, mx) <- msgPendStackBinder x_looped x_l x_r
         return (xs', Just (x, Pair x_l x_r), Just mx)
       _ -> return (xs, Nothing, Nothing)
-    let suck = initStackFrame i mb_x kf_l kf_r
+    let suck = initSuckStackFrame i mb_x kf_l kf_r
     liftM (\(mxs, k_lrs, sucks) -> (maybe id (:) mb_mx mxs, liftA2 (\kf_lr (k_avail_lr, k_lr) -> (kf_lr `Car` k_avail_lr, k_lr)) (Pair kf_l kf_r) k_lrs, IM.insert i suck sucks)) $ initStack xs (i + 1) k_l k_r
 initStack _ _ k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_r) (Loco (stackGeneralised k_r), k_r), IM.empty)
 
-initStackFrame :: Int -> Maybe (Var {- partial loop -}, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
-initStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
+initSuckStackFrame :: Int -> Maybe (Var {- partial loop -}, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
+initSuckStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
     -- First things first, ensure we can't make a reentrant attempt to suck this stack frame
     modify_ $ \s -> s { msgSuckStack = IM.delete i (msgSuckStack s) }
     -- Rename the common update binder, if any
@@ -1170,7 +1169,7 @@ initStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
                       -- Otherwise, we must still be in the process of MSGing the stack, so let's remove the
                       -- sucked frame from the available frames (again, it must be at the end):
                       avail_ks@(Pair (Car _ _) (Car _ _)) -> s { msgLR = liftA2 (\avail_k_lr s_lr -> s_lr { msgLRAvailableStack = trainInit (\_ _ -> True) avail_k_lr }) avail_ks (msgLR s) }
-                      _ -> panic "initStackFrame: available stack not paired"
+                      _ -> panic "initSuckStackFrame: available stack not paired"
     -- .. and add the frame to the individual stack
     modify_ $ \s -> s { msgLR = liftA2 (\kf_lr s_lr -> s_lr { msgLRStack = kf_lr `Car` msgLRStack s_lr }) (Pair (Tagged tg_l kf_l) (Tagged tg_r kf_r)) (msgLR s) }
     -- Ensure that all FVs of the newly-individualised frame are bound
