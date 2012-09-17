@@ -42,6 +42,7 @@ import Data.Ratio
 import MonadUtils
 import Outputable
 import BasicTypes
+import DynFlags
 import Util
 import FastString
 \end{code}
@@ -81,7 +82,8 @@ dsLit (HsDoublePrim d) = return (Lit (MachDouble (fl_value d)))
 dsLit (HsChar c)       = return (mkCharExpr c)
 dsLit (HsString str)   = mkStringExprFS str
 dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)	       = return (mkIntExpr i)
+dsLit (HsInt i)        = do dflags <- getDynFlags
+                            return (mkIntExpr dflags i)
 
 dsLit (HsRat r ty) = do
    num   <- mkIntegerExpr (numerator (fl_value r))
@@ -95,12 +97,16 @@ dsLit (HsRat r ty) = do
                 x -> pprPanic "dsLit" (ppr x)
 
 dsOverLit :: HsOverLit Id -> DsM CoreExpr
+dsOverLit lit = do dflags <- getDynFlags
+                   dsOverLit' dflags lit
+
+dsOverLit' :: DynFlags -> HsOverLit Id -> DsM CoreExpr
 -- Post-typechecker, the SyntaxExpr field of an OverLit contains 
 -- (an expression for) the literal value itself
-dsOverLit (OverLit { ol_val = val, ol_rebindable = rebindable 
-		   , ol_witness = witness, ol_type = ty })
+dsOverLit' dflags (OverLit { ol_val = val, ol_rebindable = rebindable
+                           , ol_witness = witness, ol_type = ty })
   | not rebindable
-  , Just expr <- shortCutLit val ty = dsExpr expr	-- Note [Literal short cut]
+  , Just expr <- shortCutLit dflags val ty = dsExpr expr	-- Note [Literal short cut]
   | otherwise			    = dsExpr witness
 \end{code}
 
@@ -113,22 +119,22 @@ much better do do so.
 
 
 \begin{code}
-hsLitKey :: HsLit -> Literal
+hsLitKey :: DynFlags -> HsLit -> Literal
 -- Get a Core literal to use (only) a grouping key
 -- Hence its type doesn't need to match the type of the original literal
 --	(and doesn't for strings)
 -- It only works for primitive types and strings; 
 -- others have been removed by tidy
-hsLitKey (HsIntPrim     i) = mkMachInt  i
-hsLitKey (HsWordPrim    w) = mkMachWord w
-hsLitKey (HsInt64Prim   i) = mkMachInt64  i
-hsLitKey (HsWord64Prim  w) = mkMachWord64 w
-hsLitKey (HsCharPrim    c) = MachChar   c
-hsLitKey (HsStringPrim  s) = MachStr    s
-hsLitKey (HsFloatPrim   f) = MachFloat  (fl_value f)
-hsLitKey (HsDoublePrim  d) = MachDouble (fl_value d)
-hsLitKey (HsString s)      = MachStr    (fastStringToFastBytes s)
-hsLitKey l                 = pprPanic "hsLitKey" (ppr l)
+hsLitKey dflags (HsIntPrim     i) = mkMachInt  dflags i
+hsLitKey dflags (HsWordPrim    w) = mkMachWord dflags w
+hsLitKey _      (HsInt64Prim   i) = mkMachInt64  i
+hsLitKey _      (HsWord64Prim  w) = mkMachWord64 w
+hsLitKey _      (HsCharPrim    c) = MachChar   c
+hsLitKey _      (HsStringPrim  s) = MachStr    s
+hsLitKey _      (HsFloatPrim   f) = MachFloat  (fl_value f)
+hsLitKey _      (HsDoublePrim  d) = MachDouble (fl_value d)
+hsLitKey _      (HsString s)      = MachStr    (fastStringToFastBytes s)
+hsLitKey _      l                 = pprPanic "hsLitKey" (ppr l)
 
 hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
@@ -247,9 +253,10 @@ matchLiterals (var:vars) ty sub_groups
   where
     match_group :: [EquationInfo] -> DsM (Literal, MatchResult)
     match_group eqns
-	= do { let LitPat hs_lit = firstPat (head eqns)
-	     ; match_result <- match vars ty (shiftEqns eqns)
-	     ; return (hsLitKey hs_lit, match_result) }
+        = do dflags <- getDynFlags
+             let LitPat hs_lit = firstPat (head eqns)
+             match_result <- match vars ty (shiftEqns eqns)
+             return (hsLitKey dflags hs_lit, match_result)
 
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
 	-- Equality check for string literals

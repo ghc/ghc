@@ -62,6 +62,7 @@ import Unique
 import BasicTypes
 import Outputable
 import Bag
+import DynFlags
 import FastString
 import ForeignCall
 import MonadUtils
@@ -798,7 +799,8 @@ repTy (HsTyLit lit) = do
 repTy ty		      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> DsM (Core TH.TyLitQ)
-repTyLit (HsNumTy i) = rep2 numTyLitName [mkIntExpr i]
+repTyLit (HsNumTy i) = do dflags <- getDynFlags
+                          rep2 numTyLitName [mkIntExpr dflags i]
 repTyLit (HsStrTy s) = do { s' <- mkStringExprFS s
                          ; rep2 strTyLitName [s']
                          }
@@ -1730,11 +1732,13 @@ repNamedTyCon (MkC s) = rep2 conTName [s]
 
 repTupleTyCon :: Int -> DsM (Core TH.TypeQ)
 -- Note: not Core Int; it's easier to be direct here
-repTupleTyCon i = rep2 tupleTName [mkIntExprInt i]
+repTupleTyCon i = do dflags <- getDynFlags
+                     rep2 tupleTName [mkIntExprInt dflags i]
 
 repUnboxedTupleTyCon :: Int -> DsM (Core TH.TypeQ)
 -- Note: not Core Int; it's easier to be direct here
-repUnboxedTupleTyCon i = rep2 unboxedTupleTName [mkIntExprInt i]
+repUnboxedTupleTyCon i = do dflags <- getDynFlags
+                            rep2 unboxedTupleTName [mkIntExprInt dflags i]
 
 repArrowTyCon :: DsM (Core TH.TypeQ)
 repArrowTyCon = rep2 arrowTName []
@@ -1746,7 +1750,8 @@ repPromotedTyCon :: Core TH.Name -> DsM (Core TH.TypeQ)
 repPromotedTyCon (MkC s) = rep2 promotedTName [s]
 
 repPromotedTupleTyCon :: Int -> DsM (Core TH.TypeQ)
-repPromotedTupleTyCon i = rep2 promotedTupleTName [mkIntExprInt i]
+repPromotedTupleTyCon i = do dflags <- getDynFlags
+                             rep2 promotedTupleTName [mkIntExprInt dflags i]
 
 repPromotedNilTyCon :: DsM (Core TH.TypeQ)
 repPromotedNilTyCon = rep2 promotedNilTName []
@@ -1769,7 +1774,8 @@ repKCon :: Core TH.Name -> DsM (Core TH.Kind)
 repKCon (MkC s) = rep2 conKName [s]
 
 repKTuple :: Int -> DsM (Core TH.Kind)
-repKTuple i = rep2 tupleKName [mkIntExprInt i]
+repKTuple i = do dflags <- getDynFlags
+                 rep2 tupleKName [mkIntExprInt dflags i]
 
 repKArrow :: DsM (Core TH.Kind)
 repKArrow = rep2 arrowKName []
@@ -1878,7 +1884,8 @@ coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 ------------ Literals & Variables -------------------
 
 coreIntLit :: Int -> DsM (Core Int)
-coreIntLit i = return (MkC (mkIntExprInt i))
+coreIntLit i = do dflags <- getDynFlags
+                  return (MkC (mkIntExprInt dflags i))
 
 coreVar :: Id -> Core TH.Name	-- The Id has type Name
 coreVar id = MkC (Var id)

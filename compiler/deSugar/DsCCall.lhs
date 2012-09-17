@@ -149,11 +149,12 @@ unboxArg arg
   -- Booleans
   | Just tc <- tyConAppTyCon_maybe arg_ty, 
     tc `hasKey` boolTyConKey
-  = do prim_arg <- newSysLocalDs intPrimTy
+  = do dflags <- getDynFlags
+       prim_arg <- newSysLocalDs intPrimTy
        return (Var prim_arg,
               \ body -> Case (mkWildCase arg arg_ty intPrimTy
-                                       [(DataAlt falseDataCon,[],mkIntLit 0),
-                                        (DataAlt trueDataCon, [],mkIntLit 1)])
+                                       [(DataAlt falseDataCon,[],mkIntLit dflags 0),
+                                        (DataAlt trueDataCon, [],mkIntLit dflags 1)])
                                         -- In increasing tag order!
                              prim_arg
                              (exprType body) 
@@ -335,11 +336,13 @@ resultWrapper result_ty
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
-  = return
+  = do
+    dflags <- getDynFlags
+    return
      (Just intPrimTy, \e -> mkWildCase e intPrimTy
                                    boolTy
-                                   [(DEFAULT             ,[],Var trueDataConId ),
-                                    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
+                                   [(DEFAULT                    ,[],Var trueDataConId ),
+                                    (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
   | Just (rep_ty, co) <- splitNewTypeRepCo_maybe result_ty

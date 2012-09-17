@@ -1118,23 +1118,23 @@ mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
-mkIntLit      :: Integer -> Expr b
+mkIntLit      :: DynFlags -> Integer -> Expr b
 -- | Create a machine integer literal expression of type @Int#@ from an @Int@.
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
-mkIntLitInt   :: Int     -> Expr b
+mkIntLitInt   :: DynFlags -> Int     -> Expr b
 
-mkIntLit    n = Lit (mkMachInt n)
-mkIntLitInt n = Lit (mkMachInt (toInteger n))
+mkIntLit    dflags n = Lit (mkMachInt dflags n)
+mkIntLitInt dflags n = Lit (mkMachInt dflags (toInteger n))
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
-mkWordLit     :: Integer -> Expr b
+mkWordLit     :: DynFlags -> Integer -> Expr b
 -- | Create a machine word literal expression of type  @Word#@ from a @Word@.
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
-mkWordLitWord :: Word -> Expr b
+mkWordLitWord :: DynFlags -> Word -> Expr b
 
-mkWordLit     w = Lit (mkMachWord w)
-mkWordLitWord w = Lit (mkMachWord (toInteger w))
+mkWordLit     dflags w = Lit (mkMachWord dflags w)
+mkWordLitWord dflags w = Lit (mkMachWord dflags (toInteger w))
 
 mkWord64LitWord64 :: Word64 -> Expr b
 mkWord64LitWord64 w = Lit (mkMachWord64 (toInteger w))

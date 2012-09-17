@@ -48,11 +48,6 @@ type TargetWord = Word64
 #error unknown SIZEOF_HSWORD
 #endif
 
-tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: Integer
-tARGET_MIN_INT  = fromIntegral (minBound :: TargetInt)
-tARGET_MAX_INT  = fromIntegral (maxBound :: TargetInt)
-tARGET_MAX_WORD = fromIntegral (maxBound :: TargetWord)
-
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff
 

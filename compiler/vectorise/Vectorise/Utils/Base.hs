@@ -37,6 +37,7 @@ import Type
 import TyCon
 import DataCon
 import MkId
+import DynFlags
 import FastString
 
 -- Simple Types ---------------------------------------------------------------
@@ -58,8 +59,8 @@ newLocalVVar fs vty
 
 -- Constructors ---------------------------------------------------------------
 
-mkDataConTag :: DataCon -> CoreExpr
-mkDataConTag = mkIntLitInt . dataConTagZ
+mkDataConTag :: DynFlags -> DataCon -> CoreExpr
+mkDataConTag dflags = mkIntLitInt dflags . dataConTagZ
 
 dataConTagZ :: DataCon -> Int
 dataConTagZ con = dataConTag con - fIRST_TAG

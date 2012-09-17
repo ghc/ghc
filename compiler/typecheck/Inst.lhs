@@ -251,15 +251,24 @@ cases (the rest are caught in lookupInst).
 
 \begin{code}
 newOverloadedLit :: CtOrigin
-		 -> HsOverLit Name
-		 -> TcRhoType
-		 -> TcM (HsOverLit TcId)
-newOverloadedLit orig 
+                 -> HsOverLit Name
+                 -> TcRhoType
+                 -> TcM (HsOverLit TcId)
+newOverloadedLit orig lit res_ty
+    = do dflags <- getDynFlags
+         newOverloadedLit' dflags orig lit res_ty
+
+newOverloadedLit' :: DynFlags
+                  -> CtOrigin
+                  -> HsOverLit Name
+                  -> TcRhoType
+                  -> TcM (HsOverLit TcId)
+newOverloadedLit' dflags orig
   lit@(OverLit { ol_val = val, ol_rebindable = rebindable
 	       , ol_witness = meth_name }) res_ty
 
   | not rebindable
-  , Just expr <- shortCutLit val res_ty 
+  , Just expr <- shortCutLit dflags val res_ty 
 	-- Do not generate a LitInst for rebindable syntax.  
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
