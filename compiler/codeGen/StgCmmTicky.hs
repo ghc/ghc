@@ -325,9 +325,9 @@ tickyAllocHeap hp
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
+	    addToMemLbl (cLong dflags) (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_ctr")) 1,
 		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLong (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot")) hp] }
+	    addToMemLbl (cLong dflags) (mkCmmDataLabel rtsPackageId (fsLit "ALLOC_HEAP_tot")) hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
@@ -343,7 +343,8 @@ bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkCmmDataLabel rtsPackag
 
 bumpTickyCounter' :: CmmLit -> FCode ()
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter
-bumpTickyCounter' lhs = emit (addToMem cLong (CmmLit lhs) 1)
+bumpTickyCounter' lhs = do dflags <- getDynFlags
+                           emit (addToMem (cLong dflags) (CmmLit lhs) 1)
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram _lbl _n

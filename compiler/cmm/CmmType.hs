@@ -104,9 +104,9 @@ bHalfWord dflags = cmmBits (halfWordWidth dflags)
 gcWord :: DynFlags -> CmmType
 gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
 
-cInt, cLong :: CmmType
-cInt  = cmmBits cIntWidth
-cLong = cmmBits cLongWidth
+cInt, cLong :: DynFlags -> CmmType
+cInt  dflags = cmmBits (cIntWidth  dflags)
+cLong dflags = cmmBits (cLongWidth dflags)
 
 
 ------------ Predicates ----------------
@@ -178,18 +178,15 @@ halfWordMask dflags
  | otherwise             = panic "MachOp.halfWordMask: Unknown word size"
 
 -- cIntRep is the Width for a C-language 'int'
-cIntWidth, cLongWidth :: Width
-#if SIZEOF_INT == 4
-cIntWidth = W32
-#elif  SIZEOF_INT == 8
-cIntWidth = W64
-#endif
-
-#if SIZEOF_LONG == 4
-cLongWidth = W32
-#elif  SIZEOF_LONG == 8
-cLongWidth = W64
-#endif
+cIntWidth, cLongWidth :: DynFlags -> Width
+cIntWidth dflags = case cINT_SIZE dflags of
+                   4 -> W32
+                   8 -> W64
+                   s -> panic ("cIntWidth: Unknown cINT_SIZE: " ++ show s)
+cLongWidth dflags = case cLONG_SIZE dflags of
+                    4 -> W32
+                    8 -> W64
+                    s -> panic ("cIntWidth: Unknown cLONG_SIZE: " ++ show s)
 
 widthInBits :: Width -> Int
 widthInBits W8   = 8
