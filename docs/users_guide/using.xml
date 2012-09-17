@@ -2332,6 +2332,24 @@ last (x : xs) = last' x xs
           </listitem>
         </varlistentry>
 
+        <varlistentry>
+          <term>
+            <option>-fomit-yields</option>
+            <indexterm><primary><option>-fomit-yields</option></primary></indexterm>
+          </term>
+          <listitem>
+              <para><emphasis>On by default.</emphasis>  Tells GHC to omit
+            heap checks when no allocation is being performed.  While this improves
+            binary sizes by about 5%, it also means that threads run in
+            tight non-allocating loops will not get preempted in a timely
+            fashion.  If it is important to always be able to interrupt such
+            threads, you should turn this optimization off.  Consider also
+            recompiling all libraries with this optimization turned off, if you
+            need to guarantee interruptibility.
+            </para>
+          </listitem>
+        </varlistentry>
+
       </variablelist>
 
     </sect2>

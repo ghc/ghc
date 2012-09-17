@@ -293,6 +293,7 @@ data DynFlag
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
+   | Opt_OmitYields
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2275,6 +2276,7 @@ fFlags = [
   ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
   ( "cmm-sink",                         Opt_CmmSink, nop ),
   ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
+  ( "omit-yields",                      Opt_OmitYields, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
@@ -2458,6 +2460,8 @@ defaultFlags platform
       Opt_Static,
 
       Opt_SharedImplib,
+
+      Opt_OmitYields,
 
       Opt_GenManifest,
       Opt_EmbedManifest,
