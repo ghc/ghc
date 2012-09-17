@@ -14,7 +14,6 @@ import Module
 import OccName
 import Name
 import Outputable
-import MonadUtils ()
 import Util
 
 import Data.Char
