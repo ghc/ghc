@@ -23,7 +23,7 @@ import Util
 import Coercion
 import CoreUtils  (hashCoercion, hashType {- , hashExpr -})
 import Name       (mkSystemVarName)
-import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind, varName)
+import Var        (TyVar, mkTyVar, isTyVar, isId, varType, setVarType, tyVarKind, setTyVarKind, varName, idDetails, setIdDetails, idInfo, lazySetIdInfo)
 import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
@@ -189,10 +189,10 @@ instance Outputable Pending where
     --ppr (PendingTerm     e_l  e_r)  = ppr e_l  <+> text "<-e->" <+> ppr e_r
 
 data MSGState = MSGState {
-    msgInScopeSet     :: InScopeSet,                      -- We have to ensure all new vars introduced by MSG are distinct from each other
-    msgKnownVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the "known" maps are inverse to the pending list, except that PendingTerms are not recorded in
-    msgKnownTypes     :: TypeMap (TypeMap TyVar),         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
-    msgKnownCoercions :: CoercionMap (CoercionMap CoVar), -- INVARIANT: all Vars in the range have extra information that has *already* been MSGed
+    msgInScopeSet     :: InScopeSet,                                      -- We have to ensure all new vars introduced by MSG are distinct from each other
+    msgKnownVars      :: VarEnv (VarEnv Var), {- partial loop in range -} -- INVARIANT: the "known" maps are inverse to the pending list, except that PendingTerms are not recorded in
+    msgKnownTypes     :: TypeMap (TypeMap TyVar),                         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
+    msgKnownCoercions :: CoercionMap (CoercionMap CoVar),                 -- INVARIANT: all Vars in the range have extra information that has *already* been MSGed
     msgLR             :: Pair MSGLRState,
     -- May only shrink:
     msgSuckStack      :: IM.IntMap (MSGU ()),
@@ -214,14 +214,23 @@ data MSGLRState = MSGLRState {
 
 type StackInitM = State.State (InScopeSet, VarEnv (VarEnv Var))
 
+-- A lot of things depend on being able to suck out the unique of a variable,
+-- so ensure that the looped variables I put in the stack only have loops in fields where it is unavoidable
+unloopVar :: Var {- varUnique and idScope are correct, every other field may be wrong -} -> Var {- loop -} -> Var {- partially looped -}
+unloopVar x x_looped
+  | isTyVar x = x `setVarType` varType x_looped
+  | isId x    = x `setVarType` varType x_looped `setIdDetails` idDetails x_looped `lazySetIdInfo` idInfo x_looped
+  | otherwise = error "unloopVar: TcTyVar"
+
 -- NB: derived by just specialising the msgPend code for the case of two stack binders in the "obvious" way
-msgPendStackBinder :: Var {- looped -} -> Var -> Var -> StackInitM (MSG Var)
-msgPendStackBinder x x_l x_r = State.state $ \(iss, known) -> let x0 = zapVarExtraInfo x_r
-                                                                  x1 = uniqAway iss x0
-                                                              in (msgBndrExtras top_rn2 x1 x_l x_r, (extendInScopeSet iss x1, extendVarEnv known x_l (unitVarEnv x_r x)))
+msgPendStackBinder :: Var {- looped -} -> Var -> Var -> StackInitM (Var {- partial loop -}, MSG Var)
+msgPendStackBinder x_looped x_l x_r = State.state $ \(iss, known) -> let x0 = zapVarExtraInfo x_r
+                                                                         x1 = uniqAway iss x0
+                                                                         x = x1 `unloopVar` x_looped
+                                                                     in ((x, msgBndrExtras top_rn2 x1 x_l x_r), (extendInScopeSet iss x1, extendVarEnv known x_l (unitVarEnv x_r x)))
 
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
-msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
+msgPend :: RnEnv2 -> Var -> Pending -> MSG Var {- partial loop -}
 msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
     Right x                       -> (s0, pure x)
     Left (mb_eq, binderise, mk_s) -> res
@@ -242,7 +251,8 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
             s1 = mk_s x
             s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x1 } -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
             res = unMSG (msgLoseWorkSharing' False (binderise x1)) e s2 -- This thing will be bound in the top letrec, outside any lambdas
-            (_, Right x) = res
+            (_, Right x_looped) = res
+            x = x1 `unloopVar` x_looped
   where
     lookupUpdatePending :: MSGState
                         -> Either (Maybe Var,       -- Are both sides equal vars, and if so what are they equal to?
@@ -277,7 +287,7 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
 
     binderiseVars x_l x_r x1 = do
       x <- msgBndrExtras rn2 x1 x_l x_r
-      msgu $ specGenVars x1 x (Pair x_l x_r)
+      msgu $ specGenVars x (Pair x_l x_r)
       return x
 
     binderiseTypes ty_l ty_r a1 = do
@@ -321,7 +331,7 @@ genCoercions q co_lrs = do
   sucks2 $ fmap tyCoVarsOfCo co_lrs
 
 -- Assumption: both input vars do not MSG, are flexi
-genVars, genVars' :: Var -> Generalised -> Pair Var -> MSGU ()
+genVars, genVars' :: Var {- partial loop -} -> Generalised -> Pair Var -> MSGU ()
 genVars x gen x_lrs = do
   -- Extend the renaming
   genVars' x gen x_lrs
@@ -331,8 +341,8 @@ genVars' x gen x_lrs = modify_ $ \s -> s { msgCommonHeap = M.insert x (if gen th
                                          , msgLR = liftA2 (\x_lr s_lr -> s_lr { msgLRRenaming = insertVarRenaming (msgLRRenaming s_lr) x x_lr }) x_lrs (msgLR s) }
 
 -- Assumption: both input vars MAY YET MSG, are flexi
-specGenVars :: Var -> Var {- loop, don't pull on it - can use x1 if you only need the unique -} -> Pair Var -> MSGU ()
-specGenVars x1 x (Pair x_l x_r) = do
+specGenVars :: Var {- partial loop -} -> Pair Var -> MSGU ()
+specGenVars x (Pair x_l x_r) = do
     Pair mb_hb_l mb_hb_r <- flip fmap get $ \s -> liftA2 (\x_lr lr_s -> M.lookup x_lr (msgLRAvailableHeap lr_s)) (Pair x_l x_r) (msgLR s)
     sucks <- liftA2 Pair (suck' pFst x_l) (suck' pSnd x_r)
     let hb_r_gen = maybe False heapBindingGeneralised mb_hb_r
@@ -351,7 +361,7 @@ specGenVars x1 x (Pair x_l x_r) = do
              case (hb_l_inj, hb_r_inj) of
                (Just (let_bound_l, in_e_l), Just (let_bound_r, in_e_r))
                  | let_bound_l == let_bound_r
-                 , not let_bound_r || (x_l == x_r && x_r == x1) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
+                 , not let_bound_r || (x_l == x_r && x_r == x) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
                  -> do -- Ensure that we can't attempt to MSG either side's term again (if the term is cheap)
                        -- Also overwrite the sucker so it generalises this "x" before doing normal sucking
                        modify_ $ \s -> s { msgLR = liftA3 (\x_lr in_e_lr s_lr -> if termIsCheap (snd in_e_lr) then s_lr else s_lr { msgLRAvailableHeap = M.delete x_lr (msgLRAvailableHeap s_lr)
@@ -379,7 +389,7 @@ specGenVars x1 x (Pair x_l x_r) = do
                           return in_e_r -- Right biased
                        return $ (if let_bound_r then letBound else internallyBound) in_e
                (Nothing, Nothing)
-                 | x_l == x_r && x_r == x1 -- Note [MSGing let-bounds]
+                 | x_l == x_r && x_r == x -- Note [MSGing let-bounds]
                  -> return hb_r -- Right biased
                _ -> fail "msgLoop: non-unifiable heap bindings"
       _ -> genVars x hb_r_gen (Pair x_l x_r)
@@ -1134,15 +1144,15 @@ initStack xs i (Car kf_l k_l) (Car kf_r k_r) = do
         --
         -- Furthermore I don't want to MSG the binder's *extra* info until the known maps are complete, hence
         -- this lazy pattern match/return action list nonsense, which I'll need to fix up with mfix in the caller.
-        let ~(x:xs') = xs
-        mx <- msgPendStackBinder x x_l x_r
+        let ~(x_looped:xs') = xs
+        (x, mx) <- msgPendStackBinder x_looped x_l x_r
         return (xs', Just (x, Pair x_l x_r), Just mx)
       _ -> return (xs, Nothing, Nothing)
     let suck = initStackFrame i mb_x kf_l kf_r
     liftM (\(mxs, k_lrs, sucks) -> (maybe id (:) mb_mx mxs, liftA2 (\kf_lr (k_avail_lr, k_lr) -> (kf_lr `Car` k_avail_lr, k_lr)) (Pair kf_l kf_r) k_lrs, IM.insert i suck sucks)) $ initStack xs (i + 1) k_l k_r
 initStack _ _ k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_r) (Loco (stackGeneralised k_r), k_r), IM.empty)
 
-initStackFrame :: Int -> Maybe (Var, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
+initStackFrame :: Int -> Maybe (Var {- partial loop -}, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
 initStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
     -- First things first, ensure we can't make a reentrant attempt to suck this stack frame
     modify_ $ \s -> s { msgSuckStack = IM.delete i (msgSuckStack s) }
