@@ -73,11 +73,12 @@ instance Outputable GlobalReg where
 
 pprExpr :: CmmExpr -> SDoc
 pprExpr e
-    = case e of
+    = sdocWithDynFlags $ \dflags ->
+      case e of
         CmmRegOff reg i ->
                 pprExpr (CmmMachOp (MO_Add rep)
                            [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-                where rep = typeWidth (cmmRegType reg)
+                where rep = typeWidth (cmmRegType dflags reg)
         CmmLit lit -> pprLit lit
         _other     -> pprExpr1 e
 
@@ -186,10 +187,11 @@ infixMachOp mop
 --  has the natural machine word size, we do not append the type
 --
 pprLit :: CmmLit -> SDoc
-pprLit lit = case lit of
+pprLit lit = sdocWithDynFlags $ \dflags ->
+             case lit of
     CmmInt i rep ->
         hcat [ (if i < 0 then parens else id)(integer i)
-             , ppUnless (rep == wordWidth) $
+             , ppUnless (rep == wordWidth dflags) $
                space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]

@@ -65,6 +65,7 @@ data OS
         | OSNetBSD
         | OSKFreeBSD
         | OSHaiku
+        | OSOsf3
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
@@ -104,8 +105,11 @@ osElfTarget OSDarwin    = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
+osElfTarget OSOsf3      = False -- I don't know if this is right, but as
+                                -- per comment below it's safe
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
  -- new platform we compile on (even unreg).
+

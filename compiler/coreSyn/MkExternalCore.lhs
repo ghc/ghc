@@ -229,7 +229,8 @@ make_lit dflags l =
     MachWord64 i -> C.Lint i t
     MachFloat r -> C.Lrational r t
     MachDouble r -> C.Lrational r t
-    _ -> error "MkExternalCore died: make_lit"
+    LitInteger i _ -> C.Lint i t
+    _ -> pprPanic "MkExternalCore died: make_lit" (ppr l)
   where 
     t = make_ty dflags (literalType l)
 

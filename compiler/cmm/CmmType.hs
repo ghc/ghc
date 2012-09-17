@@ -17,7 +17,7 @@ where
 
 #include "HsVersions.h"
 
-import Constants
+import DynFlags
 import FastString
 import Outputable
 
@@ -95,10 +95,14 @@ f32    = cmmFloat W32
 f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
-bWord, bHalfWord, gcWord :: CmmType
-bWord     = cmmBits wordWidth
-bHalfWord = cmmBits halfWordWidth
-gcWord    = CmmType GcPtrCat wordWidth
+bWord :: DynFlags -> CmmType
+bWord dflags = cmmBits (wordWidth dflags)
+
+bHalfWord :: DynFlags -> CmmType
+bHalfWord dflags = cmmBits (halfWordWidth dflags)
+
+gcWord :: DynFlags -> CmmType
+gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
 
 cInt, cLong :: CmmType
 cInt  = cmmBits cIntWidth
@@ -155,19 +159,23 @@ mrStr W80  = sLit("W80")
 
 
 -------- Common Widths  ------------
-wordWidth, halfWordWidth :: Width
-wordWidth | wORD_SIZE == 4 = W32
-          | wORD_SIZE == 8 = W64
-          | otherwise      = panic "MachOp.wordRep: Unknown word size"
+wordWidth :: DynFlags -> Width
+wordWidth dflags
+ | wORD_SIZE dflags == 4 = W32
+ | wORD_SIZE dflags == 8 = W64
+ | otherwise             = panic "MachOp.wordRep: Unknown word size"
 
-halfWordWidth | wORD_SIZE == 4 = W16
-              | wORD_SIZE == 8 = W32
-              | otherwise      = panic "MachOp.halfWordRep: Unknown word size"
+halfWordWidth :: DynFlags -> Width
+halfWordWidth dflags
+ | wORD_SIZE dflags == 4 = W16
+ | wORD_SIZE dflags == 8 = W32
+ | otherwise             = panic "MachOp.halfWordRep: Unknown word size"
 
-halfWordMask :: Integer
-halfWordMask | wORD_SIZE == 4 = 0xFFFF
-             | wORD_SIZE == 8 = 0xFFFFFFFF
-             | otherwise      = panic "MachOp.halfWordMask: Unknown word size"
+halfWordMask :: DynFlags -> Integer
+halfWordMask dflags
+ | wORD_SIZE dflags == 4 = 0xFFFF
+ | wORD_SIZE dflags == 8 = 0xFFFFFFFF
+ | otherwise             = panic "MachOp.halfWordMask: Unknown word size"
 
 -- cIntRep is the Width for a C-language 'int'
 cIntWidth, cLongWidth :: Width

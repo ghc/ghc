@@ -143,7 +143,6 @@ cgTopRhs bndr (StgRhsCon _cc con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag _srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
-    setSRTLabel (mkSRTLabel (idName bndr) (idCafInfo bndr)) $
     forkStatics (cgTopRhsClosure bndr cc bi upd_flag args body)
 
 
@@ -206,9 +205,10 @@ mkModuleInit cost_centre_info this_mod hpc_info
 
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
-  = emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
+  = do dflags <- getDynFlags
+       emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
-                           (tagForCon con)
+                           (tagForCon dflags con)
              | con <- tyConDataCons tycon]
 
 
@@ -236,8 +236,8 @@ cgDataCon data_con
                 do { _ <- ticky_code
                    ; ldvEnter (CmmReg nodeReg)
                    ; tickyReturnOldCon (length arg_things)
-                   ; void $ emitReturn [cmmOffsetB (CmmReg nodeReg)
-                                            (tagForCon data_con)]
+                   ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg)
+                                            (tagForCon dflags data_con)]
                    }
                         -- The case continuation code expects a tagged pointer
 

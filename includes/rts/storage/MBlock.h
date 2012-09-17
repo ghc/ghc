@@ -12,8 +12,8 @@
 #ifndef RTS_STORAGE_MBLOCK_H
 #define RTS_STORAGE_MBLOCK_H
 
-extern lnat peak_mblocks_allocated;
-extern lnat mblocks_allocated;
+extern W_ peak_mblocks_allocated;
+extern W_ mblocks_allocated;
 
 extern void initMBlocks(void);
 extern void * getMBlock(void);
@@ -156,7 +156,7 @@ typedef struct {
     MBlockMapLine lines[MBLOCK_MAP_ENTRIES];
 } MBlockMap;
 
-extern lnat mpc_misses;
+extern W_ mpc_misses;
 
 StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p);
 

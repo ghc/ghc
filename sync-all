@@ -209,7 +209,10 @@ sub scmall {
         }
         if (@_ < 1) { help(1); }
         $subcommand = shift;
-        if ($subcommand ne 'add' && $subcommand ne 'rm' && $subcommand ne 'set-url') {
+        if ($subcommand ne 'add' &&
+            $subcommand ne 'rm' &&
+            $subcommand ne 'set-branches' &&
+            $subcommand ne 'set-url') {
             help(1);
         }
         while (@_ > 0 && $_[0] =~ /^-/) {
@@ -398,6 +401,8 @@ sub scmall {
                 @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {
                 @scm_args = ("remote", "rm", $branch_name);
+            } elsif ($subcommand eq 'set-branches') {
+                @scm_args = ("remote", "set-branches", $branch_name);
             } elsif ($subcommand eq 'set-url') {
                 @scm_args = ("remote", "set-url", $branch_name, $path);
             }

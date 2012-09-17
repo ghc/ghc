@@ -24,7 +24,7 @@ import TyCon
 import ForeignCall
 import Panic
 -- import Outputable
-import Constants
+import DynFlags
 
 import Foreign
 import Foreign.C
@@ -35,20 +35,21 @@ import Text.Printf
 type ForeignCallToken = C_ffi_cif
 
 prepForeignCall
-    :: CCallConv
+    :: DynFlags
+    -> CCallConv
     -> [PrimRep]                        -- arg types
     -> PrimRep                          -- result type
     -> IO (Ptr ForeignCallToken)        -- token for making calls
                                         -- (must be freed by caller)
-prepForeignCall cconv arg_types result_type
+prepForeignCall dflags cconv arg_types result_type
   = do
     let n_args = length arg_types
     arg_arr <- mallocArray n_args
-    let init_arg (ty,n) = pokeElemOff arg_arr n (primRepToFFIType ty)
+    let init_arg (ty,n) = pokeElemOff arg_arr n (primRepToFFIType dflags ty)
     mapM_ init_arg (zip arg_types [0..])
     cif <- mallocBytes (#const sizeof(ffi_cif))
     let abi = convToABI cconv
-    let res_ty = primRepToFFIType result_type
+    let res_ty = primRepToFFIType dflags result_type
     r <- ffi_prep_cif cif abi (fromIntegral n_args) res_ty arg_arr
     if (r /= fFI_OK)
        then ghcError (InstallationError 
@@ -64,8 +65,8 @@ convToABI StdCallConv = fFI_STDCALL
 convToABI _           = fFI_DEFAULT_ABI
 
 -- c.f. DsForeign.primTyDescChar
-primRepToFFIType :: PrimRep -> Ptr C_ffi_type
-primRepToFFIType r
+primRepToFFIType :: DynFlags -> PrimRep -> Ptr C_ffi_type
+primRepToFFIType dflags r
   = case r of
      VoidRep     -> ffi_type_void
      IntRep	 -> signed_word
@@ -78,9 +79,9 @@ primRepToFFIType r
      _           -> panic "primRepToFFIType"
   where
     (signed_word, unsigned_word)
-       | wORD_SIZE == 4  = (ffi_type_sint32, ffi_type_uint32)
-       | wORD_SIZE == 8  = (ffi_type_sint64, ffi_type_uint64)
-       | otherwise       = panic "primTyDescChar"
+       | wORD_SIZE dflags == 4  = (ffi_type_sint32, ffi_type_uint32)
+       | wORD_SIZE dflags == 8  = (ffi_type_sint64, ffi_type_uint64)
+       | otherwise              = panic "primTyDescChar"
 
 
 data C_ffi_type

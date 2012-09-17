@@ -271,11 +271,11 @@ isEmptyRetainerStack( void )
  * Returns size of stack
  * -------------------------------------------------------------------------- */
 #ifdef DEBUG
-lnat
+W_
 retainerStackBlocks( void )
 {
     bdescr* bd;
-    lnat res = 0;
+    W_ res = 0;
 
     for (bd = firstStack; bd != NULL; bd = bd->link) 
       res += bd->blocks;

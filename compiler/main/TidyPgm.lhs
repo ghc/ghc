@@ -47,7 +47,6 @@ import Module
 import Packages( isDllName )
 import HscTypes
 import Maybes
-import Platform
 import UniqSupply
 import ErrUtils (Severity(..))
 import Outputable
@@ -1049,20 +1048,20 @@ tidyTopBinds hsc_env unfold_env init_occ_env binds
                     $ initTcForLookup hsc_env (tcLookupGlobal mkIntegerName)
        return $ tidy mkIntegerId init_env binds
   where
-    platform = targetPlatform (hsc_dflags hsc_env)
+    dflags = hsc_dflags hsc_env
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    this_pkg = thisPackage (hsc_dflags hsc_env)
+    this_pkg = thisPackage dflags
 
     tidy _           env []     = (env, [])
-    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind platform this_pkg mkIntegerId unfold_env env b
+    tidy mkIntegerId env (b:bs) = let (env1, b')  = tidyTopBind dflags this_pkg mkIntegerId unfold_env env b
                                       (env2, bs') = tidy mkIntegerId env1 bs
                                   in
                                       (env2, b':bs')
 
 ------------------------
-tidyTopBind  :: Platform
+tidyTopBind  :: DynFlags
              -> PackageId
              -> Id
              -> UnfoldEnv
@@ -1070,16 +1069,16 @@ tidyTopBind  :: Platform
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind platform this_pkg mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
+tidyTopBind dflags this_pkg mkIntegerId unfold_env (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs platform this_pkg (mkIntegerId, subst1) (idArity bndr) rhs
+    caf_info      = hasCafRefs dflags this_pkg (mkIntegerId, subst1) (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind platform this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
+tidyTopBind dflags this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
     prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
@@ -1096,7 +1095,7 @@ tidyTopBind platform this_pkg mkIntegerId unfold_env (occ_env,subst1) (Rec prs)
         -- the CafInfo for a recursive group says whether *any* rhs in
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
-        | or [ mayHaveCafRefs (hasCafRefs platform this_pkg (mkIntegerId, subst1) (idArity bndr) rhs)
+        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg (mkIntegerId, subst1) (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
 
@@ -1233,15 +1232,15 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
-hasCafRefs :: Platform -> PackageId -> (Id, VarEnv Var) -> Arity -> CoreExpr
+hasCafRefs :: DynFlags -> PackageId -> (Id, VarEnv Var) -> Arity -> CoreExpr
            -> CafInfo
-hasCafRefs platform this_pkg p arity expr
+hasCafRefs dflags this_pkg p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefsE p expr)
-  is_dynamic_name = isDllName this_pkg
-  is_caf = not (arity > 0 || rhsIsStatic platform is_dynamic_name expr)
+  is_dynamic_name = isDllName dflags this_pkg
+  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name expr)
 
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity

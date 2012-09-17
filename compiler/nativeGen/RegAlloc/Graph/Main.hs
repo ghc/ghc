@@ -174,7 +174,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
 
                 -- strip off liveness information,
                 --      and rewrite SPILL/RELOAD pseudos into real instructions along the way
-                let code_final          = map (stripLive platform) code_spillclean
+                let code_final          = map (stripLive dflags) code_spillclean
 
                 -- record what happened in this stage for debugging
                 let stat                =

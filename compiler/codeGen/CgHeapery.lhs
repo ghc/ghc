@@ -42,7 +42,6 @@ import TyCon
 import CostCentre
 import Util
 import Module
-import Constants
 import Outputable
 import DynFlags
 import FastString
@@ -103,8 +102,9 @@ setRealHp new_realHp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
 getHpRelOffset virtual_offset
-  = do  { hp_usg <- getHpUsage
-        ; return (cmmRegOffW hpReg (hpRel (realHp hp_usg) virtual_offset)) }
+  = do  { dflags <- getDynFlags
+        ; hp_usg <- getHpUsage
+        ; return (cmmRegOffW dflags hpReg (hpRel (realHp hp_usg) virtual_offset)) }
 \end{code}
 
 
@@ -165,7 +165,7 @@ mkVirtHeapOffsets dflags is_thunk things
                 | otherwise  = fixedHdrSize dflags
 
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + cgRepSizeW rep, (thing, hdr_size + wds_so_far))
+      = (wds_so_far + cgRepSizeW dflags rep, (thing, hdr_size + wds_so_far))
 \end{code}
 
 
@@ -208,29 +208,29 @@ mkStaticClosureFields dflags cl_info ccs caf_refs payload
 
     padding_wds
         | not is_caf = []
-        | otherwise  = ASSERT(null payload) [mkIntCLit 0]
+        | otherwise  = ASSERT(null payload) [mkIntCLit dflags 0]
 
     static_link_field
         | is_caf || staticClosureNeedsLink cl_info = [static_link_value]
         | otherwise                                = []
 
     saved_info_field
-        | is_caf     = [mkIntCLit 0]
+        | is_caf     = [mkIntCLit dflags 0]
         | otherwise  = []
 
         -- for a static constructor which has NoCafRefs, we set the
         -- static link field to a non-zero value so the garbage
         -- collector will ignore it.
     static_link_value
-        | caf_refs      = mkIntCLit 0
-        | otherwise     = mkIntCLit 1
+        | caf_refs      = mkIntCLit dflags 0
+        | otherwise     = mkIntCLit dflags 1
 
 mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding_wds static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
-  ++ concatMap padLitToWord payload
+  ++ concatMap (padLitToWord dflags) payload
   ++ padding_wds
   ++ static_link_field
   ++ saved_info_field
@@ -241,10 +241,10 @@ mkStaticClosure dflags info_lbl ccs payload padding_wds static_link_field saved_
         ++ staticProfHdr dflags ccs
         ++ staticTickyHdr
 
-padLitToWord :: CmmLit -> [CmmLit]
-padLitToWord lit = lit : padding pad_length
-  where width = typeWidth (cmmLitType lit)
-        pad_length = wORD_SIZE - widthInBytes width :: Int
+padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
+padLitToWord dflags lit = lit : padding pad_length
+  where width = typeWidth (cmmLitType dflags lit)
+        pad_length = wORD_SIZE dflags - widthInBytes width :: Int
 
         padding n | n <= 0 = []
                   | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
@@ -412,18 +412,18 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
   | ptrs > 255 || nptrs > 255 = panic "altHeapCheck"
   | otherwise
   = initHeapUsage $ \ hpHw -> do
-        { codeOnly $ do { do_checks 0 {- no stack check -} hpHw
+        { dflags <- getDynFlags
+        ; let full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
+              assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr))    -- Ho ho ho!
+                                          (CmmLit (mkWordCLit dflags liveness))
+              liveness        = mkRegLiveness regs ptrs nptrs
+              live            = Just $ map snd regs
+              rts_label       = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))
+        ; codeOnly $ do { do_checks 0 {- no stack check -} hpHw
                                     full_fail_code rts_label live
                         ; tickyAllocHeap hpHw }
         ; setRealHp hpHw
         ; code }
-  where
-    full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
-    assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr))    -- Ho ho ho!
-                                (CmmLit (mkWordCLit liveness))
-    liveness        = mkRegLiveness regs ptrs nptrs
-    live            = Just $ map snd regs
-    rts_label       = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))
 
 \end{code}
 
@@ -452,25 +452,37 @@ do_checks :: WordOff           -- Stack headroom
           -> Code
 do_checks 0 0 _ _ _ = nopC
 
-do_checks _ hp _ _ _
-  | hp > bLOCKS_PER_MBLOCK * bLOCK_SIZE_W
-  = sorry (unlines [
-            "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK * bLOCK_SIZE) ++ " bytes.",
-            "",
-            "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
-            "Suggestion: read data from a file instead of having large static data",
-            "structures in the code."])
-
 do_checks stk hp reg_save_code rts_lbl live
-  = do_checks' (CmmLit (mkIntCLit (stk*wORD_SIZE)))
-               (CmmLit (mkIntCLit (hp*wORD_SIZE)))
-         (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
+  = do dflags <- getDynFlags
+       if hp > bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE_W dflags
+           then sorry (unlines [
+                    "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE dflags) ++ " bytes.",
+                    "",
+                    "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
+                    "Suggestion: read data from a file instead of having large static data",
+                    "structures in the code."])
+           else do_checks' (mkIntExpr dflags (stk * wORD_SIZE dflags))
+                           (mkIntExpr dflags (hp * wORD_SIZE dflags))
+                    (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
 
 -- The offsets are now in *bytes*
 do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr
            -> Maybe [GlobalReg] -> Code
 do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl live
-  = do  { doGranAllocate hp_expr
+  = do  { dflags <- getDynFlags
+
+        -- Stk overflow if (Sp - stk_bytes < SpLim)
+        ; let stk_oflo = CmmMachOp (mo_wordULt dflags)
+                             [CmmMachOp (mo_wordSub dflags) [CmmReg spReg, stk_expr],
+                              CmmReg (CmmGlobal SpLim)]
+
+        -- Hp overflow if (Hp > HpLim)
+        -- (Hp has been incremented by now)
+        -- HpLim points to the LAST WORD of valid allocation space.
+              hp_oflo = CmmMachOp (mo_wordUGt dflags)
+                            [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
+  
+        ; doGranAllocate hp_expr
 
         -- The failure block: this saves the registers and jumps to
         -- the appropriate RTS stub.
@@ -496,7 +508,7 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl live
 
         ; whenC hp_nonzero
                 (stmtsC [CmmAssign hpReg
-                                (cmmOffsetExprB (CmmReg hpReg) hp_expr),
+                                (cmmOffsetExprB dflags (CmmReg hpReg) hp_expr),
                         CmmCondBranch hp_oflo hp_blk_id])
                 -- Bump heap pointer, and test for heap exhaustion
                 -- Note that we don't move the heap pointer unless the
@@ -504,17 +516,6 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl live
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
     }
-  where
-        -- Stk overflow if (Sp - stk_bytes < SpLim)
-    stk_oflo = CmmMachOp mo_wordULt
-                  [CmmMachOp mo_wordSub [CmmReg spReg, stk_expr],
-                   CmmReg (CmmGlobal SpLim)]
-
-        -- Hp overflow if (Hp > HpLim)
-        -- (Hp has been incremented by now)
-        -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp mo_wordUGt
-                  [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
 \end{code}
 
 %************************************************************************
@@ -528,38 +529,38 @@ hpChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 hpChkGen bytes liveness reentry
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
-       do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns
+           assigns = mkStmts [ mk_vanilla_assignment dflags 9 liveness,
+                               mk_vanilla_assignment dflags 10 reentry ]
+       do_checks' (zeroExpr dflags) bytes False True assigns
                   stg_gc_gen (Just (activeStgRegs platform))
-  where
-    assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
-                        mk_vanilla_assignment 10 reentry ]
 
 -- a heap check where R1 points to the closure to enter on return, and
 -- we want to assign to Sp[0] on failure (used in AutoApply.cmm:BUILD_PAP).
 hpChkNodePointsAssignSp0 :: CmmExpr -> CmmExpr -> Code
 hpChkNodePointsAssignSp0 bytes sp0
-  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assign
-          stg_gc_enter1 (Just [node])
+  = do dflags <- getDynFlags
+       do_checks' (zeroExpr dflags) bytes False True assign
+           stg_gc_enter1 (Just [node])
   where assign = oneStmt (CmmStore (CmmReg spReg) sp0)
 
 stkChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 stkChkGen bytes liveness reentry
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
-       do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns
+           assigns = mkStmts [ mk_vanilla_assignment dflags 9 liveness,
+                               mk_vanilla_assignment dflags 10 reentry ]
+       do_checks' bytes (zeroExpr dflags) True False assigns
                   stg_gc_gen (Just (activeStgRegs platform))
-  where
-    assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
-                        mk_vanilla_assignment 10 reentry ]
 
-mk_vanilla_assignment :: Int -> CmmExpr -> CmmStmt
-mk_vanilla_assignment n e
-  = CmmAssign (CmmGlobal (VanillaReg n (vgcFlag (cmmExprType e)))) e
+mk_vanilla_assignment :: DynFlags -> Int -> CmmExpr -> CmmStmt
+mk_vanilla_assignment dflags n e
+  = CmmAssign (CmmGlobal (VanillaReg n (vgcFlag (cmmExprType dflags e)))) e
 
 stkChkNodePoints :: CmmExpr -> Code
 stkChkNodePoints bytes
-  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts
-          stg_gc_enter1 (Just [node])
+  = do dflags <- getDynFlags
+       do_checks' bytes (zeroExpr dflags) True False noStmts
+           stg_gc_enter1 (Just [node])
 
 stg_gc_gen :: CmmExpr
 stg_gc_gen = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_gen")))
@@ -630,8 +631,9 @@ initDynHdr dflags info_ptr cc
 hpStore :: CmmExpr -> [(CmmExpr, VirtualHpOffset)] -> Code
 -- Store the item (expr,off) in base[off]
 hpStore base es
-  = stmtsC [ CmmStore (cmmOffsetW base off) val
-           | (val, off) <- es ]
+  = do dflags <- getDynFlags
+       stmtsC [ CmmStore (cmmOffsetW dflags base off) val
+              | (val, off) <- es ]
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 emitSetDynHdr base info_ptr ccs

@@ -139,7 +139,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
-    maxSpillSlots             :: Int,
+    maxSpillSlots             :: DynFlags -> Int,
     allocatableRegs           :: Platform -> [RealReg],
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
@@ -160,7 +160,7 @@ nativeCodeGen dflags h us cmms
                         ,shortcutStatics           = X86.Instr.shortcutStatics
                         ,shortcutJump              = X86.Instr.shortcutJump
                         ,pprNatCmmDecl              = X86.Ppr.pprNatCmmDecl
-                        ,maxSpillSlots             = X86.Instr.maxSpillSlots (target32Bit platform)
+                        ,maxSpillSlots             = X86.Instr.maxSpillSlots
                         ,allocatableRegs           = X86.Regs.allocatableRegs
                         ,ncg_x86fp_kludge          = id
                         ,ncgExpandTop              = id
@@ -378,7 +378,7 @@ cmmNativeGen dflags ncgImpl us cmm count
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
-                fixStgRegisters platform cmm
+                fixStgRegisters dflags cmm
 
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
@@ -428,7 +428,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                           $ Color.regAlloc
                                 dflags
                                 alloc_regs
-                                (mkUniqSet [0 .. maxSpillSlots ncgImpl])
+                                (mkUniqSet [0 .. maxSpillSlots ncgImpl dflags])
                                 withLiveness
 
                 -- dump out what happened during register allocation
@@ -955,13 +955,13 @@ cmmExprConFold referenceKind expr = do
     -- SDM: re-enabled for now, while cmmRewriteAssignments is turned off
     let expr' = if False -- dopt Opt_TryNewCodeGen dflags
                     then expr
-                    else cmmExprCon (targetPlatform dflags) expr
+                    else cmmExprCon dflags expr
     cmmExprNative referenceKind expr'
 
-cmmExprCon :: Platform -> CmmExpr -> CmmExpr
-cmmExprCon platform (CmmLoad addr rep) = CmmLoad (cmmExprCon platform addr) rep
-cmmExprCon platform (CmmMachOp mop args)
-    = cmmMachOpFold platform mop (map (cmmExprCon platform) args)
+cmmExprCon :: DynFlags -> CmmExpr -> CmmExpr
+cmmExprCon dflags (CmmLoad addr rep) = CmmLoad (cmmExprCon dflags addr) rep
+cmmExprCon dflags (CmmMachOp mop args)
+    = cmmMachOpFold dflags mop (map (cmmExprCon dflags) args)
 cmmExprCon _ other = other
 
 -- handles both PIC and non-PIC cases... a very strange mixture
@@ -993,9 +993,9 @@ cmmExprNative referenceKind expr = do
            -> do
                  dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
                  -- need to optimize here, since it's late
-                 return $ cmmMachOpFold platform (MO_Add wordWidth) [
+                 return $ cmmMachOpFold dflags (MO_Add (wordWidth dflags)) [
                      dynRef,
-                     (CmmLit $ CmmInt (fromIntegral off) wordWidth)
+                     (CmmLit $ CmmInt (fromIntegral off) (wordWidth dflags))
                    ]
 
         -- On powerpc (non-PIC), it's easier to jump directly to a label than

@@ -480,7 +480,8 @@ zeroSimplCount	   :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
 hasDetailedCounts  :: SimplCount -> Bool
 pprSimplCount	   :: SimplCount -> SDoc
-doSimplTick, doFreeSimplTick :: Tick -> SimplCount -> SimplCount
+doSimplTick        :: DynFlags -> Tick -> SimplCount -> SimplCount
+doFreeSimplTick    ::             Tick -> SimplCount -> SimplCount
 plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
 \end{code}
 
@@ -525,13 +526,14 @@ doFreeSimplTick tick sc@SimplCount { details = dts }
   = sc { details = dts `addTick` tick }
 doFreeSimplTick _ sc = sc 
 
-doSimplTick tick sc@SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 }
-  | nl >= opt_HistorySize = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
-  | otherwise		  = sc1 { n_log = nl+1, log1 = tick : l1 }
+doSimplTick dflags tick
+    sc@(SimplCount { ticks = tks, details = dts, n_log = nl, log1 = l1 })
+  | nl >= historySize dflags = sc1 { n_log = 1, log1 = [tick], log2 = l1 }
+  | otherwise                = sc1 { n_log = nl+1, log1 = tick : l1 }
   where
     sc1 = sc { ticks = tks+1, details = dts `addTick` tick }
 
-doSimplTick _ (VerySimplCount n) = VerySimplCount (n+1)
+doSimplTick _ _ (VerySimplCount n) = VerySimplCount (n+1)
 
 
 -- Don't use Map.unionWith because that's lazy, and we want to 
@@ -720,7 +722,7 @@ data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
         cr_module :: Module,
-        cr_globals :: ((Bool, [String], [Way]),
+        cr_globals :: ((Bool, [String]),
 #ifdef GHCI
                        (MVar PersistentLinkerState, Bool))
 #else

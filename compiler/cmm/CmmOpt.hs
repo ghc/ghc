@@ -183,8 +183,7 @@ cmmMiniInlineStmts dflags uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) 
          -- not CmmLocal: that might invalidate the usage analysis results
   isTiny _ = False
 
-  platform = targetPlatform dflags
-  foldExp (CmmMachOp op args) = cmmMachOpFold platform op args
+  foldExp (CmmMachOp op args) = cmmMachOpFold dflags op args
   foldExp e = e
 
   ncgDebugTrace str x = if ncgDebugIsOn then trace str x else x
@@ -302,17 +301,17 @@ inlineExpr _ _ other_expr = other_expr
 -- been optimized and folded.
 
 cmmMachOpFold
-    :: Platform
+    :: DynFlags
     -> MachOp       -- The operation from an CmmMachOp
     -> [CmmExpr]    -- The optimized arguments
     -> CmmExpr
 
-cmmMachOpFold platform op args = fromMaybe (CmmMachOp op args) (cmmMachOpFoldM platform op args)
+cmmMachOpFold dflags op args = fromMaybe (CmmMachOp op args) (cmmMachOpFoldM dflags op args)
 
 -- Returns Nothing if no changes, useful for Hoopl, also reduces
 -- allocation!
 cmmMachOpFoldM
-    :: Platform
+    :: DynFlags
     -> MachOp
     -> [CmmExpr]
     -> Maybe CmmExpr
@@ -338,7 +337,7 @@ cmmMachOpFoldM _ (MO_SS_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 cmmMachOpFoldM _ (MO_UU_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 
 -- Eliminate nested conversions where possible
-cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
+cmmMachOpFoldM dflags conv_outer [CmmMachOp conv_inner [x]]
   | Just (rep1,rep2,signed1) <- isIntConversion conv_inner,
     Just (_,   rep3,signed2) <- isIntConversion conv_outer
   = case () of
@@ -348,13 +347,13 @@ cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
         -- but remember to use the signedness from the widening, just in case
         -- the final conversion is a widen.
         | rep1 < rep2 && rep2 > rep3 ->
-            Just $ cmmMachOpFold platform (intconv signed1 rep1 rep3) [x]
+            Just $ cmmMachOpFold dflags (intconv signed1 rep1 rep3) [x]
         -- Nested widenings: collapse if the signedness is the same
         | rep1 < rep2 && rep2 < rep3 && signed1 == signed2 ->
-            Just $ cmmMachOpFold platform (intconv signed1 rep1 rep3) [x]
+            Just $ cmmMachOpFold dflags (intconv signed1 rep1 rep3) [x]
         -- Nested narrowings: collapse
         | rep1 > rep2 && rep2 > rep3 ->
-            Just $ cmmMachOpFold platform (MO_UU_Conv rep1 rep3) [x]
+            Just $ cmmMachOpFold dflags (MO_UU_Conv rep1 rep3) [x]
         | otherwise ->
             Nothing
   where
@@ -371,22 +370,22 @@ cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
 -- but what if the architecture only supports word-sized loads, should
 -- we do the transformation anyway?
 
-cmmMachOpFoldM _ mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
+cmmMachOpFoldM dflags mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
   = case mop of
         -- for comparisons: don't forget to narrow the arguments before
         -- comparing, since they might be out of range.
-        MO_Eq _   -> Just $ CmmLit (CmmInt (if x_u == y_u then 1 else 0) wordWidth)
-        MO_Ne _   -> Just $ CmmLit (CmmInt (if x_u /= y_u then 1 else 0) wordWidth)
+        MO_Eq _   -> Just $ CmmLit (CmmInt (if x_u == y_u then 1 else 0) (wordWidth dflags))
+        MO_Ne _   -> Just $ CmmLit (CmmInt (if x_u /= y_u then 1 else 0) (wordWidth dflags))
 
-        MO_U_Gt _ -> Just $ CmmLit (CmmInt (if x_u >  y_u then 1 else 0) wordWidth)
-        MO_U_Ge _ -> Just $ CmmLit (CmmInt (if x_u >= y_u then 1 else 0) wordWidth)
-        MO_U_Lt _ -> Just $ CmmLit (CmmInt (if x_u <  y_u then 1 else 0) wordWidth)
-        MO_U_Le _ -> Just $ CmmLit (CmmInt (if x_u <= y_u then 1 else 0) wordWidth)
+        MO_U_Gt _ -> Just $ CmmLit (CmmInt (if x_u >  y_u then 1 else 0) (wordWidth dflags))
+        MO_U_Ge _ -> Just $ CmmLit (CmmInt (if x_u >= y_u then 1 else 0) (wordWidth dflags))
+        MO_U_Lt _ -> Just $ CmmLit (CmmInt (if x_u <  y_u then 1 else 0) (wordWidth dflags))
+        MO_U_Le _ -> Just $ CmmLit (CmmInt (if x_u <= y_u then 1 else 0) (wordWidth dflags))
 
-        MO_S_Gt _ -> Just $ CmmLit (CmmInt (if x_s >  y_s then 1 else 0) wordWidth)
-        MO_S_Ge _ -> Just $ CmmLit (CmmInt (if x_s >= y_s then 1 else 0) wordWidth)
-        MO_S_Lt _ -> Just $ CmmLit (CmmInt (if x_s <  y_s then 1 else 0) wordWidth)
-        MO_S_Le _ -> Just $ CmmLit (CmmInt (if x_s <= y_s then 1 else 0) wordWidth)
+        MO_S_Gt _ -> Just $ CmmLit (CmmInt (if x_s >  y_s then 1 else 0) (wordWidth dflags))
+        MO_S_Ge _ -> Just $ CmmLit (CmmInt (if x_s >= y_s then 1 else 0) (wordWidth dflags))
+        MO_S_Lt _ -> Just $ CmmLit (CmmInt (if x_s <  y_s then 1 else 0) (wordWidth dflags))
+        MO_S_Le _ -> Just $ CmmLit (CmmInt (if x_s <= y_s then 1 else 0) (wordWidth dflags))
 
         MO_Add r -> Just $ CmmLit (CmmInt (x + y) r)
         MO_Sub r -> Just $ CmmLit (CmmInt (x - y) r)
@@ -418,9 +417,9 @@ cmmMachOpFoldM _ mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
 -- also assume that constants have been shifted to the right when
 -- possible.
 
-cmmMachOpFoldM platform op [x@(CmmLit _), y]
+cmmMachOpFoldM dflags op [x@(CmmLit _), y]
    | not (isLit y) && isCommutableMachOp op
-   = Just (cmmMachOpFold platform op [y, x])
+   = Just (cmmMachOpFold dflags op [y, x])
 
 -- Turn (a+b)+c into a+(b+c) where possible.  Because literals are
 -- moved to the right, it is more likely that we will find
@@ -438,19 +437,19 @@ cmmMachOpFoldM platform op [x@(CmmLit _), y]
 -- Also don't do it if arg1 is PicBaseReg, so that we don't separate the
 -- PicBaseReg from the corresponding label (or label difference).
 --
-cmmMachOpFoldM platform mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
+cmmMachOpFoldM dflags mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
    | mop2 `associates_with` mop1
      && not (isLit arg1) && not (isPicReg arg1)
-   = Just (cmmMachOpFold platform mop2 [arg1, cmmMachOpFold platform mop1 [arg2,arg3]])
+   = Just (cmmMachOpFold dflags mop2 [arg1, cmmMachOpFold dflags mop1 [arg2,arg3]])
    where
      MO_Add{} `associates_with` MO_Sub{} = True
      mop1 `associates_with` mop2 =
         mop1 == mop2 && isAssociativeMachOp mop1
 
 -- special case: (a - b) + c  ==>  a + (c - b)
-cmmMachOpFoldM platform mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
+cmmMachOpFoldM dflags mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
    | not (isLit arg1) && not (isPicReg arg1)
-   = Just (cmmMachOpFold platform mop1 [arg1, cmmMachOpFold platform mop2 [arg3,arg2]])
+   = Just (cmmMachOpFold dflags mop1 [arg1, cmmMachOpFold dflags mop2 [arg3,arg2]])
 
 -- Make a RegOff if we can
 cmmMachOpFoldM _ (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
@@ -479,9 +478,9 @@ cmmMachOpFoldM _ (MO_Sub _) [CmmLit (CmmLabel lbl), CmmLit (CmmInt i rep)]
 -- narrowing throws away bits from the operand, there's no way to do
 -- the same comparison at the larger size.
 
-cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
+cmmMachOpFoldM dflags cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
   |     -- powerPC NCG has a TODO for I8/I16 comparisons, so don't try
-    platformArch platform `elem` [ArchX86, ArchX86_64],
+    platformArch (targetPlatform dflags) `elem` [ArchX86, ArchX86_64],
         -- if the operand is widened:
     Just (rep, signed, narrow_fn) <- maybe_conversion conv,
         -- and this is a comparison operation:
@@ -489,7 +488,7 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
         -- and the literal fits in the smaller size:
     i == narrow_fn rep i
         -- then we can do the comparison at the smaller size
-  = Just (cmmMachOpFold platform narrow_cmp [x, CmmLit (CmmInt i rep)])
+  = Just (cmmMachOpFold dflags narrow_cmp [x, CmmLit (CmmInt i rep)])
  where
     maybe_conversion (MO_UU_Conv from to)
         | to > from
@@ -522,7 +521,7 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
 
 -- We can often do something with constants of 0 and 1 ...
 
-cmmMachOpFoldM _ mop [x, y@(CmmLit (CmmInt 0 _))]
+cmmMachOpFoldM dflags mop [x, y@(CmmLit (CmmInt 0 _))]
   = case mop of
         MO_Add   _ -> Just x
         MO_Sub   _ -> Just x
@@ -537,15 +536,15 @@ cmmMachOpFoldM _ mop [x, y@(CmmLit (CmmInt 0 _))]
         MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         MO_U_Gt  _ | isComparisonExpr x -> Just x
         MO_S_Gt  _ | isComparisonExpr x -> Just x
-        MO_U_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_S_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_U_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_S_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_U_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
+        MO_S_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
+        MO_U_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
+        MO_S_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
         MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         MO_S_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         _ -> Nothing
 
-cmmMachOpFoldM _ mop [x, (CmmLit (CmmInt 1 rep))]
+cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt 1 rep))]
   = case mop of
         MO_Mul    _ -> Just x
         MO_S_Quot _ -> Just x
@@ -556,24 +555,24 @@ cmmMachOpFoldM _ mop [x, (CmmLit (CmmInt 1 rep))]
         MO_Eq    _ | isComparisonExpr x -> Just x
         MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_S_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_U_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_S_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_U_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
+        MO_S_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
+        MO_U_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
+        MO_S_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
         MO_U_Ge  _ | isComparisonExpr x -> Just x
         MO_S_Ge  _ | isComparisonExpr x -> Just x
         _ -> Nothing
 
 -- Now look for multiplication/division by powers of 2 (integers).
 
-cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
+cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
   = case mop of
         MO_Mul rep
            | Just p <- exactLog2 n ->
-                 Just (cmmMachOpFold platform (MO_Shl rep) [x, CmmLit (CmmInt p rep)])
+                 Just (cmmMachOpFold dflags (MO_Shl rep) [x, CmmLit (CmmInt p rep)])
         MO_U_Quot rep
            | Just p <- exactLog2 n ->
-                 Just (cmmMachOpFold platform (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
+                 Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
         MO_S_Quot rep
            | Just p <- exactLog2 n, 
              CmmReg _ <- x ->   -- We duplicate x below, hence require
@@ -601,7 +600,7 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
                          CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
                     x3 = CmmMachOp (MO_Add rep) [x, x2]
                 in
-                Just (cmmMachOpFold platform (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)])
+                Just (cmmMachOpFold dflags (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)])
         _ -> Nothing
 
 -- ToDo (#7116): optimise floating-point multiplication, e.g. x*2.0 -> x+x

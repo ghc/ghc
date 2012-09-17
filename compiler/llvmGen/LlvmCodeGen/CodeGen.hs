@@ -55,11 +55,11 @@ basicBlocksCodeGen :: LlvmEnv
                    -> ( [LlvmBasicBlock] , [LlvmCmmDecl] )
                    -> UniqSM (LlvmEnv, [LlvmBasicBlock] , [LlvmCmmDecl] )
 basicBlocksCodeGen env ([]) (blocks, tops)
-  = do let platform = targetPlatform $ getDflags env
+  = do let dflags = getDflags env
        let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
        let ((BasicBlock id fstmts):rblks) = blocks'
-       let fblocks = (BasicBlock id $ funPrologue platform ++ allocs' ++ fstmts):rblks
+       let fblocks = (BasicBlock id $ funPrologue dflags ++ allocs' ++ fstmts):rblks
        return (env, fblocks, tops)
 
 basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
@@ -148,9 +148,10 @@ barrier env = do
 -- | Memory barrier instruction for LLVM < 3.0
 oldBarrier :: LlvmEnv -> UniqSM StmtData
 oldBarrier env = do
+    let dflags = getDflags env
     let fname = fsLit "llvm.memory.barrier"
     let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
-                    FixedArgs (tysToParams [i1, i1, i1, i1, i1]) llvmFunAlign
+                    FixedArgs (tysToParams [i1, i1, i1, i1, i1]) (llvmFunAlign dflags)
     let fty = LMFunction funSig
 
     let fv   = LMGlobalVar fname fty (funcLinkage funSig) Nothing Nothing False
@@ -185,7 +186,8 @@ genCall env (CmmPrim MO_WriteBarrier _) _ _ _
 -- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
 -- is strict about types.
 genCall env t@(CmmPrim (MO_PopCnt w) _) [CmmHinted dst _] args _ = do
-    let width = widthToLlvmInt w
+    let dflags = getDflags env
+        width = widthToLlvmInt w
         dstTy = cmmToLlvmType $ localRegType dst
         funTy = \n -> LMFunction $ LlvmFunctionDecl n ExternallyVisible
                           CC_Ccc width FixedArgs (tysToParams [width]) Nothing
@@ -193,9 +195,9 @@ genCall env t@(CmmPrim (MO_PopCnt w) _) [CmmHinted dst _] args _ = do
 
     (env2, argsV, stmts2, top2) <- arg_vars env1 args ([], nilOL, [])
     (env3, fptr, stmts3, top3)  <- getFunPtr env2 funTy t
-    (argsV', stmts4)            <- castVars $ zip argsV [width]
+    (argsV', stmts4)            <- castVars dflags $ zip argsV [width]
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    ([retV'], stmts5)           <- castVars [(retV,dstTy)]
+    ([retV'], stmts5)           <- castVars dflags [(retV,dstTy)]
     let s2                       = Store retV' dstV
 
     let stmts = stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL`
@@ -208,17 +210,18 @@ genCall env t@(CmmPrim op _) [] args' CmmMayReturn
  | op == MO_Memcpy ||
    op == MO_Memset ||
    op == MO_Memmove = do
-    let (args, alignVal) = splitAlignVal args'
+    let dflags = getDflags env
+        (args, alignVal) = splitAlignVal args'
         (isVolTy, isVolVal) = if getLlvmVer env >= 28
                                  then ([i1], [mkIntLit i1 0]) else ([], [])
-        argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord, i32] ++ isVolTy
-              | otherwise       = [i8Ptr, i8Ptr, llvmWord, i32] ++ isVolTy
+        argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord dflags, i32] ++ isVolTy
+              | otherwise       = [i8Ptr, i8Ptr, llvmWord dflags, i32] ++ isVolTy
         funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
 
     (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
     (env2, fptr, stmts2, top2)    <- getFunPtr env1 funTy t
-    (argVars', stmts3)            <- castVars $ zip argVars argTy
+    (argVars', stmts3)            <- castVars dflags $ zip argVars argTy
 
     let arguments = argVars' ++ (alignVal:isVolVal)
         call = Expr $ Call StdCall fptr arguments []
@@ -243,10 +246,12 @@ genCall env (CmmPrim _ (Just stmts)) _ _ _
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
 
+    let dflags = getDflags env
+
     -- parameter types
     let arg_type (CmmHinted _ AddrHint) = i8Ptr
         -- cast pointers to i8*. Llvm equivalent of void*
-        arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType expr
+        arg_type (CmmHinted expr _    ) = cmmToLlvmType $ cmmExprType dflags expr
 
     -- ret type
     let ret_type ([]) = LMVoid
@@ -288,7 +293,7 @@ genCall env target res args ret = do
     let retTy = ret_type res
     let argTy = tysToParams $ map arg_type args
     let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
-                             lmconv retTy FixedArgs argTy llvmFunAlign
+                             lmconv retTy FixedArgs argTy (llvmFunAlign dflags)
 
 
     (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
@@ -413,16 +418,17 @@ arg_vars env (CmmHinted e _:rest) (vars, stmts, tops)
 
 
 -- | Cast a collection of LLVM variables to specific types.
-castVars :: [(LlvmVar, LlvmType)]
+castVars :: DynFlags -> [(LlvmVar, LlvmType)]
          -> UniqSM ([LlvmVar], LlvmStatements)
-castVars vars = do
-                done <- mapM (uncurry castVar) vars
+castVars dflags vars = do
+                done <- mapM (uncurry (castVar dflags)) vars
                 let (vars', stmts) = unzip done
                 return (vars', toOL stmts)
 
 -- | Cast an LLVM variable to a specific type, panicing if it can't be done.
-castVar :: LlvmVar -> LlvmType -> UniqSM (LlvmVar, LlvmStatement)
-castVar v t | getVarType v == t
+castVar :: DynFlags -> LlvmVar -> LlvmType -> UniqSM (LlvmVar, LlvmStatement)
+castVar dflags v t
+            | getVarType v == t
             = return (v, Nop)
 
             | otherwise
@@ -430,7 +436,7 @@ castVar v t | getVarType v == t
                       (LMInt n, LMInt m)
                           -> if n < m then LM_Sext else LM_Trunc
                       (vt, _) | isFloat vt && isFloat t
-                          -> if llvmWidthInBits vt < llvmWidthInBits t
+                          -> if llvmWidthInBits dflags vt < llvmWidthInBits dflags t
                                 then LM_Fpext else LM_Fptrunc
                       (vt, _) | isInt vt && isFloat t       -> LM_Sitofp
                       (vt, _) | isFloat vt && isInt t       -> LM_Fptosi
@@ -496,10 +502,11 @@ cmmPrimOpFunctions env mop
     MO_Touch         -> unsupported
 
     where
+        dflags = getDflags env
         intrinTy1 = (if getLlvmVer env >= 28
-                       then "p0i8.p0i8." else "") ++ show llvmWord
+                       then "p0i8.p0i8." else "") ++ show (llvmWord dflags)
         intrinTy2 = (if getLlvmVer env >= 28
-                       then "p0i8." else "") ++ show llvmWord
+                       then "p0i8." else "") ++ show (llvmWord dflags)
         unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                           ++ " not supported here")
 
@@ -541,12 +548,13 @@ genJump env expr live = do
 -- these with registers when possible.
 genAssign :: LlvmEnv -> CmmReg -> CmmExpr -> UniqSM StmtData
 genAssign env reg val = do
-    let (env1, vreg, stmts1, top1) = getCmmReg env reg
+    let dflags = getDflags env
+        (env1, vreg, stmts1, top1) = getCmmReg env reg
     (env2, vval, stmts2, top2) <- exprToVar env1 val
     let stmts = stmts1 `appOL` stmts2
 
     let ty = (pLower . getVarType) vreg
-    case isPointer ty && getVarType vval == llvmWord of
+    case isPointer ty && getVarType vval == llvmWord dflags of
          -- Some registers are pointer types, so need to cast value to pointer
          True -> do
              (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
@@ -592,10 +600,11 @@ genStore env addr val = genStore_slow env addr val [other]
 genStore_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmExpr
               -> UniqSM StmtData
 genStore_fast env addr r n val
-  = let gr   = lmGlobalRegVar r
+  = let dflags = getDflags env
+        gr   = lmGlobalRegVar (getDflags env) r
         meta = [getTBAA r]
         grt  = (pLower . getVarType) gr
-        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+        (ix,rem) = n `divMod` ((llvmWidthInBits dflags . pLower) grt  `div` 8)
     in case isPointer grt && rem == 0 of
             True -> do
                 (env', vval,  stmts, top) <- exprToVar env val
@@ -632,7 +641,7 @@ genStore_slow env addr val meta = do
     let stmts = stmts1 `appOL` stmts2
     case getVarType vaddr of
         -- sometimes we need to cast an int to a pointer before storing
-        LMPointer ty@(LMPointer _) | getVarType vval == llvmWord -> do
+        LMPointer ty@(LMPointer _) | getVarType vval == llvmWord dflags -> do
             (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
             let s2 = MetaStmt meta $ Store v vaddr
             return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
@@ -641,7 +650,7 @@ genStore_slow env addr val meta = do
             let s1 = MetaStmt meta $ Store vval vaddr
             return (env2, stmts `snocOL` s1, top1 ++ top2)
 
-        i@(LMInt _) | i == llvmWord -> do
+        i@(LMInt _) | i == llvmWord dflags -> do
             let vty = pLift $ getVarType vval
             (vptr, s1) <- doExpr vty $ Cast LM_Inttoptr vaddr vty
             let s2 = MetaStmt meta $ Store vval vptr
@@ -650,9 +659,10 @@ genStore_slow env addr val meta = do
         other ->
             pprPanic "genStore: ptr not right type!"
                     (PprCmm.pprExpr addr <+> text (
-                        "Size of Ptr: " ++ show llvmPtrBits ++
-                        ", Size of var: " ++ show (llvmWidthInBits other) ++
+                        "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
+                        ", Size of var: " ++ show (llvmWidthInBits dflags other) ++
                         ", Var: " ++ show vaddr))
+    where dflags = getDflags env
 
 
 -- | Unconditional branch
@@ -720,14 +730,14 @@ data EOption = EOption {
 i1Option :: EOption
 i1Option = EOption (Just i1)
 
-wordOption :: EOption
-wordOption = EOption (Just llvmWord)
+wordOption :: DynFlags -> EOption
+wordOption dflags = EOption (Just (llvmWord dflags))
 
 
 -- | Convert a CmmExpr to a list of LlvmStatements with the result of the
 -- expression being stored in the returned LlvmVar.
 exprToVar :: LlvmEnv -> CmmExpr -> UniqSM ExprData
-exprToVar env = exprToVarOpt env wordOption
+exprToVar env = exprToVarOpt env (wordOption (getDflags env))
 
 exprToVarOpt :: LlvmEnv -> EOption -> CmmExpr -> UniqSM ExprData
 exprToVarOpt env opt e = case e of
@@ -746,7 +756,7 @@ exprToVarOpt env opt e = case e of
         case (isPointer . getVarType) v1 of
              True  -> do
                  -- Cmm wants the value, so pointer types must be cast to ints
-                 (v2, s2) <- doExpr llvmWord $ Cast LM_Ptrtoint v1 llvmWord
+                 (v2, s2) <- doExpr (llvmWord dflags) $ Cast LM_Ptrtoint v1 (llvmWord dflags)
                  return (env', v2, stmts `snocOL` s1 `snocOL` s2, top)
 
              False -> return (env', v1, stmts `snocOL` s1, top)
@@ -755,11 +765,12 @@ exprToVarOpt env opt e = case e of
         -> genMachOp env opt op exprs
 
     CmmRegOff r i
-        -> exprToVar env $ expandCmmReg (r, i)
+        -> exprToVar env $ expandCmmReg dflags (r, i)
 
     CmmStackSlot _ _
         -> panic "exprToVar: CmmStackSlot not supported!"
 
+  where dflags = getDflags env
 
 -- | Handle CmmMachOp expressions
 genMachOp :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
@@ -833,6 +844,8 @@ genMachOp env _ op [x] = case op of
     MO_S_Shr        _ -> panicOp
 
     where
+        dflags = getDflags env
+
         negate ty v2 negOp = do
             (env', vx, stmts, top) <- exprToVar env x
             (v1, s1) <- doExpr ty $ LlvmOp negOp v2 vx
@@ -848,7 +861,7 @@ genMachOp env _ op [x] = case op of
             let sameConv' op = do
                 (v1, s1) <- doExpr ty $ Cast op vx ty
                 return (env', v1, stmts `snocOL` s1, top)
-            let toWidth = llvmWidthInBits ty
+            let toWidth = llvmWidthInBits dflags ty
             -- LLVM doesn't like trying to convert to same width, so
             -- need to check for that as we do get Cmm code doing it.
             case widthInBits from  of
@@ -876,14 +889,15 @@ genMachOp env opt op e = genMachOp_slow env opt op e
 genMachOp_fast :: LlvmEnv -> EOption -> MachOp -> GlobalReg -> Int -> [CmmExpr]
                -> UniqSM ExprData
 genMachOp_fast env opt op r n e
-  = let gr   = lmGlobalRegVar r
+  = let dflags = getDflags env
+        gr   = lmGlobalRegVar dflags r
         grt  = (pLower . getVarType) gr
-        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+        (ix,rem) = n `divMod` ((llvmWidthInBits dflags . pLower) grt  `div` 8)
     in case isPointer grt && rem == 0 of
             True -> do
                 (gv,  s1) <- doExpr grt $ Load gr
                 (ptr, s2) <- doExpr grt $ GetElemPtr True gv [toI32 ix]
-                (var, s3) <- doExpr llvmWord $ Cast LM_Ptrtoint ptr llvmWord
+                (var, s3) <- doExpr (llvmWord dflags) $ Cast LM_Ptrtoint ptr (llvmWord dflags)
                 return (env, var, unitOL s1 `snocOL` s2 `snocOL` s3, [])
 
             False -> genMachOp_slow env opt op e
@@ -953,6 +967,8 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_FF_Conv _ _ -> panicOp
 
     where
+        dflags = getDflags env
+
         binLlvmOp ty binOp = do
             (env1, vx, stmts1, top1) <- exprToVar env x
             (env2, vy, stmts2, top2) <- exprToVar env1 y
@@ -1013,10 +1029,10 @@ genMachOp_slow env opt op [x, y] = case op of
             (env2, vy, stmts2, top2) <- exprToVar env1 y
 
             let word  = getVarType vx
-            let word2 = LMInt $ 2 * (llvmWidthInBits $ getVarType vx)
-            let shift = llvmWidthInBits word
-            let shift1 = toIWord (shift - 1)
-            let shift2 = toIWord shift
+            let word2 = LMInt $ 2 * (llvmWidthInBits dflags $ getVarType vx)
+            let shift = llvmWidthInBits dflags word
+            let shift1 = toIWord dflags (shift - 1)
+            let shift2 = toIWord dflags shift
 
             if isInt word
                 then do
@@ -1077,11 +1093,12 @@ genLoad env e ty = genLoad_slow env e ty [other]
 genLoad_fast :: LlvmEnv -> CmmExpr -> GlobalReg -> Int -> CmmType
                 -> UniqSM ExprData
 genLoad_fast env e r n ty =
-    let gr   = lmGlobalRegVar r
+    let dflags = getDflags env
+        gr   = lmGlobalRegVar dflags r
         meta = [getTBAA r]
         grt  = (pLower . getVarType) gr
         ty'  = cmmToLlvmType ty
-        (ix,rem) = n `divMod` ((llvmWidthInBits . pLower) grt  `div` 8)
+        (ix,rem) = n `divMod` ((llvmWidthInBits dflags . pLower) grt  `div` 8)
     in case isPointer grt && rem == 0 of
             True  -> do
                 (gv,  s1) <- doExpr grt $ Load gr
@@ -1118,7 +1135,7 @@ genLoad_slow env e ty meta = do
                                            (MetaExpr meta $ Load iptr)
                     return (env', dvar, stmts `snocOL` load, tops)
 
-         i@(LMInt _) | i == llvmWord -> do
+         i@(LMInt _) | i == llvmWord dflags -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     (ptr, cast)  <- doExpr pty $ Cast LM_Inttoptr iptr pty
                     (dvar, load) <- doExpr (cmmToLlvmType ty)
@@ -1127,10 +1144,10 @@ genLoad_slow env e ty meta = do
 
          other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                         (PprCmm.pprExpr e <+> text (
-                            "Size of Ptr: " ++ show llvmPtrBits ++
-                            ", Size of var: " ++ show (llvmWidthInBits other) ++
+                            "Size of Ptr: " ++ show (llvmPtrBits dflags) ++
+                            ", Size of var: " ++ show (llvmWidthInBits dflags other) ++
                             ", Var: " ++ show iptr))
-
+    where dflags = getDflags env
 
 -- | Handle CmmReg expression
 --
@@ -1146,7 +1163,7 @@ getCmmReg env r@(CmmLocal (LocalReg un _))
             Just ety -> (env, (LMLocalVar un $ pLift ety), nilOL, [])
             Nothing  -> (nenv, newv, stmts, [])
 
-getCmmReg env (CmmGlobal g) = (env, lmGlobalRegVar g, nilOL, [])
+getCmmReg env (CmmGlobal g) = (env, lmGlobalRegVar (getDflags env) g, nilOL, [])
 
 
 -- | Allocate a CmmReg on the stack
@@ -1171,16 +1188,17 @@ genLit env (CmmFloat r w)
               nilOL, [])
 
 genLit env cmm@(CmmLabel l)
-  = let label = strCLabel_llvm env l
+  = let dflags = getDflags env
+        label = strCLabel_llvm env l
         ty = funLookup label env
-        lmty = cmmToLlvmType $ cmmLitType cmm
+        lmty = cmmToLlvmType $ cmmLitType dflags cmm
     in case ty of
             -- Make generic external label definition and then pointer to it
             Nothing -> do
-                let glob@(var, _) = genStringLabelRef label
+                let glob@(var, _) = genStringLabelRef dflags label
                 let ldata = [CmmData Data [([glob], [])]]
                 let env' = funInsert label (pLower $ getVarType var) env
-                (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var llvmWord
+                (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var (llvmWord dflags)
                 return (env', v1, unitOL s1, ldata)
 
             -- Referenced data exists in this module, retrieve type and make
@@ -1188,23 +1206,25 @@ genLit env cmm@(CmmLabel l)
             Just ty' -> do
                 let var = LMGlobalVar label (LMPointer ty')
                             ExternallyVisible Nothing Nothing False
-                (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var llvmWord
+                (v1, s1) <- doExpr lmty $ Cast LM_Ptrtoint var (llvmWord dflags)
                 return (env, v1, unitOL s1, [])
 
 genLit env (CmmLabelOff label off) = do
+    let dflags = getDflags env
     (env', vlbl, stmts, stat) <- genLit env (CmmLabel label)
-    let voff = toIWord off
+    let voff = toIWord dflags off
     (v1, s1) <- doExpr (getVarType vlbl) $ LlvmOp LM_MO_Add vlbl voff
     return (env', v1, stmts `snocOL` s1, stat)
 
 genLit env (CmmLabelDiffOff l1 l2 off) = do
+    let dflags = getDflags env
     (env1, vl1, stmts1, stat1) <- genLit env (CmmLabel l1)
     (env2, vl2, stmts2, stat2) <- genLit env1 (CmmLabel l2)
-    let voff = toIWord off
+    let voff = toIWord dflags off
     let ty1 = getVarType vl1
     let ty2 = getVarType vl2
     if (isInt ty1) && (isInt ty2)
-       && (llvmWidthInBits ty1 == llvmWidthInBits ty2)
+       && (llvmWidthInBits dflags ty1 == llvmWidthInBits dflags ty2)
 
        then do
             (v1, s1) <- doExpr (getVarType vl1) $ LlvmOp LM_MO_Sub vl1 vl2
@@ -1227,11 +1247,12 @@ genLit _ CmmHighStackMark
 --
 
 -- | Function prologue. Load STG arguments into variables for function.
-funPrologue :: Platform -> [LlvmStatement]
-funPrologue platform = concat $ map getReg $ activeStgRegs platform
-    where getReg rr =
-            let reg   = lmGlobalRegVar rr
-                arg   = lmGlobalRegArg rr
+funPrologue :: DynFlags -> [LlvmStatement]
+funPrologue dflags = concat $ map getReg $ activeStgRegs platform
+    where platform = targetPlatform dflags
+          getReg rr =
+            let reg   = lmGlobalRegVar dflags rr
+                arg   = lmGlobalRegArg dflags rr
                 alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
             in [alloc, Store arg reg]
 
@@ -1249,11 +1270,11 @@ funEpilogue env (Just live) | dopt Opt_RegLiveness dflags = do
     dflags = getDflags env
     platform = targetPlatform dflags
     loadExpr r | r `elem` alwaysLive || r `elem` live = do
-        let reg  = lmGlobalRegVar r
+        let reg  = lmGlobalRegVar dflags r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
         return (v, unitOL s)
     loadExpr r = do
-        let ty = (pLower . getVarType $ lmGlobalRegVar r)
+        let ty = (pLower . getVarType $ lmGlobalRegVar dflags r)
         return (LMLitVar $ LMUndefLit ty, unitOL Nop)
 
 -- don't do liveness optimisation
@@ -1265,7 +1286,7 @@ funEpilogue env _ = do
     dflags = getDflags env
     platform = targetPlatform dflags
     loadExpr r = do
-        let reg  = lmGlobalRegVar r
+        let reg  = lmGlobalRegVar dflags r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
         return (v, unitOL s)
 
@@ -1285,7 +1306,7 @@ trashStmts :: DynFlags -> LlvmStatements
 trashStmts dflags = concatOL $ map trashReg $ activeStgRegs platform
     where platform = targetPlatform dflags
           trashReg r =
-            let reg   = lmGlobalRegVar r
+            let reg   = lmGlobalRegVar dflags r
                 ty    = (pLower . getVarType) reg
                 trash = unitOL $ Store (LMLitVar $ LMUndefLit ty) reg
             in case callerSaves (targetPlatform dflags) r of
@@ -1340,9 +1361,9 @@ doExpr ty expr = do
 
 
 -- | Expand CmmRegOff
-expandCmmReg :: (CmmReg, Int) -> CmmExpr
-expandCmmReg (reg, off)
-  = let width = typeWidth (cmmRegType reg)
+expandCmmReg :: DynFlags -> (CmmReg, Int) -> CmmExpr
+expandCmmReg dflags (reg, off)
+  = let width = typeWidth (cmmRegType dflags reg)
         voff  = CmmLit $ CmmInt (fromIntegral off) width
     in CmmMachOp (MO_Add width) [CmmReg reg, voff]
 
@@ -1356,9 +1377,11 @@ mkIntLit :: Integral a => LlvmType -> a -> LlvmVar
 mkIntLit ty i = LMLitVar $ LMIntLit (toInteger i) ty
 
 -- | Convert int type to a LLvmVar of word or i32 size
-toI32, toIWord :: Integral a => a -> LlvmVar
+toI32 :: Integral a => a -> LlvmVar
 toI32 = mkIntLit i32
-toIWord = mkIntLit llvmWord
+
+toIWord :: Integral a => DynFlags -> a -> LlvmVar
+toIWord dflags = mkIntLit (llvmWord dflags)
 
 
 -- | Error functions

@@ -182,15 +182,15 @@ getSimplCount :: SimplM SimplCount
 getSimplCount = SM (\_st_env us sc -> return (sc, us, sc))
 
 tick :: Tick -> SimplM ()
-tick t = SM (\_st_env us sc -> let sc' = doSimplTick t sc
-                               in sc' `seq` return ((), us, sc'))
+tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
+                              in sc' `seq` return ((), us, sc'))
 
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
 checkedTick t 
   = SM (\st_env us sc -> if st_max_ticks st_env <= simplCountN sc
                          then pprPanic "Simplifier ticks exhausted" (msg sc)
-                         else let sc' = doSimplTick t sc 
+                         else let sc' = doSimplTick (st_flags st_env) t sc
                               in sc' `seq` return ((), us, sc'))
   where
     msg sc = vcat [ ptext (sLit "When trying") <+> ppr t

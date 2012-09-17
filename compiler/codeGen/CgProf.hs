@@ -6,37 +6,30 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CgProf (
-	mkCCostCentre, mkCCostCentreStack,
+        mkCCostCentre, mkCCostCentreStack,
 
-	-- Cost-centre Profiling
+        -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk,
         enterCostCentreFun,
         costCentreFrom,
         curCCS, storeCurCCS,
-	emitCostCentreDecl, emitCostCentreStackDecl, 
+        emitCostCentreDecl, emitCostCentreStackDecl,
         emitSetCCC,
 
-	-- Lag/drag/void stuff
-	ldvEnter, ldvEnterClosure, ldvRecordCreate
+        -- Lag/drag/void stuff
+        ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
 
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
  -- For WORD_SIZE_IN_BITS only.
 #include "../includes/rts/Constants.h"
-	-- For LDV_CREATE_MASK, LDV_STATE_USE
-	-- which are StgWords
+        -- For LDV_CREATE_MASK, LDV_STATE_USE
+        -- which are StgWords
 #include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
+        -- For REP_xxx constants, which are MachReps
 
 import ClosureInfo
 import CgUtils
@@ -52,7 +45,6 @@ import CostCentre
 import DynFlags
 import FastString
 import Module
-import Constants	-- Lots of field offsets
 import Outputable
 
 import Data.Char
@@ -77,27 +69,30 @@ mkCCostCentre cc = CmmLabel (mkCCLabel cc)
 mkCCostCentreStack :: CostCentreStack -> CmmLit
 mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 
-costCentreFrom :: CmmExpr 	-- A closure pointer
-	       -> CmmExpr	-- The cost centre from that closure
-costCentreFrom cl = CmmLoad (cmmOffsetB cl oFFSET_StgHeader_ccs) bWord
+costCentreFrom :: DynFlags
+               -> CmmExpr       -- A closure pointer
+               -> CmmExpr       -- The cost centre from that closure
+costCentreFrom dflags cl
+    = CmmLoad (cmmOffsetB dflags cl (oFFSET_StgHeader_ccs dflags)) (bWord dflags)
 
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 -- The profiling header words in a static closure
 -- Was SET_STATIC_PROF_HDR
 staticProfHdr dflags ccs = ifProfilingL dflags [mkCCostCentreStack ccs,
-                                                staticLdvInit]
+                                                staticLdvInit dflags]
 
 dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 -- Profiling header words in a dynamic closure
-dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit]
+dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit dflags]
 
 initUpdFrameProf :: CmmExpr -> Code
 -- Initialise the profiling field of an update frame
-initUpdFrameProf frame_amode 
-  = ifProfiling $	-- frame->header.prof.ccs = CCCS
-    stmtC (CmmStore (cmmOffsetB frame_amode oFFSET_StgHeader_ccs) curCCS)
-	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
-	-- is unnecessary because it is not used anyhow.
+initUpdFrameProf frame_amode
+  = ifProfiling $       -- frame->header.prof.ccs = CCCS
+    do dflags <- getDynFlags
+       stmtC (CmmStore (cmmOffsetB dflags frame_amode (oFFSET_StgHeader_ccs dflags)) curCCS)
+        -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
+        -- is unnecessary because it is not used anyhow.
 
 -- -----------------------------------------------------------------------------
 -- Recording allocation in a cost centre
@@ -108,7 +103,7 @@ profDynAlloc :: ClosureInfo -> CmmExpr -> Code
 profDynAlloc cl_info ccs
   = ifProfiling $
     do dflags <- getDynFlags
-       profAlloc (CmmLit (mkIntCLit (closureSize dflags cl_info))) ccs
+       profAlloc (mkIntExpr dflags (closureSize dflags cl_info)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -121,30 +116,32 @@ profAlloc words ccs
   = ifProfiling $
     do dflags <- getDynFlags
        stmtC (addToMemE alloc_rep
-                   (cmmOffsetB ccs oFFSET_CostCentreStack_mem_alloc)
-                   (CmmMachOp (MO_UU_Conv wordWidth alloc_rep) $
-                     [CmmMachOp mo_wordSub [words,
-                                            CmmLit (mkIntCLit (profHdrSize dflags))]]))
+                   (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_mem_alloc dflags))
+                   (CmmMachOp (MO_UU_Conv (wordWidth dflags) alloc_rep) $
+                     [CmmMachOp (mo_wordSub dflags) [words,
+                                                     mkIntExpr dflags (profHdrSize dflags)]]))
                    -- subtract the "profiling overhead", which is the
                    -- profiling header in a closure.
- where 
+ where
    alloc_rep = typeWidth REP_CostCentreStack_mem_alloc
 
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
 
 enterCostCentreThunk :: CmmExpr -> Code
-enterCostCentreThunk closure = 
-  ifProfiling $ do 
-    stmtC $ storeCurCCS (costCentreFrom closure)
+enterCostCentreThunk closure =
+  ifProfiling $ do
+    dflags <- getDynFlags
+    stmtC $ storeCurCCS (costCentreFrom dflags closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> [GlobalReg] -> Code
 enterCostCentreFun ccs closure vols =
   ifProfiling $ do
     if isCurrentCCS ccs
-       then emitRtsCallWithVols rtsPackageId (fsLit "enterFunCCS")
-               [CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
-                CmmHinted (costCentreFrom closure) AddrHint] vols
+       then do dflags <- getDynFlags
+               emitRtsCallWithVols rtsPackageId (fsLit "enterFunCCS")
+                   [CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
+                    CmmHinted (costCentreFrom dflags closure) AddrHint] vols
        else return () -- top-level function, nothing to do
 
 ifProfiling :: Code -> Code
@@ -163,7 +160,7 @@ ifProfilingL dflags xs
 emitCostCentreDecl
    :: CostCentre
    -> Code
-emitCostCentreDecl cc = do 
+emitCostCentreDecl cc = do
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   { label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
   ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
@@ -177,51 +174,53 @@ emitCostCentreDecl cc = do
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
-     lits = [ zero,   	-- StgInt ccID,
-	      label,	-- char *label,
-	      modl,	-- char *module,
+     is_caf | isCafCC cc = mkIntCLit dflags (ord 'c') -- 'c' == is a CAF
+            | otherwise  = zero dflags
+     lits = [ zero dflags,     -- StgInt ccID,
+              label,    -- char *label,
+              modl,     -- char *module,
               loc,      -- char *srcloc,
               zero64,   -- StgWord64 mem_alloc
-              zero,     -- StgWord time_ticks
+              zero dflags,     -- StgWord time_ticks
               is_caf,   -- StgInt is_caf
-              zero      -- struct _CostCentre *link
-	    ] 
+              zero dflags      -- struct _CostCentre *link
+            ]
   ; emitDataLits (mkCCLabel cc) lits
   }
-  where
-     is_caf | isCafCC cc = mkIntCLit (ord 'c') -- 'c' == is a CAF
-            | otherwise  = zero
 
 
 emitCostCentreStackDecl
    :: CostCentreStack
    -> Code
-emitCostCentreStackDecl ccs 
+emitCostCentreStackDecl ccs
   | Just cc <- maybeSingletonCCS ccs = do
-  { let
-	-- Note: to avoid making any assumptions about how the
-	-- C compiler (that compiles the RTS, in particular) does
-	-- layouts of structs containing long-longs, simply
-	-- pad out the struct with zero words until we hit the
-	-- size of the overall struct (which we get via DerivedConstants.h)
-	--
-     lits = zero : mkCCostCentre cc : replicate (sizeof_ccs_words - 2) zero
+  { dflags <- getDynFlags
+  ; let
+        -- Note: to avoid making any assumptions about how the
+        -- C compiler (that compiles the RTS, in particular) does
+        -- layouts of structs containing long-longs, simply
+        -- pad out the struct with zero words until we hit the
+        -- size of the overall struct (which we get via DerivedConstants.h)
+        --
+     lits = zero dflags
+          : mkCCostCentre cc
+          : replicate (sizeof_ccs_words dflags - 2) (zero dflags)
   ; emitDataLits (mkCCSLabel ccs) lits
   }
   | otherwise = pprPanic "emitCostCentreStackDecl" (ppr ccs)
 
-zero :: CmmLit
-zero = mkIntCLit 0
+zero :: DynFlags -> CmmLit
+zero dflags = mkIntCLit dflags 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
-sizeof_ccs_words :: Int
-sizeof_ccs_words 
+sizeof_ccs_words :: DynFlags -> Int
+sizeof_ccs_words dflags
     -- round up to the next word.
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
+   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE dflags
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
@@ -230,51 +229,52 @@ emitSetCCC :: CostCentre -> Bool -> Bool -> Code
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
       if dopt Opt_SccProfilingOn dflags
-          then do tmp <- newTemp bWord -- TODO FIXME NOW
+          then do tmp <- newTemp (bWord dflags) -- TODO FIXME NOW
                   pushCostCentre tmp curCCS cc
-                  when tick $ stmtC (bumpSccCount (CmmReg (CmmLocal tmp)))
+                  when tick $ stmtC (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
                   when push $ stmtC (storeCurCCS (CmmReg (CmmLocal tmp)))
           else nopC
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result AddrHint
-	rtsPackageId 
+        rtsPackageId
         (fsLit "pushCostCentre") [CmmHinted ccs AddrHint,
                                   CmmHinted (CmmLit (mkCCostCentre cc)) AddrHint]
 
-bumpSccCount :: CmmExpr -> CmmStmt
-bumpSccCount ccs
+bumpSccCount :: DynFlags -> CmmExpr -> CmmStmt
+bumpSccCount dflags ccs
   = addToMem (typeWidth REP_CostCentreStack_scc_count)
-	 (cmmOffsetB ccs oFFSET_CostCentreStack_scc_count) 1
+         (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
 
 -----------------------------------------------------------------------------
 --
---		Lag/drag/void stuff
+--              Lag/drag/void stuff
 --
 -----------------------------------------------------------------------------
 
 --
 -- Initial value for the LDV field in a static closure
 --
-staticLdvInit :: CmmLit
+staticLdvInit :: DynFlags -> CmmLit
 staticLdvInit = zeroCLit
 
 --
 -- Initial value of the LDV field in a dynamic closure
 --
-dynLdvInit :: CmmExpr
-dynLdvInit =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE  
-  CmmMachOp mo_wordOr [
-      CmmMachOp mo_wordShl [loadEra, CmmLit (mkIntCLit lDV_SHIFT) ],
-      CmmLit (mkWordCLit lDV_STATE_CREATE)
+dynLdvInit :: DynFlags -> CmmExpr
+dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
+  CmmMachOp (mo_wordOr dflags) [
+      CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags lDV_SHIFT ],
+      CmmLit (mkWordCLit dflags lDV_STATE_CREATE)
   ]
-        
+
 --
 -- Initialise the LDV word of a new closure
 --
 ldvRecordCreate :: CmmExpr -> Code
-ldvRecordCreate closure = stmtC $ CmmStore (ldvWord closure) dynLdvInit
+ldvRecordCreate closure = do dflags <- getDynFlags
+                             stmtC $ CmmStore (ldvWord dflags closure) (dynLdvInit dflags)
 
 --
 -- Called when a closure is entered, marks the closure as having been "used".
@@ -283,34 +283,38 @@ ldvRecordCreate closure = stmtC $ CmmStore (ldvWord closure) dynLdvInit
 -- profiling.
 --
 ldvEnterClosure :: ClosureInfo -> Code
-ldvEnterClosure closure_info = ldvEnter (cmmOffsetB (CmmReg nodeReg) (-tag))
-  where tag = funTag closure_info
+ldvEnterClosure closure_info
+    = do dflags <- getDynFlags
+         let tag = funTag dflags closure_info
+         ldvEnter (cmmOffsetB dflags (CmmReg nodeReg) (-tag))
         -- don't forget to substract node's tag
-  
+
 ldvEnter :: CmmExpr -> Code
 -- Argument is a closure pointer
-ldvEnter cl_ptr
-  =  ifProfiling $
+ldvEnter cl_ptr = do
+  dflags <- getDynFlags
+  let
+        -- don't forget to substract node's tag
+    ldv_wd = ldvWord dflags cl_ptr
+    new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
+                                                     (CmmLit (mkWordCLit dflags lDV_CREATE_MASK)))
+                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags lDV_STATE_USE)))
+  ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
      --                era | LDV_STATE_USE }
-    emitIf (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
-	   (stmtC (CmmStore ldv_wd new_ldv_wd))
-  where
-        -- don't forget to substract node's tag
-    ldv_wd = ldvWord cl_ptr
-    new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd bWord)
-				       (CmmLit (mkWordCLit lDV_CREATE_MASK)))
-		 (cmmOrWord loadEra (CmmLit (mkWordCLit lDV_STATE_USE)))
+    emitIf (CmmMachOp (mo_wordUGt dflags) [loadEra dflags, CmmLit (zeroCLit dflags)])
+           (stmtC (CmmStore ldv_wd new_ldv_wd))
 
-loadEra :: CmmExpr 
-loadEra = CmmMachOp (MO_UU_Conv cIntWidth wordWidth)
-	  [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
+loadEra :: DynFlags -> CmmExpr
+loadEra dflags = CmmMachOp (MO_UU_Conv cIntWidth (wordWidth dflags))
+                           [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
 
-ldvWord :: CmmExpr -> CmmExpr
--- Takes the address of a closure, and returns 
+ldvWord :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
-ldvWord closure_ptr = cmmOffsetB closure_ptr oFFSET_StgHeader_ldvw
+ldvWord dflags closure_ptr
+    = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
 
 -- LDV constants, from ghc/includes/Constants.h
 lDV_SHIFT :: Int

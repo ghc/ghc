@@ -27,7 +27,6 @@ import ClosureInfo
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Type             ( flattenRepType, repType )
-import Constants        ( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery        ( mkVirtHeapOffsets )
 import Util
 
@@ -49,14 +48,14 @@ import GHC.Ptr          ( Ptr(..) )
 \begin{code}
 newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
 
-itblCode :: ItblPtr -> Ptr ()
-itblCode (ItblPtr ptr)
- | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB
+itblCode :: DynFlags -> ItblPtr -> Ptr ()
+itblCode dflags (ItblPtr ptr)
+ | ghciTablesNextToCode = castPtr ptr `plusPtr` conInfoTableSizeB dflags
  | otherwise            = castPtr ptr
 
 -- XXX bogus
-conInfoTableSizeB :: Int
-conInfoTableSizeB = 3 * wORD_SIZE
+conInfoTableSizeB :: DynFlags -> Int
+conInfoTableSizeB dflags = 3 * wORD_SIZE dflags
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
@@ -106,8 +105,8 @@ make_constr_itbls dflags cons
                ptrs'  = ptr_wds
                nptrs' = tot_wds - ptr_wds
                nptrs_really
-                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE = nptrs'
-                  | otherwise = mIN_PAYLOAD_SIZE - ptrs'
+                  | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
+                  | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
                code' = mkJumpToAddr entry_addr
                itbl  = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE
@@ -128,7 +127,7 @@ make_constr_itbls dflags cons
                             }
                -- Make a piece of code to jump to "entry_label".
                -- This is the only arch-dependent bit.
-           addrCon <- newExec pokeConItbl conInfoTbl
+           addrCon <- newExecConItbl dflags conInfoTbl
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
@@ -285,39 +284,17 @@ data StgConInfoTable = StgConInfoTable {
    infoTable :: StgInfoTable
 }
 
-instance Storable StgConInfoTable where
-   sizeOf conInfoTable    
+sizeOfConItbl :: StgConInfoTable -> Int
+sizeOfConItbl conInfoTable
       = sum [ sizeOf (conDesc conInfoTable)
             , sizeOf (infoTable conInfoTable) ]
-   alignment _ = SIZEOF_VOID_P
-   peek ptr 
-      = evalState (castPtr ptr) $ do
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-           desc <- load
-#endif
-           itbl <- load
-#ifndef GHCI_TABLES_NEXT_TO_CODE
-           desc <- load
-#endif
-           return  
-              StgConInfoTable 
-              { 
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-                conDesc   = castPtr $ ptr `plusPtr` conInfoTableSizeB `plusPtr` desc
-#else
-                conDesc   = desc
-#endif
-              , infoTable = itbl
-              }
-   poke = error "poke(StgConInfoTable): use pokeConItbl instead"
 
-
-pokeConItbl :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+pokeConItbl :: DynFlags -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
             -> IO ()
-pokeConItbl wr_ptr ex_ptr itbl 
+pokeConItbl dflags wr_ptr ex_ptr itbl
       = evalState (castPtr wr_ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-           store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB))
+           store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB dflags))
 #endif
            store (infoTable itbl)
 #ifndef GHCI_TABLES_NEXT_TO_CODE
@@ -443,12 +420,12 @@ load = do addr <- advance
           lift (peek addr)
 
 
-newExec :: Storable a => (Ptr a -> Ptr a -> a -> IO ()) -> a -> IO (FunPtr ())
-newExec poke_fn obj
+newExecConItbl :: DynFlags -> StgConInfoTable -> IO (FunPtr ())
+newExecConItbl dflags obj
    = alloca $ \pcode -> do
-        wr_ptr <- _allocateExec (fromIntegral (sizeOf obj)) pcode
+        wr_ptr <- _allocateExec (fromIntegral (sizeOfConItbl obj)) pcode
         ex_ptr <- peek pcode
-        poke_fn wr_ptr ex_ptr obj
+        pokeConItbl dflags wr_ptr ex_ptr obj
         return (castPtrToFunPtr ex_ptr)
 
 foreign import ccall unsafe "allocateExec"

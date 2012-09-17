@@ -28,10 +28,10 @@ import Unique
 
 -- | Header code for LLVM modules
 pprLlvmHeader :: SDoc
-pprLlvmHeader =
+pprLlvmHeader = sdocWithDynFlags $ \dflags ->
     moduleLayout
     $+$ text ""
-    $+$ ppLlvmFunctionDecls (map snd ghcInternalFunctions)
+    $+$ ppLlvmFunctionDecls (map snd (ghcInternalFunctions dflags))
     $+$ ppLlvmMetas stgTBAA
     $+$ text ""
 
@@ -106,14 +106,15 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
 -- | Pretty print CmmStatic
 pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (SDoc, [LlvmVar])
 pprInfoTable env count info_lbl stat
-  = let unres = genLlvmData env (Text, stat)
+  = let dflags = getDflags env
+        unres = genLlvmData env (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
         setSection ((LMGlobalVar _ ty l _ _ c), d)
             = let sec = mkLayoutSection count
                   ilabel = strCLabel_llvm env info_lbl
                               `appendFS` fsLit iTableSuf
-                  gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
+                  gv = LMGlobalVar ilabel ty l sec (llvmInfAlign dflags) c
                   v = if l == Internal then [gv] else []
               in ((gv, d), v)
         setSection v = (v,[])

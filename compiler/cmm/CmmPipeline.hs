@@ -43,7 +43,7 @@ cmmPipeline hsc_env topSRT prog =
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     (topSRT, cmms) <- {-# SCC "toTops" #-} doSRTs topSRT tops
+     (topSRT, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags topSRT tops
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
 
      return (topSRT, cmms)
@@ -105,6 +105,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
+       dumpIfSet_dyn dflags Opt_D_dump_cmmz "CAFEnv" (ppr cafEnv)
 
        if splitting_proc_points
           then do
@@ -118,7 +119,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
      
             ------------- Populate info tables with stack info -----------------
             gs <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ map (setInfoTableStackMap stackmaps) gs
+                  return $ map (setInfoTableStackMap dflags stackmaps) gs
             dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
      
             ----------- Control-flow optimisations -----------------------------
@@ -136,7 +137,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
             ------------- Populate info tables with stack info -----------------
             g <- {-# SCC "setInfoTableStackMap" #-}
-                  return $ setInfoTableStackMap stackmaps g
+                  return $ setInfoTableStackMap dflags stackmaps g
             dump' Opt_D_dump_cmmz_info "after setInfoTableStackMap" g
      
             ----------- Control-flow optimisations -----------------------------
@@ -182,7 +183,7 @@ dumpGraph dflags flag name g = do
   when (dopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
-  do_lint g = case cmmLintGraph g of
+  do_lint g = case cmmLintGraph dflags g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }

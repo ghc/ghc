@@ -20,8 +20,8 @@ import CmmUtils
 import CmmOpt
 import StgCmmUtils
 
+import DynFlags
 import UniqSupply
-import Platform
 import UniqFM
 import Unique
 import BlockId
@@ -35,8 +35,8 @@ import Prelude hiding (succ, zip)
 ----------------------------------------------------------------
 --- Main function
 
-rewriteAssignments :: Platform -> CmmGraph -> UniqSM CmmGraph
-rewriteAssignments platform g = do
+rewriteAssignments :: DynFlags -> CmmGraph -> UniqSM CmmGraph
+rewriteAssignments dflags g = do
   -- Because we need to act on forwards and backwards information, we
   -- first perform usage analysis and bake this information into the
   -- graph (backwards transform), and then do a forwards transform
@@ -44,8 +44,8 @@ rewriteAssignments platform g = do
   g'  <- annotateUsage g
   g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
                                      analRewFwd assignmentLattice
-                                                (assignmentTransfer platform)
-                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite platform)
+                                                (assignmentTransfer dflags)
+                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite dflags)
   return (modifyGraph eraseRegUsage g'')
 
 ----------------------------------------------------------------
@@ -309,7 +309,7 @@ invalidateUsersOf reg = mapUFM (invalidateUsers' reg)
 -- optimize; we need an algorithmic change to prevent us from having to
 -- traverse the /entire/ map continually.
 
-middleAssignment :: Platform -> WithRegUsage CmmNode O O -> AssignmentMap
+middleAssignment :: DynFlags -> WithRegUsage CmmNode O O -> AssignmentMap
                  -> AssignmentMap
 
 -- Algorithm for annotated assignments:
@@ -349,10 +349,10 @@ middleAssignment _ (Plain (CmmAssign (CmmLocal _) _)) assign = assign
 --  1. Delete any sinking assignments that were used by this instruction
 --  2. Look for all assignments that load from memory locations that
 --     were clobbered by this store and invalidate them.
-middleAssignment _ (Plain n@(CmmStore lhs rhs)) assign
+middleAssignment dflags (Plain n@(CmmStore lhs rhs)) assign
     = let m = deleteSinks n assign
       in foldUFM_Directly f m m -- [foldUFM performance]
-      where f u (xassign -> Just x) m | (lhs, rhs) `clobbers` (u, x) = addToUFM_Directly m u NeverOptimize
+      where f u (xassign -> Just x) m | clobbers dflags (lhs, rhs) (u, x) = addToUFM_Directly m u NeverOptimize
             f _ _ m = m
 {- Also leaky
     = mapUFM_Directly p . deleteSinks n $ assign
@@ -371,7 +371,7 @@ middleAssignment _ (Plain n@(CmmStore lhs rhs)) assign
 -- This is kind of expensive. (One way to optimize this might be to
 -- store extra information about expressions that allow this and other
 -- checks to be done cheaply.)
-middleAssignment platform (Plain n@(CmmUnsafeForeignCall{})) assign
+middleAssignment dflags (Plain n@(CmmUnsafeForeignCall{})) assign
     = deleteCallerSaves (foldRegsDefd (\m r -> addToUFM m r NeverOptimize) (deleteSinks n assign) n)
     where deleteCallerSaves m = foldUFM_Directly f m m
           f u (xassign -> Just x) m | wrapRecExpf g x False = addToUFM_Directly m u NeverOptimize
@@ -379,6 +379,7 @@ middleAssignment platform (Plain n@(CmmUnsafeForeignCall{})) assign
           g (CmmReg (CmmGlobal r)) _      | callerSaves platform r = True
           g (CmmRegOff (CmmGlobal r) _) _ | callerSaves platform r = True
           g _ b = b
+          platform = targetPlatform dflags
 
 middleAssignment _ (Plain (CmmComment {})) assign
     = assign
@@ -398,17 +399,18 @@ middleAssignment _ (Plain (CmmComment {})) assign
 --    the next spill.)
 --  * Non stack-slot stores always conflict with each other.  (This is
 --    not always the case; we could probably do something special for Hp)
-clobbers :: (CmmExpr, CmmExpr) -- (lhs, rhs) of clobbering CmmStore
+clobbers :: DynFlags
+         -> (CmmExpr, CmmExpr) -- (lhs, rhs) of clobbering CmmStore
          -> (Unique,  CmmExpr) -- (register, expression) that may be clobbered
          -> Bool
-clobbers (CmmRegOff (CmmGlobal Hp) _, _) (_, _) = False
-clobbers (CmmReg (CmmGlobal Hp), _) (_, _) = False
+clobbers _ (CmmRegOff (CmmGlobal Hp) _, _) (_, _) = False
+clobbers _ (CmmReg (CmmGlobal Hp), _) (_, _) = False
 -- ToDo: Also catch MachOp case
-clobbers (ss@CmmStackSlot{}, CmmReg (CmmLocal r)) (u, CmmLoad (ss'@CmmStackSlot{}) _)
+clobbers _ (ss@CmmStackSlot{}, CmmReg (CmmLocal r)) (u, CmmLoad (ss'@CmmStackSlot{}) _)
     | getUnique r == u, ss == ss' = False -- No-op on the stack slot (XXX: Do we need this special case?)
-clobbers (CmmStackSlot a o, rhs) (_, expr) = f expr
+clobbers dflags (CmmStackSlot a o, rhs) (_, expr) = f expr
     where f (CmmLoad (CmmStackSlot a' o') t)
-            = (a, o, widthInBytes (cmmExprWidth rhs)) `overlaps` (a', o', widthInBytes (typeWidth t))
+            = (a, o, widthInBytes (cmmExprWidth dflags rhs)) `overlaps` (a', o', widthInBytes (typeWidth t))
           f (CmmLoad e _)    = containsStackSlot e
           f (CmmMachOp _ es) = or (map f es)
           f _                = False
@@ -418,7 +420,7 @@ clobbers (CmmStackSlot a o, rhs) (_, expr) = f expr
           containsStackSlot (CmmMachOp _ es) = or (map containsStackSlot es)
           containsStackSlot (CmmStackSlot{}) = True
           containsStackSlot _ = False
-clobbers _ (_, e) = f e
+clobbers _ _ (_, e) = f e
     where f (CmmLoad (CmmStackSlot _ _) _) = False
           f (CmmLoad{}) = True -- conservative
           f (CmmMachOp _ es) = or (map f es)
@@ -463,11 +465,11 @@ invalidateVolatile k m = mapUFM p m
                   exp _ = False
         p _ = NeverOptimize -- probably shouldn't happen with AlwaysSink
 
-assignmentTransfer :: Platform
+assignmentTransfer :: DynFlags
                    -> FwdTransfer (WithRegUsage CmmNode) AssignmentMap
-assignmentTransfer platform
+assignmentTransfer dflags
     = mkFTransfer3 (flip const)
-                   (middleAssignment platform)
+                   (middleAssignment dflags)
                    ((mkFactBase assignmentLattice .) . lastAssignment)
 
 -- Note [Soundness of inlining]
@@ -611,8 +613,8 @@ assignmentRewrite = mkFRewrite3 first middle last
 -- in literals, which we can inline more aggressively, and inlining
 -- gives us opportunities for more folding.  However, we don't need any
 -- facts to do MachOp folding.
-machOpFoldRewrite :: Platform -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
-machOpFoldRewrite platform = mkFRewrite3 first middle last
+machOpFoldRewrite :: DynFlags -> FwdRewrite UniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite dflags = mkFRewrite3 first middle last
   where first _ _ = return Nothing
         middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O
         middle (Plain m) _ = return (fmap (mkMiddle . Plain) (foldNode m))
@@ -622,7 +624,7 @@ machOpFoldRewrite platform = mkFRewrite3 first middle last
         last (Plain l) _ = return (fmap (mkLast . Plain) (foldNode l))
         foldNode :: CmmNode e x -> Maybe (CmmNode e x)
         foldNode n = mapExpDeepM foldExp n
-        foldExp (CmmMachOp op args) = cmmMachOpFoldM platform op args
+        foldExp (CmmMachOp op args) = cmmMachOpFoldM dflags op args
         foldExp _ = Nothing
 
 -- ToDo: Outputable instance for UsageMap and AssignmentMap

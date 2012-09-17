@@ -55,8 +55,8 @@ import CLabel           ( CLabel )
 import Unique
 
 import CodeGen.Platform
+import DynFlags
 import Outputable
-import Constants
 import FastBool
 import FastTypes
 import Platform
@@ -194,10 +194,11 @@ addrOffset addr off
 -- temporaries and for excess call arguments.  @fpRel@, where
 -- applicable, is the same but for the frame pointer.
 
-spRel :: Int    -- desired stack offset in words, positive or negative
+spRel :: DynFlags
+      -> Int    -- desired stack offset in words, positive or negative
       -> AddrMode
 
-spRel n = AddrRegImm sp (ImmInt (n * wORD_SIZE))
+spRel dflags n = AddrRegImm sp (ImmInt (n * wORD_SIZE dflags))
 
 
 -- argRegs is the set of regs which are read for an n-argument call to C.

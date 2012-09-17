@@ -43,7 +43,6 @@ import CLabel
 import Name
 import Unique
 
-import Constants
 import DynFlags
 import Util
 import Outputable
@@ -94,16 +93,17 @@ emitReturnTarget
    -> CgStmts			-- The direct-return code (if any)
    -> FCode CLabel
 emitReturnTarget name stmts
-  = do	{ srt_info   <- getSRTInfo
-	; blks <- cgStmtsToBlocks stmts
-        ; frame <- mkStackLayout
-        ; let smrep    = mkStackRep (mkLiveness frame)
-              info     = CmmInfoTable { cit_lbl  = info_lbl
-                                      , cit_prof = NoProfilingInfo
-                                      , cit_rep  = smrep
-                                      , cit_srt  = srt_info }
-        ; emitInfoTableAndCode entry_lbl info args blks
-	; return info_lbl }
+  = do dflags <- getDynFlags
+       srt_info   <- getSRTInfo
+       blks <- cgStmtsToBlocks stmts
+       frame <- mkStackLayout
+       let smrep    = mkStackRep (mkLiveness dflags frame)
+           info     = CmmInfoTable { cit_lbl  = info_lbl
+                                   , cit_prof = NoProfilingInfo
+                                   , cit_rep  = smrep
+                                   , cit_srt  = srt_info }
+       emitInfoTableAndCode entry_lbl info args blks
+       return info_lbl
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
     uniq      = getUnique name
@@ -151,6 +151,7 @@ is not present in the list (it is always assumed).
 -}
 mkStackLayout :: FCode [Maybe LocalReg]
 mkStackLayout = do
+  dflags <- getDynFlags
   StackUsage { realSp = real_sp,
                frameSp = frame_sp } <- getStkUsage
   binds <- getLiveStackBindings
@@ -162,21 +163,22 @@ mkStackLayout = do
   WARN( not (all (\bind -> fst bind >= 0) rel_binds),
         ppr binds $$ ppr rel_binds $$
         ppr frame_size $$ ppr real_sp $$ ppr frame_sp )
-    return $ stack_layout rel_binds frame_size
+    return $ stack_layout dflags rel_binds frame_size
 
-stack_layout :: [(VirtualSpOffset, CgIdInfo)]
+stack_layout :: DynFlags
+             -> [(VirtualSpOffset, CgIdInfo)]
              -> WordOff
              -> [Maybe LocalReg]
-stack_layout [] sizeW = replicate sizeW Nothing
-stack_layout ((off, bind):binds) sizeW | off == sizeW - 1 =
-  (Just stack_bind) : (stack_layout binds (sizeW - rep_size))
+stack_layout _ [] sizeW = replicate sizeW Nothing
+stack_layout dflags ((off, bind):binds) sizeW | off == sizeW - 1 =
+  (Just stack_bind) : (stack_layout dflags binds (sizeW - rep_size))
   where
-    rep_size = cgRepSizeW (cgIdInfoArgRep bind)
+    rep_size = cgRepSizeW dflags (cgIdInfoArgRep bind)
     stack_bind = LocalReg unique machRep
     unique = getUnique (cgIdInfoId bind)
-    machRep = argMachRep (cgIdInfoArgRep bind)
-stack_layout binds@(_:_) sizeW | otherwise =
-  Nothing : (stack_layout binds (sizeW - 1))
+    machRep = argMachRep dflags (cgIdInfoArgRep bind)
+stack_layout dflags binds@(_:_) sizeW | otherwise =
+  Nothing : (stack_layout dflags binds (sizeW - 1))
 
 {- Another way to write the function that might be less error prone (untested)
 stack_layout offsets sizeW = result
@@ -212,15 +214,15 @@ emitAlgReturnTarget
 	-> FCode (CLabel, SemiTaggingStuff)
 
 emitAlgReturnTarget name branches mb_deflt fam_sz
-  = do  { blks <- getCgStmts $
+  = do  { blks <- getCgStmts $ do
                     -- is the constructor tag in the node reg?
-                    if isSmallFamily fam_sz
+                    dflags <- getDynFlags
+                    if isSmallFamily dflags fam_sz
                         then do -- yes, node has constr. tag
-                          let tag_expr = cmmConstrTag1 (CmmReg nodeReg)
+                          let tag_expr = cmmConstrTag1 dflags (CmmReg nodeReg)
                               branches' = [(tag+1,branch)|(tag,branch)<-branches]
                           emitSwitch tag_expr branches' mb_deflt 1 fam_sz
                         else do -- no, get tag from info table
-                          dflags <- getDynFlags
                           let -- Note that ptr _always_ has tag 1
                               -- when the family size is big enough
                               untagged_ptr = cmmRegOffB nodeReg (-1)
@@ -256,7 +258,7 @@ stdInfoTableSizeW dflags
               | otherwise                      = 0
 
 stdInfoTableSizeB :: DynFlags -> ByteOff
-stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE
+stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
@@ -265,11 +267,11 @@ stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word 
-stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE
+stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
-stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE + hALF_WORD_SIZE
+stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE
 
 -------------------------------------------------------------------------
 --
@@ -277,16 +279,16 @@ stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2*wORD_SIZE + hALF_WORD_SIZ
 --
 -------------------------------------------------------------------------
 
-closureInfoPtr :: CmmExpr -> CmmExpr
+closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer and returns the info table pointer
-closureInfoPtr e = CmmLoad e bWord
+closureInfoPtr dflags e = CmmLoad e (bWord dflags)
 
 entryCode :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns its entry code
 entryCode dflags e
  | tablesNextToCode dflags = e
- | otherwise               = CmmLoad e bWord
+ | otherwise               = CmmLoad e (bWord dflags)
 
 getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the *zero-indexed*
@@ -294,25 +296,25 @@ getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
 getConstrTag dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv halfWordWidth wordWidth) [infoTableConstrTag dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableConstrTag dflags info_table]
   where
-    info_table = infoTable dflags (closureInfoPtr closure_ptr)
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 
 cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the closure type
 -- obtained from the info table
 cmmGetClosureType dflags closure_ptr
-  = CmmMachOp (MO_UU_Conv halfWordWidth wordWidth) [infoTableClosureType dflags info_table]
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableClosureType dflags info_table]
   where
-    info_table = infoTable dflags (closureInfoPtr closure_ptr)
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
 
 infoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)
 -- and returns a pointer to the first word of the standard-form
 -- info table, excluding the entry-code word (if present)
 infoTable dflags info_ptr
-  | tablesNextToCode dflags = cmmOffsetB info_ptr (- stdInfoTableSizeB dflags)
-  | otherwise               = cmmOffsetW info_ptr 1 -- Past the entry code pointer
+  | tablesNextToCode dflags = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags)
+  | otherwise               = cmmOffsetW dflags info_ptr 1 -- Past the entry code pointer
 
 infoTableConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the constr tag
@@ -323,21 +325,21 @@ infoTableSrtBitmap :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the srt_bitmap
 -- field of the info table
 infoTableSrtBitmap dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdSrtBitmapOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord dflags)
 
 infoTableClosureType :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info table pointer (from infoTable) and returns the closure type
 -- field of the info table.
 infoTableClosureType dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdClosureTypeOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdClosureTypeOffset dflags)) (bHalfWord dflags)
 
 infoTablePtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTablePtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdPtrsOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdPtrsOffset dflags)) (bHalfWord dflags)
 
 infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
 infoTableNonPtrs dflags info_tbl
-  = CmmLoad (cmmOffsetB info_tbl (stdNonPtrsOffset dflags)) bHalfWord
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdNonPtrsOffset dflags)) (bHalfWord dflags)
 
 funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the info pointer of a function,
@@ -345,9 +347,9 @@ funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- in the info table.
 funInfoTable dflags info_ptr
   | tablesNextToCode dflags
-  = cmmOffsetB info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev)
+  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
   | otherwise
-  = cmmOffsetW info_ptr (1 + stdInfoTableSizeW dflags)
+  = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
 				-- Past the entry code pointer
 
 -------------------------------------------------------------------------

@@ -12,23 +12,24 @@ module LlvmCodeGen.Regs (
 import Llvm
 
 import CmmExpr
+import DynFlags
 import FastString
 import Outputable ( panic )
 
 -- | Get the LlvmVar function variable storing the real register
-lmGlobalRegVar :: GlobalReg -> LlvmVar
-lmGlobalRegVar = (pVarLift . lmGlobalReg "_Var")
+lmGlobalRegVar :: DynFlags -> GlobalReg -> LlvmVar
+lmGlobalRegVar dflags = pVarLift . lmGlobalReg dflags "_Var"
 
 -- | Get the LlvmVar function argument storing the real register
-lmGlobalRegArg :: GlobalReg -> LlvmVar
-lmGlobalRegArg = lmGlobalReg "_Arg"
+lmGlobalRegArg :: DynFlags -> GlobalReg -> LlvmVar
+lmGlobalRegArg dflags = lmGlobalReg dflags "_Arg"
 
 {- Need to make sure the names here can't conflict with the unique generated
    names. Uniques generated names containing only base62 chars. So using say
    the '_' char guarantees this.
 -}
-lmGlobalReg :: String -> GlobalReg -> LlvmVar
-lmGlobalReg suf reg
+lmGlobalReg :: DynFlags -> String -> GlobalReg -> LlvmVar
+lmGlobalReg dflags suf reg
   = case reg of
         BaseReg        -> ptrGlobal $ "Base" ++ suf
         Sp             -> ptrGlobal $ "Sp" ++ suf
@@ -53,8 +54,8 @@ lmGlobalReg suf reg
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
         -- EagerBlackholeInfo, GCEnter1, GCFun, BaseReg, PicBaseReg
     where
-        wordGlobal   name = LMNLocalVar (fsLit name) llvmWord
-        ptrGlobal    name = LMNLocalVar (fsLit name) llvmWordPtr
+        wordGlobal   name = LMNLocalVar (fsLit name) (llvmWord dflags)
+        ptrGlobal    name = LMNLocalVar (fsLit name) (llvmWordPtr dflags)
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
 

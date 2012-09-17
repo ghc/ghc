@@ -744,6 +744,22 @@ emptyModIface mod
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False }
 
+
+-- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
+mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
+                 -> (OccName -> Maybe (OccName, Fingerprint))
+mkIfaceHashCache pairs
+  = \occ -> lookupOccEnv env occ
+  where
+    env = foldr add_decl emptyOccEnv pairs
+    add_decl (v,d) env0 = foldr add env0 (ifaceDeclFingerprints v d)
+      where
+        add (occ,hash) env0 = extendOccEnv env0 occ (occ,hash)
+
+emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
+emptyIfaceHashCache _occ = Nothing
+
+
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
 -- for home modules only. Information relating to packages will be loaded into
 -- global environments in 'ExternalPackageState'.
@@ -1458,24 +1474,6 @@ class Monad m => MonadThings m where
 
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
-\end{code}
-
-\begin{code}
--- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
-mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
-                 -> (OccName -> Maybe (OccName, Fingerprint))
-mkIfaceHashCache pairs
-  = \occ -> lookupOccEnv env occ
-  where
-    env = foldr add_decl emptyOccEnv pairs
-    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclImplicitBndrs d)
-      where
-          decl_name = ifName d
-          env1 = extendOccEnv env0 decl_name (decl_name, v)
-          add_imp bndr env = extendOccEnv env bndr (decl_name, v)
-
-emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
-emptyIfaceHashCache _occ = Nothing
 \end{code}
 
 %************************************************************************

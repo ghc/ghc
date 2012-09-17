@@ -370,10 +370,11 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
                 -- (avoiding it avoids the assignment)
                 -- The deadness info is set by StgVarInfo
         ; whenC (not (isDeadBinder bndr))
-                (do { tmp_reg <- bindNewToTemp bndr
+                (do { dflags <- getDynFlags
+                    ; tmp_reg <- bindNewToTemp bndr
                     ; stmtC (CmmAssign
                              (CmmLocal tmp_reg)
-                             (tagToClosure tycon tag_amode)) })
+                             (tagToClosure dflags tycon tag_amode)) })
 
                 -- Compile the alts
         ; (branches, mb_deflt) <- cgAlgAlts NoGC Nothing{-cc_slot-}
@@ -390,7 +391,8 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
          (_,e) <- getArgAmode arg
          return e
     do_enum_primop primop
-      = do tmp <- newTemp bWord
+      = do dflags <- getDynFlags
+           tmp <- newTemp (bWord dflags)
            cgPrimOp [tmp] primop args live_in_alts
            returnFC (CmmReg (CmmLocal tmp))
 
@@ -663,8 +665,9 @@ saveCurrentCostCentre
 restoreCurrentCostCentre :: Maybe VirtualSpOffset -> Bool -> Code
 restoreCurrentCostCentre Nothing     _freeit = nopC
 restoreCurrentCostCentre (Just slot) freeit
- = do   { sp_rel <- getSpRelOffset slot
+ = do   { dflags <- getDynFlags
+        ; sp_rel <- getSpRelOffset slot
         ; whenC freeit (freeStackSlots [slot])
-        ; stmtC (storeCurCCS (CmmLoad sp_rel bWord)) }
+        ; stmtC (storeCurCCS (CmmLoad sp_rel (bWord dflags))) }
 \end{code}
 

@@ -20,6 +20,7 @@ module DynFlags (
         WarningFlag(..),
         ExtensionFlag(..),
         Language(..),
+        PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
@@ -45,10 +46,12 @@ module DynFlags (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
-        wayNames, dynFlagDependencies,
+        dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
 
         printOutputForUser, printInfoForUser,
+
+        Way(..), mkBuildTag, wayRTSOnly,
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
@@ -82,7 +85,6 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setPackageName,
-        doingTickyProfiling,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -114,6 +116,12 @@ module DynFlags (
 #endif
         -- ** Only for use in the tracing functions in Outputable
         tracingDynFlags,
+
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
+        bLOCK_SIZE_W,
+        wORD_SIZE_IN_BITS,
+        tAG_MASK,
+        mAX_PTR_TAG,
   ) where
 
 #include "HsVersions.h"
@@ -122,12 +130,11 @@ import Platform
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
-import StaticFlags
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
-import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
+import Constants
 import Panic
 import Util
 import Maybes           ( orElse )
@@ -144,8 +151,9 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 import System.IO.Unsafe ( unsafePerformIO )
 #endif
 import Data.IORef
-import Control.Monad    ( when )
+import Control.Monad
 
+import Data.Bits
 import Data.Char
 import Data.List
 import Data.Map (Map)
@@ -325,6 +333,9 @@ data DynFlag
    | Opt_GranMacros
    | Opt_PIC
    | Opt_SccProfilingOn
+   | Opt_Ticky
+   | Opt_Static
+   | Opt_Hpc
 
    -- output style opts
    | Opt_PprCaseAsLet
@@ -521,6 +532,7 @@ data DynFlags = DynFlags {
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
+  historySize           :: Int,
 
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
@@ -560,6 +572,8 @@ data DynFlags = DynFlags {
   -- | Override the 'dumpPrefix' set by 'DriverPipeline.runPipeline'.
   --    Set by @-ddump-file-prefix@
   dumpPrefixForce       :: Maybe FilePath,
+
+  ldInputs              :: [String],
 
   includePaths          :: [String],
   libraryPaths          :: [String],
@@ -699,8 +713,9 @@ data Settings = Settings {
   sOpt_l                 :: [String],
   sOpt_windres           :: [String],
   sOpt_lo                :: [String], -- LLVM: llvm optimiser
-  sOpt_lc                :: [String]  -- LLVM: llc static compiler
+  sOpt_lc                :: [String], -- LLVM: llc static compiler
 
+  sPlatformConstants     :: PlatformConstants
  }
 
 targetPlatform :: DynFlags -> Platform
@@ -764,9 +779,6 @@ opt_lo                :: DynFlags -> [String]
 opt_lo dflags = sOpt_lo (settings dflags)
 opt_lc                :: DynFlags -> [String]
 opt_lc dflags = sOpt_lc (settings dflags)
-
-wayNames :: DynFlags -> [WayName]
-wayNames = map wayName . ways
 
 -- | The target code type of the compilation (if any).
 --
@@ -855,13 +867,6 @@ isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
 isNoLink _      = False
 
--- Is it worth evaluating this Bool and caching it in the DynFlags value
--- during initDynFlags?
-doingTickyProfiling :: DynFlags -> Bool
-doingTickyProfiling _ = opt_Ticky
-  -- XXX -ticky is a static flag, because it implies -debug which is also
-  -- static.  If the way flags were made dynamic, we could fix this.
-
 data PackageFlag
   = ExposePackage   String
   | ExposePackageId String
@@ -902,19 +907,187 @@ data DynLibLoader
 data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
   deriving (Show)
 
+-----------------------------------------------------------------------------
+-- Ways
+
+-- The central concept of a "way" is that all objects in a given
+-- program must be compiled in the same "way".  Certain options change
+-- parameters of the virtual machine, eg. profiling adds an extra word
+-- to the object header, so profiling objects cannot be linked with
+-- non-profiling objects.
+
+-- After parsing the command-line options, we determine which "way" we
+-- are building - this might be a combination way, eg. profiling+threaded.
+
+-- We then find the "build-tag" associated with this way, and this
+-- becomes the suffix used to find .hi files and libraries used in
+-- this compilation.
+
+data Way
+  = WayThreaded
+  | WayDebug
+  | WayProf
+  | WayEventLog
+  | WayPar
+  | WayGran
+  | WayNDP
+  | WayDyn
+  deriving (Eq,Ord)
+
+allowed_combination :: [Way] -> Bool
+allowed_combination way = and [ x `allowedWith` y
+                              | x <- way, y <- way, x < y ]
+  where
+        -- Note ordering in these tests: the left argument is
+        -- <= the right argument, according to the Ord instance
+        -- on Way above.
+
+        -- dyn is allowed with everything
+        _ `allowedWith` WayDyn                  = True
+        WayDyn `allowedWith` _                  = True
+
+        -- debug is allowed with everything
+        _ `allowedWith` WayDebug                = True
+        WayDebug `allowedWith` _                = True
+
+        WayProf `allowedWith` WayNDP            = True
+        WayThreaded `allowedWith` WayProf       = True
+        WayThreaded `allowedWith` WayEventLog   = True
+        _ `allowedWith` _                       = False
+
+mkBuildTag :: [Way] -> String
+mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
+
+wayTag :: Way -> String
+wayTag WayThreaded = "thr"
+wayTag WayDebug    = "debug"
+wayTag WayDyn      = "dyn"
+wayTag WayProf     = "p"
+wayTag WayEventLog = "l"
+wayTag WayPar      = "mp"
+-- wayTag WayPar      = "mt"
+-- wayTag WayPar      = "md"
+wayTag WayGran     = "mg"
+wayTag WayNDP      = "ndp"
+
+wayRTSOnly :: Way -> Bool
+wayRTSOnly WayThreaded = True
+wayRTSOnly WayDebug    = True
+wayRTSOnly WayDyn      = False
+wayRTSOnly WayProf     = False
+wayRTSOnly WayEventLog = True
+wayRTSOnly WayPar      = False
+-- wayRTSOnly WayPar      = False
+-- wayRTSOnly WayPar      = False
+wayRTSOnly WayGran     = False
+wayRTSOnly WayNDP      = False
+
+wayDesc :: Way -> String
+wayDesc WayThreaded = "Threaded"
+wayDesc WayDebug    = "Debug"
+wayDesc WayDyn      = "Dynamic"
+wayDesc WayProf     = "Profiling"
+wayDesc WayEventLog = "RTS Event Logging"
+wayDesc WayPar      = "Parallel"
+-- wayDesc WayPar      = "Parallel ticky profiling"
+-- wayDesc WayPar      = "Distributed"
+wayDesc WayGran     = "GranSim"
+wayDesc WayNDP      = "Nested data parallelism"
+
+wayOpts :: Platform -> Way -> DynP ()
+wayOpts platform WayThreaded = do
+        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
+        -- which GHC has some problems with.  It's currently not clear whether
+        -- the problems are our fault or theirs, but it seems that using the
+        -- alternative 1:1 threading library libthr works around it:
+          let os = platformOS platform
+          case os of
+              OSFreeBSD -> upd $ addOptl "-lthr"
+              OSSolaris2 -> upd $ addOptl "-lrt"
+              _
+               | os `elem` [OSOpenBSD, OSNetBSD] ->
+                  do upd $ addOptc "-pthread"
+                     upd $ addOptl "-pthread"
+              _ ->
+                  return ()
+wayOpts _ WayDebug = return ()
+wayOpts platform WayDyn = do
+        upd $ addOptP "-DDYNAMIC"
+        upd $ addOptc "-DDYNAMIC"
+        let os = platformOS platform
+        case os of
+            OSMinGW32 ->
+                -- On Windows, code that is to be linked into a dynamic
+                -- library must be compiled with -fPIC. Labels not in
+                -- the current package are assumed to be in a DLL
+                -- different from the current one.
+                setFPIC
+            OSDarwin ->
+                setFPIC
+            _ | os `elem` [OSOpenBSD, OSNetBSD] ->
+                -- Without this, linking the shared libHSffi fails
+                -- because it uses pthread mutexes.
+                upd $ addOptl "-optl-pthread"
+            _ ->
+                return ()
+wayOpts _ WayProf = do
+        setDynFlag Opt_SccProfilingOn
+        upd $ addOptP "-DPROFILING"
+        upd $ addOptc "-DPROFILING"
+wayOpts _ WayEventLog = do
+        upd $ addOptP "-DTRACING"
+        upd $ addOptc "-DTRACING"
+wayOpts _ WayPar = do
+        setDynFlag Opt_Parallel
+        upd $ addOptP "-D__PARALLEL_HASKELL__"
+        upd $ addOptc "-DPAR"
+        exposePackage "concurrent"
+        upd $ addOptc "-w"
+        upd $ addOptl "-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        upd $ addOptl "-lpvm3"
+        upd $ addOptl "-lgpvm3"
+{-
+wayOpts WayPar =
+        [ "-fparallel"
+        , "-D__PARALLEL_HASKELL__"
+        , "-optc-DPAR"
+        , "-optc-DPAR_TICKY"
+        , "-package concurrent"
+        , "-optc-w"
+        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        , "-optl-lpvm3"
+        , "-optl-lgpvm3" ]
+wayOpts WayPar =
+        [ "-fparallel"
+        , "-D__PARALLEL_HASKELL__"
+        , "-D__DISTRIBUTED_HASKELL__"
+        , "-optc-DPAR"
+        , "-optc-DDIST"
+        , "-package concurrent"
+        , "-optc-w"
+        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
+        , "-optl-lpvm3"
+        , "-optl-lgpvm3" ]
+-}
+wayOpts _ WayGran = do
+        setDynFlag Opt_GranMacros
+        upd $ addOptP "-D__GRANSIM__"
+        upd $ addOptc "-DGRAN"
+        exposePackage "concurrent"
+wayOpts _ WayNDP = do
+        setExtensionFlag Opt_ParallelArrays
+        setDynFlag Opt_Vectorise
+
+-----------------------------------------------------------------------------
+
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- -- someday these will be dynamic flags
- ways <- readIORef v_Ways
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refGeneratedDumps <- newIORef Set.empty
  refLlvmVersion <- newIORef 28
  return dflags{
-        ways           = ways,
-        buildTag       = mkBuildTag (filter (not . wayRTSOnly) ways),
-        rtsBuildTag    = mkBuildTag ways,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
         generatedDumps = refGeneratedDumps,
@@ -942,6 +1115,7 @@ defaultDynFlags mySettings =
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 2000,
         floatLamArgs            = Just 0, -- Default: float only if no fvs
+        historySize             = 20,
         strictnessBefore        = [],
 
         cmdlineHcIncludes       = [],
@@ -970,6 +1144,7 @@ defaultDynFlags mySettings =
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
+        ldInputs                = [],
         includePaths            = [],
         libraryPaths            = [],
         frameworkPaths          = [],
@@ -983,9 +1158,9 @@ defaultDynFlags mySettings =
         packageFlags            = [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-        ways                    = panic "defaultDynFlags: No ways",
-        buildTag                = panic "defaultDynFlags: No buildTag",
-        rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
+        ways                    = [],
+        buildTag                = mkBuildTag [],
+        rtsBuildTag             = mkBuildTag [],
         splitInfo               = Nothing,
         settings                = mySettings,
         -- ghc -M values
@@ -1289,7 +1464,7 @@ getVerbFlags dflags
 setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
-         setPgmP, addOptl, addOptP,
+         setPgmP, addOptl, addOptc, addOptP,
          addCmdlineFramework, addHaddockOpts, addGhciScript, 
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
@@ -1335,6 +1510,7 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 -- Config.hs should really use Option.
 setPgmP   f = let (pgm:args) = words f in alterSettings (\s -> s { sPgm_P   = (pgm, map Option args)})
 addOptl   f = alterSettings (\s -> s { sOpt_l   = f : sOpt_l s})
+addOptc   f = alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})
 addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s})
 
 
@@ -1420,7 +1596,7 @@ getStgToDo dflags
 
         todo1 = if stg_stats then [D_stg_stats] else []
 
-        todo2 | WayProf `elem` wayNames dflags
+        todo2 | WayProf `elem` ways dflags
               = StgDoMassageForProfiling : todo1
               | otherwise
               = todo1
@@ -1486,7 +1662,19 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
 
-  return (dflags2, leftover, sh_warns ++ warns)
+      theWays = sort $ nub $ ways dflags2
+      theBuildTag = mkBuildTag (filter (not . wayRTSOnly) theWays)
+      dflags3 = dflags2 {
+                    ways        = theWays,
+                    buildTag    = theBuildTag,
+                    rtsBuildTag = mkBuildTag theWays
+                }
+
+  unless (allowed_combination theWays) $
+      ghcError (CmdLineError ("combination not supported: "  ++
+                              intercalate "/" (map wayDesc theWays)))
+
+  return (dflags3, leftover, sh_warns ++ warns)
 
 
 -- | Check (and potentially disable) any extensions that aren't allowed
@@ -1582,6 +1770,32 @@ dynamic_flags = [
                            addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
   , Flag "v"        (OptIntSuffix setVerbosity)
 
+        ------- ways --------------------------------------------------------
+  , Flag "prof"           (NoArg (addWay WayProf))
+  , Flag "eventlog"       (NoArg (addWay WayEventLog))
+  , Flag "parallel"       (NoArg (addWay WayPar))
+  , Flag "gransim"        (NoArg (addWay WayGran))
+  , Flag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
+  , Flag "debug"          (NoArg (addWay WayDebug))
+  , Flag "ndp"            (NoArg (addWay WayNDP))
+  , Flag "threaded"       (NoArg (addWay WayThreaded))
+
+  , Flag "ticky"          (NoArg (setDynFlag Opt_Ticky >> addWay WayDebug))
+
+    -- -ticky enables ticky-ticky code generation, and also implies -debug which
+    -- is required to get the RTS ticky support.
+
+        ----- Linker --------------------------------------------------------
+  -- -static is the default. If -dynamic has been given then, due to the
+  -- way wayOpts is currently used, we've already set -DDYNAMIC etc.
+  -- It's too fiddly to undo that, so we just give an error if
+  -- Opt_Static has been unset.
+  , Flag "static"         (noArgM (\dfs -> do unless (dopt Opt_Static dfs) (addErr "Can't use -static after -dynamic")
+                                              return dfs))
+  , Flag "dynamic"        (NoArg (unSetDynFlag Opt_Static >> addWay WayDyn))
+    -- ignored for compat w/ gcc:
+  , Flag "rdynamic"       (NoArg (return ()))
+
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
   , Flag "pgmlo"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
@@ -1603,7 +1817,7 @@ dynamic_flags = [
   , Flag "optL"           (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
   , Flag "optP"           (hasArg addOptP)
   , Flag "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
-  , Flag "optc"           (hasArg (\f -> alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})))
+  , Flag "optc"           (hasArg addOptc)
   , Flag "optm"           (HasArg (\_ -> addWarn "The -optm flag does nothing; it will be removed in a future GHC release"))
   , Flag "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
   , Flag "optl"           (hasArg addOptl)
@@ -1839,6 +2053,7 @@ dynamic_flags = [
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
+  , Flag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
 
         ------ Profiling ----------------------------------------------------
 
@@ -2067,13 +2282,11 @@ fFlags = [
   ( "ghci-history",                     Opt_GhciHistory, nop ),
   ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
   ( "defer-type-errors",                Opt_DeferTypeErrors, nop ),
-  ( "parallel",                         Opt_Parallel, nop ),
-  ( "scc-profiling",                    Opt_SccProfilingOn, nop ),
-  ( "gransim",                          Opt_GranMacros, nop ),
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
-  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop )
+  ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
+  ( "hpc",                              Opt_Hpc, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -2242,12 +2455,11 @@ xFlags = [
 defaultFlags :: Platform -> [DynFlag]
 defaultFlags platform
   = [ Opt_AutoLinkPackages,
+      Opt_Static,
 
       Opt_SharedImplib,
 
-#if GHC_DEFAULT_NEW_CODEGEN
       Opt_TryNewCodeGen,
-#endif
 
       Opt_GenManifest,
       Opt_EmbedManifest,
@@ -2265,7 +2477,6 @@ defaultFlags platform
         OSDarwin ->
             case platformArch platform of
             ArchX86_64         -> [Opt_PIC]
-            _ | not opt_Static -> [Opt_PIC]
             _                  -> []
         _ -> [])
 
@@ -2328,7 +2539,8 @@ optLevelFlags
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
-    , ([2],     Opt_RegsGraph)
+-- XXX disabled, see #7192
+--    , ([2],     Opt_RegsGraph)
     , ([0,1,2], Opt_LlvmTBAA)
     , ([0,1,2], Opt_RegLiveness)
     , ([1,2],   Opt_CmmSink)
@@ -2528,6 +2740,12 @@ setDumpFlag :: DynFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 --------------------------
+addWay :: Way -> DynP ()
+addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
+              dfs <- liftEwM getCmdLineState
+              wayOpts (targetPlatform dfs) w
+
+--------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
 setDynFlag   f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
@@ -2671,7 +2889,7 @@ setObjTarget l = updM set
                 return dflags
          HscLlvm
           | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
-            (not opt_Static || dopt Opt_PIC dflags)
+            (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
             ->
              do addWarn ("Ignoring " ++ flag ++ " as it is incompatible with -fPIC and -dynamic on this platform")
                 return dflags
@@ -2708,7 +2926,7 @@ unSetFPIC = updM set
              | platformArch platform == ArchX86_64 ->
                 do addWarn "Ignoring -fno-PIC on this platform"
                    return dflags
-            _ | not opt_Static ->
+            _ | not (dopt Opt_Static dflags) ->
                 do addWarn "Ignoring -fno-PIC as -fstatic is off"
                    return dflags
             _ -> return $ dopt_unset dflags Opt_PIC
@@ -2883,7 +3101,8 @@ picCCOpts dflags
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
-       | dopt Opt_PIC dflags || not opt_Static -> ["-fPIC", "-U __PIC__", "-D__PIC__"]
+       | dopt Opt_PIC dflags || not (dopt Opt_Static dflags) ->
+          ["-fPIC", "-U __PIC__", "-D__PIC__"]
        | otherwise                             -> []
 
 picPOpts :: DynFlags -> [String]
@@ -2927,4 +3146,19 @@ compilerInfo dflags
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags)
       ]
+
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs"
+#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
+
+bLOCK_SIZE_W :: DynFlags -> Int
+bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
+
+wORD_SIZE_IN_BITS :: DynFlags -> Int
+wORD_SIZE_IN_BITS dflags = wORD_SIZE dflags * 8
+
+tAG_MASK :: DynFlags -> Int
+tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
+
+mAX_PTR_TAG :: DynFlags -> Int
+mAX_PTR_TAG = tAG_MASK
 

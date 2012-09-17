@@ -321,7 +321,11 @@ tc_hs_type :: HsType Name -> ExpKind -> TcM TcType
 tc_hs_type (HsParTy ty)        exp_kind = tc_lhs_type ty exp_kind
 tc_hs_type (HsDocTy ty _)      exp_kind = tc_lhs_type ty exp_kind
 tc_hs_type (HsQuasiQuoteTy {}) _ = panic "tc_hs_type: qq"	-- Eliminated by renamer
-tc_hs_type (HsBangTy {})       _ = panic "tc_hs_type: bang"   -- Unwrapped by con decls
+tc_hs_type ty@(HsBangTy {})    _
+    -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
+    -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
+    -- bangs are invalid, so fail. (#7210)
+    = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
 tc_hs_type (HsRecTy _)         _ = panic "tc_hs_type: record" -- Unwrapped by con decls
       -- Record types (which only show up temporarily in constructor 
       -- signatures) should have been removed by now
@@ -566,7 +570,12 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
        ; thing <- tcLookup name
        ; traceTc "lk2" (ppr name <+> ppr thing)
        ; case thing of
-           ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+           ATyVar _ tv 
+              | isKindVar tv
+              -> failWithTc (ptext (sLit "Kind variable") <+> quotes (ppr tv)
+                             <+> ptext (sLit "used as a type"))
+              | otherwise
+              -> return (mkTyVarTy tv, tyVarKind tv)
 
            AThing kind -> do { tc <- get_loopy_tc name
                              ; inst_tycon (mkNakedTyConApp tc) kind }
@@ -1348,7 +1357,7 @@ tc_lhs_kind (L span ki) = setSrcSpan span (tc_hs_kind ki)
 
 -- The main worker
 tc_hs_kind :: HsKind Name -> TcM Kind
-tc_hs_kind k@(HsTyVar _)   = tc_kind_app k []
+tc_hs_kind (HsTyVar tc)    = tc_kind_var_app tc []
 tc_hs_kind k@(HsAppTy _ _) = tc_kind_app k []
 
 tc_hs_kind (HsParTy ki) = tc_lhs_kind ki

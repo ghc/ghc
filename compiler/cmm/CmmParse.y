@@ -340,9 +340,10 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
                 -- closure type, live regs
                 {% withThisPackage $ \pkg ->
-                   do live <- sequence (map (liftM Just) $7)
+                   do dflags <- getDynFlags
+                      live <- sequence (map (liftM Just) $7)
                       let prof = NoProfilingInfo
-                          bitmap = mkLiveness live
+                          bitmap = mkLiveness dflags live
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
@@ -522,7 +523,7 @@ expr0   :: { ExtFCode CmmExpr }
 
 -- leaving out the type of a literal gives you the native word size in C--
 maybe_ty :: { CmmType }
-        : {- empty -}                   { bWord }
+        : {- empty -}                   {% do dflags <- getDynFlags; return $ bWord dflags }
         | '::' type                     { $2 }
 
 maybe_actuals :: { [ExtFCode HintedCmmActual] }
@@ -611,7 +612,7 @@ typenot8 :: { CmmType }
         | 'bits64'              { b64 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
-        | 'gcptr'               { gcWord }
+        | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
 {
 section :: String -> Section
 section "text"      = Text
@@ -630,8 +631,9 @@ mkString s = CmmString (map (fromIntegral.ord) s)
 -- the op.
 mkMachOp :: (Width -> MachOp) -> [ExtFCode CmmExpr] -> ExtFCode CmmExpr
 mkMachOp fn args = do
+  dflags <- getDynFlags
   arg_exprs <- sequence args
-  return (CmmMachOp (fn (typeWidth (cmmExprType (head arg_exprs)))) arg_exprs)
+  return (CmmMachOp (fn (typeWidth (cmmExprType dflags (head arg_exprs)))) arg_exprs)
 
 getLit :: CmmExpr -> CmmLit
 getLit (CmmLit l) = l
@@ -658,12 +660,12 @@ exprOp name args_code = do
 exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
 exprMacros dflags = listToUFM [
   ( fsLit "ENTRY_CODE",   \ [x] -> entryCode dflags x ),
-  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr x ),
+  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr dflags x ),
   ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
   ( fsLit "FUN_INFO",     \ [x] -> funInfoTable dflags x ),
-  ( fsLit "GET_ENTRY",    \ [x] -> entryCode dflags (closureInfoPtr x) ),
-  ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr x) ),
-  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr x) ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode dflags (closureInfoPtr dflags x) ),
+  ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr dflags x) ),
+  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr dflags x) ),
   ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
   ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs dflags x ),
   ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x )
@@ -868,7 +870,7 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
             -- Temporary hack so at least some functions are CmmSafe
             CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args ret))
             _ ->
-              let expr' = adjCallTarget platform convention expr args in
+              let expr' = adjCallTarget dflags convention expr args in
               case safety of
               CmmUnsafe ->
                 code (emitForeignCall' PlayRisky results
@@ -880,13 +882,14 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                 code (emitForeignCall' PlayInterruptible results
                    (CmmCallee expr' convention) args vols NoC_SRT ret)
 
-adjCallTarget :: Platform -> CCallConv -> CmmExpr -> [CmmHinted CmmExpr]
+adjCallTarget :: DynFlags -> CCallConv -> CmmExpr -> [CmmHinted CmmExpr]
               -> CmmExpr
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
-adjCallTarget (Platform { platformOS = OSMinGW32 }) StdCallConv (CmmLit (CmmLabel lbl)) args
+adjCallTarget dflags StdCallConv (CmmLit (CmmLabel lbl)) args
+ | platformOS (targetPlatform dflags) == OSMinGW32
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (CmmHinted e _) = max wORD_SIZE (widthInBytes (typeWidth (cmmExprType e)))
+  where size (CmmHinted e _) = max (wORD_SIZE dflags) (widthInBytes (typeWidth (cmmExprType dflags e)))
                  -- c.f. CgForeignCall.emitForeignCall
 adjCallTarget _ _ expr _
   = expr
@@ -917,14 +920,15 @@ primCall results_code name args_code vols safety
 
 doStore :: CmmType -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code
-  = do addr <- addr_code
+  = do dflags <- getDynFlags
+       addr <- addr_code
        val <- val_code
         -- if the specified store type does not match the type of the expr
         -- on the rhs, then we insert a coercion that will cause the type
         -- mismatch to be flagged by cmm-lint.  If we don't do this, then
         -- the store will happen at the wrong type, and the error will not
         -- be noticed.
-       let val_width = typeWidth (cmmExprType val)
+       let val_width = typeWidth (cmmExprType dflags val)
            rep_width = typeWidth rep
        let coerce_val
                 | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
@@ -940,8 +944,8 @@ emitRetUT args = do
   emitSimultaneously stmts -- NB. the args might overlap with the stack slots
                            -- or regs that we assign to, so better use
                            -- simultaneous assignments here (#3546)
-  when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC $ CmmJump (entryCode dflags (CmmLoad (cmmRegOffW spReg sp) bWord)) (Just live)
+  when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW dflags spReg (-sp)))
+  stmtC $ CmmJump (entryCode dflags (CmmLoad (cmmRegOffW dflags spReg sp) (bWord dflags))) (Just live)
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions
@@ -1050,9 +1054,9 @@ doSwitch mb_range scrut arms deflt
 initEnv :: DynFlags -> Env
 initEnv dflags = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
-    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE)) wordWidth) )),
+    VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags * wORD_SIZE dflags)) (wordWidth dflags)) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) wordWidth) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)

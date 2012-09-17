@@ -42,7 +42,7 @@ unsigned int CCS_ID = 1;
 /* figures for the profiling report.
  */
 static StgWord64 total_alloc;
-static lnat      total_prof_ticks;
+static W_      total_prof_ticks;
 
 /* Globals for opening the profiling log file(s)
  */

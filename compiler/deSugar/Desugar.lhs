@@ -16,7 +16,6 @@ The Desugarer: turning HsSyn into Core.
 module Desugar ( deSugar, deSugarExpr ) where
 
 import DynFlags
-import StaticFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
@@ -109,7 +108,7 @@ deSugar hsc_env
                                Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
 
-                     let want_ticks = opt_Hpc
+                     let want_ticks = dopt Opt_Hpc dflags
                                    || target == HscInterpreted
                                    || (dopt Opt_SccProfilingOn dflags
                                        && case profAuto dflags of
@@ -130,7 +129,7 @@ deSugar hsc_env
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
                           ; let hpc_init
-                                  | opt_Hpc   = hpcInitCode mod ds_hpc_info
+                                  | dopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs

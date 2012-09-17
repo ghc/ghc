@@ -1399,7 +1399,9 @@ tryNewCodeGen hsc_env this_mod data_tycons
     -- We are building a single SRT for the entire module, so
     -- we must thread it through all the procedures as we cps-convert them.
     us <- mkSplitUniqSupply 'S'
-    let initTopSRT = initUs_ us emptySRT
+    let srt_mod | dopt Opt_SplitObjs dflags = Just this_mod
+                | otherwise                 = Nothing
+        initTopSRT = initUs_ us (emptySRT srt_mod)
 
     let run_pipeline topSRT cmmgroup = do
            (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup

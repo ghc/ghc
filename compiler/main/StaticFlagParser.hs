@@ -18,8 +18,7 @@ module StaticFlagParser (
 #include "HsVersions.h"
 
 import qualified StaticFlags as SF
-import StaticFlags ( v_opt_C_ready, getWayFlags, WayName(..)
-                   , opt_SimplExcessPrecision )
+import StaticFlags ( v_opt_C_ready, opt_SimplExcessPrecision )
 import CmdLineParser
 import SrcLoc
 import Util
@@ -60,17 +59,8 @@ parseStaticFlagsFull flagsAvailable args = do
   ready <- readIORef v_opt_C_ready
   when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
-  (leftover, errs, warns1) <- processArgs flagsAvailable args
+  (leftover, errs, warns) <- processArgs flagsAvailable args
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
-
-    -- deal with the way flags: the way (eg. prof) gives rise to
-    -- further flags, some of which might be static.
-  way_flags <- getWayFlags
-  let way_flags' = map (mkGeneralLocated "in way flags") way_flags
-
-    -- as these are GHC generated flags, we parse them with all static flags
-    -- in scope, regardless of what availableFlags are passed in.
-  (more_leftover, errs, warns2) <- processArgs flagsStatic way_flags'
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -83,9 +73,7 @@ parseStaticFlagsFull flagsAvailable args = do
                                         ["-fexcess-precision"]
        | otherwise                = []
 
-  when (not (null errs)) $ ghcError $ errorsToGhcException errs
-  return (excess_prec ++ more_leftover ++ leftover,
-          warns1 ++ warns2)
+  return (excess_prec ++ leftover, warns)
 
 flagsStatic :: [Flag IO]
 -- All the static flags should appear in this list.  It describes how each
@@ -102,22 +90,8 @@ flagsStatic :: [Flag IO]
 -- flags further down the list with the same prefix.
 
 flagsStatic = [
-        ------- ways --------------------------------------------------------
-    Flag "prof"           (NoArg (addWay WayProf))
-  , Flag "eventlog"       (NoArg (addWay WayEventLog))
-  , Flag "parallel"       (NoArg (addWay WayPar))
-  , Flag "gransim"        (NoArg (addWay WayGran))
-  , Flag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
-  , Flag "debug"          (NoArg (addWay WayDebug))
-  , Flag "ndp"            (NoArg (addWay WayNDP))
-  , Flag "threaded"       (NoArg (addWay WayThreaded))
-
-  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
-    -- -ticky enables ticky-ticky code generation, and also implies -debug which
-    -- is required to get the RTS ticky support.
-
         ------ Debugging ----------------------------------------------------
-  , Flag "dppr-debug"                  (PassFlag addOpt)
+    Flag "dppr-debug"                  (PassFlag addOpt)
   , Flag "dsuppress-all"               (PassFlag addOpt)
   , Flag "dsuppress-uniques"           (PassFlag addOpt)
   , Flag "dsuppress-coercions"         (PassFlag addOpt)
@@ -126,16 +100,8 @@ flagsStatic = [
   , Flag "dsuppress-idinfo"            (PassFlag addOpt)
   , Flag "dsuppress-var-kinds"         (PassFlag addOpt)
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
-  , Flag "dopt-fuel"                   (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
-  , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
-
-        ----- Linker --------------------------------------------------------
-  , Flag "static"         (PassFlag addOpt)
-  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
-    -- ignored for compat w/ gcc:
-  , Flag "rdynamic"       (NoArg (return ()))
 
         ----- RTS opts ------------------------------------------------------
   , Flag "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
@@ -166,7 +132,6 @@ isStaticFlag f =
     "fno-pre-inlining",
     "fno-opt-coercion",
     "fexcess-precision",
-    "static",
     "fhardwire-lib-paths",
     "fcpr-off",
     "ferror-spans",
@@ -175,7 +140,6 @@ isStaticFlag f =
   || any (`isPrefixOf` f) [
     "fliberate-case-threshold",
     "fmax-worker-args",
-    "fhistory-size",
     "funfolding-creation-threshold",
     "funfolding-dict-threshold",
     "funfolding-use-threshold",
@@ -202,9 +166,6 @@ type StaticP = EwM IO
 
 addOpt :: String -> StaticP ()
 addOpt = liftEwM . SF.addOpt
-
-addWay :: WayName -> StaticP ()
-addWay = liftEwM . SF.addWay
 
 removeOpt :: String -> StaticP ()
 removeOpt = liftEwM . SF.removeOpt
