@@ -662,6 +662,7 @@ tidyCo env@(_, subst) co
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
     go (NthCo d co)          = NthCo d $! go co
+    go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! tidyType env ty
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]

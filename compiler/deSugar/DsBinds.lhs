@@ -834,6 +834,7 @@ ds_tc_coercion subst tc_co
     go (TcSymCo co)           = mkSymCo (go co)
     go (TcTransCo co1 co2)    = mkTransCo (go co1) (go co2)
     go (TcNthCo n co)         = mkNthCo n (go co)
+    go (TcLRCo lr co)         = mkLRCo lr (go co)
     go (TcInstCo co ty)       = mkInstCo (go co) ty
     go (TcLetCo bs co)        = ds_tc_coercion (ds_co_binds bs) co
     go (TcCastCo co1 co2)     = mkCoCast (go co1) (go co2)

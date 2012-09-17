@@ -74,6 +74,9 @@ data Ty
   | UnsafeCoercion Ty Ty
   | InstCoercion Ty Ty
   | NthCoercion Int Ty
+  | LRCoercion LeftOrRight Ty
+
+data LeftOrRight = CLeft | CRight
 
 data Kind 
   = Klifted

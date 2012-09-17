@@ -20,11 +20,12 @@ module BinIface (
 #include "HsVersions.h"
 
 import TcRnMonad
-import TyCon      (TyCon, tyConName, tupleTyConSort, tupleTyConArity, isTupleTyCon)
+import TyCon
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
 import PrelInfo   (wiredInThings, basicKnownKeyNames)
 import Id         (idName, isDataConWorkId_maybe)
 import CoreSyn    (DFunArg(..))
+import Coercion   (LeftOrRight(..))
 import TysWiredIn
 import IfaceEnv
 import HscTypes
@@ -1037,6 +1038,15 @@ instance Binary IfaceTyCon where
    put_ bh (IfaceTc ext) = put_ bh ext
    get bh = liftM IfaceTc (get bh)
 
+instance Binary LeftOrRight where
+   put_ bh CLeft  = putByte bh 0
+   put_ bh CRight = putByte bh 1
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> return CLeft
+                   _ -> return CRight }
+
 instance Binary IfaceCoCon where
    put_ bh (IfaceCoAx n)       = do { putByte bh 0; put_ bh n }
    put_ bh IfaceReflCo         = putByte bh 1
@@ -1045,6 +1055,7 @@ instance Binary IfaceCoCon where
    put_ bh IfaceTransCo        = putByte bh 4
    put_ bh IfaceInstCo         = putByte bh 5
    put_ bh (IfaceNthCo d)      = do { putByte bh 6; put_ bh d }
+   put_ bh (IfaceLRCo lr)      = do { putByte bh 7; put_ bh lr }
 
    get bh = do
         h <- getByte bh
@@ -1056,6 +1067,7 @@ instance Binary IfaceCoCon where
           4 -> return IfaceTransCo
           5 -> return IfaceInstCo
           6 -> do { d <- get bh; return (IfaceNthCo d) }
+          7 -> do { lr <- get bh; return (IfaceLRCo lr) }
           _ -> panic ("get IfaceCoCon " ++ show h)
 
 -------------------------------------------------------------------------

@@ -20,10 +20,10 @@ module TcEvidence (
   EvLit(..), evTermCoercion,
 
   -- TcCoercion
-  TcCoercion(..), 
+  TcCoercion(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcTyConAppCo, mkTcAppCo, mkTcAppCos, mkTcFunCo,
   mkTcAxInstCo, mkTcForAllCo, mkTcForAllCos, 
-  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcInstCos,
+  mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcInstCos,
   tcCoercionKind, coVarsOfTcCo, isEqVar, mkTcCoVarCo, 
   isTcReflCo, isTcReflCo_maybe, getTcCoVar_maybe,
   liftTcCoSubstWith
@@ -32,7 +32,7 @@ module TcEvidence (
 #include "HsVersions.h"
 
 import Var
-
+import Coercion( LeftOrRight(..), pickLR )
 import PprCore ()   -- Instance OutputableBndr TyVar
 import TypeRep  -- Knows type representation
 import TcType
@@ -102,6 +102,7 @@ data TcCoercion
   | TcSymCo TcCoercion
   | TcTransCo TcCoercion TcCoercion
   | TcNthCo Int TcCoercion
+  | TcLRCo LeftOrRight TcCoercion
   | TcCastCo TcCoercion TcCoercion     -- co1 |> co2
   | TcLetCo TcEvBinds TcCoercion
   deriving (Data.Data, Data.Typeable)
@@ -167,6 +168,10 @@ mkTcNthCo :: Int -> TcCoercion -> TcCoercion
 mkTcNthCo n (TcRefl ty) = TcRefl (tyConAppArgN n ty)
 mkTcNthCo n co          = TcNthCo n co
 
+mkTcLRCo :: LeftOrRight -> TcCoercion -> TcCoercion
+mkTcLRCo lr (TcRefl ty) = TcRefl (pickLR lr (tcSplitAppTy ty))
+mkTcLRCo lr co          = TcLRCo lr co
+
 mkTcAppCos :: TcCoercion -> [TcCoercion] -> TcCoercion
 mkTcAppCos co1 tys = foldl mkTcAppCo co1 tys
 
@@ -211,6 +216,7 @@ tcCoercionKind co = go co
     go (TcSymCo co)           = swap (go co)
     go (TcTransCo co1 co2)    = Pair (pFst (go co1)) (pSnd (go co2))
     go (TcNthCo d co)         = tyConAppArgN d <$> go co
+    go (TcLRCo lr co)         = (pickLR lr . tcSplitAppTy) <$> go co
 
     -- c.f. Coercion.coercionKind
     go_inst (TcInstCo co ty) tys = go_inst co (ty:tys)
@@ -239,6 +245,7 @@ coVarsOfTcCo tc_co
     go (TcSymCo co)              = go co
     go (TcTransCo co1 co2)       = go co1 `unionVarSet` go co2
     go (TcNthCo _ co)            = go co
+    go (TcLRCo  _ co)            = go co
     go (TcLetCo (EvBinds bs) co) = foldrBag (unionVarSet . go_bind) (go co) bs
                                    `minusVarSet` get_bndrs bs
     go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
@@ -306,6 +313,7 @@ ppr_co p (TcTransCo co1 co2) = maybeParen p FunPrec $
                                <+> ppr_co FunPrec co2
 ppr_co p (TcSymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendTcCo co]
 ppr_co p (TcNthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <+> int n) [pprParendTcCo co]
+ppr_co p (TcLRCo lr co)       = pprPrefixApp p (ppr lr) [pprParendTcCo co]
 
 ppr_fun_co :: Prec -> TcCoercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)

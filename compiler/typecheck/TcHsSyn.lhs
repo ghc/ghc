@@ -1357,6 +1357,7 @@ zonkTcLCoToLCo env co
                                    ; return (TcCastCo co1' co2') }
     go (TcSymCo co)           = do { co' <- go co; return (mkTcSymCo co')  }
     go (TcNthCo n co)         = do { co' <- go co; return (mkTcNthCo n co')  }
+    go (TcLRCo lr co)         = do { co' <- go co; return (mkTcLRCo lr co')  }
     go (TcTransCo co1 co2)    = do { co1' <- go co1; co2' <- go co2
                                    ; return (mkTcTransCo co1' co2')  }
     go (TcForAllCo tv co)     = ASSERT( isImmutableTyVar tv )

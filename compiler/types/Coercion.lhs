@@ -17,6 +17,7 @@
 module Coercion (
         -- * Main data type
         Coercion(..), Var, CoVar,
+        LeftOrRight(..), pickLR,
 
         -- ** Functions over coercions
         coVarKind,
@@ -31,7 +32,7 @@ module Coercion (
         mkReflCo, mkCoVarCo, 
         mkAxInstCo, mkAxInstRHS,
         mkPiCo, mkPiCos, mkCoCast,
-        mkSymCo, mkTransCo, mkNthCo,
+        mkSymCo, mkTransCo, mkNthCo, mkLRCo,
 	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo,
         mkNewTypeCo, 
@@ -148,9 +149,17 @@ data Coercion
   | TransCo Coercion Coercion
 
   -- These are destructors
-  | NthCo Int Coercion          -- Zero-indexed
+  | NthCo  Int         Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
+  | LRCo   LeftOrRight Coercion     -- Decomposes (t_left t_right)
   | InstCo Coercion Type
   deriving (Data.Data, Data.Typeable)
+
+data LeftOrRight = CLeft | CRight 
+                 deriving( Eq, Data.Data, Data.Typeable )
+
+pickLR :: LeftOrRight -> (a,a) -> a
+pickLR CLeft  (l,_) = l
+pickLR CRight (_,r) = r
 \end{code}
 
 
@@ -337,6 +346,7 @@ tyCoVarsOfCo (UnsafeCo ty1 ty2)  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType t
 tyCoVarsOfCo (SymCo co)          = tyCoVarsOfCo co
 tyCoVarsOfCo (TransCo co1 co2)   = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
 tyCoVarsOfCo (NthCo _ co)        = tyCoVarsOfCo co
+tyCoVarsOfCo (LRCo _ co)         = tyCoVarsOfCo co
 tyCoVarsOfCo (InstCo co ty)      = tyCoVarsOfCo co `unionVarSet` tyVarsOfType ty
 
 tyCoVarsOfCos :: [Coercion] -> VarSet
@@ -354,6 +364,7 @@ coVarsOfCo (UnsafeCo _ _)      = emptyVarSet
 coVarsOfCo (SymCo co)          = coVarsOfCo co
 coVarsOfCo (TransCo co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (NthCo _ co)        = coVarsOfCo co
+coVarsOfCo (LRCo _ co)         = coVarsOfCo co
 coVarsOfCo (InstCo co _)       = coVarsOfCo co
 
 coVarsOfCos :: [Coercion] -> VarSet
@@ -370,6 +381,7 @@ coercionSize (UnsafeCo ty1 ty2)  = typeSize ty1 + typeSize ty2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (NthCo _ co)        = 1 + coercionSize co
+coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co ty)      = 1 + coercionSize co + typeSize ty
 \end{code}
 
@@ -416,8 +428,12 @@ ppr_co p (InstCo co ty) = maybeParen p TyConPrec $
 ppr_co p (UnsafeCo ty1 ty2) = pprPrefixApp p (ptext (sLit "UnsafeCo")) 
                                            [pprParendType ty1, pprParendType ty2]
 ppr_co p (SymCo co)         = pprPrefixApp p (ptext (sLit "Sym")) [pprParendCo co]
-ppr_co p (NthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <+> int n) [pprParendCo co]
+ppr_co p (NthCo n co)       = pprPrefixApp p (ptext (sLit "Nth:") <> int n) [pprParendCo co]
+ppr_co p (LRCo sel co)      = pprPrefixApp p (ppr sel) [pprParendCo co]
 
+instance Outputable LeftOrRight where
+  ppr CLeft    = ptext (sLit "Left")
+  ppr CRight   = ptext (sLit "Right")
 
 ppr_fun_co :: Prec -> Coercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
@@ -625,6 +641,10 @@ mkNthCo n co        = ASSERT( ok_tc_app _ty1 n && ok_tc_app _ty2 n )
                     where
                       Pair _ty1 _ty2 = coercionKind co
 
+mkLRCo :: LeftOrRight -> Coercion -> Coercion
+mkLRCo lr (Refl ty) = Refl (pickLR lr (splitAppTy ty))
+mkLRCo lr co        = LRCo lr co
+
 ok_tc_app :: Type -> Int -> Bool
 ok_tc_app ty n = case splitTyConApp_maybe ty of
                    Just (_, tys) -> tys `lengthExceeds` n
@@ -758,6 +778,8 @@ coreEqCoercion2 env (TransCo co11 co12) (TransCo co21 co22)
   = coreEqCoercion2 env co11 co21 && coreEqCoercion2 env co12 co22
 
 coreEqCoercion2 env (NthCo d1 co1) (NthCo d2 co2)
+  = d1 == d2 && coreEqCoercion2 env co1 co2
+coreEqCoercion2 env (LRCo d1 co1) (LRCo d2 co2)
   = d1 == d2 && coreEqCoercion2 env co1 co2
 
 coreEqCoercion2 env (InstCo co1 ty1) (InstCo co2 ty2)
@@ -900,6 +922,7 @@ subst_co subst co
     go (SymCo co)            = mkSymCo (go co)
     go (TransCo co1 co2)     = mkTransCo (go co1) (go co2)
     go (NthCo d co)          = mkNthCo d (go co)
+    go (LRCo lr co)          = mkLRCo lr (go co)
     go (InstCo co ty)        = mkInstCo (go co) $! go_ty ty
 
 substCoVar :: CvSubst -> CoVar -> Coercion
@@ -1073,6 +1096,7 @@ seqCo (UnsafeCo ty1 ty2)    = seqType ty1 `seq` seqType ty2
 seqCo (SymCo co)            = seqCo co
 seqCo (TransCo co1 co2)     = seqCo co1 `seq` seqCo co2
 seqCo (NthCo _ co)          = seqCo co
+seqCo (LRCo _ co)           = seqCo co
 seqCo (InstCo co ty)        = seqCo co `seq` seqType ty
 
 seqCos :: [Coercion] -> ()
@@ -1114,6 +1138,7 @@ coercionKind co = go co
     go (SymCo co)           = swap $ go co
     go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)
     go (NthCo d co)         = tyConAppArgN d <$> go co
+    go (LRCo lr co)         = (pickLR lr . splitAppTy) <$> go co
     go (InstCo aco ty)      = go_app aco [ty]
 
     go_app :: Coercion -> [Type] -> Pair Type

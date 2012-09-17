@@ -809,19 +809,11 @@ canEqAppTy :: CtLoc -> CtEvidence
            -> TcS StopOrContinue
 canEqAppTy loc ev s1 t1 s2 t2
   = ASSERT( not (isKind t1) && not (isKind t2) )
-    if isGiven ev then 
-        do { traceTcS "canEq (app case)" $
-                text "Ommitting decomposition of given equality between: " 
-                    <+> ppr (AppTy s1 t1) <+> text "and" <+> ppr (AppTy s2 t2)
-                   -- We cannot decompose given applications
-                   -- because we no longer have 'left' and 'right'
-           ; return Stop }
-    else 
     do { let xevcomp [x,y] = EvCoercion (mkTcAppCo (evTermCoercion x) (evTermCoercion y))
              xevcomp _ = error "canEqAppTy: can't happen" -- Can't happen
-             xev = XEvTerm { ev_comp = xevcomp
-                           , ev_decomp = error "canEqAppTy: can't happen" }
-       ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] xev 
+             xevdecomp x = let xco = evTermCoercion x 
+                           in [EvCoercion (mkTcLRCo CLeft xco), EvCoercion (mkTcLRCo CRight xco)]
+       ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
        ; canEvVarsCreated loc ctevs }
 
 canEqFailure :: CtLoc -> CtEvidence -> TcS StopOrContinue
