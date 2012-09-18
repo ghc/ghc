@@ -118,19 +118,10 @@ toStgHalfWord dflags i
 instance Outputable StgHalfWord where
     ppr (StgHalfWord i) = integer i
 
-#if SIZEOF_HSWORD == 4
-hALF_WORD_SIZE :: ByteOff
-hALF_WORD_SIZE = 2
-hALF_WORD_SIZE_IN_BITS :: Int
-hALF_WORD_SIZE_IN_BITS = 16
-#elif SIZEOF_HSWORD == 8
-hALF_WORD_SIZE :: ByteOff
-hALF_WORD_SIZE = 4
-hALF_WORD_SIZE_IN_BITS :: Int
-hALF_WORD_SIZE_IN_BITS = 32
-#else
-#error unknown SIZEOF_HSWORD
-#endif
+hALF_WORD_SIZE :: DynFlags -> ByteOff
+hALF_WORD_SIZE dflags = platformWordSize (targetPlatform dflags) `shiftR` 1
+hALF_WORD_SIZE_IN_BITS :: DynFlags -> Int
+hALF_WORD_SIZE_IN_BITS dflags = platformWordSize (targetPlatform dflags) `shiftL` 2
 \end{code}
 
 

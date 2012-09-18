@@ -579,7 +579,7 @@ stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
 -- in the *higher-addressed* part of the type_lit
-stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE
+stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE dflags
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word 
@@ -587,7 +587,7 @@ stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
 
 -------------------------------------------------------------------------
 --

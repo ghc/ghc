@@ -795,7 +795,7 @@ getSRTInfo = do
     NoSRT -> return NoC_SRT
     SRTEntries {} -> panic "getSRTInfo: SRTEntries.  Perhaps you forgot to run SimplStg?"
     SRT off len bmp
-      | len > hALF_WORD_SIZE_IN_BITS || bmp == [toStgWord dflags (fromStgHalfWord (srt_escape dflags))]
+      | len > hALF_WORD_SIZE_IN_BITS dflags || bmp == [toStgWord dflags (fromStgHalfWord (srt_escape dflags))]
       -> do id <- newUnique
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
