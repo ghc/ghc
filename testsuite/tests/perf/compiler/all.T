@@ -36,7 +36,7 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 633332520, 1)),
+          compiler_stats_range_field('bytes allocated', 641959976, 1)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
@@ -45,7 +45,8 @@ test('T1969',
                                     # 20/07/2012:     595,936,240 (amd64/Linux)
                                     # 23/08/2012:     606,230,880 (amd64/Linux)
                                     # 29/08/2012:     633,334,184 (amd64/Linux)
-                                    #                 (new codegen)
+                                    #                 (^ new codegen)
+                                    # 18/09/2012:     641,959,976 (amd64/Linux)
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint')
           # Leave -dcore-lint on for this one test, so that we have something
@@ -82,10 +83,11 @@ test('T3294',
                                                       750000000)),
                                     # expected value: 815479800  (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 2961778696, 5)),
+          compiler_stats_range_field('bytes allocated', 2717327208, 5)),
                                    # old:        1,357,587,088 (amd64/Linux)
                                    # 29/08/2012: 2,961,778,696 (amd64/Linux)
-                                   #   (increase due to new codegen, see #7198)
+                                   # (^ increase due to new codegen, see #7198)
+                                   # 18/09/2012: 2,717,327,208 (amd64/Linux)
       conf_3294
       ],
      compile,
@@ -264,6 +266,7 @@ test('T6048',
           compiler_stats_range_field('bytes allocated', 38000000, 10)),
 
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 67328320, 10))
+          compiler_stats_range_field('bytes allocated', 97247032, 10))
+                                           # 18/09/2012 97247032 amd64/Linux
       ],
       compile,[''])
