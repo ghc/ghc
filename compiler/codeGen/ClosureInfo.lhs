@@ -530,12 +530,12 @@ lfClosureType :: DynFlags -> LambdaFormInfo -> ClosureTypeInfo
 lfClosureType dflags (LFReEntrant _ arity _ argd) = Fun (toStgHalfWord dflags (toInteger arity)) argd
 lfClosureType dflags (LFCon con)                  = Constr (toStgHalfWord dflags (toInteger (dataConTagZ con)))
                                                            (dataConIdentity con)
-lfClosureType _      (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType dflags (LFThunk _ _ _ is_sel _)     = thunkClosureType dflags is_sel
 lfClosureType _      _                            = panic "lfClosureType"
 
-thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
-thunkClosureType (SelectorThunk off) = ThunkSelector (fromIntegral off)
-thunkClosureType _                   = Thunk
+thunkClosureType :: DynFlags -> StandardFormInfo -> ClosureTypeInfo
+thunkClosureType dflags (SelectorThunk off) = ThunkSelector (toStgWord dflags (toInteger off))
+thunkClosureType _      _                   = Thunk
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of

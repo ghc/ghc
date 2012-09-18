@@ -795,17 +795,17 @@ getSRTInfo = do
     NoSRT -> return NoC_SRT
     SRTEntries {} -> panic "getSRTInfo: SRTEntries.  Perhaps you forgot to run SimplStg?"
     SRT off len bmp
-      | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromInteger (fromStgHalfWord (srt_escape dflags))]
+      | len > hALF_WORD_SIZE_IN_BITS || bmp == [toStgWord dflags (fromStgHalfWord (srt_escape dflags))]
       -> do id <- newUnique
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
              ( cmmLabelOffW dflags srt_lbl off
-               : mkWordCLit dflags (fromIntegral len)
+               : mkWordCLit dflags (toStgWord dflags (toInteger len))
                : map (mkWordCLit dflags) bmp)
             return (C_SRT srt_desc_lbl 0 (srt_escape dflags))
 
       | otherwise
-      -> return (C_SRT srt_lbl off (toStgHalfWord dflags (toInteger (head bmp))))
+      -> return (C_SRT srt_lbl off (toStgHalfWord dflags (fromStgWord (head bmp))))
                 -- The fromIntegral converts to StgHalfWord
 
 srt_escape :: DynFlags -> StgHalfWord

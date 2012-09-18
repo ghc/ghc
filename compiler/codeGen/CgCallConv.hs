@@ -121,13 +121,13 @@ stdPattern dflags reps
 -- GET_NON_PTRS(), GET_PTRS(), GET_LIVENESS().
 -------------------------------------------------------------------------
 
-mkRegLiveness :: [(Id, GlobalReg)] -> Int -> Int -> StgWord
-mkRegLiveness regs ptrs nptrs
-  = (fromIntegral nptrs `shiftL` 16) .|.
-    (fromIntegral ptrs  `shiftL` 24) .|.
-    all_non_ptrs `xor` reg_bits regs
+mkRegLiveness :: DynFlags -> [(Id, GlobalReg)] -> Int -> Int -> StgWord
+mkRegLiveness dflags regs ptrs nptrs
+  = (toStgWord dflags (toInteger nptrs) `shiftL` 16) .|.
+    (toStgWord dflags (toInteger ptrs)  `shiftL` 24) .|.
+    all_non_ptrs `xor` toStgWord dflags (reg_bits regs)
   where
-    all_non_ptrs = 0xff
+    all_non_ptrs = toStgWord dflags 0xff
 
     reg_bits [] = 0
     reg_bits ((id, VanillaReg i _) : regs) | isFollowableArg (idCgRep id)

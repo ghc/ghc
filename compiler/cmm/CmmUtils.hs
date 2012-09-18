@@ -156,7 +156,7 @@ mkRODataLits lbl lits
     needsRelocation _                 = False
 
 mkWordCLit :: DynFlags -> StgWord -> CmmLit
-mkWordCLit dflags wd = CmmInt (fromIntegral wd) (wordWidth dflags)
+mkWordCLit dflags wd = CmmInt (fromStgWord wd) (wordWidth dflags)
 
 packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 -- Make a single word literal in which the lower_half_word is
@@ -168,8 +168,8 @@ packHalfWordsCLit dflags lower_half_word upper_half_word
    = if wORDS_BIGENDIAN dflags
      then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS) .|. u)
      else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS))
-    where l = fromInteger (fromStgHalfWord lower_half_word)
-          u = fromInteger (fromStgHalfWord upper_half_word)
+    where l = toStgWord dflags (fromStgHalfWord lower_half_word)
+          u = toStgWord dflags (fromStgHalfWord upper_half_word)
 
 ---------------------------------------------------
 --

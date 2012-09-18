@@ -178,7 +178,7 @@ instance Outputable a => Outputable (ProtoBCO a) where
                       Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
                                                        (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
                       Right rhs -> pprCoreExprShort (deAnnotate rhs))
-        $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> text (show bitmap))
+        $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> ppr bitmap)
         $$ nest 3 (vcat (map ppr instrs))
 
 -- Print enough of the Core expression to enable the reader to find

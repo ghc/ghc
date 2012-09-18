@@ -9,9 +9,11 @@ This is here, rather than in ClosureInfo, just to keep nhc happy.
 Other modules should access this info through ClosureInfo.
 
 \begin{code}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module SMRep (
         -- * Words and bytes
-        StgWord,
+        StgWord, fromStgWord, toStgWord,
         StgHalfWord, fromStgHalfWord, toStgHalfWord,
         hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
         WordOff, ByteOff,
@@ -50,6 +52,7 @@ import Outputable
 import Platform
 import FastString
 
+import Data.Array.Base
 import Data.Char( ord )
 import Data.Word
 import Data.Bits
@@ -73,6 +76,30 @@ roundUpToWords dflags n = (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZ
 StgWord is a type representing an StgWord on the target platform.
 
 \begin{code}
+newtype StgWord = StgWord Word64
+    deriving (Eq,
+#if __GLASGOW_HASKELL__ < 706
+              Num,
+#endif
+              Bits, IArray UArray)
+
+fromStgWord :: StgWord -> Integer
+fromStgWord (StgWord i) = toInteger i
+
+toStgWord :: DynFlags -> Integer -> StgWord
+toStgWord dflags i
+    = case platformWordSize (targetPlatform dflags) of
+      -- These conversions mean that things like toStgWord (-1)
+      -- do the right thing
+      4 -> StgWord (fromIntegral (fromInteger i :: Word32))
+      8 -> StgWord (fromInteger i :: Word64)
+      w -> panic ("toStgWord: Unknown platformWordSize: " ++ show w)
+
+instance Outputable StgWord where
+    ppr (StgWord i) = integer (toInteger i)
+
+--
+
 newtype StgHalfWord = StgHalfWord Integer
     deriving Eq
 
@@ -92,13 +119,11 @@ instance Outputable StgHalfWord where
     ppr (StgHalfWord i) = integer i
 
 #if SIZEOF_HSWORD == 4
-type StgWord     = Word32
 hALF_WORD_SIZE :: ByteOff
 hALF_WORD_SIZE = 2
 hALF_WORD_SIZE_IN_BITS :: Int
 hALF_WORD_SIZE_IN_BITS = 16
 #elif SIZEOF_HSWORD == 8
-type StgWord     = Word64
 hALF_WORD_SIZE :: ByteOff
 hALF_WORD_SIZE = 4
 hALF_WORD_SIZE_IN_BITS :: Int
@@ -396,7 +421,7 @@ pprTypeInfo (Fun arity args)
                 , ptext (sLit ("fun_type:")) <+> ppr args ])
 
 pprTypeInfo (ThunkSelector offset)
-  = ptext (sLit "ThunkSel") <+> integer (toInteger offset)
+  = ptext (sLit "ThunkSel") <+> ppr offset
 
 pprTypeInfo Thunk     = ptext (sLit "Thunk")
 pprTypeInfo BlackHole = ptext (sLit "BlackHole")

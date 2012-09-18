@@ -321,13 +321,13 @@ mkLivenessBits dflags liveness
     bitmap = mkBitmap dflags liveness
 
     small_bitmap = case bitmap of 
-		     []  -> 0
+                     []  -> toStgWord dflags 0
                      [b] -> b
 		     _   -> panic "mkLiveness"
-    bitmap_word = fromIntegral n_bits
+    bitmap_word = toStgWord dflags (fromIntegral n_bits)
               .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT dflags)
 
-    lits = mkWordCLit dflags (fromIntegral n_bits) : map (mkWordCLit dflags) bitmap
+    lits = mkWordCLit dflags (toStgWord dflags (fromIntegral n_bits)) : map (mkWordCLit dflags) bitmap
       -- The first word is the size.  The structure must match
       -- StgLargeBitmap in includes/rts/storage/InfoTable.h
 

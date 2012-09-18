@@ -312,12 +312,12 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
 
-        | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' stgHalfWord ',' STRING ',' STRING ')'
+        | 'INFO_TABLE_SELECTOR' '(' NAME ',' stgWord ',' stgHalfWord ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
+                          ty  = ThunkSelector $5
                           rep = mkRTSRep $7 $
                                    mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
@@ -613,6 +613,9 @@ typenot8 :: { CmmType }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
+
+stgWord :: { StgWord }
+        : INT                   {% do dflags <- getDynFlags; return $ toStgWord dflags $1 }
 
 stgHalfWord :: { StgHalfWord }
         : INT                   {% do dflags <- getDynFlags; return $ toStgHalfWord dflags $1 }
