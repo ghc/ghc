@@ -183,7 +183,7 @@ mkInfoTableContents dflags
        ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
-  = do { let layout  = packHalfWordsCLit dflags ptrs nonptrs
+  = do { let layout  = packHalfWordsCLit dflags (fromIntegral ptrs) (fromIntegral nonptrs)
        ; (prof_lits, prof_data) <- mkProfLits dflags prof
        ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)

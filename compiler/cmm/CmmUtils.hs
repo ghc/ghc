@@ -158,7 +158,7 @@ mkRODataLits lbl lits
 mkWordCLit :: DynFlags -> StgWord -> CmmLit
 mkWordCLit dflags wd = CmmInt (fromIntegral wd) (wordWidth dflags)
 
-packHalfWordsCLit :: (Integral a, Integral b) => DynFlags -> a -> b -> CmmLit
+packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 -- Make a single word literal in which the lower_half_word is
 -- at the lower address, and the upper_half_word is at the
 -- higher address
