@@ -20,3 +20,4 @@ test('massive_array',
      [ if_arch('i386', expect_broken(7213)),
        if_arch('i386', omit_ways(['llvm', 'optllvm'])) ],
      compile, ['-fPIC'])
+test('T7237', normal, compile, [''])
