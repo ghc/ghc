@@ -122,6 +122,7 @@ module DynFlags (
         wORD_SIZE_IN_BITS,
         tAG_MASK,
         mAX_PTR_TAG,
+        tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
   ) where
 
 #include "HsVersions.h"
@@ -155,11 +156,13 @@ import Control.Monad
 
 import Data.Bits
 import Data.Char
+import Data.Int
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Word
 import System.FilePath
 import System.IO
 
@@ -3163,4 +3166,22 @@ tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
 
 mAX_PTR_TAG :: DynFlags -> Int
 mAX_PTR_TAG = tAG_MASK
+
+-- Might be worth caching these in targetPlatform?
+tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
+tARGET_MIN_INT dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (minBound :: Int32)
+      8 -> toInteger (minBound :: Int64)
+      w -> panic ("tARGET_MIN_INT: Unknown platformWordSize: " ++ show w)
+tARGET_MAX_INT dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (maxBound :: Int32)
+      8 -> toInteger (maxBound :: Int64)
+      w -> panic ("tARGET_MAX_INT: Unknown platformWordSize: " ++ show w)
+tARGET_MAX_WORD dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (maxBound :: Word32)
+      8 -> toInteger (maxBound :: Word64)
+      w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
 

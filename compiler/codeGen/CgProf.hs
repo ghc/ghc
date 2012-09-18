@@ -307,8 +307,8 @@ ldvEnter cl_ptr = do
            (stmtC (CmmStore ldv_wd new_ldv_wd))
 
 loadEra :: DynFlags -> CmmExpr
-loadEra dflags = CmmMachOp (MO_UU_Conv cIntWidth (wordWidth dflags))
-                           [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) cInt]
+loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth dflags))
+                           [CmmLoad (mkLblExpr (mkCmmDataLabel rtsPackageId $ fsLit("era"))) (cInt dflags)]
 
 ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns

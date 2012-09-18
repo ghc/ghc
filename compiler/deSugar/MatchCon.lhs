@@ -31,6 +31,7 @@ import ListSetOps ( runs )
 import Id
 import NameEnv
 import SrcLoc
+import DynFlags
 import Outputable
 import Control.Monad(liftM)
 \end{code}
@@ -92,8 +93,9 @@ matchConFamily :: [Id]
 	       -> DsM MatchResult
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
-  = do	{ alts <- mapM (matchOneCon vars ty) groups
-	; return (mkCoAlgCaseMatchResult var ty alts) }
+  = do dflags <- getDynFlags
+       alts <- mapM (matchOneCon vars ty) groups
+       return (mkCoAlgCaseMatchResult dflags var ty alts)
 matchConFamily [] _ _ = panic "matchConFamily []"
 
 type ConArgPats = HsConDetails (LPat Id) (HsRecFields Id (LPat Id))

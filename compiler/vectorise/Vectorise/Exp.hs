@@ -728,11 +728,12 @@ vectLam inline loop_breaker expr@(fvs, AnnLam _ _)  vi
     -- in Figure 6 of HtM.
     break_loop lc ty (ve, le)
       | loop_breaker
-      = do { empty <- emptyPD ty
+      = do { dflags <- getDynFlags
+           ; empty <- emptyPD ty
            ; lty   <- mkPDataType ty
            ; return (ve, mkWildCase (Var lc) intPrimTy lty
                            [(DEFAULT, [], le),
-                            (LitAlt (mkMachInt 0), [], empty)])
+                            (LitAlt (mkMachInt dflags 0), [], empty)])
            }
       | otherwise = return (ve, le)
 vectLam _ _ _ _ = panic "vectLam"
@@ -844,9 +845,10 @@ vectAlgCase tycon _ty_args scrut bndr ty alts (VITNode _ (scrutVit : altVits))
 
     proc_alt arity sel _ lty ((DataAlt dc, bndrs, body),  vi)
       = do
+          dflags <- getDynFlags
           vect_dc <- maybeV dataConErr (lookupDataCon dc)
           let ntag = dataConTagZ vect_dc
-              tag  = mkDataConTag vect_dc
+              tag  = mkDataConTag dflags vect_dc
               fvs  = freeVarsOf body `delVarSetList` bndrs
 
           sel_tags  <- liftM (`App` sel) (builtin (selTags arity))

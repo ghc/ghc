@@ -430,7 +430,7 @@ dsFExportDynamic id co0 cconv = do
           to be entered using an external calling convention
           (stdcall, ccall).
          -}
-        adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
+        adj_args      = [ mkIntLitInt dflags (ccallConvToInt cconv)
                         , Var stbl_value
                         , Lit (MachLabel fe_nm mb_sz_args IsFunction)
                         , Lit (mkMachString typestring)

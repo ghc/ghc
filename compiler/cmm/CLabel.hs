@@ -590,9 +590,9 @@ hasCAF _                            = False
 
 needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother
-  -- don't bother declaring SRT & Bitmap labels, we always make sure
+  -- don't bother declaring Bitmap labels, we always make sure
   -- they are defined before use.
-needsCDecl (SRTLabel _ _)               = False
+needsCDecl (SRTLabel _ _)               = True
 needsCDecl (LargeSRTLabel _)            = False
 needsCDecl (LargeBitmapLabel _)         = False
 needsCDecl (IdLabel _ _ _)              = True
@@ -788,7 +788,7 @@ labelType (RtsLabel (RtsApFast _))              = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
 labelType (CaseLabel _ _)                       = CodeLabel
 labelType (PlainModuleInitLabel _)              = CodeLabel
-labelType (SRTLabel _ _)                        = CodeLabel
+labelType (SRTLabel _ _)                        = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
 labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel

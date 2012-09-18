@@ -772,7 +772,7 @@ dynLinkObjs dflags pls objs = do
 
         mapM_ loadObj (map nameOfObject unlinkeds)
 
-        -- Link the all together
+        -- Link them all together
         ok <- resolveObjs
 
         -- If resolving failed, unload all our

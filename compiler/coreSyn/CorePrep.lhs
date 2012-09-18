@@ -471,7 +471,7 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
 cpeRhsE env (Lit (LitInteger i _))
-    = cpeRhsE env (cvtLitInteger (getMkIntegerId env) i)
+    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env) i)
 cpeRhsE _env expr@(Lit {})       = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})        = cpeApp env expr
 
@@ -521,16 +521,16 @@ cpeRhsE env (Case scrut bndr ty alts)
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
-cvtLitInteger :: Id -> Integer -> CoreExpr
+cvtLitInteger :: DynFlags -> Id -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
 -- represenation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
 -- See Note [Integer literals] in Literal
-cvtLitInteger mk_integer i
+cvtLitInteger dflags mk_integer i
   | cIntegerLibraryType == IntegerGMP
-  , inIntRange i       -- Special case for small integers in GMP
-    = mkConApp integerGmpSDataCon [Lit (mkMachInt i)]
+  , inIntRange dflags i       -- Special case for small integers in GMP
+    = mkConApp integerGmpSDataCon [Lit (mkMachInt dflags i)]
 
   | otherwise
     = mkApps (Var mk_integer) [isNonNegative, ints]
@@ -540,7 +540,7 @@ cvtLitInteger mk_integer i
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkMachInt low)] : f high
+              in mkConApp intDataCon [Lit (mkMachInt dflags low)] : f high
         bits = 31
         mask = 2 ^ bits - 1
 

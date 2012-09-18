@@ -126,24 +126,24 @@ hsLitType (HsDoublePrim _) = doublePrimTy
 Overloaded literals. Here mainly becuase it uses isIntTy etc
 
 \begin{code}
-shortCutLit :: OverLitVal -> TcType -> Maybe (HsExpr TcId)
-shortCutLit (HsIntegral i) ty
-  | isIntTy ty && inIntRange i   = Just (HsLit (HsInt i))
-  | isWordTy ty && inWordRange i = Just (mkLit wordDataCon (HsWordPrim i))
-  | isIntegerTy ty 	       	 = Just (HsLit (HsInteger i ty))
-  | otherwise		       	 = shortCutLit (HsFractional (integralFractionalLit i)) ty
+shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr TcId)
+shortCutLit dflags (HsIntegral i) ty
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt i))
+  | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim i))
+  | isIntegerTy ty = Just (HsLit (HsInteger i ty))
+  | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit i)) ty
 	-- The 'otherwise' case is important
 	-- Consider (3 :: Float).  Syntactically it looks like an IntLit,
 	-- so we'll call shortCutIntLit, but of course it's a float
 	-- This can make a big difference for programs with a lot of
 	-- literals, compiled without -O
 
-shortCutLit (HsFractional f) ty
+shortCutLit _ (HsFractional f) ty
   | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim f))
   | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim f))
   | otherwise     = Nothing
 
-shortCutLit (HsIsString s) ty
+shortCutLit _ (HsIsString s) ty
   | isStringTy ty = Just (HsLit (HsString s))
   | otherwise     = Nothing
 

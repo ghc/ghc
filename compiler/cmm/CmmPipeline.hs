@@ -82,7 +82,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                   return call_pps
 
        let noncall_pps = proc_points `setDifference` call_pps
-       when (not (setNull noncall_pps)) $
+       when (not (setNull noncall_pps) && dopt Opt_D_dump_cmmz dflags) $
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Sink and inline assignments *before* stack layout -----------

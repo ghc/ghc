@@ -308,11 +308,12 @@ mkCoPrimCaseMatchResult var ty match_alts
 
 
 mkCoAlgCaseMatchResult 
-  :: Id					   -- Scrutinee
+  :: DynFlags
+  -> Id					   -- Scrutinee
   -> Type                                  -- Type of exp
   -> [(DataCon, [CoreBndr], MatchResult)]  -- Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult
-mkCoAlgCaseMatchResult var ty match_alts 
+mkCoAlgCaseMatchResult dflags var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
@@ -423,7 +424,7 @@ mkCoAlgCaseMatchResult var ty match_alts
 	    lit   = MachInt $ toInteger (dataConSourceArity con)
 	    binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] args]
 	    --
-	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr i]
+	    indexExpr i = mkApps (Var indexP) [Type elemTy, Var var, mkIntExpr dflags i]
 \end{code}
 
 %************************************************************************
