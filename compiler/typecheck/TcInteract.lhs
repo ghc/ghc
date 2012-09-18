@@ -383,7 +383,7 @@ Note [Kick out insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have an insoluble alpha ~ [alpha], which is insoluble
 because an occurs check.  And then we unify alpha := [Int].  
-Then we really want to rewrite the insouluble to [Int] ~ [[Int].
+Then we really want to rewrite the insouluble to [Int] ~ [[Int]].
 Now it can be decomposed.  Otherwise we end up with a "Can't match
 [Int] ~ [[Int]]" which is true, but a bit confusing because the
 outer type constructors match. 

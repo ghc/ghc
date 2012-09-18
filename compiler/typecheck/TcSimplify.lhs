@@ -72,6 +72,7 @@ simplifyTop wanteds
 
   where
     -- See Note [Top-level Defaulting Plan]
+    simpl_top :: WantedConstraints -> TcS WantedConstraints
     simpl_top wanteds
       = do { wc_first_go <- nestTcS (solve_wanteds_and_drop wanteds)
            ; applyTyVarDefaulting wc_first_go 
