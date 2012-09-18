@@ -476,6 +476,7 @@ mkStgAltType bndr alts = case repType (idType bndr) of
   where
    _is_poly_alt_tycon tc
         =  isFunTyCon tc
+        || isPrimTyCon tc   -- "Any" is lifted but primitive
         || isFamilyTyCon tc -- Type family; e.g. Any, or arising from strict
                             -- function application where argument has a
                             -- type-family type

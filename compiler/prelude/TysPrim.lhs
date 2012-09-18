@@ -717,6 +717,11 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
+anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
+  where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
+
+{-   Can't do this yet without messing up kind proxies
+anyTyCon :: TyCon
 anyTyCon = mkSynTyCon anyTyConName kind [kKiVar] 
                       syn_rhs
                       NoParentTyCon
@@ -724,6 +729,7 @@ anyTyCon = mkSynTyCon anyTyConName kind [kKiVar]
     kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
     syn_rhs = SynFamilyTyCon { synf_open = False, synf_injective = True }
                   -- NB Closed, injective
+-}
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = mkNakedTyConApp anyTyCon [kind]
