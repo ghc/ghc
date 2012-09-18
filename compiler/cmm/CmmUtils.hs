@@ -165,13 +165,11 @@ packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 -- ToDo: consider using half-word lits instead
 --       but be careful: that's vulnerable when reversed
 packHalfWordsCLit dflags lower_half_word upper_half_word
-#ifdef WORDS_BIGENDIAN
-   = mkWordCLit dflags ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
-                 .|. fromIntegral upper_half_word)
-#else
-   = mkWordCLit dflags ((fromIntegral lower_half_word)
-                 .|. (fromIntegral upper_half_word `shiftL` hALF_WORD_SIZE_IN_BITS))
-#endif
+   = if wORDS_BIGENDIAN dflags
+     then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS) .|. u)
+     else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS))
+    where l = fromIntegral lower_half_word
+          u = fromIntegral upper_half_word
 
 ---------------------------------------------------
 --
