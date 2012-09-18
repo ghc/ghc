@@ -84,7 +84,7 @@ instance Ppr Exp where
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
 pprInfixExp (ConE v) = pprName' Infix v
-pprInfixExp _        = error "Attempt to pretty-print non-variable or constructor in infix context!"
+pprInfixExp _        = text "<<Non-variable/constructor in infix context>>"
 
 pprExp :: Precedence -> Exp -> Doc
 pprExp _ (VarE v)     = pprName' Applied v
@@ -127,7 +127,7 @@ pprExp i (CaseE e ms)
  = parensIf (i > noPrec) $ text "case" <+> ppr e <+> text "of"
                         $$ nest nestDepth (ppr ms)
 pprExp i (DoE ss) = parensIf (i > noPrec) $ text "do" <+> ppr ss
-pprExp _ (CompE []) = error "Can't happen: pprExp (CompExp [])"
+pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
 pprExp _ (CompE ss) = text "[" <> ppr s
                   <+> text "|"
