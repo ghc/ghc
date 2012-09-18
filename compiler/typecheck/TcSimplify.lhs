@@ -1077,8 +1077,11 @@ in the cache!
 applyTyVarDefaulting :: WantedConstraints -> TcS ()
 applyTyVarDefaulting wc 
   = do { let tvs = filter isMetaTyVar (varSetElems (tyVarsOfWC wc))
-                   -- We might have runtime-skolems in GHCi, and 
-                   -- we definitely don't want to try to assign to those!
+                   -- tyVarsOfWC: post-simplification the WC should reflect
+                   --             all unifications that have happened
+                   -- filter isMetaTyVar: we might have runtime-skolems in GHCi, 
+                   -- and we definitely don't want to try to assign to those!
+
        ; traceTcS "applyTyVarDefaulting {" (ppr tvs)
        ; mapM_ defaultTyVar tvs
        ; traceTcS "applyTyVarDefaulting end }" empty }

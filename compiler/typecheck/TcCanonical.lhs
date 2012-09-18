@@ -248,7 +248,7 @@ canClassNC d ev cls tys
 
 canClass d ev cls tys
   = do { -- sctx <- getTcSContext
-       ; (xis, cos) <- flattenMany d FMFullFlatten ev tys
+       ; (xis, cos) <- flattenMany d FMFullFlatten (ctEvFlavour ev) tys
        ; let co = mkTcTyConAppCo (classTyCon cls) cos 
              xi = mkClassPred cls xis
              
@@ -391,7 +391,7 @@ canIrred :: CtLoc -> CtEvidence -> TcS StopOrContinue
 canIrred d ev
   = do { let ty = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr ty) 
-       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
+       ; (xi,co) <- flatten d FMFullFlatten (ctEvFlavour ev) ty -- co :: xi ~ ty
        ; let no_flattening = xi `eqType` ty 
              -- We can't use isTcReflCo, because even if the coercion is
              -- Refl, the output type might have had a substitution 
@@ -409,7 +409,7 @@ canIrred d ev
 canHole :: CtLoc -> CtEvidence -> TcS StopOrContinue
 canHole d ev 
   = do { let ty = ctEvPred ev
-       ; (xi,co) <- flatten d FMFullFlatten ev ty -- co :: xi ~ ty
+       ; (xi,co) <- flatten d FMFullFlatten (ctEvFlavour ev) ty -- co :: xi ~ ty
        ; mb <- rewriteCtFlavor ev xi co 
        ; case mb of
              Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_loc = d})
@@ -465,12 +465,11 @@ unexpanded synonym.
 
 \begin{code}
 
-data FlattenMode = FMSubstOnly 
-                 | FMFullFlatten
+data FlattenMode = FMSubstOnly | FMFullFlatten
 
 -- Flatten a bunch of types all at once.
 flattenMany :: CtLoc -> FlattenMode
-            -> CtEvidence -> [Type] -> TcS ([Xi], [TcCoercion])
+            -> CtFlavour -> [Type] -> TcS ([Xi], [TcCoercion])
 -- Coercions :: Xi ~ Type 
 -- Returns True iff (no flattening happened)
 -- NB: The EvVar inside the 'ctxt :: CtEvidence' is unused, 
@@ -488,7 +487,7 @@ flattenMany d f ctxt tys
 -- the new type-function-free type, and a collection of new equality
 -- constraints.  See Note [Flattening] for more detail.
 flatten :: CtLoc -> FlattenMode 
-        -> CtEvidence -> TcType -> TcS (Xi, TcCoercion)
+        -> CtFlavour -> TcType -> TcS (Xi, TcCoercion)
 -- Postcondition: Coercion :: Xi ~ TcType
 flatten loc f ctxt ty 
   | Just ty' <- tcView ty
@@ -540,7 +539,8 @@ flatten loc f ctxt (TyConApp tc tys)
                     ; case mb_ct of
                         Just ct 
                           | let ctev = cc_ev ct
-                          , ctEvFlavour ctev `canRewrite` ctEvFlavour ctxt 
+                                flav = ctEvFlavour ctev
+                          , flav `canRewrite` ctxt 
                           -> -- You may think that we can just return (cc_rhs ct) but not so. 
                              --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, []) 
                              -- The cached constraint resides in the cache so we have to flatten 
@@ -551,12 +551,12 @@ flatten loc f ctxt (TyConApp tc tys)
                              -- For now I say we don't keep it fully rewritten.
                             do { traceTcS "flatten/flat-cache hit" $ ppr ct
                                ; let rhs_xi = cc_rhs ct
-                               ; (flat_rhs_xi,co) <- flatten (cc_loc ct) f ctev rhs_xi
+                               ; (flat_rhs_xi,co) <- flatten (cc_loc ct) f flav rhs_xi
                                ; let final_co = evTermCoercion (ctEvTerm ctev)
                                                 `mkTcTransCo` mkTcSymCo co
                                ; return (final_co, flat_rhs_xi) }
                           
-                        _ | isGiven ctxt -- Given: make new flatten skolem
+                        _ | Given <- ctxt -- Given: make new flatten skolem
                           -> do { traceTcS "flatten/flat-cache miss" $ empty 
                                 ; rhs_ty <- newFlattenSkolemTy fam_ty
                                 ; let co     = mkTcReflCo fam_ty
@@ -623,7 +623,7 @@ and we have not begun to think about how to make that work!
 
 \begin{code}
 flattenTyVar :: CtLoc -> FlattenMode 
-             -> CtEvidence -> TcTyVar -> TcS (Xi, TcCoercion)
+             -> CtFlavour -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
 -- The substitution is actually the union of the substitution in the TyBinds
 -- for the unification variables that have been unified already with the inert
@@ -667,7 +667,7 @@ flattenTyVar loc f ctxt tv
     tv_eq_subst subst tv
        | Just ct <- lookupVarEnv subst tv
        , let ctev = cc_ev ct
-       , ctEvFlavour ctev `canRewrite` ctEvFlavour ctxt
+       , ctEvFlavour ctev `canRewrite` ctxt
        = Just (evTermCoercion (ctEvTerm ctev), cc_rhs ct)
               -- NB: even if ct is Derived we are not going to 
               -- touch the actual coercion so we are fine. 
@@ -726,9 +726,7 @@ emitWorkNC loc evs
     mk_nc ev = CNonCanonical { cc_ev = ev, cc_loc = loc }
 
 -------------------------
-canEqNC, canEq 
-  :: CtLoc -> CtEvidence 
-  -> Type -> Type -> TcS StopOrContinue
+canEqNC, canEq :: CtLoc -> CtEvidence -> Type -> Type -> TcS StopOrContinue
 
 canEqNC loc ev ty1 ty2
   = canEq loc ev ty1 ty2
@@ -769,7 +767,7 @@ canEq loc ev ty1 ty2
   = -- Generate equalities for each of the corresponding arguments
     if (tc1 /= tc2 || length tys1 /= length tys2)
     -- Fail straight away for better error messages
-    then canEqFailure loc ev
+    then canEqFailure loc ev ty1 ty2
     else
     do { let xcomp xs  = EvCoercion (mkTcTyConAppCo tc1 (map evTermCoercion xs))
              xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
@@ -791,7 +789,7 @@ canEq loc ev s1@(ForAllTy {}) s2@(ForAllTy {})
  = do { let (tvs1,body1) = tcSplitForAllTys s1
             (tvs2,body2) = tcSplitForAllTys s2
       ; if not (equalLength tvs1 tvs2) then 
-          canEqFailure loc ev
+          canEqFailure loc ev s1 s2
         else
           do { traceTcS "Creating implication for polytype equality" $ ppr ev
              ; deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2) 
@@ -800,7 +798,7 @@ canEq loc ev s1@(ForAllTy {}) s2@(ForAllTy {})
  = do { traceTcS "Ommitting decomposition of given polytype equality" $ 
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; return Stop }
-canEq loc ev _ _  = canEqFailure loc ev
+canEq loc ev ty1 ty2  = canEqFailure loc ev ty1 ty2
 
 ------------------------
 -- Type application
@@ -816,9 +814,17 @@ canEqAppTy loc ev s1 t1 s2 t2
        ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
        ; canEvVarsCreated loc ctevs }
 
-canEqFailure :: CtLoc -> CtEvidence -> TcS StopOrContinue
-canEqFailure loc ev 
-  = do { emitInsoluble (CNonCanonical { cc_ev = ev, cc_loc = loc }) 
+canEqFailure :: CtLoc -> CtEvidence -> TcType -> TcType -> TcS StopOrContinue
+-- See Note [Make sure that insolubles are fully rewritten]
+canEqFailure loc ev ty1 ty2
+  = do { let flav = ctEvFlavour ev
+       ; (s1, co1) <- flatten loc FMSubstOnly flav ty1
+       ; (s2, co2) <- flatten loc FMSubstOnly flav ty2
+       ; mb_ct <- rewriteCtFlavor ev (mkTcEqPred s1 s2)
+                                     (mkHdEqPred s2 co1 co2)
+       ; case mb_ct of
+           Just new_ev -> emitInsoluble (CNonCanonical { cc_ev = new_ev, cc_loc = loc }) 
+           Nothing -> pprPanic "canEqFailure" (ppr ev $$ ppr ty1 $$ ppr ty2)
        ; return Stop }
 
 ------------------------
@@ -880,6 +886,17 @@ emitKindConstraint ct   -- By now ct is canonical
          -- NB: DV finds this reasonable for now. Maybe we have to revisit.
          kind_co_loc = pushErrCtxtSameOrigin ctxt loc
 \end{code}
+
+Note [Make sure that insolubles are fully rewritten]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When an equality fails, we still want to rewrite the equality 
+all the way down, so that it accurately reflects 
+ (a) the mutable reference substitution in force at start of solving
+ (b) any ty-binds in force at this point in solving
+See Note [Kick out insolubles] in TcInteract.
+And if we don't do this there is a bad danger that 
+TcSimplify.applyTyVarDefaulting will find a variable
+that has in fact been substituted.
 
 Note [Do not decompose given polytype equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1124,18 +1141,18 @@ canEqLeafFunEq :: CtLoc -> CtEvidence
                -> (TyCon,[TcType]) -> TcType -> TcS StopOrContinue
 canEqLeafFunEq loc ev (fn,tys1) ty2  -- ev :: F tys1 ~ ty2
   = do { traceTcS "canEqLeafFunEq" $ pprEq (mkTyConApp fn tys1) ty2
+       ; let flav = ctEvFlavour ev
        ; (xis1,cos1) <- 
            {-# SCC "flattenMany" #-}
-           flattenMany loc FMFullFlatten ev tys1 -- Flatten type function arguments
+           flattenMany loc FMFullFlatten flav tys1 -- Flatten type function arguments
                                                -- cos1 :: xis1 ~ tys1
       ; (xi2,co2) <- {-# SCC "flatten" #-} 
-                     flatten loc FMFullFlatten ev ty2 -- co2 :: xi2 ~ ty2
+                     flatten loc FMFullFlatten flav ty2 -- co2 :: xi2 ~ ty2
            
        ; let fam_head = mkTyConApp fn xis1
          -- Fancy higher-dimensional coercion between equalities!
          -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
-       ; let xco = mkTcTyConAppCo eqTyCon $ 
-                  [mkTcReflCo (defaultKind $ typeKind ty2), mkTcTyConAppCo fn cos1, co2]
+       ; let xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
              -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I truly hate this (DV)
              -- xco :: (F xis1 ~ xi2) ~ (F tys1 ~ ty2)
              
@@ -1154,12 +1171,11 @@ canEqLeafTyVarLeftRec :: CtLoc -> CtEvidence
                       -> TcTyVar -> TcType -> TcS StopOrContinue
 canEqLeafTyVarLeftRec loc ev tv s2              -- ev :: tv ~ s2
   = do {  traceTcS "canEqLeafTyVarLeftRec" $ pprEq (mkTyVarTy tv) s2
-       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten ev tv -- co1 :: xi1 ~ tv
+       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten (ctEvFlavour ev) tv -- co1 :: xi1 ~ tv
        
        ; traceTcS "canEqLeafTyVarLeftRec2" $ empty 
          
-       ; let co = mkTcTyConAppCo eqTyCon $ [ mkTcReflCo (defaultKind $ typeKind s2)
-                                           , co1, mkTcReflCo s2]
+       ; let co = mkHdEqPred (typeKind s2) co1 (mkTcReflCo s2)
              -- co :: (xi1 ~ s2) ~ (tv ~ s2)
        ; mb <- rewriteCtFlavor ev (mkTcEqPred xi1 s2) co
                 -- NB that rewriteCtFlavor does not cache the result
@@ -1180,7 +1196,7 @@ canEqLeafTyVarLeft :: CtLoc -> CtEvidence
 canEqLeafTyVarLeft loc ev tv s2       -- eqv : tv ~ s2
   = do { let tv_ty = mkTyVarTy tv
        ; traceTcS "canEqLeafTyVarLeft" (pprEq tv_ty s2)
-       ; (xi2, co2) <- flatten loc FMFullFlatten ev s2 -- Flatten RHS co:xi2 ~ s2 
+       ; (xi2, co2) <- flatten loc FMFullFlatten (ctEvFlavour ev) s2 -- Flatten RHS co:xi2 ~ s2 
                        
        ; traceTcS "canEqLeafTyVarLeft" (nest 2 (vcat [ text "tv  =" <+> ppr tv
                                                      , text "s2  =" <+> ppr s2
@@ -1194,8 +1210,7 @@ canEqLeafTyVarLeft loc ev tv s2       -- eqv : tv ~ s2
        -- Not reflexivity but maybe an occurs error
        { let occ_check_result = occurCheckExpand tv xi2
              xi2' = fromMaybe xi2 occ_check_result
-             co = mkTcTyConAppCo eqTyCon $
-                  [mkTcReflCo (defaultKind $ typeKind s2), mkTcReflCo tv_ty, co2]
+             co = mkHdEqPred (typeKind s2) (mkTcReflCo tv_ty) co2
        ; mb <- rewriteCtFlavor ev (mkTcEqPred tv_ty xi2') co
                 -- NB that rewriteCtFlavor does not cache the result (as it used to)
                 -- which would be wrong if the constraint has an occurs error
@@ -1205,9 +1220,15 @@ canEqLeafTyVarLeft loc ev tv s2       -- eqv : tv ~ s2
                             Just {} -> continueWith $
                                        CTyEqCan { cc_ev = new_ev, cc_loc = loc
                                                 , cc_tyvar  = tv, cc_rhs = xi2' }
-                            Nothing -> canEqFailure loc new_ev
+                            Nothing -> canEqFailure loc new_ev tv_ty xi2'
            Nothing -> return Stop
         } }
+
+mkHdEqPred :: Type -> TcCoercion -> TcCoercion -> TcCoercion
+-- Make a higher-dimensional equality
+--    co1 :: s1~t1,  co2 :: s2~t2
+-- Then (mkHdEqPred t2 co1 co2) :: (s1~s2) ~ (t1~t2)
+mkHdEqPred t2 co1 co2 = mkTcTyConAppCo eqTyCon [mkTcReflCo (defaultKind (typeKind t2)), co1, co2]
 \end{code}
 
 Note [Occurs check expansion]
