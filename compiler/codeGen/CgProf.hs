@@ -23,8 +23,6 @@ module CgProf (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
- -- For WORD_SIZE_IN_BITS only.
 #include "../includes/dist-derivedconstants/header/DerivedConstants.h"
         -- For REP_xxx constants, which are MachReps
 
