@@ -177,19 +177,22 @@ mkInfoTableContents dflags
        ; let
              std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
              rts_tag | Just tag <- mb_rts_tag = tag
-                     | null liveness_data     = rET_SMALL -- Fits in extra_bits
-                     | otherwise              = rET_BIG   -- Does not; extra_bits is
-                                                          -- a label
+                     | null liveness_data     = rET_SMALL dflags -- Fits in extra_bits
+                     | otherwise              = rET_BIG   dflags -- Does not; extra_bits is
+                                                                 -- a label
        ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
-  = do { let layout  = packHalfWordsCLit dflags (fromIntegral ptrs) (fromIntegral nonptrs)
+  = do { let layout  = packHalfWordsCLit
+                           dflags
+                           (toStgHalfWord dflags (toInteger ptrs))
+                           (toStgHalfWord dflags (toInteger nonptrs))
        ; (prof_lits, prof_data) <- mkProfLits dflags prof
        ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
        ; let std_info = mkStdInfoTable dflags prof_lits
-                                       (mb_rts_tag   `orElse` rtsClosureType smrep)
+                                       (mb_rts_tag   `orElse` rtsClosureType dflags smrep)
                                        (mb_srt_field `orElse` srt_bitmap)
                                        (mb_layout    `orElse` layout)
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
@@ -207,7 +210,7 @@ mkInfoTableContents dflags
       = return (Nothing, Nothing, srt_label, [])
 
     mk_pieces (ThunkSelector offset) _no_srt
-      = return (Just 0, Just (mkWordCLit dflags offset), [], [])
+      = return (Just (toStgHalfWord dflags 0), Just (mkWordCLit dflags offset), [], [])
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label 
@@ -216,8 +219,8 @@ mkInfoTableContents dflags
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
       = do { (liveness_lit, liveness_data) <- mkLivenessBits dflags arg_bits
-           ; let fun_type | null liveness_data = aRG_GEN
-                          | otherwise          = aRG_GEN_BIG
+           ; let fun_type | null liveness_data = aRG_GEN     dflags
+                          | otherwise          = aRG_GEN_BIG dflags
                  extra_bits = [ packHalfWordsCLit dflags fun_type arity
                               , srt_lit, liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
@@ -236,7 +239,7 @@ mkSRTLit :: DynFlags
          -> C_SRT
          -> ([CmmLit],    -- srt_label, if any
              StgHalfWord) -- srt_bitmap
-mkSRTLit _      NoC_SRT                = ([], 0)
+mkSRTLit dflags NoC_SRT                = ([], toStgHalfWord dflags 0)
 mkSRTLit dflags (C_SRT lbl off bitmap) = ([cmmLabelOffW dflags lbl off], bitmap)
 
 

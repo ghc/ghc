@@ -168,8 +168,8 @@ packHalfWordsCLit dflags lower_half_word upper_half_word
    = if wORDS_BIGENDIAN dflags
      then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS) .|. u)
      else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS))
-    where l = fromIntegral lower_half_word
-          u = fromIntegral upper_half_word
+    where l = fromInteger (fromStgHalfWord lower_half_word)
+          u = fromInteger (fromStgHalfWord upper_half_word)
 
 ---------------------------------------------------
 --

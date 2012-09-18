@@ -480,7 +480,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds srt_info descr
 		    -- anything else gets eta expanded.
   where
     name   = idName id
-    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
     nonptr_wds = tot_wds - ptr_wds
 
 mkConInfo :: DynFlags
@@ -492,7 +492,7 @@ mkConInfo dflags is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
 		closureCon = data_con }
   where
-    sm_rep  = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep  = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
     lf_info = mkConLFInfo data_con
     nonptr_wds = tot_wds - ptr_wds
 \end{code}
@@ -526,12 +526,12 @@ closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
 %************************************************************************
 
 \begin{code}
-lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
-lfClosureType (LFReEntrant _ arity _ argd) = Fun (fromIntegral arity) argd
-lfClosureType (LFCon con)                  = Constr (fromIntegral (dataConTagZ con))
-                                                    (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _) 	   = thunkClosureType is_sel
-lfClosureType _                 	   = panic "lfClosureType"
+lfClosureType :: DynFlags -> LambdaFormInfo -> ClosureTypeInfo
+lfClosureType dflags (LFReEntrant _ arity _ argd) = Fun (toStgHalfWord dflags (toInteger arity)) argd
+lfClosureType dflags (LFCon con)                  = Constr (toStgHalfWord dflags (toInteger (dataConTagZ con)))
+                                                           (dataConIdentity con)
+lfClosureType _      (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType _      _                            = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
 thunkClosureType (SelectorThunk off) = ThunkSelector (fromIntegral off)

@@ -228,7 +228,7 @@ maxBmpSize dflags = widthInBits (wordWidth dflags) `div` 2
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
 to_SRT :: DynFlags -> CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
 to_SRT dflags top_srt off len bmp
-  | len > maxBmpSize dflags || bmp == [fromIntegral srt_escape]
+  | len > maxBmpSize dflags || bmp == [fromInteger (fromStgHalfWord (srt_escape dflags))]
   = do id <- getUniqueM
        let srt_desc_lbl = mkLargeSRTLabel id
            tbl = CmmData RelocatableReadOnlyData $
@@ -236,9 +236,9 @@ to_SRT dflags top_srt off len bmp
                      ( cmmLabelOffW dflags top_srt off
                      : mkWordCLit dflags (fromIntegral len)
                      : map (mkWordCLit dflags) bmp)
-       return (Just tbl, C_SRT srt_desc_lbl 0 srt_escape)
+       return (Just tbl, C_SRT srt_desc_lbl 0 (srt_escape dflags))
   | otherwise
-  = return (Nothing, C_SRT top_srt off (fromIntegral (head bmp)))
+  = return (Nothing, C_SRT top_srt off (toStgHalfWord dflags (toInteger (head bmp))))
 	-- The fromIntegral converts to StgHalfWord
 
 -- Gather CAF info for a procedure, but only if the procedure

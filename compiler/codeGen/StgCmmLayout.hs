@@ -469,7 +469,7 @@ mkArgDescr _nm args
        let arg_bits = argBits dflags arg_reps
            arg_reps = filter isNonV (map idArgRep args)
            -- Getting rid of voids eases matching of standard patterns
-       case stdPattern arg_reps of
+       case stdPattern dflags arg_reps of
            Just spec_id -> return (ArgSpec spec_id)
            Nothing      -> return (ArgGen arg_bits)
 
@@ -480,9 +480,10 @@ argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
                     ++ argBits dflags args
 
 ----------------------
-stdPattern :: [ArgRep] -> Maybe StgHalfWord
-stdPattern reps 
-  = case reps of
+stdPattern :: DynFlags -> [ArgRep] -> Maybe StgHalfWord
+stdPattern dflags reps
+  = fmap (toStgHalfWord dflags)
+  $ case reps of
 	[]  -> Just ARG_NONE	-- just void args, probably
 	[N] -> Just ARG_N
 	[P] -> Just ARG_P

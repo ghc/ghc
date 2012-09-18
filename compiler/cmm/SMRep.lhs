@@ -11,7 +11,8 @@ Other modules should access this info through ClosureInfo.
 \begin{code}
 module SMRep (
         -- * Words and bytes
-        StgWord, StgHalfWord,
+        StgWord,
+        StgHalfWord, fromStgHalfWord, toStgHalfWord,
         hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
         WordOff, ByteOff,
         roundUpToWords,
@@ -46,6 +47,7 @@ module SMRep (
 
 import DynFlags
 import Outputable
+import Platform
 import FastString
 
 import Data.Char( ord )
@@ -71,16 +73,32 @@ roundUpToWords dflags n = (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZ
 StgWord is a type representing an StgWord on the target platform.
 
 \begin{code}
+newtype StgHalfWord = StgHalfWord Integer
+    deriving Eq
+
+fromStgHalfWord :: StgHalfWord -> Integer
+fromStgHalfWord (StgHalfWord i) = i
+
+toStgHalfWord :: DynFlags -> Integer -> StgHalfWord
+toStgHalfWord dflags i
+    = case platformWordSize (targetPlatform dflags) of
+      -- These conversions mean that things like toStgHalfWord (-1)
+      -- do the right thing
+      4 -> StgHalfWord (toInteger (fromInteger i :: Word16))
+      8 -> StgHalfWord (toInteger (fromInteger i :: Word32))
+      w -> panic ("toStgHalfWord: Unknown platformWordSize: " ++ show w)
+
+instance Outputable StgHalfWord where
+    ppr (StgHalfWord i) = integer i
+
 #if SIZEOF_HSWORD == 4
 type StgWord     = Word32
-type StgHalfWord = Word16
 hALF_WORD_SIZE :: ByteOff
 hALF_WORD_SIZE = 2
 hALF_WORD_SIZE_IN_BITS :: Int
 hALF_WORD_SIZE_IN_BITS = 16
 #elif SIZEOF_HSWORD == 8
 type StgWord     = Word64
-type StgHalfWord = Word32
 hALF_WORD_SIZE :: ByteOff
 hALF_WORD_SIZE = 4
 hALF_WORD_SIZE_IN_BITS :: Int
@@ -277,49 +295,52 @@ closureTypeHdrSize dflags ty = case ty of
 -- Defines CONSTR, CONSTR_1_0 etc
 
 -- | Derives the RTS closure type from an 'SMRep'
-rtsClosureType :: SMRep -> StgHalfWord
-rtsClosureType (RTSRep ty _)  = ty
+rtsClosureType :: DynFlags -> SMRep -> StgHalfWord
+rtsClosureType dflags rep
+    = toStgHalfWord dflags
+    $ case rep of
+      RTSRep ty _ -> fromStgHalfWord ty
 
-rtsClosureType (HeapRep False 1 0 Constr{}) = CONSTR_1_0
-rtsClosureType (HeapRep False 0 1 Constr{}) = CONSTR_0_1
-rtsClosureType (HeapRep False 2 0 Constr{}) = CONSTR_2_0
-rtsClosureType (HeapRep False 1 1 Constr{}) = CONSTR_1_1
-rtsClosureType (HeapRep False 0 2 Constr{}) = CONSTR_0_2
-rtsClosureType (HeapRep False _ _ Constr{}) = CONSTR
+      HeapRep False 1 0 Constr{} -> CONSTR_1_0
+      HeapRep False 0 1 Constr{} -> CONSTR_0_1
+      HeapRep False 2 0 Constr{} -> CONSTR_2_0
+      HeapRep False 1 1 Constr{} -> CONSTR_1_1
+      HeapRep False 0 2 Constr{} -> CONSTR_0_2
+      HeapRep False _ _ Constr{} -> CONSTR
 
-rtsClosureType (HeapRep False 1 0 Fun{}) = FUN_1_0
-rtsClosureType (HeapRep False 0 1 Fun{}) = FUN_0_1
-rtsClosureType (HeapRep False 2 0 Fun{}) = FUN_2_0
-rtsClosureType (HeapRep False 1 1 Fun{}) = FUN_1_1
-rtsClosureType (HeapRep False 0 2 Fun{}) = FUN_0_2
-rtsClosureType (HeapRep False _ _ Fun{}) = FUN
+      HeapRep False 1 0 Fun{} -> FUN_1_0
+      HeapRep False 0 1 Fun{} -> FUN_0_1
+      HeapRep False 2 0 Fun{} -> FUN_2_0
+      HeapRep False 1 1 Fun{} -> FUN_1_1
+      HeapRep False 0 2 Fun{} -> FUN_0_2
+      HeapRep False _ _ Fun{} -> FUN
 
-rtsClosureType (HeapRep False 1 0 Thunk{}) = THUNK_1_0
-rtsClosureType (HeapRep False 0 1 Thunk{}) = THUNK_0_1
-rtsClosureType (HeapRep False 2 0 Thunk{}) = THUNK_2_0
-rtsClosureType (HeapRep False 1 1 Thunk{}) = THUNK_1_1
-rtsClosureType (HeapRep False 0 2 Thunk{}) = THUNK_0_2
-rtsClosureType (HeapRep False _ _ Thunk{}) = THUNK
+      HeapRep False 1 0 Thunk{} -> THUNK_1_0
+      HeapRep False 0 1 Thunk{} -> THUNK_0_1
+      HeapRep False 2 0 Thunk{} -> THUNK_2_0
+      HeapRep False 1 1 Thunk{} -> THUNK_1_1
+      HeapRep False 0 2 Thunk{} -> THUNK_0_2
+      HeapRep False _ _ Thunk{} -> THUNK
 
-rtsClosureType (HeapRep False _ _ ThunkSelector{}) =  THUNK_SELECTOR
+      HeapRep False _ _ ThunkSelector{} ->  THUNK_SELECTOR
 
--- Approximation: we use the CONSTR_NOCAF_STATIC type for static constructors
--- that have no pointer words only.
-rtsClosureType (HeapRep True 0 _ Constr{}) = CONSTR_NOCAF_STATIC  -- See isStaticNoCafCon below
-rtsClosureType (HeapRep True _ _ Constr{}) = CONSTR_STATIC
-rtsClosureType (HeapRep True _ _ Fun{})    = FUN_STATIC
-rtsClosureType (HeapRep True _ _ Thunk{})  = THUNK_STATIC
+      -- Approximation: we use the CONSTR_NOCAF_STATIC type for static
+      -- constructors -- that have no pointer words only.
+      HeapRep True 0 _ Constr{} -> CONSTR_NOCAF_STATIC  -- See isStaticNoCafCon below
+      HeapRep True _ _ Constr{} -> CONSTR_STATIC
+      HeapRep True _ _ Fun{}    -> FUN_STATIC
+      HeapRep True _ _ Thunk{}  -> THUNK_STATIC
 
-rtsClosureType (HeapRep False _ _ BlackHole{}) =  BLACKHOLE
+      HeapRep False _ _ BlackHole{} -> BLACKHOLE
 
-rtsClosureType _ = panic "rtsClosureType"
+      _ -> panic "rtsClosureType"
 
 -- We export these ones
-rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG :: StgHalfWord
-rET_SMALL   = RET_SMALL
-rET_BIG     = RET_BIG
-aRG_GEN     = ARG_GEN
-aRG_GEN_BIG = ARG_GEN_BIG
+rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG :: DynFlags -> StgHalfWord
+rET_SMALL   dflags = toStgHalfWord dflags RET_SMALL
+rET_BIG     dflags = toStgHalfWord dflags RET_BIG
+aRG_GEN     dflags = toStgHalfWord dflags ARG_GEN
+aRG_GEN_BIG dflags = toStgHalfWord dflags ARG_GEN_BIG
 \end{code}
 
 Note [Static NoCaf constructors]
@@ -360,18 +381,18 @@ instance Outputable SMRep where
    ppr (RTSRep ty rep) = ptext (sLit "tag:") <> ppr ty <+> ppr rep
 
 instance Outputable ArgDescr where
-  ppr (ArgSpec n) = ptext (sLit "ArgSpec") <+> integer (toInteger n)
+  ppr (ArgSpec n) = ptext (sLit "ArgSpec") <+> ppr n
   ppr (ArgGen ls) = ptext (sLit "ArgGen") <+> ppr ls
 
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)
   = ptext (sLit "Con") <+>
-    braces (sep [ ptext (sLit "tag:") <+> integer (toInteger tag)
+    braces (sep [ ptext (sLit "tag:") <+> ppr tag
                 , ptext (sLit "descr:") <> text (show descr) ])
 
 pprTypeInfo (Fun arity args)
   = ptext (sLit "Fun") <+>
-    braces (sep [ ptext (sLit "arity:") <+> integer (toInteger arity)
+    braces (sep [ ptext (sLit "arity:") <+> ppr arity
                 , ptext (sLit ("fun_type:")) <+> ppr args ])
 
 pprTypeInfo (ThunkSelector offset)
