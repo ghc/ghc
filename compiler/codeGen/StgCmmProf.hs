@@ -31,8 +31,6 @@ module StgCmmProf (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
 
 import StgCmmClosure
 import StgCmmUtils
@@ -169,6 +167,7 @@ profAlloc :: CmmExpr -> CmmExpr -> FCode ()
 profAlloc words ccs
   = ifProfiling $
         do dflags <- getDynFlags
+           let alloc_rep = rEP_CostCentreStack_mem_alloc dflags
            emit (addToMemE alloc_rep
                        (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_mem_alloc dflags))
                        (CmmMachOp (MO_UU_Conv (wordWidth dflags) (typeWidth alloc_rep)) $
@@ -176,8 +175,6 @@ profAlloc words ccs
                                                          mkIntExpr dflags (profHdrSize dflags)]]))
                        -- subtract the "profiling overhead", which is the
                        -- profiling header in a closure.
- where 
-        alloc_rep =  REP_CostCentreStack_mem_alloc
 
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
@@ -277,7 +274,7 @@ sizeof_ccs_words dflags
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE dflags
+   (ws,ms) = sIZEOF_CostCentreStack dflags `divMod` wORD_SIZE dflags
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
@@ -302,7 +299,7 @@ pushCostCentre result ccs cc
 
 bumpSccCount :: DynFlags -> CmmExpr -> CmmAGraph
 bumpSccCount dflags ccs
-  = addToMem REP_CostCentreStack_scc_count
+  = addToMem (rEP_CostCentreStack_scc_count dflags)
 	 (cmmOffsetB dflags ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
 
 -----------------------------------------------------------------------------

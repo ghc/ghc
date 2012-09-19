@@ -79,10 +79,18 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
    and the names of the CmmTypes in the compiler
       b32 :: CmmType
 */
-#define field_type_(str, s_type, field)                                     \
+#define field_type_(want_haskell, str, s_type, field)                       \
     switch (mode) {                                                         \
     case Gen_Haskell_Type:                                                  \
+        if (want_haskell) {                                                 \
+            printf("    , pc_REP_" str " :: Int\n");                        \
+            break;                                                          \
+        }                                                                   \
     case Gen_Haskell_Value:                                                 \
+        if (want_haskell) {                                                 \
+            printf("    , pc_REP_" str " = %" PRIdPTR "\n", (intptr_t)(FIELD_SIZE(s_type, field))); \
+            break;                                                          \
+        }                                                                   \
     case Gen_Haskell_Wrappers:                                              \
     case Gen_Haskell_Exports:                                               \
         break;                                                              \
@@ -104,8 +112,8 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
         break;                                                              \
     }
 
-#define field_type(s_type, field) \
-    field_type_(str(s_type,field),s_type,field);
+#define field_type(want_haskell, s_type, field) \
+    field_type_(want_haskell,str(s_type,field),s_type,field);
 
 #define field_offset_(str, s_type, field) \
     def_offset(str, OFFSET(s_type,field));
@@ -127,14 +135,20 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
     }
 
 /* Outputs the byte offset and MachRep for a field */
-#define struct_field(s_type, field)		\
-    field_offset(s_type, field);		\
-    field_type(s_type, field);			\
+#define struct_field_helper(want_haskell, s_type, field)    \
+    field_offset(s_type, field);                            \
+    field_type(want_haskell, s_type, field);                \
     struct_field_macro(str(s_type,field))
+
+#define struct_field(s_type, field)         \
+    struct_field_helper(0, s_type, field)
+
+#define struct_field_h(s_type, field)       \
+    struct_field_helper(1, s_type, field)
 
 #define struct_field_(str, s_type, field)	\
     field_offset_(str, s_type, field);		\
-    field_type_(str, s_type, field);		\
+    field_type_(0,str, s_type, field);		\
     struct_field_macro(str)
 
 #define def_size(str, size)                                                 \
@@ -222,7 +236,7 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
 /* Byte offset and MachRep for a closure field, minus the header */
 #define closure_field_(str, s_type, field) \
     closure_field_offset_(str,s_type,field) \
-    field_type_(str, s_type, field); \
+    field_type_(0, str, s_type, field); \
     closure_field_macro(str)
 
 #define closure_field(s_type, field) \
@@ -270,9 +284,9 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
         break;                                                              \
     }
 
-#define tso_field(s_type, field)		\
-    field_type(s_type, field);			\
-    tso_field_offset(s_type,field);		\
+#define tso_field(s_type, field)        \
+    field_type(0, s_type, field);       \
+    tso_field_offset(s_type,field);     \
     tso_field_macro(str(s_type,field))
   
 #define opt_struct_size(s_type, option)					                    \
@@ -479,8 +493,8 @@ main(int argc, char *argv[])
 
     struct_size(CostCentreStack);
     struct_field(CostCentreStack, ccsID);
-    struct_field(CostCentreStack, mem_alloc);
-    struct_field(CostCentreStack, scc_count);
+    struct_field_h(CostCentreStack, mem_alloc);
+    struct_field_h(CostCentreStack, scc_count);
     struct_field(CostCentreStack, prevStack);
 
     struct_field(CostCentre, ccID);
@@ -494,7 +508,7 @@ main(int argc, char *argv[])
 
     closure_payload(StgClosure,payload);
 
-    struct_field(StgEntCounter, allocs);
+    struct_field_h(StgEntCounter, allocs);
     struct_field(StgEntCounter, registeredp);
     struct_field(StgEntCounter, link);
     struct_field(StgEntCounter, entry_count);

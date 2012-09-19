@@ -43,9 +43,6 @@ module CgTicky (
        staticTickyHdr,
   ) where
 
-#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
-
 import ClosureInfo
 import CgUtils
 import CgMonad
@@ -298,7 +295,7 @@ tickyAllocHeap hp
 	  if hp == 0 then [] 	-- Inside the stmtC to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
-	    addToMem (typeWidth REP_StgEntCounter_allocs)
+	    addToMem (typeWidth (rEP_StgEntCounter_allocs dflags))
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr

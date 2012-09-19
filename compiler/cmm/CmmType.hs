@@ -12,6 +12,9 @@ module CmmType
     , wordWidth, halfWordWidth, cIntWidth, cLongWidth
     , halfWordMask
     , narrowU, narrowS
+    , rEP_CostCentreStack_mem_alloc
+    , rEP_CostCentreStack_scc_count
+    , rEP_StgEntCounter_allocs
    )
 where
 
@@ -237,6 +240,26 @@ narrowS W16 x = fromIntegral (fromIntegral x :: Int16)
 narrowS W32 x = fromIntegral (fromIntegral x :: Int32)
 narrowS W64 x = fromIntegral (fromIntegral x :: Int64)
 narrowS _ _ = panic "narrowTo"
+
+-------------------------------------------------------------------------
+
+-- These don't really belong here, but I don't know where is best to
+-- put them.
+
+rEP_CostCentreStack_mem_alloc :: DynFlags -> CmmType
+rEP_CostCentreStack_mem_alloc dflags
+    = cmmBits (widthFromBytes (pc_REP_CostCentreStack_mem_alloc pc))
+    where pc = sPlatformConstants (settings dflags)
+
+rEP_CostCentreStack_scc_count :: DynFlags -> CmmType
+rEP_CostCentreStack_scc_count dflags
+    = cmmBits (widthFromBytes (pc_REP_CostCentreStack_scc_count pc))
+    where pc = sPlatformConstants (settings dflags)
+
+rEP_StgEntCounter_allocs :: DynFlags -> CmmType
+rEP_StgEntCounter_allocs dflags
+    = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocs pc))
+    where pc = sPlatformConstants (settings dflags)
 
 -------------------------------------------------------------------------
 {-      Note [Signed vs unsigned]
