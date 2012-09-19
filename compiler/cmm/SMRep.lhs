@@ -76,6 +76,7 @@ roundUpToWords dflags n = (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZ
 StgWord is a type representing an StgWord on the target platform.
 
 \begin{code}
+-- A Word64 is large enough to hold a Word for either a 32bit or 64bit platform
 newtype StgWord = StgWord Word64
     deriving (Eq,
 #if __GLASGOW_HASKELL__ < 706
@@ -100,23 +101,25 @@ instance Outputable StgWord where
 
 --
 
-newtype StgHalfWord = StgHalfWord Integer
+-- A Word32 is large enough to hold half a Word for either a 32bit or
+-- 64bit platform
+newtype StgHalfWord = StgHalfWord Word32
     deriving Eq
 
 fromStgHalfWord :: StgHalfWord -> Integer
-fromStgHalfWord (StgHalfWord i) = i
+fromStgHalfWord (StgHalfWord w) = toInteger w
 
 toStgHalfWord :: DynFlags -> Integer -> StgHalfWord
 toStgHalfWord dflags i
     = case platformWordSize (targetPlatform dflags) of
       -- These conversions mean that things like toStgHalfWord (-1)
       -- do the right thing
-      4 -> StgHalfWord (toInteger (fromInteger i :: Word16))
-      8 -> StgHalfWord (toInteger (fromInteger i :: Word32))
+      4 -> StgHalfWord (fromIntegral (fromInteger i :: Word16))
+      8 -> StgHalfWord (fromInteger i :: Word32)
       w -> panic ("toStgHalfWord: Unknown platformWordSize: " ++ show w)
 
 instance Outputable StgHalfWord where
-    ppr (StgHalfWord i) = integer i
+    ppr (StgHalfWord w) = integer (toInteger w)
 
 hALF_WORD_SIZE :: DynFlags -> ByteOff
 hALF_WORD_SIZE dflags = platformWordSize (targetPlatform dflags) `shiftR` 1
