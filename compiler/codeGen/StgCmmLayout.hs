@@ -61,6 +61,7 @@ import Util
 import Data.List
 import Outputable
 import FastString
+import Control.Monad
 
 ------------------------------------------------------------------------
 --		Call and return sequences
@@ -86,7 +87,7 @@ emitReturn results
              do { adjustHpBackwards
                 ; emit (mkReturnSimple dflags results updfr_off) }
            AssignTo regs adjust ->
-             do { if adjust then adjustHpBackwards else return ()
+             do { when adjust adjustHpBackwards
                 ; emitMultiAssign  regs results }
        ; return AssignedDirectly
        }

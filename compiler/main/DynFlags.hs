@@ -2424,9 +2424,8 @@ xFlags = [
   ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
-    \ turn_on -> if not turn_on
-                 then deprecate "You can't turn off RelaxedPolyRec any more"
-                 else return () ),
+    \ turn_on -> unless turn_on
+               $ deprecate "You can't turn off RelaxedPolyRec any more" ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
