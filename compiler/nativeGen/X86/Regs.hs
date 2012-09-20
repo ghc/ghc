@@ -196,13 +196,13 @@ addrModeRegs _ = []
 
 
 spRel :: DynFlags
-      -> Int -- ^ desired stack offset in words, positive or negative
+      -> Int -- ^ desired stack offset in bytes, positive or negative
       -> AddrMode
 spRel dflags n
  | target32Bit (targetPlatform dflags)
-    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
+    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt n)
  | otherwise
-    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE dflags))
+    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt n)
 
 -- The register numbers must fit into 32 bits on x86, so that we can
 -- use a Word32 to represent the set of free registers in the register
