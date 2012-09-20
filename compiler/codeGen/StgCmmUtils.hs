@@ -720,5 +720,5 @@ assignTemp' e
        emitAssign reg e
        return (CmmReg reg)
 
-srt_escape :: StgHalfWord
-srt_escape = -1
+srt_escape :: DynFlags -> StgHalfWord
+srt_escape dflags = toStgHalfWord dflags (-1)

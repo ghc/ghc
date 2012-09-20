@@ -259,12 +259,12 @@ cmmproc :: { ExtCode }
                         code (emitProc Nothing (mkCmmCodeLabel pkg $1) formals blks) }
 
 info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
-        : 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
+        : 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' stgHalfWord ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, closure type, description, type
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
-                          rep  = mkRTSRep (fromIntegral $9) $
+                          rep  = mkRTSRep $9 $
                                    mkHeapRep dflags False (fromIntegral $5)
                                                    (fromIntegral $7) Thunk
                               -- not really Thunk, but that makes the info table
@@ -275,14 +275,14 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               []) }
 
-        | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
+        | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' stgHalfWord ',' STRING ',' STRING ',' stgHalfWord ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
-                          ty   = Fun 0 (ArgSpec (fromIntegral $15))
+                          ty   = Fun (toStgHalfWord dflags 0) (ArgSpec $15)
                                 -- Arity zero, arg_type $15
-                          rep = mkRTSRep (fromIntegral $9) $
+                          rep = mkRTSRep $9 $
                                     mkHeapRep dflags False (fromIntegral $5)
                                                     (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
@@ -293,14 +293,14 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
                 -- we leave most of the fields zero here.  This is only used
                 -- to generate the BCO info table in the RTS at the moment.
 
-        | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
+        | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' stgHalfWord ',' stgHalfWord ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $13 $15
-                          ty  = Constr (fromIntegral $9)  -- Tag
+                          ty  = Constr $9  -- Tag
                                        (stringToWord8s $13)
-                          rep = mkRTSRep (fromIntegral $11) $
+                          rep = mkRTSRep $11 $
                                   mkHeapRep dflags False (fromIntegral $5)
                                                   (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
@@ -312,13 +312,13 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
 
-        | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
+        | 'INFO_TABLE_SELECTOR' '(' NAME ',' stgWord ',' stgHalfWord ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
-                          rep = mkRTSRep (fromIntegral $7) $
+                          ty  = ThunkSelector $5
+                          rep = mkRTSRep $7 $
                                    mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
                               CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
@@ -326,25 +326,25 @@ info    :: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               []) }
 
-        | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
+        | 'INFO_TABLE_RET' '(' NAME ',' stgHalfWord ')'
                 -- closure type (no live regs)
                 {% withThisPackage $ \pkg ->
                    do let prof = NoProfilingInfo
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
+                          rep  = mkRTSRep $5 $ mkStackRep []
                       return (mkCmmRetLabel pkg $3,
                               CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               []) }
 
-        | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_hints0 ')'
+        | 'INFO_TABLE_RET' '(' NAME ',' stgHalfWord ',' formals_without_hints0 ')'
                 -- closure type, live regs
                 {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       live <- sequence (map (liftM Just) $7)
                       let prof = NoProfilingInfo
                           bitmap = mkLiveness dflags live
-                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
+                          rep  = mkRTSRep $5 $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
@@ -613,6 +613,13 @@ typenot8 :: { CmmType }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
+
+stgWord :: { StgWord }
+        : INT                   {% do dflags <- getDynFlags; return $ toStgWord dflags $1 }
+
+stgHalfWord :: { StgHalfWord }
+        : INT                   {% do dflags <- getDynFlags; return $ toStgHalfWord dflags $1 }
+
 {
 section :: String -> Section
 section "text"      = Text

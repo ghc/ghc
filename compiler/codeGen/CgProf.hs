@@ -23,11 +23,6 @@ module CgProf (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
- -- For WORD_SIZE_IN_BITS only.
-#include "../includes/rts/Constants.h"
-        -- For LDV_CREATE_MASK, LDV_STATE_USE
-        -- which are StgWords
 #include "../includes/dist-derivedconstants/header/DerivedConstants.h"
         -- For REP_xxx constants, which are MachReps
 
@@ -265,8 +260,8 @@ staticLdvInit = zeroCLit
 dynLdvInit :: DynFlags -> CmmExpr
 dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr dflags) [
-      CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags lDV_SHIFT ],
-      CmmLit (mkWordCLit dflags lDV_STATE_CREATE)
+      CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags (lDV_SHIFT dflags)],
+      CmmLit (mkWordCLit dflags (lDV_STATE_CREATE dflags))
   ]
 
 --
@@ -297,8 +292,8 @@ ldvEnter cl_ptr = do
         -- don't forget to substract node's tag
     ldv_wd = ldvWord dflags cl_ptr
     new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
-                                                     (CmmLit (mkWordCLit dflags lDV_CREATE_MASK)))
-                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags lDV_STATE_USE)))
+                                                     (CmmLit (mkWordCLit dflags (lDV_CREATE_MASK dflags))))
+                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (lDV_STATE_USE dflags))))
   ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
@@ -316,17 +311,10 @@ ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 ldvWord dflags closure_ptr
     = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
 
--- LDV constants, from ghc/includes/Constants.h
-lDV_SHIFT :: Int
-lDV_SHIFT = LDV_SHIFT
---lDV_STATE_MASK :: StgWord
---lDV_STATE_MASK   = LDV_STATE_MASK
-lDV_CREATE_MASK :: StgWord
-lDV_CREATE_MASK  = LDV_CREATE_MASK
---lDV_LAST_MASK    :: StgWord
---lDV_LAST_MASK    = LDV_LAST_MASK
-lDV_STATE_CREATE :: StgWord
-lDV_STATE_CREATE = LDV_STATE_CREATE
-lDV_STATE_USE    :: StgWord
-lDV_STATE_USE    = LDV_STATE_USE
+lDV_CREATE_MASK :: DynFlags -> StgWord
+lDV_CREATE_MASK dflags = toStgWord dflags (iLDV_CREATE_MASK dflags)
+lDV_STATE_CREATE :: DynFlags -> StgWord
+lDV_STATE_CREATE dflags = toStgWord dflags (iLDV_STATE_CREATE dflags)
+lDV_STATE_USE :: DynFlags -> StgWord
+lDV_STATE_USE dflags = toStgWord dflags (iLDV_STATE_USE dflags)
 

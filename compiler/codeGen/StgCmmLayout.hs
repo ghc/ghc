@@ -469,7 +469,7 @@ mkArgDescr _nm args
        let arg_bits = argBits dflags arg_reps
            arg_reps = filter isNonV (map idArgRep args)
            -- Getting rid of voids eases matching of standard patterns
-       case stdPattern arg_reps of
+       case stdPattern dflags arg_reps of
            Just spec_id -> return (ArgSpec spec_id)
            Nothing      -> return (ArgGen arg_bits)
 
@@ -480,9 +480,10 @@ argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
                     ++ argBits dflags args
 
 ----------------------
-stdPattern :: [ArgRep] -> Maybe StgHalfWord
-stdPattern reps 
-  = case reps of
+stdPattern :: DynFlags -> [ArgRep] -> Maybe StgHalfWord
+stdPattern dflags reps
+  = fmap (toStgHalfWord dflags)
+  $ case reps of
 	[]  -> Just ARG_NONE	-- just void args, probably
 	[N] -> Just ARG_N
 	[P] -> Just ARG_P
@@ -578,7 +579,7 @@ stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is 
 -- in the *higher-addressed* part of the type_lit
-stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE
+stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE dflags
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word 
@@ -586,7 +587,7 @@ stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
 
 -------------------------------------------------------------------------
 --

@@ -51,12 +51,11 @@ granFetchAndReschedule :: [(Id,GlobalReg)]  -- Live registers
 -- Emit code for simulating a fetch and then reschedule.
 granFetchAndReschedule regs node_reqd
   = do dflags <- getDynFlags
+       let liveness = mkRegLiveness dflags regs 0 0
        when (dopt Opt_GranMacros dflags &&
              (node `elem` map snd regs || node_reqd)) $
            do fetch
               reschedule liveness node_reqd
-  where
-    liveness = mkRegLiveness regs 0 0
 
 fetch :: FCode ()
 fetch = panic "granFetch"
@@ -90,9 +89,8 @@ granYield :: [(Id,GlobalReg)]   -- Live registers
 
 granYield regs node_reqd
   = do dflags <- getDynFlags
+       let liveness = mkRegLiveness dflags regs 0 0
        when (dopt Opt_GranMacros dflags && node_reqd) $ yield liveness
-  where
-     liveness = mkRegLiveness regs 0 0
 
 yield :: StgWord -> Code
 yield _liveness = panic "granYield"

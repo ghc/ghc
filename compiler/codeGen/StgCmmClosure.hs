@@ -353,16 +353,16 @@ isLFReEntrant _                = False
 --		Choosing SM reps
 -----------------------------------------------------------------------------
 
-lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
-lfClosureType (LFReEntrant _ arity _ argd) = Fun (fromIntegral arity) argd
-lfClosureType (LFCon con)                  = Constr (fromIntegral (dataConTagZ con))
-                                                      (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _) 	   = thunkClosureType is_sel
-lfClosureType _                 	   = panic "lfClosureType"
+lfClosureType :: DynFlags -> LambdaFormInfo -> ClosureTypeInfo
+lfClosureType dflags (LFReEntrant _ arity _ argd) = Fun (toStgHalfWord dflags (toInteger arity)) argd
+lfClosureType dflags (LFCon con)                  = Constr (toStgHalfWord dflags (toInteger (dataConTagZ con)))
+                                                           (dataConIdentity con)
+lfClosureType dflags (LFThunk _ _ _ is_sel _)     = thunkClosureType dflags is_sel
+lfClosureType _      _                            = panic "lfClosureType"
 
-thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
-thunkClosureType (SelectorThunk off) = ThunkSelector (fromIntegral off)
-thunkClosureType _                   = Thunk
+thunkClosureType :: DynFlags -> StandardFormInfo -> ClosureTypeInfo
+thunkClosureType dflags (SelectorThunk off) = ThunkSelector (toStgWord dflags (toInteger off))
+thunkClosureType _      _                   = Thunk
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
@@ -687,7 +687,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
                   closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
-    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
     prof       = mkProfilingInfo dflags id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
@@ -899,8 +899,8 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
 
    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
 
-   cl_type = Constr (fromIntegral (dataConTagZ data_con))
-                   (dataConIdentity data_con)
+   cl_type = Constr (toStgHalfWord dflags (toInteger (dataConTagZ data_con)))
+                    (dataConIdentity data_con)
 
    prof | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
         | otherwise                            = ProfilingInfo ty_descr val_descr

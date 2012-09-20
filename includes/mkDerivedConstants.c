@@ -293,6 +293,52 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
 
 #define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))
 
+void constantBool(char *haskellName, int val) {
+    switch (mode) {
+    case Gen_Haskell_Type:
+        printf("    , pc_%s :: Bool\n", haskellName);
+        break;
+    case Gen_Haskell_Value:
+        printf("    , pc_%s = %s\n", haskellName, val ? "True" : "False");
+        break;
+    case Gen_Haskell_Wrappers:
+        printf("%s :: DynFlags -> Bool\n", haskellName);
+        printf("%s dflags = pc_%s (sPlatformConstants (settings dflags))\n",
+               haskellName, haskellName);
+        break;
+    case Gen_Haskell_Exports:
+        printf("    %s,\n", haskellName);
+        break;
+    case Gen_Header:
+        break;
+    }
+}
+
+void constantIntegralC(char *haskellType, char *cName, char *haskellName,
+                       intptr_t val) {
+    switch (mode) {
+    case Gen_Haskell_Type:
+        printf("    , pc_%s :: %s\n", haskellName, haskellType);
+        break;
+    case Gen_Haskell_Value:
+        printf("    , pc_%s = %" PRIdPTR "\n", haskellName, val);
+        break;
+    case Gen_Haskell_Wrappers:
+        printf("%s :: DynFlags -> %s\n", haskellName, haskellType);
+        printf("%s dflags = pc_%s (sPlatformConstants (settings dflags))\n",
+               haskellName, haskellName);
+        break;
+    case Gen_Haskell_Exports:
+        printf("    %s,\n", haskellName);
+        break;
+    case Gen_Header:
+        if (cName != NULL) {
+            printf("#define %s %" PRIdPTR "\n", cName, val);
+        }
+        break;
+    }
+}
+
 void constantIntC(char *cName, char *haskellName, intptr_t val) {
     /* If the value is larger than 2^28 or smaller than -2^28, then fail.
        This test is a bit conservative, but if any constants are roughly
@@ -308,31 +354,15 @@ void constantIntC(char *cName, char *haskellName, intptr_t val) {
         exit(1);
     }
 
-    switch (mode) {
-    case Gen_Haskell_Type:
-        printf("    , pc_%s :: Int\n", haskellName);
-        break;
-    case Gen_Haskell_Value:
-        printf("    , pc_%s = %" PRIdPTR "\n", haskellName, val);
-        break;
-    case Gen_Haskell_Wrappers:
-        printf("%s :: DynFlags -> Int\n", haskellName);
-        printf("%s dflags = pc_%s (sPlatformConstants (settings dflags))\n",
-               haskellName, haskellName);
-        break;
-    case Gen_Haskell_Exports:
-        printf("    %s,\n", haskellName);
-        break;
-    case Gen_Header:
-        if (cName != NULL) {
-            printf("#define %s %" PRIdPTR "\n", cName, val);
-        }
-        break;
-    }
+    constantIntegralC("Int", cName, haskellName, val);
 }
 
 void constantInt(char *name, intptr_t val) {
-    constantIntC (NULL, name, val);
+    constantIntC(NULL, name, val);
+}
+
+void constantInteger(char *name, intptr_t val) {
+    constantIntegralC("Integer", NULL, name, val);
 }
 
 int
@@ -699,6 +729,19 @@ main(int argc, char *argv[])
 
     // Amount of pointer bits used for semi-tagging constructor closures
     constantInt("tAG_BITS", TAG_BITS);
+
+    constantBool("wORDS_BIGENDIAN",
+#ifdef WORDS_BIGENDIAN
+                                    1
+#else
+                                    0
+#endif
+                                         );
+
+    constantInt("lDV_SHIFT", LDV_SHIFT);
+    constantInteger("iLDV_CREATE_MASK",  LDV_CREATE_MASK);
+    constantInteger("iLDV_STATE_CREATE", LDV_STATE_CREATE);
+    constantInteger("iLDV_STATE_USE",    LDV_STATE_USE);
 
     switch (mode) {
     case Gen_Haskell_Type:

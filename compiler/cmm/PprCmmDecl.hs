@@ -127,7 +127,7 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
 instance Outputable C_SRT where
   ppr NoC_SRT = ptext (sLit "_no_srt_")
   ppr (C_SRT label off bitmap)
-      = parens (ppr label <> comma <> ppr off <> comma <> text (show bitmap))
+      = parens (ppr label <> comma <> ppr off <> comma <> ppr bitmap)
 
 instance Outputable ForeignHint where
   ppr NoHint     = empty
