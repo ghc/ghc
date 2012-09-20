@@ -5,6 +5,7 @@ module CmmLayoutStack (
 
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX
 import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX
+import StgCmmLayout     ( entryCode ) -- XXX
 
 import Cmm
 import BlockId
@@ -939,7 +940,8 @@ lowerSafeForeignCall dflags block
         -- received an exception during the call, then the stack might be
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
-        jump = CmmCall { cml_target    = CmmLoad (CmmReg spReg) (bWord dflags)
+        jump = CmmCall { cml_target    = entryCode dflags $
+                                         CmmLoad (CmmReg spReg) (bWord dflags)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes (wordWidth dflags)
