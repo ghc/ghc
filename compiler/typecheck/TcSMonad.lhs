@@ -1529,7 +1529,7 @@ rewriteCtFlavor (CtGiven { ctev_evtm = old_tm }) pty_new co
   = do { new_ev <- newGivenEvVar pty_new new_tm  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }
   where
-    new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCase optimises ReflCo
+    new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCast optimises ReflCo
   
 rewriteCtFlavor ctev@(CtWanted { ctev_evar = evar, ctev_pred = old_pred }) 
                       new_pred co
