@@ -759,7 +759,7 @@ main(int argc, char *argv[])
 
     switch (mode) {
     case Gen_Haskell_Type:
-        printf("  } deriving (Read, Show)\n");
+        printf("  } deriving Read\n");
         break;
     case Gen_Haskell_Value:
         printf("  }\n");
