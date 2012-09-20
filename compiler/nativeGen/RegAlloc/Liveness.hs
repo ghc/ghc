@@ -138,6 +138,11 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         mkJumpInstr target      = map Instr (mkJumpInstr target)
 
+        mkStackAllocInstr platform amount =
+             Instr (mkStackAllocInstr platform amount)
+
+        mkStackDeallocInstr platform amount =
+             Instr (mkStackDeallocInstr platform amount)
 
 
 -- | An instruction with liveness information.
