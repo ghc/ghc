@@ -5,8 +5,6 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-
 module RegAlloc.Liveness (
         RegSet,
         RegMap, emptyRegMap,
