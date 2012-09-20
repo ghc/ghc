@@ -55,10 +55,8 @@ module Data.Data (
         mkDataType,     -- :: String   -> [Constr] -> DataType
         mkIntType,      -- :: String -> DataType
         mkFloatType,    -- :: String -> DataType
-        mkStringType,   -- :: String -> DataType
         mkCharType,     -- :: String -> DataType
         mkNoRepType,    -- :: String -> DataType
-        mkNorepType,    -- :: String -> DataType
         -- ** Observers
         dataTypeName,   -- :: DataType -> String
         DataRep(..),    -- instance of: Eq, Show
@@ -77,11 +75,8 @@ module Data.Data (
         Fixity(..),     -- instance of: Eq, Show
         -- ** Constructors
         mkConstr,       -- :: DataType -> String -> Fixity -> Constr
-        mkIntConstr,    -- :: DataType -> Integer -> Constr
-        mkFloatConstr,  -- :: DataType -> Double -> Constr
         mkIntegralConstr,-- :: (Integral a) => DataType -> a -> Constr
         mkRealConstr,   -- :: (Real a) => DataType -> a -> Constr
-        mkStringConstr, -- :: DataType -> String  -> Constr
         mkCharConstr,   -- :: DataType -> Char -> Constr
         -- ** Observers
         constrType,     -- :: Constr   -> DataType
@@ -584,7 +579,7 @@ repConstr :: DataType -> ConstrRep -> Constr
 repConstr dt cr =
       case (dataTypeRep dt, cr) of
         (AlgRep cs, AlgConstr i)      -> cs !! (i-1)
-        (IntRep,    IntConstr i)      -> mkIntConstr dt i
+        (IntRep,    IntConstr i)      -> mkIntegralConstr dt i
         (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
         (CharRep,   CharConstr c)     -> mkCharConstr dt c
         _ -> error "Data.Data.repConstr"
@@ -733,17 +728,12 @@ mkFloatType :: String -> DataType
 mkFloatType = mkPrimType FloatRep
 
 
--- | This function is now deprecated. Please use 'mkCharType' instead.
-{-# DEPRECATED mkStringType "Use mkCharType instead" #-}
-mkStringType :: String -> DataType
-mkStringType = mkCharType
-
 -- | Constructs the 'Char' type
 mkCharType :: String -> DataType
 mkCharType = mkPrimType CharRep
 
 
--- | Helper for 'mkIntType', 'mkFloatType', 'mkStringType'
+-- | Helper for 'mkIntType', 'mkFloatType'
 mkPrimType :: DataRep -> String -> DataType
 mkPrimType dr str = DataType
                         { tycon   = str
@@ -761,35 +751,15 @@ mkPrimCon dt str cr = Constr
                         , confixity = error "Data.Data.confixity"
                         }
 
--- | This function is now deprecated. Please use 'mkIntegralConstr' instead.
-{-# DEPRECATED mkIntConstr "Use mkIntegralConstr instead" #-}
-mkIntConstr :: DataType -> Integer -> Constr
-mkIntConstr = mkIntegralConstr
-
 mkIntegralConstr :: (Integral a, Show a) => DataType -> a -> Constr
 mkIntegralConstr dt i = case datarep dt of
                   IntRep -> mkPrimCon dt (show i) (IntConstr (toInteger  i))
                   _ -> error "Data.Data.mkIntegralConstr"
 
--- | This function is now deprecated. Please use 'mkRealConstr' instead.
-{-# DEPRECATED mkFloatConstr "Use mkRealConstr instead" #-}
-mkFloatConstr :: DataType -> Double -> Constr
-mkFloatConstr dt = mkRealConstr dt . toRational
-
 mkRealConstr :: (Real a, Show a) => DataType -> a -> Constr
 mkRealConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
                     _ -> error "Data.Data.mkRealConstr"
-
--- | This function is now deprecated. Please use 'mkCharConstr' instead.
-{-# DEPRECATED mkStringConstr "Use mkCharConstr instead" #-}
-mkStringConstr :: DataType -> String -> Constr
-mkStringConstr dt str =
-  case datarep dt of
-    CharRep -> case str of
-      [c] -> mkPrimCon dt (show c) (CharConstr c)
-      _ -> error "Data.Data.mkStringConstr: input String must contain a single character"
-    _ -> error "Data.Data.mkStringConstr"
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr
@@ -804,14 +774,6 @@ mkCharConstr dt c = case datarep dt of
 --
 ------------------------------------------------------------------------------
 
-
--- | Deprecated version (misnamed)
-{-# DEPRECATED mkNorepType "Use mkNoRepType instead" #-}
-mkNorepType :: String -> DataType
-mkNorepType str = DataType
-                        { tycon   = str
-                        , datarep = NoRep
-                        }
 
 -- | Constructs a non-representation for a non-presentable type
 mkNoRepType :: String -> DataType
@@ -929,7 +891,7 @@ intType :: DataType
 intType = mkIntType "Prelude.Int"
 
 instance Data Int where
-  toConstr x = mkIntConstr intType (fromIntegral x)
+  toConstr x = mkIntegralConstr intType x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Int)"
@@ -942,7 +904,7 @@ integerType :: DataType
 integerType = mkIntType "Prelude.Integer"
 
 instance Data Integer where
-  toConstr = mkIntConstr integerType
+  toConstr = mkIntegralConstr integerType
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z x
                     _ -> error "Data.Data.gunfold(Integer)"
@@ -955,7 +917,7 @@ int8Type :: DataType
 int8Type = mkIntType "Data.Int.Int8"
 
 instance Data Int8 where
-  toConstr x = mkIntConstr int8Type (fromIntegral x)
+  toConstr x = mkIntegralConstr int8Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Int8)"
@@ -968,7 +930,7 @@ int16Type :: DataType
 int16Type = mkIntType "Data.Int.Int16"
 
 instance Data Int16 where
-  toConstr x = mkIntConstr int16Type (fromIntegral x)
+  toConstr x = mkIntegralConstr int16Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Int16)"
@@ -981,7 +943,7 @@ int32Type :: DataType
 int32Type = mkIntType "Data.Int.Int32"
 
 instance Data Int32 where
-  toConstr x = mkIntConstr int32Type (fromIntegral x)
+  toConstr x = mkIntegralConstr int32Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Int32)"
@@ -994,7 +956,7 @@ int64Type :: DataType
 int64Type = mkIntType "Data.Int.Int64"
 
 instance Data Int64 where
-  toConstr x = mkIntConstr int64Type (fromIntegral x)
+  toConstr x = mkIntegralConstr int64Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Int64)"
@@ -1007,7 +969,7 @@ wordType :: DataType
 wordType = mkIntType "Data.Word.Word"
 
 instance Data Word where
-  toConstr x = mkIntConstr wordType (fromIntegral x)
+  toConstr x = mkIntegralConstr wordType x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Word)"
@@ -1020,7 +982,7 @@ word8Type :: DataType
 word8Type = mkIntType "Data.Word.Word8"
 
 instance Data Word8 where
-  toConstr x = mkIntConstr word8Type (fromIntegral x)
+  toConstr x = mkIntegralConstr word8Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Word8)"
@@ -1033,7 +995,7 @@ word16Type :: DataType
 word16Type = mkIntType "Data.Word.Word16"
 
 instance Data Word16 where
-  toConstr x = mkIntConstr word16Type (fromIntegral x)
+  toConstr x = mkIntegralConstr word16Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Word16)"
@@ -1046,7 +1008,7 @@ word32Type :: DataType
 word32Type = mkIntType "Data.Word.Word32"
 
 instance Data Word32 where
-  toConstr x = mkIntConstr word32Type (fromIntegral x)
+  toConstr x = mkIntegralConstr word32Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Word32)"
@@ -1059,7 +1021,7 @@ word64Type :: DataType
 word64Type = mkIntType "Data.Word.Word64"
 
 instance Data Word64 where
-  toConstr x = mkIntConstr word64Type (fromIntegral x)
+  toConstr x = mkIntegralConstr word64Type x
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
                     _ -> error "Data.Data.gunfold(Word64)"
