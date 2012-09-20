@@ -11,7 +11,7 @@ module MkGraph
   , mkJumpReturnsTo
   , mkJump, mkDirectJump, mkForeignJump, mkForeignJumpExtra, mkJumpGC
   , mkCbranch, mkSwitch
-  , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
+  , mkReturn, mkComment, mkCallEntry, mkBranch
   , copyInOflow, copyOutOflow
   , noExtraStack
   , toCall, Transfer(..)
@@ -227,11 +227,6 @@ mkReturn        :: DynFlags -> CmmExpr -> [CmmActual] -> UpdFrameOffset
 mkReturn dflags e actuals updfr_off =
   lastWithArgs dflags Ret  Old NativeReturn actuals updfr_off $
     toCall e Nothing updfr_off 0
-
-mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkReturnSimple dflags actuals updfr_off =
-  mkReturn dflags e actuals updfr_off
-  where e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)

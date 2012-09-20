@@ -85,7 +85,9 @@ emitReturn results
        ; case sequel of
            Return _ ->
              do { adjustHpBackwards
-                ; emit (mkReturnSimple dflags results updfr_off) }
+                ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
+                ; emit (mkReturn dflags (entryCode dflags e) results updfr_off)
+                }
            AssignTo regs adjust ->
              do { when adjust adjustHpBackwards
                 ; emitMultiAssign  regs results }
