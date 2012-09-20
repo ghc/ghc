@@ -118,11 +118,8 @@ synifyTyCon tc
                                 , td_derivs = Nothing }
            , tcdFVs = placeHolderNames }
   | isSynFamilyTyCon tc 
-  = case synTyConRhs tc of
-        SynFamilyTyCon ->
-          TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
+  = TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                (Just (synifyKindSig (synTyConResKind tc)))
-        _ -> error "synifyTyCon: impossible open type synonym?"
   | isDataFamilyTyCon tc 
   = --(why no "isOpenAlgTyCon"?)
     case algTyConRhs tc of
@@ -162,8 +159,8 @@ synifyTyCon tc
   alg_cons = map (synifyDataCon alg_use_gadt_syntax) (tyConDataCons tc)
   -- "deriving" doesn't affect the signature, no need to specify any.
   alg_deriv = Nothing
-  syn_type = synifyType WithinType (synTyConType tc)
-  defn | isSynTyCon tc = TySynonym syn_type
+  defn | Just (_, syn_rhs) <- synTyConDefn_maybe tc 
+       = TySynonym (synifyType WithinType syn_rhs)
        | otherwise = TyData { td_ND = alg_nd, td_ctxt = alg_ctx
                             , td_cType = Nothing
                             , td_kindSig = fmap synifyKindSig alg_kindSig
