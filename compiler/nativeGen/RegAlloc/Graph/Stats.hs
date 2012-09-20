@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
 -- | Carries interesting info for debugging / profiling of the
 --      graph coloring register allocator.
 
@@ -262,10 +261,15 @@ countSRMs
 countSRMs cmm
         = execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
 
+countSRM_block :: Instruction instr
+               => GenBasicBlock (LiveInstr instr)
+               -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))
 countSRM_block (BasicBlock i instrs)
  = do   instrs' <- mapM countSRM_instr instrs
         return  $ BasicBlock i instrs'
 
+countSRM_instr :: Instruction instr
+               => LiveInstr instr -> State (Int, Int, Int) (LiveInstr instr)
 countSRM_instr li
         | LiveInstr SPILL{} _    <- li
         = do    modify  $ \(s, r, m)    -> (s + 1, r, m)
@@ -284,6 +288,7 @@ countSRM_instr li
         =       return li
 
 -- sigh..
+addSRM :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
 addSRM (s1, r1, m1) (s2, r2, m2)
         = (s1+s2, r1+r2, m1+m2)
 
