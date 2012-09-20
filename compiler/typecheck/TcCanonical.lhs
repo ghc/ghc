@@ -34,7 +34,7 @@ import TcSMonad
 import FastString
 
 import Util
-import Maybes( fromMaybe, catMaybes )
+import Maybes( catMaybes )
 \end{code}
 
 
@@ -180,8 +180,8 @@ canonicalize (CTyEqCan { cc_loc  = d
                        , cc_ev = ev
                        , cc_tyvar  = tv
                        , cc_rhs    = xi })
-  = {-# SCC "canEqLeafTyVarLeftRec" #-}
-    canEqLeafTyVarLeftRec d ev tv xi
+  = {-# SCC "canEqLeafTyVarEq" #-}
+    canEqLeafTyVarEq d ev tv xi
 
 canonicalize (CFunEqCan { cc_loc = d
                         , cc_ev = ev
@@ -189,7 +189,7 @@ canonicalize (CFunEqCan { cc_loc = d
                         , cc_tyargs = xis1
                         , cc_rhs    = xi2 })
   = {-# SCC "canEqLeafFunEq" #-}
-    canEqLeafFunEq d ev (fn,xis1) xi2
+    canEqLeafFunEq d ev fn xis1 xi2
 
 canonicalize (CIrredEvCan { cc_ev = ev
                           , cc_loc = d })
@@ -1112,48 +1112,40 @@ canEqLeaf loc ev s1 s2
        ; ctevs <- xCtFlavor ev [mkTcEqPred s2 s1] xev 
        ; case ctevs of
            []     -> return Stop
-           [ctev] -> canEqLeafOriented loc ctev s2 s1
+           [ctev] -> canEqLeafOriented loc ctev cls2 s1
            _      -> panic "canEqLeaf" }
 
   | otherwise
   = do { traceTcS "canEqLeaf" $ ppr (mkTcEqPred s1 s2)
-       ; canEqLeafOriented loc ev s1 s2 }
+       ; canEqLeafOriented loc ev cls1 s2 }
   where
     re_orient = reOrient ev 
     cls1 = classify s1
     cls2 = classify s2
 
 canEqLeafOriented :: CtLoc -> CtEvidence
-                  -> TcType -> TcType -> TcS StopOrContinue
+                  -> TypeClassifier -> TcType -> TcS StopOrContinue
 -- By now s1 will either be a variable or a type family application
-canEqLeafOriented loc ev s1 s2
-  = can_eq_split_lhs loc ev s1 s2
-  where can_eq_split_lhs loc ev s1 s2
-          | Just (fn,tys1) <- splitTyConApp_maybe s1
-          = canEqLeafFunEq loc ev (fn,tys1) s2
-          | Just tv <- getTyVar_maybe s1
-          = canEqLeafTyVarLeftRec loc ev tv s2
-          | otherwise
-          = pprPanic "canEqLeafOriented" $
-            text "Non-variable or non-family equality LHS" <+> ppr (ctEvPred ev)
+canEqLeafOriented loc ev (FunCls fn tys1) s2 = canEqLeafFunEq loc ev fn tys1 s2
+canEqLeafOriented loc ev (VarCls tv)      s2 = canEqLeafTyVarEq loc ev tv s2
+canEqLeafOriented _   ev (OtherCls {})    _  = pprPanic "canEqLeafOriented" (ppr (ctEvPred ev))
 
 canEqLeafFunEq :: CtLoc -> CtEvidence
-               -> (TyCon,[TcType]) -> TcType -> TcS StopOrContinue
-canEqLeafFunEq loc ev (fn,tys1) ty2  -- ev :: F tys1 ~ ty2
+               -> TyCon -> [TcType] -> TcType -> TcS StopOrContinue
+canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
   = do { traceTcS "canEqLeafFunEq" $ pprEq (mkTyConApp fn tys1) ty2
        ; let flav = ctEvFlavour ev
-       ; (xis1,cos1) <- 
-           {-# SCC "flattenMany" #-}
-           flattenMany loc FMFullFlatten flav tys1 -- Flatten type function arguments
-                                               -- cos1 :: xis1 ~ tys1
-      ; (xi2,co2) <- {-# SCC "flatten" #-} 
-                     flatten loc FMFullFlatten flav ty2 -- co2 :: xi2 ~ ty2
+
+            -- Flatten type function arguments
+            -- cos1 :: xis1 ~ tys1
+            -- co2  :: xi2 ~ ty2
+      ; (xis1,cos1) <- flattenMany loc FMFullFlatten flav tys1 
+      ; (xi2, co2)  <- flatten     loc FMFullFlatten flav ty2
            
-       ; let fam_head = mkTyConApp fn xis1
-         -- Fancy higher-dimensional coercion between equalities!
+          -- Fancy higher-dimensional coercion between equalities!
          -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
-       ; let xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
-             -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I truly hate this (DV)
+       ; let fam_head = mkTyConApp fn xis1
+             xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
              -- xco :: (F xis1 ~ xi2) ~ (F tys1 ~ ty2)
              
        ; mb <- rewriteCtFlavor ev (mkTcEqPred fam_head xi2) xco
@@ -1167,68 +1159,57 @@ canEqLeafFunEq loc ev (fn,tys1) ty2  -- ev :: F tys1 ~ ty2
                                   , cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 } } } 
 
 
-canEqLeafTyVarLeftRec :: CtLoc -> CtEvidence
-                      -> TcTyVar -> TcType -> TcS StopOrContinue
-canEqLeafTyVarLeftRec loc ev tv s2              -- ev :: tv ~ s2
-  = do {  traceTcS "canEqLeafTyVarLeftRec" $ pprEq (mkTyVarTy tv) s2
-       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten (ctEvFlavour ev) tv -- co1 :: xi1 ~ tv
-       
-       ; traceTcS "canEqLeafTyVarLeftRec2" $ empty 
-         
-       ; let co = mkHdEqPred (typeKind s2) co1 (mkTcReflCo s2)
-             -- co :: (xi1 ~ s2) ~ (tv ~ s2)
-       ; mb <- rewriteCtFlavor ev (mkTcEqPred xi1 s2) co
-                -- NB that rewriteCtFlavor does not cache the result
-                -- See Note [Caching loops]
-
-       ; traceTcS "canEqLeafTyVarLeftRec3" $ empty 
-               
-       ; case mb of
-           Nothing -> return Stop
-           Just new_ev -> 
-             case getTyVar_maybe xi1 of 
-               Just tv' -> canEqLeafTyVarLeft loc new_ev tv' s2
-               Nothing  -> canEq loc new_ev xi1 s2 }
-    
-canEqLeafTyVarLeft :: CtLoc -> CtEvidence 
+canEqLeafTyVarEq :: CtLoc -> CtEvidence
                    -> TcTyVar -> TcType -> TcS StopOrContinue
--- Precondition LHS is fully rewritten from inerts (but not RHS)
-canEqLeafTyVarLeft loc ev tv s2       -- eqv : tv ~ s2
-  = do { let tv_ty = mkTyVarTy tv
-       ; traceTcS "canEqLeafTyVarLeft" (pprEq tv_ty s2)
-       ; (xi2, co2) <- flatten loc FMFullFlatten (ctEvFlavour ev) s2 -- Flatten RHS co:xi2 ~ s2 
-                       
-       ; traceTcS "canEqLeafTyVarLeft" (nest 2 (vcat [ text "tv  =" <+> ppr tv
-                                                     , text "s2  =" <+> ppr s2
-                                                     , text "xi2 =" <+> ppr xi2]))
+canEqLeafTyVarEq loc ev tv s2              -- ev :: tv ~ s2
+  = do { traceTcS "canEqLeafTyVarEq" $ pprEq (mkTyVarTy tv) s2
+       ; let flav = ctEvFlavour ev
+       ; (xi1,co1) <- flattenTyVar loc FMFullFlatten flav tv -- co1 :: xi1 ~ tv
+       ; (xi2,co2) <- flatten      loc FMFullFlatten flav s2 -- co2 :: xi2 ~ s2 
+       ; let co = mkHdEqPred s2 co1 co2
+             -- co :: (xi1 ~ xi2) ~ (tv ~ s2)
+       
+       ; traceTcS "canEqLeafTyVarEq2" $ empty 
+       ; case (getTyVar_maybe xi1, getTyVar_maybe xi2) of {
+           (Nothing,  _) -> -- Rewriting the LHS did not yield a type variable
+                            -- so go around again to canEq
+                            do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2) co
+                               ; case mb of
+                                   Nothing     -> return Stop
+                                   Just new_ev -> canEq loc new_ev xi1 xi2 } ;
 
-       -- Reflexivity exposed through flattening        
-       ; if tv_ty `eqType` xi2 then
-           when (isWanted ev) (setEvBind (ctev_evar ev) (EvCoercion co2)) >> 
-           return Stop
-         else do
-       -- Not reflexivity but maybe an occurs error
-       { let occ_check_result = occurCheckExpand tv xi2
-             xi2' = fromMaybe xi2 occ_check_result
-             co = mkHdEqPred (typeKind s2) (mkTcReflCo tv_ty) co2
-       ; mb <- rewriteCtFlavor ev (mkTcEqPred tv_ty xi2') co
-                -- NB that rewriteCtFlavor does not cache the result (as it used to)
-                -- which would be wrong if the constraint has an occurs error
+           (Just tv1', Just tv2') | tv1' == tv2' 
+              -> do { when (isWanted ev) $
+                      setEvBind (ctev_evar ev) (mkEvCast (EvCoercion (mkTcReflCo xi1)) co)
+                    ; return Stop } ;
 
-       ; case mb of
-           Just new_ev -> case occ_check_result of
-                            Just {} -> continueWith $
-                                       CTyEqCan { cc_ev = new_ev, cc_loc = loc
-                                                , cc_tyvar  = tv, cc_rhs = xi2' }
-                            Nothing -> canEqFailure loc new_ev tv_ty xi2'
-           Nothing -> return Stop
-        } }
+           (Just tv1', _) ->
+
+         -- LHS rewrote to a type variable, RHS to something else
+         case occurCheckExpand tv1' xi2 of
+           Nothing ->  -- Occurs check error
+                       do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2) co
+                          ; case mb of
+                              Nothing     -> return Stop
+                              Just new_ev -> canEqFailure loc new_ev xi1 xi2 }
+
+           Just xi2' -> -- No occurs check, so we can continue; but make sure
+                        -- that the new goal has enough type synonyms expanded by 
+                        -- by the occurCheckExpand
+                        do { mb <- rewriteCtFlavor ev (mkTcEqPred xi1 xi2') co
+                           ; case mb of
+                               Nothing     -> return Stop
+                               Just new_ev -> continueWith $
+                                              CTyEqCan { cc_ev = new_ev, cc_loc = loc
+                                                       , cc_tyvar  = tv1', cc_rhs = xi2' } }
+    } }
 
 mkHdEqPred :: Type -> TcCoercion -> TcCoercion -> TcCoercion
 -- Make a higher-dimensional equality
 --    co1 :: s1~t1,  co2 :: s2~t2
 -- Then (mkHdEqPred t2 co1 co2) :: (s1~s2) ~ (t1~t2)
 mkHdEqPred t2 co1 co2 = mkTcTyConAppCo eqTyCon [mkTcReflCo (defaultKind (typeKind t2)), co1, co2]
+   -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I truly hate this (DV)
 \end{code}
 
 Note [Occurs check expansion]
