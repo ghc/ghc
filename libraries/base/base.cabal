@@ -83,7 +83,6 @@ Library {
             GHC.IO.Handle.Types,
             GHC.IO.IOMode,
             GHC.IOArray,
-            GHC.IOBase,
             GHC.IORef,
             GHC.IP,
             GHC.Int,
