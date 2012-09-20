@@ -60,7 +60,6 @@ Library {
             GHC.ForeignPtr,
             GHC.Generics,
             GHC.GHCi,
-            GHC.Handle,
             GHC.IO,
             GHC.IO.Buffer,
             GHC.IO.BufferedIO,
