@@ -256,7 +256,8 @@ test('T5837',
 
       # sample: 3926235424 (amd64/Linux, 15/2/2012)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 79110184, 10))
+          compiler_stats_range_field('bytes allocated', 87254264, 10))
+                                           # 2012-09-20 87254264 amd64/Linux
       ],
       compile_fail,['-fcontext-stack=50'])
 
