@@ -14,7 +14,7 @@ import Data.Char(ord,chr)
 
 -- low level imports
 import GHC.Base                 (realWorld#)
-import GHC.IOBase               (IO(IO), unIO, unsafePerformIO)
+import GHC.IO                   (IO(IO), unIO, unsafePerformIO)
 import GHC.Prim                 (State#,RealWorld)
 
 
