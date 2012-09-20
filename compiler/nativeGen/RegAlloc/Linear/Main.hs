@@ -139,22 +139,27 @@ regAlloc
         :: (Outputable instr, Instruction instr)
         => DynFlags
         -> LiveCmmDecl statics instr
-        -> UniqSM (NatCmmDecl statics instr, Maybe RegAllocStats)
+        -> UniqSM ( NatCmmDecl statics instr
+                  , Maybe Int  -- number of extra stack slots required,
+                               -- beyond maxSpillSlots
+                  , Maybe RegAllocStats)
 
 regAlloc _ (CmmData sec d)
         = return
                 ( CmmData sec d
+                , Nothing
                 , Nothing )
 
 regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl [])
         = return ( CmmProc info lbl (ListGraph [])
+                 , Nothing
                  , Nothing )
 
 regAlloc dflags (CmmProc static lbl sccs)
         | LiveInfo info (Just first_id) (Just block_live) _     <- static
         = do
                 -- do register allocation on each component.
-                (final_blocks, stats)
+                (final_blocks, stats, stack_use)
                         <- linearRegAlloc dflags first_id block_live sccs
 
                 -- make sure the block that was first in the input list
@@ -162,7 +167,15 @@ regAlloc dflags (CmmProc static lbl sccs)
                 let ((first':_), rest')
                                 = partition ((== first_id) . blockId) final_blocks
 
+                let max_spill_slots = maxSpillSlots dflags
+                    extra_stack
+                      | stack_use > max_spill_slots
+                      = Just (stack_use - max_spill_slots)
+                      | otherwise
+                      = Nothing
+
                 return  ( CmmProc info lbl (ListGraph (first' : rest'))
+                        , extra_stack
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
@@ -184,7 +197,7 @@ linearRegAlloc
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
-        -> UniqSM ([NatBasicBlock instr], RegAllocStats)
+        -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc dflags first_id block_live sccs
  = let platform = targetPlatform dflags
@@ -204,14 +217,14 @@ linearRegAlloc'
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
-        -> UniqSM ([NatBasicBlock instr], RegAllocStats)
+        -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc' dflags initFreeRegs first_id block_live sccs
  = do   us      <- getUs
-        let (_, _, stats, blocks) =
+        let (_, stack, stats, blocks) =
                 runR dflags emptyBlockMap initFreeRegs emptyRegMap (emptyStackMap dflags) us
                     $ linearRA_SCCs first_id block_live [] sccs
-        return  (blocks, stats)
+        return  (blocks, stats, getStackUse stack)
 
 
 linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)

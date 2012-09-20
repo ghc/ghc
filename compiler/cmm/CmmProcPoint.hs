@@ -11,6 +11,7 @@ where
 
 import Prelude hiding (last, unzip, succ, zip)
 
+import DynFlags
 import BlockId
 import CLabel
 import Cmm
@@ -25,8 +26,6 @@ import Platform
 import UniqSupply
 
 import Hoopl
-
-import qualified Data.Map as Map
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -207,9 +206,9 @@ extendPPSet platform g blocks procPoints =
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
-splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
+splitAtProcPoints :: DynFlags -> CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
                      CmmDecl -> UniqSM [CmmDecl]
-splitAtProcPoints entry_label callPPs procPoints procMap
+splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbls = info_tbls})
                            top_l g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
@@ -234,12 +233,15 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      --  * Labels for the info tables of their new procedures (only if
      --    the proc point is a callPP)
      -- Due to common blockification, we may overestimate the set of procpoints.
-     let add_label map pp = Map.insert pp lbls map
+     let add_label map pp = mapInsert pp lbls map
            where lbls | pp == entry = (entry_label, Just (toInfoLbl entry_label))
                       | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> 
                                                     Just (infoTblLbl pp))
-         procLabels = foldl add_label Map.empty
+
+         procLabels :: LabelMap (CLabel, Maybe CLabel)
+         procLabels = foldl add_label mapEmpty
                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
+
      -- In each new graph, add blocks jumping off to the new procedures,
      -- and replace branches to procpoints with branches to the jump-off blocks
      let add_jump_block (env, bs) (pp, l) =
@@ -259,8 +261,17 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                       CmmCondBranch _ ti fi -> add_if_pp ti (add_if_pp fi rst)
                       CmmSwitch _ tbl       -> foldr add_if_pp rst (catMaybes tbl)
                       _                     -> rst
-                  add_if_pp id rst = case Map.lookup id procLabels of
-                                       Just (lbl, mb_info_lbl) -> (id, mb_info_lbl `orElse` lbl) : rst
+
+                  -- when jumping to a PP that has an info table, if
+                  -- tablesNextToCode is off we must jump to the entry
+                  -- label instead.
+                  jump_label (Just info_lbl) _
+                             | tablesNextToCode dflags = info_lbl
+                             | otherwise               = toEntryLbl info_lbl
+                  jump_label Nothing         block_lbl = block_lbl
+
+                  add_if_pp id rst = case mapLookup id procLabels of
+                                       Just (lbl, mb_info_lbl) -> (id, jump_label mb_info_lbl lbl) : rst
                                        Nothing                 -> rst
               (jumpEnv, jumpBlocks) <-
                  foldM add_jump_block (mapEmpty, []) needed_jumps
@@ -274,8 +285,10 @@ splitAtProcPoints entry_label callPPs procPoints procMap
               let g' = ofBlockMap ppId blockEnv'''
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)
+
      graphEnv <- foldM add_jumps emptyBlockMap $ mapToList graphEnv
-     let to_proc (bid, g) = case expectJust "pp label" $ Map.lookup bid procLabels of
+
+     let to_proc (bid, g) = case expectJust "pp label" $ mapLookup bid procLabels of
              (lbl, Just info_lbl)
                | bid == entry
                -> CmmProc (TopInfo {info_tbls=info_tbls, stack_info=stack_info})
@@ -295,7 +308,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap
          replacePPIds g = {-# SCC "replacePPIds" #-}
                           mapGraphNodes (id, mapExp repl, mapExp repl) g
            where repl e@(CmmLit (CmmBlock bid)) =
-                   case Map.lookup bid procLabels of
+                   case mapLookup bid procLabels of
                      Just (_, Just info_lbl)  -> CmmLit (CmmLabel info_lbl)
                      _ -> e
                  repl e = e
@@ -312,7 +325,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      return -- pprTrace "procLabels" (ppr procLabels)
             -- pprTrace "splitting graphs" (ppr procs)
             procs
-splitAtProcPoints _ _ _ _ t@(CmmData _ _) = return [t]
+splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 
 
 -- Only called from CmmProcPoint.splitAtProcPoints. NB. does a
