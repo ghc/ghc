@@ -27,10 +27,7 @@ module RegAlloc.Linear.StackMap (
 
 where
 
-import RegAlloc.Linear.FreeRegs
-
 import DynFlags
-import Outputable
 import UniqFM
 import Unique
 
@@ -49,7 +46,7 @@ data StackMap
 
 -- | An empty stack map, with all slots available.
 emptyStackMap :: DynFlags -> StackMap
-emptyStackMap dflags = StackMap 0 emptyUFM
+emptyStackMap _ = StackMap 0 emptyUFM
 
 
 -- | If this vreg unique already has a stack assignment then return the slot number,
