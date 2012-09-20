@@ -290,5 +290,8 @@ countSRM_instr li
 -- sigh..
 addSRM :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
 addSRM (s1, r1, m1) (s2, r2, m2)
-        = (s1+s2, r1+r2, m1+m2)
+        = let !s = s1 + s2
+              !r = r1 + r2
+              !m = m1 + m2
+          in (s, r, m)
 
