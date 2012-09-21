@@ -945,9 +945,9 @@ selector_loop:
 #ifdef PROFILING
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
-              SET_INFO(p, (StgInfoTable *)info_ptr);
+              SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
               OVERWRITING_CLOSURE((StgClosure*)p);
-              SET_INFO(p, &stg_WHITEHOLE_info);
+              SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
 #endif
 
               // the closure in val is now the "value" of the
