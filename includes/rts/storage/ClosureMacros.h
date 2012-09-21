@@ -46,11 +46,14 @@
  
    -------------------------------------------------------------------------- */
 
-#define SET_INFO(c,i) ((c)->header.info = (i))
-#define GET_INFO(c)   ((c)->header.info)
-#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
+INLINE_HEADER void SET_INFO(StgClosure *c, const StgInfoTable *info) {
+    c->header.info = info;
+}
+INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
+    return c->header.info;
+}
 
-#define GET_TAG(con) (get_itbl(con)->srt_bitmap)
+#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
 
 #ifdef TABLES_NEXT_TO_CODE
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
@@ -89,6 +92,10 @@ INLINE_HEADER StgFunInfoTable *get_fun_itbl(const StgClosure *c) {return FUN_INF
 INLINE_HEADER StgThunkInfoTable *get_thunk_itbl(const StgClosure *c) {return THUNK_INFO_PTR_TO_STRUCT(c->header.info);}
 
 INLINE_HEADER StgConInfoTable *get_con_itbl(const StgClosure *c) {return CON_INFO_PTR_TO_STRUCT((c)->header.info);}
+
+INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
+    return get_itbl(con)->srt_bitmap;
+}
 
 /* -----------------------------------------------------------------------------
    Macros for building closures
@@ -142,7 +149,7 @@ INLINE_HEADER StgConInfoTable *get_con_itbl(const StgClosure *c) {return CON_INF
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
     OVERWRITING_CLOSURE((StgClosure *)(c));                     \
-    SET_INFO((c), (new_info));                                  \
+    SET_INFO((StgClosure *)(c), (new_info));                    \
     LDV_RECORD_CREATE(c);
 
 /* -----------------------------------------------------------------------------

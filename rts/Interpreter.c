@@ -339,7 +339,7 @@ eval_obj:
 	{
 	    StgUpdateFrame *__frame;
 	    __frame = (StgUpdateFrame *)Sp;
-	    SET_INFO(__frame, (StgInfoTable *)&stg_upd_frame_info);
+	    SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
 	    __frame->updatee = (StgClosure *)(ap);
 	}
 	
