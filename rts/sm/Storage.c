@@ -78,6 +78,7 @@ initGeneration (generation *gen, int g)
     gen->n_old_blocks = 0;
     gen->large_objects = NULL;
     gen->n_large_blocks = 0;
+    gen->n_large_words = 0;
     gen->n_new_large_words = 0;
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
@@ -947,7 +948,7 @@ W_ countOccupied (bdescr *bd)
 
 W_ genLiveWords (generation *gen)
 {
-    return gen->n_words + countOccupied(gen->large_objects);
+    return gen->n_words + gen->n_large_words;
 }
 
 W_ genLiveBlocks (generation *gen)

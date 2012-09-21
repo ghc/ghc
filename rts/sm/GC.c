@@ -572,6 +572,7 @@ GarbageCollect (rtsBool force_major_gc,
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
+        gen->n_large_words  = countOccupied(gen->large_objects);
         gen->n_new_large_words = 0;
     }
     else // for generations > N
@@ -583,13 +584,15 @@ GarbageCollect (rtsBool force_major_gc,
 	for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
-	}
+            gen->n_large_words += bd->free - bd->start;
+        }
         
 	// add the new blocks we promoted during this GC 
 	gen->n_large_blocks += gen->n_scavenged_large_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
+    ASSERT(countOccupied(gen->large_objects) == gen->n_large_words);
 
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
