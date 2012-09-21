@@ -8,6 +8,10 @@ T3330a.hs:19:34:
     Expected type: (s0 ix0 -> ix1)
                    -> r ix1 -> Writer [AnyF s] (r'0 ix1)
       Actual type: s ix
+    Relevant bindings include
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+      p :: s ix (bound at T3330a.hs:19:10)
+      x :: PF s r ix (bound at T3330a.hs:19:12)
     In the first argument of `hmapM', namely `p'
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)
@@ -20,6 +24,10 @@ T3330a.hs:19:34:
     Expected type: (s0 ix0 -> ix1)
                    -> r ix1 -> Writer [AnyF s] (r'0 ix1)
       Actual type: s ix
+    Relevant bindings include
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+      p :: s ix (bound at T3330a.hs:19:10)
+      x :: PF s r ix (bound at T3330a.hs:19:12)
     In the first argument of `hmapM', namely `p'
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)
@@ -31,6 +39,10 @@ T3330a.hs:19:44:
            at T3330a.hs:18:13
     Expected type: PF s r (r0 ix0 -> Writer [AnyF s0] (r0 ix0))
       Actual type: PF s r ix
+    Relevant bindings include
+      children :: s ix -> PF s r ix -> [AnyF s] (bound at T3330a.hs:19:1)
+      p :: s ix (bound at T3330a.hs:19:10)
+      x :: PF s r ix (bound at T3330a.hs:19:12)
     In the third argument of `hmapM', namely `x'
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)

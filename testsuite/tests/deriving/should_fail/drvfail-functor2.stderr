@@ -26,7 +26,6 @@ drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)
       arising from the 'deriving' clause of a data type declaration
     Possible fix:
-      add an instance declaration for (Functor NoFunctor)
-      or use a standalone 'deriving instance' declaration,
-           so you can specify the instance context yourself
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
     When deriving the instance for (Functor UseNoFunctor)

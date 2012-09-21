@@ -20,6 +20,12 @@ FD2.hs:26:34:
           the type signature for
             foldr1 :: Elem a e => (e -> e -> e) -> a -> e
           at FD2.hs:21:13
+    Relevant bindings include
+      foldr1 :: (e -> e -> e) -> a -> e (bound at FD2.hs:22:3)
+      f :: e -> e -> e (bound at FD2.hs:22:10)
+      mf :: e1 -> Maybe e1 -> Maybe e1 (bound at FD2.hs:25:12)
+      x :: e1 (bound at FD2.hs:26:15)
+      y :: e1 (bound at FD2.hs:26:23)
     In the return type of a call of `f'
     In the first argument of `Just', namely `(f x y)'
     In the expression: Just (f x y)

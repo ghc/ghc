@@ -1,8 +1,9 @@
 
 mc23.hs:9:29:
-    Couldn't match type `[a0]' with `a -> b0'
-    Expected type: (a -> b0) -> [a] -> t0 a
+    Couldn't match type `[a0]' with `a -> b'
+    Expected type: (a -> b) -> [a] -> t a
       Actual type: [a0] -> [a0]
+    Relevant bindings include z :: t b (bound at mc23.hs:9:1)
     In the return type of a call of `take'
     Probable cause: `take' is applied to too many arguments
     In the expression: take 5

@@ -7,7 +7,5 @@ T5858.hs:11:7:
     Note: there is a potential instance available:
       instance t1 ~ String => InferOverloaded (t1, t1)
         -- Defined at T5858.hs:8:10
-    Possible fix:
-      add an instance declaration for (InferOverloaded ([a0], [a1]))
     In the expression: infer ([], [])
     In an equation for `foo': foo = infer ([], [])

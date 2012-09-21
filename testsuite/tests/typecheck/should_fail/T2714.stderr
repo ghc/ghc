@@ -6,6 +6,8 @@ T2714.hs:8:5:
           at T2714.hs:8:1
     Expected type: ((a -> b) -> b) -> c -> a
       Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
+    Relevant bindings include
+      f :: ((a -> b) -> b) -> forall c. c -> a (bound at T2714.hs:8:1)
     In the expression: ffmap
     In an equation for `f': f = ffmap
 
@@ -16,5 +18,7 @@ T2714.hs:8:5:
           at T2714.hs:7:6
     Expected type: ((a -> b) -> b) -> c -> a
       Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
+    Relevant bindings include
+      f :: ((a -> b) -> b) -> forall c. c -> a (bound at T2714.hs:8:1)
     In the expression: ffmap
     In an equation for `f': f = ffmap

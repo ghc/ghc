@@ -1,13 +1,12 @@
 
-T2627b.hs:20:14:
-    Couldn't match type `t0' with `Dual (Dual t0)'
-      `t0' is untouchable
-           inside the constraints (b ~ W a2 b2)
-           bound at a pattern with constructor
-                      Wr :: forall a b. a -> Comm b -> Comm (W a b),
-                    in an equation for `conn'
-    Expected type: Dual t0
-      Actual type: Dual (Dual (Dual t0))
-    In the pattern: Wr a r
+T2627b.hs:20:24:
+    Couldn't match expected type `a0' with actual type `Dual (Dual a0)'
+      `a0' is untouchable
+        inside the constraints (b ~ W a2 b2)
+        bound by a pattern with constructor
+                   Wr :: forall a b. a -> Comm b -> Comm (W a b),
+                 in an equation for `conn'
+        at T2627b.hs:20:14-19
+    In the expression: conn undefined undefined
     In an equation for `conn':
         conn (Rd k) (Wr a r) = conn undefined undefined

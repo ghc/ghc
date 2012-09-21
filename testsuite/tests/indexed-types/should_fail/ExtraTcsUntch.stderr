@@ -5,7 +5,6 @@ ExtraTcsUntch.hs:24:53:
       bound by the inferred type of
                f :: F Int ~ [[t]] => [t] -> ((), ((), ()))
       at ExtraTcsUntch.hs:(21,1)-(25,29)
-    Possible fix: add an instance declaration for (C [t] [a])
     In the expression: op x [y]
     In the expression: (h [[undefined]], op x [y])
     In a case alternative: TEx y -> (h [[undefined]], op x [y])

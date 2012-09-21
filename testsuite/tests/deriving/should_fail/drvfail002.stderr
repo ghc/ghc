@@ -2,8 +2,9 @@
 drvfail002.hs:19:23:
     No instance for (X T c)
       arising from the 'deriving' clause of a data type declaration
+    The type variable `c' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     Possible fix:
-      add an instance declaration for (X T c)
-      or use a standalone 'deriving instance' declaration,
-           so you can specify the instance context yourself
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
     When deriving the instance for (Show S)

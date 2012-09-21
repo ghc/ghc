@@ -5,6 +5,12 @@ T3169.hs:13:22:
       bound by the instance declaration at T3169.hs:10:10-36
     Expected type: Map a (Map b elt)
       Actual type: Map (a, b) elt
+    Relevant bindings include
+      lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
+        (bound at T3169.hs:12:3)
+      a :: a (bound at T3169.hs:12:11)
+      b :: b (bound at T3169.hs:12:13)
+      m :: Map (a, b) elt (bound at T3169.hs:12:17)
     In the second argument of `lookup', namely `m'
     In the expression: lookup a m :: Maybe (Map b elt)
     In the expression:
@@ -21,6 +27,11 @@ T3169.hs:13:22:
             at T3169.hs:12:3
     Expected type: Map a (Map b elt)
       Actual type: Map (a, b) elt
+    Relevant bindings include
+      lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
+        (bound at T3169.hs:12:3)
+      b :: b (bound at T3169.hs:12:13)
+      m :: Map (a, b) elt (bound at T3169.hs:12:17)
     In the second argument of `lookup', namely `m'
     In the expression: lookup a m :: Maybe (Map b elt)
     In the expression:

@@ -14,6 +14,10 @@ T3440.hs:11:22:
              GADT :: forall a. a -> Fam a -> GADT (Fam a),
            in an equation for `unwrap'
            at T3440.hs:11:9
+    Relevant bindings include
+      unwrap :: GADT (Fam a) -> (a, Fam a) (bound at T3440.hs:11:1)
+      x :: a1 (bound at T3440.hs:11:14)
+      y :: Fam a1 (bound at T3440.hs:11:16)
     In the expression: x
     In the expression: (x, y)
     In an equation for `unwrap': unwrap (GADT x y) = (x, y)

@@ -8,6 +8,10 @@ tcfail099.hs:9:20:
           at tcfail099.hs:9:7
       `t' is a rigid type variable bound by
           the inferred type of call :: DS -> t -> Int at tcfail099.hs:9:1
+    Relevant bindings include
+      call :: DS -> t -> Int (bound at tcfail099.hs:9:1)
+      f :: a -> Int (bound at tcfail099.hs:9:9)
+      arg :: t (bound at tcfail099.hs:9:12)
     In the first argument of `f', namely `arg'
     In the expression: f arg
     In an equation for `call': call (C f) arg = f arg

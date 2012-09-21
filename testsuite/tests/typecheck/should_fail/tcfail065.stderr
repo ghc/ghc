@@ -6,6 +6,9 @@ tcfail065.hs:29:20:
       `x1' is a rigid type variable bound by
            the type signature for setX :: x1 -> X x -> X x
            at tcfail065.hs:29:3
+    Relevant bindings include
+      setX :: x1 -> X x -> X x (bound at tcfail065.hs:29:3)
+      x :: x1 (bound at tcfail065.hs:29:8)
     In the first argument of `X', namely `x'
     In the expression: X x
     In an equation for `setX': setX x (X _) = X x
