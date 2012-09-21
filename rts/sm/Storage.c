@@ -764,6 +764,7 @@ allocatePinned (Capability *cap, W_ n)
         // g0->large_objects.
         if (bd != NULL) {
             dbl_link_onto(bd, &cap->pinned_object_blocks);
+            cap->total_allocated += bd->free - bd->start;
         }
 
         // We need to find another block.  We could just allocate one,
