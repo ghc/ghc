@@ -1,15 +1,7 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module X86.Cond (
-	Cond(..),
-	condUnsigned,
-	condToSigned,
+        Cond(..),
+        condUnsigned,
+        condToSigned,
         condToUnsigned,
         maybeFlipCond
 )
@@ -17,24 +9,24 @@ module X86.Cond (
 where
 
 data Cond
-	= ALWAYS	-- What's really used? ToDo
-	| EQQ
-	| GE
-	| GEU
-	| GTT
-	| GU
-	| LE
-	| LEU
-	| LTT
-	| LU
-	| NE
-	| NEG
-	| POS
-	| CARRY
-	| OFLO
-	| PARITY
-	| NOTPARITY
-	deriving Eq
+        = ALWAYS        -- What's really used? ToDo
+        | EQQ
+        | GE
+        | GEU
+        | GTT
+        | GU
+        | LE
+        | LEU
+        | LTT
+        | LU
+        | NE
+        | NEG
+        | POS
+        | CARRY
+        | OFLO
+        | PARITY
+        | NOTPARITY
+        deriving Eq
 
 condUnsigned :: Cond -> Bool
 condUnsigned GU  = True
