@@ -28,10 +28,8 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
-#if defined(THREADED_RTS)
 /* idle ticks left before we perform a GC */
 static int ticks_to_gc = 0;
-#endif
 
 /*
  * Function: handle_tick()
@@ -52,8 +50,7 @@ handle_tick(int unused STG_UNUSED)
       }
   }
 
-#if defined(THREADED_RTS)
-  /* 
+  /*
    * If we've been inactive for idleGCDelayTime (set by +RTS
    * -I), tell the scheduler to wake up and do a GC, to check
    * for threads that are deadlocked.
@@ -66,24 +63,28 @@ handle_tick(int unused STG_UNUSED)
       break;
   case ACTIVITY_MAYBE_NO:
       if (ticks_to_gc == 0) {
-          /* 0 ==> no idle GC */
-          recent_activity = ACTIVITY_DONE_GC;
-          // disable timer signals (see #1623)
-          stopTimer();
+          if (RtsFlags.GcFlags.doIdleGC) {
+              recent_activity = ACTIVITY_INACTIVE;
+#ifdef THREADED_RTS
+              wakeUpRts();
+              // The scheduler will call stopTimer() when it has done
+              // the GC.
+#endif
+          } else {
+              recent_activity = ACTIVITY_DONE_GC;
+              // disable timer signals (see #1623, #5991)
+              // but only if we're not profiling
+#ifndef PROFILING
+              stopTimer();
+#endif
+          }
       } else {
           ticks_to_gc--;
-          if (ticks_to_gc == 0) {
-              ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
-                  RtsFlags.MiscFlags.tickInterval;
-              recent_activity = ACTIVITY_INACTIVE;
-              wakeUpRts();
-          }
       }
       break;
   default:
       break;
   }
-#endif
 }
 
 // This global counter is used to allow multiple threads to stop the

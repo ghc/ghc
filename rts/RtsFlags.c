@@ -115,6 +115,11 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
+#ifdef THREADED_RTS
+    RtsFlags.GcFlags.doIdleGC           = rtsTrue;
+#else
+    RtsFlags.GcFlags.doIdleGC           = rtsFalse;
+#endif
 
 #if osf3_HOST_OS
 /* ToDo: Perhaps by adjusting this value we can make linking without
@@ -915,8 +920,13 @@ error = rtsTrue;
 		if (rts_argv[arg][2] == '\0') {
 		  /* use default */
 		} else {
-                    RtsFlags.GcFlags.idleGCDelayTime =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                    Time t = fsecondsToTime(atof(rts_argv[arg]+2));
+                    if (t == 0) {
+                        RtsFlags.GcFlags.doIdleGC = rtsFalse;
+                    } else {
+                        RtsFlags.GcFlags.doIdleGC = rtsTrue;
+                        RtsFlags.GcFlags.idleGCDelayTime = t;
+                    }
 		}
 		break;
 
