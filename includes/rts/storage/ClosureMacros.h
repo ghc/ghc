@@ -177,16 +177,22 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     }
 }
 
-#define STATIC_LINK2(info,p)							\
-   (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +			\
-					info->layout.payload.nptrs + 1])))
+INLINE_HEADER StgClosure *STATIC_LINK2(const StgInfoTable *info,
+                                       StgClosure *p) {
+    return (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +
+                            info->layout.payload.nptrs + 1])));
+}
 
 /* -----------------------------------------------------------------------------
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */
 
-#define CHARLIKE_CLOSURE(n) ((P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE])
-#define INTLIKE_CLOSURE(n)  ((P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE])
+INLINE_HEADER P_ CHARLIKE_CLOSURE(int n) {
+    return (P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE];
+}
+INLINE_HEADER P_ INTLIKE_CLOSURE(int n) {
+    return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
+}
 
 /* ----------------------------------------------------------------------------
    Macros for untagging and retagging closure pointers
