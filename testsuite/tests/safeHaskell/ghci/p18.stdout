@@ -3,5 +3,5 @@ Package Trust: Off
 Data.ByteString is trusted!
 Trust type is (Module: Trustworthy, Package: untrusted)
 Package Trust: On
-Trusted package dependencies (untrusted): bytestring-0.10.0.0
+Trusted package dependencies (untrusted): bytestring-0.10.1.0
 Data.ByteString is NOT trusted!

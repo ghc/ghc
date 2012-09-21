@@ -95,3 +95,9 @@ test('T5001',
       extra_clean(['T5001a.hi', 'T5001a.o'])],
      multimod_compile,
      ['T5001', '-v0'])
+
+# T5252Take2 failed when compiled *wihtout* optimisation
+test('T5252Take2',
+     extra_clean(['T5252Take2a.hi', 'T5252Take2a.o']),
+     run_command, 
+     ['$MAKE -s --no-print-directory T5252Take2'])

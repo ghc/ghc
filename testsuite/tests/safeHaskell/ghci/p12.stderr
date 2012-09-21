@@ -3,5 +3,5 @@ Some flags have not been recognized: -fno-package-trust
 
 <no location info>:
     Data.ByteString: Can't be safely imported!
-    The package (bytestring-0.10.0.0) the module resides in isn't trusted.
+    The package (bytestring-0.10.1.0) the module resides in isn't trusted.
 
