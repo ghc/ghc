@@ -393,11 +393,17 @@ finish:
 // Allocate a chunk of blocks that is at least min and at most max
 // blocks in size. This API is used by the nursery allocator that
 // wants contiguous memory preferably, but doesn't require it.  When
-// memory is fragmented we might have lots of large chunks that are
+// memory is fragmented we might have lots of chunks that are
 // less than a full megablock, so allowing the nursery allocator to
 // use these reduces fragmentation considerably.  e.g. on a GHC build
 // with +RTS -H, I saw fragmentation go from 17MB down to 3MB on a
 // single compile.
+//
+// Further to this: in #7257 there is a program that creates serious
+// fragmentation such that the heap is full of tiny <4 block chains.
+// The nursery allocator therefore has to use single blocks to avoid
+// fragmentation, but we make sure that we allocate large blocks
+// preferably if there are any.
 //
 bdescr *
 allocLargeChunk (W_ min, W_ max)
