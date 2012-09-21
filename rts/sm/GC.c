@@ -290,7 +290,7 @@ GarbageCollect (nat collect_gen,
 
   // gather blocks allocated using allocatePinned() from each capability
   // and put them on the g0->large_object list.
-  collect_pinned_object_blocks();
+  allocated += collect_pinned_object_blocks();
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
