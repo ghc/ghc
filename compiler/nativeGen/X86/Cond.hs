@@ -10,7 +10,8 @@ module X86.Cond (
 	Cond(..),
 	condUnsigned,
 	condToSigned,
-	condToUnsigned
+        condToUnsigned,
+        maybeFlipCond
 )
 
 where
@@ -57,3 +58,19 @@ condToUnsigned LTT = LU
 condToUnsigned GE  = GEU
 condToUnsigned LE  = LEU
 condToUnsigned x   = x
+
+-- | @maybeFlipCond c@ returns @Just c'@ if it is possible to flip the
+-- arguments to the conditional @c@, and the new condition should be @c'@.
+maybeFlipCond :: Cond -> Maybe Cond
+maybeFlipCond cond  = case cond of
+        EQQ   -> Just EQQ
+        NE    -> Just NE
+        LU    -> Just GU
+        GU    -> Just LU
+        LEU   -> Just GEU
+        GEU   -> Just LEU
+        LTT   -> Just GTT
+        GTT   -> Just LTT
+        LE    -> Just GE
+        GE    -> Just LE
+        _other -> Nothing

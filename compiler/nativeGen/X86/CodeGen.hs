@@ -1276,7 +1276,8 @@ condIntCode' _ cond x (CmmLit (CmmInt 0 pk)) = do
     return (CondCode False cond code)
 
 -- anything vs operand
-condIntCode' is32Bit cond x y | isOperand is32Bit y = do
+condIntCode' is32Bit cond x y
+ | isOperand is32Bit y = do
     dflags <- getDynFlags
     (x_reg, x_code) <- getNonClobberedReg x
     (y_op,  y_code) <- getOperand y
@@ -1284,6 +1285,17 @@ condIntCode' is32Bit cond x y | isOperand is32Bit y = do
         code = x_code `appOL` y_code `snocOL`
                   CMP (cmmTypeSize (cmmExprType dflags x)) y_op (OpReg x_reg)
     return (CondCode False cond code)
+-- operand vs. anything: invert the comparison so that we can use a
+-- single comparison instruction.
+ | isOperand is32Bit x
+ , Just revcond <- maybeFlipCond cond = do
+    dflags <- getDynFlags
+    (y_reg, y_code) <- getNonClobberedReg y
+    (x_op,  x_code) <- getOperand x
+    let
+        code = y_code `appOL` x_code `snocOL`
+                  CMP (cmmTypeSize (cmmExprType dflags x)) x_op (OpReg y_reg)
+    return (CondCode False revcond code)
 
 -- anything vs anything
 condIntCode' _ cond x y = do
