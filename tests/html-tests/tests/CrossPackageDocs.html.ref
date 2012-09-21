@@ -328,16 +328,6 @@ defined in the <a href=""
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > (<a href=""
-		    >Either</a
-		    > e)</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
 		></table
 	      ></div
 	    ></div
