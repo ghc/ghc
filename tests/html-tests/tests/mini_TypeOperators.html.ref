@@ -60,14 +60,6 @@ window.onload = function () {pageLoad();};
 	  >biO</a
 	  ></p
 	></div
-      ><div class="top"
-      ><p class="src"
-	><span class="keyword"
-	  >data</span
-	  > <a href="" target="main"
-	  >Flip</a
-	  > (~&gt;) b a</p
-	></div
       ></div
     ></body
   ></html
