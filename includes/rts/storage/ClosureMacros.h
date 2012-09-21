@@ -505,7 +505,7 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    LDV_recordDead((StgClosure *)(p), size);
+    LDV_recordDead(p, size);
 #endif
 
     for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
