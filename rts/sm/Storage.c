@@ -438,16 +438,12 @@ allocNursery (bdescr *tail, W_ blocks)
     // tiny optimisation (~0.5%), but it's free.
 
     while (blocks > 0) {
-        if (blocks >= BLOCKS_PER_MBLOCK / 4) {
-            n = stg_min(BLOCKS_PER_MBLOCK, blocks);
-            bd = allocLargeChunk(16, n); // see comment with allocLargeChunk()
-            // NB. we want a nice power of 2 for the minimum here
-            n = bd->blocks;
-        } else {
-            bd = allocGroup(blocks);
-            n = blocks;
-        }
-
+        n = stg_min(BLOCKS_PER_MBLOCK, blocks);
+        // allocLargeChunk will prefer large chunks, but will pick up
+        // small chunks if there are any available.  We must allow
+        // single blocks here to avoid fragmentation (#7257)
+        bd = allocLargeChunk(1, n);
+        n = bd->blocks;
         blocks -= n;
 
         for (i = 0; i < n; i++) {
