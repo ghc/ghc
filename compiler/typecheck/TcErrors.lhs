@@ -104,8 +104,7 @@ reportUnsolved wanted
 reportAllUnsolved :: WantedConstraints -> TcM ()
 -- Report all unsolved goals, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
-reportAllUnsolved wanted 
-  = report_unsolved Nothing (panic "reportAllUnsolved") wanted
+reportAllUnsolved wanted = report_unsolved Nothing False wanted
 
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
                 -> Bool              -- cec_defer
@@ -123,11 +122,12 @@ report_unsolved mb_binds_var defer wanted
                  
             -- If we are deferring we are going to need /all/ evidence around,
             -- including the evidence produced by unflattening (zonkWC)
-       ; errs_so_far <- ifErrsM (return True) (return False)
+--       ; errs_so_far <- ifErrsM (return True) (return False)
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
              free_tvs = tyVarsOfWC wanted
              err_ctxt = CEC { cec_encl  = []
-                            , cec_insol = errs_so_far || insolubleWC wanted
+                            , cec_insol = False
+                                          --errs_so_far || insolubleWC wanted
                                           -- Don't report ambiguity errors if
                                           -- there are any other solid errors 
                                           -- to report
@@ -170,12 +170,12 @@ data ReportErrCtxt
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
 reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                                  , ic_wanted = wanted, ic_binds = evb
-                                 , ic_insol = insoluble, ic_info = info })
+                                 , ic_insol = ic_insoluble, ic_info = info })
   | BracketSkol <- info
-  , not insoluble -- For Template Haskell brackets report only
-  = return ()     -- definite errors. The whole thing will be re-checked
-                  -- later when we plug it in, and meanwhile there may
-                  -- certainly be un-satisfied constraints
+  , not ic_insoluble -- For Template Haskell brackets report only
+  = return ()        -- definite errors. The whole thing will be re-checked
+                     -- later when we plug it in, and meanwhile there may
+                     -- certainly be un-satisfied constraints
 
   | otherwise
   = reportWanteds ctxt' wanted
@@ -185,8 +185,12 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env2) given
                      , ic_info  = info' }
+    insoluble' = case info of
+                   InferSkol {} -> ic_insoluble
+                   _            -> cec_insol ctxt    
     ctxt' = ctxt { cec_tidy  = env2
                  , cec_encl  = implic' : cec_encl ctxt
+                 , cec_insol = insoluble'
                  , cec_binds = case cec_binds ctxt of
                                  Nothing -> Nothing
                                  Just {} -> Just evb }
@@ -205,7 +209,8 @@ reportWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics }
 
 reportFlats :: ReportErrCtxt -> Cts -> TcM ()
 reportFlats ctxt flats    -- Here 'flats' includes insolble goals
-  = tryReporters 
+  = traceTc "reportFlats" (ppr flats) >>
+    tryReporters 
       [ -- First deal with things that are utterly wrong
         -- Like Int ~ Bool (incl nullary TyCons)
         -- or  Int ~ t a   (AppTy on one side)
@@ -215,13 +220,12 @@ reportFlats ctxt flats    -- Here 'flats' includes insolble goals
         -- Report equalities of form (a~ty).  They are usually
         -- skolem-equalities, and they cause confusing knock-on 
         -- effects in other errors; see test T4093b.
-      , ("Skolem equalities",    skolem_eq,   mkUniReporter mkEqErr1)
-      , ("Unambiguous",          unambiguous, reportFlatErrs) ]
-      reportAmbigErrs
+      , ("Skolem equalities",    skolem_eq,   mkUniReporter mkEqErr1) ]
+--      , ("Unambiguous",          unambiguous, reportFlatErrs) ]
+      reportFlatErrs
       ctxt (bagToList flats)
   where
-    utterly_wrong, skolem_eq, unambiguous :: Ct -> PredTree -> Bool
-
+    utterly_wrong, skolem_eq :: Ct -> PredTree -> Bool
     utterly_wrong _ (EqPred ty1 ty2) = isRigid ty1 && isRigid ty2 
     utterly_wrong _ _ = False
 
@@ -230,6 +234,8 @@ reportFlats ctxt flats    -- Here 'flats' includes insolble goals
     skolem_eq _ (EqPred ty1 ty2) = isRigidOrSkol ty1 && isRigidOrSkol ty2 
     skolem_eq _ _ = False
 
+{-
+    unambiguous :: Ct -> PredTree -> Bool
     unambiguous ct pred 
       | not (any isAmbiguousTyVar (varSetElems (tyVarsOfCt ct)))
       = True
@@ -237,6 +243,7 @@ reportFlats ctxt flats    -- Here 'flats' includes insolble goals
       = case pred of
           EqPred ty1 ty2 -> isNothing (isTyFun_maybe ty1) && isNothing (isTyFun_maybe ty2)
           _              -> False
+-}
 
 ---------------
 isRigid, isRigidOrSkol :: Type -> Bool
@@ -256,13 +263,14 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       _ -> Nothing
 
 -----------------
+{-
 reportAmbigErrs :: Reporter
 reportAmbigErrs ctxt cts
   | cec_insol ctxt = return ()
   | otherwise      = reportFlatErrs ctxt cts
           -- Only report ambiguity if no other errors (at all) happened
           -- See Note [Avoiding spurious errors] in TcSimplify
-
+-}
 reportFlatErrs :: Reporter
 -- Called once for non-ambigs, once for ambigs
 -- Report equality errors, and others only if we've done all 
@@ -271,10 +279,12 @@ reportFlatErrs :: Reporter
 reportFlatErrs
   = tryReporters
       [ ("Equalities", is_equality, mkGroupReporter mkEqErr) ]
-      (\ctxt cts -> do { let (dicts, ips, irreds) = go cts [] [] []
-                       ; mkGroupReporter mkIPErr    ctxt ips   
-                       ; mkGroupReporter mkIrredErr ctxt irreds
-                       ; mkGroupReporter mkDictErr  ctxt dicts })
+      (\ctxt cts -> do { let ctxt' | cec_insol ctxt = ctxt { cec_suppress = True }
+                                   | otherwise      = ctxt
+                       ; let (dicts, ips, irreds) = go cts [] [] []
+                       ; mkGroupReporter mkIPErr    ctxt' ips   
+                       ; mkGroupReporter mkIrredErr ctxt' irreds
+                       ; mkGroupReporter mkDictErr  ctxt' dicts })
   where
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -282,7 +292,8 @@ reportFlatErrs
     go [] dicts ips irreds
       = (dicts, ips, irreds)
     go (ct:cts) dicts ips irreds
-      | isIPPred (ctPred ct) = go cts dicts (ct:ips) irreds
+      | isIPPred (ctPred ct) 
+      = go cts dicts (ct:ips) irreds
       | otherwise
       = case classifyPredType (ctPred ct) of
           ClassPred {}  -> go cts (ct:dicts) ips irreds
@@ -376,6 +387,7 @@ tryReporters reporters deflt ctxt cts
                          -- Carry on with the rest, because we must make
                          -- deferred bindings for them if we have 
                          -- -fdefer-type-errors
+                         -- But suppress their error messages
       where
        (yeses, nos) = partition keep_me cts
        keep_me ct = pred ct (classifyPredType (ctPred ct))
@@ -593,13 +605,8 @@ mkTyVarEqErr :: ReportErrCtxt -> SDoc -> Ct -> Bool -> TcTyVar -> TcType -> TcM 
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt extra ct oriented tv1 ty2
   -- Occurs check
-  | isNothing (occurCheckExpand tv1 ty2)
-  = let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:") 2
-                           (sep [ppr ty1, char '~', ppr ty2])
-    in mkErrorMsg ctxt ct (occCheckMsg $$ extra)
-
-  |  isSkolemTyVar tv1 	  -- ty2 won't be a meta-tyvar, or else the thing would
-     		   	  -- be oriented the other way round; see TcCanonical.reOrient
+  |  isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
+     		   	     -- be oriented the other way round; see TcCanonical.reOrient
   || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                              , extraTyVarInfo ctxt ty1 ty2
@@ -609,6 +616,11 @@ mkTyVarEqErr ctxt extra ct oriented tv1 ty2
   -- an *untouchable* meta tyvar, else it'd have been unified
   | not (k2 `tcIsSubKind` k1)   	 -- Kind error
   = mkErrorMsg ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
+
+  | isNothing (occurCheckExpand tv1 ty2)
+  = let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:") 2
+                           (sep [ppr ty1, char '~', ppr ty2])
+    in mkErrorMsg ctxt ct (occCheckMsg $$ extra)
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
@@ -673,6 +685,17 @@ mkEqInfoMsg ctxt ct ty1 ty2
               = ptext (sLit "NB:") <+> quotes (ppr tc1) 
                 <+> ptext (sLit "is a type function, and may not be injective")
               | otherwise = empty
+
+isUserSkolem :: ReportErrCtxt -> TcTyVar -> Bool
+-- See Note [Reporting occurs-check errors]
+isUserSkolem ctxt tv
+  = isSkolemTyVar tv && any is_user_skol_tv (cec_encl ctxt)
+  where
+    is_user_skol_tv (Implic { ic_skols = sks, ic_info = skol_info })
+      = tv `elem` sks && is_user_skol_info skol_info
+
+    is_user_skol_info (InferSkol {}) = False
+    is_user_skol_info _ = True
 
 misMatchOrCND :: ReportErrCtxt -> Ct -> Bool -> TcType -> TcType -> SDoc
 -- If oriented then ty1 is expected, ty2 is actual
@@ -759,6 +782,24 @@ mkExpectedActualMsg exp_ty act_ty
          , text "  Actual type:" <+> ppr act_ty ]
 \end{code}
 
+Note [Reporting occurs-check errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given (a ~ [a]), if 'a' is a rigid type variable bound by a user-supplied
+type signature, then the best thing is to report that we can't unify
+a with [a], because a is a skolem variable.  That avoids the confusing
+"occur-check" error message.
+
+But nowadays when inferring the type of a function with no type signature,
+even if there are errors inside, we still generalise its signature and
+carry on. For example
+   f x = x:x
+Here we will infer somethiing like
+   f :: forall a. a -> [a]
+with a suspended error of (a ~ [a]).  So 'a' is now a skolem, but not
+one bound by the programmer!  Here we really should report an occurs check.
+
+So isUserSkolem distinguishes the two.
+
 Note [Non-injective type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very confusing to get a message like
@@ -814,6 +855,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
   | null matches  -- No matches but perhaps several unifiers
   = do { (ctxt, is_ambig, ambig_msg) <- mkAmbigMsg ctxt [ct]
        ; (ctxt, binds_msg) <- relevantBindings ctxt ct
+       ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
        ; return (ctxt, cannot_resolve_msg is_ambig binds_msg ambig_msg) }
 
   | not safe_haskell   -- Some matches => overlap errors
@@ -832,8 +874,8 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     cannot_resolve_msg has_ambig_tvs binds_msg ambig_msg
       = vcat [ addArising orig (no_inst_herald <+> pprParendType pred)
              , vcat (pp_givens givens)
-             , if has_ambig_tvs && (not (null unifiers) || not (null givens))
-               then ambig_msg $$ binds_msg $$ potential_msg
+             , if (has_ambig_tvs && all_tyvars)
+               then vcat [ ambig_msg, binds_msg, potential_msg ]
                else empty
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
 

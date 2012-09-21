@@ -457,6 +457,7 @@ trySpontaneousEqOneWay :: CtLoc -> CtEvidence
 -- tv is a MetaTyVar, not untouchable
 trySpontaneousEqOneWay d gw tv xi
   | not (isSigTyVar tv) || isTyVarTy xi
+  , typeKind xi `tcIsSubKind` tyVarKind tv
   = solveWithIdentity d gw tv xi
   | otherwise -- Still can't solve, sig tyvar and non-variable rhs
   = return SPCantSolve
@@ -467,10 +468,12 @@ trySpontaneousEqTwoWay :: CtLoc -> CtEvidence
 -- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here
 
 trySpontaneousEqTwoWay d gw tv1 tv2
-  = do { let k1_sub_k2 = k1 `tcIsSubKind` k2
-       ; if k1_sub_k2 && nicer_to_update_tv2
-         then solveWithIdentity d gw tv2 (mkTyVarTy tv1)
-         else solveWithIdentity d gw tv1 (mkTyVarTy tv2) }
+  | k1 `tcIsSubKind` k2 && nicer_to_update_tv2
+  = solveWithIdentity d gw tv2 (mkTyVarTy tv1)
+  | k2 `tcIsSubKind` k1
+  = solveWithIdentity d gw tv1 (mkTyVarTy tv2)
+  | otherwise
+  = return SPCantSolve
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2

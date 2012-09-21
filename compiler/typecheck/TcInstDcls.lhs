@@ -573,7 +573,9 @@ tcFamInstDecl1 :: TyCon -> FamInstDecl Name -> TcM FamInst
 tcFamInstDecl1 fam_tc decl@(FamInstDecl { fid_tycon = fam_tc_name
                                         , fid_defn = TySynonym {} })
   = do { -- (0) Check it's an open type family
-         checkTc (isOpenSynFamilyTyCon fam_tc)
+         checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+       ; checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; checkTc (isOpenSynFamilyTyCon fam_tc)
                  (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym

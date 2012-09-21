@@ -764,24 +764,7 @@ canEq loc ev ty1 ty2
   | Just (tc1,tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2,tys2) <- tcSplitTyConApp_maybe ty2
   , isDecomposableTyCon tc1 && isDecomposableTyCon tc2
-  = -- Generate equalities for each of the corresponding arguments
-    if (tc1 /= tc2 || length tys1 /= length tys2)
-    -- Fail straight away for better error messages
-    then canEqFailure loc ev ty1 ty2
-    else
-    do { let xcomp xs  = EvCoercion (mkTcTyConAppCo tc1 (map evTermCoercion xs))
-             xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
-             xev = XEvTerm xcomp xdecomp
-       ; ctevs <- xCtFlavor ev (zipWith mkTcEqPred tys1 tys2) xev
-       ; canEvVarsCreated loc ctevs }
-
--- See Note [Equality between type applications]
---     Note [Care with type applications] in TcUnify
-canEq loc ev ty1 ty2    -- e.g.  F a b ~ Maybe c
-                          -- where F has arity 1
-  | Just (s1,t1) <- tcSplitAppTy_maybe ty1
-  , Just (s2,t2) <- tcSplitAppTy_maybe ty2
-  = canEqAppTy loc ev s1 t1 s2 t2
+  = canDecomposableTyConApp loc ev tc1 tys1 tc2 tys2 
 
 canEq loc ev s1@(ForAllTy {}) s2@(ForAllTy {})
  | tcIsForAllTy s1, tcIsForAllTy s2
@@ -798,20 +781,53 @@ canEq loc ev s1@(ForAllTy {}) s2@(ForAllTy {})
  = do { traceTcS "Ommitting decomposition of given polytype equality" $ 
         pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
       ; return Stop }
-canEq loc ev ty1 ty2  = canEqFailure loc ev ty1 ty2
+
+-- The last remaining source of success is an application
+-- e.g.  F a b ~ Maybe c   where F has arity 1
+-- See Note [Equality between type applications]
+--     Note [Care with type applications] in TcUnify
+canEq loc ev ty1 ty2 
+ =  do { let flav = ctEvFlavour ev
+       ; (s1, co1) <- flatten loc FMSubstOnly flav ty1
+       ; (s2, co2) <- flatten loc FMSubstOnly flav ty2
+       ; mb_ct <- rewriteCtFlavor ev (mkTcEqPred s1 s2) (mkHdEqPred s2 co1 co2)
+       ; case mb_ct of
+           Nothing     -> return Stop
+           Just new_ev -> last_chance new_ev s1 s2 }
+  where
+    last_chance new_ev ty1 ty2
+      | Just (tc1,tys1) <- tcSplitTyConApp_maybe ty1
+      , Just (tc2,tys2) <- tcSplitTyConApp_maybe ty2
+      , isDecomposableTyCon tc1 && isDecomposableTyCon tc2
+      = canDecomposableTyConApp loc new_ev tc1 tys1 tc2 tys2
+    
+      | Just (s1,t1) <- tcSplitAppTy_maybe ty1
+      , Just (s2,t2) <- tcSplitAppTy_maybe ty2
+      = do { let xevcomp [x,y] = EvCoercion (mkTcAppCo (evTermCoercion x) (evTermCoercion y))
+             	 xevcomp _ = error "canEqAppTy: can't happen" -- Can't happen
+             	 xevdecomp x = let xco = evTermCoercion x 
+       	                       in [EvCoercion (mkTcLRCo CLeft xco), EvCoercion (mkTcLRCo CRight xco)]
+       	   ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
+       	   ; canEvVarsCreated loc ctevs }
+
+      | otherwise
+      = do { emitInsoluble (CNonCanonical { cc_ev = new_ev, cc_loc = loc })
+           ; return Stop }
 
 ------------------------
--- Type application
-canEqAppTy :: CtLoc -> CtEvidence 
-           -> Type -> Type -> Type -> Type
-           -> TcS StopOrContinue
-canEqAppTy loc ev s1 t1 s2 t2
-  = ASSERT( not (isKind t1) && not (isKind t2) )
-    do { let xevcomp [x,y] = EvCoercion (mkTcAppCo (evTermCoercion x) (evTermCoercion y))
-             xevcomp _ = error "canEqAppTy: can't happen" -- Can't happen
-             xevdecomp x = let xco = evTermCoercion x 
-                           in [EvCoercion (mkTcLRCo CLeft xco), EvCoercion (mkTcLRCo CRight xco)]
-       ; ctevs <- xCtFlavor ev [mkTcEqPred s1 s2, mkTcEqPred t1 t2] (XEvTerm xevcomp xevdecomp)
+canDecomposableTyConApp :: CtLoc -> CtEvidence 
+                        -> TyCon -> [TcType] 
+                        -> TyCon -> [TcType] 
+                        -> TcS StopOrContinue
+canDecomposableTyConApp loc ev tc1 tys1 tc2 tys2
+  | tc1 /= tc2 || length tys1 /= length tys2
+    -- Fail straight away for better error messages
+  = canEqFailure loc ev (mkTyConApp tc1 tys1) (mkTyConApp tc2 tys2)
+  | otherwise
+  = do { let xcomp xs  = EvCoercion (mkTcTyConAppCo tc1 (map evTermCoercion xs))
+             xdecomp x = zipWith (\_ i -> EvCoercion $ mkTcNthCo i (evTermCoercion x)) tys1 [0..]
+             xev = XEvTerm xcomp xdecomp
+       ; ctevs <- xCtFlavor ev (zipWith mkTcEqPred tys1 tys2) xev
        ; canEvVarsCreated loc ctevs }
 
 canEqFailure :: CtLoc -> CtEvidence -> TcType -> TcType -> TcS StopOrContinue
@@ -1100,7 +1116,8 @@ canEqLeaf :: CtLoc -> CtEvidence
 -- saturated type function application).  
 
 -- Preconditions: 
---    * one of the two arguments is variable or family applications
+--    * one of the two arguments is variable 
+--      or an exactly-saturated family application
 --    * the two types are not equal (looking through synonyms)
 canEqLeaf loc ev s1 s2 
   | cls1 `re_orient` cls2

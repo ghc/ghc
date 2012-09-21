@@ -29,7 +29,7 @@ module TcHsType (
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
 
-        ExpKind(..), ekConstraint, expArgKind, checkExpectedKind,
+        ExpKind(..), ekConstraint, expArgKind, 
         kindGeneralize,
 
 		-- Sort-checking kinds
@@ -1281,59 +1281,60 @@ checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
 -- checks that the actual kind act_kind is compatible
 --      with the expected kind exp_kind
 -- The first argument, ty, is used only in the error message generation
-checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
-    traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr ek)
-    (_errs, mb_r) <- tryTc (unifyKind act_kind exp_kind)
-    case mb_r of
-        Just _  -> return ()  -- Unification succeeded
-        Nothing -> do
+checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
+ = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr ek)
+      ; (_, lie) <- captureConstraints (unifyKind act_kind exp_kind)
 
-        -- So there's definitely an error
-        -- Now to find out what sort
-           exp_kind <- zonkTcKind exp_kind
-           act_kind <- zonkTcKind act_kind
+         -- Kind unification only generates definite errors
+      ; if isEmptyWC lie 
+        then return () -- Unification succeeded
+        else do
 
-           env0 <- tcInitTidyEnv
-           let (exp_as, _) = splitKindFunTys exp_kind
-               (act_as, _) = splitKindFunTys act_kind
-               n_exp_as  = length exp_as
-               n_act_as  = length act_as
-               n_diff_as = n_act_as - n_exp_as
+      {  -- So there's an error
+         -- Now to find out what sort
+        exp_kind <- zonkTcKind exp_kind
+      ; act_kind <- zonkTcKind act_kind
+      ; env0 <- tcInitTidyEnv
+      ; let (exp_as, _) = splitKindFunTys exp_kind
+            (act_as, _) = splitKindFunTys act_kind
+            n_exp_as  = length exp_as
+            n_act_as  = length act_as
+            n_diff_as = n_act_as - n_exp_as
 
-               (env1, tidy_exp_kind) = tidyOpenKind env0 exp_kind
-               (env2, tidy_act_kind) = tidyOpenKind env1 act_kind
+            (env1, tidy_exp_kind) = tidyOpenKind env0 exp_kind
+            (env2, tidy_act_kind) = tidyOpenKind env1 act_kind
 
-               err | n_exp_as < n_act_as     -- E.g. [Maybe]
-                   = ptext (sLit "Expecting") <+>
-                     speakN n_diff_as <+> ptext (sLit "more argument") <>
-                     (if n_diff_as > 1 then char 's' else empty) <+>
-                     ptext (sLit "to") <+> quotes (ppr ty)
+            err | n_exp_as < n_act_as     -- E.g. [Maybe]
+                = ptext (sLit "Expecting") <+>
+                  speakN n_diff_as <+> ptext (sLit "more argument") <>
+                  (if n_diff_as > 1 then char 's' else empty) <+>
+                  ptext (sLit "to") <+> quotes (ppr ty)
 
-                     -- Now n_exp_as >= n_act_as. In the next two cases,
-                     -- n_exp_as == 0, and hence so is n_act_as
-                   | isConstraintKind tidy_act_kind
-                   = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
-                   
-                   | isConstraintKind tidy_exp_kind
-                   = text "Type of kind" <+> ppr tidy_act_kind <+> text "used as a constraint"
-                   
-                   | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
-                   = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
-                       <+> ptext (sLit "is unlifted")
+                  -- Now n_exp_as >= n_act_as. In the next two cases,
+                  -- n_exp_as == 0, and hence so is n_act_as
+                | isConstraintKind tidy_act_kind
+                = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
+                
+                | isConstraintKind tidy_exp_kind
+                = text "Type of kind" <+> ppr tidy_act_kind <+> text "used as a constraint"
+                
+                | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+                = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
+                    <+> ptext (sLit "is unlifted")
 
-                   | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
-                   = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
-                       <+> ptext (sLit "is lifted")
+                | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
+                = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
+                    <+> ptext (sLit "is lifted")
 
-                   | otherwise               -- E.g. Monad [Int]
-                   = ptext (sLit "Kind mis-match") $$ more_info
+                | otherwise               -- E.g. Monad [Int]
+                = ptext (sLit "Kind mis-match") $$ more_info
 
-               more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
-                                    <+> quotes (pprKind tidy_exp_kind) <> comma,
-                                 ptext (sLit "but") <+> quotes (ppr ty) <+>
-                                     ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
+            more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
+                                 <+> quotes (pprKind tidy_exp_kind) <> comma,
+                              ptext (sLit "but") <+> quotes (ppr ty) <+>
+                                  ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
-           failWithTcM (env2, err)
+      ; failWithTcM (env2, err) } }
 \end{code}
 
 %************************************************************************
