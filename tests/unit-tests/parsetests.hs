@@ -11,8 +11,10 @@ import Haddock.Types
 import Outputable
 import Data.Monoid
 
+dynFlags = defaultDynFlags (error "dynFlags for Haddock tests: undefined")
+
 instance Outputable a => Show a where
-  show = showSDoc . ppr
+  show = showSDoc dynFlags . ppr
 
 deriving instance Show a => Show (Doc a)
 deriving instance Eq a =>Eq (Doc a)
@@ -80,4 +82,4 @@ main = do
     toTestCase (ParseTest s r) = TestCase $ assertEqual s r (parse s)
 
     parse :: String -> Maybe (Doc RdrName)
-    parse s = parseParas $ tokenise (defaultDynFlags undefined) s (0,0)
+    parse s = parseParas $ tokenise dynFlags s (0,0)
