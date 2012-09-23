@@ -95,16 +95,26 @@ deserializeConstr bytes k = deserializeWord8 bytes $ \constr_ix bytes ->
                                 x -> error $ "deserializeConstr: unrecognised serialized constructor type " ++ show x ++ " in context " ++ show bytes
 
 
+#if __GLASGOW_HASKELL__ < 707
 serializeFixedWidthNum :: forall a. (Num a, Integral a, Bits a) => a -> [Word8] -> [Word8]
 serializeFixedWidthNum what = go (bitSize what) what
+#else
+serializeFixedWidthNum :: forall a. (Num a, Integral a, FiniteBits a) => a -> [Word8] -> [Word8]
+serializeFixedWidthNum what = go (finiteBitSize what) what
+#endif
   where
     go :: Int -> a -> [Word8] -> [Word8]
     go size current rest
       | size <= 0 = rest
       | otherwise = fromIntegral (current .&. 255) : go (size - 8) (current `shiftR` 8) rest
 
+#if __GLASGOW_HASKELL__ < 707
 deserializeFixedWidthNum :: forall a b. (Num a, Integral a, Bits a) => [Word8] -> (a -> [Word8] -> b) -> b
 deserializeFixedWidthNum bytes k = go (bitSize (undefined :: a)) bytes k
+#else
+deserializeFixedWidthNum :: forall a b. (Num a, Integral a, FiniteBits a) => [Word8] -> (a -> [Word8] -> b) -> b
+deserializeFixedWidthNum bytes k = go (finiteBitSize (undefined :: a)) bytes k
+#endif
   where
     go :: Int -> [Word8] -> (a -> [Word8] -> b) -> b
     go size bytes k
