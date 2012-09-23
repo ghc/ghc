@@ -290,7 +290,11 @@ lookupInstDeclBndr cls what rdr
                 -- In an instance decl you aren't allowed
                 -- to use a qualified name for the method
                 -- (Although it'd make perfect sense.)
-       ; lookupSubBndrOcc (ParentIs cls) doc rdr }
+       ; lookupSubBndrOcc False -- False => we don't give deprecated
+                                -- warnings when a deprecated class
+                                -- method is defined. We only warn
+                                -- when it's used
+                          (ParentIs cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -337,11 +341,12 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
-lookupSubBndrOcc :: Parent  -- NoParent   => just look it up as usual
+lookupSubBndrOcc :: Bool
+                 -> Parent  -- NoParent   => just look it up as usual
                             -- ParentIs p => use p to disambiguate
                  -> SDoc -> RdrName
                  -> RnM Name
-lookupSubBndrOcc parent doc rdr_name
+lookupSubBndrOcc warnIfDeprec parent doc rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = lookupExactOcc n
 
@@ -355,7 +360,7 @@ lookupSubBndrOcc parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-            [gre] -> do { addUsedRdrName gre (used_rdr_name gre)
+            [gre] -> do { addUsedRdrName warnIfDeprec gre (used_rdr_name gre)
                           -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
             []    -> do { addErr (unknownSubordinateErr doc rdr_name)
@@ -690,7 +695,7 @@ lookupGreRn_help rdr_name lookup
   = do  { env <- getGlobalRdrEnv
         ; case lookup env of
             []    -> return Nothing
-            [gre] -> do { addUsedRdrName gre rdr_name
+            [gre] -> do { addUsedRdrName True gre rdr_name
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
                         ; return (Just (head gres)) } }
@@ -719,13 +724,13 @@ Note [Handling of deprecations]
      - the things exported by a module export 'module M'
 
 \begin{code}
-addUsedRdrName :: GlobalRdrElt -> RdrName -> RnM ()
+addUsedRdrName :: Bool -> GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
-addUsedRdrName gre rdr
+addUsedRdrName warnIfDeprec gre rdr
   | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
                                 -- See Note [Handling of deprecations]
   | otherwise      = do { env <- getGblEnv
-                        ; warnIfDeprecated gre
+                        ; when warnIfDeprec $ warnIfDeprecated gre
                         ; updMutVar (tcg_used_rdrnames env)
                                     (\s -> Set.insert rdr s) }
 
