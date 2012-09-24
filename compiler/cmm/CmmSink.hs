@@ -3,7 +3,7 @@ module CmmSink (
      cmmSink
   ) where
 
-import StgCmmUtils (callerSaves)
+import CodeGen.Platform (callerSaves)
 
 import Cmm
 import BlockId

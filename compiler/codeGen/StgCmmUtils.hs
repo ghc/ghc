@@ -37,9 +37,7 @@ module StgCmmUtils (
         mkWordCLit,
         newStringCLit, newByteStringCLit,
         packHalfWordsCLit,
-        blankWord,
-
-        srt_escape
+        blankWord
   ) where
 
 #include "HsVersions.h"
@@ -719,6 +717,3 @@ assignTemp' e
        let reg = CmmLocal lreg
        emitAssign reg e
        return (CmmReg reg)
-
-srt_escape :: DynFlags -> StgHalfWord
-srt_escape dflags = toStgHalfWord dflags (-1)

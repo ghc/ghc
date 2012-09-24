@@ -9,6 +9,7 @@ module CmmInfo (
   mkEmptyContInfoTable,
   cmmToRawCmm,
   mkInfoTable,
+  srtEscape
 ) where
 
 #include "HsVersions.h"
@@ -384,3 +385,9 @@ newStringLit bytes
   = do { uniq <- getUniqueUs
        ; return (mkByteStringCLit uniq bytes) }
 
+
+-- Misc utils
+
+-- | Value of the srt field of an info table when using an StgLargeSRT
+srtEscape :: DynFlags -> StgHalfWord
+srtEscape dflags = toStgHalfWord dflags (-1)

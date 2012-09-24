@@ -3,9 +3,9 @@ module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
 
-import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX
-import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX
-import StgCmmLayout     ( entryCode ) -- XXX
+import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
+import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
+import StgCmmLayout     ( entryCode ) -- XXX layering violation
 
 import Cmm
 import BlockId
