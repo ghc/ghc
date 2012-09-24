@@ -1214,22 +1214,22 @@ getCondCode (CmmMachOp mop [x, y])
       MO_F_Lt W64 -> condFltCode LTT x y
       MO_F_Le W64 -> condFltCode LE  x y
 
-      MO_Eq _ -> condIntCode EQQ x y
-      MO_Ne _ -> condIntCode NE  x y
+      MO_Eq _     -> condIntCode EQQ x y
+      MO_Ne _     -> condIntCode NE  x y
 
-      MO_S_Gt _ -> condIntCode GTT x y
-      MO_S_Ge _ -> condIntCode GE  x y
-      MO_S_Lt _ -> condIntCode LTT x y
-      MO_S_Le _ -> condIntCode LE  x y
+      MO_S_Gt _   -> condIntCode GTT x y
+      MO_S_Ge _   -> condIntCode GE  x y
+      MO_S_Lt _   -> condIntCode LTT x y
+      MO_S_Le _   -> condIntCode LE  x y
 
       MO_U_Gt _ -> condIntCode GU  x y
       MO_U_Ge _ -> condIntCode GEU x y
       MO_U_Lt _ -> condIntCode LU  x y
       MO_U_Le _ -> condIntCode LEU x y
 
-      _other -> pprPanic "getCondCode(x86,x86_64,sparc)" (ppr (CmmMachOp mop [x,y]))
+      _other -> pprPanic "getCondCode(x86,x86_64)" (ppr (CmmMachOp mop [x,y]))
 
-getCondCode other = pprPanic "getCondCode(2)(x86,sparc)" (ppr other)
+getCondCode other = pprPanic "getCondCode(2)(x86,x96_64)" (ppr other)
 
 
 
