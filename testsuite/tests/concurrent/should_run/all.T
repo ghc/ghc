@@ -21,6 +21,10 @@ test('conc071', omit_ways(['threaded2']), compile_and_run, [''])
 test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
+# vector code must get inlined to become non-allocating
+test('367', composes([skip_if_fast, expect_fail]), compile_and_run, ['-O2'])
+test('367_letnoescape', composes([skip_if_fast, expect_fail]), compile_and_run, [''])
+
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
 test('2910a', normal, compile_and_run, [''])
