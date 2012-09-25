@@ -1676,9 +1676,10 @@ linkBinary dflags o_files dep_packages = do
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-              in ["-L" ++ l,
-                  "-Wl,-rpath",      "-Wl," ++ libpath,
-                  "-Wl,-rpath-link", "-Wl," ++ l]
+                  rpath = if dopt Opt_RPath dflags
+                          then ["-Wl,-rpath",      "-Wl," ++ libpath]
+                          else []
+              in ["-L" ++ l, "-Wl,-rpath-link", "-Wl," ++ l] ++ rpath
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags

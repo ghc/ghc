@@ -37,12 +37,18 @@ main = do hSetBuffering stdout LineBuffering
                   runHsColour distDir dir args'
               "check" : dir : [] ->
                   doCheck dir
-              "install" : ghc : ghcpkg : strip : topdir : directory : distDir
-                        : myDestDir : myPrefix : myLibdir : myDocdir
-                        : relocatableBuild : args' ->
-                  doInstall ghc ghcpkg strip topdir directory distDir
-                            myDestDir myPrefix myLibdir myDocdir
-                            relocatableBuild args'
+              "copy" : strip : directory : distDir
+                     : myDestDir : myPrefix : myLibdir : myDocdir
+                     : args' ->
+                  doCopy strip directory distDir
+                         myDestDir myPrefix myLibdir myDocdir
+                         args'
+              "register" : ghc : ghcpkg : topdir : directory : distDir
+                         : myDestDir : myPrefix : myLibdir : myDocdir
+                         : relocatableBuild : args' ->
+                  doRegister ghc ghcpkg topdir directory distDir
+                             myDestDir myPrefix myLibdir myDocdir
+                             relocatableBuild args'
               "configure" : args' -> case break (== "--") args' of
                    (config_args, "--" : distdir : directories) ->
                        mapM_ (generate config_args distdir) directories
@@ -121,37 +127,26 @@ runHsColour distdir directory args
  = withCurrentDirectory directory
  $ defaultMainArgs ("hscolour" : "--builddir" : distdir : args)
 
-doInstall :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> String -> [String]
-          -> IO ()
-doInstall ghc ghcpkg strip topdir directory distDir
+doCopy :: FilePath -> FilePath
+       -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+       -> [String]
+       -> IO ()
+doCopy strip directory distDir
           myDestDir myPrefix myLibdir myDocdir
-          relocatableBuildStr args
+          args
  = withCurrentDirectory directory $ do
-     relocatableBuild <- case relocatableBuildStr of
-                         "YES" -> return True
-                         "NO"  -> return False
-                         _ -> die ["Bad relocatableBuildStr: " ++
-                                   show relocatableBuildStr]
      let copyArgs = ["copy", "--builddir", distDir]
                  ++ (if null myDestDir
                      then []
                      else ["--destdir", myDestDir])
                  ++ args
-         regArgs = "register" : "--builddir" : distDir : args
          copyHooks = userHooks {
                          copyHook = noGhcPrimHook
                                   $ modHook False
                                   $ copyHook userHooks
                      }
-         regHooks = userHooks {
-                        regHook = modHook relocatableBuild
-                                $ regHook userHooks
-                    }
 
      defaultMainWithHooksArgs copyHooks copyArgs
-     defaultMainWithHooksArgs regHooks  regArgs
     where
       noGhcPrimHook f pd lbi us flags
               = let pd'
@@ -168,23 +163,46 @@ doInstall ghc ghcpkg strip topdir directory distDir
                 in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
        = do let verbosity = normal
-                idts = installDirTemplates lbi
-                idts' = idts {
-                            prefix    = toPathTemplate $
-                                            if relocatableBuild
-                                            then "$topdir"
-                                            else myPrefix,
-                            libdir    = toPathTemplate $
-                                            if relocatableBuild
-                                            then "$topdir"
-                                            else myLibdir,
-                            libsubdir = toPathTemplate "$pkgid",
-                            docdir    = toPathTemplate $
-                                            if relocatableBuild
-                                            then "$topdir/../doc/html/libraries/$pkgid"
-                                            else (myDocdir </> "$pkgid"),
-                            htmldir   = toPathTemplate "$docdir"
-                        }
+                idts = updateInstallDirTemplates relocatableBuild
+                                                 myPrefix myLibdir myDocdir
+                                                 (installDirTemplates lbi)
+                progs = withPrograms lbi
+                stripProgram' = stripProgram {
+                    programFindLocation = \_ -> return (Just strip) }
+
+            progs' <- configureProgram verbosity stripProgram' progs
+            let lbi' = lbi {
+                               withPrograms = progs',
+                               installDirTemplates = idts
+                           }
+            f pd lbi' us flags
+
+doRegister :: FilePath -> FilePath -> FilePath -> FilePath
+           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+           -> String -> [String]
+           -> IO ()
+doRegister ghc ghcpkg topdir directory distDir
+           myDestDir myPrefix myLibdir myDocdir
+           relocatableBuildStr args
+ = withCurrentDirectory directory $ do
+     relocatableBuild <- case relocatableBuildStr of
+                         "YES" -> return True
+                         "NO"  -> return False
+                         _ -> die ["Bad relocatableBuildStr: " ++
+                                   show relocatableBuildStr]
+     let regArgs = "register" : "--builddir" : distDir : args
+         regHooks = userHooks {
+                        regHook = modHook relocatableBuild
+                                $ regHook userHooks
+                    }
+
+     defaultMainWithHooksArgs regHooks  regArgs
+    where
+      modHook relocatableBuild f pd lbi us flags
+       = do let verbosity = normal
+                idts = updateInstallDirTemplates relocatableBuild
+                                                 myPrefix myLibdir myDocdir
+                                                 (installDirTemplates lbi)
                 progs = withPrograms lbi
                 ghcpkgconf = topdir </> "package.conf.d"
                 ghcProgram' = ghcProgram {
@@ -194,11 +212,9 @@ doInstall ghc ghcpkg strip topdir directory distDir
                     programPostConf = \_ _ -> return $ ["--global-package-db", ghcpkgconf]
                                                     ++ ["--force" | not (null myDestDir) ],
                     programFindLocation = \_ -> return (Just ghcpkg) }
-                stripProgram' = stripProgram {
-                    programFindLocation = \_ -> return (Just strip) }
                 configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
 
-            progs' <- configurePrograms [ghcProgram', ghcPkgProgram', stripProgram'] progs
+            progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
             let Just ghcPkgProg = lookupProgram ghcPkgProgram' progs'
             instInfos <- dump verbosity ghcPkgProg GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
@@ -215,10 +231,31 @@ doInstall ghc ghcpkg strip topdir directory distDir
                 lbi' = lbi {
                                libraryConfig = mlc',
                                installedPkgs = installedPkgs',
-                               installDirTemplates = idts',
+                               installDirTemplates = idts,
                                withPrograms = progs'
                            }
             f pd lbi' us flags
+
+updateInstallDirTemplates :: Bool -> FilePath -> FilePath -> FilePath
+                          -> InstallDirTemplates
+                          -> InstallDirTemplates
+updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
+    = idts {
+          prefix    = toPathTemplate $
+                          if relocatableBuild
+                          then "$topdir"
+                          else myPrefix,
+          libdir    = toPathTemplate $
+                          if relocatableBuild
+                          then "$topdir"
+                          else myLibdir,
+          libsubdir = toPathTemplate "$pkgid",
+          docdir    = toPathTemplate $
+                          if relocatableBuild
+                          then "$topdir/../doc/html/libraries/$pkgid"
+                          else (myDocdir </> "$pkgid"),
+          htmldir   = toPathTemplate "$docdir"
+      }
 
 -- The packages are built with the package ID ending in "-inplace", but
 -- when they're installed they get the package hash appended. We need to
@@ -331,8 +368,12 @@ generate config_args distdir directory
 
           dep_ids = map snd (externalPackageDeps lbi)
 
+      let libraryDirs = forDeps Installed.libraryDirs
       wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
-      wrappedLibraryDirs <- wrap $ forDeps Installed.libraryDirs
+      wrappedLibraryDirs <- wrap libraryDirs
+      let depDynlibDirName d = display (Installed.sourcePackageId d)
+          rpaths = map (\d -> "'$$ORIGIN/../" ++ depDynlibDirName d ++ "'")
+                       dep_pkgs
 
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
@@ -342,6 +383,7 @@ generate config_args distdir directory
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) dep_ids),
+                variablePrefix ++ "_RPATHS = " ++ unwords rpaths,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
@@ -364,6 +406,7 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_INCLUDE_DIRS_SINGLE_QUOTED = " ++ unwords wrappedIncludeDirs,
                 variablePrefix ++ "_DEP_CC_OPTS = "                    ++ unwords (forDeps Installed.ccOptions),
                 variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "     ++ unwords wrappedLibraryDirs,
+                variablePrefix ++ "_DEP_LIB_DIRS_SEARCHPATH = "        ++ mkSearchPath libraryDirs,
                 variablePrefix ++ "_DEP_EXTRA_LIBS = "                 ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "                    ++ unwords (forDeps Installed.ldOptions),
                 variablePrefix ++ "_BUILD_GHCI_LIB = "                 ++ boolToYesNo (withGHCiLib lbi),
@@ -388,5 +431,6 @@ generate config_args distdir directory
       | head s == ' ' = die ["Leading space in value to be wrapped:", s]
       | last s == ' ' = die ["Trailing space in value to be wrapped:", s]
       | otherwise     = return ("\'" ++ s ++ "\'")
+     mkSearchPath = intercalate [searchPathSeparator]
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"

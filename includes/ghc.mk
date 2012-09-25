@@ -44,6 +44,10 @@ ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
 endif
 
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT
+endif
+
 ifneq "$(BINDIST)" "YES"
 
 ifeq "$(PORTING_HOST)" "YES"
@@ -148,6 +152,7 @@ else
 
 includes_dist-derivedconstants_C_SRCS = mkDerivedConstants.c
 includes_dist-derivedconstants_PROG   = mkDerivedConstants$(exeext)
+includes_dist-derivedconstants_INSTALL_INPLACE = YES
 
 $(eval $(call build-prog,includes,dist-derivedconstants,0))
 

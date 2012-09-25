@@ -339,6 +339,7 @@ data DynFlag
    | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Static
+   | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
 
@@ -1160,7 +1161,7 @@ defaultDynFlags mySettings =
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
-        flags = IntSet.fromList (map fromEnum (defaultFlags (sTargetPlatform mySettings))),
+        flags = IntSet.fromList (map fromEnum (defaultFlags mySettings)),
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
@@ -2273,7 +2274,8 @@ fFlags = [
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
   ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
-  ( "hpc",                              Opt_Hpc, nop )
+  ( "hpc",                              Opt_Hpc, nop ),
+  ( "use-rpaths",                       Opt_RPath, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -2438,10 +2440,9 @@ xFlags = [
   ( "PackageImports",                   Opt_PackageImports, nop )
   ]
 
-defaultFlags :: Platform -> [DynFlag]
-defaultFlags platform
+defaultFlags :: Settings -> [DynFlag]
+defaultFlags settings
   = [ Opt_AutoLinkPackages,
-      Opt_Static,
 
       Opt_SharedImplib,
 
@@ -2453,7 +2454,8 @@ defaultFlags platform
       Opt_GhciSandbox,
       Opt_GhciHistory,
       Opt_HelpfulErrors,
-      Opt_ProfCountEntries
+      Opt_ProfCountEntries,
+      Opt_RPath
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -2465,6 +2467,12 @@ defaultFlags platform
             ArchX86_64         -> [Opt_PIC]
             _                  -> []
         _ -> [])
+
+    ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
+        then []
+        else [Opt_Static])
+
+    where platform = sTargetPlatform settings
 
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags

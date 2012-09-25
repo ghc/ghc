@@ -18,7 +18,7 @@ dnl--------------------------------------------------------------------
 
 FP_GMP
 
-bootstrap_target=`ghc/stage2/build/tmp/ghc-stage2 +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+bootstrap_target=@TargetPlatform@
 FPTOOLS_SET_PLATFORM_VARS
 
 BuildingCrossCompiler=NO

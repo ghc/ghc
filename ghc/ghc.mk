@@ -77,6 +77,9 @@ ghc_stage3_SHELL_WRAPPER = YES
 ghc_stage1_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage2_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage3_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
+ghc_stage1_INSTALL_INPLACE = YES
+ghc_stage2_INSTALL_INPLACE = YES
+ghc_stage3_INSTALL_INPLACE = YES
 
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL = YES
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME = ghc-$(ProjectVersion)

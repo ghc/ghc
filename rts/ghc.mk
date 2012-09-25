@@ -508,9 +508,9 @@ endif
 # -----------------------------------------------------------------------------
 # installing
 
-INSTALL_LIBS += $(ALL_RTS_LIBS)
-INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
-INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
+RTS_INSTALL_LIBS += $(ALL_RTS_LIBS)
+RTS_INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
+RTS_INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
 
 install: install_libffi_headers
 

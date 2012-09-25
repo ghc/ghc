@@ -129,6 +129,12 @@ endif
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsPlatformList)),YES,NO)
 
+SharedLibsByDefaultPlatformList =               \
+                         x86_64-unknown-linux
+
+DYNAMIC_BY_DEFAULT = $(if $(filter $(TARGETPLATFORM),\
+	$(SharedLibsByDefaultPlatformList)),YES,NO)
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,

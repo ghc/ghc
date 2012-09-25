@@ -801,6 +801,28 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_docs
 endif
 
+define installLibsTo
+# $1 = libraries to install
+# $2 = directory to install to
+	$(call INSTALL_DIR,$2)
+	for i in $1; do \
+		case $$i in \
+		  *.a) \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
+		  *.dll) \
+		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
+		    $$(STRIP_CMD) $2/$$i ;; \
+		  *.so) \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2) ;; \
+		  *.dylib) \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2);; \
+		  *) \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
+		esac; \
+	done
+endef
+
 install_bins: $(INSTALL_BINS)
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
 	for i in $(INSTALL_BINS); do \
@@ -808,23 +830,7 @@ install_bins: $(INSTALL_BINS)
 	done
 
 install_libs: $(INSTALL_LIBS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibdir)")
-	for i in $(INSTALL_LIBS); do \
-		case $$i in \
-		  *.a) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
-		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
-		  *.dll) \
-		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ; \
-		    $(STRIP_CMD) "$(DESTDIR)$(ghclibdir)"/$$i ;; \
-		  *.so) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
-		  *.dylib) \
-		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)");; \
-		  *) \
-		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
-		esac; \
-	done
+	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
@@ -904,14 +910,29 @@ install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)/rts-1.0")
+	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts-1.0")
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+	$(foreach p, $(PKGS_THAT_ARE_INTREE_ONLY), \
+	    $(call installLibsTo, $(wildcard libraries/$p/dist-install/build/*.so libraries/$p/dist-install/build/*.dll libraries/$p/dist-install/build/*.dylib), "$(DESTDIR)$(topdir)/$p-$(libraries/$p_dist-install_VERSION)"))
+endif
+	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
+	    $(call make-command,                                      \
+	           CROSS_COMPILE="$(CrossCompilePrefix)"              \
+	           "$(GHC_CABAL_INPLACE)" copy                        \
+	                                  "$(STRIP_CMD)"              \
+	                                  $p $(INSTALL_DISTDIR_$p)    \
+	                                  '$(DESTDIR)'                \
+	                                  '$(prefix)'                 \
+	                                  '$(ghclibdir)'              \
+	                                  '$(docdir)/html/libraries'))
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
-                   CROSS_COMPILE="$(CrossCompilePrefix)"              \
-	           "$(GHC_CABAL_INPLACE)" install                     \
+	           CROSS_COMPILE="$(CrossCompilePrefix)"              \
+	           "$(GHC_CABAL_INPLACE)" register                    \
 	                                  "$(INSTALLED_GHC_REAL)"     \
 	                                  "$(INSTALLED_GHC_PKG_REAL)" \
-	                                  "$(STRIP_CMD)"              \
 	                                  "$(DESTDIR)$(topdir)"       \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
 	                                  '$(DESTDIR)'                \
@@ -967,6 +988,7 @@ $(eval $(call bindist,.,\
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out settings,$(INSTALL_LIBS)) \
+    $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
     mk/install.mk.in \

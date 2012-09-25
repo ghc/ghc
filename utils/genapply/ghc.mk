@@ -12,6 +12,7 @@
 
 utils/genapply_dist_MODULES = GenApply
 utils/genapply_dist_PROG    = $(GHC_GENAPPLY_PGM)
+utils/genapply_dist_INSTALL_INPLACE = YES
 
 utils/genapply_HC_OPTS += -package pretty
 

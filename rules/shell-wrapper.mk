@@ -16,56 +16,43 @@ $(call profStart, shell-wrapper($1,$2))
 # $1 = dir
 # $2 = distdir
 
-ifeq "$$(Windows)" "YES"
-$1_$2_WANT_INPLACE_WRAPPER = NO
-else ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$1_$2_WANT_INPLACE_WRAPPER = NO
-else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
-# We need to set LD_LIBRARY_PATH for all programs, so always need
-# a shell wrapper
-$1_$2_WANT_INPLACE_WRAPPER = YES
-else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-$1_$2_WANT_INPLACE_WRAPPER = YES
-else
-$1_$2_WANT_INPLACE_WRAPPER = NO
-endif
-
-ifeq "$$(Windows)" "YES"
-$1_$2_WANT_INSTALLED_WRAPPER = NO
-else ifeq "$$($1_$2_INSTALL)" "NO"
-$1_$2_WANT_INSTALLED_WRAPPER = NO
-else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-$1_$2_WANT_INSTALLED_WRAPPER = YES
-else
-$1_$2_WANT_INSTALLED_WRAPPER = NO
-endif
-
-
-ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
-
 ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
 $1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROG).wrapper
 endif
 
-all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
+ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
+
+ifeq "$$($1_$2_TOPDIR)" "YES"
+INPLACE_WRAPPER = $$(INPLACE_LIB)/$$($1_$2_PROG)
+else
+INPLACE_WRAPPER = $$(INPLACE_BIN)/$$($1_$2_PROG)
+endif
+
+all_$1_$2 : $$(INPLACE_WRAPPER)
 
 $$(INPLACE_BIN)/$$($1_$2_PROG): WRAPPER=$$@
-$$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE) $$($1_$2_SHELL_WRAPPER_NAME)
-	$$(call removeFiles,                             $$@)
-	echo '#!$$(SHELL)'                             >> $$@
-	echo 'executablename="$$(TOP)/$$<"'            >> $$@
-	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'       >> $$@
-	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'        >> $$@
-	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'     >> $$@
-	echo 'pgmgcc="$$(WhatGccIsCalled)"'            >> $$@
+ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+$$(INPLACE_WRAPPER): $$($1_$2_SHELL_WRAPPER_NAME)
+endif
+$$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
+	$$(call removeFiles,                                                  $$@)
+	echo '#!$$(SHELL)'                                                 >> $$@
+	echo 'executablename="$$(TOP)/$$<"'                                >> $$@
+	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'                           >> $$@
+	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'                            >> $$@
+	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'                         >> $$@
+	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
-ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-	cat $$($1_$2_SHELL_WRAPPER_NAME)               >> $$@
-else
-	echo 'exec "$executablename" $$$${1+"$$$$@"}'  >> $$@
+ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+	echo 'export LD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH)"'  >> $$@
 endif
-	$$(EXECUTABLE_FILE)                               $$@
+ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+	cat $$($1_$2_SHELL_WRAPPER_NAME)                                   >> $$@
+else
+	echo 'exec "$$$$executablename" $$$${1+"$$$$@"}'                   >> $$@
+endif
+	$$(EXECUTABLE_FILE)                                                   $$@
 
 endif
 
