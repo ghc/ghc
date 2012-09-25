@@ -22,8 +22,8 @@ test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 # vector code must get inlined to become non-allocating
-test('367', composes([skip_if_fast, expect_fail]), compile_and_run, ['-O2'])
-test('367_letnoescape', composes([skip_if_fast, expect_fail]), compile_and_run, [''])
+test('367', composes([skip_if_fast, reqlib('vector'), expect_broken(367), timeout_multiplier(0.001)]), compile_and_run, ['-O2'])
+test('367_letnoescape', composes([skip_if_fast, expect_broken(367), timeout_multiplier(0.001)]), compile_and_run, [''])
 
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
