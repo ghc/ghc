@@ -90,7 +90,6 @@ import Panic
 import GHC.Exts
 #endif
 
-import Id
 import Module
 import Packages
 import RdrName
@@ -119,7 +118,6 @@ import ProfInit
 import TyCon
 import Name
 import SimplStg         ( stg2stg )
-import CodeGen          ( codeGen )
 import qualified OldCmm as Old
 import qualified Cmm as New
 import CmmParse         ( parseCmmFile )
@@ -1284,16 +1282,10 @@ hscGenHardCode cgguts mod_summary = do
 
         ------------------  Code generation ------------------
 
-        cmms <- if dopt Opt_TryNewCodeGen dflags
-                    then {-# SCC "NewCodeGen" #-}
+        cmms <- {-# SCC "NewCodeGen" #-}
                          tryNewCodeGen hsc_env this_mod data_tycons
                              cost_centre_info
                              stg_binds hpc_info
-                    else {-# SCC "CodeGen" #-}
-                         return (codeGen dflags this_mod data_tycons
-                               cost_centre_info
-                               stg_binds hpc_info)
-
 
         ------------------  Code output -----------------------
         rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
@@ -1369,7 +1361,7 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
 
 tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
                 -> CollectedCCs
-                -> [(StgBinding,[(Id,[Id])])]
+                -> [StgBinding]
                 -> HpcInfo
                 -> IO (Stream IO Old.CmmGroup ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
@@ -1437,7 +1429,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
 
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
-            -> IO ( [(StgBinding,[(Id,[Id])])] -- output program
+            -> IO ( [StgBinding] -- output program
                   , CollectedCCs) -- cost centre info (declared and used)
 myCoreToStg dflags this_mod prepd_binds = do
     stg_binds

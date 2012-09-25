@@ -245,7 +245,6 @@ Library
         StgCmmTicky
         StgCmmUtils
         ClosureInfo
-        CodeGen
         SMRep
         CoreArity
         CoreFVs
@@ -364,7 +363,6 @@ Library
         SimplMonad
         SimplUtils
         Simplify
-        SRT
         SimplStg
         StgStats
         UnariseStg

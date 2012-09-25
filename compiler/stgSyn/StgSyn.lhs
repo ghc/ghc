@@ -38,7 +38,7 @@ module StgSyn (
         isDllConApp,
         stgArgType,
 
-        pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
+        pprStgBinding, pprStgBindings,
         pprStgLVs
     ) where
 
@@ -650,16 +650,6 @@ pprStgBinding  bind  = pprGenStgBinding bind
 
 pprStgBindings :: [StgBinding] -> SDoc
 pprStgBindings binds = vcat (map pprGenStgBinding binds)
-
-pprGenStgBindingWithSRT :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                        => (GenStgBinding bndr bdee,[(Id,[Id])]) -> SDoc
-pprGenStgBindingWithSRT (bind,srts)
-  = vcat $ pprGenStgBinding bind : map pprSRT srts
-  where pprSRT (id,srt) =
-           ptext (sLit "SRT") <> parens (ppr id) <> ptext (sLit ": ") <> ppr srt
-
-pprStgBindingsWithSRTs :: [(StgBinding,[(Id,[Id])])] -> SDoc
-pprStgBindingsWithSRTs binds = vcat (map pprGenStgBindingWithSRT binds)
 
 instance (Outputable bdee) => Outputable (GenStgArg bdee) where
     ppr = pprStgArg

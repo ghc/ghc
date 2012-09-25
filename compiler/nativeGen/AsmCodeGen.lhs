@@ -51,7 +51,7 @@ import NCGMonad
 import BlockId
 import CgUtils          ( fixStgRegisters )
 import OldCmm
-import CmmOpt           ( cmmEliminateDeadBlocks, cmmMiniInline, cmmMachOpFold )
+import CmmOpt           ( cmmMachOpFold )
 import OldPprCmm
 import CLabel
 
@@ -858,15 +858,13 @@ genMachCode dflags cmmTopCodeGen cmm_top
 Here we do:
 
   (a) Constant folding
-  (b) Simple inlining: a temporary which is assigned to and then
-      used, once, can be shorted.
   (c) Position independent code and dynamic linking
         (i)  introduce the appropriate indirections
              and position independent refs
         (ii) compile a list of imported symbols
   (d) Some arch-specific optimizations
 
-(a) and (b) will be moving to the new Hoopl pipeline, however, (c) and
+(a) will be moving to the new Hoopl pipeline, however, (c) and
 (d) are only needed by the native backend and will continue to live
 here.
 
@@ -881,14 +879,7 @@ Ideas for other things we could do (put these in Hoopl please!):
 cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  let reachable_blocks | dopt Opt_TryNewCodeGen dflags = blocks
-                       | otherwise = cmmEliminateDeadBlocks blocks
-      -- The new codegen path has already eliminated unreachable blocks by now
-
-      inlined_blocks | dopt Opt_TryNewCodeGen dflags = reachable_blocks
-                     | otherwise = cmmMiniInline dflags reachable_blocks
-
-  blocks' <- mapM cmmBlockConFold inlined_blocks
+  blocks' <- mapM cmmBlockConFold blocks
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))

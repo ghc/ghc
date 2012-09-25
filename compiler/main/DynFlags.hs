@@ -348,7 +348,6 @@ data DynFlag
    | Opt_RunCPSZ
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
-   | Opt_TryNewCodeGen
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -2267,7 +2266,6 @@ fFlags = [
   ( "print-bind-contents",              Opt_PrintBindContents, nop ),
   ( "run-cps",                          Opt_RunCPS, nop ),
   ( "run-cpsz",                         Opt_RunCPSZ, nop ),
-  ( "new-codegen",                      Opt_TryNewCodeGen, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
   ( "avoid-vect",                       Opt_AvoidVect, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
@@ -2460,8 +2458,6 @@ defaultFlags platform
       Opt_Static,
 
       Opt_SharedImplib,
-
-      Opt_TryNewCodeGen,
 
       Opt_GenManifest,
       Opt_EmbedManifest,
