@@ -13,7 +13,7 @@ module CLabel (
 
         mkClosureLabel,
         mkSRTLabel,
-        mkModSRTLabel,
+        mkTopSRTLabel,
         mkInfoTableLabel,
         mkEntryLabel,
         mkSlowEntryLabel,
@@ -120,8 +120,6 @@ import DynFlags
 import Platform
 import UniqSet
 
-import Data.Maybe (isJust)
-
 -- -----------------------------------------------------------------------------
 -- The CLabel type
 
@@ -218,7 +216,7 @@ data CLabel
   | HpcTicksLabel Module
 
   -- | Static reference table
-  | SRTLabel (Maybe Module) !Unique
+  | SRTLabel !Unique
 
   -- | Label of an StgLargeSRT
   | LargeSRTLabel
@@ -355,8 +353,8 @@ data DynamicLinkerLabelInfo
 mkSlowEntryLabel :: Name -> CafInfo -> CLabel
 mkSlowEntryLabel        name c         = IdLabel name  c Slow
 
-mkModSRTLabel     :: Maybe Module -> Unique -> CLabel
-mkModSRTLabel mb_mod u = SRTLabel mb_mod u
+mkTopSRTLabel     :: Unique -> CLabel
+mkTopSRTLabel u = SRTLabel u
 
 mkSRTLabel        :: Name -> CafInfo -> CLabel
 mkRednCountsLabel :: Name -> CafInfo -> CLabel
@@ -592,7 +590,7 @@ needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother
   -- don't bother declaring Bitmap labels, we always make sure
   -- they are defined before use.
-needsCDecl (SRTLabel _ _)               = True
+needsCDecl (SRTLabel _)                 = True
 needsCDecl (LargeSRTLabel _)            = False
 needsCDecl (LargeBitmapLabel _)         = False
 needsCDecl (IdLabel _ _ _)              = True
@@ -740,7 +738,7 @@ externallyVisibleCLabel (CCS_Label _)           = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)       = True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
-externallyVisibleCLabel (SRTLabel mb_mod _)     = isJust mb_mod
+externallyVisibleCLabel (SRTLabel _)            = False
 externallyVisibleCLabel (LargeSRTLabel _)       = False
 externallyVisibleCLabel (PicBaseLabel {}) = panic "externallyVisibleCLabel PicBaseLabel"
 externallyVisibleCLabel (DeadStripPreventer {}) = panic "externallyVisibleCLabel DeadStripPreventer"
@@ -788,7 +786,7 @@ labelType (RtsLabel (RtsApFast _))              = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
 labelType (CaseLabel _ _)                       = CodeLabel
 labelType (PlainModuleInitLabel _)              = CodeLabel
-labelType (SRTLabel _ _)                        = DataLabel
+labelType (SRTLabel _)                          = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
 labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
@@ -991,10 +989,8 @@ pprCLbl (CaseLabel u (CaseAlt tag))
 pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, ptext (sLit "_dflt")]
 
-pprCLbl (SRTLabel mb_mod u)
-  = pp_mod <> pprUnique u <> pp_cSEP <> ptext (sLit "srt")
-  where pp_mod | Just mod <- mb_mod = ppr mod <> pp_cSEP
-               | otherwise          = empty
+pprCLbl (SRTLabel u)
+  = pprUnique u <> pp_cSEP <> ptext (sLit "srt")
 
 pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext (sLit "srtd")
 pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLit "btm")

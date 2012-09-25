@@ -14,7 +14,7 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
-    , doSRTs, TopSRT, emptySRT, srtToData )
+    , doSRTs, TopSRT, emptySRT, isEmptySRT, srtToData )
 where
 
 #include "HsVersions.h"
@@ -31,7 +31,6 @@ import CmmInfo
 import Data.List
 import DynFlags
 import Maybes
-import Module
 import Outputable
 import SMRep
 import UniqSupply
@@ -136,10 +135,13 @@ instance Outputable TopSRT where
                    <+> ppr elts
                    <+> ppr eltmap
 
-emptySRT :: MonadUnique m => Maybe Module -> m TopSRT
-emptySRT mb_mod =
-  do top_lbl <- getUniqueM >>= \ u -> return $ mkModSRTLabel mb_mod u
+emptySRT :: MonadUnique m => m TopSRT
+emptySRT =
+  do top_lbl <- getUniqueM >>= \ u -> return $ mkTopSRTLabel u
      return TopSRT { lbl = top_lbl, next_elt = 0, rev_elts = [], elt_map = Map.empty }
+
+isEmptySRT :: TopSRT -> Bool
+isEmptySRT srt = null (rev_elts srt)
 
 cafMember :: TopSRT -> CLabel -> Bool
 cafMember srt lbl = Map.member lbl (elt_map srt)

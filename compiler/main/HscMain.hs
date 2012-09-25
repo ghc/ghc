@@ -136,7 +136,6 @@ import Fingerprint      ( Fingerprint )
 
 import DynFlags
 import ErrUtils
-import UniqSupply       ( mkSplitUniqSupply )
 
 import Outputable
 import HscStats         ( ppSourceStats )
@@ -144,7 +143,7 @@ import HscTypes
 import MkExternalCore   ( emitExternalCore )
 import FastString
 import UniqFM           ( emptyUFM )
-import UniqSupply       ( initUs_ )
+import UniqSupply
 import Bag
 import Exception
 import qualified Stream
@@ -1399,17 +1398,33 @@ tryNewCodeGen hsc_env this_mod data_tycons
     -- We are building a single SRT for the entire module, so
     -- we must thread it through all the procedures as we cps-convert them.
     us <- mkSplitUniqSupply 'S'
-    let srt_mod | dopt Opt_SplitObjs dflags = Just this_mod
-                | otherwise                 = Nothing
-        initTopSRT = initUs_ us (emptySRT srt_mod)
 
-    let run_pipeline topSRT cmmgroup = do
-           (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup
-           return (topSRT,cmmOfZgraph cmmgroup)
+    -- When splitting, we generate one SRT per split chunk, otherwise
+    -- we generate one SRT for the whole module.
+    let
+     pipeline_stream
+      | dopt Opt_SplitObjs dflags
+        = {-# SCC "cmmPipeline" #-}
+          let run_pipeline us cmmgroup = do
+                let (topSRT', us') = initUs us emptySRT
+                (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT' cmmgroup
+                let srt | isEmptySRT topSRT = []
+                        | otherwise         = srtToData topSRT
+                return (us',cmmOfZgraph (srt ++ cmmgroup))
 
-    let pipeline_stream = {-# SCC "cmmPipeline" #-} do
-          topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
-          Stream.yield (cmmOfZgraph (srtToData topSRT))
+          in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
+                return ()
+
+      | otherwise
+        = {-# SCC "cmmPipeline" #-}
+          let initTopSRT = initUs_ us emptySRT in
+  
+          let run_pipeline topSRT cmmgroup = do
+                (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup
+                return (topSRT,cmmOfZgraph cmmgroup)
+  
+          in do topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
+                Stream.yield (cmmOfZgraph (srtToData topSRT))
 
     let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" $ ppr a
