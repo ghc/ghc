@@ -1229,7 +1229,7 @@ getCondCode (CmmMachOp mop [x, y])
 
       _other -> pprPanic "getCondCode(x86,x86_64)" (ppr (CmmMachOp mop [x,y]))
 
-getCondCode other = pprPanic "getCondCode(2)(x86,x96_64)" (ppr other)
+getCondCode other = pprPanic "getCondCode(2)(x86,x86_64)" (ppr other)
 
 
 
