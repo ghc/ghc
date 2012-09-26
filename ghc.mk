@@ -322,7 +322,8 @@ PKGS_THAT_ARE_DPH := \
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-PKGS_THAT_BUILD_WITH_STAGE2 := $(PKGS_THAT_ARE_DPH) haskell98 haskell2010
+PKGS_THAT_BUILD_WITH_STAGE2 := \
+    $(PKGS_THAT_ARE_DPH) old-time haskell98 haskell2010
 
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
