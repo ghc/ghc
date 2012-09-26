@@ -327,26 +327,31 @@ recurseStack opt k (init_resid_tgs, init_deeds, init_e) = (\f -> foldM f (init_r
       Apply   x                   -> return (resid_tgs, deeds, xes, e `app`   x)
       Scrutinise x ty alts        -> liftM ((\(extra_deedss, alts') -> (resid_tgs, plusDeedss extra_deedss `plusDeeds` deeds, xes, case_ e x ty alts')) . unzip) $ forM alts $ \(alt_con, state) -> liftM (second ((,) alt_con)) $ opt state
       PrimApply pop tys as states -> (\(resid_tgss, as_deedss, as_es') (states_deedss, states_es') -> (plusResidTagss (resid_tgs:resid_tgss), plusDeedss as_deedss `plusDeeds` plusDeedss states_deedss `plusDeeds` deeds, xes, primOp pop tys (as_es' ++ e:states_es')))
-                                       <$> liftM unzip3 (mapM (recurseCoerced (recurseAnswer opt)) as) <*> liftM unzip (mapM opt states)
+                                       <$> liftM unzip3 (mapM (recurseValue opt) as) <*> liftM unzip (mapM opt states)
       StrictLet x state           -> liftM (\(extra_deeds, e') -> (resid_tgs, extra_deeds `plusDeeds` deeds, xes, let_ x e e')) $ opt state
       Update x                    -> return (resid_tgs, deeds, (x, e) : xes, var x)
       CastIt co                   -> return (resid_tgs, deeds, xes, e `cast` co)
     return (oneResidTag tg_kf `plusResidTags` resid_tgs, deeds, xes, e)
 
-recurseHeap :: Monad m
+recurseValue :: Applicative m
+             => (State -> m (Deeds, Out FVedTerm))
+             -> PushedValue -> m (ResidTags, Deeds, Out FVedTerm)
+recurseValue = recurseCoerced . recurseAnswer
+
+recurseHeap :: (Applicative m, Monad m)
             => (State -> m (Deeds, Out FVedTerm))
             -> PushedHeap -> (ResidTags, Deeds, [(Var, FVedTerm)], FVedTerm) -> m (ResidTags, Deeds, FVedTerm)
-recurseHeap opt init_h (resid_tgs, init_deeds, init_xes, e)
+recurseHeap opt init_h (init_resid_tgs, init_deeds, init_xes, e)
   -- Unfortunately, it is necessary to remove elements from init_h that already have a residual binding in init_xes.
   -- The reason for this is that if the stack has an initial update and a value is in focus, we can get a residual
   -- binding for that from either the "stack" or the "heap" portion. What we must avoid is binding both in a let at the same time!
-  = go (foldr (M.delete . fst) init_h init_xes) init_deeds init_xes
+  = go (foldr (M.delete . fst) init_h init_xes) init_resid_tgs init_deeds init_xes
        (foldr (\(x, e) fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` fvs) (fvedTermFreeVars e) init_xes)
-  where go h deeds xes do_fvs
+  where go h resid_tgs deeds xes do_fvs
           -- | pprTrace "go" (ppr do_fvs $$ ppr (M.keysSet h)) False = undefined
           | M.null h_to_do = return (resid_tgs, deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)
-          | otherwise      = do (extra_deedss, extra_xes) <- liftM unzip $ mapM (\(x, e) -> {- pprTrace "go1" (ppr x) $ -} liftM (second ((,) x)) $ opt e) (M.toList h_to_do)
-                                go h' (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
+          | otherwise      = do (resid_tgss, extra_deedss, extra_xes) <- liftM unzip3 $ mapM (\(x, e) -> {- pprTrace "go1" (ppr x) $ -} liftM (third3 ((,) x)) $ either (recurseValue opt) (liftM (\(deeds, e) -> (emptyResidTags, deeds, e)) . opt) e) (M.toList h_to_do)
+                                go h' (plusResidTagss (resid_tgs:resid_tgss)) (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
                                    (foldr (\(x, e) do_fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` do_fvs) emptyVarSet extra_xes)
          where (h_to_do, h') = M.partitionWithKey (\x _ -> x `elemVarSet` do_fvs) h
 
@@ -445,9 +450,12 @@ data PushFocus qa term = QAFocus qa
                        | TermFocus term
                        | OpaqueFocus FVedTerm
 
-type PushedHeap  = M.Map (Out Var) State
-type PushedStack = [Tagged (StackFrameG (Tagged (Coerced (ValueG State))) State [AltG State])]
-type PushedFocus = PushFocus (Tagged (QAG (ValueG State))) State
+type PushedHeapBinding = Either PushedValue State
+type PushedHeap  = M.Map (Out Var) PushedHeapBinding
+type PushedStack = [Tagged (StackFrameG PushedValue State [AltG State])]
+type PushedValue = Tagged (Coerced (ValueG State))
+type PushedQA    = Tagged (QAG (ValueG State))
+type PushedFocus = PushFocus PushedQA State
 
 -- FIXME: deal with deeds in here
 push :: S.Set Context
@@ -567,7 +575,9 @@ plusContext _ _ = Nothing
 
 splitFocus :: InScopeSet -> PushFocus (Anned QA) (In AnnedTerm) -> Generalised -> (LGraph Context Entries,
                                                                                    PureHeap -> IM.IntMap Stack -> PushedFocus)
-splitFocus ids (QAFocus qa)     True  = splitQA ids qa
+splitFocus ids (QAFocus qa)     True  = (M.singleton FocusContext $ M.insert (StackContext 0) ManyEntries qa_verts,
+                                         \h_prep k_prep -> QAFocus (mk_qa h_prep k_prep))
+  where (qa_verts, mk_qa) = splitQA ids qa
 splitFocus ids (QAFocus qa)     False = (M.singleton FocusContext $ M.insert (StackContext 0) OneEntry (varEdges OneEntry (annedFreeVars qa)),
                                          \h_prep k_prep -> TermFocus (emptyDeeds, Heap h_prep ids, lookupStackPrep 0 k_prep, qa))
 splitFocus ids (TermFocus in_e) True  = splitOpaque $ annedTermToFVedTerm $ renameIn (renameAnnedTerm ids) in_e
@@ -580,9 +590,9 @@ splitOpaque :: FVedTerm -> (LGraph Context Entries,
                             PureHeap -> IM.IntMap Stack -> PushedFocus)
 splitOpaque e' = (M.singleton FocusContext $ M.insert (StackContext 0) ManyEntries $ varEdges ManyEntries (fvedTermFreeVars e'), \_ _ -> OpaqueFocus e')
 
-splitQA :: InScopeSet -> Anned QA -> (LGraph Context Entries,
-                                      PureHeap -> IM.IntMap Stack -> PushedFocus)
-splitQA ids anned_qa = (M.singleton FocusContext $ M.insert (StackContext 0) ManyEntries qa_verts, \h_prep _k_prep -> QAFocus $ Tagged (annedTag anned_qa) (mk_untagged_qa h_prep))
+splitQA :: InScopeSet -> Anned QA -> (M.Map Context Entries,
+                                      PureHeap -> IM.IntMap Stack -> PushedQA)
+splitQA ids anned_qa = (qa_verts, \h_prep _k_prep -> Tagged (annedTag anned_qa) (mk_untagged_qa h_prep))
   where (qa_verts, mk_untagged_qa) = case annee anned_qa of
           Question x' -> (M.singleton (HeapContext x') ManyEntries, \_ -> Question x')
           Answer a    -> second (Answer .) $ splitAnswer ids a
@@ -642,8 +652,19 @@ splitPureHeap ids h = (M.fromDistinctAscList [ (HeapContext x', fmap fst mb_spli
                                     guard (how_bound == InternallyBound)
                                     return (mk_e h_prep))
   where
-    split_h :: M.Map Var (Maybe (M.Map Context Entries, (HowBound, PureHeap -> State)))
-    split_h = flip M.map h $ \hb -> fmap ((second ((,) (howBound hb))) . splitTerm ids OneEntry) (heapBindingTerm hb)
+    split_h :: M.Map Var (Maybe (M.Map Context Entries, (HowBound, PureHeap -> PushedHeapBinding)))
+    split_h = flip M.map h $ \hb -> fmap ((second ((,) (howBound hb))) . splitHeapTerm) (heapBindingTerm hb)
+
+    splitHeapTerm :: In AnnedTerm -> (M.Map Context Entries,
+                                      PureHeap -> PushedHeapBinding)
+    splitHeapTerm (rn, e)
+      | eAGER_SPLIT_VALUES
+      , Just anned_a <- termToCastAnswer ids (rn, e)
+      , let (qa_verts, mk_value) = splitValue ids anned_a
+      = (qa_verts, \h_prep -> Left (mk_value h_prep))
+      | otherwise
+      , let (e_verts, mk_e) = splitTerm ids OneEntry (rn, e)
+      = (e_verts, \h_prep -> Right (mk_e h_prep))
 
 -- NB: we need to add an explicit final frame to prevent the stack and QA graphs from having references to nonexistant nodes
 splitStack :: InScopeSet -> Stack -> Maybe Var -> (LGraph Context Entries,
@@ -717,7 +738,7 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
                                                       alt_bvs' = altConBoundVars alt_con' ]
           PrimApply pop tys' as in_es  -> (Nothing, Nothing, False, foldr multEntered M.empty (as_verts ++ es_verts),
                                            \h_prep _k_prep -> PrimApply pop tys' (map ($ h_prep) mk_as) (map ($ h_prep) mk_es))
-            where (as_verts, mk_as) = unzip $ map (\anned_a -> second (Tagged (annedTag anned_a) .) $ splitCoerced (splitAnswer ids) (annee anned_a)) as
+            where (as_verts, mk_as) = unzip $ map (splitValue ids) as
                   (es_verts, mk_es) = unzip $ map (splitTerm ids OneEntry) in_es
           StrictLet x' in_e            -> (Nothing, Nothing, True, varBndrEdges x' e_verts,
                                            \h_prep k_prep -> StrictLet x' (mk_e (M.insert x' lambdaBound h_prep) k_prep))
@@ -726,6 +747,10 @@ splitStack ids k mb_scrut = go (fmap (\x' -> ((Uncast, x'), [])) mb_scrut, 0, []
                                            Nothing, False, varEdges ManyEntries (tyCoVarsOfCo co'), \_ _ -> CastIt co')
           Update x'                    -> (Just ((Uncast, x'), scruts_flat),
                                            Just x', False, varEdges ManyEntries (varBndrFreeVars x'), \_ _ -> Update x')
+
+splitValue :: InScopeSet -> Anned (Coerced Answer) -> (M.Map Context Entries,
+                                                       PureHeap -> Tagged (Coerced (ValueG State)))
+splitValue ids anned_a = second (Tagged (annedTag anned_a) .) $ splitCoerced (splitAnswer ids) (annee anned_a)
 
 lookupStackPrep :: Int -> IM.IntMap Stack -> Stack
 lookupStackPrep = IM.findWithDefault (Loco False)
