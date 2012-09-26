@@ -8,6 +8,7 @@ module Supercompile.Core.Renaming (
     
     -- | PreRenamings
     PreRenaming, invertRenaming, composeRenamings,
+    restrictRenaming,
 
     -- | Extending the renaming
     insertVarRenaming,
@@ -190,6 +191,9 @@ composeRenamings (id_subst1, tv_subst1, co_subst1) rn2
   = (mapVarEnv (mkIdExpr . renameId rn2) id_subst1,
      mapVarEnv (lookupTyVarSubst    rn2) tv_subst1,
      mapVarEnv (lookupCoVarSubst    rn2) co_subst1)
+
+restrictRenaming :: Renaming -> VarSet -> Renaming
+restrictRenaming (id_subst, tv_subst, co_subst) fvs = (id_subst `restrictVarEnv` fvs, tv_subst `restrictVarEnv` fvs, co_subst `restrictVarEnv` fvs)
 
 mkIdExpr :: Id -> CoreSyn.CoreExpr
 mkIdExpr = CoreSyn.Var

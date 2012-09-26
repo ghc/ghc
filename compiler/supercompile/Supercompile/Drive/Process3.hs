@@ -39,6 +39,7 @@ import VarEnv     (varEnvElts)
 import Control.Monad (join)
 
 import Data.Function (on)
+import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Monoid (mempty)
@@ -146,6 +147,8 @@ data ScpState = ScpState {
     scpMemoState :: MemoState,
     scpProcessHistoryState :: ProcessHistory,
     scpFulfilmentState :: FulfilmentState,
+    scpRollbackUniques :: Int,
+    scpRolledBack :: IS.IntSet,
     -- Debugging aids below this line:
     scpResidTags :: ResidTags,
     scpParentChildren :: ParentChildren
@@ -185,7 +188,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv hist 0 parent [] nothingSpeculated tag_anns)
+        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs 0 IS.empty emptyResidTags emptyParentChildren)) (ScpEnv hist 0 parent [] nothingSpeculated tag_anns)
         fulfils = fulfilments (scpFulfilmentState s')
         e' = letRec fulfils e
 
@@ -194,8 +197,16 @@ outputFreeVars :: ScpM [Id]
 outputFreeVars = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
                                        in return (varSetElems extraOutputFvs ++ concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps, s)
 
+-- NB: creates one-shot continuations, so rollback may fail
 callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
-callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
+callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) (s { scpRollbackUniques = scpRollbackUniques s + 1 })) env)
+
+
+-- Thinking about a rollback operator suitable for type gen in "memo":
+--callCCM' :: (forall r. (a -> ScpM ()) -> ScpM' r b)
+--         -> (b -> ScpM a) -> ScpM a
+--callCCM' mx act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> let mk_rb s_upd = (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s_upd of Just s'' -> jump_back (a, s''); Nothing -> return ((), s'))
+--                                                                                in unReaderT (unStateT (unScpM (fmap snd (mfix (\(~(rb, _b) -> do { b <- mx rb; s_upd <- get; return (mk_rb s_upd, b) ))) >>= act)) (s { scpRollbackUniques = scpRollbackUniques s + 1 })) env)
 
 catchM :: ((c -> ScpM ()) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
        -> (c -> ScpM a)              -- ^ Handler deferred to if an exception is raised
@@ -208,30 +219,34 @@ catchM try handler = do
 
 rolledBackTo :: ScpState -> ScpState -> Maybe ScpState
 rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
- Nothing -> pprTrace "rollback failed" (on (curry ppr) (fmapTrain (map fun . uncurry (:)) (map fun) . promises . scpMemoState) s' s) Nothing
- Just (dangerous_promises, ok_promises) -> Just $
-  let -- We have to roll back any promise on the "stack" above us:
-      (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
-      -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
-      (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
-
-      pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
-      pruneFulfilments (FS fulfilments) rolled_back
-        | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " promises/fulfilments:") (ppr (map fun spine_rolled_back, rolled_back)))
-                      (FS fulfilments, rolled_back)
-        | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
-        where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
-  in ScpState {
-      scpMemoState = MS {
-          -- The most recent promise in s' always has no work done on it, so don't report dumping for it
-          promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
-          hNames   = hNames (scpMemoState s')
-        },
-      scpProcessHistoryState = scpProcessHistoryState s,
-      scpFulfilmentState     = rolled_fulfilments,
-      scpResidTags           = scpResidTags s', -- FIXME: not totally accurate
-      scpParentChildren      = scpParentChildren s'
-    }
+  -- NB: we check scpRolledBack to ensure that rollback is *one-shot*, or else sc-rollback is dangerous for termination
+  Just (dangerous_promises, ok_promises) | not_shot -> Just $
+   let -- We have to roll back any promise on the "stack" above us:
+       (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
+       -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
+       (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
+ 
+       pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
+       pruneFulfilments (FS fulfilments) rolled_back
+         | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " promises/fulfilments:") (ppr (map fun spine_rolled_back, rolled_back)))
+                       (FS fulfilments, rolled_back)
+         | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
+         where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
+   in ScpState {
+       scpMemoState = MS {
+           -- The most recent promise in s' always has no work done on it, so don't report dumping for it
+           promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
+           hNames   = hNames (scpMemoState s')
+         },
+       scpProcessHistoryState = scpProcessHistoryState s,
+       scpFulfilmentState     = rolled_fulfilments,
+       scpRollbackUniques     = scpRollbackUniques s',
+       scpRolledBack          = IS.insert (scpRollbackUniques s) (scpRolledBack s'),
+       scpResidTags           = scpResidTags s', -- FIXME: not totally accurate
+       scpParentChildren      = scpParentChildren s'
+     }
+  _ -> pprTrace "rollback failed" (ppr not_shot $$ on (curry ppr) (fmapTrain (map fun . uncurry (:)) (map fun) . promises . scpMemoState) s' s) Nothing
+ where not_shot = scpRollbackUniques s `IS.notMember` scpRolledBack s'
 
 scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
@@ -256,11 +271,14 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
 fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
+refulfillM :: Promise -> FVedTerm -> ScpM ()
+refulfillM p e' = ScpM $ StateT $ \s -> return ((), s { scpFulfilmentState = refulfill e' (scpFulfilmentState s) p })
+
 terminateM :: String -> State -> (RollbackState -> ScpM ()) -> ScpM a -> (String -> State -> (RollbackState -> ScpM ()) -> ScpM a) -> ScpM a
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                      (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                      (env { scpStopCount = scpStopCount env + 1})
         Continue hist'
           -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistoryState = hist' })) (env { scpNodeKey = generatedKey hist', scpProcessHistoryEnv = hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
@@ -309,8 +327,10 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
   where gen = mK_GENERALISER shallow_state state
 
 tryMSG opt = bothWays $ \shallow_state state -> do
-  -- FIXME: better? In particular, could rollback and then MSG
   (Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
+  -- NB: have to check that we throw away *some* info via MSG or else we can get a loop where we
+  -- MSG back to the same state and thus create a loop (i.e. if previous state is (a, a)^t and new state is (b, c)^t)
+  guard (not (isPureHeapEmpty h_r) || not (isStackEmpty k_r))
   let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
   pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
                           pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ do
@@ -368,7 +388,6 @@ insertTagsM (resid_tags, deeds, e') =
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
 
--- FIXME: use MSG while matching to detect opportunities to do type despecialisation
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
 memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
@@ -409,17 +428,17 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
         --
         -- If we aren't careful, instance matching can easily cause the supercompiler to loop. What if we have this tieback:
         --
-        --   \_ -> f x
+        --   \_ -> f x                   f x
         --
         -- And we are asked to supercompile:
         --
-        --   let a = \_ -> f a
-        --   in \_ -> f a
+        --   let a = \_ -> f a           let a = \_ -> f a
+        --   in \_ -> f a                in f a
         --
         -- If we aren't careful, we will detect an instance match, and hence recursively supercompile the "remaining" term:
         --
-        --   let a = \_ -> f a
-        --   in \_ -> f a
+        --   let a = \_ -> f a           let a = \_ -> f a
+        --   in \_ -> f a                in f a
         --
         -- We ran into a very similar situation in practice with exp3_8, where the recursive structure was actually an instance
         -- dictionary which contained several methods (lambdas), each of which selected methods from that same dictionary. i.e.
@@ -532,17 +551,27 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                 ; fulfillM res }, s { scpMemoState = ms' })
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
-        in case fmap (\(exact, (p, mr)) -> (exact, case mr of
-                       RightIsInstance (Heap h_inst ids_inst) rn_lr k_inst -> do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                                                                 ; stuff <- instanceSplit memo_opt (remaining_deeds, Heap (foldr (\x -> M.insert x lambdaBound) h_inst (fun p:varSetElems extraOutputFvs)) ids_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
-                                                                                 ; insertTagsM stuff }
+        in case fmap (\(exact, ((p, is_ancestor), mr)) -> case mr of
+                       RightIsInstance (Heap h_inst ids_inst) rn_lr k_inst -> (exact, do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                                                                         ; stuff <- instanceSplit memo_opt (remaining_deeds, Heap (foldr (\x -> M.insert x lambdaBound) h_inst (fun p:varSetElems extraOutputFvs)) ids_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
+                                                                                         ; insertTagsM stuff })
                          where
                           -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                           Just remaining_deeds = claimDeeds (releaseStateDeed state) (pureHeapSize h_inst + stackSize k_inst)
-                        -- FIXME: in rare cases (i.e when rollback is off OR when the state we are type-genning against is on the stack)
-                        -- then this codepath could also overwrite the fulfilment for the old state to call into the generalised version:
-                       RightGivesTypeGen _rn_l s rn_r -> trace "typegen" $ do { (deeds, e') <- memo_opt s; (_, e'') <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_r, e'); return (deeds, e'') })) $
-                     bestChoice [ (p, mr)
+                        -- NB: when the state we are type-genning against is on the stack OR we are not rolling back
+                        -- then this codepath can also overwrite the fulfilment for the old state to call into the generalised version,
+                        -- otherwise we have to leave it in place
+                        --
+                        -- NB: don't record a promise for type generalisation! This is OK for termination because all type gens
+                        -- are non-trivial so we will eventually have to stop genning. Furthermore, it means that we can't end
+                        -- up with a FIXME: continue
+                       RightGivesTypeGen rn_l s rn_r -> trace "typegen" $ (True, do { (deeds, e') <- memo_opt s
+                                                                                    ; (_, e'_r) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_r, e')
+                                                                                    ; when (not sC_ROLLBACK || is_ancestor) $ do
+                                                                                        (_, e'_l) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_l, e')
+                                                                                        refulfillM p e'_l
+                                                                                    ; return (deeds, e'_r) })) $
+                     bestChoice [ ((p, is_ancestor), mr)
                                 | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
                                 , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
                                                                      | (p_parent, p_siblings) <- parented_ps
@@ -557,22 +586,23 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
                                 --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                 --                                      match' mm (meaning p) reduced_state]
-                                , Just mr <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
+                                , Just mr <- [{- trace "match" $ (\res -> trace "match'" res) -} (msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch)]
                                 {-
                                 , if dumped p
                                    then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
                                    else True
                                 -}
-                                ] of Just (exact, res) -> pure $ if exact then (res, s) else remember (\_ _ -> liftM ((,) False) res)
-                                     Nothing           | CheckOnly <- memo_how
-                                                       -> pure (liftM snd $ opt Nothing state, s)
-                                                       | otherwise
-                                                       -> pure (remember opt)
+                                ] of Just (skip, res) -> pure $ if skip then (res, s) else remember (\_ _ -> liftM ((,) False) res)
+                                     Nothing          | CheckOnly <- memo_how
+                                                      -> pure (liftM snd $ opt Nothing state, s)
+                                                      | otherwise
+                                                      -> pure (remember opt)
       where (_state_did_reduce, reduced_state) = reduceForMatch state
 
             -- Prefer more exact matches (see Note [Instance matching and loops]: it is essential to choose exact matches over instances)
-            bestChoice :: [(Promise, MSGMatchResult)]
-                       -> Maybe (Bool, (Promise, MSGMatchResult))
+            bestChoice :: forall promise.
+                          [(promise, MSGMatchResult)]
+                       -> Maybe (Bool, (promise, MSGMatchResult))
             bestChoice = go Nothing
               where go mb_best [] = fmap ((,) False) mb_best
                     go mb_best (this@(_, mr):rest)
@@ -588,13 +618,45 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                     moreSpecific (RightIsInstance (Heap h_l _) _ k_l) (RightIsInstance (Heap h_r _) _ k_r)
                       = (pureHeapSize h_l + stackSize k_l) <= (pureHeapSize h_r + stackSize k_r)
                     -- Another heuristic: try to discard *most* type information (this is only more specific in the sense that it is more specific about what can be thrown away)
-                    moreSpecific (RightGivesTypeGen _ _ rn_l) (RightGivesTypeGen _ _ rn_r)
-                      = renamingSize rn_r <= renamingSize rn_l
+                    -- Something to think about is what would happen if we did rollback to implement type gen. i.e. if we were driving:
+                    --   h1 = f (G Int)
+                    -- And we had a prior promise for:
+                    --   h0 = f (G Bool)
+                    -- We should rollback to just after the h0 promise and drive
+                    --   h2 = f (G a)
+                    -- (using an instantiated verison of h2 to fulfill h0). Then if we later drive:
+                    --   h3 = f (T a)
+                    -- We should rollback to just after the h2 promise (*) and drive:
+                    --   h4 = f (b a)
+                    -- (using an instantiated version of h4 to fulfill h3).
+                    --
+                    -- Note that at (*) we rolled back from h3 (T a) to h2 (G a) and NOT to h0 (G Int) (which is still on the stack, unlike h1, which was rolled back)
+                    -- This means that we preferred to roll back to something which gives an MSG with the *smallest possible* renaming (i.e. is more specific).
+                    -- This is the opposite of what I've implemented below (FIXME).
+                    -- TODO: maybe it actually would be OK (for SC termination) to roll back to h0 at (*)? Though it would mean dumping any tiebacks to h2 unnecessarily.
+                    moreSpecific (RightGivesTypeGen _ _ _rn_l) (RightGivesTypeGen _ _ _rn_r)
+                      -- OK, here is what I have concluded after long thought.
+                      -- As long as we DON'T CREATE A PROMISE when type generalising, then there will be a always be a maximum of one
+                      -- possible type generalisation. A simple example demonstrates the principal behind this. Imagine that there were two
+                      -- possible generalisations e.g. the promises held states for:
+                      --   f Int   Char
+                      --   f Float Bool
+                      -- And we were driving
+                      --   f Int   Bool
+                      -- Looking at the promises, we could generalise to either
+                      --   f Int   alpha
+                      --   f alpha Bool
+                      -- But in fact if you think about it if we aren't recording promises when we type generalise then there shouldn't be two
+                      -- such promises to begin with! The reason is when we get to driving the later of the two (say f Float Bool), we would
+                      -- type generalise it against the earlier promise (i.e. f Int Char) and hence would have driven (f alpha beta) without
+                      -- recording (f Float Bool). Now when we come to supercompile (f Int Bool) we can just tie back to (f alpha beta),
+                      -- which is absolutely what we want.
+                      = error "moreSpecific: two possible type gens, this should not happen!" -- renamingSize rn_r <= renamingSize rn_l
                     -- Prefer instance matches to type generalisation (don't have a good sense about what is best here):
                     moreSpecific (RightIsInstance _ _ _) _ = True
                     moreSpecific _ (RightIsInstance _ _ _) = False
 
-                    renamingSize (_, tv_subst, co_subst) = sumMap typeSize (varEnvElts tv_subst) + sumMap coercionSize (varEnvElts co_subst)
+                    --renamingSize (_, tv_subst, co_subst) = sumMap typeSize (varEnvElts tv_subst) + sumMap coercionSize (varEnvElts co_subst)
 
                     -- TODO: it might be OK to insist the incoming renaming is invertible, but this should definitely work:
                     isEmptyRenaming (_, tv_subst, co_subst) = all isTyVarTy (varEnvElts tv_subst) && all isCoVarCo (varEnvElts co_subst)

@@ -30,6 +30,7 @@ import Control.Arrow (first, second, (***), (&&&))
 import Control.Applicative (Applicative(..), (<$>), liftA, liftA2, liftA3)
 import Control.Exception (bracket)
 import Control.Monad hiding (join, forM_)
+import Control.Monad.Fix
 
 import Data.Function (on)
 import Data.Maybe
@@ -894,6 +895,9 @@ instance Monad m => Monad (StateT s m) where
 instance MonadTrans (StateT s) where
     lift mx = StateT $ \s -> liftM (flip (,) s) mx
 
+instance MonadFix m => MonadFix (StateT s m) where
+    mfix fxmx = StateT $ \s -> mfix $ \(~(x, _)) -> unStateT (fxmx x) s
+
 
 newtype ReaderT r m a = ReaderT { unReaderT :: r -> m a }
 
@@ -910,6 +914,9 @@ instance Monad m => Monad (ReaderT r m) where
 
 instance MonadTrans (ReaderT r) where
     lift mx = ReaderT $ \_ -> mx
+
+instance MonadFix m => MonadFix (ReaderT r m) where
+    mfix fxmy = ReaderT $ \r -> mfix $ \x -> unReaderT (fxmy x) r
 
 runReaderT :: r -> ReaderT r m a -> m a
 runReaderT = flip unReaderT
@@ -931,9 +938,9 @@ instance Monad (ContT r m) where
 instance MonadTrans (ContT r) where
     lift mx = ContT $ \k -> mx >>= k
 
+
 runContT :: Monad m => ContT r m r -> m r
 runContT mx = unContT mx return
 
 callCC :: ((forall b. a -> ContT r m b) -> ContT r m a) -> ContT r m a
 callCC f = ContT $ \k -> unContT (f (\a -> ContT $ \_k -> k a)) k
-

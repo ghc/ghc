@@ -644,8 +644,9 @@ msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
 msgMatch inst_mtch (Pair (_, Heap h_l _, rn_l, k_l) (deeds_r, heap_r@(Heap h_r _), rn_r, k_r), (heap@(Heap _ ids), k, qa))
   -- Try to detect instantiation first
   --  1) Is the left-hand renaming invertible?
-  -- FIXME: trim the renaming to the FVs of the common state so that "dead" substitutions don't cause the inversion check to fail
-  | Just rn_l_inv@(rn_l_inv_xs, rn_l_inv_as, rn_l_inv_qs) <- invertRenaming ids rn_l
+  -- NB: must trim the renaming to the FVs of the common state so that "dead" substitutions don't cause the inversion check to fail
+  | let rn_l_trimmed = rn_l `restrictRenaming` stateFreeVars (emptyDeeds, heap, k, qa)
+  , Just rn_l_inv@(rn_l_inv_xs, rn_l_inv_as, rn_l_inv_qs) <- invertRenaming ids rn_l_trimmed
   --  2) Is the left-hand stack empty, and if has been instantiated on the right, was that valid?
   , Loco gen_k_l <- k_l
   , case k_r of Loco _ -> True
@@ -695,6 +696,7 @@ msgMatch inst_mtch (Pair (_, Heap h_l _, rn_l, k_l) (deeds_r, heap_r@(Heap h_r _
   | otherwise
   = Nothing
 
+-- A type renaming is non-trivial only if there exists at least one mapping to type that is NOT a tyvar
 isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
