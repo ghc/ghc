@@ -342,7 +342,7 @@ tryMSG opt = bothWays $ \shallow_state state -> do
     instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
 
 pprMSGResult :: MSGResult -> SDoc
-pprMSGResult (Pair (deeds_l, heap_l@(Heap h_l ids_l), rn_l, k_l) (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa))
+pprMSGResult (Pair (deeds_l, heap_l, _rn_l, k_l) (deeds_r, heap_r, _rn_r, k_r), (heap, k, qa))
   = pPrintFullState quietStatePrettiness (emptyDeeds, heap, k, qa) $$
     pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
     pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
@@ -557,7 +557,14 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 ; fulfillM res }, s { scpMemoState = ms' })
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
         in case fmap (\(exact, ((p, is_ancestor), mr)) -> case mr of
-                       RightIsInstance (Heap h_inst ids_inst) rn_lr k_inst -> (exact, do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                       RightIsInstance (Heap h_inst ids_inst) rn_lr k_inst -> (exact, do { traceRenderM ("=sc" ++ if exact then "" else "(inst)")
+                                                                                                        (fun p
+                                                                                                        , PrettyDoc (pPrintFullState quietStatePrettiness state)
+                                                                                                        --, PrettyDoc (pPrintFullState quietStatePrettiness reduced_state)
+                                                                                                        , PrettyDoc (pPrintFullState quietStatePrettiness (meaning p))
+                                                                                                        --, case msgMaybe (MSGMode { msgCommonHeapVars = emptyInScopeSet }) (meaning p) reduced_state of Just result -> PrettyDoc (pprMSGResult result)
+                                                                                                        --, res
+                                                                                                        )
                                                                                          ; stuff <- instanceSplit memo_opt (remaining_deeds, Heap (foldr (\x -> M.insert x lambdaBound) h_inst (fun p:varSetElems extraOutputFvs)) ids_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p))
                                                                                          ; insertTagsM stuff })
                          where
