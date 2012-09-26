@@ -327,13 +327,12 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
   where gen = mK_GENERALISER shallow_state state
 
 tryMSG opt = bothWays $ \shallow_state state -> do
-  (Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
+  msg_result@(Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   -- NB: have to check that we throw away *some* info via MSG or else we can get a loop where we
   -- MSG back to the same state and thus create a loop (i.e. if previous state is (a, a)^t and new state is (b, c)^t)
   guard (not (isPureHeapEmpty h_r) || not (isStackEmpty k_r))
   let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
-  pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
-                          pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ do
+  pprTrace "MSG success" (pprMSGResult msg_result) $ Just $ do
     (deeds', e) <- sc (deeds, heap, k, qa)
     -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
     -- NB: adding some new bindings to h_r for the h functions is a bit of a hack because:
@@ -341,6 +340,12 @@ tryMSG opt = bothWays $ \shallow_state state -> do
     --  2. These new dummy bindings will never be passed down to any recursive invocation of opt
     (h_hs, e') <- renameSCResult ids (rn_r, e)
     instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
+
+pprMSGResult :: MSGResult -> SDoc
+pprMSGResult (Pair (deeds_l, heap_l@(Heap h_l ids_l), rn_l, k_l) (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa))
+  = pPrintFullState quietStatePrettiness (emptyDeeds, heap, k, qa) $$
+    pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
+    pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
 
 renameSCResult :: InScopeSet -> In FVedTerm -> ScpM (PureHeap, FVedTerm)
 renameSCResult ids (rn_r, e) = do

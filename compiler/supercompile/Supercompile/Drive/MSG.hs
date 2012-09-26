@@ -1,5 +1,5 @@
 module Supercompile.Drive.MSG (
-    MSGMode(..), msg, msgMaybe,
+    MSGMode(..), MSGResult, msg, msgMaybe,
 
     InstanceMatching(..), MSGMatchResult(..), msgMatch
   ) where
@@ -1151,7 +1151,7 @@ initStack xs i (Car kf_l k_l) (Car kf_r k_r) = do
       _ -> return (xs, Nothing, Nothing)
     let suck = initSuckStackFrame i mb_x kf_l kf_r
     liftM (\(mxs, k_lrs, sucks) -> (maybe id (:) mb_mx mxs, liftA2 (\kf_lr (k_avail_lr, k_lr) -> (kf_lr `Car` k_avail_lr, k_lr)) (Pair kf_l kf_r) k_lrs, IM.insert i suck sucks)) $ initStack xs (i + 1) k_l k_r
-initStack _ _ k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_r) (Loco (stackGeneralised k_r), k_r), IM.empty)
+initStack _ _ k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_l) (Loco (stackGeneralised k_r), k_r), IM.empty)
 
 initSuckStackFrame :: Int -> Maybe (Var {- partial loop -}, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
 initSuckStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
