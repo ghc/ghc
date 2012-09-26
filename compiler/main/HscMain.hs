@@ -75,6 +75,7 @@ module HscMain
     ) where
 
 #ifdef GHCI
+import Id
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
