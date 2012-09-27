@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 module TypeOperators (
   -- * stuff
   (:-:),
@@ -5,7 +6,6 @@ module TypeOperators (
   Op,
   O(..),
   biO,
-  Flip(..)
 ) where
 
 data a :-: b
@@ -18,5 +18,3 @@ newtype (g `O` f) a = O { unO :: g (f a) }
 
 biO :: (g `O` f) a
 biO = undefined
-
-newtype Flip (~>) b a = Flip { unFlip :: a ~> b }

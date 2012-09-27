@@ -94,20 +94,6 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	    > ::  (g `<a href=""
 	    >O</a
 	    >` f) a</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    >  <a href=""
-	    >Flip</a
-	    > (~&gt;) b a = <a href=""
-	    >Flip</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href=""
-		>unFlip</a
-		> :: a ~&gt; b</li
-	      ></ul
-	    >}</li
 	  ></ul
 	></div
       ><div id="interface"
@@ -185,46 +171,6 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	    > ::  (g `<a href=""
 	    >O</a
 	    >` f) a</p
-	  ></div
-	><div class="top"
-	><p class="src"
-	  ><span class="keyword"
-	    >newtype</span
-	    >  <a name="t:Flip" class="def"
-	    >Flip</a
-	    > (~&gt;) b a </p
-	  ><div class="subs constructors"
-	  ><p class="caption"
-	    >Constructors</p
-	    ><table
-	    ><tr
-	      ><td class="src"
-		><a name="v:Flip" class="def"
-		  >Flip</a
-		  ></td
-		><td class="doc empty"
-		>&nbsp;</td
-		></tr
-	      ><tr
-	      ><td colspan="2"
-		><div class="subs fields"
-		  ><p class="caption"
-		    >Fields</p
-		    ><dl
-		    ><dt class="src"
-		      ><a name="v:unFlip" class="def"
-			>unFlip</a
-			> :: a ~&gt; b</dt
-		      ><dd class="doc empty"
-		      >&nbsp;</dd
-		      ></dl
-		    ><div class="clear"
-		    ></div
-		    ></div
-		  ></td
-		></tr
-	      ></table
-	    ></div
 	  ></div
 	></div
       ></div

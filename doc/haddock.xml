@@ -1830,6 +1830,13 @@ module A where
 	<literal>&lt;...&gt;</literal>.  If the output format supports
 	it, the URL will be turned into a hyperlink when
 	rendered.</para>
+
+        The URL can be followed by an optional label:
+<programlisting>
+&lt;http://example.com label&gt;
+</programlisting>
+        The label is then used as a descriptive text for the hyperlink, if the
+        output format supports it.
       </section>
 
       <section>
