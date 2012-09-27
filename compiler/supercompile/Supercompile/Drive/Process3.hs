@@ -579,7 +579,12 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                         -- up with a FIXME: continue
                        RightGivesTypeGen rn_l s rn_r -> trace "typegen" $ (True, do { (deeds, e') <- memo_opt s
                                                                                     ; (_, e'_r) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_r, e')
-                                                                                    ; when (not sC_ROLLBACK || is_ancestor) $ do
+                                                                                      -- OH MY GOD:
+                                                                                      --  - If we do memo-rollback or sc-rollback then we CAN'T overwrite old fulfilments
+                                                                                      --    because they might end up pointing to a promise which gets rolled back
+                                                                                      --  - So we can *either* overwrite old fulfilments, or not RB to ancestors (e.g. upon type gen)
+                                                                                      --  - But overwriting old fulfilments is the main thing we wanted to achieve, so we better make that choice :(
+                                                                                    ; when (not sC_ROLLBACK && not is_ancestor) $ do
                                                                                         (_, e'_l) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_l, e')
                                                                                         refulfillM p e'_l
                                                                                     ; return (deeds, e'_r) })) $
@@ -591,9 +596,10 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                                                      , p_sibling <- p_parent:p_siblings ] ++
                                                                      [ (p_root,    False,                         emptyInScopeSet)
                                                                      | p_root <- unparented_ps ]
-                                , let inst_mtch | not iNSTANCE_MATCHING = NoInstances
-                                                | is_ancestor           = AllInstances
-                                                | otherwise             = InstancesOfGeneralised
+                                , let inst_mtch = case iNSTANCE_MATCHING of
+                                                    NoInstances            -> NoInstances
+                                                    InstancesOfGeneralised -> InstancesOfGeneralised
+                                                    AllInstances           -> if is_ancestor then AllInstances else InstancesOfGeneralised
                                       mm = MSGMode { msgCommonHeapVars = common_h_vars }
                                 --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
                                 --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $

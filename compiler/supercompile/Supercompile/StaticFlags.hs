@@ -19,8 +19,13 @@ data Superinlinability = ForEverything | ForRecursion | ForNothing
 sUPERINLINABILITY :: Superinlinability
 sUPERINLINABILITY = parseEnum "-fsupercompiler-superinlinability" ForRecursion [("", ForRecursion), ("recursion", ForRecursion), ("everything", ForEverything), ("nothing", ForNothing)]
 
-iNSTANCE_MATCHING :: Bool
-iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"
+data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
+
+-- I've decided that allowing arbitrary tiebacks to any ancestor state overlaps too much with the combination
+-- of MSG-based generalisation+rollback, and has the potential to lose more useful optimisation than that combo does.
+-- Matching back to generalised stuff is still a good idea, but we need to propagate generalised flags more agressively (FIXME)
+iNSTANCE_MATCHING :: InstanceMatching
+iNSTANCE_MATCHING = parseEnum "-fsupercompiler-instance-matching" InstancesOfGeneralised [("full", AllInstances), ("generalised", InstancesOfGeneralised), ("none", NoInstances)]
 
 -- This is not remotely safe:
 fLOAT_TO_MATCH :: Bool

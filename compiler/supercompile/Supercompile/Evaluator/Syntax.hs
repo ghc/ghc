@@ -11,6 +11,7 @@ import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
 
+import Supercompile.StaticFlags
 import Supercompile.Utilities
 
 import Id       (Id, idType, zapIdOccInfo)
@@ -207,8 +208,6 @@ qaToAnswer qa = case qa of Answer a -> Just a; Question _ -> Nothing
 
 
 type Generalised = Bool
-
-data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
 
 mayInstantiate :: InstanceMatching -> Generalised -> Bool
 mayInstantiate NoInstances            _   = False
