@@ -67,7 +67,7 @@ endif
 else
 # Where do we install the inplace version?
 ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
-$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
+$1_$2_INPLACE = $$(INPLACE_LIB)/bin/$$($1_$2_PROG)
 else
 ifeq "$$($1_$2_TOPDIR)" "YES"
 $1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)

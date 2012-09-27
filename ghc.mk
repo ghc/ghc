@@ -796,7 +796,7 @@ TAGS: TAGS_compiler
 # Installation
 
 install: install_libs install_packages install_libexecs \
-         install_libexec_scripts install_bins install_topdirs
+         install_bins install_topdirs
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_docs
 endif
@@ -826,27 +826,17 @@ install_libs: $(INSTALL_LIBS)
 		esac; \
 	done
 
-install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
-ifeq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
-	@:
-else
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
-	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(call INSTALL_SCRIPT,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
-	done
-endif
-
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
 	@:
 else
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)/bin")
 	for i in $(INSTALL_LIBEXECS); do \
-		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
+		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)/bin"); \
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
-	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/ghc"
+	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 
 install_topdirs: $(INSTALL_TOPDIRS)
@@ -884,8 +874,8 @@ INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows)" "NO"
-INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/ghc
-INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/ghc-pkg
+INSTALLED_GHC_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc
+INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(ghclibexecdir)/bin/ghc-pkg
 else
 INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe

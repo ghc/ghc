@@ -59,7 +59,7 @@ install_$1_$2_wrapper:
 	$$(call removeFiles,                                        "$$(WRAPPER)")
 	$$(CREATE_SCRIPT)                                           "$$(WRAPPER)"
 	echo '#!$$(SHELL)'                                       >> "$$(WRAPPER)"
-	echo 'exedir="$$(ghclibexecdir)"'                        >> "$$(WRAPPER)"
+	echo 'exedir="$$(ghclibexecdir)/bin"'                    >> "$$(WRAPPER)"
 	echo 'exeprog="$$($1_$2_PROG)"'                          >> "$$(WRAPPER)"
 	echo 'executablename="$$$$exedir/$$$$exeprog"'           >> "$$(WRAPPER)"
 	echo 'datadir="$$(datadir)"'                             >> "$$(WRAPPER)"
