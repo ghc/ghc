@@ -184,7 +184,7 @@ endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 ifeq "$$($1_$2_INSTALL)" "YES"
-ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
+ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
 else ifeq "$$($1_$2_TOPDIR)" "YES"
 INSTALL_TOPDIRS  += $1/$2/build/tmp/$$($1_$2_PROG)

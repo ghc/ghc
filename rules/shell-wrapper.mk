@@ -16,13 +16,37 @@ $(call profStart, shell-wrapper($1,$2))
 # $1 = dir
 # $2 = distdir
 
-ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
+ifeq "$$(Windows)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = NO
+else ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$1_$2_WANT_INPLACE_WRAPPER = NO
+else ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+# We need to set LD_LIBRARY_PATH for all programs, so always need
+# a shell wrapper
+$1_$2_WANT_INPLACE_WRAPPER = YES
+else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+$1_$2_WANT_INPLACE_WRAPPER = YES
+else
+$1_$2_WANT_INPLACE_WRAPPER = NO
+endif
+
+ifeq "$$(Windows)" "YES"
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+else ifeq "$$($1_$2_INSTALL)" "NO"
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+else ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
+$1_$2_WANT_INSTALLED_WRAPPER = YES
+else
+$1_$2_WANT_INSTALLED_WRAPPER = NO
+endif
+
+
+ifeq "$$($1_$2_WANT_INPLACE_WRAPPER)" "YES"
 
 ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
 $1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROG).wrapper
 endif
 
-ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
 
 $$(INPLACE_BIN)/$$($1_$2_PROG): WRAPPER=$$@
@@ -36,11 +60,16 @@ $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE) $$($1_$2_SHELL_WRAPPER_NAME)
 	echo 'pgmgcc="$$(WhatGccIsCalled)"'            >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
+ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 	cat $$($1_$2_SHELL_WRAPPER_NAME)               >> $$@
+else
+	echo 'exec "$executablename" $$$${1+"$$$$@"}'  >> $$@
+endif
 	$$(EXECUTABLE_FILE)                               $$@
+
 endif
 
-ifeq "$$($1_$2_INSTALL)" "YES"
+ifeq "$$($1_$2_WANT_INSTALLED_WRAPPER)" "YES"
 
 ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)" ""
 $1_$2_INSTALL_SHELL_WRAPPER_NAME = $$($1_$2_PROG)
@@ -70,9 +99,7 @@ install_$1_$2_wrapper:
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
 	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
 
-endif # $1_$2_INSTALL
-
-endif # $1_$2_SHELL_WRAPPER && !Windows
+endif
 
 $(call profEnd, shell-wrapper($1,$2))
 endef
