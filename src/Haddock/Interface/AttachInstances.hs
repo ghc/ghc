@@ -22,19 +22,20 @@ import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import GHC
-import Name
-import InstEnv
 import Class
-import GhcMonad (withSession)
-import TysPrim( funTyCon )
-import MonadUtils (liftIO)
-import TcRnDriver (tcRnGetInfo)
-import TypeRep
-import Var hiding (varName)
-import TyCon
-import PrelNames
 import FastString
+import GHC
+import GhcMonad (withSession)
+import Id
+import InstEnv
+import MonadUtils (liftIO)
+import Name
+import PrelNames
+import TcRnDriver (tcRnGetInfo)
+import TyCon
+import TypeRep
+import TysPrim( funTyCon )
+import Var hiding (varName)
 #define FSLIT(x) (mkFastString# (x#))
 
 type ExportedNames = Set.Set Name
@@ -65,7 +66,7 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
                   Just (_, _, instances) ->
                     let insts = map (first synifyInstHead) $ sortImage (first instHead) $
                                 filter (\((_,_,cls,tys),_) -> not $ isInstanceHidden expInfo cls tys)
-                                [ (instanceHead i, getName i) | i <- instances ]
+                                [ (instanceHead' i, getName i) | i <- instances ]
                     in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
                        | (inst, name) <- insts ]
                   Nothing -> []
@@ -92,6 +93,20 @@ lookupInstDoc name iface ifaceMap instIfaceMap =
             Nothing -> Nothing
   where
     modName = nameModule name
+
+
+-- | Like GHC's 'instanceHead' but drops "silent" arguments.
+instanceHead' :: ClsInst -> ([TyVar], ThetaType, Class, [Type])
+instanceHead' ispec = (tvs, dropSilentArgs dfun theta, cls, tys)
+  where
+    dfun = is_dfun ispec
+    (tvs, theta, cls, tys) = instanceHead ispec
+
+
+-- | Drop "silent" arguments. See GHC Note [Silent superclass
+-- arguments].
+dropSilentArgs :: DFunId -> ThetaType -> ThetaType
+dropSilentArgs dfun theta = drop (dfunNSilent dfun) theta
 
 
 -- | Like GHC's getInfo but doesn't cut things out depending on the
