@@ -70,6 +70,6 @@ createInterfaces
   -> [String]       -- ^ File or module names
   -> IO [Interface] -- ^ Resulting list of interfaces
 createInterfaces flags modules = do
-  (_, ifaces, _) <- readPackagesAndProcessModules flags modules
+  (_, ifaces, _) <- withGhc' flags (readPackagesAndProcessModules flags modules)
   return ifaces
 

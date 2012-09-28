@@ -15,7 +15,7 @@
 --
 -- Program entry point and top-level code.
 -----------------------------------------------------------------------------
-module Main (main, readPackagesAndProcessModules) where
+module Main (main, readPackagesAndProcessModules, withGhc') where
 
 
 import Haddock.Backends.Xhtml
@@ -135,15 +135,7 @@ main = handleTopExceptions $ do
   shortcutFlags flags
   qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}
 
-  libDir <- fmap snd (getGhcDirs flags)
-
-  -- Catches all GHC source errors, then prints and re-throws them.
-  let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
-        printException err
-        liftIO exitFailure
-
-  -- Initialize GHC.
-  withGhc libDir (ghcFlags flags) $ \_ -> handleSrcErrors $ do
+  withGhc' flags $ do
 
     dflags <- getDynFlags
 
@@ -167,6 +159,18 @@ main = handleTopExceptions $ do
 
       -- Render even though there are no input files (usually contents/index).
       liftIO $ renderStep dflags flags qual packages []
+
+
+withGhc' :: [Flag] -> Ghc a -> IO a
+withGhc' flags action = do
+  libDir <- fmap snd (getGhcDirs flags)
+
+  -- Catches all GHC source errors, then prints and re-throws them.
+  let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
+        printException err
+        liftIO exitFailure
+
+  withGhc libDir (ghcFlags flags) (\_ -> handleSrcErrors action)
 
 
 readPackagesAndProcessModules :: [Flag] -> [String]
