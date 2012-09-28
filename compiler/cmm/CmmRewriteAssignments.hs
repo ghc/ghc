@@ -15,10 +15,11 @@ module CmmRewriteAssignments
   ( rewriteAssignments
   ) where
 
+import StgCmmUtils -- XXX layering violation
+
 import Cmm
 import CmmUtils
 import CmmOpt
-import StgCmmUtils
 
 import DynFlags
 import UniqSupply

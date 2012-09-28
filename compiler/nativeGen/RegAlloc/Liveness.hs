@@ -5,8 +5,6 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-
 module RegAlloc.Liveness (
         RegSet,
         RegMap, emptyRegMap,
@@ -138,6 +136,11 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         mkJumpInstr target      = map Instr (mkJumpInstr target)
 
+        mkStackAllocInstr platform amount =
+             Instr (mkStackAllocInstr platform amount)
+
+        mkStackDeallocInstr platform amount =
+             Instr (mkStackDeallocInstr platform amount)
 
 
 -- | An instruction with liveness information.

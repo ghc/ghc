@@ -96,7 +96,7 @@ utils/ghc-pkg_PACKAGE = ghc-pkg
 
 utils/ghc-pkg_$(GHC_PKG_DISTDIR)_PROG = ghc-pkg
 utils/ghc-pkg_$(GHC_PKG_DISTDIR)_SHELL_WRAPPER = YES
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER = YES
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL = YES
 utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_INPLACE = NO
 

@@ -108,6 +108,8 @@ instance Instruction Instr where
 	mkRegRegMoveInstr	= sparc_mkRegRegMoveInstr
 	takeRegRegMoveInstr	= sparc_takeRegRegMoveInstr
 	mkJumpInstr		= sparc_mkJumpInstr
+        mkStackAllocInstr       = panic "no sparc_mkStackAllocInstr"
+        mkStackDeallocInstr     = panic "no sparc_mkStackDeallocInstr"
 
 
 -- | SPARC instruction set.

@@ -61,12 +61,30 @@ void scheduleWorker (Capability *cap, Task *task);
 extern volatile StgWord sched_state;
 
 /* 
- * flag that tracks whether we have done any execution in this time slice.
+ * flag that tracks whether we have done any execution in this time
+ * slice, and controls the disabling of the interval timer.
+ *
+ * The timer interrupt transitions ACTIVITY_YES into
+ * ACTIVITY_MAYBE_NO, waits for RtsFlags.GcFlags.idleGCDelayTime,
+ * and then:
+ *   - if idle GC is no, set ACTIVITY_INACTIVE and wakeUpRts()
+ *   - if idle GC is off, set ACTIVITY_DONE_GC and stopTimer()
+ *
+ * If the scheduler finds ACTIVITY_INACTIVE, then it sets
+ * ACTIVITY_DONE_GC, performs the GC and calls stopTimer().
+ *
+ * If the scheduler finds ACTIVITY_DONE_GC and it has a thread to run,
+ * it enables the timer again with startTimer().
  */
-#define ACTIVITY_YES      0 /* there has been activity in the current slice */
-#define ACTIVITY_MAYBE_NO 1 /* no activity in the current slice */
-#define ACTIVITY_INACTIVE 2 /* a complete slice has passed with no activity */
-#define ACTIVITY_DONE_GC  3 /* like 2, but we've done a GC too */
+#define ACTIVITY_YES      0
+  // the RTS is active
+#define ACTIVITY_MAYBE_NO 1
+  // no activity since the last timer signal
+#define ACTIVITY_INACTIVE 2
+  // RtsFlags.GcFlags.idleGCDelayTime has passed with no activity
+#define ACTIVITY_DONE_GC  3
+  // like ACTIVITY_INACTIVE, but we've done a GC too (if idle GC is
+  // enabled) and the interval timer is now turned off.
 
 /* Recent activity flag.
  * Locks required  : Transition from MAYBE_NO to INACTIVE

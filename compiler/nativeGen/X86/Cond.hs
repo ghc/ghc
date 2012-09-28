@@ -1,39 +1,32 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module X86.Cond (
-	Cond(..),
-	condUnsigned,
-	condToSigned,
-	condToUnsigned
+        Cond(..),
+        condUnsigned,
+        condToSigned,
+        condToUnsigned,
+        maybeFlipCond
 )
 
 where
 
 data Cond
-	= ALWAYS	-- What's really used? ToDo
-	| EQQ
-	| GE
-	| GEU
-	| GTT
-	| GU
-	| LE
-	| LEU
-	| LTT
-	| LU
-	| NE
-	| NEG
-	| POS
-	| CARRY
-	| OFLO
-	| PARITY
-	| NOTPARITY
-	deriving Eq
+        = ALWAYS        -- What's really used? ToDo
+        | EQQ
+        | GE
+        | GEU
+        | GTT
+        | GU
+        | LE
+        | LEU
+        | LTT
+        | LU
+        | NE
+        | NEG
+        | POS
+        | CARRY
+        | OFLO
+        | PARITY
+        | NOTPARITY
+        deriving Eq
 
 condUnsigned :: Cond -> Bool
 condUnsigned GU  = True
@@ -57,3 +50,19 @@ condToUnsigned LTT = LU
 condToUnsigned GE  = GEU
 condToUnsigned LE  = LEU
 condToUnsigned x   = x
+
+-- | @maybeFlipCond c@ returns @Just c'@ if it is possible to flip the
+-- arguments to the conditional @c@, and the new condition should be @c'@.
+maybeFlipCond :: Cond -> Maybe Cond
+maybeFlipCond cond  = case cond of
+        EQQ   -> Just EQQ
+        NE    -> Just NE
+        LU    -> Just GU
+        GU    -> Just LU
+        LEU   -> Just GEU
+        GEU   -> Just LEU
+        LTT   -> Just GTT
+        GTT   -> Just LTT
+        LE    -> Just GE
+        GE    -> Just LE
+        _other -> Nothing

@@ -71,6 +71,12 @@ libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-pointless-pragmas
 # bytestring has identities at the moment
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
 
+# bytestring uses bitSize at the moment
+libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
+
+# containers uses bitSize at the moment
+libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
+
 # Temporarily turn off unused-do-bind warnings for the time package
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind 
 # Temporary: mkTyCon is deprecated

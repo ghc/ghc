@@ -113,7 +113,7 @@ revertCAFs( void )
          c != (StgIndStatic *)END_OF_STATIC_LIST; 
 	 c = (StgIndStatic *)c->static_link) 
     {
-	SET_INFO(c, c->saved_info);
+	SET_INFO((StgClosure *)c, c->saved_info);
 	c->saved_info = NULL;
 	// could, but not necessary: c->static_link = NULL; 
     }

@@ -159,7 +159,7 @@ $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2
 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_CC)" -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_v_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_v_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_v_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 endif
 
 # Note [lib-depends] if this program is built with stage1 or greater, we
@@ -184,10 +184,12 @@ endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 ifeq "$$($1_$2_INSTALL)" "YES"
-ifeq "$$($1_$2_TOPDIR)" "YES"
-INSTALL_TOPDIRS += $1/$2/build/tmp/$$($1_$2_PROG)
+ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
+INSTALL_LIBEXECS += $1/$2/build/tmp/$$($1_$2_PROG)
+else ifeq "$$($1_$2_TOPDIR)" "YES"
+INSTALL_TOPDIRS  += $1/$2/build/tmp/$$($1_$2_PROG)
 else
-INSTALL_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
+INSTALL_BINS     += $1/$2/build/tmp/$$($1_$2_PROG)
 endif
 endif
 

@@ -351,10 +351,9 @@ litIsDupable dflags (LitInteger i _) = inIntRange dflags i
 litIsDupable _      _                = True
 
 litFitsInChar :: Literal -> Bool
-litFitsInChar (MachInt i)
-                         = fromInteger i <= ord minBound
-                        && fromInteger i >= ord maxBound
-litFitsInChar _         = False
+litFitsInChar (MachInt i) = i >= toInteger (ord minBound)
+                         && i <= toInteger (ord maxBound)
+litFitsInChar _           = False
 
 litIsLifted :: Literal -> Bool
 litIsLifted (LitInteger {}) = True

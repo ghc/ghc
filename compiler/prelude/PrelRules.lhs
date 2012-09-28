@@ -385,37 +385,38 @@ litEq is_eq = msum
 -- minBound, so we can replace such comparison with False.
 boundsCmp :: Comparison -> RuleM CoreExpr
 boundsCmp op = do
+  dflags <- getDynFlags
   [a, b] <- getArgs
-  liftMaybe $ mkRuleFn op a b
+  liftMaybe $ mkRuleFn dflags op a b
 
 data Comparison = Gt | Ge | Lt | Le
 
-mkRuleFn :: Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
-mkRuleFn Gt (Lit lit) _ | isMinBound lit = Just falseVal
-mkRuleFn Le (Lit lit) _ | isMinBound lit = Just trueVal
-mkRuleFn Ge _ (Lit lit) | isMinBound lit = Just trueVal
-mkRuleFn Lt _ (Lit lit) | isMinBound lit = Just falseVal
-mkRuleFn Ge (Lit lit) _ | isMaxBound lit = Just trueVal
-mkRuleFn Lt (Lit lit) _ | isMaxBound lit = Just falseVal
-mkRuleFn Gt _ (Lit lit) | isMaxBound lit = Just falseVal
-mkRuleFn Le _ (Lit lit) | isMaxBound lit = Just trueVal
-mkRuleFn _ _ _                           = Nothing
+mkRuleFn :: DynFlags -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
+mkRuleFn dflags Gt (Lit lit) _ | isMinBound dflags lit = Just falseVal
+mkRuleFn dflags Le (Lit lit) _ | isMinBound dflags lit = Just trueVal
+mkRuleFn dflags Ge _ (Lit lit) | isMinBound dflags lit = Just trueVal
+mkRuleFn dflags Lt _ (Lit lit) | isMinBound dflags lit = Just falseVal
+mkRuleFn dflags Ge (Lit lit) _ | isMaxBound dflags lit = Just trueVal
+mkRuleFn dflags Lt (Lit lit) _ | isMaxBound dflags lit = Just falseVal
+mkRuleFn dflags Gt _ (Lit lit) | isMaxBound dflags lit = Just falseVal
+mkRuleFn dflags Le _ (Lit lit) | isMaxBound dflags lit = Just trueVal
+mkRuleFn _ _ _ _                                       = Nothing
 
-isMinBound :: Literal -> Bool
-isMinBound (MachChar c)   = c == minBound
-isMinBound (MachInt i)    = i == toInteger (minBound :: Int)
-isMinBound (MachInt64 i)  = i == toInteger (minBound :: Int64)
-isMinBound (MachWord i)   = i == toInteger (minBound :: Word)
-isMinBound (MachWord64 i) = i == toInteger (minBound :: Word64)
-isMinBound _              = False
+isMinBound :: DynFlags -> Literal -> Bool
+isMinBound _      (MachChar c)   = c == minBound
+isMinBound dflags (MachInt i)    = i == tARGET_MIN_INT dflags
+isMinBound _      (MachInt64 i)  = i == toInteger (minBound :: Int64)
+isMinBound _      (MachWord i)   = i == 0
+isMinBound _      (MachWord64 i) = i == 0
+isMinBound _      _              = False
 
-isMaxBound :: Literal -> Bool
-isMaxBound (MachChar c)   = c == maxBound
-isMaxBound (MachInt i)    = i == toInteger (maxBound :: Int)
-isMaxBound (MachInt64 i)  = i == toInteger (maxBound :: Int64)
-isMaxBound (MachWord i)   = i == toInteger (maxBound :: Word)
-isMaxBound (MachWord64 i) = i == toInteger (maxBound :: Word64)
-isMaxBound _              = False
+isMaxBound :: DynFlags -> Literal -> Bool
+isMaxBound _      (MachChar c)   = c == maxBound
+isMaxBound dflags (MachInt i)    = i == tARGET_MAX_INT dflags
+isMaxBound _      (MachInt64 i)  = i == toInteger (maxBound :: Int64)
+isMaxBound dflags (MachWord i)   = i == tARGET_MAX_WORD dflags
+isMaxBound _      (MachWord64 i) = i == toInteger (maxBound :: Word64)
+isMaxBound _      _              = False
 
 
 -- Note that we *don't* warn the user about overflow. It's not done at

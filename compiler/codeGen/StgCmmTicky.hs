@@ -46,8 +46,6 @@ module StgCmmTicky (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
 
 import StgCmmClosure
 import StgCmmUtils
@@ -321,7 +319,7 @@ tickyAllocHeap hp
 	  if hp == 0 then [] 	-- Inside the emitMiddle to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
-	    addToMem REP_StgEntCounter_allocs 
+	    addToMem (rEP_StgEntCounter_allocs dflags)
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr

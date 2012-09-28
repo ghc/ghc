@@ -259,7 +259,7 @@ printClosure( StgClosure *obj )
         {
             StgUpdateFrame* u = (StgUpdateFrame*)obj;
             debugBelch("UPDATE_FRAME(");
-            printPtr((StgPtr)GET_INFO(u));
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
             debugBelch(",");
             printPtr((StgPtr)u->updatee);
             debugBelch(")\n"); 
@@ -270,7 +270,7 @@ printClosure( StgClosure *obj )
         {
             StgCatchFrame* u = (StgCatchFrame*)obj;
             debugBelch("CATCH_FRAME(");
-            printPtr((StgPtr)GET_INFO(u));
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
             debugBelch(",");
             printPtr((StgPtr)u->handler);
             debugBelch(")\n"); 
@@ -290,7 +290,7 @@ printClosure( StgClosure *obj )
         {
             StgStopFrame* u = (StgStopFrame*)obj;
             debugBelch("STOP_FRAME(");
-            printPtr((StgPtr)GET_INFO(u));
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
             debugBelch(")\n"); 
             break;
         }

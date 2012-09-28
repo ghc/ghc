@@ -11,7 +11,7 @@
 
 module X86.Instr (Instr(..), Operand(..),
                   getJumpDestBlockId, canShortcut, shortcutStatics,
-                  shortcutJump, i386_insert_ffrees,
+                  shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)
 where
 
@@ -58,6 +58,8 @@ instance Instruction Instr where
         mkRegRegMoveInstr       = x86_mkRegRegMoveInstr
         takeRegRegMoveInstr     = x86_takeRegRegMoveInstr
         mkJumpInstr             = x86_mkJumpInstr
+        mkStackAllocInstr       = x86_mkStackAllocInstr
+        mkStackDeallocInstr     = x86_mkStackDeallocInstr
 
 
 -- -----------------------------------------------------------------------------
@@ -620,14 +622,13 @@ x86_mkSpillInstr
     -> Instr
 
 x86_mkSpillInstr dflags reg delta slot
-  = let off     = spillSlotToOffset dflags slot
+  = let off     = spillSlotToOffset dflags slot - delta
     in
-    let off_w = (off - delta) `div` (if is32Bit then 4 else 8)
-    in case targetClassOfReg platform reg of
+    case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordSize is32Bit)
-                              (OpReg reg) (OpAddr (spRel dflags off_w))
-           RcDouble    -> GST FF80 reg (spRel dflags off_w) {- RcFloat/RcDouble -}
-           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off_w))
+                              (OpReg reg) (OpAddr (spRel dflags off))
+           RcDouble    -> GST FF80 reg (spRel dflags off) {- RcFloat/RcDouble -}
+           RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -641,14 +642,13 @@ x86_mkLoadInstr
     -> Instr
 
 x86_mkLoadInstr dflags reg delta slot
-  = let off     = spillSlotToOffset dflags slot
+  = let off     = spillSlotToOffset dflags slot - delta
     in
-        let off_w = (off-delta) `div` (if is32Bit then 4 else 8)
-        in case targetClassOfReg platform reg of
+        case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordSize is32Bit)
-                               (OpAddr (spRel dflags off_w)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel dflags off_w) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off_w)) (OpReg reg)
+                               (OpAddr (spRel dflags off)) (OpReg reg)
+              RcDouble  -> GLD FF80 (spRel dflags off) reg {- RcFloat/RcDouble -}
+              RcDoubleSSE -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
@@ -666,12 +666,7 @@ maxSpillSlots dflags
 -- the C stack pointer.
 spillSlotToOffset :: DynFlags -> Int -> Int
 spillSlotToOffset dflags slot
-   | slot >= 0 && slot < maxSpillSlots dflags
    = 64 + spillSlotSize dflags * slot
-   | otherwise
-   = pprPanic "spillSlotToOffset:"
-              (   text "invalid spill location: " <> int slot
-              $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
 
 --------------------------------------------------------------------------------
 
@@ -744,8 +739,25 @@ x86_mkJumpInstr id
         = [JXX ALWAYS id]
 
 
+x86_mkStackAllocInstr
+        :: Platform
+        -> Int
+        -> Instr
+x86_mkStackAllocInstr platform amount
+  = case platformArch platform of
+      ArchX86    -> SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
+      ArchX86_64 -> SUB II64 (OpImm (ImmInt amount)) (OpReg rsp)
+      _ -> panic "x86_mkStackAllocInstr"
 
-
+x86_mkStackDeallocInstr
+        :: Platform
+        -> Int
+        -> Instr
+x86_mkStackDeallocInstr platform amount
+  = case platformArch platform of
+      ArchX86    -> ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
+      ArchX86_64 -> ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)
+      _ -> panic "x86_mkStackDeallocInstr"
 
 i386_insert_ffrees
         :: [GenBasicBlock Instr]
@@ -753,18 +765,12 @@ i386_insert_ffrees
 
 i386_insert_ffrees blocks
    | or (map (any is_G_instr) [ instrs | BasicBlock _ instrs <- blocks ])
-   = map ffree_before_nonlocal_transfers blocks
-
+   = map insertGFREEs blocks
    | otherwise
    = blocks
-  where
-   ffree_before_nonlocal_transfers (BasicBlock id insns)
-     = BasicBlock id (foldr p [] insns)
-     where p insn r = case insn of
-                        CALL _ _ -> GFREE : insn : r
-                        JMP _ _  -> GFREE : insn : r
-                        JXX_GBL _ _ -> panic "i386_insert_ffrees: cannot handle JXX_GBL"
-                        _        -> insn : r
+ where
+   insertGFREEs (BasicBlock id insns)
+     = BasicBlock id (insertBeforeNonlocalTransfers GFREE insns)
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
 -- you must update this too
@@ -794,6 +800,57 @@ is_G_instr instr
         GTAN{}          -> True
         GFREE           -> panic "is_G_instr: GFREE (!)"
         _               -> False
+
+
+--
+-- Note [extra spill slots]
+--
+-- If the register allocator used more spill slots than we have
+-- pre-allocated (rESERVED_C_STACK_BYTES), then we must allocate more
+-- C stack space on entry and exit from this proc.  Therefore we
+-- insert a "sub $N, %rsp" at every entry point, and an "add $N, %rsp"
+-- before every non-local jump.
+--
+-- This became necessary when the new codegen started bundling entire
+-- functions together into one proc, because the register allocator
+-- assigns a different stack slot to each virtual reg within a proc.
+-- To avoid using so many slots we could also:
+--
+--   - split up the proc into connected components before code generator
+--
+--   - rename the virtual regs, so that we re-use vreg names and hence
+--     stack slots for non-overlapping vregs.
+--
+allocMoreStack
+  :: Platform
+  -> Int
+  -> NatCmmDecl statics X86.Instr.Instr
+  -> NatCmmDecl statics X86.Instr.Instr
+
+allocMoreStack _ _ top@(CmmData _ _) = top
+allocMoreStack platform amount (CmmProc info lbl (ListGraph code)) =
+        CmmProc info lbl (ListGraph (map insert_stack_insns code))
+  where
+    alloc   = mkStackAllocInstr platform amount
+    dealloc = mkStackDeallocInstr platform amount
+
+    is_entry_point id = id `mapMember` info
+
+    insert_stack_insns (BasicBlock id insns)
+       | is_entry_point id  = BasicBlock id (alloc : block')
+       | otherwise          = BasicBlock id block'
+       where
+         block' = insertBeforeNonlocalTransfers dealloc insns
+
+
+insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
+insertBeforeNonlocalTransfers insert insns
+     = foldr p [] insns
+     where p insn r = case insn of
+                        CALL _ _    -> insert : insn : r
+                        JMP _ _     -> insert : insn : r
+                        JXX_GBL _ _ -> panic "insertBeforeNonlocalTransfers: cannot handle JXX_GBL"
+                        _           -> insn : r
 
 
 data JumpDest = DestBlockId BlockId | DestImm Imm

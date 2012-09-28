@@ -46,11 +46,14 @@
  
    -------------------------------------------------------------------------- */
 
-#define SET_INFO(c,i) ((c)->header.info = (i))
-#define GET_INFO(c)   ((c)->header.info)
-#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
+INLINE_HEADER void SET_INFO(StgClosure *c, const StgInfoTable *info) {
+    c->header.info = info;
+}
+INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
+    return c->header.info;
+}
 
-#define GET_TAG(con) (get_itbl(con)->srt_bitmap)
+#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
 
 #ifdef TABLES_NEXT_TO_CODE
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
@@ -89,6 +92,10 @@ INLINE_HEADER StgFunInfoTable *get_fun_itbl(const StgClosure *c) {return FUN_INF
 INLINE_HEADER StgThunkInfoTable *get_thunk_itbl(const StgClosure *c) {return THUNK_INFO_PTR_TO_STRUCT(c->header.info);}
 
 INLINE_HEADER StgConInfoTable *get_con_itbl(const StgClosure *c) {return CON_INFO_PTR_TO_STRUCT((c)->header.info);}
+
+INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
+    return get_itbl(con)->srt_bitmap;
+}
 
 /* -----------------------------------------------------------------------------
    Macros for building closures
@@ -142,7 +149,7 @@ INLINE_HEADER StgConInfoTable *get_con_itbl(const StgClosure *c) {return CON_INF
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
     OVERWRITING_CLOSURE((StgClosure *)(c));                     \
-    SET_INFO((c), (new_info));                                  \
+    SET_INFO((StgClosure *)(c), (new_info));                    \
     LDV_RECORD_CREATE(c);
 
 /* -----------------------------------------------------------------------------
@@ -170,16 +177,22 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     }
 }
 
-#define STATIC_LINK2(info,p)							\
-   (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +			\
-					info->layout.payload.nptrs + 1])))
+INLINE_HEADER StgClosure *STATIC_LINK2(const StgInfoTable *info,
+                                       StgClosure *p) {
+    return (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +
+                            info->layout.payload.nptrs + 1])));
+}
 
 /* -----------------------------------------------------------------------------
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */
 
-#define CHARLIKE_CLOSURE(n) ((P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE])
-#define INTLIKE_CLOSURE(n)  ((P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE])
+INLINE_HEADER P_ CHARLIKE_CLOSURE(int n) {
+    return (P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE];
+}
+INLINE_HEADER P_ INTLIKE_CLOSURE(int n) {
+    return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
+}
 
 /* ----------------------------------------------------------------------------
    Macros for untagging and retagging closure pointers
@@ -492,7 +505,7 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    LDV_recordDead((StgClosure *)(p), size);
+    LDV_recordDead(p, size);
 #endif
 
     for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {

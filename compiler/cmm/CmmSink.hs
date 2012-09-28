@@ -3,7 +3,7 @@ module CmmSink (
      cmmSink
   ) where
 
-import StgCmmUtils (callerSaves)
+import CodeGen.Platform (callerSaves)
 
 import Cmm
 import BlockId
@@ -155,7 +155,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
           where
             should_drop =  conflicts dflags a final_last
-                        || {- not (isTiny rhs) && -} live_in_multi live_sets r
+                        || {- not (isSmall rhs) && -} live_in_multi live_sets r
                         || r `Set.member` live_in_joins
 
             live_sets' | should_drop = live_sets
@@ -172,12 +172,21 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
                  mapFromList [ (l, filterAssignments dflags (getLive l) assigs'')
                              | l <- succs ]
 
-{-
--- tiny: an expression we don't mind duplicating
-isTiny :: CmmExpr -> Bool
-isTiny (CmmReg _) = True
-isTiny (CmmLit _) = True
-isTiny _other     = False
+{- TODO: enable this later, when we have some good tests in place to
+   measure the effect and tune it.
+
+-- small: an expression we don't mind duplicating
+isSmall :: CmmExpr -> Bool
+isSmall (CmmReg (CmmLocal _)) = True  -- not globals, we want to coalesce them instead
+isSmall (CmmLit _) = True
+isSmall (CmmMachOp (MO_Add _) [x,y]) = isTrivial x && isTrivial y
+isSmall (CmmRegOff (CmmLocal _) _) = True
+isSmall _ = False
+
+isTrivial :: CmmExpr -> Bool
+isTrivial (CmmReg (CmmLocal _)) = True
+isTrivial (CmmLit _) = True
+isTrivial _ = False
 -}
 
 --

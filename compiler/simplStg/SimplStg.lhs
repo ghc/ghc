@@ -22,12 +22,10 @@ import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import UnariseStg       ( unarise )
-import SRT		( computeSRTs )
 
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, StgToDo(..),
 			  getStgToDo )
-import Id		( Id )
-import Module		( Module )
+import Module           ( Module )
 import ErrUtils
 import SrcLoc
 import UniqSupply	( mkSplitUniqSupply, splitUniqSupply )
@@ -38,7 +36,7 @@ import Outputable
 stg2stg :: DynFlags		     -- includes spec of what stg-to-stg passes to do
 	-> Module		     -- module name (profiling only)
 	-> [StgBinding]		     -- input...
-	-> IO ( [(StgBinding,[(Id,[Id])])]  -- output program...
+        -> IO ( [StgBinding]  -- output program...
 	      , CollectedCCs)        -- cost centre information (declared and used)
 
 stg2stg dflags module_name binds
@@ -56,14 +54,11 @@ stg2stg dflags module_name binds
 		<- foldl_mn do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
 
         ; let un_binds = unarise us1 processed_binds
-        ; let srt_binds
-               | dopt Opt_TryNewCodeGen dflags = zip un_binds (repeat [])
-               | otherwise = computeSRTs dflags un_binds
 
 	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
-	     		(pprStgBindingsWithSRTs srt_binds)
+                        (pprStgBindings un_binds)
 
-	; return (srt_binds, cost_centres)
+        ; return (un_binds, cost_centres)
    }
 
   where

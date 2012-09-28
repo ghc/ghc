@@ -64,6 +64,8 @@ instance Instruction Instr where
         mkRegRegMoveInstr _     = ppc_mkRegRegMoveInstr
         takeRegRegMoveInstr     = ppc_takeRegRegMoveInstr
         mkJumpInstr             = ppc_mkJumpInstr
+        mkStackAllocInstr       = panic "no ppc_mkStackAllocInstr"
+        mkStackDeallocInstr     = panic "no ppc_mkStackDeallocInstr"
 
 
 -- -----------------------------------------------------------------------------
