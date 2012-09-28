@@ -704,7 +704,7 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
   = do { traceTcS "solveWanteds {" (ppr wanted)
 
          -- Try the flat bit, including insolubles. Solving insolubles a 
-         -- second time round is a bit of a waste but the code is simple 
+         -- second time round is a bit of a waste; but the code is simple 
          -- and the program is wrong anyway, and we don't run the danger 
          -- of adding Derived insolubles twice; see 
          -- TcSMonad Note [Do not add duplicate derived insolubles] 
