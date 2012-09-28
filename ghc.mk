@@ -3,7 +3,7 @@ utils/haddock_USES_CABAL = YES
 utils/haddock_PACKAGE = haddock
 utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
 utils/haddock_dist_SHELL_WRAPPER = YES
-utils/haddock_dist_INSTALL_SHELL_WRAPPER = YES
+utils/haddock_dist_INSTALL = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-ghc-$(ProjectVersion)
 utils/haddock_dist_PROG = haddock$(exeext)
 
