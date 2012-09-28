@@ -29,8 +29,7 @@ module TcHsType (
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
 
-        ExpKind(..), ekConstraint, expArgKind, 
-        kindGeneralize,
+        kindGeneralize, checkKind,
 
 		-- Sort-checking kinds
 	tcLHsKind, 
@@ -967,7 +966,7 @@ kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
            ; return (n, exp_k) }
     kc_tv (L _ (KindedTyVar n hs_k)) exp_k
       = do { k <- tcLHsKind hs_k
-           ; _ <- unifyKind k exp_k
+           ; checkKind k exp_k
            ; check_in_scope n exp_k
            ; return (n, k) }
 
@@ -979,7 +978,7 @@ kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
       = do { mb_thing <- tcLookupLcl_maybe n
            ; case mb_thing of
                Nothing         -> return ()
-               Just (AThing k) -> discardResult (unifyKind k exp_k)
+               Just (AThing k) -> checkKind k exp_k
                Just thing      -> pprPanic "check_in_scope" (ppr thing) }
 
 -----------------------
@@ -1014,7 +1013,7 @@ tcTyClTyVars tycon (HsQTvs { hsq_kvs = hs_kvs, hsq_tvs = hs_tvs }) thing_inside
   where
     tc_hs_tv (L _ (UserTyVar n))        kind = return (mkTyVar n kind)
     tc_hs_tv (L _ (KindedTyVar n hs_k)) kind = do { tc_kind <- tcLHsKind hs_k
-                                                  ; _ <- unifyKind kind tc_kind
+                                                  ; checkKind kind tc_kind
                                                   ; return (mkTyVar n kind) }
 
 -----------------------------------
@@ -1274,8 +1273,15 @@ unifyKinds fun act_kinds
        ; mapM_ check (zip [1..] act_kinds)
        ; return kind }
 
+checkKind :: TcKind -> TcKind -> TcM ()
+checkKind act_kind exp_kind
+  = do { mb_subk <- unifyKindX act_kind exp_kind
+       ; case mb_subk of
+           Just EQ -> return ()
+           _       -> unifyKindMisMatch act_kind exp_kind }
+
 checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
--- A fancy wrapper for 'unifyKind', which tries
+-- A fancy wrapper for 'unifyKindX', which tries
 -- to give decent error messages.
 --      (checkExpectedKind ty act_kind exp_kind)
 -- checks that the actual kind act_kind is compatible
@@ -1283,12 +1289,13 @@ checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
 -- The first argument, ty, is used only in the error message generation
 checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
  = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr ek)
-      ; (_, lie) <- captureConstraints (unifyKind act_kind exp_kind)
+      ; mb_subk <- unifyKindX act_kind exp_kind
 
          -- Kind unification only generates definite errors
-      ; if isEmptyWC lie 
-        then return () -- Unification succeeded
-        else do
+      ; case mb_subk of {
+          Just LT -> return () ;    -- act_kind is a sub-kind of exp_kind
+          Just EQ -> return () ;    -- The two are equal
+          _other  -> do
 
       {  -- So there's an error
          -- Now to find out what sort
@@ -1334,7 +1341,7 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
                               ptext (sLit "but") <+> quotes (ppr ty) <+>
                                   ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
-      ; failWithTcM (env2, err) } }
+      ; failWithTcM (env2, err) } } }
 \end{code}
 
 %************************************************************************
@@ -1489,5 +1496,15 @@ badPatSigTvs sig_ty bad_tvs
 	  	 ptext (sLit "but are actually discarded by a type synonym") ]
          , ptext (sLit "To fix this, expand the type synonym") 
          , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
+
+unifyKindMisMatch :: TcKind -> TcKind -> TcM a
+unifyKindMisMatch ki1 ki2 = do
+    ki1' <- zonkTcKind ki1
+    ki2' <- zonkTcKind ki2
+    let msg = hang (ptext (sLit "Couldn't match kind"))
+              2 (sep [quotes (ppr ki1'),
+                      ptext (sLit "against"),
+                      quotes (ppr ki2')])
+    failWithTc msg
 \end{code}
 

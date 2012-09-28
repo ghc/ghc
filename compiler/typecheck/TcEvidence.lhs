@@ -16,7 +16,7 @@ module TcEvidence (
 
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
 
-  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvKindCast,
+  EvTerm(..), mkEvCast, evVarsOfTerm, 
   EvLit(..), evTermCoercion,
 
   -- TcCoercion
@@ -483,8 +483,6 @@ data EvTerm
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
 
-  | EvKindCast EvTerm TcCoercion  -- See Note [EvKindCast]
-
   | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
                                  -- Note [EvLit]
 
@@ -520,19 +518,6 @@ because that does not satisfy the invariant.  Instead we make a binding
 and the constraint
     [G] g1 :: a~Bool
 See Trac [7238]
-
-Note [EvKindCast] 
-~~~~~~~~~~~~~~~~~ 
-EvKindCast g kco is produced when we have a constraint (g : s1 ~ s2) 
-but the kinds of s1 and s2 (k1 and k2 respectively) don't match but 
-are rather equal by a coercion. You may think that this coercion will
-always turn out to be ReflCo, so why is this needed? Because sometimes
-we will want to defer kind errors until the runtime and in these cases
-that coercion will be an 'error' term, which we want to evaluate rather
-than silently forget about!
-
-The relevant (and only) place where such a coercion is produced in 
-the simplifier is in TcCanonical.emitKindConstraint.
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -595,11 +580,6 @@ mkEvCast ev lco
   | isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
-mkEvKindCast :: EvTerm -> TcCoercion -> EvTerm
-mkEvKindCast ev lco
-  | isTcReflCo lco = ev
-  | otherwise      = EvKindCast ev lco
-
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
 
@@ -625,7 +605,6 @@ evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
 evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo co
 evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
 evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
-evVarsOfTerm (EvKindCast v co)    = coVarsOfTcCo co `unionVarSet` evVarsOfTerm v
 evVarsOfTerm (EvLit _)            = emptyVarSet
 
 evVarsOfTerms :: [EvTerm] -> VarSet
@@ -683,7 +662,6 @@ instance Outputable EvBind where
 instance Outputable EvTerm where
   ppr (EvId v)           = ppr v
   ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
-  ppr (EvKindCast v co)  = ppr v <+> (ptext (sLit "`kind-cast`")) <+> pprParendTcCo co
   ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
   ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
   ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs

@@ -1117,11 +1117,6 @@ zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcLCoToLCo env co
 zonkEvTerm env (EvCast tm co)     = do { tm' <- zonkEvTerm env tm
                                        ; co' <- zonkTcLCoToLCo env co
                                        ; return (mkEvCast tm' co') }
-
-zonkEvTerm env (EvKindCast v co)  = do { v'  <- zonkEvTerm env v
-                                       ; co' <- zonkTcLCoToLCo env co
-                                       ; return (mkEvKindCast v' co') }
-
 zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
                                        ; return (EvTupleSel tm' n) }
 zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms

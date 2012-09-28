@@ -19,7 +19,8 @@ module TcUnify (
   checkConstraints, newImplication, 
 
   -- Various unifications
-  unifyType, unifyTypeList, unifyTheta, unifyKind, 
+  unifyType, unifyTypeList, unifyTheta, 
+  unifyKindX, 
 
   --------------------------------
   -- Holes
@@ -466,7 +467,9 @@ non-exported generic functions.
 unifyType :: TcTauType -> TcTauType -> TcM TcCoercion
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyType ty1 ty2 = uType [] ty1 ty2
+unifyType ty1 ty2 = uType origin ty1 ty2
+  where
+    origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
 
 ---------------
 unifyPred :: PredType -> PredType -> TcM TcCoercion
@@ -508,25 +511,9 @@ second, except that if the first is a synonym then the second may be a
 de-synonym'd version.  This way we get better error messages.
 
 \begin{code}
-data SwapFlag 
-  = NotSwapped	-- Args are: actual,   expected
-  | IsSwapped   -- Args are: expected, actual
-
-instance Outputable SwapFlag where
-  ppr IsSwapped  = ptext (sLit "Is-swapped")
-  ppr NotSwapped = ptext (sLit "Not-swapped")
-
-flipSwap :: SwapFlag -> SwapFlag
-flipSwap IsSwapped  = NotSwapped
-flipSwap NotSwapped = IsSwapped
-
-unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
-unSwap NotSwapped f a b = f a b
-unSwap IsSwapped  f a b = f b a
-
 ------------
-uType, uType_np, uType_defer
-  :: [EqOrigin]
+uType, uType_defer
+  :: CtOrigin
   -> TcType    -- ty1 is the *actual* type
   -> TcType    -- ty2 is the *expected* type
   -> TcM TcCoercion
@@ -534,10 +521,9 @@ uType, uType_np, uType_defer
 --------------
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
-uType_defer items ty1 ty2
-  = ASSERT( not (null items) )
-    do { eqv <- newEq ty1 ty2
-       ; loc <- getCtLoc (TypeEqOrigin (last items))
+uType_defer origin ty1 ty2
+  = do { eqv <- newEq ty1 ty2
+       ; loc <- getCtLoc origin
        ; let ctev = CtWanted { ctev_evar = eqv
                              , ctev_pred = mkTcEqPred ty1 ty2 }
        ; emitFlat $ mkNonCanonical loc ctev 
@@ -549,18 +535,13 @@ uType_defer items ty1 ty2
             { ctxt <- getErrCtxt
             ; doc <- mkErrInfo emptyTidyEnv ctxt
             ; traceTc "utype_defer" (vcat [ppr eqv, ppr ty1,
-                                           ppr ty2, ppr items, doc])
+                                           ppr ty2, ppr origin, doc])
             }
        ; return (mkTcCoVarCo eqv) }
 
 --------------
--- Push a new item on the origin stack (the most common case)
-uType origin ty1 ty2  -- Push a new item on the origin stack
-  = uType_np (pushOrigin ty1 ty2 origin) ty1 ty2
-
---------------
 -- unify_np (short for "no push" on the origin stack) does the work
-uType_np origin orig_ty1 orig_ty2
+uType origin orig_ty1 orig_ty2
   = do { untch <- getUntouchables
        ; traceTc "u_tys " $ vcat 
               [ text "untch" <+> ppr untch
@@ -651,11 +632,11 @@ uType_np origin orig_ty1 orig_ty2
 
     ------------------
     go_app s1 t1 s2 t2
-      = do { co_s <- uType_np origin s1 s2  -- See Note [Unifying AppTy]
+      = do { co_s <- uType origin s1 s2  -- See Note [Unifying AppTy]
            ; co_t <- uType origin t1 t2        
            ; return $ mkTcAppCo co_s co_t }
 
-unifySigmaTy :: [EqOrigin] -> TcType -> TcType -> TcM TcCoercion
+unifySigmaTy :: CtOrigin -> TcType -> TcType -> TcM TcCoercion
 unifySigmaTy origin ty1 ty2
   = do { let (tvs1, body1) = tcSplitForAllTys ty1
              (tvs2, body2) = tcSplitForAllTys ty2
@@ -762,7 +743,7 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 
 \begin{code}
-uUnfilledVar :: [EqOrigin]
+uUnfilledVar :: CtOrigin
              -> SwapFlag
              -> TcTyVar -> TcTyVarDetails       -- Tyvar 1
              -> TcTauType  			-- Type 2
@@ -802,7 +783,7 @@ uUnfilledVar origin swapped tv1 details1 non_var_ty2  -- ty2 is not a type varia
 	  --     eg tv1 occured in type family parameter
 
 ----------------
-uUnfilledVars :: [EqOrigin]
+uUnfilledVars :: CtOrigin
               -> SwapFlag
               -> TcTyVar -> TcTyVarDetails      -- Tyvar 1
               -> TcTyVar -> TcTyVarDetails      -- Tyvar 2
@@ -813,8 +794,7 @@ uUnfilledVars :: [EqOrigin]
 uUnfilledVars origin swapped tv1 details1 tv2 details2
   = do { traceTc "uUnfilledVars" (    text "trying to unify" <+> ppr k1
                                   <+> text "with"            <+> ppr k2)
-       ; let ctxt = mkKindErrorCtxt ty1 ty2 k1 k2
-       ; mb_sub_kind <- addErrCtxtM ctxt $ unifyKind k1 k2
+       ; mb_sub_kind <- unifyKindX k1 k2
        ; case mb_sub_kind of {
            Nothing -> unSwap swapped (uType_defer origin) (mkTyVarTy tv1) ty2 ;
            Just sub_kind -> 
@@ -838,10 +818,10 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
 	   -- This happens for skolems of all sorts
            (_, _, _) -> unSwap swapped (uType_defer origin) ty1 ty2 } }
   where
-    k1       = tyVarKind tv1
-    k2       = tyVarKind tv2
-    ty1      = mkTyVarTy tv1
-    ty2      = mkTyVarTy tv2
+    k1  = tyVarKind tv1
+    k2  = tyVarKind tv2
+    ty1 = mkTyVarTy tv1
+    ty2 = mkTyVarTy tv2
 
     nicer_to_update_tv1 _     SigTv = True
     nicer_to_update_tv1 SigTv _     = False
@@ -875,13 +855,8 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 -- sort matters out.
 
 checkTauTvUpdate tv ty
-  = do { ty' <- zonkTcType ty
-       ; let k2 = typeKind ty'
-       ; k1 <- zonkTcKind (tyVarKind tv)
-       ; let ctxt = mkKindErrorCtxt (mkTyVarTy tv) ty' k1 k2
-       ; sub_k <- addErrCtxtM ctxt $
-                  unifyKind (tyVarKind tv) (typeKind ty')
-
+  = do { ty'   <- zonkTcType ty
+       ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty')
        ; case sub_k of
            Nothing -> return Nothing
            Just LT -> return Nothing
@@ -1010,50 +985,6 @@ we return a made-up TcTyVarDetails, but I think it works smoothly.
 
 %************************************************************************
 %*                                                                      *
-        Errors and contexts
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-pushOrigin :: TcType -> TcType -> [EqOrigin] -> [EqOrigin]
-pushOrigin ty_act ty_exp origin
-  = UnifyOrigin { uo_actual = ty_act, uo_expected = ty_exp } : origin
-\end{code}
-
-
------------------------------------------
-	UNUSED FOR NOW
------------------------------------------
-
-----------------
-----------------
--- If an error happens we try to figure out whether the function
--- function has been given too many or too few arguments, and say so.
-addSubCtxt :: InstOrigin -> TcType -> TcType -> TcM a -> TcM a
-addSubCtxt orig actual_res_ty expected_res_ty thing_inside
-  = addErrCtxtM mk_err thing_inside
-  where
-    mk_err tidy_env
-      = do { exp_ty' <- zonkTcType expected_res_ty
-           ; act_ty' <- zonkTcType actual_res_ty
-           ; let (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
-                 (env2, act_ty'') = tidyOpenType env1     act_ty'
-                 (exp_args, _)    = tcSplitFunTys exp_ty''
-                 (act_args, _)    = tcSplitFunTys act_ty''
-
-                 len_act_args     = length act_args
-                 len_exp_args     = length exp_args
-
-                 message = case orig of
-                             OccurrenceOf fun
-                                  | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
-                                  | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
-                             _ -> mkExpectedActualMsg act_ty'' exp_ty''
-           ; return (env2, message) }
-
-
-%************************************************************************
-%*                                                                      *
                 Kind unification
 %*                                                                      *
 %************************************************************************
@@ -1086,31 +1017,31 @@ matchExpectedFunKind (FunTy arg_kind res_kind) = return (Just (arg_kind,res_kind
 matchExpectedFunKind _                         = return Nothing
 
 -----------------  
-unifyKind :: TcKind           -- k1 (actual)
-          -> TcKind           -- k2 (expected)
-          -> TcM (Maybe Ordering)     
+unifyKindX :: TcKind           -- k1 (actual)
+           -> TcKind           -- k2 (expected)
+           -> TcM (Maybe Ordering)     
                               -- Returns the relation between the kinds
                               -- Just LT <=> k1 is a sub-kind of k2
                               -- Nothing <=> incomparable
 
--- unifyKind deals with the top-level sub-kinding story
+-- unifyKindX deals with the top-level sub-kinding story
 -- but recurses into the simpler unifyKindEq for any sub-terms
 -- The sub-kinding stuff only applies at top level
 
-unifyKind (TyVarTy kv1) k2 = uKVar NotSwapped unifyKind kv1 k2
-unifyKind k1 (TyVarTy kv2) = uKVar IsSwapped  unifyKind kv2 k1
+unifyKindX (TyVarTy kv1) k2 = uKVar NotSwapped unifyKindX kv1 k2
+unifyKindX k1 (TyVarTy kv2) = uKVar IsSwapped  unifyKindX kv2 k1
 
-unifyKind k1 k2       -- See Note [Expanding synonyms during unification]
-  | Just k1' <- tcView k1 = unifyKind k1' k2
-  | Just k2' <- tcView k2 = unifyKind k1  k2'
+unifyKindX k1 k2       -- See Note [Expanding synonyms during unification]
+  | Just k1' <- tcView k1 = unifyKindX k1' k2
+  | Just k2' <- tcView k2 = unifyKindX k1  k2'
 
-unifyKind k1@(TyConApp kc1 []) k2@(TyConApp kc2 [])
+unifyKindX (TyConApp kc1 []) (TyConApp kc2 [])
   | kc1 == kc2               = return (Just EQ)
   | kc1 `tcIsSubKindCon` kc2 = return (Just LT)
   | kc2 `tcIsSubKindCon` kc1 = return (Just GT)
-  | otherwise                = unifyKindMisMatch k1 k2
+  | otherwise                = return Nothing
 
-unifyKind k1 k2 = unifyKindEq k1 k2
+unifyKindX k1 k2 = unifyKindEq k1 k2
   -- In all other cases, let unifyKindEq do the work
 
 uKVar :: SwapFlag -> (TcKind -> TcKind -> TcM (Maybe Ordering))
@@ -1128,7 +1059,7 @@ uKVar swapped unify_kind kv1 k2
   = uKVar (flipSwap swapped) unify_kind kv2 (TyVarTy kv1)
 
   | otherwise 
-  = unSwap swapped unifyKindMisMatch (TyVarTy kv1) k2
+  = return Nothing
 
 {- Note [Unifying kind variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1166,7 +1097,7 @@ unifyKindEq (TyConApp kc1 k1s) (TyConApp kc2 k2s)
                  then Just EQ 
                  else Nothing) }
 
-unifyKindEq k1 k2 = unifyKindMisMatch k1 k2
+unifyKindEq _ _ = return Nothing
 
 ----------------
 uUnboundKVar :: MetaKindVar -> TcKind -> TcM (Maybe Ordering)
@@ -1201,34 +1132,7 @@ mkKindErrorCtxt ty1 ty2 k1 k2 env0
           k1  <- zonkTcKind k1'
           k2  <- zonkTcKind k2'
           return (env4, 
-                  vcat [ ptext (sLit "Kind incompatibility when matching types:")
+                  vcat [ ptext (sLit "Kind incompatibility when matching types xx:")
                        , nest 2 (vcat [ ppr ty1 <+> dcolon <+> ppr k1
                                       , ppr ty2 <+> dcolon <+> ppr k2 ]) ])
-
-unifyKindMisMatch :: TcKind -> TcKind -> TcM (Maybe Ordering)
-unifyKindMisMatch ki1 ki2 
-  = do { _ <- uType_defer (pushOrigin ki1 ki2 []) ki1 ki2
-       ; return Nothing }
-{-
-do
-    ki1' <- zonkTcKind ki1
-    ki2' <- zonkTcKind ki2
-    let msg = hang (ptext (sLit "Couldn't match kind"))
-              2 (sep [quotes (ppr ki1'),
-                      ptext (sLit "against"),
-                      quotes (ppr ki2')])
-    failWithTc msg
-
-
-----------------
-kindOccurCheckErr :: Var -> Type -> SDoc
-kindOccurCheckErr tyvar ty
-  = hang (ptext (sLit "Occurs check: cannot construct the infinite kind:"))
-       2 (sep [ppr tyvar, char '=', ppr ty])
-
-kindSigVarErr :: Var -> Type -> SDoc
-kindSigVarErr tv ty
-  = hang (ptext (sLit "Cannot unify the kind variable") <+> quotes (ppr tv))
-       2 (ptext (sLit "with the kind") <+> quotes (ppr ty))
--}
 \end{code}

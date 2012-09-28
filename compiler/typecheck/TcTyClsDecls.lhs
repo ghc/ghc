@@ -28,7 +28,6 @@ module TcTyClsDecls (
 import HsSyn
 import HscTypes
 import BuildTyCl
-import TcUnify
 import TcRnMonad
 import TcEnv
 import TcHsSyn
@@ -659,7 +658,7 @@ tcTyDefn calc_isrec tc_name tvs kind
            Nothing   -> return ()
            Just hs_k -> do { checkTc (kind_signatures) (badSigTyDecl tc_name)
                            ; tc_kind <- tcLHsKind hs_k
-                           ; _ <- unifyKind kind tc_kind
+                           ; checkKind kind tc_kind
                            ; return () }
 
        ; dataDeclChecks tc_name new_or_data stupid_theta cons
@@ -771,12 +770,12 @@ kcTyDefn (TySynonym { td_synRhs = rhs_ty }) res_k
 ------------------
 kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
 kcResultKind Nothing res_k
-  = discardResult (unifyKind res_k liftedTypeKind)
+  = checkKind res_k liftedTypeKind
       --             type family F a 
       -- defaults to type family F a :: *
-kcResultKind (Just k ) res_k
+kcResultKind (Just k) res_k
   = do { k' <- tcLHsKind k
-       ; discardResult (unifyKind k' res_k) }
+       ; checkKind  k' res_k }
 
 -------------------------
 -- Kind check type patterns and kind annotate the embedded type variables.

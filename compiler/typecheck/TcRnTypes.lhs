@@ -65,7 +65,7 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin, 
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin,
-	CtOrigin(..), EqOrigin(..), 
+	CtOrigin(..), 
         pushErrCtxt, pushErrCtxtSameOrigin,
 
 	SkolemInfo(..),
@@ -1480,7 +1480,11 @@ data CtOrigin
 
   | SpecPragOrigin Name		-- Specialisation pragma for identifier
 
-  | TypeEqOrigin EqOrigin
+  | TypeEqOrigin { uo_actual   :: TcType
+                 , uo_expected :: TcType }
+  | KindEqOrigin 
+      TcType TcType             -- A kind equality arising from unifying these two types
+      CtOrigin                  -- originally arising from this
 
   | IPOccOrigin  HsIPName 	-- Occurrence of an implicit parameter
 
@@ -1510,14 +1514,6 @@ data CtOrigin
   | FunDepOrigin
   | HoleOrigin
 
-data EqOrigin 
-  = UnifyOrigin 
-       { uo_actual   :: TcType
-       , uo_expected :: TcType }
-
-instance Outputable CtOrigin where
-  ppr orig = pprO orig
-
 pprO :: CtOrigin -> SDoc
 pprO (GivenOrigin sk)      = ppr sk
 pprO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
@@ -1544,12 +1540,13 @@ pprO DefaultOrigin	   = ptext (sLit "a 'default' declaration")
 pprO DoOrigin	           = ptext (sLit "a do statement")
 pprO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
 pprO ProcOrigin	           = ptext (sLit "a proc expression")
-pprO (TypeEqOrigin eq)     = ptext (sLit "an equality") <+> ppr eq
+pprO (TypeEqOrigin t1 t2)  = ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
+pprO (KindEqOrigin t1 t2 _) = ptext (sLit "a kind equality arising from") <+> sep [ppr t1, char '~', ppr t2]
 pprO AnnOrigin             = ptext (sLit "an annotation")
 pprO FunDepOrigin          = ptext (sLit "a functional dependency")
 pprO HoleOrigin            = ptext (sLit "a use of the hole") <+> quotes (ptext $ sLit "_")
 
-instance Outputable EqOrigin where
-  ppr (UnifyOrigin t1 t2) = ppr t1 <+> char '~' <+> ppr t2
+instance Outputable CtOrigin where
+  ppr = pprO
 \end{code}
 

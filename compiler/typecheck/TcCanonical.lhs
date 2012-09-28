@@ -622,13 +622,17 @@ because now the 'b' has escaped its scope.  We'd have to flatten to
 and we have not begun to think about how to make that work!
 
 \begin{code}
-flattenTyVar :: CtLoc -> FlattenMode 
-             -> CtFlavour -> TcTyVar -> TcS (Xi, TcCoercion)
+flattenTyVar, flattenFinalTyVar
+        :: CtLoc -> FlattenMode 
+        -> CtFlavour -> TcTyVar -> TcS (Xi, TcCoercion)
 -- "Flattening" a type variable means to apply the substitution to it
 -- The substitution is actually the union of the substitution in the TyBinds
 -- for the unification variables that have been unified already with the inert
 -- equalities, see Note [Spontaneously solved in TyBinds] in TcInteract.
 flattenTyVar loc f ctxt tv
+  | not (isTcTyVar tv)	              -- Happens when flatten under a (forall a. ty)
+  = flattenFinalTyVar loc f ctxt tv   -- So ty contains referneces to the non-TcTyVar a
+  | otherwise
   = do { mb_ty <- isFilledMetaTyVar_maybe tv
        ; case mb_ty of {
            Just ty -> flatten loc f ctxt ty ;
@@ -655,13 +659,7 @@ flattenTyVar loc f ctxt tv
        -- In fact, because of flavors, it couldn't possibly be idempotent,
        -- this is explained in Note [Non-idempotent inert substitution]
 
-           Nothing -> 
-
-    -- Done, but make sure the kind is zonked
-    do { let knd = tyVarKind tv
-       ; (new_knd,_kind_co) <- flatten loc f ctxt knd
-       ; let ty = mkTyVarTy (setVarType tv new_knd)
-       ; return (ty, mkTcReflCo ty) }
+           Nothing -> flattenFinalTyVar loc f ctxt tv
     } } } } } } 
   where
     tv_eq_subst subst tv
@@ -672,6 +670,13 @@ flattenTyVar loc f ctxt tv
               -- NB: even if ct is Derived we are not going to 
               -- touch the actual coercion so we are fine. 
        | otherwise = Nothing
+
+flattenFinalTyVar loc f ctxt tv
+  = -- Done, but make sure the kind is zonked
+    do { let knd = tyVarKind tv
+       ; (new_knd,_kind_co) <- flatten loc f ctxt knd
+       ; let ty = mkTyVarTy (setVarType tv new_knd)
+       ; return (ty, mkTcReflCo ty) }
 \end{code}
 
 Note [Non-idempotent inert substitution]
@@ -795,11 +800,11 @@ canEq loc ev ty1 ty2
            Nothing     -> return Stop
            Just new_ev -> last_chance new_ev s1 s2 }
   where
-    last_chance new_ev ty1 ty2
+    last_chance ev ty1 ty2
       | Just (tc1,tys1) <- tcSplitTyConApp_maybe ty1
       , Just (tc2,tys2) <- tcSplitTyConApp_maybe ty2
       , isDecomposableTyCon tc1 && isDecomposableTyCon tc2
-      = canDecomposableTyConApp loc new_ev tc1 tys1 tc2 tys2
+      = canDecomposableTyConApp loc ev tc1 tys1 tc2 tys2
     
       | Just (s1,t1) <- tcSplitAppTy_maybe ty1
       , Just (s2,t2) <- tcSplitAppTy_maybe ty2
@@ -811,7 +816,7 @@ canEq loc ev ty1 ty2
        	   ; canEvVarsCreated loc ctevs }
 
       | otherwise
-      = do { emitInsoluble (CNonCanonical { cc_ev = new_ev, cc_loc = loc })
+      = do { emitInsoluble (CNonCanonical { cc_ev = ev, cc_loc = loc })
            ; return Stop }
 
 ------------------------
@@ -860,47 +865,25 @@ emitKindConstraint ct   -- By now ct is canonical
 
       _   -> continueWith ct
   where
-    emit_kind_constraint loc ev ty1 ty2 
+    emit_kind_constraint loc _ev ty1 ty2 
        | compatKind k1 k2    -- True when ty1,ty2 are themselves kinds,
        = continueWith ct     -- because then k1, k2 are BOX
        
        | otherwise
        = ASSERT( isKind k1 && isKind k2 )
-         do { mw <- newWantedEvVar (mkEqPred k1 k2) 
-            ; kev_tm <- case mw of
-                         Cached ev_tm -> return ev_tm
-                         Fresh kev   -> do { emitWorkNC kind_co_loc [kev]
-                                           ; return (ctEvTerm kev) } 
-
-            ; let xcomp [x] = mkEvKindCast x (evTermCoercion kev_tm)
-                  xcomp _   = panic "emit_kind_constraint:can't happen"
-                  xdecomp x = [mkEvKindCast x (evTermCoercion kev_tm)]
-                  xev = XEvTerm xcomp xdecomp
-
-            ; ctevs <- xCtFlavor ev [mkTcEqPred ty1 ty2] xev 
-                     -- Important: Do not cache original as Solved since we are supposed to 
-                     -- solve /exactly/ the same constraint later!  Example:
-                     -- (alpha :: kappa0) 
-                     -- (T :: *)
-                     -- Equality is: (alpha ~ T), so we will emitConstraint (kappa0 ~ *) but
-                     -- we don't want to say that (alpha ~ T) is now Solved!
-                     --
-                     -- We do need to do this xCtFlavor so that in the case of
-                     -- -fdefer-type-errors we still make a demand on kev_tm
-
-            ; case ctevs of
-                []         -> return Stop
-                [new_ctev] -> continueWith (ct { cc_ev = new_ctev }) 
-                _          -> panic "emitKindConstraint" }
+         do { mw <- newDerived (mkEqPred k1 k2) 
+            ; case mw of
+                Nothing  -> return ()
+                Just kev -> emitWorkNC kind_co_loc [kev]
+            ; continueWith ct }
        where
          k1 = typeKind ty1
          k2 = typeKind ty2
-         ctxt = mkKindErrorCtxtTcS ty1 k1 ty2 k2
 
          -- Always create a Wanted kind equality even if 
          -- you are decomposing a given constraint.
          -- NB: DV finds this reasonable for now. Maybe we have to revisit.
-         kind_co_loc = pushErrCtxtSameOrigin ctxt loc
+         kind_co_loc = setCtLocOrigin loc (KindEqOrigin ty1 ty2 (ctLocOrigin loc))
 \end{code}
 
 Note [Make sure that insolubles are fully rewritten]

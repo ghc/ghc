@@ -126,14 +126,11 @@ report_unsolved mb_binds_var defer wanted
        ; let tidy_env = tidyFreeTyVars env0 free_tvs
              free_tvs = tyVarsOfWC wanted
              err_ctxt = CEC { cec_encl  = []
-                            , cec_insol = False
-                                          --errs_so_far || insolubleWC wanted
-                                          -- Don't report ambiguity errors if
-                                          -- there are any other solid errors 
-                                          -- to report
                             , cec_tidy  = tidy_env
                             , cec_defer    = defer
-                            , cec_suppress = False
+                            , cec_suppress = insolubleWC wanted
+                                  -- Suppress all but insolubles if there are
+                                  -- any insoulubles, or earlier errors
                             , cec_binds    = mb_binds_var }
 
        ; traceTc "reportUnsolved (after unflattening):" $ 
@@ -151,9 +148,6 @@ data ReportErrCtxt
                 	       	       --   (innermost first)
                                        -- ic_skols and givens are tidied, rest are not
           , cec_tidy  :: TidyEnv
-          , cec_insol :: Bool       -- True <=> do not report errors involving 
-                                    --          ambiguous errors
-
           , cec_binds :: Maybe EvBindsVar 
                          -- Nothinng <=> Report all errors, including holes; no bindings
                          -- Just ev  <=> make some errors (depending on cec_defer)
@@ -185,23 +179,20 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env2) given
                      , ic_info  = info' }
-    insoluble' = case info of
-                   InferSkol {} -> ic_insoluble
-                   _            -> cec_insol ctxt    
     ctxt' = ctxt { cec_tidy  = env2
                  , cec_encl  = implic' : cec_encl ctxt
-                 , cec_insol = insoluble'
                  , cec_binds = case cec_binds ctxt of
                                  Nothing -> Nothing
                                  Just {} -> Just evb }
 
 reportWanteds :: ReportErrCtxt -> WantedConstraints -> TcM ()
 reportWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = implics })
-  = do { reportFlats ctxt tidy_cts
+  = do { reportFlats (ctxt { cec_suppress = False }) (mapBag (tidyCt env) insols)
+       ; reportFlats ctxt                            (mapBag (tidyCt env) flats)
        ; mapBagM_ (reportImplic ctxt) implics }
   where
     env = cec_tidy ctxt
-    tidy_cts = mapBag (tidyCt env) (insols `unionBags` flats)
+--    tidy_cts = mapBag (tidyCt env) (insols `unionBags` flats)
                   -- All the Derived ones have been filtered out alrady
                   -- by the constraint solver. This is ok; we don't want
                   -- to report unsolved Derived goals as error
@@ -263,14 +254,6 @@ isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       _ -> Nothing
 
 -----------------
-{-
-reportAmbigErrs :: Reporter
-reportAmbigErrs ctxt cts
-  | cec_insol ctxt = return ()
-  | otherwise      = reportFlatErrs ctxt cts
-          -- Only report ambiguity if no other errors (at all) happened
-          -- See Note [Avoiding spurious errors] in TcSimplify
--}
 reportFlatErrs :: Reporter
 -- Called once for non-ambigs, once for ambigs
 -- Report equality errors, and others only if we've done all 
@@ -279,12 +262,10 @@ reportFlatErrs :: Reporter
 reportFlatErrs
   = tryReporters
       [ ("Equalities", is_equality, mkGroupReporter mkEqErr) ]
-      (\ctxt cts -> do { let ctxt' | cec_insol ctxt = ctxt { cec_suppress = True }
-                                   | otherwise      = ctxt
-                       ; let (dicts, ips, irreds) = go cts [] [] []
-                       ; mkGroupReporter mkIPErr    ctxt' ips   
-                       ; mkGroupReporter mkIrredErr ctxt' irreds
-                       ; mkGroupReporter mkDictErr  ctxt' dicts })
+      (\ctxt cts -> do { let (dicts, ips, irreds) = go cts [] [] []
+                       ; mkGroupReporter mkIPErr    ctxt ips   
+                       ; mkGroupReporter mkIrredErr ctxt irreds
+                       ; mkGroupReporter mkDictErr  ctxt dicts })
   where
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -558,10 +539,11 @@ mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkEqErr1 ctxt ct
   = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
        ; (ctxt, orig) <- zonkTidyOrigin ctxt orig
+       ; let (is_oriented, wanted_msg) = mk_wanted_extra orig
        ; if isGiven ev then 
-           mkEqErr_help ctxt (inaccessible_msg orig $$ binds_msg) ct False ty1 ty2
+           mkEqErr_help ctxt (inaccessible_msg orig $$ binds_msg) ct Nothing ty1 ty2
          else
-           mk_err binds_msg orig }
+           mkEqErr_help ctxt (wanted_msg $$ binds_msg) ct is_oriented ty1 ty2 }
   where
     ev         = cc_ev ct
     orig       = ctLocOrigin (cc_loc ct)
@@ -572,24 +554,26 @@ mkEqErr1 ctxt ct
 
        -- If the types in the error message are the same as the types
        -- we are unifying, don't add the extra expected/actual message
-    mk_err extra (TypeEqOrigin (UnifyOrigin { uo_actual = act, uo_expected = exp })) 
-      | act `pickyEqType` ty1
-      , exp `pickyEqType` ty2 = mkEqErr_help ctxt extra  ct True  ty2 ty1
-      | exp `pickyEqType` ty1
-      , act `pickyEqType` ty2 = mkEqErr_help ctxt extra  ct True  ty1 ty2
-      | otherwise             = mkEqErr_help ctxt extra1 ct False ty1 ty2
+    mk_wanted_extra orig@(TypeEqOrigin {})
+      = mkExpectedActualMsg ty1 ty2 orig
+
+
+    mk_wanted_extra (KindEqOrigin cty1 cty2 sub_o)
+      = (Nothing, msg1 $$ msg2)
       where
-        extra1 = msg $$ extra
-        msg    = mkExpectedActualMsg exp act
-    mk_err extra _ = mkEqErr_help ctxt extra ct False ty1 ty2
+        msg1 = hang (ptext (sLit "When matching types"))
+                  2 (vcat [ ppr cty1 <+> dcolon <+> ppr (typeKind cty1)
+                          , ppr cty2 <+> dcolon <+> ppr (typeKind cty2) ])
+        msg2 = case sub_o of
+                 TypeEqOrigin {} -> snd (mkExpectedActualMsg cty1 cty2 sub_o)
+                 _ -> empty
+
+    mk_wanted_extra _ = (Nothing, empty)
 
 mkEqErr_help, reportEqErr 
    :: ReportErrCtxt -> SDoc
    -> Ct
-   -> Bool     -- True  <=> Types are correct way round;
-               --           report "expected ty1, actual ty2"
-               -- False <=> Just report a mismatch without orientation
-               --           The ReportErrCtxt has expected/actual 
+   -> Maybe SwapFlag   -- Nothing <=> not sure
    -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help ctxt extra ct oriented ty1 ty2
   | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr ctxt extra ct oriented tv1 ty2
@@ -601,7 +585,7 @@ reportEqErr ctxt extra1 ct oriented ty1 ty2
        ; mkErrorMsg ctxt' ct (vcat [ misMatchOrCND ctxt' ct oriented ty1 ty2
                                    , extra2, extra1]) }
 
-mkTyVarEqErr :: ReportErrCtxt -> SDoc -> Ct -> Bool -> TcTyVar -> TcType -> TcM ErrMsg
+mkTyVarEqErr :: ReportErrCtxt -> SDoc -> Ct -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt extra ct oriented tv1 ty2
   -- Occurs check
@@ -697,7 +681,7 @@ isUserSkolem ctxt tv
     is_user_skol_info (InferSkol {}) = False
     is_user_skol_info _ = True
 
-misMatchOrCND :: ReportErrCtxt -> Ct -> Bool -> TcType -> TcType -> SDoc
+misMatchOrCND :: ReportErrCtxt -> Ct -> Maybe SwapFlag -> TcType -> TcType -> SDoc
 -- If oriented then ty1 is expected, ty2 is actual
 misMatchOrCND ctxt ct oriented ty1 ty2
   | null givens || 
@@ -710,7 +694,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
   = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
-    orig   = TypeEqOrigin (UnifyOrigin ty1 ty2)
+    orig   = TypeEqOrigin ty1 ty2
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
@@ -763,10 +747,12 @@ kindErrorMsg ty1 ty2
     k2 = typeKind ty2
 
 --------------------
-misMatchMsg :: Bool -> TcType -> TcType -> SDoc	   -- Types are already tidy
+misMatchMsg :: Maybe SwapFlag -> TcType -> TcType -> SDoc	   -- Types are already tidy
 -- If oriented then ty1 is expected, ty2 is actual
-misMatchMsg oriented ty1 ty2 
-  | oriented
+misMatchMsg oriented ty1 ty2  
+  | Just IsSwapped <- oriented
+  = misMatchMsg (Just NotSwapped) ty2 ty1
+  | Just NotSwapped <- oriented
   = sep [ ptext (sLit "Couldn't match expected") <+> what <+> quotes (ppr ty1)
         , nest 12 $   ptext (sLit "with actual") <+> what <+> quotes (ppr ty2) ]
   | otherwise
@@ -776,10 +762,16 @@ misMatchMsg oriented ty1 ty2
     what | isKind ty1 = ptext (sLit "kind")
          | otherwise  = ptext (sLit "type")
 
-mkExpectedActualMsg :: Type -> Type -> SDoc
-mkExpectedActualMsg exp_ty act_ty
-  = vcat [ text "Expected type:" <+> ppr exp_ty
-         , text "  Actual type:" <+> ppr act_ty ]
+mkExpectedActualMsg :: Type -> Type -> CtOrigin -> (Maybe SwapFlag, SDoc)
+mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp })
+  | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (Just IsSwapped,  empty)
+  | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (Just NotSwapped, empty)
+  | otherwise                                    = (Nothing, msg)
+  where
+    msg = vcat [ text "Expected type:" <+> ppr exp
+               , text "  Actual type:" <+> ppr act ]
+
+mkExpectedActualMsg _ _ _ = panic "mkExprectedAcutalMsg"
 \end{code}
 
 Note [Reporting occurs-check errors]
@@ -874,7 +866,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     cannot_resolve_msg has_ambig_tvs binds_msg ambig_msg
       = vcat [ addArising orig (no_inst_herald <+> pprParendType pred)
              , vcat (pp_givens givens)
-             , if (has_ambig_tvs && all_tyvars)
+             , if (has_ambig_tvs && not (null unifiers && null givens))
                then vcat [ ambig_msg, binds_msg, potential_msg ]
                else empty
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
@@ -1232,10 +1224,15 @@ zonkTidyOrigin ctxt (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
        ; let (env1, skol_info2) = tidySkolemInfo (cec_tidy ctxt) skol_info1
        ; return (ctxt { cec_tidy = env1 }, GivenOrigin skol_info2) }
-zonkTidyOrigin ctxt (TypeEqOrigin (UnifyOrigin { uo_actual = act, uo_expected = exp }))
+zonkTidyOrigin ctxt (TypeEqOrigin { uo_actual = act, uo_expected = exp })
   = do { (env1, act') <- zonkTidyTcType (cec_tidy ctxt) act
        ; (env2, exp') <- zonkTidyTcType env1            exp
        ; return ( ctxt { cec_tidy = env2 }
-                , TypeEqOrigin (UnifyOrigin { uo_actual = act', uo_expected = exp' })) }
+                , TypeEqOrigin { uo_actual = act', uo_expected = exp' }) }
+zonkTidyOrigin ctxt (KindEqOrigin ty1 ty2 orig)
+  = do { (env1, ty1') <- zonkTidyTcType (cec_tidy ctxt) ty1
+       ; (env2, ty2') <- zonkTidyTcType env1            ty2
+       ; (ctxt2, orig') <- zonkTidyOrigin (ctxt { cec_tidy = env2 }) orig
+       ; return (ctxt2, KindEqOrigin ty1' ty2' orig') }
 zonkTidyOrigin ctxt orig = return (ctxt, orig)
 \end{code}

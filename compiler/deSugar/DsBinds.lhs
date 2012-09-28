@@ -741,10 +741,6 @@ dsEvTerm (EvCast tm co)
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvKindCast v co)
-  = do { v' <- dsEvTerm v
-       ; dsTcCoercion co $ (\_ -> v') }
-
 dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
                                      ; return (Var df `mkTyApps` tys `mkApps` tms') }
 dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox
