@@ -1,83 +1,68 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleInstances, UndecidableInstances, IncoherentInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Main (main) where
+module Main (main, spec) where
 
-import Test.HUnit
-import RdrName (RdrName)
-import DynFlags (defaultDynFlags)
-import Haddock.Lex (tokenise)
-import Haddock.Parse (parseParas)
-import Haddock.Types
-import Outputable
-import Data.Monoid
+import           Test.Hspec
+import           RdrName (RdrName)
+import           DynFlags (DynFlags, defaultDynFlags)
+import           Haddock.Lex (tokenise)
+import           Haddock.Parse (parseParas)
+import           Haddock.Types
+import           Outputable
+import           Data.Monoid
+
+dynFlags :: DynFlags
+dynFlags = defaultDynFlags (error "dynFlags for Haddock tests: undefined")
 
 instance Outputable a => Show a where
-  show = showSDoc . ppr
+  show = showSDoc dynFlags . ppr
 
 deriving instance Show a => Show (Doc a)
 deriving instance Eq a =>Eq (Doc a)
 
-data ParseTest = ParseTest {
-    input   :: String
-  , result  :: (Maybe (Doc RdrName))
-  }
-
-tests :: [ParseTest]
-tests = [
-    ParseTest {
-      input  = "foobar"
-    , result = Just $ DocParagraph $ DocString "foobar\n"
-    }
-
-  , ParseTest {
-      input  = "foobar\n\n>>> fib 10\n55"
-    , result = Just $ DocAppend (DocParagraph $ DocString "foobar\n") (DocExamples $ [Example "fib 10" ["55"]])
-    }
-
-  , ParseTest {
-      input  = "foobar\n>>> fib 10\n55"
-    , result = Nothing -- parse error
-    }
-
-  , ParseTest {
-      input  = "foobar\n\n> some code"
-    , result = Just (DocAppend (DocParagraph (DocString "foobar\n")) (DocCodeBlock (DocString " some code\n")))
-    }
-
-  , ParseTest {
-      input  = "foobar\n> some code"
-    , result = Nothing -- parse error
-    }
-
-  -- test <BLANKLINE> support
-  , ParseTest {
-      input  = ">>> putFooBar\nfoo\n<BLANKLINE>\nbar"
-    , result = Just $ DocExamples $ [Example "putFooBar" ["foo","","bar"]]
-    }
-
-  -- tests for links
-  , ParseTest {
-      input  = "<http://example.com/>"
-    , result = Just . DocParagraph $ hyperlink "http://example.com/" Nothing `mappend` DocString "\n"
-    }
-
-  , ParseTest {
-      input  = "<http://example.com/ some link>"
-    , result = Just . DocParagraph $ hyperlink "http://example.com/" (Just "some link") `mappend` DocString "\n"
-    }
-  ]
-
-hyperlink :: String -> Maybe String -> Doc RdrName
-hyperlink url = DocHyperlink . Hyperlink url
+parse :: String -> Maybe (Doc RdrName)
+parse s = parseParas $ tokenise dynFlags s (0,0)
 
 main :: IO ()
-main = do
-  _ <- runTestTT $ TestList $ map toTestCase tests
-  return ();
+main = hspec spec
+
+spec :: Spec
+spec = do
+  describe "parseParas" $ do
+
+    it "parses a paragraph" $ do
+      parse "foobar" `shouldBe` (Just . DocParagraph . DocString) "foobar\n"
+
+    context "when parsing an example" $ do
+
+      it "requires an example to be separated from a previous paragrap by an empty line" $ do
+        parse "foobar\n\n>>> fib 10\n55" `shouldBe`
+          (Just $ DocAppend (DocParagraph $ DocString "foobar\n") (DocExamples $ [Example "fib 10" ["55"]]))
+
+        -- parse error
+        parse "foobar\n>>> fib 10\n55" `shouldBe` Nothing
+
+      it "parses a result line that only contains <BLANKLINE> as an emptly line" $ do
+        parse ">>> putFooBar\nfoo\n<BLANKLINE>\nbar" `shouldBe`
+          (Just $ DocExamples $ [Example "putFooBar" ["foo","","bar"]])
+
+    context "when parsing a code block" $ do
+      it "requires a code blocks to be separated from a previous paragrap by an empty line" $ do
+        parse "foobar\n\n> some code" `shouldBe`
+          Just (DocAppend (DocParagraph (DocString "foobar\n")) (DocCodeBlock (DocString " some code\n")))
+
+        -- parse error
+        parse "foobar\n> some code" `shouldBe` Nothing
+
+
+    context "when parsing a URL" $ do
+      it "parses a URL" $ do
+        parse "<http://example.com/>" `shouldBe`
+          (Just . DocParagraph $ hyperlink "http://example.com/" Nothing `mappend` DocString "\n")
+
+      it "accepts an optional label" $ do
+        parse "<http://example.com/ some link>" `shouldBe`
+          (Just . DocParagraph $ hyperlink "http://example.com/" (Just "some link") `mappend` DocString "\n")
   where
-
-    toTestCase :: ParseTest -> Test
-    toTestCase (ParseTest s r) = TestCase $ assertEqual s r (parse s)
-
-    parse :: String -> Maybe (Doc RdrName)
-    parse s = parseParas $ tokenise (defaultDynFlags undefined) s (0,0)
+    hyperlink :: String -> Maybe String -> Doc RdrName
+    hyperlink url = DocHyperlink . Hyperlink url
