@@ -1239,7 +1239,7 @@ isTouchableMetaTyVarTcS tv
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
 isFilledMetaTyVar_maybe tv
- = ASSERT( isTcTyVar tv )
+ = ASSERT2( isTcTyVar tv, ppr tv )
    case tcTyVarDetails tv of
      MetaTv { mtv_ref = ref } 
         -> do { cts <- wrapTcS (TcM.readTcRef ref)
