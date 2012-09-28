@@ -8,10 +8,10 @@ tc141.hs:11:12:
 
 tc141.hs:11:31:
     Couldn't match expected type `a1' with actual type `a'
-      `a1' is a rigid type variable bound by
-           an expression type signature: a1 at tc141.hs:11:31
-      `a' is a rigid type variable bound by
-          the inferred type of f :: (a, a) -> (t, a) at tc141.hs:11:1
+      because type variable `a1' would escape its scope
+    This (rigid, skolem) type variable is bound by
+      an expression type signature: a1
+      at tc141.hs:11:31-34
     Relevant bindings include
       f :: (a, a) -> (t, a) (bound at tc141.hs:11:1)
       x :: (a, a) (bound at tc141.hs:11:3)
@@ -35,10 +35,10 @@ tc141.hs:13:13:
 
 tc141.hs:15:18:
     Couldn't match expected type `a2' with actual type `t'
-      `a2' is a rigid type variable bound by
-           the type signature for v :: a2 at tc141.hs:14:19
-      `t' is a rigid type variable bound by
-          the inferred type of g :: a -> t -> a1 at tc141.hs:13:1
+      because type variable `a2' would escape its scope
+    This (rigid, skolem) type variable is bound by
+      the type signature for v :: a2
+      at tc141.hs:14:19
     Relevant bindings include
       g :: a -> t -> a1 (bound at tc141.hs:13:1)
       b :: t (bound at tc141.hs:13:5)

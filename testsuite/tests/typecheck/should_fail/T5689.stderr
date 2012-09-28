@@ -1,6 +1,6 @@
 
 T5689.hs:10:36:
-    Couldn't match expected type `t' with actual type `Bool'
+    Couldn't match expected type `Bool' with actual type `t'
     Relevant bindings include
       r :: IORef (t -> t) (bound at T5689.hs:7:14)
       v :: t (bound at T5689.hs:10:28)

@@ -6,7 +6,7 @@ T1900.hs:11:12:
     In the instance declaration for `Bug Int'
 
 T1900.hs:14:16:
-    Could not deduce (Depend s ~ Depend s0)
+    Could not deduce (Depend s0 ~ Depend s)
     from the context (Bug s)
       bound by the type signature for check :: Bug s => Depend s -> Bool
       at T1900.hs:13:10-36

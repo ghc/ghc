@@ -9,7 +9,7 @@ GenCannotDoRep0.hs:13:45:
 
 GenCannotDoRep0.hs:17:1:
     Can't make a derived instance of `Generic (P Int)':
-      P must not be instantiated; try deriving `P a' instead
+      P must not be instantiated; try deriving `P Int' instead
     In the stand-alone deriving instance for `Generic (P Int)'
 
 GenCannotDoRep0.hs:26:1:

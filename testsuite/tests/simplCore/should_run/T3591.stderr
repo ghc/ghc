@@ -51,8 +51,16 @@ fmap await
 fmap await
 fmap await
 liftOut
+liftOut
+inject suspend
+liftFunctor id
+calling fmap
+fmap Either
+poking a
+fmap RightF
 fmap Either
 fmap RightF
+fmap await
 fmap await
 bounce start
 bounce end
@@ -177,8 +185,16 @@ fmap await
 fmap await
 fmap await
 liftOut
+liftOut
+inject suspend
+liftFunctor id
+calling fmap
+fmap Either
+poking a
+fmap RightF
 fmap Either
 fmap RightF
+fmap await
 fmap await
 bounce start
 bounce end

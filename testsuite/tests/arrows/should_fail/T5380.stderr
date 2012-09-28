@@ -1,6 +1,6 @@
 
 T5380.hs:7:27:
-    Couldn't match expected type `not_bool' with actual type `Bool'
+    Couldn't match expected type `Bool' with actual type `not_bool'
       `not_bool' is a rigid type variable bound by
                  the type signature for
                    testB :: not_bool -> (() -> ()) -> () -> not_unit

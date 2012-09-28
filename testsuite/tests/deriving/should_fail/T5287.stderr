@@ -4,6 +4,8 @@ T5287.hs:6:29:
       arising from the 'deriving' clause of a data type declaration
     The type variable `oops' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there is a potential instance available:
+      instance A Int Bool -- Defined at T5287.hs:7:10
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

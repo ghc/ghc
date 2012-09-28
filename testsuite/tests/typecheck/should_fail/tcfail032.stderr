@@ -1,6 +1,6 @@
 
 tcfail032.hs:14:8:
-    Couldn't match expected type `t' with actual type `a1 -> Int'
+    Couldn't match expected type `a1 -> Int' with actual type `t'
       because type variable `a1' would escape its scope
     This (rigid, skolem) type variable is bound by
       an expression type signature: Eq a1 => a1 -> Int
