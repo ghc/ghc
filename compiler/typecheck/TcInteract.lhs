@@ -481,7 +481,7 @@ trySpontaneousEqTwoWay d gw tv1 tv2
 \end{code}
 
 Note [Kind errors] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 Consider the wanted problem: 
       alpha ~ (# Int, Int #) 
 where alpha :: ArgKind and (# Int, Int #) :: (#). We can't spontaneously solve this constraint, 
