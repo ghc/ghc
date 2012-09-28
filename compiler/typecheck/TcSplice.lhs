@@ -872,7 +872,7 @@ runMeta show_code run_and_convert expr
         exn_msg <- liftIO $ Panic.safeShowException exn
         let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
                         nest 2 (text exn_msg),
-                        if show_code then nest 2 (text "Code:" <+> ppr expr) else empty]
+                        if show_code then text "Code:" <+> ppr expr else empty]
         failWithTc msg
 \end{code}
 
