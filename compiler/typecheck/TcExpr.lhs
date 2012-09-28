@@ -313,20 +313,28 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
        ; let doc = ptext (sLit "The first argument of ($) takes")
        ; (co_arg1, [arg2_ty], op_res_ty) <- matchExpectedFunTys doc 1 arg1_ty
-       	 -- arg2_ty maybe polymorphic; that's the point
+         -- arg1_ty = arg2_ty -> op_res_ty
+       	 -- And arg2_ty maybe polymorphic; that's the point
 
        -- Make sure that the argument and result types have kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
-       ; _ <- unifyKind (typeKind arg2_ty) liftedTypeKind
-       ; _ <- unifyKind (typeKind res_ty)  liftedTypeKind
+       -- ($) :: forall ab. (a->b) -> a -> b
+       ; a_ty <- newFlexiTyVarTy liftedTypeKind
+       ; b_ty <- newFlexiTyVarTy liftedTypeKind
 
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; co_res <- unifyType op_res_ty res_ty
-       ; op_id <- tcLookupId op_name
 
-       ; let op' = L loc (HsWrap (mkWpTyApps [arg2_ty, op_res_ty]) (HsVar op_id))
-       ; return $ mkHsWrapCo co_res $
-         OpApp (mkLHsWrapCo co_arg1 arg1') op' fix arg2' }
+       ; co_res <- unifyType b_ty res_ty        -- b ~ res
+       ; co_a   <- unifyType arg2_ty   a_ty     -- arg2 ~ a
+       ; co_b   <- unifyType op_res_ty b_ty     -- op_res ~ b
+       ; op_id  <- tcLookupId op_name
+
+       ; let op' = L loc (HsWrap (mkWpTyApps [a_ty, b_ty]) (HsVar op_id))
+       ; return $ mkHsWrapCo (co_res) $
+         OpApp (mkLHsWrapCo (mkTcFunCo co_a co_b) $
+                mkLHsWrapCo co_arg1 arg1') 
+               op' fix 
+               (mkLHsWrapCo co_a arg2') }
 
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
