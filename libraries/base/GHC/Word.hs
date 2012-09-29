@@ -27,6 +27,7 @@ module GHC.Word (
     ) where
 
 import Data.Bits
+import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
@@ -142,11 +143,15 @@ instance Bits Word8 where
                                           (x# `uncheckedShiftRL#` (8# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 7##)
-    bitSize  _                = 8
+    bitSizeMaybe i            = Just (finiteBitSize i)
+    bitSize i                 = finiteBitSize i
     isSigned _                = False
     popCount (W8# x#)         = I# (word2Int# (popCnt8# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+instance FiniteBits Word8 where
+    finiteBitSize _ = 8
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
@@ -285,11 +290,15 @@ instance Bits Word16 where
                                             (x# `uncheckedShiftRL#` (16# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 15##)
-    bitSize  _                = 16
+    bitSizeMaybe i            = Just (finiteBitSize i)
+    bitSize i                 = finiteBitSize i
     isSigned _                = False
     popCount (W16# x#)        = I# (word2Int# (popCnt16# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+instance FiniteBits Word16 where
+    finiteBitSize _ = 16
 
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
@@ -469,11 +478,15 @@ instance Bits Word32 where
                                             (x# `uncheckedShiftRL#` (32# -# i'#))))
         where
         !i'# = word2Int# (int2Word# i# `and#` 31##)
-    bitSize  _                = 32
+    bitSizeMaybe i            = Just (finiteBitSize i)
+    bitSize i                 = finiteBitSize i
     isSigned _                = False
     popCount (W32# x#)        = I# (word2Int# (popCnt32# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+instance FiniteBits Word32 where
+    finiteBitSize _ = 32
 
 {-# RULES
 "fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
@@ -602,7 +615,8 @@ instance Bits Word64 where
                              (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 63##)
-    bitSize  _                = 64
+    bitSizeMaybe i            = Just (finiteBitSize i)
+    bitSize i                 = finiteBitSize i
     isSigned _                = False
     popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
     bit                       = bitDefault
@@ -717,7 +731,8 @@ instance Bits Word64 where
                              (x# `uncheckedShiftRL#` (64# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 63##)
-    bitSize  _                = 64
+    bitSizeMaybe i            = Just (finiteBitSize i)
+    bitSize i                 = finiteBitSize i
     isSigned _                = False
     popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
     bit                       = bitDefault
@@ -735,6 +750,9 @@ uncheckedShiftRL64# :: Word# -> Int# -> Word#
 uncheckedShiftRL64# = uncheckedShiftRL#
 
 #endif
+
+instance FiniteBits Word64 where
+    finiteBitSize _ = 64
 
 instance Show Word64 where
     showsPrec p x = showsPrec p (toInteger x)
