@@ -31,9 +31,12 @@ module GHC.TypeLits
     -- * Functions on type nats
   , type (<=), type (<=?), type (+), type (*), type (^)
 
-    -- * Destructing type-nats.
+    -- * Destructing type-nat singletons.
   , isZero, IsZero(..)
   , isEven, IsEven(..)
+
+    -- * Matching on type-nats
+  , Nat1(..), FromNat1
   ) where
 
 import GHC.Base(Eq((==)), Bool(..), ($), otherwise, (.))
@@ -184,5 +187,16 @@ instance Show (IsEven n) where
   show IsEvenZero = "0"
   show (IsEven x) = "(2 * " ++ show x ++ ")"
   show (IsOdd  x) = "(2 * " ++ show x ++ " + 1)"
+
+
+--------------------------------------------------------------------------------
+
+-- | Unary implemenation of natural numbers.
+-- Used both at the type and at the value level.
+data Nat1 = Zero | Succ Nat1
+
+type family FromNat1 (n :: Nat1) :: Nat
+type instance FromNat1 Zero     = 0
+type instance FromNat1 (Succ n) = 1 + FromNat1 n
 
 
