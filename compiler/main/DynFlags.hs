@@ -767,15 +767,18 @@ pgm_lc dflags = sPgm_lc (settings dflags)
 opt_L                 :: DynFlags -> [String]
 opt_L dflags = sOpt_L (settings dflags)
 opt_P                 :: DynFlags -> [String]
-opt_P dflags = sOpt_P (settings dflags)
+opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_P (settings dflags)
 opt_F                 :: DynFlags -> [String]
 opt_F dflags = sOpt_F (settings dflags)
 opt_c                 :: DynFlags -> [String]
-opt_c dflags = sOpt_c (settings dflags)
+opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_c (settings dflags)
 opt_a                 :: DynFlags -> [String]
 opt_a dflags = sOpt_a (settings dflags)
 opt_l                 :: DynFlags -> [String]
-opt_l dflags = sOpt_l (settings dflags)
+opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_l (settings dflags)
 opt_windres           :: DynFlags -> [String]
 opt_windres dflags = sOpt_windres (settings dflags)
 opt_lo                :: DynFlags -> [String]
@@ -997,28 +1000,11 @@ wayDesc WayPar      = "Parallel"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
-wayOpts :: Platform -> Way -> DynP ()
-wayOpts platform WayThreaded = do
-        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
-        -- which GHC has some problems with.  It's currently not clear whether
-        -- the problems are our fault or theirs, but it seems that using the
-        -- alternative 1:1 threading library libthr works around it:
-          let os = platformOS platform
-          case os of
-              OSFreeBSD -> upd $ addOptl "-lthr"
-              OSSolaris2 -> upd $ addOptl "-lrt"
-              _
-               | os `elem` [OSOpenBSD, OSNetBSD] ->
-                  do upd $ addOptc "-pthread"
-                     upd $ addOptl "-pthread"
-              _ ->
-                  return ()
-wayOpts _ WayDebug = return ()
-wayOpts platform WayDyn = do
-        upd $ addOptP "-DDYNAMIC"
-        upd $ addOptc "-DDYNAMIC"
-        let os = platformOS platform
-        case os of
+wayExtras :: Platform -> Way -> DynP ()
+wayExtras _ WayThreaded = return ()
+wayExtras _ WayDebug = return ()
+wayExtras platform WayDyn =
+        case platformOS platform of
             OSMinGW32 ->
                 -- On Windows, code that is to be linked into a dynamic
                 -- library must be compiled with -fPIC. Labels not in
@@ -1027,59 +1013,69 @@ wayOpts platform WayDyn = do
                 setFPIC
             OSDarwin ->
                 setFPIC
-            _ | os `elem` [OSOpenBSD, OSNetBSD] ->
-                -- Without this, linking the shared libHSffi fails
-                -- because it uses pthread mutexes.
-                upd $ addOptl "-optl-pthread"
             _ ->
                 return ()
-wayOpts _ WayProf = do
-        setDynFlag Opt_SccProfilingOn
-        upd $ addOptP "-DPROFILING"
-        upd $ addOptc "-DPROFILING"
-wayOpts _ WayEventLog = do
-        upd $ addOptP "-DTRACING"
-        upd $ addOptc "-DTRACING"
-wayOpts _ WayPar = do
-        setDynFlag Opt_Parallel
-        upd $ addOptP "-D__PARALLEL_HASKELL__"
-        upd $ addOptc "-DPAR"
-        exposePackage "concurrent"
-        upd $ addOptc "-w"
-        upd $ addOptl "-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        upd $ addOptl "-lpvm3"
-        upd $ addOptl "-lgpvm3"
-{-
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DPAR_TICKY"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-D__DISTRIBUTED_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DDIST"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
--}
-wayOpts _ WayGran = do
-        setDynFlag Opt_GranMacros
-        upd $ addOptP "-D__GRANSIM__"
-        upd $ addOptc "-DGRAN"
-        exposePackage "concurrent"
-wayOpts _ WayNDP = do
-        setExtensionFlag Opt_ParallelArrays
-        setDynFlag Opt_Vectorise
+wayExtras _ WayProf = setDynFlag Opt_SccProfilingOn
+wayExtras _ WayEventLog = return ()
+wayExtras _ WayPar = do setDynFlag Opt_Parallel
+                        exposePackage "concurrent"
+wayExtras _ WayGran = do setDynFlag Opt_GranMacros
+                         exposePackage "concurrent"
+wayExtras _ WayNDP = do setExtensionFlag Opt_ParallelArrays
+                        setDynFlag Opt_Vectorise
+
+wayOptc :: Platform -> Way -> [String]
+wayOptc platform WayThreaded = case platformOS platform of
+                               OSOpenBSD -> ["-pthread"]
+                               OSNetBSD  -> ["-pthread"]
+                               _         -> []
+wayOptc _ WayDebug      = []
+wayOptc _ WayDyn        = ["-DDYNAMIC"]
+wayOptc _ WayProf       = ["-DPROFILING"]
+wayOptc _ WayEventLog   = ["-DTRACING"]
+wayOptc _ WayPar        = ["-DPAR", "-w"]
+wayOptc _ WayGran       = ["-DGRAN"]
+wayOptc _ WayNDP        = []
+
+wayOptl :: Platform -> Way -> [String]
+wayOptl platform WayThreaded =
+        case platformOS platform of
+        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
+        -- which GHC has some problems with.  It's currently not clear whether
+        -- the problems are our fault or theirs, but it seems that using the
+        -- alternative 1:1 threading library libthr works around it:
+        OSFreeBSD  -> ["-lthr"]
+        OSSolaris2 -> ["-lrt"]
+        OSOpenBSD  -> ["-pthread"]
+        OSNetBSD   -> ["-pthread"]
+        _          -> []
+wayOptl _ WayDebug = []
+wayOptl platform WayDyn =
+        case platformOS platform of
+        OSOpenBSD -> -- Without this, linking the shared libHSffi fails
+                     -- because it uses pthread mutexes.
+                     ["-optl-pthread"]
+        OSNetBSD -> -- Without this, linking the shared libHSffi fails
+                    -- because it uses pthread mutexes.
+                    ["-optl-pthread"]
+        _ -> []
+wayOptl _ WayProf       = []
+wayOptl _ WayEventLog   = []
+wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
+                           "-lpvm3",
+                           "-lgpvm3"]
+wayOptl _ WayGran       = []
+wayOptl _ WayNDP        = []
+
+wayOptP :: Platform -> Way -> [String]
+wayOptP _ WayThreaded = []
+wayOptP _ WayDebug    = []
+wayOptP _ WayDyn      = ["-DDYNAMIC"]
+wayOptP _ WayProf     = ["-DPROFILING"]
+wayOptP _ WayEventLog = ["-DTRACING"]
+wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
+wayOptP _ WayGran     = ["-D__GRANSIM__"]
+wayOptP _ WayNDP      = []
 
 -----------------------------------------------------------------------------
 
@@ -1790,7 +1786,7 @@ dynamic_flags = [
 
         ----- Linker --------------------------------------------------------
   -- -static is the default. If -dynamic has been given then, due to the
-  -- way wayOpts is currently used, we've already set -DDYNAMIC etc.
+  -- way wayExtras is currently used, we've already set -DDYNAMIC etc.
   -- It's too fiddly to undo that, so we just give an error if
   -- Opt_Static has been unset.
   , Flag "static"         (noArgM (\dfs -> do unless (dopt Opt_Static dfs) (addErr "Can't use -static after -dynamic")
@@ -2745,7 +2741,7 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 addWay :: Way -> DynP ()
 addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
-              wayOpts (targetPlatform dfs) w
+              wayExtras (targetPlatform dfs) w
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
