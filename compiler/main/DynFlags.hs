@@ -814,13 +814,6 @@ data HscTarget
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
 
-showHscTargetFlag :: HscTarget -> String
-showHscTargetFlag HscC           = "-fvia-c"
-showHscTargetFlag HscAsm         = "-fasm"
-showHscTargetFlag HscLlvm        = "-fllvm"
-showHscTargetFlag HscInterpreted = "-fbyte-code"
-showHscTargetFlag HscNothing     = "-fno-code"
-
 -- | Will this target result in an object file on the disk?
 isObjectTarget :: HscTarget -> Bool
 isObjectTarget HscC     = True
@@ -1667,7 +1660,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       ghcError (CmdLineError ("combination not supported: "  ++
                               intercalate "/" (map wayDesc theWays)))
 
-  return (dflags3, leftover, sh_warns ++ warns)
+  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+
+  return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 
 -- | Check (and potentially disable) any extensions that aren't allowed
@@ -2869,59 +2864,16 @@ setObjTarget l = updM set
   where
    set dflags
      | isObjectTarget (hscTarget dflags)
-       = case l of
-         HscC
-          | platformUnregisterised (targetPlatform dflags) ->
-             do addWarn ("Compiler not unregisterised, so ignoring " ++ flag)
-                return dflags
-         HscAsm
-          | cGhcWithNativeCodeGen /= "YES" ->
-             do addWarn ("Compiler has no native codegen, so ignoring " ++
-                         flag)
-                return dflags
-         HscLlvm
-          | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
-            (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
-            ->
-             do addWarn ("Ignoring " ++ flag ++ " as it is incompatible with -fPIC and -dynamic on this platform")
-                return dflags
-         _ -> return $ dflags { hscTarget = l }
+       = return $ dflags { hscTarget = l }
      | otherwise = return dflags
-     where platform = targetPlatform dflags
-           arch = platformArch platform
-           os   = platformOS   platform
-           flag = showHscTargetFlag l
 
 setFPIC :: DynP ()
 setFPIC = updM set
-  where
-   set dflags
-    | cGhcWithNativeCodeGen == "YES" || platformUnregisterised (targetPlatform dflags)
-       = let platform = targetPlatform dflags
-         in case hscTarget dflags of
-            HscLlvm
-             | (platformArch platform == ArchX86_64) &&
-               (platformOS platform `elem` [OSLinux, OSDarwin]) ->
-                do addWarn "Ignoring -fPIC as it is incompatible with LLVM on this platform"
-                   return dflags
-            _ -> return $ dopt_set dflags Opt_PIC
-    | otherwise
-       = ghcError $ CmdLineError "-fPIC is not supported on this platform"
+    where set dflags = return $ dopt_set dflags Opt_PIC
 
 unSetFPIC :: DynP ()
 unSetFPIC = updM set
-  where
-   set dflags
-       = let platform = targetPlatform dflags
-         in case platformOS platform of
-            OSDarwin
-             | platformArch platform == ArchX86_64 ->
-                do addWarn "Ignoring -fno-PIC on this platform"
-                   return dflags
-            _ | not (dopt Opt_Static dflags) ->
-                do addWarn "Ignoring -fno-PIC as -fstatic is off"
-                   return dflags
-            _ -> return $ dopt_unset dflags Opt_PIC
+    where set dflags = return $ dopt_unset dflags Opt_PIC
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags
@@ -3171,4 +3123,49 @@ tARGET_MAX_WORD dflags
       4 -> toInteger (maxBound :: Word32)
       8 -> toInteger (maxBound :: Word64)
       w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
+
+-- Whenever makeDynFlagsConsistent does anything, it starts over, to
+-- ensure that a later change doesn't invalidate an earlier check.
+-- Be careful not to introduce potential loops!
+makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Located String])
+makeDynFlagsConsistent dflags
+ | hscTarget dflags == HscC &&
+   not (platformUnregisterised (targetPlatform dflags))
+    = if cGhcWithNativeCodeGen == "YES"
+      then let dflags' = dflags { hscTarget = HscAsm }
+               warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
+           in loop dflags' warn
+      else let dflags' = dflags { hscTarget = HscLlvm }
+               warn = "Compiler not unregisterised, so using LLVM rather than compiling via C"
+           in loop dflags' warn
+ | hscTarget dflags /= HscC &&
+   platformUnregisterised (targetPlatform dflags)
+    = loop (dflags { hscTarget = HscC })
+           "Compiler unregisterised, so compiling via C"
+ | hscTarget dflags == HscAsm &&
+   cGhcWithNativeCodeGen /= "YES"
+      = let dflags' = dflags { hscTarget = HscLlvm }
+            warn = "No native code generator, so using LLVM"
+        in loop dflags' warn
+ | hscTarget dflags == HscLlvm &&
+   not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
+   (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
+    = if cGhcWithNativeCodeGen == "YES"
+      then let dflags' = dflags { hscTarget = HscAsm }
+               warn = "Using native code generator rather than LLVM, as LLVM is incompatible with -fPIC and -dynamic on this platform"
+           in loop dflags' warn
+      else ghcError $ CmdLineError "Can't use -fPIC or -dynamic on this platform"
+ | os == OSDarwin &&
+   arch == ArchX86_64 &&
+   not (dopt Opt_PIC dflags)
+    = loop (dopt_set dflags Opt_PIC)
+           "Enabling -fPIC as it is always on for this platform"
+ | otherwise = (dflags, [])
+    where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
+          loop updated_dflags warning
+              = case makeDynFlagsConsistent updated_dflags of
+                (dflags', ws) -> (dflags', L loc warning : ws)
+          platform = targetPlatform dflags
+          arch = platformArch platform
+          os   = platformOS   platform
 
