@@ -48,8 +48,10 @@ module Documentation.Haddock (
 
   -- * Flags and options
   Flag(..),
-  DocOption(..)
+  DocOption(..),
 
+  -- * Program entry point
+  haddock,
 ) where
 
 
@@ -58,7 +60,7 @@ import Haddock.Interface
 import Haddock.Types
 import Haddock.Options
 import Haddock.Utils
-import Main
+import Haddock
 
 
 -- | Create 'Interface' structures from a given list of Haddock command-line
@@ -72,4 +74,3 @@ createInterfaces
 createInterfaces flags modules = do
   (_, ifaces, _) <- withGhc' flags (readPackagesAndProcessModules flags modules)
   return ifaces
-

@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Main
+-- Module      :  Haddock
 -- Copyright   :  (c) Simon Marlow 2003-2006,
 --                    David Waern  2006-2010
 -- License     :  BSD-like
@@ -15,7 +15,7 @@
 --
 -- Program entry point and top-level code.
 -----------------------------------------------------------------------------
-module Main (main, readPackagesAndProcessModules, withGhc') where
+module Haddock (haddock, readPackagesAndProcessModules, withGhc') where
 
 
 import Haddock.Backends.Xhtml
@@ -39,7 +39,6 @@ import Data.IORef
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
-import System.Environment
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -123,14 +122,18 @@ handleGhcExceptions =
 -------------------------------------------------------------------------------
 
 
-main :: IO ()
-main = handleTopExceptions $ do
+-- | Run Haddock with given list of arguments.
+--
+-- Haddock's own main function is defined in terms of this:
+--
+-- > main = getArgs >>= haddock
+haddock :: [String] -> IO ()
+haddock args = handleTopExceptions $ do
 
   -- Parse command-line flags and handle some of them initially.
   -- TODO: unify all of this (and some of what's in the 'render' function),
   -- into one function that returns a record with a field for each option,
   -- or which exits with an error or help message.
-  args <- getArgs
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
   qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}

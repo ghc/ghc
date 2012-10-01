@@ -95,10 +95,12 @@ executable haddock
     build-depends: ghc-paths
 
   main-is:              Main.hs
-  hs-source-dirs:       src
+  hs-source-dirs:       src, driver
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
   other-modules:
+    Documentation.Haddock
+    Haddock
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
@@ -157,7 +159,7 @@ library
     Documentation.Haddock
 
   other-modules:
-    Main
+    Haddock
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
