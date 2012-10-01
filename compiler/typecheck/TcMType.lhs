@@ -155,17 +155,17 @@ newWantedEvVars theta = mapM newWantedEvVar theta
 
 newEvVar :: TcPredType -> TcM EvVar
 -- Creates new *rigid* variables for predicates
-newEvVar ty = do { name <- newName (predTypeOccName ty) 
+newEvVar ty = do { name <- newSysName (predTypeOccName ty) 
                  ; return (mkLocalId name ty) }
 
 newEq :: TcType -> TcType -> TcM EvVar
 newEq ty1 ty2
-  = do { name <- newName (mkVarOccFS (fsLit "cobox"))
+  = do { name <- newSysName (mkVarOccFS (fsLit "cobox"))
        ; return (mkLocalId name (mkTcEqPred ty1 ty2)) }
 
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys 
-  = do { name <- newName (mkDictOcc (getOccName cls))
+  = do { name <- newSysName (mkDictOcc (getOccName cls))
        ; return (mkLocalId name (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
