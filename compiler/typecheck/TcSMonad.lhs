@@ -32,7 +32,7 @@ module TcSMonad (
     mkGivenLoc, 
 
     TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality 
-    traceFireTcS, bumpStepCountTcS, 
+    traceFireTcS, 
     tryTcS, nestTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
 
@@ -168,8 +168,8 @@ mkKindErrorCtxtTcS ty1 ki1 ty2 ki2
 %*									*
 %************************************************************************
 
-Note [WorkList]
-~~~~~~~~~~~~~~~
+Note [WorkList priorities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A WorkList contains canonical and non-canonical items (of all flavors). 
 Notice that each Ct now has a simplification depth. We may 
 consider using this depth for prioritization as well in the future. 
@@ -179,6 +179,7 @@ equalities (wl_eqs) from the rest of the canonical constraints,
 so that it's easier to deal with them first, but the separation 
 is not strictly necessary. Notice that non-canonical constraints 
 are also parts of the worklist. 
+
 
 Note [NonCanonical Semantics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -220,7 +221,7 @@ extractDeque (DQ [] bs)     = case reverse bs of
                                 (a:as) -> Just (DQ as [], a)
                                 [] -> panic "extractDeque"
 
--- See Note [WorkList]
+-- See Note [WorkList priorities]
 data WorkList = WorkList { wl_eqs    :: [Ct]
                          , wl_funeqs :: Deque Ct
                          , wl_rest   :: [Ct] 
@@ -959,17 +960,14 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
 
-bumpStepCountTcS :: TcS ()
-bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
-                                    ; n <- TcM.readTcRef ref
-                                    ; TcM.writeTcRef ref (n+1) }
-
 traceFireTcS :: Ct -> SDoc -> TcS ()
--- Dump a rule-firing trace
+-- Dump a rule-firing trace, and bumpt the counter
 traceFireTcS ct doc 
   = TcS $ \env -> 
     TcM.ifDOptM Opt_D_dump_cs_trace $ 
-    do { n <- TcM.readTcRef (tcs_count env)
+    do { let count_ref = tcs_count env
+       ; n <- TcM.readTcRef count_ref
+       ; TcM.writeTcRef count_ref (n+1)
        ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct))) <+> doc
        ; TcM.dumpTcRn msg }
 
