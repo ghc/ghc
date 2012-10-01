@@ -247,20 +247,15 @@ canClassNC d ev cls tys
     `andWhenContinue` emitSuperclasses
 
 canClass d ev cls tys
-  = do { -- sctx <- getTcSContext
-       ; (xis, cos) <- flattenMany d FMFullFlatten (ctEvFlavour ev) tys
+  = do { (xis, cos) <- flattenMany d FMFullFlatten (ctEvFlavour ev) tys
        ; let co = mkTcTyConAppCo (classTyCon cls) cos 
              xi = mkClassPred cls xis
-             
        ; mb <- rewriteCtFlavor ev xi co
-
        ; case mb of
-           Just new_ev -> 
-             let (ClassPred cls xis_for_dict) = classifyPredType (ctEvPred new_ev)
-             in continueWith $ 
-                CDictCan { cc_ev = new_ev, cc_loc = d
-                         , cc_tyargs = xis_for_dict, cc_class = cls }
-           Nothing -> return Stop }
+           Nothing -> return Stop
+           Just new_ev -> continueWith $ 
+                          CDictCan { cc_ev = new_ev, cc_loc = d
+                                   , cc_tyargs = xis, cc_class = cls } }
 
 emitSuperclasses :: Ct -> TcS StopOrContinue
 emitSuperclasses ct@(CDictCan { cc_loc = d, cc_ev = ev
@@ -567,24 +562,22 @@ flatten loc f ctxt (TyConApp tc tys)
                             			     , cc_tyargs = xi_args    
                             			     , cc_rhs    = rhs_ty
                             			     , cc_loc  = loc }
-                                ; updWorkListTcS $ extendWorkListEq ct
+                                ; updWorkListTcS $ extendWorkListFunEq ct
                                 ; return (co, rhs_ty) }
 
                          | otherwise -- Wanted or Derived: make new unification variable
                          -> do { traceTcS "flatten/flat-cache miss" $ empty 
                                ; rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
-                               ; let pred = mkTcEqPred fam_ty rhs_xi_var
-                               ; mw <- newWantedEvVar pred
-                               ; case mw of
-                                   Fresh ctev -> 
-                                     do { let ct = CFunEqCan { cc_ev = ctev
-                                                             , cc_fun = tc
-                                                             , cc_tyargs = xi_args
-                                                             , cc_rhs    = rhs_xi_var 
-                                                             , cc_loc    = loc }
-                                        ; updWorkListTcS $ extendWorkListEq ct
-                                        ; return (evTermCoercion (ctEvTerm ctev), rhs_xi_var) }
-                                   Cached {} -> panic "flatten TyConApp, var must be fresh!" } 
+                               ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_xi_var)
+                                   -- NC (no-cache) version because we've already
+                                   -- looked in the solved goals an inerts (lookupFlatEqn)
+                               ; let ct = CFunEqCan { cc_ev = ctev
+                                                    , cc_fun = tc
+                                                    , cc_tyargs = xi_args
+                                                    , cc_rhs    = rhs_xi_var 
+                                                    , cc_loc    = loc }
+                               ; updWorkListTcS $ extendWorkListFunEq ct
+                               ; return (evTermCoercion (ctEvTerm ctev), rhs_xi_var) }
                     }
                   -- Emit the flat constraints
          ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
@@ -1149,7 +1142,7 @@ canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
            Nothing -> return Stop ;
            Just new_ev 
              | isTcReflCo xco -> continueWith new_ct
-             | otherwise      -> do { updWorkListTcS (extendWorkListEq new_ct); return Stop }
+             | otherwise      -> do { updWorkListTcS (extendWorkListFunEq new_ct); return Stop }
              where
                new_ct = CFunEqCan { cc_ev = new_ev, cc_loc = loc
                                   , cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 } } } 

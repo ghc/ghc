@@ -13,7 +13,8 @@ module TcSMonad (
 
     WorkList(..), isEmptyWorkList, emptyWorkList,
     workListFromEq, workListFromNonEq, workListFromCt, 
-    extendWorkListEq, extendWorkListNonEq, extendWorkListCt, 
+    extendWorkListEq, extendWorkListFunEq, 
+    extendWorkListNonEq, extendWorkListCt, 
     extendWorkListCts, extendWorkListEqs, appendWorkList, selectWorkItem,
     withWorkList,
 
@@ -46,7 +47,7 @@ module TcSMonad (
 
     xCtFlavor,        -- Transform a CtEvidence during a step 
     rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
-    newWantedEvVar, instDFunConstraints,
+    newWantedEvVar, newWantedEvVarNC, instDFunConstraints,
     newDerived,
     
        -- Creation of evidence variables
@@ -237,9 +238,13 @@ extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
 extendWorkListEq ct wl 
   | Just {} <- isCFunEqCan_Maybe ct
-  = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
+  = extendWorkListFunEq ct wl
   | otherwise
   = wl { wl_eqs = ct : wl_eqs wl }
+
+extendWorkListFunEq :: Ct -> WorkList -> WorkList
+extendWorkListFunEq ct wl 
+  = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
 
 extendWorkListEqs :: [Ct] -> WorkList -> WorkList
 -- Append a list of equalities
@@ -1404,6 +1409,12 @@ newGivenEvVar pred rhs
        ; setEvBind new_ev rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev }) }
 
+newWantedEvVarNC :: TcPredType -> TcS CtEvidence
+-- Don't look up in the solved/inerts; we know it's not there
+newWantedEvVarNC pty
+  = do { new_ev <- wrapTcS $ TcM.newEvVar pty
+       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev })}
+
 newWantedEvVar :: TcPredType -> TcS MaybeNew
 newWantedEvVar pty
   = do { mb_ct <- lookupInInerts pty
@@ -1411,10 +1422,8 @@ newWantedEvVar pty
             Just ctev | not (isDerived ctev) 
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (Cached (ctEvTerm ctev)) }
-            _ -> do { new_ev <- wrapTcS $ TcM.newEvVar pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr new_ev
-                    ; let ctev = CtWanted { ctev_pred = pty
-                                          , ctev_evar = new_ev }
+            _ -> do { ctev <- newWantedEvVarNC pty
+                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (Fresh ctev) } }
 
 newDerived :: TcPredType -> TcS (Maybe CtEvidence)
@@ -1471,7 +1480,7 @@ See Note [Coercion evidence terms] in TcEvidence.
 
 
 \begin{code}
-xCtFlavor :: CtEvidence              -- Original flavor   
+xCtFlavor :: CtEvidence            -- Original flavor   
           -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
