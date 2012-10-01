@@ -497,6 +497,12 @@ tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 tcTopSpliceExpr tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
+    unsetDOptM Opt_DeferTypeErrors $
+                   -- Don't defer type errors.  Not only are we
+                   -- going to run this code, but we do an unsafe
+                   -- coerce, so we get a seg-fault if, say we
+                   -- splice a type into a place where an expression
+                   -- is expected (Trac #7276)
     setStage Splice $
     do {    -- Typecheck the expression
          (expr', lie) <- captureConstraints tc_action
