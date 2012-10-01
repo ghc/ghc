@@ -1071,19 +1071,15 @@ reOrient :: CtEvidence -> TypeClassifier -> TypeClassifier -> Bool
 -- We try to say False if possible, to minimise evidence generation
 --
 -- Postcondition: After re-orienting, first arg is not OTherCls
-reOrient _ev (OtherCls {}) (FunCls {})   = True
-reOrient _ev (OtherCls {}) (VarCls {})   = True
-reOrient _ev (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
+reOrient _ev (OtherCls {}) cls2 = ASSERT( case cls2 of { OtherCls {} -> False; _ -> True } )
+                                  True  -- One must be Var/Fun
 
-reOrient _ev (FunCls {})   (VarCls _tv)  = False  
+reOrient _ev (FunCls {}) _      = False             -- Fun/Other on rhs
   -- But consider the following variation: isGiven ev && isMetaTyVar tv
-
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-reOrient _ev (FunCls {}) _                = False             -- Fun/Other on rhs
 
-reOrient _ev (VarCls {}) (FunCls {})      = True 
-reOrient _ev (VarCls {})  (OtherCls {})   = False
-
+reOrient _ev (VarCls {})   (FunCls {})      = True 
+reOrient _ev (VarCls {})   (OtherCls {})   = False
 reOrient _ev (VarCls tv1)  (VarCls tv2)  
   | isMetaTyVar tv2 && not (isMetaTyVar tv1) = True 
   | otherwise                                = False 
