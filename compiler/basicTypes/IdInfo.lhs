@@ -142,7 +142,7 @@ data IdDetails
        --             instance C a => C [a]
        --       has is_silent = 1, because the dfun
        --       has type  dfun :: (D a, C a) => C [a]
-       --       See the DFun Superclass Invariant in TcInstDcls
+       --       See Note [Silent superclass arguments] in TcInstDcls
        --
        -- Bool = True <=> the class has only one method, so may be
        --                  implemented with a newtype, so it might be bad

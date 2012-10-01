@@ -947,7 +947,7 @@ immediate superclasses of the dictionary we are trying to
 construct. In our example:
        dfun :: forall a. C [a] -> D [a] -> D [a]
        dfun = \(dc::C [a]) (dd::D [a]) -> DOrd dc ...
-Notice teh extra (dc :: C [a]) argument compared to the previous version.
+Notice the extra (dc :: C [a]) argument compared to the previous version.
 
 This gives us:
 
@@ -967,9 +967,13 @@ dictionary constructor). No superclass is hidden inside a dfun
 application.
 
 The extra arguments required to satisfy the DFun Superclass Invariant
-always come first, and are called the "silent" arguments.  DFun types
-are built (only) by MkId.mkDictFunId, so that is where we decide
-what silent arguments are to be added.
+always come first, and are called the "silent" arguments.  You can
+find out how many silent arguments there are using Id.dfunNSilent;
+and then you can just drop that number of arguments to see the ones
+that were in the original instance declaration.
+
+DFun types are built (only) by MkId.mkDictFunId, so that is where we
+decide what silent arguments are to be added.
 
 In our example, if we had  [Wanted] dw :: D [a] we would get via the instance:
     dw := dfun d1 d2
