@@ -552,96 +552,94 @@ nothingSpeculated = S.empty
 --   bar -> f -> a -> b -> c -> a (!RB)
 --          g -> b (!STOP)
 --          h -> c (!STOP)
+--
+-- Note [Old speculate]
+-- ~~~~~~~~~~~~~~~~~~~~
+--
+-- An older verison of speculate only allowed speculated bindings to see *values* in the heap, and tried to
+-- drive the heap in topological order so that as many dependent terms were reduces to values as possible
+-- before reaching the terms that used them.
+--
+-- However, I don't seem to have a good justification for doing this rather than the more obvious
+-- plan of just speculating heap bindings one by one in some arbitrary order but with all heap bindings
+-- simultaneously available.
+--
+-- (CHSC introduced the values-only behavior in 29db9669 with no comments and in the same commit that added rollback,
+-- and the behaviour was imported to GHC from there.)
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
 speculate speculated (stats, (deeds, heap, k, in_e)) = (speculated', (stats', (deeds', heap', k, in_e)))
   where (speculated', (stats', deeds', heap')) = speculateHeap speculated (stats, deeds, heap)
 
+newtype SpecHistory = SH { unSH :: LinearHistory (State, [Var], SpecHistory -> SpecM ()) }
+
 speculateHeap :: AlreadySpeculated -> (SCStats, Deeds, Heap) -> (AlreadySpeculated, (SCStats, Deeds, Heap))
-speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M.keysSet h, (stats', deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids'))
+speculateHeap speculated (stats, deeds, heap@(Heap h _)) = {-# SCC "speculate" #-} (M.keysSet h', (mempty, deeds', heap'))
   where
-    (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
-    (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)
+    hist = SH $ mkLinearHistory (cofmap fstOf3 wQO)
+    (_, deeds', heap'@(Heap h' _)) = runSpecM (speculateMany [] (M.keysSet h S.\\ speculated) hist deeds heap)
 
-    ((_hist, _forbidden, ids'), (stats', deeds', h_speculated_ok, h_speculated_failure)) = runSpecM (speculateManyMap [] h_non_values_unspeculated) ((mkLinearHistory (cofmap fstOf3 wQO), [], ids), (stats, deeds, h_values, M.empty))
-    
-    speculateManyMap parents = speculateMany parents . concatMap M.toList . topologicalSort heapBindingFreeVars
-    speculateMany parents = mapM_ (speculateOne parents)
-    
-    speculateOne :: [Var] -> (Out Var, HeapBinding) -> SpecM ()
-    speculateOne parents (x', hb)
-      | HB InternallyBound (Right in_e) <- hb
-      , spec_trace "speculate" (ppr x') True
-      = --pprTrace "speculateOne" (ppr (x', annedTag (snd in_e))) $
-        (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure (Just parents')
-      | otherwise
-      = speculation_failure Nothing
-      where
-        parents' = x' : parents
-        spec_trace msg doc = pprTrace (replicate (length parents) ' ' ++ msg) doc
-        speculation_failure mb_forbidden = modifySpecState $ \((hist, forbidden, ids), (stats, deeds, h_speculated_ok, h_speculated_failure)) -> (((hist, maybe id (:) mb_forbidden forbidden, ids), (stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure)), ())
-        try_speculation in_e rb = Monad.join (modifySpecState go)
-          where go no_change@((hist, forbidden, ids), (stats, deeds, h_speculated_ok, h_speculated_failure)) = case terminate hist (gc state, parents', SpecM $ spec_trace "rolled back to" (ppr x') . unSpecM rb) of
-                    Stop (_gced_old_state, old_parents', rb)
-                      -> spec_trace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness (gc state) $$ pPrintFullState quietStatePrettiness _gced_old_state -})
-                         (no_change, {- speculation_failure Nothing -} if any (`isSuffixOf` old_parents') forbidden then speculation_failure Nothing else rb) -- Don't allow rollback to rolled back region
-                    Continue hist -> {- spec_trace "continue" (pPrintFullState quietStatePrettiness state) $ -} case reduceWithStats state of
-                        (extra_stats, (deeds, Heap h_speculated_ok' ids, k, qa))
-                          -- I used to insist that evaluation should reach an *answer*, but actually it's really good if we
-                          -- get any cheap thing -- so questions are OK, and even cast questions are permissible (cast answers
-                          -- will never occur in practice).
-                          --
-                          -- A case where this makes a difference is if we have:
-                          --   (+)_selector $dNumInteger
-                          -- It will normally get speculated to a Question:
-                          --   GHC.Integer.plusInteger
-                          -- Due to the fact that plusInteger does not have an unfolding.
-                          --
-                          -- If the speculator only keeps Answers then it wouldn't keep this result,
-                          -- and thus if we had something like:
-                          --  (let add = (+)_selector $dNumInteger in (.. add .., .. add ..))
-                          -- Then we got a residual let-binding for "add", and the two h-functions
-                          -- corresponding to each component of the tuple were lambda-abstracted
-                          -- over "add"!
-                          | Just (cast_by, mb_update) <- isTrivialStack_maybe k
-                          -- TODO: might it not be cleaner to speculate the term with an Update frame for x' bunged on the end
-                          -- of the stack? In this case, I could be asurred that mb_update is Just
-                          , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
-                                in_e' = castAnnedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa)) qa cast_by
-                                h_speculated_ok'' = case mb_update of
-                                  Nothing                           -> M.insert x' (internallyBound in_e') h_speculated_ok
-                                  Just (Tagged tg_y' y', y_cast_by) -> M.insert x' (internallyBound (mkVarCastBy tg_y' y' y_cast_by)) $
-                                                                       M.insert y' (internallyBound in_e') h_speculated_ok
-                          -> (((hist, forbidden, ids), (stats `mappend` extra_stats, deeds, h_speculated_ok'', h_speculated_failure)), speculateManyMap parents' h_unspeculated)
-                        _ -> (no_change, speculation_failure Nothing)
-                  where state = normalise (deeds, Heap h_speculated_ok ids, Loco False, in_e)
-                        -- NB: try to avoid dead bindings in the state using 'gc' before the termination test so
-                        -- that the termination condition is more lenient. This showed up in practice, in a version
-                        -- of LetRec.hs where we had:
-                        --   let dead = xs in 1 : xs `embed` let ys = 1 : ys in ys
-                        -- (Because the tag on the ys/xs indirections was the cons-cell tag)
-                        --
-                        -- It's very important that we don' tjust gc the state itself because some of the h_speculated_ok
-                        -- bindings might be live in the original state supplied to speculate, and we don't want to drop them!
+    speculateMany :: [Var] -> S.Set (Out Var) -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
+    speculateMany depth xs' hist deeds heap = foldM (\(hist, deeds, heap) x' -> speculateOne depth x' hist deeds heap) (hist, deeds, heap) (S.toList xs')
 
-type SpecState = ((LinearHistory (State, [Var], SpecM ()), [[Var]], InScopeSet), -- Kept during a rollback
-                  (SCStats, Deeds, PureHeap, PureHeap))                          -- Discarded during a rollback
-newtype SpecM a = SpecM { unSpecM :: SpecState -> (SpecState -> a -> SpecState) -> SpecState }
+    speculateOne :: [Var] -> Out Var -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
+    speculateOne depth x' hist deeds (Heap h ids) = case M.lookup x' h of
+        Just (HB InternallyBound (Right in_e))
+          | spec_trace "speculate" (ppr x') True
+          , let state = normalise (deeds, Heap (M.delete x' h) ids, Loco False, in_e)
+                depth' = x':depth
+          -- I used to insist that evaluation should reach an *answer*, but actually it's really good if we
+          -- get any cheap thing -- so questions are OK, and even cast questions are permissible (cast answers
+          -- will never occur in practice).
+          --
+          -- A case where this makes a difference is if we have:
+          --   (+)_selector $dNumInteger
+          -- It will normally get speculated to a Question:
+          --   GHC.Integer.plusInteger
+          -- Due to the fact that plusInteger does not have an unfolding.
+          --
+          -- If the speculator only keeps Answers then it wouldn't keep this result,
+          -- and thus if we had something like:
+          --  (let add = (+)_selector $dNumInteger in (.. add .., .. add ..))
+          -- Then we got a residual let-binding for "add", and the two h-functions
+          -- corresponding to each component of the tuple were lambda-abstracted
+          -- over "add"!
+          , (deeds', Heap h' ids', k', qa') <- reduce state
+          --, if isNothing (isCastStack_maybe k') then spec_trace "speculate: not value" (ppr x') True else True
+          -- TODO: might it not be cleaner to speculate the term with an Update frame for x' bunged on the end
+          -- of the stack? In this case, I would not need to construct in_e' myself
+          , Just cast_by <- isCastStack_maybe k'
+          , let in_e' = castAnnedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa')) qa' cast_by
+            -- NB: try to avoid dead bindings in the state using 'gc' before the termination test so
+            -- that the termination condition is more lenient. This showed up in practice, in a version
+            -- of LetRec.hs where we had:
+            --   let dead = xs in 1 : xs `embed` let ys = 1 : ys in ys
+            -- (Because the tag on the ys/xs indirections was the cons-cell tag)
+            --
+            -- It's very important that we don' tjust gc the state itself because some of the h_speculated_ok
+            -- bindings might be live in the original state supplied to speculate, and we don't want to drop them!
+          -> catchSpecM (\rb -> case terminate (unSH hist) (gc state, depth', rb) of
+                                  Stop (_, old_depth, old_rb) -> spec_trace "speculation denied" (ppr x') $
+                                                                 (when (old_depth `isSuffixOf` depth) (old_rb hist) >> dont_speculate hist)
+                                  Continue hist'              -> speculateMany depth' (M.keysSet h' S.\\ M.keysSet h) (SH hist') deeds' (Heap (M.insert x' (internallyBound in_e') h') ids'))
+                        dont_speculate
+        _ -> dont_speculate hist
+      where dont_speculate hist' = return (hist', deeds, Heap h ids)
+            spec_trace msg doc = pprTrace (replicate (length depth) ' ' ++ msg) doc
 
-instance Functor SpecM where
-    fmap = liftM
 
-instance Monad.Monad SpecM where
-    return x = SpecM $ \s k -> k s x
-    mx >>= fxmy = SpecM $ \s k -> unSpecM mx s (\s x -> unSpecM (fxmy x) s k)
+type SpecM = ContT (SpecHistory, Deeds, Heap) Identity
 
-modifySpecState :: (SpecState -> (SpecState, a)) -> SpecM a
-modifySpecState f = SpecM $ \s k -> case f s of (s, x) -> k s x
+runSpecM :: SpecM (SpecHistory, Deeds, Heap) -> (SpecHistory, Deeds, Heap)
+runSpecM = unI . runContT
 
-runSpecM :: SpecM () -> SpecState -> SpecState
-runSpecM spec state = unSpecM spec state (\state () -> state)
+catchSpecM :: ((forall b. c -> SpecM b) -> SpecM a)
+           -> (c -> SpecM a)
+           -> SpecM a
+catchSpecM try ctch = do
+    ei <- callCC $ \f -> fmap Right $ try (f . Left)
+    case ei of Left c  -> ctch c
+               Right x -> return x
 
-catchSpecM :: ((forall b. SpecM b) -> SpecM ()) -> SpecM () -> SpecM ()
-catchSpecM mx mcatch = SpecM $ \s@(_, sr) k -> unSpecM (mx (SpecM $ \(sl, _) _k -> unSpecM mcatch (sl, sr) k)) s k
 
 reduce :: State -> State
 reduce = thirdOf3 . reduce'
