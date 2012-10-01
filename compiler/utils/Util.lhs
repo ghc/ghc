@@ -87,6 +87,7 @@ module Util (
         escapeSpaces,
         parseSearchPath,
         Direction(..), reslash,
+        makeRelativeTo,
 
         -- * Utils for defining Data instances
         abstractConstr, abstractDataType, mkNoRepType,
@@ -1006,6 +1007,17 @@ reslash d = f
           slash = case d of
                   Forwards -> '/'
                   Backwards -> '\\'
+
+makeRelativeTo :: FilePath -> FilePath -> FilePath
+this `makeRelativeTo` that = directory </> thisFilename
+    where (thisDirectory, thisFilename) = splitFileName this
+          thatDirectory = dropFileName that
+          directory = joinPath $ f (splitPath thisDirectory)
+                                   (splitPath thatDirectory)
+
+          f (x : xs) (y : ys)
+           | x == y = f xs ys
+          f xs ys = replicate (length ys) ".." ++ xs
 \end{code}
 
 %************************************************************************

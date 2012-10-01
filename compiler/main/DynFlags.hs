@@ -339,6 +339,7 @@ data DynFlag
    | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Static
+   | Opt_RelativeDynlibPaths
    | Opt_Hpc
 
    -- output style opts
@@ -1780,6 +1781,7 @@ dynamic_flags = [
                                      addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
+  , Flag "relative-dynlib-paths"  (NoArg (setDynFlag Opt_RelativeDynlibPaths))
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.

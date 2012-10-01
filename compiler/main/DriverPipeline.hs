@@ -1662,13 +1662,23 @@ linkBinary dflags o_files dep_packages = do
     -- explicit packages with the auto packages and all of their
     -- dependencies, and eliminating duplicates.
 
+    full_output_fn <- if isAbsolute output_fn
+                      then return output_fn
+                      else do d <- getCurrentDirectory
+                              return $ normalise (d </> output_fn)
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
-    let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
+    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            not (dopt Opt_Static dflags)
-            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+            = let libpath = if dopt Opt_RelativeDynlibPaths dflags
+                            then "$ORIGIN" </>
+                                 (l `makeRelativeTo` full_output_fn)
+                            else l
+              in ["-L" ++ l,
+                  "-Wl,-rpath",      "-Wl," ++ libpath,
+                  "-Wl,-rpath-link", "-Wl," ++ l]
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
