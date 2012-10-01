@@ -215,7 +215,7 @@ test-suite spec
 
   -- NOTE: As of this writing, Cabal does not properly handle alex/happy for
   -- test suites.  We work around this by adding dist/build to hs-source-dirs,
-  -- so that the the generated lexer/parser from the library is used.  I
+  -- so that the the generated lexer/parser from the library is used.  In
   -- addition we depend on 'haddock', so that the library is compiled before
   -- the test suite.
   --
