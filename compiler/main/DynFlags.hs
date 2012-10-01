@@ -971,8 +971,6 @@ wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
 wayTag WayPar      = "mp"
--- wayTag WayPar      = "mt"
--- wayTag WayPar      = "md"
 wayTag WayGran     = "mg"
 wayTag WayNDP      = "ndp"
 
@@ -983,8 +981,6 @@ wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
 wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
 wayRTSOnly WayGran     = False
 wayRTSOnly WayNDP      = False
 
@@ -995,8 +991,6 @@ wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
 wayDesc WayPar      = "Parallel"
--- wayDesc WayPar      = "Parallel ticky profiling"
--- wayDesc WayPar      = "Distributed"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
