@@ -155,17 +155,17 @@ newWantedEvVars theta = mapM newWantedEvVar theta
 
 newEvVar :: TcPredType -> TcM EvVar
 -- Creates new *rigid* variables for predicates
-newEvVar ty = do { name <- newName (predTypeOccName ty) 
+newEvVar ty = do { name <- newSysName (predTypeOccName ty) 
                  ; return (mkLocalId name ty) }
 
 newEq :: TcType -> TcType -> TcM EvVar
 newEq ty1 ty2
-  = do { name <- newName (mkVarOccFS (fsLit "cobox"))
+  = do { name <- newSysName (mkVarOccFS (fsLit "cobox"))
        ; return (mkLocalId name (mkTcEqPred ty1 ty2)) }
 
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys 
-  = do { name <- newName (mkDictOcc (getOccName cls))
+  = do { name <- newSysName (mkDictOcc (getOccName cls))
        ; return (mkLocalId name (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
@@ -679,7 +679,7 @@ zonkFlats binds_var untch cts
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)
 --       , Just ty_lhs' <- occurCheck tv ty_lhs
       = ASSERT2( isWantedCt orig_ct, ppr orig_ct )
-        ASSERT2( case orig_ct of { CFunEqCan {} -> True; _ -> False }, ppr orig_ct )
+        ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
         do { writeMetaTyVar tv ty_lhs
            ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
                  evvar  = ctev_evar (cc_ev zct)

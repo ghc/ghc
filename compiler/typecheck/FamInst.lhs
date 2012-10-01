@@ -177,7 +177,9 @@ tcLookupFamInst tycon tys
   | otherwise
   = do { instEnv <- tcGetFamInstEnvs
        ; let mb_match = lookupFamInstEnv instEnv tycon tys 
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ ppr mb_match $$ ppr instEnv)
+--       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ 
+--                                  pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ 
+--                                  ppr mb_match $$ ppr instEnv)
        ; case mb_match of
 	   [] -> return Nothing
 	   ((fam_inst, rep_tys):_) 

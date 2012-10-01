@@ -376,6 +376,11 @@ newName occ
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
 
+newSysName :: OccName -> TcM Name
+newSysName occ
+  = do { uniq <- newUnique
+       ; return (mkSystemName uniq occ) }
+
 newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply

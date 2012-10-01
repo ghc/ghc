@@ -296,11 +296,10 @@ spontaneousSolveStage workItem
            SPSolved new_tv
               -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
               -- see Note [Spontaneously solved in TyBinds]
-              -> do { bumpStepCountTcS
-                   ; traceFireTcS workItem $
-                     ptext (sLit "Spontaneously solved:") <+> ppr workItem
-                   ; kickOutRewritable Given new_tv
-                   ; return Stop } }
+              -> do { traceFireTcS workItem $
+                      ptext (sLit "Spontaneously solved:") <+> ppr workItem
+                    ; kickOutRewritable Given new_tv
+                    ; return Stop } }
 \end{code}
 Note [Spontaneously solved in TyBinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -649,19 +648,16 @@ interactWithInertsStage wi
                               , ptext (sLit "WorkItem  =") <+> ppr wi ]
                ; case ir of 
                    IRWorkItemConsumed { ir_fire = rule } 
-                       -> do { bumpStepCountTcS
-                             ; traceFireTcS wi (mk_msg rule (text "WorkItemConsumed"))
+                       -> do { traceFireTcS wi (mk_msg rule (text "WorkItemConsumed"))
                              ; insertInertItemTcS atomic_inert
                              ; return Stop } 
                    IRReplace { ir_fire = rule }
-                       -> do { bumpStepCountTcS
-                             ; traceFireTcS atomic_inert 
+                       -> do { traceFireTcS atomic_inert 
                                             (mk_msg rule (text "InertReplace"))
                              ; insertInertItemTcS wi
                              ; return Stop } 
                    IRInertConsumed { ir_fire = rule }
-                       -> do { bumpStepCountTcS
-                             ; traceFireTcS atomic_inert 
+                       -> do { traceFireTcS atomic_inert 
                                             (mk_msg rule (text "InertItemConsumed"))
                              ; return (ContinueWith wi) }
                    IRKeepGoing {} -- Should we do a bumpStepCountTcS? No for now.
@@ -726,8 +722,9 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_loc = d1 }) 
                     wi@(CFunEqCan { cc_ev = ev2, cc_fun = tc2
                                   , cc_tyargs = args2, cc_rhs = xi2, cc_loc = d2 })
-  | fl1 `canSolve` fl2 && lhss_match
-  = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
+  | fl1 `canSolve` fl2 
+  = ASSERT( lhss_match )   -- extractRelevantInerts ensures this
+    do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
               , text "inertItem=" <+> ppr ii ]
 
@@ -744,8 +741,9 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
        ; emitWorkNC d2 ctevs 
        ; return (IRWorkItemConsumed "FunEq/FunEq") }
 
-  | fl2 `canSolve` fl1 && lhss_match
-  = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
+  | fl2 `canSolve` fl1
+  = ASSERT( lhss_match )   -- extractRelevantInerts ensures this
+    do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
               , text "inertItem=" <+> ppr ii ]
 
@@ -1027,7 +1025,7 @@ So our problem is this
 
 We may add the given in the inert set, along with its superclasses
 [assuming we don't fail because there is a matching instance, see 
- tryTopReact, given case ]
+ topReactionsStage, given case ]
   Inert:
     d0 :_g Foo t 
   WorkList 
@@ -1339,20 +1337,14 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 *********************************************************************************
 
 \begin{code}
-topReactionsStage :: SimplifierStage 
-topReactionsStage workItem 
- = tryTopReact workItem 
-   
-
-tryTopReact :: WorkItem -> TcS StopOrContinue
-tryTopReact wi 
+topReactionsStage :: WorkItem -> TcS StopOrContinue
+topReactionsStage wi 
  = do { inerts <- getTcSInerts
       ; tir <- doTopReact inerts wi
       ; case tir of 
           NoTopInt -> return (ContinueWith wi)
           SomeTopInt rule what_next 
-                   -> do { bumpStepCountTcS 
-                         ; traceFireTcS wi $
+                   -> do { traceFireTcS wi $
                            vcat [ ptext (sLit "Top react:") <+> text rule
                                 , text "WorkItem =" <+> ppr wi ]
                          ; return what_next } }
@@ -1440,18 +1432,18 @@ doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> CtLoc -> TcS TopInteractResult
 doTopReactFunEq ct fl fun_tc args xi loc
   = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
-                                 -- reached that far 
-
-    -- First look in the cache of solved funeqs
+                                     -- reached this far 
+    -- Look in the cache of solved funeqs
     do { fun_eq_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
        ; case lookupFamHead fun_eq_cache fam_ty of {
-            Just (CFunEqCan { cc_ev = ctev, cc_rhs = rhs_ty })
-                -> ASSERT( not (isDerived ctev) )
-                   succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
-            Just {}  -> pprPanic "doTopReactFunEq" (ppr ct) ;
-            Nothing -> 
+           Just (CFunEqCan { cc_ev = ctev, cc_rhs = rhs_ty })
+             | ctEvFlavour ctev `canRewrite` ctEvFlavour fl
+             -> ASSERT( not (isDerived ctev) )
+                succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
+           Just ct' -> pprPanic "doTopReactFunEq" (ppr ct') ;
+           Nothing -> 
 
-    -- No cached solved, so look up in top-level instances
+    -- Look up in top-level instances
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> return NoTopInt ;
@@ -1462,7 +1454,7 @@ doTopReactFunEq ct fl fun_tc args xi loc
          unless (isDerived fl) (addSolvedFunEq ct fam_ty)
 
        ; let coe_ax = famInstAxiom famInst 
-       ; succeed_with "Fun/Top"(mkTcAxInstCo coe_ax rep_tys)
+       ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax rep_tys)
                       (mkAxInstRHS coe_ax rep_tys) } } } } }
   where
     fam_ty = mkTyConApp fun_tc args

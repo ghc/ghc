@@ -13,7 +13,8 @@ module TcSMonad (
 
     WorkList(..), isEmptyWorkList, emptyWorkList,
     workListFromEq, workListFromNonEq, workListFromCt, 
-    extendWorkListEq, extendWorkListNonEq, extendWorkListCt, 
+    extendWorkListEq, extendWorkListFunEq, 
+    extendWorkListNonEq, extendWorkListCt, 
     extendWorkListCts, extendWorkListEqs, appendWorkList, selectWorkItem,
     withWorkList,
 
@@ -31,7 +32,7 @@ module TcSMonad (
     mkGivenLoc, 
 
     TcS, runTcS, runTcSWithEvBinds, failTcS, panicTcS, traceTcS, -- Basic functionality 
-    traceFireTcS, bumpStepCountTcS, 
+    traceFireTcS, 
     tryTcS, nestTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
 
@@ -46,7 +47,7 @@ module TcSMonad (
 
     xCtFlavor,        -- Transform a CtEvidence during a step 
     rewriteCtFlavor,  -- Specialized version of xCtFlavor for coercions
-    newWantedEvVar, instDFunConstraints,
+    newWantedEvVar, newWantedEvVarNC, instDFunConstraints,
     newDerived,
     
        -- Creation of evidence variables
@@ -167,8 +168,8 @@ mkKindErrorCtxtTcS ty1 ki1 ty2 ki2
 %*									*
 %************************************************************************
 
-Note [WorkList]
-~~~~~~~~~~~~~~~
+Note [WorkList priorities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A WorkList contains canonical and non-canonical items (of all flavors). 
 Notice that each Ct now has a simplification depth. We may 
 consider using this depth for prioritization as well in the future. 
@@ -178,6 +179,7 @@ equalities (wl_eqs) from the rest of the canonical constraints,
 so that it's easier to deal with them first, but the separation 
 is not strictly necessary. Notice that non-canonical constraints 
 are also parts of the worklist. 
+
 
 Note [NonCanonical Semantics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,7 +221,7 @@ extractDeque (DQ [] bs)     = case reverse bs of
                                 (a:as) -> Just (DQ as [], a)
                                 [] -> panic "extractDeque"
 
--- See Note [WorkList]
+-- See Note [WorkList priorities]
 data WorkList = WorkList { wl_eqs    :: [Ct]
                          , wl_funeqs :: Deque Ct
                          , wl_rest   :: [Ct] 
@@ -237,9 +239,13 @@ extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
 extendWorkListEq ct wl 
   | Just {} <- isCFunEqCan_Maybe ct
-  = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
+  = extendWorkListFunEq ct wl
   | otherwise
   = wl { wl_eqs = ct : wl_eqs wl }
+
+extendWorkListFunEq :: Ct -> WorkList -> WorkList
+extendWorkListFunEq ct wl 
+  = wl { wl_funeqs = insertDeque ct (wl_funeqs wl) }
 
 extendWorkListEqs :: [Ct] -> WorkList -> WorkList
 -- Append a list of equalities
@@ -954,17 +960,14 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
 
-bumpStepCountTcS :: TcS ()
-bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
-                                    ; n <- TcM.readTcRef ref
-                                    ; TcM.writeTcRef ref (n+1) }
-
 traceFireTcS :: Ct -> SDoc -> TcS ()
--- Dump a rule-firing trace
+-- Dump a rule-firing trace, and bumpt the counter
 traceFireTcS ct doc 
   = TcS $ \env -> 
     TcM.ifDOptM Opt_D_dump_cs_trace $ 
-    do { n <- TcM.readTcRef (tcs_count env)
+    do { let count_ref = tcs_count env
+       ; n <- TcM.readTcRef count_ref
+       ; TcM.writeTcRef count_ref (n+1)
        ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct))) <+> doc
        ; TcM.dumpTcRn msg }
 
@@ -1404,6 +1407,12 @@ newGivenEvVar pred rhs
        ; setEvBind new_ev rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evtm = EvId new_ev }) }
 
+newWantedEvVarNC :: TcPredType -> TcS CtEvidence
+-- Don't look up in the solved/inerts; we know it's not there
+newWantedEvVarNC pty
+  = do { new_ev <- wrapTcS $ TcM.newEvVar pty
+       ; return (CtWanted { ctev_pred = pty, ctev_evar = new_ev })}
+
 newWantedEvVar :: TcPredType -> TcS MaybeNew
 newWantedEvVar pty
   = do { mb_ct <- lookupInInerts pty
@@ -1411,10 +1420,8 @@ newWantedEvVar pty
             Just ctev | not (isDerived ctev) 
                       -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                             ; return (Cached (ctEvTerm ctev)) }
-            _ -> do { new_ev <- wrapTcS $ TcM.newEvVar pty
-                    ; traceTcS "newWantedEvVar/cache miss" $ ppr new_ev
-                    ; let ctev = CtWanted { ctev_pred = pty
-                                          , ctev_evar = new_ev }
+            _ -> do { ctev <- newWantedEvVarNC pty
+                    ; traceTcS "newWantedEvVar/cache miss" $ ppr ctev
                     ; return (Fresh ctev) } }
 
 newDerived :: TcPredType -> TcS (Maybe CtEvidence)
@@ -1471,7 +1478,7 @@ See Note [Coercion evidence terms] in TcEvidence.
 
 
 \begin{code}
-xCtFlavor :: CtEvidence              -- Original flavor   
+xCtFlavor :: CtEvidence            -- Original flavor   
           -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
