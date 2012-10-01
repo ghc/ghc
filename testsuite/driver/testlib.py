@@ -14,6 +14,7 @@ import traceback
 import copy
 import glob
 import types
+import math
 
 have_subprocess = False
 try:
@@ -215,6 +216,14 @@ def exit_code( val ):
 
 def _exit_code( opts, v ):
     opts.exit_code = v
+
+# -----
+
+def timeout_multiplier( val ):
+    return lambda opts, v=val: _timeout_multiplier(opts, v)
+
+def _timeout_multiplier( opts, v ):
+    opts.timeout_multiplier = v
 
 # -----
 
@@ -1176,13 +1185,13 @@ def simple_run( name, way, prog, args ):
         + stdin_comes_from         \
         + redirection
 
-    if getTestOpts().cmd_wrapper != None:
-        cmd = getTestOpts().cmd_wrapper(cmd);
+    if opts.cmd_wrapper != None:
+        cmd = opts.cmd_wrapper(cmd);
 
-    cmd = 'cd ' + getTestOpts().testdir + ' && ' + cmd
+    cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
     # run the command
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1198,9 +1207,11 @@ def simple_run( name, way, prog, args ):
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        if not opts.combined_output and not check_stderr_ok(name):
+        bad_stderr = not opts.combined_output and not check_stderr_ok(name)
+        bad_stdout = not check_stdout_ok(name)
+        if bad_stderr:
             return failBecause('bad stderr')
-        if not check_stdout_ok(name):
+        if bad_stdout:
             return failBecause('bad stdout')
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
@@ -1285,7 +1296,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=getTestOpts().timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1712,23 +1723,24 @@ def runCmd( cmd ):
         r = os.system(cmd)
     return r << 8
 
-def runCmdFor( name, cmd ):
+def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
     if_verbose( 1, cmd )
     r = 0
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
+    timeout = int(math.ceil(config.timeout * timeout_multiplier))
 
     if config.timeout_prog != '':
         if config.check_files_written:
             fn = name + ".strace"
             r = rawSystem(["strace", "-o", fn, "-fF", "-e", "creat,open,chdir,clone,vfork",
-                           config.timeout_prog, str(config.timeout),
+                           config.timeout_prog, str(timeout),
                            cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
-            r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
+            r = rawSystem([config.timeout_prog, str(timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8

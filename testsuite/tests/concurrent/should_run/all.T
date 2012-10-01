@@ -21,6 +21,10 @@ test('conc071', omit_ways(['threaded2']), compile_and_run, [''])
 test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
+# vector code must get inlined to become non-allocating
+test('367', composes([reqlib('vector'), timeout_multiplier(0.001)]), compile_and_run, ['-O2 -fno-omit-yields'])
+test('367_letnoescape', composes([timeout_multiplier(0.001)]), compile_and_run, ['-fno-omit-yields'])
+
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
 test('2910a', normal, compile_and_run, [''])

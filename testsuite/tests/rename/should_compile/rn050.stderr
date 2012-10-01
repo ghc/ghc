@@ -1,8 +1,4 @@
 
-rn050.hs:10:3: Warning:
-    In the use of `op' (imported from Rn050_A):
-    Deprecated: "Use bop instead"
-
 rn050.hs:13:7: Warning:
     In the use of `op' (imported from Rn050_A):
     Deprecated: "Use bop instead"
