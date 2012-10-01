@@ -1779,13 +1779,10 @@ dynamic_flags = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  -- -static is the default. If -dynamic has been given then, due to the
-  -- way wayExtras is currently used, we've already set -DDYNAMIC etc.
-  -- It's too fiddly to undo that, so we just give an error if
-  -- Opt_Static has been unset.
-  , Flag "static"         (noArgM (\dfs -> do unless (dopt Opt_Static dfs) (addErr "Can't use -static after -dynamic")
-                                              return dfs))
-  , Flag "dynamic"        (NoArg (unSetDynFlag Opt_Static >> addWay WayDyn))
+  , Flag "static"         (NoArg (do setDynFlag Opt_Static
+                                     removeWay WayDyn))
+  , Flag "dynamic"        (NoArg (do unSetDynFlag Opt_Static
+                                     addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
 
@@ -2736,6 +2733,9 @@ addWay :: Way -> DynP ()
 addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
               wayExtras (targetPlatform dfs) w
+
+removeWay :: Way -> DynP ()
+removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
