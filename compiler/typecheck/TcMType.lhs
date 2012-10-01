@@ -679,7 +679,7 @@ zonkFlats binds_var untch cts
       , not (tv `elemVarSet` tyVarsOfType ty_lhs)
 --       , Just ty_lhs' <- occurCheck tv ty_lhs
       = ASSERT2( isWantedCt orig_ct, ppr orig_ct )
-        ASSERT2( case orig_ct of { CFunEqCan {} -> True; _ -> False }, ppr orig_ct )
+        ASSERT2( case tcSplitTyConApp_maybe ty_lhs of { Just (tc,_) -> isSynFamilyTyCon tc; _ -> False }, ppr orig_ct )
         do { writeMetaTyVar tv ty_lhs
            ; let evterm = EvCoercion (mkTcReflCo ty_lhs)
                  evvar  = ctev_evar (cc_ev zct)
