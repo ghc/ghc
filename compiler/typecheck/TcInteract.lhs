@@ -171,6 +171,7 @@ runSolverPipeline pipeline workItem
                   vcat [ ptext (sLit "work item = ") <+> ppr workItem 
                        , ptext (sLit "inerts    = ") <+> ppr initial_is]
 
+       ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
 
        ; final_is <- getTcSInerts
@@ -178,7 +179,8 @@ runSolverPipeline pipeline workItem
            Stop            -> do { traceTcS "End solver pipeline (discharged) }" 
                                        (ptext (sLit "inerts    = ") <+> ppr final_is)
                                  ; return () }
-           ContinueWith ct -> do { traceTcS "End solver pipeline (not discharged) }" $
+           ContinueWith ct -> do { traceFireTcS ct (ptext (sLit "Kept as inert:") <+> ppr ct)
+                                 ; traceTcS "End solver pipeline (not discharged) }" $
                                        vcat [ ptext (sLit "final_item = ") <+> ppr ct
                                             , ptext (sLit "inerts     = ") <+> ppr final_is]
                                  ; insertInertItemTcS ct }
@@ -220,38 +222,12 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 
 \begin{code}
 thePipeline :: [(String,SimplifierStage)]
-thePipeline = [ ("lookup-in-inerts",        lookupInInertsStage)
-              , ("canonicalization",        canonicalizationStage)
+thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
               , ("spontaneous solve",       spontaneousSolveStage)
               , ("interact with inerts",    interactWithInertsStage)
               , ("top-level reactions",     topReactionsStage) ]
 \end{code}
 
-
-\begin{code}
-
--- A quick lookup everywhere to see if we know about this constraint
---------------------------------------------------------------------
-lookupInInertsStage :: SimplifierStage
-lookupInInertsStage ct
-  | CtWanted { ctev_evar = ev_id, ctev_pred = pred } <- cc_ev ct
-  = do { mb_ct <- lookupInInerts pred
-       ; case mb_ct of
-           Just ctev
-             |  not (isDerived ctev)
-             -> do { setEvBind ev_id (ctEvTerm ctev)
-                   ; return Stop }
-           _ -> continueWith ct }
-  | otherwise -- I could do something like that for givens 
-              -- as well I suppose but it is not a big deal
-  = continueWith ct
-
-
--- The canonicalization stage, see TcCanonical for details
-----------------------------------------------------------
-canonicalizationStage :: SimplifierStage
-canonicalizationStage = TcCanonical.canonicalize 
-\end{code}
 
 *********************************************************************************
 *                                                                               * 
@@ -287,7 +263,10 @@ spontaneousSolveStage workItem
            SPCantSolve
               | CTyEqCan { cc_tyvar = tv, cc_ev = fl } <- workItem
               -- Unsolved equality
-              -> do { kickOutRewritable (ctEvFlavour fl) tv
+              -> do { n_kicked <- kickOutRewritable (ctEvFlavour fl) tv
+                    ; traceFireTcS workItem $
+                      ptext (sLit "Kept as inert") <+> ppr_kicked n_kicked <> colon 
+                      <+> ppr workItem
                     ; insertInertItemTcS workItem
                     ; return Stop }
               | otherwise
@@ -296,10 +275,15 @@ spontaneousSolveStage workItem
            SPSolved new_tv
               -- Post: tv ~ xi is now in TyBinds, no need to put in inerts as well
               -- see Note [Spontaneously solved in TyBinds]
-              -> do { traceFireTcS workItem $
-                      ptext (sLit "Spontaneously solved:") <+> ppr workItem
-                    ; kickOutRewritable Given new_tv
+              -> do { n_kicked <- kickOutRewritable Given new_tv
+                    ; traceFireTcS workItem $
+                      ptext (sLit "Spontaneously solved") <+> ppr_kicked n_kicked <> colon 
+                      <+> ppr workItem
                     ; return Stop } }
+
+ppr_kicked :: Int -> SDoc
+ppr_kicked 0 = empty
+ppr_kicked n = parens (int n <+> ptext (sLit "kicked out")) 
 \end{code}
 Note [Spontaneously solved in TyBinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -320,13 +304,14 @@ these binds /and/ the inerts for potentially unsolved or other given equalities.
 kickOutRewritable :: CtFlavour    -- Flavour of the equality that is 
                                   -- being added to the inert set
                   -> TcTyVar      -- The new equality is tv ~ ty
-                  -> TcS ()
+                  -> TcS Int
 kickOutRewritable new_flav new_tv
   = do { wl <- modifyInertTcS kick_out
        ; traceTcS "kickOutRewritable" $ 
             vcat [ text "tv = " <+> ppr new_tv  
                  , ptext (sLit "Kicked out =") <+> ppr wl]
-       ; updWorkListTcS (appendWorkList wl) }
+       ; updWorkListTcS (appendWorkList wl)
+       ; return (workListSize wl)  }
   where
     kick_out :: InertSet -> (WorkList, InertSet)
     kick_out (is@(IS { inert_cans = IC { inert_eqs = tv_eqs
@@ -660,7 +645,7 @@ interactWithInertsStage wi
                        -> do { traceFireTcS atomic_inert 
                                             (mk_msg rule (text "InertItemConsumed"))
                              ; return (ContinueWith wi) }
-                   IRKeepGoing {} -- Should we do a bumpStepCountTcS? No for now.
+                   IRKeepGoing {}
                        -> do { insertInertItemTcS atomic_inert
                              ; return (ContinueWith wi) }
                }
@@ -1384,23 +1369,31 @@ doTopReactDict :: InertSet -> WorkItem -> CtEvidence -> Class -> [Xi]
                -> CtLoc -> TcS TopInteractResult
 doTopReactDict inerts workItem fl cls xis loc
   = do { instEnvs <- getInstEnvs 
-       ; let fd_eqns = improveFromInstEnv instEnvs 
-                           (mkClassPred cls xis, arising_sdoc)
+       ; let pred = mkClassPred cls xis
+             fd_eqns = improveFromInstEnv instEnvs (pred, arising_sdoc)
              
        ; fd_work <- rewriteWithFunDeps fd_eqns loc
        ; if not (null fd_work) then
             do { updWorkListTcS (extendWorkListEqs fd_work)
                ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
-                                    , tir_new_item = ContinueWith workItem } }
-         else -- No fundeps
-         if isWanted fl then
-            do { lkup_inst_res  <- matchClassInst inerts cls xis loc
-               ; case lkup_inst_res of
-                   GenInst wtvs ev_term -> do { addSolvedDict fl 
-                                              ; doSolveFromInstance wtvs ev_term }
-                   NoInstance -> return NoTopInt }
-         else 
-            return NoTopInt }
+                                   , tir_new_item = ContinueWith workItem } }
+         else if not (isWanted fl) then 
+            return NoTopInt
+         else do
+
+       { solved_dicts <- getTcSInerts >>= (return . inert_solved_dicts)
+       ; case lookupSolvedDict solved_dicts pred of {
+            Just ev -> do { setEvBind dict_id (ctEvTerm ev); 
+                          ; return $ 
+                            SomeTopInt { tir_rule = "Dict/Top (cached)" 
+                                       , tir_new_item = Stop } } ;
+            Nothing -> do
+
+      { lkup_inst_res  <- matchClassInst inerts cls xis loc
+      ; case lkup_inst_res of
+           GenInst wtvs ev_term -> do { addSolvedDict fl 
+                                      ; doSolveFromInstance wtvs ev_term }
+           NoInstance -> return NoTopInt } } } }
    where 
      arising_sdoc = pprArisingAt loc
      dict_id = ctEvId fl
@@ -1430,18 +1423,17 @@ doTopReactDict inerts workItem fl cls xis loc
 --------------------
 doTopReactFunEq :: Ct -> CtEvidence -> TyCon -> [Xi] -> Xi
                 -> CtLoc -> TcS TopInteractResult
-doTopReactFunEq ct fl fun_tc args xi loc
+doTopReactFunEq _ct fl fun_tc args xi loc
   = ASSERT (isSynFamilyTyCon fun_tc) -- No associated data families have 
                                      -- reached this far 
     -- Look in the cache of solved funeqs
     do { fun_eq_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
        ; case lookupFamHead fun_eq_cache fam_ty of {
-           Just (CFunEqCan { cc_ev = ctev, cc_rhs = rhs_ty })
+           Just (ctev, rhs_ty)
              | ctEvFlavour ctev `canRewrite` ctEvFlavour fl
              -> ASSERT( not (isDerived ctev) )
                 succeed_with "Fun/Cache" (evTermCoercion (ctEvTerm ctev)) rhs_ty ;
-           Just ct' -> pprPanic "doTopReactFunEq" (ppr ct') ;
-           Nothing -> 
+           _other -> 
 
     -- Look up in top-level instances
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
@@ -1451,7 +1443,7 @@ doTopReactFunEq ct fl fun_tc args xi loc
 
     -- Found a top-level instance
     do {    -- Add it to the solved goals
-         unless (isDerived fl) (addSolvedFunEq ct fam_ty)
+         unless (isDerived fl) (addSolvedFunEq fam_ty fl xi)
 
        ; let coe_ax = famInstAxiom famInst 
        ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax rep_tys)

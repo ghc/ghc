@@ -48,6 +48,7 @@ module StaticFlags (
 	opt_SimplExcessPrecision,
 	opt_NoOptCoercion,
 	opt_MaxWorkerArgs,
+        opt_NoFlatCache,
 
 	-- Unfolding control
 	opt_UF_CreationThreshold,
@@ -242,6 +243,9 @@ opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 
 opt_NoOptCoercion :: Bool
 opt_NoOptCoercion    	        = lookUp  (fsLit "-fno-opt-coercion")
+
+opt_NoFlatCache :: Bool
+opt_NoFlatCache    	        = lookUp  (fsLit "-fno-flat-cache")
 
 -- Unfolding control
 -- See Note [Discounts and thresholds] in CoreUnfold

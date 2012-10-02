@@ -532,9 +532,8 @@ flatten loc f ctxt (TyConApp tc tys)
                FMFullFlatten -> 
                  do { mb_ct <- lookupFlatEqn fam_ty
                     ; case mb_ct of
-                        Just ct 
-                          | let ctev = cc_ev ct
-                                flav = ctEvFlavour ctev
+                        Just (ctev, rhs_ty)
+                          | let flav = ctEvFlavour ctev
                           , flav `canRewrite` ctxt 
                           -> -- You may think that we can just return (cc_rhs ct) but not so. 
                              --            return (mkTcCoVarCo (ctId ct), cc_rhs ct, []) 
@@ -544,40 +543,21 @@ flatten loc f ctxt (TyConApp tc tys)
                              -- cache as well when we interact an equality with the inert. 
                              -- The design choice is: do we keep the flat cache rewritten or not?
                              -- For now I say we don't keep it fully rewritten.
-                            do { traceTcS "flatten/flat-cache hit" $ ppr ct
-                               ; let rhs_xi = cc_rhs ct
-                               ; (flat_rhs_xi,co) <- flatten (cc_loc ct) f flav rhs_xi
+                            do { traceTcS "flatten/flat-cache hit" $ ppr ctev
+                               ; (rhs_xi,co) <- flatten loc f flav rhs_ty
                                ; let final_co = evTermCoercion (ctEvTerm ctev)
                                                 `mkTcTransCo` mkTcSymCo co
-                               ; return (final_co, flat_rhs_xi) }
+                               ; return (final_co, rhs_xi) }
                           
-                        _ | Given <- ctxt -- Given: make new flatten skolem
-                          -> do { traceTcS "flatten/flat-cache miss" $ empty 
-                                ; rhs_ty <- newFlattenSkolemTy fam_ty
-                                ; let co     = mkTcReflCo fam_ty
-                                      new_ev = CtGiven { ctev_pred = mkTcEqPred fam_ty rhs_ty
-                                                       , ctev_evtm = EvCoercion co }
-                                      ct = CFunEqCan { cc_ev = new_ev
-                                                     , cc_fun    = tc 
-                            			     , cc_tyargs = xi_args    
-                            			     , cc_rhs    = rhs_ty
-                            			     , cc_loc  = loc }
+                        _ -> do { traceTcS "flatten/flat-cache miss" $ ppr fam_ty
+                                ; (ctev, rhs_xi) <- newFlattenSkolem ctxt fam_ty
+                                ; let ct = CFunEqCan { cc_ev     = ctev
+                                                     , cc_fun    = tc
+                                                     , cc_tyargs = xi_args
+                                                     , cc_rhs    = rhs_xi
+                                                     , cc_loc    = loc }
                                 ; updWorkListTcS $ extendWorkListFunEq ct
-                                ; return (co, rhs_ty) }
-
-                         | otherwise -- Wanted or Derived: make new unification variable
-                         -> do { traceTcS "flatten/flat-cache miss" $ empty 
-                               ; rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
-                               ; ctev <- newWantedEvVarNC (mkTcEqPred fam_ty rhs_xi_var)
-                                   -- NC (no-cache) version because we've already
-                                   -- looked in the solved goals an inerts (lookupFlatEqn)
-                               ; let ct = CFunEqCan { cc_ev = ctev
-                                                    , cc_fun = tc
-                                                    , cc_tyargs = xi_args
-                                                    , cc_rhs    = rhs_xi_var 
-                                                    , cc_loc    = loc }
-                               ; updWorkListTcS $ extendWorkListFunEq ct
-                               ; return (evTermCoercion (ctEvTerm ctev), rhs_xi_var) }
+                                ; return (evTermCoercion (ctEvTerm ctev), rhs_xi) }
                     }
                   -- Emit the flat constraints
          ; return ( mkAppTys rhs_xi xi_rest -- NB mkAppTys: rhs_xi might not be a type variable
@@ -1140,9 +1120,9 @@ canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
        ; mb <- rewriteCtFlavor ev (mkTcEqPred fam_head xi2) xco
        ; case mb of {
            Nothing -> return Stop ;
-           Just new_ev 
-             | isTcReflCo xco -> continueWith new_ct
-             | otherwise      -> do { updWorkListTcS (extendWorkListFunEq new_ct); return Stop }
+           Just new_ev -> continueWith new_ct
+--             | isTcReflCo xco -> continueWith new_ct
+--             | otherwise      -> do { updWorkListTcS (extendWorkListFunEq new_ct); return Stop }
              where
                new_ct = CFunEqCan { cc_ev = new_ev, cc_loc = loc
                                   , cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 } } } 
