@@ -42,9 +42,10 @@ test('haddock.Cabal',
                                                       117))
                                         # 2012-08-14: 116 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 77992512, 1))
+          stats_range_field('max_bytes_used', 91341568, 2))
                              # 2012-08-14: 74119424 (amd64/Linux)
                              # 2012-08-29: 77992512 (amd64/Linux, new codegen)
+                             # 2012-10-02: 91341568 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 47461532, 1))
                              # 2012-08-14: 47461532 (x86/OSX)
