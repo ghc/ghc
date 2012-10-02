@@ -508,16 +508,17 @@ We do quite often need to get a TcCoercion from an EvTerm; see
 
 INVARIANT: The evidence for any constraint with type (t1~t2) is 
 a coercion evidence term.  Consider for example
-    [G] g :: F Int a
+    [G] d :: F Int a
 If we have
     ax7 a :: F Int a ~ (a ~ Bool)
 then we do NOT generate the constraint
-    [G} (g |> ax7 a) :: a ~ Bool
-because that does not satisfy the invariant.  Instead we make a binding
+    [G} (d |> ax7 a) :: a ~ Bool
+because that does not satisfy the invariant (d is not a coercion variable).  
+Instead we make a binding
     g1 :: a~Bool = g |> ax7 a
 and the constraint
     [G] g1 :: a~Bool
-See Trac [7238]
+See Trac [7238] and Note [Bind new Givens immediately] in TcSMonad
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~

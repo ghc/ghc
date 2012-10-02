@@ -26,7 +26,6 @@ import Name
 import Module
 import Outputable
 import UniqFM
-import VarSet
 import FastString
 import Util
 import Maybes
