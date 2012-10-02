@@ -713,6 +713,9 @@ zonkExpr env (HsWrap co_fn expr)
     zonkExpr env1 expr	`thenM` \ new_expr ->
     return (HsWrap new_co_fn new_expr)
 
+zonkExpr _ HsHole
+  = return HsHole
+
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
 zonkCmdTop :: ZonkEnv -> LHsCmdTop TcId -> TcM (LHsCmdTop Id)
@@ -1114,11 +1117,6 @@ zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcLCoToLCo env co
 zonkEvTerm env (EvCast tm co)     = do { tm' <- zonkEvTerm env tm
                                        ; co' <- zonkTcLCoToLCo env co
                                        ; return (mkEvCast tm' co') }
-
-zonkEvTerm env (EvKindCast v co)  = do { v'  <- zonkEvTerm env v
-                                       ; co' <- zonkTcLCoToLCo env co
-                                       ; return (mkEvKindCast v' co') }
-
 zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
                                        ; return (EvTupleSel tm' n) }
 zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
@@ -1158,29 +1156,17 @@ zonkEvBinds env binds
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
 zonkEvBind env (EvBind var term)
-  = case term of 
-      -- Special-case fast paths for small coercions
-      -- NB: could be optimized further! (e.g. SymCo cv)
-      -- See Note [Optimized Evidence Binding Zonking]
-      EvCoercion co 
-        | Just ty <- isTcReflCo_maybe co
-        -> do { zty  <- zonkTcTypeToType env ty
-              ; let var' = setVarType var (mkEqPred zty zty)
-                  -- Here we save the task of zonking var's type, 
-                  -- because we know just what it is!
-              ; return (EvBind var' (EvCoercion (mkTcReflCo zty))) }
+  = do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
 
-        | Just cv <- getTcCoVar_maybe co 
-        -> do { let cv'   = zonkIdOcc env cv -- Just lazily look up
-                    term' = EvCoercion (TcCoVarCo cv')
-                    var'  = setVarType var (varType cv')
-              ; return (EvBind var' term') }
-
-      -- The default path
-      _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
-              ; term' <- zonkEvTerm env term 
-              ; return (EvBind var' term')
-              }
+         -- Optimise the common case of Refl coercions
+         -- See Note [Optimise coercion zonking]
+         -- This has a very big effect on some programs (eg Trac #5030)
+       ; let ty' = idType var'
+       ; case getEqPredTys_maybe ty' of
+           Just (ty1, ty2) | ty1 `eqType` ty2 
+                  -> return (EvBind var' (EvCoercion (mkTcReflCo ty1)))
+           _other -> do { term' <- zonkEvTerm env term 
+                        ; return (EvBind var' term') } }
 \end{code}
 
 %************************************************************************
@@ -1235,8 +1221,8 @@ The type of Phantom is (forall (k : BOX). forall (a : k). Int). Both `a` and
 we have a type or a kind variable; for kind variables we just return AnyK (and
 not the ill-kinded Any BOX).
 
-Note [Optimized Evidence Binding Zonking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Optimise coercion zonkind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When optimising evidence binds we may come across situations where 
 a coercion looks like
       cv = ReflCo ty
@@ -1244,10 +1230,11 @@ or    cv1 = cv2
 where the type 'ty' is big.  In such cases it is a waste of time to zonk both 
   * The variable on the LHS
   * The coercion on the RHS
-Rather, we can zonk the coercion, take its type and use that for 
-the variable.  For big coercions this might be a lose, though, so we
-just have a fast case for a couple of special cases.
+Rather, we can zonk the variable, and if its type is (ty ~ ty), we can just
+use Refl on the right, ignoring the actual coercion on the RHS.
 
+This can have a very big effect, because the constraint solver sometimes does go
+to a lot of effort to prove Refl!  (Eg when solving  10+3 = 10+3; cf Trac #5030)
 
 \begin{code}
 zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
@@ -1257,16 +1244,17 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
          SkolemTv {}    -> lookup_in_env
          RuntimeUnk {}  -> lookup_in_env
          FlatSkol ty    -> zonkTcTypeToType env ty
-         MetaTv _ ref   -> do { cts <- readMutVar ref
-           		      ; case cts of    
-           		           Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
-                                                         zonkTcTypeToType env (tyVarKind tv)
-                                               ; zonk_unbound_tyvar (setTyVarKind tv kind) }
-           		           Indirect ty -> do { zty <- zonkTcTypeToType env ty 
-                                                     -- Small optimisation: shortern-out indirect steps
-                                                     -- so that the old type may be more easily collected.
-                                                     ; writeMutVar ref (Indirect zty)
-                                                     ; return zty } }
+         MetaTv { mtv_ref = ref }  
+           -> do { cts <- readMutVar ref
+           	 ; case cts of    
+           	      Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
+                                            zonkTcTypeToType env (tyVarKind tv)
+                                  ; zonk_unbound_tyvar (setTyVarKind tv kind) }
+           	      Indirect ty -> do { zty <- zonkTcTypeToType env ty 
+                                        -- Small optimisation: shortern-out indirect steps
+                                        -- so that the old type may be more easily collected.
+                                        ; writeMutVar ref (Indirect zty)
+                                        ; return zty } }
   | otherwise
   = lookup_in_env
   where
@@ -1353,6 +1341,7 @@ zonkTcLCoToLCo env co
                                    ; return (TcCastCo co1' co2') }
     go (TcSymCo co)           = do { co' <- go co; return (mkTcSymCo co')  }
     go (TcNthCo n co)         = do { co' <- go co; return (mkTcNthCo n co')  }
+    go (TcLRCo lr co)         = do { co' <- go co; return (mkTcLRCo lr co')  }
     go (TcTransCo co1 co2)    = do { co1' <- go co1; co2' <- go co2
                                    ; return (mkTcTransCo co1' co2')  }
     go (TcForAllCo tv co)     = ASSERT( isImmutableTyVar tv )

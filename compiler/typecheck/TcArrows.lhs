@@ -18,6 +18,7 @@ import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId )
 
 import HsSyn
 import TcMatches
+-- import TcSimplify( solveWantedsTcM )
 import TcType
 import TcMType
 import TcBinds
@@ -160,18 +161,20 @@ tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
 	; let fun_ty = mkCmdArrTy env (foldl mkPairTy arg_ty cmd_stk) res_ty
 
 	; fun' <- select_arrow_scope (tcMonoExpr fun fun_ty)
+             -- ToDo: There should be no need for the escapeArrowScope stuff
+             -- See Note [Escaping the arrow scope] in TcRnTypes
 
 	; arg' <- tcMonoExpr arg arg_ty
 
 	; return (HsArrApp fun' arg' fun_ty ho_app lr) }
   where
-	-- Before type-checking f, use the environment of the enclosing
-	-- proc for the (-<) case.  
-	-- Local bindings, inside the enclosing proc, are not in scope 
-	-- inside f.  In the higher-order case (-<<), they are.
+       -- Before type-checking f, use the environment of the enclosing
+       -- proc for the (-<) case.  
+       -- Local bindings, inside the enclosing proc, are not in scope 
+       -- inside f.  In the higher-order case (-<<), they are.
     select_arrow_scope tc = case ho_app of
-	HsHigherOrderApp -> tc
-	HsFirstOrderApp  -> escapeArrowScope tc
+        HsHigherOrderApp -> tc
+        HsFirstOrderApp  -> escapeArrowScope tc
 
 -------------------------------------------
 -- 		Command application
@@ -256,15 +259,34 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 	; let e_ty = mkFunTys [mkAppTys b [tup,s] | (_,_,b,tup,s) <- cmds_w_tys] 
 			      e_res_ty
 
+  -- ToDo: SLPJ: something is badly wrong here.  
+  -- The escapeArrowScope pops the Untouchables.. but that
+  -- risks screwing up the skolem-escape check
+  -- Moreover, arrowfail001 fails with an ASSERT failure
+  -- because a variable gets the wrong level
 		-- Check expr
-        ; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
-                                 escapeArrowScope (tcMonoExpr expr e_ty)
+        ; (inner_binds, expr')
+               <- checkConstraints ArrowSkol [w_tv] [] $
+                  escapeArrowScope (tcMonoExpr expr e_ty)
+
+{-
+        ; ((inner_binds, expr'), lie)
+               <- captureConstraints $
+                  checkConstraints ArrowSkol [w_tv] [] $
+                  tcMonoExpr expr e_ty
+                                 -- No need for escapeArrowScope in the 
+                                 -- type checker.
+                                 -- Note [Escaping the arrow scope] in TcRnTypes
+        ; (lie, outer_binds) <- solveWantedsTcM lie
+        ; emitConstraints lie
+-}
 
 		-- OK, now we are in a position to unscramble 
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-        ; let wrap = WpTyLam w_tv <.> mkWpLet inst_binds
+        ; let wrap = {- mkWpLet (EvBinds outer_binds) <.> -}
+                     WpTyLam w_tv <.> mkWpLet inner_binds
 	; return (HsArrForm (mkLHsWrap wrap expr') fixity cmds') }
   where
  	-- Make the types	

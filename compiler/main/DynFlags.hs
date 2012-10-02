@@ -510,6 +510,7 @@ data ExtensionFlag
    | Opt_TraditionalRecordSyntax
    | Opt_LambdaCase
    | Opt_MultiWayIf
+   | Opt_TypeHoles
    deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -2451,7 +2452,8 @@ xFlags = [
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
-  ( "PackageImports",                   Opt_PackageImports, nop )
+  ( "PackageImports",                   Opt_PackageImports, nop ),
+  ( "TypeHoles",                        Opt_TypeHoles, nop )
   ]
 
 defaultFlags :: Platform -> [DynFlag]

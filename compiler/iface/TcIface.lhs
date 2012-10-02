@@ -474,9 +474,9 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
-     tc_syn_rhs Nothing   = return SynFamilyTyCon
-     tc_syn_rhs (Just ty) = do { rhs_ty <- tcIfaceType ty
-                               ; return (SynonymTyCon rhs_ty) }
+     tc_syn_rhs (SynFamilyTyCon a b) = return (SynFamilyTyCon a b)
+     tc_syn_rhs (SynonymTyCon ty)    = do { rhs_ty <- tcIfaceType ty
+                                          ; return (SynonymTyCon rhs_ty) }
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,
@@ -962,6 +962,7 @@ tcIfaceCoApp IfaceSymCo       [t]     = SymCo        <$> tcIfaceCo t
 tcIfaceCoApp IfaceTransCo     [t1,t2] = TransCo      <$> tcIfaceCo t1 <*> tcIfaceCo t2
 tcIfaceCoApp IfaceInstCo      [t1,t2] = InstCo       <$> tcIfaceCo t1 <*> tcIfaceType t2
 tcIfaceCoApp (IfaceNthCo d)   [t]     = NthCo d      <$> tcIfaceCo t
+tcIfaceCoApp (IfaceLRCo lr)   [t]     = LRCo lr      <$> tcIfaceCo t
 tcIfaceCoApp cc ts = pprPanic "toIfaceCoApp" (ppr cc <+> ppr ts)
 
 tcIfaceCoVar :: FastString -> IfL CoVar

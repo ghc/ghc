@@ -838,6 +838,19 @@ lintCoercion the_co@(NthCo n co)
            _ -> failWithL (hang (ptext (sLit "Bad getNth:"))
                               2 (ppr the_co $$ ppr s $$ ppr t)) }
 
+lintCoercion the_co@(LRCo lr co)
+  = do { (_,s,t) <- lintCoercion co
+       ; case (splitAppTy_maybe s, splitAppTy_maybe t) of
+           (Just s_pr, Just t_pr) 
+             -> return (k, s_pick, t_pick)
+             where
+               s_pick = pickLR lr s_pr
+               t_pick = pickLR lr t_pr
+               k = typeKind s_pick
+
+           _ -> failWithL (hang (ptext (sLit "Bad LRCo:"))
+                              2 (ppr the_co $$ ppr s $$ ppr t)) }
+
 lintCoercion (InstCo co arg_ty)
   = do { (k,s,t)  <- lintCoercion co
        ; arg_kind <- lintType arg_ty

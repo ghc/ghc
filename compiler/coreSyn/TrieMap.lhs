@@ -470,6 +470,8 @@ data CoercionMap a
        , km_sym    :: CoercionMap a
        , km_trans  :: CoercionMap (CoercionMap a)
        , km_nth    :: IntMap.IntMap (CoercionMap a)
+       , km_left   :: CoercionMap a
+       , km_right  :: CoercionMap a
        , km_inst   :: CoercionMap (TypeMap a) }
 
 wrapEmptyKM :: CoercionMap a
@@ -477,7 +479,8 @@ wrapEmptyKM = KM { km_refl = emptyTM, km_tc_app = emptyNameEnv
                  , km_app = emptyTM, km_forall = emptyTM
                  , km_var = emptyTM, km_axiom = emptyNameEnv
                  , km_unsafe = emptyTM, km_sym = emptyTM, km_trans = emptyTM
-                 , km_nth = emptyTM, km_inst = emptyTM }
+                 , km_nth = emptyTM, km_left = emptyTM, km_right = emptyTM
+                 , km_inst = emptyTM }
 
 instance TrieMap CoercionMap where
    type Key CoercionMap = Coercion
@@ -493,7 +496,8 @@ mapC f (KM { km_refl = krefl, km_tc_app = ktc
            , km_app = kapp, km_forall = kforall
            , km_var = kvar, km_axiom = kax
            , km_unsafe = kunsafe, km_sym = ksym, km_trans = ktrans
-           , km_nth = knth, km_inst = kinst })
+           , km_nth = knth, km_left = kml, km_right = kmr
+           , km_inst = kinst })
   = KM { km_refl   = mapTM f krefl
        , km_tc_app = mapNameEnv (mapTM f) ktc
        , km_app    = mapTM (mapTM f) kapp
@@ -504,6 +508,8 @@ mapC f (KM { km_refl = krefl, km_tc_app = ktc
        , km_sym    = mapTM f ksym
        , km_trans  = mapTM (mapTM f) ktrans
        , km_nth    = IntMap.map (mapTM f) knth
+       , km_left   = mapTM f kml
+       , km_right  = mapTM f kmr
        , km_inst   = mapTM (mapTM f) kinst }
 
 lkC :: CmEnv -> Coercion -> CoercionMap a -> Maybe a
@@ -522,6 +528,8 @@ lkC env co m
     go (CoVarCo v)         = km_var    >.> lkVar env v
     go (SymCo c)           = km_sym    >.> lkC env c
     go (NthCo n c)         = km_nth    >.> lookupTM n >=> lkC env c
+    go (LRCo CLeft  c)     = km_left   >.> lkC env c
+    go (LRCo CRight c)     = km_right  >.> lkC env c
 
 xtC :: CmEnv -> Coercion -> XT a -> CoercionMap a -> CoercionMap a
 xtC env co f EmptyKM = xtC env co f wrapEmptyKM
@@ -534,9 +542,11 @@ xtC env (UnsafeCo t1 t2)    f m = m { km_unsafe = km_unsafe m |> xtT env t1 |>> 
 xtC env (InstCo c t)        f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
 xtC env (ForAllCo v c)      f m = m { km_forall = km_forall m |> xtC (extendCME env v) c 
                                                   |>> xtBndr env v f }
-xtC env (CoVarCo v)         f m = m { km_var 	= km_var m |> xtVar env  v f }
-xtC env (SymCo c)           f m = m { km_sym 	= km_sym m |> xtC env    c f }
-xtC env (NthCo n c)         f m = m { km_nth 	= km_nth m |> xtInt n |>> xtC env c f } 
+xtC env (CoVarCo v)         f m = m { km_var 	= km_var m   |> xtVar env v f }
+xtC env (SymCo c)           f m = m { km_sym 	= km_sym m   |> xtC env   c f }
+xtC env (NthCo n c)         f m = m { km_nth 	= km_nth m   |> xtInt n |>> xtC env c f } 
+xtC env (LRCo CLeft  c)     f m = m { km_left 	= km_left  m |> xtC env c f } 
+xtC env (LRCo CRight c)     f m = m { km_right 	= km_right m |> xtC env c f } 
 
 fdC :: (a -> b -> b) -> CoercionMap a -> b -> b
 fdC _ EmptyKM = \z -> z
@@ -550,6 +560,8 @@ fdC k m = foldTM k (km_refl m)
         . foldTM k (km_sym m)
         . foldTM (foldTM k) (km_trans m)
         . foldTM (foldTM k) (km_nth m)
+        . foldTM k          (km_left m)
+        . foldTM k          (km_right m)
         . foldTM (foldTM k) (km_inst m)
 \end{code}
 

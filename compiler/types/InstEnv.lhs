@@ -61,6 +61,10 @@ data ClsInst
                 --      forall is_tvs. (...) => is_cls is_tys
 
              , is_dfun :: DFunId -- See Note [Haddock assumptions]
+                    -- See Note [Silent superclass arguments] in TcInstDcls
+                    -- for how to map the DFun's type back to the source
+                    -- language instance decl
+
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
     }
@@ -159,6 +163,7 @@ pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
     let theta_to_print
           | debugStyle sty = theta
           | otherwise = drop (dfunNSilent dfun) theta
+          -- See Note [Silent superclass arguments] in TcInstDcls
     in ptext (sLit "instance") <+> ppr flag
        <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
   where

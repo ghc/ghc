@@ -440,8 +440,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
   | otherwise
   = putSrcSpanDs loc $ 
-    do { let poly_name = idName poly_id
-       ; spec_name <- newLocalName poly_name
+    do { uniq <- newUnique
+       ; let poly_name = idName poly_id
+             spec_name = mkClonedInternalName uniq poly_name
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
@@ -740,10 +741,6 @@ dsEvTerm (EvCast tm co)
                         -- 'v' is always a lifted evidence variable so it is
                         -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvKindCast v co)
-  = do { v' <- dsEvTerm v
-       ; dsTcCoercion co $ (\_ -> v') }
-
 dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
                                      ; return (Var df `mkTyApps` tys `mkApps` tms') }
 dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox
@@ -833,6 +830,7 @@ ds_tc_coercion subst tc_co
     go (TcSymCo co)           = mkSymCo (go co)
     go (TcTransCo co1 co2)    = mkTransCo (go co1) (go co2)
     go (TcNthCo n co)         = mkNthCo n (go co)
+    go (TcLRCo lr co)         = mkLRCo lr (go co)
     go (TcInstCo co ty)       = mkInstCo (go co) ty
     go (TcLetCo bs co)        = ds_tc_coercion (ds_co_binds bs) co
     go (TcCastCo co1 co2)     = mkCoCast (go co1) (go co2)
