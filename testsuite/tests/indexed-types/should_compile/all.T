@@ -197,4 +197,7 @@ test('T6152',
 test('T6088', normal, compile, [''])
 test('T7082', normal, compile, [''])
 test('T7156', normal, compile, [''])
+test('T5591a', normal, compile, [''])
+test('T5591b', normal, compile, [''])
+
 
