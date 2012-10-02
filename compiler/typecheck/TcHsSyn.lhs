@@ -1156,29 +1156,17 @@ zonkEvBinds env binds
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
 zonkEvBind env (EvBind var term)
-  = case term of 
-      -- Special-case fast paths for small coercions
-      -- NB: could be optimized further! (e.g. SymCo cv)
-      -- See Note [Optimized Evidence Binding Zonking]
-      EvCoercion co 
-        | Just ty <- isTcReflCo_maybe co
-        -> do { zty  <- zonkTcTypeToType env ty
-              ; let var' = setVarType var (mkEqPred zty zty)
-                  -- Here we save the task of zonking var's type, 
-                  -- because we know just what it is!
-              ; return (EvBind var' (EvCoercion (mkTcReflCo zty))) }
+  = do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
 
-        | Just cv <- getTcCoVar_maybe co 
-        -> do { let cv'   = zonkIdOcc env cv -- Just lazily look up
-                    term' = EvCoercion (TcCoVarCo cv')
-                    var'  = setVarType var (varType cv')
-              ; return (EvBind var' term') }
-
-      -- The default path
-      _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
-              ; term' <- zonkEvTerm env term 
-              ; return (EvBind var' term')
-              }
+         -- Optimise the common case of Refl coercions
+         -- See Note [Optimise coercion zonking]
+         -- This has a very big effect on some programs (eg Trac #5030)
+       ; let ty' = idType var'
+       ; case getEqPredTys_maybe ty' of
+           Just (ty1, ty2) | ty1 `eqType` ty2 
+                  -> return (EvBind var' (EvCoercion (mkTcReflCo ty1)))
+           _other -> do { term' <- zonkEvTerm env term 
+                        ; return (EvBind var' term') } }
 \end{code}
 
 %************************************************************************
@@ -1233,8 +1221,8 @@ The type of Phantom is (forall (k : BOX). forall (a : k). Int). Both `a` and
 we have a type or a kind variable; for kind variables we just return AnyK (and
 not the ill-kinded Any BOX).
 
-Note [Optimized Evidence Binding Zonking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Optimise coercion zonkind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When optimising evidence binds we may come across situations where 
 a coercion looks like
       cv = ReflCo ty
@@ -1242,10 +1230,11 @@ or    cv1 = cv2
 where the type 'ty' is big.  In such cases it is a waste of time to zonk both 
   * The variable on the LHS
   * The coercion on the RHS
-Rather, we can zonk the coercion, take its type and use that for 
-the variable.  For big coercions this might be a lose, though, so we
-just have a fast case for a couple of special cases.
+Rather, we can zonk the variable, and if its type is (ty ~ ty), we can just
+use Refl on the right, ignoring the actual coercion on the RHS.
 
+This can have a very big effect, because the constraint solver sometimes does go
+to a lot of effort to prove Refl!  (Eg when solving  10+3 = 10+3; cf Trac #5030)
 
 \begin{code}
 zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
