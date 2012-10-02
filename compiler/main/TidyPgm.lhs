@@ -1238,7 +1238,7 @@ hasCafRefs dflags this_pkg p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
-  mentions_cafs = isFastTrue (cafRefsE p expr)
+  mentions_cafs = isFastTrue (cafRefsE dflags p expr)
   is_dynamic_name = isDllName dflags this_pkg
   is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name expr)
 
@@ -1248,28 +1248,28 @@ hasCafRefs dflags this_pkg p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: (Id, VarEnv Id) -> Expr a -> FastBool
-cafRefsE p (Var id)            = cafRefsV p id
-cafRefsE p (Lit lit)           = cafRefsL p lit
-cafRefsE p (App f a)           = fastOr (cafRefsE p f) (cafRefsE p) a
-cafRefsE p (Lam _ e)           = cafRefsE p e
-cafRefsE p (Let b e)           = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
-cafRefsE p (Case e _bndr _ alts) = fastOr (cafRefsE p e) (cafRefsEs p) (rhssOfAlts alts)
-cafRefsE p (Tick _n e)         = cafRefsE p e
-cafRefsE p (Cast e _co)        = cafRefsE p e
-cafRefsE _ (Type _)            = fastBool False
-cafRefsE _ (Coercion _)        = fastBool False
+cafRefsE :: DynFlags -> (Id, VarEnv Id) -> Expr a -> FastBool
+cafRefsE _      p (Var id)            = cafRefsV p id
+cafRefsE dflags p (Lit lit)           = cafRefsL dflags p lit
+cafRefsE dflags p (App f a)           = fastOr (cafRefsE dflags p f) (cafRefsE dflags p) a
+cafRefsE dflags p (Lam _ e)           = cafRefsE dflags p e
+cafRefsE dflags p (Let b e)           = fastOr (cafRefsEs dflags p (rhssOfBind b)) (cafRefsE dflags p) e
+cafRefsE dflags p (Case e _bndr _ alts) = fastOr (cafRefsE dflags p e) (cafRefsEs dflags p) (rhssOfAlts alts)
+cafRefsE dflags p (Tick _n e)         = cafRefsE dflags p e
+cafRefsE dflags p (Cast e _co)        = cafRefsE dflags p e
+cafRefsE _      _ (Type _)            = fastBool False
+cafRefsE _      _ (Coercion _)        = fastBool False
 
-cafRefsEs :: (Id, VarEnv Id) -> [Expr a] -> FastBool
-cafRefsEs _ []    = fastBool False
-cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
+cafRefsEs :: DynFlags -> (Id, VarEnv Id) -> [Expr a] -> FastBool
+cafRefsEs _      _ []     = fastBool False
+cafRefsEs dflags p (e:es) = fastOr (cafRefsE dflags p e) (cafRefsEs dflags p) es
 
-cafRefsL :: (Id, VarEnv Id) -> Literal -> FastBool
+cafRefsL :: DynFlags -> (Id, VarEnv Id) -> Literal -> FastBool
 -- Don't forget that mk_integer id might have Caf refs!
 -- We first need to convert the Integer into its final form, to
 -- see whether mkInteger is used.
-cafRefsL p@(mk_integer, _) (LitInteger i _) = cafRefsE p (cvtLitInteger mk_integer i)
-cafRefsL _ _                         = fastBool False
+cafRefsL dflags p@(mk_integer, _) (LitInteger i _) = cafRefsE dflags p (cvtLitInteger dflags mk_integer i)
+cafRefsL _      _ _                         = fastBool False
 
 cafRefsV :: (Id, VarEnv Id) -> Id -> FastBool
 cafRefsV (_, p) id

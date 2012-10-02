@@ -378,8 +378,8 @@ doCorePass _      CoreCSE                   = {-# SCC "CommonSubExpr" #-}
 doCorePass _      CoreLiberateCase          = {-# SCC "LiberateCase" #-}
                                               doPassD liberateCase
 
-doCorePass _      CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
-                                              doPass floatInwards
+doCorePass dflags CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
+                                              doPass (floatInwards dflags)
 
 doCorePass _      (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
                                               doPassDUM (floatOutwards f)

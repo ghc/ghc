@@ -221,19 +221,10 @@ awaitEvent(rtsBool wait)
           ptv = NULL;
       }
 
-      while (1) { // repeat the select on EINTR
-
-          // Disable the timer signal while blocked in
-          // select(), to conserve power. (#1623, #5991)
-          if (wait) stopTimer();
-
-          numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv);
-
-          if (wait) startTimer();
-
-          if (numFound >= 0) break;
-
-          if (errno != EINTR) {
+      /* Check for any interesting events */
+      
+      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
+	  if (errno != EINTR) {
 	    /* Handle bad file descriptors by unblocking all the
 	       waiting threads. Why? Because a thread might have been
 	       a bit naughty and closed a file descriptor while another

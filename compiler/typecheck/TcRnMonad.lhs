@@ -285,16 +285,16 @@ unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 
 -- | Do it flag is true
 ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifDOptM flag thing_inside = do { b <- doptM flag ;
-                                if b then thing_inside else return () }
+ifDOptM flag thing_inside = do b <- doptM flag
+                               when b thing_inside
 
 ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifWOptM flag thing_inside = do { b <- woptM flag ;
-                                if b then thing_inside else return () }
+ifWOptM flag thing_inside = do b <- woptM flag
+                               when b thing_inside
 
 ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifXOptM flag thing_inside = do { b <- xoptM flag ;
-                                if b then thing_inside else return () }
+ifXOptM flag thing_inside = do b <- xoptM flag
+                               when b thing_inside
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }

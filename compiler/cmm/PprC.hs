@@ -492,13 +492,11 @@ pprStatics dflags (CmmStaticLit (CmmFloat f W64) : rest)
   = map pprLit1 (doubleToWords dflags f) ++ pprStatics dflags rest
 pprStatics dflags (CmmStaticLit (CmmInt i W64) : rest)
   | wordWidth dflags == W32
-#ifdef WORDS_BIGENDIAN
-  = pprStatics dflags (CmmStaticLit (CmmInt q W32) :
-                       CmmStaticLit (CmmInt r W32) : rest)
-#else
-  = pprStatics dflags (CmmStaticLit (CmmInt r W32) :
-                       CmmStaticLit (CmmInt q W32) : rest)
-#endif
+  = if wORDS_BIGENDIAN dflags
+    then pprStatics dflags (CmmStaticLit (CmmInt q W32) :
+                            CmmStaticLit (CmmInt r W32) : rest)
+    else pprStatics dflags (CmmStaticLit (CmmInt r W32) :
+                            CmmStaticLit (CmmInt q W32) : rest)
   where r = i .&. 0xffffffff
         q = i `shiftR` 32
 pprStatics dflags (CmmStaticLit (CmmInt _ w) : _)

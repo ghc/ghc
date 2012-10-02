@@ -36,6 +36,7 @@ import OccName
 
 import Util
 import Outputable
+import DynFlags
 import FastString
 import MonadUtils
 
@@ -375,8 +376,9 @@ vectDataConWorkers orig_tc vect_tc arr_tc
     rep_tys  = map dataConRepArgTys $ tyConDataCons vect_tc
 
     mk_data_con con tys pre post
-      = liftM2 (,) (vect_data_con con)
-                   (lift_data_con tys pre post (mkDataConTag con))
+      = do dflags <- getDynFlags
+           liftM2 (,) (vect_data_con con)
+                      (lift_data_con tys pre post (mkDataConTag dflags con))
 
     sel_replicate len tag
       | arity > 1 = do

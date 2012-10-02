@@ -52,7 +52,7 @@ codeGen :: DynFlags
          -> Module
          -> [TyCon]
          -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
-         -> [(StgBinding,[(Id,[Id])])]  -- Bindings to convert, with SRTs
+         -> [StgBinding]                -- Bindings to convert
          -> HpcInfo
          -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
                                         -- be interleaved with output
@@ -114,8 +114,8 @@ This is so that we can write the top level processing in a compositional
 style, with the increasing static environment being plumbed as a state
 variable. -}
 
-cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> FCode ()
-cgTopBinding dflags (StgNonRec id rhs, _srts)
+cgTopBinding :: DynFlags -> StgBinding -> FCode ()
+cgTopBinding dflags (StgNonRec id rhs)
   = do  { id' <- maybeExternaliseId dflags id
         ; (info, fcode) <- cgTopRhs id' rhs
         ; fcode
@@ -123,7 +123,7 @@ cgTopBinding dflags (StgNonRec id rhs, _srts)
                                      -- so we find it when we look up occurrences
         }
 
-cgTopBinding dflags (StgRec pairs, _srts)
+cgTopBinding dflags (StgRec pairs)
   = do  { let (bndrs, rhss) = unzip pairs
         ; bndrs' <- Prelude.mapM (maybeExternaliseId dflags) bndrs
         ; let pairs' = zip bndrs' rhss

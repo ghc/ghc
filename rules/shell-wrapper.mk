@@ -16,16 +16,7 @@ $(call profStart, shell-wrapper($1,$2))
 # $1 = dir
 # $2 = distdir
 
-ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-
-ifeq "$$(Windows)" "YES"
-
-ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER)" "YES"
-# Just install the binary on Windows
-$1_$2_INSTALL = YES
-endif
-
-else
+ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
 
 ifeq "$$($1_$2_SHELL_WRAPPER_NAME)" ""
 $1_$2_SHELL_WRAPPER_NAME = $1/$$($1_$2_PROG).wrapper
@@ -49,7 +40,7 @@ $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE) $$($1_$2_SHELL_WRAPPER_NAME)
 	$$(EXECUTABLE_FILE)                               $$@
 endif
 
-ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER)" "YES"
+ifeq "$$($1_$2_INSTALL)" "YES"
 
 ifeq "$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)" ""
 $1_$2_INSTALL_SHELL_WRAPPER_NAME = $$($1_$2_PROG)
@@ -79,11 +70,9 @@ install_$1_$2_wrapper:
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
 	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
 
-endif # $1_$2_INSTALL_SHELL_WRAPPER
+endif # $1_$2_INSTALL
 
-endif
-
-endif # $1_$2_SHELL_WRAPPER
+endif # $1_$2_SHELL_WRAPPER && !Windows
 
 $(call profEnd, shell-wrapper($1,$2))
 endef

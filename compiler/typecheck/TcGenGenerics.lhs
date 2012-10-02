@@ -224,7 +224,7 @@ canDoGenerics tc tc_args
     (tc_name, tc_tys) = case tyConParent tc of
         FamInstTyCon _ ptc tys -> (ppr ptc, hsep (map ppr
                                             (tys ++ drop (length tys) tc_args)))
-        _                      -> (ppr tc, hsep (map ppr tc_args))
+        _                      -> (ppr tc, hsep (map ppr (tyConTyVars tc)))
 
         -- If any of the constructor has an unboxed type as argument,
         -- then we can't build the embedding-projection pair, because

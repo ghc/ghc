@@ -156,22 +156,20 @@ mkRODataLits lbl lits
     needsRelocation _                 = False
 
 mkWordCLit :: DynFlags -> StgWord -> CmmLit
-mkWordCLit dflags wd = CmmInt (fromIntegral wd) (wordWidth dflags)
+mkWordCLit dflags wd = CmmInt (fromStgWord wd) (wordWidth dflags)
 
-packHalfWordsCLit :: (Integral a, Integral b) => DynFlags -> a -> b -> CmmLit
+packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 -- Make a single word literal in which the lower_half_word is
 -- at the lower address, and the upper_half_word is at the
 -- higher address
 -- ToDo: consider using half-word lits instead
 --       but be careful: that's vulnerable when reversed
 packHalfWordsCLit dflags lower_half_word upper_half_word
-#ifdef WORDS_BIGENDIAN
-   = mkWordCLit dflags ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
-                 .|. fromIntegral upper_half_word)
-#else
-   = mkWordCLit dflags ((fromIntegral lower_half_word)
-                 .|. (fromIntegral upper_half_word `shiftL` hALF_WORD_SIZE_IN_BITS))
-#endif
+   = if wORDS_BIGENDIAN dflags
+     then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS dflags) .|. u)
+     else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS dflags))
+    where l = toStgWord dflags (fromStgHalfWord lower_half_word)
+          u = toStgWord dflags (fromStgHalfWord upper_half_word)
 
 ---------------------------------------------------
 --

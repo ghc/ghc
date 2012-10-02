@@ -43,9 +43,6 @@ module CgTicky (
        staticTickyHdr,
   ) where
 
-#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
-	-- For REP_xxx constants, which are MachReps
-
 import ClosureInfo
 import CgUtils
 import CgMonad
@@ -298,13 +295,13 @@ tickyAllocHeap hp
 	  if hp == 0 then [] 	-- Inside the stmtC to avoid control
 	  else [		-- dependency on the argument
 		-- Bump the allcoation count in the StgEntCounter
-	    addToMem (typeWidth REP_StgEntCounter_allocs)
+	    addToMem (typeWidth (rEP_StgEntCounter_allocs dflags))
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				(oFFSET_StgEntCounter_allocs dflags))) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLongWidth (mkCmmDataLabel rtsPackageId $ fsLit "ALLOC_HEAP_ctr") 1,
+	    addToMemLbl (cLongWidth dflags) (mkCmmDataLabel rtsPackageId $ fsLit "ALLOC_HEAP_ctr") 1,
   		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLongWidth (mkCmmDataLabel rtsPackageId $ fsLit "ALLOC_HEAP_tot") hp] }
+	    addToMemLbl (cLongWidth dflags) (mkCmmDataLabel rtsPackageId $ fsLit "ALLOC_HEAP_tot") hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
@@ -323,7 +320,8 @@ bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkCmmDataLabel rtsPackag
 
 bumpTickyCounter' :: CmmLit -> Code
 -- krc: note that we're incrementing the _entry_count_ field of the ticky counter
-bumpTickyCounter' lhs = stmtC (addToMemLong (CmmLit lhs) 1)
+bumpTickyCounter' lhs = do dflags <- getDynFlags
+                           stmtC (addToMemLong dflags (CmmLit lhs) 1)
 
 bumpHistogram :: FastString -> Int -> Code
 bumpHistogram _lbl _n
@@ -346,8 +344,8 @@ bumpHistogramE lbl n
 -}
 
 ------------------------------------------------------------------
-addToMemLong :: CmmExpr -> Int -> CmmStmt
-addToMemLong = addToMem cLongWidth
+addToMemLong :: DynFlags -> CmmExpr -> Int -> CmmStmt
+addToMemLong dflags = addToMem (cLongWidth dflags)
 
 ------------------------------------------------------------------
 -- Showing the "type category" for ticky-ticky profiling

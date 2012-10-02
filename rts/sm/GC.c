@@ -290,7 +290,7 @@ GarbageCollect (nat collect_gen,
 
   // gather blocks allocated using allocatePinned() from each capability
   // and put them on the g0->large_object list.
-  collect_pinned_object_blocks();
+  allocated += collect_pinned_object_blocks();
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
@@ -402,6 +402,10 @@ GarbageCollect (nat collect_gen,
 
       // If we get to here, there's really nothing left to do.
       break;
+  }
+
+  if (n_gc_threads != 1) {
+      gct->allocated = clearNursery(cap);
   }
 
   shutdown_gc_threads(gct->thread_index);
@@ -574,6 +578,7 @@ GarbageCollect (nat collect_gen,
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
+        gen->n_large_words  = countOccupied(gen->large_objects);
         gen->n_new_large_words = 0;
     }
     else // for generations > N
@@ -585,13 +590,15 @@ GarbageCollect (nat collect_gen,
 	for (bd = gen->scavenged_large_objects; bd; bd = next) {
             next = bd->link;
             dbl_link_onto(bd, &gen->large_objects);
-	}
+            gen->n_large_words += bd->free - bd->start;
+        }
         
 	// add the new blocks we promoted during this GC 
 	gen->n_large_blocks += gen->n_scavenged_large_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
+    ASSERT(countOccupied(gen->large_objects) == gen->n_large_words);
 
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
@@ -636,9 +643,15 @@ GarbageCollect (nat collect_gen,
           allocated += clearNursery(&capabilities[n]);
       }
   } else {
-      gct->allocated = clearNursery(cap);
+      // When doing parallel GC, clearNursery() is called by the
+      // worker threads, and the value returned is stored in
+      // gct->allocated.
       for (n = 0; n < n_capabilities; n++) {
-          allocated += gc_threads[n]->allocated;
+          if (gc_threads[n]->idle) {
+              allocated += clearNursery(&capabilities[n]);
+          } else {
+              allocated += gc_threads[n]->allocated;
+          }
       }
   }
 

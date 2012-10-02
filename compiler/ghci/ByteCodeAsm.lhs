@@ -166,7 +166,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
       insns_arr = listArray (0, n_insns - 1) asm_insns
       !insns_barr = barr insns_arr
 
-      bitmap_arr = mkBitmapArray bsize bitmap
+      bitmap_arr = mkBitmapArray dflags bsize bitmap
       !bitmap_barr = barr bitmap_arr
 
       ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs
@@ -178,9 +178,9 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
-mkBitmapArray :: Word16 -> [StgWord] -> UArray Int StgWord
-mkBitmapArray bsize bitmap
-  = listArray (0, length bitmap) (fromIntegral bsize : bitmap)
+mkBitmapArray :: DynFlags -> Word16 -> [StgWord] -> UArray Int StgWord
+mkBitmapArray dflags bsize bitmap
+  = listArray (0, length bitmap) (toStgWord dflags (toInteger bsize) : bitmap)
 
 -- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16,

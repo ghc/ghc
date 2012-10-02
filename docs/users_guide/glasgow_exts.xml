@@ -8552,8 +8552,9 @@ Assertion failures can be caught, see the documentation for the
 	</listitem>
       </itemizedlist>
       Warnings and deprecations are not reported for
-      (a) uses within the defining module, and
-      (b) uses in an export list.
+      (a) uses within the defining module,
+      (b) defining a method in a class instance, and
+      (c) uses in an export list.
       The latter reduces spurious complaints within a library
       in which one module gathers together and re-exports
       the exports of several others.

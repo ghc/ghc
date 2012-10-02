@@ -64,6 +64,7 @@ import TyCon
 import Unique
 import Outputable
 import TysPrim
+import DynFlags
 import FastString
 import Maybes
 import Platform
@@ -602,8 +603,8 @@ Note [exprIsDupable]
 
 
 \begin{code}
-exprIsDupable :: CoreExpr -> Bool
-exprIsDupable e
+exprIsDupable :: DynFlags -> CoreExpr -> Bool
+exprIsDupable dflags e
   = isJust (go dupAppSize e)
   where
     go :: Int -> CoreExpr -> Maybe Int
@@ -613,7 +614,7 @@ exprIsDupable e
     go n (Tick _ e)    = go n e
     go n (Cast e _)    = go n e
     go n (App f a) | Just n' <- go n a = go n' f
-    go n (Lit lit) | litIsDupable lit = decrement n
+    go n (Lit lit) | litIsDupable dflags lit = decrement n
     go _ _ = Nothing
 
     decrement :: Int -> Maybe Int

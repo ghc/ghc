@@ -19,7 +19,6 @@ module OldCmmLint (
 
 import BlockId
 import OldCmm
-import CLabel
 import Outputable
 import OldPprCmm()
 import FastString
@@ -50,10 +49,9 @@ runCmmLint _ l p =
 
 lintCmmDecl :: DynFlags -> (GenCmmDecl h i (ListGraph CmmStmt)) -> CmmLint ()
 lintCmmDecl dflags (CmmProc _ lbl (ListGraph blocks))
-  = addLintInfo (text "in proc " <> pprCLabel platform lbl) $
+  = addLintInfo (text "in proc " <> ppr lbl) $
         let labels = foldl (\s b -> setInsert (blockId b) s) setEmpty blocks
         in  mapM_ (lintCmmBlock dflags labels) blocks
-    where platform = targetPlatform dflags
 
 lintCmmDecl _ (CmmData {})
   = return ()

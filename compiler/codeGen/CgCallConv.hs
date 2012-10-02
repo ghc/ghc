@@ -70,7 +70,7 @@ mkArgDescr _nm args
        let arg_bits = argBits dflags arg_reps
            arg_reps = filter nonVoidArg (map idCgRep args)
            -- Getting rid of voids eases matching of standard patterns
-       case stdPattern arg_reps of
+       case stdPattern dflags arg_reps of
            Just spec_id -> return (ArgSpec spec_id)
            Nothing      -> return (ArgGen arg_bits)
 
@@ -79,33 +79,36 @@ argBits _      []              = []
 argBits dflags (PtrArg : args) = False : argBits dflags args
 argBits dflags (arg    : args) = take (cgRepSizeW dflags arg) (repeat True) ++ argBits dflags args
 
-stdPattern :: [CgRep] -> Maybe StgHalfWord
-stdPattern []          = Just ARG_NONE  -- just void args, probably
+stdPattern :: DynFlags -> [CgRep] -> Maybe StgHalfWord
+stdPattern dflags reps
+    = fmap (toStgHalfWord dflags)
+    $ case reps of
+      []          -> Just ARG_NONE  -- just void args, probably
 
-stdPattern [PtrArg]    = Just ARG_P
-stdPattern [FloatArg]  = Just ARG_F
-stdPattern [DoubleArg] = Just ARG_D
-stdPattern [LongArg]   = Just ARG_L
-stdPattern [NonPtrArg] = Just ARG_N
+      [PtrArg]    -> Just ARG_P
+      [FloatArg]  -> Just ARG_F
+      [DoubleArg] -> Just ARG_D
+      [LongArg]   -> Just ARG_L
+      [NonPtrArg] -> Just ARG_N
 
-stdPattern [NonPtrArg,NonPtrArg] = Just ARG_NN
-stdPattern [NonPtrArg,PtrArg]    = Just ARG_NP
-stdPattern [PtrArg,NonPtrArg]    = Just ARG_PN
-stdPattern [PtrArg,PtrArg]       = Just ARG_PP
+      [NonPtrArg,NonPtrArg] -> Just ARG_NN
+      [NonPtrArg,PtrArg]    -> Just ARG_NP
+      [PtrArg,NonPtrArg]    -> Just ARG_PN
+      [PtrArg,PtrArg]       -> Just ARG_PP
 
-stdPattern [NonPtrArg,NonPtrArg,NonPtrArg] = Just ARG_NNN
-stdPattern [NonPtrArg,NonPtrArg,PtrArg]    = Just ARG_NNP
-stdPattern [NonPtrArg,PtrArg,NonPtrArg]    = Just ARG_NPN
-stdPattern [NonPtrArg,PtrArg,PtrArg]       = Just ARG_NPP
-stdPattern [PtrArg,NonPtrArg,NonPtrArg]    = Just ARG_PNN
-stdPattern [PtrArg,NonPtrArg,PtrArg]       = Just ARG_PNP
-stdPattern [PtrArg,PtrArg,NonPtrArg]       = Just ARG_PPN
-stdPattern [PtrArg,PtrArg,PtrArg]          = Just ARG_PPP
+      [NonPtrArg,NonPtrArg,NonPtrArg] -> Just ARG_NNN
+      [NonPtrArg,NonPtrArg,PtrArg]    -> Just ARG_NNP
+      [NonPtrArg,PtrArg,NonPtrArg]    -> Just ARG_NPN
+      [NonPtrArg,PtrArg,PtrArg]       -> Just ARG_NPP
+      [PtrArg,NonPtrArg,NonPtrArg]    -> Just ARG_PNN
+      [PtrArg,NonPtrArg,PtrArg]       -> Just ARG_PNP
+      [PtrArg,PtrArg,NonPtrArg]       -> Just ARG_PPN
+      [PtrArg,PtrArg,PtrArg]          -> Just ARG_PPP
 
-stdPattern [PtrArg,PtrArg,PtrArg,PtrArg]               = Just ARG_PPPP
-stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg]        = Just ARG_PPPPP
-stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg,PtrArg] = Just ARG_PPPPPP
-stdPattern _ = Nothing
+      [PtrArg,PtrArg,PtrArg,PtrArg]               -> Just ARG_PPPP
+      [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg]        -> Just ARG_PPPPP
+      [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg,PtrArg] -> Just ARG_PPPPPP
+      _ -> Nothing
 
 
 -------------------------------------------------------------------------
@@ -118,13 +121,13 @@ stdPattern _ = Nothing
 -- GET_NON_PTRS(), GET_PTRS(), GET_LIVENESS().
 -------------------------------------------------------------------------
 
-mkRegLiveness :: [(Id, GlobalReg)] -> Int -> Int -> StgWord
-mkRegLiveness regs ptrs nptrs
-  = (fromIntegral nptrs `shiftL` 16) .|.
-    (fromIntegral ptrs  `shiftL` 24) .|.
-    all_non_ptrs `xor` reg_bits regs
+mkRegLiveness :: DynFlags -> [(Id, GlobalReg)] -> Int -> Int -> StgWord
+mkRegLiveness dflags regs ptrs nptrs
+  = (toStgWord dflags (toInteger nptrs) `shiftL` 16) .|.
+    (toStgWord dflags (toInteger ptrs)  `shiftL` 24) .|.
+    all_non_ptrs `xor` toStgWord dflags (reg_bits regs)
   where
-    all_non_ptrs = 0xff
+    all_non_ptrs = toStgWord dflags 0xff
 
     reg_bits [] = 0
     reg_bits ((id, VanillaReg i _) : regs) | isFollowableArg (idCgRep id)

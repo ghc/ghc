@@ -1553,7 +1553,8 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
   | otherwise
-  = do { case lookupRule (activeRule env) (getUnfoldingInRuleMatch env)
+  = do { dflags <- getDynFlags
+       ; case lookupRule dflags (activeRule env) (getUnfoldingInRuleMatch env)
                          (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
@@ -2337,11 +2338,12 @@ mkDupableAlts env case_bndr' the_alts
 
 mkDupableAlt :: SimplEnv -> OutId -> (AltCon, [CoreBndr], CoreExpr)
               -> SimplM (SimplEnv, (AltCon, [CoreBndr], CoreExpr))
-mkDupableAlt env case_bndr (con, bndrs', rhs')
-  | exprIsDupable rhs'  -- Note [Small alternative rhs]
-  = return (env, (con, bndrs', rhs'))
-  | otherwise
-  = do  { let rhs_ty'  = exprType rhs'
+mkDupableAlt env case_bndr (con, bndrs', rhs') = do
+  dflags <- getDynFlags
+  if exprIsDupable dflags rhs'  -- Note [Small alternative rhs]
+   then return (env, (con, bndrs', rhs'))
+   else
+    do  { let rhs_ty'  = exprType rhs'
               scrut_ty = idType case_bndr
               case_bndr_w_unf
                 = case con of

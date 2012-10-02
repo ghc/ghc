@@ -78,7 +78,7 @@ ghc_stage1_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage2_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage3_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 
-ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER = YES
+ghc_stage$(INSTALL_GHC_STAGE)_INSTALL = YES
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME = ghc-$(ProjectVersion)
 
 # We override the program name to be ghc, rather than ghc-stage2.

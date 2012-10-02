@@ -39,12 +39,12 @@ type Bitmap = [StgWord]
 -- | Make a bitmap from a sequence of bits
 mkBitmap :: DynFlags -> [Bool] -> Bitmap
 mkBitmap _ [] = []
-mkBitmap dflags stuff = chunkToBitmap chunk : mkBitmap dflags rest
+mkBitmap dflags stuff = chunkToBitmap dflags chunk : mkBitmap dflags rest
   where (chunk, rest) = splitAt (wORD_SIZE_IN_BITS dflags) stuff
 
-chunkToBitmap :: [Bool] -> StgWord
-chunkToBitmap chunk = 
-  foldr (.|.) 0 [ 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
+chunkToBitmap :: DynFlags -> [Bool] -> StgWord
+chunkToBitmap dflags chunk =
+  foldr (.|.) (toStgWord dflags 0) [ toStgWord dflags 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
 
 -- | Make a bitmap where the slots specified are the /ones/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0xb@.
@@ -54,7 +54,7 @@ intsToBitmap :: DynFlags -> Int -> [Int] -> Bitmap
 intsToBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
   | otherwise = 
-    (foldr (.|.) 0 (map (1 `shiftL`) these)) : 
+    (foldr (.|.) (toStgWord dflags 0) (map (toStgWord dflags 1 `shiftL`) these)) : 
         intsToBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
              (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
    where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
@@ -68,12 +68,12 @@ intsToReverseBitmap :: DynFlags -> Int -> [Int] -> Bitmap
 intsToReverseBitmap dflags size slots{- must be sorted -}
   | size <= 0 = []
   | otherwise = 
-    (foldr xor init (map (1 `shiftL`) these)) :
+    (foldr xor (toStgWord dflags init) (map (toStgWord dflags 1 `shiftL`) these)) :
         intsToReverseBitmap dflags (size - wORD_SIZE_IN_BITS dflags)
              (map (\x -> x - wORD_SIZE_IN_BITS dflags) rest)
    where (these,rest) = span (< wORD_SIZE_IN_BITS dflags) slots
          init
-           | size >= wORD_SIZE_IN_BITS dflags = complement 0
+           | size >= wORD_SIZE_IN_BITS dflags = -1
            | otherwise                        = (1 `shiftL` size) - 1
 
 {- |

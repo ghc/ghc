@@ -474,16 +474,12 @@ $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
 $(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
 $(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
 
-# Every Constants.o object file depends on includes/GHCConstants.h:
-$(eval $(call compiler-hs-dependency,Constants,$(includes_GHCCONSTANTS) includes/HaskellConstants.hs))
-
 # Every PrimOp.o object file depends on $(PRIMOP_BITS):
 $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 
 # GHC itself doesn't know about the above dependencies, so we have to
-# switch off the recompilation checker for those modules:
+# switch off the recompilation checker for that module:
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
-compiler/main/Constants_HC_OPTS  += -fforce-recomp
 
 # LibFFI.hs #includes ffi.h
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)

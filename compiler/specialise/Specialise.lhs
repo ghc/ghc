@@ -1063,9 +1063,9 @@ specCalls subst rules_for_me calls_for_me fn rhs
     body         = mkLams (drop n_dicts rhs_ids) rhs_body
                 -- Glue back on the non-dict lambdas
 
-    already_covered :: [CoreExpr] -> Bool
-    already_covered args          -- Note [Specialisations already covered]
-       = isJust (lookupRule (const True) realIdUnfolding
+    already_covered :: DynFlags -> [CoreExpr] -> Bool
+    already_covered dflags args      -- Note [Specialisations already covered]
+       = isJust (lookupRule dflags (const True) realIdUnfolding
                             (substInScope subst)
                             fn args rules_for_me)
 
@@ -1119,7 +1119,8 @@ specCalls subst rules_for_me calls_for_me fn rhs
                  ty_args   = mk_ty_args call_ts poly_tyvars
                  inst_args = ty_args ++ map Var inst_dict_ids
 
-           ; if already_covered inst_args then
+           ; dflags <- getDynFlags
+           ; if already_covered dflags inst_args then
                 return Nothing
              else do
            {    -- Figure out the type of the specialised function

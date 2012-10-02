@@ -11,7 +11,7 @@ module MkGraph
   , mkJumpReturnsTo
   , mkJump, mkDirectJump, mkForeignJump, mkForeignJumpExtra, mkJumpGC
   , mkCbranch, mkSwitch
-  , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
+  , mkReturn, mkComment, mkCallEntry, mkBranch
   , copyInOflow, copyOutOflow
   , noExtraStack
   , toCall, Transfer(..)
@@ -69,34 +69,38 @@ flattenCmmAGraph id stmts =
     CmmGraph { g_entry = id,
                g_graph = GMany NothingO body NothingO }
   where
-  blocks = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry id) emptyBlock) []
-  body = foldr addBlock emptyBody blocks
+  body = foldr addBlock emptyBody $ flatten id stmts []
 
   --
-  -- flatten: turn a list of CgStmt into a list of Blocks.  We know
-  -- that any code before the first label is unreachable, so just drop
-  -- it.
+  -- flatten: given an entry label and a CmmAGraph, make a list of blocks.
   --
   -- NB. avoid the quadratic-append trap by passing in the tail of the
   -- list.  This is important for Very Long Functions (e.g. in T783).
   --
-  flatten :: [CgStmt] -> [Block CmmNode C C] -> [Block CmmNode C C]
-  flatten [] blocks = blocks
+  flatten :: Label -> CmmAGraph -> [Block CmmNode C C] -> [Block CmmNode C C]
+  flatten id g blocks
+      = flatten1 (fromOL g) (blockJoinHead (CmmEntry id) emptyBlock) blocks
 
-  flatten (CgLabel id : stmts) blocks
+  --
+  -- flatten0: we are outside a block at this point: any code before
+  -- the first label is unreachable, so just drop it.
+  --
+  flatten0 :: [CgStmt] -> [Block CmmNode C C] -> [Block CmmNode C C]
+  flatten0 [] blocks = blocks
+
+  flatten0 (CgLabel id : stmts) blocks
     = flatten1 stmts block blocks
     where !block = blockJoinHead (CmmEntry id) emptyBlock
 
-  flatten (CgFork fork_id stmts : rest) blocks
-    = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry fork_id) emptyBlock) $
-      flatten rest blocks
+  flatten0 (CgFork fork_id stmts : rest) blocks
+    = flatten fork_id stmts $ flatten0 rest blocks
 
-  flatten (CgLast _ : stmts) blocks = flatten stmts blocks
-  flatten (CgStmt _ : stmts) blocks = flatten stmts blocks
+  flatten0 (CgLast _ : stmts) blocks = flatten0 stmts blocks
+  flatten0 (CgStmt _ : stmts) blocks = flatten0 stmts blocks
 
   --
   -- flatten1: we have a partial block, collect statements until the
-  -- next last node to make a block, then call flatten to get the rest
+  -- next last node to make a block, then call flatten0 to get the rest
   -- of the blocks
   --
   flatten1 :: [CgStmt] -> Block CmmNode C O
@@ -112,7 +116,7 @@ flattenCmmAGraph id stmts =
     = blockJoinTail block (CmmBranch (entryLabel block)) : blocks
 
   flatten1 (CgLast stmt : stmts) block blocks
-    = block' : flatten stmts blocks
+    = block' : flatten0 stmts blocks
     where !block' = blockJoinTail block stmt
 
   flatten1 (CgStmt stmt : stmts) block blocks
@@ -120,8 +124,7 @@ flattenCmmAGraph id stmts =
     where !block' = blockSnoc block stmt
 
   flatten1 (CgFork fork_id stmts : rest) block blocks
-    = flatten1 (fromOL stmts) (blockJoinHead (CmmEntry fork_id) emptyBlock) $
-      flatten1 rest block blocks
+    = flatten fork_id stmts $ flatten1 rest block blocks
 
   -- a label here means that we should start a new block, and the
   -- current block should fall through to the new block.
@@ -227,11 +230,6 @@ mkReturn        :: DynFlags -> CmmExpr -> [CmmActual] -> UpdFrameOffset
 mkReturn dflags e actuals updfr_off =
   lastWithArgs dflags Ret  Old NativeReturn actuals updfr_off $
     toCall e Nothing updfr_off 0
-
-mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkReturnSimple dflags actuals updfr_off =
-  mkReturn dflags e actuals updfr_off
-  where e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)

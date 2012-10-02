@@ -468,8 +468,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 { fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
-                ; if node_points then load_fvs node lf_info fv_bindings
-                                 else return ()
+                ; when node_points $ load_fvs node lf_info fv_bindings
                 ; void $ cgExpr body
                 }}
   }

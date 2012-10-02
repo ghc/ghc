@@ -38,13 +38,11 @@ module PprCmmDecl
     )
 where
 
-import CLabel
 import PprCmmExpr
 import Cmm
 
 import DynFlags
 import Outputable
-import Platform
 import FastString
 
 import Data.List
@@ -72,7 +70,7 @@ instance (Outputable d, Outputable info, Outputable i)
     ppr t = pprTop t
 
 instance Outputable CmmStatics where
-    ppr x = sdocWithPlatform $ \platform -> pprStatics platform x
+    ppr = pprStatics
 
 instance Outputable CmmStatic where
     ppr = pprStatic
@@ -127,7 +125,7 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
 instance Outputable C_SRT where
   ppr NoC_SRT = ptext (sLit "_no_srt_")
   ppr (C_SRT label off bitmap)
-      = parens (ppr label <> comma <> ppr off <> comma <> text (show bitmap))
+      = parens (ppr label <> comma <> ppr off <> comma <> ppr bitmap)
 
 instance Outputable ForeignHint where
   ppr NoHint     = empty
@@ -141,9 +139,8 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
-pprStatics :: Platform -> CmmStatics -> SDoc
-pprStatics platform (Statics lbl ds)
-    = vcat ((pprCLabel platform lbl <> colon) : map ppr ds)
+pprStatics :: CmmStatics -> SDoc
+pprStatics (Statics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of

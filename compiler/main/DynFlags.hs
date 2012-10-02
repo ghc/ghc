@@ -122,6 +122,7 @@ module DynFlags (
         wORD_SIZE_IN_BITS,
         tAG_MASK,
         mAX_PTR_TAG,
+        tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
   ) where
 
 #include "HsVersions.h"
@@ -155,11 +156,13 @@ import Control.Monad
 
 import Data.Bits
 import Data.Char
+import Data.Int
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Word
 import System.FilePath
 import System.IO
 
@@ -290,6 +293,7 @@ data DynFlag
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
+   | Opt_OmitYields
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -345,7 +349,6 @@ data DynFlag
    | Opt_RunCPSZ
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
-   | Opt_TryNewCodeGen
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -2264,7 +2267,6 @@ fFlags = [
   ( "print-bind-contents",              Opt_PrintBindContents, nop ),
   ( "run-cps",                          Opt_RunCPS, nop ),
   ( "run-cpsz",                         Opt_RunCPSZ, nop ),
-  ( "new-codegen",                      Opt_TryNewCodeGen, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
   ( "avoid-vect",                       Opt_AvoidVect, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
@@ -2274,6 +2276,7 @@ fFlags = [
   ( "irrefutable-tuples",               Opt_IrrefutableTuples, nop ),
   ( "cmm-sink",                         Opt_CmmSink, nop ),
   ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
+  ( "omit-yields",                      Opt_OmitYields, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
@@ -2421,9 +2424,8 @@ xFlags = [
   ( "MultiWayIf",                       Opt_MultiWayIf, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
-    \ turn_on -> if not turn_on
-                 then deprecate "You can't turn off RelaxedPolyRec any more"
-                 else return () ),
+    \ turn_on -> unless turn_on
+               $ deprecate "You can't turn off RelaxedPolyRec any more" ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
@@ -2459,7 +2461,7 @@ defaultFlags platform
 
       Opt_SharedImplib,
 
-      Opt_TryNewCodeGen,
+      Opt_OmitYields,
 
       Opt_GenManifest,
       Opt_EmbedManifest,
@@ -3161,4 +3163,22 @@ tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
 
 mAX_PTR_TAG :: DynFlags -> Int
 mAX_PTR_TAG = tAG_MASK
+
+-- Might be worth caching these in targetPlatform?
+tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
+tARGET_MIN_INT dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (minBound :: Int32)
+      8 -> toInteger (minBound :: Int64)
+      w -> panic ("tARGET_MIN_INT: Unknown platformWordSize: " ++ show w)
+tARGET_MAX_INT dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (maxBound :: Int32)
+      8 -> toInteger (maxBound :: Int64)
+      w -> panic ("tARGET_MAX_INT: Unknown platformWordSize: " ++ show w)
+tARGET_MAX_WORD dflags
+    = case platformWordSize (targetPlatform dflags) of
+      4 -> toInteger (maxBound :: Word32)
+      8 -> toInteger (maxBound :: Word64)
+      w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
 

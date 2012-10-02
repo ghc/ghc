@@ -14,28 +14,23 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
-    , doSRTs, TopSRT, emptySRT, srtToData )
+    , doSRTs, TopSRT, emptySRT, isEmptySRT, srtToData )
 where
 
 #include "HsVersions.h"
 
--- These should not be imported here!
-import StgCmmUtils
 import Hoopl
-
 import Digraph
-import qualified Prelude as P
-import Prelude hiding (succ)
-
 import BlockId
 import Bitmap
 import CLabel
+import PprCmmDecl ()
 import Cmm
 import CmmUtils
+import CmmInfo
 import Data.List
 import DynFlags
 import Maybes
-import Module
 import Outputable
 import SMRep
 import UniqSupply
@@ -46,6 +41,9 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Monad
+
+import qualified Prelude as P
+import Prelude hiding (succ)
 
 foldSet :: (a -> b -> b) -> b -> Set a -> b
 foldSet = Set.foldr
@@ -137,10 +135,13 @@ instance Outputable TopSRT where
                    <+> ppr elts
                    <+> ppr eltmap
 
-emptySRT :: MonadUnique m => Maybe Module -> m TopSRT
-emptySRT mb_mod =
-  do top_lbl <- getUniqueM >>= \ u -> return $ mkModSRTLabel mb_mod u
+emptySRT :: MonadUnique m => m TopSRT
+emptySRT =
+  do top_lbl <- getUniqueM >>= \ u -> return $ mkTopSRTLabel u
      return TopSRT { lbl = top_lbl, next_elt = 0, rev_elts = [], elt_map = Map.empty }
+
+isEmptySRT :: TopSRT -> Bool
+isEmptySRT srt = null (rev_elts srt)
 
 cafMember :: TopSRT -> CLabel -> Bool
 cafMember srt lbl = Map.member lbl (elt_map srt)
@@ -228,17 +229,17 @@ maxBmpSize dflags = widthInBits (wordWidth dflags) `div` 2
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
 to_SRT :: DynFlags -> CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
 to_SRT dflags top_srt off len bmp
-  | len > maxBmpSize dflags || bmp == [fromIntegral srt_escape]
+  | len > maxBmpSize dflags || bmp == [toStgWord dflags (fromStgHalfWord (srtEscape dflags))]
   = do id <- getUniqueM
        let srt_desc_lbl = mkLargeSRTLabel id
            tbl = CmmData RelocatableReadOnlyData $
                    Statics srt_desc_lbl $ map CmmStaticLit
                      ( cmmLabelOffW dflags top_srt off
-                     : mkWordCLit dflags (fromIntegral len)
+                     : mkWordCLit dflags (toStgWord dflags (fromIntegral len))
                      : map (mkWordCLit dflags) bmp)
-       return (Just tbl, C_SRT srt_desc_lbl 0 srt_escape)
+       return (Just tbl, C_SRT srt_desc_lbl 0 (srtEscape dflags))
   | otherwise
-  = return (Nothing, C_SRT top_srt off (fromIntegral (head bmp)))
+  = return (Nothing, C_SRT top_srt off (toStgHalfWord dflags (fromStgWord (head bmp))))
 	-- The fromIntegral converts to StgHalfWord
 
 -- Gather CAF info for a procedure, but only if the procedure

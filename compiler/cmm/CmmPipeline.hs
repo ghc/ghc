@@ -82,7 +82,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                   return call_pps
 
        let noncall_pps = proc_points `setDifference` call_pps
-       when (not (setNull noncall_pps)) $
+       when (not (setNull noncall_pps) && dopt Opt_D_dump_cmmz dflags) $
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Sink and inline assignments *before* stack layout -----------
@@ -114,7 +114,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                              procPointAnalysis proc_points g
             dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" pp_map
             gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
-                  splitAtProcPoints l call_pps proc_points pp_map (CmmProc h l g)
+                  splitAtProcPoints dflags l call_pps proc_points pp_map
+                                    (CmmProc h l g)
             dumps Opt_D_dump_cmmz_split "Post splitting" gs
      
             ------------- Populate info tables with stack info -----------------

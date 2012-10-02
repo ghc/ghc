@@ -416,7 +416,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
         ; let full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
               assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr))    -- Ho ho ho!
                                           (CmmLit (mkWordCLit dflags liveness))
-              liveness        = mkRegLiveness regs ptrs nptrs
+              liveness        = mkRegLiveness dflags regs ptrs nptrs
               live            = Just $ map snd regs
               rts_label       = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))
         ; codeOnly $ do { do_checks 0 {- no stack check -} hpHw
