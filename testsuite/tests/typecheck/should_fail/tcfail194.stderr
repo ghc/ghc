@@ -1,8 +1,9 @@
 
 tcfail194.hs:9:29:
-    Couldn't match type `[a0]' with `a -> t0'
-    Expected type: (a -> t0) -> [a] -> [a]
+    Couldn't match type `[a0]' with `a -> t'
+    Expected type: (a -> t) -> [a] -> [a]
       Actual type: [a0] -> [a0]
+    Relevant bindings include z :: [t] (bound at tcfail194.hs:9:1)
     In the return type of a call of `take'
     Probable cause: `take' is applied to too many arguments
     In the expression: take 5

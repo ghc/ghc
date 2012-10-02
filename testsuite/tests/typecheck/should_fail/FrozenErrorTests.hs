@@ -4,14 +4,11 @@ module Test where
 
 data T a where 
   MkT :: a -> T a 
-  MkT2 :: forall a b. (b ~ T b) => b -> T a
   MkT3 :: forall a. (a ~ Bool) => T a 
+
 -- Occurs checks in givens
 foo :: forall a. (a ~ T a) => a -> a 
 foo x = x 
-
-blah x = case x of 
-           MkT2 y -> ()
 
 -- Mismatches in givens 
 bloh :: T Int -> () 

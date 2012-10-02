@@ -163,14 +163,12 @@ test('T4007',
      ['$MAKE -s --no-print-directory T4007'])
 
 test('T5030',
-     [expect_broken(5030),
-      # expected value: 449368924 (x86/Linux)
+     [# expected value: 449368924 (x86/Linux)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 196457520, 10)),
       # expected value: 346750856 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 300000000,
-                                                      400000000)),
+          compiler_stats_range_field('bytes allocated', 530000000, 10)),
        only_ways(['normal'])
       ],
      compile,
@@ -219,7 +217,7 @@ test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
       # sample from x86/Linux
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 296657384, 10)),
+          compiler_stats_range_field('bytes allocated', 300000000, 10)),
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 713385808, 10))
                                          # prev:       585,521,080
@@ -244,9 +242,9 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
       if_wordsize(32, # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 1682508520, 10)),
+          compiler_stats_range_field('bytes allocated',  650000000, 10)),
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 3361296144, 10))
+          compiler_stats_range_field('bytes allocated', 1300000000, 10))
       ],
       compile,['-O'])
 
