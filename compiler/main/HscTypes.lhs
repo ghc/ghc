@@ -37,6 +37,8 @@ module HscTypes (
 
         PackageInstEnv, PackageRuleBase,
 
+        mkSOName,
+
         -- * Annotations
         prepareAnnotations,
 
@@ -157,6 +159,7 @@ import Fingerprint
 import MonadUtils
 import Bag
 import ErrUtils
+import Platform
 import Util
 
 import Control.Monad    ( mplus, guard, liftM, when )
@@ -1777,6 +1780,15 @@ data NameCache
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 \end{code}
 
+
+\begin{code}
+mkSOName :: Platform -> FilePath -> FilePath
+mkSOName platform root
+    = case platformOS platform of
+      OSDarwin  -> ("lib" ++ root) <.> "dylib"
+      OSMinGW32 ->           root  <.> "dll"
+      _         -> ("lib" ++ root) <.> "so"
+\end{code}
 
 
 %************************************************************************

@@ -1185,13 +1185,6 @@ searchForLibUsingGcc dflags so dirs = do
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
-mkSOName :: Platform -> FilePath -> FilePath
-mkSOName platform root
-    = case platformOS platform of
-      OSDarwin  -> ("lib" ++ root) <.> "dylib"
-      OSMinGW32 ->           root  <.> "dll"
-      _         -> ("lib" ++ root) <.> "so"
-
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
 -- name. They are searched for in different paths than normal libraries.

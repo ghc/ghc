@@ -371,7 +371,7 @@ linkingNeeded dflags linkables pkg_deps = do
                           | Just c <- map (lookupPackage pkg_map) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
-        pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
+        pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
@@ -408,9 +408,11 @@ ghcLinkInfoSectionName :: String
 ghcLinkInfoSectionName = ".debug-ghc-link-info"
    -- if we use the ".debug" prefix, then strip will strip it by default
 
-findHSLib :: [String] -> String -> IO (Maybe FilePath)
-findHSLib dirs lib = do
-  let batch_lib_file = "lib" ++ lib <.> "a"
+findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
+findHSLib dflags dirs lib = do
+  let batch_lib_file = if dopt Opt_Static dflags
+                       then "lib" ++ lib <.> "a"
+                       else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
   case found of
     [] -> return Nothing
