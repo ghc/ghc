@@ -195,17 +195,6 @@ calcClassCycles cls
     expandTheta _    _    []           = id
     expandTheta seen path (pred:theta) = expandType seen path pred . expandTheta seen path theta
 
-    {-
-    expandTree seen path (ClassPred cls tys)
-      | cls `elemUniqSet` seen = 
-      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) 
-                                             (substTysWith (classTyVars cls) tys (classSCTheta cls))
-    expandTree seen path (TuplePred ts)      = flip (foldr (expandTree seen path)) ts
-    expandTree _    _    (EqPred _ _)        = id
-    expandTree _    _    (IPPred _ _)        = id
-    expandTree seen path (IrredPred pred)    = expandType seen path pred
-    -}
-
     expandType seen path (TyConApp tc tys)
       -- Expand unsaturated classes to their superclass theta if they are yet unseen.
       -- If they have already been seen then we have detected an error!
@@ -222,9 +211,8 @@ calcClassCycles cls
       -- For synonyms, try to expand them: some arguments might be
       -- phantoms, after all. We can expand with impunity because at
       -- this point the type synonym cycle check has already happened.
-      | isSynTyCon tc
-      , SynonymTyCon rhs <- synTyConRhs tc
-      , let (env, remainder) = papp (tyConTyVars tc) tys
+      | Just (tvs, rhs) <- synTyConDefn_maybe tc
+      , let (env, remainder) = papp tvs tys
             rest_tys = either (const []) id remainder
       = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) 
         . flip (foldr (expandType seen path)) rest_tys

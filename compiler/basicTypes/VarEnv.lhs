@@ -27,7 +27,8 @@ module VarEnv (
 	modifyVarEnv, modifyVarEnv_Directly,
 	isEmptyVarEnv, foldVarEnv, 
 	elemVarEnvByKey, lookupVarEnv_Directly,
-	filterVarEnv_Directly, restrictVarEnv,
+	filterVarEnv_Directly, restrictVarEnv, 
+        partitionVarEnv,
 
 	-- * The InScopeSet type
 	InScopeSet, 
@@ -384,6 +385,7 @@ extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 		  
 lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
 filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
+partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv	  :: VarEnv a -> Var -> VarEnv a
@@ -430,6 +432,7 @@ isEmptyVarEnv	 = isNullUFM
 foldVarEnv	 = foldUFM
 lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv_Directly = filterUFM_Directly
+partitionVarEnv       = partitionUFM
 
 restrictVarEnv env vs = filterVarEnv_Directly keep env
   where

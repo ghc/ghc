@@ -46,7 +46,7 @@ import Outputable
 \begin{code}
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
-              -> SynTyConRhs
+              -> SynTyConRhs Type
               -> Kind                   -- ^ Kind of the RHS
               -> TyConParent
               -> TcRnIf m n TyCon

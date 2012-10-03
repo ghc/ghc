@@ -39,6 +39,7 @@ module RdrHsSyn (
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
         checkMonadComp,       -- P (HsStmtContext RdrName)
+        checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
@@ -312,7 +313,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
 
 getMonoBind bind binds = (bind, binds)
 
-has_args :: [LMatch RdrName] -> Bool
+has_args :: [LMatch RdrName (LHsExpr RdrName)] -> Bool
 has_args []                           = panic "RdrHsSyn:has_args"
 has_args ((L _ (Match args _ _)) : _) = not (null args)
         -- Don't group together FunBinds if they have
@@ -637,7 +638,7 @@ patFail loc e = parseErrorSDoc loc (text "Parse error in pattern:" <+> ppr e)
 
 checkValDef :: LHsExpr RdrName
             -> Maybe (LHsType RdrName)
-            -> Located (GRHSs RdrName)
+            -> Located (GRHSs RdrName (LHsExpr RdrName))
             -> P (HsBind RdrName)
 
 checkValDef lhs (Just sig) grhss
@@ -656,7 +657,7 @@ checkFunBind :: SrcSpan
              -> Bool
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
-             -> Located (GRHSs RdrName)
+             -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
 checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   = do  ps <- checkPatterns pats
@@ -665,14 +666,14 @@ checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
 
-makeFunBind :: Located id -> Bool -> [LMatch id] -> HsBind id
+makeFunBind :: Located id -> Bool -> [LMatch id (LHsExpr id)] -> HsBind id
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn is_infix ms
   = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup ms,
               fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames, fun_tick = Nothing }
 
 checkPatBind :: LHsExpr RdrName
-             -> Located (GRHSs RdrName)
+             -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
 checkPatBind lhs (L _ grhss)
   = do  { lhs <- checkPattern lhs
@@ -807,6 +808,94 @@ checkMonadComp = do
     return $ if xopt Opt_MonadComprehensions (dflags pState)
                 then MonadComp
                 else ListComp
+
+-- -------------------------------------------------------------------------
+-- Checking arrow syntax.
+
+-- We parse arrow syntax as expressions and check for valid syntax below,
+-- converting the expression into a pattern at the same time.
+
+checkCommand :: LHsExpr RdrName -> P (LHsCmd RdrName)
+checkCommand lc = locMap checkCmd lc
+
+locMap :: (SrcSpan -> a -> P b) -> Located a -> P (Located b)
+locMap f (L l a) = f l a >>= (\b -> return $ L l b)
+
+checkCmd :: SrcSpan -> HsExpr RdrName -> P (HsCmd RdrName)
+checkCmd _ (HsArrApp e1 e2 ptt haat b) = 
+    return $ HsCmdArrApp e1 e2 ptt haat b
+checkCmd _ (HsArrForm e mf args) = 
+    return $ HsCmdArrForm e mf args
+checkCmd _ (HsApp e1 e2) = 
+    checkCommand e1 >>= (\c -> return $ HsCmdApp c e2)
+checkCmd _ (HsLam mg) = 
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam mg')
+checkCmd _ (HsPar e) = 
+    checkCommand e >>= (\c -> return $ HsCmdPar c)
+checkCmd _ (HsCase e mg) = 
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg')
+checkCmd _ (HsIf cf ep et ee) = do
+    pt <- checkCommand et
+    pe <- checkCommand ee
+    return $ HsCmdIf cf ep pt pe
+checkCmd _ (HsLet lb e) = 
+    checkCommand e >>= (\c -> return $ HsCmdLet lb c)
+checkCmd _ (HsDo DoExpr stmts ty) = 
+    mapM checkCmdLStmt stmts >>= (\ss -> return $ HsCmdDo ss ty)
+
+checkCmd _ (OpApp eLeft op fixity eRight) = do
+    -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
+    c1 <- checkCommand eLeft
+    c2 <- checkCommand eRight
+    let arg1 = L (getLoc c1) $ HsCmdTop c1 [] placeHolderType []
+        arg2 = L (getLoc c2) $ HsCmdTop c2 [] placeHolderType []
+    return $ HsCmdArrForm op (Just fixity) [arg1, arg2]
+
+checkCmd l e = cmdFail l e
+
+checkCmdLStmt :: ExprLStmt RdrName -> P (CmdLStmt RdrName)
+checkCmdLStmt = locMap checkCmdStmt
+
+checkCmdStmt :: SrcSpan -> ExprStmt RdrName -> P (CmdStmt RdrName)
+checkCmdStmt _ (LastStmt e r) = 
+    checkCommand e >>= (\c -> return $ LastStmt c r)
+checkCmdStmt _ (BindStmt pat e b f) = 
+    checkCommand e >>= (\c -> return $ BindStmt pat c b f)
+checkCmdStmt _ (BodyStmt e t g ty) = 
+    checkCommand e >>= (\c -> return $ BodyStmt c t g ty)
+checkCmdStmt _ (LetStmt bnds) = return $ LetStmt bnds
+checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
+    ss <- mapM checkCmdLStmt stmts
+    return $ stmt { recS_stmts = ss }
+checkCmdStmt l stmt = cmdStmtFail l stmt
+
+checkCmdMatchGroup :: MatchGroup RdrName (LHsExpr RdrName) -> P (MatchGroup RdrName (LHsCmd RdrName))
+checkCmdMatchGroup (MatchGroup ms ty) = do
+    ms' <- mapM (locMap $ const convert) ms
+    return $ MatchGroup ms' ty
+    where convert (Match pat mty grhss) = do
+            grhss' <- checkCmdGRHSs grhss
+            return $ Match pat mty grhss'
+
+checkCmdGRHSs :: GRHSs RdrName (LHsExpr RdrName) -> P (GRHSs RdrName (LHsCmd RdrName))
+checkCmdGRHSs (GRHSs grhss binds) = do
+    grhss' <- mapM checkCmdGRHS grhss
+    return $ GRHSs grhss' binds
+
+checkCmdGRHS :: LGRHS RdrName (LHsExpr RdrName) -> P (LGRHS RdrName (LHsCmd RdrName))
+checkCmdGRHS = locMap $ const convert
+  where 
+    convert (GRHS stmts e) = do
+        c <- checkCommand e
+--        cmdStmts <- mapM checkCmdLStmt stmts
+        return $ GRHS {- cmdStmts -} stmts c
+
+
+cmdFail :: SrcSpan -> HsExpr RdrName -> P a
+cmdFail loc e = parseErrorSDoc loc (text "Parse error in command:" <+> ppr e)
+cmdStmtFail :: SrcSpan -> Stmt RdrName (LHsExpr RdrName) -> P a
+cmdStmtFail loc e = parseErrorSDoc loc 
+                    (text "Parse error in command statement:" <+> ppr e)
 
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities

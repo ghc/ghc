@@ -12,7 +12,7 @@ module TyCon(
 
         AlgTyConRhs(..), visibleDataCons,
         TyConParent(..), isNoParent,
-        SynTyConRhs(..),
+        SynTyConRhs(..), 
 
         -- ** Coercion axiom constructors
         CoAxiom(..),
@@ -38,10 +38,11 @@ module TyCon(
         isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
-        isSynTyCon, isClosedSynTyCon,
+        isSynTyCon, isOpenSynFamilyTyCon,
         isDecomposableTyCon,
         isForeignTyCon, 
         isPromotedDataCon, isPromotedTyCon,
+        isPromotedDataCon_maybe, isPromotedTyCon_maybe,
 
         isInjectiveTyCon,
         isDataTyCon, isProductTyCon, isEnumerationTyCon,
@@ -66,12 +67,11 @@ module TyCon(
         tyConParent,
         tyConTuple_maybe, tyConClass_maybe,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
-        synTyConDefn, synTyConRhs, synTyConType,
+        synTyConDefn_maybe, synTyConRhs_maybe, 
         tyConExtName,           -- External name for foreign types
         algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
-        promotedDataCon, promotedTyCon,
 
         -- ** Manipulating TyCons
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -359,8 +359,8 @@ data TyCon
 
         tyConTyVars  :: [TyVar],        -- Bound tyvars
 
-        synTcRhs     :: SynTyConRhs,    -- ^ Contains information about the
-                                        -- expansion of the synonym
+        synTcRhs     :: SynTyConRhs Type,  -- ^ Contains information about the
+                                           -- expansion of the synonym
 
         synTcParent  :: TyConParent     -- ^ Gives the family declaration 'TyCon'
                                         -- of 'TyCon's representing family instances
@@ -566,16 +566,27 @@ isNoParent _             = False
 --------------------
 
 -- | Information pertaining to the expansion of a type synonym (@type@)
-data SynTyConRhs
+data SynTyConRhs ty
   = -- | An ordinary type synonyn.
     SynonymTyCon
-       Type           -- This 'Type' is the rhs, and may mention from 'tyConTyVars'.
+       ty             -- This 'Type' is the rhs, and may mention from 'tyConTyVars'.
                       -- It acts as a template for the expansion when the 'TyCon'
                       -- is applied to some types.
 
    -- | A type synonym family  e.g. @type family F x y :: * -> *@
-   | SynFamilyTyCon
+   | SynFamilyTyCon {
+        synf_open :: Bool,         -- See Note [Closed type families]
+        synf_injective :: Bool 
+     }
 \end{code}
+
+Note [Closed type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+* In an open type family you can add new instances later.  This is the 
+  usual case.  
+
+* In a closed type family you can only put instnaces where the family
+  is defined.  GHC doesn't support syntax for this yet.
 
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -918,7 +929,7 @@ mkPrimTyCon' name kind arity rep is_unlifted
     }
 
 -- | Create a type synonym 'TyCon'
-mkSynTyCon :: Name -> Kind -> [TyVar] -> SynTyConRhs -> TyConParent -> TyCon
+mkSynTyCon :: Name -> Kind -> [TyVar] -> SynTyConRhs Type -> TyConParent -> TyCon
 mkSynTyCon name kind tyvars rhs parent
   = SynTyCon {
         tyConName = name,
@@ -1106,14 +1117,14 @@ isSynFamilyTyCon :: TyCon -> Bool
 isSynFamilyTyCon (SynTyCon {synTcRhs = SynFamilyTyCon {}}) = True
 isSynFamilyTyCon _ = False
 
+isOpenSynFamilyTyCon :: TyCon -> Bool
+isOpenSynFamilyTyCon (SynTyCon {synTcRhs = SynFamilyTyCon { synf_open = is_open } }) = is_open
+isOpenSynFamilyTyCon _ = False
+
 -- | Is this a synonym 'TyCon' that can have may have further instances appear?
 isDataFamilyTyCon :: TyCon -> Bool
 isDataFamilyTyCon (AlgTyCon {algTcRhs = DataFamilyTyCon {}}) = True
 isDataFamilyTyCon _ = False
-
--- | Is this a synonym 'TyCon' that can have no further instances appear?
-isClosedSynTyCon :: TyCon -> Bool
-isClosedSynTyCon tycon = isSynTyCon tycon && not (isFamilyTyCon tycon)
 
 -- | Injective 'TyCon's can be decomposed, so that
 --     T ty1 ~ T ty2  =>  ty1 ~ ty2
@@ -1184,25 +1195,25 @@ isForeignTyCon :: TyCon -> Bool
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon _                                   = False
 
--- | Is this a PromotedDataCon?
-isPromotedDataCon :: TyCon -> Bool
-isPromotedDataCon (PromotedDataCon {}) = True
-isPromotedDataCon _                    = False
-
 -- | Is this a PromotedTyCon?
 isPromotedTyCon :: TyCon -> Bool
 isPromotedTyCon (PromotedTyCon {}) = True
 isPromotedTyCon _                  = False
 
--- | Retrieves the promoted DataCon if this is a PromotedDataTyCon;
--- Panics otherwise
-promotedDataCon :: TyCon -> DataCon
-promotedDataCon = dataCon
+-- | Retrieves the promoted TyCon if this is a PromotedTyCon;
+isPromotedTyCon_maybe :: TyCon -> Maybe TyCon
+isPromotedTyCon_maybe (PromotedTyCon { ty_con = tc }) = Just tc
+isPromotedTyCon_maybe _ = Nothing
 
--- | Retrieves the promoted TypeCon if this is a PromotedTypeTyCon;
--- Panics otherwise
-promotedTyCon :: TyCon -> TyCon
-promotedTyCon = ty_con
+-- | Is this a PromotedDataCon?
+isPromotedDataCon :: TyCon -> Bool
+isPromotedDataCon (PromotedDataCon {}) = True
+isPromotedDataCon _                    = False
+
+-- | Retrieves the promoted DataCon if this is a PromotedDataCon;
+isPromotedDataCon_maybe :: TyCon -> Maybe DataCon
+isPromotedDataCon_maybe (PromotedDataCon { dataCon = dc }) = Just dc
+isPromotedDataCon_maybe _ = Nothing
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -1351,26 +1362,17 @@ tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
 \end{code}
 
 \begin{code}
--- | Extract the 'TyVar's bound by a type synonym and the corresponding (unsubstituted) right hand side.
--- If the given 'TyCon' is not a type synonym, panics
-synTyConDefn :: TyCon -> ([TyVar], Type)
-synTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = SynonymTyCon ty})
-  = (tyvars, ty)
-synTyConDefn tycon = pprPanic "getSynTyConDefn" (ppr tycon)
+-- | Extract the 'TyVar's bound by a vanilla type synonym (not familiy)
+-- and the corresponding (unsubstituted) right hand side.
+synTyConDefn_maybe :: TyCon -> Maybe ([TyVar], Type)
+synTyConDefn_maybe (SynTyCon {tyConTyVars = tyvars, synTcRhs = SynonymTyCon ty})
+  = Just (tyvars, ty)
+synTyConDefn_maybe _ = Nothing
 
--- | Extract the information pertaining to the right hand side of a type synonym (@type@) declaration. Panics
--- if the given 'TyCon' is not a type synonym
-synTyConRhs :: TyCon -> SynTyConRhs
-synTyConRhs (SynTyCon {synTcRhs = rhs}) = rhs
-synTyConRhs tc                          = pprPanic "synTyConRhs" (ppr tc)
-
--- | Find the expansion of the type synonym represented by the given 'TyCon'. The free variables of this
--- type will typically include those 'TyVar's bound by the 'TyCon'. Panics if the 'TyCon' is not that of
--- a type synonym
-synTyConType :: TyCon -> Type
-synTyConType tc = case synTcRhs tc of
-                    SynonymTyCon t -> t
-                    _              -> pprPanic "synTyConType" (ppr tc)
+-- | Extract the information pertaining to the right hand side of a type synonym (@type@) declaration.
+synTyConRhs_maybe :: TyCon -> Maybe (SynTyConRhs Type)
+synTyConRhs_maybe (SynTyCon {synTcRhs = rhs}) = Just rhs
+synTyConRhs_maybe _                           = Nothing
 \end{code}
 
 \begin{code}

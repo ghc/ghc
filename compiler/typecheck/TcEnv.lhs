@@ -25,6 +25,8 @@ module TcEnv(
         tcExtendTyVarEnv, tcExtendTyVarEnv2, 
         tcExtendGhciEnv, tcExtendLetEnv,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
+        tcExtendIdBndrs,
+
         tcLookup, tcLookupLocated, tcLookupLocalIds, 
         tcLookupId, tcLookupTyVar, 
         tcLookupLcl_maybe, 
@@ -375,26 +377,35 @@ tcExtendLetEnv closed ids thing_inside
         ; tc_extend_local_env [ (idName id, ATcId { tct_id = id 
                                                   , tct_closed = closed
                                                   , tct_level = thLevel stage })
-                                 | id <- ids]
-          thing_inside }
+                              | id <- ids] $
+          tcExtendIdBndrs [TcIdBndr id closed | id <- ids] thing_inside }
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 tcExtendIdEnv ids thing_inside 
-  = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
+  = tcExtendIdEnv2 [(idName id, id) | id <- ids] $
+    tcExtendIdBndrs [TcIdBndr id NotTopLevel | id <- ids] 
+    thing_inside
 
 tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
 tcExtendIdEnv1 name id thing_inside 
-  = tcExtendIdEnv2 [(name,id)] thing_inside
+  = tcExtendIdEnv2 [(name,id)] $
+    tcExtendIdBndrs [TcIdBndr id NotTopLevel]
+    thing_inside
 
 tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
+-- Do *not* extend the tcl_bndrs stack
+-- The tct_closed flag really doesn't matter
 -- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
   = do  { stage <- getStage
         ; tc_extend_local_env [ (name, ATcId { tct_id = id 
                                              , tct_closed = NotTopLevel
                                              , tct_level = thLevel stage })
-                                 | (name,id) <- names_w_ids]
+                              | (name,id) <- names_w_ids] $
           thing_inside }
+
+tcExtendIdBndrs :: [TcIdBinder] -> TcM a -> TcM a
+tcExtendIdBndrs bndrs = updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
 
 tcExtendGhciEnv :: [TcId] -> TcM a -> TcM a
 -- Used to bind Ids for GHCi identifiers bound earlier in the user interaction

@@ -42,7 +42,6 @@ import NameSet
 import Bag
 import Outputable
 import UniqSupply
-import Unique
 import UniqFM
 import DynFlags
 import Maybes
@@ -78,7 +77,6 @@ initTc :: HscEnv
 
 initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
-        meta_var     <- newIORef initTyVarUnique ;
         tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
@@ -148,11 +146,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_th_ctxt    = topStage,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_bndrs      = [],
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
-                tcl_meta       = meta_var,
-                tcl_untch      = initTyVarUnique
+                tcl_untch      = noUntouchables
              } ;
         } ;
 
@@ -345,16 +343,6 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 %************************************************************************
 
 \begin{code}
-newMetaUnique :: TcM Unique
--- The uniques for TcMetaTyVars are allocated specially
--- in guaranteed linear order, starting at zero for each module
-newMetaUnique
- = do { env <- getLclEnv
-      ; let meta_var = tcl_meta env
-      ; uniq <- readMutVar meta_var
-      ; writeMutVar meta_var (incrUnique uniq)
-      ; return uniq }
-
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv ;
@@ -379,21 +367,24 @@ newUniqueSupply
         writeMutVar u_var us1 ;
         return us2 }}}
 
-newLocalName :: Name -> TcRnIf gbl lcl Name
-newLocalName name       -- Make a clone
-  = do  { uniq <- newUnique
-        ; return (mkInternalName uniq (nameOccName name) (getSrcSpan name)) }
-
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
-newSysLocalIds fs tys
-  = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+newLocalName :: Name -> TcM Name
+newLocalName name = newName (nameOccName name)
 
 newName :: OccName -> TcM Name
 newName occ
   = do { uniq <- newUnique
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
+
+newSysName :: OccName -> TcM Name
+newSysName occ
+  = do { uniq <- newUnique
+       ; return (mkSystemName uniq occ) }
+
+newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds fs tys
+  = do  { us <- newUniqueSupply
+        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -829,14 +820,18 @@ updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
-getCtLoc :: orig -> TcM (CtLoc orig)
+getCtLoc :: CtOrigin -> TcM CtLoc
 getCtLoc origin
-  = do { loc <- getSrcSpanM ; env <- getLclEnv ;
-         return (CtLoc origin loc (tcl_ctxt env)) }
+  = do { env <- getLclEnv 
+       ; return (CtLoc { ctl_origin = origin, ctl_env =  env, ctl_depth = 0 }) }
 
-setCtLoc :: CtLoc orig -> TcM a -> TcM a
-setCtLoc (CtLoc _ src_loc ctxt) thing_inside
-  = setSrcSpan src_loc (setErrCtxt ctxt thing_inside)
+setCtLoc :: CtLoc -> TcM a -> TcM a
+-- Set the SrcSpan and error context from the CtLoc
+setCtLoc (CtLoc { ctl_env = lcl }) thing_inside
+  = updLclEnv (\env -> env { tcl_loc = tcl_loc lcl
+                           , tcl_bndrs = tcl_bndrs lcl
+                           , tcl_ctxt = tcl_ctxt lcl }) 
+              thing_inside
 \end{code}
 
 %************************************************************************
@@ -1037,6 +1032,13 @@ emitImplications ct
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addImplics` ct) }
 
+emitInsoluble :: Ct -> TcM ()
+emitInsoluble ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addInsols` unitBag ct) ;
+         v <- readTcRef lie_var ;
+         traceTc "emitInsoluble" (ppr v) }
+
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
@@ -1049,20 +1051,27 @@ captureConstraints thing_inside
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
   = do { env <- getLclEnv
-       ; low_meta <- readTcRef (tcl_meta env)
-       ; res <- setLclEnv (env { tcl_untch = low_meta })
+       ; let untch' = pushUntouchables (tcl_untch env)
+       ; res <- setLclEnv (env { tcl_untch = untch' })
                 thing_inside
-       ; high_meta <- readTcRef (tcl_meta env)
-       ; return (res, TouchableRange low_meta high_meta) }
+       ; return (res, untch') }
 
-isUntouchable :: TcTyVar -> TcM Bool
-isUntouchable tv
+getUntouchables :: TcM Untouchables
+getUntouchables = do { env <- getLclEnv
+                     ; return (tcl_untch env) }
+
+setUntouchables :: Untouchables -> TcM a -> TcM a
+setUntouchables untch thing_inside 
+  = updLclEnv (\env -> env { tcl_untch = untch }) thing_inside
+
+isTouchableTcM :: TcTyVar -> TcM Bool
+isTouchableTcM tv
     -- Kind variables are always touchable
   | isSuperKind (tyVarKind tv) 
   = return False
   | otherwise 
   = do { env <- getLclEnv
-       ; return (varUnique tv < tcl_untch env) }
+       ; return (isTouchableMetaTyVar (tcl_untch env) tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

@@ -1334,15 +1334,15 @@ decl    :: { Located (OrdList (LHsDecl RdrName)) }
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | docdecl               { LL $ unitOL $1 }
 
-rhs     :: { Located (GRHSs RdrName) }
+rhs     :: { Located (GRHSs RdrName (LHsExpr RdrName)) }
         : '=' exp wherebinds    { sL (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
         | gdrhs wherebinds      { LL $ GRHSs (reverse (unLoc $1)) (unLoc $2) }
 
-gdrhs :: { Located [LGRHS RdrName] }
+gdrhs :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
         : gdrhs gdrh            { LL ($2 : unLoc $1) }
         | gdrh                  { L1 [$1] }
 
-gdrh :: { LGRHS RdrName }
+gdrh :: { LGRHS RdrName (LHsExpr RdrName) }
         : '|' guardquals '=' exp        { sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
@@ -1422,8 +1422,9 @@ exp10 :: { LHsExpr RdrName }
 
         | 'proc' aexp '->' exp  
                         {% checkPattern $2 >>= \ p -> 
-                           return (LL $ HsProc p (LL $ HsCmdTop $4 [] 
-                                                   placeHolderType undefined)) }
+                            checkCommand $4 >>= \ cmd ->
+                            return (LL $ HsProc p (LL $ HsCmdTop cmd [] 
+                                                    placeHolderType undefined)) }
                                                 -- TODO: is LL right here?
 
         | '{-# CORE' STRING '#-}' exp           { LL $ HsCoreAnn (getSTRING $2) $4 }
@@ -1516,7 +1517,8 @@ cmdargs :: { [LHsCmdTop RdrName] }
         | {- empty -}                   { [] }
 
 acmd    :: { LHsCmdTop RdrName }
-        : aexp2                 { L1 $ HsCmdTop $1 [] placeHolderType undefined }
+        : aexp2                 {% checkCommand $1 >>= \ cmd ->
+                                    return (L1 $ HsCmdTop cmd [] placeHolderType undefined) }
 
 cvtopbody :: { [LHsDecl RdrName] }
         :  '{'            cvtopdecls0 '}'               { $2 }
@@ -1592,7 +1594,7 @@ lexps :: { Located [LHsExpr RdrName] }
 -----------------------------------------------------------------------------
 -- List Comprehensions
 
-flattenedpquals :: { Located [LStmt RdrName] }
+flattenedpquals :: { Located [LStmt RdrName (LHsExpr RdrName)] }
     : pquals   { case (unLoc $1) of
                     [qs] -> L1 qs
                     -- We just had one thing in our "parallel" list so 
@@ -1604,11 +1606,11 @@ flattenedpquals :: { Located [LStmt RdrName] }
                     -- we wrap them into as a ParStmt
                 }
 
-pquals :: { Located [[LStmt RdrName]] }
+pquals :: { Located [[LStmt RdrName (LHsExpr RdrName)]] }
     : squals '|' pquals     { L (getLoc $2) (reverse (unLoc $1) : unLoc $3) }
     | squals                { L (getLoc $1) [reverse (unLoc $1)] }
 
-squals :: { Located [LStmt RdrName] }   -- In reverse order, because the last 
+squals :: { Located [LStmt RdrName (LHsExpr RdrName)] }   -- In reverse order, because the last 
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual               { LL [L (getLoc $3) ((unLoc $3) (reverse (unLoc $1)))] }
     | squals ',' qual                        { LL ($3 : unLoc $1) }
@@ -1623,7 +1625,7 @@ squals :: { Located [LStmt RdrName] }   -- In reverse order, because the last
 -- consensus on the syntax, this feature is not being used until we
 -- get user demand.
 
-transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
+transformqual :: { Located ([LStmt RdrName (LHsExpr RdrName)] -> Stmt RdrName (LHsExpr RdrName)) }
                         -- Function is applied to a list of stmts *in order*
     : 'then' exp                           { LL $ \ss -> (mkTransformStmt    ss $2)    }
     | 'then' exp 'by' exp                  { LL $ \ss -> (mkTransformByStmt  ss $2 $4) }
@@ -1657,44 +1659,44 @@ parr :: { LHsExpr RdrName }
 -----------------------------------------------------------------------------
 -- Guards
 
-guardquals :: { Located [LStmt RdrName] }
+guardquals :: { Located [LStmt RdrName (LHsExpr RdrName)] }
     : guardquals1           { L (getLoc $1) (reverse (unLoc $1)) }
 
-guardquals1 :: { Located [LStmt RdrName] }
+guardquals1 :: { Located [LStmt RdrName (LHsExpr RdrName)] }
     : guardquals1 ',' qual  { LL ($3 : unLoc $1) }
     | qual                  { L1 [$1] }
 
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist :: { Located [LMatch RdrName] }
+altslist :: { Located [LMatch RdrName (LHsExpr RdrName)] }
         : '{'            alts '}'       { LL (reverse (unLoc $2)) }
         |     vocurly    alts  close    { L (getLoc $2) (reverse (unLoc $2)) }
 
-alts    :: { Located [LMatch RdrName] }
+alts    :: { Located [LMatch RdrName (LHsExpr RdrName)] }
         : alts1                         { L1 (unLoc $1) }
         | ';' alts                      { LL (unLoc $2) }
 
-alts1   :: { Located [LMatch RdrName] }
+alts1   :: { Located [LMatch RdrName (LHsExpr RdrName)] }
         : alts1 ';' alt                 { LL ($3 : unLoc $1) }
         | alts1 ';'                     { LL (unLoc $1) }
         | alt                           { L1 [$1] }
 
-alt     :: { LMatch RdrName }
+alt     :: { LMatch RdrName (LHsExpr RdrName) }
         : pat opt_sig alt_rhs           { LL (Match [$1] $2 (unLoc $3)) }
 
-alt_rhs :: { Located (GRHSs RdrName) }
+alt_rhs :: { Located (GRHSs RdrName (LHsExpr RdrName)) }
         : ralt wherebinds               { LL (GRHSs (unLoc $1) (unLoc $2)) }
 
-ralt :: { Located [LGRHS RdrName] }
+ralt :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
         : '->' exp                      { LL (unguardedRHS $2) }
         | gdpats                        { L1 (reverse (unLoc $1)) }
 
-gdpats :: { Located [LGRHS RdrName] }
+gdpats :: { Located [LGRHS RdrName (LHsExpr RdrName)] }
         : gdpats gdpat                  { LL ($2 : unLoc $1) }
         | gdpat                         { L1 [$1] }
 
-gdpat   :: { LGRHS RdrName }
+gdpat   :: { LGRHS RdrName (LHsExpr RdrName) }
         : '|' guardquals '->' exp               { sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
@@ -1716,37 +1718,37 @@ apats  :: { [LPat RdrName] }
 -----------------------------------------------------------------------------
 -- Statement sequences
 
-stmtlist :: { Located [LStmt RdrName] }
+stmtlist :: { Located [LStmt RdrName (LHsExpr RdrName)] }
         : '{'           stmts '}'       { LL (unLoc $2) }
         |     vocurly   stmts close     { $2 }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
 -- here, because we need too much lookahead if we see do { e ; }
--- So we use ExprStmts throughout, and switch the last one over
+-- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
-stmts :: { Located [LStmt RdrName] }
+stmts :: { Located [LStmt RdrName (LHsExpr RdrName)] }
         : stmt stmts_help               { LL ($1 : unLoc $2) }
         | ';' stmts                     { LL (unLoc $2) }
         | {- empty -}                   { noLoc [] }
 
-stmts_help :: { Located [LStmt RdrName] } -- might be empty
+stmts_help :: { Located [LStmt RdrName (LHsExpr RdrName)] } -- might be empty
         : ';' stmts                     { LL (unLoc $2) }
         | {- empty -}                   { noLoc [] }
 
 -- For typing stmts at the GHCi prompt, where 
 -- the input may consist of just comments.
-maybe_stmt :: { Maybe (LStmt RdrName) }
+maybe_stmt :: { Maybe (LStmt RdrName (LHsExpr RdrName)) }
         : stmt                          { Just $1 }
         | {- nothing -}                 { Nothing }
 
-stmt  :: { LStmt RdrName }
+stmt  :: { LStmt RdrName (LHsExpr RdrName) }
         : qual                              { $1 }
         | 'rec' stmtlist                { LL $ mkRecStmt (unLoc $2) }
 
-qual  :: { LStmt RdrName }
+qual  :: { LStmt RdrName (LHsExpr RdrName) }
     : pat '<-' exp                      { LL $ mkBindStmt $1 $3 }
-    | exp                                   { L1 $ mkExprStmt $1 }
+    | exp                                   { L1 $ mkBodyStmt $1 }
     | 'let' binds                       { LL $ LetStmt (unLoc $2) }
 
 -----------------------------------------------------------------------------

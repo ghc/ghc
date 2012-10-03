@@ -391,7 +391,7 @@ gen_Ord_binds loc tycon
          ++ [mkSimpleHsAlt nlWildPat (mkTagCmp op)])
 
 
-    mkOrdOpAlt :: OrdOp -> DataCon -> LMatch RdrName
+    mkOrdOpAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
     -- Make the alternative  (Ki a1 a2 .. av -> 
     mkOrdOpAlt op data_con
       = mkSimpleHsAlt (nlConVarPat data_con_RDR as_needed) (mkInnerRhs op data_con)
@@ -436,7 +436,7 @@ gen_Ord_binds loc tycon
         tag     = get_tag data_con 
         tag_lit = noLoc (HsLit (HsIntPrim (toInteger tag)))
 
-    mkInnerEqAlt :: OrdOp -> DataCon -> LMatch RdrName
+    mkInnerEqAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
     -- First argument 'a' known to be built with K
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
@@ -1604,7 +1604,8 @@ mkSimpleLam2 lam = do
     return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
-mkSimpleConMatch :: Monad m => (RdrName -> [a] -> m (LHsExpr RdrName)) -> [LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName)
+mkSimpleConMatch :: Monad m => (RdrName -> [a] -> m (LHsExpr RdrName)) -> [LPat RdrName] 
+                 -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName (LHsExpr RdrName))
 mkSimpleConMatch fold extra_pats con insides = do
     let con_name = getRdrName con
     let vars_needed = takeList insides as_RDRs
@@ -1613,7 +1614,8 @@ mkSimpleConMatch fold extra_pats con insides = do
     return $ mkMatch (extra_pats ++ [pat]) rhs emptyLocalBinds
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
-mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName))
+mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a]
+                  -> m (LMatch RdrName (LHsExpr RdrName)))
                   -> TupleSort -> [LHsExpr RdrName -> a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
 mkSimpleTupleCase match_for_con sort insides x = do
     let con = tupleCon sort (length insides)
@@ -1863,7 +1865,7 @@ mk_FunBind loc fun pats_and_exprs
   where
     matches = [mkMatch p e emptyLocalBinds | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: Located RdrName -> [LMatch RdrName] -> HsBind RdrName
+mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> HsBind RdrName
 mkRdrFunBind fun@(L _ fun_rdr) matches
  | null matches = mkFunBind fun [mkMatch [] (error_Expr str) emptyLocalBinds]
 	-- Catch-all eqn looks like   

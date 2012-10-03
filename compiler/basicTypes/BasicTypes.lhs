@@ -66,6 +66,7 @@ module BasicTypes(
         StrictnessMark(..), isMarkedStrict,
 
 	DefMethSpec(..),
+        SwapFlag(..), flipSwap, unSwap,
 
         CompilerPhase(..), PhaseNum,
         Activation(..), isActive, isActiveIn,
@@ -122,6 +123,31 @@ type RepArity = Int
 \begin{code}
 type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 \end{code}
+
+%************************************************************************
+%*									*
+           Swap flag
+%*									*
+%************************************************************************
+
+\begin{code}
+data SwapFlag 
+  = NotSwapped	-- Args are: actual,   expected
+  | IsSwapped   -- Args are: expected, actual
+
+instance Outputable SwapFlag where
+  ppr IsSwapped  = ptext (sLit "Is-swapped")
+  ppr NotSwapped = ptext (sLit "Not-swapped")
+
+flipSwap :: SwapFlag -> SwapFlag
+flipSwap IsSwapped  = NotSwapped
+flipSwap NotSwapped = IsSwapped
+
+unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
+unSwap NotSwapped f a b = f a b
+unSwap IsSwapped  f a b = f b a
+\end{code}
+
 
 %************************************************************************
 %*									*

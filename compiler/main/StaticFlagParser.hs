@@ -131,11 +131,11 @@ isStaticFlag f =
     "fruntime-types",
     "fno-pre-inlining",
     "fno-opt-coercion",
+    "fno-flat-cache",
     "fexcess-precision",
     "fhardwire-lib-paths",
     "fcpr-off",
-    "ferror-spans",
-    "fhpc"
+    "ferror-spans"
     ]
   || any (`isPrefixOf` f) [
     "fliberate-case-threshold",

@@ -1,9 +1,11 @@
 \begin{code}
 module DataCon where
 import Name( Name )
+import {-# SOURCE #-} TyCon( TyCon )
 
 data DataCon
 dataConName      :: DataCon -> Name
+dataConTyCon     :: DataCon -> TyCon
 isVanillaDataCon :: DataCon -> Bool
 instance Eq DataCon
 instance Ord DataCon

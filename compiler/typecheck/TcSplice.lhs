@@ -348,7 +348,7 @@ tcBracket brack res_ty
           -- We will type check this bracket again at its usage site.
           --
           -- We build a single implication constraint with a BracketSkol;
-          -- that in turn tells simplifyCheck to report only definite
+          -- that in turn tells simplifyTop to report only definite
           -- errors
        ; (_,lie) <- captureConstraints $
                     newImplication BracketSkol [] [] $
@@ -497,6 +497,12 @@ tcTopSpliceExpr :: TcM (LHsExpr Id) -> TcM (LHsExpr Id)
 tcTopSpliceExpr tc_action
   = checkNoErrs $  -- checkNoErrs: must not try to run the thing
                    -- if the type checker fails!
+    unsetDOptM Opt_DeferTypeErrors $
+                   -- Don't defer type errors.  Not only are we
+                   -- going to run this code, but we do an unsafe
+                   -- coerce, so we get a seg-fault if, say we
+                   -- splice a type into a place where an expression
+                   -- is expected (Trac #7276)
     setStage Splice $
     do {    -- Typecheck the expression
          (expr', lie) <- captureConstraints tc_action
@@ -872,7 +878,7 @@ runMeta show_code run_and_convert expr
         exn_msg <- liftIO $ Panic.safeShowException exn
         let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
                         nest 2 (text exn_msg),
-                        if show_code then nest 2 (text "Code:" <+> ppr expr) else empty]
+                        if show_code then text "Code:" <+> ppr expr else empty]
         failWithTc msg
 \end{code}
 
@@ -1227,9 +1233,8 @@ reifyTyCon tc
                     (TH.FamilyD flavour (reifyName tc) tvs' kind')
                     instances) }
 
-  | isSynTyCon tc
-  = do { let (tvs, rhs) = synTyConDefn tc
-       ; rhs' <- reifyType rhs
+  | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
+  = do { rhs' <- reifyType rhs
        ; tvs' <- reifyTyVars tvs
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
@@ -1376,10 +1381,10 @@ reify_kc_app :: TyCon -> [TypeRep.Kind] -> TcM TH.Kind
 reify_kc_app kc kis
   = fmap (foldl TH.AppT r_kc) (mapM reifyKind kis)
   where
-    r_kc | isPromotedTyCon kc &&
-           isTupleTyCon (promotedTyCon kc)  = TH.TupleT (tyConArity kc)
-         | kc `hasKey` listTyConKey         = TH.ListT
-         | otherwise                        = TH.ConT (reifyName kc)
+    r_kc | Just tc <- isPromotedTyCon_maybe kc
+         , isTupleTyCon tc          = TH.TupleT (tyConArity kc)
+         | kc `hasKey` listTyConKey = TH.ListT
+         | otherwise                = TH.ConT (reifyName kc)
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
@@ -1410,8 +1415,8 @@ reify_tc_app tc tys
   where
     arity = tyConArity tc
     r_tc | isTupleTyCon tc            = if isPromotedDataCon tc
-                                          then TH.PromotedTupleT arity
-                                          else TH.TupleT arity
+                                        then TH.PromotedTupleT arity
+                                        else TH.TupleT arity
          | tc `hasKey` listTyConKey   = TH.ListT
          | tc `hasKey` nilDataConKey  = TH.PromotedNilT
          | tc `hasKey` consDataConKey = TH.PromotedConsT

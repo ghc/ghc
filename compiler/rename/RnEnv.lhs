@@ -18,7 +18,7 @@ module RnEnv (
         lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
         greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
-        lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
+        lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
         lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
         getLookupOccRn, addUsedRdrNames,
 
@@ -1179,27 +1179,23 @@ lookupIfThenElse
 lookupSyntaxName :: Name                                -- The standard name
                  -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
 lookupSyntaxName std_name
-  = xoptM Opt_RebindableSyntax          `thenM` \ rebindable_on ->
-    if not rebindable_on then normal_case
-    else
-        -- Get the similarly named thing from the local environment
-    lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
-    return (HsVar usr_name, unitFV usr_name)
-  where
-    normal_case = return (HsVar std_name, emptyFVs)
+  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+       ; if not rebindable_on then 
+           return (HsVar std_name, emptyFVs)
+         else
+            -- Get the similarly named thing from the local environment
+           do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
+              ; return (HsVar usr_name, unitFV usr_name) } }
 
-lookupSyntaxTable :: [Name]                             -- Standard names
-                  -> RnM (SyntaxTable Name, FreeVars)   -- See comments with HsExpr.ReboundNames
-lookupSyntaxTable std_names
-  = xoptM Opt_RebindableSyntax          `thenM` \ rebindable_on ->
-    if not rebindable_on then normal_case
-    else
-        -- Get the similarly named thing from the local environment
-    mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names    `thenM` \ usr_names ->
-
-    return (std_names `zip` map HsVar usr_names, mkFVs usr_names)
-  where
-    normal_case = return (std_names `zip` map HsVar std_names, emptyFVs)
+lookupSyntaxNames :: [Name]                          -- Standard names
+                  -> RnM ([HsExpr Name], FreeVars)   -- See comments with HsExpr.ReboundNames
+lookupSyntaxNames std_names
+  = do { rebindable_on <- xoptM Opt_RebindableSyntax
+       ; if not rebindable_on then 
+             return (map HsVar std_names, emptyFVs)
+        else
+          do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
+             ; return (map HsVar usr_names, mkFVs usr_names) } }
 \end{code}
 
 

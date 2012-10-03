@@ -164,7 +164,7 @@ foreign import ccall interruptible
       <sect2 id="ffi-capi">
         <title>The CAPI calling convention</title>
         <para>
-          The <literal>CAPI</literal> extension allows a calling
+          The <literal>CApiFFI</literal> extension allows a calling
           convention of <literal>capi</literal> to be used in foreign
           declarations, e.g.
 

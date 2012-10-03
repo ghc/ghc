@@ -145,11 +145,19 @@ opt_co' env sym (TransCo co1 co2)
 
 opt_co' env sym (NthCo n co)
   | TyConAppCo tc cos <- co'
-  , isDecomposableTyCon tc		-- Not synonym families
+  , isDecomposableTyCon tc   -- Not synonym families
   = ASSERT( n < length cos )
     cos !! n
   | otherwise
   = NthCo n co'
+  where
+    co' = opt_co env sym co
+
+opt_co' env sym (LRCo lr co)
+  | Just pr_co <- splitAppCo_maybe co'
+  = pickLR lr pr_co
+  | otherwise
+  = LRCo lr co'
   where
     co' = opt_co env sym co
 
@@ -165,7 +173,6 @@ opt_co' env sym (InstCo co ty)
   = substCoWithTy (getCvInScope env) tv ty' co'_body   
 
   | otherwise = InstCo co' ty'
-
   where
     co' = opt_co env sym co
     ty' = substTy env ty
@@ -208,17 +215,18 @@ opt_trans2 _ co1 co2
 -- Optimize coercions with a top-level use of transitivity.
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
--- push transitivity down through matching top-level constructors.
-opt_trans_rule is in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
-  | tc1 == tc2 = fireTransRule "PushTyConApp" in_co1 in_co2 $
-                 TyConAppCo tc1 (opt_transList is cos1 cos2)
-
--- push transitivity through matching destructors
+-- Push transitivity through matching destructors
 opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
   | d1 == d2
   , co1 `compatible_co` co2
   = fireTransRule "PushNth" in_co1 in_co2 $
     mkNthCo d1 (opt_trans is co1 co2)
+
+opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
+  | d1 == d2
+  , co1 `compatible_co` co2
+  = fireTransRule "PushLR" in_co1 in_co2 $
+    mkLRCo d1 (opt_trans is co1 co2)
 
 -- Push transitivity inside instantiation
 opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
@@ -227,11 +235,17 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   = fireTransRule "TrPushInst" in_co1 in_co2 $
     mkInstCo (opt_trans is co1 co2) ty1
  
--- Push transitivity inside apply
+-- Push transitivity down through matching top-level constructors.
+opt_trans_rule is in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
+  | tc1 == tc2 
+  = fireTransRule "PushTyConApp" in_co1 in_co2 $
+    TyConAppCo tc1 (opt_transList is cos1 cos2)
+
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
     mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
+-- Eta rules
 opt_trans_rule is co1@(TyConAppCo tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
   = ASSERT( length cos1 == length cos2 )
@@ -243,6 +257,16 @@ opt_trans_rule is co1 co2@(TyConAppCo tc cos2)
   = ASSERT( length cos1 == length cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     TyConAppCo tc (opt_transList is cos1 cos2)
+
+opt_trans_rule is co1@(AppCo co1a co1b) co2
+  | Just (co2a,co2b) <- etaAppCo_maybe co2
+  = fireTransRule "EtaAppL" co1 co2 $
+    mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+
+opt_trans_rule is co1 co2@(AppCo co2a co2b)
+  | Just (co1a,co1b) <- etaAppCo_maybe co1
+  = fireTransRule "EtaAppR" co1 co2 $
+    mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 -- Push transitivity inside forall
 opt_trans_rule is co1 co2
@@ -359,6 +383,21 @@ etaForAllCo_maybe co
   | otherwise
   = Nothing
 
+etaAppCo_maybe :: Coercion -> Maybe (Coercion,Coercion)
+-- If possible, split a coercion
+--   g :: t1a t1b ~ t2a t2b
+-- into a pair of coercions (left g, right g)
+etaAppCo_maybe co
+  | Just (co1,co2) <- splitAppCo_maybe co
+  = Just (co1,co2)
+  | Pair ty1 ty2 <- coercionKind co
+  , Just (_,t1) <- splitAppTy_maybe ty1
+  , Just (_,t2) <- splitAppTy_maybe ty2
+  , typeKind t1 `eqType` typeKind t2      -- Note [Eta for AppCo]
+  = Just (LRCo CLeft co, LRCo CRight co)
+  | otherwise
+  = Nothing
+
 etaTyConAppCo_maybe :: TyCon -> Coercion -> Maybe [Coercion]
 -- If possible, split a coercion 
 --       g :: T s1 .. sn ~ T t1 .. tn
@@ -383,3 +422,25 @@ etaTyConAppCo_maybe tc co
   | otherwise
   = Nothing
 \end{code}  
+
+Note [Eta for AppCo]
+~~~~~~~~~~~~~~~~~~~~
+Supopse we have 
+   g :: s1 t1 ~ s2 t2
+
+Then we can't necessarily make
+   left  g :: s1 ~ s2
+   right g :: t1 ~ t2
+becuase it's poossible that
+   s1 :: * -> *         t1 :: *
+   s2 :: (*->*) -> *    t2 :: * -> *
+and in that case (left g) does not have the same
+kind on either side.
+
+It's enough to check that 
+  kind t1 = kind t2
+because if g is well-kinded then
+  kind (s1 t2) = kind (s2 t2)
+and these two imply
+  kind s1 = kind s2
+

@@ -51,7 +51,7 @@ module UniqFM (
         foldUFM, foldUFM_Directly,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
-        filterUFM, filterUFM_Directly,
+        filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
@@ -146,6 +146,7 @@ mapUFM          :: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM       :: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
+partitionUFM    :: (elt -> Bool) -> UniqFM elt -> (UniqFM elt, UniqFM elt)
 
 sizeUFM         :: UniqFM elt -> Int
 --hashUFM               :: UniqFM elt -> Int
@@ -232,6 +233,8 @@ mapUFM f (UFM m) = UFM (M.map f m)
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
 filterUFM p (UFM m) = UFM (M.filter p m)
 filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
+partitionUFM p (UFM m) = case M.partition p m of
+                           (left, right) -> (UFM left, UFM right)
 
 sizeUFM (UFM m) = M.size m
 elemUFM k (UFM m) = M.member (getKey $ getUnique k) m

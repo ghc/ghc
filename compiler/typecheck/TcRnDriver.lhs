@@ -63,7 +63,6 @@ import CoreSyn
 import ErrUtils
 import Id
 import VarEnv
-import Var
 import Module
 import UniqFM
 import Name
@@ -726,15 +725,12 @@ checkBootTyCon tc1 tc2
 
   | Just c1 <- tyConClass_maybe tc1
   , Just c2 <- tyConClass_maybe tc2
-  = let
-       (clas_tyvars1, clas_fds1, sc_theta1, _, ats1, op_stuff1)
+  , let (clas_tvs1, clas_fds1, sc_theta1, _, ats1, op_stuff1)
           = classExtraBigSig c1
-       (clas_tyvars2, clas_fds2, sc_theta2, _, ats2, op_stuff2)
+        (clas_tvs2, clas_fds2, sc_theta2, _, ats2, op_stuff2)
           = classExtraBigSig c2
-
-       env0 = mkRnEnv2 emptyInScopeSet
-       env = rnBndrs2 env0 clas_tyvars1 clas_tyvars2
-
+  , Just env <- eqTyVarBndrs emptyRnEnv2 clas_tvs1 clas_tvs2
+  = let
        eqSig (id1, def_meth1) (id2, def_meth2)
          = idName id1 == idName id2 &&
            eqTypeX env op_ty1 op_ty2 &&
@@ -751,18 +747,15 @@ checkBootTyCon tc1 tc2
 
        -- Ignore the location of the defaults
        eqATDef (ATD tvs1 ty_pats1 ty1 _loc1) (ATD tvs2 ty_pats2 ty2 _loc2)
-         = eqListBy same_kind tvs1 tvs2 &&
-           eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
+         | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
+         = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
            eqTypeX env ty1 ty2
-         where env = rnBndrs2 env0 tvs1 tvs2
+         | otherwise = False
 
        eqFD (as1,bs1) (as2,bs2) =
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
          eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
-
-       same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
     in
-       eqListBy same_kind clas_tyvars1 clas_tyvars2 &&
              -- Checks kind of class
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
@@ -771,24 +764,22 @@ checkBootTyCon tc1 tc2
         eqListBy eqSig op_stuff1 op_stuff2 &&
         eqListBy eqAT ats1 ats2)
 
-  | isSynTyCon tc1 && isSynTyCon tc2
+  | Just syn_rhs1 <- synTyConRhs_maybe tc1
+  , Just syn_rhs2 <- synTyConRhs_maybe tc2
+  , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
-        env = rnBndrs2 env0 tvs1 tvs2
-
-        eqSynRhs SynFamilyTyCon SynFamilyTyCon
-            = True
+    let eqSynRhs (SynFamilyTyCon o1 i1) (SynFamilyTyCon o2 i2)
+            = o1==o2 && i1==i2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
-    equalLength tvs1 tvs2 &&
-    eqSynRhs (synTyConRhs tc1) (synTyConRhs tc2)
+    eqSynRhs syn_rhs1 syn_rhs2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
+  , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    eqKind (tyConKind tc1) (tyConKind tc2) &&
-    eqListBy eqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
+    eqListBy (eqPredX env) (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
   | isForeignTyCon tc1 && isForeignTyCon tc2
@@ -797,24 +788,25 @@ checkBootTyCon tc1 tc2
 
   | otherwise = False
   where
-        env0 = mkRnEnv2 emptyInScopeSet
+    eqAlgRhs (AbstractTyCon dis1) rhs2
+      | dis1      = isDistinctAlgRhs rhs2   --Check compatibility
+      | otherwise = True
+    eqAlgRhs DataFamilyTyCon{} DataFamilyTyCon{} = True
+    eqAlgRhs tc1@DataTyCon{} tc2@DataTyCon{} =
+        eqListBy eqCon (data_cons tc1) (data_cons tc2)
+    eqAlgRhs tc1@NewTyCon{} tc2@NewTyCon{} =
+        eqCon (data_con tc1) (data_con tc2)
+    eqAlgRhs _ _ = False
 
-        eqAlgRhs (AbstractTyCon dis1) rhs2
-          | dis1      = isDistinctAlgRhs rhs2   --Check compatibility
-          | otherwise = True
-        eqAlgRhs DataFamilyTyCon{} DataFamilyTyCon{} = True
-        eqAlgRhs tc1@DataTyCon{} tc2@DataTyCon{} =
-            eqListBy eqCon (data_cons tc1) (data_cons tc2)
-        eqAlgRhs tc1@NewTyCon{} tc2@NewTyCon{} =
-            eqCon (data_con tc1) (data_con tc2)
-        eqAlgRhs _ _ = False
+    eqCon c1 c2
+      =  dataConName c1 == dataConName c2
+      && dataConIsInfix c1 == dataConIsInfix c2
+      && dataConStrictMarks c1 == dataConStrictMarks c2
+      && dataConFieldLabels c1 == dataConFieldLabels c2
+      && eqType (dataConUserType c1) (dataConUserType c2)
 
-        eqCon c1 c2
-          =  dataConName c1 == dataConName c2
-          && dataConIsInfix c1 == dataConIsInfix c2
-          && dataConStrictMarks c1 == dataConStrictMarks c2
-          && dataConFieldLabels c1 == dataConFieldLabels c2
-          && eqType (dataConUserType c1) (dataConUserType c2)
+emptyRnEnv2 :: RnEnv2
+emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 
 ----------------
 missingBootThing :: Name -> String -> SDoc
@@ -1209,7 +1201,7 @@ setInteractiveContext hsc_env icxt thing_inside
 --
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
-tcRnStmt :: HscEnv -> InteractiveContext -> LStmt RdrName
+tcRnStmt :: HscEnv -> InteractiveContext -> GhciLStmt RdrName
          -> IO (Messages, Maybe ([Id], LHsExpr Id, FixityEnv))
 tcRnStmt hsc_env ictxt rdr_stmt
   = initTcPrintErrors hsc_env iNTERACTIVE $
@@ -1320,10 +1312,10 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 -- for more details. We do this lifting by trying different ways ('plans') of
 -- lifting the code into the IO monad and type checking each plan until one
 -- succeeds.
-tcUserStmt :: LStmt RdrName -> TcM (PlanResult, FixityEnv)
+tcUserStmt :: GhciLStmt RdrName -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (L loc (ExprStmt expr _ _ _))
+tcUserStmt (L loc (BodyStmt expr _ _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
@@ -1347,7 +1339,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                                            (HsVar bindIOName) noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
+              print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 
         -- The plans are:
@@ -1383,7 +1375,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
 
 tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
-           rnStmts GhciStmt [rdr_stmt] $ \_ -> do
+           rnStmts GhciStmtCtxt rnLExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
              return (fix_env, emptyFVs)
             -- Don't try to typecheck if the renamer fails!
@@ -1415,19 +1407,19 @@ tcUserStmt rdr_stmt@(L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
+        print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
                                     (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
-tcGhciStmts :: [LStmt Name] -> TcM PlanResult
+tcGhciStmts :: [GhciLStmt Name] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
         ret_id  <- tcLookupId returnIOName ;            -- return @ IO
         let {
             ret_ty      = mkListTy unitTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
-            tc_io_stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
+            tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts io_ret_ty ;
             names = collectLStmtsBinders stmts ;
          } ;
 
@@ -1463,7 +1455,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo GhciStmt stmts io_ret_ty))
+                     noLoc (HsDo GhciStmtCtxt stmts io_ret_ty))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -1522,14 +1514,14 @@ tcRnExpr hsc_env ictxt rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    (((_tc_expr, res_ty), untch), lie) <- captureConstraints $ 
-                                          captureUntouchables (tcInferRho rn_expr) ;
+    ((_tc_expr, res_ty), lie) <- captureConstraints $ 
+                                 tcInferRho rn_expr ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $
                                       {-# SCC "simplifyInfer" #-}
                                       simplifyInfer True {- Free vars are closed -}
                                                     False {- No MR for now -}
                                                     [(fresh_it, res_ty)]
-                                                    (untch,lie) ;
+                                                    lie ;
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;

@@ -654,7 +654,13 @@ The type constructor Any of kind forall k. k -> k has these properties:
     primitive type:
       - has a fixed unique, anyTyConKey, 
       - lives in the global name cache
-      - built with TyCon.PrimTyCon
+
+  * It is a *closed* type family, with no instances.  This means that
+    if   ty :: '(k1, k2)  we add a given coercion
+             g :: ty ~ (Fst ty, Snd ty)
+    If Any was a *data* type, then we'd get inconsistency becuase 'ty'
+    could be (Any '(k1,k2)) and then we'd have an equality with Any on
+    one side and '(,) on the other
 
   * It is lifted, and hence represented by a pointer
 
@@ -713,6 +719,17 @@ anyTy = mkTyConTy anyTyCon
 anyTyCon :: TyCon
 anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
   where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
+
+{-   Can't do this yet without messing up kind proxies
+anyTyCon :: TyCon
+anyTyCon = mkSynTyCon anyTyConName kind [kKiVar] 
+                      syn_rhs
+                      NoParentTyCon
+  where 
+    kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
+    syn_rhs = SynFamilyTyCon { synf_open = False, synf_injective = True }
+                  -- NB Closed, injective
+-}
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = mkNakedTyConApp anyTyCon [kind]
