@@ -1,14 +1,8 @@
 
 arrowfail003.hs:8:7:
-    The arrow command
+    Arrow command found where an expression was expected:
       returnA -< []
-    was found where an expression was expected
-    In the expression: returnA -< []
-    In an equation for `foo': foo = returnA -< []
 
 arrowfail003.hs:9:7:
-    The arrow command
-      (|zeroArrow |)
-    was found where an expression was expected
-    In the expression: (|zeroArrow |)
-    In an equation for `bar': bar = (|zeroArrow |)
+    Arrow command found where an expression was expected:
+      (| zeroArrow |)
