@@ -654,15 +654,15 @@ mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
 	  -> RnM (HsCmd Name)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _))
+mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ _ _))
 	op2 fix2 a2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsArrForm op2 (Just fix2) [a1, a2])
+       return (HsCmdArrForm op2 (Just fix2) [a1, a2])
 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
-       return (HsArrForm op1 (Just fix1)
+       return (HsCmdArrForm op1 (Just fix1)
 	          [a11, L loc (HsCmdTop (L loc new_c) [] placeHolderType [])])
 	-- TODO: locs are wrong
   where
@@ -670,7 +670,7 @@ mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsArrForm op1 (Just fix1) [a11,a12])) _ _ _
 
 --	Default case
 mkOpFormRn arg1 op fix arg2 			-- Default case, no rearrangment
-  = return (HsArrForm op (Just fix) [arg1, arg2])
+  = return (HsCmdArrForm op (Just fix) [arg1, arg2])
 
 
 --------------------------------------
@@ -699,7 +699,7 @@ not_op_pat (ConPatIn _ (InfixCon _ _)) = False
 not_op_pat _        	               = True
 
 --------------------------------------
-checkPrecMatch :: Name -> MatchGroup Name -> RnM ()
+checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
   -- Check precedence of a function binding written infix
   --   eg  a `op` b `C` c = ...
   -- See comments with rnExpr (OpApp ...) about "deriving"

@@ -158,8 +158,8 @@ matchNameMaker ctxt = LamMk report_unused
     -- Do not report unused names in interactive contexts
     -- i.e. when you type 'x <- e' at the GHCi prompt
     report_unused = case ctxt of
-                      StmtCtxt GhciStmt -> False
-                      _                 -> True
+                      StmtCtxt GhciStmtCtxt -> False
+                      _                     -> True
 
 rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
 rnHsSigCps sig 

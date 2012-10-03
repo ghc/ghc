@@ -1201,7 +1201,7 @@ setInteractiveContext hsc_env icxt thing_inside
 --
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
-tcRnStmt :: HscEnv -> InteractiveContext -> LStmt RdrName
+tcRnStmt :: HscEnv -> InteractiveContext -> GhciLStmt RdrName
          -> IO (Messages, Maybe ([Id], LHsExpr Id, FixityEnv))
 tcRnStmt hsc_env ictxt rdr_stmt
   = initTcPrintErrors hsc_env iNTERACTIVE $
@@ -1312,10 +1312,10 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 -- for more details. We do this lifting by trying different ways ('plans') of
 -- lifting the code into the IO monad and type checking each plan until one
 -- succeeds.
-tcUserStmt :: LStmt RdrName -> TcM (PlanResult, FixityEnv)
+tcUserStmt :: GhciLStmt RdrName -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (L loc (ExprStmt expr _ _ _))
+tcUserStmt (L loc (BodyStmt expr _ _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
@@ -1339,7 +1339,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                                            (HsVar bindIOName) noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
+              print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 
         -- The plans are:
@@ -1375,7 +1375,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
 
 tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
-           rnStmts GhciStmt [rdr_stmt] $ \_ -> do
+           rnStmts GhciStmtCtxt rnLExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
              return (fix_env, emptyFVs)
             -- Don't try to typecheck if the renamer fails!
@@ -1407,19 +1407,19 @@ tcUserStmt rdr_stmt@(L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
+        print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
                                     (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
-tcGhciStmts :: [LStmt Name] -> TcM PlanResult
+tcGhciStmts :: [GhciLStmt Name] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
         ret_id  <- tcLookupId returnIOName ;            -- return @ IO
         let {
             ret_ty      = mkListTy unitTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
-            tc_io_stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
+            tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts io_ret_ty ;
             names = collectLStmtsBinders stmts ;
          } ;
 
@@ -1455,7 +1455,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo GhciStmt stmts io_ret_ty))
+                     noLoc (HsDo GhciStmtCtxt stmts io_ret_ty))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)

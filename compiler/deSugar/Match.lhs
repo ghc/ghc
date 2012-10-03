@@ -664,9 +664,9 @@ Call @match@ with all of this information!
 \end{enumerate}
 
 \begin{code}
-matchWrapper :: HsMatchContext Name	-- For shadowing warning messages
-	     -> MatchGroup Id		-- Matches being desugared
-	     -> DsM ([Id], CoreExpr) 	-- Results
+matchWrapper :: HsMatchContext Name             -- For shadowing warning messages
+	     -> MatchGroup Id (LHsExpr Id)      -- Matches being desugared
+	     -> DsM ([Id], CoreExpr)            -- Results
 \end{code}
 
  There is one small problem with the Lambda Patterns, when somebody

@@ -473,14 +473,6 @@ tcExpr (HsDo do_or_lc stmts _) res_ty
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
 	; return $ mkHsWrapCo coi (HsProc pat' cmd') }
-
-tcExpr e@(HsArrApp _ _ _ _ _) _
-  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
-                      ptext (sLit "was found where an expression was expected")])
-
-tcExpr e@(HsArrForm _ _ _) _
-  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
-                      ptext (sLit "was found where an expression was expected")])
 \end{code}
 
 Note [Rebindable syntax for if]
@@ -847,6 +839,7 @@ tcExpr e@(HsQuasiQuoteE _) _ =
 
 \begin{code}
 tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
+  -- Include ArrForm, ArrApp, which shouldn't appear at all
 \end{code}
 
 

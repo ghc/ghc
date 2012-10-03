@@ -18,7 +18,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
-import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
+import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr, 
                                MatchGroup, pprFunBind,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
@@ -106,7 +106,7 @@ data HsBindLR idL idR
 
         fun_infix :: Bool,      -- ^ True => infix declaration
 
-        fun_matches :: MatchGroup idR,  -- ^ The payload
+        fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
         fun_co_fn :: HsWrapper, -- ^ Coercion from the type of the MatchGroup to the type of
                                 -- the Id.  Example:
@@ -131,7 +131,7 @@ data HsBindLR idL idR
   | PatBind {   -- The pattern is never a simple variable;
                 -- That case is done by FunBind
         pat_lhs    :: LPat idL,
-        pat_rhs    :: GRHSs idR,
+        pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_rhs_ty :: PostTcType,       -- Type of the GRHSs
         bind_fvs   :: NameSet,          -- See Note [Bind free vars]
         pat_ticks  :: (Maybe (Tickish Id), [Maybe (Tickish Id)])

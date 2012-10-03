@@ -334,9 +334,8 @@ tcSyntaxName :: CtOrigin
 	     -> TcType			-- Type to instantiate it at
 	     -> (Name, HsExpr Name)	-- (Standard name, user name)
 	     -> TcM (Name, HsExpr TcId)	-- (Standard name, suitable expression)
---	*** NOW USED ONLY FOR CmdTop (sigh) ***
--- NB: tcSyntaxName calls tcExpr, and hence can do unification.
--- So we do not call it from lookupInst, which is called from tcSimplify
+-- USED ONLY FOR CmdTop (sigh) ***
+-- See Note [CmdSyntaxTable] in HsExpr
 
 tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
