@@ -274,7 +274,6 @@ genCall env target res args ret = do
             CCallConv    -> CC_Ccc
             CApiConv     -> CC_Ccc
             PrimCallConv -> CC_Ccc
-            CmmCallConv  -> panic "CmmCallConv not supported here!"
 
     {-
         Some of the possibilities here are a worry with the use of a custom

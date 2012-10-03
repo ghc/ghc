@@ -111,12 +111,8 @@ pprStmt stmt = case stmt of
           pp_lhs | null results = empty
                  | otherwise    = commafy (map ppr_ar results) <+> equals
                 -- Don't print the hints on a native C-- call
-          ppr_ar (CmmHinted ar k) = case cconv of
-                            CmmCallConv -> ppr ar
-                            _           -> ppr (ar,k)
-          pp_conv = case cconv of
-                      CmmCallConv -> empty
-                      _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
+          ppr_ar (CmmHinted ar k) = ppr (ar,k)
+          pp_conv = ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
 
     -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
     CmmCall (CmmPrim op _) results args ret ->

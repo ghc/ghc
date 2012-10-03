@@ -16,7 +16,7 @@ module OldCmm (
 
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
 
-        CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
+        CmmStmt(..), New.CmmReturnInfo(..), CmmHinted(..),
         HintedCmmFormal, HintedCmmActual,
 
         CmmSafety(..), CmmCallTarget(..),
@@ -120,11 +120,6 @@ cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
 cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
 cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
 
-data CmmReturnInfo
-  = CmmMayReturn
-  | CmmNeverReturns
-  deriving ( Eq )
-
 -----------------------------------------------------------------------------
 --              CmmStmt
 -- A "statement".  Note that all branches are explicit: there are no
@@ -145,7 +140,7 @@ data CmmStmt
       CmmCallTarget
       [HintedCmmFormal]            -- zero or more results
       [HintedCmmActual]            -- zero or more arguments
-      CmmReturnInfo
+      New.CmmReturnInfo
       -- Some care is necessary when handling the arguments of these, see
       -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
 

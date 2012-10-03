@@ -15,6 +15,8 @@ module CmmType
     , rEP_CostCentreStack_mem_alloc
     , rEP_CostCentreStack_scc_count
     , rEP_StgEntCounter_allocs
+
+    , ForeignHint(..)
    )
 where
 
@@ -52,7 +54,8 @@ instance Outputable CmmType where
 
 instance Outputable CmmCat where
   ppr FloatCat  = ptext $ sLit("F")
-  ppr _         = ptext $ sLit("I")
+  ppr GcPtrCat  = ptext $ sLit("P")
+  ppr BitsCat   = ptext $ sLit("I")
 
 -- Why is CmmType stratified?  For native code generation,
 -- most of the time you just want to know what sort of register
@@ -240,6 +243,19 @@ narrowS W16 x = fromIntegral (fromIntegral x :: Int16)
 narrowS W32 x = fromIntegral (fromIntegral x :: Int32)
 narrowS W64 x = fromIntegral (fromIntegral x :: Int64)
 narrowS _ _ = panic "narrowTo"
+
+-------------------------------------------------------------------------
+-- Hints
+
+-- Hints are extra type information we attach to the arguments and
+-- results of a foreign call, where more type information is sometimes
+-- needed by the ABI to make the correct kind of call.
+
+data ForeignHint
+  = NoHint | AddrHint | SignedHint
+  deriving( Eq )
+        -- Used to give extra per-argument or per-result
+        -- information needed by foreign calling conventions
 
 -------------------------------------------------------------------------
 

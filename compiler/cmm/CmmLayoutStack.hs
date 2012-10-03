@@ -933,7 +933,7 @@ lowerSafeForeignCall dflags block
 
         (ret_args, regs, copyout) = copyOutOflow dflags NativeReturn Jump (Young succ)
                                            (map (CmmReg . CmmLocal) res)
-                                           updfr (0, [])
+                                           updfr []
 
         -- NB. after resumeThread returns, the top-of-stack probably contains
         -- the stack frame for succ, but it might not: if the current thread
@@ -973,14 +973,14 @@ callSuspendThread :: DynFlags -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread dflags id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
-             (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
+        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn))
        [id] [CmmReg (CmmGlobal BaseReg), mkIntExpr dflags (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "resumeThread"))
-            (ForeignConvention CCallConv [AddrHint] [AddrHint]))
+            (ForeignConvention CCallConv [AddrHint] [AddrHint] CmmMayReturn))
        [new_base] [CmmReg (CmmLocal id)]
 
 -- -----------------------------------------------------------------------------

@@ -97,15 +97,17 @@ cmmCfgOptsProc _ top = top
 
 blockConcat :: Bool -> CmmGraph -> (CmmGraph, BlockEnv BlockId)
 blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
-  = (replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks, shortcut_map)
+  = (replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks, shortcut_map')
   where
-     -- we might be able to shortcut the entry BlockId itself
-     new_entry
+     -- we might be able to shortcut the entry BlockId itself.
+     -- remember to update the shortcut_map', since we also have to
+     -- update the info_tbls mapping now.
+     (new_entry, shortcut_map')
        | Just entry_blk <- mapLookup entry_id new_blocks
        , Just dest      <- canShortcut entry_blk
-       = dest
+       = (dest, mapInsert entry_id dest shortcut_map)
        | otherwise
-       = entry_id
+       = (entry_id, shortcut_map)
 
      blocks = postorderDfs g
      blockmap = foldr addBlock emptyBody blocks

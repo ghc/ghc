@@ -800,8 +800,8 @@ getSRTInfo = do
             let srt_desc_lbl = mkLargeSRTLabel id
             emitRODataLits "getSRTInfo" srt_desc_lbl
              ( cmmLabelOffW dflags srt_lbl off
-               : mkWordCLit dflags (toStgWord dflags (toInteger len))
-               : map (mkWordCLit dflags) bmp)
+               : mkWordCLit dflags (toInteger len)
+               : map (mkWordCLit dflags . fromStgWord) bmp)
             return (C_SRT srt_desc_lbl 0 (srt_escape dflags))
 
       | otherwise

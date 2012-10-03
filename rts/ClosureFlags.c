@@ -55,8 +55,7 @@ StgWord16 closure_flags[] = {
  [RET_BCO]              =  ( 0                                         ),
  [RET_SMALL]		=  (     _BTM|                       _SRT      ),
  [RET_BIG]		=  (                                 _SRT      ),
- [RET_DYN]		=  (                                 _SRT      ),
- [RET_FUN]		=  ( 0                                         ),
+ [RET_FUN]              =  ( 0                                         ),
  [UPDATE_FRAME]        	=  (     _BTM                                  ),
  [CATCH_FRAME]	   	=  (     _BTM                                  ),
  [UNDERFLOW_FRAME]      =  (     _BTM                                  ),
@@ -84,6 +83,6 @@ StgWord16 closure_flags[] = {
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 61
+#if N_CLOSURE_TYPES != 60
 #error Closure types changed: update ClosureFlags.c!
 #endif

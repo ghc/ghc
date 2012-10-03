@@ -189,7 +189,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE dflags && val_int >= mIN_INTLIKE dflags
-  = do  { let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
+  = do  { let intlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_INTLIKE")
               offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- INTLIKE closures consist of a header and one word payload
               intlike_amode = CmmLit (cmmLabelOffW dflags intlike_lbl offsetW)
@@ -201,7 +201,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE dflags && val_int >= mIN_CHARLIKE dflags
-  = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
+  = do  { let charlike_lbl   = mkCmmClosureLabel rtsPackageId (fsLit "stg_CHARLIKE")
               offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSize dflags + 1)
                 -- CHARLIKE closures consist of a header and one word payload
               charlike_amode = CmmLit (cmmLabelOffW dflags charlike_lbl offsetW)

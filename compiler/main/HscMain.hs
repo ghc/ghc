@@ -1349,7 +1349,11 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        rawCmms <- cmmToRawCmm dflags (Stream.yield cmm)
+        us <- mkSplitUniqSupply 'S'
+        let initTopSRT = initUs_ us emptySRT
+        dumpIfSet_dyn dflags Opt_D_dump_cmmz "Parsed Cmm" (ppr cmm)
+        (_, cmmgroup) <- cmmPipeline hsc_env initTopSRT cmm
+        rawCmms <- cmmToRawCmm dflags (Stream.yield (cmmOfZgraph cmmgroup))
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where

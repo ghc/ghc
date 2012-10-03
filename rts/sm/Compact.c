@@ -301,37 +301,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	
 	switch (info->i.type) {
 	    
-	    // Dynamic bitmap: the mask is stored on the stack 
-	case RET_DYN:
-	{
-	    StgWord dyn;
-	    dyn = ((StgRetDyn *)p)->liveness;
-
-	    // traverse the bitmap first
-	    bitmap = RET_DYN_LIVENESS(dyn);
-	    p      = (P_)&((StgRetDyn *)p)->payload[0];
-	    size   = RET_DYN_BITMAP_SIZE;
-	    while (size > 0) {
-		if ((bitmap & 1) == 0) {
-		    thread((StgClosure **)p);
-		}
-		p++;
-		bitmap = bitmap >> 1;
-		size--;
-	    }
-	    
-	    // skip over the non-ptr words
-	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
-	    
-	    // follow the ptr words
-	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-		thread((StgClosure **)p);
-		p++;
-	    }
-	    continue;
-	}
-	    
-	    // small bitmap (<= 32 entries, or 64 on a 64-bit machine) 
+            // small bitmap (<= 32 entries, or 64 on a 64-bit machine)
         case CATCH_RETRY_FRAME:
         case CATCH_STM_FRAME:
         case ATOMICALLY_FRAME:

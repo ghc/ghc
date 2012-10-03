@@ -6,6 +6,7 @@ module CmmSink (
 import CodeGen.Platform (callerSaves)
 
 import Cmm
+import CmmOpt
 import BlockId
 import CmmLive
 import CmmUtils
@@ -13,8 +14,7 @@ import Hoopl
 
 import DynFlags
 import UniqFM
--- import PprCmm ()
--- import Outputable
+import PprCmm ()
 
 import Data.List (partition)
 import qualified Data.Set as Set
@@ -76,9 +76,11 @@ import qualified Data.Set as Set
 -- *but*, that will invalidate the liveness analysis, and we'll have
 -- to re-do it.
 
--- TODO: things that we aren't optimising very well yet.
+-- -----------------------------------------------------------------------------
+-- things that we aren't optimising very well yet.
 --
--- From GHC's FastString.hashStr:
+-- -----------
+-- (1) From GHC's FastString.hashStr:
 --
 --  s2ay:
 --      if ((_s2an::I64 == _s2ao::I64) >= 1) goto c2gn; else goto c2gp;
@@ -95,6 +97,26 @@ import qualified Data.Set as Set
 -- a nice loop, but we didn't eliminate the silly assignment at the end.
 -- See Note [dependent assignments], which would probably fix this.
 --
+-- -----------
+-- (2) From stg_atomically_frame in PrimOps.cmm
+--
+-- We have a diamond control flow:
+--
+--     x = ...
+--       |
+--      / \
+--     A   B
+--      \ /
+--       |
+--    use of x
+--
+-- Now x won't be sunk down to its use, because we won't push it into
+-- both branches of the conditional.  We certainly do have to check
+-- that we can sink it past all the code in both A and B, but having
+-- discovered that, we could sink it to its use.
+--
+
+-- -----------------------------------------------------------------------------
 
 type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- Assignment caches AbsMem, an abstraction of the memory read by
@@ -130,7 +152,8 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
       -- Now sink and inline in this block
       (middle', assigs) = walk dflags ann_middles (mapFindWithDefault [] lbl sunk)
-      (final_last, assigs') = tryToInline dflags live last assigs
+      fold_last = constantFold dflags last
+      (final_last, assigs') = tryToInline dflags live fold_last assigs
 
       -- We cannot sink into join points (successors with more than
       -- one predecessor), so identify the join points and the set
@@ -246,13 +269,24 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
    go []               block as = (block, as)
    go ((live,node):ns) block as
     | shouldDiscard node live    = go ns block as
-    | Just a <- shouldSink dflags node1 = go ns block (a : as1)
+    | Just a <- shouldSink dflags node2 = go ns block (a : as1)
     | otherwise                         = go ns block' as'
     where
-      (node1, as1) = tryToInline dflags live node as
+      node1 = constantFold dflags node
 
-      (dropped, as') = dropAssignmentsSimple dflags (\a -> conflicts dflags a node1) as1
-      block' = foldl blockSnoc block dropped `blockSnoc` node1
+      (node2, as1) = tryToInline dflags live node1 as
+
+      (dropped, as') = dropAssignmentsSimple dflags
+                          (\a -> conflicts dflags a node2) as1
+
+      block' = foldl blockSnoc block dropped `blockSnoc` node2
+
+
+constantFold :: DynFlags -> CmmNode e x -> CmmNode e x
+constantFold dflags node = mapExpDeep f node
+  where f (CmmMachOp op args) = cmmMachOpFold dflags op args
+        f (CmmRegOff r 0) = CmmReg r
+        f e = e
 
 --
 -- Heuristic to decide whether to pick up and sink an assignment
@@ -352,6 +386,8 @@ tryToInline dflags live node assigs = go usages node [] assigs
            where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
                  inline (CmmRegOff (CmmLocal l') off) | l == l'
                     = cmmOffset dflags rhs off
+                    -- re-constant fold after inlining
+                 inline (CmmMachOp op args) = cmmMachOpFold dflags op args
                  inline other = other
 
   go usages node skipped (assig@(l,rhs,_) : rest)
@@ -416,7 +452,8 @@ conflicts dflags (r, rhs, addr) node
   | foldRegsUsed (\b r' -> r == r' || b) False node               = True
 
   -- (2) a store to an address conflicts with a read of the same memory
-  | CmmStore addr' e <- node, memConflicts addr (loadAddr dflags addr' (cmmExprWidth dflags e)) = True
+  | CmmStore addr' e <- node
+  , memConflicts addr (loadAddr dflags addr' (cmmExprWidth dflags e)) = True
 
   -- (3) an assignment to Hp/Sp conflicts with a heap/stack read respectively
   | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
@@ -526,5 +563,6 @@ loadAddr dflags e w =
 regAddr :: DynFlags -> CmmReg -> Int -> Width -> AbsMem
 regAddr _      (CmmGlobal Sp) i w = SpMem i (widthInBytes w)
 regAddr _      (CmmGlobal Hp) _ _ = HeapMem
+regAddr _      (CmmGlobal CurrentTSO) _ _ = HeapMem -- important for PrimOps
 regAddr dflags r _ _ | isGcPtrType (cmmRegType dflags r) = HeapMem -- yay! GCPtr pays for itself
 regAddr _      _ _ _ = AnyMem

@@ -353,16 +353,16 @@ isLFReEntrant _                = False
 --		Choosing SM reps
 -----------------------------------------------------------------------------
 
-lfClosureType :: DynFlags -> LambdaFormInfo -> ClosureTypeInfo
-lfClosureType dflags (LFReEntrant _ arity _ argd) = Fun (toStgHalfWord dflags (toInteger arity)) argd
-lfClosureType dflags (LFCon con)                  = Constr (toStgHalfWord dflags (toInteger (dataConTagZ con)))
-                                                           (dataConIdentity con)
-lfClosureType dflags (LFThunk _ _ _ is_sel _)     = thunkClosureType dflags is_sel
-lfClosureType _      _                            = panic "lfClosureType"
+lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
+lfClosureType (LFReEntrant _ arity _ argd) = Fun arity argd
+lfClosureType (LFCon con)                  = Constr (dataConTagZ con)
+                                                    (dataConIdentity con)
+lfClosureType (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType _                            = panic "lfClosureType"
 
-thunkClosureType :: DynFlags -> StandardFormInfo -> ClosureTypeInfo
-thunkClosureType dflags (SelectorThunk off) = ThunkSelector (toStgWord dflags (toInteger off))
-thunkClosureType _      _                   = Thunk
+thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
+thunkClosureType (SelectorThunk off) = ThunkSelector off
+thunkClosureType _                   = Thunk
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
@@ -372,8 +372,6 @@ thunkClosureType _      _                   = Thunk
 -----------------------------------------------------------------------------
 --		nodeMustPointToIt
 -----------------------------------------------------------------------------
-
--- Be sure to see the stg-details notes about these...
 
 nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
 nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
@@ -687,7 +685,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
                   closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
-    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
+    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     prof       = mkProfilingInfo dflags id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
@@ -899,8 +897,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
 
    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
 
-   cl_type = Constr (toStgHalfWord dflags (toInteger (dataConTagZ data_con)))
-                    (dataConIdentity data_con)
+   cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
 
    prof | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
         | otherwise                            = ProfilingInfo ty_descr val_descr

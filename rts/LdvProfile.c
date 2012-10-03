@@ -133,7 +133,6 @@ processHeapClosureForDead( StgClosure *c )
     case CATCH_FRAME:
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
-    case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:

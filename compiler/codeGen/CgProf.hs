@@ -258,7 +258,7 @@ dynLdvInit :: DynFlags -> CmmExpr
 dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr dflags) [
       CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags (lDV_SHIFT dflags)],
-      CmmLit (mkWordCLit dflags (lDV_STATE_CREATE dflags))
+      CmmLit (mkWordCLit dflags (iLDV_STATE_CREATE dflags))
   ]
 
 --
@@ -289,8 +289,8 @@ ldvEnter cl_ptr = do
         -- don't forget to substract node's tag
     ldv_wd = ldvWord dflags cl_ptr
     new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
-                                                     (CmmLit (mkWordCLit dflags (lDV_CREATE_MASK dflags))))
-                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (lDV_STATE_USE dflags))))
+                                                     (CmmLit (mkWordCLit dflags (iLDV_CREATE_MASK dflags))))
+                 (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (iLDV_STATE_USE dflags))))
   ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
@@ -307,11 +307,4 @@ ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- the address of the LDV word in the closure
 ldvWord dflags closure_ptr
     = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
-
-lDV_CREATE_MASK :: DynFlags -> StgWord
-lDV_CREATE_MASK dflags = toStgWord dflags (iLDV_CREATE_MASK dflags)
-lDV_STATE_CREATE :: DynFlags -> StgWord
-lDV_STATE_CREATE dflags = toStgWord dflags (iLDV_STATE_CREATE dflags)
-lDV_STATE_USE :: DynFlags -> StgWord
-lDV_STATE_USE dflags = toStgWord dflags (iLDV_STATE_USE dflags)
 

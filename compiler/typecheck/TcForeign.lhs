@@ -464,7 +464,6 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
                              return PrimCallConv
-checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
 \end{code}
 
 Warnings

@@ -605,7 +605,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case CATCH_FRAME:
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
-    case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
@@ -931,8 +930,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case IND_STATIC:
 	case CONSTR_NOCAF_STATIC:
 	    // stack objects
-	case RET_DYN:
-	case UPDATE_FRAME:
+        case UPDATE_FRAME:
 	case CATCH_FRAME:
         case UNDERFLOW_FRAME:
         case STOP_FRAME:
@@ -1087,7 +1085,6 @@ isRetainer( StgClosure *c )
     case CATCH_FRAME:
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
-    case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
@@ -1349,29 +1346,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    // and don't forget to follow the SRT 
 	    goto follow_srt;
 
-	    // Dynamic bitmap: the mask is stored on the stack 
-	case RET_DYN: {
-	    StgWord dyn;
-	    dyn = ((StgRetDyn *)p)->liveness;
-
-	    // traverse the bitmap first
-	    bitmap = RET_DYN_LIVENESS(dyn);
-	    p      = (P_)&((StgRetDyn *)p)->payload[0];
-	    size   = RET_DYN_BITMAP_SIZE;
-	    p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
-	    
-	    // skip over the non-ptr words
-	    p += RET_DYN_NONPTRS(dyn) + RET_DYN_NONPTR_REGS_SIZE;
-	    
-	    // follow the ptr words
-	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-		retainClosure((StgClosure *)*p, c, c_child_r);
-		p++;
-	    }
-	    continue;
-	}
-
-	case RET_FUN: {
+        case RET_FUN: {
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
 	    

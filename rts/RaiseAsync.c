@@ -959,7 +959,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 // transactions, but I don't fully understand the
                 // interaction with STM invariants.
                 stack->sp[1] = (W_)&stg_NO_TREC_closure;
-                stack->sp[0] = (W_)&stg_gc_unpt_r1_info;
+                stack->sp[0] = (W_)&stg_ret_p_info;
                 tso->what_next = ThreadRunGHC;
                 goto done;
 	    }

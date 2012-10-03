@@ -75,6 +75,8 @@ instance Outputable ForeignConvention where
 instance Outputable ForeignTarget where
     ppr = pprForeignTarget
 
+instance Outputable CmmReturnInfo where
+    ppr = pprReturnInfo
 
 instance Outputable (Block CmmNode C C) where
     ppr = pprBlock
@@ -145,17 +147,18 @@ pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
 pprConvention (NativeReturn {})     = text "<native-ret-convention>"
 pprConvention  Slow                 = text "<slow-convention>"
 pprConvention  GC                   = text "<gc-convention>"
-pprConvention  PrimOpCall           = text "<primop-call-convention>"
-pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
 
 pprForeignConvention :: ForeignConvention -> SDoc
-pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs
+pprForeignConvention (ForeignConvention c args res ret) =
+          doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res <+> ppr ret
+
+pprReturnInfo :: CmmReturnInfo -> SDoc
+pprReturnInfo CmmMayReturn = empty
+pprReturnInfo CmmNeverReturns = ptext (sLit "never returns")
 
 pprForeignTarget :: ForeignTarget -> SDoc
-pprForeignTarget (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
-  where ppr_fc :: ForeignConvention -> SDoc
-        ppr_fc (ForeignConvention c args res) =
-          doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res
+pprForeignTarget (ForeignTarget fn c) = ppr c <+> ppr_target fn
+  where
         ppr_target :: CmmExpr -> SDoc
         ppr_target t@(CmmLit _) = ppr t
         ppr_target fn'          = parens (ppr fn')

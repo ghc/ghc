@@ -72,7 +72,7 @@ module CLabel (
         mkCmmRetLabel,
         mkCmmCodeLabel,
         mkCmmDataLabel,
-        mkCmmGcPtrLabel,
+        mkCmmClosureLabel,
 
         mkRtsApFastLabel,
 
@@ -331,7 +331,7 @@ data CmmLabelInfo
   | CmmRet                      -- ^ misc rts return points,    suffix _ret
   | CmmData                     -- ^ misc rts data bits, eg CHARLIKE_closure
   | CmmCode                     -- ^ misc rts code
-  | CmmGcPtr                    -- ^ GcPtrs eg CHARLIKE_closure
+  | CmmClosure                  -- ^ closures eg CHARLIKE_closure
   | CmmPrimCall                 -- ^ a prim call to some hand written Cmm code
   deriving (Eq, Ord)
 
@@ -418,7 +418,7 @@ mkCAFBlackHoleEntryLabel        = CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOL
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
-  mkCmmCodeLabel, mkCmmDataLabel,  mkCmmGcPtrLabel
+  mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
         :: PackageId -> FastString -> CLabel
 
 mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
@@ -427,7 +427,7 @@ mkCmmRetInfoLabel   pkg str     = CmmLabel pkg str CmmRetInfo
 mkCmmRetLabel       pkg str     = CmmLabel pkg str CmmRet
 mkCmmCodeLabel      pkg str     = CmmLabel pkg str CmmCode
 mkCmmDataLabel      pkg str     = CmmLabel pkg str CmmData
-mkCmmGcPtrLabel     pkg str     = CmmLabel pkg str CmmGcPtr
+mkCmmClosureLabel   pkg str     = CmmLabel pkg str CmmClosure
 
 
 -- Constructing RtsLabels
@@ -543,6 +543,7 @@ mkPlainModuleInitLabel mod      = PlainModuleInitLabel mod
 
 toClosureLbl :: CLabel -> CLabel
 toClosureLbl (IdLabel n c _) = IdLabel n c Closure
+toClosureLbl (CmmLabel m str _) = CmmLabel m str CmmClosure
 toClosureLbl l = pprPanic "toClosureLbl" (ppr l)
 
 toSlowEntryLbl :: CLabel -> CLabel
@@ -774,7 +775,7 @@ isGcPtrLabel lbl = case labelType lbl of
 --    whether it be code, data, or static GC object.
 labelType :: CLabel -> CLabelType
 labelType (CmmLabel _ _ CmmData)                = DataLabel
-labelType (CmmLabel _ _ CmmGcPtr)               = GcPtrLabel
+labelType (CmmLabel _ _ CmmClosure)             = GcPtrLabel
 labelType (CmmLabel _ _ CmmCode)                = CodeLabel
 labelType (CmmLabel _ _ CmmInfo)                = DataLabel
 labelType (CmmLabel _ _ CmmEntry)               = CodeLabel
@@ -1001,7 +1002,6 @@ pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLi
 
 pprCLbl (CmmLabel _ str CmmCode)        = ftext str
 pprCLbl (CmmLabel _ str CmmData)        = ftext str
-pprCLbl (CmmLabel _ str CmmGcPtr)       = ftext str
 pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
 
 pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
@@ -1045,6 +1045,9 @@ pprCLbl (CmmLabel _ fs CmmRetInfo)
 
 pprCLbl (CmmLabel _ fs CmmRet)
   = ftext fs <> ptext (sLit "_ret")
+
+pprCLbl (CmmLabel _ fs CmmClosure)
+  = ftext fs <> ptext (sLit "_closure")
 
 pprCLbl (RtsLabel (RtsPrimOp primop))
   = ptext (sLit "stg_") <> ppr primop

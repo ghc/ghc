@@ -434,9 +434,20 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
                         (uniqSetToList $ liveDieRead live)
                         (uniqSetToList $ liveDieWrite live)
 
-
 raInsn _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)
+
+-- ToDo: what can we do about
+--
+--     R1 = x
+--     jump I64[x] // [R1]
+--
+-- where x is mapped to the same reg as R1.  We want to coalesce x and
+-- R1, but the register allocator doesn't know whether x will be
+-- assigned to again later, in which case x and R1 should be in
+-- different registers.  Right now we assume the worst, and the
+-- assignment to R1 will clobber x, so we'll spill x into another reg,
+-- generating another reg->reg move.
 
 
 isInReg :: Reg -> RegMap Loc -> Bool

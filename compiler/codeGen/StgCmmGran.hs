@@ -53,7 +53,7 @@ staticGranHdr = []
 doGranAllocate :: CmmExpr -> Code
 -- macro DO_GRAN_ALLOCATE
 doGranAllocate hp
-  | not opt_GranMacros = nopC
+  | not opt_GranMacros = return ()
   | otherwise          = panic "doGranAllocate"
 
 
@@ -75,7 +75,7 @@ granFetchAndReschedule regs node_reqd
   = do { fetch
        ; reschedule liveness node_reqd }
   | otherwise
-  = nopC
+  = return ()
   where
     liveness = mkRegLiveness regs 0 0
 
@@ -109,7 +109,7 @@ granYield :: [(Id,GlobalReg)]   -- Live registers
 
 granYield regs node_reqd
   | opt_GranMacros && node_reqd = yield liveness
-  | otherwise                   = nopC
+  | otherwise                   = return ()
   where
      liveness = mkRegLiveness regs 0 0
 

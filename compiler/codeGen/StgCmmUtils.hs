@@ -36,7 +36,6 @@ module StgCmmUtils (
         addToMem, addToMemE, addToMemLbl,
         mkWordCLit,
         newStringCLit, newByteStringCLit,
-        packHalfWordsCLit,
         blankWord
   ) where
 
@@ -196,9 +195,9 @@ emitRtsCallGen res pkg fun args safe
     call updfr_off =
       if safe then
         emit =<< mkCmmCall fun_expr res' args' updfr_off
-      else
-        emit $ mkUnsafeCall (ForeignTarget fun_expr
-                         (ForeignConvention CCallConv arg_hints res_hints)) res' args'
+      else do
+        let conv = ForeignConvention CCallConv arg_hints res_hints CmmMayReturn
+        emit $ mkUnsafeCall (ForeignTarget fun_expr conv) res' args'
     (args', arg_hints) = unzip args
     (res',  res_hints) = unzip res
     fun_expr = mkLblExpr (mkCmmCodeLabel pkg fun)

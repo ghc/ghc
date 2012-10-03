@@ -251,7 +251,6 @@ printClosure( StgClosure *obj )
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
-    case RET_DYN:
     case RET_FUN:
     */
 
@@ -478,38 +477,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             printObj((StgClosure*)sp);
 	    continue;
 
-	case RET_DYN:
-	{ 
-	    StgRetDyn* r;
-	    StgPtr p;
-	    StgWord dyn;
-	    nat size;
-
-	    r = (StgRetDyn *)sp;
-	    dyn = r->liveness;
-	    debugBelch("RET_DYN (%p)\n", r);
-
-	    p = (P_)(r->payload);
-	    printSmallBitmap(spBottom, sp,
-			     RET_DYN_LIVENESS(r->liveness), 
-			     RET_DYN_BITMAP_SIZE);
-	    p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
-
-	    for (size = RET_DYN_NONPTRS(dyn); size > 0; size--) {
-		debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-p), p);
-		debugBelch("Word# %ld\n", (long)*p);
-		p++;
-	    }
-	
-	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-		debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-p), p);
-		printPtr(p);
-		p++;
-	    }
-	    continue;
-	}
-
-	case RET_SMALL:
+        case RET_SMALL:
 	    debugBelch("RET_SMALL (%p)\n", info);
 	    bitmap = info->layout.bitmap;
 	    printSmallBitmap(spBottom, sp+1, 
@@ -1112,7 +1080,6 @@ char *closure_type_names[] = {
  [RET_BCO]               = "RET_BCO",
  [RET_SMALL]             = "RET_SMALL",
  [RET_BIG]               = "RET_BIG",
- [RET_DYN]               = "RET_DYN",
  [RET_FUN]               = "RET_FUN",
  [UPDATE_FRAME]          = "UPDATE_FRAME",
  [CATCH_FRAME]           = "CATCH_FRAME",

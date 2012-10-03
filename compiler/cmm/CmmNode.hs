@@ -9,8 +9,9 @@
 -- for details
 
 module CmmNode (
-     CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
+     CmmNode(..), CmmFormal, CmmActual,
      UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
+     CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
   ) where
@@ -228,14 +229,31 @@ type CmmFormal = LocalReg
 
 type UpdFrameOffset = ByteOff
 
+-- | A convention maps a list of values (function arguments or return
+-- values) to registers or stack locations.
 data Convention
-  = NativeDirectCall -- Native C-- call skipping the node (closure) argument
-  | NativeNodeCall   -- Native C-- call including the node argument
-  | NativeReturn     -- Native C-- return
-  | Slow             -- Slow entry points: all args pushed on the stack
-  | GC               -- Entry to the garbage collector: uses the node reg!
-  | PrimOpCall       -- Calling prim ops
-  | PrimOpReturn     -- Returning from prim ops
+  = NativeDirectCall
+       -- ^ top-level Haskell functions use @NativeDirectCall@, which
+       -- maps arguments to registers starting with R2, according to
+       -- how many registers are available on the platform.  This
+       -- convention ignores R1, because for a top-level function call
+       -- the function closure is implicit, and doesn't need to be passed.
+  | NativeNodeCall
+       -- ^ non-top-level Haskell functions, which pass the address of
+       -- the function closure in R1 (regardless of whether R1 is a
+       -- real register or not), and the rest of the arguments in
+       -- registers or on the stack.
+  | NativeReturn
+       -- ^ a native return.  The convention for returns depends on
+       -- how many values are returned: for just one value returned,
+       -- the appropriate register is used (R1, F1, etc.). regardless
+       -- of whether it is a real register or not.  For multiple
+       -- values returned, they are mapped to registers or the stack.
+  | Slow
+       -- ^ Slow entry points: all args pushed on the stack
+  | GC
+       -- ^ Entry to the garbage collector: uses the node reg!
+       -- (TODO: I don't think we need this --SDM)
   deriving( Eq )
 
 data ForeignConvention
@@ -243,7 +261,13 @@ data ForeignConvention
         CCallConv               -- Which foreign-call convention
         [ForeignHint]           -- Extra info about the args
         [ForeignHint]           -- Extra info about the result
+        CmmReturnInfo
   deriving Eq
+
+data CmmReturnInfo
+  = CmmMayReturn
+  | CmmNeverReturns
+  deriving ( Eq )
 
 data ForeignTarget        -- The target of a foreign call
   = ForeignTarget                -- A foreign procedure
@@ -252,12 +276,6 @@ data ForeignTarget        -- The target of a foreign call
   | PrimTarget            -- A possibly-side-effecting machine operation
         CallishMachOp            -- Which one
   deriving Eq
-
-data ForeignHint
-  = NoHint | AddrHint | SignedHint
-  deriving( Eq )
-        -- Used to give extra per-argument or per-result
-        -- information needed by foreign calling conventions
 
 --------------------------------------------------
 -- Instances of register and slot users / definers

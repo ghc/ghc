@@ -670,7 +670,6 @@ loop:
   case RET_BCO:
   case RET_SMALL:
   case RET_BIG:
-  case RET_DYN:
   case UPDATE_FRAME:
   case UNDERFLOW_FRAME:
   case STOP_FRAME:

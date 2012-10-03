@@ -22,6 +22,7 @@ module CmmUtils(
         mkWordCLit, packHalfWordsCLit,
         mkByteStringCLit,
         mkDataLits, mkRODataLits,
+        mkStgWordCLit,
 
         -- CmmExpr
         mkIntExpr, zeroExpr,
@@ -120,6 +121,8 @@ typeForeignHint = primRepForeignHint . typePrimRep
 --
 ---------------------------------------------------
 
+-- XXX: should really be Integer, since Int doesn't necessarily cover
+-- the full range of target Ints.
 mkIntCLit :: DynFlags -> Int -> CmmLit
 mkIntCLit dflags i = CmmInt (toInteger i) (wordWidth dflags)
 
@@ -131,6 +134,9 @@ zeroCLit dflags = CmmInt 0 (wordWidth dflags)
 
 zeroExpr :: DynFlags -> CmmExpr
 zeroExpr dflags = CmmLit (zeroCLit dflags)
+
+mkWordCLit :: DynFlags -> Integer -> CmmLit
+mkWordCLit dflags wd = CmmInt wd (wordWidth dflags)
 
 mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
 -- We have to make a top-level decl for the string,
@@ -155,8 +161,8 @@ mkRODataLits lbl lits
     needsRelocation (CmmLabelOff _ _) = True
     needsRelocation _                 = False
 
-mkWordCLit :: DynFlags -> StgWord -> CmmLit
-mkWordCLit dflags wd = CmmInt (fromStgWord wd) (wordWidth dflags)
+mkStgWordCLit :: DynFlags -> StgWord -> CmmLit
+mkStgWordCLit dflags wd = CmmInt (fromStgWord wd) (wordWidth dflags)
 
 packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 -- Make a single word literal in which the lower_half_word is
@@ -168,8 +174,8 @@ packHalfWordsCLit dflags lower_half_word upper_half_word
    = if wORDS_BIGENDIAN dflags
      then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS dflags) .|. u)
      else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS dflags))
-    where l = toStgWord dflags (fromStgHalfWord lower_half_word)
-          u = toStgWord dflags (fromStgHalfWord upper_half_word)
+    where l = fromStgHalfWord lower_half_word
+          u = fromStgHalfWord upper_half_word
 
 ---------------------------------------------------
 --
@@ -197,6 +203,9 @@ cmmOffset _ e                 0        = e
 cmmOffset _ (CmmReg reg)      byte_off = cmmRegOff reg byte_off
 cmmOffset _ (CmmRegOff reg m) byte_off = cmmRegOff reg (m+byte_off)
 cmmOffset _ (CmmLit lit)      byte_off = CmmLit (cmmOffsetLit lit byte_off)
+cmmOffset _ (CmmStackSlot area off) byte_off
+  = CmmStackSlot area (off - byte_off)
+  -- note stack area offsets increase towards lower addresses
 cmmOffset _ (CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]) byte_off2
   = CmmMachOp (MO_Add rep)
               [expr, CmmLit (CmmInt (byte_off1 + toInteger byte_off2) rep)]
@@ -207,6 +216,7 @@ cmmOffset dflags expr byte_off
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
+cmmRegOff reg 0        = CmmReg reg
 cmmRegOff reg byte_off = CmmRegOff reg byte_off
 
 cmmOffsetLit :: CmmLit -> Int -> CmmLit

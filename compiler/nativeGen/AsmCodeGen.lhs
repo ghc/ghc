@@ -971,12 +971,13 @@ cmmStmtConFold stmt
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprConFold referenceKind expr = do
     dflags <- getDynFlags
-    -- Skip constant folding if new code generator is running
-    -- (this optimization is done in Hoopl)
-    -- SDM: re-enabled for now, while cmmRewriteAssignments is turned off
-    let expr' = if False -- dopt Opt_TryNewCodeGen dflags
+
+    -- With -O1 and greater, the cmmSink pass does constant-folding, so
+    -- we don't need to do it again here.
+    let expr' = if optLevel dflags >= 1
                     then expr
                     else cmmExprCon dflags expr
+
     cmmExprNative referenceKind expr'
 
 cmmExprCon :: DynFlags -> CmmExpr -> CmmExpr

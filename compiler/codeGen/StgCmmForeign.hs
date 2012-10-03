@@ -9,9 +9,10 @@
 module StgCmmForeign (
   cgForeignCall, loadThreadState, saveThreadState,
   emitPrimCall, emitCCall,
+  emitForeignCall,     -- For CmmParse
   emitSaveThreadState, -- will be needed by the Cmm parser
   emitLoadThreadState, -- ditto
-  emitOpenNursery,
+  emitCloseNursery, emitOpenNursery
  ) where
 
 #include "HsVersions.h"
@@ -24,10 +25,8 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmLayout
 
-import BlockId
 import Cmm
 import CmmUtils
-import OldCmm ( CmmReturnInfo(..) )
 import MkGraph
 import Type
 import TysPrim
@@ -85,7 +84,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
                    DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)
                                            [] -> panic "cgForeignCall []"
-              fc = ForeignConvention cconv arg_hints res_hints
+              fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
               call_target = ForeignTarget cmm_target fc
 
         -- we want to emit code for the call, and then emitReturn.
@@ -100,12 +99,10 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
         ; sequel <- getSequel
         ; case sequel of
             AssignTo assign_to_these _ ->
-                emitForeignCall safety assign_to_these call_target
-                                     call_args CmmMayReturn
+                emitForeignCall safety assign_to_these call_target call_args
 
             _something_else ->
-                do { _ <- emitForeignCall safety res_regs call_target
-                                     call_args CmmMayReturn
+                do { _ <- emitForeignCall safety res_regs call_target call_args
                    ; emitReturn (map (CmmReg . CmmLocal) res_regs)
                    }
          }
@@ -183,17 +180,17 @@ emitCCall :: [(CmmFormal,ForeignHint)]
           -> [(CmmActual,ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
-  = void $ emitForeignCall PlayRisky results target args CmmMayReturn
+  = void $ emitForeignCall PlayRisky results target args
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
     target = ForeignTarget fn fc
-    fc = ForeignConvention CCallConv arg_hints result_hints
+    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn
 
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
-  = void $ emitForeignCall PlayRisky res (PrimTarget op) args CmmMayReturn
+  = void $ emitForeignCall PlayRisky res (PrimTarget op) args
 
 -- alternative entry point, used by CmmParse
 emitForeignCall
@@ -201,10 +198,8 @@ emitForeignCall
         -> [CmmFormal]          -- where to put the results
         -> ForeignTarget        -- the op
         -> [CmmActual]          -- arguments
-        -> CmmReturnInfo        -- This can say "never returns"
-                                --   only RTS procedures do this
         -> FCode ReturnKind
-emitForeignCall safety results target args _ret
+emitForeignCall safety results target args
   | not (playSafe safety) = do
     dflags <- getDynFlags
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
@@ -218,7 +213,7 @@ emitForeignCall safety results target args _ret
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
     k <- newLabelC
-    let (off, copyout) = copyInOflow dflags NativeReturn (Young k) results
+    let (off, copyout) = copyInOflow dflags NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     emit $
            (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth dflags)))
@@ -285,17 +280,15 @@ saveThreadState dflags =
         mkStore (cmmOffset dflags stgCurrentTSO (tso_CCCS dflags)) curCCS
       else mkNop
 
-emitSaveThreadState :: BlockId -> FCode ()
-emitSaveThreadState bid = do
+emitSaveThreadState :: FCode ()
+emitSaveThreadState = do
   dflags <- getDynFlags
+  emit (saveThreadState dflags)
 
-  -- CurrentTSO->stackobj->sp = Sp;
-  emitStore (cmmOffset dflags (CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags))
-                 (CmmStackSlot (Young bid) (widthInBytes (typeWidth (gcWord dflags))))
-  emit $ closeNursery dflags
-  -- and save the current cost centre stack in the TSO when profiling:
-  when (dopt Opt_SccProfilingOn dflags) $
-        emitStore (cmmOffset dflags stgCurrentTSO (tso_CCCS dflags)) curCCS
+emitCloseNursery :: FCode ()
+emitCloseNursery = do
+  df <- getDynFlags
+  emit (closeNursery df)
 
    -- CurrentNursery->free = Hp+1;
 closeNursery :: DynFlags -> CmmAGraph
@@ -303,8 +296,6 @@ closeNursery dflags = mkStore (nursery_bdescr_free dflags) (cmmOffsetW dflags st
 
 loadThreadState :: DynFlags -> LocalReg -> LocalReg -> CmmAGraph
 loadThreadState dflags tso stack = do
-  -- tso <- newTemp (gcWord dflags) -- TODO FIXME NOW
-  -- stack <- newTemp (gcWord dflags) -- TODO FIXME NOW
   catAGraphs [
         -- tso = CurrentTSO;
         mkAssign (CmmLocal tso) stgCurrentTSO,
@@ -321,9 +312,18 @@ loadThreadState dflags tso stack = do
           storeCurCCS
             (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) (ccsType dflags))
         else mkNop]
-emitLoadThreadState :: LocalReg -> LocalReg -> FCode ()
-emitLoadThreadState tso stack = do dflags <- getDynFlags
-                                   emit $ loadThreadState dflags tso stack
+
+emitLoadThreadState :: FCode ()
+emitLoadThreadState = do
+  dflags <- getDynFlags
+  load_tso <- newTemp (gcWord dflags)
+  load_stack <- newTemp (gcWord dflags)
+  emit $ loadThreadState dflags load_tso load_stack
+
+emitOpenNursery :: FCode ()
+emitOpenNursery = do
+  df <- getDynFlags
+  emit (openNursery df)
 
 openNursery :: DynFlags -> CmmAGraph
 openNursery dflags = catAGraphs [
@@ -345,9 +345,6 @@ openNursery dflags = catAGraphs [
                 )
             )
    ]
-emitOpenNursery :: FCode ()
-emitOpenNursery = do dflags <- getDynFlags
-                     emit $ openNursery dflags
 
 nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: DynFlags -> CmmExpr
 nursery_bdescr_free   dflags = cmmOffset dflags stgCurrentNursery (oFFSET_bdescr_free dflags)

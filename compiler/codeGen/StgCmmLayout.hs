@@ -111,7 +111,7 @@ emitCall convs fun args
 --
 emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
-   -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ReturnKind
+   -> [CmmExpr] -> FCode ReturnKind
 emitCallWithExtraStack (callConv, retConv) fun args extra_stack
   = do	{ dflags <- getDynFlags
         ; adjustHpBackwards
@@ -124,7 +124,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
             AssignTo res_regs _ -> do
               k <- newLabelC
               let area = Young k
-                  (off, copyin) = copyInOflow dflags retConv area res_regs
+                  (off, copyin) = copyInOflow dflags retConv area res_regs []
                   copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
                                    extra_stack
               emit (copyout <*> mkLabel k <*> copyin)
@@ -222,7 +222,7 @@ direct_call caller call_conv lbl arity args
        emitCallWithExtraStack (call_conv, NativeReturn)
                               target
                               (nonVArgs fast_args)
-                              (mkStkOffsets dflags (stack_args dflags))
+                              (nonVArgs (stack_args dflags))
   where
     target = CmmLit (CmmLabel lbl)
     (fast_args, rest_args) = splitAt real_arity args
@@ -326,32 +326,7 @@ slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 
 
 -------------------------------------------------------------------------
--- Fix the byte-offsets of a bunch of things to push on the stack
-
--- This is used for pushing slow-call continuations.
--- See Note [over-saturated calls].
-
-mkStkOffsets
-  :: DynFlags
-  -> [(ArgRep, Maybe CmmExpr)]    -- things to make offsets for
-  -> ( ByteOff                    -- OUTPUTS: Topmost allocated word
-     , [(CmmExpr, ByteOff)] )     -- things with offsets (voids filtered out)
-mkStkOffsets dflags things
-    = loop 0 [] (reverse things)
-  where
-    loop offset offs [] = (offset,offs)
-    loop offset offs ((_,Nothing):things) = loop offset offs things
-	-- ignore Void arguments
-    loop offset offs ((rep,Just thing):things)
-        = loop thing_off ((thing, thing_off):offs) things
-	where
-          thing_off = offset + argRepSizeW dflags rep * wORD_SIZE dflags
-	    -- offset of thing is offset+size, because we're 
-	    -- growing the stack *downwards* as the offsets increase.
-
-
--------------------------------------------------------------------------
---	Classifying arguments: ArgRep
+--      Classifying arguments: ArgRep
 -------------------------------------------------------------------------
 
 -- ArgRep is not exported (even abstractly)
@@ -472,7 +447,7 @@ mkArgDescr _nm args
        let arg_bits = argBits dflags arg_reps
            arg_reps = filter isNonV (map idArgRep args)
            -- Getting rid of voids eases matching of standard patterns
-       case stdPattern dflags arg_reps of
+       case stdPattern arg_reps of
            Just spec_id -> return (ArgSpec spec_id)
            Nothing      -> return (ArgGen arg_bits)
 
@@ -483,10 +458,9 @@ argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
                     ++ argBits dflags args
 
 ----------------------
-stdPattern :: DynFlags -> [ArgRep] -> Maybe StgHalfWord
-stdPattern dflags reps
-  = fmap (toStgHalfWord dflags)
-  $ case reps of
+stdPattern :: [ArgRep] -> Maybe Int
+stdPattern reps
+  = case reps of
 	[]  -> Just ARG_NONE	-- just void args, probably
 	[N] -> Just ARG_N
 	[P] -> Just ARG_P
@@ -545,7 +519,7 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
         ; let args' = if node_points then (node : arg_regs) else arg_regs
               conv  = if nodeMustPointToIt dflags lf_info then NativeNodeCall
                                                           else NativeDirectCall
-              (offset, _) = mkCallEntry dflags conv args'
+              (offset, _) = mkCallEntry dflags conv args' []
         ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
         }
 

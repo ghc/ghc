@@ -415,7 +415,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
         { dflags <- getDynFlags
         ; let full_fail_code  = fail_code `plusStmts` oneStmt assign_liveness
               assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr))    -- Ho ho ho!
-                                          (CmmLit (mkWordCLit dflags liveness))
+                                          (CmmLit (mkStgWordCLit dflags liveness))
               liveness        = mkRegLiveness dflags regs ptrs nptrs
               live            = Just $ map snd regs
               rts_label       = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))

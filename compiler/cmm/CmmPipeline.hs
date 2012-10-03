@@ -52,7 +52,7 @@ cmmPipeline hsc_env topSRT prog =
 
 cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
 cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
-cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
+cpsTop hsc_env proc =
     do
        ----------- Control-flow optimisations ----------------------------------
 
@@ -60,9 +60,12 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        -- later passes by removing lots of empty blocks, so we do it
        -- even when optimisation isn't turned on.
        --
-       g <- {-# SCC "cmmCfgOpts(1)" #-}
-            return $ cmmCfgOpts splitting_proc_points g
+       CmmProc h l g <- {-# SCC "cmmCfgOpts(1)" #-}
+            return $ cmmCfgOptsProc splitting_proc_points proc
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
+
+       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
+                                          , do_layout = do_layout }} = h
 
        ----------- Eliminate common blocks -------------------------------------
        g <- {-# SCC "elimCommonBlocks" #-}
@@ -95,7 +98,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        ----------- Layout the stack and manifest Sp ----------------------------
        (g, stackmaps) <-
             {-# SCC "layoutStack" #-}
-            runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+            if do_layout
+               then runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+               else return (g, mapEmpty)
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
        ----------- Sink and inline assignments *after* stack layout ------------

@@ -22,19 +22,23 @@ cmmOfZgraph tops = map mapTop tops
   where mapTop (CmmProc h l g) = CmmProc (info_tbls h) l (ofZgraph g)
         mapTop (CmmData s ds) = CmmData s ds
 
-data ValueDirection = Arguments | Results
+add_hints :: [a] -> [ForeignHint] -> [Old.CmmHinted a]
+add_hints args hints = zipWith Old.CmmHinted args hints
 
-add_hints :: ForeignTarget -> ValueDirection -> [a] -> [Old.CmmHinted a]
-add_hints conv vd args = zipWith Old.CmmHinted args (get_hints conv vd)
-
-get_hints :: ForeignTarget -> ValueDirection -> [ForeignHint]
-get_hints (ForeignTarget _ (ForeignConvention _ hints _)) Arguments = hints
-get_hints (ForeignTarget _ (ForeignConvention _ _ hints)) Results   = hints
-get_hints (PrimTarget _) _vd = repeat NoHint
+get_hints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+get_hints (PrimTarget op) = (res_hints ++ repeat NoHint,
+                             arg_hints ++ repeat NoHint)
+  where (res_hints, arg_hints) = callishMachOpHints op
+get_hints (ForeignTarget _ (ForeignConvention _ arg_hints res_hints _))
+  = (res_hints, arg_hints)
 
 cmm_target :: ForeignTarget -> Old.CmmCallTarget
 cmm_target (PrimTarget op) = Old.CmmPrim op Nothing
-cmm_target (ForeignTarget e (ForeignConvention cc _ _)) = Old.CmmCallee e cc
+cmm_target (ForeignTarget e (ForeignConvention cc _ _ _)) = Old.CmmCallee e cc
+
+get_ret :: ForeignTarget -> CmmReturnInfo
+get_ret (PrimTarget _) = CmmMayReturn
+get_ret (ForeignTarget _ (ForeignConvention _ _ _ ret)) = ret
 
 ofZgraph :: CmmGraph -> Old.ListGraph Old.CmmStmt
 ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
@@ -83,11 +87,14 @@ ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
                             CmmAssign l r                                  -> Old.CmmAssign l r
                             CmmStore  l r                                  -> Old.CmmStore  l r
                             CmmUnsafeForeignCall (PrimTarget MO_Touch) _ _ -> Old.CmmNop
-                            CmmUnsafeForeignCall target ress args          -> 
+                            CmmUnsafeForeignCall target ress args          ->
                               Old.CmmCall (cmm_target target)
-                                          (add_hints target Results   ress)
-                                          (add_hints target Arguments args)
-                                          Old.CmmMayReturn
+                                          (add_hints ress res_hints)
+                                          (add_hints args arg_hints)
+                                          (get_ret target)
+                                  where
+                                     (res_hints, arg_hints) = get_hints target
+
 
                   last :: CmmNode O C -> () -> [Old.CmmStmt]
                   last node _ = stmts

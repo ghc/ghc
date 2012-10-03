@@ -105,32 +105,6 @@ checkStackFrame( StgPtr c )
 
     /* All activation records have 'bitmap' style layout info. */
     switch (info->i.type) {
-    case RET_DYN: /* Dynamic bitmap: the mask is stored on the stack */
-    {
-	StgWord dyn;
-	StgPtr p;
-	StgRetDyn* r;
-	
-	r = (StgRetDyn *)c;
-	dyn = r->liveness;
-	
-	p = (P_)(r->payload);
-	checkSmallBitmap(p,RET_DYN_LIVENESS(r->liveness),RET_DYN_BITMAP_SIZE);
-	p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
-
-	// skip over the non-pointers
-	p += RET_DYN_NONPTRS(dyn);
-	
-	// follow the ptr words
-	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-	    checkClosureShallow((StgClosure *)*p);
-	    p++;
-	}
-	
-	return sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE +
-	    RET_DYN_NONPTR_REGS_SIZE +
-	    RET_DYN_NONPTRS(dyn) + RET_DYN_PTRS(dyn);
-    }
 
     case UPDATE_FRAME:
       ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
@@ -381,7 +355,6 @@ checkClosure( StgClosure* p )
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
-    case RET_DYN:
     case UPDATE_FRAME:
     case UNDERFLOW_FRAME:
     case STOP_FRAME:

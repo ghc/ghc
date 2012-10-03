@@ -82,24 +82,22 @@ costCentreFrom :: DynFlags
 	       -> CmmExpr	-- The cost centre from that closure
 costCentreFrom dflags cl = CmmLoad (cmmOffsetB dflags cl (oFFSET_StgHeader_ccs dflags)) (ccsType dflags)
 
+-- | The profiling header words in a static closure
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
--- The profiling header words in a static closure
--- Was SET_STATIC_PROF_HDR
 staticProfHdr dflags ccs
  = ifProfilingL dflags [mkCCostCentreStack ccs, staticLdvInit dflags]
 
+-- | Profiling header words in a dynamic closure
 dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
--- Profiling header words in a dynamic closure
 dynProfHdr dflags ccs = ifProfilingL dflags [ccs, dynLdvInit dflags]
 
-initUpdFrameProf :: ByteOff -> FCode ()
--- Initialise the profiling field of an update frame
-initUpdFrameProf frame_off
+-- | Initialise the profiling field of an update frame
+initUpdFrameProf :: CmmExpr -> FCode ()
+initUpdFrameProf frame
   = ifProfiling $	-- frame->header.prof.ccs = CCCS
     do dflags <- getDynFlags
-       emitStore (CmmStackSlot Old (frame_off - oFFSET_StgHeader_ccs dflags))
-                 curCCS
-	-- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0) 
+       emitStore (cmmOffset dflags frame (oFFSET_StgHeader_ccs dflags)) curCCS
+        -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
 	-- is unnecessary because it is not used anyhow.
 
 ---------------------------------------------------------------------------
@@ -200,7 +198,7 @@ ifProfiling code
   = do dflags <- getDynFlags
        if dopt Opt_SccProfilingOn dflags
            then code
-           else nopC
+           else return ()
 
 ifProfilingL :: DynFlags -> [a] -> [a]
 ifProfilingL dflags xs
@@ -216,7 +214,7 @@ initCostCentres :: CollectedCCs -> FCode ()
 -- Emit the declarations
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
   = do dflags <- getDynFlags
-       whenC (dopt Opt_SccProfilingOn dflags) $
+       when (dopt Opt_SccProfilingOn dflags) $
            do mapM_ emitCostCentreDecl local_CCs
               mapM_ emitCostCentreStackDecl singleton_CCSs
 
@@ -283,7 +281,7 @@ emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
       if not (dopt Opt_SccProfilingOn dflags)
-          then nopC
+          then return ()
           else do tmp <- newTemp (ccsType dflags) -- TODO FIXME NOW
                   pushCostCentre tmp curCCS cc
                   when tick $ emit (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
@@ -321,7 +319,7 @@ dynLdvInit :: DynFlags -> CmmExpr
 dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE  
   CmmMachOp (mo_wordOr dflags) [
       CmmMachOp (mo_wordShl dflags) [loadEra dflags, mkIntExpr dflags (lDV_SHIFT dflags)],
-      CmmLit (mkWordCLit dflags (lDV_STATE_CREATE dflags))
+      CmmLit (mkWordCLit dflags (iLDV_STATE_CREATE dflags))
   ]
         
 --
@@ -350,8 +348,8 @@ ldvEnter cl_ptr = do
     let -- don't forget to substract node's tag
         ldv_wd = ldvWord dflags cl_ptr
         new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
-                                                         (CmmLit (mkWordCLit dflags (lDV_CREATE_MASK dflags))))
-                                      (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (lDV_STATE_USE dflags))))
+                                                         (CmmLit (mkWordCLit dflags (iLDV_CREATE_MASK dflags))))
+                                      (cmmOrWord dflags (loadEra dflags) (CmmLit (mkWordCLit dflags (iLDV_STATE_USE dflags))))
     ifProfiling $
          -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
@@ -370,11 +368,4 @@ ldvWord :: DynFlags -> CmmExpr -> CmmExpr
 -- the address of the LDV word in the closure
 ldvWord dflags closure_ptr
     = cmmOffsetB dflags closure_ptr (oFFSET_StgHeader_ldvw dflags)
-
-lDV_CREATE_MASK :: DynFlags -> StgWord
-lDV_CREATE_MASK dflags = toStgWord dflags (iLDV_CREATE_MASK dflags)
-lDV_STATE_CREATE :: DynFlags -> StgWord
-lDV_STATE_CREATE dflags = toStgWord dflags (iLDV_STATE_CREATE dflags)
-lDV_STATE_USE :: DynFlags -> StgWord
-lDV_STATE_USE dflags = toStgWord dflags (iLDV_STATE_USE dflags)
 

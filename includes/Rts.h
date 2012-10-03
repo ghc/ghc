@@ -208,7 +208,6 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/storage/FunTypes.h"
 #include "rts/storage/InfoTables.h"
 #include "rts/storage/Closures.h"
-#include "rts/storage/Liveness.h"
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/TSO.h"
 #include "stg/MiscClosures.h" /* InfoTables, closures etc. defined in the RTS */

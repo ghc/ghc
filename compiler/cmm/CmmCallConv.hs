@@ -8,7 +8,8 @@
 module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
-  globalArgRegs
+  assignStack,
+  globalArgRegs, realArgRegs
 ) where
 
 #include "HsVersions.h"
@@ -18,7 +19,6 @@ import SMRep
 import Cmm (Convention(..))
 import PprCmm ()
 
-import qualified Data.List as L
 import DynFlags
 import Outputable
 
@@ -33,15 +33,22 @@ instance Outputable ParamLocation where
   ppr (RegisterParam g) = ppr g
   ppr (StackParam p)    = ppr p
 
--- | JD: For the new stack story, I want arguments passed on the stack to manifest as
--- positive offsets in a CallArea, not negative offsets from the stack pointer.
--- Also, I want byte offsets, not word offsets.
-assignArgumentsPos :: DynFlags -> Convention -> (a -> CmmType) -> [a] ->
-                      [(a, ParamLocation)]
+-- |
 -- Given a list of arguments, and a function that tells their types,
 -- return a list showing where each argument is passed
-assignArgumentsPos dflags conv arg_ty reps = assignments
-    where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
+--
+assignArgumentsPos :: DynFlags
+                   -> ByteOff           -- stack offset to start with
+                   -> Convention
+                   -> (a -> CmmType)    -- how to get a type from an arg
+                   -> [a]               -- args
+                   -> (
+                        ByteOff              -- bytes of stack args
+                      , [(a, ParamLocation)] -- args and locations
+                      )
+
+assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
+    where
       regs = case (reps, conv) of
                (_,   NativeNodeCall)   -> getRegsWithNode dflags
                (_,   NativeDirectCall) -> getRegsWithoutNode dflags
@@ -49,23 +56,14 @@ assignArgumentsPos dflags conv arg_ty reps = assignments
                (_,   NativeReturn)     -> getRegsWithNode dflags
                -- GC calling convention *must* put values in registers
                (_,   GC)               -> allRegs dflags
-               (_,   PrimOpCall)       -> allRegs dflags
-               ([_], PrimOpReturn)     -> allRegs dflags
-               (_,   PrimOpReturn)     -> getRegsWithNode dflags
                (_,   Slow)             -> noRegs
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
-      -- (even if there are still available registers for args of a different type).
-      -- When returning an unboxed tuple, we also separate the stack
-      -- arguments by pointerhood.
-      (reg_assts, stk_args) = assign_regs [] reps regs
-      stk_args' = case conv of NativeReturn -> part
-                               PrimOpReturn -> part
-                               GC | length stk_args /= 0 -> panic "Failed to allocate registers for GC call"
-                               _            -> stk_args
-                  where part = uncurry (++)
-                                       (L.partition (not . isGcPtrType . arg_ty) stk_args)
-      stk_assts = assign_stk 0 [] (reverse stk_args')
+      -- (even if there are still available registers for args of a
+      -- different type).  When returning an unboxed tuple, we also
+      -- separate the stack arguments by pointerhood.
+      (reg_assts, stk_args)  = assign_regs [] reps regs
+      (stk_off,   stk_assts) = assignStack dflags off arg_ty stk_args
       assignments = reg_assts ++ stk_assts
 
       assign_regs assts []     _    = (assts, [])
@@ -88,11 +86,21 @@ assignArgumentsPos dflags conv arg_ty reps = assignments
               gcp | isGcPtrType ty = VGcPtr
                   | otherwise  	   = VNonGcPtr
 
-      assign_stk _      assts [] = assts
-      assign_stk offset assts (r:rs) = assign_stk off' ((r, StackParam off') : assts) rs
+
+assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
+            -> (
+                 ByteOff              -- bytes of stack args
+               , [(a, ParamLocation)] -- args and locations
+               )
+assignStack dflags offset arg_ty args = assign_stk offset [] (reverse args)
+ where
+      assign_stk offset assts [] = (offset, assts)
+      assign_stk offset assts (r:rs)
+        = assign_stk off' ((r, StackParam off') : assts) rs
         where w    = typeWidth (arg_ty r)
-              size = (((widthInBytes w - 1) `div` wORD_SIZE dflags) + 1) * wORD_SIZE dflags
+              size = (((widthInBytes w - 1) `div` word_size) + 1) * word_size
               off' = offset + size
+              word_size = wORD_SIZE dflags
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available
@@ -158,3 +166,9 @@ globalArgRegs dflags = map ($ VGcPtr) (allVanillaRegs dflags) ++
                        allFloatRegs dflags ++
                        allDoubleRegs dflags ++
                        allLongRegs dflags
+
+realArgRegs :: DynFlags -> [GlobalReg]
+realArgRegs dflags = map ($VGcPtr) (realVanillaRegs dflags) ++
+                realFloatRegs dflags ++
+                realDoubleRegs dflags ++
+                realLongRegs dflags

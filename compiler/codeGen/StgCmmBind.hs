@@ -10,7 +10,7 @@ module StgCmmBind (
         cgTopRhsClosure,
         cgBind,
         emitBlackHoleCode,
-        pushUpdateFrame
+        pushUpdateFrame, emitUpdateFrame
   ) where
 
 #include "HsVersions.h"
@@ -37,7 +37,6 @@ import CLabel
 import StgSyn
 import CostCentre
 import Id
-import Control.Monad
 import Name
 import Module
 import ListSetOps
@@ -47,6 +46,8 @@ import Outputable
 import FastString
 import Maybes
 import DynFlags
+
+import Control.Monad
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -460,7 +461,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                     (CmmMachOp (mo_wordSub dflags)
                          [ CmmReg nodeReg
                          , mkIntExpr dflags (funTag dflags cl_info) ])
-                ; whenC node_points (ldvEnterClosure cl_info)
+                ; when node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 
                 -- Main payload
@@ -525,8 +526,8 @@ thunkCode cl_info fv_details _cc node arity body
         ; entryHeapCheck cl_info node' arity [] $ do
         { -- Overwrite with black hole if necessary
           -- but *after* the heap-overflow check
-        ; whenC (blackHoleOnEntry cl_info && node_points)
-                (blackHoleIt cl_info)
+        ; when (blackHoleOnEntry cl_info && node_points)
+                (blackHoleIt cl_info node)
 
           -- Push update frame
         ; setupUpdate cl_info node $
@@ -545,13 +546,14 @@ thunkCode cl_info fv_details _cc node arity body
 --              Update and black-hole wrappers
 ------------------------------------------------------------------------
 
-blackHoleIt :: ClosureInfo -> FCode ()
+blackHoleIt :: ClosureInfo -> LocalReg -> FCode ()
 -- Only called for closures with no args
 -- Node points to the closure
-blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
+blackHoleIt closure_info node
+  = emitBlackHoleCode (closureSingleEntry closure_info) (CmmReg (CmmLocal node))
 
-emitBlackHoleCode :: Bool -> FCode ()
-emitBlackHoleCode is_single_entry = do
+emitBlackHoleCode :: Bool -> CmmExpr -> FCode ()
+emitBlackHoleCode is_single_entry node = do
   dflags <- getDynFlags
 
   -- Eager blackholing is normally disabled, but can be turned on with
@@ -578,12 +580,12 @@ emitBlackHoleCode is_single_entry = do
              -- profiling), so currently eager blackholing doesn't
              -- work with profiling.
 
-  whenC eager_blackholing $ do
+  when eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
-    emitStore (cmmOffsetW dflags (CmmReg nodeReg) (fixedHdrSize dflags))
+    emitStore (cmmOffsetW dflags node (fixedHdrSize dflags))
                   (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
-    emitStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
+    emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
         -- Nota Bene: this function does not change Node (even if it's a CAF),
@@ -634,12 +636,19 @@ pushUpdateFrame lbl updatee body
        let
            hdr         = fixedHdrSize dflags * wORD_SIZE dflags
            frame       = updfr + hdr + sIZEOF_StgUpdateFrame_NoHdr dflags
-           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
        --
-       emitStore (CmmStackSlot Old frame) (mkLblExpr lbl)
-       emitStore (CmmStackSlot Old (frame - off_updatee)) updatee
-       initUpdFrameProf frame
+       emitUpdateFrame dflags (CmmStackSlot Old frame) lbl updatee
        withUpdFrameOff frame body
+
+emitUpdateFrame :: DynFlags -> CmmExpr -> CLabel -> CmmExpr -> FCode ()
+emitUpdateFrame dflags frame lbl updatee = do
+  let
+           hdr         = fixedHdrSize dflags * wORD_SIZE dflags
+           off_updatee = hdr + oFFSET_StgUpdateFrame_updatee dflags
+  --
+  emitStore frame (mkLblExpr lbl)
+  emitStore (cmmOffset dflags frame off_updatee) updatee
+  initUpdFrameProf frame
 
 -----------------------------------------------------------------------------
 -- Entering a CAF

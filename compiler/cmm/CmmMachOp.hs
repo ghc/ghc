@@ -16,7 +16,7 @@ module CmmMachOp
     , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
 
     -- CallishMachOp
-    , CallishMachOp(..)
+    , CallishMachOp(..), callishMachOpHints
     , pprCallishMachOp
    )
 where
@@ -463,3 +463,10 @@ data CallishMachOp
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)
 
+callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
+callishMachOpHints op = case op of
+  MO_Memcpy  -> ([], [AddrHint,AddrHint,NoHint,NoHint])
+  MO_Memset  -> ([], [AddrHint,NoHint,NoHint,NoHint])
+  MO_Memmove -> ([], [AddrHint,AddrHint,NoHint,NoHint])
+  _          -> ([],[])
+  -- empty lists indicate NoHint

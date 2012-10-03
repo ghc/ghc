@@ -169,23 +169,6 @@ RTS_RET(stg_noforceIO);
 
 /* standard selector thunks */
 
-RTS_RET(stg_sel_ret_0_upd);
-RTS_RET(stg_sel_ret_1_upd);
-RTS_RET(stg_sel_ret_2_upd);
-RTS_RET(stg_sel_ret_3_upd);
-RTS_RET(stg_sel_ret_4_upd);
-RTS_RET(stg_sel_ret_5_upd);
-RTS_RET(stg_sel_ret_6_upd);
-RTS_RET(stg_sel_ret_7_upd);
-RTS_RET(stg_sel_ret_8_upd);
-RTS_RET(stg_sel_ret_9_upd);
-RTS_RET(stg_sel_ret_10_upd);
-RTS_RET(stg_sel_ret_11_upd);
-RTS_RET(stg_sel_ret_12_upd);
-RTS_RET(stg_sel_ret_13_upd);
-RTS_RET(stg_sel_ret_14_upd);
-RTS_RET(stg_sel_ret_15_upd);
-
 RTS_ENTRY(stg_sel_0_upd);
 RTS_ENTRY(stg_sel_1_upd);
 RTS_ENTRY(stg_sel_2_upd);
@@ -267,45 +250,39 @@ RTS_FUN_DECL(stg_PAP_apply);
 
 /* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
 
-RTS_RET(stg_enter);
-RTS_RET(stg_enter_checkbh);
-
-RTS_RET(stg_gc_void);
-
-RTS_FUN_DECL(__stg_gc_enter_1);
 RTS_FUN_DECL(stg_gc_noregs);
 
-RTS_RET(stg_gc_unpt_r1);
+RTS_RET(stg_enter_checkbh);
+
+RTS_RET(stg_ret_v);
+RTS_RET(stg_ret_p);
+RTS_RET(stg_ret_n);
+RTS_RET(stg_ret_f);
+RTS_RET(stg_ret_d);
+RTS_RET(stg_ret_l);
+
+RTS_FUN_DECL(stg_gc_prim_p);
+RTS_FUN_DECL(stg_gc_prim_pp);
+RTS_FUN_DECL(stg_gc_prim_n);
+
+RTS_RET(stg_enter);
+RTS_FUN_DECL(__stg_gc_enter_1);
+
 RTS_FUN_DECL(stg_gc_unpt_r1);
-
-RTS_RET(stg_gc_unbx_r1);
 RTS_FUN_DECL(stg_gc_unbx_r1);
-
-RTS_RET(stg_gc_f1);
 RTS_FUN_DECL(stg_gc_f1);
-
-RTS_RET(stg_gc_d1);
 RTS_FUN_DECL(stg_gc_d1);
-
-RTS_RET(stg_gc_l1);
 RTS_FUN_DECL(stg_gc_l1);
+RTS_FUN_DECL(stg_gc_pp);
+RTS_FUN_DECL(stg_gc_ppp);
+RTS_FUN_DECL(stg_gc_pppp);
 
 RTS_RET(stg_gc_fun);
 RTS_FUN_DECL(__stg_gc_fun);
 
-RTS_RET(stg_gc_gen);
-RTS_FUN_DECL(stg_gc_gen);
-
-RTS_RET(stg_ut_1_0_unreg);
-
-RTS_FUN_DECL(stg_gc_gen_hp);
-RTS_FUN_DECL(stg_gc_ut);
-RTS_FUN_DECL(stg_gen_yield);
 RTS_FUN_DECL(stg_yield_noregs);
 RTS_FUN_DECL(stg_yield_to_interpreter);
-RTS_FUN_DECL(stg_gen_block);
 RTS_FUN_DECL(stg_block_noregs);
-RTS_FUN_DECL(stg_block_1);
 RTS_FUN_DECL(stg_block_blackhole);
 RTS_FUN_DECL(stg_block_blackhole_finally);
 RTS_FUN_DECL(stg_block_takemvar);

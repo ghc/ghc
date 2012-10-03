@@ -480,7 +480,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds srt_info descr
 		    -- anything else gets eta expanded.
   where
     name   = idName id
-    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
+    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     nonptr_wds = tot_wds - ptr_wds
 
 mkConInfo :: DynFlags
@@ -492,7 +492,7 @@ mkConInfo dflags is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
 		closureCon = data_con }
   where
-    sm_rep  = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType dflags lf_info)
+    sm_rep  = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     lf_info = mkConLFInfo data_con
     nonptr_wds = tot_wds - ptr_wds
 \end{code}
@@ -526,16 +526,16 @@ closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
 %************************************************************************
 
 \begin{code}
-lfClosureType :: DynFlags -> LambdaFormInfo -> ClosureTypeInfo
-lfClosureType dflags (LFReEntrant _ arity _ argd) = Fun (toStgHalfWord dflags (toInteger arity)) argd
-lfClosureType dflags (LFCon con)                  = Constr (toStgHalfWord dflags (toInteger (dataConTagZ con)))
-                                                           (dataConIdentity con)
-lfClosureType dflags (LFThunk _ _ _ is_sel _)     = thunkClosureType dflags is_sel
-lfClosureType _      _                            = panic "lfClosureType"
+lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
+lfClosureType (LFReEntrant _ arity _ argd) = Fun arity argd
+lfClosureType (LFCon con)                  = Constr (dataConTagZ con)
+                                                    (dataConIdentity con)
+lfClosureType (LFThunk _ _ _ is_sel _)     = thunkClosureType is_sel
+lfClosureType _                            = panic "lfClosureType"
 
-thunkClosureType :: DynFlags -> StandardFormInfo -> ClosureTypeInfo
-thunkClosureType dflags (SelectorThunk off) = ThunkSelector (toStgWord dflags (toInteger off))
-thunkClosureType _      _                   = Thunk
+thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
+thunkClosureType (SelectorThunk off) = ThunkSelector off
+thunkClosureType _                   = Thunk
 
 -- We *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of

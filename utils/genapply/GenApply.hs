@@ -232,7 +232,7 @@ genMkPAP regstatus macro jump ticker disamb
             if is_fun_case then mb_tag_node arity else empty,
             if overflow_regs
                 then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
-                else text "jump " <> text jump <> semi
+                else text "jump " <> text jump <+> text "[*]" <> semi
             ]) $$
            text "}"
 
@@ -334,7 +334,7 @@ genMkPAP regstatus macro jump ticker disamb
                 then text "R2 = " <> fun_info_label <> semi
                 else empty,
             if is_fun_case then mb_tag_node n_args else empty,
-            text "jump " <> text jump <> semi
+            text "jump " <> text jump <+> text "[*]" <> semi
           ])
 
 -- The LARGER ARITY cases:
@@ -416,7 +416,7 @@ enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
         reg_doc,
         text "  Sp_adj(" <> int sp' <> text ");",
         -- enter, but adjust offset with tag
-        text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ");",
+        text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ") [*];",
         text "}"
        ]
   -- I don't totally understand this code, I copied it from
@@ -478,7 +478,7 @@ genApply regstatus args =
    in
     vcat [
       text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
-        text "RET_SMALL, " <> (cat $ zipWith formalParam args [1..]) <>
+        text "RET_SMALL, W_ info_ptr, " <> (cat $ zipWith formalParam args [1..]) <>
         text ")\n{",
       nest 4 (vcat [
        text "W_ info;",
@@ -701,7 +701,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             text "jump" <+> fun_ret_label <> semi
+             text "jump" <+> fun_ret_label <+> text "[*]" <> semi
           ]),
           char '}'
         ]),
@@ -739,7 +739,7 @@ genStackApply regstatus args =
    (assign_regs, sp') = loadRegArgs regstatus 0 args
    body = vcat [assign_regs,
                 text "Sp_adj" <> parens (int sp') <> semi,
-                text "jump %GET_ENTRY(UNTAG(R1));"
+                text "jump %GET_ENTRY(UNTAG(R1)) [*];"
                 ]
 
 -- -----------------------------------------------------------------------------
@@ -766,7 +766,7 @@ genStackSave regstatus args =
                 text "Sp(2) = R1;",
                 text "Sp(1) =" <+> int stk_args <> semi,
                 text "Sp(0) = stg_gc_fun_info;",
-                text "jump stg_gc_noregs;"
+                text "jump stg_gc_noregs [];"
                 ]
 
    std_frame_size = 3 -- the std bits of the frame. See StgRetFun in Closures.h,

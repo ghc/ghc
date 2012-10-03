@@ -14,6 +14,7 @@ module CmmOpt (
 
 #include "HsVersions.h"
 
+import CmmUtils
 import OldCmm
 import DynFlags
 import CLabel
@@ -184,22 +185,22 @@ cmmMachOpFoldM dflags mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], ar
 
 -- Make a RegOff if we can
 cmmMachOpFoldM _ (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
-  = Just $ CmmRegOff reg (fromIntegral (narrowS rep n))
+  = Just $ cmmRegOff reg (fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Add _) [CmmRegOff reg off, CmmLit (CmmInt n rep)]
-  = Just $ CmmRegOff reg (off + fromIntegral (narrowS rep n))
+  = Just $ cmmRegOff reg (off + fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Sub _) [CmmReg reg, CmmLit (CmmInt n rep)]
-  = Just $ CmmRegOff reg (- fromIntegral (narrowS rep n))
+  = Just $ cmmRegOff reg (- fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Sub _) [CmmRegOff reg off, CmmLit (CmmInt n rep)]
-  = Just $ CmmRegOff reg (off - fromIntegral (narrowS rep n))
+  = Just $ cmmRegOff reg (off - fromIntegral (narrowS rep n))
 
 -- Fold label(+/-)offset into a CmmLit where possible
 
-cmmMachOpFoldM _ (MO_Add _) [CmmLit (CmmLabel lbl), CmmLit (CmmInt i rep)]
-  = Just $ CmmLit (CmmLabelOff lbl (fromIntegral (narrowU rep i)))
-cmmMachOpFoldM _ (MO_Add _) [CmmLit (CmmInt i rep), CmmLit (CmmLabel lbl)]
-  = Just $ CmmLit (CmmLabelOff lbl (fromIntegral (narrowU rep i)))
-cmmMachOpFoldM _ (MO_Sub _) [CmmLit (CmmLabel lbl), CmmLit (CmmInt i rep)]
-  = Just $ CmmLit (CmmLabelOff lbl (fromIntegral (negate (narrowU rep i))))
+cmmMachOpFoldM _ (MO_Add _) [CmmLit lit, CmmLit (CmmInt i rep)]
+  = Just $ CmmLit (cmmOffsetLit lit (fromIntegral (narrowU rep i)))
+cmmMachOpFoldM _ (MO_Add _) [CmmLit (CmmInt i rep), CmmLit lit]
+  = Just $ CmmLit (cmmOffsetLit lit (fromIntegral (narrowU rep i)))
+cmmMachOpFoldM _ (MO_Sub _) [CmmLit lit, CmmLit (CmmInt i rep)]
+  = Just $ CmmLit (cmmOffsetLit lit (fromIntegral (negate (narrowU rep i))))
 
 
 -- Comparison of literal with widened operand: perform the comparison

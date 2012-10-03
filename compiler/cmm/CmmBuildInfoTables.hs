@@ -235,8 +235,8 @@ to_SRT dflags top_srt off len bmp
            tbl = CmmData RelocatableReadOnlyData $
                    Statics srt_desc_lbl $ map CmmStaticLit
                      ( cmmLabelOffW dflags top_srt off
-                     : mkWordCLit dflags (toStgWord dflags (fromIntegral len))
-                     : map (mkWordCLit dflags) bmp)
+                     : mkWordCLit dflags (fromIntegral len)
+                     : map (mkStgWordCLit dflags) bmp)
        return (Just tbl, C_SRT srt_desc_lbl 0 (srtEscape dflags))
   | otherwise
   = return (Nothing, C_SRT top_srt off (toStgHalfWord dflags (fromStgWord (head bmp))))
@@ -252,7 +252,8 @@ localCAFInfo :: CAFEnv -> CmmDecl -> (CAFSet, Maybe CLabel)
 localCAFInfo _      (CmmData _ _) = (Set.empty, Nothing)
 localCAFInfo cafEnv proc@(CmmProc _ top_l (CmmGraph {g_entry=entry})) =
   case topInfoTable proc of
-    Just (CmmInfoTable { cit_rep = rep }) | not (isStaticRep rep)
+    Just (CmmInfoTable { cit_rep = rep })
+      | not (isStaticRep rep) && not (isStackRep rep)
       -> (cafs, Just (toClosureLbl top_l))
     _other -> (cafs, Nothing)
   where

@@ -865,7 +865,6 @@ is_cishCC :: CCallConv -> Bool
 is_cishCC CCallConv    = True
 is_cishCC CApiConv     = True
 is_cishCC StdCallConv  = True
-is_cishCC CmmCallConv  = False
 is_cishCC PrimCallConv = False
 
 -- ---------------------------------------------------------------------

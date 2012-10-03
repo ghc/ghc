@@ -410,14 +410,6 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
     info = get_ret_itbl(frame);
     switch (info->i.type) {
 
-    case RET_DYN:
-    {
-	StgRetDyn *dyn = (StgRetDyn *)frame;
-	return  sizeofW(StgRetDyn) + RET_DYN_BITMAP_SIZE + 
-	    RET_DYN_NONPTR_REGS_SIZE +
-	    RET_DYN_PTRS(dyn->liveness) + RET_DYN_NONPTRS(dyn->liveness);
-    }
-	    
     case RET_FUN:
 	return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
 
