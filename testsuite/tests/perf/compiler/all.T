@@ -14,10 +14,11 @@ test('T1969',
                              #                 19 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 22,
-                                                               24)),
+                                                               28)),
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 34 (amd64/Linux)
                                              # 2012-09-20      23 (amd64/Linux)
+                                             # 2012-10-03      25 (amd64/Linux if .hi exists)
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 4000000,
                                                      7000000)),
