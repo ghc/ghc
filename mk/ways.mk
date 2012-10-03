@@ -22,7 +22,7 @@
 #
 # The ways currently defined.
 #
-ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p
+ALL_WAYS=v p t l s mp mg debug dyn thr thr_l debug_dyn thr_dyn thr_debug_dyn thr_p thr_debug debug_p thr_debug_p l_dyn thr_l_dyn
 
 #
 # The following ways currently have treated specially, p t mg,
@@ -93,9 +93,18 @@ WAY_thr_dyn_NAME=thr_dyn
 WAY_thr_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS
 
 # Way 'thr_debug_dyn':
-WAY_thr_debug_dyn_NAME=thr_dyn
+WAY_thr_debug_dyn_NAME=thr_debug_dyn
 WAY_thr_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS -optc-DDEBUG
 
 # Way 'debug_dyn':
-WAY_debug_dyn_NAME=thr_dyn
+WAY_debug_dyn_NAME=debug_dyn
 WAY_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DDEBUG
+
+# Way 'l_dyn':
+WAY_l_dyn_NAME=event logging dynamic
+WAY_l_dyn_HC_OPTS= -fPIC -dynamic -eventlog
+
+# Way 'thr_l_dyn':
+WAY_thr_l_dyn_NAME=threaded event logging dynamic
+WAY_thr_l_dyn_HC_OPTS= -fPIC -dynamic -optc-DTHREADED_RTS -eventlog
+
