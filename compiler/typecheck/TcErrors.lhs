@@ -1196,11 +1196,11 @@ are created by in RtClosureInspect.zonkRTTIType.
 solverDepthErrorTcS :: Ct -> TcM a
 solverDepthErrorTcS ct
   = setCtLoc loc $
-    do { ct <- zonkCt ct
+    do { pred <- zonkTcType (ctPred ct)
        ; env0 <- tcInitTidyEnv
-       ; let tidy_env = tidyFreeTyVars env0 (tyVarsOfCt ct)
-             tidy_ct  = tidyCt tidy_env ct
-       ; failWithTcM (tidy_env, hang msg 2 (ppr tidy_ct)) }
+       ; let tidy_env  = tidyFreeTyVars env0 (tyVarsOfType pred)
+             tidy_pred = tidyType tidy_env pred
+       ; failWithTcM (tidy_env, hang msg 2 (ppr tidy_pred)) }
   where
     loc   = cc_loc ct
     depth = ctLocDepth loc
