@@ -91,7 +91,7 @@ test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
 test('T1999', normal, compile, [''])
-test('T1999a', expect_broken(1999), compile, [''])
+test('T1999a', normal, compile, [''])
 
 test('T2587', normal, compile, [''])
 test('T2040', normal, compile, [''])
@@ -113,3 +113,4 @@ test('T5424',
      ['T5424', '-v0 -O0'])
 
 test('FloatEq', normal, compile, [''])
+test('T7205', normal, compile, [''])

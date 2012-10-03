@@ -8,7 +8,6 @@ tcfail102.hs:9:15:
       bound by the type signature for
                  f :: Integral a => P (Ratio a) -> P (Ratio a)
       at tcfail102.hs:8:6-45
-    Possible fix: add an instance declaration for (Integral (Ratio a))
     In the `p' field of a record
     In the expression: x {p = p x}
     In an equation for `f': f x = x {p = p x}

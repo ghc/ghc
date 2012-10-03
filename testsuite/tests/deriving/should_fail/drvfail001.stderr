@@ -3,7 +3,6 @@ drvfail001.hs:16:33:
     No instance for (Show (f (f a)))
       arising from the 'deriving' clause of a data type declaration
     Possible fix:
-      add an instance declaration for (Show (f (f a)))
-      or use a standalone 'deriving instance' declaration,
-           so you can specify the instance context yourself
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
     When deriving the instance for (Show (SM f a))

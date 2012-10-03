@@ -17,7 +17,7 @@ T2239.hs:47:13:
 
 T2239.hs:50:13:
     Couldn't match type `forall b1. b1 ~ Bool => b1 -> b1'
-                  with `b -> b'
+                  with `Bool -> Bool'
     Expected type: (forall b. b ~ Bool => b -> b) -> b -> b
       Actual type: (forall b. b ~ Bool => b -> b)
                    -> forall b. b ~ Bool => b -> b

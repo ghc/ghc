@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # file T6106_preproc.sh
 #

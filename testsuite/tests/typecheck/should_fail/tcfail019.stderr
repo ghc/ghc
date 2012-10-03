@@ -2,5 +2,4 @@
 tcfail019.hs:18:10:
     No instance for (B [a])
       arising from the superclasses of an instance declaration
-    Possible fix: add an instance declaration for (B [a])
     In the instance declaration for `D [a]'

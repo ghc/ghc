@@ -8,6 +8,9 @@ T5300.hs:15:9:
       at T5300.hs:14:7-69
     The type variable `c0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Relevant bindings include
+      f2 :: a1 -> StateT (T b2) m a2 (bound at T5300.hs:15:1)
+      fm :: a1 (bound at T5300.hs:15:4)
     In the first argument of `(>>=)', namely `f1 fm'
     In the expression: f1 fm >>= return . undefined
     In an equation for `f2': f2 fm = f1 fm >>= return . undefined

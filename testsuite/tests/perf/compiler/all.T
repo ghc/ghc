@@ -13,10 +13,12 @@ test('T1969',
                              #                 15 (x86/OS X)
                              #                 19 (x86/OS X)
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 24,
-                                                               37)),
+          compiler_stats_num_field('peak_megabytes_allocated', 22,
+                                                               28)),
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 34 (amd64/Linux)
+                                             # 2012-09-20      23 (amd64/Linux)
+                                             # 2012-10-03      25 (amd64/Linux if .hi exists)
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 4000000,
                                                      7000000)),
@@ -36,7 +38,7 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
                                     #                 274932264 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 633332520, 1)),
+          compiler_stats_range_field('bytes allocated', 641959976, 1)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
@@ -45,7 +47,8 @@ test('T1969',
                                     # 20/07/2012:     595,936,240 (amd64/Linux)
                                     # 23/08/2012:     606,230,880 (amd64/Linux)
                                     # 29/08/2012:     633,334,184 (amd64/Linux)
-                                    #                 (new codegen)
+                                    #                 (^ new codegen)
+                                    # 18/09/2012:     641,959,976 (amd64/Linux)
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint')
           # Leave -dcore-lint on for this one test, so that we have something
@@ -82,10 +85,11 @@ test('T3294',
                                                       750000000)),
                                     # expected value: 815479800  (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 2961778696, 5)),
+          compiler_stats_range_field('bytes allocated', 2717327208, 5)),
                                    # old:        1,357,587,088 (amd64/Linux)
                                    # 29/08/2012: 2,961,778,696 (amd64/Linux)
-                                   #   (increase due to new codegen, see #7198)
+                                   # (^ increase due to new codegen, see #7198)
+                                   # 18/09/2012: 2,717,327,208 (amd64/Linux)
       conf_3294
       ],
      compile,
@@ -160,14 +164,12 @@ test('T4007',
      ['$MAKE -s --no-print-directory T4007'])
 
 test('T5030',
-     [expect_broken(5030),
-      # expected value: 449368924 (x86/Linux)
+     [# expected value: 449368924 (x86/Linux)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 196457520, 10)),
       # expected value: 346750856 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 300000000,
-                                                      400000000)),
+          compiler_stats_range_field('bytes allocated', 530000000, 10)),
        only_ways(['normal'])
       ],
      compile,
@@ -216,7 +218,7 @@ test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
       # sample from x86/Linux
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 296657384, 10)),
+          compiler_stats_range_field('bytes allocated', 300000000, 10)),
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 713385808, 10))
                                          # prev:       585,521,080
@@ -241,9 +243,9 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
       if_wordsize(32, # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 1682508520, 10)),
+          compiler_stats_range_field('bytes allocated',  650000000, 10)),
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 3361296144, 10))
+          compiler_stats_range_field('bytes allocated', 1300000000, 10))
       ],
       compile,['-O'])
 
@@ -254,7 +256,9 @@ test('T5837',
 
       # sample: 3926235424 (amd64/Linux, 15/2/2012)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 79110184, 10))
+          compiler_stats_range_field('bytes allocated', 81879216, 10))
+	  				   # 2012-10-02 81879216
+                                           # 2012-09-20 87254264 amd64/Linux
       ],
       compile_fail,['-fcontext-stack=50'])
 
@@ -264,6 +268,7 @@ test('T6048',
           compiler_stats_range_field('bytes allocated', 38000000, 10)),
 
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 67328320, 10))
+          compiler_stats_range_field('bytes allocated', 97247032, 10))
+                                           # 18/09/2012 97247032 amd64/Linux
       ],
       compile,[''])

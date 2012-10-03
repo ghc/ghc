@@ -158,3 +158,7 @@ test('T7040_ghci', [ only_ways(['ghci']),
                       cmd_prefix('$MAKE T7040_ghci_setup && '),
                       extra_clean(['T7040_ghci_c.o']) ],
                     compile_and_run, ['T7040_ghci_c.o'])
+
+test('T7227', [ extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS'),
+                extra_clean(['T7227.stat']) ]
+            , compile_and_run, [''] )

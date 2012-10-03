@@ -36,9 +36,20 @@ withArgs ::
 withArgs = undefined
 
 plug ::
-   (MakeValueTuple b) =>
-   (b, ValueTuple b)
+   (MakeValueTuple c) =>
+   (c, ValueTuple c)
 plug = undefined
 
 filterFormants :: (Float, Vector)
 filterFormants = withArgs plug
+
+{- Call to withArgs generates
+
+    (MakeValueTuple Vector, (c,ValueTuple c)~(Float,ValueTuple Vector), MakeValueTuple c)
+=   (MakeValueTuple (Serial Float), ValueTuple Float ~ ValueTuple (Serial Float), MakeValueTuple Float)
+=   (MakeValueTuple (Serial Float), MakeValueTuple Float,
+     IO Float ~ Serial (ValueTuple Float))
+
+     IO Float ~ Serial f, ValueTuple Float ~ f
+=    IO Float ~ Serial f, IO Float ~ f
+-}
