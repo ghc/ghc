@@ -3726,7 +3726,7 @@ We reuse the keyword <literal>default</literal> to signal that a signature
 applies to the default method only; when defining instances of the
 <literal>Enum</literal> class, the original type <literal>[a]</literal> of
 <literal>enum</literal> still applies. When giving an empty instance, however,
-the default implementation <literal>map to0 genum</literal> is filled-in,
+the default implementation <literal>map to genum</literal> is filled-in,
 and type-checked with the type
 <literal>(Generic a, GEnum (Rep a)) => [a]</literal>.
 </para>
