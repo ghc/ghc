@@ -3097,6 +3097,8 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
+       ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
+                                       then "YES" else "NO"),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
