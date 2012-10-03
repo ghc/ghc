@@ -768,8 +768,8 @@ checkBootTyCon tc1 tc2
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let eqSynRhs SynFamilyTyCon SynFamilyTyCon
-            = True
+    let eqSynRhs (SynFamilyTyCon o1 i1) (SynFamilyTyCon o2 i2)
+            = o1==o2 && i1==i2
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
