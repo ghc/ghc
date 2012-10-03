@@ -45,31 +45,38 @@ data V1 p
 
 -- | Unit: used for constructors without arguments
 data U1 p = U1
+  deriving (Eq, Read, Show)
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-
+  deriving (Eq, Read, Show)
 
 -- | Recursive calls of kind * -> *
 newtype Rec1 f p = Rec1 { unRec1 :: f p }
+  deriving (Eq, Read, Show)
 
 -- | Constants, additional parameters and recursion of kind *
 newtype K1 i c p = K1 { unK1 :: c }
+  deriving (Eq, Read, Show)
 
 -- | Meta-information (constructor names, etc.)
 newtype M1 i c f p = M1 { unM1 :: f p }
+  deriving (Eq, Read, Show)
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
 data (:+:) f g p = L1 (f p) | R1 (g p)
+  deriving (Eq, Read, Show)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
 data (:*:) f g p = f p :*: g p
+  deriving (Eq, Read, Show)
 
 -- | Composition of functors
 infixr 7 :.:
 newtype (:.:) f g p = Comp1 { unComp1 :: f (g p) }
+  deriving (Eq, Read, Show)
 
 -- | Tag for K1: recursion (of kind *)
 data R
