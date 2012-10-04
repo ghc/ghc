@@ -107,7 +107,7 @@ dsOverLit' dflags (OverLit { ol_val = val, ol_rebindable = rebindable
                            , ol_witness = witness, ol_type = ty })
   | not rebindable
   , Just expr <- shortCutLit dflags val ty = dsExpr expr	-- Note [Literal short cut]
-  | otherwise			    = dsExpr witness
+  | otherwise	                           = dsExpr witness
 \end{code}
 
 Note [Literal short cut]
