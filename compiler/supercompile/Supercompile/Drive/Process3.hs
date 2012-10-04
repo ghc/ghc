@@ -613,11 +613,11 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                 --                                      match' mm (meaning p) reduced_state]
                                 , Just mr <- [{- trace "match" $ (\res -> trace "match'" res) -} (msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch)]
-                                {-
+                                {--}
                                 , if dumped p
                                    then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
                                    else True
-                                -}
+                                {--}
                                 ] of Just (skip, res) -> pure $ if skip then (res, s) else remember (\_ _ -> liftM ((,) False) res)
                                      Nothing          | CheckOnly <- memo_how
                                                       -> pure (liftM snd $ opt Nothing state, s)
