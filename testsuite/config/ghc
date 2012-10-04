@@ -52,12 +52,12 @@ if (ghc_with_threaded_rts == 1):
         config.have_smp = True
         config.run_ways.append('threaded2')
 
-if (ghc_with_dynamic_rts == 1):
-    config.have_shared_libs = True
-    config.run_ways.append('dyn')
-
 if (ghc_dynamic_by_default == 1):
     config.run_ways.append('static')
+else:
+    if (ghc_with_dynamic_rts == 1):
+        config.have_shared_libs = True
+        config.run_ways.append('dyn')
 
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
