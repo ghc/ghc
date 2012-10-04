@@ -74,61 +74,57 @@ flag in-ghc-tree
 
 executable haddock
   default-language:     Haskell2010
-  -- In a GHC tree - in particular, in a source tarball - we don't
-  -- require alex or happy
-  if !flag(in-ghc-tree)
-    build-tools: alex >= 2.3, happy >= 1.18
-  build-depends:
-    base >= 4.3 && < 4.7,
-    filepath,
-    directory,
-    containers,
-    deepseq,
-    array,
-    xhtml >= 3000.2 && < 3000.3,
-    Cabal >= 1.10,
-    ghc >= 7.4 && < 7.8
-
-  if flag(in-ghc-tree)
-    cpp-options: -DIN_GHC_TREE
-  else
-    build-depends: ghc-paths
-
   main-is:              Main.hs
-  hs-source-dirs:       src, driver
+  hs-source-dirs:       driver
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
-  other-modules:
-    Documentation.Haddock
-    Haddock
-    Haddock.Interface
-    Haddock.Interface.Rename
-    Haddock.Interface.Create
-    Haddock.Interface.AttachInstances
-    Haddock.Interface.LexParseRn
-    Haddock.Interface.ParseModuleHeader
-    Haddock.Lex
-    Haddock.Parse
-    Haddock.Utils
-    Haddock.Backends.Xhtml
-    Haddock.Backends.Xhtml.Decl
-    Haddock.Backends.Xhtml.DocMarkup
-    Haddock.Backends.Xhtml.Layout
-    Haddock.Backends.Xhtml.Names
-    Haddock.Backends.Xhtml.Themes
-    Haddock.Backends.Xhtml.Types
-    Haddock.Backends.Xhtml.Utils
-    Haddock.Backends.LaTeX
-    Haddock.Backends.HaddockDB
-    Haddock.Backends.Hoogle
-    Haddock.ModuleTree
-    Haddock.Types
-    Haddock.Doc
-    Haddock.Version
-    Haddock.InterfaceFile
-    Haddock.Options
-    Haddock.GhcUtils
-    Haddock.Convert
+  build-depends:
+    base >= 4.3 && < 4.7
+  if flag(in-ghc-tree)
+    hs-source-dirs: src
+    cpp-options: -DIN_GHC_TREE
+    build-depends:
+      filepath,
+      directory,
+      containers,
+      deepseq,
+      array,
+      xhtml >= 3000.2 && < 3000.3,
+      Cabal >= 1.10,
+      ghc >= 7.4 && < 7.8
+    other-modules:
+      Documentation.Haddock
+      Haddock
+      Haddock.Interface
+      Haddock.Interface.Rename
+      Haddock.Interface.Create
+      Haddock.Interface.AttachInstances
+      Haddock.Interface.LexParseRn
+      Haddock.Interface.ParseModuleHeader
+      Haddock.Lex
+      Haddock.Parse
+      Haddock.Utils
+      Haddock.Backends.Xhtml
+      Haddock.Backends.Xhtml.Decl
+      Haddock.Backends.Xhtml.DocMarkup
+      Haddock.Backends.Xhtml.Layout
+      Haddock.Backends.Xhtml.Names
+      Haddock.Backends.Xhtml.Themes
+      Haddock.Backends.Xhtml.Types
+      Haddock.Backends.Xhtml.Utils
+      Haddock.Backends.LaTeX
+      Haddock.Backends.HaddockDB
+      Haddock.Backends.Hoogle
+      Haddock.ModuleTree
+      Haddock.Types
+      Haddock.Doc
+      Haddock.Version
+      Haddock.InterfaceFile
+      Haddock.Options
+      Haddock.GhcUtils
+      Haddock.Convert
+  else
+    build-depends:  haddock
 
 library
   default-language:     Haskell2010
