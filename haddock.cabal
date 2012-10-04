@@ -123,11 +123,11 @@ executable haddock
     Haddock.Types
     Haddock.Doc
     Haddock.Version
-    Haddock.InterfaceFile        
+    Haddock.InterfaceFile
     Haddock.Options
     Haddock.GhcUtils
     Haddock.Convert
-   
+
 library
   default-language:     Haskell2010
   -- In a GHC tree - in particular, in a source tarball - we don't
@@ -187,7 +187,7 @@ library
     Haddock.GhcUtils
     Haddock.Convert
     Paths_haddock
-  
+
   if flag(in-ghc-tree)
     buildable: False
 
