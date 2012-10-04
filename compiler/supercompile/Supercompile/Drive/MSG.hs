@@ -233,7 +233,8 @@ msgPendStackBinder x_looped x_l x_r = State.state $ \(iss, known) -> let x0 = za
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var {- partial loop -}
 msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
     Right x                       -> (s0, pure x)
-    Left (mb_eq, binderise, mk_s) -> res
+    Left (mb_eq, binderise, mk_s) -> case res of (_,  Left msg) -> (s0, Left msg)
+                                                 (s3, Right x)  -> (s3, Right x)  -- NB: must revert state or else x_looped will be in the msgKnownVars, and pulling on it will fail the irrefutible pattern match
       where -- The use of s here is necessary to ensure we only allocate a given common var once
             extra_iss | Just eq <- mb_eq
                       , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
