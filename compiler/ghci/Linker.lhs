@@ -480,7 +480,10 @@ dieWith dflags span msg = ghcError (ProgramError (showSDoc dflags (mkLocMessage 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
 checkNonStdWay dflags srcspan = do
   let tag = buildTag dflags
-  if null tag {-  || tag == "dyn" -} then return False else do
+      dynamicByDefault = dYNAMIC_BY_DEFAULT dflags
+  if (null tag && not dynamicByDefault) ||
+     (tag == "dyn" && dynamicByDefault)
+      then return False
     -- see #3604: object files compiled for way "dyn" need to link to the
     -- dynamic packages, so we can't load them into a statically-linked GHCi.
     -- we have to treat "dyn" in the same way as "prof".
@@ -490,9 +493,9 @@ checkNonStdWay dflags srcspan = do
     -- .o files or -dynamic .o files into GHCi (currently that's not possible
     -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
     -- whereas we have __stginit_base_Prelude_.
-  if (objectSuf dflags == normalObjectSuffix)
-     then failNonStd dflags srcspan
-     else return True
+      else if (objectSuf dflags == normalObjectSuffix) && not (null tag)
+      then failNonStd dflags srcspan
+      else return True
 
 normalObjectSuffix :: String
 normalObjectSuffix = phaseInputExt StopLn
@@ -627,14 +630,23 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
             adjust_ul (DotO file) = do
                 MASSERT (osuf `isSuffixOf` file)
-                let new_file = reverse (drop (length osuf + 1) (reverse file))
-                                 <.> normalObjectSuffix
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith dflags span $
-                          ptext (sLit "cannot find normal object file ")
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
+                let file_base = reverse (drop (length osuf + 1) (reverse file))
+                    dyn_file = file_base <.> "dyn_o"
+                    new_file = file_base <.> normalObjectSuffix
+                -- Note that even if dYNAMIC_BY_DEFAULT is on, we might
+                -- still have dynamic object files called .o, so we need
+                -- to try both filenames.
+                use_dyn <- if dYNAMIC_BY_DEFAULT dflags
+                           then do doesFileExist dyn_file
+                           else return False
+                if use_dyn
+                    then return (DotO dyn_file)
+                    else do ok <- doesFileExist new_file
+                            if (not ok)
+                               then dieWith dflags span $
+                                      ptext (sLit "cannot find normal object file ")
+                                            <> quotes (text new_file) $$ while_linking_expr
+                               else return (DotO new_file)
             adjust_ul _ = panic "adjust_ul"
 \end{code}
 
@@ -1145,10 +1157,13 @@ locateLib dflags is_hs dirs lib
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = findHSDll `orElse` findObject `orElse` findArchive `orElse` assumeDll
+  = findHSDll `orElse` findDynObject `orElse` findDynArchive `orElse`
+                       findObject    `orElse` findArchive `orElse` assumeDll
    where
-     mk_obj_path dir = dir </> (lib <.> "o")
-     mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
+     mk_obj_path      dir = dir </> (lib <.> "o")
+     mk_dyn_obj_path  dir = dir </> (lib <.> "dyn_o")
+     mk_arch_path     dir = dir </> ("lib" ++ lib <.> "a")
+     mk_dyn_arch_path dir = dir </> ("lib" ++ lib <.> "dyn_a")
 
      hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
      mk_hs_dyn_lib_path dir = dir </> mkSOName platform hs_dyn_lib_name
@@ -1156,11 +1171,14 @@ locateLib dflags is_hs dirs lib
      so_name = mkSOName platform lib
      mk_dyn_lib_path dir = dir </> so_name
 
-     findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
-     findArchive = liftM (fmap Archive) $ findFile mk_arch_path dirs
-     findHSDll   = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
-     findDll     = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path dirs
-     tryGcc      = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
+     findObject     = liftM (fmap Object)  $ findFile mk_obj_path        dirs
+     findDynObject  = do putStrLn "In findDynObject"
+                         liftM (fmap Object)  $ findFile mk_dyn_obj_path    dirs
+     findArchive    = liftM (fmap Archive) $ findFile mk_arch_path       dirs
+     findDynArchive = liftM (fmap Archive) $ findFile mk_dyn_arch_path   dirs
+     findHSDll      = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
+     findDll        = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path    dirs
+     tryGcc         = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
 
      assumeDll   = return (DLL lib)
      infixr `orElse`
@@ -1217,15 +1235,12 @@ loadFramework extraPaths rootname
 findFile :: (FilePath -> FilePath)      -- Maps a directory path to a file path
          -> [FilePath]                  -- Directories to look in
          -> IO (Maybe FilePath)         -- The first file path to match
-findFile _ []
-  = return Nothing
-findFile mk_file_path (dir:dirs)
-  = do  { let file_path = mk_file_path dir
-        ; b <- doesFileExist file_path
-        ; if b then
-             return (Just file_path)
-          else
-             findFile mk_file_path dirs }
+findFile _            [] = return Nothing
+findFile mk_file_path (dir : dirs)
+  = do let file_path = mk_file_path dir
+       b <- doesFileExist file_path
+       if b then return (Just file_path)
+            else findFile mk_file_path dirs
 \end{code}
 
 \begin{code}

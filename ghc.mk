@@ -184,6 +184,12 @@ include rules/way-prelims.mk
 $(foreach way,$(ALL_WAYS),\
   $(eval $(call way-prelims,$(way))))
 
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+GHCI_WAY = dyn
+else
+GHCI_WAY = v
+endif
+
 # -----------------------------------------------------------------------------
 # Compilation Flags
 
