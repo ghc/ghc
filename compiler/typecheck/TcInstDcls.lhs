@@ -511,7 +511,7 @@ cyclicDeclErr :: Outputable d => [Located d] -> TcRn ()
 cyclicDeclErr inst_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext (sLit "Cycle in type declarations: data constructor used (in a type) before it is defined"),
-		 nest 2 (vcat (map ppr_decl sorted_decls))])
+                 nest 2 (vcat (map ppr_decl sorted_decls))])
   where
     sorted_decls = sortLocated inst_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
@@ -585,8 +585,8 @@ tcLocalInstDecl (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
                 -- Dfun location is that of instance *header*
 
         ; overlap_flag <- getOverlapFlag
-        ; let dfun  	= mkDictFunId dfun_name tyvars theta clas inst_tys
-              ispec 	= mkLocalInstance dfun overlap_flag
+        ; let dfun      = mkDictFunId dfun_name tyvars theta clas inst_tys
+              ispec     = mkLocalInstance dfun overlap_flag
               inst_info = InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False }
 
         ; return ( [inst_info], fam_insts0 ++ concat fam_insts1) }

@@ -208,6 +208,9 @@ data Context = HeapContext Var
              | FocusContext
              deriving (Eq, Ord)
 
+instance Show Context where
+    show = showPpr
+
 instance Outputable Context where
     pprPrec prec (HeapContext x') = pprPrec prec x'
     pprPrec prec (StackContext i) = pprPrec prec i
