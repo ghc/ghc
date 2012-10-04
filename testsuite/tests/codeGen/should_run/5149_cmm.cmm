@@ -2,7 +2,7 @@
 
 g5149
 {
-    jump %ENTRY_CODE(Sp(0));
+    jump %ENTRY_CODE(Sp(0)) [R1];
 }
 
 /* This code is carefully arranged to tickle the bug reported in #5149 */
@@ -23,8 +23,9 @@ f5149
     }
 
   a:
-    jump g5149;
+    jump g5149 [R1];
   b:
-    RET_N(TO_W_(%f2i32(z)));
+    R1 = TO_W_(%f2i32(z));
+    jump %ENTRY_CODE(Sp(0)) [R1];
 }
 
