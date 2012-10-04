@@ -647,7 +647,9 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                                       ptext (sLit "cannot find normal object file ")
                                             <> quotes (text new_file) $$ while_linking_expr
                                else return (DotO new_file)
-            adjust_ul _ = panic "adjust_ul"
+            adjust_ul (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
+            adjust_ul (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
+            adjust_ul l@(BCOs {}) = return l
 \end{code}
 
 
