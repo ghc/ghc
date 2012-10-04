@@ -700,9 +700,18 @@ foldZipEqualM f = go
 zipMaybeWithEqual :: String
                   -> (a -> b -> c)
                   -> Maybe a -> Maybe b -> Maybe c
-zipMaybeWithEqual _ _ Nothing   Nothing = Nothing
-zipMaybeWithEqual _ f (Just x) (Just y) = Just (f x y)
-zipMaybeWithEqual msg _ _ _ = error ("zipMaybeWithEqual:" ++ msg)
+zipMaybeWithEqual _   _ Nothing   Nothing = Nothing
+zipMaybeWithEqual msg _ Nothing  (Just _) = error ("zipMaybeWithEqual(Nothing,Just):" ++ msg)
+zipMaybeWithEqual msg _ (Just _)  Nothing = error ("zipMaybeWithEqual(Just,Nothing):" ++ msg)
+zipMaybeWithEqual _   f (Just x) (Just y) = Just (f x y)
+
+
+zipPair :: (a -> b -> c)
+        -> (d -> e -> f)
+        -> (a, d)
+        -> (b, e)
+        -> (c, f)
+zipPair abc def (a, d) (b, e) = (abc a b, def d e)
 
 
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.

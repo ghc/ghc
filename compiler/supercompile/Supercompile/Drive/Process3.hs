@@ -39,7 +39,6 @@ import VarEnv     (varEnvElts)
 import Control.Monad (join)
 
 import Data.Function (on)
-import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Monoid (mempty)
@@ -47,7 +46,7 @@ import Data.Monoid (mempty)
 
 {--}
 type RollbackState = ScpM (ResidTags, Deeds, Out FVedTerm)
-type ProcessHistory = GraphicalHistory (NodeKey, (String, State, RollbackState -> ScpM ()))
+type ProcessHistory = GraphicalHistory (NodeKey, (String, State, forall b. RollbackState -> ScpM b))
 
 pROCESS_HISTORY :: ProcessHistory
 pROCESS_HISTORY = mkGraphicalHistory (cofmap sndOf3 wQO)
@@ -147,8 +146,6 @@ data ScpState = ScpState {
     scpMemoState :: MemoState,
     scpProcessHistoryState :: ProcessHistory,
     scpFulfilmentState :: FulfilmentState,
-    scpRollbackUniques :: Int,
-    scpRolledBack :: IS.IntSet,
     -- Debugging aids below this line:
     scpResidTags :: ResidTags,
     scpParentChildren :: ParentChildren
@@ -188,7 +185,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs 0 IS.empty emptyResidTags emptyParentChildren)) (ScpEnv hist 0 parent [] nothingSpeculated tag_anns)
+        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv hist 0 parent [] nothingSpeculated tag_anns)
         fulfils = fulfilments (scpFulfilmentState s')
         e' = letRec fulfils e
 
@@ -197,9 +194,8 @@ outputFreeVars :: ScpM [Id]
 outputFreeVars = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
                                        in return (varSetElems extraOutputFvs ++ concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps, s)
 
--- NB: creates one-shot continuations, so rollback may fail
-callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
-callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) (s { scpRollbackUniques = scpRollbackUniques s + 1 })) env)
+callCCM :: ((forall b. a -> ScpM b) -> ScpM a) -> ScpM a
+callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> error "callCCM: rolledBackTo failed"))) s) env)
 
 
 -- Thinking about a rollback operator suitable for type gen in "memo":
@@ -208,9 +204,9 @@ callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unRe
 --callCCM' mx act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> let mk_rb s_upd = (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s_upd of Just s'' -> jump_back (a, s''); Nothing -> return ((), s'))
 --                                                                                in unReaderT (unStateT (unScpM (fmap snd (mfix (\(~(rb, _b) -> do { b <- mx rb; s_upd <- get; return (mk_rb s_upd, b) ))) >>= act)) (s { scpRollbackUniques = scpRollbackUniques s + 1 })) env)
 
-catchM :: ((c -> ScpM ()) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
-       -> (c -> ScpM a)              -- ^ Handler deferred to if an exception is raised
-       -> ScpM a                     -- ^ Result from either the main action or the handler
+catchM :: ((forall b. c -> ScpM b) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
+       -> (c -> ScpM a)                       -- ^ Handler deferred to if an exception is raised
+       -> ScpM a                              -- ^ Result from either the main action or the handler
 catchM try handler = do
     ei_exc_res <- callCCM $ \jump_back -> fmap Right (try (jump_back . Left))
     case ei_exc_res of
@@ -220,7 +216,7 @@ catchM try handler = do
 rolledBackTo :: ScpState -> ScpState -> Maybe ScpState
 rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
   -- NB: we check scpRolledBack to ensure that rollback is *one-shot*, or else sc-rollback is dangerous for termination
-  Just (dangerous_promises, ok_promises) | not_shot -> Just $
+  Just (dangerous_promises, ok_promises) -> Just $
    let -- We have to roll back any promise on the "stack" above us:
        (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
        -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
@@ -240,13 +236,10 @@ rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
          },
        scpProcessHistoryState = scpProcessHistoryState s,
        scpFulfilmentState     = rolled_fulfilments,
-       scpRollbackUniques     = scpRollbackUniques s',
-       scpRolledBack          = IS.insert (scpRollbackUniques s) (scpRolledBack s'),
        scpResidTags           = scpResidTags s', -- FIXME: not totally accurate
        scpParentChildren      = scpParentChildren s'
      }
-  _ -> pprTrace "rollback failed" (ppr not_shot $$ on (curry ppr) (fmapTrain (map fun . uncurry (:)) (map fun) . promises . scpMemoState) s' s) Nothing
- where not_shot = scpRollbackUniques s `IS.notMember` scpRolledBack s'
+  _ -> pprTrace "rollback failed" (on (curry ppr) (fmapTrain (map fun . uncurry (:)) (map fun) . promises . scpMemoState) s' s) Nothing
 
 scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
@@ -274,7 +267,7 @@ fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (sc
 refulfillM :: Promise -> FVedTerm -> ScpM ()
 refulfillM p e' = ScpM $ StateT $ \s -> return ((), s { scpFulfilmentState = refulfill e' (scpFulfilmentState s) p })
 
-terminateM :: String -> State -> (RollbackState -> ScpM ()) -> ScpM a -> (String -> State -> (RollbackState -> ScpM ()) -> ScpM a) -> ScpM a
+terminateM :: String -> State -> (forall b. RollbackState -> ScpM b) -> ScpM a -> (String -> State -> (forall b. RollbackState -> ScpM b) -> ScpM a) -> ScpM a
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
@@ -298,11 +291,13 @@ sc' mb_h state = pprTrace "sc'" (trce1 state) $ {-# SCC "sc'" #-} case mb_h of
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $ do
-                                                           let gen = fmap (trace "sc-stop(msg)") (tryMSG sc shallow_state state) `mplus`
-                                                                     fmap (trace "sc-stop(tag)") (tryTaG sc shallow_state state) `orElse`
-                                                                          trace "sc-stop(split)" (split sc shallow_state, split sc state)
-                                                           when sC_ROLLBACK $ shallow_rb (fst gen)
-                                                           try_generalise (snd gen))
+                                                           let (mb_shallow_gen, mb_gen) = zipPair mplus mplus (tryMSG sc shallow_state state)
+                                                                                                              (tryTaG sc shallow_state state)
+                                                           case mb_shallow_gen of
+                                                             Just shallow_gen | sC_ROLLBACK           -> trace "sc-stop(rb,gen)"   $ shallow_rb shallow_gen
+                                                             Nothing | sC_ROLLBACK, Nothing <- mb_gen -> trace "sc-stop(rb,split)" $ shallow_rb (split sc shallow_state)
+                                                             _ -> case mb_gen of Just gen             -> trace "sc-stop(gen)"      $ try_generalise gen
+                                                                                 Nothing              -> trace "sc-stop(split)"    $ try_generalise (split sc state))
   where
     try_generalise gen = my_generalise gen
 
@@ -321,11 +316,14 @@ sc' mb_h state = pprTrace "sc'" (trce1 state) $ {-# SCC "sc'" #-} case mb_h of
 
 tryTaG, tryMSG :: (State -> ScpM (Deeds, Out FVedTerm))
                -> State -> State
-               -> Maybe (ScpM (ResidTags, Deeds, Out FVedTerm),
-                         ScpM (ResidTags, Deeds, Out FVedTerm))
+               -> (Maybe (ScpM (ResidTags, Deeds, Out FVedTerm)),
+                   Maybe (ScpM (ResidTags, Deeds, Out FVedTerm)))
+
+-- NB: this actually returns either (Nothing, Nothing) or (Just, Just)
 tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallow_state state
   where gen = mK_GENERALISER shallow_state state
 
+-- NB: this cannot return (Just, Nothing)
 tryMSG opt = bothWays $ \shallow_state state -> do
   msg_result@(Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   -- NB: have to check that we throw away *some* info via MSG or else we can get a loop where we
@@ -342,10 +340,10 @@ tryMSG opt = bothWays $ \shallow_state state -> do
     instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
 
 pprMSGResult :: MSGResult -> SDoc
-pprMSGResult (Pair (deeds_l, heap_l, _rn_l, k_l) (deeds_r, heap_r, _rn_r, k_r), (heap, k, qa))
+pprMSGResult (Pair (deeds_l, heap_l, rn_l, k_l) (deeds_r, heap_r, rn_r, k_r), (heap, k, qa))
   = pPrintFullState quietStatePrettiness (emptyDeeds, heap, k, qa) $$
-    pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
-    pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
+    ppr rn_l $$ pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
+    ppr rn_r $$ pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
 
 renameSCResult :: InScopeSet -> In FVedTerm -> ScpM (PureHeap, FVedTerm)
 renameSCResult ids (rn_r, e) = do
@@ -354,11 +352,9 @@ renameSCResult ids (rn_r, e) = do
         h_r'  = foldr (\x h  -> M.insert x lambdaBound h) M.empty hs
     return (h_r', renameFVedTerm ids rn_r' e)
 
--- NB: in the case of both callers, if "f" fails one way then it fails the other way as well (and likewise for success).
--- Therefore we can return a single Maybe rather than a pair of two Maybes.
-bothWays :: (a -> a -> Maybe b)
-         -> a -> a -> Maybe (b, b)
-bothWays f shallow_state state = zipMaybeWithEqual "bothWays" (,) (f state shallow_state) (f shallow_state state)
+bothWays :: (a -> a -> b)
+         -> a -> a -> (b, b)
+bothWays f shallow_state state = (f state shallow_state, f shallow_state state)
 
 insertTagsM :: (ResidTags, a, b) -> ScpM (a, b)
 insertTagsM (resid_tags, deeds, e') =
@@ -392,6 +388,18 @@ insertTagsM (resid_tags, deeds, e') =
 --
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
+
+
+-- Are rollback-loops really a problem? If we have:
+--   h0 x = let f = \x -> f x in f x
+-- And we split to:
+--   h1 x = let f = \x -> f x in f x
+-- Then we will still have the promise for h0 in the environment, so we tie back!
+--
+-- NB: if a state is in the history then we are guaranteed to have done reduce+split on it.
+-- We might still want to prevent rollback if we can generalise the current state but not the older state,
+-- but if we can't generalise either then we can roll back to split just fine.
+
 
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
