@@ -64,7 +64,7 @@ module TcRnTypes(
         Implication(..),
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocOrigin, 
         ctLocDepth, bumpCtLocDepth,
-        setCtLocOrigin,
+        setCtLocOrigin, setCtLocEnv,
 	CtOrigin(..), 
         pushErrCtxt, pushErrCtxtSameOrigin,
 
@@ -1359,6 +1359,9 @@ bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = d+1 }
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
+
+setCtLocEnv :: CtLoc -> TcLclEnv -> CtLoc
+setCtLocEnv ctl env = ctl { ctl_env = env }
 
 pushErrCtxt :: CtOrigin -> ErrCtxt -> CtLoc -> CtLoc
 pushErrCtxt o err loc@(CtLoc { ctl_env = lcl }) 
