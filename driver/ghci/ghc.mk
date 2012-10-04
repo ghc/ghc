@@ -32,6 +32,7 @@ driver/ghci_dist_C_SRCS  = ghci.c ../utils/cwrapper.c ../utils/getLocation.c
 driver/ghci_dist_CC_OPTS += -I driver/utils
 driver/ghci_dist_PROG    = ghci$(exeext)
 driver/ghci_dist_INSTALL = YES
+driver/ghci_dist_INSTALL_INPLACE = YES
 driver/ghci_dist_OTHER_OBJS = driver/ghci/ghci.res
 
 $(eval $(call build-prog,driver/ghci,dist,1))

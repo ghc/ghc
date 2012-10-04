@@ -339,6 +339,8 @@ data DynFlag
    | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Static
+   | Opt_RPath
+   | Opt_RelativeDynlibPaths
    | Opt_Hpc
 
    -- output style opts
@@ -768,15 +770,18 @@ pgm_lc dflags = sPgm_lc (settings dflags)
 opt_L                 :: DynFlags -> [String]
 opt_L dflags = sOpt_L (settings dflags)
 opt_P                 :: DynFlags -> [String]
-opt_P dflags = sOpt_P (settings dflags)
+opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_P (settings dflags)
 opt_F                 :: DynFlags -> [String]
 opt_F dflags = sOpt_F (settings dflags)
 opt_c                 :: DynFlags -> [String]
-opt_c dflags = sOpt_c (settings dflags)
+opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_c (settings dflags)
 opt_a                 :: DynFlags -> [String]
 opt_a dflags = sOpt_a (settings dflags)
 opt_l                 :: DynFlags -> [String]
-opt_l dflags = sOpt_l (settings dflags)
+opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (ways dflags)
+            ++ sOpt_l (settings dflags)
 opt_windres           :: DynFlags -> [String]
 opt_windres dflags = sOpt_windres (settings dflags)
 opt_lo                :: DynFlags -> [String]
@@ -811,13 +816,6 @@ data HscTarget
   | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
-
-showHscTargetFlag :: HscTarget -> String
-showHscTargetFlag HscC           = "-fvia-c"
-showHscTargetFlag HscAsm         = "-fasm"
-showHscTargetFlag HscLlvm        = "-fllvm"
-showHscTargetFlag HscInterpreted = "-fbyte-code"
-showHscTargetFlag HscNothing     = "-fno-code"
 
 -- | Will this target result in an object file on the disk?
 isObjectTarget :: HscTarget -> Bool
@@ -969,8 +967,6 @@ wayTag WayDyn      = "dyn"
 wayTag WayProf     = "p"
 wayTag WayEventLog = "l"
 wayTag WayPar      = "mp"
--- wayTag WayPar      = "mt"
--- wayTag WayPar      = "md"
 wayTag WayGran     = "mg"
 wayTag WayNDP      = "ndp"
 
@@ -981,8 +977,6 @@ wayRTSOnly WayDyn      = False
 wayRTSOnly WayProf     = False
 wayRTSOnly WayEventLog = True
 wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
--- wayRTSOnly WayPar      = False
 wayRTSOnly WayGran     = False
 wayRTSOnly WayNDP      = False
 
@@ -993,33 +987,14 @@ wayDesc WayDyn      = "Dynamic"
 wayDesc WayProf     = "Profiling"
 wayDesc WayEventLog = "RTS Event Logging"
 wayDesc WayPar      = "Parallel"
--- wayDesc WayPar      = "Parallel ticky profiling"
--- wayDesc WayPar      = "Distributed"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
-wayOpts :: Platform -> Way -> DynP ()
-wayOpts platform WayThreaded = do
-        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
-        -- which GHC has some problems with.  It's currently not clear whether
-        -- the problems are our fault or theirs, but it seems that using the
-        -- alternative 1:1 threading library libthr works around it:
-          let os = platformOS platform
-          case os of
-              OSFreeBSD -> upd $ addOptl "-lthr"
-              OSSolaris2 -> upd $ addOptl "-lrt"
-              _
-               | os `elem` [OSOpenBSD, OSNetBSD] ->
-                  do upd $ addOptc "-pthread"
-                     upd $ addOptl "-pthread"
-              _ ->
-                  return ()
-wayOpts _ WayDebug = return ()
-wayOpts platform WayDyn = do
-        upd $ addOptP "-DDYNAMIC"
-        upd $ addOptc "-DDYNAMIC"
-        let os = platformOS platform
-        case os of
+wayExtras :: Platform -> Way -> DynP ()
+wayExtras _ WayThreaded = return ()
+wayExtras _ WayDebug = return ()
+wayExtras platform WayDyn =
+        case platformOS platform of
             OSMinGW32 ->
                 -- On Windows, code that is to be linked into a dynamic
                 -- library must be compiled with -fPIC. Labels not in
@@ -1028,59 +1003,69 @@ wayOpts platform WayDyn = do
                 setFPIC
             OSDarwin ->
                 setFPIC
-            _ | os `elem` [OSOpenBSD, OSNetBSD] ->
-                -- Without this, linking the shared libHSffi fails
-                -- because it uses pthread mutexes.
-                upd $ addOptl "-optl-pthread"
             _ ->
                 return ()
-wayOpts _ WayProf = do
-        setDynFlag Opt_SccProfilingOn
-        upd $ addOptP "-DPROFILING"
-        upd $ addOptc "-DPROFILING"
-wayOpts _ WayEventLog = do
-        upd $ addOptP "-DTRACING"
-        upd $ addOptc "-DTRACING"
-wayOpts _ WayPar = do
-        setDynFlag Opt_Parallel
-        upd $ addOptP "-D__PARALLEL_HASKELL__"
-        upd $ addOptc "-DPAR"
-        exposePackage "concurrent"
-        upd $ addOptc "-w"
-        upd $ addOptl "-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        upd $ addOptl "-lpvm3"
-        upd $ addOptl "-lgpvm3"
-{-
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DPAR_TICKY"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
-wayOpts WayPar =
-        [ "-fparallel"
-        , "-D__PARALLEL_HASKELL__"
-        , "-D__DISTRIBUTED_HASKELL__"
-        , "-optc-DPAR"
-        , "-optc-DDIST"
-        , "-package concurrent"
-        , "-optc-w"
-        , "-optl-L${PVM_ROOT}/lib/${PVM_ARCH}"
-        , "-optl-lpvm3"
-        , "-optl-lgpvm3" ]
--}
-wayOpts _ WayGran = do
-        setDynFlag Opt_GranMacros
-        upd $ addOptP "-D__GRANSIM__"
-        upd $ addOptc "-DGRAN"
-        exposePackage "concurrent"
-wayOpts _ WayNDP = do
-        setExtensionFlag Opt_ParallelArrays
-        setDynFlag Opt_Vectorise
+wayExtras _ WayProf = setDynFlag Opt_SccProfilingOn
+wayExtras _ WayEventLog = return ()
+wayExtras _ WayPar = do setDynFlag Opt_Parallel
+                        exposePackage "concurrent"
+wayExtras _ WayGran = do setDynFlag Opt_GranMacros
+                         exposePackage "concurrent"
+wayExtras _ WayNDP = do setExtensionFlag Opt_ParallelArrays
+                        setDynFlag Opt_Vectorise
+
+wayOptc :: Platform -> Way -> [String]
+wayOptc platform WayThreaded = case platformOS platform of
+                               OSOpenBSD -> ["-pthread"]
+                               OSNetBSD  -> ["-pthread"]
+                               _         -> []
+wayOptc _ WayDebug      = []
+wayOptc _ WayDyn        = ["-DDYNAMIC"]
+wayOptc _ WayProf       = ["-DPROFILING"]
+wayOptc _ WayEventLog   = ["-DTRACING"]
+wayOptc _ WayPar        = ["-DPAR", "-w"]
+wayOptc _ WayGran       = ["-DGRAN"]
+wayOptc _ WayNDP        = []
+
+wayOptl :: Platform -> Way -> [String]
+wayOptl platform WayThreaded =
+        case platformOS platform of
+        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
+        -- which GHC has some problems with.  It's currently not clear whether
+        -- the problems are our fault or theirs, but it seems that using the
+        -- alternative 1:1 threading library libthr works around it:
+        OSFreeBSD  -> ["-lthr"]
+        OSSolaris2 -> ["-lrt"]
+        OSOpenBSD  -> ["-pthread"]
+        OSNetBSD   -> ["-pthread"]
+        _          -> []
+wayOptl _ WayDebug = []
+wayOptl platform WayDyn =
+        case platformOS platform of
+        OSOpenBSD -> -- Without this, linking the shared libHSffi fails
+                     -- because it uses pthread mutexes.
+                     ["-optl-pthread"]
+        OSNetBSD -> -- Without this, linking the shared libHSffi fails
+                    -- because it uses pthread mutexes.
+                    ["-optl-pthread"]
+        _ -> []
+wayOptl _ WayProf       = []
+wayOptl _ WayEventLog   = []
+wayOptl _ WayPar        = ["-L${PVM_ROOT}/lib/${PVM_ARCH}",
+                           "-lpvm3",
+                           "-lgpvm3"]
+wayOptl _ WayGran       = []
+wayOptl _ WayNDP        = []
+
+wayOptP :: Platform -> Way -> [String]
+wayOptP _ WayThreaded = []
+wayOptP _ WayDebug    = []
+wayOptP _ WayDyn      = ["-DDYNAMIC"]
+wayOptP _ WayProf     = ["-DPROFILING"]
+wayOptP _ WayEventLog = ["-DTRACING"]
+wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
+wayOptP _ WayGran     = ["-D__GRANSIM__"]
+wayOptP _ WayNDP      = []
 
 -----------------------------------------------------------------------------
 
@@ -1177,7 +1162,7 @@ defaultDynFlags mySettings =
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
-        flags = IntSet.fromList (map fromEnum (defaultFlags (sTargetPlatform mySettings))),
+        flags = IntSet.fromList (map fromEnum (defaultFlags mySettings)),
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
         ghciScripts = [],
         language = Nothing,
@@ -1678,7 +1663,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       ghcError (CmdLineError ("combination not supported: "  ++
                               intercalate "/" (map wayDesc theWays)))
 
-  return (dflags3, leftover, sh_warns ++ warns)
+  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+
+  return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 
 -- | Check (and potentially disable) any extensions that aren't allowed
@@ -1790,15 +1777,13 @@ dynamic_flags = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  -- -static is the default. If -dynamic has been given then, due to the
-  -- way wayOpts is currently used, we've already set -DDYNAMIC etc.
-  -- It's too fiddly to undo that, so we just give an error if
-  -- Opt_Static has been unset.
-  , Flag "static"         (noArgM (\dfs -> do unless (dopt Opt_Static dfs) (addErr "Can't use -static after -dynamic")
-                                              return dfs))
-  , Flag "dynamic"        (NoArg (unSetDynFlag Opt_Static >> addWay WayDyn))
+  , Flag "static"         (NoArg (do setDynFlag Opt_Static
+                                     removeWay WayDyn))
+  , Flag "dynamic"        (NoArg (do unSetDynFlag Opt_Static
+                                     addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
+  , Flag "relative-dynlib-paths"  (NoArg (setDynFlag Opt_RelativeDynlibPaths))
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
@@ -2290,7 +2275,8 @@ fFlags = [
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop ),
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
   ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
-  ( "hpc",                              Opt_Hpc, nop )
+  ( "hpc",                              Opt_Hpc, nop ),
+  ( "use-rpaths",                       Opt_RPath, nop )
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -2456,10 +2442,9 @@ xFlags = [
   ( "TypeHoles",                        Opt_TypeHoles, nop )
   ]
 
-defaultFlags :: Platform -> [DynFlag]
-defaultFlags platform
+defaultFlags :: Settings -> [DynFlag]
+defaultFlags settings
   = [ Opt_AutoLinkPackages,
-      Opt_Static,
 
       Opt_SharedImplib,
 
@@ -2471,7 +2456,8 @@ defaultFlags platform
       Opt_GhciSandbox,
       Opt_GhciHistory,
       Opt_HelpfulErrors,
-      Opt_ProfCountEntries
+      Opt_ProfCountEntries,
+      Opt_RPath
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -2483,6 +2469,12 @@ defaultFlags platform
             ArchX86_64         -> [Opt_PIC]
             _                  -> []
         _ -> [])
+
+    ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
+        then []
+        else [Opt_Static])
+
+    where platform = sTargetPlatform settings
 
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
@@ -2747,7 +2739,10 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 addWay :: Way -> DynP ()
 addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
-              wayOpts (targetPlatform dfs) w
+              wayExtras (targetPlatform dfs) w
+
+removeWay :: Way -> DynP ()
+removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
@@ -2881,59 +2876,16 @@ setObjTarget l = updM set
   where
    set dflags
      | isObjectTarget (hscTarget dflags)
-       = case l of
-         HscC
-          | platformUnregisterised (targetPlatform dflags) ->
-             do addWarn ("Compiler not unregisterised, so ignoring " ++ flag)
-                return dflags
-         HscAsm
-          | cGhcWithNativeCodeGen /= "YES" ->
-             do addWarn ("Compiler has no native codegen, so ignoring " ++
-                         flag)
-                return dflags
-         HscLlvm
-          | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
-            (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
-            ->
-             do addWarn ("Ignoring " ++ flag ++ " as it is incompatible with -fPIC and -dynamic on this platform")
-                return dflags
-         _ -> return $ dflags { hscTarget = l }
+       = return $ dflags { hscTarget = l }
      | otherwise = return dflags
-     where platform = targetPlatform dflags
-           arch = platformArch platform
-           os   = platformOS   platform
-           flag = showHscTargetFlag l
 
 setFPIC :: DynP ()
 setFPIC = updM set
-  where
-   set dflags
-    | cGhcWithNativeCodeGen == "YES" || platformUnregisterised (targetPlatform dflags)
-       = let platform = targetPlatform dflags
-         in case hscTarget dflags of
-            HscLlvm
-             | (platformArch platform == ArchX86_64) &&
-               (platformOS platform `elem` [OSLinux, OSDarwin]) ->
-                do addWarn "Ignoring -fPIC as it is incompatible with LLVM on this platform"
-                   return dflags
-            _ -> return $ dopt_set dflags Opt_PIC
-    | otherwise
-       = ghcError $ CmdLineError "-fPIC is not supported on this platform"
+    where set dflags = return $ dopt_set dflags Opt_PIC
 
 unSetFPIC :: DynP ()
 unSetFPIC = updM set
-  where
-   set dflags
-       = let platform = targetPlatform dflags
-         in case platformOS platform of
-            OSDarwin
-             | platformArch platform == ArchX86_64 ->
-                do addWarn "Ignoring -fno-PIC on this platform"
-                   return dflags
-            _ | not (dopt Opt_Static dflags) ->
-                do addWarn "Ignoring -fno-PIC as -fstatic is off"
-                   return dflags
-            _ -> return $ dopt_unset dflags Opt_PIC
+    where set dflags = return $ dopt_unset dflags Opt_PIC
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags
@@ -3145,6 +3097,8 @@ compilerInfo dflags
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
+       ("Dynamic by default",          if dYNAMIC_BY_DEFAULT dflags
+                                       then "YES" else "NO"),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
@@ -3183,4 +3137,49 @@ tARGET_MAX_WORD dflags
       4 -> toInteger (maxBound :: Word32)
       8 -> toInteger (maxBound :: Word64)
       w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
+
+-- Whenever makeDynFlagsConsistent does anything, it starts over, to
+-- ensure that a later change doesn't invalidate an earlier check.
+-- Be careful not to introduce potential loops!
+makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Located String])
+makeDynFlagsConsistent dflags
+ | hscTarget dflags == HscC &&
+   not (platformUnregisterised (targetPlatform dflags))
+    = if cGhcWithNativeCodeGen == "YES"
+      then let dflags' = dflags { hscTarget = HscAsm }
+               warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
+           in loop dflags' warn
+      else let dflags' = dflags { hscTarget = HscLlvm }
+               warn = "Compiler not unregisterised, so using LLVM rather than compiling via C"
+           in loop dflags' warn
+ | hscTarget dflags /= HscC &&
+   platformUnregisterised (targetPlatform dflags)
+    = loop (dflags { hscTarget = HscC })
+           "Compiler unregisterised, so compiling via C"
+ | hscTarget dflags == HscAsm &&
+   cGhcWithNativeCodeGen /= "YES"
+      = let dflags' = dflags { hscTarget = HscLlvm }
+            warn = "No native code generator, so using LLVM"
+        in loop dflags' warn
+ | hscTarget dflags == HscLlvm &&
+   not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
+   (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
+    = if cGhcWithNativeCodeGen == "YES"
+      then let dflags' = dflags { hscTarget = HscAsm }
+               warn = "Using native code generator rather than LLVM, as LLVM is incompatible with -fPIC and -dynamic on this platform"
+           in loop dflags' warn
+      else ghcError $ CmdLineError "Can't use -fPIC or -dynamic on this platform"
+ | os == OSDarwin &&
+   arch == ArchX86_64 &&
+   not (dopt Opt_PIC dflags)
+    = loop (dopt_set dflags Opt_PIC)
+           "Enabling -fPIC as it is always on for this platform"
+ | otherwise = (dflags, [])
+    where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
+          loop updated_dflags warning
+              = case makeDynFlagsConsistent updated_dflags of
+                (dflags', ws) -> (dflags', L loc warning : ws)
+          platform = targetPlatform dflags
+          arch = platformArch platform
+          os   = platformOS   platform
 

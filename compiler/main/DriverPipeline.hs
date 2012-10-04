@@ -371,7 +371,7 @@ linkingNeeded dflags linkables pkg_deps = do
                           | Just c <- map (lookupPackage pkg_map) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
-        pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
+        pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
@@ -408,9 +408,11 @@ ghcLinkInfoSectionName :: String
 ghcLinkInfoSectionName = ".debug-ghc-link-info"
    -- if we use the ".debug" prefix, then strip will strip it by default
 
-findHSLib :: [String] -> String -> IO (Maybe FilePath)
-findHSLib dirs lib = do
-  let batch_lib_file = "lib" ++ lib <.> "a"
+findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
+findHSLib dflags dirs lib = do
+  let batch_lib_file = if dopt Opt_Static dflags
+                       then "lib" ++ lib <.> "a"
+                       else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
   case found of
     [] -> return Nothing
@@ -1662,13 +1664,24 @@ linkBinary dflags o_files dep_packages = do
     -- explicit packages with the auto packages and all of their
     -- dependencies, and eliminating duplicates.
 
+    full_output_fn <- if isAbsolute output_fn
+                      then return output_fn
+                      else do d <- getCurrentDirectory
+                              return $ normalise (d </> output_fn)
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
-    let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
+    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            not (dopt Opt_Static dflags)
-            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+            = let libpath = if dopt Opt_RelativeDynlibPaths dflags
+                            then "$ORIGIN" </>
+                                 (l `makeRelativeTo` full_output_fn)
+                            else l
+                  rpath = if dopt Opt_RPath dflags
+                          then ["-Wl,-rpath",      "-Wl," ++ libpath]
+                          else []
+              in ["-L" ++ l, "-Wl,-rpath-link", "-Wl," ++ l] ++ rpath
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags

@@ -776,6 +776,14 @@ main(int argc, char *argv[])
 #endif
                                          );
 
+    constantBool("dYNAMIC_BY_DEFAULT",
+#ifdef DYNAMIC_BY_DEFAULT
+                                       1
+#else
+                                       0
+#endif
+                                         );
+
     constantInt("lDV_SHIFT", LDV_SHIFT);
     constantInteger("iLDV_CREATE_MASK",  LDV_CREATE_MASK);
     constantInteger("iLDV_STATE_CREATE", LDV_STATE_CREATE);

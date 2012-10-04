@@ -115,6 +115,13 @@ $$(foreach way,$$($1_$2_WAYS),$$(eval \
     $$(call build-package-way,$1,$2,$$(way),$3) \
   ))
 
+# Programs will need to depend on either the vanilla lib (if -static
+# is the default) or the dyn lib (if -dynamic is the default). We
+# conservatively make them depend on both, to keep things simple.
+# If dyn libs are not being built then $$($1_$2_dyn_LIB) will just
+# expand to the empty string, and be ignored.
+$1_$2_PROGRAM_DEP_LIB = $$($1_$2_v_LIB) $$($1_$2_dyn_LIB)
+
 # C and S files are possibly built the "dyn" way.
 ifeq "$$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)

@@ -26,8 +26,13 @@ GhcStage2HcOpts += -O -fwarn-tabs -dcore-lint
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    += -O -dcore-lint
+
+# We define DefaultFastGhcLibWays in this style so that the value is
+# correct even if the user alters DYNAMIC_BY_DEFAULT
+DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),v dyn,v)
+
 ifeq "$(ValidateSpeed)" "FAST"
-GhcLibWays     := v
+GhcLibWays     = $(DefaultFastGhcLibWays)
 else
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
 endif

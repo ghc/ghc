@@ -10,8 +10,9 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/ghctags_dist-install_MODULES = Main
-utils/ghctags_dist-install_HC_OPTS = -package ghc
-utils/ghctags_dist-install_INSTALL = NO
-utils/ghctags_dist-install_PROG    = ghctags$(exeext)
+utils/ghctags_dist-install_MODULES         = Main
+utils/ghctags_dist-install_HC_OPTS         = -package ghc
+utils/ghctags_dist-install_INSTALL         = NO
+utils/ghctags_dist-install_INSTALL_INPLACE = YES
+utils/ghctags_dist-install_PROG            = ghctags$(exeext)
 $(eval $(call build-prog,utils/ghctags,dist-install,2))

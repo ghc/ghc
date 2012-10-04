@@ -129,6 +129,12 @@ endif
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsPlatformList)),YES,NO)
 
+SharedLibsByDefaultPlatformList =               \
+                         x86_64-unknown-linux
+
+DYNAMIC_BY_DEFAULT = $(if $(filter $(TARGETPLATFORM),\
+	$(SharedLibsByDefaultPlatformList)),YES,NO)
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
@@ -261,7 +267,7 @@ endif
 # (see GhcWithSMP).
 GhcRTSWays += thr thr_debug thr_l
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
-GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn,)
+GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn l_dyn thr_l_dyn,)
 
 # We can only build GHCi threaded if we have a threaded RTS:
 GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
