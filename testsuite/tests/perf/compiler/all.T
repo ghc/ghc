@@ -50,7 +50,7 @@ test('T1969',
                                     #                 (^ new codegen)
                                     # 18/09/2012:     641,959,976 (amd64/Linux)
       only_ways(['normal']),
-      extra_hc_opts('-dcore-lint')
+      extra_hc_opts('-dcore-lint -static')
           # Leave -dcore-lint on for this one test, so that we have something
           # that will catch a regression in -dcore-lint performance.
       ],
@@ -126,7 +126,8 @@ test('T4801',
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('max_bytes_used', 20000000,
                                                      23000000)),
-       only_ways(['normal'])
+       only_ways(['normal']),
+       extra_hc_opts('-static')
       ],
      compile,
      [''])
@@ -207,10 +208,11 @@ test('T783',
           compiler_stats_num_field('bytes allocated', 125000000,
                                                       225000000)),
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 436927840, 10))
+          compiler_stats_range_field('bytes allocated', 436927840, 10)),
                            # prev:       349,263,216 (amd64/Linux)
                            # 07/08/2012: 384,479,856 (amd64/Linux)
                            # 29/08/2012: 436,927,840 (amd64/Linux)
+      extra_hc_opts('-static')
       ],
       compile,[''])
 

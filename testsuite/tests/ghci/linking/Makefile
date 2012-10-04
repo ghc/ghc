@@ -31,7 +31,7 @@ ghcilink002 :
 	$(RM) -rf dir002
 	mkdir dir002
 	"$(TEST_HC)" -c -dynamic f.c -o dir002/foo.o
-	"$(TEST_HC)" -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
+	"$(TEST_HC)" -no-auto-link-packages -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir002 -lfoo TestLink.hs
 
 # Test 3: ghci -lstdc++
@@ -93,7 +93,7 @@ ghcilink005 :
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
-	"$(TEST_HC)" -shared -o dir005/$(call DLL,foo) dir005/foo.o
+	"$(TEST_HC)" -no-auto-link-packages -shared -o dir005/$(call DLL,foo) dir005/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
 
 # Test 6: 

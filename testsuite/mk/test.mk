@@ -80,6 +80,12 @@ else
 RUNTEST_OPTS += -e ghc_unregisterised=0
 endif
 
+ifeq "$(GhcDynamicByDefault)" "YES"
+RUNTEST_OPTS += -e ghc_dynamic_by_default=1
+else
+RUNTEST_OPTS += -e ghc_dynamic_by_default=0
+endif
+
 ifeq "$(GhcWithSMP)" "YES"
 RUNTEST_OPTS += -e ghc_with_smp=1
 else

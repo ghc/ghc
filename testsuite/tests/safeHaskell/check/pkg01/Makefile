@@ -25,7 +25,11 @@ safePkg01:
 	'$(TEST_HC)' --make -o setup Setup.hs -v0
 
 	'$(GHC_PKG)' init local.db
-	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
+# We don't make use of -rtsopts in this test, and if it's enabled then
+# we get a warning if dynlibs are enabled by default that:
+# 	Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+# so we filter the flag out
+	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	./setup register --inplace -v0
