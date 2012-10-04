@@ -147,7 +147,6 @@ mkLiftedTupleSelector xs want_x tup_e
 termUnfoldings :: S.Term -> [(Var, S.Term)]
 termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
   where
-    -- FIXME: varBndrFreeVars?
     go new_fvs all_fvs all_xwhy_nots all_xes
       | isEmptyVarSet added_fvs = pprTrace "termUnfoldings" (vcat [hang (text why_not <> text ":") 2 (vcat (map ppr xs)) | (why_not, xs) <- groups snd fst all_xwhy_nots]) $
                                   all_xes

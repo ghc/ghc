@@ -23,8 +23,8 @@ import Util
 import Coercion
 import CoreUtils  (hashCoercion, hashType {- , hashExpr -})
 import Name       (mkSystemVarName)
-import Var        (TyVar, mkTyVar, isTyVar, isId, varType, setVarType, tyVarKind, setTyVarKind, varName, idDetails, setIdDetails, idInfo, lazySetIdInfo)
-import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId)
+import Var        (TyVar, mkTyVar, isTyVar, isId, varType, setVarType, tyVarKind, setTyVarKind, varName, idDetails, setIdDetails, idInfo, lazySetIdInfo, varUnique)
+import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId, isGlobalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
 import Pair
@@ -235,14 +235,14 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
     Right x                       -> (s0, pure x)
     Left (mb_eq, binderise, mk_s) -> case res of (_,  Left msg) -> (s0, Left msg)
                                                  (s3, Right x)  -> (s3, Right x)  -- NB: must revert state or else x_looped will be in the msgKnownVars, and pulling on it will fail the irrefutible pattern match
-      where -- The use of s here is necessary to ensure we only allocate a given common var once
-            extra_iss | Just eq <- mb_eq
-                      , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
-                      = emptyInScopeSet
-                      | otherwise
-                      = msgInScopeSet s0
-            -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
-            x1 = uniqAway (rnInScopeSet rn2 `unionInScope` extra_iss) x0
+      where x1 = case mb_eq of
+                   Just eq | eq `elemInScopeSet` msgCommonHeapVars (msgMode e) || isGlobalId eq
+                   -- The incoming x0 is always a local variable, but we better make a damn sure that we return a global variable if necessary
+                   -- TODO: maybe all global ids should be in the initial InScopeSet? Would need to change prepareTerm.
+                           -> eq
+                   -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
+                   -- The use of s here is necessary to ensure we only allocate a given common var once
+                   _       -> uniqAway (rnInScopeSet rn2 `unionInScope` msgInScopeSet s0) x0
             -- We *don't* need to uniqAway with the set of common variables (in e) because the msgInScopeSet
             -- was initialized to contain them all.
 
