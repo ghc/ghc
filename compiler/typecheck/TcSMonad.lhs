@@ -1600,28 +1600,28 @@ Main purpose: create new evidence for new_pred;
 -- NB: this allows us to sneak away with ``error'' thunks for 
 -- coercions that come from derived ids (which don't exist!) 
 
-rewriteCtFlavor (CtDerived {}) pty_new _co
-  = newDerived pty_new
-        
-rewriteCtFlavor (CtGiven { ctev_evtm = old_tm }) pty_new co
-  = do { new_ev <- newGivenEvVar pty_new new_tm  -- See Note [Bind new Givens immediately]
-       ; return (Just new_ev) }
-  where
-    new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCast optimises ReflCo
-  
-rewriteCtFlavor ctev@(CtWanted { ctev_evar = evar, ctev_pred = old_pred }) 
-                      new_pred co
+
+rewriteCtFlavor old_ev new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
-  = return (Just (if old_pred `eqType` new_pred
-                  then ctev 
-                  else ctev { ctev_pred = new_pred }))
+  = return (Just (if ctEvPred old_ev `eqType` new_pred
+                  then old_ev
+                  else old_ev { ctev_pred = new_pred }))
        -- Even if the coercion is Refl, it might reflect the result of unification alpha := ty
        -- so old_pred and new_pred might not *look* the same, and it's vital to proceed from
        -- now on using new_pred.
        -- However, if they *do* look the same, we'd prefer to stick with old_pred
        -- then retain the old type, so that error messages come out mentioning synonyms
 
-  | otherwise
+rewriteCtFlavor (CtDerived {}) new_pred _co
+  = newDerived new_pred
+        
+rewriteCtFlavor (CtGiven { ctev_evtm = old_tm }) new_pred co
+  = do { new_ev <- newGivenEvVar new_pred new_tm  -- See Note [Bind new Givens immediately]
+       ; return (Just new_ev) }
+  where
+    new_tm = mkEvCast old_tm (mkTcSymCo co)  -- mkEvCast optimises ReflCo
+  
+rewriteCtFlavor (CtWanted { ctev_evar = evar, ctev_pred = old_pred }) new_pred co
   = do { new_evar <- newWantedEvVar new_pred
        ; setEvBind evar (mkEvCast (getEvTerm new_evar) co)
        ; case new_evar of

@@ -79,7 +79,9 @@ simplifyTop wanteds
            ; simpl_top_loop wc_first_go }
     
     simpl_top_loop wc
-      | isEmptyWC wc 
+      | isEmptyWC wc || insolubleWC wc
+             -- Don't do type-class defaulting if there are insolubles
+             -- Doing so is not going to solve the insolubles
       = return wc
       | otherwise
       = do { wc_residual <- nestTcS (solve_wanteds_and_drop wc)
