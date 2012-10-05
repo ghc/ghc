@@ -114,3 +114,4 @@ test('T5424',
 
 test('FloatEq', normal, compile, [''])
 test('T7205', normal, compile, [''])
+test('T7293', normal, compile_fail, [''])
