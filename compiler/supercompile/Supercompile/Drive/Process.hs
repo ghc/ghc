@@ -638,6 +638,11 @@ type SpecRB = SpecHistory -> SpecM (SpecHistory, Deeds, Heap)
 type Depth = Train (SpecRB, Var) (SpecRB, Var)
 newtype SpecHistory = SH { unSH :: LinearHistory (State, Depth) }
 
+-- FIXME: AlreadySpeculated should be renamed when we generalise since heap bindings may change name
+
+-- NB: we can't use the domain of the heap incoming to the previous "reduce" call as the AlreadySpeculated
+-- set because normalisation may have caused some unspeculated bindings to enter the heap since the last "speculate"
+-- (e.g. consider splitting into the branch of a case where the branch has some top level lets)
 speculateHeap :: AlreadySpeculated -> (SCStats, Deeds, Heap) -> (AlreadySpeculated, (SCStats, Deeds, Heap))
 speculateHeap speculated (stats, deeds, heap@(Heap h _)) = {-# SCC "speculate" #-} (M.keysSet h', (mempty, deeds', heap'))
   where
