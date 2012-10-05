@@ -1479,7 +1479,7 @@ run_BCO:
             // Re-load the pointer to the BCO from the stg_ret_p frame,
             // it might have moved during the call.  Also reload the
             // pointers to the components of the BCO.
-            obj        = (P_)Sp[1];
+            obj        = (StgClosure*)Sp[1];
             bco        = (StgBCO*)obj;
             instrs     = (StgWord16*)(bco->instrs->payload);
             literals   = (StgWord*)(&bco->literals->payload[0]);
