@@ -566,27 +566,101 @@ nothingSpeculated = S.empty
 --
 -- (CHSC introduced the values-only behavior in 29db9669 with no comments and in the same commit that added rollback,
 -- and the behaviour was imported to GHC from there.)
+--
+-- Note [Rollback in threaded histories]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- I used to prevent any rollback at all when we detected a termination test failure against a non-ancestor.
+-- But this leads to some annoying behaviour, such as a |iterate not True| binding getting speculated to:
+--   let xs0 = x1 : xs1
+--       x1 = False
+--       xs1 = x2 : xs2
+--       x2 = True
+--       xs2 = x3 : xs3
+--       x3 = not x2
+--       xs3 = iterate not x3
+--   in Just xs0
+--
+-- Which then prevents deforesting the |not| calls because we can't push the non-value x3 into the
+-- drive of the recursive call |iterate not x3|, since it's used non-linearly!!!
+--
+-- I fixed this by rolling back to the common ancestor of the two states, which in this case means that
+-- iterate doesn't get speculated at all. When doing this we have to be very careful that we don't
+-- test the termination condition against values because otherwise if we speculated two different |True|
+-- bindings at top level we would roll back to the start of "speculate" and as a result wouldn't speculate
+-- anything in that heap at all!
+
+-- Note [Lets created by reduce are special]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Consider:
+--   let x = True
+--   in iterate not x
+--
+-- Reduce [#]:
+--   let x = True
+--       y = not x
+--       ys = iterate not y
+--   in x : ys
+--
+-- Split (x is non-linear but value):
+--   let x = True
+--       y = not x
+--   in iterate not y
+--
+-- Reduce [*]:
+--   let x = True
+--       y = not x
+--       z = not y
+--       zs = iterate not z
+--   in y : zs
+--
+-- Split (y is non-linear but not value):
+--   let z = not y
+--   in iterate not z
+--
+-- So in fact we don't get good results without *any* speculation. But notice that if we try to speculate
+-- with rollback to common ancestor, then the heap in step [#] will roll back so that no speculation
+-- occurs at all, since speculating "iterate not y" eventually speculates something that embeds into "not x"
+-- and so we roll back to the common ancestor with "y = not x" i.e. the top level!
+--
+-- For this reason I have decided to treat the top level of lets as special i.e. don't allow rolling back
+-- in such a way that it prevents speculation of the entire top level. I'm still rolling back to an enclosing
+-- speculateMany for the recursive calls, though..
+
+-- FIXME: if I speculate roughly in dependency order then GHCs inlining heuristics will have more information
+-- to work with in the reduce invocations
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
 speculate speculated (stats, (deeds, heap, k, in_e)) = (speculated', (stats', (deeds', heap', k, in_e)))
   where (speculated', (stats', deeds', heap')) = speculateHeap speculated (stats, deeds, heap)
 
-newtype SpecHistory = SH { unSH :: LinearHistory (State, [Var], SpecHistory -> SpecM ()) }
+type SpecRB = SpecHistory -> SpecM (SpecHistory, Deeds, Heap)
+type Depth = Train (SpecRB, Var) (SpecRB, Var)
+newtype SpecHistory = SH { unSH :: LinearHistory (State, Depth) }
 
 speculateHeap :: AlreadySpeculated -> (SCStats, Deeds, Heap) -> (AlreadySpeculated, (SCStats, Deeds, Heap))
 speculateHeap speculated (stats, deeds, heap@(Heap h _)) = {-# SCC "speculate" #-} (M.keysSet h', (mempty, deeds', heap'))
   where
-    hist = SH $ mkLinearHistory (cofmap fstOf3 wQO)
-    (_, deeds', heap'@(Heap h' _)) = runSpecM (speculateMany [] (M.keysSet h S.\\ speculated) hist deeds heap)
+    hist = SH $ mkLinearHistory (cofmap fst wQO)
+    -- For iterate to fuse, it's important that you choose the second of these implementations:
+    --(_, deeds', heap'@(Heap h' _)) = runSpecM (catchSpecM (\rb   -> speculateMany Loco (M.keysSet h S.\\ speculated) hist deeds heap)
+    --                                                      (\hist -> return (hist, deeds, heap)))
+    (deeds', heap'@(Heap h' _)) = S.foldr (\x' (deeds, heap) -> case runSpecM (speculateOne' Loco x' hist deeds heap) of (_, deeds, heap) -> (deeds, heap)) (deeds, heap) (M.keysSet h S.\\ speculated)
 
-    speculateMany :: [Var] -> S.Set (Out Var) -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
-    speculateMany depth xs' hist deeds heap = foldM (\(hist, deeds, heap) x' -> speculateOne depth x' hist deeds heap) (hist, deeds, heap) (S.toList xs')
+    -- For iterate to fuse, it doesn't matter which of these implementations you use:
+    speculateMany :: ((SpecRB, Var) -> Depth) -> S.Set (Out Var) -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
+    --speculateMany mk_depth xs' hist deeds heap = catchSpecM (\rb   -> foldM (\(hist, deeds, heap) x' -> speculateOne (mk_depth (rb, x')) x' hist deeds heap) (hist, deeds, heap) (S.toList xs'))
+    --                                                        (\hist -> return (hist, deeds, heap))
+    speculateMany mk_depth xs' hist deeds heap = foldM (\(hist, deeds, heap) x' -> speculateOne' mk_depth x' hist deeds heap) (hist, deeds, heap) (S.toList xs')
 
-    speculateOne :: [Var] -> Out Var -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
+    speculateOne' mk_depth x' hist deeds heap = catchSpecM (\rb   -> speculateOne (mk_depth (rb, x')) x' hist deeds heap)
+                                                           (\hist -> return (hist, deeds, heap))
+
+    speculateOne :: Depth -> Out Var -> SpecHistory -> Deeds -> Heap -> SpecM (SpecHistory, Deeds, Heap)
     speculateOne depth x' hist deeds (Heap h ids) = case M.lookup x' h of
         Just (HB InternallyBound (Right in_e))
           | spec_trace "speculate" (ppr x') True
           , let state = normalise (deeds, Heap (M.delete x' h) ids, Loco False, in_e)
-                depth' = x':depth
           -- I used to insist that evaluation should reach an *answer*, but actually it's really good if we
           -- get any cheap thing -- so questions are OK, and even cast questions are permissible (cast answers
           -- will never occur in practice).
@@ -603,7 +677,7 @@ speculateHeap speculated (stats, deeds, heap@(Heap h _)) = {-# SCC "speculate" #
           -- Then we got a residual let-binding for "add", and the two h-functions
           -- corresponding to each component of the tuple were lambda-abstracted
           -- over "add"!
-          , (deeds', Heap h' ids', k', qa') <- reduce state
+          , (reduced, (deeds', Heap h' ids', k', qa')) <- reduceWithFlag state
           --, if isNothing (isCastStack_maybe k') then spec_trace "speculate: not value" (ppr x') True else True
           -- TODO: might it not be cleaner to speculate the term with an Update frame for x' bunged on the end
           -- of the stack? In this case, I would not need to construct in_e' myself
@@ -615,16 +689,21 @@ speculateHeap speculated (stats, deeds, heap@(Heap h _)) = {-# SCC "speculate" #
             --   let dead = xs in 1 : xs `embed` let ys = 1 : ys in ys
             -- (Because the tag on the ys/xs indirections was the cons-cell tag)
             --
-            -- It's very important that we don' tjust gc the state itself because some of the h_speculated_ok
+            -- It's very important that we don't just gc the state itself because some of the h_speculated_ok
             -- bindings might be live in the original state supplied to speculate, and we don't want to drop them!
-          -> catchSpecM (\rb -> case terminate (unSH hist) (gc state, depth', rb) of
-                                  Stop (_, old_depth, old_rb) -> spec_trace "speculation denied" (ppr x') $
-                                                                 (when (old_depth `isSuffixOf` depth) (old_rb hist) >> dont_speculate hist)
-                                  Continue hist'              -> speculateMany depth' (M.keysSet h' S.\\ M.keysSet h) (SH hist') deeds' (Heap (M.insert x' (internallyBound in_e') h') ids'))
-                        dont_speculate
+
+            -- NB: it's OK not to check termination if our state was a value (possibly in some heap) before reduction
+            -- because we can't possibly recurse infinitely on such a path (due to normalisation size reduction principle)
+          -> case (if not reduced then Continue (unSH hist) else terminate (unSH hist) (gc state, depth)) of
+               Stop (_, old_depth) -> spec_trace "speculation denied" (ppr x' <+> ppr (snd (trainFirst old_depth))) $
+                                      commonAncestorRB old_depth depth hist
+               Continue hist'      -> speculateMany (`Car` depth) (M.keysSet h' S.\\ M.keysSet h) (SH hist') deeds' (Heap (M.insert x' (internallyBound in_e') h') ids')
         _ -> dont_speculate hist
       where dont_speculate hist' = return (hist', deeds, Heap h ids)
-            spec_trace msg doc = pprTrace (replicate (length depth) ' ' ++ msg) doc
+            spec_trace msg doc = pprTrace (replicate (trainLength depth) ' ' ++ msg) doc
+
+    commonAncestorRB :: Depth -> Depth -> SpecRB
+    commonAncestorRB old_depth depth = trainFirst (thirdOf3 (trainExtensionBy (\(old_rb, old_x) (_, x) -> if old_x == x then Just old_rb else Nothing) (\(old_rb, _top_x) _ -> old_rb) old_depth depth))
 
 
 type SpecM = ContT (SpecHistory, Deeds, Heap) Identity

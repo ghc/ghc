@@ -79,7 +79,7 @@ appendHead ys1 (Loco ys2)        = Loco (ys1 ++ ys2)
 leftExtension :: Train (Promise, a) b -- ^ Longer list
               -> Train (Promise, a) b -- ^ Shorter list
               -> Maybe ([(Promise, a)], Train (Promise, a) b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
-leftExtension = trainLeftExtensionBy (\orig@(p1, _) (p2, _) -> if fun p1 == fun p2 then Just orig else Nothing) (\b1 _b2 -> Just b1)
+leftExtension = trainLeftExtensionBy (\orig@(p1, _) (p2, _) -> if fun p1 == fun p2 then Just orig else Nothing) (\b1 _b2 -> b1)
     -- We can only roll back to direct ancestors, or we risk loops/other madness
 
 

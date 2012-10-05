@@ -804,6 +804,14 @@ trainCars :: Train a b -> [a]
 trainCars (Car a abs) = a : trainCars abs
 trainCars (Loco _)    = []
 
+trainFirst :: Train a a -> a
+trainFirst (Car a _) = a
+trainFirst (Loco a)  = a
+
+trainHead :: Train a b -> Maybe a
+trainHead (Car a _) = Just a
+trainHead (Loco _)  = Nothing
+
 trainCarFoldl' :: (c -> a -> c) -> c -> Train a b -> c
 trainCarFoldl' f_car = trainFoldl' f_car (\s _a -> s)
 
@@ -835,22 +843,27 @@ trainMapAccumL f_car f_loco = go
 
 {-# INLINE trainLeftExtensionBy #-}
 trainLeftExtensionBy :: (a1 -> a2 -> Maybe a)
-                     -> (b1 -> b2 -> Maybe b)
+                     -> (b1 -> b2 -> b)
                      -> Train a1 b1 -- ^ Longer list
                      -> Train a2 b2 -- ^ Shorter list
                      -> Maybe ([a1], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
-trainLeftExtensionBy f_car f_loco xs ys = do
-    loco <- f_loco xs_loco ys_loco
-    go (reverse xs_cars) (reverse ys_cars) (Loco loco)
+trainLeftExtensionBy f_car f_loco xs ys = case trainExtensionBy f_car f_loco xs ys of
+    (xs_cars, [], train) -> Just (xs_cars, train)
+    _                    -> Nothing
+
+{-# INLINE trainExtensionBy #-}
+trainExtensionBy :: (a1 -> a2 -> Maybe a)
+                 -> (b1 -> b2 -> b)
+                 -> Train a1 b1
+                 -> Train a2 b2
+                 -> ([a1], [a2], Train a b)
+trainExtensionBy f_car f_loco xs ys = go (reverse xs_cars) (reverse ys_cars) (Loco (f_loco xs_loco ys_loco))
   where
     (xs_cars, xs_loco) = trainToList xs
     (ys_cars, ys_loco) = trainToList ys
 
-    go xs_cars         []              train = Just (reverse xs_cars, train)
-    go []              _               _     = Nothing
-    go (x_car:xs_cars) (y_car:ys_cars) train = do
-        car <- f_car x_car y_car
-        go xs_cars ys_cars (Car car train)
+    go (x_car:xs_cars) (y_car:ys_cars) train | Just car <- f_car x_car y_car = go xs_cars ys_cars (Car car train)
+    go xs_cars         ys_cars         train                                 = (xs_cars, ys_cars, train)
 
 trainLength :: Train a b -> Int
 trainLength = trainCarFoldl' (\n _ -> n + 1) 0
