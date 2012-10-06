@@ -204,6 +204,9 @@ void
 exitTicker (rtsBool wait STG_UNUSED)
 {
 #if defined(USE_TIMER_CREATE)
+    // Before deleting the timer set the signal to ignore to avoid the
+    // possibility of the signal being delivered after the timer is deleted.
+    signal(ITIMER_SIGNAL, SIG_IGN);
     timer_delete(timer);
     // ignore errors - we don't really care if it fails.
 #endif
