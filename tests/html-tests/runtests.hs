@@ -68,12 +68,12 @@ test = do
   (_, conf) <- configure normal (Just ghcPath) Nothing defaultProgramConfiguration
   pkgIndex <- getInstalledPackages normal [GlobalPackageDB] conf
   let mkDep pkgName =
-        maybe (error "Couldn't find test dependencies") id $ do
+        fromMaybe (error "Couldn't find test dependencies") $ do
           let pkgs = lookupPackageName pkgIndex (PackageName pkgName)
-          (_, pkgs') <- safeHead pkgs
-          pkg <- safeHead pkgs'
-          ifacePath <- safeHead (haddockInterfaces pkg)
-          htmlPath <- safeHead (haddockHTMLs pkg)
+          (_, pkgs') <- listToMaybe pkgs
+          pkg <- listToMaybe pkgs'
+          ifacePath <- listToMaybe (haddockInterfaces pkg)
+          htmlPath <- listToMaybe (haddockHTMLs pkg)
           return ("-i " ++ htmlPath ++ "," ++ ifacePath)
 
   let base    = mkDep "base"
@@ -90,10 +90,6 @@ test = do
   wait handle "*** Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
   where
-
-    safeHead :: [a] -> Maybe a
-    safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
-
     wait :: ProcessHandle -> String -> IO ()
     wait h msg = do
       r <- waitForProcess h
