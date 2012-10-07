@@ -10,12 +10,13 @@ import Distribution.Simple.PackageIndex
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Verbosity
+import System.IO
 import System.Cmd
 import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
-import System.Process (runProcess, waitForProcess)
+import System.Process (ProcessHandle, runProcess, waitForProcess)
 
 
 packageRoot, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
@@ -54,12 +55,12 @@ test = do
   putStrLn "Haddock version: "
   h1 <- runProcess haddockPath ["--version"] Nothing
                    env Nothing Nothing Nothing
-  waitForProcess h1
+  wait h1 "*** Running `haddock --version' failed!"
   putStrLn ""
   putStrLn "GHC version: "
   h2 <- runProcess haddockPath ["--ghc-version"] Nothing
                    env Nothing Nothing Nothing
-  waitForProcess h2
+  wait h2 "*** Running `haddock --ghc-version' failed!"
   putStrLn ""
 
   -- TODO: maybe do something more clever here using haddock.cabal
@@ -86,12 +87,19 @@ test = do
                        Nothing env Nothing
                        Nothing Nothing
 
-  code <- waitForProcess handle
-  when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
+  wait handle "*** Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
   where
+
+    safeHead :: [a] -> Maybe a
     safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
 
+    wait :: ProcessHandle -> String -> IO ()
+    wait h msg = do
+      r <- waitForProcess h
+      unless (r == ExitSuccess) $ do
+        hPutStrLn stderr msg
+        exitFailure
 
 check :: [FilePath] -> Bool -> IO ()
 check modules strict = do
@@ -114,10 +122,13 @@ check modules strict = do
             writeFile reffile' ref'
             writeFile outfile' out'
             r <- programOnPath "colordiff"
-            if r
+            code <- if r
               then system $ "colordiff " ++ reffile' ++ " " ++ outfile'
               else system $ "diff " ++ reffile' ++ " " ++ outfile'
             if strict then exitFailure else return ()
+            unless (code == ExitSuccess) $ do
+              hPutStrLn stderr "*** Running diff failed!"
+              exitFailure
           else do
             putStrLn $ "Pass: " ++ mod
       else do
