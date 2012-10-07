@@ -43,15 +43,19 @@ test = do
           _ -> filter ((==) ".hs" . takeExtension) contents
 
   let mods' = map (testDir </>) mods
+
+  env_ <- getEnvironment
+  let env = Just (("haddock_datadir", packageRoot) : env_)
+
   putStrLn ""
   putStrLn "Haddock version: "
   h1 <- runProcess haddockPath ["--version"] Nothing
-                   (Just [("haddock_datadir", packageRoot)]) Nothing Nothing Nothing
+                   env Nothing Nothing Nothing
   waitForProcess h1
   putStrLn ""
   putStrLn "GHC version: "
   h2 <- runProcess haddockPath ["--ghc-version"] Nothing
-                   (Just [("haddock_datadir", packageRoot)]) Nothing Nothing Nothing
+                   env Nothing Nothing Nothing
   waitForProcess h2
   putStrLn ""
 
@@ -77,7 +81,7 @@ test = do
   handle <- runProcess haddockPath
                        (["-w", "-o", outDir, "-h", "--pretty-html", "--optghc=-fglasgow-exts"
                         , "--optghc=-w", base, process, ghcprim] ++ opts ++ mods')
-                       Nothing (Just [("haddock_datadir", packageRoot)]) Nothing
+                       Nothing env Nothing
                        Nothing Nothing
 
   code <- waitForProcess handle
