@@ -53,28 +53,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
 	  ><span class="keyword"
 	    >class</span
 	    >  <a href=""
-	    >Monad</a
-	    > m  <span class="keyword"
+	    >IsString</a
+	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
 	      ><a href=""
-		>(&gt;&gt;=)</a
-		> ::  m a -&gt; (a -&gt; m b) -&gt; m b</li
-	      ><li
-	      ><a href=""
-		>(&gt;&gt;)</a
-		> ::  m a -&gt; m b -&gt; m b</li
-	      ><li
-	      ><a href=""
-		>return</a
-		> ::  a -&gt; m a</li
-	      ><li
-	      ><a href=""
-		>fail</a
-		> ::  <a href=""
+		>fromString</a
+		> :: <a href=""
 		>String</a
-		> -&gt; m a</li
+		> -&gt; a</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
@@ -140,191 +128,39 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
 	><p class="src"
 	  ><span class="keyword"
 	    >class</span
-	    >  <a name="t:Monad" class="def"
-	    >Monad</a
-	    > m  <span class="keyword"
+	    >  <a name="t:IsString" class="def"
+	    >IsString</a
+	    > a  <span class="keyword"
 	    >where</span
 	    ></p
 	  ><div class="doc"
 	  ><p
-	    >The <code
-	      ><a href=""
-		>Monad</a
-		></code
-	      > class defines the basic operations over a <em
-	      >monad</em
-	      >,
-a concept from a branch of mathematics known as <em
-	      >category theory</em
-	      >.
-From the perspective of a Haskell programmer, however, it is best to
-think of a monad as an <em
-	      >abstract datatype</em
-	      > of actions.
-Haskell's <code
-	      >do</code
-	      > expressions provide a convenient syntax for writing
-monadic expressions.
-</p
-	    ><p
-	    >Minimal complete definition: <code
-	      ><a href=""
-		>&gt;&gt;=</a
-		></code
-	      > and <code
-	      ><a href=""
-		>return</a
-		></code
-	      >.
-</p
-	    ><p
-	    >Instances of <code
-	      ><a href=""
-		>Monad</a
-		></code
-	      > should satisfy the following laws:
-</p
-	    ><pre
-	    > return a &gt;&gt;= k  ==  k a
- m &gt;&gt;= return  ==  m
- m &gt;&gt;= (\x -&gt; k x &gt;&gt;= h)  ==  (m &gt;&gt;= k) &gt;&gt;= h
-</pre
-	    ><p
-	    >Instances of both <code
-	      ><a href=""
-		>Monad</a
-		></code
-	      > and <code
-	      ><a href=""
-		>Functor</a
-		></code
-	      > should additionally satisfy the law:
-</p
-	    ><pre
-	    > fmap f xs  ==  xs &gt;&gt;= return . f
-</pre
-	    ><p
-	    >The instances of <code
-	      ><a href=""
-		>Monad</a
-		></code
-	      > for lists, <code
-	      ><a href=""
-		>Maybe</a
-		></code
-	      > and <code
-	      ><a href=""
-		>IO</a
-		></code
-	      >
-defined in the <a href=""
-	      >Prelude</a
-	      > satisfy these laws.
+	    >Class for string-like datastructures; used by the overloaded string
+   extension (-foverloaded-strings in GHC).
 </p
 	    ></div
 	  ><div class="subs methods"
 	  ><p class="caption"
 	    >Methods</p
 	    ><p class="src"
-	    ><a name="v:-62--62--61-" class="def"
-	      >(&gt;&gt;=)</a
-	      > ::  m a -&gt; (a -&gt; m b) -&gt; m b</p
-	    ><div class="doc"
-	    ><p
-	      >Sequentially compose two actions, passing any value produced
- by the first as an argument to the second.
-</p
-	      ></div
-	    ><p class="src"
-	    ><a name="v:-62--62-" class="def"
-	      >(&gt;&gt;)</a
-	      > ::  m a -&gt; m b -&gt; m b</p
-	    ><div class="doc"
-	    ><p
-	      >Sequentially compose two actions, discarding any value produced
- by the first, like sequencing operators (such as the semicolon)
- in imperative languages.
-</p
-	      ></div
-	    ><p class="src"
-	    ><a name="v:return" class="def"
-	      >return</a
-	      > ::  a -&gt; m a</p
-	    ><div class="doc"
-	    ><p
-	      >Inject a value into the monadic type.
-</p
-	      ></div
-	    ><p class="src"
-	    ><a name="v:fail" class="def"
-	      >fail</a
-	      > ::  <a href=""
+	    ><a name="v:fromString" class="def"
+	      >fromString</a
+	      > :: <a href=""
 	      >String</a
-	      > -&gt; m a</p
-	    ><div class="doc"
-	    ><p
-	      >Fail with a message.  This operation is not part of the
- mathematical definition of a monad, but is invoked on pattern-match
- failure in a <code
-		>do</code
-		> expression.
-</p
-	      ></div
+	      > -&gt; a</p
 	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:Monad" class="caption collapser" onclick="toggleSection('i:Monad')"
+	  ><p id="control.i:IsString" class="caption collapser" onclick="toggleSection('i:IsString')"
 	    >Instances</p
-	    ><div id="section.i:Monad" class="show"
+	    ><div id="section.i:IsString" class="show"
 	    ><table
 	      ><tr
 		><td class="src"
 		  ><a href=""
-		    >Monad</a
-		    > []</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > <a href=""
-		    >IO</a
-		    ></td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > Q</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > <a href=""
-		    >Maybe</a
-		    ></td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > PprM</td
-		  ><td class="doc empty"
-		  >&nbsp;</td
-		  ></tr
-		><tr
-		><td class="src"
-		  ><a href=""
-		    >Monad</a
-		    > ((-&gt;) r)</td
+		    >IsString</a
+		    > [<a href=""
+		    >Char</a
+		    >]</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr

@@ -1,3 +1,4 @@
-module CrossPackageDocs (map, Monad(..), runInteractiveProcess) where
+module CrossPackageDocs (map, IsString(..), runInteractiveProcess) where
 
 import System.Process
+import Data.String

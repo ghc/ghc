@@ -30,8 +30,8 @@ window.onload = function () {pageLoad();};
 	><span class="keyword"
 	  >class</span
 	  > <a href="" target="main"
-	  >Monad</a
-	  > m</p
+	  >IsString</a
+	  > a</p
 	></div
       ><div class="top"
       ><p class="src"
