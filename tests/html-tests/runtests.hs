@@ -1,8 +1,9 @@
+import Prelude hiding (mod)
 import Control.Monad
 import Data.List
 import Data.Maybe
 import Distribution.InstalledPackageInfo
-import Distribution.Package
+import Distribution.Package (PackageName (..))
 import Distribution.Simple.Compiler
 import Distribution.Simple.GHC
 import Distribution.Simple.PackageIndex
@@ -14,10 +15,10 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
-import System.Process
-import Text.Printf
+import System.Process (runProcess, waitForProcess)
 
 
+packageRoot, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
 packageRoot   = "."
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
 testSuiteRoot = packageRoot </> "tests" </> "html-tests"
@@ -25,11 +26,13 @@ testDir       = testSuiteRoot </> "tests"
 outDir        = testSuiteRoot </> "output"
 
 
+main :: IO ()
 main = do
   test
   putStrLn "All tests passed!"
 
 
+test :: IO ()
 test = do
   x <- doesFileExist haddockPath
   unless x $ die "you need to run 'cabal build' successfully first"
@@ -39,7 +42,7 @@ test = do
   let (opts, spec) = span ("-" `isPrefixOf`) args
   let mods =
         case spec of
-          x:_ | x /= "all" -> [x ++ ".hs"]
+          y:_ | y /= "all" -> [y ++ ".hs"]
           _ -> filter ((==) ".hs" . takeExtension) contents
 
   let mods' = map (testDir </>) mods
@@ -63,7 +66,6 @@ test = do
   ghcPath <- fmap init $ rawSystemStdout normal haddockPath ["--print-ghc-path"]
   (_, conf) <- configure normal (Just ghcPath) Nothing defaultProgramConfiguration
   pkgIndex <- getInstalledPackages normal [GlobalPackageDB] conf
-  let safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
   let mkDep pkgName =
         maybe (error "Couldn't find test dependencies") id $ do
           let pkgs = lookupPackageName pkgIndex (PackageName pkgName)
@@ -87,8 +89,11 @@ test = do
   code <- waitForProcess handle
   when (code /= ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods (if not (null args) && args !! 0 == "all" then False else True)
+  where
+    safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
 
 
+check :: [FilePath] -> Bool -> IO ()
 check modules strict = do
   forM_ modules $ \mod -> do
     let outfile = outDir  </> dropExtension mod ++ ".html"
@@ -108,8 +113,8 @@ check modules strict = do
                 outfile' = outDir </> takeFileName outfile ++ ".nolinks"
             writeFile reffile' ref'
             writeFile outfile' out'
-            b <- programOnPath "colordiff"
-            if b
+            r <- programOnPath "colordiff"
+            if r
               then system $ "colordiff " ++ reffile' ++ " " ++ outfile'
               else system $ "diff " ++ reffile' ++ " " ++ outfile'
             if strict then exitFailure else return ()
@@ -119,8 +124,10 @@ check modules strict = do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
 
 
+haddockEq :: String -> String -> Bool
 haddockEq file1 file2 = stripLinks file1 == stripLinks file2
 
+stripLinks :: String -> String
 stripLinks str =
   let prefix = "<a href=\"" in
   case stripPrefix prefix str of
@@ -130,7 +137,7 @@ stripLinks str =
         [] -> []
         x : xs -> x : stripLinks xs
 
+programOnPath :: FilePath -> IO Bool
 programOnPath p = do
   result <- findProgramLocation silent p
   return (isJust result)
-
