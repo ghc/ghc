@@ -11,9 +11,6 @@
 --
 -------------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-missing-fields #-}
--- So that tracingSettings works properly
-
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
