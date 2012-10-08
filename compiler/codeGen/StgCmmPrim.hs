@@ -1069,27 +1069,30 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
               -> FCode ()
 emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
     dflags <- getDynFlags
-    -- Passed as arguments (be careful)
-    src     <- assignTempE src0
-    src_off <- assignTempE src_off0
-    dst     <- assignTempE dst0
-    dst_off <- assignTempE dst_off0
     n       <- assignTempE n0
+    nonzero <- getCode $ do
+        -- Passed as arguments (be careful)
+        src     <- assignTempE src0
+        src_off <- assignTempE src_off0
+        dst     <- assignTempE dst0
+        dst_off <- assignTempE dst_off0
 
-    -- Set the dirty bit in the header.
-    emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+        -- Set the dirty bit in the header.
+        emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
-    dst_elems_p <- assignTempE $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
-    dst_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p dst_off
-    src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
-    bytes <- assignTempE $ cmmMulWord dflags n (mkIntExpr dflags (wORD_SIZE dflags))
+        dst_elems_p <- assignTempE $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
+        dst_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p dst_off
+        src_p <- assignTempE $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
+        bytes <- assignTempE $ cmmMulWord dflags n (mkIntExpr dflags (wORD_SIZE dflags))
 
-    copy src dst dst_p src_p bytes
+        copy src dst dst_p src_p bytes
 
-    -- The base address of the destination card table
-    dst_cards_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p (loadArrPtrsSize dflags dst)
+        -- The base address of the destination card table
+        dst_cards_p <- assignTempE $ cmmOffsetExprW dflags dst_elems_p (loadArrPtrsSize dflags dst)
 
-    emitSetCards dst_off dst_cards_p n
+        emitSetCards dst_off dst_cards_p n
+
+    emit =<< mkCmmIfThen (cmmNeWord dflags n (mkIntExpr dflags 0)) nonzero
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
@@ -1137,14 +1140,16 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
--- number of cards).  Marks the relevant cards as dirty.
+-- number of cards). The number of elements may not be zero.
+-- Marks the relevant cards as dirty.
 emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetCards dst_start dst_cards_start n = do
     dflags <- getDynFlags
     start_card <- assignTempE $ card dflags dst_start
+    let end_card = card dflags (cmmSubWord dflags (cmmAddWord dflags dst_start n) (mkIntExpr dflags 1))
     emitMemsetCall (cmmAddWord dflags dst_cards_start start_card)
         (mkIntExpr dflags 1)
-        (cardRoundUp dflags n)
+        (cmmAddWord dflags (cmmSubWord dflags end_card start_card) (mkIntExpr dflags 1))
         (mkIntExpr dflags 1) -- no alignment (1 byte)
 
 -- Convert an element index to a card index
