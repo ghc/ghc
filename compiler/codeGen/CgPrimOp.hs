@@ -994,26 +994,27 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
     dflags <- getDynFlags
     -- Assign the arguments to temporaries so the code generator can
     -- calculate liveness for us.
-    src <- assignTemp_ src0
-    src_off <- assignTemp_ src_off0
-    dst <- assignTemp_ dst0
-    dst_off <- assignTemp_ dst_off0
     n <- assignTemp_ n0
+    emitIf (cmmNeWord dflags n (CmmLit (mkIntCLit dflags 0))) $ do
+        src <- assignTemp_ src0
+        src_off <- assignTemp_ src_off0
+        dst <- assignTemp_ dst0
+        dst_off <- assignTemp_ dst_off0
 
-    -- Set the dirty bit in the header.
-    stmtC (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+        -- Set the dirty bit in the header.
+        stmtC (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
-    dst_elems_p <- assignTemp $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
-    dst_p <- assignTemp $ cmmOffsetExprW dflags dst_elems_p dst_off
-    src_p <- assignTemp $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
-    bytes <- assignTemp $ cmmMulWord dflags n (CmmLit (mkIntCLit dflags (wORD_SIZE dflags)))
+        dst_elems_p <- assignTemp $ cmmOffsetB dflags dst (arrPtrsHdrSize dflags)
+        dst_p <- assignTemp $ cmmOffsetExprW dflags dst_elems_p dst_off
+        src_p <- assignTemp $ cmmOffsetExprW dflags (cmmOffsetB dflags src (arrPtrsHdrSize dflags)) src_off
+        bytes <- assignTemp $ cmmMulWord dflags n (CmmLit (mkIntCLit dflags (wORD_SIZE dflags)))
 
-    copy src dst dst_p src_p bytes live
+        copy src dst dst_p src_p bytes live
 
-    -- The base address of the destination card table
-    dst_cards_p <- assignTemp $ cmmOffsetExprW dflags dst_elems_p (loadArrPtrsSize dflags dst)
+        -- The base address of the destination card table
+        dst_cards_p <- assignTemp $ cmmOffsetExprW dflags dst_elems_p (loadArrPtrsSize dflags dst)
 
-    emitSetCards dst_off dst_cards_p n live
+        emitSetCards dst_off dst_cards_p n live
 
 -- | Takes an info table label, a register to return the newly
 -- allocated array in, a source array, an offset in the source array,
@@ -1065,14 +1066,16 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
--- number of cards).  Marks the relevant cards as dirty.
+-- number of cards). The number of elements may not be zero.
+-- Marks the relevant cards as dirty.
 emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> StgLiveVars -> Code
 emitSetCards dst_start dst_cards_start n live = do
     dflags <- getDynFlags
     start_card <- assignTemp $ card dflags dst_start
+    let end_card = card dflags (cmmAddWord dflags dst_start n)
     emitMemsetCall (cmmAddWord dflags dst_cards_start start_card)
         (CmmLit (mkIntCLit dflags 1))
-        (cardRoundUp dflags n)
+        (cmmAddWord dflags (cmmSubWord dflags end_card start_card) (CmmLit (mkIntCLit dflags 1)))
         (CmmLit (mkIntCLit dflags 1)) -- no alignment (1 byte)
         live
 
