@@ -317,7 +317,7 @@ withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
         ghcActs dynflags'''
   `finally` restoreStaticFlagGlobals savedFlags
   where
-    parseGhcFlags :: Monad m => DynFlags -> [Located String]
+    parseGhcFlags :: MonadIO m => DynFlags -> [Located String]
                   -> [String] -> m DynFlags
     parseGhcFlags dynflags flags_ origFlags = do
       -- TODO: handle warnings?
