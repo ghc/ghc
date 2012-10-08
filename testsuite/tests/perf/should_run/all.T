@@ -242,8 +242,8 @@ test('T7257',
           stats_range_field('bytes allocated', 1150000000, 10)),
                            # expected value: 1246287228 (i386/Linux)
       if_wordsize(32,
-          stats_range_field('peak_megabytes_allocated', 150, 5)),
-                           # unkonwn
+          stats_range_field('peak_megabytes_allocated', 217, 5)),
+                           # 2012-10-08: 217 (x86/Linux)
       if_wordsize(64,
           stats_range_field('bytes allocated', 1774893760, 5)),
                            # 2012-09-21: 1774893760 (amd64/Linux)
