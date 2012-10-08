@@ -394,6 +394,8 @@ simplifyInfer _top_lvl apply_mr name_taus (untch,wanteds)
              final_quant_candidates = map ctPred $ bagToList $
                                       keepWanted (wc_flat quant_candidates_transformed)
              -- NB: Already the fixpoint of any unifications that may have happened
+             -- But need to zonk out the flatten-skolems
+       ; final_quant_candidates <- mapM zonkTcType final_quant_candidates
                   
        ; gbl_tvs        <- tcGetGlobalTyVars -- TODO: can we just use untch instead of gbl_tvs?
        ; zonked_tau_tvs <- zonkTyVarsAndFV zonked_tau_tvs
