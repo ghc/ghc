@@ -1180,7 +1180,7 @@ scTopBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, CoreBind)
 scTopBind env (Rec prs)
   | Just threshold <- sc_size env
   , not force_spec
-  , not (all (couldBeSmallEnoughToInline threshold) rhss)
+  , not (all (couldBeSmallEnoughToInline (sc_dflags env) threshold) rhss)
 		-- No specialisation
   = do	{ let (rhs_env,bndrs') = extendRecBndrs env bndrs
 	; (_, rhss') <- mapAndUnzipM (scExpr rhs_env) rhss

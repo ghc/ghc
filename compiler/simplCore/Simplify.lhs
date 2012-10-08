@@ -654,7 +654,8 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
         -- Simplify the unfolding
       ; new_unfolding <- simplUnfolding env top_lvl old_bndr final_rhs old_unf
 
-      ; if postInlineUnconditionally env top_lvl new_bndr occ_info
+      ; dflags <- getDynFlags
+      ; if postInlineUnconditionally dflags env top_lvl new_bndr occ_info
                                      final_rhs new_unfolding
 
                         -- Inline and discard the binding
@@ -749,7 +750,8 @@ simplUnfolding env top_lvl id _
            _other              -- Happens for INLINABLE things
               -> let bottoming = isBottomingId id
                  in bottoming `seq` -- See Note [Force bottoming field]
-                    return (mkUnfolding src' is_top_lvl bottoming expr')
+                    do dflags <- getDynFlags
+                       return (mkUnfolding dflags src' is_top_lvl bottoming expr')
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
@@ -762,7 +764,8 @@ simplUnfolding env top_lvl id _
 simplUnfolding _ top_lvl id new_rhs _
   = let bottoming = isBottomingId id
     in bottoming `seq`  -- See Note [Force bottoming field]
-       return (mkUnfolding InlineRhs (isTopLevel top_lvl) bottoming new_rhs)
+       do dflags <- getDynFlags
+          return (mkUnfolding dflags InlineRhs (isTopLevel top_lvl) bottoming new_rhs)
           -- We make an  unfolding *even for loop-breakers*.
           -- Reason: (a) It might be useful to know that they are WHNF
           --         (b) In TidyPgm we currently assume that, if we want to
@@ -2008,23 +2011,26 @@ simplAlt env scrut imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
 
 simplAlt env scrut _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
   = ASSERT( null bndrs )
-    do  { let env' = addBinderUnfolding env scrut case_bndr'
-                                        (mkSimpleUnfolding (Lit lit))
+    do  { dflags <- getDynFlags
+        ; let env' = addBinderUnfolding env scrut case_bndr'
+                                        (mkSimpleUnfolding dflags (Lit lit))
         ; rhs' <- simplExprC env' rhs cont'
         ; return (LitAlt lit, [], rhs') }
 
 simplAlt env scrut _ case_bndr' cont' (DataAlt con, vs, rhs)
-  = do  {       -- Deal with the pattern-bound variables
+  = do  { dflags <- getDynFlags
+
+                -- Deal with the pattern-bound variables
                 -- Mark the ones that are in ! positions in the
                 -- data constructor as certainly-evaluated.
                 -- NB: simplLamBinders preserves this eval info
-          let vs_with_evals = add_evals (dataConRepStrictness con)
+        ; let vs_with_evals = add_evals (dataConRepStrictness con)
         ; (env', vs') <- simplLamBndrs env vs_with_evals
 
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
               con_args  = map Type inst_tys' ++ varsToCoreExprs vs'
-              unf       = mkSimpleUnfolding (mkConApp con con_args)
+              unf       = mkSimpleUnfolding dflags (mkConApp con con_args)
               env''     = addBinderUnfolding env' scrut case_bndr' unf
 
         ; rhs' <- simplExprC env'' rhs cont'

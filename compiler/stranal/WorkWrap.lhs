@@ -261,11 +261,11 @@ tryWW dflags is_rec fn_id rhs
   | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
   	-- See Note [Thunk splitting]
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
-    checkSize new_fn_id rhs $ 
+    checkSize dflags new_fn_id rhs $ 
     splitThunk dflags new_fn_id rhs
 
   | is_fun && worthSplittingFun wrap_dmds res_info
-  = checkSize new_fn_id rhs $
+  = checkSize dflags new_fn_id rhs $
     splitFun dflags new_fn_id fn_info wrap_dmds res_info rhs
 
   | otherwise
@@ -294,9 +294,9 @@ tryWW dflags is_rec fn_id rhs
     is_thunk  = not is_fun && not (exprIsHNF rhs)
 
 ---------------------
-checkSize :: Id -> CoreExpr
+checkSize :: DynFlags -> Id -> CoreExpr
 	  -> UniqSM [(Id,CoreExpr)] -> UniqSM [(Id,CoreExpr)]
-checkSize fn_id rhs thing_inside
+checkSize dflags fn_id rhs thing_inside
   | isStableUnfolding (realIdUnfolding fn_id)
   = return [ (fn_id, rhs) ]
       -- See Note [Don't w/w INLINE things]
@@ -304,7 +304,7 @@ checkSize fn_id rhs thing_inside
       -- NB: use realIdUnfolding because we want to see the unfolding
       --     even if it's a loop breaker!
 
-  | certainlyWillInline (idUnfolding fn_id)
+  | certainlyWillInline dflags (idUnfolding fn_id)
   = return [ (fn_id `setIdUnfolding` inline_rule, rhs) ]
 	-- Note [Don't w/w inline small non-loop-breaker things]
 	-- NB: use idUnfolding because we don't want to apply

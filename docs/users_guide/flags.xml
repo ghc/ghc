@@ -1732,28 +1732,28 @@
           <row>
             <entry><option>-funfolding-creation-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-creation-threshold</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-fun-discount</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-fun-discount</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-keeness-factor</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-keeness-factor</option></entry>
           </row>
 
           <row>
             <entry><option>-funfolding-use-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry><option>-fno-unfolding-use-threshold</option></entry>
           </row>
 

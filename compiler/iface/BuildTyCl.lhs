@@ -37,6 +37,7 @@ import TyCon
 import Type
 import Coercion
 
+import DynFlags
 import TcRnMonad
 import Util
 import Outputable
@@ -205,6 +206,8 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
   = fixM  $ \ rec_clas -> 	-- Only name generation inside loop
     do	{ traceIf (text "buildClass")
+        ; dflags <- getDynFlags
+
 	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
 		-- because one should import the class to get the binding for 
@@ -217,7 +220,7 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 	      -- Make selectors for the superclasses 
 	; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc) 
 				[1..length sc_theta]
-        ; let sc_sel_ids = [ mkDictSelId no_unf sc_name rec_clas 
+        ; let sc_sel_ids = [ mkDictSelId dflags no_unf sc_name rec_clas 
                            | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors. Thus
@@ -282,13 +285,14 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
   where
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _) 
-      = do { dm_info <- case dm_spec of
+      = do { dflags <- getDynFlags
+           ; dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
                           GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
 			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
-           ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }
+           ; return (mkDictSelId dflags no_unf op_name rec_clas, dm_info) }
 \end{code}
 
 Note [Class newtypes and equality predicates]

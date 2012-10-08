@@ -646,6 +646,15 @@ data DynFlags = DynFlags {
   --     flattenExtensionFlags language extensions
   extensionFlags        :: IntSet,
 
+  -- Unfolding control
+  -- See Note [Discounts and thresholds] in CoreUnfold
+  ufCreationThreshold   :: Int,
+  ufUseThreshold        :: Int,
+  ufFunAppDiscount      :: Int,
+  ufDictDiscount        :: Int,
+  ufKeenessFactor       :: Float,
+  ufDearOp              :: Int,
+
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
   flushOut              :: FlushOut,
@@ -1173,6 +1182,21 @@ defaultDynFlags mySettings =
         warnUnsafeOnLoc = noSrcSpan,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
+
+        -- The ufCreationThreshold threshold must be reasonably high to
+        -- take account of possible discounts.
+        -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to inline
+        -- into Csg.calc (The unfolding for sqr never makes it into the
+        -- interface file.)
+        ufCreationThreshold = 750,
+        ufUseThreshold      = 60,
+        ufFunAppDiscount    = 60,
+        -- Be fairly keen to inline a fuction if that means
+        -- we'll be able to pick the right method from a dictionary
+        ufDictDiscount      = 30,
+        ufKeenessFactor     = 1.5,
+        ufDearOp            = 40,
+
         log_action = defaultLogAction,
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
@@ -2027,6 +2051,12 @@ dynamic_flags = [
   , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
   , Flag "fhistory-size"               (intSuffix (\n d -> d{ historySize = n }))
 
+  , Flag "funfolding-creation-threshold" (intSuffix   (\n d -> d {ufCreationThreshold = n}))
+  , Flag "funfolding-use-threshold"      (intSuffix   (\n d -> d {ufUseThreshold = n}))
+  , Flag "funfolding-fun-discount"       (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
+  , Flag "funfolding-dict-discount"      (intSuffix   (\n d -> d {ufDictDiscount = n}))
+  , Flag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
+
         ------ Profiling ----------------------------------------------------
 
         -- OLD profiling flags
@@ -2711,6 +2741,9 @@ sepArg fn = SepArg (upd . fn)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
+
+floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+floatSuffix fn = FloatSuffix (\n -> upd (fn n))
 
 optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
               -> OptKind (CmdLineP DynFlags)

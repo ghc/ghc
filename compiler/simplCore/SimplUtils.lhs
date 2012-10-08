@@ -922,14 +922,14 @@ story for now.
 
 \begin{code}
 postInlineUnconditionally 
-    :: SimplEnv -> TopLevelFlag
+    :: DynFlags -> SimplEnv -> TopLevelFlag
     -> OutId		-- The binder (an InId would be fine too)
        			--            (*not* a CoVar)
     -> OccInfo 		-- From the InId
     -> OutExpr
     -> Unfolding
     -> Bool
-postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
+postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
   | not active		        = False
   | isWeakLoopBreaker occ_info  = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
@@ -952,7 +952,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 	-- This is very important in practice; e.g. wheel-seive1 doubles 
 	-- in allocation if you miss this out
       OneOcc in_lam _one_br int_cxt	-- OneOcc => no code-duplication issue
-	->     smallEnoughToInline unfolding	-- Small enough to dup
+	->     smallEnoughToInline dflags unfolding	-- Small enough to dup
 			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 			--
 		 	-- NB: Do NOT inline arbitrarily big things, even if one_br is True

@@ -789,7 +789,9 @@ specCase subst scrut' case_bndr [(con, args, rhs)]
   | isDictId case_bndr           -- See Note [Floating dictionaries out of cases]
   , interestingDict scrut'
   , not (isDeadBinder case_bndr && null sc_args')
-  = do { (case_bndr_flt : sc_args_flt) <- mapM clone_me (case_bndr' : sc_args')
+  = do { dflags <- getDynFlags
+
+       ; (case_bndr_flt : sc_args_flt) <- mapM clone_me (case_bndr' : sc_args')
 
        ; let sc_rhss = [ Case (Var case_bndr_flt) case_bndr' (idType sc_arg')
                               [(con, args', Var sc_arg')]
@@ -800,8 +802,8 @@ specCase subst scrut' case_bndr [(con, args, rhs)]
              -- binders so they look interesting to interestingDict
              mb_sc_flts :: [Maybe DictId]
              mb_sc_flts = map (lookupVarEnv clone_env) args'
-             clone_env  = zipVarEnv sc_args' (zipWith add_unf sc_args_flt sc_rhss)
-             subst_prs  = (case_bndr, Var (add_unf case_bndr_flt scrut'))
+             clone_env  = zipVarEnv sc_args' (zipWith (add_unf dflags) sc_args_flt sc_rhss)
+             subst_prs  = (case_bndr, Var (add_unf dflags case_bndr_flt scrut'))
                         : [ (arg, Var sc_flt)
                           | (arg, Just sc_flt) <- args `zip` mb_sc_flts ]
              subst_rhs' = extendIdSubstList subst_rhs subst_prs
@@ -828,8 +830,8 @@ specCase subst scrut' case_bndr [(con, args, rhs)]
          occ  = nameOccName name
          loc  = getSrcSpan name
 
-    add_unf sc_flt sc_rhs  -- Sole purpose: make sc_flt respond True to interestingDictId
-      = setIdUnfolding sc_flt (mkSimpleUnfolding sc_rhs)
+    add_unf dflags sc_flt sc_rhs  -- Sole purpose: make sc_flt respond True to interestingDictId
+      = setIdUnfolding sc_flt (mkSimpleUnfolding dflags sc_rhs)
 
     arg_set = mkVarSet args'
     is_flt_sc_arg var =  isId var
@@ -1114,12 +1116,13 @@ specCalls subst rules_for_me calls_for_me fn rhs
            ; (rhs_subst1, inst_dict_ids) <- newDictBndrs rhs_subst rhs_dict_ids
                           -- Clone rhs_dicts, including instantiating their types
 
-           ; let (rhs_subst2, dx_binds) = bindAuxiliaryDicts rhs_subst1 $
+           ; dflags <- getDynFlags
+
+           ; let (rhs_subst2, dx_binds) = bindAuxiliaryDicts dflags rhs_subst1 $
                                           (my_zipEqual rhs_dict_ids inst_dict_ids call_ds)
                  ty_args   = mk_ty_args call_ts poly_tyvars
                  inst_args = ty_args ++ map Var inst_dict_ids
 
-           ; dflags <- getDynFlags
            ; if already_covered dflags inst_args then
                 return Nothing
              else do
@@ -1164,7 +1167,7 @@ specCalls subst rules_for_me calls_for_me fn rhs
                 spec_unf
                   = case inlinePragmaSpec spec_inl_prag of
                       Inline    -> mkInlineUnfolding (Just spec_arity) spec_rhs
-                      Inlinable -> mkInlinableUnfolding spec_rhs
+                      Inlinable -> mkInlinableUnfolding dflags spec_rhs
                       _         -> NoUnfolding
 
                 --------------------------------------
@@ -1188,13 +1191,14 @@ specCalls subst rules_for_me calls_for_me fn rhs
          | otherwise = zip3 xs ys zs
 
 bindAuxiliaryDicts
-        :: Subst
+        :: DynFlags
+        -> Subst
         -> [(DictId,DictId,CoreExpr)]   -- (orig_dict, inst_dict, dx)
         -> (Subst,                      -- Substitute for all orig_dicts
             [CoreBind])                 -- Auxiliary bindings
 -- Bind any dictionary arguments to fresh names, to preserve sharing
 -- Substitution already substitutes orig_dict -> inst_dict
-bindAuxiliaryDicts subst triples = go subst [] triples
+bindAuxiliaryDicts dflags subst triples = go subst [] triples
   where
     go subst binds []    = (subst, binds)
     go subst binds ((d, dx_id, dx) : pairs)
@@ -1205,7 +1209,7 @@ bindAuxiliaryDicts subst triples = go subst [] triples
 
       | otherwise        = go subst_w_unf (NonRec dx_id dx : binds) pairs
       where
-        dx_id1 = dx_id `setIdUnfolding` mkSimpleUnfolding dx
+        dx_id1 = dx_id `setIdUnfolding` mkSimpleUnfolding dflags dx
         subst_w_unf = extendIdSubst subst d (Var dx_id1)
              -- Important!  We're going to substitute dx_id1 for d
              -- and we want it to look "interesting", else we won't gather *any*

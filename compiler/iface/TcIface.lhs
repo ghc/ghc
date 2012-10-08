@@ -1198,11 +1198,12 @@ tcIdInfo ignore_prags name ty info
 \begin{code}
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding name _ info (IfCoreUnfold stable if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
+  = do  { dflags <- getDynFlags
+        ; mb_expr <- tcPragExpr name if_expr
         ; let unf_src = if stable then InlineStable else InlineRhs
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
-                    Just expr -> mkUnfolding unf_src
+                    Just expr -> mkUnfolding dflags unf_src
                                              True {- Top level -} 
                                              is_bottoming expr) }
   where

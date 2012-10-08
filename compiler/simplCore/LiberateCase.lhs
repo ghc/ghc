@@ -168,7 +168,7 @@ libCaseBind env (Rec pairs)
 
     rhs_small_enough id rhs	-- Note [Small enough]
 	=  idArity id > 0	-- Note [Only functions!]
-	&& maybe True (\size -> couldBeSmallEnoughToInline size rhs)
+	&& maybe True (\size -> couldBeSmallEnoughToInline (lc_dflags env) size rhs)
                       (bombOutSize env)
 \end{code}
 
@@ -366,9 +366,7 @@ topLevel = 0
 \begin{code}
 data LibCaseEnv
   = LibCaseEnv {
-	lc_size :: Maybe Int,	-- Bomb-out size for deciding if
-				-- potential liberatees are too big.
-				-- (passed in from cmd-line args)
+        lc_dflags :: DynFlags,
 
 	lc_lvl :: LibCaseLevel,	-- Current level
 		-- The level is incremented when (and only when) going
@@ -405,13 +403,16 @@ data LibCaseEnv
 
 initEnv :: DynFlags -> LibCaseEnv
 initEnv dflags 
-  = LibCaseEnv { lc_size = liberateCaseThreshold dflags,
+  = LibCaseEnv { lc_dflags = dflags,
 		 lc_lvl = 0,
 		 lc_lvl_env = emptyVarEnv, 
 		 lc_rec_env = emptyVarEnv,
 		 lc_scruts = [] }
 
+-- Bomb-out size for deciding if
+-- potential liberatees are too big.
+-- (passed in from cmd-line args)
 bombOutSize :: LibCaseEnv -> Maybe Int
-bombOutSize = lc_size
+bombOutSize = liberateCaseThreshold . lc_dflags
 \end{code}
 

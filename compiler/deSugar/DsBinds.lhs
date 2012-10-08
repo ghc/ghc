@@ -101,23 +101,25 @@ dsLHsBind (L loc bind)
 dsHsBind :: HsBind Id -> DsM (OrdList (Id,CoreExpr))
 
 dsHsBind (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardless })
-  = do  { core_expr <- dsLExpr expr
+  = do  { dflags <- getDynFlags
+        ; core_expr <- dsLExpr expr
 
 	        -- Dictionary bindings are always VarBinds,
 	        -- so we only need do this here
         ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
 	      	   | otherwise         = var
 
-        ; return (unitOL (makeCorePair var' False 0 core_expr)) }
+        ; return (unitOL (makeCorePair dflags var' False 0 core_expr)) }
 
 dsHsBind (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_co_fn = co_fn, fun_tick = tick
                   , fun_infix = inf })
- = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
+ = do	{ dflags <- getDynFlags
+        ; (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
         ; let body' = mkOptTickBox tick body
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; {- pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun)) $ -}
-           return (unitOL (makeCorePair fun False 0 rhs)) }
+           return (unitOL (makeCorePair dflags fun False 0 rhs)) }
 
 dsHsBind (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty
                   , pat_ticks = (rhs_tick, var_ticks) })
@@ -137,7 +139,8 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_ev_binds = ev_binds, abs_binds = binds })
   | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
-  = do  { bind_prs    <- ds_lhs_binds binds
+  = do  { dflags <- getDynFlags
+        ; bind_prs    <- ds_lhs_binds binds
 	; let	core_bind = Rec (fromOL bind_prs)
         ; ds_binds <- dsTcEvBinds ev_binds
         ; rhs <- dsHsWrapper wrap $  -- Usually the identity
@@ -149,7 +152,7 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 	; (spec_binds, rules) <- dsSpecs rhs prags
 
 	; let   global'   = addIdSpecialisations global rules
-		main_bind = makeCorePair global' (isDefaultMethod prags)
+		main_bind = makeCorePair dflags global' (isDefaultMethod prags)
                                          (dictArity dicts) rhs 
     
 	; return (main_bind `consOL` spec_binds) }
@@ -158,8 +161,9 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
          -- See Note [Desugaring AbsBinds]
-  = do  { bind_prs    <- ds_lhs_binds binds
-        ; let core_bind = Rec [ makeCorePair (add_inline lcl_id) False 0 rhs
+  = do  { dflags <- getDynFlags
+        ; bind_prs    <- ds_lhs_binds binds
+        ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- fromOL bind_prs ]
 	      	-- Monomorphic recursion possible, hence Rec
 
@@ -207,8 +211,8 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
     add_inline lcl_id = lookupVarEnv inline_env lcl_id `orElse` lcl_id
 
 ------------------------
-makeCorePair :: Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
-makeCorePair gbl_id is_default_method dict_arity rhs
+makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
+makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method		      -- Default methods are *always* inlined
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
@@ -221,7 +225,7 @@ makeCorePair gbl_id is_default_method dict_arity rhs
 
   where
     inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding rhs
+    inlinable_unf = mkInlinableUnfolding dflags rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
       	-- Add an Unfolding for an INLINE (but not for NOINLINE)
@@ -463,7 +467,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        			(mkVarApps (Var spec_id) bndrs)
 
        ; spec_rhs <- dsHsWrapper spec_co poly_rhs
-       ; let spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
+       ; let spec_pair = makeCorePair dflags spec_id False (dictArity bndrs) spec_rhs
 
        ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
               (warnDs (specOnInline poly_name))

@@ -429,13 +429,14 @@ at the outside.  When dealing with classes it's very convenient to
 recover the original type signature from the class op selector.
 
 \begin{code}
-mkDictSelId :: Bool	     -- True <=> don't include the unfolding
+mkDictSelId :: DynFlags
+            -> Bool	     -- True <=> don't include the unfolding
 			     -- Little point on imports without -O, because the
 			     -- dictionary itself won't be visible
  	    -> Name	     -- Name of one of the *value* selectors 
 	       		     -- (dictionary superclass or method)
             -> Class -> Id
-mkDictSelId no_unf name clas
+mkDictSelId dflags no_unf name clas
   = mkGlobalId (ClassOpId clas) name sel_ty info
   where
     sel_ty = mkForAllTys tyvars (mkFunTy (idType dict_id) (idType the_arg_id))
@@ -449,7 +450,7 @@ mkDictSelId no_unf name clas
                 `setArityInfo`      1
                 `setStrictnessInfo` Just strict_sig
                 `setUnfoldingInfo`  (if no_unf then noUnfolding
-	                             else mkImplicitUnfolding rhs)
+	                             else mkImplicitUnfolding dflags rhs)
 		   -- In module where class op is defined, we must add
 		   -- the unfolding, even though it'll never be inlined
 		   -- becuase we use that to generate a top-level binding
