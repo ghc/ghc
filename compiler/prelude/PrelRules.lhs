@@ -840,6 +840,8 @@ builtinIntegerRules =
   rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
   rule_decodeDouble   "decodeDoubleInteger" decodeDoubleIntegerName,
   rule_convert        "doubleFromInteger"   doubleFromIntegerName   (\_ -> mkDoubleLitDouble),
+  rule_rationalTo     "rationalToFloat"     rationalToFloatName     mkFloatExpr,
+  rule_rationalTo     "rationalToDouble"    rationalToDoubleName    mkDoubleExpr,
   rule_binop          "gcdInteger"          gcdIntegerName          gcd,
   rule_binop          "lcmInteger"          lcmIntegerName          lcm,
   rule_binop          "andInteger"          andIntegerName          (.&.),
@@ -907,6 +909,9 @@ builtinIntegerRules =
           rule_smallIntegerTo str name primOp
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_smallIntegerTo primOp }
+          rule_rationalTo str name mkLit
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_rationalTo mkLit }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -1150,6 +1155,30 @@ match_Integer_Int_encodeFloat mkLit _ _ id_unf [xl,yl]
   , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
 match_Integer_Int_encodeFloat _ _ _ _ _ = Nothing
+
+---------------------------------------------------
+-- constant folding for Float/Double
+--
+-- This turns
+--      rationalToFloat n d
+-- into a literal Float, and similarly for Doubles.
+--
+-- it's important to not match d == 0, because that may represent a
+-- literal "0/0" or similar, and we can't produce a literal value for
+-- NaN or +-Inf
+match_rationalTo :: RealFloat a
+                 => (a -> Expr CoreBndr)
+                 -> DynFlags
+                 -> Id
+                 -> IdUnfoldingFun
+                 -> [Expr CoreBndr]
+                 -> Maybe (Expr CoreBndr)
+match_rationalTo mkLit _ _ id_unf [xl, yl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  = Just (mkLit (fromInteger x/fromInteger y))
+match_rationalTo _ _ _ _ _ = Nothing
 
 match_decodeDouble :: DynFlags
                    -> Id
