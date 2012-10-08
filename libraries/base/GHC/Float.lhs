@@ -230,18 +230,23 @@ instance  Real Float  where
 
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
-    fromRational (n:%0)
-        | n == 0        = 0/0
-        | n < 0         = (-1)/0
-        | otherwise     = 1/0
-    fromRational (n:%d)
-        | n == 0        = encodeFloat 0 0
-        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-        | otherwise     = fromRat'' minEx mantDigs n d
-          where
-            minEx       = FLT_MIN_EXP
-            mantDigs    = FLT_MANT_DIG
+    {-# INLINE fromRational #-}
+    fromRational (n:%d) = rationalToFloat n d
     recip x             =  1.0 / x
+
+rationalToFloat :: Integer -> Integer -> Float
+{-# NOINLINE [1] rationalToFloat #-}
+rationalToFloat n 0
+    | n == 0        = 0/0
+    | n < 0         = (-1)/0
+    | otherwise     = 1/0
+rationalToFloat n d
+    | n == 0        = encodeFloat 0 0
+    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+    | otherwise     = fromRat'' minEx mantDigs n d
+      where
+        minEx       = FLT_MIN_EXP
+        mantDigs    = FLT_MANT_DIG
 
 -- RULES for Integer and Int
 {-# RULES
@@ -391,18 +396,23 @@ instance  Real Double  where
 
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
-    fromRational (n:%0)
-        | n == 0        = 0/0
-        | n < 0         = (-1)/0
-        | otherwise     = 1/0
-    fromRational (n:%d)
-        | n == 0        = encodeFloat 0 0
-        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-        | otherwise     = fromRat'' minEx mantDigs n d
-          where
-            minEx       = DBL_MIN_EXP
-            mantDigs    = DBL_MANT_DIG
+    {-# INLINE fromRational #-}
+    fromRational (n:%d) = rationalToDouble n d
     recip x             =  1.0 / x
+
+rationalToDouble :: Integer -> Integer -> Double
+{-# NOINLINE [1] rationalToDouble #-}
+rationalToDouble n 0
+    | n == 0        = 0/0
+    | n < 0         = (-1)/0
+    | otherwise     = 1/0
+rationalToDouble n d
+    | n == 0        = encodeFloat 0 0
+    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+    | otherwise     = fromRat'' minEx mantDigs n d
+      where
+        minEx       = DBL_MIN_EXP
+        mantDigs    = DBL_MANT_DIG
 
 instance  Floating Double  where
     pi                  =  3.141592653589793238
