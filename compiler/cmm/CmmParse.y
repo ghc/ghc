@@ -260,42 +260,42 @@ import Data.Maybe
         '||'    { L _ (CmmT_BoolOr) }
 
         'CLOSURE'       { L _ (CmmT_CLOSURE) }
-	'INFO_TABLE'	{ L _ (CmmT_INFO_TABLE) }
-	'INFO_TABLE_RET'{ L _ (CmmT_INFO_TABLE_RET) }
-	'INFO_TABLE_FUN'{ L _ (CmmT_INFO_TABLE_FUN) }
-	'INFO_TABLE_CONSTR'{ L _ (CmmT_INFO_TABLE_CONSTR) }
-	'INFO_TABLE_SELECTOR'{ L _ (CmmT_INFO_TABLE_SELECTOR) }
-	'else'		{ L _ (CmmT_else) }
-	'export'	{ L _ (CmmT_export) }
-	'section'	{ L _ (CmmT_section) }
-	'align'		{ L _ (CmmT_align) }
-	'goto'		{ L _ (CmmT_goto) }
-	'if'		{ L _ (CmmT_if) }
+        'INFO_TABLE'    { L _ (CmmT_INFO_TABLE) }
+        'INFO_TABLE_RET'{ L _ (CmmT_INFO_TABLE_RET) }
+        'INFO_TABLE_FUN'{ L _ (CmmT_INFO_TABLE_FUN) }
+        'INFO_TABLE_CONSTR'{ L _ (CmmT_INFO_TABLE_CONSTR) }
+        'INFO_TABLE_SELECTOR'{ L _ (CmmT_INFO_TABLE_SELECTOR) }
+        'else'          { L _ (CmmT_else) }
+        'export'        { L _ (CmmT_export) }
+        'section'       { L _ (CmmT_section) }
+        'align'         { L _ (CmmT_align) }
+        'goto'          { L _ (CmmT_goto) }
+        'if'            { L _ (CmmT_if) }
         'call'          { L _ (CmmT_call) }
         'jump'          { L _ (CmmT_jump) }
         'foreign'       { L _ (CmmT_foreign) }
-	'never'		{ L _ (CmmT_never) }
-	'prim'		{ L _ (CmmT_prim) }
-	'return'	{ L _ (CmmT_return) }
-	'returns'	{ L _ (CmmT_returns) }
-	'import'	{ L _ (CmmT_import) }
-	'switch'	{ L _ (CmmT_switch) }
-	'case'		{ L _ (CmmT_case) }
+        'never'         { L _ (CmmT_never) }
+        'prim'          { L _ (CmmT_prim) }
+        'return'        { L _ (CmmT_return) }
+        'returns'       { L _ (CmmT_returns) }
+        'import'        { L _ (CmmT_import) }
+        'switch'        { L _ (CmmT_switch) }
+        'case'          { L _ (CmmT_case) }
         'default'       { L _ (CmmT_default) }
         'push'          { L _ (CmmT_push) }
         'bits8'         { L _ (CmmT_bits8) }
-	'bits16'	{ L _ (CmmT_bits16) }
-	'bits32'	{ L _ (CmmT_bits32) }
-	'bits64'	{ L _ (CmmT_bits64) }
-	'float32'	{ L _ (CmmT_float32) }
-	'float64'	{ L _ (CmmT_float64) }
-	'gcptr'	        { L _ (CmmT_gcptr) }
+        'bits16'        { L _ (CmmT_bits16) }
+        'bits32'        { L _ (CmmT_bits32) }
+        'bits64'        { L _ (CmmT_bits64) }
+        'float32'       { L _ (CmmT_float32) }
+        'float64'       { L _ (CmmT_float64) }
+        'gcptr'         { L _ (CmmT_gcptr) }
 
-	GLOBALREG	{ L _ (CmmT_GlobalReg   $$) }
-  	NAME		{ L _ (CmmT_Name	$$) }
-	STRING		{ L _ (CmmT_String	$$) }
-	INT		{ L _ (CmmT_Int		$$) }
-	FLOAT		{ L _ (CmmT_Float	$$) }
+        GLOBALREG       { L _ (CmmT_GlobalReg   $$) }
+        NAME            { L _ (CmmT_Name        $$) }
+        STRING          { L _ (CmmT_String      $$) }
+        INT             { L _ (CmmT_Int         $$) }
+        FLOAT           { L _ (CmmT_Float       $$) }
 
 %monad { P } { >>= } { return }
 %lexer { cmmlex } { L _ CmmT_EOF }
@@ -318,17 +318,17 @@ import Data.Maybe
 %%
 
 cmm     :: { CmmParse () }
-	: {- empty -}			{ return () }
-	| cmmtop cmm			{ do $1; $2 }
+        : {- empty -}                   { return () }
+        | cmmtop cmm                    { do $1; $2 }
 
 cmmtop  :: { CmmParse () }
-	: cmmproc			{ $1 }
-	| cmmdata			{ $1 }
-	| decl				{ $1 } 
-	| 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
-		{% withThisPackage $ \pkg -> 
-		   do lits <- sequence $6;
-		      staticClosure pkg $3 $5 (map getLit lits) }
+        : cmmproc                       { $1 }
+        | cmmdata                       { $1 }
+        | decl                          { $1 } 
+        | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
+                {% withThisPackage $ \pkg -> 
+                   do lits <- sequence $6;
+                      staticClosure pkg $3 $5 (map getLit lits) }
 
 -- The only static closures in the RTS are dummy closures like
 -- stg_END_TSO_QUEUE_closure and stg_dummy_ret.  We don't need
@@ -340,35 +340,35 @@ cmmtop  :: { CmmParse () }
 --      * we can derive closure and info table labels from a single NAME
 
 cmmdata :: { CmmParse () }
-	: 'section' STRING '{' data_label statics '}' 
-		{ do lbl <- $4;
-		     ss <- sequence $5;
-		     code (emitDecl (CmmData (section $2) (Statics lbl $ concat ss))) }
+        : 'section' STRING '{' data_label statics '}' 
+                { do lbl <- $4;
+                     ss <- sequence $5;
+                     code (emitDecl (CmmData (section $2) (Statics lbl $ concat ss))) }
 
 data_label :: { CmmParse CLabel }
-    : NAME ':'	
-		{% withThisPackage $ \pkg -> 
-		   return (mkCmmDataLabel pkg $1) }
+    : NAME ':'  
+                {% withThisPackage $ \pkg -> 
+                   return (mkCmmDataLabel pkg $1) }
 
-statics	:: { [CmmParse [CmmStatic]] }
-	: {- empty -}			{ [] }
-	| static statics		{ $1 : $2 }
+statics :: { [CmmParse [CmmStatic]] }
+        : {- empty -}                   { [] }
+        | static statics                { $1 : $2 }
     
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static  :: { CmmParse [CmmStatic] }
-	: type expr ';'	{ do e <- $2;
-			     return [CmmStaticLit (getLit e)] }
-	| type ';'			{ return [CmmUninitialised
-							(widthInBytes (typeWidth $1))] }
-        | 'bits8' '[' ']' STRING ';'	{ return [mkString $4] }
-        | 'bits8' '[' INT ']' ';'	{ return [CmmUninitialised 
-							(fromIntegral $3)] }
-        | typenot8 '[' INT ']' ';'	{ return [CmmUninitialised 
-						(widthInBytes (typeWidth $1) * 
-							fromIntegral $3)] }
-	| 'CLOSURE' '(' NAME lits ')'
-		{ do { lits <- sequence $4
+        : type expr ';' { do e <- $2;
+                             return [CmmStaticLit (getLit e)] }
+        | type ';'                      { return [CmmUninitialised
+                                                        (widthInBytes (typeWidth $1))] }
+        | 'bits8' '[' ']' STRING ';'    { return [mkString $4] }
+        | 'bits8' '[' INT ']' ';'       { return [CmmUninitialised 
+                                                        (fromIntegral $3)] }
+        | typenot8 '[' INT ']' ';'      { return [CmmUninitialised 
+                                                (widthInBytes (typeWidth $1) * 
+                                                        fromIntegral $3)] }
+        | 'CLOSURE' '(' NAME lits ')'
+                { do { lits <- sequence $4
                 ; dflags <- getDynFlags
                      ; return $ map CmmStaticLit $
                         mkStaticClosure dflags (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
@@ -378,8 +378,8 @@ static  :: { CmmParse [CmmStatic] }
         -- arrays of closures required for the CHARLIKE & INTLIKE arrays
 
 lits    :: { [CmmParse CmmExpr] }
-	: {- empty -}		{ [] }
-	| ',' expr lits		{ $2 : $3 }
+        : {- empty -}           { [] }
+        | ',' expr lits         { $2 : $3 }
 
 cmmproc :: { CmmParse () }
         : info maybe_conv maybe_formals maybe_body
@@ -404,14 +404,14 @@ maybe_body :: { CmmParse () }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
-		{% withThisPackage $ \pkg ->
-		   do	newFunctionName $1 pkg
+                {% withThisPackage $ \pkg ->
+                   do   newFunctionName $1 pkg
                         return (mkCmmCodeLabel pkg $1, Nothing, []) }
 
 
         | 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
-		-- ptrs, nptrs, closure type, description, type
-		{% withThisPackage $ \pkg ->
+                -- ptrs, nptrs, closure type, description, type
+                {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
@@ -421,13 +421,13 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                               -- we want.
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
-	
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                              []) }
+        
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
-		-- ptrs, nptrs, closure type, description, type, fun type
-		{% withThisPackage $ \pkg -> 
+                -- ptrs, nptrs, closure type, description, type, fun type
+                {% withThisPackage $ \pkg -> 
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           ty   = Fun 0 (ArgSpec (fromIntegral $15))
@@ -437,11 +437,11 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                                     (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
-		-- we leave most of the fields zero here.  This is only used
-		-- to generate the BCO info table in the RTS at the moment.
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                              []) }
+                -- we leave most of the fields zero here.  This is only used
+                -- to generate the BCO info table in the RTS at the moment.
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
@@ -455,16 +455,16 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                                   (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                              []) }
 
-		     -- If profiling is on, this string gets duplicated,
-		     -- but that's the way the old code did it we can fix it some other time.
-	
+                     -- If profiling is on, this string gets duplicated,
+                     -- but that's the way the old code did it we can fix it some other time.
+        
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
-		-- selector, closure type, description, type
-		{% withThisPackage $ \pkg ->
+                -- selector, closure type, description, type
+                {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
                           ty  = ThunkSelector (fromIntegral $5)
@@ -472,45 +472,45 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                    mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                              []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
-		-- closure type (no live regs)
-		{% withThisPackage $ \pkg ->
-		   do let prof = NoProfilingInfo
+                -- closure type (no live regs)
+                {% withThisPackage $ \pkg ->
+                   do let prof = NoProfilingInfo
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                              []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
-		-- closure type, live regs
-		{% withThisPackage $ \pkg ->
+                -- closure type, live regs
+                {% withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       live <- sequence $7
-		      let prof = NoProfilingInfo
+                      let prof = NoProfilingInfo
                           -- drop one for the info pointer
                           bitmap = mkLiveness dflags (map Just (drop 1 live))
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_rep = rep
+                                           , cit_prof = prof, cit_srt = NoC_SRT },
                               live) }
 
 body    :: { CmmParse () }
-	: {- empty -}			{ return () }
-	| decl body			{ do $1; $2 }
-	| stmt body			{ do $1; $2 }
+        : {- empty -}                   { return () }
+        | decl body                     { do $1; $2 }
+        | stmt body                     { do $1; $2 }
 
 decl    :: { CmmParse () }
-	: type names ';'		{ mapM_ (newLocal $1) $2 }
-	| 'import' importNames ';'	{ mapM_ newImport $2 }
-	| 'export' names ';'		{ return () }  -- ignore exports
+        : type names ';'                { mapM_ (newLocal $1) $2 }
+        | 'import' importNames ';'      { mapM_ newImport $2 }
+        | 'export' names ';'            { return () }  -- ignore exports
 
 
 -- an imported function name, with optional packageId
@@ -522,50 +522,50 @@ importNames
 importName
         :: { (FastString,  CLabel) }
 
-	-- A label imported without an explicit packageId.
-	--	These are taken to come frome some foreign, unnamed package.
-	: NAME	
-	{ ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
+        -- A label imported without an explicit packageId.
+        --      These are taken to come frome some foreign, unnamed package.
+        : NAME  
+        { ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
 
-	-- A label imported with an explicit packageId.
-	| STRING NAME
-	{ ($2, mkCmmCodeLabel (fsToPackageId (mkFastString $1)) $2) }
-	
-	
-names 	:: { [FastString] }
-	: NAME				{ [$1] }
-	| NAME ',' names		{ $1 : $3 }
+        -- A label imported with an explicit packageId.
+        | STRING NAME
+        { ($2, mkCmmCodeLabel (fsToPackageId (mkFastString $1)) $2) }
+        
+        
+names   :: { [FastString] }
+        : NAME                          { [$1] }
+        | NAME ',' names                { $1 : $3 }
 
-stmt	:: { CmmParse () }
+stmt    :: { CmmParse () }
         : ';'                                   { return () }
 
-	| NAME ':'
+        | NAME ':'
                 { do l <- newLabel $1; emitLabel l }
 
 
 
-	| lreg '=' expr ';'
+        | lreg '=' expr ';'
                 { do reg <- $1; e <- $3; emitAssign reg e }
-	| type '[' expr ']' '=' expr ';'
-		{ doStore $1 $3 $6 }
+        | type '[' expr ']' '=' expr ';'
+                { doStore $1 $3 $6 }
 
         -- Gah! We really want to say "foreign_results" but that causes
-	-- a shift/reduce conflict with assignment.  We either
-	-- we expand out the no-result and single result cases or
-	-- we tweak the syntax to avoid the conflict.  The later
-	-- option is taken here because the other way would require
-	-- multiple levels of expanding and get unwieldy.
+        -- a shift/reduce conflict with assignment.  We either
+        -- we expand out the no-result and single result cases or
+        -- we tweak the syntax to avoid the conflict.  The later
+        -- option is taken here because the other way would require
+        -- multiple levels of expanding and get unwieldy.
         | foreign_results 'foreign' STRING expr '(' cmm_hint_exprs0 ')' safety opt_never_returns ';'
                 {% foreignCall $3 $1 $4 $6 $8 $9 }
         | foreign_results 'prim' '%' NAME '(' exprs0 ')' ';'
                 {% primCall $1 $4 $6 }
-	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
-	-- Perhaps we ought to use the %%-form?
-	| NAME '(' exprs0 ')' ';'
-		{% stmtMacro $1 $3  }
-	| 'switch' maybe_range expr '{' arms default '}'
-		{ do as <- sequence $5; doSwitch $2 $3 as $6 }
-	| 'goto' NAME ';'
+        -- stmt-level macros, stealing syntax from ordinary C-- function calls.
+        -- Perhaps we ought to use the %%-form?
+        | NAME '(' exprs0 ')' ';'
+                {% stmtMacro $1 $3  }
+        | 'switch' maybe_range expr '{' arms default '}'
+                { do as <- sequence $5; doSwitch $2 $3 as $6 }
+        | 'goto' NAME ';'
                 { do l <- lookupLabel $2; emit (mkBranch l) }
         | 'return' '(' exprs0 ')' ';'
                 { doReturn $3 }
@@ -580,9 +580,9 @@ stmt	:: { CmmParse () }
         | '(' formals ')' '=' 'call' expr '(' exprs0 ')' ';'
                 { doCall $6 $2 $8 }
         | 'if' bool_expr 'goto' NAME
-		{ do l <- lookupLabel $4; cmmRawIf $2 l }
-	| 'if' bool_expr '{' body '}' else 	
-		{ cmmIfThenElse $2 $4 $6 }
+                { do l <- lookupLabel $4; cmmRawIf $2 l }
+        | 'if' bool_expr '{' body '}' else      
+                { cmmIfThenElse $2 $4 $6 }
         | 'push' '(' exprs0 ')' maybe_body
                 { pushStackFrame $3 $5 }
 
@@ -591,20 +591,20 @@ opt_never_returns :: { CmmReturnInfo }
         | 'never' 'returns'             { CmmNeverReturns }
 
 bool_expr :: { CmmParse BoolExpr }
-	: bool_op			{ $1 }
-	| expr				{ do e <- $1; return (BoolTest e) }
+        : bool_op                       { $1 }
+        | expr                          { do e <- $1; return (BoolTest e) }
 
 bool_op :: { CmmParse BoolExpr }
-	: bool_expr '&&' bool_expr 	{ do e1 <- $1; e2 <- $3; 
-					  return (BoolAnd e1 e2) }
-	| bool_expr '||' bool_expr	{ do e1 <- $1; e2 <- $3; 
-					  return (BoolOr e1 e2)  }
-	| '!' bool_expr			{ do e <- $2; return (BoolNot e) }
-	| '(' bool_op ')'		{ $2 }
+        : bool_expr '&&' bool_expr      { do e1 <- $1; e2 <- $3; 
+                                          return (BoolAnd e1 e2) }
+        | bool_expr '||' bool_expr      { do e1 <- $1; e2 <- $3; 
+                                          return (BoolOr e1 e2)  }
+        | '!' bool_expr                 { do e <- $2; return (BoolNot e) }
+        | '(' bool_op ')'               { $2 }
 
 safety  :: { Safety }
         : {- empty -}                   { PlayRisky }
-	| STRING			{% parseSafety $1 }
+        | STRING                        {% parseSafety $1 }
 
 vols    :: { [GlobalReg] }
         : '[' ']'                       { [] }
@@ -622,66 +622,66 @@ maybe_range :: { Maybe (Int,Int) }
         | {- empty -}           { Nothing }
 
 arms    :: { [CmmParse ([Int],Either BlockId (CmmParse ()))] }
-	: {- empty -}			{ [] }
-	| arm arms			{ $1 : $2 }
+        : {- empty -}                   { [] }
+        | arm arms                      { $1 : $2 }
 
 arm     :: { CmmParse ([Int],Either BlockId (CmmParse ())) }
-	: 'case' ints ':' arm_body	{ do b <- $4; return ($2, b) }
+        : 'case' ints ':' arm_body      { do b <- $4; return ($2, b) }
 
 arm_body :: { CmmParse (Either BlockId (CmmParse ())) }
-	: '{' body '}'			{ return (Right $2) }
-	| 'goto' NAME ';'		{ do l <- lookupLabel $2; return (Left l) }
+        : '{' body '}'                  { return (Right $2) }
+        | 'goto' NAME ';'               { do l <- lookupLabel $2; return (Left l) }
 
 ints    :: { [Int] }
         : INT                           { [ fromIntegral $1 ] }
         | INT ',' ints                  { fromIntegral $1 : $3 }
 
 default :: { Maybe (CmmParse ()) }
-	: 'default' ':' '{' body '}'	{ Just $4 }
-	-- taking a few liberties with the C-- syntax here; C-- doesn't have
-	-- 'default' branches
-	| {- empty -}			{ Nothing }
+        : 'default' ':' '{' body '}'    { Just $4 }
+        -- taking a few liberties with the C-- syntax here; C-- doesn't have
+        -- 'default' branches
+        | {- empty -}                   { Nothing }
 
 -- Note: OldCmm doesn't support a first class 'else' statement, though
 -- CmmNode does.
 else    :: { CmmParse () }
         : {- empty -}                   { return () }
-	| 'else' '{' body '}'		{ $3 }
+        | 'else' '{' body '}'           { $3 }
 
 -- we have to write this out longhand so that Happy's precedence rules
 -- can kick in.
 expr    :: { CmmParse CmmExpr }
-	: expr '/' expr			{ mkMachOp MO_U_Quot [$1,$3] }
-	| expr '*' expr			{ mkMachOp MO_Mul [$1,$3] }
-	| expr '%' expr			{ mkMachOp MO_U_Rem [$1,$3] }
-	| expr '-' expr			{ mkMachOp MO_Sub [$1,$3] }
-	| expr '+' expr			{ mkMachOp MO_Add [$1,$3] }
-	| expr '>>' expr		{ mkMachOp MO_U_Shr [$1,$3] }
-	| expr '<<' expr		{ mkMachOp MO_Shl [$1,$3] }
-	| expr '&' expr			{ mkMachOp MO_And [$1,$3] }
-	| expr '^' expr			{ mkMachOp MO_Xor [$1,$3] }
-	| expr '|' expr			{ mkMachOp MO_Or [$1,$3] }
-	| expr '>=' expr		{ mkMachOp MO_U_Ge [$1,$3] }
-	| expr '>' expr			{ mkMachOp MO_U_Gt [$1,$3] }
-	| expr '<=' expr		{ mkMachOp MO_U_Le [$1,$3] }
-	| expr '<' expr			{ mkMachOp MO_U_Lt [$1,$3] }
-	| expr '!=' expr		{ mkMachOp MO_Ne [$1,$3] }
-	| expr '==' expr		{ mkMachOp MO_Eq [$1,$3] }
-	| '~' expr			{ mkMachOp MO_Not [$2] }
-	| '-' expr			{ mkMachOp MO_S_Neg [$2] }
-	| expr0 '`' NAME '`' expr0  	{% do { mo <- nameToMachOp $3 ;
-					        return (mkMachOp mo [$1,$5]) } }
-	| expr0				{ $1 }
+        : expr '/' expr                 { mkMachOp MO_U_Quot [$1,$3] }
+        | expr '*' expr                 { mkMachOp MO_Mul [$1,$3] }
+        | expr '%' expr                 { mkMachOp MO_U_Rem [$1,$3] }
+        | expr '-' expr                 { mkMachOp MO_Sub [$1,$3] }
+        | expr '+' expr                 { mkMachOp MO_Add [$1,$3] }
+        | expr '>>' expr                { mkMachOp MO_U_Shr [$1,$3] }
+        | expr '<<' expr                { mkMachOp MO_Shl [$1,$3] }
+        | expr '&' expr                 { mkMachOp MO_And [$1,$3] }
+        | expr '^' expr                 { mkMachOp MO_Xor [$1,$3] }
+        | expr '|' expr                 { mkMachOp MO_Or [$1,$3] }
+        | expr '>=' expr                { mkMachOp MO_U_Ge [$1,$3] }
+        | expr '>' expr                 { mkMachOp MO_U_Gt [$1,$3] }
+        | expr '<=' expr                { mkMachOp MO_U_Le [$1,$3] }
+        | expr '<' expr                 { mkMachOp MO_U_Lt [$1,$3] }
+        | expr '!=' expr                { mkMachOp MO_Ne [$1,$3] }
+        | expr '==' expr                { mkMachOp MO_Eq [$1,$3] }
+        | '~' expr                      { mkMachOp MO_Not [$2] }
+        | '-' expr                      { mkMachOp MO_S_Neg [$2] }
+        | expr0 '`' NAME '`' expr0      {% do { mo <- nameToMachOp $3 ;
+                                                return (mkMachOp mo [$1,$5]) } }
+        | expr0                         { $1 }
 
-expr0	:: { CmmParse CmmExpr }
-	: INT   maybe_ty	 { return (CmmLit (CmmInt $1 (typeWidth $2))) }
-	| FLOAT maybe_ty	 { return (CmmLit (CmmFloat $1 (typeWidth $2))) }
-	| STRING		 { do s <- code (newStringCLit $1); 
-				      return (CmmLit s) }
-	| reg			 { $1 }
-	| type '[' expr ']'	 { do e <- $3; return (CmmLoad e $1) }
-	| '%' NAME '(' exprs0 ')' {% exprOp $2 $4 }
-	| '(' expr ')'		 { $2 }
+expr0   :: { CmmParse CmmExpr }
+        : INT   maybe_ty         { return (CmmLit (CmmInt $1 (typeWidth $2))) }
+        | FLOAT maybe_ty         { return (CmmLit (CmmFloat $1 (typeWidth $2))) }
+        | STRING                 { do s <- code (newStringCLit $1); 
+                                      return (CmmLit s) }
+        | reg                    { $1 }
+        | type '[' expr ']'      { do e <- $3; return (CmmLoad e $1) }
+        | '%' NAME '(' exprs0 ')' {% exprOp $2 $4 }
+        | '(' expr ')'           { $2 }
 
 
 -- leaving out the type of a literal gives you the native word size in C--
@@ -690,38 +690,38 @@ maybe_ty :: { CmmType }
         | '::' type                     { $2 }
 
 cmm_hint_exprs0 :: { [CmmParse (CmmExpr, ForeignHint)] }
-	: {- empty -}			{ [] }
+        : {- empty -}                   { [] }
         | cmm_hint_exprs                { $1 }
 
 cmm_hint_exprs :: { [CmmParse (CmmExpr, ForeignHint)] }
-	: cmm_hint_expr			{ [$1] }
-	| cmm_hint_expr ',' cmm_hint_exprs	{ $1 : $3 }
+        : cmm_hint_expr                 { [$1] }
+        | cmm_hint_expr ',' cmm_hint_exprs      { $1 : $3 }
 
 cmm_hint_expr :: { CmmParse (CmmExpr, ForeignHint) }
         : expr                          { do e <- $1;
                                              return (e, inferCmmHint e) }
-	| expr STRING			{% do h <- parseCmmHint $2;
-					      return $ do
+        | expr STRING                   {% do h <- parseCmmHint $2;
+                                              return $ do
                                                 e <- $1; return (e, h) }
 
 exprs0  :: { [CmmParse CmmExpr] }
-	: {- empty -}			{ [] }
-	| exprs				{ $1 }
+        : {- empty -}                   { [] }
+        | exprs                         { $1 }
 
 exprs   :: { [CmmParse CmmExpr] }
-	: expr				{ [ $1 ] }
-	| expr ',' exprs		{ $1 : $3 }
+        : expr                          { [ $1 ] }
+        | expr ',' exprs                { $1 : $3 }
 
 reg     :: { CmmParse CmmExpr }
-	: NAME			{ lookupName $1 }
-	| GLOBALREG		{ return (CmmReg (CmmGlobal $1)) }
+        : NAME                  { lookupName $1 }
+        | GLOBALREG             { return (CmmReg (CmmGlobal $1)) }
 
 foreign_results :: { [CmmParse (LocalReg, ForeignHint)] }
         : {- empty -}                   { [] }
         | '(' foreign_formals ')' '='   { $2 }
 
 foreign_formals :: { [CmmParse (LocalReg, ForeignHint)] }
-	: foreign_formal			{ [$1] }
+        : foreign_formal                        { [$1] }
         | foreign_formal ','                    { [$1] }
         | foreign_formal ',' foreign_formals    { $1 : $3 }
 
@@ -732,26 +732,26 @@ foreign_formal :: { CmmParse (LocalReg, ForeignHint) }
                                          e <- $2; return (e,h) }
 
 local_lreg :: { CmmParse LocalReg }
-	: NAME			{ do e <- lookupName $1;
-				     return $
-				       case e of 
-					CmmReg (CmmLocal r) -> r
-					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a local register") }
+        : NAME                  { do e <- lookupName $1;
+                                     return $
+                                       case e of 
+                                        CmmReg (CmmLocal r) -> r
+                                        other -> pprPanic "CmmParse:" (ftext $1 <> text " not a local register") }
 
-lreg	:: { CmmParse CmmReg }
-	: NAME			{ do e <- lookupName $1;
-				     return $
-				       case e of 
-					CmmReg r -> r
-					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
-	| GLOBALREG		{ return (CmmGlobal $1) }
+lreg    :: { CmmParse CmmReg }
+        : NAME                  { do e <- lookupName $1;
+                                     return $
+                                       case e of 
+                                        CmmReg r -> r
+                                        other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
+        | GLOBALREG             { return (CmmGlobal $1) }
 
 maybe_formals :: { Maybe [CmmParse LocalReg] }
         : {- empty -}           { Nothing }
         | '(' formals0 ')'      { Just $2 }
 
 formals0 :: { [CmmParse LocalReg] }
-	: {- empty -}		{ [] }
+        : {- empty -}           { [] }
         | formals               { $1 }
 
 formals :: { [CmmParse LocalReg] }
@@ -760,7 +760,7 @@ formals :: { [CmmParse LocalReg] }
         | formal ',' formals       { $1 : $3 }
 
 formal :: { CmmParse LocalReg }
-	: type NAME		{ newLocal $1 $2 }
+        : type NAME             { newLocal $1 $2 }
 
 type    :: { CmmType }
         : 'bits8'               { b8 }
@@ -991,13 +991,13 @@ stmtMacros = listToUFM [
 
   ( fsLit "PUSH_UPD_FRAME",        \[sp,e] -> emitPushUpdateFrame sp e ),
   ( fsLit "SET_HDR",               \[ptr,info,ccs] ->
-					emitSetDynHdr ptr info ccs ),
+                                        emitSetDynHdr ptr info ccs ),
   ( fsLit "TICK_ALLOC_PRIM",       \[hdr,goods,slop] ->
-					tickyAllocPrim hdr goods slop ),
+                                        tickyAllocPrim hdr goods slop ),
   ( fsLit "TICK_ALLOC_PAP",        \[goods,slop] ->
-					tickyAllocPAP goods slop ),
+                                        tickyAllocPAP goods slop ),
   ( fsLit "TICK_ALLOC_UP_THK",     \[goods,slop] ->
-					tickyAllocThunk goods slop ),
+                                        tickyAllocThunk goods slop ),
   ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode False reg ),
   ( fsLit "UPD_BH_SINGLE_ENTRY",   \[reg] -> emitBlackHoleCode True  reg )
  ]
@@ -1032,7 +1032,7 @@ staticClosure pkg cl_label info payload
 foreignCall
         :: String
         -> [CmmParse (LocalReg, ForeignHint)]
-	-> CmmParse CmmExpr
+        -> CmmParse CmmExpr
         -> [CmmParse (CmmExpr, ForeignHint)]
         -> Safety
         -> CmmReturnInfo
@@ -1045,8 +1045,8 @@ foreignCall conv_string results_code expr_code args_code safety ret
         return $ do
           dflags <- getDynFlags
           results <- sequence results_code
-	  expr <- expr_code
-	  args <- sequence args_code
+          expr <- expr_code
+          args <- sequence args_code
           let
                   expr' = adjCallTarget dflags conv expr args
                   (arg_exprs, arg_hints) = unzip args
@@ -1106,15 +1106,15 @@ adjCallTarget _ _ expr _
 
 primCall
         :: [CmmParse (CmmFormal, ForeignHint)]
-	-> FastString
+        -> FastString
         -> [CmmParse CmmExpr]
         -> P (CmmParse ())
 primCall results_code name args_code
   = case lookupUFM callishMachOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
-	Just p  -> return $ do
-		results <- sequence results_code
-		args <- sequence args_code
+        Just p  -> return $ do
+                results <- sequence results_code
+                args <- sequence args_code
                 code (emitPrimCall (map fst results) p args)
 
 doStore :: CmmType -> CmmParse CmmExpr  -> CmmParse CmmExpr -> CmmParse ()
@@ -1180,9 +1180,9 @@ emitCond (e1 `BoolOr` e2) then_id = do
   emitCond e2 then_id
 emitCond (e1 `BoolAnd` e2) then_id = do
         -- we'd like to invert one of the conditionals here to avoid an
-	-- extra branch instruction, but we can't use maybeInvertComparison
-	-- here because we can't look too closely at the expression since
-	-- we're in a loop.
+        -- extra branch instruction, but we can't use maybeInvertComparison
+        -- here because we can't look too closely at the expression since
+        -- we're in a loop.
   and_id <- newBlockId
   else_id <- newBlockId
   emitCond e1 and_id
@@ -1206,34 +1206,34 @@ doSwitch :: Maybe (Int,Int) -> CmmParse CmmExpr -> [([Int],Either BlockId (CmmPa
          -> Maybe (CmmParse ()) -> CmmParse ()
 doSwitch mb_range scrut arms deflt
    = do
-	-- Compile code for the default branch
-	dflt_entry <- 
-		case deflt of
-		  Nothing -> return Nothing
+        -- Compile code for the default branch
+        dflt_entry <- 
+                case deflt of
+                  Nothing -> return Nothing
                   Just e  -> do b <- forkLabelledCode e; return (Just b)
 
-	-- Compile each case branch
-	table_entries <- mapM emitArm arms
+        -- Compile each case branch
+        table_entries <- mapM emitArm arms
 
-	-- Construct the table
-	let
-	    all_entries = concat table_entries
-	    ixs = map fst all_entries
-	    (min,max) 
-		| Just (l,u) <- mb_range = (l,u)
-		| otherwise              = (minimum ixs, maximum ixs)
+        -- Construct the table
+        let
+            all_entries = concat table_entries
+            ixs = map fst all_entries
+            (min,max) 
+                | Just (l,u) <- mb_range = (l,u)
+                | otherwise              = (minimum ixs, maximum ixs)
 
-	    entries = elems (accumArray (\_ a -> Just a) dflt_entry (min,max)
-				all_entries)
-	expr <- scrut
-	-- ToDo: check for out of range and jump to default if necessary
+            entries = elems (accumArray (\_ a -> Just a) dflt_entry (min,max)
+                                all_entries)
+        expr <- scrut
+        -- ToDo: check for out of range and jump to default if necessary
         emit (mkSwitch expr entries)
    where
         emitArm :: ([Int],Either BlockId (CmmParse ())) -> CmmParse [(Int,BlockId)]
-	emitArm (ints,Left blockid) = return [ (i,blockid) | i <- ints ]
-	emitArm (ints,Right code) = do
+        emitArm (ints,Left blockid) = return [ (i,blockid) | i <- ints ]
+        emitArm (ints,Right code) = do
            blockid <- forkLabelledCode code
-	   return [ (i,blockid) | i <- ints ]
+           return [ (i,blockid) | i <- ints ]
 
 forkLabelledCode :: CmmParse () -> CmmParse BlockId
 forkLabelledCode p = do
