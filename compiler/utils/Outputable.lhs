@@ -70,7 +70,7 @@ module Outputable (
         pprDebugAndThen,
     ) where
 
-import {-# SOURCE #-}   DynFlags( DynFlags, tracingDynFlags,
+import {-# SOURCE #-}   DynFlags( DynFlags,
                                   targetPlatform, pprUserLength, pprCols )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
@@ -914,7 +914,7 @@ pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprDebugAndThen tracingDynFlags trace str doc x
+   | otherwise         = pprDebugAndThen unsafeGlobalDynFlags trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
@@ -927,9 +927,9 @@ warnPprTrace _     _     _     _    x | not debugIsOn     = x
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = pprDebugAndThen tracingDynFlags trace str msg x
+  = pprDebugAndThen unsafeGlobalDynFlags trace str msg x
   where
-    str = showSDoc tracingDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
+    str = showSDoc unsafeGlobalDynFlags (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.

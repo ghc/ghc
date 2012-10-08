@@ -114,8 +114,6 @@ module DynFlags (
 -- exposes the appropriate runtime boolean
         rtsIsProfiled,
 #endif
-        -- ** Only for use in the tracing functions in Outputable
-        tracingDynFlags,
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
@@ -137,8 +135,10 @@ import Config
 import CmdLineParser
 import Constants
 import Panic
+import StaticFlags
 import Util
 import Maybes           ( orElse )
+import MonadUtils
 import qualified Pretty
 import SrcLoc
 import FastString
@@ -1186,24 +1186,6 @@ defaultDynFlags mySettings =
       }
 
 --------------------------------------------------------------------------
--- Do not use tracingDynFlags!
--- tracingDynFlags is a hack, necessary because we need to be able to
--- show SDocs when tracing, but we don't always have DynFlags available.
--- Do not use it if you can help it. It will not reflect options set
--- by the commandline flags, and all fields may be either wrong or
--- undefined.
-tracingDynFlags :: DynFlags
-tracingDynFlags = defaultDynFlags tracingSettings
-
-tracingSettings :: Settings
-tracingSettings = trace "panic: Settings not defined in tracingDynFlags" $
-                  Settings { sTargetPlatform = tracingPlatform }
-                  -- Missing flags give a nice error
-
-tracingPlatform :: Platform
-tracingPlatform = Platform { platformWordSize = 4, platformOS = OSUnknown }
-                  -- Missing flags give a nice error
---------------------------------------------------------------------------
 
 type FatalMessager = String -> IO ()
 type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
@@ -1604,7 +1586,7 @@ getStgToDo dflags
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
-parseDynamicFlagsCmdLine :: Monad m => DynFlags -> [Located String]
+parseDynamicFlagsCmdLine :: MonadIO m => DynFlags -> [Located String]
                          -> m (DynFlags, [Located String], [Located String])
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
@@ -1614,7 +1596,7 @@ parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
-parseDynamicFilePragma :: Monad m => DynFlags -> [Located String]
+parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
                        -> m (DynFlags, [Located String], [Located String])
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
@@ -1625,7 +1607,7 @@ parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
 -- the dynamic flag parser that the other methods simply wrap. It allows
 -- saying which flags are valid flags and indicating if we are parsing
 -- arguments from the command line or from a file pragma.
-parseDynamicFlagsFull :: Monad m
+parseDynamicFlagsFull :: MonadIO m
                   => [Flag (CmdLineP DynFlags)]    -- ^ valid flags to match against
                   -> Bool                          -- ^ are the arguments from the command line?
                   -> DynFlags                      -- ^ current dynamic flags
@@ -1664,6 +1646,8 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
                               intercalate "/" (map wayDesc theWays)))
 
   let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+
+  liftIO $ setUnsafeGlobalDynFlags dflags4
 
   return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
 
