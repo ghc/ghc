@@ -6,16 +6,8 @@ g5149
 }
 
 /* This code is carefully arranged to tickle the bug reported in #5149 */
-f5149
+f5149 (W_ x, W_ y, D_ z)
 {
-    D_ z;
-
-    z = D1;
-
-    W_ x,y;
-    x = R1;
-    y = R2;
-
     if (x > y) {
        goto a; /* this jump is shortcutted to g5149 */
     }  else {
