@@ -86,7 +86,7 @@
           <row>
             <entry><option>-ferror-spans</option></entry>
             <entry>output full span in error messages</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>

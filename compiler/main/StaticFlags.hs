@@ -60,9 +60,6 @@ module StaticFlags (
 	opt_UF_KeenessFactor,
 	opt_UF_DearOp,
 
-	-- misc opts
-	opt_ErrorSpans,
-
     -- For the parser
     addOpt, removeOpt, v_opt_C_ready,
 
@@ -290,11 +287,6 @@ opt_UF_DictDiscount      = lookup_def_int "-funfolding-dict-discount"      (30::
 
 opt_UF_KeenessFactor	 = lookup_def_float "-funfolding-keeness-factor"   (1.5::Float)
 opt_UF_DearOp            = ( 40 :: Int)
-
-
--- Include full span info in error messages, instead of just the start position.
-opt_ErrorSpans :: Bool
-opt_ErrorSpans			= lookUp (fsLit "-ferror-spans")
 
 -----------------------------------------------------------------------------
 -- Tunneling our global variables into a new instance of the GHC library

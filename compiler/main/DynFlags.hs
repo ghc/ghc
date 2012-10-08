@@ -344,6 +344,8 @@ data DynFlag
    | Opt_Hpc
 
    -- output style opts
+   | Opt_ErrorSpans -- Include full span info in error messages,
+                    -- instead of just the start position.
    | Opt_PprCaseAsLet
 
    -- temporary flags
@@ -2205,6 +2207,7 @@ dFlags = [
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]
 fFlags = [
+  ( "error-spans",                      Opt_ErrorSpans, nop ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
   ( "strictness",                       Opt_Strictness, nop ),
   ( "specialise",                       Opt_Specialise, nop ),

@@ -134,8 +134,7 @@ isStaticFlag f =
     "fno-flat-cache",
     "fexcess-precision",
     "fhardwire-lib-paths",
-    "fcpr-off",
-    "ferror-spans"
+    "fcpr-off"
     ]
   || any (`isPrefixOf` f) [
     "fliberate-case-threshold",
