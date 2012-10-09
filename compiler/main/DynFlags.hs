@@ -672,6 +672,8 @@ data DynFlags = DynFlags {
   ufKeenessFactor       :: Float,
   ufDearOp              :: Int,
 
+  maxWorkerArgs         :: Int,
+
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
   flushOut              :: FlushOut,
@@ -1213,6 +1215,8 @@ defaultDynFlags mySettings =
         ufDictDiscount      = 30,
         ufKeenessFactor     = 1.5,
         ufDearOp            = 40,
+
+        maxWorkerArgs = 10,
 
         log_action = defaultLogAction,
         flushOut = defaultFlushOut,
@@ -2082,6 +2086,8 @@ dynamic_flags = [
   , Flag "funfolding-fun-discount"       (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
   , Flag "funfolding-dict-discount"      (intSuffix   (\n d -> d {ufDictDiscount = n}))
   , Flag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
+
+  , Flag "fmax-worker-args" (intSuffix (\n d -> d {maxWorkerArgs = n}))
 
         ------ Profiling ----------------------------------------------------
 

@@ -39,7 +39,6 @@ module StaticFlags (
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
 	opt_NoOptCoercion,
-	opt_MaxWorkerArgs,
         opt_NoFlatCache,
 
     -- For the parser
@@ -55,13 +54,13 @@ import {-# SOURCE #-} DynFlags (DynFlags)
 
 import FastString
 import Util
-import Maybes		( firstJusts )
+-- import Maybes		( firstJusts )
 import Panic
 
 import Control.Monad
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
-import Data.List
+-- import Data.List
 
 --------------------------------------------------------------------------
 -- Do not use unsafeGlobalDynFlags!
@@ -95,8 +94,6 @@ removeOpt f = do
   writeIORef v_opt_C $! filter (/= f) fs
 
 lookUp	       	 :: FastString -> Bool
-lookup_def_int   :: String -> Int -> Int
-lookup_str       :: String -> Maybe String
 
 -- holds the static opts while they're being collected, before
 -- being unsafely read by unpacked_static_opts below.
@@ -115,24 +112,25 @@ packed_static_opts   = map mkFastString staticFlags
 
 lookUp     sw = sw `elem` packed_static_opts
 
+{-
 -- (lookup_str "foo") looks for the flag -foo=X or -fooX,
 -- and returns the string X
+lookup_str       :: String -> Maybe String
 lookup_str sw
    = case firstJusts (map (stripPrefix sw) staticFlags) of
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing
 
+lookup_def_int   :: String -> Int -> Int
 lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> try_read sw xx
 
-{-
 lookup_def_float :: String -> Float -> Float
 lookup_def_float sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
 		  	    Just xx -> try_read sw xx
--}
 
 try_read :: Read a => String -> String -> a
 -- (try_read sw str) tries to read s; if it fails, it
@@ -143,6 +141,7 @@ try_read sw str
 	[]	  -> ghcError (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
 			-- ToDo: hack alert. We should really parse the arguments
 			-- 	 and announce errors in a more civilised way.
+-}
 
 
 {-
@@ -182,8 +181,6 @@ opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
 opt_CprOff :: Bool
 opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
-opt_MaxWorkerArgs :: Int
-opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 -- Simplifier switches
 opt_SimplNoPreInlining :: Bool

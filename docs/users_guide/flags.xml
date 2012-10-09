@@ -1613,7 +1613,7 @@
             <entry><option>-fmax-worker-args</option></entry>
             <entry>If a worker has that many arguments, none will be
               unpacked anymore (default: 10)</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 

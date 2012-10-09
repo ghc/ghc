@@ -20,8 +20,7 @@ module DmdAnal ( dmdAnalPgm, dmdAnalTopRhs,
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlags )
-import StaticFlags	( opt_MaxWorkerArgs )
+import DynFlags
 import Demand	-- All of it
 import CoreSyn
 import PprCore	
@@ -70,47 +69,48 @@ To think about
 
 \begin{code}
 dmdAnalPgm :: DynFlags -> CoreProgram -> IO CoreProgram
-dmdAnalPgm _ binds
+dmdAnalPgm dflags binds
   = do {
 	let { binds_plus_dmds = do_prog binds } ;
 	return binds_plus_dmds
     }
   where
     do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL dmdAnalTopBind emptySigEnv binds
+    do_prog binds = snd $ mapAccumL (dmdAnalTopBind dflags) emptySigEnv binds
 
-dmdAnalTopBind :: SigEnv
+dmdAnalTopBind :: DynFlags
+               -> SigEnv
 	       -> CoreBind 
 	       -> (SigEnv, CoreBind)
-dmdAnalTopBind sigs (NonRec id rhs)
+dmdAnalTopBind dflags sigs (NonRec id rhs)
   = (sigs2, NonRec id2 rhs2)
   where
-    (    _, _, (_,   rhs1)) = dmdAnalRhs TopLevel NonRecursive (virgin sigs)    (id, rhs)
-    (sigs2, _, (id2, rhs2)) = dmdAnalRhs TopLevel NonRecursive (nonVirgin sigs) (id, rhs1)
+    (    _, _, (_,   rhs1)) = dmdAnalRhs dflags TopLevel NonRecursive (virgin sigs)    (id, rhs)
+    (sigs2, _, (id2, rhs2)) = dmdAnalRhs dflags TopLevel NonRecursive (nonVirgin sigs) (id, rhs1)
     	-- Do two passes to improve CPR information
     	-- See comments with ignore_cpr_info in mk_sig_ty
     	-- and with extendSigsWithLam
 
-dmdAnalTopBind sigs (Rec pairs)
+dmdAnalTopBind dflags sigs (Rec pairs)
   = (sigs', Rec pairs')
   where
-    (sigs', _, pairs')  = dmdFix TopLevel (virgin sigs) pairs
+    (sigs', _, pairs')  = dmdFix dflags TopLevel (virgin sigs) pairs
 		-- We get two iterations automatically
 		-- c.f. the NonRec case above
 \end{code}
 
 \begin{code}
-dmdAnalTopRhs :: CoreExpr -> (StrictSig, CoreExpr)
+dmdAnalTopRhs :: DynFlags -> CoreExpr -> (StrictSig, CoreExpr)
 -- Analyse the RHS and return
 --	a) appropriate strictness info
 --	b) the unfolding (decorated with strictness info)
-dmdAnalTopRhs rhs
+dmdAnalTopRhs dflags rhs
   = (sig, rhs2)
   where
     call_dmd	   = vanillaCall (exprArity rhs)
-    (_,      rhs1) = dmdAnal (virgin emptySigEnv)    call_dmd rhs
-    (rhs_ty, rhs2) = dmdAnal (nonVirgin emptySigEnv) call_dmd rhs1
-    sig		   = mkTopSigTy rhs rhs_ty
+    (_,      rhs1) = dmdAnal dflags (virgin emptySigEnv)    call_dmd rhs
+    (rhs_ty, rhs2) = dmdAnal dflags (nonVirgin emptySigEnv) call_dmd rhs1
+    sig		   = mkTopSigTy dflags rhs rhs_ty
 	-- Do two passes; see notes with extendSigsWithLam
 	-- Otherwise we get bogus CPR info for constructors like
 	-- 	newtype T a = MkT a
@@ -126,14 +126,14 @@ dmdAnalTopRhs rhs
 %************************************************************************
 
 \begin{code}
-dmdAnal :: AnalEnv -> Demand -> CoreExpr -> (DmdType, CoreExpr)
+dmdAnal :: DynFlags -> AnalEnv -> Demand -> CoreExpr -> (DmdType, CoreExpr)
 
-dmdAnal _ Abs  e = (topDmdType, e)
+dmdAnal _ _ Abs  e = (topDmdType, e)
 
-dmdAnal env dmd e
+dmdAnal dflags env dmd e
   | not (isStrictDmd dmd)
   = let 
-	(res_ty, e') = dmdAnal env evalDmd e
+	(res_ty, e') = dmdAnal dflags env evalDmd e
     in
     (deferType res_ty, e')
 	-- It's important not to analyse e with a lazy demand because
@@ -151,17 +151,17 @@ dmdAnal env dmd e
 	--    evaluation of f in a C(L) demand!
 
 
-dmdAnal _ _ (Lit lit) = (topDmdType, Lit lit)
-dmdAnal _ _ (Type ty) = (topDmdType, Type ty)	-- Doesn't happen, in fact
-dmdAnal _ _ (Coercion co) = (topDmdType, Coercion co)
+dmdAnal _ _ _ (Lit lit) = (topDmdType, Lit lit)
+dmdAnal _ _ _ (Type ty) = (topDmdType, Type ty)	-- Doesn't happen, in fact
+dmdAnal _ _ _ (Coercion co) = (topDmdType, Coercion co)
 
-dmdAnal env dmd (Var var)
+dmdAnal _ env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
 
-dmdAnal env dmd (Cast e co)
+dmdAnal dflags env dmd (Cast e co)
   = (dmd_ty, Cast e' co)
   where
-    (dmd_ty, e') = dmdAnal env dmd' e
+    (dmd_ty, e') = dmdAnal dflags env dmd' e
     to_co        = pSnd (coercionKind co)
     dmd'
       | Just tc <- tyConAppTyCon_maybe to_co
@@ -173,60 +173,60 @@ dmdAnal env dmd (Cast e co)
 	-- inside recursive products -- we might not reach
 	-- a fixpoint.  So revert to a vanilla Eval demand
 
-dmdAnal env dmd (Tick t e)
+dmdAnal dflags env dmd (Tick t e)
   = (dmd_ty, Tick t e')
   where
-    (dmd_ty, e') = dmdAnal env dmd e
+    (dmd_ty, e') = dmdAnal dflags env dmd e
 
-dmdAnal env dmd (App fun (Type ty))
+dmdAnal dflags env dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
   where
-    (fun_ty, fun') = dmdAnal env dmd fun
+    (fun_ty, fun') = dmdAnal dflags env dmd fun
 
-dmdAnal sigs dmd (App fun (Coercion co))
+dmdAnal dflags sigs dmd (App fun (Coercion co))
   = (fun_ty, App fun' (Coercion co))
   where
-    (fun_ty, fun') = dmdAnal sigs dmd fun
+    (fun_ty, fun') = dmdAnal dflags sigs dmd fun
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
-dmdAnal env dmd (App fun arg)	-- Non-type arguments
+dmdAnal dflags env dmd (App fun arg)	-- Non-type arguments
   = let				-- [Type arg handled above]
-	(fun_ty, fun') 	  = dmdAnal env (Call dmd) fun
-	(arg_ty, arg') 	  = dmdAnal env arg_dmd arg
+	(fun_ty, fun') 	  = dmdAnal dflags env (Call dmd) fun
+	(arg_ty, arg') 	  = dmdAnal dflags env arg_dmd arg
 	(arg_dmd, res_ty) = splitDmdTy fun_ty
     in
     (res_ty `bothType` arg_ty, App fun' arg')
 
-dmdAnal env dmd (Lam var body)
+dmdAnal dflags env dmd (Lam var body)
   | isTyVar var
   = let   
-	(body_ty, body') = dmdAnal env dmd body
+	(body_ty, body') = dmdAnal dflags env dmd body
     in
     (body_ty, Lam var body')
 
   | Call body_dmd <- dmd	-- A call demand: good!
   = let	
 	env'		 = extendSigsWithLam env var
-	(body_ty, body') = dmdAnal env' body_dmd body
-	(lam_ty, var')   = annotateLamIdBndr env body_ty var
+	(body_ty, body') = dmdAnal dflags env' body_dmd body
+	(lam_ty, var')   = annotateLamIdBndr dflags env body_ty var
     in
     (lam_ty, Lam var' body')
 
   | otherwise	-- Not enough demand on the lambda; but do the body
   = let		-- anyway to annotate it and gather free var info
-	(body_ty, body') = dmdAnal env evalDmd body
-	(lam_ty, var')   = annotateLamIdBndr env body_ty var
+	(body_ty, body') = dmdAnal dflags env evalDmd body
+	(lam_ty, var')   = annotateLamIdBndr dflags env body_ty var
     in
     (deferType lam_ty, Lam var' body')
 
-dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
+dmdAnal dflags env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   | let tycon = dataConTyCon dc
   , isProductTyCon tycon
   , not (isRecursiveTyCon tycon)
   = let
 	env_alt	      = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
-	(alt_ty, alt')	      = dmdAnalAlt env_alt dmd alt
+	(alt_ty, alt')	      = dmdAnalAlt dflags env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
 	case_bndr_sig	      = cprSig
@@ -264,7 +264,7 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
         scrut_dmd 	   = alt_dmd `both`
 			     idDemandInfo case_bndr'
 
-	(scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
+	(scrut_ty, scrut') = dmdAnal dflags env scrut_dmd scrut
         res_ty =           alt_ty1 `bothType` scrut_ty
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
@@ -273,10 +273,10 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 --                                  , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty [alt'])
 
-dmdAnal env dmd (Case scrut case_bndr ty alts)
+dmdAnal dflags env dmd (Case scrut case_bndr ty alts)
   = let
-	(alt_tys, alts')        = mapAndUnzip (dmdAnalAlt env dmd) alts
-	(scrut_ty, scrut')      = dmdAnal env evalDmd scrut
+	(alt_tys, alts')        = mapAndUnzip (dmdAnalAlt dflags env dmd) alts
+	(scrut_ty, scrut')      = dmdAnal dflags env evalDmd scrut
 	(alt_ty, case_bndr')	= annotateBndr (foldr lubType botDmdType alt_tys) case_bndr
         res_ty                  = alt_ty `bothType` scrut_ty
     in
@@ -286,10 +286,10 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
-dmdAnal env dmd (Let (NonRec id rhs) body)
+dmdAnal dflags env dmd (Let (NonRec id rhs) body)
   = let
-	(sigs', lazy_fv, (id1, rhs')) = dmdAnalRhs NotTopLevel NonRecursive env (id, rhs)
-	(body_ty, body') 	      = dmdAnal (updSigEnv env sigs') dmd body
+	(sigs', lazy_fv, (id1, rhs')) = dmdAnalRhs dflags NotTopLevel NonRecursive env (id, rhs)
+	(body_ty, body') 	      = dmdAnal dflags (updSigEnv env sigs') dmd body
 	(body_ty1, id2)    	      = annotateBndr body_ty id1
 	body_ty2		      = addLazyFVs body_ty1 lazy_fv
     in
@@ -307,11 +307,11 @@ dmdAnal env dmd (Let (NonRec id rhs) body)
 	-- bother to re-analyse the RHS.
     (body_ty2, Let (NonRec id2 rhs') body')    
 
-dmdAnal env dmd (Let (Rec pairs) body)
+dmdAnal dflags env dmd (Let (Rec pairs) body)
   = let
 	bndrs			 = map fst pairs
-	(sigs', lazy_fv, pairs') = dmdFix NotTopLevel env pairs
-	(body_ty, body')         = dmdAnal (updSigEnv env sigs') dmd body
+	(sigs', lazy_fv, pairs') = dmdFix dflags NotTopLevel env pairs
+	(body_ty, body')         = dmdAnal dflags (updSigEnv env sigs') dmd body
 	body_ty1		 = addLazyFVs body_ty lazy_fv
     in
     sigs' `seq` body_ty `seq`
@@ -325,10 +325,10 @@ dmdAnal env dmd (Let (Rec pairs) body)
     (body_ty2,  Let (Rec pairs') body')
 
 
-dmdAnalAlt :: AnalEnv -> Demand -> Alt Var -> (DmdType, Alt Var)
-dmdAnalAlt env dmd (con,bndrs,rhs)
+dmdAnalAlt :: DynFlags -> AnalEnv -> Demand -> Alt Var -> (DmdType, Alt Var)
+dmdAnalAlt dflags env dmd (con,bndrs,rhs)
   = let 
-	(rhs_ty, rhs')   = dmdAnal env dmd rhs
+	(rhs_ty, rhs')   = dmdAnal dflags env dmd rhs
         rhs_ty'          = addDataConPatDmds con bndrs rhs_ty
 	(alt_ty, bndrs') = annotateBndrs rhs_ty' bndrs
 	final_alt_ty | io_hack_reqd = alt_ty `lubType` topDmdType
@@ -488,13 +488,14 @@ dmdTransform env var dmd
 %************************************************************************
 
 \begin{code}
-dmdFix :: TopLevelFlag
+dmdFix :: DynFlags
+       -> TopLevelFlag
        -> AnalEnv 		-- Does not include bindings for this binding
        -> [(Id,CoreExpr)]
        -> (SigEnv, DmdEnv,
 	   [(Id,CoreExpr)])	-- Binders annotated with stricness info
 
-dmdFix top_lvl env orig_pairs
+dmdFix dflags top_lvl env orig_pairs
   = loop 1 initial_env orig_pairs
   where
     bndrs        = map fst orig_pairs
@@ -543,7 +544,7 @@ dmdFix top_lvl env orig_pairs
         my_downRhs (sigs,lazy_fv) (id,rhs)
           = ((sigs', lazy_fv'), pair')
           where
-	    (sigs', lazy_fv1, pair') = dmdAnalRhs top_lvl Recursive (updSigEnv env sigs) (id,rhs)
+	    (sigs', lazy_fv1, pair') = dmdAnalRhs dflags top_lvl Recursive (updSigEnv env sigs) (id,rhs)
 	    lazy_fv'		     = plusVarEnv_C both lazy_fv lazy_fv1
 	   
     same_sig sigs sigs' var = lookup sigs var == lookup sigs' var
@@ -551,22 +552,22 @@ dmdFix top_lvl env orig_pairs
 			Just (sig,_) -> sig
                         Nothing      -> pprPanic "dmdFix" (ppr var)
 
-dmdAnalRhs :: TopLevelFlag -> RecFlag
+dmdAnalRhs :: DynFlags -> TopLevelFlag -> RecFlag
 	-> AnalEnv -> (Id, CoreExpr)
 	-> (SigEnv,  DmdEnv, (Id, CoreExpr))
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 
-dmdAnalRhs top_lvl rec_flag env (id, rhs)
+dmdAnalRhs dflags top_lvl rec_flag env (id, rhs)
  = (sigs', lazy_fv, (id', rhs'))
  where
   arity		     = idArity id   -- The idArity should be up to date
 				    -- The simplifier was run just beforehand
-  (rhs_dmd_ty, rhs') = dmdAnal env (vanillaCall arity) rhs
+  (rhs_dmd_ty, rhs') = dmdAnal dflags env (vanillaCall arity) rhs
   (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty && not (exprIsTrivial rhs), ppr id )
 				-- The RHS can be eta-reduced to just a variable, 
 				-- in which case we should not complain. 
-		       mkSigTy top_lvl rec_flag id rhs rhs_dmd_ty
+		       mkSigTy dflags top_lvl rec_flag id rhs rhs_dmd_ty
   id'		     = id `setIdStrictness` sig_ty
   sigs'		     = extendSigEnv top_lvl (sigEnv env) id sig_ty
 \end{code}
@@ -579,14 +580,14 @@ dmdAnalRhs top_lvl rec_flag env (id, rhs)
 %************************************************************************
 
 \begin{code}
-mkTopSigTy :: CoreExpr -> DmdType -> StrictSig
+mkTopSigTy :: DynFlags -> CoreExpr -> DmdType -> StrictSig
 	-- Take a DmdType and turn it into a StrictSig
 	-- NB: not used for never-inline things; hence False
-mkTopSigTy rhs dmd_ty = snd (mk_sig_ty False False rhs dmd_ty)
+mkTopSigTy dflags rhs dmd_ty = snd (mk_sig_ty dflags False False rhs dmd_ty)
 
-mkSigTy :: TopLevelFlag -> RecFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
-mkSigTy top_lvl rec_flag id rhs dmd_ty 
-  = mk_sig_ty never_inline thunk_cpr_ok rhs dmd_ty
+mkSigTy :: DynFlags -> TopLevelFlag -> RecFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+mkSigTy dflags top_lvl rec_flag id rhs dmd_ty 
+  = mk_sig_ty dflags never_inline thunk_cpr_ok rhs dmd_ty
   where
     never_inline = isNeverActive (idInlineActivation id)
     maybe_id_dmd = idDemandInfo_maybe id
@@ -727,9 +728,9 @@ in favour of error!
 
 
 \begin{code}
-mk_sig_ty :: Bool -> Bool -> CoreExpr
+mk_sig_ty :: DynFlags -> Bool -> Bool -> CoreExpr
           -> DmdType -> (DmdEnv, StrictSig)
-mk_sig_ty _never_inline thunk_cpr_ok rhs (DmdType fv dmds res) 
+mk_sig_ty dflags _never_inline thunk_cpr_ok rhs (DmdType fv dmds res) 
   = (lazy_fv, mkStrictSig dmd_ty)
 	-- Re unused never_inline, see Note [NOINLINE and strictness]
   where
@@ -767,7 +768,7 @@ mk_sig_ty _never_inline thunk_cpr_ok rhs (DmdType fv dmds res)
 	-- DmdType, because that makes fixpointing very slow --- the 
 	-- DmdType gets full of lazy demands that are slow to converge.
 
-    final_dmds = setUnpackStrategy dmds
+    final_dmds = setUnpackStrategy dflags dmds
 	-- Set the unpacking strategy
 	
     res' = case res of
@@ -781,9 +782,9 @@ or whether we'll just remember its strictness.  If unpacking would give
 rise to a *lot* of worker args, we may decide not to unpack after all.
 
 \begin{code}
-setUnpackStrategy :: [Demand] -> [Demand]
-setUnpackStrategy ds
-  = snd (go (opt_MaxWorkerArgs - nonAbsentArgs ds) ds)
+setUnpackStrategy :: DynFlags -> [Demand] -> [Demand]
+setUnpackStrategy dflags ds
+  = snd (go (maxWorkerArgs dflags - nonAbsentArgs ds) ds)
   where
     go :: Int 			-- Max number of args available for sub-components of [Demand]
        -> [Demand]
@@ -870,13 +871,14 @@ annotateBndr dmd_ty@(DmdType fv ds res) var
 annotateBndrs :: DmdType -> [Var] -> (DmdType, [Var])
 annotateBndrs = mapAccumR annotateBndr
 
-annotateLamIdBndr :: AnalEnv
+annotateLamIdBndr :: DynFlags
+                  -> AnalEnv
                   -> DmdType 	-- Demand type of body
 		  -> Id 	-- Lambda binder
 		  -> (DmdType, 	-- Demand type of lambda
 		      Id)	-- and binder annotated with demand	
 
-annotateLamIdBndr env (DmdType fv ds res) id
+annotateLamIdBndr dflags env (DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
@@ -887,7 +889,7 @@ annotateLamIdBndr env (DmdType fv ds res) id
                  Nothing  -> main_ty
                  Just unf -> main_ty `bothType` unf_ty
                           where
-                             (unf_ty, _) = dmdAnal env dmd unf
+                             (unf_ty, _) = dmdAnal dflags env dmd unf
     
     main_ty = DmdType fv' (hacked_dmd:ds) res
 
