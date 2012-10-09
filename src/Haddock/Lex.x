@@ -50,7 +50,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 <0,para> {
  $ws* \n		;
  $ws* \>		{ begin birdtrack }
- $ws* prop \> .* \n	{ strtoken TokProperty }
+ $ws* prop \> .* \n	{ strtoken TokProperty `andBegin` property}
  $ws* \>\>\>            { strtoken TokExamplePrompt `andBegin` exampleexpr }
  $ws* [\*\-]		{ token TokBullet `andBegin` string }
  $ws* \[		{ token TokDefStart `andBegin` def }
@@ -74,6 +74,8 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 }
 
 <birdtrack> .*	\n?	{ strtokenNL TokBirdTrack `andBegin` line }
+
+<property> ()           { token TokPara `andBegin` para }
 
 <example> {
   $ws*	\n		{ token TokPara `andBegin` para }
