@@ -29,6 +29,7 @@ import Panic
 import UniqSupply
 import MonadUtils
 import Util
+import Outputable
 
 import Data.Bits
 import Data.Word
@@ -221,7 +222,7 @@ mkInfoTableContents dflags
                     []          -> mkIntCLit dflags 0
                     (lit:_rest) -> ASSERT( null _rest ) lit
 
-    mk_pieces BlackHole _ = panic "mk_pieces: BlackHole"
+    mk_pieces other _ = pprPanic "mk_pieces" (ppr other)
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 

@@ -41,12 +41,10 @@ import SMRep
 import Cmm
 import CmmUtils
 import CostCentre
-import Outputable
 import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
-import Util
 
 import Control.Monad (when)
 import Data.Maybe (isJust)
@@ -182,8 +180,8 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
     is_caf = isThunkRep (cit_rep info_tbl)
 
     padding
-        | not is_caf = []
-        | otherwise  = ASSERT(null payload) [mkIntCLit dflags 0]
+        | is_caf && null payload = [mkIntCLit dflags 0]
+        | otherwise = []
 
     static_link_field
         | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl

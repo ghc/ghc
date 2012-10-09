@@ -23,7 +23,7 @@ module SMRep (
         ConstrDescription,
 
         -- ** Construction
-        mkHeapRep, blackHoleRep, mkStackRep, mkRTSRep,
+        mkHeapRep, blackHoleRep, indStaticRep, mkStackRep, mkRTSRep,
 
         -- ** Predicates
         isStaticRep, isConRep, isThunkRep, isFunRep, isStaticNoCafCon,
@@ -163,6 +163,7 @@ data ClosureTypeInfo
   | Thunk
   | ThunkSelector SelectorOffset
   | BlackHole
+  | IndStatic
 
 type ConstrTag         = Int
 type ConstrDescription = [Word8] -- result of dataConIdentity
@@ -219,6 +220,9 @@ mkStackRep liveness = StackRep liveness
 blackHoleRep :: SMRep
 blackHoleRep = HeapRep False 0 0 BlackHole
 
+indStaticRep :: SMRep
+indStaticRep = HeapRep True 1 0 IndStatic
+
 -----------------------------------------------------------------------------
 -- Predicates
 
@@ -240,6 +244,7 @@ isThunkRep :: SMRep -> Bool
 isThunkRep (HeapRep _ _ _ Thunk{})         = True
 isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
 isThunkRep (HeapRep _ _ _ BlackHole{})     = True
+isThunkRep (HeapRep _ _ _ IndStatic{})     = True
 isThunkRep _                               = False
 
 isFunRep :: SMRep -> Bool
@@ -302,6 +307,7 @@ closureTypeHdrSize dflags ty = case ty of
                   Thunk{}         -> thunkHdrSize dflags
                   ThunkSelector{} -> thunkHdrSize dflags
                   BlackHole{}     -> thunkHdrSize dflags
+                  IndStatic{}     -> thunkHdrSize dflags
                   _               -> fixedHdrSize dflags
         -- All thunks use thunkHdrSize, even if they are non-updatable.
         -- this is because we don't have separate closure types for
@@ -353,6 +359,8 @@ rtsClosureType rep
       HeapRep True _ _ Thunk{}  -> THUNK_STATIC
 
       HeapRep False _ _ BlackHole{} -> BLACKHOLE
+
+      HeapRep False _ _ IndStatic{} -> IND_STATIC
 
       _ -> panic "rtsClosureType"
 
@@ -421,6 +429,7 @@ pprTypeInfo (ThunkSelector offset)
 
 pprTypeInfo Thunk     = ptext (sLit "Thunk")
 pprTypeInfo BlackHole = ptext (sLit "BlackHole")
+pprTypeInfo IndStatic = ptext (sLit "IndStatic")
 
 -- XXX Does not belong here!!
 stringToWord8s :: String -> [Word8]
