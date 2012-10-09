@@ -79,6 +79,9 @@ binaryInterfaceVersion = 22
 #error Unknown GHC version
 #endif
 
+binaryInterfaceVersionCompatibility :: [Word16]
+binaryInterfaceVersionCompatibility = [21, 22]
+
 
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
@@ -187,7 +190,7 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
   case () of
     _ | magic /= binaryInterfaceMagic -> return . Left $
       "Magic number mismatch: couldn't load interface file: " ++ filename
-      | version /= binaryInterfaceVersion -> return . Left $
+      | version `notElem` binaryInterfaceVersionCompatibility -> return . Left $
       "Interface file is of wrong version: " ++ filename
       | otherwise -> with_name_cache $ \update_nc -> do
 
