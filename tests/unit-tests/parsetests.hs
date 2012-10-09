@@ -63,6 +63,17 @@ spec = do
       it "accepts an optional label" $ do
         parse "<http://example.com/ some link>" `shouldBe`
           (Just . DocParagraph $ hyperlink "http://example.com/" (Just "some link") `mappend` DocString "\n")
+
+    context "when parsing properties" $ do
+      it "can parse a single property" $ do
+        parse "prop> 23 == 23" `shouldBe` (Just $ DocProperty "23 == 23")
+
+      it "can parse a multiple subsequent properties" $ do
+        let input = unlines [
+                "prop> 23 == 23"
+              , "prop> 42 == 42"
+              ]
+        parse input `shouldBe` (Just $ DocProperty "23 == 23" `DocAppend` DocProperty "42 == 42")
   where
     hyperlink :: String -> Maybe String -> Doc RdrName
     hyperlink url = DocHyperlink . Hyperlink url
