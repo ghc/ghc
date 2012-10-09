@@ -34,7 +34,6 @@ module StaticFlags (
 
 	-- optimisation opts
 	opt_NoStateHack,
-        opt_SimpleListLiterals,
 	opt_CprOff,
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
@@ -171,9 +170,6 @@ opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
 -- language opts
 opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  (fsLit "-fdicts-strict")
-
-opt_SimpleListLiterals :: Bool
-opt_SimpleListLiterals	        = lookUp  (fsLit "-fsimple-list-literals")
 
 opt_NoStateHack :: Bool
 opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")

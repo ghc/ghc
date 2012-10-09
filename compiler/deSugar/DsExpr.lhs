@@ -40,7 +40,6 @@ import CoreFVs
 import MkCore
 
 import DynFlags
-import StaticFlags
 import CostCentre
 import Id
 import VarSet
@@ -688,8 +687,8 @@ dsExplicitList elt_ty xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
-       ; if opt_SimpleListLiterals                      -- -fsimple-list-literals
-         || not (dopt Opt_EnableRewriteRules dflags)    -- Rewrite rules off
+       ; if dopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
+         || not (dopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
                 -- See Note [Desugaring RULE left hand sides] in Desugar
          || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!

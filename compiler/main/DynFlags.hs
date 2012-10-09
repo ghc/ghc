@@ -291,6 +291,7 @@ data DynFlag
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
    | Opt_OmitYields
+   | Opt_SimpleListLiterals
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -2316,6 +2317,7 @@ fFlags = [
   ( "cmm-sink",                         Opt_CmmSink, nop ),
   ( "cmm-elim-common-blocks",           Opt_CmmElimCommonBlocks, nop ),
   ( "omit-yields",                      Opt_OmitYields, nop ),
+  ( "simple-list-literals",             Opt_SimpleListLiterals, nop ),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),

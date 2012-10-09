@@ -119,7 +119,6 @@ isStaticFlag f =
     "fno-hi-version-check",
     "dno-black-holing",
     "fno-state-hack",
-    "fsimple-list-literals",
     "fruntime-types",
     "fno-pre-inlining",
     "fno-opt-coercion",
