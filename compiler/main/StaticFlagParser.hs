@@ -137,7 +137,6 @@ isStaticFlag f =
     "fcpr-off"
     ]
   || any (`isPrefixOf` f) [
-    "fliberate-case-threshold",
     "fmax-worker-args"
      ]
 
