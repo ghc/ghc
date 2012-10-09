@@ -50,7 +50,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 <0,para> {
  $ws* \n		;
  $ws* \>		{ begin birdtrack }
- $ws* prop\>            { strtoken TokPropertyPrompt `andBegin` propertyexpr }
+ $ws* prop \> .* \n	{ strtoken TokProperty }
  $ws* \>\>\>            { strtoken TokExamplePrompt `andBegin` exampleexpr }
  $ws* [\*\-]		{ token TokBullet `andBegin` string }
  $ws* \[		{ token TokDefStart `andBegin` def }
@@ -62,7 +62,6 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 -- beginning of a line
 <line> {
   $ws* \>		{ begin birdtrack }
-  $ws* prop\>           { strtoken TokPropertyPrompt `andBegin` propertyexpr }
   $ws* \>\>\>		{ strtoken TokExamplePrompt `andBegin` exampleexpr }
   $ws* \n		{ token TokPara `andBegin` para }
   -- Here, we really want to be able to say
@@ -85,10 +84,6 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~\:]
 <exampleexpr> .* \n	{ strtokenNL TokExampleExpression `andBegin` example }
 
 <exampleresult> .* \n	{ strtokenNL TokExampleResult `andBegin` example }
-
-<propertyexpr> .* \n	{ strtokenNL TokPropertyExpression `andBegin` property }
-
-<property> ()           { token TokPara `andBegin` para }
 
 <string,def> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
@@ -135,8 +130,7 @@ data Token
   | TokEmphasis String
   | TokAName String
   | TokBirdTrack String
-  | TokPropertyPrompt String
-  | TokPropertyExpression String
+  | TokProperty String
   | TokExamplePrompt String
   | TokExampleExpression String
   | TokExampleResult String

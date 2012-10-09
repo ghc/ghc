@@ -35,8 +35,7 @@ import Data.List  (stripPrefix)
 	'-'	{ (TokBullet,_) }
 	'(n)'	{ (TokNumber,_) }
 	'>..'	{ (TokBirdTrack $$,_) }
-	PPROMPT	{ (TokPropertyPrompt $$,_) }
-	PEXP	{ (TokPropertyExpression $$,_) }
+	PROP	{ (TokProperty $$,_) }
 	PROMPT	{ (TokExamplePrompt $$,_) }
 	RESULT	{ (TokExampleResult $$,_) }
 	EXP	{ (TokExampleExpression $$,_) }
@@ -75,15 +74,15 @@ defpara :: { (Doc RdrName, Doc RdrName) }
 para    :: { Doc RdrName }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
-	| property		{ DocProperty $1 }
+	| property		{ $1 }
 	| examples		{ DocExamples $1 }
 
 codepara :: { Doc RdrName }
 	: '>..' codepara	{ docAppend (DocString $1) $2 }
 	| '>..'			{ DocString $1 }
 
-property :: { String }
-	: PPROMPT PEXP		{ strip $2 }
+property :: { Doc RdrName }
+	: PROP			{ makeProperty $1 }
 
 examples :: { [Example] }
 	: example examples	{ $1 : $2 }
@@ -135,6 +134,13 @@ makeHyperlink :: String -> Hyperlink
 makeHyperlink input = case break isSpace $ strip input of
   (url, "")    -> Hyperlink url Nothing
   (url, label) -> Hyperlink url (Just . dropWhile isSpace $ label)
+
+makeProperty :: String -> Doc RdrName
+makeProperty s = case strip s of
+  'p':'r':'o':'p':'>':xs ->
+	DocProperty (dropWhile isSpace xs)
+  xs ->
+	error $ "makeProperty: invalid input " ++ show xs
 
 -- | Create an 'Example', stripping superfluous characters as appropriate
 makeExample :: String -> String -> [String] -> Example
