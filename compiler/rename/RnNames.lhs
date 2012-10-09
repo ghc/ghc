@@ -630,7 +630,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
     occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
                                  | a <- all_avails, n <- availNames a]
       where
-        -- we know that (1) there are at most entries for one name, (2) their
+        -- we know that (1) there are at most 2 entries for one name, (2) their
         -- first component is identical, (3) they are for tys/cls, and (4) one
         -- entry has the name in its parent position (the other doesn't)
         combine (name, AvailTC p1 subs1, Nothing)
