@@ -247,8 +247,8 @@
 // because LDV profiling relies on entering closures to mark them as
 // "used".
 
-#define LOAD_INFO \
-    info = %INFO_PTR(UNTAG(P1));
+#define LOAD_INFO(ret,x)                        \
+    info = %INFO_PTR(UNTAG(x));
 
 #define MAYBE_UNTAG(x) UNTAG(x);
 
@@ -346,11 +346,13 @@
    ------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
-#define PROF_HDR_FIELDS(w_)                     \
-  w_ prof_hdr_1,                                \
-  w_ prof_hdr_2,
+#define PROF_HDR_FIELDS(w_) PROF_HDR_FIELDS_(w_,prof_hdr_1,prof_hdr_2)
+#define PROF_HDR_FIELDS_(w_,hdr1,hdr2)          \
+  w_ hdr1,                                      \
+  w_ hdr2,
 #else
 #define PROF_HDR_FIELDS(w_) /* nothing */
+#define PROF_HDR_FIELDS_(w_,hdr1,hdr2) /* nothing */
 #endif
 
 /* -------------------------------------------------------------------------

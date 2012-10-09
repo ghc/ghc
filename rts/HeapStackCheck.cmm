@@ -216,7 +216,7 @@ stg_gc_prim_n (W_ arg)
 /* The stg_enter_checkbh frame has the same shape as an update frame: */
 
 INFO_TABLE_RET ( stg_enter_checkbh, RET_SMALL,
-                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,updatee))
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,updatee))
     return (P_ ret)
 {
     foreign "C" checkBlockingQueues(MyCapability() "ptr",

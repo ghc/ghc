@@ -35,9 +35,9 @@
  */
 #ifdef CMINUSMINUS
 
-#define UPDATE_FRAME_FIELDS(w_,p_,info_ptr,updatee)     \
+#define UPDATE_FRAME_FIELDS(w_,p_,info_ptr,ccs,updatee) \
                  w_ info_ptr,                           \
-                 PROF_HDR_FIELDS(w_)                    \
+                 PROF_HDR_FIELDS_(w_,ccs,_unused_)      \
                  p_ updatee
 
 

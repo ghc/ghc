@@ -28,14 +28,11 @@
    -------------------------------------------------------------------------- */
 
 #ifdef PROFILING
-#define RET_FIELDS(w_,info_ptr,ccs)             \
-  w_ info_ptr,                                  \
-  w_ ccs
-#define GET_SAVED_CCCS  CCCS = ccs
+#define SAVE_CCS        W_ saved_ccs; saved_ccs = CCCS;
+#define RESTORE_CCS     CCCS = saved_ccs;
 #else
-#define RET_FIELDS(w_,info_ptr,ccs)             \
-  w_ info_ptr
-#define GET_SAVED_CCCS  /* empty */
+#define SAVE_CCS        /* nothing */
+#define RESTORE_CCS     /* nothing */
 #endif
 
 /*
@@ -69,11 +66,13 @@
       STK_CHK_NP(node);                                                 \
       UPD_BH_UPDATABLE(node);                                           \
       LDV_ENTER(node);                                                  \
-      ENTER_CCS_THUNK(node);                                            \
       selectee = StgThunk_payload(node,0);                              \
-      push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info,node)) {           \
+      push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info,CCCS,node)) {      \
+        ENTER_CCS_THUNK(node);                                          \
         if (NEED_EVAL(selectee)) {                                      \
+          SAVE_CCS;                                                     \
           (P_ constr) = call %GET_ENTRY(selectee) (selectee);           \
+          RESTORE_CCS;                                                  \
           selectee = constr;                                            \
         }                                                               \
         field = StgClosure_payload(UNTAG(selectee),offset);             \
@@ -111,10 +110,12 @@ SELECTOR_CODE_UPD(15)
       STK_CHK_NP(node);                                                 \
       UPD_BH_UPDATABLE(node);                                           \
       LDV_ENTER(node);                                                  \
-      ENTER_CCS_THUNK(node);                                            \
       selectee = StgThunk_payload(node,0);                              \
       if (NEED_EVAL(selectee)) {                                        \
+          ENTER_CCS_THUNK(node);                                        \
+          SAVE_CCS;                                                     \
           (P_ constr) = call %GET_ENTRY(selectee) (selectee);           \
+          RESTORE_CCS;                                                  \
           selectee = constr;                                            \
       }                                                                 \
       field = StgClosure_payload(UNTAG(selectee),offset);               \
@@ -164,8 +165,8 @@ INFO_TABLE(stg_ap_1_upd,1,0,THUNK_1_0,"stg_ap_1_upd_info","stg_ap_1_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_0_fast
             (StgThunk_payload(node,0));
     }
@@ -178,8 +179,8 @@ INFO_TABLE(stg_ap_2_upd,2,0,THUNK_2_0,"stg_ap_2_upd_info","stg_ap_2_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_p_fast
             (StgThunk_payload(node,0),
              StgThunk_payload(node,1));
@@ -193,8 +194,8 @@ INFO_TABLE(stg_ap_3_upd,3,0,THUNK,"stg_ap_3_upd_info","stg_ap_3_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_pp_fast
             (StgThunk_payload(node,0),
              StgThunk_payload(node,1),
@@ -209,8 +210,8 @@ INFO_TABLE(stg_ap_4_upd,4,0,THUNK,"stg_ap_4_upd_info","stg_ap_4_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_ppp_fast
             (StgThunk_payload(node,0),
              StgThunk_payload(node,1),
@@ -226,8 +227,8 @@ INFO_TABLE(stg_ap_5_upd,5,0,THUNK,"stg_ap_5_upd_info","stg_ap_5_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_pppp_fast
             (StgThunk_payload(node,0),
              StgThunk_payload(node,1),
@@ -244,8 +245,8 @@ INFO_TABLE(stg_ap_6_upd,6,0,THUNK,"stg_ap_6_upd_info","stg_ap_6_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+        ENTER_CCS_THUNK(node);
         jump stg_ap_ppppp_fast
             (StgThunk_payload(node,0),
              StgThunk_payload(node,1),
@@ -263,8 +264,8 @@ INFO_TABLE(stg_ap_7_upd,7,0,THUNK,"stg_ap_7_upd_info","stg_ap_7_upd_info")
     STK_CHK_NP(node);
     UPD_BH_UPDATABLE(node);
     LDV_ENTER(node);
-    ENTER_CCS_THUNK(node);
-    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, node)) {
+    push (UPDATE_FRAME_FIELDS(,,stg_upd_frame_info, CCCS, node)) {
+      ENTER_CCS_THUNK(node);
       jump stg_ap_pppppp_fast
           (StgThunk_payload(node,0),
            StgThunk_payload(node,1),
