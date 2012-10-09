@@ -521,14 +521,18 @@ the_maybe (x:xs) = go x xs
                     | otherwise = Nothing
 
 
+instance Functor G.SCC where
+    fmap f (G.AcyclicSCC x) = G.AcyclicSCC (f x)
+    fmap f (G.CyclicSCC xs) = G.CyclicSCC (fmap f xs)
+
 -- | Orders elements of a map into dependency order insofar as that is possible.
 --
 -- This function ignores any elements reported as reachable that are not present in the input.
 --
 -- An element (b1 :: b) strictly precedes (b2 :: b) in the output whenever b1 is reachable from b2 but not vice versa.
 -- Element b1 occurs in the same SCC as b2 whenever both b1 is reachable from b2 and b1 is reachable from b2.
-topologicalSort :: Ord a => (b -> UniqFM a) -> M.Map a b -> [M.Map a b]
-topologicalSort f got = [M.fromList [(a, b) | (b, a, _) <- G.flattenSCC scc] | scc <- G.stronglyConnCompR [(b, a, eltsUFM (f b)) | (a, b) <- M.toList got]]
+topologicalSort :: Ord a => (b -> UniqFM a) -> M.Map a b -> [G.SCC (a, b)]
+topologicalSort f got = [fmap (\(b, a, _) -> (a, b)) scc | scc <- G.stronglyConnCompR [(b, a, eltsUFM (f b)) | (a, b) <- M.toList got]]
 
 
 restrict :: Ord k => M.Map k v -> S.Set k -> M.Map k v
@@ -695,6 +699,15 @@ foldZipEqualM f = go
    go acc []     []     = return acc
    go acc (x:xs) (y:ys) = f acc x y >>= \acc' -> go acc' xs ys
    go _ _ _ = fail "foldZipEqualM"
+
+{-# INLINE listExtensionBy #-}
+listExtensionBy :: (a1 -> a2 -> Maybe a)
+                -> [a1] -> [a2]
+                -> ([a1], [a2], [a])
+listExtensionBy f xs ys = go (reverse xs) (reverse ys) []
+  where
+    go (x:xs) (y:ys) zs | Just z <- f x y = go xs ys (z:zs)
+    go xs     ys     zs                   = (xs, ys, zs)
 
 
 zipMaybeWithEqual :: String
