@@ -1,0 +1,9 @@
+
+\begin{code}
+module PrelNames where
+
+import Module
+
+mAIN :: Module
+\end{code}
+

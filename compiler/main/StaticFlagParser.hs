@@ -92,14 +92,6 @@ flagsStatic :: [Flag IO]
 flagsStatic = [
         ------ Debugging ----------------------------------------------------
     Flag "dppr-debug"                  (PassFlag addOpt)
-  , Flag "dsuppress-all"               (PassFlag addOpt)
-  , Flag "dsuppress-uniques"           (PassFlag addOpt)
-  , Flag "dsuppress-coercions"         (PassFlag addOpt)
-  , Flag "dsuppress-module-prefixes"   (PassFlag addOpt)
-  , Flag "dsuppress-type-applications" (PassFlag addOpt)
-  , Flag "dsuppress-idinfo"            (PassFlag addOpt)
-  , Flag "dsuppress-var-kinds"         (PassFlag addOpt)
-  , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 

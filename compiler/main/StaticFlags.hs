@@ -29,16 +29,6 @@ module StaticFlags (
 	opt_PprStyle_Debug,
         opt_NoDebugOutput,
 
-	-- Suppressing boring aspects of core dumps
-	opt_SuppressAll,
-	opt_SuppressUniques,
-        opt_SuppressCoercions,
-	opt_SuppressModulePrefixes,
-	opt_SuppressTypeApplications,
-	opt_SuppressIdInfo,
-	opt_SuppressTypeSignatures,
-        opt_SuppressVarKinds,
-
 	-- language opts
 	opt_DictsStrict,
 
@@ -172,55 +162,6 @@ unpacked_opts =
 -}
 
 -- debugging options
--- | Suppress all that is suppressable in core dumps.
---   Except for uniques, as some simplifier phases introduce new varibles that
---   have otherwise identical names.
-opt_SuppressAll :: Bool
-opt_SuppressAll
-	= lookUp  (fsLit "-dsuppress-all")
-
--- | Suppress all coercions, them replacing with '...'
-opt_SuppressCoercions :: Bool
-opt_SuppressCoercions
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-coercions")
-
-opt_SuppressVarKinds :: Bool
-opt_SuppressVarKinds
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-var-kinds")
-
--- | Suppress module id prefixes on variables.
-opt_SuppressModulePrefixes :: Bool
-opt_SuppressModulePrefixes
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-module-prefixes")
-
--- | Suppress type applications.
-opt_SuppressTypeApplications :: Bool
-opt_SuppressTypeApplications
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-type-applications")
-
--- | Suppress info such as arity and unfoldings on identifiers.
-opt_SuppressIdInfo :: Bool
-opt_SuppressIdInfo
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-idinfo")
-
--- | Suppress separate type signatures in core, but leave types on lambda bound vars
-opt_SuppressTypeSignatures :: Bool
-opt_SuppressTypeSignatures
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-type-signatures")
-
--- | Suppress unique ids on variables.
---   Except for uniques, as some simplifier phases introduce new variables that
---   have otherwise identical names.
-opt_SuppressUniques :: Bool
-opt_SuppressUniques
-	=  lookUp  (fsLit "-dsuppress-uniques")
-
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")

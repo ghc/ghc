@@ -86,8 +86,6 @@ import FastTypes
 import FastString
 import Outputable
 
--- import StaticFlags ( opt_SuppressVarKinds )
-
 import Data.Data
 \end{code}
 
@@ -217,7 +215,7 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
 -- Printing the type on every occurrence is too much!
---            <+> if (not opt_SuppressVarKinds)
+--            <+> if (not (dopt Opt_SuppressVarKinds dflags))
 --                then ifPprDebug (text "::" <+> ppr (tyVarKind var) <+> text ")")
 --                else empty
 

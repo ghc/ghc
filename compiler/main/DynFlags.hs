@@ -125,7 +125,7 @@ module DynFlags (
 import Platform
 import Module
 import PackageConfig
-import PrelNames        ( mAIN )
+import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
@@ -344,6 +344,23 @@ data DynFlag
    | Opt_ErrorSpans -- Include full span info in error messages,
                     -- instead of just the start position.
    | Opt_PprCaseAsLet
+
+   -- Suppress all coercions, them replacing with '...'
+   | Opt_SuppressCoercions
+   | Opt_SuppressVarKinds
+   -- Suppress module id prefixes on variables.
+   | Opt_SuppressModulePrefixes
+   -- Suppress type applications.
+   | Opt_SuppressTypeApplications
+   -- Suppress info such as arity and unfoldings on identifiers.
+   | Opt_SuppressIdInfo
+   -- Suppress separate type signatures in core, but leave types on
+   -- lambda bound vars
+   | Opt_SuppressTypeSignatures
+   -- Suppress unique ids on variables.
+   -- Except for uniques, as some simplifier phases introduce new
+   -- variables that have otherwise identical names.
+   | Opt_SuppressUniques
 
    -- temporary flags
    | Opt_RunCPS
@@ -1914,6 +1931,15 @@ dynamic_flags = [
   , Flag "dppr-user-length" (intSuffix (\n d -> d{ pprUserLength = n }))
   , Flag "dppr-cols"        (intSuffix (\n d -> d{ pprCols = n }))
   , Flag "dtrace-level"     (intSuffix (\n d -> d{ traceLevel = n }))
+  -- Suppress all that is suppressable in core dumps.
+  -- Except for uniques, as some simplifier phases introduce new varibles that
+  -- have otherwise identical names.
+  , Flag "dsuppress-all"    (NoArg $ do setDynFlag Opt_SuppressCoercions
+                                        setDynFlag Opt_SuppressVarKinds
+                                        setDynFlag Opt_SuppressModulePrefixes
+                                        setDynFlag Opt_SuppressTypeApplications
+                                        setDynFlag Opt_SuppressIdInfo
+                                        setDynFlag Opt_SuppressTypeSignatures)
 
         ------ Debugging ----------------------------------------------------
   , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))
@@ -2229,7 +2255,14 @@ negatableFlags = [
 -- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
 dFlags :: [FlagSpec DynFlag]
 dFlags = [
-  ( "ppr-case-as-let",                  Opt_PprCaseAsLet, nop ) ]
+  ( "suppress-coercions",               Opt_SuppressCoercions,          nop),
+  ( "suppress-var-kinds",               Opt_SuppressVarKinds,           nop),
+  ( "suppress-module-prefixes",         Opt_SuppressModulePrefixes,     nop),
+  ( "suppress-type-applications",       Opt_SuppressTypeApplications,   nop),
+  ( "suppress-idinfo",                  Opt_SuppressIdInfo,             nop),
+  ( "suppress-type-signatures",         Opt_SuppressTypeSignatures,     nop),
+  ( "suppress-uniques",                 Opt_SuppressUniques,            nop),
+  ( "ppr-case-as-let",                  Opt_PprCaseAsLet,               nop)]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]

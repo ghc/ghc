@@ -109,12 +109,12 @@ module OccName (
 import Util
 import Unique
 import BasicTypes
+import DynFlags
 import UniqFM
 import UniqSet
 import FastString
 import Outputable
 import Binary
-import StaticFlags( opt_SuppressUniques )
 import Data.Char
 import Data.Data
 \end{code}
@@ -271,8 +271,10 @@ pprOccName (OccName sp occ)
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
 	         | otherwise      = empty
 
-    pp_occ | opt_SuppressUniques = text (strip_th_unique (unpackFS occ))
-           | otherwise           = ftext occ
+    pp_occ = sdocWithDynFlags $ \dflags ->
+             if dopt Opt_SuppressUniques dflags
+             then text (strip_th_unique (unpackFS occ))
+             else ftext occ
 
 	-- See Note [Suppressing uniques in OccNames]
     strip_th_unique ('[' : c : _) | isAlphaNum c = []
