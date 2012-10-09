@@ -35,7 +35,6 @@ module StaticFlags (
 	-- optimisation opts
 	opt_NoStateHack,
 	opt_CprOff,
-	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
 	opt_NoOptCoercion,
         opt_NoFlatCache,
@@ -179,10 +178,6 @@ opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
 
 -- Simplifier switches
-opt_SimplNoPreInlining :: Bool
-opt_SimplNoPreInlining		= lookUp  (fsLit "-fno-pre-inlining")
-	-- NoPreInlining is there just to see how bad things
-	-- get if you don't do it!
 opt_SimplExcessPrecision :: Bool
 opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 

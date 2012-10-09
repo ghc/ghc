@@ -341,6 +341,10 @@ data DynFlag
    | Opt_RelativeDynlibPaths
    | Opt_Hpc
 
+   -- PreInlining is on by default. The option is there just to see how
+   -- bad things get if you turn it off!
+   | Opt_SimplPreInlining
+
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
                     -- instead of just the start position.
@@ -2331,6 +2335,7 @@ fFlags = [
   ( "prof-count-entries",               Opt_ProfCountEntries, nop ),
   ( "prof-cafs",                        Opt_AutoSccsOnIndividualCafs, nop ),
   ( "hpc",                              Opt_Hpc, nop ),
+  ( "pre-inlining",                     Opt_SimplPreInlining, nop ),
   ( "use-rpaths",                       Opt_RPath, nop )
   ]
 
@@ -2512,6 +2517,7 @@ defaultFlags settings
       Opt_GhciHistory,
       Opt_HelpfulErrors,
       Opt_ProfCountEntries,
+      Opt_SimplPreInlining,
       Opt_RPath
     ]
 

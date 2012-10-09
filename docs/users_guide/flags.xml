@@ -1627,7 +1627,7 @@
           <row>
             <entry><option>-fno-pre-inlining</option></entry>
             <entry>Turn off pre-inlining</entry>
-            <entry>static</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
 

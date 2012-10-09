@@ -34,7 +34,6 @@ import SimplEnv
 import CoreMonad        ( SimplifierMode(..), Tick(..) )
 import MkCore           ( sortQuantVars )
 import DynFlags
-import StaticFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
@@ -812,12 +811,12 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 
 \begin{code}
-preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
-preInlineUnconditionally env top_lvl bndr rhs
+preInlineUnconditionally :: DynFlags -> SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
+preInlineUnconditionally dflags env top_lvl bndr rhs
   | not active                               = False
   | isStableUnfolding (idUnfolding bndr)     = False -- Note [InlineRule and preInlineUnconditionally]
   | isTopLevel top_lvl && isBottomingId bndr = False -- Note [Top-level bottoming Ids]
-  | opt_SimplNoPreInlining                   = False
+  | not (dopt Opt_SimplPreInlining dflags)   = False
   | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
   | otherwise = case idOccInfo bndr of
                   IAmDead                    -> True -- Happens in ((\x.1) v)

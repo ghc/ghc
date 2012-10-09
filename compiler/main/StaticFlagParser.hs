@@ -120,7 +120,6 @@ isStaticFlag f =
     "dno-black-holing",
     "fno-state-hack",
     "fruntime-types",
-    "fno-pre-inlining",
     "fno-opt-coercion",
     "fno-flat-cache",
     "fexcess-precision",

@@ -291,12 +291,12 @@ simplRecOrTopPair :: SimplEnv
                   -> SimplM SimplEnv    -- Returns an env that includes the binding
 
 simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
-  | preInlineUnconditionally env top_lvl old_bndr rhs   -- Check for unconditional inline
-  = do  { tick (PreInlineUnconditionally old_bndr)
-        ; return (extendIdSubst env old_bndr (mkContEx env rhs)) }
-
-  | otherwise
-  = simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
+  = do dflags <- getDynFlags
+       -- Check for unconditional inline
+       if preInlineUnconditionally dflags env top_lvl old_bndr rhs
+           then do tick (PreInlineUnconditionally old_bndr)
+                   return (extendIdSubst env old_bndr (mkContEx env rhs))
+           else simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
 \end{code}
 
 
@@ -1333,21 +1333,24 @@ simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
         ; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | preInlineUnconditionally env NotTopLevel bndr rhs
-  = do  { tick (PreInlineUnconditionally bndr)
-        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
-          simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
+  = do dflags <- getDynFlags
+       case () of
+         _
+          | preInlineUnconditionally dflags env NotTopLevel bndr rhs ->
+            do  { tick (PreInlineUnconditionally bndr)
+                ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
+                  simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-  | isStrictId bndr              -- Includes coercions
-  = do  { simplExprF (rhs_se `setFloats` env) rhs
-                     (StrictBind bndr bndrs body env cont) }
+          | isStrictId bndr ->           -- Includes coercions
+            do  { simplExprF (rhs_se `setFloats` env) rhs
+                             (StrictBind bndr bndrs body env cont) }
 
-  | otherwise
-  = ASSERT( not (isTyVar bndr) )
-    do  { (env1, bndr1) <- simplNonRecBndr env bndr
-        ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
-        ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
-        ; simplLam env3 bndrs body cont }
+          | otherwise ->
+            ASSERT( not (isTyVar bndr) )
+            do  { (env1, bndr1) <- simplNonRecBndr env bndr
+                ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
+                ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
+                ; simplLam env3 bndrs body cont }
 \end{code}
 
 %************************************************************************
