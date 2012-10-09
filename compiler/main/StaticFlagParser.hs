@@ -18,7 +18,7 @@ module StaticFlagParser (
 #include "HsVersions.h"
 
 import qualified StaticFlags as SF
-import StaticFlags ( v_opt_C_ready, opt_SimplExcessPrecision )
+import StaticFlags ( v_opt_C_ready )
 import CmdLineParser
 import SrcLoc
 import Util
@@ -65,15 +65,7 @@ parseStaticFlagsFull flagsAvailable args = do
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
 
-    -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
-    -- the static flag parser has slurped it, we must return it as a
-    -- leftover too.  ToDo: make -fexcess-precision dynamic only.
-  let excess_prec
-       | opt_SimplExcessPrecision = map (mkGeneralLocated "in excess_prec")
-                                        ["-fexcess-precision"]
-       | otherwise                = []
-
-  return (excess_prec ++ leftover, warns)
+  return (leftover, warns)
 
 flagsStatic :: [Flag IO]
 -- All the static flags should appear in this list.  It describes how each
@@ -122,7 +114,6 @@ isStaticFlag f =
     "fruntime-types",
     "fno-opt-coercion",
     "fno-flat-cache",
-    "fexcess-precision",
     "fhardwire-lib-paths",
     "fcpr-off"
     ]

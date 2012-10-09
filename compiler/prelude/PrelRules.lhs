@@ -42,7 +42,6 @@ import Maybes      ( orElse )
 import Name        ( Name, nameOccName )
 import Outputable
 import FastString
-import StaticFlags ( opt_SimplExcessPrecision )
 import BasicTypes
 import DynFlags
 import Platform
@@ -284,9 +283,9 @@ cmpOp cmp = go
 
 negOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Negate
 negOp _      (MachFloat 0.0)  = Nothing  -- can't represent -0.0 as a Rational
-negOp _      (MachFloat f)    = Just (mkFloatVal (-f))
+negOp dflags (MachFloat f)    = Just (mkFloatVal dflags (-f))
 negOp _      (MachDouble 0.0) = Nothing
-negOp _      (MachDouble d)   = Just (mkDoubleVal (-d))
+negOp dflags (MachDouble d)   = Just (mkDoubleVal dflags (-d))
 negOp dflags (MachInt i)      = intResult dflags (-i)
 negOp _      _                = Nothing
 
@@ -329,16 +328,16 @@ wordShiftOp2 _ _ _ _ = Nothing
 floatOp2 :: (Rational -> Rational -> Rational)
          -> DynFlags -> Literal -> Literal
          -> Maybe (Expr CoreBndr)
-floatOp2 op _ (MachFloat f1) (MachFloat f2)
-  = Just (mkFloatVal (f1 `op` f2))
+floatOp2 op dflags (MachFloat f1) (MachFloat f2)
+  = Just (mkFloatVal dflags (f1 `op` f2))
 floatOp2 _ _ _ _ = Nothing
 
 --------------------------
 doubleOp2 :: (Rational -> Rational -> Rational)
           -> DynFlags -> Literal -> Literal
           -> Maybe (Expr CoreBndr)
-doubleOp2 op _ (MachDouble f1) (MachDouble f2)
-  = Just (mkDoubleVal (f1 `op` f2))
+doubleOp2 op dflags (MachDouble f1) (MachDouble f2)
+  = Just (mkDoubleVal dflags (f1 `op` f2))
 doubleOp2 _ _ _ _ = Nothing
 
 --------------------------
@@ -518,13 +517,13 @@ unaryLit :: (DynFlags -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 unaryLit op = do
   dflags <- getDynFlags
   [Lit l] <- getArgs
-  liftMaybe $ op dflags (convFloating l)
+  liftMaybe $ op dflags (convFloating dflags l)
 
 binaryLit :: (DynFlags -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 binaryLit op = do
   dflags <- getDynFlags
   [Lit l1, Lit l2] <- getArgs
-  liftMaybe $ op dflags (convFloating l1) (convFloating l2)
+  liftMaybe $ op dflags (convFloating dflags l1) (convFloating dflags l2)
 
 leftIdentity :: Literal -> RuleM CoreExpr
 leftIdentity id_lit = leftIdentityDynFlags (const id_lit)
@@ -580,12 +579,12 @@ nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
 -- and target architecture here, but it's convenient (and wrong :-).
-convFloating :: Literal -> Literal
-convFloating (MachFloat  f) | not opt_SimplExcessPrecision =
+convFloating :: DynFlags -> Literal -> Literal
+convFloating dflags (MachFloat  f) | not (dopt Opt_ExcessPrecision dflags) =
    MachFloat  (toRational (fromRational f :: Float ))
-convFloating (MachDouble d) | not opt_SimplExcessPrecision =
+convFloating dflags (MachDouble d) | not (dopt Opt_ExcessPrecision dflags) =
    MachDouble (toRational (fromRational d :: Double))
-convFloating l = l
+convFloating _ l = l
 
 guardFloatDiv :: RuleM ()
 guardFloatDiv = do
@@ -616,10 +615,10 @@ mkIntVal :: DynFlags -> Integer -> Expr CoreBndr
 mkIntVal dflags i = Lit (mkMachInt dflags i)
 mkWordVal :: DynFlags -> Integer -> Expr CoreBndr
 mkWordVal dflags w = Lit (mkMachWord dflags w)
-mkFloatVal :: Rational -> Expr CoreBndr
-mkFloatVal  f = Lit (convFloating (MachFloat  f))
-mkDoubleVal :: Rational -> Expr CoreBndr
-mkDoubleVal d = Lit (convFloating (MachDouble d))
+mkFloatVal :: DynFlags -> Rational -> Expr CoreBndr
+mkFloatVal dflags f = Lit (convFloating dflags (MachFloat  f))
+mkDoubleVal :: DynFlags -> Rational -> Expr CoreBndr
+mkDoubleVal dflags d = Lit (convFloating dflags (MachDouble d))
 
 matchPrimOpId :: PrimOp -> Id -> RuleM ()
 matchPrimOpId op id = do

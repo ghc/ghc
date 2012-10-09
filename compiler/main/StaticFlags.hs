@@ -35,7 +35,6 @@ module StaticFlags (
 	-- optimisation opts
 	opt_NoStateHack,
 	opt_CprOff,
-	opt_SimplExcessPrecision,
 	opt_NoOptCoercion,
         opt_NoFlatCache,
 
@@ -176,10 +175,6 @@ opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
 opt_CprOff :: Bool
 opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
-
--- Simplifier switches
-opt_SimplExcessPrecision :: Bool
-opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 
 opt_NoOptCoercion :: Bool
 opt_NoOptCoercion    	        = lookUp  (fsLit "-fno-opt-coercion")
