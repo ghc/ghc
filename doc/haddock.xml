@@ -1658,7 +1658,7 @@ module A where
 	by zero or more result lines:</para>
 
 <programlisting>
--- | Two examples are given bellow:
+-- | Two examples are given below:
 --
 -- &gt;&gt;&gt; fib 10
 -- 55
