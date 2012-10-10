@@ -231,6 +231,9 @@ class TestOptions:
        self.objc_src   = 0
        self.objcpp_src = 0
 
+       # Should we put .hi/.o files in a subdirectory?
+       self.outputdir = None
+
        # Command to run before the test
        self.pre_cmd = None
 

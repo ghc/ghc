@@ -5,6 +5,7 @@
 # This allows us to use the "with X:" syntax with python 2.5:
 from __future__ import with_statement
 
+import shutil
 import sys
 import os
 import errno
@@ -450,6 +451,12 @@ def objc_src( opts ):
 def objcpp_src( opts ):
     opts.objcpp_src = 1;
 
+def outputdir( odir ):
+    return lambda opts, d=odir: _outputdir(opts, d)
+
+def _outputdir( opts, odir ):
+    opts.outputdir = odir;
+
 # ----
 
 def pre_cmd( cmd ):
@@ -674,6 +681,13 @@ def test_common_work (name, opts, func, args):
 
             clean(getTestOpts().clean_files)
 
+            if getTestOpts().outputdir != None:
+                odir = in_testdir(getTestOpts().outputdir)
+                try:
+                    shutil.rmtree(odir)
+                except:
+                    pass
+
             try:
                 cleanCmd = getTestOpts().clean_cmd
                 if cleanCmd != None:
@@ -877,6 +891,8 @@ def ghci_script( name, way, script ):
     # actually testing the recompilation behaviour in the GHCi tests.
     flags = filter(lambda f: f != '-fforce-recomp', getTestOpts().compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
@@ -1132,6 +1148,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     comp_flags = getTestOpts().compiler_always_flags
     if noforce:
         comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
+    if getTestOpts().outputdir != None:
+        comp_flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
@@ -1316,8 +1334,12 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     script.close()
 
+    flags = getTestOpts().compiler_always_flags
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
+
     cmd = "'" + config.compiler + "' " \
-          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
+          + join(flags,' ') + ' ' \
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
@@ -1409,9 +1431,12 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     else:
         to_do = ' --make ' + top_mod + ' '
 
+    flags = getTestOpts().compiler_always_flags
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
+          + join(flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
@@ -1438,6 +1463,8 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         to_compile = string.replace(deplist2,'.hs,', '.hcr');
 
     flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
@@ -2067,6 +2094,14 @@ def platform_wordsize_qualify( name, suff ):
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.
 def pretest_cleanup(name):
+   if getTestOpts().outputdir != None:
+       odir = in_testdir(getTestOpts().outputdir)
+       try:
+           shutil.rmtree(odir)
+       except:
+           pass
+       os.mkdir(odir)
+
    rm_no_fail(qualify(name,'comp.stderr'))
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name,'run.stdout'))
