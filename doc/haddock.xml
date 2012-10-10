@@ -1672,6 +1672,18 @@ module A where
 	generated documenation.</para>
       </section>
 
+      <section>
+	<title>Properties</title>
+        <para>
+          Haddock provides markup for properties:
+<programlisting>
+-- | Addition is commutative:
+--
+-- prop> a + b = b + a
+</programlisting>
+          This allows third-party applications to extract and verify them.
+        </para>
+      </section>
 
       <section>
 	<title>Hyperlinked Identifiers</title>
