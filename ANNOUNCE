@@ -1,41 +1,20 @@
 --------------------------------------------
--- Haddock 2.10.0 and 2.11.0
+-- Haddock 2.13.0
 --------------------------------------------
 
-Two new versions of Haddock have been uploaded to Hackage: version
-2.10.0 which comes with GHC 7.4.2 and 2.11.0 which comes with the new
-GHC 7.6.1!
+A new versions of Haddock has been uploaded to Hackage.
 
 --------------------------------------------
 -- Changes in version 2.12.0
 --------------------------------------------
 
- * Labeled URLs (e.g <http://example.net/ some label>)
+ * Hide instances that are "internal" to a module
 
- * Improved memory usage (new dependency: deepseq)
+ * Add support for properties in documentation
 
---------------------------------------------
--- Changes in version 2.11.0
---------------------------------------------
+ * Fix a bug with spurious superclass constraints
 
- * Show deprecation messages for identifiers
-
- * List identifiers declared on the same line (with a common type) separately
-
- * Don't crash on unicode strings in doc comments
-
- * Fix reporting of modules safe haskell mode
-
- * Fix a case where we were generating invalid xhtml
-
- * Improved --qual option (no crashes, proper error messages)
-
- * A new --qual option "aliased" which qualifies identifers by the module alias
-   used in the source code
-
- * The Haddock API restores GHC's static flags after invocation
-
- * Access to unexported identifiers through the Haddock API again
+ * Fix and extend the Haddock API
 
 --------------------------------------------
 -- Links
@@ -62,14 +41,10 @@ Code repository:
 
 The following people contributed patches to this release:
 
-Paolo Capriotti
-Simon Hengel
-Ian Lynagh
-Simon Peyton Jones
-Iavor S. Diatchki
-David Terei
-Henning Thielemann
+Kazu Yamamoto
+Roman Cheplyaka
 David Waern
+Simon Hengel
 
 --------------------------------------------
 -- Get Involved
