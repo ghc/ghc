@@ -54,10 +54,8 @@ defaults
 
 #include "MachDeps.h"
 
--- We need platform defines (tests for mingw32 below).  However, we only
--- test the TARGET platform, which doesn't vary between stages, so the
--- stage1 platform defines are fine:
-#include "../stage1/ghc_boot_platform.h"
+-- We need platform defines (tests for mingw32 below).
+#include "ghc_boot_platform.h"
 
 section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int})

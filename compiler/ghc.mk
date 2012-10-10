@@ -11,17 +11,6 @@
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# For expressing extra dependencies on source files
-
-define compiler-hs-dependency # args: $1 = module, $2 = dependency
-
-$$(foreach stage,1 2 3,\
- $$(foreach way,$$(compiler_stage$$(stage)_WAYS),\
-  compiler/stage$$(stage)/build/$1.$$($$(way)_osuf))) : $2
-
-endef
-
-# -----------------------------------------------------------------------------
 # Create compiler configuration
 #
 # The 'echo' commands simply spit the values of various make variables
@@ -232,17 +221,20 @@ compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
 #		Generate supporting stuff for prelude/PrimOp.lhs 
 #		from prelude/primops.txt
 
-# XXX: these should go in stage1/stage2/stage3
-PRIMOP_BITS = compiler/primop-data-decl.hs-incl        \
-              compiler/primop-tag.hs-incl              \
-              compiler/primop-list.hs-incl             \
-              compiler/primop-has-side-effects.hs-incl \
-              compiler/primop-out-of-line.hs-incl      \
-              compiler/primop-commutable.hs-incl       \
-              compiler/primop-code-size.hs-incl        \
-              compiler/primop-can-fail.hs-incl         \
-              compiler/primop-strictness.hs-incl       \
-              compiler/primop-primop-info.hs-incl
+PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
+                    primop-tag.hs-incl              \
+                    primop-list.hs-incl             \
+                    primop-has-side-effects.hs-incl \
+                    primop-out-of-line.hs-incl      \
+                    primop-commutable.hs-incl       \
+                    primop-code-size.hs-incl        \
+                    primop-can-fail.hs-incl         \
+                    primop-strictness.hs-incl       \
+                    primop-primop-info.hs-incl
+
+PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
+PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
+PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 
 compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 compiler_CPP_OPTS += ${GhcCppOpts}
@@ -251,45 +243,43 @@ define preprocessCompilerFiles
 # $0 = stage
 compiler/stage$1/build/Parser.y: compiler/parser/Parser.y.pp
 	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -x c $$< | grep -v '^#pragma GCC' > $$@
+
+compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)
+	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -x c $$< | grep -v '^#pragma GCC' > $$@
+
+ifneq "$$(BootingFromHc)" "YES"
+compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --data-decl          < $$< > $$@
+compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --primop-tag         < $$< > $$@
+compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --primop-list        < $$< > $$@
+compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --has-side-effects   < $$< > $$@
+compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --out-of-line        < $$< > $$@
+compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --commutable         < $$< > $$@
+compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --code-size          < $$< > $$@
+compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --can-fail           < $$< > $$@
+compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --strictness         < $$< > $$@
+compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --primop-primop-info < $$< > $$@
+
+# Usages aren't used any more; but the generator 
+# can still generate them if we want them back
+compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --usage              < $$< > $$@
+endif
+
 endef
 
 $(eval $(call preprocessCompilerFiles,1))
 $(eval $(call preprocessCompilerFiles,2))
 $(eval $(call preprocessCompilerFiles,3))
-
-
-$(PRIMOPS_TXT): %: %.pp compiler/stage1/$(PLATFORM_H)
-	$(CPP) $(RAWCPP_FLAGS) -P $(compiler_CPP_OPTS) -x c $< | grep -v '^#pragma GCC' > $@
-
-$(eval $(call clean-target,compiler,primop, $(PRIMOPS_TXT) compiler/parser/Parser.y $(PRIMOP_BITS)))
-
-ifneq "$(BootingFromHc)" "YES"
-compiler/primop-data-decl.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --data-decl          < $< > $@
-compiler/primop-tag.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --primop-tag         < $< > $@
-compiler/primop-list.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --primop-list        < $< > $@
-compiler/primop-has-side-effects.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --has-side-effects   < $< > $@
-compiler/primop-out-of-line.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --out-of-line        < $< > $@
-compiler/primop-commutable.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --commutable         < $< > $@
-compiler/primop-code-size.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --code-size          < $< > $@
-compiler/primop-can-fail.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --can-fail           < $< > $@
-compiler/primop-strictness.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --strictness         < $< > $@
-compiler/primop-primop-info.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --primop-primop-info < $< > $@
-
-# Usages aren't used any more; but the generator 
-# can still generate them if we want them back
-compiler/primop-usage.hs-incl: $(PRIMOPS_TXT)
-	"$(GENPRIMOP_INPLACE)" --usage              < $< > $@
-endif
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -479,14 +469,18 @@ COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_TYPE)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
-COMPILER_INCLUDES_DEPS += $(PRIMOP_BITS)
 
-$(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
-$(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
-$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS)
+$(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
+$(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
+$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)
 
-# Every PrimOp.o object file depends on $(PRIMOP_BITS):
-$(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
+$(foreach way,$$(compiler_stage1_WAYS),\
+      compiler/stage1/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE1)
+$(foreach way,$$(compiler_stage2_WAYS),\
+      compiler/stage2/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE2)
+$(foreach way,$$(compiler_stage3_WAYS),\
+      compiler/stage3/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE3)
+
 
 # GHC itself doesn't know about the above dependencies, so we have to
 # switch off the recompilation checker for that module:
