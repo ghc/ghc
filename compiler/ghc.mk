@@ -247,7 +247,18 @@ PRIMOP_BITS = compiler/primop-data-decl.hs-incl        \
 compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 compiler_CPP_OPTS += ${GhcCppOpts}
 
-$(PRIMOPS_TXT) compiler/parser/Parser.y: %: %.pp compiler/stage1/$(PLATFORM_H)
+define preprocessCompilerFiles
+# $0 = stage
+compiler/stage$1/build/Parser.y: compiler/parser/Parser.y.pp
+	$$(CPP) $$(RAWCPP_FLAGS) -P $$(compiler_CPP_OPTS) -x c $$< | grep -v '^#pragma GCC' > $$@
+endef
+
+$(eval $(call preprocessCompilerFiles,1))
+$(eval $(call preprocessCompilerFiles,2))
+$(eval $(call preprocessCompilerFiles,3))
+
+
+$(PRIMOPS_TXT): %: %.pp compiler/stage1/$(PLATFORM_H)
 	$(CPP) $(RAWCPP_FLAGS) -P $(compiler_CPP_OPTS) -x c $< | grep -v '^#pragma GCC' > $@
 
 $(eval $(call clean-target,compiler,primop, $(PRIMOPS_TXT) compiler/parser/Parser.y $(PRIMOP_BITS)))

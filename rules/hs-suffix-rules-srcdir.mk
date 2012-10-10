@@ -26,6 +26,12 @@ $1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
 $1/$2/build/%.hs : $1/$4/%.y | $$$$(dir $$$$@)/.
 	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
 
+$1/$2/build/%.hs : $1/$2/build/%.ly | $$$$(dir $$$$@)/.
+	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+
+$1/$2/build/%.hs : $1/$2/build/%.y | $$$$(dir $$$$@)/.
+	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
+
 $1/$2/build/%.hs : $1/$4/%.x | $$$$(dir $$$$@)/.
 	$$(call cmd,ALEX) $$($1_$2_$3_ALL_ALEX_OPTS) $$< -o $$@
 
