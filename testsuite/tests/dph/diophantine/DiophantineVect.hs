@@ -14,20 +14,20 @@ solution3'
      a `cutTo` b = sliceP 0 (lengthP b) a
      sumpri xx   = productP [: pow p x | p <- primes `cutTo` xx | x <- xx :]
      distinct xx = productP [: x I.+ 1   | x <- xx :]
-     
+
      series :: [:Int:] -> Int -> [:[:Int:]:]
-     series xs n     
+     series xs n
        | n == 1      = [: [: 0 :] :]
-       | otherwise   = [: [: x :] +:+ ps 
+       | otherwise   = [: [: x :] +:+ ps
                              | x <- xs
                              , ps <- series (I.enumFromToP 0 x) (n I.- 1) :]
-     
-     prob x y        
-      = let  xx      = [: (sumpri m ,m) 
+
+     prob x y
+      = let  xx      = [: (sumpri m ,m)
                              | m <- series (I.enumFromToP 1 3) x
-                             , distinct [: x I.* 2 | x <- m :] > y :]          
+                             , distinct [: x I.* 2 | x <- m :] > y :]
              i       = minIndexP [: a | (a, b) <- xx :]
-        in   xx !: i 
+        in   xx !: i
    in
    prob 5 200
 
