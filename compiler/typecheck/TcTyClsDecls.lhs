@@ -1042,7 +1042,9 @@ tcConArg new_or_data bty
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsConArgType new_or_data bty
         ; traceTc "tcConArg 2" (ppr bty)
-        ; strict_mark <- chooseBoxingStrategy arg_ty (getBangStrictness bty)
+        ; dflags <- getDynFlags
+        ; let strict_mark = chooseBoxingStrategy dflags arg_ty (getBangStrictness bty)
+                              -- Must be computed lazily
 	; return (arg_ty, strict_mark) }
 
 tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
@@ -1178,19 +1180,19 @@ conRepresentibleWithH98Syntax
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: TcType -> HsBang -> TcM HsBang
-chooseBoxingStrategy arg_ty bang
+chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
+chooseBoxingStrategy dflags arg_ty bang
   = case bang of
-	HsNoBang -> return HsNoBang
-	HsStrict -> do { unbox_strict <- doptM Opt_UnboxStrictFields
-                       ; if unbox_strict then return (can_unbox HsStrict arg_ty)
-                                         else return HsStrict }
-	HsNoUnpack -> return HsStrict
-	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
-                       ; let bang = can_unbox HsUnpackFailed arg_ty
-                       ; if omit_prags && bang == HsUnpack
-                            then return HsStrict
-                            else return bang }
+	HsNoBang -> HsNoBang
+	HsStrict -> let unbox_strict = dopt Opt_UnboxStrictFields dflags
+                    in if unbox_strict then (can_unbox HsStrict arg_ty)
+                                       else HsStrict
+	HsNoUnpack -> HsStrict
+	HsUnpack -> let omit_prags = dopt Opt_OmitInterfacePragmas dflags
+                        bang = can_unbox HsUnpackFailed arg_ty
+                    in if omit_prags && bang == HsUnpack
+                       then HsStrict
+                       else bang
             -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
 	    -- See Trac #5252: unpacking means we must not conceal the
 	    --                 representation of the argument type
