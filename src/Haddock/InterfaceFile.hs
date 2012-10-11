@@ -61,26 +61,27 @@ binaryInterfaceMagic :: Word32
 binaryInterfaceMagic = 0xD0Cface
 
 
--- Since datatypes in the GHC API might change between major versions, and
--- because we store GHC datatypes in our interface files, we need to make sure
--- we version our interface files accordingly.
+#if __GLASGOW_HASKELL__ == 706
+-- IMPORTANT: Since datatypes in the GHC API might change between major
+-- versions, and because we store GHC datatypes in our interface files, we need
+-- to make sure we version our interface files accordingly.
+--
+-- If you adapt this code to work with a newer versions of GHC *you* need to
+-- follow those steps:
+--
+-- (1) increase `binaryInterfaceVersion`
+--
+-- (2) set `binaryInterfaceVersionCompatibility` to [binaryInterfaceVersion]
+--
 binaryInterfaceVersion :: Word16
-#if __GLASGOW_HASKELL__ == 702
 binaryInterfaceVersion = 22
-#elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 22
-#elif __GLASGOW_HASKELL__ == 704
-binaryInterfaceVersion = 22
-#elif __GLASGOW_HASKELL__ == 705
-binaryInterfaceVersion = 22
-#elif __GLASGOW_HASKELL__ == 706
-binaryInterfaceVersion = 22
-#else
-#error Unknown GHC version
-#endif
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [21, 22]
+
+#else
+#error Unsupported GHC version
+#endif
 
 
 initBinMemSize :: Int
