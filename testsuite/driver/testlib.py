@@ -549,31 +549,22 @@ def newTestDir( dir ):
 # -----------------------------------------------------------------------------
 # Actually doing tests
 
-allTests = []
+parallelTests = []
+aloneTests = []
 allTestNames = set([])
 
-def runTest (opts, name, setup, func, args):
-    n = 1
-
-    if type(setup) is types.ListType:
-       setup = composes(setup)
-
-    setup(opts)
-
-    if opts.alone:
-        n = config.threads
-
+def runTest (opts, name, func, args):
     ok = 0
 
     if config.use_threads:
         t.thread_pool.acquire()
         try:
-            while config.threads<(t.running_threads+n):
+            while config.threads<(t.running_threads+1):
                 t.thread_pool.wait()
-            t.running_threads = t.running_threads+n
+            t.running_threads = t.running_threads+1
             ok=1
             t.thread_pool.release()
-            thread.start_new_thread(test_common_thread, (n, name, opts, func, args))
+            thread.start_new_thread(test_common_thread, (name, opts, func, args))
         except:
             if not ok:
                 t.thread_pool.release()
@@ -583,23 +574,34 @@ def runTest (opts, name, setup, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
-    global allTests
+    global aloneTests
+    global parallelTests
     global allTestNames
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
     myTestOpts = copy.copy(thisdir_testopts)
-    allTests += [lambda : runTest(myTestOpts, name, setup, func, args)]
+
+    if type(setup) is types.ListType:
+       setup = composes(setup)
+
+    setup(myTestOpts)
+
+    thisTest = lambda : runTest(myTestOpts, name, func, args)
+    if myTestOpts.alone:
+        aloneTests.append(thisTest)
+    else:
+        parallelTests.append(thisTest)
     allTestNames.add(name)
 
 if config.use_threads:
-    def test_common_thread(n, name, opts, func, args):
+    def test_common_thread(name, opts, func, args):
         t.lock.acquire()
         try:
             test_common_work(name,opts,func,args)
         finally:
             t.lock.release()
             t.thread_pool.acquire()
-            t.running_threads = t.running_threads - n
+            t.running_threads = t.running_threads - 1
             t.thread_pool.notify()
             t.thread_pool.release()
 
@@ -745,7 +747,7 @@ def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
 
     try:
-        print '=====>', full_name, t.total_tests, 'of', len(allTests), \
+        print '=====>', full_name, t.total_tests, 'of', len(allTestNames), \
                         str([t.n_unexpected_passes,   \
                              t.n_unexpected_failures, \
                              t.n_framework_failures])
