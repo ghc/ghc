@@ -1,11 +1,11 @@
 --------------------------------------------
--- Haddock 2.13.0
+-- Haddock 2.13.1
 --------------------------------------------
 
 A new versions of Haddock has been uploaded to Hackage.
 
 --------------------------------------------
--- Changes in version 2.12.0
+-- Changes in version 2.13.1
 --------------------------------------------
 
  * Hide instances that are "internal" to a module
@@ -24,7 +24,7 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/package/haddock-2.12.0
+ http://hackage.haskell.org/package/haddock
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
