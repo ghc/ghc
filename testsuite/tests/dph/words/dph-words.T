@@ -1,8 +1,8 @@
 
 test    ('dph-words-copy-opt' 
-        , [ alone
+        , [ high_memory_usage
+          , outputdir('copy-opt')
           , skip_if_fast
-          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
@@ -12,9 +12,9 @@ test    ('dph-words-copy-opt'
 
 
 test    ('dph-words-vseg-opt' 
-        , [ alone
+        , [ high_memory_usage
+          , outputdir('vseg-opt')
           , skip_if_fast
-          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
@@ -24,8 +24,7 @@ test    ('dph-words-vseg-opt'
 
 
 test    ('dph-words-copy-fast' 
-        , [ alone
-          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
+        , [ outputdir('copy-fast')
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
@@ -35,8 +34,7 @@ test    ('dph-words-copy-fast'
 
 
 test    ('dph-words-vseg-fast' 
-        , [ alone
-          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
+        , [ outputdir('vseg-fast')
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
