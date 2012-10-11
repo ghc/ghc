@@ -71,7 +71,7 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc >= 7.4 && < 7.8
+      ghc == 7.6.*
     other-modules:
       Documentation.Haddock
       Haddock
@@ -121,7 +121,7 @@ library
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc >= 7.4 && < 7.8
+    ghc == 7.6.*
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
