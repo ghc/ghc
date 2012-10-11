@@ -96,3 +96,4 @@ test('T5573a', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compil
 test('T5573b', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
 test('T7023', normal, compile_and_run, [''])
 test('T7126', normal, compile_and_run, [''])
+test('T6117', expect_broken(6117), compile_and_run, [''])
