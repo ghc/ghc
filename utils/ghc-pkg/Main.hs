@@ -985,7 +985,10 @@ listPackages verbosity my_flags mPackageName mModuleName = do
       broken = map sourcePackageId (brokenPackages pkg_map)
 
       show_normal PackageDB{ location = db_name, packages = pkg_confs } =
-          hPutStrLn stdout $ unlines ((db_name ++ ":") : map ("    " ++) pp_pkgs)
+          do hPutStrLn stdout (db_name ++ ":")
+             if null pp_pkgs
+                 then hPutStrLn stdout "    (no packages)"
+                 else hPutStrLn stdout $ unlines (map ("    " ++) pp_pkgs)
            where
                  pp_pkgs = map pp_pkg pkg_confs
                  pp_pkg p
