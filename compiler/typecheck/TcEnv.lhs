@@ -681,6 +681,9 @@ data InstBindings a
                         -- See Note [Newtype deriving and unused constructors]
                         -- in TcDeriv
 
+instance OutputableBndr a => Outputable (InstInfo a) where
+    ppr = pprInstInfoDetails
+
 pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
 pprInstInfoDetails info 
    = hang (pprInstanceHdr (iSpec info) <+> ptext (sLit "where"))
