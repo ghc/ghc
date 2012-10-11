@@ -438,6 +438,9 @@ def unless_tag( tag, f ):
 def alone(opts):
     opts.alone = True
 
+def high_memory_usage(opts):
+    opts.alone = True
+
 # ---
 def literate( opts ):
     opts.literate = 1;
