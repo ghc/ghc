@@ -1148,7 +1148,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    comp_flags = getTestOpts().compiler_always_flags
+    comp_flags = copy.copy(getTestOpts().compiler_always_flags)
     if noforce:
         comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
     if getTestOpts().outputdir != None:
@@ -1337,7 +1337,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     script.close()
 
-    flags = getTestOpts().compiler_always_flags
+    flags = copy.copy(getTestOpts().compiler_always_flags)
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
 
@@ -1434,7 +1434,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     else:
         to_do = ' --make ' + top_mod + ' '
 
-    flags = getTestOpts().compiler_always_flags
+    flags = copy.copy(getTestOpts().compiler_always_flags)
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
