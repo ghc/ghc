@@ -258,6 +258,7 @@ collectContInfo blocks
  where
   (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
 
+  get_cont :: Block CmmNode x C -> (Maybe (Label, ByteOff), ByteOff)
   get_cont b =
      case lastNode b of
         CmmCall { cml_cont = Just l, .. }
