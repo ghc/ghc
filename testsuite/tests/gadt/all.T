@@ -116,3 +116,7 @@ test('FloatEq', normal, compile, [''])
 test('T7205', normal, compile, [''])
 test('T7293', normal, compile_fail, [''])
 test('T7294', normal, compile, [''])
+test('T7321',
+     extra_clean(['T7321a.hi', 'T7321a.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7321'])
