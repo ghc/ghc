@@ -113,6 +113,7 @@ BINDIST_LIBS += $$($1_$2_$3_LIB)
 endif
 
 # Build the GHCi library
+ifneq "$$(DYNLiBS_BY_DEFAULT)" "YES"
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
@@ -128,6 +129,7 @@ ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
+endif
 endif
 endif
 endif
