@@ -66,8 +66,9 @@ binaryInterfaceMagic = 0xD0Cface
 -- versions, and because we store GHC datatypes in our interface files, we need
 -- to make sure we version our interface files accordingly.
 --
--- If you adapt this code to work with a newer versions of GHC *you* need to
--- follow those steps:
+-- If you change the interface file format or adapt Haddock to work with a new
+-- major version of GHC (so that the format changes indirectly) *you* need to
+-- follow these steps:
 --
 -- (1) increase `binaryInterfaceVersion`
 --
