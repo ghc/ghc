@@ -632,7 +632,7 @@ type Typ
 data TypView = Unit
              | Arrow Typ Typ
 
-view :: Type -> TypeView
+view :: Typ -> TypView
 
 -- additional operations for constructing Typ's ...
 </programlisting>
