@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2012 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -46,9 +46,9 @@ $$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
 ifeq "$$(TargetOS_CPP)" "linux"
-	echo 'export LD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH)"'  >> $$@
+	echo 'export LD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH):$$$$LD_LIBRARY_PATH"' >> $$@
 else ifeq "$$(TargetOS_CPP)" "darwin"
-	echo 'export DYLD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH)"' >> $$@
+	echo 'export DYLD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH):$$$$DYLD_LIBRARY_PATH"' >> $$@
 endif
 endif
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
