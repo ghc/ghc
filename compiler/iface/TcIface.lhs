@@ -570,20 +570,17 @@ tcIfaceDataCons tycon_name tycon _ if_cons
      = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
         { name  <- lookupIfaceTop occ
-        ; eq_spec <- tcIfaceEqSpec spec
-        ; theta <- tcIfaceCtxt ctxt     -- Laziness seems not worth the bother here
-                -- At one stage I thought that this context checking *had*
-                -- to be lazy, because of possible mutual recursion between the
-                -- type and the classe: 
-                -- E.g. 
-                --      class Real a where { toRat :: a -> Ratio Integer }
-                --      data (Real a) => Ratio a = ...
-                -- But now I think that the laziness in checking class ops breaks 
-                -- the loop, so no laziness needed
 
-        -- Read the argument types, but lazily to avoid faulting in
-        -- the component types unless they are really needed
-        ; arg_tys <- forkM (mk_doc name) (mapM tcIfaceType args)
+        -- Read the context and argument types, but lazily for two reasons
+        -- (a) to avoid looking tugging on a recursive use of 
+        --     the type itself, which is knot-tied
+        -- (b) to avoid faulting in the component types unless 
+        --     they are really needed
+        ; ~(eq_spec, theta, arg_tys) <- forkM (mk_doc name) $
+             do { eq_spec <- tcIfaceEqSpec spec
+                ; theta   <- tcIfaceCtxt ctxt
+                ; arg_tys <- mapM tcIfaceType args
+                ; return (eq_spec, theta, arg_tys) }
         ; lbl_names <- mapM lookupIfaceTop field_lbls
 
         -- Remember, tycon is the representation tycon
