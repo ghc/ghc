@@ -356,6 +356,12 @@ def if_cygwin( f ):
 
 # ---
 
+def if_ghci_dynamic( f ):
+    if config.ghc_dynamic_by_default:
+        return f
+    else:
+        return normal
+
 def if_in_tree_compiler( f ):
     if config.in_tree_compiler:
         return f
