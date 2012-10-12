@@ -5,7 +5,7 @@
 module ShouldSucceed where
 import GHC.Base
 
-f :: (->) Int# Int#
+f :: ((->) Int#) Int#
 f x = x
 
 
