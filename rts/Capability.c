@@ -842,7 +842,7 @@ tryGrabCapability (Capability *cap, Task *task)
  * allow the workers to stop.
  *
  * This function should be called when interrupted and
- * shutting_down_scheduler = rtsTrue, thus any worker that wakes up
+ * sched_state = SCHED_SHUTTING_DOWN, thus any worker that wakes up
  * will exit the scheduler and call taskStop(), and any bound thread
  * that wakes up will return to its caller.  Runnable threads are
  * killed.
