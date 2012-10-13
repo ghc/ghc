@@ -173,28 +173,6 @@ static void deleteThread_(Capability *cap, StgTSO *tso);
       * thread ends
       * stack overflow
 
-   GRAN version:
-     In a GranSim setup this loop iterates over the global event queue.
-     This revolves around the global event queue, which determines what 
-     to do next. Therefore, it's more complicated than either the 
-     concurrent or the parallel (GUM) setup.
-  This version has been entirely removed (JB 2008/08).
-
-   GUM version:
-     GUM iterates over incoming messages.
-     It starts with nothing to do (thus CurrentTSO == END_TSO_QUEUE),
-     and sends out a fish whenever it has nothing to do; in-between
-     doing the actual reductions (shared code below) it processes the
-     incoming messages and deals with delayed operations 
-     (see PendingFetches).
-     This is not the ugliest code you could imagine, but it's bloody close.
-
-  (JB 2008/08) This version was formerly indicated by a PP-Flag PAR,
-  now by PP-flag PARALLEL_HASKELL. The Eden RTS (in GHC-6.x) uses it,
-  as well as future GUM versions. This file has been refurbished to
-  only contain valid code, which is however incomplete, refers to
-  invalid includes etc.
-
    ------------------------------------------------------------------------ */
 
 static Capability *
