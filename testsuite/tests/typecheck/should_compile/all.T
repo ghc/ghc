@@ -387,3 +387,4 @@ test('T7171',normal,run_command,
 test('T7173', normal, compile, [''])
 test('T7196', normal, compile, [''])
 test('T7050', normal, compile, [''])
+test('T7312', normal, compile, [''])

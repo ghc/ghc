@@ -11,6 +11,11 @@ gadt17:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Gadt17_help.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c gadt17.hs
 
+T7321:
+	@$(RM) T7321a.hi T7321.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7321a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7321.hs
+
 gadt23:
 	$(RM) gadt23 gadt23.hi gadt23.o Gadt23_AST.hi Gadt23_AST.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make gadt23.hs
