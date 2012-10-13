@@ -641,6 +641,8 @@ data DynFlags = DynFlags {
   -- know what to clean when an exception happens
   filesToClean          :: IORef [FilePath],
   dirsToClean           :: IORef (Map FilePath FilePath),
+  filesToNotIntermediateClean :: IORef [FilePath],
+
 
   -- Names of files which were generated from -ddump-to-file; used to
   -- track which ones we need to truncate because it's our first run
@@ -908,7 +910,7 @@ data PackageFlag
   | IgnorePackage   String
   | TrustPackage    String
   | DistrustPackage String
-  deriving Eq
+  deriving (Eq, Show)
 
 defaultHscTarget :: Platform -> HscTarget
 defaultHscTarget = defaultObjectTarget
@@ -1022,29 +1024,35 @@ wayDesc WayPar      = "Parallel"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
+wayDynFlags :: Platform -> Way -> [DynFlag]
+wayDynFlags _ WayThreaded = []
+wayDynFlags _ WayDebug = []
+wayDynFlags platform WayDyn =
+        case platformOS platform of
+            -- On Windows, code that is to be linked into a dynamic
+            -- library must be compiled with -fPIC. Labels not in
+            -- the current package are assumed to be in a DLL
+            -- different from the current one.
+            OSMinGW32 -> [Opt_PIC]
+            OSDarwin  -> [Opt_PIC]
+            OSLinux   -> [Opt_PIC]
+            _         -> []
+wayDynFlags _ WayProf     = [Opt_SccProfilingOn]
+wayDynFlags _ WayEventLog = []
+wayDynFlags _ WayPar      = [Opt_Parallel]
+wayDynFlags _ WayGran     = [Opt_GranMacros]
+wayDynFlags _ WayNDP      = []
+
 wayExtras :: Platform -> Way -> DynP ()
 wayExtras _ WayThreaded = return ()
-wayExtras _ WayDebug = return ()
-wayExtras platform WayDyn =
-        case platformOS platform of
-            OSMinGW32 ->
-                -- On Windows, code that is to be linked into a dynamic
-                -- library must be compiled with -fPIC. Labels not in
-                -- the current package are assumed to be in a DLL
-                -- different from the current one.
-                setFPIC
-            OSDarwin ->
-                setFPIC
-            _ ->
-                return ()
-wayExtras _ WayProf = setDynFlag Opt_SccProfilingOn
+wayExtras _ WayDebug    = return ()
+wayExtras _ WayDyn      = return ()
+wayExtras _ WayProf     = return ()
 wayExtras _ WayEventLog = return ()
-wayExtras _ WayPar = do setDynFlag Opt_Parallel
-                        exposePackage "concurrent"
-wayExtras _ WayGran = do setDynFlag Opt_GranMacros
-                         exposePackage "concurrent"
-wayExtras _ WayNDP = do setExtensionFlag Opt_ParallelArrays
-                        setDynFlag Opt_Vectorise
+wayExtras _ WayPar      = exposePackage "concurrent"
+wayExtras _ WayGran     = exposePackage "concurrent"
+wayExtras _ WayNDP      = do setExtensionFlag Opt_ParallelArrays
+                             setDynFlag Opt_Vectorise
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc platform WayThreaded = case platformOS platform of
@@ -1106,11 +1114,13 @@ initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
+ refFilesToNotIntermediateClean <- newIORef []
  refGeneratedDumps <- newIORef Set.empty
  refLlvmVersion <- newIORef 28
  return dflags{
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
+        filesToNotIntermediateClean = refFilesToNotIntermediateClean,
         generatedDumps = refGeneratedDumps,
         llvmVersion    = refLlvmVersion
         }
@@ -1192,6 +1202,7 @@ defaultDynFlags mySettings =
         -- end of ghc -M values
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
+        filesToNotIntermediateClean = panic "defaultDynFlags: No filesToNotIntermediateClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
         flags = IntSet.fromList (map fromEnum (defaultFlags mySettings)),
@@ -2130,8 +2141,8 @@ dynamic_flags = [
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
   , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
-  , Flag "fPIC"             (NoArg setFPIC)
-  , Flag "fno-PIC"          (NoArg unSetFPIC)
+  , Flag "fPIC"             (NoArg (setDynFlag Opt_PIC))
+  , Flag "fno-PIC"          (NoArg (unSetDynFlag Opt_PIC))
  ]
  ++ map (mkFlag turnOn  ""     setDynFlag  ) negatableFlags
  ++ map (mkFlag turnOff "no-"  unSetDynFlag) negatableFlags
@@ -2532,7 +2543,7 @@ defaultFlags settings
         _ -> [])
 
     ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-        then []
+        then wayDynFlags platform WayDyn
         else [Opt_Static])
 
     where platform = sTargetPlatform settings
@@ -2803,7 +2814,9 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 addWay :: Way -> DynP ()
 addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
-              wayExtras (targetPlatform dfs) w
+              let platform = targetPlatform dfs
+              wayExtras platform w
+              mapM_ setDynFlag $ wayDynFlags platform w
 
 removeWay :: Way -> DynP ()
 removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
@@ -2942,14 +2955,6 @@ setObjTarget l = updM set
      | isObjectTarget (hscTarget dflags)
        = return $ dflags { hscTarget = l }
      | otherwise = return dflags
-
-setFPIC :: DynP ()
-setFPIC = updM set
-    where set dflags = return $ dopt_set dflags Opt_PIC
-
-unSetFPIC :: DynP ()
-unSetFPIC = updM set
-    where set dflags = return $ dopt_unset dflags Opt_PIC
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags

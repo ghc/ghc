@@ -415,11 +415,17 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preload_static _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else loadObj name >> return True
+                     else do if dYNAMIC_BY_DEFAULT dflags
+                                 then dynLoadObjs dflags [name]
+                                 else loadObj name
+                             return True
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else loadArchive name >> return True
+                     else do if dYNAMIC_BY_DEFAULT dflags
+                                 then panic "Loading archives not supported"
+                                 else loadArchive name
+                             return True
 \end{code}
 
 
@@ -783,20 +789,45 @@ dynLinkObjs dflags pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             unlinkeds                = concatMap linkableUnlinked new_objs
+            wanted_objs              = map nameOfObject unlinkeds
 
-        mapM_ loadObj (map nameOfObject unlinkeds)
+        if dYNAMIC_BY_DEFAULT dflags
+            then do dynLoadObjs dflags wanted_objs
+                    return (pls, Succeeded)
+            else do mapM_ loadObj wanted_objs
 
-        -- Link them all together
-        ok <- resolveObjs
+                    -- Link them all together
+                    ok <- resolveObjs
 
-        -- If resolving failed, unload all our
-        -- object modules and carry on
-        if succeeded ok then do
-                return (pls1, Succeeded)
-          else do
-                pls2 <- unload_wkr dflags [] pls1
-                return (pls2, Failed)
+                    -- If resolving failed, unload all our
+                    -- object modules and carry on
+                    if succeeded ok then do
+                            return (pls1, Succeeded)
+                      else do
+                            pls2 <- unload_wkr dflags [] pls1
+                            return (pls2, Failed)
 
+dynLoadObjs :: DynFlags -> [FilePath] -> IO ()
+dynLoadObjs dflags objs = do
+    let platform = targetPlatform dflags
+    soFile <- newTempName dflags (soExt platform)
+    let -- When running TH for a non-dynamic way, we still need to make
+        -- -l flags to link against the dynamic libraries, so we turn
+        -- Opt_Static off
+        dflags1 = dopt_unset dflags Opt_Static
+        dflags2 = dflags1 {
+                      -- We don't want to link the ldInputs in; we'll
+                      -- be calling dynLoadObjs with any objects that
+                      -- need to be linked.
+                      ldInputs = [],
+                      outputFile = Just soFile
+                  }
+    linkDynLib dflags2 objs []
+    consIORef (filesToNotIntermediateClean dflags) soFile
+    m <- loadDLL soFile
+    case m of
+        Nothing -> return ()
+        Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
                -> [Linkable]    -- New linkables

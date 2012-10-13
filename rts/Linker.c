@@ -137,6 +137,16 @@
 #include <sys/tls.h>
 #endif
 
+// Defining this as 'int' rather than 'const int' means that we don't get
+// warnings like
+//    error: function might be possible candidate for attribute ‘noreturn’
+// from gcc:
+#ifdef DYNAMIC_BY_DEFAULT
+int dynamicByDefault = 1;
+#else
+int dynamicByDefault = 0;
+#endif
+
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
 
@@ -2044,6 +2054,10 @@ loadArchive( pathchar *path )
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%" PATH_FMT" '\n", path));
 
+    if (dynamicByDefault) {
+        barf("loadArchive called, but using dynlibs by default (%s)", path);
+    }
+
     gnuFileIndex = NULL;
     gnuFileIndexSize = 0;
 
@@ -2434,6 +2448,10 @@ loadObj( pathchar *path )
 #  endif
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
+
+   if (dynamicByDefault) {
+       barf("loadObj called, but using dynlibs by default (%s)", path);
+   }
 
    initLinker();
 

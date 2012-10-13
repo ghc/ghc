@@ -55,6 +55,7 @@ import qualified Data.Map as Map
 import qualified FiniteMap as Map ( insertListWith )
 
 import Control.Monad
+import Data.IORef
 import Data.List
 import qualified Data.List as List
 import Data.Maybe
@@ -364,7 +365,8 @@ discardIC hsc_env
 
 intermediateCleanTempFiles :: DynFlags -> [ModSummary] -> HscEnv -> IO ()
 intermediateCleanTempFiles dflags summaries hsc_env
- = cleanTempFilesExcept dflags except
+ = do notIntermediate <- readIORef (filesToNotIntermediateClean dflags)
+      cleanTempFilesExcept dflags (notIntermediate ++ except)
   where
     except =
           -- Save preprocessed files. The preprocessed file *might* be
