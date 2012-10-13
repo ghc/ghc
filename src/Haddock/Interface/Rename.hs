@@ -271,6 +271,8 @@ renameType t = case t of
 
   HsTyLit x -> return (HsTyLit x)
 
+  HsExplicitListTy a b    -> HsExplicitListTy a <$> mapM renameLType b
+
   _ -> error "renameType"
 
 
