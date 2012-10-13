@@ -179,7 +179,7 @@ test-suite html-tests
 test-suite spec
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
-  main-is:          parsetests.hs
+  main-is:          Spec.hs
   hs-source-dirs:
       tests/unit-tests
     , tests/nanospec

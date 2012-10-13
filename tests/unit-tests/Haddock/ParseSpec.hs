@@ -1,6 +1,6 @@
 {-# LANGUAGE StandaloneDeriving, FlexibleInstances, UndecidableInstances, IncoherentInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Main (main, spec) where
+module Haddock.ParseSpec (main, spec) where
 
 import           Test.Hspec
 import           RdrName (RdrName)
