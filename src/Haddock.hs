@@ -272,8 +272,7 @@ readInterfaceFiles :: MonadIO m
                    -> [(DocPaths, FilePath)]
                    -> m [(DocPaths, InterfaceFile)]
 readInterfaceFiles name_cache_accessor pairs = do
-  mbPackages <- mapM tryReadIface pairs
-  return (catMaybes mbPackages)
+  catMaybes `liftM` mapM tryReadIface pairs
   where
     -- try to read an interface, warn if we can't
     tryReadIface (paths, file) = do
