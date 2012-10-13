@@ -273,8 +273,12 @@ renameType t = case t of
 
   HsExplicitListTy a b    -> HsExplicitListTy a <$> mapM renameLType b
 
-  _ -> error "renameType"
-
+  HsQuasiQuoteTy _        -> error "renameType: HsQuasiQuoteTy"
+  HsSpliceTy _ _ _        -> error "renameType: HsSpliceTy"
+  HsRecTy _               -> error "renameType: HsRecTy"
+  HsCoreTy _              -> error "renameType: HsCoreTy"
+  HsExplicitTupleTy _ _   -> error "renameType: HsExplicitTupleTy"
+  HsWrapTy _ _            -> error "renameType: HsWrapTy"
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
