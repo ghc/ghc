@@ -113,7 +113,7 @@ BINDIST_LIBS += $$($1_$2_$3_LIB)
 endif
 
 # Build the GHCi library
-ifneq "$$(DYNLiBS_BY_DEFAULT)" "YES"
+ifneq "$$(DYNLIBS_BY_DEFAULT)" "YES"
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
