@@ -82,33 +82,32 @@ renameInterface dflags renamingEnv warnings iface =
 --------------------------------------------------------------------------------
 
 
-newtype GenRnM n a =
-  RnM { unRn :: (n -> (Bool, DocName))  -- name lookup function
-             -> (a,[n])
+newtype RnM a =
+  RnM { unRn :: (Name -> (Bool, DocName))  -- name lookup function
+             -> (a,[Name])
       }
 
-type RnM a = GenRnM Name a
-
-instance Monad (GenRnM n) where
+instance Monad RnM where
   (>>=) = thenRn
   return = returnRn
 
-instance Functor (GenRnM n) where
+instance Functor RnM where
   fmap f x = do a <- x; return (f a)
 
-instance Applicative (GenRnM n) where
+instance Applicative RnM where
   pure = return
   (<*>) = ap
 
-returnRn :: a -> GenRnM n a
+returnRn :: a -> RnM a
 returnRn a   = RnM (const (a,[]))
-thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
+thenRn :: RnM a -> (a -> RnM b) -> RnM b
 m `thenRn` k = RnM (\lkp -> case unRn m lkp of
   (a,out1) -> case unRn (k a) lkp of
     (b,out2) -> (b,out1++out2))
 
 getLookupRn :: RnM (Name -> (Bool, DocName))
 getLookupRn = RnM (\lkp -> (lkp,[]))
+
 outRn :: Name -> RnM ()
 outRn name = RnM (const ((),[name]))
 
