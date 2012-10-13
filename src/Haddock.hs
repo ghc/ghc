@@ -32,7 +32,8 @@ import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils hiding (pretty)
 
-import Control.Monad
+import Control.Monad hiding (forM_)
+import Data.Foldable (forM_)
 import Control.Exception
 import Data.Maybe
 import Data.IORef
@@ -143,9 +144,8 @@ haddock args = handleTopExceptions $ do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
 
       -- Dump an "interface file" (.haddock file), if requested.
-      case optDumpInterfaceFile flags of
-        Just f -> liftIO $ dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
-        Nothing -> return ()
+      forM_ (optDumpInterfaceFile flags) $ \f -> do
+        liftIO $ dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
 
       -- Render the interfaces.
       liftIO $ renderStep dflags flags qual packages ifaces
