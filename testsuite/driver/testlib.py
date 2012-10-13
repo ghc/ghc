@@ -1753,6 +1753,7 @@ def normalise_asm( str ):
     for line in lines:
       # Drop metadata directives (e.g. ".type")
       if not metadata.match(line):
+        line = re.sub('@plt', '', line)
         instr = line.lstrip().split()
         # Drop empty lines.
         if not instr:
