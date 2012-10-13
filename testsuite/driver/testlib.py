@@ -306,7 +306,7 @@ def if_platform( plat, f ):
     else:
         return normal
 
-def if_not_platform( plat, f ):
+def unless_platform( plat, f ):
     if config.platform != plat:
         return f
     else:
