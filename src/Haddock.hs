@@ -60,9 +60,6 @@ import StaticFlags (saveStaticFlagGlobals, restoreStaticFlagGlobals)
 import Panic (panic, handleGhcException)
 import Module
 
-import Control.Monad.Fix (MonadFix)
-
-
 --------------------------------------------------------------------------------
 -- * Exception handling
 --------------------------------------------------------------------------------
@@ -267,10 +264,10 @@ render dflags flags qual ifaces installedIfaces srcMap = do
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: (MonadFix m, MonadIO m) =>
-                      NameCacheAccessor m
-                   -> [(DocPaths, FilePath)] ->
-                      m [(DocPaths, InterfaceFile)]
+readInterfaceFiles :: MonadIO m
+                   => NameCacheAccessor m
+                   -> [(DocPaths, FilePath)]
+                   -> m [(DocPaths, InterfaceFile)]
 readInterfaceFiles name_cache_accessor pairs = do
   mbPackages <- mapM tryReadIface pairs
   return (catMaybes mbPackages)
