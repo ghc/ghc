@@ -111,12 +111,12 @@ getLookupRn = RnM (\lkp -> (lkp,[]))
 outRn :: Name -> RnM ()
 outRn name = RnM (const ((),[name]))
 
-lookupRn :: (DocName -> a) -> Name -> RnM a
-lookupRn and_then name = do
+lookupRn :: Name -> RnM DocName
+lookupRn name = do
   lkp <- getLookupRn
   case lkp name of
-    (False,maps_to) -> do outRn name; return (and_then maps_to)
-    (True, maps_to) -> return (and_then maps_to)
+    (False,maps_to) -> do outRn name; return maps_to
+    (True, maps_to) -> return maps_to
 
 
 runRnFM :: LinkEnv -> RnM a -> (a,[Name])
@@ -133,7 +133,7 @@ runRnFM env rn = unRn rn lkp
 
 
 rename :: Name -> RnM DocName
-rename = lookupRn id
+rename = lookupRn
 
 
 renameL :: Located Name -> RnM (Located DocName)
@@ -476,8 +476,8 @@ renameExportItem item = case item of
       return (inst', idoc')
     return (ExportDecl decl' doc' subs' instances')
   ExportNoDecl x subs -> do
-    x'    <- lookupRn id x
-    subs' <- mapM (lookupRn id) subs
+    x'    <- lookupRn x
+    subs' <- mapM lookupRn subs
     return (ExportNoDecl x' subs')
   ExportDoc doc -> do
     doc' <- renameDoc doc
