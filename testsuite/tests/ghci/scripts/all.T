@@ -131,3 +131,8 @@ test('T6091', normal, ghci_script, ['T6091.script'])
 test('T6106', extra_clean(['T6106.hs']), ghci_script, ['T6106.script'])
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
+test('ghci058',
+     extra_clean(['Ghci058.hs', 'Ghci058.hi', 'Ghci058.o']),
+     ghci_script,
+     ['ghci058.script'])
+
