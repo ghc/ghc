@@ -68,13 +68,14 @@ import TysWiredIn
 import BasicTypes
 import SrcLoc
 import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
+import Unique
 import UniqSupply
 import Outputable
 import FastString
 import Util
 
 import Control.Monad ( unless, when, zipWithM )
-import PrelNames(ipClassName)
+import PrelNames( ipClassName, funTyConKey )
 \end{code}
 
 
@@ -316,6 +317,18 @@ tc_lhs_types :: [(LHsType Name, ExpKind)] -> TcM [TcType]
 tc_lhs_types tys_w_kinds = mapM (uncurry tc_lhs_type) tys_w_kinds
 
 ------------------------------------------
+tc_fun_type :: HsType Name -> LHsType Name -> LHsType Name -> ExpKind -> TcM TcType
+-- We need to recognise (->) so that we can construct a FunTy, 
+-- *and* we need to do by looking at the Name, not the TyCon
+-- (see Note [Zonking inside the knot]).  For example,
+-- consider  f :: (->) Int Int  (Trac #7312)
+tc_fun_type ty ty1 ty2 exp_kind@(EK _ ctxt)
+  = do { ty1' <- tc_lhs_type ty1 (EK openTypeKind ctxt)
+       ; ty2' <- tc_lhs_type ty2 (EK openTypeKind ctxt)
+       ; checkExpectedKind ty liftedTypeKind exp_kind
+       ; return (mkFunTy ty1' ty2') }
+
+------------------------------------------
 tc_hs_type :: HsType Name -> ExpKind -> TcM TcType
 tc_hs_type (HsParTy ty)        exp_kind = tc_lhs_type ty exp_kind
 tc_hs_type (HsDocTy ty _)      exp_kind = tc_lhs_type ty exp_kind
@@ -335,24 +348,30 @@ tc_hs_type hs_ty@(HsTyVar name) exp_kind
        ; checkExpectedKind hs_ty k exp_kind
        ; return ty }
 
-tc_hs_type ty@(HsFunTy ty1 ty2) exp_kind@(EK _ ctxt)
-  = do { ty1' <- tc_lhs_type ty1 (EK openTypeKind ctxt)
-       ; ty2' <- tc_lhs_type ty2 (EK openTypeKind ctxt)
-       ; checkExpectedKind ty liftedTypeKind exp_kind
-       ; return (mkFunTy ty1' ty2') }
+tc_hs_type ty@(HsFunTy ty1 ty2) exp_kind
+  = tc_fun_type ty ty1 ty2 exp_kind
 
 tc_hs_type hs_ty@(HsOpTy ty1 (_, l_op@(L _ op)) ty2) exp_kind
+  | op `hasKey` funTyConKey
+  = tc_fun_type hs_ty ty1 ty2 exp_kind
+  | otherwise
   = do { (op', op_kind) <- tcTyVar op
        ; tys' <- tcCheckApps hs_ty l_op op_kind [ty1,ty2] exp_kind
        ; return (mkNakedAppTys op' tys') }
          -- mkNakedAppTys: see Note [Zonking inside the knot]
 
 tc_hs_type hs_ty@(HsAppTy ty1 ty2) exp_kind
-  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
-       ; (fun_ty', fun_kind) <- tc_infer_lhs_type fun_ty
+  | L _ (HsTyVar fun) <- fun_ty
+  , fun `hasKey` funTyConKey
+  , [fty1,fty2] <- arg_tys
+  = tc_fun_type hs_ty fty1 fty2 exp_kind
+  | otherwise
+  = do { (fun_ty', fun_kind) <- tc_infer_lhs_type fun_ty
        ; arg_tys' <- tcCheckApps hs_ty fun_ty fun_kind arg_tys exp_kind
        ; return (mkNakedAppTys fun_ty' arg_tys') }
          -- mkNakedAppTys: see Note [Zonking inside the knot]
+  where
+    (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
 
 --------- Foralls
 tc_hs_type (HsForAllTy _ hs_tvs context ty) exp_kind
