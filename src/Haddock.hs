@@ -144,8 +144,11 @@ haddock args = handleTopExceptions $ do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
 
       -- Dump an "interface file" (.haddock file), if requested.
-      forM_ (optDumpInterfaceFile flags) $ \f -> do
-        liftIO $ dumpInterfaceFile f (map toInstalledIface ifaces) homeLinks
+      forM_ (optDumpInterfaceFile flags) $ \path -> liftIO $ do
+        writeInterfaceFile path InterfaceFile {
+            ifInstalledIfaces = map toInstalledIface ifaces
+          , ifLinkEnv         = homeLinks
+          }
 
       -- Render the interfaces.
       liftIO $ renderStep dflags flags qual packages ifaces
@@ -282,15 +285,6 @@ readInterfaceFiles name_cache_accessor pairs = do
           putStrLn "Skipping this interface."
           return Nothing
         Right f -> return $ Just (paths, f)
-
-
-dumpInterfaceFile :: FilePath -> [InstalledInterface] -> LinkEnv -> IO ()
-dumpInterfaceFile path ifaces homeLinks = writeInterfaceFile path ifaceFile
-  where
-    ifaceFile = InterfaceFile {
-        ifInstalledIfaces = ifaces,
-        ifLinkEnv         = homeLinks
-      }
 
 
 -------------------------------------------------------------------------------
