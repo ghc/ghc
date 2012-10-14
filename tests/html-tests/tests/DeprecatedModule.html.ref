@@ -47,7 +47,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedModule.html"
 	><div class="doc"
 	><div class="warning"
 	  ><p
-	    >Deprecated: Use Foo instead</p
+	    >Deprecated: Use <a href=""
+	      >Foo</a
+	      > instead
+</p
 	    ></div
 	  ><p
 	  >Documentation for <a href=""

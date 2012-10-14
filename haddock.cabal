@@ -189,6 +189,7 @@ test-suite spec
       base
     , ghc
     , containers
+    , deepseq
     , array
 
   -- NOTE: As of this writing, Cabal does not properly handle alex/happy for

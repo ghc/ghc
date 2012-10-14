@@ -51,6 +51,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedFunction.htm
 	    > :: <a href=""
 	    >Int</a
 	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >bar</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
 	  ></ul
 	></div
       ><div id="interface"
@@ -66,10 +72,28 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedFunction.htm
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: use bar instead</p
+	      >Deprecated: use <code
+		><a href=""
+		  >bar</a
+		  ></code
+		> instead
+</p
 	      ></div
 	    ><p
-	    >some documentation foo
+	    >some documentation for foo
+</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:bar" class="def"
+	    >bar</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >some documentation for bar
 </p
 	    ></div
 	  ></div

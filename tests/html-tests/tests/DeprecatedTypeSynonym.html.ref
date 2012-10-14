@@ -78,7 +78,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedTypeSynonym.
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: TypeSyn</p
+	      >Deprecated: TypeSyn
+</p
 	      ></div
 	    ><p
 	    >some documentation
@@ -97,7 +98,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedTypeSynonym.
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: OtherTypeSyn</p
+	      >Deprecated: OtherTypeSyn
+</p
 	      ></div
 	    ></div
 	  ></div

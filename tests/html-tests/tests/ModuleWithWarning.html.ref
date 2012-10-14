@@ -47,7 +47,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_ModuleWithWarning.html
 	><div class="doc"
 	><div class="warning"
 	  ><p
-	    >Warning: This is an unstable interface.</p
+	    >Warning: This is an unstable interface.  Prefer functions from <a href=""
+	      >Prelude</a
+	      > instead!
+</p
 	    ></div
 	  ><p
 	  >Documentation for <a href=""

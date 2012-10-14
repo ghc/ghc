@@ -96,7 +96,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for foo</p
+	      >Deprecated: for foo
+</p
 	      ></div
 	    ></div
 	  ></div
@@ -110,7 +111,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for baz</p
+	      >Deprecated: for baz
+</p
 	      ></div
 	    ></div
 	  ></div
@@ -124,7 +126,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for bar</p
+	      >Deprecated: for bar
+</p
 	      ></div
 	    ></div
 	  ></div
@@ -138,7 +141,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for one</p
+	      >Deprecated: for one
+</p
 	      ></div
 	    ><p
 	    >some documentation for one, two and three
@@ -155,7 +159,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for three</p
+	      >Deprecated: for three
+</p
 	      ></div
 	    ><p
 	    >some documentation for one, two and three
@@ -172,7 +177,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugDeprecated.html");}
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for two</p
+	      >Deprecated: for two
+</p
 	      ></div
 	    ><p
 	    >some documentation for one, two and three

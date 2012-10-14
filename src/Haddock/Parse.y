@@ -7,7 +7,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Haddock.Parse where
+module Haddock.Parse (parseString, parseParas) where
 
 import Haddock.Lex
 import Haddock.Types (Doc(..), Example(Example), Hyperlink(..))

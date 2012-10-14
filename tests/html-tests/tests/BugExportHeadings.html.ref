@@ -166,7 +166,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugExportHeadings.html
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for one</p
+	      >Deprecated: for one
+</p
 	      ></div
 	    ></div
 	  ></div
@@ -183,7 +184,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugExportHeadings.html
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for two</p
+	      >Deprecated: for two
+</p
 	      ></div
 	    ></div
 	  ></div
@@ -200,7 +202,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_BugExportHeadings.html
 	  ><div class="doc"
 	  ><div class="warning"
 	    ><p
-	      >Deprecated: for three</p
+	      >Deprecated: for three
+</p
 	      ></div
 	    ></div
 	  ></div

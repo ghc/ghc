@@ -41,7 +41,7 @@ import Name
 import Bag
 import RdrName
 import TcRnTypes
-import FastString (unpackFS)
+import FastString (concatFS)
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -90,7 +90,8 @@ createInterface tm flags modMap instIfaceMap = do
 
   liftErrMsg $ warnAboutFilteredDecls dflags mdl decls
 
-  let warningMap = mkWarningMap warnings gre exportedNames
+  warningMap <- liftErrMsg $ mkWarningMap dflags warnings gre exportedNames
+
   exportItems <- mkExportItems modMap mdl warningMap gre exportedNames decls maps exports
                    instances instIfaceMap dflags
 
@@ -112,11 +113,13 @@ createInterface tm flags modMap instIfaceMap = do
   let !aliases =
         mkAliasMap dflags $ tm_renamed_source tm
 
+  modWarn <- liftErrMsg $ moduleWarning dflags gre warnings
+
   return $! Interface {
     ifaceMod             = mdl,
     ifaceOrigFilename    = msHsFilePath ms,
     ifaceInfo            = info,
-    ifaceDoc             = Documentation mbDoc (moduleWarning warnings),
+    ifaceDoc             = Documentation mbDoc modWarn,
     ifaceRnDoc           = Documentation Nothing Nothing,
     ifaceOptions         = opts,
     ifaceDocMap          = docMap,
@@ -169,29 +172,35 @@ lookupModuleDyn dflags Nothing mdlName =
 
 type WarningMap = DocMap Name
 
-mkWarningMap :: Warnings -> GlobalRdrEnv -> [Name] -> WarningMap
-mkWarningMap NoWarnings  _ _ = M.empty
-mkWarningMap (WarnAll _) _ _ = M.empty
-mkWarningMap (WarnSome ws) gre exps = M.fromList
-      [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
-      , let n = gre_name elt, n `elem` exps ]
-
-
-moduleWarning :: Warnings -> Maybe (Doc id)
-moduleWarning ws =
-  case ws of
-    NoWarnings -> Nothing
-    WarnSome _ -> Nothing
-    WarnAll w  -> Just $! warnToDoc w
-
-
-warnToDoc :: WarningTxt -> Doc id
-warnToDoc w = case w of
-  (DeprecatedTxt msg) -> format "Deprecated: " msg
-  (WarningTxt    msg) -> format "Warning: "    msg
+mkWarningMap :: DynFlags -> Warnings -> GlobalRdrEnv -> [Name] -> ErrMsgM WarningMap
+mkWarningMap dflags warnings gre exps = case warnings of
+  NoWarnings  -> return M.empty
+  WarnAll _   -> return M.empty
+  WarnSome ws -> do
+    let ws' = [ (n, w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
+              , let n = gre_name elt, n `elem` exps ]
+    M.fromList . catMaybes <$> mapM parse ws'
   where
-    format x xs = let !str = force $ concat (x : map unpackFS xs)
-                  in DocWarning $ DocParagraph $ DocString str
+    parse (n, w) = (fmap $ (,) n) <$> parseWarning dflags gre w
+
+
+moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> ErrMsgM (Maybe (Doc Name))
+moduleWarning dflags gre ws =
+  case ws of
+    NoWarnings -> return Nothing
+    WarnSome _ -> return Nothing
+    WarnAll w  -> parseWarning dflags gre w
+
+
+parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Maybe (Doc Name))
+parseWarning dflags gre w = do
+  r <- case w of
+    (DeprecatedTxt msg) -> format "Deprecated: " msg
+    (WarningTxt    msg) -> format "Warning: "    msg
+  r `deepseq` return r
+  where
+    format x xs = fmap (DocWarning . DocParagraph . DocAppend (DocString x))
+      <$> processDocString dflags gre (HsDocString $ concatFS xs)
 
 
 -------------------------------------------------------------------------------

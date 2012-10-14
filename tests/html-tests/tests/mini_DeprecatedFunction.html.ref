@@ -25,6 +25,12 @@ window.onload = function () {pageLoad();};
 	  >foo</a
 	  ></p
 	></div
+      ><div class="top"
+      ><p class="src"
+	><a href="" target="main"
+	  >bar</a
+	  ></p
+	></div
       ></div
     ></body
   ></html
