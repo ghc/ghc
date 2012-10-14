@@ -26,7 +26,7 @@ $(call hs-objs,$1,$2,$3)
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
 $1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
-$$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 # Note [inconsistent distdirs]
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
@@ -35,7 +35,7 @@ $$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 # Really we should use a consistent scheme for distdirs, but in the
 # meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
-$$($1_PACKAGE)-$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif
 
 # All the .a/.so library file dependencies for this library.
