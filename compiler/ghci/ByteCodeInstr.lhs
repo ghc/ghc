@@ -22,6 +22,7 @@ module ByteCodeInstr (
 
 import ByteCodeItbls	( ItblPtr )
 
+import StgCmmLayout     ( ArgRep(..) )
 import PprCore
 import Type
 import Outputable
@@ -34,7 +35,6 @@ import DataCon
 import VarSet
 import PrimOp
 import SMRep
-import ClosureInfo -- CgRep stuff
 
 import Module (Module)
 import GHC.Exts
@@ -75,7 +75,7 @@ data BCInstr
 
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name)
-   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) CgRep
+   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
 
    -- Pushing literals
    | PUSH_UBX  (Either Literal (Ptr ())) Word16
@@ -147,7 +147,7 @@ data BCInstr
    -- To Infinity And Beyond
    | ENTER
    | RETURN		-- return a lifted value
-   | RETURN_UBX CgRep -- return an unlifted value, here's its rep
+   | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
 
    -- Breakpoints 
    | BRK_FUN          (MutableByteArray# RealWorld) Word16 BreakInfo

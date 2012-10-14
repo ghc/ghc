@@ -2,13 +2,13 @@ module DebuggerUtils (
        dataConInfoPtrToName,
   ) where
 
+import StgCmmLayout ( stdInfoTableSizeB )
 import ByteCodeItbls
 import DynFlags
 import FastString
 import TcRnTypes
 import TcRnMonad
 import IfaceEnv
-import CgInfoTbls
 import Module
 import OccName
 import Name
