@@ -369,6 +369,7 @@ generate config_args distdir directory
           dep_ids = map snd (externalPackageDeps lbi)
 
       let libraryDirs = forDeps Installed.libraryDirs
+          transitive_dep_ids = map Installed.sourcePackageId dep_pkgs
       wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
       wrappedLibraryDirs <- wrap libraryDirs
       let depDynlibDirName d = display (Installed.sourcePackageId d)
@@ -383,6 +384,8 @@ generate config_args distdir directory
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
                 variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) dep_ids),
+                variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords (map display transitive_dep_ids),
+                variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords (map (display . packageName) transitive_dep_ids),
                 variablePrefix ++ "_RPATHS = " ++ unwords rpaths,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
