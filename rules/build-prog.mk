@@ -205,7 +205,7 @@ ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
 	install_name_tool $$(foreach d,$$($1_$2_TRANSITIVE_DEP_NAMES), -change $$(TOP)/$$($$($$d_INSTALL_INFO)_dyn_LIB) @loader_path/../$$d-$$($$($$d_INSTALL_INFO)_VERSION)/$$($$($$d_INSTALL_INFO)_dyn_LIB_NAME)) $$@
 # Use relative paths for the RTS. Rather than try to work out which RTS
 # way is being linked, we just change it for all ways
-	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../$$d-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
+	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
 endif
 endif
 endif
