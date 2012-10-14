@@ -45,8 +45,8 @@ module Data.List
 
    -- * Reducing lists (folds)
 
-   , foldl             -- :: (a -> b -> a) -> a -> [b] -> a
-   , foldl'            -- :: (a -> b -> a) -> a -> [b] -> a
+   , foldl             -- :: (b -> a -> b) -> b -> [a] -> b
+   , foldl'            -- :: (b -> a -> b) -> b -> [a] -> b
    , foldl1            -- :: (a -> a -> a) -> [a] -> a
    , foldl1'           -- :: (a -> a -> a) -> [a] -> a
    , foldr             -- :: (a -> b -> b) -> b -> [a] -> b
@@ -68,7 +68,7 @@ module Data.List
    -- * Building lists
 
    -- ** Scans
-   , scanl             -- :: (a -> b -> a) -> a -> [b] -> [a]
+   , scanl             -- :: (b -> a -> b) -> b -> [a] -> [b]
    , scanl1            -- :: (a -> a -> a) -> [a] -> [a]
    , scanr             -- :: (a -> b -> b) -> b -> [a] -> [b]
    , scanr1            -- :: (a -> a -> a) -> [a] -> [a]
@@ -1004,7 +1004,7 @@ unfoldr f b  =
 -- -----------------------------------------------------------------------------
 
 -- | A strict version of 'foldl'.
-foldl'           :: (a -> b -> a) -> a -> [b] -> a
+foldl'           :: (b -> a -> b) -> b -> [a] -> b
 #ifdef __GLASGOW_HASKELL__
 foldl' f z0 xs0 = lgo z0 xs0
     where lgo z []     = z
