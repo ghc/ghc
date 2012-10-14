@@ -270,14 +270,16 @@ renameType t = case t of
 
   HsTyLit x -> return (HsTyLit x)
 
-  HsExplicitListTy a b    -> HsExplicitListTy a <$> mapM renameLType b
-
-  HsQuasiQuoteTy _        -> error "renameType: HsQuasiQuoteTy"
+  HsWrapTy a b            -> HsWrapTy a <$> renameType b
+  HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
+  HsCoreTy a              -> pure (HsCoreTy a)
+  HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
+  HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
+  HsQuasiQuoteTy a        -> HsQuasiQuoteTy <$> renameHsQuasiQuote a
   HsSpliceTy _ _ _        -> error "renameType: HsSpliceTy"
-  HsRecTy _               -> error "renameType: HsRecTy"
-  HsCoreTy _              -> error "renameType: HsCoreTy"
-  HsExplicitTupleTy _ _   -> error "renameType: HsExplicitTupleTy"
-  HsWrapTy _ _            -> error "renameType: HsWrapTy"
+
+renameHsQuasiQuote :: HsQuasiQuote Name -> RnM (HsQuasiQuote DocName)
+renameHsQuasiQuote (HsQuasiQuote a b c) = HsQuasiQuote <$> rename a <*> pure b <*> pure c
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
@@ -403,21 +405,24 @@ renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
       return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
                    , con_details = details', con_res = restype', con_doc = mbldoc' })
   where
-    renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
+    renameDetails (RecCon fields) = return . RecCon =<< mapM renameConDeclFieldField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
     renameDetails (InfixCon a b) = do
       a' <- renameLType a
       b' <- renameLType b
       return (InfixCon a' b')
 
-    renameField (ConDeclField name t doc) = do
-      name' <- renameL name
-      t'   <- renameLType t
-      doc' <- mapM renameLDocHsSyn doc
-      return (ConDeclField name' t' doc')
-
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
+
+
+renameConDeclFieldField :: ConDeclField Name -> RnM (ConDeclField DocName)
+renameConDeclFieldField (ConDeclField name t doc) = do
+  name' <- renameL name
+  t'   <- renameLType t
+  doc' <- mapM renameLDocHsSyn doc
+  return (ConDeclField name' t' doc')
+
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
