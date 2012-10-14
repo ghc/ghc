@@ -26,10 +26,11 @@ ifeq "$$(filter dyn,$$($1_$2_WAYS))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 
-ifeq "$$(GhcWithInterpreter)" "YES"
-$1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
-else
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
+ifeq "$$(GhcWithInterpreter)" "YES"
+ifneq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+$1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
+endif
 endif
 
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
