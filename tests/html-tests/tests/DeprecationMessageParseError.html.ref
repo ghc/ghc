@@ -50,8 +50,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecationMessagePars
 </p
 	  ><ul
 	  ><li
-	    > if parsing of a deprecation message fails, the message is included
-   verbatim
+	    > If parsing of a deprecation message fails, the message is included
+   verbatim.
 </li
 	    ></ul
 	  ></div

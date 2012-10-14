@@ -41,6 +41,23 @@ window.onload = function () {pageLoad();setSynopsis("mini_PruneWithWarning.html"
 	><p class="caption"
 	>PruneWithWarning</p
 	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >What is tested here:
+</p
+	  ><ul
+	  ><li
+	    > If a binding has a deprecation message but no documentation, it is pruned
+   when <code
+	      >OPTIONS_HADDOCK prune</code
+	      > is used.
+</li
+	    ></ul
+	  ></div
+	></div
       ><div id="interface"
       ></div
       ></div

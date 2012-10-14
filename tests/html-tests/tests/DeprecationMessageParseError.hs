@@ -1,8 +1,8 @@
 -- |
 -- What is tested here:
 --
--- * if parsing of a deprecation message fails, the message is included
---   verbatim
+-- * If parsing of a deprecation message fails, the message is included
+--   verbatim.
 --
 module DeprecationMessageParseError where
 
