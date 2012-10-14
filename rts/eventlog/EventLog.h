@@ -49,6 +49,8 @@ void postUserMsg(Capability *cap, char *msg, va_list ap);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
+void postUserMarker(Capability *cap, char *markername);
+
 void postEventStartup(EventCapNo n_caps);
 
 /*
