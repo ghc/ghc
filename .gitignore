@@ -1,3 +1,9 @@
 /dist/
 /tests/html-tests/output/
+
 /doc/haddock
+/doc/autom4te.cache/
+/doc/config.log
+/doc/config.mk
+/doc/config.status
+/doc/configure
