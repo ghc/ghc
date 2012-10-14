@@ -92,7 +92,9 @@ createInterface tm flags modMap instIfaceMap = do
 
   warningMap <- liftErrMsg $ mkWarningMap dflags warnings gre exportedNames
 
-  exportItems <- mkExportItems modMap mdl warningMap gre exportedNames decls maps exports
+  let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
+
+  exportItems <- mkExportItems modMap mdl allWarnings gre exportedNames decls maps exports
                    instances instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames exportItems opts
@@ -135,6 +137,7 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceModuleAliases   = aliases
   , ifaceInstances       = instances
   , ifaceHaddockCoverage = coverage
+  , ifaceWarningMap      = warningMap
   }
 
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
@@ -169,8 +172,6 @@ lookupModuleDyn dflags Nothing mdlName =
 -------------------------------------------------------------------------------
 -- Warnings
 -------------------------------------------------------------------------------
-
-type WarningMap = DocMap Name
 
 mkWarningMap :: DynFlags -> Warnings -> GlobalRdrEnv -> [Name] -> ErrMsgM WarningMap
 mkWarningMap dflags warnings gre exps = case warnings of

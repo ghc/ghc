@@ -114,7 +114,12 @@ data Interface = Interface
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
   , ifaceHaddockCoverage :: !(Int, Int)
+
+    -- | Warnings for things defined in this module.
+  , ifaceWarningMap :: !WarningMap
   }
+
+type WarningMap = DocMap Name
 
 
 -- | A subset of the fields of 'Interface' that we store in the interface
