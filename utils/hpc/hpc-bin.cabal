@@ -22,6 +22,15 @@ Flag base3
 Executable hpc
     Main-Is: Hpc.hs
     Other-Modules: HpcParser
+                   HpcCombine
+                   HpcDraft
+                   HpcFlags
+                   HpcLexer
+                   HpcMarkup
+                   HpcOverlay
+                   HpcReport
+                   HpcShowTix
+                   HpcUtils
 
     if flag(base4)
         Build-Depends: base       >= 4   && < 5
