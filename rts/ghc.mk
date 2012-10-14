@@ -16,6 +16,9 @@
 # We build the RTS with stage 1
 rts_dist_HC = $(GHC_STAGE1)
 
+rts_INSTALL_INFO = rts
+rts_VERSION = 1.0
+
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 rts_dist_WAYS = $(rts_WAYS)

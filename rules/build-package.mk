@@ -66,6 +66,10 @@ define build-package-helper
 
 $(call package-config,$1,$2,$3)
 
+ifeq "$3" "1"
+$$($1_PACKAGE)_INSTALL_INFO = $1_$2
+endif
+
 # Bootstrapping libs are only built one way
 ifeq "$3" "0"
 $1_$2_WAYS = v
