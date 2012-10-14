@@ -16,5 +16,7 @@ Executable ghctags
     Main-Is: Main.hs
 
     Build-Depends: base       >= 4   && < 5,
+                   containers,
+                   Cabal,
                    ghc
 

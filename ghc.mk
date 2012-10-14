@@ -474,6 +474,8 @@ utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
+utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/hpc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
