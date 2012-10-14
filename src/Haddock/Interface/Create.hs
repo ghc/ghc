@@ -41,7 +41,7 @@ import Name
 import Bag
 import RdrName
 import TcRnTypes
-import FastString (concatFS)
+import FastString (unpackFS, concatFS)
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -179,9 +179,9 @@ mkWarningMap dflags warnings gre exps = case warnings of
   WarnSome ws -> do
     let ws' = [ (n, w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
               , let n = gre_name elt, n `elem` exps ]
-    M.fromList . catMaybes <$> mapM parse ws'
+    M.fromList <$> mapM parse ws'
   where
-    parse (n, w) = (fmap $ (,) n) <$> parseWarning dflags gre w
+    parse (n, w) = (,) n <$> parseWarning dflags gre w
 
 
 moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> ErrMsgM (Maybe (Doc Name))
@@ -189,18 +189,19 @@ moduleWarning dflags gre ws =
   case ws of
     NoWarnings -> return Nothing
     WarnSome _ -> return Nothing
-    WarnAll w  -> parseWarning dflags gre w
+    WarnAll w  -> Just <$> parseWarning dflags gre w
 
 
-parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Maybe (Doc Name))
+parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Doc Name)
 parseWarning dflags gre w = do
   r <- case w of
-    (DeprecatedTxt msg) -> format "Deprecated: " msg
-    (WarningTxt    msg) -> format "Warning: "    msg
+    (DeprecatedTxt msg) -> format "Deprecated: " (concatFS msg)
+    (WarningTxt    msg) -> format "Warning: "    (concatFS msg)
   r `deepseq` return r
   where
-    format x xs = fmap (DocWarning . DocParagraph . DocAppend (DocString x))
-      <$> processDocString dflags gre (HsDocString $ concatFS xs)
+    format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
+      .   fromMaybe (DocString . unpackFS $ xs)
+      <$> processDocString dflags gre (HsDocString xs)
 
 
 -------------------------------------------------------------------------------
