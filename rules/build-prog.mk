@@ -175,7 +175,7 @@ ifneq "$3" "0"
 ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
 $1_$2_GHC_LD_OPTS = \
     -fno-use-rpaths \
-    $$(addprefix -optl-Wl$$(comma)-rpath -optl-Wl$$(comma),$$($1_$2_RPATHS))
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
 endif
 endif
 
