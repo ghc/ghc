@@ -70,7 +70,7 @@ spec = do
       it "can parse a single property" $ do
         parseParas "prop> 23 == 23" `shouldBe` Just (DocProperty "23 == 23")
 
-      it "can parse a multiple subsequent properties" $ do
+      it "can parse multiple subsequent properties" $ do
         parseParas $ unlines [
               "prop> 23 == 23"
             , "prop> 42 == 42"
