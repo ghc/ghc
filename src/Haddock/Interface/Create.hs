@@ -116,25 +116,25 @@ createInterface tm flags modMap instIfaceMap = do
   modWarn <- liftErrMsg $ moduleWarning dflags gre warnings
 
   return $! Interface {
-    ifaceMod             = mdl,
-    ifaceOrigFilename    = msHsFilePath ms,
-    ifaceInfo            = info,
-    ifaceDoc             = Documentation mbDoc modWarn,
-    ifaceRnDoc           = Documentation Nothing Nothing,
-    ifaceOptions         = opts,
-    ifaceDocMap          = docMap,
-    ifaceArgMap          = argMap,
-    ifaceRnDocMap        = M.empty,
-    ifaceRnArgMap        = M.empty,
-    ifaceExportItems     = prunedExportItems,
-    ifaceRnExportItems   = [],
-    ifaceExports         = exportedNames,
-    ifaceVisibleExports  = visibleNames,
-    ifaceDeclMap         = declMap,
-    ifaceSubMap          = subMap,
-    ifaceModuleAliases   = aliases,
-    ifaceInstances       = instances,
-    ifaceHaddockCoverage = coverage
+    ifaceMod             = mdl
+  , ifaceOrigFilename    = msHsFilePath ms
+  , ifaceInfo            = info
+  , ifaceDoc             = Documentation mbDoc modWarn
+  , ifaceRnDoc           = Documentation Nothing Nothing
+  , ifaceOptions         = opts
+  , ifaceDocMap          = docMap
+  , ifaceArgMap          = argMap
+  , ifaceRnDocMap        = M.empty
+  , ifaceRnArgMap        = M.empty
+  , ifaceExportItems     = prunedExportItems
+  , ifaceRnExportItems   = []
+  , ifaceExports         = exportedNames
+  , ifaceVisibleExports  = visibleNames
+  , ifaceDeclMap         = declMap
+  , ifaceSubMap          = subMap
+  , ifaceModuleAliases   = aliases
+  , ifaceInstances       = instances
+  , ifaceHaddockCoverage = coverage
   }
 
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
