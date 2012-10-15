@@ -52,11 +52,22 @@ flag in-ghc-tree
   default: False
   manual: True
 
+-- Using this disables -O2, and hence allows to use --disable-optimization,
+-- which is about twice as fast.  This should probably be the default, but we
+-- need some benchmarks first..
+flag dev
+  default: False
+  manual: True
+
 executable haddock
   default-language:     Haskell2010
   main-is:              Main.hs
   hs-source-dirs:       driver
-  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
+
+  if flag(dev)
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
+  else
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   build-depends:
     base >= 4.3 && < 4.7
@@ -129,7 +140,10 @@ library
     build-depends: ghc-paths
 
   hs-source-dirs:       src
-  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
+  if flag(dev)
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
+  else
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   exposed-modules:
     Documentation.Haddock
