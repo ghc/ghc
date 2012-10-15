@@ -9,12 +9,12 @@ To add a new test:
     passes since there is no reference file to compare with.
 
  3) To make a reference file from the output file, do
-      runhaskell accept.hs <modulename>
+      runhaskell accept.lhs <modulename>
 
 Tips and tricks:
 
 To "accept" all output files (copy them to reference files), run
-  runhaskell accept.hs
+  runhaskell accept.lhs
 
 You can run all tests despite failing tests, like so
   cabal test --test-option=all

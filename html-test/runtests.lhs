@@ -1,3 +1,6 @@
+#!/usr/bin/env runhaskell
+\begin{code}
+{-# LANGUAGE CPP #-}
 import Prelude hiding (mod)
 import Control.Monad
 import Control.Applicative
@@ -20,14 +23,14 @@ import System.FilePath
 import System.Process (ProcessHandle, runProcess, waitForProcess)
 
 
-packageRoot, dataDir, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
-packageRoot   = "."
+packageRoot, dataDir, haddockPath, baseDir, testDir, outDir :: FilePath
+baseDir = takeDirectory __FILE__
+testDir       = baseDir </> "tests"
+refDir        = baseDir </> "ref"
+outDir        = baseDir </> "output"
+packageRoot   = baseDir </> ".."
 dataDir       = packageRoot </> "resources"
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
-testSuiteRoot = packageRoot </> "html-test"
-testDir       = testSuiteRoot </> "tests"
-refDir        = testSuiteRoot </> "ref"
-outDir        = testSuiteRoot </> "output"
 
 
 main :: IO ()
@@ -150,3 +153,4 @@ programOnPath :: FilePath -> IO Bool
 programOnPath p = do
   result <- findProgramLocation silent p
   return (isJust result)
+\end{code}

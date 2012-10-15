@@ -1,3 +1,6 @@
+#!/usr/bin/env runhaskell
+\begin{code}
+{-# LANGUAGE CPP #-}
 import System.Cmd
 import System.Environment
 import System.FilePath
@@ -5,15 +8,16 @@ import System.Directory
 import Data.List
 import Control.Applicative
 
+baseDir = takeDirectory __FILE__
+
 main :: IO ()
 main = do
+  contents <- filter (`notElem` ignore) <$> getDirectoryContents (baseDir </> "output")
   args <- getArgs
-  dir <- getCurrentDirectory
-  contents <- filter (`notElem` ignore) <$> getDirectoryContents (dir </> "output")
   if not $ null args then
-    mapM_ copy [ "output" </> file  | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
+    mapM_ copy [ baseDir </> "output" </> file | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
   else
-    mapM_ copy [ "output" </> file | file <- contents]
+    mapM_ copy [ baseDir </> "output" </> file | file <- contents]
   where
     ignore = [
         "."
@@ -25,7 +29,7 @@ main = do
 
 copy :: FilePath -> IO ()
 copy file = do
-  let new = "ref" </> takeFileName file
+  let new = baseDir </> "ref" </> takeFileName file
   if ".html" `isSuffixOf` file then do
     putStrLn (file ++ " -> " ++ new)
     stripLinks <$> readFile file >>= writeFile new
@@ -42,3 +46,4 @@ stripLinks str =
       case str of
         [] -> []
         x : xs -> x : stripLinks xs
+\end{code}
