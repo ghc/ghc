@@ -1,5 +1,6 @@
 import Prelude hiding (mod)
 import Control.Monad
+import Control.Applicative
 import Data.List
 import Data.Maybe
 import Distribution.InstalledPackageInfo
@@ -19,8 +20,9 @@ import System.FilePath
 import System.Process (ProcessHandle, runProcess, waitForProcess)
 
 
-packageRoot, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
+packageRoot, dataDir, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
 packageRoot   = "."
+dataDir       = packageRoot </> "resources"
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
 testSuiteRoot = packageRoot </> "tests" </> "html-tests"
 testDir       = testSuiteRoot </> "tests"
@@ -48,8 +50,8 @@ test = do
 
   let mods' = map (testDir </>) mods
 
-  env_ <- getEnvironment
-  let env = Just (("haddock_datadir", packageRoot) : env_)
+  -- add haddock_datadir to environment for subprocesses
+  env <- Just . (:) ("haddock_datadir", dataDir) <$> getEnvironment
 
   putStrLn ""
   putStrLn "Haddock version: "

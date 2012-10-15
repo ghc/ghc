@@ -33,19 +33,19 @@ extra-source-files:
 -- the test-suite stanzas don't get picked up by `cabal sdist`.
   tests/html-tests/runtests.hs
 
-data-files:
-  html/frames.html
-  html/haddock-util.js
-  html/Classic.theme/haskell_icon.gif
-  html/Classic.theme/minus.gif
-  html/Classic.theme/plus.gif
-  html/Classic.theme/xhaddock.css
-  html/Ocean.std-theme/hslogo-16.png
-  html/Ocean.std-theme/minus.gif
-  html/Ocean.std-theme/ocean.css
-  html/Ocean.std-theme/plus.gif
-  html/Ocean.std-theme/synopsis.png
-  latex/haddock.sty
+data-dir:   resources
+data-files: html/frames.html
+            html/haddock-util.js
+            html/Classic.theme/haskell_icon.gif
+            html/Classic.theme/minus.gif
+            html/Classic.theme/plus.gif
+            html/Classic.theme/xhaddock.css
+            html/Ocean.std-theme/hslogo-16.png
+            html/Ocean.std-theme/minus.gif
+            html/Ocean.std-theme/ocean.css
+            html/Ocean.std-theme/plus.gif
+            html/Ocean.std-theme/synopsis.png
+            latex/haddock.sty
 
 flag in-ghc-tree
   description: Are we in a GHC tree?
