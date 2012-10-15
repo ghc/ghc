@@ -350,22 +350,22 @@ tcBracket brack res_ty
           -- We build a single implication constraint with a BracketSkol;
           -- that in turn tells simplifyTop to report only definite
           -- errors
-       ; (_,lie) <- captureConstraints $
-                    newImplication BracketSkol [] [] $
-                    setStage brack_stage $
-                    do { meta_ty <- tc_bracket cur_stage brack
-                       ; unifyType meta_ty res_ty }
+       ; ((_binds1, meta_ty), lie) <- captureConstraints $
+                          newImplication BracketSkol [] [] $
+                          setStage brack_stage $
+                          tc_bracket cur_stage brack
 
           -- It's best to simplify the constraint now, even though in
           -- principle some later unification might be useful for it,
           -- because we don't want these essentially-junk TH implication
           -- contraints floating around nested inside other constraints
           -- See for example Trac #4949
-       ; _ <- simplifyTop lie
+       ; _binds2 <- simplifyTop lie
 
         -- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
-       ; return (noLoc (HsBracketOut brack pendings)) }
+       ; co <- unifyType meta_ty res_ty
+       ; return (noLoc (mkHsWrapCo co (HsBracketOut brack pendings))) }
 
 tc_bracket :: ThStage -> HsBracket Name -> TcM TcType
 tc_bracket outer_stage br@(VarBr _ name)     -- Note [Quoting names]
