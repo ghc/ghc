@@ -41,6 +41,36 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedReExport.htm
 	><p class="caption"
 	>DeprecatedReExport</p
 	></div
+      ><div id="table-of-contents"
+      ><p class="caption"
+	>Contents</p
+	><ul
+	><li
+	  ><a href=""
+	    >Re-exported from an other module
+</a
+	    ></li
+	  ><li
+	  ><a href=""
+	    >Re-exported from an other package
+</a
+	    ></li
+	  ></ul
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >What is tested here:
+</p
+	  ><ul
+	  ><li
+	    > Deprecation messages are shown for re-exported items.
+</li
+	    ></ul
+	  ></div
+	></div
       ><div id="synopsis"
       ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
 	>Synopsis</p
@@ -54,8 +84,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedReExport.htm
 	  ></ul
 	></div
       ><div id="interface"
-      ><h1
-	>Documentation</h1
+      ><h1 id="g:1"
+	>Re-exported from an other module
+</h1
 	><div class="top"
 	><p class="src"
 	  ><a name="v:foo" class="def"
@@ -77,6 +108,17 @@ window.onload = function () {pageLoad();setSynopsis("mini_DeprecatedReExport.htm
 	    >some documentation for foo
 </p
 	    ></div
+	  ></div
+	><h1 id="g:2"
+	>Re-exported from an other package
+</h1
+	><div class="doc"
+	><p
+	  >Not yet working, see <a href=""
+	    >http://trac.haskell.org/haddock/ticket/223</a
+	    >
+ , isEmptyChan
+</p
 	  ></div
 	></div
       ></div

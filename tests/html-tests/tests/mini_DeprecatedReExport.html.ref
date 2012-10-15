@@ -19,12 +19,18 @@ window.onload = function () {pageLoad();};
       >DeprecatedReExport</p
       ></div
     ><div id="interface"
-    ><div class="top"
+    ><h1
+      >Re-exported from an other module
+</h1
+      ><div class="top"
       ><p class="src"
 	><a href="" target="main"
 	  >foo</a
 	  ></p
 	></div
+      ><h1
+      >Re-exported from an other package
+</h1
       ></div
     ></body
   ></html
