@@ -3,7 +3,7 @@ is, it compares output files against a set of reference files.
 
 To add a new test: 
 
- 1) Create a module in the "tests" directory.
+ 1) Create a module in the "html-test/src" directory.
 
  2) Run "cabal test". You should now have output/<modulename>.html. The test
     passes since there is no reference file to compare with.

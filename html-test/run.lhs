@@ -25,7 +25,7 @@ import System.Process (ProcessHandle, runProcess, waitForProcess)
 
 packageRoot, dataDir, haddockPath, baseDir, testDir, outDir :: FilePath
 baseDir = takeDirectory __FILE__
-testDir       = baseDir </> "tests"
+testDir       = baseDir </> "src"
 refDir        = baseDir </> "ref"
 outDir        = baseDir </> "output"
 packageRoot   = baseDir </> ".."
