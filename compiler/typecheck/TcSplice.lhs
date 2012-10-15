@@ -284,7 +284,7 @@ The predicate we use is TcEnv.thTopLevelId.
 %************************************************************************
 
 \begin{code}
-tcBracket     :: HsBracket Name -> TcRhoType -> TcM (LHsExpr TcId)
+tcBracket     :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> TcRhoType -> TcM (HsExpr TcId)
 tcSpliceType  :: HsSplice Name -> FreeVars -> TcM (TcType, TcKind)
@@ -365,7 +365,7 @@ tcBracket brack res_ty
         -- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
        ; co <- unifyType meta_ty res_ty
-       ; return (noLoc (mkHsWrapCo co (HsBracketOut brack pendings))) }
+       ; return (mkHsWrapCo co (HsBracketOut brack pendings)) }
 
 tc_bracket :: ThStage -> HsBracket Name -> TcM TcType
 tc_bracket outer_stage br@(VarBr _ name)     -- Note [Quoting names]
