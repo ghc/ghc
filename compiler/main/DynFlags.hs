@@ -1967,7 +1967,7 @@ dynamic_flags = [
   , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
-  , Flag "ddump-cmmz-cfg"          (setDumpFlag Opt_D_dump_cmmz_cbe)
+  , Flag "ddump-cmmz-cfg"          (setDumpFlag Opt_D_dump_cmmz_cfg)
   , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
   , Flag "ddump-cmmz-spills"       (setDumpFlag Opt_D_dump_cmmz_spills)
   , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)
