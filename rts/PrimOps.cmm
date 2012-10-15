@@ -2034,3 +2034,28 @@ stg_traceEventzh ( W_ msg )
    return ();
 }
 
+// Same code as stg_traceEventzh above but a different kind of event
+// Before changing this code, read the comments in the impl above
+stg_traceMarkerzh ( W_ msg )
+{
+#if defined(TRACING) || defined(DEBUG)
+
+   ccall traceUserMarker(MyCapability() "ptr", msg "ptr");
+
+#elif defined(DTRACE)
+
+   W_ enabled;
+
+#if !defined(solaris2_TARGET_OS)
+   (enabled) = ccall __dtrace_isenabled$HaskellEvent$user__marker$v1();
+#else
+   enabled = 1;
+#endif
+   if (enabled != 0) {
+     ccall dtraceUserMarkerWrapper(MyCapability() "ptr", msg "ptr");
+   }
+
+#endif
+   return ();
+}
+

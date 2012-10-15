@@ -80,6 +80,7 @@ char *EventDesc[] = {
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
   [EVENT_USER_MSG]            = "User message",
+  [EVENT_USER_MARKER]         = "User marker",
   [EVENT_GC_IDLE]             = "GC idle",
   [EVENT_GC_WORK]             = "GC working",
   [EVENT_GC_DONE]             = "GC done",
@@ -369,6 +370,7 @@ initEventLogging(void)
 
         case EVENT_LOG_MSG:          // (msg)
         case EVENT_USER_MSG:         // (msg)
+        case EVENT_USER_MARKER:      // (markername)
         case EVENT_RTS_IDENTIFIER:   // (capset, str)
         case EVENT_PROGRAM_ARGS:     // (capset, strvec)
         case EVENT_PROGRAM_ENV:      // (capset, strvec)
@@ -1084,6 +1086,27 @@ void postEventStartup(EventCapNo n_caps)
     postCapNo(&eventBuf, n_caps);
 
     RELEASE_LOCK(&eventBufMutex);
+}
+
+void postUserMarker(Capability *cap, char *markername)
+{
+    EventsBuf *eb;
+    int size = strlen(markername);
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForVariableEvent(eb, size)){
+        printAndClearEventBuf(eb);
+
+        if (!hasRoomForVariableEvent(eb, size)){
+            // Event size exceeds buffer size, bail out:
+            return;
+        }
+    }
+
+    postEventHeader(eb, EVENT_USER_MARKER);
+    postPayloadSize(eb, size);
+    postBuf(eb, (StgWord8*) markername, size);
 }
 
 void postThreadLabel(Capability    *cap,

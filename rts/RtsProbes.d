@@ -99,4 +99,5 @@ provider HaskellEvent {
 /*  probe log__msg (char *); */
   /* we don't need EVENT_BLOCK_MARKER with dtrace */
   probe user__msg (EventCapNo, char *);
+  probe user__marker (EventCapNo, char *);
 };

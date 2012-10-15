@@ -197,6 +197,12 @@ void trace_(char *msg, ...);
  */
 void traceUserMsg(Capability *cap, char *msg);
 
+/* 
+ * A marker event emitted by the program
+ * Used by Debug.Trace.{traceMarker, traceMarkerIO}
+ */
+void traceUserMarker(Capability *cap, char *msg);
+
 /*
  * An event to record a Haskell thread's label/name
  * Used by GHC.Conc.labelThread
@@ -310,6 +316,7 @@ INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #if !defined(DEBUG) && !defined(TRACING) && defined(DTRACE)
 
 void dtraceUserMsgWrapper(Capability *cap, char *msg);
+void dtraceUserMarkerWrapper(Capability *cap, char *msg);
 
 #endif /* !defined(DEBUG) && !defined(TRACING) && defined(DTRACE) */
 
@@ -356,6 +363,8 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_CAP_DISABLE(cap)
 #define dtraceUserMsg(cap, msg)                         \
     HASKELLEVENT_USER_MSG(cap, msg)
+#define dtraceUserMarker(cap, msg)                      \
+    HASKELLEVENT_USER_MARKER(cap, msg)
 #define dtraceGcIdle(cap)                               \
     HASKELLEVENT_GC_IDLE(cap)
 #define dtraceGcWork(cap)                               \
@@ -435,6 +444,7 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
 #define dtraceThreadLabel(cap, tso, label)              /* nothing */
 INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
+#define dtraceUserMarker(cap, msg)                      /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
 #define dtraceGcDone(cap)                               /* nothing */

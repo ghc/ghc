@@ -431,6 +431,7 @@ RTS_FUN_DECL(stg_noDuplicatezh);
 
 RTS_FUN_DECL(stg_traceCcszh);
 RTS_FUN_DECL(stg_traceEventzh);
+RTS_FUN_DECL(stg_traceMarkerzh);
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes
