@@ -305,7 +305,7 @@ foreign import ccall safe "kevent64"
     c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                -> Ptr TimeSpec -> IO CInt
 #elif defined(HAVE_KEVENT)
-foreign import ccall safe "__hscore_kevent"
+foreign import capi safe "sys/event.h kevent"
     c_kevent :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
              -> Ptr TimeSpec -> IO CInt
 #else
