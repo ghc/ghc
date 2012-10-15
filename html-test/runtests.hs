@@ -24,7 +24,7 @@ packageRoot, dataDir, haddockPath, testSuiteRoot, testDir, outDir :: FilePath
 packageRoot   = "."
 dataDir       = packageRoot </> "resources"
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
-testSuiteRoot = packageRoot </> "tests" </> "html-tests"
+testSuiteRoot = packageRoot </> "html-test"
 testDir       = testSuiteRoot </> "tests"
 outDir        = testSuiteRoot </> "output"
 
