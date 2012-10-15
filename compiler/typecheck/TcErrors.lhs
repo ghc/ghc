@@ -16,7 +16,6 @@ module TcErrors(
 
 #include "HsVersions.h"
 
-import TcCanonical( occurCheckExpand )
 import TcRnTypes
 import TcRnMonad
 import TcMType
