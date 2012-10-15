@@ -26,6 +26,7 @@ dataDir       = packageRoot </> "resources"
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
 testSuiteRoot = packageRoot </> "html-test"
 testDir       = testSuiteRoot </> "tests"
+refDir        = testSuiteRoot </> "ref"
 outDir        = testSuiteRoot </> "output"
 
 
@@ -102,12 +103,11 @@ test = do
 check :: [FilePath] -> Bool -> IO ()
 check modules strict = do
   forM_ modules $ \mod -> do
-    let outfile = outDir  </> dropExtension mod ++ ".html"
-    let reffile = testDir </> dropExtension mod ++ ".html.ref"
+    let outfile = outDir </> dropExtension mod ++ ".html"
+    let reffile = refDir </> dropExtension mod ++ ".html"
     b <- doesFileExist reffile
     if b
       then do
-        copyFile reffile (outDir </> takeFileName reffile)
         out <- readFile outfile
         ref <- readFile reffile
         if not $ haddockEq out ref
@@ -116,7 +116,7 @@ check modules strict = do
             let ref' = stripLinks ref
                 out' = stripLinks out
             let reffile' = outDir </> takeFileName reffile ++ ".nolinks"
-                outfile' = outDir </> takeFileName outfile ++ ".nolinks"
+                outfile' = outDir </> takeFileName outfile ++ ".ref.nolinks"
             writeFile reffile' ref'
             writeFile outfile' out'
             r <- programOnPath "colordiff"

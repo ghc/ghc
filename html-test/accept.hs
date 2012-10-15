@@ -26,7 +26,7 @@ main = do
 
 
 copy file = do
-  let new = "tests" </> takeFileName file <.> ".ref"
+  let new = "ref" </> takeFileName file
   print file
   print new
   contents <- readFile file
