@@ -1059,7 +1059,7 @@ wayOptc platform WayThreaded = case platformOS platform of
                                OSOpenBSD -> ["-pthread"]
                                OSNetBSD  -> ["-pthread"]
                                _         -> []
-wayOptc _ WayDebug      = []
+wayOptc _ WayDebug      = ["-O0", "-g"]
 wayOptc _ WayDyn        = ["-DDYNAMIC"]
 wayOptc _ WayProf       = ["-DPROFILING"]
 wayOptc _ WayEventLog   = ["-DTRACING"]
