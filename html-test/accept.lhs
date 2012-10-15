@@ -12,19 +12,19 @@ baseDir = takeDirectory __FILE__
 
 main :: IO ()
 main = do
-  contents <- filter (`notElem` ignore) <$> getDirectoryContents (baseDir </> "output")
+  contents <- filter (not . ignore) <$> getDirectoryContents (baseDir </> "output")
   args <- getArgs
   if not $ null args then
     mapM_ copy [ baseDir </> "output" </> file | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
   else
     mapM_ copy [ baseDir </> "output" </> file | file <- contents]
   where
-    ignore = [
-        "."
-      , ".."
-      , "doc-index.html"
-      , "index-frames.html"
-      , "index.html"
+    ignore =
+      foldr (liftA2 (||)) (const False) [
+        (== ".")
+      , (== "..")
+      , (isPrefixOf "index")
+      , (isPrefixOf "doc-index")
       ]
 
 copy :: FilePath -> IO ()
