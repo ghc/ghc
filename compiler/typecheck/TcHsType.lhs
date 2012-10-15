@@ -74,6 +74,7 @@ import Outputable
 import FastString
 import Util
 
+import Data.Maybe
 import Control.Monad ( unless, when, zipWithM )
 import PrelNames( ipClassName, funTyConKey )
 \end{code}
@@ -1306,9 +1307,8 @@ checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
 -- checks that the actual kind act_kind is compatible
 --      with the expected kind exp_kind
 -- The first argument, ty, is used only in the error message generation
-checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
- = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr ek)
-      ; mb_subk <- unifyKindX act_kind exp_kind
+checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
+ = do { mb_subk <- unifyKindX act_kind exp_kind
 
          -- Kind unification only generates definite errors
       ; case mb_subk of {
@@ -1320,6 +1320,7 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
          -- Now to find out what sort
         exp_kind <- zonkTcKind exp_kind
       ; act_kind <- zonkTcKind act_kind
+      ; traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr exp_kind)
       ; env0 <- tcInitTidyEnv
       ; let (exp_as, _) = splitKindFunTys exp_kind
             (act_as, _) = splitKindFunTys act_kind
@@ -1330,15 +1331,15 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
             (env1, tidy_exp_kind) = tidyOpenKind env0 exp_kind
             (env2, tidy_act_kind) = tidyOpenKind env1 act_kind
 
-            err | n_exp_as < n_act_as     -- E.g. [Maybe]
-                = ptext (sLit "Expecting") <+>
-                  speakN n_diff_as <+> ptext (sLit "more argument") <>
-                  (if n_diff_as > 1 then char 's' else empty) <+>
-                  ptext (sLit "to") <+> quotes (ppr ty)
+            occurs_check 
+               | Just act_tv <- tcGetTyVar_maybe act_kind
+               = isNothing (occurCheckExpand act_tv exp_kind)
+               | Just exp_tv <- tcGetTyVar_maybe exp_kind
+               = isNothing (occurCheckExpand exp_tv act_kind)
+               | otherwise 
+               = False
 
-                  -- Now n_exp_as >= n_act_as. In the next two cases,
-                  -- n_exp_as == 0, and hence so is n_act_as
-                | isConstraintKind tidy_act_kind
+            err | isConstraintKind tidy_act_kind
                 = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
                 
                 | isConstraintKind tidy_exp_kind
@@ -1352,6 +1353,18 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
                 = ptext (sLit "Expecting an unlifted type, but") <+> quotes (ppr ty)
                     <+> ptext (sLit "is lifted")
 
+                | occurs_check   -- Must precede the "more args expected" check
+                = ptext (sLit "Kind occurs check") $$ more_info
+
+                | n_exp_as < n_act_as     -- E.g. [Maybe]
+                = vcat [ ptext (sLit "Expecting") <+>
+                         speakN n_diff_as <+> ptext (sLit "more argument")
+                         <> (if n_diff_as > 1 then char 's' else empty)
+                         <+> ptext (sLit "to") <+> quotes (ppr ty)
+                       , more_info ]
+
+                  -- Now n_exp_as >= n_act_as. In the next two cases,
+                  -- n_exp_as == 0, and hence so is n_act_as
                 | otherwise               -- E.g. Monad [Int]
                 = ptext (sLit "Kind mis-match") $$ more_info
 
@@ -1360,6 +1373,7 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt)
                               ptext (sLit "but") <+> quotes (ppr ty) <+>
                                   ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
+      ; traceTc "checkExpectedKind 1" (ppr ty $$ ppr tidy_act_kind $$ ppr tidy_exp_kind $$ ppr env1 $$ ppr env2)
       ; failWithTcM (env2, err) } } }
 \end{code}
 
