@@ -12,12 +12,12 @@ baseDir = takeDirectory __FILE__
 
 main :: IO ()
 main = do
-  contents <- filter (not . ignore) <$> getDirectoryContents (baseDir </> "output")
+  contents <- filter (not . ignore) <$> getDirectoryContents (baseDir </> "out")
   args <- getArgs
   if not $ null args then
-    mapM_ copy [ baseDir </> "output" </> file | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
+    mapM_ copy [ baseDir </> "out" </> file | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
   else
-    mapM_ copy [ baseDir </> "output" </> file | file <- contents]
+    mapM_ copy [ baseDir </> "out" </> file | file <- contents]
   where
     ignore =
       foldr (liftA2 (||)) (const False) [

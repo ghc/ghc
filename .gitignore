@@ -1,5 +1,5 @@
 /dist/
-/html-test/output/
+/html-test/out/
 
 /doc/haddock
 /doc/autom4te.cache/

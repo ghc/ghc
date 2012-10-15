@@ -27,7 +27,7 @@ packageRoot, dataDir, haddockPath, baseDir, testDir, outDir :: FilePath
 baseDir = takeDirectory __FILE__
 testDir       = baseDir </> "src"
 refDir        = baseDir </> "ref"
-outDir        = baseDir </> "output"
+outDir        = baseDir </> "out"
 packageRoot   = baseDir </> ".."
 dataDir       = packageRoot </> "resources"
 haddockPath   = packageRoot </> "dist" </> "build" </> "haddock" </> "haddock"
