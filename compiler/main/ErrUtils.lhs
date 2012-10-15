@@ -19,7 +19,7 @@ module ErrUtils (
 
         ghcExit,
         doIfSet, doIfSet_dyn,
-        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_or,
+        dumpIfSet, dumpIfSet_dyn,
         mkDumpDoc, dumpSDoc,
 
         --  * Messages during compilation
@@ -211,13 +211,6 @@ dumpIfSet_dyn dflags flag hdr doc
   = dumpSDoc dflags flag hdr doc
   | otherwise
   = return ()
-
-dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
-dumpIfSet_dyn_or _ [] _ _ = return ()
-dumpIfSet_dyn_or dflags (flag : flags) hdr doc
-    = if dopt flag dflags || verbosity dflags >= 4
-      then dumpSDoc dflags flag hdr doc
-      else dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
