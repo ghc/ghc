@@ -1796,7 +1796,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
           --                            ppr scrut]) $
           tick (CaseElim case_bndr)
         ; env' <- simplNonRecX env case_bndr scrut
-          -- If case_bndr is deads, simplNonRecX will discard
+          -- If case_bndr is dead, simplNonRecX will discard
         ; simplExprF env' rhs cont }
   where
     elim_lifted   -- See Note [Case elimination: lifted case]
