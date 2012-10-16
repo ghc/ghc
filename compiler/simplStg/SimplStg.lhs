@@ -23,6 +23,7 @@ import ErrUtils
 import SrcLoc
 import UniqSupply       ( mkSplitUniqSupply, splitUniqSupply )
 import Outputable
+import Control.Monad
 \end{code}
 
 \begin{code}
@@ -44,7 +45,7 @@ stg2stg dflags module_name binds
                 -- Do the main business!
         ; let (us0, us1) = splitUniqSupply us'
         ; (processed_binds, _, cost_centres)
-                <- foldl_mn do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
+                <- foldM do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
 
         ; let un_binds = unarise us1 processed_binds
 
@@ -87,10 +88,4 @@ stg2stg dflags module_name binds
             --         UniqueSupply for the next guy to use
             --         cost-centres to be declared/registered (specialised)
             --         add to description of what's happened (reverse order)
-
--- here so it can be inlined...
-foldl_mn :: (b -> a -> IO b) -> b -> [a] -> IO b
-foldl_mn _ z []     = return z
-foldl_mn f z (x:xs) = f z x     >>= \ zz ->
-                      foldl_mn f zz xs
 \end{code}
