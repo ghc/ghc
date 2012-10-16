@@ -181,23 +181,16 @@ data GeneralFlag
    | Opt_D_dump_cmmz_cfg
    | Opt_D_dump_cmmz_cbe
    | Opt_D_dump_cmmz_proc
-   | Opt_D_dump_cmmz_spills
    | Opt_D_dump_cmmz_rewrite
-   | Opt_D_dump_cmmz_dead
-   | Opt_D_dump_cmmz_stub
    | Opt_D_dump_cmmz_sp
    | Opt_D_dump_cmmz_procmap
    | Opt_D_dump_cmmz_split
-   | Opt_D_dump_cmmz_lower
    | Opt_D_dump_cmmz_info
-   | Opt_D_dump_cmmz_cafs
    -- end cmmz subflags
    | Opt_D_dump_cps_cmm
-   | Opt_D_dump_cvt_cmm
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
-   | Opt_D_dump_asm_coalesce
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
@@ -205,10 +198,8 @@ data GeneralFlag
    | Opt_D_dump_asm_expanded
    | Opt_D_dump_llvm
    | Opt_D_dump_core_stats
-   | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
-   | Opt_D_dump_flatC
    | Opt_D_dump_foreign
    | Opt_D_dump_inlinings
    | Opt_D_dump_rule_firings
@@ -240,7 +231,6 @@ data GeneralFlag
    | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
-   | Opt_D_dump_avoid_vect
    | Opt_D_dump_ticked
    | Opt_D_dump_rtti
    | Opt_D_source_stats
@@ -253,7 +243,6 @@ data GeneralFlag
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_faststring_stats
    | Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
-   | Opt_D_no_debug_output
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
@@ -1969,24 +1958,17 @@ dynamic_flags = [
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
   , Flag "ddump-cmmz-cfg"          (setDumpFlag Opt_D_dump_cmmz_cfg)
   , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
-  , Flag "ddump-cmmz-spills"       (setDumpFlag Opt_D_dump_cmmz_spills)
   , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)
   , Flag "ddump-cmmz-rewrite"      (setDumpFlag Opt_D_dump_cmmz_rewrite)
-  , Flag "ddump-cmmz-dead"         (setDumpFlag Opt_D_dump_cmmz_dead)
-  , Flag "ddump-cmmz-stub"         (setDumpFlag Opt_D_dump_cmmz_stub)
   , Flag "ddump-cmmz-sp"           (setDumpFlag Opt_D_dump_cmmz_sp)
   , Flag "ddump-cmmz-procmap"      (setDumpFlag Opt_D_dump_cmmz_procmap)
   , Flag "ddump-cmmz-split"        (setDumpFlag Opt_D_dump_cmmz_split)
-  , Flag "ddump-cmmz-lower"        (setDumpFlag Opt_D_dump_cmmz_lower)
   , Flag "ddump-cmmz-info"         (setDumpFlag Opt_D_dump_cmmz_info)
-  , Flag "ddump-cmmz-cafs"         (setDumpFlag Opt_D_dump_cmmz_cafs)
   , Flag "ddump-core-stats"        (setDumpFlag Opt_D_dump_core_stats)
   , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
-  , Flag "ddump-cvt-cmm"           (setDumpFlag Opt_D_dump_cvt_cmm)
   , Flag "ddump-asm"               (setDumpFlag Opt_D_dump_asm)
   , Flag "ddump-asm-native"        (setDumpFlag Opt_D_dump_asm_native)
   , Flag "ddump-asm-liveness"      (setDumpFlag Opt_D_dump_asm_liveness)
-  , Flag "ddump-asm-coalesce"      (setDumpFlag Opt_D_dump_asm_coalesce)
   , Flag "ddump-asm-regalloc"      (setDumpFlag Opt_D_dump_asm_regalloc)
   , Flag "ddump-asm-conflicts"     (setDumpFlag Opt_D_dump_asm_conflicts)
   , Flag "ddump-asm-regalloc-stages" (setDumpFlag Opt_D_dump_asm_regalloc_stages)
@@ -1994,10 +1976,8 @@ dynamic_flags = [
   , Flag "ddump-asm-expanded"      (setDumpFlag Opt_D_dump_asm_expanded)
   , Flag "ddump-llvm"              (NoArg (do setObjTarget HscLlvm
                                               setDumpFlag' Opt_D_dump_llvm))
-  , Flag "ddump-cpranal"           (setDumpFlag Opt_D_dump_cpranal)
   , Flag "ddump-deriv"             (setDumpFlag Opt_D_dump_deriv)
   , Flag "ddump-ds"                (setDumpFlag Opt_D_dump_ds)
-  , Flag "ddump-flatC"             (setDumpFlag Opt_D_dump_flatC)
   , Flag "ddump-foreign"           (setDumpFlag Opt_D_dump_foreign)
   , Flag "ddump-inlinings"         (setDumpFlag Opt_D_dump_inlinings)
   , Flag "ddump-rule-firings"      (setDumpFlag Opt_D_dump_rule_firings)
@@ -2035,7 +2015,6 @@ dynamic_flags = [
   , Flag "ddump-hi"                (setDumpFlag Opt_D_dump_hi)
   , Flag "ddump-minimal-imports"   (setDumpFlag Opt_D_dump_minimal_imports)
   , Flag "ddump-vect"              (setDumpFlag Opt_D_dump_vect)
-  , Flag "ddump-avoid-vect"        (setDumpFlag Opt_D_dump_avoid_vect)
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)
