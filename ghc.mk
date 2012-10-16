@@ -677,6 +677,9 @@ endif
 # BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
 # libraries/dph/ghc.mk refers to stuff defined earlier, in particular
 # things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
+ifeq "$(GhcProfiled)" "YES"
+BUILD_DIRS_EXTRA := $(filter-out libraries/dph,$(BUILD_DIRS_EXTRA))
+endif
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
 
 # A useful pseudo-target (must be after the include above, because it needs
