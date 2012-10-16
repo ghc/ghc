@@ -1052,7 +1052,7 @@ wayExtras _ WayEventLog = return ()
 wayExtras _ WayPar      = exposePackage "concurrent"
 wayExtras _ WayGran     = exposePackage "concurrent"
 wayExtras _ WayNDP      = do setExtensionFlag Opt_ParallelArrays
-                             setDynFlag Opt_Vectorise
+                             setGeneralFlag Opt_Vectorise
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc platform WayThreaded = case platformOS platform of
@@ -1799,7 +1799,7 @@ dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
     Flag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
   , Flag "cpp"      (NoArg (setExtensionFlag Opt_Cpp))
-  , Flag "F"        (NoArg (setDynFlag Opt_Pp))
+  , Flag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , Flag "#include"
          (HasArg (\s -> do addCmdlineHCInclude s
                            addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
@@ -1815,19 +1815,19 @@ dynamic_flags = [
   , Flag "ndp"            (NoArg (addWay WayNDP))
   , Flag "threaded"       (NoArg (addWay WayThreaded))
 
-  , Flag "ticky"          (NoArg (setDynFlag Opt_Ticky >> addWay WayDebug))
+  , Flag "ticky"          (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
 
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (NoArg (do setDynFlag Opt_Static
+  , Flag "static"         (NoArg (do setGeneralFlag Opt_Static
                                      removeWay WayDyn))
-  , Flag "dynamic"        (NoArg (do unSetDynFlag Opt_Static
+  , Flag "dynamic"        (NoArg (do unSetGeneralFlag Opt_Static
                                      addWay WayDyn))
     -- ignored for compat w/ gcc:
   , Flag "rdynamic"       (NoArg (return ()))
-  , Flag "relative-dynlib-paths"  (NoArg (setDynFlag Opt_RelativeDynlibPaths))
+  , Flag "relative-dynlib-paths"  (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
@@ -1858,7 +1858,7 @@ dynamic_flags = [
 
   , Flag "split-objs"
          (NoArg (if can_split
-                 then setDynFlag Opt_SplitObjs
+                 then setGeneralFlag Opt_SplitObjs
                  else addWarn "ignoring -fsplit-objs"))
 
         -------- ghc -M -----------------------------------------------------
@@ -1905,22 +1905,22 @@ dynamic_flags = [
 
         ------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
-  , Flag "keep-hc-file"     (NoArg (setDynFlag Opt_KeepHcFiles))
-  , Flag "keep-hc-files"    (NoArg (setDynFlag Opt_KeepHcFiles))
-  , Flag "keep-s-file"      (NoArg (setDynFlag Opt_KeepSFiles))
-  , Flag "keep-s-files"     (NoArg (setDynFlag Opt_KeepSFiles))
+  , Flag "keep-hc-file"     (NoArg (setGeneralFlag Opt_KeepHcFiles))
+  , Flag "keep-hc-files"    (NoArg (setGeneralFlag Opt_KeepHcFiles))
+  , Flag "keep-s-file"      (NoArg (setGeneralFlag Opt_KeepSFiles))
+  , Flag "keep-s-files"     (NoArg (setGeneralFlag Opt_KeepSFiles))
   , Flag "keep-raw-s-file"  (NoArg (addWarn "The -keep-raw-s-file flag does nothing; it will be removed in a future GHC release"))
   , Flag "keep-raw-s-files" (NoArg (addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
   , Flag "keep-llvm-file"   (NoArg (do setObjTarget HscLlvm
-                                       setDynFlag Opt_KeepLlvmFiles))
+                                       setGeneralFlag Opt_KeepLlvmFiles))
   , Flag "keep-llvm-files"  (NoArg (do setObjTarget HscLlvm
-                                       setDynFlag Opt_KeepLlvmFiles))
+                                       setGeneralFlag Opt_KeepLlvmFiles))
      -- This only makes sense as plural
-  , Flag "keep-tmp-files"   (NoArg (setDynFlag Opt_KeepTmpFiles))
+  , Flag "keep-tmp-files"   (NoArg (setGeneralFlag Opt_KeepTmpFiles))
 
         ------- Miscellaneous ----------------------------------------------
-  , Flag "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages))
-  , Flag "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain))
+  , Flag "no-auto-link-packages" (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
+  , Flag "no-hs-main"     (NoArg (setGeneralFlag Opt_NoHsMain))
   , Flag "with-rtsopts"   (HasArg setRtsOpts)
   , Flag "rtsopts"        (NoArg (setRtsOptsEnabled RtsOptsAll))
   , Flag "rtsopts=all"    (NoArg (setRtsOptsEnabled RtsOptsAll))
@@ -1928,15 +1928,15 @@ dynamic_flags = [
   , Flag "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone))
   , Flag "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone))
   , Flag "main-is"        (SepArg setMainIs)
-  , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock))
+  , Flag "haddock"        (NoArg (setGeneralFlag Opt_Haddock))
   , Flag "haddock-opts"   (hasArg addHaddockOpts)
   , Flag "hpcdir"         (SepArg setOptHpcDir)
   , Flag "ghci-script"    (hasArg addGhciScript)
   , Flag "interactive-print" (hasArg setInteractivePrint)
         ------- recompilation checker --------------------------------------
-  , Flag "recomp"         (NoArg (do unSetDynFlag Opt_ForceRecomp
+  , Flag "recomp"         (NoArg (do unSetGeneralFlag Opt_ForceRecomp
                                      deprecate "Use -fno-force-recomp instead"))
-  , Flag "no-recomp"      (NoArg (do setDynFlag Opt_ForceRecomp
+  , Flag "no-recomp"      (NoArg (do setGeneralFlag Opt_ForceRecomp
                                      deprecate "Use -fforce-recomp instead"))
 
         ------ HsCpp opts ---------------------------------------------------
@@ -1954,15 +1954,15 @@ dynamic_flags = [
   -- Suppress all that is suppressable in core dumps.
   -- Except for uniques, as some simplifier phases introduce new varibles that
   -- have otherwise identical names.
-  , Flag "dsuppress-all"    (NoArg $ do setDynFlag Opt_SuppressCoercions
-                                        setDynFlag Opt_SuppressVarKinds
-                                        setDynFlag Opt_SuppressModulePrefixes
-                                        setDynFlag Opt_SuppressTypeApplications
-                                        setDynFlag Opt_SuppressIdInfo
-                                        setDynFlag Opt_SuppressTypeSignatures)
+  , Flag "dsuppress-all"    (NoArg $ do setGeneralFlag Opt_SuppressCoercions
+                                        setGeneralFlag Opt_SuppressVarKinds
+                                        setGeneralFlag Opt_SuppressModulePrefixes
+                                        setGeneralFlag Opt_SuppressTypeApplications
+                                        setGeneralFlag Opt_SuppressIdInfo
+                                        setGeneralFlag Opt_SuppressTypeSignatures)
 
         ------ Debugging ----------------------------------------------------
-  , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))
+  , Flag "dstg-stats"     (NoArg (setGeneralFlag Opt_StgStats))
 
   , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
@@ -2043,27 +2043,27 @@ dynamic_flags = [
   , Flag "ddump-to-file"           (setDumpFlag Opt_DumpToFile)
   , Flag "ddump-hi-diffs"          (setDumpFlag Opt_D_dump_hi_diffs)
   , Flag "ddump-rtti"              (setDumpFlag Opt_D_dump_rtti)
-  , Flag "dcore-lint"              (NoArg (setDynFlag Opt_DoCoreLinting))
-  , Flag "dstg-lint"               (NoArg (setDynFlag Opt_DoStgLinting))
-  , Flag "dcmm-lint"               (NoArg (setDynFlag Opt_DoCmmLinting))
-  , Flag "dasm-lint"               (NoArg (setDynFlag Opt_DoAsmLinting))
+  , Flag "dcore-lint"              (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , Flag "dstg-lint"               (NoArg (setGeneralFlag Opt_DoStgLinting))
+  , Flag "dcmm-lint"               (NoArg (setGeneralFlag Opt_DoCmmLinting))
+  , Flag "dasm-lint"               (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , Flag "dshow-passes"            (NoArg (do forceRecompile
                                               setVerbosity $ Just 2))
-  , Flag "dfaststring-stats"       (NoArg (setDynFlag Opt_D_faststring_stats))
-  , Flag "dno-llvm-mangler"        (NoArg (setDynFlag Opt_NoLlvmMangler)) -- hidden flag
+  , Flag "dfaststring-stats"       (NoArg (setGeneralFlag Opt_D_faststring_stats))
+  , Flag "dno-llvm-mangler"        (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
   , Flag "monly-2-regs" (NoArg (addWarn "The -monly-2-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
-  , Flag "msse2"        (NoArg (setDynFlag Opt_SSE2))
-  , Flag "msse4.2"      (NoArg (setDynFlag Opt_SSE4_2))
+  , Flag "msse2"        (NoArg (setGeneralFlag Opt_SSE2))
+  , Flag "msse4.2"      (NoArg (setGeneralFlag Opt_SSE4_2))
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
-  , Flag "Werror" (NoArg (setDynFlag           Opt_WarnIsError))
-  , Flag "Wwarn"  (NoArg (unSetDynFlag         Opt_WarnIsError))
+  , Flag "Werror" (NoArg (setGeneralFlag           Opt_WarnIsError))
+  , Flag "Wwarn"  (NoArg (unSetGeneralFlag         Opt_WarnIsError))
   , Flag "Wall"   (NoArg (mapM_ setWarningFlag minusWallOpts))
   , Flag "Wnot"   (NoArg (do upd (\dfs -> dfs {warningFlags = IntSet.empty})
                              deprecate "Use -w instead"))
@@ -2112,8 +2112,8 @@ dynamic_flags = [
   , Flag "no-auto-all"           (noArg (\d -> d { profAuto = NoProfAuto } ))
   , Flag "auto"                  (noArg (\d -> d { profAuto = ProfAutoExports } ))
   , Flag "no-auto"               (noArg (\d -> d { profAuto = NoProfAuto } ))
-  , Flag "caf-all"               (NoArg (setDynFlag Opt_AutoSccsOnIndividualCafs))
-  , Flag "no-caf-all"            (NoArg (unSetDynFlag Opt_AutoSccsOnIndividualCafs))
+  , Flag "caf-all"               (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
+  , Flag "no-caf-all"            (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
 
         -- NEW profiling flags
   , Flag "fprof-auto"             (noArg (\d -> d { profAuto = ProfAutoAll } ))
@@ -2141,15 +2141,15 @@ dynamic_flags = [
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg setPackageTrust)
   , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
-  , Flag "fPIC"             (NoArg (setDynFlag Opt_PIC))
-  , Flag "fno-PIC"          (NoArg (unSetDynFlag Opt_PIC))
+  , Flag "fPIC"             (NoArg (setGeneralFlag Opt_PIC))
+  , Flag "fno-PIC"          (NoArg (unSetGeneralFlag Opt_PIC))
  ]
- ++ map (mkFlag turnOn  ""     setDynFlag  ) negatableFlags
- ++ map (mkFlag turnOff "no-"  unSetDynFlag) negatableFlags
- ++ map (mkFlag turnOn  "d"    setDynFlag  ) dFlags
- ++ map (mkFlag turnOff "dno-" unSetDynFlag) dFlags
- ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
- ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
+ ++ map (mkFlag turnOn  ""     setGeneralFlag  ) negatableFlags
+ ++ map (mkFlag turnOff "no-"  unSetGeneralFlag) negatableFlags
+ ++ map (mkFlag turnOn  "d"    setGeneralFlag  ) dFlags
+ ++ map (mkFlag turnOff "dno-" unSetGeneralFlag) dFlags
+ ++ map (mkFlag turnOn  "f"    setGeneralFlag  ) fFlags
+ ++ map (mkFlag turnOff "fno-" unSetGeneralFlag) fFlags
  ++ map (mkFlag turnOn  "f"    setWarningFlag  ) fWarningFlags
  ++ map (mkFlag turnOff "fno-" unSetWarningFlag) fWarningFlags
  ++ map (mkFlag turnOn  "f"    setExtensionFlag  ) fLangFlags
@@ -2183,11 +2183,11 @@ package_flags = [
   , Flag "package-id"            (HasArg exposePackageId)
   , Flag "package"               (HasArg exposePackage)
   , Flag "hide-package"          (HasArg hidePackage)
-  , Flag "hide-all-packages"     (NoArg (setDynFlag Opt_HideAllPackages))
+  , Flag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
   , Flag "ignore-package"        (HasArg ignorePackage)
   , Flag "syslib"                (HasArg (\s -> do exposePackage s
                                                    deprecate "Use -package instead"))
-  , Flag "distrust-all-packages" (NoArg (setDynFlag Opt_DistrustAllPackages))
+  , Flag "distrust-all-packages" (NoArg (setGeneralFlag Opt_DistrustAllPackages))
   , Flag "trust"                 (HasArg trustPackage)
   , Flag "distrust"              (HasArg distrustPackage)
   ]
@@ -2677,11 +2677,11 @@ minusWallOpts
       ]
 
 enableGlasgowExts :: DynP ()
-enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls
+enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls
                        mapM_ setExtensionFlag glasgowExtsFlags
 
 disableGlasgowExts :: DynP ()
-disableGlasgowExts = do unSetDynFlag Opt_PrintExplicitForalls
+disableGlasgowExts = do unSetGeneralFlag Opt_PrintExplicitForalls
                         mapM_ unSetExtensionFlag glasgowExtsFlags
 
 glasgowExtsFlags :: [ExtensionFlag]
@@ -2738,7 +2738,7 @@ setWarnUnsafe False = return ()
 
 setPackageTrust :: DynP ()
 setPackageTrust = do
-    setDynFlag Opt_PackageTrust
+    setGeneralFlag Opt_PackageTrust
     l <- getCurLoc
     upd $ \d -> d { pkgTrustOnLoc = l }
 
@@ -2816,15 +2816,15 @@ addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
               let platform = targetPlatform dfs
               wayExtras platform w
-              mapM_ setDynFlag $ wayGeneralFlags platform w
+              mapM_ setGeneralFlag $ wayGeneralFlags platform w
 
 removeWay :: Way -> DynP ()
 removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
-setDynFlag, unSetDynFlag :: GeneralFlag -> DynP ()
-setDynFlag   f = upd (\dfs -> dopt_set dfs f)
-unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
+setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
+setGeneralFlag   f = upd (\dfs -> dopt_set dfs f)
+unSetGeneralFlag f = upd (\dfs -> dopt_unset dfs f)
 
 --------------------------
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
@@ -2854,7 +2854,7 @@ alterSettings f dflags = dflags { settings = f (settings dflags) }
 --------------------------
 setDumpFlag' :: GeneralFlag -> DynP ()
 setDumpFlag' dump_flag
-  = do setDynFlag dump_flag
+  = do setGeneralFlag dump_flag
        when want_recomp forceRecompile
   where
         -- Certain dumpy-things are really interested in what's going
@@ -2869,13 +2869,13 @@ forceRecompile :: DynP ()
 -- don't switch it off in --make mode, else *everything* gets
 -- recompiled which probably isn't what you want
 forceRecompile = do dfs <- liftEwM getCmdLineState
-                    when (force_recomp dfs) (setDynFlag Opt_ForceRecomp)
+                    when (force_recomp dfs) (setGeneralFlag Opt_ForceRecomp)
         where
           force_recomp dfs = isOneShot (ghcMode dfs)
 
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do forceRecompile
-                         setDynFlag Opt_D_verbose_core2core
+                         setGeneralFlag Opt_D_verbose_core2core
                          upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
 
 setDumpSimplPhases :: String -> DynP ()
