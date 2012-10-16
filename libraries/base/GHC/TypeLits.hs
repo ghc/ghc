@@ -5,12 +5,10 @@
 {-# LANGUAGE EmptyDataDecls #-}         -- for declaring the kinds
 {-# LANGUAGE GADTs #-}                  -- for examining type nats
 {-# LANGUAGE PolyKinds #-}              -- for Sing family
-{-# LANGUAGE UndecidableInstances #-}   -- for a bunch of the instances
-{-# LANGUAGE FlexibleInstances #-}      -- for kind parameters
-{-# LANGUAGE FlexibleContexts #-}       -- for kind parameters
-{-# LANGUAGE ScopedTypeVariables #-}    -- for kind parameters
-{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=, singRep, SingE
-{-# LANGUAGE FunctionalDependencies #-} -- for SingRep and SingE
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -23,7 +21,6 @@ module GHC.TypeLits
     -- * Linking type and value level
   , Sing, SingI, SingE, SingRep, sing, fromSing
   , unsafeSingNat, unsafeSingSymbol
-  , Kind
 
     -- * Working with singletons
   , withSing, singThat
@@ -37,6 +34,10 @@ module GHC.TypeLits
 
     -- * Matching on type-nats
   , Nat1(..), FromNat1
+
+    -- * Kind parameters
+  , OfKind(..), Demote, DemoteRep
+  , KindOf
   ) where
 
 import GHC.Base(Eq((==)), Bool(..), ($), otherwise, (.))
@@ -44,20 +45,24 @@ import GHC.Num(Integer, (-))
 import GHC.Base(String)
 import GHC.Read(Read(..))
 import GHC.Show(Show(..))
-import GHC.Prim(Any)
 import Unsafe.Coerce(unsafeCoerce)
 import Data.Bits(testBit,shiftR)
 import Data.Maybe(Maybe(..))
 import Data.List((++))
 
--- | A type synonym useful for passing kinds as parameters.
-type Kind = Any
+-- | (Kind) A kind useful for passing kinds as parameters.
+data OfKind (a :: *) = KindParam
+
+{- | A shortcut for naming the kind parameter corresponding to the
+kind of a some type.  For example, @KindOf Int ~ (KindParam :: OfKind *)@,
+but @KindOf 2 ~ (KindParam :: OfKind Nat)@. -}
+type KindOf (a :: k) = (KindParam :: OfKind k)
 
 
--- | This is the *kind* of type-level natural numbers.
+-- | (Kind) This is the kind of type-level natural numbers.
 data Nat
 
--- | This is the *kind* of type-level symbols.
+-- | (Kind) This is the kind of type-level symbols.
 data Symbol
 
 
@@ -113,21 +118,28 @@ and not their type---all types of a given kind are processed by the
 same instances.
 -}
 
-class (kparam ~ Kind) => SingE (kparam :: k) rep | kparam -> rep where
-  fromSing :: Sing (a :: k) -> rep
+class (kparam ~ KindParam) => SingE (kparam :: OfKind k) where
+  type DemoteRep kparam :: *
+  fromSing :: Sing (a :: k) -> DemoteRep kparam
 
-instance SingE (Kind :: Nat) Integer where
+instance SingE (KindParam :: OfKind Nat) where
+  type DemoteRep (KindParam :: OfKind Nat) = Integer
   fromSing (SNat n) = n
 
-instance SingE (Kind :: Symbol) String where
+instance SingE (KindParam :: OfKind Symbol) where
+  type DemoteRep (KindParam :: OfKind Symbol) = String
   fromSing (SSym s) = s
 
+{- | A convenient name for the type used to representing the values
+for a particular singleton family.  For example, @Demote 2 ~ Integer@,
+and also @Demote 3 ~ Integer@, but @Demote "Hello" ~ String@. -}
+type Demote a = DemoteRep (KindOf a)
 
 {- | A convenience class, useful when we need to both introduce and eliminate
 a given singleton value. Users should never need to define instances of
 this classes. -}
-class    (SingI a, SingE (Kind :: k) rep) => SingRep (a :: k) rep | a -> rep
-instance (SingI a, SingE (Kind :: k) rep) => SingRep (a :: k) rep
+class    (SingI a, SingE (KindOf a)) => SingRep (a :: k)
+instance (SingI a, SingE (KindOf a)) => SingRep (a :: k)
 
 
 {- | A convenience function useful when we need to name a singleton value
@@ -144,15 +156,14 @@ property.  If the singleton does not satisfy the property, then the function
 returns 'Nothing'. The property is expressed in terms of the underlying
 representation of the singleton. -}
 
-singThat :: (SingRep a rep) => (rep -> Bool) -> Maybe (Sing a)
+singThat :: SingRep a => (Demote a -> Bool) -> Maybe (Sing a)
 singThat p = withSing $ \x -> if p (fromSing x) then Just x else Nothing
 
 
-
-instance (SingE (Kind :: k) rep, Show rep) => Show (Sing (a :: k)) where
+instance (SingE (KindOf a), Show (Demote a)) => Show (Sing a) where
   showsPrec p = showsPrec p . fromSing
 
-instance (SingRep a rep, Read rep, Eq rep) => Read (Sing a) where
+instance (SingRep a, Read (Demote a), Eq (Demote a)) => Read (Sing a) where
   readsPrec p cs = do (x,ys) <- readsPrec p cs
                       case singThat (== x) of
                         Just y  -> [(y,ys)]
