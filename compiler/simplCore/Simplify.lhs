@@ -1585,7 +1585,7 @@ tryRules env rules fn args call_cont
       | otherwise
       = return ()
 
-    log_rule dflags dflag hdr details = liftIO . dumpSDoc dflags dflag "" $
+    log_rule dflags flag hdr details = liftIO . dumpSDoc dflags flag "" $
       sep [text hdr, nest 4 details]
 
 \end{code}

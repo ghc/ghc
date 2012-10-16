@@ -13,7 +13,7 @@
 
 module DynFlags (
         -- * Dynamic flags and associated configuration types
-        DynFlag(..),
+        GeneralFlag(..),
         WarningFlag(..),
         ExtensionFlag(..),
         Language(..),
@@ -96,7 +96,7 @@ module DynFlags (
 
         supportedLanguagesAndExtensions,
 
-        -- ** DynFlag C compiler options
+        -- ** DynFlags C compiler options
         picCCOpts, picPOpts,
 
         -- * Configuration of the stg-to-stg passes
@@ -170,7 +170,7 @@ import qualified Data.IntSet as IntSet
 -- DynFlags
 
 -- | Enumerates the simple on-or-off dynamic flags
-data DynFlag
+data GeneralFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
@@ -536,7 +536,7 @@ data ExtensionFlag
    | Opt_TypeHoles
    deriving (Eq, Enum, Show)
 
--- | Contains not only a collection of 'DynFlag's but also a plethora of
+-- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
 data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
@@ -1024,10 +1024,10 @@ wayDesc WayPar      = "Parallel"
 wayDesc WayGran     = "GranSim"
 wayDesc WayNDP      = "Nested data parallelism"
 
-wayDynFlags :: Platform -> Way -> [DynFlag]
-wayDynFlags _ WayThreaded = []
-wayDynFlags _ WayDebug = []
-wayDynFlags platform WayDyn =
+wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
+wayGeneralFlags _ WayThreaded = []
+wayGeneralFlags _ WayDebug = []
+wayGeneralFlags platform WayDyn =
         case platformOS platform of
             -- On Windows, code that is to be linked into a dynamic
             -- library must be compiled with -fPIC. Labels not in
@@ -1037,11 +1037,11 @@ wayDynFlags platform WayDyn =
             OSDarwin  -> [Opt_PIC]
             OSLinux   -> [Opt_PIC]
             _         -> []
-wayDynFlags _ WayProf     = [Opt_SccProfilingOn]
-wayDynFlags _ WayEventLog = []
-wayDynFlags _ WayPar      = [Opt_Parallel]
-wayDynFlags _ WayGran     = [Opt_GranMacros]
-wayDynFlags _ WayNDP      = []
+wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
+wayGeneralFlags _ WayEventLog = []
+wayGeneralFlags _ WayPar      = [Opt_Parallel]
+wayGeneralFlags _ WayGran     = [Opt_GranMacros]
+wayGeneralFlags _ WayNDP      = []
 
 wayExtras :: Platform -> Way -> DynP ()
 wayExtras _ WayThreaded = return ()
@@ -1354,16 +1354,16 @@ languageExtensions (Just Haskell2010)
        Opt_DoAndIfThenElse,
        Opt_RelaxedPolyRec]
 
--- | Test whether a 'DynFlag' is set
-dopt :: DynFlag -> DynFlags -> Bool
+-- | Test whether a 'GeneralFlag' is set
+dopt :: GeneralFlag -> DynFlags -> Bool
 dopt f dflags  = fromEnum f `IntSet.member` flags dflags
 
--- | Set a 'DynFlag'
-dopt_set :: DynFlags -> DynFlag -> DynFlags
+-- | Set a 'GeneralFlag'
+dopt_set :: DynFlags -> GeneralFlag -> DynFlags
 dopt_set dfs f = dfs{ flags = IntSet.insert (fromEnum f) (flags dfs) }
 
--- | Unset a 'DynFlag'
-dopt_unset :: DynFlags -> DynFlag -> DynFlags
+-- | Unset a 'GeneralFlag'
+dopt_unset :: DynFlags -> GeneralFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = IntSet.delete (fromEnum f) (flags dfs) }
 
 -- | Test whether a 'WarningFlag' is set
@@ -2270,12 +2270,12 @@ fWarningFlags = [
   ( "warn-inline-rule-shadowing",       Opt_WarnInlineRuleShadowing, nop ) ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
-negatableFlags :: [FlagSpec DynFlag]
+negatableFlags :: [FlagSpec GeneralFlag]
 negatableFlags = [
   ( "ignore-dot-ghci",                  Opt_IgnoreDotGhci, nop ) ]
 
 -- | These @-d\<blah\>@ flags can all be reversed with @-dno-\<blah\>@
-dFlags :: [FlagSpec DynFlag]
+dFlags :: [FlagSpec GeneralFlag]
 dFlags = [
   ( "suppress-coercions",               Opt_SuppressCoercions,          nop),
   ( "suppress-var-kinds",               Opt_SuppressVarKinds,           nop),
@@ -2287,7 +2287,7 @@ dFlags = [
   ( "ppr-case-as-let",                  Opt_PprCaseAsLet,               nop)]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fFlags :: [FlagSpec DynFlag]
+fFlags :: [FlagSpec GeneralFlag]
 fFlags = [
   ( "error-spans",                      Opt_ErrorSpans, nop ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls, nop ),
@@ -2513,7 +2513,7 @@ xFlags = [
   ( "TypeHoles",                        Opt_TypeHoles, nop )
   ]
 
-defaultFlags :: Settings -> [DynFlag]
+defaultFlags :: Settings -> [GeneralFlag]
 defaultFlags settings
   = [ Opt_AutoLinkPackages,
 
@@ -2543,7 +2543,7 @@ defaultFlags settings
         _ -> [])
 
     ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-        then wayDynFlags platform WayDyn
+        then wayGeneralFlags platform WayDyn
         else [Opt_Static])
 
     where platform = sTargetPlatform settings
@@ -2589,7 +2589,7 @@ impliedFlags
     , (Opt_ImplicitParams, turnOn, Opt_FlexibleInstances)
   ]
 
-optLevelFlags :: [([Int], DynFlag)]
+optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags
   = [ ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
@@ -2807,7 +2807,7 @@ optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
               -> OptKind (CmdLineP DynFlags)
 optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
-setDumpFlag :: DynFlag -> OptKind (CmdLineP DynFlags)
+setDumpFlag :: GeneralFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 --------------------------
@@ -2816,13 +2816,13 @@ addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               dfs <- liftEwM getCmdLineState
               let platform = targetPlatform dfs
               wayExtras platform w
-              mapM_ setDynFlag $ wayDynFlags platform w
+              mapM_ setDynFlag $ wayGeneralFlags platform w
 
 removeWay :: Way -> DynP ()
 removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
-setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
+setDynFlag, unSetDynFlag :: GeneralFlag -> DynP ()
 setDynFlag   f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 
@@ -2852,7 +2852,7 @@ alterSettings :: (Settings -> Settings) -> DynFlags -> DynFlags
 alterSettings f dflags = dflags { settings = f (settings dflags) }
 
 --------------------------
-setDumpFlag' :: DynFlag -> DynP ()
+setDumpFlag' :: GeneralFlag -> DynP ()
 setDumpFlag' dump_flag
   = do setDynFlag dump_flag
        when want_recomp forceRecompile

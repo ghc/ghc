@@ -23,7 +23,7 @@ import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
 import UnariseStg       ( unarise )
 
-import DynFlags		( DynFlags(..), DynFlag(..), dopt, StgToDo(..),
+import DynFlags		( DynFlags(..), GeneralFlag(..), dopt, StgToDo(..),
 			  getStgToDo )
 import Module           ( Module )
 import ErrUtils

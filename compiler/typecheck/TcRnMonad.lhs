@@ -263,7 +263,7 @@ Command-line flags
 xoptM :: ExtensionFlag -> TcRnIf gbl lcl Bool
 xoptM flag = do { dflags <- getDynFlags; return (xopt flag dflags) }
 
-doptM :: DynFlag -> TcRnIf gbl lcl Bool
+doptM :: GeneralFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDynFlags; return (dopt flag dflags) }
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
@@ -273,7 +273,7 @@ setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-unsetDOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetDOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                             env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
@@ -282,7 +282,7 @@ unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                             env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
-ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifDOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifDOptM flag thing_inside = do b <- doptM flag
                                when b thing_inside
 
@@ -437,12 +437,12 @@ traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
-traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
+traceOptIf :: GeneralFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
 traceOptIf flag doc = ifDOptM flag $
                           do dflags <- getDynFlags
                              liftIO (printInfoForUser dflags alwaysQualify doc)
 
-traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
+traceOptTcRn :: GeneralFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
 traceOptTcRn flag doc = ifDOptM flag $ do
                         { loc  <- getSrcSpanM
@@ -461,7 +461,7 @@ debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
                   | otherwise         = dumpTcRn doc
 
-dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
+dumpOptTcRn :: GeneralFlag -> SDoc -> TcRn ()
 dumpOptTcRn flag doc = ifDOptM flag (dumpTcRn doc)
 \end{code}
 

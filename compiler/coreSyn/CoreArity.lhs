@@ -34,7 +34,7 @@ import TyCon	( isRecursiveTyCon, isClassTyCon )
 import Coercion
 import BasicTypes
 import Unique
-import DynFlags ( DynFlags, DynFlag(..), dopt )
+import DynFlags ( DynFlags, GeneralFlag(..), dopt )
 import Outputable
 import FastString
 import Pair

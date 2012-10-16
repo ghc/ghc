@@ -68,7 +68,7 @@ import qualified Data.Set as Set
 -- ---------------------------------------------------------------------------
 -- The Package state
 
--- | Package state is all stored in 'DynFlag's, including the details of
+-- | Package state is all stored in 'DynFlags', including the details of
 -- all packages, which packages are exposed, and which modules they
 -- provide.
 --

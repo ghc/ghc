@@ -224,7 +224,7 @@ pprTypeAndContents id = do
 --------------------------------------------------------------
 -- Utils 
 
-traceOptIf :: GhcMonad m => DynFlag -> SDoc -> m ()
+traceOptIf :: GhcMonad m => GeneralFlag -> SDoc -> m ()
 traceOptIf flag doc = do
   dflags <- GHC.getSessionDynFlags
   when (dopt flag dflags) $ liftIO $ printInfoForUser dflags alwaysQualify doc
