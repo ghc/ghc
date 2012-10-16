@@ -308,7 +308,7 @@ tickyAllocHeap hp
 
 ifTicky :: Code -> Code
 ifTicky code = do dflags <- getDynFlags
-                  if dopt Opt_Ticky dflags then code
+                  if gopt Opt_Ticky dflags then code
                                            else nopC
 
 addToMemLbl :: Width -> CLabel -> Int -> CmmStmt

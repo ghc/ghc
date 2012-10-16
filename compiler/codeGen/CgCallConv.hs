@@ -164,7 +164,7 @@ constructSlowCall amodes
 slowArgs :: DynFlags -> [(CgRep,CmmExpr)] -> [(CgRep,CmmExpr)]
 slowArgs _ [] = []
 slowArgs dflags amodes
-  | dopt Opt_SccProfilingOn dflags = save_cccs ++ this_pat ++ slowArgs dflags rest
+  | gopt Opt_SccProfilingOn dflags = save_cccs ++ this_pat ++ slowArgs dflags rest
   | otherwise                      =              this_pat ++ slowArgs dflags rest
   where
     (arg_pat, args, rest) = matchSlowPattern amodes

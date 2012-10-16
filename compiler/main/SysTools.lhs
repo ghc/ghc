@@ -375,7 +375,7 @@ runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
       args1 = args0 ++ args
-      args2 = if dopt Opt_WarnIsError dflags
+      args2 = if gopt Opt_WarnIsError dflags
               then Option "-Werror" : args1
               else                    args1
   mb_env <- getGccEnv args2
@@ -676,7 +676,7 @@ readElfSection _dflags section exe = do
 \begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = dirsToClean dflags
         ds <- readIORef ref
         removeTmpDirs dflags (Map.elems ds)
@@ -684,7 +684,7 @@ cleanTempDirs dflags
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         fs <- readIORef ref
         removeTmpFiles dflags fs
@@ -692,7 +692,7 @@ cleanTempFiles dflags
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
@@ -1053,7 +1053,7 @@ linkDynLib dflags o_files dep_packages
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS (targetPlatform dflags)) &&
            dynLibLoader dflags == SystemDependent &&
-           not (dopt Opt_Static dflags)
+           not (gopt Opt_Static dflags)
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
          | otherwise = ["-L" ++ l]
 
@@ -1097,7 +1097,7 @@ linkDynLib dflags o_files dep_packages
                     , Option "-shared"
                     ] ++
                     [ FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
-                    | dopt Opt_SharedImplib dflags
+                    | gopt Opt_SharedImplib dflags
                     ]
                  ++ map (FileOption "") o_files
                  ++ map Option (

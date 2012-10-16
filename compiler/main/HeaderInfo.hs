@@ -152,7 +152,7 @@ getOptionsFromFile dflags filename
           -- we already have an apparently-complete token.
           -- We therefore just turn Opt_Haddock off when doing the lazy
           -- lex.
-          dflags' = dopt_unset dflags Opt_Haddock
+          dflags' = gopt_unset dflags Opt_Haddock
 
 blockSize :: Int
 -- blockSize = 17 -- for testing :-)

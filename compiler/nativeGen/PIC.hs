@@ -160,7 +160,7 @@ cmmMakePicReference dflags lbl
 	= CmmLit $ CmmLabel lbl
 
 
-	| (dopt Opt_PIC dflags || not (dopt Opt_Static dflags)) && absoluteLabel lbl 
+	| (gopt Opt_PIC dflags || not (gopt Opt_Static dflags)) && absoluteLabel lbl 
 	= CmmMachOp (MO_Add (wordWidth dflags)) 
 		[ CmmReg (CmmGlobal PicBaseReg)
 		, CmmLit $ picRelative 
@@ -220,7 +220,7 @@ howToAccessLabel
 howToAccessLabel dflags _ OSMinGW32 _ lbl
 
 	-- Assume all symbols will be in the same PE, so just access them directly.
-	| dopt Opt_Static dflags
+	| gopt Opt_Static dflags
 	= AccessDirectly
 	
 	-- If the target symbol is in another PE we need to access it via the
@@ -256,7 +256,7 @@ howToAccessLabel dflags arch OSDarwin DataReference lbl
 	-- we'd need to pass the current Module all the way in to
 	-- this function.
 	| arch /= ArchX86_64
-	, dopt Opt_PIC dflags && externallyVisibleCLabel lbl 
+	, gopt Opt_PIC dflags && externallyVisibleCLabel lbl 
 	= AccessViaSymbolPtr
 	 
 	| otherwise 
@@ -306,7 +306,7 @@ howToAccessLabel dflags _ os _ _
 	--           if we don't dynamically link to Haskell code,
 	--           it actually manages to do so without messing thins up.
 	| osElfTarget os
-	, not (dopt Opt_PIC dflags) && dopt Opt_Static dflags
+	, not (gopt Opt_PIC dflags) && gopt Opt_Static dflags
 	= AccessDirectly
 
 howToAccessLabel dflags arch os DataReference lbl
@@ -320,7 +320,7 @@ howToAccessLabel dflags arch os DataReference lbl
 	    -- via a symbol pointer (see below for an explanation why
 	    -- PowerPC32 Linux is especially broken).
 	    | arch == ArchPPC
-	    , dopt Opt_PIC dflags
+	    , gopt Opt_PIC dflags
 	    -> AccessViaSymbolPtr
 	
 	    | otherwise 
@@ -341,12 +341,12 @@ howToAccessLabel dflags arch os DataReference lbl
 
 howToAccessLabel dflags arch os CallReference lbl
 	| osElfTarget os
-	, labelDynamic dflags (thisPackage dflags) lbl && not (dopt Opt_PIC dflags)
+	, labelDynamic dflags (thisPackage dflags) lbl && not (gopt Opt_PIC dflags)
 	= AccessDirectly
 
 	| osElfTarget os
 	, arch /= ArchX86
-	, labelDynamic dflags (thisPackage dflags) lbl && dopt Opt_PIC dflags
+	, labelDynamic dflags (thisPackage dflags) lbl && gopt Opt_PIC dflags
 	= AccessViaStub
 
 howToAccessLabel dflags _ os _ lbl
@@ -357,7 +357,7 @@ howToAccessLabel dflags _ os _ lbl
 
 -- all other platforms
 howToAccessLabel dflags _ _ _ _
-	| not (dopt Opt_PIC dflags)
+	| not (gopt Opt_PIC dflags)
 	= AccessDirectly
 	
 	| otherwise
@@ -428,12 +428,12 @@ needImportedSymbols dflags arch os
 	-- PowerPC Linux: -fPIC or -dynamic
 	| osElfTarget os
 	, arch	== ArchPPC
-	= dopt Opt_PIC dflags || not (dopt Opt_Static dflags)
+	= gopt Opt_PIC dflags || not (gopt Opt_Static dflags)
 
 	-- i386 (and others?): -dynamic but not -fPIC
 	| osElfTarget os
 	, arch	/= ArchPPC_64
-	= not (dopt Opt_Static dflags) && not (dopt Opt_PIC dflags)
+	= not (gopt Opt_Static dflags) && not (gopt Opt_PIC dflags)
 
 	| otherwise
 	= False
@@ -455,7 +455,7 @@ gotLabel
 -- However, for PIC on x86, we need a small helper function.
 pprGotDeclaration :: DynFlags -> Arch -> OS -> SDoc
 pprGotDeclaration dflags ArchX86 OSDarwin
-	| dopt Opt_PIC dflags
+	| gopt Opt_PIC dflags
 	= vcat [
 	        ptext (sLit ".section __TEXT,__textcoal_nt,coalesced,no_toc"),
 	        ptext (sLit ".weak_definition ___i686.get_pc_thunk.ax"),
@@ -475,7 +475,7 @@ pprGotDeclaration _ _ OSDarwin
 pprGotDeclaration dflags arch os
 	| osElfTarget os
 	, arch	/= ArchPPC_64
-	, not (dopt Opt_PIC dflags)
+	, not (gopt Opt_PIC dflags)
 	= empty
 
 	| osElfTarget os
@@ -499,7 +499,7 @@ pprGotDeclaration _ _ _
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
 pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC, platformOS = OSDarwin }) importedLbl
 	| Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
-	= case dopt Opt_PIC dflags of
+	= case gopt Opt_PIC dflags of
            False ->
             vcat [
                 ptext (sLit ".symbol_stub"),
@@ -553,7 +553,7 @@ pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC, platformOS
 		
 pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
 	| Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
-	= case dopt Opt_PIC dflags of
+	= case gopt Opt_PIC dflags of
            False ->
             vcat [
                 ptext (sLit ".symbol_stub"),
@@ -586,7 +586,7 @@ pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS
                     ptext (sLit "\tjmp dyld_stub_binding_helper")
             ]
 	  $+$ vcat [        ptext (sLit ".section __DATA, __la_sym_ptr")
-                    <> (if dopt Opt_PIC dflags then int 2 else int 3)
+                    <> (if gopt Opt_PIC dflags then int 2 else int 3)
                     <> ptext (sLit ",lazy_symbol_pointers"),
 	        ptext (sLit "L") <> pprCLabel platform lbl <> ptext (sLit "$lazy_ptr:"),
 	            ptext (sLit "\t.indirect_symbol") <+> pprCLabel platform lbl,
@@ -622,7 +622,7 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --    section.
 --    The "official" GOT mechanism (label@got) isn't intended to be used
 --    in position dependent code, so we have to create our own "fake GOT"
---    when not Opt_PIC && not (dopt Opt_Static dflags).
+--    when not Opt_PIC && not (gopt Opt_Static dflags).
 --
 -- 2) PowerPC Linux is just plain broken.
 --    While it's theoretically possible to use GOT offsets larger

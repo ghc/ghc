@@ -272,7 +272,7 @@ pprOccName (OccName sp occ)
 	         | otherwise      = empty
 
     pp_occ = sdocWithDynFlags $ \dflags ->
-             if dopt Opt_SuppressUniques dflags
+             if gopt Opt_SuppressUniques dflags
              then text (strip_th_unique (unpackFS occ))
              else ftext occ
 

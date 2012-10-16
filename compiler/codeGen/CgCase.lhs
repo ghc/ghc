@@ -653,7 +653,7 @@ saveCurrentCostCentre ::
 
 saveCurrentCostCentre
   = do dflags <- getDynFlags
-       if not (dopt Opt_SccProfilingOn dflags)
+       if not (gopt Opt_SccProfilingOn dflags)
            then returnFC (Nothing, noStmts)
            else do slot <- allocPrimStack PtrArg
                    sp_rel <- getSpRelOffset slot

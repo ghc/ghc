@@ -814,7 +814,7 @@ dynLoadObjs dflags objs = do
     let -- When running TH for a non-dynamic way, we still need to make
         -- -l flags to link against the dynamic libraries, so we turn
         -- Opt_Static off
-        dflags1 = dopt_unset dflags Opt_Static
+        dflags1 = gopt_unset dflags Opt_Static
         dflags2 = dflags1 {
                       -- We don't want to link the ldInputs in; we'll
                       -- be calling dynLoadObjs with any objects that

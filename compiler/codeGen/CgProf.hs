@@ -139,11 +139,11 @@ enterCostCentreFun ccs closure vols =
 ifProfiling :: Code -> Code
 ifProfiling code
     = do dflags <- getDynFlags
-         if dopt Opt_SccProfilingOn dflags then code else nopC
+         if gopt Opt_SccProfilingOn dflags then code else nopC
 
 ifProfilingL :: DynFlags -> [a] -> [a]
 ifProfilingL dflags xs
-  | dopt Opt_SccProfilingOn dflags = xs
+  | gopt Opt_SccProfilingOn dflags = xs
   | otherwise                      = []
 
 -- ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ sizeof_ccs_words dflags
 emitSetCCC :: CostCentre -> Bool -> Bool -> Code
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
-      if dopt Opt_SccProfilingOn dflags
+      if gopt Opt_SccProfilingOn dflags
           then do tmp <- newTemp (bWord dflags) -- TODO FIXME NOW
                   pushCostCentre tmp curCCS cc
                   when tick $ stmtC (bumpSccCount dflags (CmmReg (CmmLocal tmp)))

@@ -296,7 +296,7 @@ genCondJump bid bool = do
 
 genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
 genSwitch dflags expr ids
-        | dopt Opt_PIC dflags
+        | gopt Opt_PIC dflags
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise

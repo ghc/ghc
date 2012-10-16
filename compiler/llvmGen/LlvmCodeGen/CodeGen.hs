@@ -1261,7 +1261,7 @@ funPrologue dflags = concat $ map getReg $ activeStgRegs platform
 funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
 
 -- Have information and liveness optimisation is enabled
-funEpilogue env (Just live) | dopt Opt_RegLiveness dflags = do
+funEpilogue env (Just live) | gopt Opt_RegLiveness dflags = do
     loads <- mapM loadExpr (activeStgRegs platform)
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)

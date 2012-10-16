@@ -276,7 +276,7 @@ saveThreadState dflags =
   mkStore (cmmOffset dflags (CmmLoad (cmmOffset dflags stgCurrentTSO (tso_stackobj dflags)) (bWord dflags)) (stack_SP dflags)) stgSp
   <*> closeNursery dflags
   -- and save the current cost centre stack in the TSO when profiling:
-  <*> if dopt Opt_SccProfilingOn dflags then
+  <*> if gopt Opt_SccProfilingOn dflags then
         mkStore (cmmOffset dflags stgCurrentTSO (tso_CCCS dflags)) curCCS
       else mkNop
 
@@ -308,7 +308,7 @@ loadThreadState dflags tso stack = do
                                     (rESERVED_STACK_WORDS dflags)),
         openNursery dflags,
         -- and load the current cost centre stack from the TSO when profiling:
-        if dopt Opt_SccProfilingOn dflags then
+        if gopt Opt_SccProfilingOn dflags then
           storeCurCCS
             (CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) (ccsType dflags))
         else mkNop]

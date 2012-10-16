@@ -53,7 +53,7 @@ dsListComp lquals res_ty = do
                    [elt_ty] -> elt_ty
                    _ -> pprPanic "dsListComp" (ppr res_ty $$ ppr lquals)
 
-    if not (dopt Opt_EnableRewriteRules dflags) || dopt Opt_IgnoreInterfacePragmas dflags
+    if not (gopt Opt_EnableRewriteRules dflags) || gopt Opt_IgnoreInterfacePragmas dflags
        -- Either rules are switched off, or we are ignoring what there are;
        -- Either way foldr/build won't happen, so use the more efficient
        -- Wadler-style desugaring

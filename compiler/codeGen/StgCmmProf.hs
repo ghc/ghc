@@ -133,7 +133,7 @@ saveCurrentCostCentre :: FCode (Maybe LocalReg)
 	-- Returns Nothing if profiling is off
 saveCurrentCostCentre
   = do dflags <- getDynFlags
-       if not (dopt Opt_SccProfilingOn dflags)
+       if not (gopt Opt_SccProfilingOn dflags)
            then return Nothing
            else do local_cc <- newTemp (ccType dflags)
                    emitAssign (CmmLocal local_cc) curCCS
@@ -196,13 +196,13 @@ enterCostCentreFun ccs closure =
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
   = do dflags <- getDynFlags
-       if dopt Opt_SccProfilingOn dflags
+       if gopt Opt_SccProfilingOn dflags
            then code
            else return ()
 
 ifProfilingL :: DynFlags -> [a] -> [a]
 ifProfilingL dflags xs
-  | dopt Opt_SccProfilingOn dflags = xs
+  | gopt Opt_SccProfilingOn dflags = xs
   | otherwise                      = []
 
 
@@ -214,7 +214,7 @@ initCostCentres :: CollectedCCs -> FCode ()
 -- Emit the declarations
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
   = do dflags <- getDynFlags
-       when (dopt Opt_SccProfilingOn dflags) $
+       when (gopt Opt_SccProfilingOn dflags) $
            do mapM_ emitCostCentreDecl local_CCs
               mapM_ emitCostCentreStackDecl singleton_CCSs
 
@@ -280,7 +280,7 @@ sizeof_ccs_words dflags
 emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
-      if not (dopt Opt_SccProfilingOn dflags)
+      if not (gopt Opt_SccProfilingOn dflags)
           then return ()
           else do tmp <- newTemp (ccsType dflags) -- TODO FIXME NOW
                   pushCostCentre tmp curCCS cc

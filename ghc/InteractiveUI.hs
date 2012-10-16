@@ -424,7 +424,7 @@ runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let
-   read_dot_files = not (dopt Opt_IgnoreDotGhci dflags)
+   read_dot_files = not (gopt Opt_IgnoreDotGhci dflags)
 
    current_dir = return (Just ".ghci")
 
@@ -519,7 +519,7 @@ runGHCi paths maybe_exprs = do
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
     dflags <- getDynFlags
-    histFile <- if dopt Opt_GhciHistory dflags
+    histFile <- if gopt Opt_GhciHistory dflags
                 then liftIO $ withGhcAppData (\dir -> return (Just (dir </> "ghci_history")))
                                              (return Nothing)
                 else return Nothing
@@ -990,7 +990,7 @@ noArgs _ _  = liftIO $ putStrLn "This command takes no arguments"
 withSandboxOnly :: String -> GHCi () -> GHCi ()
 withSandboxOnly cmd this = do
    dflags <- getDynFlags
-   if not (dopt Opt_GhciSandbox dflags)
+   if not (gopt Opt_GhciSandbox dflags)
       then printForUser (text cmd <+>
                          ptext (sLit "is not supported with -fno-ghci-sandbox"))
       else this
@@ -1017,7 +1017,7 @@ info s  = handleSourceError GHC.printException $ do
 infoThing :: GHC.GhcMonad m => String -> m SDoc
 infoThing str = do
     dflags    <- getDynFlags
-    let pefas = dopt Opt_PrintExplicitForalls dflags
+    let pefas = gopt Opt_PrintExplicitForalls dflags
     names     <- GHC.parseName str
     mb_stuffs <- mapM GHC.getInfo names
     let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
@@ -1407,7 +1407,7 @@ typeOfExpr str
   $ do
        ty <- GHC.exprType str
        dflags <- getDynFlags
-       let pefas = dopt Opt_PrintExplicitForalls dflags
+       let pefas = gopt Opt_PrintExplicitForalls dflags
        printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
 
 -----------------------------------------------------------------------------
@@ -1592,7 +1592,7 @@ browseModule bang modl exports_only = do
 
         rdr_env <- GHC.getGRE
 
-        let pefas              = dopt Opt_PrintExplicitForalls dflags
+        let pefas              = gopt Opt_PrintExplicitForalls dflags
             things | bang      = catMaybes mb_things
                    | otherwise = filtered_things
             pretty | bang      = pprTyThing
@@ -1908,10 +1908,10 @@ showDynFlags show_all dflags = do
   showLanguages' show_all dflags
   putStrLn $ showSDoc dflags $
      text "GHCi-specific dynamic flag settings:" $$
-         nest 2 (vcat (map (setting dopt) ghciFlags))
+         nest 2 (vcat (map (setting gopt) ghciFlags))
   putStrLn $ showSDoc dflags $
      text "other dynamic, non-language, flag settings:" $$
-         nest 2 (vcat (map (setting dopt) others))
+         nest 2 (vcat (map (setting gopt) others))
   putStrLn $ showSDoc dflags $
      text "warning settings:" $$
          nest 2 (vcat (map (setting wopt) DynFlags.fWarningFlags))
@@ -2184,7 +2184,7 @@ showBindings = do
     makeDoc (AnId i) = pprTypeAndContents i
     makeDoc tt = do
         dflags    <- getDynFlags
-        let pefas = dopt Opt_PrintExplicitForalls dflags
+        let pefas = gopt Opt_PrintExplicitForalls dflags
         mb_stuff <- GHC.getInfo (getName tt)
         return $ maybe (text "") (pprTT pefas) mb_stuff
     pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
@@ -2199,7 +2199,7 @@ showBindings = do
 
 printTyThing :: TyThing -> GHCi ()
 printTyThing tyth = do dflags <- getDynFlags
-                       let pefas = dopt Opt_PrintExplicitForalls dflags
+                       let pefas = gopt Opt_PrintExplicitForalls dflags
                        printForUser (pprTyThing pefas tyth)
 
 showBkptTable :: GHCi ()

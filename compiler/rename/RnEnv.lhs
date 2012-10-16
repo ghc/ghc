@@ -619,7 +619,7 @@ lookupOccRn_maybe rdr_name
          -- imports. We can and should instead check the qualified import
          -- but at the moment this requires some refactoring so leave as a TODO
        ; dflags <- getDynFlags
-       ; let allow_qual = dopt Opt_ImplicitImportQualified dflags &&
+       ; let allow_qual = gopt Opt_ImplicitImportQualified dflags &&
                           not (safeDirectImpsReq dflags)
        ; is_ghci <- getIsGHCi
                -- This test is not expensive,
@@ -1307,7 +1307,7 @@ checkDupAndShadowedNames envs names
 -------------------------------------
 checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
 checkShadowedOccs (global_env,local_env) loc_occs
-  = ifWOptM Opt_WarnNameShadowing $
+  = whenWOptM Opt_WarnNameShadowing $
     do  { traceRn (text "shadow" <+> ppr loc_occs)
         ; mapM_ check_shadow loc_occs }
   where
@@ -1359,7 +1359,7 @@ unboundName wl rdr = unboundNameX wl rdr empty
 
 unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
-  = do  { show_helpful_errors <- doptM Opt_HelpfulErrors
+  = do  { show_helpful_errors <- goptM Opt_HelpfulErrors
         ; let what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
               err = unknownNameErr what rdr_name $$ extra
         ; if not show_helpful_errors
@@ -1538,7 +1538,7 @@ mapFvRnCPS f (x:xs) cont = f x             $ \ x' ->
 \begin{code}
 warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
-    = ifWOptM Opt_WarnUnusedBinds
+    = whenWOptM Opt_WarnUnusedBinds
     $ do isBoot <- tcIsHsBoot
          let noParent gre = case gre_par gre of
                             NoParent -> True
@@ -1556,7 +1556,7 @@ warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
 
 check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()
 check_unused flag bound_names used_names
- = ifWOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
+ = whenWOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
 
 -------------------------
 --      Helpers

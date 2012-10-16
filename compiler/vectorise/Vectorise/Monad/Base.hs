@@ -132,7 +132,7 @@ traceVt herald doc
 --
 dumpOptVt :: GeneralFlag -> String -> SDoc -> VM ()
 dumpOptVt flag header doc 
-  = do { b <- liftDs $ doptM flag
+  = do { b <- liftDs $ goptM flag
        ; if b 
          then dumpVt header doc 
          else return () 

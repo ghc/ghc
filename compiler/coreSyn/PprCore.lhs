@@ -119,7 +119,7 @@ ppr_expr add_par (Cast expr co)
          ptext (sLit "`cast`") <+> pprCo co]
   where
     pprCo co = sdocWithDynFlags $ \dflags ->
-               if dopt Opt_SuppressCoercions dflags
+               if gopt Opt_SuppressCoercions dflags
                then ptext (sLit "...")
                else parens $
                         sep [ppr co, dcolon <+> pprEqPred (coercionKind co)]
@@ -157,7 +157,7 @@ ppr_expr add_par expr@(App {})
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
-    if dopt Opt_PprCaseAsLet dflags
+    if gopt Opt_PprCaseAsLet dflags
     then add_par $
          sep [sep    [ ptext (sLit "let")
                              <+> char '{'
@@ -252,7 +252,7 @@ ppr_case_pat con args
 pprArg :: OutputableBndr a => Expr a -> SDoc
 pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
-   if dopt Opt_SuppressTypeApplications dflags
+   if gopt Opt_SuppressTypeApplications dflags
    then empty
    else ptext (sLit "@") <+> pprParendType ty
 pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
@@ -293,7 +293,7 @@ pprTypedLamBinder bind_site debug_on var
       | not debug_on && isDeadBinder var       -> char '_'
       | not debug_on, CaseBind <- bind_site    -> -- No parens, no kind info
                                                   pprUntypedBinder var
-      | dopt Opt_SuppressTypeSignatures dflags -> -- Suppress the signature
+      | gopt Opt_SuppressTypeSignatures dflags -> -- Suppress the signature
                                                   pprUntypedBinder var
       | isTyVar var                            -> parens (pprKindedTyVarBndr var)
       | otherwise ->
@@ -311,7 +311,7 @@ pprTypedLetBinder binder
     case () of
     _
       | isTyVar binder                         -> pprKindedTyVarBndr binder
-      | dopt Opt_SuppressTypeSignatures dflags -> pprIdBndr binder
+      | gopt Opt_SuppressTypeSignatures dflags -> pprIdBndr binder
       | otherwise                              -> hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc
@@ -327,7 +327,7 @@ pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
-    if dopt Opt_SuppressIdInfo dflags
+    if gopt Opt_SuppressIdInfo dflags
     then empty
     else megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
   where
@@ -358,7 +358,7 @@ pprIdBndrInfo info
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
   = sdocWithDynFlags $ \dflags ->
-    if dopt Opt_SuppressIdInfo dflags
+    if gopt Opt_SuppressIdInfo dflags
     then empty
     else
     showAttributes

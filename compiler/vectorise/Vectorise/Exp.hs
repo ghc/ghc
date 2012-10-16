@@ -47,7 +47,7 @@ import Control.Monad
 import Control.Applicative
 import Data.Maybe
 import Data.List
-import TcRnMonad (doptM)
+import TcRnMonad (goptM)
 import DynFlags
 import Util
 
@@ -65,7 +65,7 @@ vectPolyExpr :: Bool -> [Var] -> CoreExprWithFVs -> Maybe VITree
   -- precompute vectorisation avoidance information (and possibly encapsulated subexpressions)
 vectPolyExpr loop_breaker recFns expr Nothing
   = do
-    { vectAvoidance <- liftDs $ doptM Opt_AvoidVect
+    { vectAvoidance <- liftDs $ goptM Opt_AvoidVect
     ; vi <- vectAvoidInfo expr  
     ; (expr', vi') <- 
         if vectAvoidance

@@ -142,8 +142,8 @@ endPass dflags pass binds rules
        ; lintPassResult dflags pass binds }      
   where
     mb_flag = case coreDumpFlag pass of
-                Just flag | dopt flag dflags                    -> Just flag
-                          | dopt Opt_D_verbose_core2core dflags -> Just flag
+                Just flag | gopt flag dflags                    -> Just flag
+                          | gopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
 dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
@@ -180,7 +180,7 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
 
 lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
 lintPassResult dflags pass binds
-  = when (dopt Opt_DoCoreLinting dflags) $
+  = when (gopt Opt_DoCoreLinting dflags) $
     do { let (warns, errs) = lintCoreBindings binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
@@ -384,7 +384,7 @@ dumpSimplPhase dflags mode
    | Just spec_string <- shouldDumpSimplPhase dflags
    = match_spec spec_string
    | otherwise
-   = dopt Opt_D_verbose_core2core dflags
+   = gopt Opt_D_verbose_core2core dflags
 
   where
     match_spec :: String -> Bool
@@ -510,7 +510,7 @@ simplCountN (SimplCount { ticks = n }) = n
 zeroSimplCount dflags
 		-- This is where we decide whether to do
 		-- the VerySimpl version or the full-stats version
-  | dopt Opt_D_dump_simpl_stats dflags
+  | gopt Opt_D_dump_simpl_stats dflags
   = SimplCount {ticks = 0, details = Map.empty,
                 n_log = 0, log1 = [], log2 = []}
   | otherwise

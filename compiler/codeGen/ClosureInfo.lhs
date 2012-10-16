@@ -579,7 +579,7 @@ nodeMustPointToIt _ (LFCon _) = True
 	-- 27/11/92.
 
 nodeMustPointToIt dflags (LFThunk _ no_fvs updatable NonStandardThunk _)
-  = updatable || not no_fvs || dopt Opt_SccProfilingOn dflags
+  = updatable || not no_fvs || gopt Opt_SccProfilingOn dflags
 	  -- For the non-updatable (single-entry case):
 	  --
 	  -- True if has fvs (in which case we need access to them, and we
@@ -651,7 +651,7 @@ getCallMethod :: DynFlags
 	      -> CallMethod
 
 getCallMethod dflags _ _ lf_info _
-  | nodeMustPointToIt dflags lf_info && dopt Opt_Parallel dflags
+  | nodeMustPointToIt dflags lf_info && gopt Opt_Parallel dflags
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
@@ -666,7 +666,7 @@ getCallMethod dflags name caf (LFReEntrant _ arity _ _) n_args
 getCallMethod dflags _ _ (LFCon con) n_args
   -- when profiling, we must always enter a closure when we use it, so
   -- that the closure can be recorded as used for LDV profiling.
-  | dopt Opt_SccProfilingOn dflags
+  | gopt Opt_SccProfilingOn dflags
   = EnterIt
   | otherwise
   = ASSERT( n_args == 0 )
@@ -689,7 +689,7 @@ getCallMethod _dflags _name _caf (LFThunk _ _ _updatable _std_form_info is_fun) 
     -- So the right thing to do is just to enter the thing
 
 -- Old version:
---  | updatable || dopt Opt_Ticky dflags -- to catch double entry
+--  | updatable || gopt Opt_Ticky dflags -- to catch double entry
 --  = EnterIt
 --  | otherwise	-- Jump direct to code for single-entry thunks
 --  = JumpToIt (thunkEntryLabel name caf std_form_info updatable)

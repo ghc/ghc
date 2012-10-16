@@ -102,7 +102,7 @@ errors (like (Eq a)).  Often the latter are a knock-on effect of the former.
 reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
   = do { binds_var <- newTcEvBinds
-       ; defer <- doptM Opt_DeferTypeErrors
+       ; defer <- goptM Opt_DeferTypeErrors
        ; report_unsolved (Just binds_var) defer wanted
        ; getTcEvBinds binds_var }
 

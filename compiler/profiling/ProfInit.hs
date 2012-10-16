@@ -24,7 +24,7 @@ import Module
 profilingInitCode :: Module -> CollectedCCs -> SDoc
 profilingInitCode this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
  = sdocWithDynFlags $ \dflags ->
-   if not (dopt Opt_SccProfilingOn dflags)
+   if not (gopt Opt_SccProfilingOn dflags)
    then empty
    else vcat
     [ text "static void prof_init_" <> ppr this_mod

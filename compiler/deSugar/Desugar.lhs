@@ -108,9 +108,9 @@ deSugar hsc_env
                                Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
 
-                     let want_ticks = dopt Opt_Hpc dflags
+                     let want_ticks = gopt Opt_Hpc dflags
                                    || target == HscInterpreted
-                                   || (dopt Opt_SccProfilingOn dflags
+                                   || (gopt Opt_SccProfilingOn dflags
                                        && case profAuto dflags of
                                             NoProfAuto -> False
                                             _          -> True)
@@ -129,7 +129,7 @@ deSugar hsc_env
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
                           ; let hpc_init
-                                  | dopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
+                                  | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
@@ -357,7 +357,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
 
-        ; lhs' <- unsetDOptM Opt_EnableRewriteRules $
+        ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 

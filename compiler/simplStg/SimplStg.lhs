@@ -16,7 +16,7 @@ import StgLint          ( lintStgBindings )
 import StgStats         ( showStgStats )
 import UnariseStg       ( unarise )
 
-import DynFlags         ( DynFlags(..), GeneralFlag(..), dopt, StgToDo(..),
+import DynFlags         ( DynFlags(..), GeneralFlag(..), gopt, StgToDo(..),
                           getStgToDo )
 import Module           ( Module )
 import ErrUtils
@@ -56,7 +56,7 @@ stg2stg dflags module_name binds
    }
 
   where
-    stg_linter = if dopt Opt_DoStgLinting dflags
+    stg_linter = if gopt Opt_DoStgLinting dflags
                  then lintStgBindings
                  else ( \ _whodunnit binds -> binds )
 

@@ -263,8 +263,8 @@ Command-line flags
 xoptM :: ExtensionFlag -> TcRnIf gbl lcl Bool
 xoptM flag = do { dflags <- getDynFlags; return (xopt flag dflags) }
 
-doptM :: GeneralFlag -> TcRnIf gbl lcl Bool
-doptM flag = do { dflags <- getDynFlags; return (dopt flag dflags) }
+goptM :: GeneralFlag -> TcRnIf gbl lcl Bool
+goptM flag = do { dflags <- getDynFlags; return (gopt flag dflags) }
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
 woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
@@ -273,26 +273,26 @@ setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-unsetDOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-                            env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetGOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = gopt_unset (hsc_dflags top) flag}} )
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
                             env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
-ifDOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifDOptM flag thing_inside = do b <- doptM flag
-                               when b thing_inside
+whenGOptM :: GeneralFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenGOptM flag thing_inside = do b <- goptM flag
+                                 when b thing_inside
 
-ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifWOptM flag thing_inside = do b <- woptM flag
-                               when b thing_inside
+whenWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenWOptM flag thing_inside = do b <- woptM flag
+                                 when b thing_inside
 
-ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifXOptM flag thing_inside = do b <- xoptM flag
-                               when b thing_inside
+whenXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+whenXOptM flag thing_inside = do b <- xoptM flag
+                                 when b thing_inside
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
@@ -438,13 +438,13 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 
 traceOptIf :: GeneralFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
-traceOptIf flag doc = ifDOptM flag $
+traceOptIf flag doc = whenGOptM flag $
                           do dflags <- getDynFlags
                              liftIO (printInfoForUser dflags alwaysQualify doc)
 
 traceOptTcRn :: GeneralFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
-traceOptTcRn flag doc = ifDOptM flag $ do
+traceOptTcRn flag doc = whenGOptM flag $ do
                         { loc  <- getSrcSpanM
                         ; let real_doc
                                 | opt_PprStyle_Debug = mkLocMessage SevInfo loc doc
@@ -462,7 +462,7 @@ debugDumpTcRn doc | opt_NoDebugOutput = return ()
                   | otherwise         = dumpTcRn doc
 
 dumpOptTcRn :: GeneralFlag -> SDoc -> TcRn ()
-dumpOptTcRn flag doc = ifDOptM flag (dumpTcRn doc)
+dumpOptTcRn flag doc = whenGOptM flag (dumpTcRn doc)
 \end{code}
 
 
@@ -654,7 +654,7 @@ reportWarning warn
 dumpDerivingInfo :: SDoc -> TcM ()
 dumpDerivingInfo doc
   = do { dflags <- getDynFlags
-       ; when (dopt Opt_D_dump_deriv dflags) $ do
+       ; when (gopt Opt_D_dump_deriv dflags) $ do
        { rdr_env <- getGlobalRdrEnv
        ; let unqual = mkPrintUnqualified dflags rdr_env
        ; liftIO (putMsgWith dflags unqual doc) } }
@@ -1262,7 +1262,7 @@ forkM_maybe doc thing_inside
                     -- Bleat about errors in the forked thread, if -ddump-if-trace is on
                     -- Otherwise we silently discard errors. Errors can legitimately
                     -- happen when compiling interface signatures (see tcInterfaceSigs)
-                      ifDOptM Opt_D_dump_if_trace $ do
+                      whenGOptM Opt_D_dump_if_trace $ do
                           dflags <- getDynFlags
                           let msg = hang (text "forkM failed:" <+> doc)
                                        2 (text (show exn))

@@ -291,7 +291,7 @@ just more arguments that we are passing on the stack (cml_args).
 slowArgs :: DynFlags -> [(ArgRep, Maybe CmmExpr)] -> [(ArgRep, Maybe CmmExpr)]
 slowArgs _ [] = []
 slowArgs dflags args -- careful: reps contains voids (V), but args does not
-  | dopt Opt_SccProfilingOn dflags
+  | gopt Opt_SccProfilingOn dflags
               = save_cccs ++ this_pat ++ slowArgs dflags rest_args
   | otherwise =              this_pat ++ slowArgs dflags rest_args
   where
@@ -547,7 +547,7 @@ stdInfoTableSizeW dflags
   = size_fixed + size_prof
   where
     size_fixed = 2	-- layout, type
-    size_prof | dopt Opt_SccProfilingOn dflags = 2
+    size_prof | gopt Opt_SccProfilingOn dflags = 2
 	      | otherwise	   = 0
 
 stdInfoTableSizeB  :: DynFlags -> ByteOff

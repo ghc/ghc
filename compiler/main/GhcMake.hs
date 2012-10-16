@@ -283,7 +283,7 @@ load how_much = do
           -- that main() is going to come from somewhere else.
           --
           let ofile = outputFile dflags
-          let no_hs_main = dopt Opt_NoHsMain dflags
+          let no_hs_main = gopt Opt_NoHsMain dflags
           let 
             main_mod = mainModIs dflags
             a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
@@ -562,7 +562,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
            && all bco_ok scc
 
         object_ok ms
-          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
                                          && same_as_prev t
           | otherwise = False
@@ -582,7 +582,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
                 -- a problem.
 
         bco_ok ms
-          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupUFM hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) && 
@@ -1414,7 +1414,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
                 | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
                   -- note: local_opts is only required if there's no Unlit phase
                 | xopt Opt_Cpp dflags'          = True
-                | dopt Opt_Pp  dflags'          = True
+                | gopt Opt_Pp  dflags'          = True
                 | otherwise                     = False
 
         when needs_preprocessing $

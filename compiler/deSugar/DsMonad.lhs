@@ -9,7 +9,7 @@
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
         initDs, initDsTc, fixDs,
-        foldlM, foldrM, ifDOptM, unsetDOptM, unsetWOptM,
+        foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM,
         Applicative(..),(<$>),
 
         newLocalName,
@@ -220,7 +220,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
     --   * 'Data.Array.Parallel.Prim' iff '-fvectorise' specified.
     loadDAP thing_inside
       = do { dapEnv  <- loadOneModule dATA_ARRAY_PARALLEL_NAME      checkLoadDAP          paErr
-           ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (doptM Opt_Vectorise) veErr
+           ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (goptM Opt_Vectorise) veErr
            ; updGblEnv (\env -> env {ds_dph_env = dapEnv `plusOccEnv` dappEnv }) thing_inside
            }
       where

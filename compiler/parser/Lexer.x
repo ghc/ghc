@@ -1967,7 +1967,7 @@ mkPState flags buf loc =
                .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
                .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
                .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
-               .|. haddockBit                  `setBitIf` dopt Opt_Haddock                  flags
+               .|. haddockBit                  `setBitIf` gopt Opt_Haddock                  flags
                .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
                .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
                .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
@@ -1976,11 +1976,11 @@ mkPState flags buf loc =
                .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
                .|. transformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
                .|. transformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
-               .|. rawTokenStreamBit           `setBitIf` dopt Opt_KeepRawTokenStream       flags
-               .|. hpcBit                      `setBitIf` dopt Opt_Hpc                      flags
+               .|. rawTokenStreamBit           `setBitIf` gopt Opt_KeepRawTokenStream       flags
+               .|. hpcBit                      `setBitIf` gopt Opt_Hpc                      flags
                .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
                .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
-               .|. sccProfilingOnBit           `setBitIf` dopt Opt_SccProfilingOn           flags
+               .|. sccProfilingOnBit           `setBitIf` gopt Opt_SccProfilingOn           flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
@@ -2333,7 +2333,7 @@ reportLexError loc1 loc2 buf str
 
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
-    where dflags' = dopt_set (dopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
+    where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
           initState = mkPState dflags' buf loc
           go = do
             ltok <- lexer return

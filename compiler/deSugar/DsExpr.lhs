@@ -297,7 +297,7 @@ dsExpr (ExplicitTuple tup_args boxity)
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
     mod_name <- getModuleDs
-    count <- doptM Opt_ProfCountEntries
+    count <- goptM Opt_ProfCountEntries
     uniq <- newUnique
     Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
 
@@ -687,8 +687,8 @@ dsExplicitList elt_ty xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
-       ; if dopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
-         || not (dopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
+       ; if gopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
+         || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
                 -- See Note [Desugaring RULE left hand sides] in Desugar
          || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!

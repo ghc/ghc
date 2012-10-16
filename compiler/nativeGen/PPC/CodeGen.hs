@@ -1162,7 +1162,7 @@ genCCall' dflags gcp target dest_regs argsAndHints
 
 genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
 genSwitch dflags expr ids
-  | dopt Opt_PIC dflags
+  | gopt Opt_PIC dflags
   = do
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat II32
@@ -1196,7 +1196,7 @@ generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
     let jumpTable
-            | dopt Opt_PIC dflags = map jumpTableEntryRel ids
+            | gopt Opt_PIC dflags = map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
                 where jumpTableEntryRel Nothing
                         = CmmStaticLit (CmmInt 0 (wordWidth dflags))

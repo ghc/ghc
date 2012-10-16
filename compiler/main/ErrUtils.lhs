@@ -93,7 +93,7 @@ mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
   -- would look strange.  Better to say explicitly "<no location info>".
 mkLocMessage severity locn msg
     = sdocWithDynFlags $ \dflags ->
-      let locn' = if dopt Opt_ErrorSpans dflags
+      let locn' = if gopt Opt_ErrorSpans dflags
                   then ppr locn
                   else ppr (srcSpanStart locn)
       in hang (locn' <> colon <+> sev_info) 4 msg
@@ -194,7 +194,7 @@ doIfSet flag action | flag      = action
                     | otherwise = return ()
 
 doIfSet_dyn :: DynFlags -> GeneralFlag -> IO () -> IO()
-doIfSet_dyn dflags flag action | dopt flag dflags = action
+doIfSet_dyn dflags flag action | gopt flag dflags = action
                                | otherwise        = return ()
 
 -- -----------------------------------------------------------------------------
@@ -207,7 +207,7 @@ dumpIfSet dflags flag hdr doc
 
 dumpIfSet_dyn :: DynFlags -> GeneralFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | dopt flag dflags || verbosity dflags >= 4
+  | gopt flag dflags || verbosity dflags >= 4
   = dumpSDoc dflags flag hdr doc
   | otherwise
   = return ()
@@ -264,7 +264,7 @@ dumpSDoc dflags flag hdr doc
 chooseDumpFile :: DynFlags -> GeneralFlag -> Maybe String
 chooseDumpFile dflags flag
 
-        | dopt Opt_DumpToFile dflags
+        | gopt Opt_DumpToFile dflags
         , Just prefix <- getPrefix
         = Just $ setDir (prefix ++ (beautifyDumpName flag))
 

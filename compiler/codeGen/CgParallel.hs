@@ -40,7 +40,7 @@ doGranAllocate :: CmmExpr -> Code
 -- macro DO_GRAN_ALLOCATE
 doGranAllocate _hp
   = do dflags <- getDynFlags
-       when (dopt Opt_GranMacros dflags) $ panic "doGranAllocate"
+       when (gopt Opt_GranMacros dflags) $ panic "doGranAllocate"
 
 
 
@@ -52,7 +52,7 @@ granFetchAndReschedule :: [(Id,GlobalReg)]  -- Live registers
 granFetchAndReschedule regs node_reqd
   = do dflags <- getDynFlags
        let liveness = mkRegLiveness dflags regs 0 0
-       when (dopt Opt_GranMacros dflags &&
+       when (gopt Opt_GranMacros dflags &&
              (node `elem` map snd regs || node_reqd)) $
            do fetch
               reschedule liveness node_reqd
@@ -90,7 +90,7 @@ granYield :: [(Id,GlobalReg)]   -- Live registers
 granYield regs node_reqd
   = do dflags <- getDynFlags
        let liveness = mkRegLiveness dflags regs 0 0
-       when (dopt Opt_GranMacros dflags && node_reqd) $ yield liveness
+       when (gopt Opt_GranMacros dflags && node_reqd) $ yield liveness
 
 yield :: StgWord -> Code
 yield _liveness = panic "granYield"

@@ -91,9 +91,9 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         --      intermediate structures in the allocator - otherwise tell the
         --      allocator to ditch them early so we don't end up creating space leaks.
         let dump = or
-                [ dopt Opt_D_dump_asm_regalloc_stages dflags
-                , dopt Opt_D_dump_asm_stats dflags
-                , dopt Opt_D_dump_asm_conflicts dflags ]
+                [ gopt Opt_D_dump_asm_regalloc_stages dflags
+                , gopt Opt_D_dump_asm_stats dflags
+                , gopt Opt_D_dump_asm_conflicts dflags ]
 
         -- check that we're not running off down the garden path.
         when (spinCount > maxSpinCount)
@@ -137,7 +137,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         let (graph_colored, rsSpill, rmCoalesce)
                         = {-# SCC "ColorGraph" #-}
                            Color.colorGraph
-                                (dopt Opt_RegsIterative dflags)
+                                (gopt Opt_RegsIterative dflags)
                                 spinCount
                                 regsFree triv spill graph
 
@@ -160,7 +160,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
          then do
                 -- if -fasm-lint is turned on then validate the graph
                 let graph_colored_lint  =
-                        if dopt Opt_DoAsmLinting dflags
+                        if gopt Opt_DoAsmLinting dflags
                                 then Color.validateGraph (text "")
                                         True    -- require all nodes to be colored
                                         graph_colored
@@ -205,7 +205,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
          else do
                 -- if -fasm-lint is turned on then validate the graph
                 let graph_colored_lint  =
-                        if dopt Opt_DoAsmLinting dflags
+                        if gopt Opt_DoAsmLinting dflags
                                 then Color.validateGraph (text "")
                                         False   -- don't require nodes to be colored
                                         graph_colored

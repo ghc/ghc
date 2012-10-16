@@ -120,16 +120,16 @@ getCoreToDo dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
-    strictness    = dopt Opt_Strictness                   dflags
-    full_laziness = dopt Opt_FullLaziness                 dflags
-    do_specialise = dopt Opt_Specialise                   dflags
-    do_float_in   = dopt Opt_FloatIn                      dflags
-    cse           = dopt Opt_CSE                          dflags
-    spec_constr   = dopt Opt_SpecConstr                   dflags
-    liberate_case = dopt Opt_LiberateCase                 dflags
-    static_args   = dopt Opt_StaticArgumentTransformation dflags
-    rules_on      = dopt Opt_EnableRewriteRules           dflags
-    eta_expand_on = dopt Opt_DoLambdaEtaExpansion         dflags
+    strictness    = gopt Opt_Strictness                   dflags
+    full_laziness = gopt Opt_FullLaziness                 dflags
+    do_specialise = gopt Opt_Specialise                   dflags
+    do_float_in   = gopt Opt_FloatIn                      dflags
+    cse           = gopt Opt_CSE                          dflags
+    spec_constr   = gopt Opt_SpecConstr                   dflags
+    liberate_case = gopt Opt_LiberateCase                 dflags
+    static_args   = gopt Opt_StaticArgumentTransformation dflags
+    rules_on      = gopt Opt_EnableRewriteRules           dflags
+    eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -157,12 +157,12 @@ getCoreToDo dflags
           --  We need to eliminate these common sub expressions before their definitions
           --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings,
           --  so we also run simpl_gently to inline them.
-      ++  (if dopt Opt_Vectorise dflags && phase == 3
+      ++  (if gopt Opt_Vectorise dflags && phase == 3
             then [CoreCSE, simpl_gently]
             else [])
 
     vectorisation
-      = runWhen (dopt Opt_Vectorise dflags) $
+      = runWhen (gopt Opt_Vectorise dflags) $
           CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
 
                 -- By default, we have 2 phases before phase 0.
@@ -497,7 +497,7 @@ simplifyExpr dflags expr
         ; (expr', counts) <- initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
 
-        ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (gopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -560,7 +560,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts')
            <- do_iteration us 1 [] binds rules
 
-        ; Err.dumpIfSet dflags (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (dump_phase && gopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics for following pass"
                   (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
                          blankLine,
@@ -676,7 +676,7 @@ end_iteration dflags pass iteration_no counts binds rules
   = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
        ; lintPassResult dflags pass binds }
   where
-    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
+    mb_flag | gopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
             | otherwise                               = Nothing
             -- Show details if Opt_D_dump_simpl_iterations is on
 

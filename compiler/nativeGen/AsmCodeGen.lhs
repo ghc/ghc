@@ -287,7 +287,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
         return  ()
 
  where  add_split tops
-                | dopt Opt_SplitObjs dflags = split_marker : tops
+                | gopt Opt_SplitObjs dflags = split_marker : tops
                 | otherwise                 = tops
 
         split_marker = CmmProc mapEmpty mkSplitMarkerLabel (ListGraph [])
@@ -356,8 +356,8 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
            -- and then using 'seq' doesn't work, because the let
            -- apparently gets inlined first.
         lsPprNative <- return $!
-                if  dopt Opt_D_dump_asm       dflags
-                 || dopt Opt_D_dump_asm_stats dflags
+                if  gopt Opt_D_dump_asm       dflags
+                 || gopt Opt_D_dump_asm_stats dflags
                         then native
                         else []
 
@@ -432,8 +432,8 @@ cmmNativeGen dflags ncgImpl us cmm count
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear) <-
-         if ( dopt Opt_RegsGraph dflags
-           || dopt Opt_RegsIterative dflags)
+         if ( gopt Opt_RegsGraph dflags
+           || gopt Opt_RegsIterative dflags)
           then do
                 -- the regs usable for allocation
                 let (alloc_regs :: UniqFM (UniqSet RealReg))
@@ -466,7 +466,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =
-                        if dopt Opt_D_dump_asm_stats dflags
+                        if gopt Opt_D_dump_asm_stats dflags
                          then Just regAllocStats else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak
@@ -498,7 +498,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
                 let mPprStats =
-                        if dopt Opt_D_dump_asm_stats dflags
+                        if gopt Opt_D_dump_asm_stats dflags
                          then Just (catMaybes regAllocStats) else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak
@@ -1024,15 +1024,15 @@ cmmExprNative referenceKind expr = do
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | arch == ArchPPC && not (dopt Opt_PIC dflags)
+          | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | arch == ArchPPC && not (dopt Opt_PIC dflags)
+          | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
-          | arch == ArchPPC && not (dopt Opt_PIC dflags)
+          | arch == ArchPPC && not (gopt Opt_PIC dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 

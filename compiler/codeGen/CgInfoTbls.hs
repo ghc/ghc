@@ -74,7 +74,7 @@ mkCmmInfo cl_info
                               cit_prof = prof dflags,
                               cit_srt  = closureSRT cl_info })
   where
-    prof dflags | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
+    prof dflags | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
                 | otherwise = ProfilingInfo ty_descr_w8 val_descr_w8
     ty_descr_w8  = stringToWord8s (closureTypeDescr cl_info)
     val_descr_w8 = stringToWord8s (closureValDescr cl_info)
@@ -254,7 +254,7 @@ stdInfoTableSizeW dflags
   = size_fixed + size_prof
   where
     size_fixed = 2	-- layout, type
-    size_prof | dopt Opt_SccProfilingOn dflags = 2
+    size_prof | gopt Opt_SccProfilingOn dflags = 2
               | otherwise                      = 0
 
 stdInfoTableSizeB :: DynFlags -> ByteOff

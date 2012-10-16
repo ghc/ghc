@@ -235,7 +235,7 @@ instance Exception GhcApiError
 -- -Werror is enabled, or print them out otherwise.
 printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
 printOrThrowWarnings dflags warns
-  | dopt Opt_WarnIsError dflags
+  | gopt Opt_WarnIsError dflags
   = when (not (isEmptyBag warns)) $ do
       throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg dflags
   | otherwise

@@ -22,7 +22,7 @@ module GHC (
         needsTemplateHaskell,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), dopt,
+        DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
         GhcMode(..), GhcLink(..), defaultObjectTarget,
         parseDynamicFlags,
         getSessionDynFlags, setSessionDynFlags,

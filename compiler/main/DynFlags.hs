@@ -21,9 +21,9 @@ module DynFlags (
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
-        dopt,
-        dopt_set,
-        dopt_unset,
+        gopt,
+        gopt_set,
+        gopt_unset,
         wopt,
         wopt_set,
         wopt_unset,
@@ -1355,16 +1355,16 @@ languageExtensions (Just Haskell2010)
        Opt_RelaxedPolyRec]
 
 -- | Test whether a 'GeneralFlag' is set
-dopt :: GeneralFlag -> DynFlags -> Bool
-dopt f dflags  = fromEnum f `IntSet.member` flags dflags
+gopt :: GeneralFlag -> DynFlags -> Bool
+gopt f dflags  = fromEnum f `IntSet.member` flags dflags
 
 -- | Set a 'GeneralFlag'
-dopt_set :: DynFlags -> GeneralFlag -> DynFlags
-dopt_set dfs f = dfs{ flags = IntSet.insert (fromEnum f) (flags dfs) }
+gopt_set :: DynFlags -> GeneralFlag -> DynFlags
+gopt_set dfs f = dfs{ flags = IntSet.insert (fromEnum f) (flags dfs) }
 
 -- | Unset a 'GeneralFlag'
-dopt_unset :: DynFlags -> GeneralFlag -> DynFlags
-dopt_unset dfs f = dfs{ flags = IntSet.delete (fromEnum f) (flags dfs) }
+gopt_unset :: DynFlags -> GeneralFlag -> DynFlags
+gopt_unset dfs f = dfs{ flags = IntSet.delete (fromEnum f) (flags dfs) }
 
 -- | Test whether a 'WarningFlag' is set
 wopt :: WarningFlag -> DynFlags -> Bool
@@ -1413,7 +1413,7 @@ dynFlagDependencies = pluginModNames
 
 -- | Is the -fpackage-trust mode on
 packageTrustOn :: DynFlags -> Bool
-packageTrustOn = dopt Opt_PackageTrust
+packageTrustOn = gopt Opt_PackageTrust
 
 -- | Is Safe Haskell on in some way (including inference mode)
 safeHaskellOn :: DynFlags -> Bool
@@ -1604,11 +1604,11 @@ updOptLevel n dfs
   = dfs2{ optLevel = final_n }
   where
    final_n = max 0 (min 2 n)    -- Clamp to 0 <= n <= 2
-   dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
-   dfs2 = foldr (flip dopt_set)   dfs1 extra_dopts
+   dfs1 = foldr (flip gopt_unset) dfs  remove_gopts
+   dfs2 = foldr (flip gopt_set)   dfs1 extra_gopts
 
-   extra_dopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
-   remove_dopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
+   extra_gopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
+   remove_gopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
 
 -- -----------------------------------------------------------------------------
 -- StgToDo:  abstraction of stg-to-stg passes to run.
@@ -1623,7 +1623,7 @@ getStgToDo :: DynFlags -> [StgToDo]
 getStgToDo dflags
   = todo2
   where
-        stg_stats = dopt Opt_StgStats dflags
+        stg_stats = gopt Opt_StgStats dflags
 
         todo1 = if stg_stats then [D_stg_stats] else []
 
@@ -1728,7 +1728,7 @@ safeFlagCheck cmdl dflags =
 
         -- throw error if -fpackage-trust by itself with no safe haskell flag
         False | not cmdl && packageTrustOn dflags
-              -> (dopt_unset dflags' Opt_PackageTrust,
+              -> (gopt_unset dflags' Opt_PackageTrust,
                   [L (pkgTrustOnLoc dflags') $
                       "-fpackage-trust ignored;" ++
                       " must be specified with a Safe Haskell flag"]
@@ -2823,8 +2823,8 @@ removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
-setGeneralFlag   f = upd (\dfs -> dopt_set dfs f)
-unSetGeneralFlag f = upd (\dfs -> dopt_unset dfs f)
+setGeneralFlag   f = upd (\dfs -> gopt_set dfs f)
+unSetGeneralFlag f = upd (\dfs -> gopt_unset dfs f)
 
 --------------------------
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
@@ -3115,10 +3115,10 @@ picCCOpts dflags
           --     Don't generate "common" symbols - these are unwanted
           --     in dynamic libraries.
 
-       | dopt Opt_PIC dflags -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
+       | gopt Opt_PIC dflags -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
        | otherwise           -> ["-mdynamic-no-pic"]
       OSMinGW32 -- no -fPIC for Windows
-       | dopt Opt_PIC dflags -> ["-U __PIC__", "-D__PIC__"]
+       | gopt Opt_PIC dflags -> ["-U __PIC__", "-D__PIC__"]
        | otherwise           -> []
       _
       -- we need -fPIC for C files when we are compiling with -dynamic,
@@ -3126,13 +3126,13 @@ picCCOpts dflags
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
-       | dopt Opt_PIC dflags || not (dopt Opt_Static dflags) ->
+       | gopt Opt_PIC dflags || not (gopt Opt_Static dflags) ->
           ["-fPIC", "-U __PIC__", "-D__PIC__"]
        | otherwise                             -> []
 
 picPOpts :: DynFlags -> [String]
 picPOpts dflags
- | dopt Opt_PIC dflags = ["-U __PIC__", "-D__PIC__"]
+ | gopt Opt_PIC dflags = ["-U __PIC__", "-D__PIC__"]
  | otherwise           = []
 
 -- -----------------------------------------------------------------------------
@@ -3232,7 +3232,7 @@ makeDynFlagsConsistent dflags
         in loop dflags' warn
  | hscTarget dflags == HscLlvm &&
    not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
-   (not (dopt Opt_Static dflags) || dopt Opt_PIC dflags)
+   (not (gopt Opt_Static dflags) || gopt Opt_PIC dflags)
     = if cGhcWithNativeCodeGen == "YES"
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Using native code generator rather than LLVM, as LLVM is incompatible with -fPIC and -dynamic on this platform"
@@ -3240,8 +3240,8 @@ makeDynFlagsConsistent dflags
       else ghcError $ CmdLineError "Can't use -fPIC or -dynamic on this platform"
  | os == OSDarwin &&
    arch == ArchX86_64 &&
-   not (dopt Opt_PIC dflags)
-    = loop (dopt_set dflags Opt_PIC)
+   not (gopt Opt_PIC dflags)
+    = loop (gopt_set dflags Opt_PIC)
            "Enabling -fPIC as it is always on for this platform"
  | otherwise = (dflags, [])
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")

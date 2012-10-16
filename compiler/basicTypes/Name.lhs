@@ -466,7 +466,7 @@ pprExternal sty uniq mod occ name is_wired is_builtin
   | otherwise                   = pprModulePrefix sty mod name <> ppr_occ_name occ
   where
     pp_mod = sdocWithDynFlags $ \dflags ->
-             if dopt Opt_SuppressModulePrefixes dflags
+             if gopt Opt_SuppressModulePrefixes dflags
              then empty
              else ppr mod <> dot
 
@@ -496,7 +496,7 @@ pprModulePrefix :: PprStyle -> Module -> Name -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in HscTypes
 pprModulePrefix sty mod name = sdocWithDynFlags $ \dflags ->
-  if dopt Opt_SuppressModulePrefixes dflags
+  if gopt Opt_SuppressModulePrefixes dflags
   then empty
   else
     case qualName sty name of              -- See Outputable.QualifyName:
@@ -511,7 +511,7 @@ ppr_underscore_unique :: Unique -> SDoc
 -- But suppress it if we aren't printing the uniques anyway
 ppr_underscore_unique uniq
   = sdocWithDynFlags $ \dflags ->
-    if dopt Opt_SuppressUniques dflags
+    if gopt Opt_SuppressUniques dflags
     then empty
     else char '_' <> pprUnique uniq
 

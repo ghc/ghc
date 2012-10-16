@@ -197,7 +197,7 @@ performTailCall fun_info arg_amodes pending_assts
     -- Test if closure is a constructor
     maybeSwitchOnCons dflags enterClosure eob
               | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
-                not (dopt Opt_SccProfilingOn dflags)
+                not (gopt Opt_SccProfilingOn dflags)
                 -- we can't shortcut when profiling is on, because we have
                 -- to enter a closure to mark it as "used" for LDV profiling
               = do { is_constr <- newLabelC

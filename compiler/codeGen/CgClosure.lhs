@@ -482,8 +482,8 @@ emitBlackHoleCode is_single_entry = do
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from CmmParse.
 
-  let  eager_blackholing =  not (dopt Opt_SccProfilingOn dflags)
-                         && dopt Opt_EagerBlackHoling dflags
+  let  eager_blackholing =  not (gopt Opt_SccProfilingOn dflags)
+                         && gopt Opt_EagerBlackHoling dflags
              -- Profiling needs slop filling (to support LDV
              -- profiling), so currently eager blackholing doesn't
              -- work with profiling.
@@ -515,8 +515,8 @@ setupUpdate closure_info code
           tickyPushUpdateFrame
           dflags <- getDynFlags
           if blackHoleOnEntry closure_info &&
-             not (dopt Opt_SccProfilingOn dflags) &&
-             dopt Opt_EagerBlackHoling dflags
+             not (gopt Opt_SccProfilingOn dflags) &&
+             gopt Opt_EagerBlackHoling dflags
                then pushBHUpdateFrame (CmmReg nodeReg) code
                else pushUpdateFrame   (CmmReg nodeReg) code
   

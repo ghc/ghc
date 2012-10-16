@@ -159,7 +159,7 @@ emitPrimOp dflags [res] GetCCSOfOp [arg] _live
   = stmtC (CmmAssign (CmmLocal res) val)
   where
     val
-     | dopt Opt_SccProfilingOn dflags = costCentreFrom dflags (cmmUntag dflags arg)
+     | gopt Opt_SccProfilingOn dflags = costCentreFrom dflags (cmmUntag dflags arg)
      | otherwise                      = CmmLit (zeroCLit dflags)
 
 emitPrimOp _      [res] GetCurrentCCSOp [_dummy_arg] _live

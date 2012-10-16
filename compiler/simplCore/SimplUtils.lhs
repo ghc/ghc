@@ -497,8 +497,8 @@ simplEnvForGHCi dflags
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case = True }
   where
-    rules_on      = dopt Opt_EnableRewriteRules   dflags
-    eta_expand_on = dopt Opt_DoLambdaEtaExpansion dflags
+    rules_on      = gopt Opt_EnableRewriteRules   dflags
+    eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
    -- Do not do any inlining, in case we expose some unboxed
    -- tuple stuff that confuses the bytecode interpreter
 
@@ -816,7 +816,7 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
   | not active                               = False
   | isStableUnfolding (idUnfolding bndr)     = False -- Note [InlineRule and preInlineUnconditionally]
   | isTopLevel top_lvl && isBottomingId bndr = False -- Note [Top-level bottoming Ids]
-  | not (dopt Opt_SimplPreInlining dflags)   = False
+  | not (gopt Opt_SimplPreInlining dflags)   = False
   | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
   | otherwise = case idOccInfo bndr of
                   IAmDead                    -> True -- Happens in ((\x.1) v)
@@ -1073,7 +1073,7 @@ mkLam _env bndrs body
         (bndrs1, body1) = collectBinders body
 
     mkLam' dflags bndrs body
-      | dopt Opt_DoEtaReduction dflags
+      | gopt Opt_DoEtaReduction dflags
       , Just etad_lam <- tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
@@ -1597,7 +1597,7 @@ mkCase, mkCase1, mkCase2
 --------------------------------------------------
 
 mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
-  | dopt Opt_CaseMerge dflags
+  | gopt Opt_CaseMerge dflags
   , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
   , inner_scrut_var == outer_bndr
   = do  { tick (CaseMerge outer_bndr)

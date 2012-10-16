@@ -183,7 +183,7 @@ rnImportDecl this_mod
         Just (False, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
-           | otherwise  -> ifWOptM Opt_WarnMissingImportList $
+           | otherwise  -> whenWOptM Opt_WarnMissingImportList $
                            addWarn (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
@@ -314,7 +314,7 @@ rnImportDecl this_mod
                    }
 
     -- Complain if we import a deprecated module
-    ifWOptM Opt_WarnWarningsDeprecations (
+    whenWOptM Opt_WarnWarningsDeprecations (
        case warns of
           WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
@@ -651,11 +651,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
              return [ (L loc ie, avail) | (ie,avail) <- stuff ]
         where
             -- Warn when importing T(..) if T was exported abstractly
-            emit_warning (DodgyImport n) = ifWOptM Opt_WarnDodgyImports $
+            emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
               addWarn (dodgyImportWarn n)
-            emit_warning MissingImportList = ifWOptM Opt_WarnMissingImportList $
+            emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
               addWarn (missingImportListItem ieRdr)
-            emit_warning BadImportW = ifWOptM Opt_WarnDodgyImports $
+            emit_warning BadImportW = whenWOptM Opt_WarnDodgyImports $
               addWarn (lookup_err_msg BadImport)
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
@@ -1307,10 +1307,10 @@ warnUnusedImportDecls gbl_env
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
                        , ptext (sLit "Import usage") <+> ppr usage])
-       ; ifWOptM Opt_WarnUnusedImports $
+       ; whenWOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
-       ; ifDOptM Opt_D_dump_minimal_imports $
+       ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
     explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME

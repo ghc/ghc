@@ -1183,7 +1183,7 @@ conRepresentibleWithH98Syntax
 chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
 chooseBoxingStrategy dflags arg_ty bang
   = case initial_choice of
-      HsUnpack | dopt Opt_OmitInterfacePragmas dflags
+      HsUnpack | gopt Opt_OmitInterfacePragmas dflags
                -> HsStrict
       _other   -> initial_choice
        -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
@@ -1195,7 +1195,7 @@ chooseBoxingStrategy dflags arg_ty bang
   where
     initial_choice = case bang of
 	               HsNoBang -> HsNoBang
-	               HsStrict | dopt Opt_UnboxStrictFields dflags
+	               HsStrict | gopt Opt_UnboxStrictFields dflags
                                 -> can_unbox HsStrict arg_ty
                                 | otherwise -> HsStrict
                        HsNoUnpack -> HsStrict

@@ -1014,7 +1014,7 @@ traceFireTcS :: Ct -> SDoc -> TcS ()
 -- Dump a rule-firing trace
 traceFireTcS ct doc 
   = TcS $ \env -> 
-    TcM.ifDOptM Opt_D_dump_cs_trace $ 
+    TcM.whenGOptM Opt_D_dump_cs_trace $ 
     do { n <- TcM.readTcRef (tcs_count env)
        ; let msg = int n <> brackets (int (ctLocDepth (cc_loc ct))) <+> doc
        ; TcM.dumpTcRn msg }

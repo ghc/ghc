@@ -85,7 +85,7 @@ cpsTop hsc_env proc =
                   return call_pps
 
        let noncall_pps = proc_points `setDifference` call_pps
-       when (not (setNull noncall_pps) && dopt Opt_D_dump_cmmz dflags) $
+       when (not (setNull noncall_pps) && gopt Opt_D_dump_cmmz dflags) $
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Sink and inline assignments *before* stack layout -----------
@@ -163,7 +163,7 @@ cpsTop hsc_env proc =
            = mapM_ (dumpWith dflags flag name)
 
         condPass flag pass g dumpflag dumpname =
-            if dopt flag dflags
+            if gopt flag dflags
                then do
                     g <- return $ pass g
                     dump dumpflag dumpname g
@@ -186,7 +186,7 @@ runUniqSM m = do
 
 dumpGraph :: DynFlags -> GeneralFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
-  when (dopt Opt_DoCmmLinting dflags) $ do_lint g
+  when (gopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
   do_lint g = case cmmLintGraph dflags g of
@@ -201,6 +201,6 @@ dumpWith dflags flag txt g = do
          -- them into files."  Also, -ddump-cmmz doesn't play nicely
          -- with -ddump-to-file, since the headers get omitted.
    dumpIfSet_dyn dflags flag txt (ppr g)
-   when (not (dopt flag dflags)) $
+   when (not (gopt flag dflags)) $
       dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
 

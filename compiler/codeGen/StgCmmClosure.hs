@@ -400,7 +400,7 @@ nodeMustPointToIt _ (LFCon _) = True
 	-- 27/11/92.
 
 nodeMustPointToIt dflags (LFThunk _ no_fvs updatable NonStandardThunk _)
-  = updatable || not no_fvs || dopt Opt_SccProfilingOn dflags
+  = updatable || not no_fvs || gopt Opt_SccProfilingOn dflags
 	  -- For the non-updatable (single-entry case):
 	  --
 	  -- True if has fvs (in which case we need access to them, and we
@@ -472,7 +472,7 @@ getCallMethod :: DynFlags
 	      -> CallMethod
 
 getCallMethod dflags _name _ lf_info _n_args
-  | nodeMustPointToIt dflags lf_info && dopt Opt_Parallel dflags
+  | nodeMustPointToIt dflags lf_info && gopt Opt_Parallel dflags
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
@@ -496,7 +496,7 @@ getCallMethod dflags name caf (LFThunk _ _ updatable std_form_info is_fun) n_arg
 		-- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || dopt Opt_Ticky dflags -- to catch double entry
+  | updatable || gopt Opt_Ticky dflags -- to catch double entry
       {- OLD: || opt_SMP
 	 I decided to remove this, because in SMP mode it doesn't matter
 	 if we enter the same thunk multiple times, so the optimisation
@@ -852,7 +852,7 @@ enterIdLabel dflags id c
 
 mkProfilingInfo :: DynFlags -> Id -> String -> ProfilingInfo
 mkProfilingInfo dflags id val_descr
-  | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
+  | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
   | otherwise = ProfilingInfo ty_descr_w8 val_descr_w8
   where
     ty_descr_w8  = stringToWord8s (getTyDescription (idType id))
@@ -899,7 +899,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
 
    cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
 
-   prof | not (dopt Opt_SccProfilingOn dflags) = NoProfilingInfo
+   prof | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
         | otherwise                            = ProfilingInfo ty_descr val_descr
 
    ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con

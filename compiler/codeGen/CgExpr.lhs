@@ -396,7 +396,7 @@ mkRhsClosure dflags bndr cc bi
  	&& all isFollowableArg (map idCgRep fvs) 
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE dflags
-        && not (dopt Opt_SccProfilingOn dflags)
+        && not (gopt Opt_SccProfilingOn dflags)
                                   -- not when profiling: we don't want to
                                   -- lose information about this particular
                                   -- thunk (e.g. its type) (#949)

@@ -215,7 +215,7 @@ emitSaveThreadState = do
                               (stack_SP dflags)) stgSp
   emitCloseNursery
   -- and save the current cost centre stack in the TSO when profiling:
-  when (dopt Opt_SccProfilingOn dflags) $
+  when (gopt Opt_SccProfilingOn dflags) $
         stmtC (CmmStore (cmmOffset dflags stgCurrentTSO (tso_CCCS dflags)) curCCS)
 
    -- CurrentNursery->free = Hp+1;
@@ -246,7 +246,7 @@ emitLoadThreadState = do
     ]
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
-  when (dopt Opt_SccProfilingOn dflags) $
+  when (gopt Opt_SccProfilingOn dflags) $
         stmtC $ storeCurCCS $
                   CmmLoad (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) (bWord dflags)
 

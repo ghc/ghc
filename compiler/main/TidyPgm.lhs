@@ -307,8 +307,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               })
 
   = do  { let { dflags     = hsc_dflags hsc_env
-              ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
-              ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
+              ; omit_prags = gopt Opt_OmitInterfacePragmas dflags
+              ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; th         = xopt Opt_TemplateHaskell      dflags
               ; data_kinds = xopt Opt_DataKinds            dflags
               ; no_trim_types = th || data_kinds
@@ -373,14 +373,14 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-        ; unless (dopt Opt_D_dump_simpl dflags) $
+        ; unless (gopt Opt_D_dump_simpl dflags) $
             Err.dumpIfSet_dyn dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> ptext (sLit "rules")))
               (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
-        ; when (dopt Opt_D_dump_core_stats dflags)
+        ; when (gopt Opt_D_dump_core_stats dflags)
                (log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
                           (ptext (sLit "Tidy size (terms,types,coercions)")
                            <+> ppr (moduleName mod) <> colon

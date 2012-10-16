@@ -185,7 +185,7 @@ because they don't support cross package data references well.
 
 buildDynCon' dflags platform binder _ con [arg_amode]
   | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
+  , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE dflags && val_int >= mIN_INTLIKE dflags
@@ -197,7 +197,7 @@ buildDynCon' dflags platform binder _ con [arg_amode]
 
 buildDynCon' dflags platform binder _ con [arg_amode]
   | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not (dopt Opt_PIC dflags)
+  , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE dflags && val_int >= mIN_CHARLIKE dflags
@@ -324,7 +324,7 @@ cgReturnDataCon con amodes = do
   if isUnboxedTupleCon con then returnUnboxedTuple amodes
   -- when profiling we can't shortcut here, we have to enter the closure
   -- for it to be marked as "used" for LDV profiling.
-   else if dopt Opt_SccProfilingOn dflags then build_it_then (enter_it dflags)
+   else if gopt Opt_SccProfilingOn dflags then build_it_then (enter_it dflags)
    else ASSERT( amodes `lengthIs` dataConRepRepArity con )
      do { EndOfBlockInfo _ sequel <- getEndOfBlockInfo
         ; case sequel of
