@@ -798,4 +798,9 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg)
     dtraceUserMsg(cap->no, msg);
 }
 
+void dtraceUserMarkerWrapper(Capability *cap, char *msg)
+{
+    dtraceUserMarker(cap->no, msg);
+}
+
 #endif /* !defined(DEBUG) && !defined(TRACING) && defined(DTRACE) */
