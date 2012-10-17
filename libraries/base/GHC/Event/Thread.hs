@@ -98,25 +98,42 @@ threadWait evt fd = mask_ $ do
     else return ()
 
 
-threadWaitSTM :: Event -> Fd -> IO (STM ())
+threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
   m <- newTVarIO Nothing
   Just mgr <- getSystemEventManager 
-  registerFd mgr (\reg e -> unregisterFd_ mgr reg >> atomically (writeTVar m (Just e))) fd evt
-  return (do mevt <- readTVar m
-             case mevt of
-               Nothing -> retry
-               Just evt -> 
-                 if evt `eventIs` evtClose
-                 then throwSTM $ errnoToIOError "threadWait" eBADF Nothing Nothing
-                 else return ()
-         )
+  reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> atomically (writeTVar m (Just e))) fd evt
+  let waitAction =
+        do mevt <- readTVar m
+           case mevt of
+             Nothing -> retry
+             Just evt -> 
+               if evt `eventIs` evtClose
+               then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
+               else return ()
+  return (waitAction, unregisterFd_ mgr reg >> return ())
 
-threadWaitReadSTM :: Fd -> IO (STM ())
+-- | Allows a thread to use an STM action to wait for a file descriptor to be readable.
+-- The STM action will retry until the file descriptor has data ready.
+-- The second element of the return value pair is an IO action that can be used
+-- to deregister interest in the file descriptor. 
+--
+-- The STM action will throw an 'IOError' if the file descriptor was closed
+-- while the STM action is being executed.  To safely close a file descriptor
+-- that has been used with 'threadWaitReadSTM', use 'closeFdWith'.
+threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM = threadWaitSTM evtRead
 {-# INLINE threadWaitReadSTM #-}
 
-threadWaitWriteSTM :: Fd -> IO (STM ())
+-- | Allows a thread to use an STM action to wait until a file descriptor can accept a write.
+-- The STM action will retry while the file until the given file descriptor can accept a write.
+-- The second element of the return value pair is an IO action that can be used to deregister
+-- interest in the file descriptor. 
+--
+-- The STM action will throw an 'IOError' if the file descriptor was closed
+-- while the STM action is being executed.  To safely close a file descriptor
+-- that has been used with 'threadWaitWriteSTM', use 'closeFdWith'.
+threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM = threadWaitSTM evtWrite
 {-# INLINE threadWaitWriteSTM #-}
 
