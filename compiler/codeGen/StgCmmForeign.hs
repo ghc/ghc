@@ -213,7 +213,7 @@ emitForeignCall safety results target args
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
     k <- newLabelC
-    let (off, copyout) = copyInOflow dflags NativeReturn (Young k) results []
+    let (off, _, copyout) = copyInOflow dflags NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     emit $
            (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth dflags)))

@@ -105,7 +105,7 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 -- | Returns the info table associated with the CmmDecl's entry point,
 -- if any.
 topInfoTable :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> Maybe i
-topInfoTable (CmmProc infos _ (ListGraph (b:_)))
+topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
   = mapLookup (blockId b) infos
 topInfoTable _
   = Nothing
@@ -118,8 +118,8 @@ cmmMapGraph    :: (g -> g') -> GenCmmGroup d h g -> GenCmmGroup d h g'
 cmmMapGraph f tops = map (cmmTopMapGraph f) tops
 
 cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
-cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
-cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
+cmmTopMapGraph f (CmmProc h l v g) = CmmProc h l v (f g)
+cmmTopMapGraph _ (CmmData s ds)    = CmmData s ds
 
 -----------------------------------------------------------------------------
 --              CmmStmt

@@ -847,8 +847,8 @@ elimStackStores stackmap stackmaps area_off nodes
 
 
 setInfoTableStackMap :: DynFlags -> BlockEnv StackMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l g)
-  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l g
+setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l v g)
+  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }

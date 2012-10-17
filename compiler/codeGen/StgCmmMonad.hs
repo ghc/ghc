@@ -713,12 +713,12 @@ emitProcWithStackFrame
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { dflags <- getDynFlags
-        ; emitProc_ mb_info lbl blocks (widthInBytes (wordWidth dflags)) False
+        ; emitProc_ mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args blocks True -- do layout
   = do  { dflags <- getDynFlags
-        ; let (offset, entry) = mkCallEntry dflags conv args stk_args
-        ; emitProc_ mb_info lbl (entry <*> blocks) offset True
+        ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
+        ; emitProc_ mb_info lbl live (entry <*> blocks) offset True
         }
 emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
 
@@ -729,13 +729,13 @@ emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
 emitProcWithConvention conv mb_info lbl args blocks
   = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
-emitProc :: Maybe CmmInfoTable -> CLabel -> CmmAGraph -> Int -> FCode ()
-emitProc  mb_info lbl blocks offset
- = emitProc_ mb_info lbl blocks offset True
+emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraph -> Int -> FCode ()
+emitProc  mb_info lbl live blocks offset
+ = emitProc_ mb_info lbl live blocks offset True
 
-emitProc_ :: Maybe CmmInfoTable -> CLabel -> CmmAGraph -> Int -> Bool
+emitProc_ :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraph -> Int -> Bool
           -> FCode ()
-emitProc_ mb_info lbl blocks offset do_layout
+emitProc_ mb_info lbl live blocks offset do_layout
   = do  { dflags <- getDynFlags
         ; l <- newLabelC
         ; let
@@ -751,7 +751,7 @@ emitProc_ mb_info lbl blocks offset do_layout
               tinfo = TopInfo { info_tbls = infos
                               , stack_info=sinfo}
 
-              proc_block = CmmProc tinfo lbl blks
+              proc_block = CmmProc tinfo lbl live blks
 
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
@@ -795,7 +795,7 @@ mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   dflags <- getDynFlags
   k <- newLabelC
   let area = Young k
-      (off, copyin) = copyInOflow dflags retConv area results []
+      (off, _, copyin) = copyInOflow dflags retConv area results []
       copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
   return (copyout <*> mkLabel k <*> copyin)
 

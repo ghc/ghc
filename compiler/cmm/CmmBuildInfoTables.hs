@@ -250,7 +250,7 @@ to_SRT dflags top_srt off len bmp
 -- any CAF that is reachable from c.
 localCAFInfo :: CAFEnv -> CmmDecl -> (CAFSet, Maybe CLabel)
 localCAFInfo _      (CmmData _ _) = (Set.empty, Nothing)
-localCAFInfo cafEnv proc@(CmmProc _ top_l (CmmGraph {g_entry=entry})) =
+localCAFInfo cafEnv proc@(CmmProc _ top_l _ (CmmGraph {g_entry=entry})) =
   case topInfoTable proc of
     Just (CmmInfoTable { cit_rep = rep })
       | not (isStaticRep rep) && not (isStackRep rep)
@@ -295,7 +295,7 @@ bundle :: Map CLabel CAFSet
        -> (CAFEnv, CmmDecl)
        -> (CAFSet, Maybe CLabel)
        -> (BlockEnv CAFSet, CmmDecl)
-bundle flatmap (env, decl@(CmmProc infos lbl g)) (closure_cafs, mb_lbl)
+bundle flatmap (env, decl@(CmmProc infos lbl _ g)) (closure_cafs, mb_lbl)
   = ( mapMapWithKey get_cafs (info_tbls infos), decl )
  where
   entry = g_entry g
@@ -371,8 +371,8 @@ buildSRTs dflags top_srt caf_map
 -}
 
 updInfoSRTs :: BlockEnv C_SRT -> CmmDecl -> CmmDecl
-updInfoSRTs srt_env (CmmProc top_info top_l g) =
-  CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}) top_l g
+updInfoSRTs srt_env (CmmProc top_info top_l live g) =
+  CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}) top_l live g
   where updInfoTbl l info_tbl
              = info_tbl { cit_srt = expectJust "updInfo" $ mapLookup l srt_env }
 updInfoSRTs _ t = t

@@ -41,7 +41,7 @@ llvmCodeGen dflags h us cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
                       foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
-        split p@(CmmProc _ l _) (d,e) =
+        split p@(CmmProc _ l _ _) (d,e) =
             let lbl = strCLabel_llvm env $ case topInfoTable p of
                         Nothing                   -> l
                         Just (Statics info_lbl _) -> info_lbl
@@ -129,7 +129,7 @@ cmmProcLlvmGens dflags h _ _ [] _ ivars
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
  = cmmProcLlvmGens dflags h us env cmms count ivars
 
-cmmProcLlvmGens dflags h us env ((CmmProc _ _ (ListGraph [])) : cmms) count ivars
+cmmProcLlvmGens dflags h us env ((CmmProc _ _ _ (ListGraph [])) : cmms) count ivars
  = cmmProcLlvmGens dflags h us env cmms count ivars
 
 cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars = do

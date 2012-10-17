@@ -28,7 +28,7 @@ cmmCfgOpts :: Bool -> CmmGraph -> CmmGraph
 cmmCfgOpts split g = fst (blockConcat split g)
 
 cmmCfgOptsProc :: Bool -> CmmDecl -> CmmDecl
-cmmCfgOptsProc split (CmmProc info lbl g) = CmmProc info' lbl g'
+cmmCfgOptsProc split (CmmProc info lbl live g) = CmmProc info' lbl live g'
     where (g', env) = blockConcat split g
           info' = info{ info_tbls = new_info_tbls }
           new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))

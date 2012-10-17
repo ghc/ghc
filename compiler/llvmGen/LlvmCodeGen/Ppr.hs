@@ -83,7 +83,7 @@ pprLlvmCmmDecl :: LlvmEnv -> Int -> LlvmCmmDecl -> (SDoc, [LlvmVar])
 pprLlvmCmmDecl _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
+pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl _ (ListGraph blks))
   = let (idoc, ivar) = case mb_info of
                         Nothing -> (empty, [])
                         Just (Statics info_lbl dat)

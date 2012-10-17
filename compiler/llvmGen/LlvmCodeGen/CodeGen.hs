@@ -37,10 +37,10 @@ type LlvmStatements = OrdList LlvmStatement
 -- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: LlvmEnv -> RawCmmDecl -> UniqSM (LlvmEnv, [LlvmCmmDecl])
-genLlvmProc env proc0@(CmmProc _ lbl (ListGraph blocks)) = do
+genLlvmProc env proc0@(CmmProc _ lbl live (ListGraph blocks)) = do
     (env', lmblocks, lmdata) <- basicBlocksCodeGen env blocks ([], [])
     let info = topInfoTable proc0
-        proc = CmmProc info lbl (ListGraph lmblocks)
+        proc = CmmProc info lbl live (ListGraph lmblocks)
     return (env', proc:lmdata)
 
 genLlvmProc _ _ = panic "genLlvmProc: case that shouldn't reach here!"

@@ -32,8 +32,8 @@ expandTop :: NatCmmDecl CmmStatics Instr -> NatCmmDecl CmmStatics Instr
 expandTop top@(CmmData{})
 	= top
 
-expandTop (CmmProc info lbl (ListGraph blocks))
-	= CmmProc info lbl (ListGraph $ map expandBlock blocks)
+expandTop (CmmProc info lbl live (ListGraph blocks))
+	= CmmProc info lbl live (ListGraph $ map expandBlock blocks)
 
 
 -- | Expand out synthetic instructions in this block

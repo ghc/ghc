@@ -90,9 +90,9 @@ get_Regtable_addr_from_offset dflags _ offset =
 fixStgRegisters :: DynFlags -> RawCmmDecl -> RawCmmDecl
 fixStgRegisters _ top@(CmmData _ _) = top
 
-fixStgRegisters dflags (CmmProc info lbl (ListGraph blocks)) =
+fixStgRegisters dflags (CmmProc info lbl live (ListGraph blocks)) =
   let blocks' = map (fixStgRegBlock dflags) blocks
-  in CmmProc info lbl $ ListGraph blocks'
+  in CmmProc info lbl live $ ListGraph blocks'
 
 fixStgRegBlock :: DynFlags -> CmmBasicBlock -> CmmBasicBlock
 fixStgRegBlock dflags (BasicBlock id stmts) =

@@ -90,7 +90,7 @@ mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat)
   = return [CmmData sec dat]
 
-mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
+mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
   --
   -- in the non-tables-next-to-code case, procs can have at most a
   -- single info table associated with the entry label of the proc.
@@ -99,7 +99,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
   = case topInfoTable proc of   --  must be at most one
       -- no info table
       Nothing ->
-         return [CmmProc mapEmpty entry_lbl blocks]
+         return [CmmProc mapEmpty entry_lbl live blocks]
 
       Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
         (top_decls, (std_info, extra_bits)) <-
@@ -120,7 +120,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
              -- Separately emit info table (with the function entry
              -- point as first entry) and the entry code
              return (top_decls ++
-                     [CmmProc mapEmpty entry_lbl blocks,
+                     [CmmProc mapEmpty entry_lbl live blocks,
                       mkDataLits Data info_lbl
                          (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
@@ -134,7 +134,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl blocks)
   = do
     (top_declss, raw_infos) <- unzip `fmap` mapM do_one_info (mapToList infos)
     return (concat top_declss ++
-            [CmmProc (mapFromList raw_infos) entry_lbl blocks])
+            [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
 
   where
    do_one_info (lbl,itbl) = do

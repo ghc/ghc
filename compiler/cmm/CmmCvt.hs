@@ -19,7 +19,7 @@ import Outputable
 
 cmmOfZgraph :: CmmGroup -> Old.CmmGroup
 cmmOfZgraph tops = map mapTop tops
-  where mapTop (CmmProc h l g) = CmmProc (info_tbls h) l (ofZgraph g)
+  where mapTop (CmmProc h l v g) = CmmProc (info_tbls h) l v (ofZgraph g)
         mapTop (CmmData s ds) = CmmData s ds
 
 add_hints :: [a] -> [ForeignHint] -> [Old.CmmHinted a]

@@ -48,7 +48,7 @@ runCmmLint _ l p =
    Right _  -> Nothing
 
 lintCmmDecl :: DynFlags -> (GenCmmDecl h i (ListGraph CmmStmt)) -> CmmLint ()
-lintCmmDecl dflags (CmmProc _ lbl (ListGraph blocks))
+lintCmmDecl dflags (CmmProc _ lbl _ (ListGraph blocks))
   = addLintInfo (text "in proc " <> ppr lbl) $
         let labels = foldl (\s b -> setInsert (blockId b) s) setEmpty blocks
         in  mapM_ (lintCmmBlock dflags labels) blocks

@@ -693,7 +693,7 @@ initializePicBase_ppc
         -> NatM [NatCmmDecl CmmStatics PPC.Instr]
 
 initializePicBase_ppc ArchPPC os picReg
-    (CmmProc info lab (ListGraph blocks) : statics)
+    (CmmProc info lab live (ListGraph blocks) : statics)
     | osElfTarget os
     = do
         dflags <- getDynFlags
@@ -719,11 +719,11 @@ initializePicBase_ppc ArchPPC os picReg
                                : PPC.ADD picReg picReg (PPC.RIReg tmp)
                                : insns)
 
-        return (CmmProc info lab (ListGraph (b' : tail blocks)) : gotOffset : statics)
+        return (CmmProc info lab live (ListGraph (b' : tail blocks)) : gotOffset : statics)
 
 initializePicBase_ppc ArchPPC OSDarwin picReg
-        (CmmProc info lab (ListGraph blocks) : statics)
-        = return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
+        (CmmProc info lab live (ListGraph blocks) : statics)
+        = return (CmmProc info lab live (ListGraph (b':tail blocks)) : statics)
 
         where   BasicBlock bID insns = head blocks
                 b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
@@ -746,9 +746,9 @@ initializePicBase_x86
         -> NatM [NatCmmDecl (Alignment, CmmStatics) X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg
-        (CmmProc info lab (ListGraph blocks) : statics)
+        (CmmProc info lab live (ListGraph blocks) : statics)
     | osElfTarget os
-    = return (CmmProc info lab (ListGraph blocks') : statics)
+    = return (CmmProc info lab live (ListGraph blocks') : statics)
     where blocks' = case blocks of
                      [] -> []
                      (b:bs) -> fetchGOT b : map maybeFetchGOT bs
@@ -764,8 +764,8 @@ initializePicBase_x86 ArchX86 os picReg
              BasicBlock bID (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 ArchX86 OSDarwin picReg
-        (CmmProc info lab (ListGraph blocks) : statics)
-        = return (CmmProc info lab (ListGraph blocks') : statics)
+        (CmmProc info lab live (ListGraph blocks) : statics)
+        = return (CmmProc info lab live (ListGraph blocks') : statics)
 
     where blocks' = case blocks of
                      [] -> []

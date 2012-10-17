@@ -61,7 +61,7 @@ cpsTop hsc_env proc =
        -- later passes by removing lots of empty blocks, so we do it
        -- even when optimisation isn't turned on.
        --
-       CmmProc h l g <- {-# SCC "cmmCfgOpts(1)" #-}
+       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOptsProc splitting_proc_points proc
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
@@ -121,7 +121,7 @@ cpsTop hsc_env proc =
             dumpWith dflags Opt_D_dump_cmmz_procmap "procpoint map" pp_map
             gs <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
                   splitAtProcPoints dflags l call_pps proc_points pp_map
-                                    (CmmProc h l g)
+                                    (CmmProc h l v g)
             dumps Opt_D_dump_cmmz_split "Post splitting" gs
      
             ------------- Populate info tables with stack info -----------------
@@ -140,7 +140,7 @@ cpsTop hsc_env proc =
 
           else do
             -- attach info tables to return points
-            g <- return $ attachContInfoTables call_pps (CmmProc h l g)
+            g <- return $ attachContInfoTables call_pps (CmmProc h l v g)
 
             ------------- Populate info tables with stack info -----------------
             g <- {-# SCC "setInfoTableStackMap" #-}
