@@ -50,6 +50,7 @@ import Data.List
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Ord
+import Data.Time
 import Control.Monad
 import System.IO
 
@@ -232,9 +233,6 @@ dumpSDoc :: DynFlags -> GeneralFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
       case mFile of
-            -- write the dump to a file
-            -- don't add the header in this case, we can see what kind
-            -- of dump it is from the filename.
             Just fileName
                  -> do
                         let gdref = generatedDumps dflags
@@ -245,9 +243,13 @@ dumpSDoc dflags flag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
-                        let doc'
-                              | null hdr  = doc
-                              | otherwise = doc $$ blankLine
+                        doc' <- if null hdr
+                                then return doc
+                                else do t <- getCurrentTime
+                                        let d = text (show t)
+                                             $$ blankLine
+                                             $$ doc
+                                        return $ mkDumpDoc hdr d
                         defaultLogActionHPrintDoc dflags handle doc' defaultDumpStyle
                         hClose handle
 
