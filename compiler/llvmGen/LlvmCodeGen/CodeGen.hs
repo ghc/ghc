@@ -510,7 +510,7 @@ cmmPrimOpFunctions env mop
                           ++ " not supported here")
 
 -- | Tail function calls
-genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData
+genJump :: LlvmEnv -> CmmExpr -> [GlobalReg] -> UniqSM StmtData
 
 -- Call to known function
 genJump env (CmmLit (CmmLabel lbl)) live = do
@@ -1258,10 +1258,10 @@ funPrologue dflags = concat $ map getReg $ activeStgRegs platform
 
 -- | Function epilogue. Load STG variables to use as argument for call.
 -- STG Liveness optimisation done here.
-funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
+funEpilogue :: LlvmEnv -> [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
 
 -- Have information and liveness optimisation is enabled
-funEpilogue env (Just live) | gopt Opt_RegLiveness dflags = do
+funEpilogue env live | gopt Opt_RegLiveness dflags = do
     loads <- mapM loadExpr (activeStgRegs platform)
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)

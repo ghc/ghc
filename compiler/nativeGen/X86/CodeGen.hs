@@ -173,9 +173,8 @@ stmtToInstrs stmt = do
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
-jumpRegs :: DynFlags -> Maybe [GlobalReg] -> [Reg]
-jumpRegs dflags Nothing      = allHaskellArgRegs dflags
-jumpRegs dflags (Just gregs) = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
+jumpRegs :: DynFlags -> [GlobalReg] -> [Reg]
+jumpRegs dflags gregs = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
     where platform = targetPlatform dflags
 
 --------------------------------------------------------------------------------

@@ -156,7 +156,7 @@ data CmmStmt
 
   | CmmJump                       -- Jump to another C-- function,
       CmmExpr                       -- Target
-      (Maybe [GlobalReg])           -- Live registers at call site;
+      [GlobalReg]                   -- Live registers at call site;
                                     --      Nothing -> no information, assume
                                     --                 all live
                                     --      Just .. -> info on liveness, []
