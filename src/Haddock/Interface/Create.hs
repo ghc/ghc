@@ -34,7 +34,7 @@ import qualified Data.Traversable as T
 import qualified Packages
 import qualified Module
 import qualified SrcLoc
-import GHC hiding (flags)
+import GHC
 import HscTypes
 import Name
 import Bag

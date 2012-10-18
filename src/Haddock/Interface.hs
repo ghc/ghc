@@ -49,9 +49,9 @@ import System.FilePath
 import Text.Printf
 
 import Digraph
-import DynFlags hiding (verbosity, flags)
+import DynFlags hiding (verbosity)
 import Exception
-import GHC hiding (verbosity, flags)
+import GHC hiding (verbosity)
 import HscTypes
 
 
