@@ -2,7 +2,7 @@
 module Main where
 
 import Prelude hiding ( mod, id, mapM )
-import GHC hiding (flags)
+import GHC
 --import Packages
 import HscTypes         ( isBootSummary )
 import Digraph          ( flattenSCCs )
