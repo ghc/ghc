@@ -156,8 +156,10 @@ pOSITIVE_INFORMATION = lookUp $ fsLit "-fsupercompiler-positive-information"
 --    to arguments that have already been floated out by the previous GHC invocation), but this isn't useful
 --    in practice.
 
+-- TODO: tying back to preinits has become harder since we have to add both (f x) and (\x -> e) states
+-- to the cache since we no longer reduce before matching...
 pREINITALIZE_MEMO_TABLE :: Bool
-pREINITALIZE_MEMO_TABLE = lookUp $ fsLit "-fsupercompiler-preinitalize"
+pREINITALIZE_MEMO_TABLE = not $ lookUp $ fsLit "-fsupercompiler-no-preinitalize"
 
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)

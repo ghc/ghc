@@ -48,9 +48,9 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isTyVar, isId, tyVarKind, varType, setVarType)
-import Id         (idType, zapFragileIdInfo, localiseId, isDictId)
+import Id         (idType, zapFragileIdInfo, localiseId, isDictId, isGlobalId)
 import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
-import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
+import Coercion   (Coercion(..), isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
 import TyCon      (PrimRep(..))
 import Type       (Kind, isUnLiftedType, mkTyVarTy, eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
 import Kind       (isUnliftedTypeKind)
@@ -391,7 +391,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                  | otherwise = (killed, M.insert x' (fiddle hb) kept)
 
         -- Secondly, pull out any remaining bindings (which must be cheap) that didn't exist in the
-        -- unspeculated heap. These will be our new top-level bindings.
+        -- unspeculated heap. These will be our new top-level bindings (and are guaranteed to be LocalIds).
         h''_must_be_bound = [ (x', annedTermToFVedTerm (renameIn (renameAnnedTerm ids') in_e))
                             | (x', hb) <- M.toList h''
                             , not (x' `S.member` unfolding_bvs)
@@ -401,13 +401,18 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         
         -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
         -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
-        preinit_state = normalise (deeds', preinit_heap, Loco False, (rn, anned_e))
-        preinit_heap = Heap (M.filter heap_binding_is_cheap h' `M.union` h_fvs) ids'
+        preinit_h'_cheap = M.filter heap_binding_is_cheap h'
+        -- Global variables are SO ANNOYING. If we don't localise both the binding sites and the occurrence sites
+        -- then preinit tieback won't work.
+        preinit_rewrite (rn, e) = renamedTerm (rewriteGlobals (\x -> if x `M.member` preinit_h'_cheap then localiseId x else x) (renameAnnedTerm ids' rn e))
+        preinit_h_avail = M.map (\hb -> hb { heapBindingMeaning = fmap preinit_rewrite (heapBindingMeaning hb) }) (M.mapKeysMonotonic localiseVar preinit_h'_cheap)
+        preinit_state = normalise (deeds', preinit_heap, Loco False, preinit_rewrite (rn, anned_e))
+        preinit_heap = Heap (preinit_h_avail `M.union` h_fvs) ids'
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
         preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
-                       | (x', anned_e) <- h_unfoldings
-                       , (heap', accessor_e, anned_e') <- eta preinit_heap (var x') anned_e]
+                       | (x', in_e_def) <- h_unfoldings
+                       , (heap', accessor_e, anned_e') <- eta preinit_heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
 
         -- FIXME: instead of adding unfoldings as Let, (in order to sidestep the bug where Let stuff will be underspecialised)
         -- we should add it them as normal bindings but pre-initialise the memo cache. Of course this will be bad in the case
@@ -439,22 +444,63 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 -- lets in the body or maybe even simplify a case given the stuff in the heap. (NB: there this does not cause work dup.)
 -- I won't go as far as using "speculate" because in that case "eta" could potentially yield an infinite list
 -- (for some non-HM-typeable programs).
-eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
-eta heap accessor_e1 in_e = (heap, accessor_e1, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
+--
+-- NB: given an unfolding (f = \x y -> e) will return memo entries for all the states (\x y -> e), (\y -> e), e, f, (f x) and (f x y).
+-- Because we do not reduce before matching, both are necessary!
+eta :: Heap -> FVedTerm -> In AnnedTerm -> AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
+eta heap tieback_e1 in_e_def e_call = (heap, tieback_e1, in_e_def) : (heap, tieback_e1, renamedTerm e_call) : case normalise (maxBound, heap, Loco False, in_e_def) of
   (_, Heap h ids, k, anned_qa)
     | Answer (rn, v) <- extract anned_qa
     , Just a_cast <- isCastStack_maybe k
-    , let accessor_e2 = case a_cast of
-            Uncast      -> accessor_e1
-            CastBy co _ -> accessor_e1 `cast` mkSymCo ids co
-          mb_res@(~(Just (_, x, _))) = case v of
-             Lambda   x e_body -> Just (accessor_e2 `app`   x',           x, e_body)
-             TyLambda a e_body -> Just (accessor_e2 `tyApp` mkTyVarTy x', a, e_body)
-             _                 -> Nothing
+    , let tieback_e2 = case a_cast of
+            Uncast      -> tieback_e1
+            CastBy co _ -> tieback_e1 `cast` mkSymCo ids co
+          mb_res@(~(Just (_, x, _, _))) = case v of
+             Lambda   x e_def_body -> Just (tieback_e2 `app`   x',           x, e_def_body, annedTerm (annedTag e_def_body) (e_call `App`   x'))
+             TyLambda a e_def_body -> Just (tieback_e2 `tyApp` mkTyVarTy x', a, e_def_body, annedTerm (annedTag e_def_body) (e_call `TyApp` mkTyVarTy x'))
+             _                     -> Nothing
           (ids', rn', x') = renameNonRecBinder ids rn x
-    , Just (accessor_e2, _, e_body) <- mb_res
-    -> eta (Heap (M.insert x' lambdaBound h) ids') accessor_e2 (rn', e_body)
+    , Just (tieback_e2, _, e_def_body, e_call_body) <- mb_res
+    -> eta (Heap (M.insert x' lambdaBound h) ids') tieback_e2 (rn', e_def_body) e_call_body
   _ -> []
+
+{-# INLINE rewriteGlobals #-}
+rewriteGlobals :: (Var -> Var) -> AnnedTerm -> AnnedTerm
+rewriteGlobals f = term
+  where
+    var' x | isGlobalId x = f x
+           | otherwise    = x
+
+    term e = annedTerm (annedTag e) (term' (extract e))
+
+    term' (Var x)             = Var (var' x)
+    term' (Value v)           = Value (value' v)
+    term' (TyApp e ty)        = TyApp (term e) ty
+    term' (CoApp e co)        = CoApp (term e) (coercion' co)
+    term' (App e x)           = App (term e) (var' x)
+    term' (PrimOp pop tys es) = PrimOp pop tys (map term es)
+    term' (Case e x ty alts)  = Case (term e) x ty [(alt_con, term e) | (alt_con, e) <- alts]
+    term' (Let x e1 e2)       = Let x (term e1) (term e2)
+    term' (LetRec xes e)      = LetRec [(x, term e) | (x, e) <- xes] (term e)
+    term' (Cast e co)         = Cast (term e) (coercion' co)
+
+    value' (Literal l)          = Literal l
+    value' (Coercion co)        = Coercion (coercion' co)
+    value' (TyLambda a e)       = TyLambda a (term e)
+    value' (Lambda x e)         = Lambda x (term e)
+    value' (Data dc tys cos xs) = Data dc tys (map coercion' cos) xs
+
+    coercion' (Refl ty)            = Refl ty
+    coercion' (TyConAppCo tc cos)  = TyConAppCo tc (map coercion' cos)
+    coercion' (AppCo co1 co2)      = AppCo (coercion' co1) (coercion' co2)
+    coercion' (ForAllCo a co)      = ForAllCo a (coercion' co)
+    coercion' (CoVarCo a)          = CoVarCo (var' a)
+    coercion' (AxiomInstCo ax cos) = AxiomInstCo ax (map coercion' cos)
+    coercion' (UnsafeCo ty1 ty2)   = UnsafeCo ty1 ty2
+    coercion' (SymCo co)           = SymCo (coercion' co)
+    coercion' (TransCo co1 co2)    = TransCo (coercion' co1) (coercion' co2)
+    coercion' (NthCo i co)         = NthCo i (coercion' co)
+    coercion' (InstCo co ty)       = InstCo (coercion' co) ty
 
 
 data SCStats = SCStats {
