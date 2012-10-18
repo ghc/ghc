@@ -130,9 +130,9 @@ traceVt herald doc
 
 -- |Dump the given program conditionally.
 --
-dumpOptVt :: GeneralFlag -> String -> SDoc -> VM ()
+dumpOptVt :: DumpFlag -> String -> SDoc -> VM ()
 dumpOptVt flag header doc 
-  = do { b <- liftDs $ goptM flag
+  = do { b <- liftDs $ doptM flag
        ; if b 
          then dumpVt header doc 
          else return () 

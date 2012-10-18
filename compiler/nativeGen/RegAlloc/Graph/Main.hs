@@ -91,9 +91,9 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
         --      intermediate structures in the allocator - otherwise tell the
         --      allocator to ditch them early so we don't end up creating space leaks.
         let dump = or
-                [ gopt Opt_D_dump_asm_regalloc_stages dflags
-                , gopt Opt_D_dump_asm_stats dflags
-                , gopt Opt_D_dump_asm_conflicts dflags ]
+                [ dopt Opt_D_dump_asm_regalloc_stages dflags
+                , dopt Opt_D_dump_asm_stats dflags
+                , dopt Opt_D_dump_asm_conflicts dflags ]
 
         -- check that we're not running off down the garden path.
         when (spinCount > maxSpinCount)

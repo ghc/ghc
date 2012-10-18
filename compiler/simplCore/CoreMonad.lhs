@@ -142,8 +142,8 @@ endPass dflags pass binds rules
        ; lintPassResult dflags pass binds }      
   where
     mb_flag = case coreDumpFlag pass of
-                Just flag | gopt flag dflags                    -> Just flag
-                          | gopt Opt_D_verbose_core2core dflags -> Just flag
+                Just flag | dopt flag dflags                    -> Just flag
+                          | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
 dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
@@ -151,7 +151,7 @@ dumpIfSet dflags dump_me pass extra_info doc
   = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags 
-               -> Maybe GeneralFlag		-- Just df => show details in a file whose
+               -> Maybe DumpFlag		-- Just df => show details in a file whose
 	       	  			--            name is specified by df
                -> SDoc 			-- Header
                -> SDoc 			-- Extra info to appear after header
@@ -265,7 +265,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 \end{code}
 
 \begin{code}
-coreDumpFlag :: CoreToDo -> Maybe GeneralFlag
+coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_dump_simpl_phases
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_dump_core_pipeline
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
@@ -384,7 +384,7 @@ dumpSimplPhase dflags mode
    | Just spec_string <- shouldDumpSimplPhase dflags
    = match_spec spec_string
    | otherwise
-   = gopt Opt_D_verbose_core2core dflags
+   = dopt Opt_D_verbose_core2core dflags
 
   where
     match_spec :: String -> Bool
@@ -510,7 +510,7 @@ simplCountN (SimplCount { ticks = n }) = n
 zeroSimplCount dflags
 		-- This is where we decide whether to do
 		-- the VerySimpl version or the full-stats version
-  | gopt Opt_D_dump_simpl_stats dflags
+  | dopt Opt_D_dump_simpl_stats dflags
   = SimplCount {ticks = 0, details = Map.empty,
                 n_log = 0, log1 = [], log2 = []}
   | otherwise
@@ -1019,7 +1019,7 @@ debugTraceMsg :: SDoc -> CoreM ()
 debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
-dumpIfSet_dyn :: GeneralFlag -> String -> SDoc -> CoreM ()
+dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
 \end{code}
 

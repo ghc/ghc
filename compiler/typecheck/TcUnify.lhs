@@ -531,7 +531,7 @@ uType_defer origin ty1 ty2
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on, because
        -- it is hugely expensive (#5631)
-       ; whenGOptM Opt_D_dump_tc_trace $ do
+       ; whenDOptM Opt_D_dump_tc_trace $ do
             { ctxt <- getErrCtxt
             ; doc <- mkErrInfo emptyTidyEnv ctxt
             ; traceTc "utype_defer" (vcat [ppr eqv, ppr ty1,

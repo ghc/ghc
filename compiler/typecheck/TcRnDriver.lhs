@@ -1779,7 +1779,7 @@ tcDump env
  = do { dflags <- getDynFlags ;
 
         -- Dump short output if -ddump-types or -ddump-tc
-        when (gopt Opt_D_dump_types dflags || gopt Opt_D_dump_tc dflags)
+        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
              (dumpTcRn short_dump) ;
 
         -- Dump bindings if -ddump-tc
@@ -1794,7 +1794,7 @@ tcDump env
 tcCoreDump :: ModGuts -> TcM ()
 tcCoreDump mod_guts
  = do { dflags <- getDynFlags ;
-        when (gopt Opt_D_dump_types dflags || gopt Opt_D_dump_tc dflags)
+        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
              (dumpTcRn (pprModGuts mod_guts)) ;
 
         -- Dump bindings if -ddump-tc

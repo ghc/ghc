@@ -497,7 +497,7 @@ simplifyExpr dflags expr
         ; (expr', counts) <- initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
 
-        ; Err.dumpIfSet dflags (gopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -560,7 +560,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts')
            <- do_iteration us 1 [] binds rules
 
-        ; Err.dumpIfSet dflags (dump_phase && gopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics for following pass"
                   (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
                          blankLine,
@@ -676,7 +676,7 @@ end_iteration dflags pass iteration_no counts binds rules
   = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
        ; lintPassResult dflags pass binds }
   where
-    mb_flag | gopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
+    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
             | otherwise                               = Nothing
             -- Show details if Opt_D_dump_simpl_iterations is on
 

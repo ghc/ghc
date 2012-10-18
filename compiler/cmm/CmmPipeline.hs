@@ -85,7 +85,7 @@ cpsTop hsc_env proc =
                   return call_pps
 
        let noncall_pps = proc_points `setDifference` call_pps
-       when (not (setNull noncall_pps) && gopt Opt_D_dump_cmmz dflags) $
+       when (not (setNull noncall_pps) && dopt Opt_D_dump_cmmz dflags) $
          pprTrace "Non-call proc points: " (ppr noncall_pps) $ return ()
 
        ----------- Sink and inline assignments *before* stack layout -----------
@@ -184,7 +184,7 @@ runUniqSM m = do
   return (initUs_ us m)
 
 
-dumpGraph :: DynFlags -> GeneralFlag -> String -> CmmGraph -> IO ()
+dumpGraph :: DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
@@ -195,12 +195,12 @@ dumpGraph dflags flag name g = do
                                 }
                  Nothing  -> return ()
 
-dumpWith :: Outputable a => DynFlags -> GeneralFlag -> String -> a -> IO ()
+dumpWith :: Outputable a => DynFlags -> DumpFlag -> String -> a -> IO ()
 dumpWith dflags flag txt g = do
          -- ToDo: No easy way of say "dump all the cmmz, *and* split
          -- them into files."  Also, -ddump-cmmz doesn't play nicely
          -- with -ddump-to-file, since the headers get omitted.
    dumpIfSet_dyn dflags flag txt (ppr g)
-   when (not (gopt flag dflags)) $
+   when (not (dopt flag dflags)) $
       dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
 

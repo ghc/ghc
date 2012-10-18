@@ -1779,8 +1779,8 @@ dumpIfaceStats hsc_env = do
               (ifaceStats eps)
   where
     dflags = hsc_dflags hsc_env
-    dump_rn_stats = gopt Opt_D_dump_rn_stats dflags
-    dump_if_trace = gopt Opt_D_dump_if_trace dflags
+    dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
+    dump_if_trace = dopt Opt_D_dump_if_trace dflags
 
 
 {- **********************************************************************

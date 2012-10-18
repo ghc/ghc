@@ -335,7 +335,7 @@ endMkDependHS dflags
 
 dumpModCycles :: DynFlags -> [ModSummary] -> IO ()
 dumpModCycles dflags mod_summaries
-  | not (gopt Opt_D_dump_mod_cycles dflags)
+  | not (dopt Opt_D_dump_mod_cycles dflags)
   = return ()
 
   | null cycles

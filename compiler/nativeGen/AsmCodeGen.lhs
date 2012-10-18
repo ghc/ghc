@@ -356,8 +356,8 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
            -- and then using 'seq' doesn't work, because the let
            -- apparently gets inlined first.
         lsPprNative <- return $!
-                if  gopt Opt_D_dump_asm       dflags
-                 || gopt Opt_D_dump_asm_stats dflags
+                if  dopt Opt_D_dump_asm       dflags
+                 || dopt Opt_D_dump_asm_stats dflags
                         then native
                         else []
 
@@ -466,7 +466,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =
-                        if gopt Opt_D_dump_asm_stats dflags
+                        if dopt Opt_D_dump_asm_stats dflags
                          then Just regAllocStats else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak
@@ -498,7 +498,7 @@ cmmNativeGen dflags ncgImpl us cmm count
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
                 let mPprStats =
-                        if gopt Opt_D_dump_asm_stats dflags
+                        if dopt Opt_D_dump_asm_stats dflags
                          then Just (catMaybes regAllocStats) else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak

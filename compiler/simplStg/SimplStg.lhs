@@ -16,8 +16,7 @@ import StgLint          ( lintStgBindings )
 import StgStats         ( showStgStats )
 import UnariseStg       ( unarise )
 
-import DynFlags         ( DynFlags(..), GeneralFlag(..), gopt, StgToDo(..),
-                          getStgToDo )
+import DynFlags
 import Module           ( Module )
 import ErrUtils
 import SrcLoc
@@ -37,8 +36,8 @@ stg2stg dflags module_name binds
   = do  { showPass dflags "Stg2Stg"
         ; us <- mkSplitUniqSupply 'g'
 
-        ; doIfSet_dyn dflags Opt_D_verbose_stg2stg
-                      (log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (text "VERBOSE STG-TO-STG:"))
+        ; when (dopt Opt_D_verbose_stg2stg dflags)
+               (log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (text "VERBOSE STG-TO-STG:"))
 
         ; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[],[]) binds
 

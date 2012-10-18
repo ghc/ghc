@@ -218,7 +218,7 @@ simplTopBinds env0 binds0
                 -- See note [Glomming] in OccurAnal.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
         ; dflags <- getDynFlags
-        ; let dump_flag = gopt Opt_D_verbose_core2core dflags
+        ; let dump_flag = dopt Opt_D_verbose_core2core dflags
         ; env2 <- simpl_binds dump_flag env1 binds0
         ; freeTick SimplifierDone
         ; return env2 }
@@ -1420,8 +1420,8 @@ completeCall env var cont
     }}}
   where
     dump_inline dflags unfolding cont
-      | not (gopt Opt_D_dump_inlinings dflags) = return ()
-      | not (gopt Opt_D_verbose_core2core dflags)
+      | not (dopt Opt_D_dump_inlinings dflags) = return ()
+      | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
             liftIO $ printInfoForUser dflags alwaysQualify $
                 sep [text "Inlining done:", nest 4 (ppr var)]
@@ -1571,14 +1571,14 @@ tryRules env rules fn args call_cont
                 ; return (Just (ruleArity rule, rule_rhs)) }}}
   where
     dump dflags rule rule_rhs
-      | gopt Opt_D_dump_rule_rewrites dflags
+      | dopt Opt_D_dump_rule_rewrites dflags
       = log_rule dflags Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ru_name rule)
           , text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args))
           , text "After: " <+> pprCoreExpr rule_rhs
           , text "Cont:  " <+> ppr call_cont ]
 
-      | gopt Opt_D_dump_rule_firings dflags
+      | dopt Opt_D_dump_rule_firings dflags
       = log_rule dflags Opt_D_dump_rule_firings "Rule fired:" $
           ftext (ru_name rule)
 

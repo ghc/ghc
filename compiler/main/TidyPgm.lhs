@@ -373,14 +373,14 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-        ; unless (gopt Opt_D_dump_simpl dflags) $
+        ; unless (dopt Opt_D_dump_simpl dflags) $
             Err.dumpIfSet_dyn dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> ptext (sLit "rules")))
               (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
-        ; when (gopt Opt_D_dump_core_stats dflags)
+        ; when (dopt Opt_D_dump_core_stats dflags)
                (log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
                           (ptext (sLit "Tidy size (terms,types,coercions)")
                            <+> ppr (moduleName mod) <> colon

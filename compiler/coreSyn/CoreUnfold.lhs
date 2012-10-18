@@ -908,7 +908,7 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
                                     is_wf is_exp uf_arity guidance
-          | gopt Opt_D_dump_inlinings dflags && gopt Opt_D_verbose_core2core dflags
+          | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
           -> pprTrace "Inactive unfolding:" (ppr id) Nothing
           | otherwise -> Nothing
 	NoUnfolding 	 -> Nothing 
@@ -923,7 +923,7 @@ tryUnfolding dflags id lone_variable
              is_wf is_exp uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
- | gopt Opt_D_dump_inlinings dflags && gopt Opt_D_verbose_core2core dflags
+ | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
  = pprTrace ("Considering inlining: " ++ showSDocDump dflags (ppr id))
 		 (vcat [text "arg infos" <+> ppr arg_infos,
 			text "uf arity" <+> ppr uf_arity,
