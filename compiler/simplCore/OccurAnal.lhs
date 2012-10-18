@@ -436,7 +436,7 @@ We are in an infinite loop.
 
 A more elaborate example (that I actually saw in practice when I went to
 mark GHC.List.filter as INLINABLE) is as follows. Say I have this module:
-  {-# LANGUAGE Rank2Types #-}
+  {-# LANGUAGE RankNTypes #-}
   module GHCList where
   
   import Prelude hiding (filter)

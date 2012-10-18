@@ -993,21 +993,16 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty 
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
-       ; rank2_flag      <- xoptM Opt_Rank2Types
-       ; rankn_flag      <- xoptM Opt_RankNTypes
-       ; polycomp        <- xoptM Opt_PolymorphicComponents
+       ; rankn_flag  <- xoptM Opt_RankNTypes
        ; let gen_rank :: Rank -> Rank
              gen_rank r | rankn_flag = ArbitraryRank
-	                | rank2_flag = r2
 	                | otherwise  = r
 
-             rank2 = gen_rank r2
              rank1 = gen_rank r1
              rank0 = gen_rank r0
 
              r0 = rankZeroMonoType
              r1 = LimitedRank True r0
-             r2 = LimitedRank True r1
 
              rank
 	       = case ctxt of
@@ -1021,10 +1016,8 @@ checkValidType ctxt ty
 	     	 ExprSigCtxt 	-> rank1
 	     	 FunSigCtxt _   -> rank1
 	     	 InfSigCtxt _   -> ArbitraryRank	-- Inferred type
-	     	 ConArgCtxt _   | polycomp -> rank2
-                                     -- We are given the type of the entire
-                                     -- constructor, hence rank 1
- 	     			| otherwise -> rank1
+	     	 ConArgCtxt _   -> rank1 -- We are given the type of the entire
+                                         -- constructor, hence rank 1
 
 	     	 ForSigCtxt _	-> rank1
 	     	 SpecInstCtxt   -> rank1
