@@ -32,10 +32,10 @@ import Data.Maybe
 
 cmmLint :: (Outputable d, Outputable h)
         => DynFlags -> GenCmmGroup d h CmmGraph -> Maybe SDoc
-cmmLint dflags tops = runCmmLint dflags (mapM_ lintCmmDecl) tops
+cmmLint dflags tops = runCmmLint dflags (mapM_ (lintCmmDecl dflags)) tops
 
 cmmLintGraph :: DynFlags -> CmmGraph -> Maybe SDoc
-cmmLintGraph dflags g = runCmmLint dflags lintCmmGraph g
+cmmLintGraph dflags g = runCmmLint dflags (lintCmmGraph dflags) g
 
 runCmmLint :: Outputable a => DynFlags -> (a -> CmmLint b) -> a -> Maybe SDoc
 runCmmLint dflags l p =
@@ -46,18 +46,19 @@ runCmmLint dflags l p =
                              nest 2 (ppr p)])
      Right _  -> Nothing
 
-lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
-lintCmmDecl (CmmProc _ lbl g)
-  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph g
-lintCmmDecl (CmmData {})
+lintCmmDecl :: DynFlags -> GenCmmDecl h i CmmGraph -> CmmLint ()
+lintCmmDecl dflags (CmmProc _ lbl _ g)
+  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph dflags g
+lintCmmDecl _ (CmmData {})
   = return ()
 
 
-lintCmmGraph :: CmmGraph -> CmmLint ()
-lintCmmGraph g = cmmLiveness g `seq` mapM_ (lintCmmBlock labels) blocks
-                 -- cmmLiveness throws an error if there are registers
-                 -- live on entry to the graph (i.e. undefined
-                 -- variables)
+lintCmmGraph :: DynFlags -> CmmGraph -> CmmLint ()
+lintCmmGraph dflags g =
+    cmmLocalLiveness dflags g `seq` mapM_ (lintCmmBlock labels) blocks
+    -- cmmLiveness throws an error if there are registers
+    -- live on entry to the graph (i.e. undefined
+    -- variables)
   where
        blocks = toBlockList g
        labels = setFromList (map entryLabel blocks)
