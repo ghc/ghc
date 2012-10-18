@@ -97,6 +97,9 @@ mK_GENERALISER :: State -> State -> Generaliser
 --     wqo2 | sUB_GRAPHS = subGraphGeneralisation wqo1
 --          | otherwise  = wqo1
 
+sET_WQO :: TTest State
+sET_WQO = cofmap (tagBagTagSet . stateTags) finiteT
+
 
 type ParentChildren = M.Map (Maybe Var) [(Var, (State, Bool))]
 
@@ -661,35 +664,41 @@ speculateHeap already_speculated (stats, deeds, heap) = (already_speculated, (st
 -- NB: speculation of a cyclic SCC or non-top-level acyclic SCCs might fail in one order but succeed in another
 --     due to the *history* (not value environment), how to resolve this? Well, FIXME (maybe using a symmetric history like (==) on TagBag?)
 speculateHeapIdempotent :: (Deeds, Heap) -> (Deeds, Heap)
-speculateHeapIdempotent (deeds, Heap h ids) = {-# SCC "speculate" #-} (deeds', Heap h' ids')
+speculateHeapIdempotent (deeds, Heap init_h ids) = {-# SCC "speculate" #-} (deeds', Heap h' ids')
   where
-    hist = SH $ mkLinearHistory (cofmap fst wQO)
+    -- NB: must use set wqo so that order of traversal of the SCCs/elements within a CyclicSCC is irrelevant
+    hist = SH $ mkLinearHistory (cofmap fst sET_WQO)
 
-    (deeds', ids', h') = speculateTopHeap (deeds, ids) h
+    (deeds', ids', h') = speculateTopHeap (deeds, ids) init_h
+    --(deeds', ids', h') = runSpecM $ fmap (\(_hist, deeds, ids, h) -> (deeds, ids, h)) $ speculateNestedHeap (return ()) [] hist (deeds, ids, M.empty) h
+    --(deeds', ids', h') = runSpecM $ callCC $ \k -> fmap (\(_hist, deeds, ids, h) -> (deeds, ids, h)) $ speculateNestedHeap (return ()) [(\_ -> k (deeds, ids, h), voidArgId)] hist (deeds, ids, M.empty) h
 
     speculateTopHeap :: (Deeds, InScopeSet) -> PureHeap -> (Deeds, InScopeSet, PureHeap)
-    speculateTopHeap (deeds, ids) h = foldl' speculateSCC (deeds, ids, M.empty) (topologicalSort heapBindingFreeVars h)
-      where speculateSCC (deeds, ids, h) scc = runSpecM $ case scc of
-              G.AcyclicSCC xhb -> speculateSCCHB (return ()) (deeds, ids, h) xhb
-              G.CyclicSCC xhbs -> callCC $ \k -> foldM (speculateSCCHB (k (deeds, ids, h `M.union` M.fromList xhbs))) (deeds, ids, h) xhbs
-            speculateSCCHB fail_rb (deeds, ids, h') (x', hb)
-              = fmap (\(_hist, deeds, ids, h'_extra) -> (deeds, ids, h'_extra `M.union` h')) $
-                     speculateHB fail_rb [] hist (deeds, ids, h) x' hb
+    speculateTopHeap (deeds, ids) h = foldl' speculateTopSCC (deeds, ids, M.empty) (topologicalSort heapBindingFreeVars h)
+      where speculateTopSCC (deeds, ids, h') scc = runSpecM $ fmap (\(_hist, deeds, ids, h) -> (deeds, ids, h)) $ speculateSCC (return ()) [] M.empty (hist, deeds, ids, h') scc
 
-    -- FIXME: CyclicSCCs should only succeed if all bindings in the group were totally driven to values
     speculateNestedHeap :: SpecM ()
-                        -> Depth -> SpecHistory -> (Deeds, InScopeSet, PureHeap) -> PureHeap
-                        -> SpecM (SpecHistory, Deeds, InScopeSet, PureHeap)
-    speculateNestedHeap fail_rb depth hist (deeds, ids, h) h_difference = foldM speculateSCC (hist, deeds, ids, M.empty) (topologicalSort heapBindingFreeVars h_difference)
-      where speculateSCC (hist, deeds, ids, h') scc = case scc of
-                G.AcyclicSCC xhb -> speculateSCCHB fail_rb (hist, deeds, ids, h') xhb
-                G.CyclicSCC xhbs -> callCC (\k -> let fail_rb' = k (hist, deeds, ids, h' `M.union` M.fromList xhbs) >> fail_rb
-                                                  in foldM (speculateSCCHB fail_rb') (hist, deeds, ids, h') xhbs)
-            speculateSCCHB fail_rb (hist, deeds, ids, h') (x', hb) = fmap (\(hist, deeds, ids, h'_extra) -> (hist, deeds, ids, h'_extra `M.union` h')) $ speculateHB fail_rb depth hist (deeds, ids, h) x' hb
+                        -> Depth -> SpecHistory -> (Deeds, InScopeSet, PureHeap {- dom = X -}) -> PureHeap {- dom = Y && dom \disjoint X -}
+                        -> SpecM (SpecHistory, Deeds, InScopeSet, PureHeap {- Y \subseteq dom && dom \disjoint X -})
+    speculateNestedHeap fail_rb depth hist (deeds, ids, h) h_difference = foldM (speculateSCC fail_rb depth h) (hist, deeds, ids, M.empty) (topologicalSort heapBindingFreeVars h_difference)
 
+    -- NB: CyclicSCCs only succeeds if all bindings in the group were totally driven to values, since anything else may break loops and hence change visibility on a subsequent drive
+    speculateSCC :: SpecM ()
+                 -> Depth -> PureHeap {- dom = X -} -> (SpecHistory, Deeds, InScopeSet, PureHeap {- dom = Y && dom \disjoint X -}) -> G.SCC (Out Var, HeapBinding) {- dom = Z && dom \disjoint X -}
+                 -> SpecM (SpecHistory, Deeds, InScopeSet, PureHeap {- (Y \union Z) \subseteq dom && \dom \disjoint X -})
+    speculateSCC fail_rb depth h (hist, deeds, ids, h') scc = case scc of
+        G.AcyclicSCC (x', hb) -> fmap (\(hist, deeds, ids, h'_extra) -> (hist, deeds, ids, h'_extra `M.union` h')) $ speculateHB fail_rb depth hist (deeds, ids, h `M.union` h') x' hb
+        G.CyclicSCC xhbs      -> callCC (\k -> let fail_rb' = fail_rb >> k (hist, deeds, ids, h' `M.union` M.fromList xhbs)
+                                                   -- NB: the union in "go" might overwrite some things because we pass the same full incoming heap into each recursive call.
+                                                   -- We put the accumulated heap on the left of the union (and set the initial heap to the incoming heap) to ensure that
+                                                   -- any bindings present in h' are present unchanged in 
+                                                   go (hist, deeds, ids, h'') (x', hb) = fmap (\(hist, deeds, ids, h''_extra) -> (hist, deeds, ids, h''_extra `M.union` h'')) $ speculateHB fail_rb' depth hist (deeds, ids, h `M.union` h') x' hb
+                                               in foldM go (hist, deeds, ids, h') xhbs)
+
+    -- NB: returned heap only includes the input binding and any new such bindings floated out of it
     speculateHB :: SpecM ()
-                -> Depth -> SpecHistory -> (Deeds, InScopeSet, PureHeap) -> Out Var -> HeapBinding
-                -> SpecM (SpecHistory, Deeds, InScopeSet, PureHeap)
+                -> Depth -> SpecHistory -> (Deeds, InScopeSet, PureHeap {- dom = X -}) -> Out Var {- x -} -> HeapBinding
+                -> SpecM (SpecHistory, Deeds, InScopeSet, PureHeap {- { x } \subseteq dom && dom \disjoint X -})
     speculateHB fail_rb depth hist (deeds, ids, h) x' hb = case hb of
       HB InternallyBound (Right in_e)
         | let state = normalise (deeds, Heap h ids, Loco False, in_e)
@@ -704,14 +713,17 @@ speculateHeapIdempotent (deeds, Heap h ids) = {-# SCC "speculate" #-} (deeds', H
         -> if not reduced -- Don't need to check the termination test (and risk rollback) if the focus
                           -- is already reduced (recursive call will be strictly smaller)
             then recurse depth hist
-            else catchSpecM (\rb   -> let depth' = (rb, x') : depth
+            else trce depth "reducing" (ppr x') $
+                 catchSpecM (\rb   -> let depth' = (rb, x') : depth
                                       in case terminate (unSH hist) (gc state, depth') of
-                                           Stop (_, old_depth) -> commonAncestorRB old_depth depth hist
+                                           Stop (_, old_depth) -> trce depth "stopped" (ppr x') $ commonAncestorRB old_depth depth hist
                                            Continue hist'      -> recurse depth' (SH hist'))
-                            (\hist -> fail_rb >> return (hist, deeds, ids, M.singleton x' hb))
+                            (\hist -> trce depth "caught" (ppr x')  $ fail_rb >> return (hist, deeds, ids, M.singleton x' hb))
         | otherwise
-        -> fail_rb >> return (hist, deeds, ids, M.singleton x' hb)
-      _ ->            return (hist, deeds, ids, M.singleton x' hb)
+        -> trce depth "non-value" (ppr x') $ fail_rb >> return (hist, deeds, ids, M.singleton x' hb)
+      _ ->                                              return (hist, deeds, ids, M.singleton x' hb)
+
+    trce depth msg = pprTrace ("spec:" ++ replicate (length depth) ' ' ++ msg)
 
     commonAncestorRB :: Depth -> Depth -> SpecRB
     commonAncestorRB old_depth depth = head (thirdOf3 (listExtensionBy (\(old_rb, old_x) (_, x) -> if old_x == x then Just old_rb else Nothing) old_depth depth))

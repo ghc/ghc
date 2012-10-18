@@ -1,6 +1,6 @@
 module Supercompile.Termination.TagBag (
         embedWithTagBags,
-        TagBag, stateTags
+        TagBag, tagBagTagSet, stateTags
     ) where
 
 import Supercompile.Termination.Combinators
@@ -25,6 +25,9 @@ newtype TagBag = TagBag { unTagBag :: FinMap Nat }
 instance Outputable TagBag where
     ppr tb = hsep [ pPrintTag tag <> (if n == 1 then empty else braces (ppr n))
                   | (tag, n) <- IM.toList (unTagBag tb) ]
+
+tagBagTagSet :: TagBag -> FinSet
+tagBagTagSet = IM.keysSet . unTagBag
 
 pPrintTag :: Int -> SDoc
 pPrintTag n = (try 'h' 5 `mplus` try 'k' 3 `mplus` try 'q' 2 `mplus` uniq '?' n) `orElse` nat '?' n
