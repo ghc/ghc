@@ -41,11 +41,11 @@ llvmCodeGen dflags h us cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
                       foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
-        split p@(CmmProc _ l _ _) (d,e) =
+        split p@(CmmProc _ l live _) (d,e) =
             let lbl = strCLabel_llvm env $ case topInfoTable p of
                         Nothing                   -> l
                         Just (Statics info_lbl _) -> info_lbl
-                env' = funInsert lbl (llvmFunTy dflags) e
+                env' = funInsert lbl (llvmFunTy dflags live) e
             in (d,env')
     in do
         showPass dflags "LlVM CodeGen"
