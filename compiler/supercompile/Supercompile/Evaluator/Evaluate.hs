@@ -363,7 +363,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
             --
             -- Perhaps if we had deep normalisation + GC we could get these results by penalising heap allocation heavily?
             -- If so we must remember to do it for heap bindings *and* letrecs.
-            let k_summary = summariseContext h k
+            let k_summary = summariseContext h (Car kf k)
             guard $ case () of
               _ -- If the lambda is marked SUPERINLINABLE, always inline it
                 | super
