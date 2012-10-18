@@ -5,8 +5,8 @@ To add a new test:
 
  1) Create a module in the "html-test/src" directory.
 
- 2) Run "cabal test". You should now have output/<modulename>.html. The test
-    passes since there is no reference file to compare with.
+ 2) Run "cabal test". You should now have "html-test/out/<modulename>.html".
+    The test passes since there is no reference file to compare with.
 
  3) To make a reference file from the output file, do
       runhaskell accept.lhs <modulename>
