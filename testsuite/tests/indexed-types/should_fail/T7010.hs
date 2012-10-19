@@ -28,6 +28,15 @@ processIO = undefined
 phoneme :: (Vector, Vector)
 phoneme = processIO stereoFromMono
 
+{-
+
+   ( MakeValueTuple Vector  =  MakeValueTuple (Serial Float)
+   , ValueTuple Vector ~ ValueTuple Vector    (agf))
+
+--> MakeValueTuple Float
+--> <solved>
+-}
+
 
 withArgs ::
    (MakeValueTuple b) =>

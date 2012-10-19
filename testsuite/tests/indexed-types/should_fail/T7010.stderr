@@ -1,5 +1,5 @@
 
-T7010.hs:44:27:
+T7010.hs:53:27:
     Couldn't match type `Serial (IO Float)' with `IO Float'
     Expected type: (Float, ValueTuple Vector)
       Actual type: (Float, ValueTuple Float)
