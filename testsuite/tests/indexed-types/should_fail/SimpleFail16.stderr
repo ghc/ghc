@@ -1,6 +1,6 @@
 
 SimpleFail16.hs:10:12:
-    Couldn't match expected type `F ()' with actual type `p0 a0'
+    Couldn't match expected type `p0 a0' with actual type `F ()'
     The type variables `p0', `a0' are ambiguous
     Possible cause: the monomorphism restriction applied to: `bar'
     Probable fix: give these definition(s) an explicit type signature

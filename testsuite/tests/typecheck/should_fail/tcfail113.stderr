@@ -1,12 +1,12 @@
 
 tcfail113.hs:12:7:
     Expecting one more argument to `Maybe'
+    Expected kind `*', but `Maybe' has kind `* -> *'
     In the type signature for `f': f :: [Maybe]
 
 tcfail113.hs:15:8:
-    Kind mis-match
     The first argument of `T' should have kind `* -> *',
-    but `Int' has kind `*'
+      but `Int' has kind `*'
     In the type signature for `g': g :: T Int
 
 tcfail113.hs:18:6:

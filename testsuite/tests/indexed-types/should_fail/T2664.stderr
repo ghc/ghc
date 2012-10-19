@@ -12,8 +12,8 @@ T2664.hs:31:52:
           the instance declaration at T2664.hs:22:10
       `a' is a rigid type variable bound by
           the instance declaration at T2664.hs:22:10
-    Expected type: Dual (Dual a)
-      Actual type: b
+    Expected type: IO (PChan b, PChan (Dual a))
+      Actual type: IO (PChan (Dual (Dual a)), PChan (Dual a))
     Relevant bindings include
       newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:23:5)
       v :: MVar (Either (PChan a) (PChan b)) (bound at T2664.hs:24:9)
