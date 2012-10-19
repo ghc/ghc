@@ -1124,7 +1124,7 @@ So, when analysing the RHS of x3 we notice that x3 will itself
 definitely inline the next time round, and so we analyse x3's rhs in
 an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
 
-Annoyingly, we have to approximiate SimplUtils.preInlineUnconditionally.
+Annoyingly, we have to approximate SimplUtils.preInlineUnconditionally.
 If we say "yes" when preInlineUnconditionally says "no" the simplifier iterates
 indefinitely:
         x = f y
