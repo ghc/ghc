@@ -820,6 +820,11 @@ dynLoadObjs dflags objs = do
                       -- be calling dynLoadObjs with any objects that
                       -- need to be linked.
                       ldInputs = [],
+                      -- Even if we're e.g. profiling, we still want
+                      -- the vanilla dynamic libraries, so we set the
+                      -- ways / build tag to be just WayDyn.
+                      ways = [WayDyn],
+                      buildTag = mkBuildTag [WayDyn],
                       outputFile = Just soFile
                   }
     linkDynLib dflags2 objs []
