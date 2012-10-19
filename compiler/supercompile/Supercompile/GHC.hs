@@ -147,6 +147,7 @@ conAppToTerm dc es
     fromType_maybe (Type ty) = Just ty
     fromType_maybe _         = Nothing
 
+-- NB: this function must not float stuff out of bindings, so that later SUPERINLINABLE propagation will work properly
 coreExprToTerm :: CoreExpr -> ParseM S.Term
 coreExprToTerm init_e = {-# SCC "coreExprToTerm" #-} term init_e
   where
@@ -168,9 +169,9 @@ coreExprToTerm init_e = {-# SCC "coreExprToTerm" #-} term init_e
     term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (fmap ((,) e_arg) $ maybeUnLiftedTerm (exprType e_arg) e_arg)
     term (Lam x e) | isTyVar x     = fmap (S.value . S.TyLambda x) (bindFloats (term e))
                    | otherwise     = fmap (S.value . S.Lambda x) (bindFloats (term e))
-    term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (maybeUnLiftedTerm (idType x) e1) (bindFloats (term e2))
-    term (Let (Rec xes) e)         = bindFloatsWith (liftM2 (,) (mapM (secondM term) xes) (term e))
-    term (Case e x ty alts)        = liftM2 (\e alts -> S.case_ e x ty alts) (term e) (mapM alt alts)
+    term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (bindFloats (term e1)) (bindFloats (term e2))
+    term (Let (Rec xes) e)         = bindFloatsWith (liftM2 (,) (mapM (secondM (bindFloats . term)) xes) (term e))
+    term (Case e x ty alts)        = liftM2 (\e alts -> S.case_ e x ty alts) (bindFloats (term e)) (mapM alt alts)
     term (Cast e co)               = fmap (flip S.cast co) (term e)
     term (Tick _ e)                = term e -- FIXME: record ticks
     term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
