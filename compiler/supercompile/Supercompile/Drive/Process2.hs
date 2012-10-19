@@ -330,4 +330,4 @@ foo = undefined
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ bindManyMixedLiftedness fvedTermFreeVars to_bind $ unI $ runFulfilmentT $ runHistoryThreadM $ runMemoT $ runContT $ runScpM $ liftM (foo . fmap snd) $ sc 0 state
-  where (_, (to_bind, state), _) = prepareTerm unfoldings e
+  where (_, (to_bind, _preinit_with, state), _) = prepareTerm unfoldings e

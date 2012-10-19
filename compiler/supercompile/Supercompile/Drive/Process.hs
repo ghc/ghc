@@ -291,13 +291,13 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
 -- Be very careful when you change this function. At one point it accounted for 10% of
 -- supercompile runtime, so I went to a lot of trouble to deforest everything in sight.
 prepareTerm :: M.Map Var Term -> Term -> (S.Set Var,                    -- Names of all unfoldings in the input heaps
-                                          ([(Var,   FVedTerm)], State), -- For use without memo-cache preinitalization
-                                          ([(State, FVedTerm)], State)) -- With preinitialization
+                                          ([(Var,   FVedTerm)], [(State, FVedTerm)], State), -- For use without memo-cache preinitalization
+                                          (                     [(State, FVedTerm)], State)) -- Without expression-carrying "let"-binding in the heaps (may still contain non-expression-carrying "let"-bindings)
 prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                            pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
                            pprTraceSC "all input FVs" (ppr (input_fvs `delVarSetList` S.toList unfolding_bvs)) $
                            (unfolding_bvs, pprTraceSC "no-preinit unfoldings" (pPrintPrecLetRec noPrec (M.toList h'') (PrettyDoc (text "<stuff>")))
-                                                      (h''_must_be_bound, state),
+                                                      (h''_must_be_bound, letty_preinit_with, state),
                                            (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
@@ -392,12 +392,20 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 
         -- Secondly, pull out any remaining bindings (which must be cheap) that didn't exist in the
         -- unspeculated heap. These will be our new top-level bindings (and are guaranteed to be LocalIds).
+        (h''_binds_globalid, h''_was_floated) = M.partitionWithKey (\x' _ -> x' `S.member` unfolding_bvs) h''
         h''_must_be_bound = [ (x', annedTermToFVedTerm (renameIn (renameAnnedTerm ids') in_e))
-                            | (x', hb) <- M.toList h''
-                            , not (x' `S.member` unfolding_bvs)
+                            | (x', hb) <- M.toList h''_was_floated
                             , Just in_e <- [heapBindingTerm hb] ]
 
-        state = normalise (deeds', Heap (h'' `M.union` h_fvs) ids', Loco False, (rn, anned_e))
+        heap = Heap (h'' `M.union` h_fvs) ids'
+        state = normalise (deeds', heap, Loco False, (rn, anned_e))
+        
+        -- FIXME: update other comments about memocache preinit
+        -- We can and should do memocache preinit even if we still use "let"-bindings in the heap with associated terms
+        letty_preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
+                             | (x', hb) <- M.toList h''_binds_globalid
+                             , Just in_e_def <- [heapBindingTerm hb]
+                             , (heap', accessor_e, anned_e') <- eta heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
         
         -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
         -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
@@ -464,6 +472,7 @@ eta heap tieback_e1 in_e_def e_call = (heap, tieback_e1, in_e_def) : (heap, tieb
     -> eta (Heap (M.insert x' lambdaBound h) ids') tieback_e2 (rn', e_def_body) e_call_body
   _ -> []
 
+-- FIXME: broken right now because we need to rewrite free variables within binders as well (i.e. rules, specialisations etc). Very tedious!
 {-# INLINE rewriteGlobals #-}
 rewriteGlobals :: (Var -> Var) -> AnnedTerm -> AnnedTerm
 rewriteGlobals f = term

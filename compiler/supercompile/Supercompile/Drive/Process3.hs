@@ -757,14 +757,16 @@ reduceForMatch state | rEDUCE_BEFORE_MATCH = {- second gc $ -} reduceWithFlag (c
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)
   where (bvs_unfoldings, no_preinit, preinit) = prepareTerm unfoldings e
-        (to_bind, state)              = no_preinit -- Delay forcing these to suppress
-        (preinit_with, preinit_state) = preinit    -- prepareTerm debug prints
-        start k | pREINITALIZE_MEMO_TABLE = run preinit_state $ preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
-                | otherwise               = bindManyMixedLiftedness fvedTermFreeVars to_bind $ run state $ k state
+        (to_bind, letty_preinit_with, state) = no_preinit -- Delay forcing these to suppress
+        (preinit_with, preinit_state)        = preinit    -- prepareTerm debug prints
+        start k | uSE_LET_BINDINGS = bindManyMixedLiftedness fvedTermFreeVars to_bind $ run state $ preinitalise letty_preinit_with >> k state
+                | otherwise        = run preinit_state $ preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
         run tags_state = runScpM (tagAnnotations tags_state)
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
-preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do
+preinitalise states_fulfils
+  | not pREINITALIZE_MEMO_TABLE = return () -- If you do this, expect your output code to grow a lot!
+  | otherwise = forM_ states_fulfils $ \(state, e') -> do
     ScpM $ StateT $ \s -> do
         let (ms', _p) = promise (scpMemoState s) (state, snd (reduceForMatch state))
         return ((), s { scpMemoState = ms' })
