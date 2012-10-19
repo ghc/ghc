@@ -524,6 +524,10 @@ hasEqualities givens = any (has_eq . evVarPred) givens
     has_eq' (ClassPred cls _tys) = any has_eq (classSCTheta cls)
     has_eq' (TuplePred ts)       = any has_eq ts
     has_eq' (IrredPred _)        = True -- Might have equalities in it after reduction?
+       -- This is conservative.  e.g. if there's a constraint function FC with
+       --    type instance FC Int = Show
+       -- then we won't float from inside a given constraint (FC Int a), even though
+       -- it's really the innocuous (Show a).  Too bad!  Add a type signature
 
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet

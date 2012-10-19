@@ -922,6 +922,9 @@ approximateWC wc
                                  
     float_implic :: TcTyVarSet -> Implication -> Cts
     float_implic skols imp
+      | hasEqualities (ic_given imp)  -- Don't float out of equalities
+      = emptyCts                      -- cf floatEqualities
+      | otherwise                     -- See Note [approximateWC]
       = float_wc skols' (ic_wanted imp)
       where
         skols' = skols `extendVarSetList` ic_skols imp `extendVarSetList` ic_fsks imp
@@ -935,6 +938,30 @@ approximateWC wc
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
 \end{code}
+
+Note [ApproximateWC]
+~~~~~~~~~~~~~~~~~~~~
+approximateWC takes a constraint, typically arising from the RHS of a
+let-binding whose type we are *inferring*, and extracts from it some
+*flat* constraints that we might plausibly abstract over.  Of course
+the top-level flat constraints are plausible, but we also float constraints
+out from inside, if the are not captured by skolems.
+
+However we do *not* float anything out if the implication binds equality
+constriants, because that defeats the OutsideIn story.  Consider
+   data T a where
+     TInt :: T Int
+     MkT :: T a
+
+   f TInt = 3::Int
+
+We get the implication (a ~ Int => res ~ Int), where so far we've decided 
+  f :: T a -> res
+We don't want to float (res~Int) out because then we'll infer  
+  f :: T a -> Int
+which is only on of the possible types. (GHC 7.6 accidentally *did*
+float out of such implications, which meant it would happily infer
+non-principal types.)
 
 Note [DefaultTyVar]
 ~~~~~~~~~~~~~~~~~~~
