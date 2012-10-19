@@ -16,7 +16,7 @@ import DataCon  (DataCon, dataConWorkId)
 import Var      (TyVar, Var, varName, isTyVar, varType)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
-import Id       (Id, idType)
+import Id       (Id, isId, idType, idInlinePragma)
 import PrimOp   (primOpType)
 import Literal  (Literal, literalType)
 import Type     (Type, mkTyVarTy, applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy_maybe, eqType)
@@ -70,10 +70,11 @@ pprPrecDefault prec e = pPrintPrecLam prec xs (PrettyFunction ppr_prec)
 
 -- NB: don't use GHC's pprBndr because its way too noisy, printing unfoldings etc
 pPrintBndr :: BindingSite -> Var -> SDoc
-pPrintBndr bs x = prettyParen needs_parens $ ppr x <+> text "::" <+> ppr (varType x)
+pPrintBndr bs x = prettyParen needs_parens $ ppr x <+> superinlinable <+> text "::" <+> ppr (varType x)
   where needs_parens = case bs of LambdaBind -> True
                                   CaseBind   -> True
                                   LetBind    -> False
+        superinlinable = if isId x then ppr (idInlinePragma x) else empty
 
 data AltCon = DataAlt DataCon [TyVar] [CoVar] [Id] | LiteralAlt Literal | DefaultAlt
             deriving (Eq, Show)
