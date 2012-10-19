@@ -25,7 +25,7 @@ data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
 -- of MSG-based generalisation+rollback, and has the potential to lose more useful optimisation than that combo does.
 -- Matching back to generalised stuff is still a good idea, but we need to propagate generalised flags more agressively (FIXME)
 iNSTANCE_MATCHING :: InstanceMatching
-iNSTANCE_MATCHING = parseEnum "-fsupercompiler-instance-matching" InstancesOfGeneralised [("full", AllInstances), ("generalised", InstancesOfGeneralised), ("none", NoInstances)]
+iNSTANCE_MATCHING = parseEnum "-fsupercompiler-instance-matching" NoInstances [("full", AllInstances), ("generalised", InstancesOfGeneralised), ("none", NoInstances)]
 
 -- This is not remotely safe:
 fLOAT_TO_MATCH :: Bool
