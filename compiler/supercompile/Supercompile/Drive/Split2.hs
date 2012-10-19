@@ -57,7 +57,7 @@ shortcutEdges :: forall node edge.
                  Ord node
               => (node -> Bool)
               -> (edge -> edge -> edge)         -- Used to join edges if after shortcutting there is more than one path from a node to another one
-              -> (edge -> node -> edge -> edge) -- Used when joining two edges in a contiguous path
+              -> (edge -> node -> edge -> edge) -- Used when joining two edges in a contiguous path (the node always satisfys the predicate)
               -> LGraph node edge
               -> LGraph node edge
 shortcutEdges should_shortcut combine_edges combine g = State.evalState visit_graph M.empty
@@ -464,7 +464,8 @@ type PushedFocus = PushFocus PushedQA State
 push :: S.Set Context
      -> (Heap, Stack, PushFocus (Anned QA) (In AnnedTerm))
      -> (PushedHeap, PushedStack, PushedFocus)
-push generalised (Heap h ids, k, focus) = (h', k', focus')
+push generalised (Heap h ids, k, focus) = -- pprTrace "push" (ppr verts $$ ppr marked)
+                                          (h', k', focus')
   where -- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
         --  < H | v | >
         -- and:
@@ -498,7 +499,7 @@ push generalised (Heap h ids, k, focus) = (h', k', focus')
         cheap_marked = S.fromDistinctAscList [HeapContext x' | (x', hb) <- M.toAscList h, maybe True (termIsCheap . snd) (heapBindingTerm hb)] S.\\ generalised
         verts = trimUnreachable FocusContext $
                 shortcutEdges (`S.member` cheap_marked)
-                              plusEntries (\ent1 _ ent2 -> ent1 `plusEntries` ent2)
+                              plusEntries (\ent1 _ _ent2 -> ent1) -- NB: we discard ent2. Consider inlining binding (x = Just y) [which marks y as Many] into context (case x of Just y -> ...) [which marks x as Once]. We don't want to mark y with Many (i.e. Once+Many) because we can in fact push it down safely.
                               (verts_h `unionDisjoint` (verts_k `unionDisjoint` verts_focus))
         extra_marked = solve generalised verts
         marked = cheap_marked `S.union` extra_marked
