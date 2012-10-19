@@ -111,9 +111,10 @@ pairT :: TTest a -> TTest b -> TTest (a, b)
 pairT (WQO prepare_a embed_a) (WQO prepare_b embed_b) = WQO (prepare_a *** prepare_b) go
   where go (a1, b1) (a2, b2) = zipPair ((&&), (&&)) (a1 `embed_a` a2) (b1 `embed_b` b2)
 
+-- NB: zipPair is lazy in the second pair so that when f/g are (&&) we can doing some evaluation
 zipPair :: (a -> b -> c, d -> e -> f)
         -> (a, d) -> (b, e) -> (c, f)
-zipPair (f, g) (a, d) (b, e) = (f a b, g d e)
+zipPair (f, g) (a, d) ~(b, e) = (f a b, g d e)
 
 -- | Type class of zippable things. Instances should satisfy the laws:
 --
