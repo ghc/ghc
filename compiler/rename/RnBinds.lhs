@@ -50,7 +50,7 @@ import Digraph		( SCC(..) )
 import Bag
 import Outputable
 import FastString
-import Data.List	( partition )
+import Data.List	( partition, sort )
 import Maybes		( orElse )
 import Control.Monad
 \end{code}
@@ -641,15 +641,7 @@ renameSigs :: HsSigCtxt
 	   -> RnM ([LSig Name], FreeVars)
 -- Renames the signatures and performs error checks
 renameSigs ctxt sigs 
-  = do	{ mapM_ dupSigDeclErr (findDupsEq overlapHsSig sigs)  -- Duplicate
-	  	-- Check for duplicates on RdrName version, 
-		-- because renamed version has unboundName for
-		-- not-in-scope binders, which gives bogus dup-sig errors
-		-- NB: in a class decl, a 'generic' sig is not considered 
-		--     equal to an ordinary sig, so we allow, say
-		--     	     class C a where
-		--	       op :: a -> a
- 		--             default op :: Eq a => a -> a
+  = do	{ mapM_ dupSigDeclErr (findDupSigs sigs)
 		
 	; (sigs', sig_fvs) <- mapFvRn (wrapLocFstM (renameSig ctxt)) sigs
 
@@ -736,6 +728,32 @@ okHsSig ctxt (L _ sig)
 
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
+
+-------------------
+findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]
+-- Check for duplicates on RdrName version, 
+-- because renamed version has unboundName for
+-- not-in-scope binders, which gives bogus dup-sig errors
+-- NB: in a class decl, a 'generic' sig is not considered 
+--     equal to an ordinary sig, so we allow, say
+--     	     class C a where
+--	       op :: a -> a
+--             default op :: Eq a => a -> a
+findDupSigs sigs
+  = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
+  where
+    expand_sig sig@(FixSig (FixitySig n _)) = [(n,sig)]
+    expand_sig sig@(InlineSig n _)          = [(n,sig)]
+    expand_sig sig@(TypeSig  ns _)   = [(n,sig) | n <- ns]
+    expand_sig sig@(GenericSig ns _) = [(n,sig) | n <- ns]
+    expand_sig _ = []
+
+    matching_sig (L _ n1,sig1) (L _ n2,sig2) = n1 == n2 && mtch sig1 sig2
+    mtch (FixSig {})     (FixSig {})     = True
+    mtch (InlineSig {})  (InlineSig {})  = True
+    mtch (TypeSig {})    (TypeSig {})    = True
+    mtch (GenericSig {}) (GenericSig {}) = True
+    mtch _ _ = False
 \end{code}
 
 
@@ -819,14 +837,15 @@ rnGRHS' ctxt (GRHS guards rhs)
 %************************************************************************
 
 \begin{code}
-dupSigDeclErr :: [LSig RdrName] -> RnM ()
-dupSigDeclErr sigs@(L loc sig : _)
+dupSigDeclErr :: [(Located RdrName, Sig RdrName)] -> RnM ()
+dupSigDeclErr pairs@((L loc name, sig) : _)
   = addErrAt loc $
-	vcat [ptext (sLit "Duplicate") <+> what_it_is <> colon,
-	      nest 2 (vcat (map ppr_sig sigs))]
+    vcat [ ptext (sLit "Duplicate") <+> what_it_is 
+           <> ptext (sLit "s for") <+> quotes (ppr name)
+         , ptext (sLit "at") <+> vcat (map ppr $ sort $ map (getLoc . fst) pairs) ]
   where
     what_it_is = hsSigDoc sig
-    ppr_sig (L loc sig) = ppr loc <> colon <+> ppr sig
+
 dupSigDeclErr [] = panic "dupSigDeclErr"
 
 misplacedSigErr :: LSig Name -> RnM ()
