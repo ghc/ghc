@@ -284,7 +284,7 @@ sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)) -- Bool records whether generalisation occurred, for debug printing
-sc' mb_h state = pprTrace "sc'" (trce1 state) $ {-# SCC "sc'" #-} case mb_h of
+sc' mb_h state = {- pprTrace "sc'" (trce1 state) $ -} {-# SCC "sc'" #-} case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> -- traceRenderM "!sc" (PrettyDoc (pPrintFullState quietStatePrettiness state)) >>
                                                    my_split state
   Just h  -> flip catchM try_generalise $ \rb ->
@@ -312,7 +312,8 @@ sc' mb_h state = pprTrace "sc'" (trce1 state) $ {-# SCC "sc'" #-} case mb_h of
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
     my_generalise splt  = liftM ((,) True)  $ splt           >>= insertTagsM
-    my_split      state = liftM ((,) False) $ split sc state >>= insertTagsM
+    my_split      state = --pprTrace "my_split" (pPrintFullState quietStatePrettiness state) $
+                          liftM ((,) False) $ split sc state >>= insertTagsM
 
 tryTaG, tryMSG :: (State -> ScpM (Deeds, Out FVedTerm))
                -> State -> State
