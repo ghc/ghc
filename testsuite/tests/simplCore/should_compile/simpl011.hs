@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, Rank2Types, ScopedTypeVariables, KindSignatures,
+{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables, KindSignatures,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This one triggered a bug in the indirection-shorting 

@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, MultiParamTypeClasses, FlexibleContexts,
+{-# LANGUAGE RankNTypes, MultiParamTypeClasses, FlexibleContexts,
    TypeFamilies, ScopedTypeVariables #-}
 
 module T7280 where

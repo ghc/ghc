@@ -1,5 +1,5 @@
 {-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses,
-             FunctionalDependencies, Rank2Types #-}
+             FunctionalDependencies, RankNTypes #-}
 
 module Q where
 

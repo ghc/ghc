@@ -1,6 +1,6 @@
 -- Test trying to use a function bound in the list comprehension as the transform function
 
-{-# OPTIONS_GHC -XRank2Types -XTransformListComp #-}
+{-# OPTIONS_GHC -XRankNTypes -XTransformListComp #-}
 
 module RnFail048 where
 

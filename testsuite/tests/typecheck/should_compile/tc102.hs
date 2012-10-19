@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
 -- !!! Caused ghc-4.04proto to report a bogus type error
 -- !!! (as reported by Keith)

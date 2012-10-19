@@ -2,7 +2,7 @@
 --
 -- Test trying to use a function bound in the list comprehension as the group function
 
-{-# OPTIONS_GHC -XRank2Types -XMonadComprehensions -XTransformListComp #-}
+{-# OPTIONS_GHC -XRankNTypes -XMonadComprehensions -XTransformListComp #-}
 
 module RnFail049 where
 

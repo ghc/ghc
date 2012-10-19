@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, Rank2Types #-}
+{-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, RankNTypes #-}
 module T5655 where
 
 import GHC.Prim (Constraint)

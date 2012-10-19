@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 -- !!! Local universal quantification.
 module ShouldSucceed where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, Rank2Types #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 
 module ShouldCompile where
 

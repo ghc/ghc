@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE RankNTypes           #-}
 
 module T7019a where
 

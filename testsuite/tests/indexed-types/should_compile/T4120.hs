@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, TypeFamilies #-}
+{-# LANGUAGE RankNTypes, TypeFamilies #-}
 
 -- Unification yielding a coercion under a forall
 

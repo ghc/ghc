@@ -1,4 +1,4 @@
-{-# LANGUAGE RebindableSyntax, NPlusKPatterns, Rank2Types,
+{-# LANGUAGE RebindableSyntax, NPlusKPatterns, RankNTypes,
              ScopedTypeVariables, FlexibleInstances #-}
 module Main where
 	{
