@@ -879,6 +879,13 @@ genMachOp env _ op [x] = case op of
     MO_FF_Conv from to
         -> sameConv from (widthToLlvmFloat to) LM_Fptrunc LM_Fpext
 
+    MO_VF_Neg len w ->
+        let ty    = widthToLlvmFloat w
+            vecty = LMVector len ty
+            all0  = LMFloatLit (-0) ty
+            all0s = LMLitVar $ LMVectorLit (replicate len all0)
+        in negate vecty all0s LM_MO_FSub
+
     -- Handle unsupported cases explicitly so we get a warning
     -- of missing case when new MachOps added
     MO_Add _          -> panicOp
@@ -919,6 +926,14 @@ genMachOp env _ op [x] = case op of
     MO_Shl          _ -> panicOp
     MO_U_Shr        _ -> panicOp
     MO_S_Shr        _ -> panicOp
+ 
+    MO_V_Insert   _ _ -> panicOp
+    MO_V_Extract  _ _ -> panicOp
+
+    MO_VF_Add     _ _ -> panicOp
+    MO_VF_Sub     _ _ -> panicOp
+    MO_VF_Mul     _ _ -> panicOp
+    MO_VF_Quot    _ _ -> panicOp
 
     where
         dflags = getDflags env
@@ -984,6 +999,24 @@ genMachOp_fast env opt op r n e
 -- This handles all the cases not handle by the specialised genMachOp_fast.
 genMachOp_slow :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
 
+-- Element extraction
+genMachOp_slow env _ (MO_V_Extract {}) [val, idx] = do
+    (env1, vval, stmts1, top1) <- exprToVar env  val
+    (env2, vidx, stmts2, top2) <- exprToVar env1 idx
+    let (LMVector _ ty)        =  getVarType vval
+    (v1, s1)                   <- doExpr ty $ Extract vval vidx
+    return (env2, v1, stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
+
+-- Element insertion
+genMachOp_slow env _ (MO_V_Insert {}) [val, elt, idx] = do
+    (env1, vval, stmts1, top1) <- exprToVar env  val
+    (env2, velt, stmts2, top2) <- exprToVar env1 elt
+    (env3, vidx, stmts3, top3) <- exprToVar env2 idx
+    let ty                     =  getVarType vval
+    (v1, s1)                   <- doExpr ty $ Insert vval velt vidx
+    return (env3, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL` s1,
+            top1 ++ top2 ++ top3)
+    
 -- Binary MachOp
 genMachOp_slow env opt op [x, y] = case op of
 
@@ -1032,6 +1065,11 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_Shl _   -> genBinMach LM_MO_Shl
     MO_U_Shr _ -> genBinMach LM_MO_LShr
     MO_S_Shr _ -> genBinMach LM_MO_AShr
+ 
+    MO_VF_Add _ _  -> genBinMach LM_MO_FAdd
+    MO_VF_Sub _ _  -> genBinMach LM_MO_FSub
+    MO_VF_Mul _ _  -> genBinMach LM_MO_FMul
+    MO_VF_Quot _ _ -> genBinMach LM_MO_FDiv
 
     MO_Not _       -> panicOp
     MO_S_Neg _     -> panicOp
@@ -1042,6 +1080,11 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_SS_Conv _ _ -> panicOp
     MO_UU_Conv _ _ -> panicOp
     MO_FF_Conv _ _ -> panicOp
+
+    MO_V_Insert  {} -> panicOp
+    MO_V_Extract {} -> panicOp
+
+    MO_VF_Neg {} -> panicOp
 
     where
         dflags = getDflags env

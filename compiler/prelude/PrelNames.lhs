@@ -1420,6 +1420,11 @@ typeNatAddTyFamNameKey    = mkPreludeTyConUnique 162
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 163
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 164
 
+-- SIMD vector types (Unique keys)
+floatX4PrimTyConKey :: Unique
+
+floatX4PrimTyConKey = mkPreludeTyConUnique 170
+
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299
 -----------------------------------------------------

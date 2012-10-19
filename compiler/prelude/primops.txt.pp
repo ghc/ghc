@@ -2202,6 +2202,101 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
 
 
 ------------------------------------------------------------------------
+section "Float SIMD Vectors" 
+	{Operations on SIMD vectors of 4 single-precision (32-bit)
+         floating-point numbers.}
+------------------------------------------------------------------------
+
+primtype FloatX4#
+
+primop FloatToFloatX4Op "floatToFloatX4#" GenPrimOp     
+   Float# -> FloatX4#
+
+primop FloatX4PackOp "packFloatX4#" GenPrimOp         
+   Float# -> Float# -> Float# -> Float# -> FloatX4#
+
+primop FloatX4UnpackOp "unpackFloatX4#" GenPrimOp         
+   FloatX4# -> (# Float#, Float#, Float#, Float# #)
+
+primop FloatX4InsertOp "insertFloatX4#" GenPrimOp     
+   FloatX4# -> Float# -> Int# -> FloatX4#
+   with can_fail = True
+
+primop FloatX4AddOp "plusFloatX4#" Dyadic            
+   FloatX4# -> FloatX4# -> FloatX4#
+   with commutable = True
+
+primop FloatX4SubOp "minusFloatX4#" Dyadic
+  FloatX4# -> FloatX4# -> FloatX4#
+
+primop FloatX4MulOp "timesFloatX4#" Dyadic    
+   FloatX4# -> FloatX4# -> FloatX4#
+   with commutable = True
+
+primop FloatX4DivOp "divideFloatX4#" Dyadic  
+   FloatX4# -> FloatX4# -> FloatX4#
+   with can_fail = True
+
+primop FloatX4NegOp "negateFloatX4#" Monadic
+   FloatX4# -> FloatX4#
+
+primop IndexByteArrayOp_FloatX4 "indexFloatX4Array#" GenPrimOp
+   ByteArray# -> Int# -> FloatX4#
+   with can_fail = True
+
+primop ReadByteArrayOp_FloatX4 "readFloatX4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_FloatX4 "writeFloatX4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_FloatX4 "indexFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> FloatX4#
+   with can_fail = True
+
+primop ReadOffAddrOp_FloatX4 "readFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_FloatX4 "writeFloatX4OffAddr#" GenPrimOp
+   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexByteArrayOp_FloatAsFloatX4 "indexFloatArrayAsFloatX4#" GenPrimOp
+   ByteArray# -> Int# -> FloatX4#
+   with can_fail = True
+
+primop ReadByteArrayOp_FloatAsFloatX4 "readFloatArrayAsFloatX4#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_FloatAsFloatX4 "writeFloatArrayAsFloatX4#" GenPrimOp
+   MutableByteArray# s -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_FloatAsFloatX4 "indexFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> FloatX4#
+   with can_fail = True
+
+primop ReadOffAddrOp_FloatAsFloatX4 "readFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, FloatX4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
+   Addr# -> Int# -> FloatX4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+------------------------------------------------------------------------
 ---                                                                  ---
 ------------------------------------------------------------------------
 
