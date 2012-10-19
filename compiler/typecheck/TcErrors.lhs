@@ -702,7 +702,7 @@ isUserSkolem ctxt tv
     is_user_skol_info _ = True
 
 misMatchOrCND :: ReportErrCtxt -> Ct -> Maybe SwapFlag -> TcType -> TcType -> SDoc
--- If oriented then ty1 is expected, ty2 is actual
+-- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt ct oriented ty1 ty2
   | null givens || 
     (isRigid ty1 && isRigid ty2) || 
@@ -714,7 +714,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
   = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
-    orig   = TypeEqOrigin ty1 ty2
+    orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
