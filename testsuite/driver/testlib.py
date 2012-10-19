@@ -306,7 +306,7 @@ def if_platform( plat, f ):
     else:
         return normal
 
-def if_not_platform( plat, f ):
+def unless_platform( plat, f ):
     if config.platform != plat:
         return f
     else:
@@ -355,6 +355,12 @@ def if_cygwin( f ):
         return normal
 
 # ---
+
+def if_ghci_dynamic( f ):
+    if config.ghc_dynamic_by_default:
+        return f
+    else:
+        return normal
 
 def if_in_tree_compiler( f ):
     if config.in_tree_compiler:
@@ -1747,6 +1753,7 @@ def normalise_asm( str ):
     for line in lines:
       # Drop metadata directives (e.g. ".type")
       if not metadata.match(line):
+        line = re.sub('@plt', '', line)
         instr = line.lstrip().split()
         # Drop empty lines.
         if not instr:
