@@ -30,7 +30,7 @@ import Llvm
 import LlvmCodeGen.Regs
 
 import CLabel
-import CgUtils ( activeStgRegs )
+import CodeGen.Platform ( activeStgRegs )
 import DynFlags
 import FastString
 import OldCmm

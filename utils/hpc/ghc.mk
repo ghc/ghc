@@ -10,10 +10,8 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/hpc_dist-install_MODULES = Main HpcCombine HpcDraft HpcFlags HpcLexer \
-			 HpcMarkup HpcOverlay HpcParser HpcReport \
-			 HpcShowTix HpcUtils
-utils/hpc_dist-install_HC_OPTS         = -cpp -package hpc
+utils/hpc_USES_CABAL                   = YES
+utils/hpc_PACKAGE                      = hpc-bin
 utils/hpc_dist-install_INSTALL         = YES
 utils/hpc_dist-install_INSTALL_INPLACE = YES
 utils/hpc_dist-install_PROG            = hpc$(exeext)

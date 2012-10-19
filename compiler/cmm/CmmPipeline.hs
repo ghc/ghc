@@ -163,7 +163,7 @@ cpsTop hsc_env proc =
            = mapM_ (dumpWith dflags flag name)
 
         condPass flag pass g dumpflag dumpname =
-            if dopt flag dflags
+            if gopt flag dflags
                then do
                     g <- return $ pass g
                     dump dumpflag dumpname g
@@ -184,9 +184,9 @@ runUniqSM m = do
   return (initUs_ us m)
 
 
-dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
+dumpGraph :: DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
-  when (dopt Opt_DoCmmLinting dflags) $ do_lint g
+  when (gopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name g
  where
   do_lint g = case cmmLintGraph dflags g of
@@ -195,7 +195,7 @@ dumpGraph dflags flag name g = do
                                 }
                  Nothing  -> return ()
 
-dumpWith :: Outputable a => DynFlags -> DynFlag -> String -> a -> IO ()
+dumpWith :: Outputable a => DynFlags -> DumpFlag -> String -> a -> IO ()
 dumpWith dflags flag txt g = do
          -- ToDo: No easy way of say "dump all the cmmz, *and* split
          -- them into files."  Also, -ddump-cmmz doesn't play nicely

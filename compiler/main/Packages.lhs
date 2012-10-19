@@ -68,7 +68,7 @@ import qualified Data.Set as Set
 -- ---------------------------------------------------------------------------
 -- The Package state
 
--- | Package state is all stored in 'DynFlag's, including the details of
+-- | Package state is all stored in 'DynFlags', including the details of
 -- all packages, which packages are exposed, and which modules they
 -- provide.
 --
@@ -252,11 +252,11 @@ setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
 setBatchPackageFlags dflags pkgs = (maybeDistrustAll . maybeHideAll) pkgs
   where
     maybeHideAll pkgs'
-      | dopt Opt_HideAllPackages dflags = map hide pkgs'
+      | gopt Opt_HideAllPackages dflags = map hide pkgs'
       | otherwise                       = pkgs'
 
     maybeDistrustAll pkgs'
-      | dopt Opt_DistrustAllPackages dflags = map distrust pkgs'
+      | gopt Opt_DistrustAllPackages dflags = map distrust pkgs'
       | otherwise                           = pkgs'
 
     hide pkg = pkg{ exposed = False }
@@ -792,7 +792,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
   let
       -- add base & rts to the preload packages
       basicLinkedPackages
-       | dopt Opt_AutoLinkPackages dflags
+       | gopt Opt_AutoLinkPackages dflags
           = filter (flip elemUFM pkg_db) [basePackageId, rtsPackageId]
        | otherwise = []
       -- but in any case remove the current package from the set of
@@ -895,7 +895,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
         rts_tag = mkBuildTag ways2
 
-        mkDynName | dopt Opt_Static dflags = id
+        mkDynName | gopt Opt_Static dflags = id
                   | otherwise = (++ ("-ghc" ++ cProjectVersion))
 
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
@@ -947,7 +947,7 @@ lookupModuleWithSuggestions dflags m
   where
     pkg_state = pkgState dflags
     suggestions
-      | dopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
+      | gopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
       | otherwise                     = []
 
     all_mods :: [(String, Module)]     -- All modules
@@ -1035,7 +1035,7 @@ isDllName :: DynFlags -> PackageId -> Name -> Bool
 -- the synbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
 isDllName dflags this_pkg name
-  | dopt Opt_Static dflags = False
+  | gopt Opt_Static dflags = False
   | Just mod <- nameModule_maybe name = modulePackageId mod /= this_pkg
   | otherwise = False  -- no, it is not even an external name
 

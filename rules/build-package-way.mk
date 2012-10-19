@@ -25,8 +25,9 @@ $(call hs-objs,$1,$2,$3)
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB = $1/$2/build/libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
-$$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
+$1_$2_$3_LIB_NAME = libHS$$($1_PACKAGE)-$$($1_$2_VERSION)$$($3_libsuf)
+$1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_NAME)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
 # Note [inconsistent distdirs]
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
@@ -35,7 +36,7 @@ $$($1_PACKAGE)-$($1_$2_VERSION)_$2_$3_LIB = $$($1_$2_$3_LIB)
 # Really we should use a consistent scheme for distdirs, but in the
 # meantime we work around it by defining ghc-<ver>_dist-install_way_LIB:
 ifeq "$$($1_PACKAGE) $2" "ghc stage2"
-$$($1_PACKAGE)-$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_dist-install_$3_LIB = $$($1_$2_$3_LIB)
 endif
 
 # All the .a/.so library file dependencies for this library.
@@ -81,7 +82,6 @@ $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
-	     -dylib-install-name $(ghclibdir)/`basename "$$@" | sed 's/^libHS//;s/[-]ghc.*//'`/`basename "$$@"` \
          -no-auto-link-packages \
          -o $$@
 endif
@@ -113,6 +113,9 @@ BINDIST_LIBS += $$($1_$2_$3_LIB)
 endif
 
 # Build the GHCi library
+ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+$1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
+else
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
@@ -128,6 +131,7 @@ ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
+endif
 endif
 endif
 endif

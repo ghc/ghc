@@ -76,13 +76,13 @@ sse2Enabled = do
                     -- calling convention specifies the use of xmm regs,
                     -- and possibly other places.
                     return True
-      ArchX86    -> return (dopt Opt_SSE2 dflags || dopt Opt_SSE4_2 dflags)
+      ArchX86    -> return (gopt Opt_SSE2 dflags || gopt Opt_SSE4_2 dflags)
       _          -> panic "sse2Enabled: Not an X86* arch"
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
   dflags <- getDynFlags
-  return (dopt Opt_SSE4_2 dflags)
+  return (gopt Opt_SSE4_2 dflags)
 
 if_sse2 :: NatM a -> NatM a -> NatM a
 if_sse2 sse2 x87 = do
@@ -2291,7 +2291,7 @@ outOfLineCmmOp mop res args
 genSwitch :: DynFlags -> CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
 
 genSwitch dflags expr ids
-  | dopt Opt_PIC dflags
+  | gopt Opt_PIC dflags
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
@@ -2352,7 +2352,7 @@ createJumpTable :: DynFlags -> [Maybe BlockId] -> Section -> CLabel
                 -> GenCmmDecl (Alignment, CmmStatics) h g
 createJumpTable dflags ids section lbl
     = let jumpTable
-            | dopt Opt_PIC dflags =
+            | gopt Opt_PIC dflags =
                   let jumpTableEntryRel Nothing
                           = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)

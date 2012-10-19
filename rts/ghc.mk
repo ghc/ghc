@@ -16,6 +16,9 @@
 # We build the RTS with stage 1
 rts_dist_HC = $(GHC_STAGE1)
 
+rts_INSTALL_INFO = rts
+rts_VERSION = 1.0
+
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 rts_dist_WAYS = $(rts_WAYS)
@@ -187,10 +190,6 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend rts/dist
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -lffi `cat rts/libs.depend` $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
-ifeq "$$(darwin_HOST_OS)" "1"
-	# Ensure library's install name is correct before anyone links with it.
-	install_name_tool -id $$(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
-endif
 endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_ffi_objs_stamp)
@@ -315,6 +314,10 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+rts/Linker_CC_OPTS += -DDYNAMIC_BY_DEFAULT
+endif
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the

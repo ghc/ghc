@@ -262,7 +262,7 @@ cgDataCon data_con
 
 maybeExternaliseId :: DynFlags -> Id -> FCode Id
 maybeExternaliseId dflags id
-  | dopt Opt_SplitObjs dflags,  -- Externalise the name for -split-objs
+  | gopt Opt_SplitObjs dflags,  -- Externalise the name for -split-objs
     isInternalName name = do { mod <- getModuleName
                              ; returnFC (setIdName id (externalise mod)) }
   | otherwise           = returnFC id

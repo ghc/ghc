@@ -19,7 +19,7 @@ module ErrUtils (
 
         ghcExit,
         doIfSet, doIfSet_dyn,
-        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_or,
+        dumpIfSet, dumpIfSet_dyn,
         mkDumpDoc, dumpSDoc,
 
         --  * Messages during compilation
@@ -50,6 +50,7 @@ import Data.List
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Ord
+import Data.Time
 import Control.Monad
 import System.IO
 
@@ -93,7 +94,7 @@ mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
   -- would look strange.  Better to say explicitly "<no location info>".
 mkLocMessage severity locn msg
     = sdocWithDynFlags $ \dflags ->
-      let locn' = if dopt Opt_ErrorSpans dflags
+      let locn' = if gopt Opt_ErrorSpans dflags
                   then ppr locn
                   else ppr (srcSpanStart locn)
       in hang (locn' <> colon <+> sev_info) 4 msg
@@ -193,8 +194,8 @@ doIfSet :: Bool -> IO () -> IO ()
 doIfSet flag action | flag      = action
                     | otherwise = return ()
 
-doIfSet_dyn :: DynFlags -> DynFlag -> IO () -> IO()
-doIfSet_dyn dflags flag action | dopt flag dflags = action
+doIfSet_dyn :: DynFlags -> GeneralFlag -> IO () -> IO()
+doIfSet_dyn dflags flag action | gopt flag dflags = action
                                | otherwise        = return ()
 
 -- -----------------------------------------------------------------------------
@@ -205,19 +206,12 @@ dumpIfSet dflags flag hdr doc
   | not flag   = return ()
   | otherwise  = log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
-dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
+dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | dopt flag dflags || verbosity dflags >= 4
+  | dopt flag dflags
   = dumpSDoc dflags flag hdr doc
   | otherwise
   = return ()
-
-dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
-dumpIfSet_dyn_or _ [] _ _ = return ()
-dumpIfSet_dyn_or dflags (flag : flags) hdr doc
-    = if dopt flag dflags || verbosity dflags >= 4
-      then dumpSDoc dflags flag hdr doc
-      else dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
@@ -235,13 +229,10 @@ mkDumpDoc hdr doc
 -- 
 -- When hdr is empty, we print in a more compact format (no separators and
 -- blank lines)
-dumpSDoc :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
-dumpSDoc dflags dflag hdr doc
- = do let mFile = chooseDumpFile dflags dflag
+dumpSDoc :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
+dumpSDoc dflags flag hdr doc
+ = do let mFile = chooseDumpFile dflags flag
       case mFile of
-            -- write the dump to a file
-            -- don't add the header in this case, we can see what kind
-            -- of dump it is from the filename.
             Just fileName
                  -> do
                         let gdref = generatedDumps dflags
@@ -252,9 +243,13 @@ dumpSDoc dflags dflag hdr doc
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
-                        let doc'
-                              | null hdr  = doc
-                              | otherwise = doc $$ blankLine
+                        doc' <- if null hdr
+                                then return doc
+                                else do t <- getCurrentTime
+                                        let d = text (show t)
+                                             $$ blankLine
+                                             $$ doc
+                                        return $ mkDumpDoc hdr d
                         defaultLogActionHPrintDoc dflags handle doc' defaultDumpStyle
                         hClose handle
 
@@ -268,12 +263,12 @@ dumpSDoc dflags dflag hdr doc
 
 -- | Choose where to put a dump file based on DynFlags
 --
-chooseDumpFile :: DynFlags -> DynFlag -> Maybe String
-chooseDumpFile dflags dflag
+chooseDumpFile :: DynFlags -> DumpFlag -> Maybe String
+chooseDumpFile dflags flag
 
-        | dopt Opt_DumpToFile dflags
+        | gopt Opt_DumpToFile dflags
         , Just prefix <- getPrefix
-        = Just $ setDir (prefix ++ (beautifyDumpName dflag))
+        = Just $ setDir (prefix ++ (beautifyDumpName flag))
 
         | otherwise
         = Nothing
@@ -293,12 +288,14 @@ chooseDumpFile dflags dflag
                          Just d  -> d </> f
                          Nothing ->       f
 
--- | Build a nice file name from name of a DynFlag constructor
-beautifyDumpName :: DynFlag -> String
-beautifyDumpName dflag
- = let str  = show dflag
-       cut  = if isPrefixOf "Opt_D_" str then drop 6 str else str
-       dash = map (\c -> if c == '_' then '-' else c) cut
+-- | Build a nice file name from name of a GeneralFlag constructor
+beautifyDumpName :: DumpFlag -> String
+beautifyDumpName flag
+ = let str = show flag
+       suff = case stripPrefix "Opt_D_" str of
+              Just x -> x
+              Nothing -> panic ("Bad flag name: " ++ str)
+       dash = map (\c -> if c == '_' then '-' else c) suff
    in dash
 
 

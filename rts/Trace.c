@@ -708,6 +708,28 @@ void traceUserMsg(Capability *cap, char *msg)
     traceFormatUserMsg(cap, "%s", msg);
 }
 
+void traceUserMarker(Capability *cap, char *markername)
+{
+    /* Note: traceUserMarker is special since it has no wrapper (it's called
+       from cmm code), so we check eventlog_enabled and TRACE_user here.
+     */
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_user) {
+        ACQUIRE_LOCK(&trace_utx);
+        tracePreface();
+        debugBelch("cap %d: User marker: %s\n", cap->no, markername);
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled && TRACE_user) {
+            postUserMarker(cap, markername);
+        }
+    }
+    dtraceUserMarker(cap->no, markername);
+}
+
+
 void traceThreadLabel_(Capability *cap,
                        StgTSO     *tso,
                        char       *label)
@@ -774,6 +796,11 @@ void traceEnd (void)
 void dtraceUserMsgWrapper(Capability *cap, char *msg)
 {
     dtraceUserMsg(cap->no, msg);
+}
+
+void dtraceUserMarkerWrapper(Capability *cap, char *msg)
+{
+    dtraceUserMarker(cap->no, msg);
 }
 
 #endif /* !defined(DEBUG) && !defined(TRACING) && defined(DTRACE) */

@@ -22,7 +22,7 @@ import MkCore
 import CoreArity	( etaExpand )
 import CoreMonad	( FloatOutSwitches(..) )
 
-import DynFlags		( DynFlags, DynFlag(..) )
+import DynFlags
 import ErrUtils		( dumpIfSet_dyn )
 import Id		( Id, idArity, isBottomingId )
 import Var		( Var )

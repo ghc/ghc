@@ -1400,7 +1400,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
     -- we generate one SRT for the whole module.
     let
      pipeline_stream
-      | dopt Opt_SplitObjs dflags
+      | gopt Opt_SplitObjs dflags
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do
                 let (topSRT', us') = initUs us emptySRT
@@ -1733,7 +1733,7 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
 
     | otherwise = do
         let dflags = hsc_dflags hsc_env
-        let lint_on = dopt Opt_DoCoreLinting dflags
+        let lint_on = gopt Opt_DoCoreLinting dflags
 
         {- Simplify it -}
         simpl_expr <- simplifyExpr dflags ds_expr

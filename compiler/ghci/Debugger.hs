@@ -147,7 +147,7 @@ bindSuspensions t = do
 showTerm :: GhcMonad m => Term -> m SDoc
 showTerm term = do
     dflags       <- GHC.getSessionDynFlags
-    if dopt Opt_PrintEvldWithShow dflags
+    if gopt Opt_PrintEvldWithShow dflags
        then cPprTerm (liftM2 (++) (\_y->[cPprShowable]) cPprTermBase) term
        else cPprTerm cPprTermBase term
  where
@@ -205,8 +205,8 @@ newGrimName userName  = do
 pprTypeAndContents :: GhcMonad m => Id -> m SDoc
 pprTypeAndContents id = do
   dflags  <- GHC.getSessionDynFlags
-  let pefas     = dopt Opt_PrintExplicitForalls dflags
-      pcontents = dopt Opt_PrintBindContents dflags
+  let pefas     = gopt Opt_PrintExplicitForalls dflags
+      pcontents = gopt Opt_PrintBindContents dflags
       pprdId    = (pprTyThing pefas . AnId) id
   if pcontents 
     then do
@@ -224,7 +224,7 @@ pprTypeAndContents id = do
 --------------------------------------------------------------
 -- Utils 
 
-traceOptIf :: GhcMonad m => DynFlag -> SDoc -> m ()
+traceOptIf :: GhcMonad m => DumpFlag -> SDoc -> m ()
 traceOptIf flag doc = do
   dflags <- GHC.getSessionDynFlags
   when (dopt flag dflags) $ liftIO $ printInfoForUser dflags alwaysQualify doc

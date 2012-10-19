@@ -307,8 +307,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               })
 
   = do  { let { dflags     = hsc_dflags hsc_env
-              ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
-              ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
+              ; omit_prags = gopt Opt_OmitInterfacePragmas dflags
+              ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; th         = xopt Opt_TemplateHaskell      dflags
               ; data_kinds = xopt Opt_DataKinds            dflags
               ; no_trim_types = th || data_kinds

@@ -580,9 +580,9 @@ nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 -- Rational value to that of Float/Double. We confuse host architecture
 -- and target architecture here, but it's convenient (and wrong :-).
 convFloating :: DynFlags -> Literal -> Literal
-convFloating dflags (MachFloat  f) | not (dopt Opt_ExcessPrecision dflags) =
+convFloating dflags (MachFloat  f) | not (gopt Opt_ExcessPrecision dflags) =
    MachFloat  (toRational (fromRational f :: Float ))
-convFloating dflags (MachDouble d) | not (dopt Opt_ExcessPrecision dflags) =
+convFloating dflags (MachDouble d) | not (gopt Opt_ExcessPrecision dflags) =
    MachDouble (toRational (fromRational d :: Double))
 convFloating _ l = l
 

@@ -478,7 +478,7 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
                                      -- pat_ty /= pat_ty iff coi /= IdCo
               unmangled_result = TuplePat pats' boxity pat_ty'
 	      possibly_mangled_result
-	        | dopt Opt_IrrefutableTuples dflags &&
+	        | gopt Opt_IrrefutableTuples dflags &&
                   isBoxed boxity            = LazyPat (noLoc unmangled_result)
 	        | otherwise		    = unmangled_result
 

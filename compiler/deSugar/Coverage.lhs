@@ -90,8 +90,8 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
                       , this_mod     = mod
                       , tickishType  = case hscTarget dflags of
                           HscInterpreted          -> Breakpoints
-                          _ | dopt Opt_Hpc dflags -> HpcTicks
-                            | dopt Opt_SccProfilingOn dflags
+                          _ | gopt Opt_Hpc dflags -> HpcTicks
+                            | gopt Opt_SccProfilingOn dflags
                                                   -> ProfNotes
                             | otherwise           -> error "addTicksToBinds: No way to annotate!"
                        })
@@ -106,7 +106,7 @@ addTicksToBinds dflags mod mod_loc exports tyCons binds =
      hashNo <- writeMixEntries dflags mod count entries orig_file2
      modBreaks <- mkModBreaks dflags count entries
 
-     doIfSet_dyn dflags Opt_D_dump_ticked $
+     when (dopt Opt_D_dump_ticked dflags) $
          log_action dflags dflags SevDump noSrcSpan defaultDumpStyle
              (pprLHsBinds binds1)
 
@@ -145,7 +145,7 @@ mkModBreaks dflags count entries = do
 
 writeMixEntries :: DynFlags -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
 writeMixEntries dflags mod count entries filename
-  | not (dopt Opt_Hpc dflags) = return 0
+  | not (gopt Opt_Hpc dflags) = return 0
   | otherwise   = do
         let
             hpc_dir = hpcDir dflags
@@ -183,7 +183,7 @@ data TickDensity
 
 mkDensity :: DynFlags -> TickDensity
 mkDensity dflags
-  | dopt Opt_Hpc dflags                  = TickForCoverage
+  | gopt Opt_Hpc dflags                  = TickForCoverage
   | HscInterpreted  <- hscTarget dflags  = TickForBreakPoints
   | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
   | ProfAutoTop     <- profAuto dflags   = TickTopFunctions
@@ -269,7 +269,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
                  || id `elemVarSet` inline_ids
 
   -- See Note [inline sccs]
-  if inline && dopt Opt_SccProfilingOn dflags then return (L pos funBind) else do
+  if inline && gopt Opt_SccProfilingOn dflags then return (L pos funBind) else do
 
   (fvs, (MatchGroup matches' ty)) <-
         getFreeVars $
@@ -1084,7 +1084,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
 
         dflags = tte_dflags env
 
-        count = countEntries && dopt Opt_ProfCountEntries dflags
+        count = countEntries && gopt Opt_ProfCountEntries dflags
 
         tickish = case tickishType env of
           HpcTicks    -> HpcTick (this_mod env) c

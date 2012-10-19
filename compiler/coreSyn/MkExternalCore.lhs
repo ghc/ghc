@@ -44,7 +44,7 @@ import System.IO
 
 emitExternalCore :: DynFlags -> CgGuts -> IO ()
 emitExternalCore dflags cg_guts
- | dopt Opt_EmitExternalCore dflags
+ | gopt Opt_EmitExternalCore dflags
  = (do handle <- openFile corename WriteMode
        hPutStrLn handle (show (mkExternalCore dflags cg_guts))
        hClose handle)

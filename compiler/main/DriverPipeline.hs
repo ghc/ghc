@@ -155,7 +155,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
    let hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- -fforce-recomp should also work with --make
-   let force_recomp = dopt Opt_ForceRecomp dflags
+   let force_recomp = gopt Opt_ForceRecomp dflags
        source_modified
          | force_recomp || isNothing maybe_old_linkable = SourceModified
          | otherwise = source_modified0
@@ -320,7 +320,7 @@ link' dflags batch_attempt_linking hpt
 
         linking_needed <- linkingNeeded dflags linkables pkg_deps
 
-        if not (dopt Opt_ForceRecomp dflags) && not linking_needed
+        if not (gopt Opt_ForceRecomp dflags) && not linking_needed
            then do debugTraceMsg dflags 2 (text exe_file <+> ptext (sLit "is up to date, linking not required."))
                    return Succeeded
            else do
@@ -330,7 +330,7 @@ link' dflags batch_attempt_linking hpt
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
                 LinkBinary  -> linkBinary
-                LinkDynLib  -> linkDynLib
+                LinkDynLib  -> linkDynLibCheck
                 other       -> panicBadLink other
         link dflags obj_files pkg_deps
 
@@ -410,7 +410,7 @@ ghcLinkInfoSectionName = ".debug-ghc-link-info"
 
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
-  let batch_lib_file = if dopt Opt_Static dflags
+  let batch_lib_file = if gopt Opt_Static dflags
                        then "lib" ++ lib <.> "a"
                        else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
@@ -434,7 +434,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
 
    let
         dflags = hsc_dflags hsc_env
-        split     = dopt Opt_SplitObjs dflags
+        split     = gopt Opt_SplitObjs dflags
         mb_o_file = outputFile dflags
         ghc_link  = ghcLink dflags      -- Set by -c or -no-link
 
@@ -465,8 +465,8 @@ doLink dflags stop_phase o_files
   | otherwise
   = case ghcLink dflags of
         NoLink     -> return ()
-        LinkBinary -> linkBinary dflags o_files []
-        LinkDynLib -> linkDynLib dflags o_files []
+        LinkBinary -> linkBinary      dflags o_files []
+        LinkDynLib -> linkDynLibCheck dflags o_files []
         other      -> panicBadLink other
 
 
@@ -675,9 +675,9 @@ getOutputFilename stop_phase output basename
                 hcsuf      = hcSuf dflags
                 odir       = objectDir dflags
                 osuf       = objectSuf dflags
-                keep_hc    = dopt Opt_KeepHcFiles dflags
-                keep_s     = dopt Opt_KeepSFiles dflags
-                keep_bc    = dopt Opt_KeepLlvmFiles dflags
+                keep_hc    = gopt Opt_KeepHcFiles dflags
+                keep_s     = gopt Opt_KeepSFiles dflags
+                keep_bc    = gopt Opt_KeepLlvmFiles dflags
 
                 myPhaseInputExt HCc       = hcsuf
                 myPhaseInputExt MergeStub = osuf
@@ -778,7 +778,7 @@ runPhase (Cpp sf) input_fn dflags0
 
        if not (xopt Opt_Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
-           unless (dopt Opt_Pp dflags1) $ io $ handleFlagWarnings dflags1 warns
+           unless (gopt Opt_Pp dflags1) $ io $ handleFlagWarnings dflags1 warns
 
            -- no need to preprocess CPP, just pass input file along
            -- to the next phase of the pipeline.
@@ -792,7 +792,7 @@ runPhase (Cpp sf) input_fn dflags0
             (dflags2, unhandled_flags, warns)
                 <- io $ parseDynamicFilePragma dflags0 src_opts
             io $ checkProcessArgsResult dflags2 unhandled_flags
-            unless (dopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
+            unless (gopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
 
             setDynFlags dflags2
@@ -804,7 +804,7 @@ runPhase (Cpp sf) input_fn dflags0
 
 runPhase (HsPp sf) input_fn dflags
   = do
-       if not (dopt Opt_Pp dflags) then
+       if not (gopt Opt_Pp dflags) then
            -- no need to preprocess, just pass input file along
            -- to the next phase of the pipeline.
           return (Hsc sf, input_fn)
@@ -1054,7 +1054,7 @@ runPhase cc_phase input_fn dflags
             _ ->
                 return []
 
-        let split_objs = dopt Opt_SplitObjs dflags
+        let split_objs = gopt Opt_SplitObjs dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
                       | otherwise         = [ ]
 
@@ -1072,7 +1072,7 @@ runPhase cc_phase input_fn dflags
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
                 (if platformArch platform == ArchX86 &&
-                    not (dopt Opt_ExcessPrecision dflags)
+                    not (gopt Opt_ExcessPrecision dflags)
                         then [ "-ffloat-store" ]
                         else []) ++
 
@@ -1324,7 +1324,7 @@ runPhase LlvmOpt input_fn dflags
                        then [SysTools.Option (llvmOpts !! opt_lvl)]
                        else []
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
-             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+             | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
 
@@ -1353,17 +1353,17 @@ runPhase LlvmLlc input_fn dflags
 
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
-        rmodel | dopt Opt_PIC dflags          = "pic"
-               | not (dopt Opt_Static dflags) = "dynamic-no-pic"
+        rmodel | gopt Opt_PIC dflags          = "pic"
+               | not (gopt Opt_Static dflags) = "dynamic-no-pic"
                | otherwise                    = "static"
         tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
-             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+             | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
-    let next_phase = case dopt Opt_NoLlvmMangler dflags of
+    let next_phase = case gopt Opt_NoLlvmMangler dflags of
                          False                            -> LlvmMangle
-                         True | dopt Opt_SplitObjs dflags -> Splitter
+                         True | gopt Opt_SplitObjs dflags -> Splitter
                          True                             -> As
                         
     output_fn <- phaseOutputFilename next_phase
@@ -1407,7 +1407,7 @@ runPhase LlvmLlc input_fn dflags
 
 runPhase LlvmMangle input_fn dflags
   = do
-      let next_phase = if dopt Opt_SplitObjs dflags then Splitter else As
+      let next_phase = if gopt Opt_SplitObjs dflags then Splitter else As
       output_fn <- phaseOutputFilename next_phase
       io $ llvmFixupAsm dflags input_fn output_fn
       return (next_phase, output_fn)
@@ -1449,7 +1449,7 @@ maybeMergeStub
 
 runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool
 runPhase_MoveBinary dflags input_fn
-    | WayPar `elem` ways dflags && not (dopt Opt_Static dflags) =
+    | WayPar `elem` ways dflags && not (gopt Opt_Static dflags) =
         panic ("Don't know how to combine PVM wrapper and dynamic wrapper")
     | WayPar `elem` ways dflags = do
         let sysMan = pgm_sysman dflags
@@ -1490,7 +1490,7 @@ mkExtraObj dflags extn xs
 --
 mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags = do
-   when (dopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
+   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
       log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
@@ -1499,7 +1499,7 @@ mkExtraObjToLinkIntoBinary dflags = do
 
   where
     main
-      | dopt Opt_NoHsMain dflags = empty
+      | gopt Opt_NoHsMain dflags = empty
       | otherwise = vcat [
              ptext (sLit "#include \"Rts.h\""),
              ptext (sLit "extern StgClosure ZCMain_main_closure;"),
@@ -1564,7 +1564,7 @@ getLinkInfo dflags dep_packages = do
                    pkg_frameworks,
                    rtsOpts dflags,
                    rtsOptsEnabled dflags,
-                   dopt Opt_NoHsMain dflags,
+                   gopt Opt_NoHsMain dflags,
                    extra_ld_inputs,
                    getOpts dflags opt_l)
    --
@@ -1673,12 +1673,12 @@ linkBinary dflags o_files dep_packages = do
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           not (dopt Opt_Static dflags)
-            = let libpath = if dopt Opt_RelativeDynlibPaths dflags
+           not (gopt Opt_Static dflags)
+            = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-                  rpath = if dopt Opt_RPath dflags
+                  rpath = if gopt Opt_RPath dflags
                           then ["-Wl,-rpath",      "-Wl," ++ libpath]
                           else []
               in ["-L" ++ l, "-Wl,-rpath-link", "-Wl," ++ l] ++ rpath
@@ -1835,7 +1835,7 @@ maybeCreateManifest
    -> IO [FilePath]                     -- extra objects to embed, maybe
 maybeCreateManifest dflags exe_filename
  | platformOS (targetPlatform dflags) == OSMinGW32 &&
-   dopt Opt_GenManifest dflags
+   gopt Opt_GenManifest dflags
     = do let manifest_filename = exe_filename <.> "manifest"
 
          writeFile manifest_filename $
@@ -1858,7 +1858,7 @@ maybeCreateManifest dflags exe_filename
          -- foo.exe.manifest. However, for extra robustness, and so that
          -- we can move the binary around, we can embed the manifest in
          -- the binary itself using windres:
-         if not (dopt Opt_EmbedManifest dflags) then return [] else do
+         if not (gopt Opt_EmbedManifest dflags) then return [] else do
 
          rc_filename <- newTempName dflags "rc"
          rc_obj_filename <- newTempName dflags (objectSuf dflags)
@@ -1884,176 +1884,15 @@ maybeCreateManifest dflags exe_filename
  | otherwise = return []
 
 
-linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
-linkDynLib dflags o_files dep_packages
+linkDynLibCheck :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLibCheck dflags o_files dep_packages
  = do
     when (haveRtsOptsFlags dflags) $ do
       log_action dflags dflags SevInfo noSrcSpan defaultUserStyle
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
 
-    let verbFlags = getVerbFlags dflags
-    let o_file = outputFile dflags
-
-    pkgs <- getPreloadPackagesAnd dflags dep_packages
-
-    let pkg_lib_paths = collectLibraryPaths pkgs
-    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
-        get_pkg_lib_path_opts l
-         | osElfTarget (platformOS (targetPlatform dflags)) &&
-           dynLibLoader dflags == SystemDependent &&
-           not (dopt Opt_Static dflags)
-            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-         | otherwise = ["-L" ++ l]
-
-    let lib_paths = libraryPaths dflags
-    let lib_path_opts = map ("-L"++) lib_paths
-
-    -- We don't want to link our dynamic libs against the RTS package,
-    -- because the RTS lib comes in several flavours and we want to be
-    -- able to pick the flavour when a binary is linked.
-    -- On Windows we need to link the RTS import lib as Windows does
-    -- not allow undefined symbols.
-    -- The RTS library path is still added to the library search path
-    -- above in case the RTS is being explicitly linked in (see #3807).
-    let platform = targetPlatform dflags
-        os = platformOS platform
-        pkgs_no_rts = case os of
-                      OSMinGW32 ->
-                          pkgs
-                      _ ->
-                          filter ((/= rtsPackageId) . packageConfigId) pkgs
-    let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
-
-        -- probably _stub.o files
-    let extra_ld_inputs = ldInputs dflags
-
-    let extra_ld_opts = getOpts dflags opt_l
-
-    case os of
-        OSMinGW32 -> do
-            -------------------------------------------------------------
-            -- Making a DLL
-            -------------------------------------------------------------
-            let output_fn = case o_file of
-                            Just s -> s
-                            Nothing -> "HSdll.dll"
-
-            SysTools.runLink dflags (
-                    map SysTools.Option verbFlags
-                 ++ [ SysTools.Option "-o"
-                    , SysTools.FileOption "" output_fn
-                    , SysTools.Option "-shared"
-                    ] ++
-                    [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
-                    | dopt Opt_SharedImplib dflags
-                    ]
-                 ++ map (SysTools.FileOption "") o_files
-                 ++ map SysTools.Option (
-
-                 -- Permit the linker to auto link _symbol to _imp_symbol
-                 -- This lets us link against DLLs without needing an "import library"
-                    ["-Wl,--enable-auto-import"]
-
-                 ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
-                 ++ pkg_lib_path_opts
-                 ++ pkg_link_opts
-                ))
-        OSDarwin -> do
-            -------------------------------------------------------------------
-            -- Making a darwin dylib
-            -------------------------------------------------------------------
-            -- About the options used for Darwin:
-            -- -dynamiclib
-            --   Apple's way of saying -shared
-            -- -undefined dynamic_lookup:
-            --   Without these options, we'd have to specify the correct
-            --   dependencies for each of the dylibs. Note that we could
-            --   (and should) do without this for all libraries except
-            --   the RTS; all we need to do is to pass the correct
-            --   HSfoo_dyn.dylib files to the link command.
-            --   This feature requires Mac OS X 10.3 or later; there is
-            --   a similar feature, -flat_namespace -undefined suppress,
-            --   which works on earlier versions, but it has other
-            --   disadvantages.
-            -- -single_module
-            --   Build the dynamic library as a single "module", i.e. no
-            --   dynamic binding nonsense when referring to symbols from
-            --   within the library. The NCG assumes that this option is
-            --   specified (on i386, at least).
-            -- -install_name
-            --   Mac OS/X stores the path where a dynamic library is (to
-            --   be) installed in the library itself.  It's called the
-            --   "install name" of the library. Then any library or
-            --   executable that links against it before it's installed
-            --   will search for it in its ultimate install location.
-            --   By default we set the install name to the absolute path
-            --   at build time, but it can be overridden by the
-            --   -dylib-install-name option passed to ghc. Cabal does
-            --   this.
-            -------------------------------------------------------------------
-
-            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-
-            instName <- case dylibInstallName dflags of
-                Just n -> return n
-                Nothing -> do
-                    pwd <- getCurrentDirectory
-                    return $ pwd `combine` output_fn
-            SysTools.runLink dflags (
-                    map SysTools.Option verbFlags
-                 ++ [ SysTools.Option "-dynamiclib"
-                    , SysTools.Option "-o"
-                    , SysTools.FileOption "" output_fn
-                    ]
-                 ++ map SysTools.Option (
-                    o_files
-                 ++ [ "-undefined", "dynamic_lookup", "-single_module" ]
-                 ++ (if platformArch platform == ArchX86_64
-                     then [ ]
-                     else [ "-Wl,-read_only_relocs,suppress" ])
-                 ++ [ "-install_name", instName ]
-                 ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
-                 ++ pkg_lib_path_opts
-                 ++ pkg_link_opts
-                ))
-        _ -> do
-            -------------------------------------------------------------------
-            -- Making a DSO
-            -------------------------------------------------------------------
-
-            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-            let buildingRts = thisPackage dflags == rtsPackageId
-            let bsymbolicFlag = if buildingRts
-                                then -- -Bsymbolic breaks the way we implement
-                                     -- hooks in the RTS
-                                     []
-                                else -- we need symbolic linking to resolve
-                                     -- non-PIC intra-package-relocations
-                                     ["-Wl,-Bsymbolic"]
-
-            SysTools.runLink dflags (
-                    map SysTools.Option verbFlags
-                 ++ [ SysTools.Option "-o"
-                    , SysTools.FileOption "" output_fn
-                    ]
-                 ++ map SysTools.Option (
-                    o_files
-                 ++ [ "-shared" ]
-                 ++ bsymbolicFlag
-                    -- Set the library soname. We use -h rather than -soname as
-                    -- Solaris 10 doesn't support the latter:
-                 ++ [ "-Wl,-h," ++ takeFileName output_fn ]
-                 ++ extra_ld_inputs
-                 ++ lib_path_opts
-                 ++ extra_ld_opts
-                 ++ pkg_lib_path_opts
-                 ++ pkg_link_opts
-                ))
+    linkDynLib dflags o_files dep_packages
 
 -- -----------------------------------------------------------------------------
 -- Running CPP
@@ -2155,7 +1994,7 @@ hscPostBackendPhase _ HsBootFile _    =  StopLn
 hscPostBackendPhase dflags _ hsc_lang =
   case hsc_lang of
         HscC -> HCc
-        HscAsm | dopt Opt_SplitObjs dflags -> Splitter
+        HscAsm | gopt Opt_SplitObjs dflags -> Splitter
                | otherwise                 -> As
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn

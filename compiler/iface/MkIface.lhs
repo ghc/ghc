@@ -1131,7 +1131,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
                      return $ Just iface
 
         src_changed
-            | dopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+            | gopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
             | SourceModified <- src_modified = True
             | otherwise = False
     in do

@@ -147,7 +147,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
         let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                          implicit_prelude import_decls } ;
 
-        ifWOptM Opt_WarnImplicitPrelude $
+        whenWOptM Opt_WarnImplicitPrelude $
              when (notNull prel_imports) $ addWarn (implicitPreludeWarn) ;
 
         tcg_env <- {-# SCC "tcRnImports" #-}
@@ -1351,7 +1351,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         -- naked expression. Deferring type errors here is unhelpful because the
         -- expression gets evaluated right away anyway. It also would potentially
         -- emit two redundant type-error warnings, one from each plan.
-        ; plan <- unsetDOptM Opt_DeferTypeErrors $ runPlans [
+        ; plan <- unsetGOptM Opt_DeferTypeErrors $ runPlans [
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
@@ -1388,7 +1388,7 @@ tcUserStmt rdr_stmt@(L loc _)
                            = L loc $ BindStmt pat (nlHsApp ghciStep expr) op1 op2
                | otherwise = rn_stmt
 
-       ; opt_pr_flag <- doptM Opt_PrintBindResult
+       ; opt_pr_flag <- goptM Opt_PrintBindResult
        ; let print_result_plan
                | opt_pr_flag                         -- The flag says "print result"   
                , [v] <- collectLStmtBinders gi_stmt  -- One binder

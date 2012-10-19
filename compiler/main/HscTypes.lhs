@@ -37,7 +37,7 @@ module HscTypes (
 
         PackageInstEnv, PackageRuleBase,
 
-        mkSOName,
+        mkSOName, soExt,
 
         -- * Annotations
         prepareAnnotations,
@@ -235,7 +235,7 @@ instance Exception GhcApiError
 -- -Werror is enabled, or print them out otherwise.
 printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
 printOrThrowWarnings dflags warns
-  | dopt Opt_WarnIsError dflags
+  | gopt Opt_WarnIsError dflags
   = when (not (isEmptyBag warns)) $ do
       throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg dflags
   | otherwise
@@ -1788,6 +1788,13 @@ mkSOName platform root
       OSDarwin  -> ("lib" ++ root) <.> "dylib"
       OSMinGW32 ->           root  <.> "dll"
       _         -> ("lib" ++ root) <.> "so"
+
+soExt :: Platform -> FilePath
+soExt platform
+    = case platformOS platform of
+      OSDarwin  -> "dylib"
+      OSMinGW32 -> "dll"
+      _         -> "so"
 \end{code}
 
 

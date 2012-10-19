@@ -179,7 +179,7 @@ import StgCmmUtils
 import StgCmmForeign
 import StgCmmExpr
 import StgCmmClosure
-import StgCmmLayout
+import StgCmmLayout     hiding (ArgRep(..))
 import StgCmmTicky
 import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
 
@@ -1018,7 +1018,7 @@ pushStackFrame fields body = do
   withUpdFrameOff new_updfr_off body
 
 profilingInfo dflags desc_str ty_str
-  = if not (dopt Opt_SccProfilingOn dflags)
+  = if not (gopt Opt_SccProfilingOn dflags)
     then NoProfilingInfo
     else ProfilingInfo (stringToWord8s desc_str)
                        (stringToWord8s ty_str)

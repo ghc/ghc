@@ -34,7 +34,7 @@ import TyCon	( isRecursiveTyCon, isClassTyCon )
 import Coercion
 import BasicTypes
 import Unique
-import DynFlags ( DynFlags, DynFlag(..), dopt )
+import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
@@ -486,7 +486,7 @@ exprEtaExpandArity dflags cheap_app e
   where
     env = AE { ae_bndrs    = []
              , ae_cheap_fn = mk_cheap_fn dflags cheap_app
-             , ae_ped_bot  = dopt Opt_PedanticBottoms dflags }
+             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
 
     has_lam (Tick _ e) = has_lam e
     has_lam (Lam b e)  = isId b || has_lam e
@@ -499,7 +499,7 @@ getBotArity _        = Nothing
 
 mk_cheap_fn :: DynFlags -> CheapAppFun -> CheapFun
 mk_cheap_fn dflags cheap_app
-  | not (dopt Opt_DictsCheap dflags)
+  | not (gopt Opt_DictsCheap dflags)
   = \e _     -> exprIsCheap' cheap_app e
   | otherwise
   = \e mb_ty -> exprIsCheap' cheap_app e

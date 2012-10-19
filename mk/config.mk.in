@@ -130,7 +130,8 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsPlatformList)),YES,NO)
 
 SharedLibsByDefaultPlatformList =               \
-                         x86_64-unknown-linux
+                         x86_64-unknown-linux   \
+                         x86_64-apple-darwin
 
 DYNAMIC_BY_DEFAULT = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsByDefaultPlatformList)),YES,NO)

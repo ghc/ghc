@@ -161,8 +161,8 @@
 #define EVENT_TASK_CREATE         55 /* (taskID, cap, tid)       */
 #define EVENT_TASK_MIGRATE        56 /* (taskID, cap, new_cap)   */
 #define EVENT_TASK_DELETE         57 /* (taskID)                 */
-
-/* Range 58 - 59 is available for new GHC and common events. */
+#define EVENT_USER_MARKER         58 /* (marker_name) */
+/* Range 59 - 59 is available for new GHC and common events. */
 
 /* Range 60 - 80 is used by eden for parallel tracing
  * see http://www.mathematik.uni-marburg.de/~eden/
@@ -177,7 +177,7 @@
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_GHC_EVENT_TAGS        58
+#define NUM_GHC_EVENT_TAGS        59
 
 #if 0  /* DEPRECATED EVENTS: */
 /* we don't actually need to record the thread, it's implicit */

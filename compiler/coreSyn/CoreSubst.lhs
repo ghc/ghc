@@ -76,7 +76,7 @@ import Unique
 import UniqSupply
 import Maybes
 import ErrUtils
-import DynFlags   ( DynFlags, DynFlag(..) )
+import DynFlags
 import BasicTypes ( isAlwaysActive )
 import Util
 import Pair

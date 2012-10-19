@@ -215,7 +215,7 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
 -- Printing the type on every occurrence is too much!
---            <+> if (not (dopt Opt_SuppressVarKinds dflags))
+--            <+> if (not (gopt Opt_SuppressVarKinds dflags))
 --                then ifPprDebug (text "::" <+> ppr (tyVarKind var) <+> text ")")
 --                else empty
 

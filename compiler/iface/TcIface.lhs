@@ -256,7 +256,7 @@ typecheckIface iface
                 -- information that we shouldn't.  From a versioning point of view
                 -- It's not actually *wrong* to do so, but in fact GHCi is unable 
                 -- to handle unboxed tuples, so it must not see unfoldings.
-          ignore_prags <- doptM Opt_IgnoreInterfacePragmas
+          ignore_prags <- goptM Opt_IgnoreInterfacePragmas
 
                 -- Typecheck the decls.  This is done lazily, so that the knot-tying
                 -- within this single module work out right.  In the If monad there is
@@ -1272,7 +1272,7 @@ tcPragExpr name expr
     core_expr' <- tcIfaceExpr expr
 
                 -- Check for type consistency in the unfolding
-    ifDOptM Opt_DoCoreLinting $ do
+    whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         case lintUnfolding noSrcLoc in_scope core_expr' of
           Nothing       -> return ()

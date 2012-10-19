@@ -142,8 +142,8 @@ endPass dflags pass binds rules
        ; lintPassResult dflags pass binds }      
   where
     mb_flag = case coreDumpFlag pass of
-                Just dflag | dopt dflag dflags                   -> Just dflag
-                           | dopt Opt_D_verbose_core2core dflags -> Just dflag
+                Just flag | dopt flag dflags                    -> Just flag
+                          | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
 dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
@@ -151,15 +151,15 @@ dumpIfSet dflags dump_me pass extra_info doc
   = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags 
-               -> Maybe DynFlag		-- Just df => show details in a file whose
+               -> Maybe DumpFlag		-- Just df => show details in a file whose
 	       	  			--            name is specified by df
                -> SDoc 			-- Header
                -> SDoc 			-- Extra info to appear after header
                -> CoreProgram -> [CoreRule] 
                -> IO ()
 dumpPassResult dflags mb_flag hdr extra_info binds rules
-  | Just dflag <- mb_flag
-  = Err.dumpSDoc dflags dflag (showSDoc dflags hdr) dump_doc
+  | Just flag <- mb_flag
+  = Err.dumpSDoc dflags flag (showSDoc dflags hdr) dump_doc
 
   | otherwise
   = Err.debugTraceMsg dflags 2 size_doc
@@ -180,7 +180,7 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
 
 lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
 lintPassResult dflags pass binds
-  = when (dopt Opt_DoCoreLinting dflags) $
+  = when (gopt Opt_DoCoreLinting dflags) $
     do { let (warns, errs) = lintCoreBindings binds
        ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults dflags pass warns errs binds  }
@@ -265,7 +265,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 \end{code}
 
 \begin{code}
-coreDumpFlag :: CoreToDo -> Maybe DynFlag
+coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_dump_simpl_phases
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_dump_core_pipeline
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_verbose_core2core
@@ -1019,7 +1019,7 @@ debugTraceMsg :: SDoc -> CoreM ()
 debugTraceMsg = msg (flip Err.debugTraceMsg 3)
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
-dumpIfSet_dyn :: DynFlag -> String -> SDoc -> CoreM ()
+dumpIfSet_dyn :: DumpFlag -> String -> SDoc -> CoreM ()
 dumpIfSet_dyn flag str = msg (\dflags -> Err.dumpIfSet_dyn dflags flag str)
 \end{code}
 

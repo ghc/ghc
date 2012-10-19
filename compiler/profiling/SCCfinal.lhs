@@ -51,7 +51,7 @@ stgMassageForProfiling dflags mod_name _us stg_binds
           = initMM mod_name (do_top_bindings stg_binds)
 
         (fixed_ccs, fixed_cc_stacks)
-          = if dopt Opt_AutoSccsOnIndividualCafs dflags
+          = if gopt Opt_AutoSccsOnIndividualCafs dflags
             then ([],[])  -- don't need "all CAFs" CC
             else ([all_cafs_cc], [all_cafs_ccs])
 
@@ -102,7 +102,7 @@ stgMassageForProfiling dflags mod_name _us stg_binds
       = do
         -- Top level CAF without a cost centre attached
         -- Attach CAF cc (collect if individual CAF ccs)
-        caf_ccs <- if dopt Opt_AutoSccsOnIndividualCafs dflags
+        caf_ccs <- if gopt Opt_AutoSccsOnIndividualCafs dflags
                    then let cc = mkAutoCC binder modl CafCC
                             ccs = mkSingletonCCS cc
                                    -- careful: the binder might be :Main.main,

@@ -173,9 +173,13 @@ endif
 
 ifneq "$3" "0"
 ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(TargetOS_CPP)" "linux"
 $1_$2_GHC_LD_OPTS = \
     -fno-use-rpaths \
-    $$(addprefix -optl-Wl$$(comma)-rpath -optl-Wl$$(comma),$$($1_$2_RPATHS))
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
+else ifeq "$$(TargetOS_CPP)" "darwin"
+$1_$2_GHC_LD_OPTS = -optl-Wl,-headerpad_max_install_names
+endif
 endif
 endif
 
@@ -194,6 +198,17 @@ $1/$2/build/tmp/$$($1_$2_PROG) : \
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+ifeq "$$(TargetOS_CPP)" "darwin"
+ifneq "$3" "0"
+ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
+# Use relative paths for all the libraries
+	install_name_tool $$(foreach d,$$($1_$2_TRANSITIVE_DEP_NAMES), -change $$(TOP)/$$($$($$d_INSTALL_INFO)_dyn_LIB) @loader_path/../$$d-$$($$($$d_INSTALL_INFO)_VERSION)/$$($$($$d_INSTALL_INFO)_dyn_LIB_NAME)) $$@
+# Use relative paths for the RTS. Rather than try to work out which RTS
+# way is being linked, we just change it for all ways
+	install_name_tool $$(foreach w,$$(rts_WAYS), -change $$(TOP)/$$(rts_$$w_LIB) @loader_path/../rts-$$(rts_VERSION)/$$(rts_$$w_LIB_NAME)) $$@
+endif
+endif
+endif
 else
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_CC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_CC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_EXTRA_CC_OPTS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))

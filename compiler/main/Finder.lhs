@@ -612,7 +612,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
         ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkg)
         <> dot $$ cabal_pkg_hidden_hint pkg
     cabal_pkg_hidden_hint pkg
-     | dopt Opt_BuildingCabalPackage dflags
+     | gopt Opt_BuildingCabalPackage dflags
         = case simpleParse (packageIdString pkg) of
           Just pid ->
               ptext (sLit "Perhaps you need to add") <+>

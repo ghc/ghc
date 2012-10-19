@@ -380,7 +380,7 @@ sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing =
    mask $ \restore -> -- fork starts blocked
      let runIt = liftM Complete $ try (restore $ rethrow dflags thing)
-     in if dopt Opt_GhciSandbox dflags
+     in if gopt Opt_GhciSandbox dflags
         then do tid <- forkIO $ do res <- runIt
                                    putMVar statusMVar res -- empty: can't block
                 withInterruptsSentTo tid $ takeMVar statusMVar
@@ -403,8 +403,8 @@ rethrow :: DynFlags -> IO a -> IO a
 rethrow dflags io = Exception.catch io $ \se -> do
                    -- If -fbreak-on-error, we break unconditionally,
                    --  but with care of not breaking twice
-                if dopt Opt_BreakOnError dflags &&
-                   not (dopt Opt_BreakOnException dflags)
+                if gopt Opt_BreakOnError dflags &&
+                   not (gopt Opt_BreakOnException dflags)
                     then poke exceptionFlag 1
                     else case fromException se of
                          -- If it is a "UserInterrupt" exception, we allow
@@ -433,7 +433,7 @@ withBreakAction step dflags breakMVar statusMVar act
    setBreakAction = do
      stablePtr <- newStablePtr onBreak
      poke breakPointIOAction stablePtr
-     when (dopt Opt_BreakOnException dflags) $ poke exceptionFlag 1
+     when (gopt Opt_BreakOnException dflags) $ poke exceptionFlag 1
      when step $ setStepFlag
      return stablePtr
         -- Breaking on exceptions is not enabled by default, since it

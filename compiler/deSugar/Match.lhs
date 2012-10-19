@@ -23,6 +23,7 @@ import DynFlags
 import HsSyn		
 import TcHsSyn
 import TcEvidence
+import TcRnMonad
 import Check
 import CoreSyn
 import Literal
@@ -301,7 +302,7 @@ match vars@(v:_) ty eqns
         ; let grouped = groupEquations dflags tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
-        ; ifDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+        ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
 	; match_results <- mapM match_group grouped
 	; return (adjustMatchResult (foldr1 (.) aux_binds) $

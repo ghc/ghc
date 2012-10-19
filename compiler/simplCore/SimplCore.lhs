@@ -120,16 +120,16 @@ getCoreToDo dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
-    strictness    = dopt Opt_Strictness                   dflags
-    full_laziness = dopt Opt_FullLaziness                 dflags
-    do_specialise = dopt Opt_Specialise                   dflags
-    do_float_in   = dopt Opt_FloatIn                      dflags
-    cse           = dopt Opt_CSE                          dflags
-    spec_constr   = dopt Opt_SpecConstr                   dflags
-    liberate_case = dopt Opt_LiberateCase                 dflags
-    static_args   = dopt Opt_StaticArgumentTransformation dflags
-    rules_on      = dopt Opt_EnableRewriteRules           dflags
-    eta_expand_on = dopt Opt_DoLambdaEtaExpansion         dflags
+    strictness    = gopt Opt_Strictness                   dflags
+    full_laziness = gopt Opt_FullLaziness                 dflags
+    do_specialise = gopt Opt_Specialise                   dflags
+    do_float_in   = gopt Opt_FloatIn                      dflags
+    cse           = gopt Opt_CSE                          dflags
+    spec_constr   = gopt Opt_SpecConstr                   dflags
+    liberate_case = gopt Opt_LiberateCase                 dflags
+    static_args   = gopt Opt_StaticArgumentTransformation dflags
+    rules_on      = gopt Opt_EnableRewriteRules           dflags
+    eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -157,12 +157,12 @@ getCoreToDo dflags
           --  We need to eliminate these common sub expressions before their definitions
           --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings,
           --  so we also run simpl_gently to inline them.
-      ++  (if dopt Opt_Vectorise dflags && phase == 3
+      ++  (if gopt Opt_Vectorise dflags && phase == 3
             then [CoreCSE, simpl_gently]
             else [])
 
     vectorisation
-      = runWhen (dopt Opt_Vectorise dflags) $
+      = runWhen (gopt Opt_Vectorise dflags) $
           CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
 
                 -- By default, we have 2 phases before phase 0.

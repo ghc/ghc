@@ -584,7 +584,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
     else do
-      when (not (dopt Opt_OmitYields dflags) && checkYield) $ do
+      when (not (gopt Opt_OmitYields dflags) && checkYield) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq dflags)
                                   [CmmReg (CmmGlobal HpLim),

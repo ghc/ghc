@@ -45,7 +45,11 @@ $$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$$(TargetOS_CPP)" "linux"
 	echo 'export LD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH)"'  >> $$@
+else ifeq "$$(TargetOS_CPP)" "darwin"
+	echo 'export DYLD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH)"' >> $$@
+endif
 endif
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                                   >> $$@

@@ -12,7 +12,7 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
 
 import BlockId
-import CgUtils ( activeStgRegs, callerSaves )
+import CodeGen.Platform ( activeStgRegs, callerSaves )
 import CLabel
 import OldCmm
 import qualified OldPprCmm as PprCmm
@@ -1261,7 +1261,7 @@ funPrologue dflags = concat $ map getReg $ activeStgRegs platform
 funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
 
 -- Have information and liveness optimisation is enabled
-funEpilogue env (Just live) | dopt Opt_RegLiveness dflags = do
+funEpilogue env (Just live) | gopt Opt_RegLiveness dflags = do
     loads <- mapM loadExpr (activeStgRegs platform)
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)

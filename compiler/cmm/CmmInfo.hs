@@ -366,7 +366,7 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt_len layout_lit
 
  where  
     prof_info 
-	| dopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
+	| gopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
 	| otherwise = []
 
     type_lit = packHalfWordsCLit dflags (toStgHalfWord dflags (fromIntegral cl_type)) srt_len

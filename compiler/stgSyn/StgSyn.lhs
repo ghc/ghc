@@ -800,7 +800,7 @@ pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag srt [{-no args-}] (StgApp fun
 -- general case
 pprStgRhs (StgRhsClosure cc bi free_vars upd_flag srt args body)
   = sdocWithDynFlags $ \dflags ->
-    hang (hsep [if dopt Opt_SccProfilingOn dflags then ppr cc else empty,
+    hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
                 pp_binder_info bi,
                 ifPprDebug (brackets (interppSP free_vars)),
                 char '\\' <> ppr upd_flag, pprMaybeSRT srt, brackets (interppSP args)])

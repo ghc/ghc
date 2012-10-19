@@ -24,6 +24,8 @@ module SysTools (
         figureLlvmVersion,
         readElfSection,
 
+        linkDynLib,
+
         askCc,
 
         touch,                  -- String -> String -> IO ()
@@ -43,6 +45,8 @@ module SysTools (
 #include "HsVersions.h"
 
 import DriverPhases
+import Module
+import Packages
 import Config
 import Outputable
 import ErrUtils
@@ -371,7 +375,7 @@ runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
       args1 = args0 ++ args
-      args2 = if dopt Opt_WarnIsError dflags
+      args2 = if gopt Opt_WarnIsError dflags
               then Option "-Werror" : args1
               else                    args1
   mb_env <- getGccEnv args2
@@ -672,7 +676,7 @@ readElfSection _dflags section exe = do
 \begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = dirsToClean dflags
         ds <- readIORef ref
         removeTmpDirs dflags (Map.elems ds)
@@ -680,7 +684,7 @@ cleanTempDirs dflags
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         fs <- readIORef ref
         removeTmpFiles dflags fs
@@ -688,7 +692,7 @@ cleanTempFiles dflags
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
-   = unless (dopt Opt_KeepTmpFiles dflags)
+   = unless (gopt Opt_KeepTmpFiles dflags)
    $ do let ref = filesToClean dflags
         files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
@@ -1035,5 +1039,171 @@ linesPlatform xs =
    lineBreak (x:xs) = let (as,bs) = lineBreak xs in (x:as,bs)
 
 #endif
+
+linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLib dflags o_files dep_packages
+ = do
+    let verbFlags = getVerbFlags dflags
+    let o_file = outputFile dflags
+
+    pkgs <- getPreloadPackagesAnd dflags dep_packages
+
+    let pkg_lib_paths = collectLibraryPaths pkgs
+    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not (gopt Opt_Static dflags)
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
+
+    let lib_paths = libraryPaths dflags
+    let lib_path_opts = map ("-L"++) lib_paths
+
+    -- We don't want to link our dynamic libs against the RTS package,
+    -- because the RTS lib comes in several flavours and we want to be
+    -- able to pick the flavour when a binary is linked.
+    -- On Windows we need to link the RTS import lib as Windows does
+    -- not allow undefined symbols.
+    -- The RTS library path is still added to the library search path
+    -- above in case the RTS is being explicitly linked in (see #3807).
+    let platform = targetPlatform dflags
+        os = platformOS platform
+        pkgs_no_rts = case os of
+                      OSMinGW32 ->
+                          pkgs
+                      _ ->
+                          filter ((/= rtsPackageId) . packageConfigId) pkgs
+    let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
+
+        -- probably _stub.o files
+    let extra_ld_inputs = ldInputs dflags
+
+    let extra_ld_opts = getOpts dflags opt_l
+
+    case os of
+        OSMinGW32 -> do
+            -------------------------------------------------------------
+            -- Making a DLL
+            -------------------------------------------------------------
+            let output_fn = case o_file of
+                            Just s -> s
+                            Nothing -> "HSdll.dll"
+
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-o"
+                    , FileOption "" output_fn
+                    , Option "-shared"
+                    ] ++
+                    [ FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+                    | gopt Opt_SharedImplib dflags
+                    ]
+                 ++ map (FileOption "") o_files
+                 ++ map Option (
+
+                 -- Permit the linker to auto link _symbol to _imp_symbol
+                 -- This lets us link against DLLs without needing an "import library"
+                    ["-Wl,--enable-auto-import"]
+
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
+        OSDarwin -> do
+            -------------------------------------------------------------------
+            -- Making a darwin dylib
+            -------------------------------------------------------------------
+            -- About the options used for Darwin:
+            -- -dynamiclib
+            --   Apple's way of saying -shared
+            -- -undefined dynamic_lookup:
+            --   Without these options, we'd have to specify the correct
+            --   dependencies for each of the dylibs. Note that we could
+            --   (and should) do without this for all libraries except
+            --   the RTS; all we need to do is to pass the correct
+            --   HSfoo_dyn.dylib files to the link command.
+            --   This feature requires Mac OS X 10.3 or later; there is
+            --   a similar feature, -flat_namespace -undefined suppress,
+            --   which works on earlier versions, but it has other
+            --   disadvantages.
+            -- -single_module
+            --   Build the dynamic library as a single "module", i.e. no
+            --   dynamic binding nonsense when referring to symbols from
+            --   within the library. The NCG assumes that this option is
+            --   specified (on i386, at least).
+            -- -install_name
+            --   Mac OS/X stores the path where a dynamic library is (to
+            --   be) installed in the library itself.  It's called the
+            --   "install name" of the library. Then any library or
+            --   executable that links against it before it's installed
+            --   will search for it in its ultimate install location.
+            --   By default we set the install name to the absolute path
+            --   at build time, but it can be overridden by the
+            --   -dylib-install-name option passed to ghc. Cabal does
+            --   this.
+            -------------------------------------------------------------------
+
+            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+
+            instName <- case dylibInstallName dflags of
+                Just n -> return n
+                Nothing -> do
+                    pwd <- getCurrentDirectory
+                    return $ pwd `combine` output_fn
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-dynamiclib"
+                    , Option "-o"
+                    , FileOption "" output_fn
+                    ]
+                 ++ map Option (
+                    o_files
+                 ++ [ "-undefined", "dynamic_lookup", "-single_module" ]
+                 ++ (if platformArch platform == ArchX86_64
+                     then [ ]
+                     else [ "-Wl,-read_only_relocs,suppress" ])
+                 ++ [ "-install_name", instName ]
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
+        _ -> do
+            -------------------------------------------------------------------
+            -- Making a DSO
+            -------------------------------------------------------------------
+
+            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+            let buildingRts = thisPackage dflags == rtsPackageId
+            let bsymbolicFlag = if buildingRts
+                                then -- -Bsymbolic breaks the way we implement
+                                     -- hooks in the RTS
+                                     []
+                                else -- we need symbolic linking to resolve
+                                     -- non-PIC intra-package-relocations
+                                     ["-Wl,-Bsymbolic"]
+
+            runLink dflags (
+                    map Option verbFlags
+                 ++ [ Option "-o"
+                    , FileOption "" output_fn
+                    ]
+                 ++ map Option (
+                    o_files
+                 ++ [ "-shared" ]
+                 ++ bsymbolicFlag
+                    -- Set the library soname. We use -h rather than -soname as
+                    -- Solaris 10 doesn't support the latter:
+                 ++ [ "-Wl,-h," ++ takeFileName output_fn ]
+                 ++ extra_ld_inputs
+                 ++ lib_path_opts
+                 ++ extra_ld_opts
+                 ++ pkg_lib_path_opts
+                 ++ pkg_link_opts
+                ))
 
 \end{code}

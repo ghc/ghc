@@ -474,6 +474,8 @@ utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
+utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/hpc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
@@ -675,6 +677,9 @@ endif
 # BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
 # libraries/dph/ghc.mk refers to stuff defined earlier, in particular
 # things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
+ifeq "$(GhcProfiled)" "YES"
+BUILD_DIRS_EXTRA := $(filter-out libraries/dph,$(BUILD_DIRS_EXTRA))
+endif
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
 
 # A useful pseudo-target (must be after the include above, because it needs

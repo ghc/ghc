@@ -799,7 +799,7 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 \begin{code}
 warnUnusedForAlls :: SDoc -> LHsTyVarBndrs RdrName -> [RdrName] -> TcM ()
 warnUnusedForAlls in_doc bound mentioned_rdrs
-  = ifWOptM Opt_WarnUnusedMatches $
+  = whenWOptM Opt_WarnUnusedMatches $
     mapM_ add_warn bound_but_not_used
   where
     bound_names        = hsLTyVarLocNames bound
