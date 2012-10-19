@@ -1110,7 +1110,7 @@ canEqLeafFunEq loc ev fn tys1 ty2  -- ev :: F tys1 ~ ty2
       ; (xi2, co2)  <- flatten     loc FMFullFlatten flav ty2
            
           -- Fancy higher-dimensional coercion between equalities!
-         -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
+          -- SPJ asks why?  Why not just co : F xis1 ~ F tys1?
        ; let fam_head = mkTyConApp fn xis1
              xco = mkHdEqPred ty2 (mkTcTyConAppCo fn cos1) co2
              -- xco :: (F xis1 ~ xi2) ~ (F tys1 ~ ty2)

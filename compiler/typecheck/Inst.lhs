@@ -212,19 +212,21 @@ instCallConstraints :: CtOrigin -> TcThetaType -> TcM HsWrapper
 -- Instantiates the TcTheta, puts all constraints thereby generated
 -- into the LIE, and returns a HsWrapper to enclose the call site.
 
-instCallConstraints _ [] = return idHsWrapper
-
-instCallConstraints origin (pred : preds)
-  | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred ty1 ty2)
-        ; co <- unifyType ty1 ty2
-	; co_fn <- instCallConstraints origin preds
-        ; return (co_fn <.> WpEvApp (EvCoercion co)) }
-
+instCallConstraints orig preds
+  | null preds 
+  = return idHsWrapper
   | otherwise
-  = do	{ ev_var <- emitWanted origin pred
-	; co_fn <- instCallConstraints origin preds
-	; return (co_fn <.> WpEvApp (EvId ev_var)) }
+  = do { traceTc "instCallConstraints" (pprTheta preds)
+       ; evs <- mapM go preds
+       ; return (mkWpEvApps evs) }
+  where
+    go pred 
+     | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
+     = do  { co <- unifyType ty1 ty2
+           ; return (EvCoercion co) }
+     | otherwise
+     = do { ev_var <- emitWanted orig pred
+     	  ; return (EvId ev_var) }
 
 ----------------
 instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()

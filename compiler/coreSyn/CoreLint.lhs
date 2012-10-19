@@ -886,7 +886,8 @@ lintCoercion co@(AxiomInstCo (CoAxiom { co_ax_tvs = ktvs
            ; let ktv_kind = Type.substTy subst_l (tyVarKind ktv)
                   -- Using subst_l is ok, because subst_l and subst_r
                   -- must agree on kind equalities
-           ; unless (k `isSubKind` ktv_kind) (bad_ax (ptext (sLit "check_ki2")))
+           ; unless (k `isSubKind` ktv_kind) 
+                    (bad_ax (ptext (sLit "check_ki2") <+> vcat [ ppr co, ppr k, ppr ktv, ppr ktv_kind ] ))
            ; return (Type.extendTvSubst subst_l ktv t1, 
                      Type.extendTvSubst subst_r ktv t2) } 
 \end{code}

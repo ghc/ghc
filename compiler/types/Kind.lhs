@@ -167,7 +167,7 @@ okArrowResultKind _                = False
 --              Subkinding
 -- The tc variants are used during type-checking, where we don't want the
 -- Constraint kind to be a subkind of anything
--- After type-checking (in core), Constraint is a subkind of argTypeKind
+-- After type-checking (in core), Constraint is a subkind of openTypeKind
 isSubOpenTypeKind :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
 isSubOpenTypeKind (TyConApp kc []) = isSubOpenTypeKindCon kc
