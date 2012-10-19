@@ -427,8 +427,8 @@ tc_hs_type hs_ty@(HsExplicitListTy _k tys) exp_kind
        ; checkExpectedKind hs_ty (mkPromotedListTy kind) exp_kind
        ; return (foldr (mk_cons kind) (mk_nil kind) taus) }
   where
-    mk_cons k a b = mkTyConApp (buildPromotedDataCon consDataCon) [k, a, b]
-    mk_nil  k     = mkTyConApp (buildPromotedDataCon nilDataCon) [k]
+    mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
+    mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
 
 tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
   = do { tks <- mapM tc_infer_lhs_type tys
@@ -607,12 +607,10 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
            AGlobal (ATyCon tc) -> inst_tycon (mkTyConApp tc) (tyConKind tc)
 
            AGlobal (ADataCon dc)
-             | isPromotableType ty -> inst_tycon (mkTyConApp tc) (tyConKind tc)
+             | Just tc <- promoteDataCon_maybe dc
+             -> inst_tycon (mkTyConApp tc) (tyConKind tc)
              | otherwise -> failWithTc (quotes (ppr dc) <+> ptext (sLit "of type")
-                            <+> quotes (ppr ty) <+> ptext (sLit "is not promotable"))
-             where
-               ty = dataConUserType dc
-               tc = buildPromotedDataCon dc
+                            <+> quotes (ppr (dataConUserType dc)) <+> ptext (sLit "is not promotable"))
 
            APromotionErr err -> promotionErr name err
 
@@ -1465,7 +1463,7 @@ tc_kind_var_app name arg_kis
   	           ; unless data_kinds $ addErr (dataKindsErr name)
   	     	   ; case isPromotableTyCon tc of
   	     	       Just n | n == length arg_kis ->
-  	     	         return (mkTyConApp (buildPromotedTyCon tc) arg_kis)
+  	     	         return (mkTyConApp (promoteTyCon tc) arg_kis)
   	     	       Just _  -> tycon_err tc "is not fully applied"
   	     	       Nothing -> tycon_err tc "is not promotable" }
 
