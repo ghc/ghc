@@ -825,11 +825,13 @@ kcScopedKindVars kv_ns thing_inside
                      -- NB: use mutable signature variables
        ; tcExtendTyVarEnv2 (kv_ns `zip` kvs) thing_inside } 
 
-kcHsTyVarBndrs :: Bool    -- Default UserTyVar to *
+kcHsTyVarBndrs :: Bool    -- True <=> full kind signature provided
+                          -- Default UserTyVar to *
                           -- and use KindVars not meta kind vars
                -> LHsTyVarBndrs Name 
 	       -> ([TcKind] -> TcM r)
 	       -> TcM r
+-- Used in getInitialKind
 kcHsTyVarBndrs full_kind_sig (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thing_inside
   = do { kvs <- if full_kind_sig 
                 then return (map mkKindSigVar kv_ns)
@@ -848,6 +850,14 @@ kcHsTyVarBndrs full_kind_sig (HsQTvs { hsq_kvs = kv_ns, hsq_tvs = hs_tvs }) thin
            ; return (n, kind) }
     kc_hs_tv (KindedTyVar n k) 
       = do { kind <- tcLHsKind k
+               -- In an associated type decl, the type variable may already 
+               -- be in scope; in that case we want to make sure its kind
+               -- matches the one declared here
+           ; mb_thing <- tcLookupLcl_maybe n
+           ; case mb_thing of
+               Nothing          -> return ()
+               Just (AThing ks) -> checkKind kind ks
+               Just thing       -> pprPanic "check_in_scope" (ppr thing)
            ; return (n, kind) }
 
 tcScopedKindVars :: [Name] -> TcM a -> TcM a
@@ -970,38 +980,29 @@ kcLookupKind nm
            AGlobal (ATyCon tc) -> return (tyConKind tc)
            _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing) }
 
-kcTyClTyVars :: Name -> LHsTyVarBndrs Name -> (TcKind -> TcM a) -> TcM a
+kcTyClTyVars :: Name -> LHsTyVarBndrs Name -> TcM a -> TcM a
 -- Used for the type variables of a type or class decl,
 -- when doing the initial kind-check.  
 kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
   = kcScopedKindVars kvs $
     do 	{ tc_kind <- kcLookupKind name
-	; let (arg_ks, res_k) = splitKindFunTysN (length hs_tvs) tc_kind
+	; let (arg_ks, _res_k) = splitKindFunTysN (length hs_tvs) tc_kind
                      -- There should be enough arrows, because
                      -- getInitialKinds used the tcdTyVars
         ; name_ks <- zipWithM kc_tv hs_tvs arg_ks
-        ; tcExtendKindEnv name_ks (thing_inside res_k) }
+        ; tcExtendKindEnv name_ks thing_inside }
   where
+    -- getInitialKind has already gotten the kinds of these type
+    -- variables, but tiresomely we need to check them *again* 
+    -- to match the kind variables they mention against the ones 
+    -- we've freshly brought into scope
     kc_tv :: LHsTyVarBndr Name -> Kind -> TcM (Name, Kind)
     kc_tv (L _ (UserTyVar n)) exp_k 
-      = do { check_in_scope n exp_k
-           ; return (n, exp_k) }
+      = return (n, exp_k)
     kc_tv (L _ (KindedTyVar n hs_k)) exp_k
       = do { k <- tcLHsKind hs_k
            ; checkKind k exp_k
-           ; check_in_scope n exp_k
-           ; return (n, k) }
-
-    check_in_scope :: Name -> Kind -> TcM ()
-    -- In an associated type decl, the type variable may already 
-    -- be in scope; in that case we want to make sure it matches
-    -- any signature etc here
-    check_in_scope n exp_k
-      = do { mb_thing <- tcLookupLcl_maybe n
-           ; case mb_thing of
-               Nothing         -> return ()
-               Just (AThing k) -> checkKind k exp_k
-               Just thing      -> pprPanic "check_in_scope" (ppr thing) }
+           ; return (n, exp_k) }
 
 -----------------------
 tcTyClTyVars :: Name -> LHsTyVarBndrs Name	-- LHS of the type or class decl

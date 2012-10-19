@@ -128,7 +128,7 @@ tcTyClGroup boot_details tyclds
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
-                 -- (see Note [ARecDataCon: Recusion and promoting data constructors]
+                 -- (see Note [Recusion and promoting data constructors]
                  -- we will have failed already in kcTyClGroup, so no worries here
            ; tcExtendRecEnv (zipRecTyClss names_w_poly_kinds rec_tyclss) $
 
@@ -324,8 +324,12 @@ getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
 --      Example: data T a b = ...
 --      return (T, kv1 -> kv2 -> kv3)
 --
--- ALSO for each datacon, return (dc, ARecDataCon)
--- Note [ARecDataCon: Recusion and promoting data constructors]
+-- This pass deals with (ie incorporates into the kind it produces)
+--   * The kind signatures on type-variable binders
+--   * The result kinds signature on a TyClDecl
+--
+-- ALSO for each datacon, return (dc, APromotionErr RecDataConPE)
+-- Note [ARecDataCon: Recursion and promoting data constructors]
 -- 
 -- No family instances are passed to getInitialKinds
 
@@ -361,14 +365,15 @@ getInitialKind top_lvl decl@(TyDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcd
              kvs       = varSetElems (tyVarsOfType body_kind)
              main_pr   = (name, AThing (mkForAllTys kvs body_kind))
              inner_prs = [(unLoc (con_name con), APromotionErr RecDataConPE) | L _ con <- cons ]
-             -- See Note [ARecDataCon: Recusion and promoting data constructors]
+             -- See Note [Recusion and promoting data constructors]
        ; return (main_pr : inner_prs) }
  
   | TyData { td_cons = cons } <- defn
   = kcHsTyVarBndrs False ktvs $ \ arg_kinds -> 
     do { let main_pr   = (name, AThing (mkArrowKinds arg_kinds liftedTypeKind))
-             inner_prs = [(unLoc (con_name con), APromotionErr RecDataConPE) | L _ con <- cons ]
-             -- See Note [ARecDataCon: Recusion and promoting data constructors]
+             inner_prs = [ (unLoc (con_name con), APromotionErr RecDataConPE) 
+                         | L _ con <- cons ]
+             -- See Note [Recusion and promoting data constructors]
        ; return (main_pr : inner_prs) }
 
   | otherwise = pprPanic "getInitialKind" (ppr decl)
@@ -413,13 +418,18 @@ kcLTyClDecl (L loc decl)
 
 kcTyClDecl :: TyClDecl Name -> TcM ()
 -- This function is used solely for its side effect on kind variables
+-- NB kind signatures on the type variables and 
+--    result kind signature have aready been dealt with
+--    by getInitialKind, so we can ignore them here.
 
 kcTyClDecl decl@(TyDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdTyDefn = defn })
   | TyData { td_cons = cons, td_kindSig = Just _ } <- defn
-  = mapM_ (wrapLocM kcConDecl) cons  -- Ignore the td_ctxt; heavily deprecated and inconvenient
+  = mapM_ (wrapLocM kcConDecl) cons  
+    -- hs_tvs and td_kindSig already dealt with in getInitialKind
+    -- Ignore the td_ctxt; heavily deprecated and inconvenient
 
   | TyData { td_ctxt = ctxt, td_cons = cons } <- defn
-  = kcTyClTyVars name hs_tvs $ \ _res_k -> 
+  = kcTyClTyVars name hs_tvs $ 
     do	{ _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kcConDecl) cons }
 
@@ -427,7 +437,7 @@ kcTyClDecl decl@(TyDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdTyDefn = d
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
                        , tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
-  = kcTyClTyVars name hs_tvs $ \ _res_k -> 
+  = kcTyClTyVars name hs_tvs $ 
     do	{ _ <- tcHsContext ctxt
 	; mapM_ (wrapLocM kcTyClDecl) ats
 	; mapM_ (wrapLocM kc_sig)     sigs }
@@ -436,8 +446,8 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
     kc_sig (GenericSig _ op_ty) = discardResult (tcHsLiftedType op_ty)
     kc_sig _                    = return ()
 
-kcTyClDecl (ForeignType {}) = return ()
 kcTyClDecl (TyFamily {})    = return ()
+kcTyClDecl (ForeignType {}) = return ()
 
 -------------------
 kcConDecl :: ConDecl Name -> TcM ()
@@ -451,8 +461,8 @@ kcConDecl (ConDecl { con_name = name, con_qvars = ex_tvs
        ; return () }
 \end{code}
 
-Note [ARecDataCon: Recusion and promoting data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Recursion and promoting data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't want to allow promotion in a strongly connected component
 when kind checking.
 
