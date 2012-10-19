@@ -467,6 +467,8 @@ pprLit lit = case lit of
                 -- these constants come from <math.h>
                 -- see #1861
 
+    CmmVec {} -> panic "PprC printing vector literal"
+
     CmmBlock bid       -> mkW_ <> pprCLabelAddr (infoTblLbl bid)
     CmmHighStackMark   -> panic "PprC printing high stack mark"
     CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl

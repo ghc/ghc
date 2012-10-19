@@ -70,7 +70,8 @@ type UnresStatic = Either UnresLabel LlvmStatic
 
 -- | Translate a basic CmmType to an LlvmType.
 cmmToLlvmType :: CmmType -> LlvmType
-cmmToLlvmType ty | isFloatType ty = widthToLlvmFloat $ typeWidth ty
+cmmToLlvmType ty | isVecType ty   = LMVector (vecLength ty) (cmmToLlvmType (vecElemType ty))
+                 | isFloatType ty = widthToLlvmFloat $ typeWidth ty
                  | otherwise      = widthToLlvmInt   $ typeWidth ty
 
 -- | Translate a Cmm Float Width to a LlvmType.

@@ -33,6 +33,7 @@ import BlockId
 import CLabel
 import DynFlags
 import Unique
+import Outputable (panic)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -101,6 +102,7 @@ data CmmLit
         -- it will be used as a signed or unsigned value (the CmmType doesn't
         -- distinguish between signed & unsigned).
   | CmmFloat  Rational Width
+  | CmmVec [CmmLit]                     -- Vector literal
   | CmmLabel    CLabel                  -- Address of label
   | CmmLabelOff CLabel Int              -- Address of label + byte offset
 
@@ -133,6 +135,11 @@ cmmExprType dflags (CmmStackSlot _ _)  = bWord dflags -- an address
 cmmLitType :: DynFlags -> CmmLit -> CmmType
 cmmLitType _      (CmmInt _ width)     = cmmBits  width
 cmmLitType _      (CmmFloat _ width)   = cmmFloat width
+cmmLitType _      (CmmVec [])          = panic "cmmLitType: CmmVec []"
+cmmLitType cflags (CmmVec (l:ls))      = let ty = cmmLitType cflags l
+                                         in if all (`cmmEqType` ty) (map (cmmLitType cflags) ls)
+                                            then cmmVec (1+length ls) ty
+                                            else panic "cmmLitType: CmmVec"
 cmmLitType dflags (CmmLabel lbl)       = cmmLabelType dflags lbl
 cmmLitType dflags (CmmLabelOff lbl _)  = cmmLabelType dflags lbl
 cmmLitType dflags (CmmLabelDiffOff {}) = bWord dflags
