@@ -891,9 +891,9 @@ reduce' orig_state = go False (mkLinearHistory rEDUCE_WQO) orig_state
           Just (deeds, heap, k, e)
            | Just deeds' <- if bOUND_STEPS then claimStep deeds else Just deeds
            , let state' = (deeds', heap, k, e)
-           -> case terminate hist state of
+           -> case terminate hist (gc state) of
             Continue hist' -> go True hist' state'
-            Stop old_state -> pprTrace "reduce-stop" {- (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) -} empty
+            Stop old_state -> pprTrace "reduce-stop" {--} (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) {--} -- empty
                               -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                               -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
                               (can_step, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
