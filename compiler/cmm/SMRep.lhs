@@ -5,9 +5,6 @@
 
 Storage manager representation of closures
 
-This is here, rather than in ClosureInfo, just to keep nhc happy.
-Other modules should access this info through ClosureInfo.
-
 \begin{code}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 

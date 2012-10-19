@@ -179,7 +179,7 @@ import StgCmmUtils
 import StgCmmForeign
 import StgCmmExpr
 import StgCmmClosure
-import StgCmmLayout
+import StgCmmLayout     hiding (ArgRep(..))
 import StgCmmTicky
 import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
 

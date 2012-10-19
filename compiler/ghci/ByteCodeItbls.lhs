@@ -23,11 +23,10 @@ module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
 import DynFlags
 import Name             ( Name, getName )
 import NameEnv
-import ClosureInfo
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Type             ( flattenRepType, repType )
-import CgHeapery        ( mkVirtHeapOffsets )
+import Type             ( flattenRepType, repType, typePrimRep )
+import StgCmmLayout     ( mkVirtHeapOffsets )
 import Util
 
 import Foreign
@@ -99,7 +98,7 @@ make_constr_itbls dflags cons
 
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
         mk_itbl dcon conNo entry_addr = do
-           let rep_args = [ (typeCgRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
+           let rep_args = [ (typePrimRep rep_arg,rep_arg) | arg <- dataConRepArgTys dcon, rep_arg <- flattenRepType (repType arg) ]
                (tot_wds, ptr_wds, _) = mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args
 
                ptrs'  = ptr_wds

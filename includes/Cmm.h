@@ -250,7 +250,7 @@
 #define LOAD_INFO(ret,x)                        \
     info = %INFO_PTR(UNTAG(x));
 
-#define MAYBE_UNTAG(x) UNTAG(x);
+#define UNTAG_IF_PROF(x) UNTAG(x)
 
 #else
 
@@ -260,7 +260,7 @@
   }                                             \
   info = %INFO_PTR(x);
 
-#define MAYBE_UNTAG(x) (x) /* already untagged */
+#define UNTAG_IF_PROF(x) (x) /* already untagged */
 
 #endif
 
@@ -306,7 +306,7 @@
    }							\
   default:						\
    {							\
-       x = MAYBE_UNTAG(x);                              \
+       x = UNTAG_IF_PROF(x);                            \
        jump %ENTRY_CODE(info) (x);                      \
    }							\
   }
@@ -346,13 +346,11 @@
    ------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
-#define PROF_HDR_FIELDS(w_) PROF_HDR_FIELDS_(w_,prof_hdr_1,prof_hdr_2)
-#define PROF_HDR_FIELDS_(w_,hdr1,hdr2)          \
-  w_ hdr1,                                      \
+#define PROF_HDR_FIELDS(w_,hdr1,hdr2)          \
+  w_ hdr1,                                     \
   w_ hdr2,
 #else
-#define PROF_HDR_FIELDS(w_) /* nothing */
-#define PROF_HDR_FIELDS_(w_,hdr1,hdr2) /* nothing */
+#define PROF_HDR_FIELDS(w_,hdr1,hdr2) /* nothing */
 #endif
 
 /* -------------------------------------------------------------------------

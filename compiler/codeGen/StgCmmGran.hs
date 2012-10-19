@@ -96,7 +96,7 @@ reschedule liveness node_reqd = panic "granReschedule"
 -- @Continue@ rather  than the @EnterNodeCode@  function in the  RTS). We emit
 -- this kind of macro at the beginning of the following kinds of basic bocks:
 -- \begin{itemize}
---  \item Slow entry code where node is not alive (see @CgClosure.lhs@). Normally
+--  \item Slow entry code where node is not alive (see @StgCmmClosure.lhs@). Normally
 --        we use @fetchAndReschedule@ at a slow entry code.
 --  \item Fast entry code (see @CgClosure.lhs@).
 --  \item Alternatives in case expressions (@CLabelledCode@ structures), provided

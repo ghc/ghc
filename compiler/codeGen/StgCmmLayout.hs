@@ -30,7 +30,9 @@ module StgCmmLayout (
         cmmGetClosureType,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
-	funInfoTable
+        funInfoTable,
+
+        ArgRep(..), toArgRep, argRepSizeW
   ) where
 
 
@@ -329,15 +331,15 @@ slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 --      Classifying arguments: ArgRep
 -------------------------------------------------------------------------
 
--- ArgRep is not exported (even abstractly)
--- It's a local helper type for classification
+-- ArgRep is exported, but only for use in the byte-code generator which
+-- also needs to know about the classification of arguments.
 
-data ArgRep = P 	-- GC Ptr
-	  | N   -- One-word non-ptr
-	  | L	-- Two-word non-ptr (long)
-	  | V	-- Void
-	  | F	-- Float
-	  | D	-- Double
+data ArgRep = P   -- GC Ptr
+            | N   -- Word-sized non-ptr
+            | L   -- 64-bit non-ptr (long)
+            | V   -- Void
+            | F   -- Float
+            | D   -- Double
 instance Outputable ArgRep where
   ppr P = text "P"
   ppr N = text "N"

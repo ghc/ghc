@@ -24,7 +24,7 @@ module OldCmm (
 
         module CmmExpr,
 
-        Section(..), ProfilingInfo(..), C_SRT(..)
+        Section(..), ProfilingInfo(..), New.C_SRT(..)
     ) where
 
 #include "HsVersions.h"
@@ -35,7 +35,6 @@ import Cmm ( CmmInfoTable(..), GenCmmGroup, CmmStatics(..), GenCmmDecl(..),
              ProfilingInfo(..), ClosureTypeInfo(..) )
 
 import BlockId
-import ClosureInfo
 import CmmExpr
 import FastString
 import ForeignCall
@@ -184,7 +183,7 @@ type HintedCmmActual = CmmHinted CmmActual
 
 data CmmSafety
   = CmmUnsafe
-  | CmmSafe C_SRT
+  | CmmSafe New.C_SRT
   | CmmInterruptible
 
 -- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
