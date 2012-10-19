@@ -279,7 +279,7 @@ tcHsLiftedType ty = addTypeCtxt ty $ tc_lhs_type ty ekLifted
 tcCheckLHsType :: LHsType Name -> Kind -> TcM Type
 tcCheckLHsType hs_ty exp_kind
   = addTypeCtxt hs_ty $ 
-    tc_lhs_type hs_ty (EK exp_kind (ptext (sLit "Expected")))
+    tc_lhs_type hs_ty (EK exp_kind expectedKindMsg)
 
 tcLHsType :: LHsType Name -> TcM (TcType, TcKind)
 -- Called from outside: set the context
@@ -291,7 +291,7 @@ tcCheckHsTypeAndGen :: HsType Name -> Kind -> TcM Type
 -- Typecheck a type signature, and kind-generalise it
 -- The result is not necessarily zonked, and has not been checked for validity
 tcCheckHsTypeAndGen hs_ty kind
-  = do { ty  <- tc_hs_type hs_ty (EK kind (ptext (sLit "Expected")))
+  = do { ty  <- tc_hs_type hs_ty (EK kind expectedKindMsg)
        ; kvs <- kindGeneralize (tyVarsOfType ty) []
        ; return (mkForAllTys kvs ty) }
 \end{code}
@@ -305,7 +305,7 @@ the expected kind.
 tc_infer_lhs_type :: LHsType Name -> TcM (TcType, TcKind)
 tc_infer_lhs_type ty =
   do { kv <- newMetaKindVar
-     ; r <- tc_lhs_type ty (EK kv (ptext (sLit "Expected")))
+     ; r <- tc_lhs_type ty (EK kv expectedKindMsg)
      ; return (r, kv) }
 
 tc_lhs_type :: LHsType Name -> ExpKind -> TcM TcType
@@ -442,8 +442,7 @@ tc_hs_type hs_ty@(HsExplicitTupleTy _ tys) exp_kind
 
 --------- Constraint types
 tc_hs_type ipTy@(HsIParamTy n ty) exp_kind
-  = do { ty' <- tc_lhs_type ty 
-            (EK liftedTypeKind (ptext (sLit "The type argument of the implicit parameter had")))
+  = do { ty' <- tc_lhs_type ty ekLifted
        ; checkExpectedKind ipTy constraintKind exp_kind
        ; ipClass <- tcLookupClass ipClassName
        ; let n' = mkStrLitTy $ hsIPNameFS n
@@ -454,16 +453,21 @@ tc_hs_type ty@(HsEqTy ty1 ty2) exp_kind
   = do { (ty1', kind1) <- tc_infer_lhs_type ty1
        ; (ty2', kind2) <- tc_infer_lhs_type ty2
        ; checkExpectedKind ty2 kind2
-              (EK kind1 (ptext (sLit "The left argument of the equality predicate had")))
+              (EK kind1 msg_fn)
        ; checkExpectedKind ty constraintKind exp_kind
        ; return (mkNakedTyConApp eqTyCon [kind1, ty1', ty2']) }
+  where
+    msg_fn pkind = ptext (sLit "The left argument of the equality had kind")
+                   <+> quotes (pprKind pkind)
 
 --------- Misc
 tc_hs_type (HsKindSig ty sig_k) exp_kind 
   = do { sig_k' <- tcLHsKind sig_k
        ; checkExpectedKind ty sig_k' exp_kind
-       ; tc_lhs_type ty
-             (EK sig_k' (ptext (sLit "An enclosing kind signature specified"))) }
+       ; tc_lhs_type ty (EK sig_k' msg_fn) }
+  where
+    msg_fn pkind = ptext (sLit "The signature specified kind") 
+                   <+> quotes (pprKind pkind)
 
 tc_hs_type (HsCoreTy ty) exp_kind
   = do { checkExpectedKind ty (typeKind ty) exp_kind
@@ -1269,21 +1273,36 @@ We would like to get a decent error message from
 -- The ExpKind datatype means "expected kind" and contains 
 -- some info about just why that kind is expected, to improve
 -- the error message on a mis-match
-data ExpKind = EK TcKind SDoc
+data ExpKind = EK TcKind (TcKind -> SDoc)
+   -- The second arg is function that takes a *tidied* version 
+   -- of the first arg, and produces something like
+   --    "Expected kind k"
+   --    "Expected a constraint"
+   --    "The argument of Maybe should have kind k"
 
 instance Outputable ExpKind where
-  ppr (EK k _) = ptext (sLit "Expected kind:") <+> ppr k
+  ppr (EK k f) = f k
 
 ekLifted, ekOpen, ekConstraint :: ExpKind
-ekLifted     = EK liftedTypeKind (ptext (sLit "Expected"))
-ekOpen       = EK openTypeKind   (ptext (sLit "Expected"))
-ekConstraint = EK constraintKind (ptext (sLit "Expected"))
+ekLifted     = EK liftedTypeKind expectedKindMsg
+ekOpen       = EK openTypeKind   expectedKindMsg
+ekConstraint = EK constraintKind expectedKindMsg
+
+expectedKindMsg :: TcKind -> SDoc
+expectedKindMsg pkind
+  | isConstraintKind pkind = ptext (sLit "Expected a constraint")
+  | isOpenTypeKind   pkind = ptext (sLit "Expected a type")
+  | otherwise = ptext (sLit "Expected kind") <+> quotes (pprKind pkind)
 
 -- Build an ExpKind for arguments
 expArgKind :: SDoc -> TcKind -> Int -> ExpKind
-expArgKind exp kind arg_no = EK kind (ptext (sLit "The") <+> speakNth arg_no 
-                                  <+> ptext (sLit "argument of") <+> exp
-                                  <+> ptext (sLit "should have"))
+expArgKind exp kind arg_no = EK kind msg_fn
+  where
+    msg_fn pkind 
+      = sep [ ptext (sLit "The") <+> speakNth arg_no 
+              <+> ptext (sLit "argument of") <+> exp
+            , nest 2 $ ptext (sLit "should have kind") 
+              <+> quotes (pprKind pkind) ]
 
 unifyKinds :: SDoc -> [(TcType, TcKind)] -> TcM TcKind
 unifyKinds fun act_kinds
@@ -1339,13 +1358,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
                | otherwise 
                = False
 
-            err | isConstraintKind tidy_act_kind
-                = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
-                
-                | isConstraintKind tidy_exp_kind
-                = text "Type of kind" <+> ppr tidy_act_kind <+> text "used as a constraint"
-                
-                | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+            err | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
                 = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
                     <+> ptext (sLit "is unlifted")
 
@@ -1366,12 +1379,11 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
                   -- Now n_exp_as >= n_act_as. In the next two cases,
                   -- n_exp_as == 0, and hence so is n_act_as
                 | otherwise               -- E.g. Monad [Int]
-                = ptext (sLit "Kind mis-match") $$ more_info
+                = more_info
 
-            more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
-                                 <+> quotes (pprKind tidy_exp_kind) <> comma,
-                              ptext (sLit "but") <+> quotes (ppr ty) <+>
-                                  ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
+            more_info = sep [ ek_ctxt tidy_exp_kind <> comma
+                            , nest 2 $ ptext (sLit "but") <+> quotes (ppr ty)
+                              <+> ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
       ; traceTc "checkExpectedKind 1" (ppr ty $$ ppr tidy_act_kind $$ ppr tidy_exp_kind $$ ppr env1 $$ ppr env2)
       ; failWithTcM (env2, err) } } }
