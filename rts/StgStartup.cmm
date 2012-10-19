@@ -36,7 +36,7 @@
 
 INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
                W_ info_ptr,
-               PROF_HDR_FIELDS(W_))
+               PROF_HDR_FIELDS(W_,p1,p2))
 /* no return list: explicit stack layout */
 {
     /* 

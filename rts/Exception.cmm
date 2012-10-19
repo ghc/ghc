@@ -341,15 +341,15 @@ stg_killMyself
  * kind of return to the activation record underneath us on the stack.
  */
 
-#define CATCH_FRAME_FIELDS(w_,p_,info_ptr,exceptions_blocked,handler)   \
+#define CATCH_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,exceptions_blocked,handler)   \
   w_ info_ptr,                                                          \
-  PROF_HDR_FIELDS(w_)                                                   \
+  PROF_HDR_FIELDS(w_,p1,p2)                                             \
   w_ exceptions_blocked,                                                \
   p_ handler
 
 
 INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
-               CATCH_FRAME_FIELDS(W_,P_,info_ptr,
+               CATCH_FRAME_FIELDS(W_,P_,info_ptr, p1, p2,
                                   exceptions_blocked,handler))
     return (P_ ret)
 {
@@ -388,7 +388,7 @@ stg_catchzh ( P_ io,      /* :: IO a */
     TICK_SLOW_CALL_v();
 
     jump stg_ap_v_fast
-        (CATCH_FRAME_FIELDS(,,stg_catch_frame_info,
+        (CATCH_FRAME_FIELDS(,,stg_catch_frame_info, CCCS, 0,
                             exceptions_blocked, handler))
         (io);
 }

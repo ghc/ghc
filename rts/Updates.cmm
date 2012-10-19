@@ -26,7 +26,7 @@
  * we don't mind duplicating this jump.
  */
 INFO_TABLE_RET ( stg_upd_frame, UPDATE_FRAME,
-                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,updatee) )
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,_unused,updatee) )
     return (P_ ret) /* the closure being returned */
 {
     /* ToDo: it might be a PAP, so we should check... */
@@ -42,7 +42,7 @@ INFO_TABLE_RET ( stg_upd_frame, UPDATE_FRAME,
  * another thread in the meantime.
  */
 INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
-                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,updatee) )
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,_unused,updatee) )
     return (P_ ret) /* the closure being returned */
 {
     W_ v, i, tso, link;
@@ -77,11 +77,11 @@ INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
  * high watermark.
  */
 INFO_TABLE_RET ( stg_bh_upd_frame, UPDATE_FRAME,
-                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,updatee) )
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,_unused,updatee) )
     return (P_ ret) /* the closure being returned */
 {
     // This all compiles away to a single jump instruction (sigh)
     jump RET_LBL(stg_marked_upd_frame)
-        ( UPDATE_FRAME_FIELDS(,,info_ptr,ccs,updatee) )
+        ( UPDATE_FRAME_FIELDS(,,info_ptr,ccs,_unused,updatee) )
         (ret);
 }

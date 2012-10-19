@@ -676,11 +676,12 @@ stg_threadStatuszh ( gcptr tso )
 // Catch retry frame -----------------------------------------------------------
 
 #define CATCH_RETRY_FRAME_FIELDS(w_,p_,info_ptr,        \
+                                 p1, p2,                \
                                  running_alt_code,      \
                                  first_code,            \
                                  alt_code)              \
   w_ info_ptr,                                          \
-  PROF_HDR_FIELDS(w_)                                   \
+  PROF_HDR_FIELDS(w_,p1,p2)                             \
   w_ running_alt_code,                                  \
   p_ first_code,                                        \
   p_ alt_code
@@ -688,7 +689,7 @@ stg_threadStatuszh ( gcptr tso )
 
 INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
                CATCH_RETRY_FRAME_FIELDS(W_,P_,
-                                        info_ptr,
+                                        info_ptr, p1, p2,
                                         running_alt_code,
                                         first_code,
                                         alt_code))
@@ -712,14 +713,14 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
         StgTSO_trec(CurrentTSO) = new_trec;
         if (running_alt_code != 0) {
             jump stg_ap_v_fast
-                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr,
+                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr, p1, p2,
                                           running_alt_code,
                                           first_code,
                                           alt_code))
                 (alt_code);
         } else {
             jump stg_ap_v_fast
-                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr,
+                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr, p1, p2,
                                           running_alt_code,
                                           first_code,
                                           alt_code))
@@ -731,9 +732,9 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 // Atomically frame ------------------------------------------------------------
 
 // This must match StgAtomicallyFrame in Closures.h
-#define ATOMICALLY_FRAME_FIELDS(w_,p_,info_ptr,code,next,result)        \
+#define ATOMICALLY_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,next,result)  \
   w_ info_ptr,                                                          \
-  PROF_HDR_FIELDS(w_)                                                   \
+  PROF_HDR_FIELDS(w_,p1,p2)                                             \
   p_ code,                                                              \
   p_ next,                                                              \
   p_ result
@@ -742,7 +743,7 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
                // layout of the frame, and bind the field names
                ATOMICALLY_FRAME_FIELDS(W_,P_,
-                                       info_ptr,
+                                       info_ptr, p1, p2,
                                        code,
                                        next_invariant,
                                        frame_result))
@@ -779,7 +780,8 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
     StgTSO_trec(CurrentTSO) = trec;
     q = StgInvariantCheckQueue_invariant(next_invariant);
     jump stg_ap_v_fast
-        (ATOMICALLY_FRAME_FIELDS(,,info_ptr,code,next_invariant,frame_result))
+        (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
+                                 code,next_invariant,frame_result))
         (StgAtomicInvariant_code(q));
 
   } else {
@@ -799,7 +801,8 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
       jump stg_ap_v_fast
           // push the StgAtomicallyFrame again: the code generator is
           // clever enough to only assign the fields that have changed.
-          (ATOMICALLY_FRAME_FIELDS(,,info_ptr,code,next_invariant,frame_result))
+          (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
+                                   code,next_invariant,frame_result))
           (code);
     }
   }
@@ -809,7 +812,7 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
 INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
                // layout of the frame, and bind the field names
                ATOMICALLY_FRAME_FIELDS(W_,P_,
-                                       info_ptr,
+                                       info_ptr, p1, p2,
                                        code,
                                        next_invariant,
                                        frame_result))
@@ -822,7 +825,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
   if (valid != 0) {
       /* Previous attempt is still valid: no point trying again yet */
       jump stg_block_noregs
-          (ATOMICALLY_FRAME_FIELDS(,,info_ptr,
+          (ATOMICALLY_FRAME_FIELDS(,,info_ptr, p1, p2,
                                    code,next_invariant,frame_result))
           ();
   } else {
@@ -832,7 +835,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
 
     // change the frame header to stg_atomically_frame_info
     jump stg_ap_v_fast
-        (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info,
+        (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, p1, p2,
                                  code,next_invariant,frame_result))
         (code);
   }
@@ -845,15 +848,15 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
  * kind of return to the activation record underneath us on the stack.
  */
 
-#define CATCH_STM_FRAME_FIELDS(w_,p_,info_ptr,code,handler)     \
+#define CATCH_STM_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,handler) \
   w_ info_ptr,                                                  \
-  PROF_HDR_FIELDS(w_)                                           \
+  PROF_HDR_FIELDS(w_,p1,p2)                                     \
   p_ code,                                                      \
   p_ handler
 
 INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
                // layout of the frame, and bind the field names
-               CATCH_STM_FRAME_FIELDS(W_,P_,info_ptr,code,handler))
+               CATCH_STM_FRAME_FIELDS(W_,P_,info_ptr,p1,p2,code,handler))
     return (P_ ret)
 {
     W_ r, trec, outer;
@@ -872,7 +875,7 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
         StgTSO_trec(CurrentTSO) = new_trec;
 
         jump stg_ap_v_fast
-            (CATCH_STM_FRAME_FIELDS(,,info_ptr,code,handler))
+            (CATCH_STM_FRAME_FIELDS(,,info_ptr,p1,p2,code,handler))
             (code);
     }
 }
@@ -907,7 +910,7 @@ stg_atomicallyzh (P_ stm)
   StgTSO_trec(CurrentTSO) = new_trec;
 
   jump stg_ap_v_fast
-      (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info,
+      (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, CCCS, 0,
                                code,next_invariant,frame_result))
       (stm);
 }
@@ -937,7 +940,8 @@ stg_catchSTMzh (P_ code    /* :: STM a */,
     StgTSO_trec(CurrentTSO) = new_trec;
 
     jump stg_ap_v_fast
-        (CATCH_STM_FRAME_FIELDS(,,stg_catch_stm_frame_info, code, handler))
+        (CATCH_STM_FRAME_FIELDS(,,stg_catch_stm_frame_info, CCCS, 0,
+                                code, handler))
         (code);
 }
 
@@ -959,7 +963,7 @@ stg_catchRetryzh (P_ first_code, /* :: STM a */
 
   // push the CATCH_RETRY stack frame, and apply first_code to realWorld#
   jump stg_ap_v_fast
-      (CATCH_RETRY_FRAME_FIELDS(,, stg_catch_retry_frame_info,
+      (CATCH_RETRY_FRAME_FIELDS(,, stg_catch_retry_frame_info, CCCS, 0,
                                 0, /* not running_alt_code */
                                 first_code,
                                 alt_code))
