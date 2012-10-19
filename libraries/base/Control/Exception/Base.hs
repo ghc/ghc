@@ -379,22 +379,6 @@ blocked  = return False
 -- might get a the opposite behaviour. This is ok, because 'catch' is an
 -- 'IO' computation.
 --
--- Note that the "Prelude" also exports a function called
--- 'Prelude.catch' with a similar type to 'Control.Exception.catch',
--- except that the "Prelude" version only catches the IO and user
--- families of exceptions (as required by Haskell 98).
---
--- We recommend either hiding the "Prelude" version of 'Prelude.catch'
--- when importing "Control.Exception":
---
--- > import Prelude hiding (catch)
---
--- or importing "Control.Exception" qualified, to avoid name-clashes:
---
--- > import qualified Control.Exception as C
---
--- and then using @C.catch@
---
 #ifndef __NHC__
 catch   :: Exception e
         => IO a         -- ^ The computation to run
