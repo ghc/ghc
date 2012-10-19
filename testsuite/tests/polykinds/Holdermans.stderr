@@ -1,0 +1,6 @@
+
+Holdermans.hs:11:11:
+    `T' of type `forall a. a -> K' is not promotable
+    In the type `G (T [])'
+    In the definition of data constructor `D'
+    In the data declaration for `G'
