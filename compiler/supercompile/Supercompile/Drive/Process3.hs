@@ -756,10 +756,12 @@ reduceForMatch state | rEDUCE_BEFORE_MATCH = {- second gc $ -} reduceWithFlag (c
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)
-  where (bvs_unfoldings, (to_bind, state), (preinit_with, preinit_state)) = prepareTerm unfoldings e
-        start k | pREINITALIZE_MEMO_TABLE = run $ preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
-                | otherwise               = bindManyMixedLiftedness fvedTermFreeVars to_bind $ run $ k state
-        run = runScpM (tagAnnotations state)
+  where (bvs_unfoldings, no_preinit, preinit) = prepareTerm unfoldings e
+        (to_bind, state)              = no_preinit -- Delay forcing these to suppress
+        (preinit_with, preinit_state) = preinit    -- prepareTerm debug prints
+        start k | pREINITALIZE_MEMO_TABLE = run preinit_state $ preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
+                | otherwise               = bindManyMixedLiftedness fvedTermFreeVars to_bind $ run state $ k state
+        run tags_state = runScpM (tagAnnotations tags_state)
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
 preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do
