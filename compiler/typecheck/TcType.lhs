@@ -554,31 +554,9 @@ tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
 tidyFreeTyVars (full_occ_env, var_env) tyvars 
-  = fst (tidyOpenTyVars (full_occ_env, var_env) tv_list)
+  = fst (tidyOpenTyVars (full_occ_env, var_env) (varSetElems tyvars))
 
-  where
-    tv_list = varSetElems tyvars
-    
-{-
-      -- The idea here was that we restrict the new TidyEnv to the 
-      -- _free_ vars of the type, so that we don't gratuitously rename
-      -- the _bound_ variables of the type.
-      --
-      -- But the idea goes badly wrong if we tidy more than 
-      -- one open type, e.g.  a_99 and (a_77 -> a_99). Then
-      -- we tidy the former to a0, and the latter to a0 -> a0!
-    trimmed_occ_env = foldr mk_occ_env emptyOccEnv tv_list
-
-    mk_occ_env :: TyVar -> TidyOccEnv -> TidyOccEnv
-    mk_occ_env tv env 
-       = case lookupOccEnv full_occ_env occ of
-            Just n  -> extendOccEnv env occ n
-            Nothing -> env
-       where
-         occ = getOccName tv
--}
-
----------------
+        ---------------
 tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
 tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
 
@@ -620,9 +598,13 @@ tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
 -- and then uses 'tidyType' to work over the type itself
 tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
 tidyOpenType env ty
-  = (env', tidyType env' ty)
+  = (env', tidyType (trimmed_occ_env, var_env) ty)
   where
-    env' = tidyFreeTyVars env (tyVarsOfType ty)
+    (env'@(_, var_env), tvs') = tidyOpenTyVars env (varSetElems (tyVarsOfType ty))
+    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
+      -- The idea here was that we restrict the new TidyEnv to the 
+      -- _free_ vars of the type, so that we don't gratuitously rename
+      -- the _bound_ variables of the type.
 
 ---------------
 tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
