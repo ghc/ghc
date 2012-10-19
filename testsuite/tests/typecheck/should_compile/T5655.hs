@@ -23,4 +23,5 @@ f = ap (ETwice . twice)
 foo :: ETwice
 foo = ETwice (5 :: Int)
 
+bar :: IO ()
 bar = ap print (f foo)
