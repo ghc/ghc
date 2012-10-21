@@ -27,6 +27,9 @@ TOP		= @hardtop@
 
 include $(TOP)/mk/project.mk
 
+# By default, be verbose
+V = 1
+
 ################################################################################
 #
 #		Global configuration options
