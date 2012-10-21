@@ -241,6 +241,8 @@ primOpRules nm WordLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 primOpRules nm WordEqOp   = mkRelOpRule nm (==) [ litEq True ]
 primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq False ]
 
+primOpRules nm AddrAddOp  = mkPrimOpRule nm 2 [ rightIdentityDynFlags zeroi ]
+
 primOpRules nm SeqOp      = mkPrimOpRule nm 4 [ seqRule ]
 primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
 
