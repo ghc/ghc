@@ -120,8 +120,10 @@ primOpRules nm WordQuotOp  = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word
 primOpRules nm WordRemOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
                                                , rightIdentityDynFlags onew ]
 primOpRules nm AndOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
+                                               , idempotent
                                                , zeroElem zerow ]
 primOpRules nm OrOp        = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
+                                               , idempotent
                                                , identityDynFlags zerow ]
 primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , identityDynFlags zerow
@@ -477,6 +479,11 @@ subsumedByPrimOp primop = do
   [e@(Var primop_id `App` _)] <- getArgs
   matchPrimOpId primop primop_id
   return e
+
+idempotent :: RuleM CoreExpr
+idempotent = do [e1, e2] <- getArgs
+                guard $ cheapEqExpr e1 e2
+                return e1
 \end{code}
 
 %************************************************************************
