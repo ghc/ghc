@@ -50,6 +50,7 @@ import Util
 import Control.Monad
 import Data.Bits as Bits
 import Data.Int
+import Data.Ratio
 import Data.Word
 \end{code}
 
@@ -1177,7 +1178,7 @@ match_rationalTo mkLit _ _ id_unf [xl, yl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
-  = Just (mkLit (fromInteger x/fromInteger y))
+  = Just (mkLit (fromRational (x % y)))
 match_rationalTo _ _ _ _ _ = Nothing
 
 match_decodeDouble :: DynFlags
