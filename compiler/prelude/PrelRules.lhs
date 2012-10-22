@@ -98,7 +98,8 @@ primOpRules nm IntRemOp    = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intO
                                                     retLit zeroi
                                                , equalArgs >> retLit zeroi
                                                , equalArgs >> retLit zeroi ]
-primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp ]
+primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
+                                               , inversePrimOp IntNegOp ]
 primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftL)
                                                , rightIdentityDynFlags zeroi ]
 primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftR)
@@ -119,8 +120,10 @@ primOpRules nm WordQuotOp  = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word
 primOpRules nm WordRemOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
                                                , rightIdentityDynFlags onew ]
 primOpRules nm AndOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
+                                               , idempotent
                                                , zeroElem zerow ]
 primOpRules nm OrOp        = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
+                                               , idempotent
                                                , identityDynFlags zerow ]
 primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , identityDynFlags zerow
@@ -135,18 +138,38 @@ primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLitDynFlags word2IntLit
                                                   , inversePrimOp Int2WordOp ]
 primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLitDynFlags int2WordLit
                                                   , inversePrimOp Word2IntOp ]
-primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit ]
-primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit ]
+primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit
+                                                  , subsumedByPrimOp Narrow8IntOp
+                                                  , subsumedByPrimOp Narrow16IntOp
+                                                  , subsumedByPrimOp Narrow32IntOp ]
+primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit
+                                                  , Narrow16IntOp `subsumesPrimOp` Narrow8IntOp
+                                                  , subsumedByPrimOp Narrow16IntOp
+                                                  , subsumedByPrimOp Narrow32IntOp ]
 primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit
+                                                  , Narrow32IntOp `subsumesPrimOp` Narrow8IntOp
+                                                  , Narrow32IntOp `subsumesPrimOp` Narrow16IntOp
+                                                  , subsumedByPrimOp Narrow32IntOp
                                                   , removeOp32 ]
-primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit ]
-primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit ]
+primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit
+                                                  , subsumedByPrimOp Narrow8WordOp
+                                                  , subsumedByPrimOp Narrow16WordOp
+                                                  , subsumedByPrimOp Narrow32WordOp ]
+primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit
+                                                  , Narrow16WordOp `subsumesPrimOp` Narrow8WordOp
+                                                  , subsumedByPrimOp Narrow16WordOp
+                                                  , subsumedByPrimOp Narrow32WordOp ]
 primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit
+                                                  , Narrow32WordOp `subsumesPrimOp` Narrow8WordOp
+                                                  , Narrow32WordOp `subsumesPrimOp` Narrow16WordOp
+                                                  , subsumedByPrimOp Narrow32WordOp
                                                   , removeOp32 ]
-primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit ]
-primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do { [Lit lit] <- getArgs
-                                                  ; guard (litFitsInChar lit)
-                                                  ; liftLit int2CharLit } ]
+primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit
+                                                  , inversePrimOp ChrOp ]
+primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
+                                                       guard (litFitsInChar lit)
+                                                       liftLit int2CharLit
+                                                  , inversePrimOp OrdOp ]
 primOpRules nm Float2IntOp    = mkPrimOpRule nm 1 [ liftLit float2IntLit ]
 primOpRules nm Int2FloatOp    = mkPrimOpRule nm 1 [ liftLit int2FloatLit ]
 primOpRules nm Double2IntOp   = mkPrimOpRule nm 1 [ liftLit double2IntLit ]
@@ -165,7 +188,8 @@ primOpRules nm FloatMulOp   = mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
                          -- zeroElem zerof doesn't hold because of NaN
 primOpRules nm FloatDivOp   = mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
                                                 , rightIdentity onef ]
-primOpRules nm FloatNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp ]
+primOpRules nm FloatNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp
+                                                , inversePrimOp FloatNegOp ]
 
 -- Double
 primOpRules nm DoubleAddOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
@@ -177,7 +201,8 @@ primOpRules nm DoubleMulOp   = mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
                           -- zeroElem zerod doesn't hold because of NaN
 primOpRules nm DoubleDivOp   = mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
                                                  , rightIdentity oned ]
-primOpRules nm DoubleNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp ]
+primOpRules nm DoubleNegOp   = mkPrimOpRule nm 1 [ unaryLit negOp
+                                                 , inversePrimOp DoubleNegOp ]
 
 -- Relational operators
 primOpRules nm IntEqOp    = mkRelOpRule nm (==) [ litEq True ]
@@ -215,6 +240,8 @@ primOpRules nm WordLeOp   = mkRelOpRule nm (<=) [ boundsCmp Le ]
 primOpRules nm WordLtOp   = mkRelOpRule nm (<)  [ boundsCmp Lt ]
 primOpRules nm WordEqOp   = mkRelOpRule nm (==) [ litEq True ]
 primOpRules nm WordNeOp   = mkRelOpRule nm (/=) [ litEq False ]
+
+primOpRules nm AddrAddOp  = mkPrimOpRule nm 2 [ rightIdentityDynFlags zeroi ]
 
 primOpRules nm SeqOp      = mkPrimOpRule nm 4 [ seqRule ]
 primOpRules nm SparkOp    = mkPrimOpRule nm 4 [ sparkRule ]
@@ -443,6 +470,22 @@ inversePrimOp primop = do
   matchPrimOpId primop primop_id
   return e
 
+subsumesPrimOp :: PrimOp -> PrimOp -> RuleM CoreExpr
+this `subsumesPrimOp` that = do
+  [Var primop_id `App` e] <- getArgs
+  matchPrimOpId that primop_id
+  return (Var (mkPrimOpId this) `App` e)
+
+subsumedByPrimOp :: PrimOp -> RuleM CoreExpr
+subsumedByPrimOp primop = do
+  [e@(Var primop_id `App` _)] <- getArgs
+  matchPrimOpId primop primop_id
+  return e
+
+idempotent :: RuleM CoreExpr
+idempotent = do [e1, e2] <- getArgs
+                guard $ cheapEqExpr e1 e2
+                return e1
 \end{code}
 
 %************************************************************************

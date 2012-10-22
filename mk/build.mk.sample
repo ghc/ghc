@@ -33,6 +33,10 @@
 GhcLibWays = v
 DYNAMIC_BY_DEFAULT = NO
 
+# Uncomment this to get prettier build output.
+# Please use V = 1 when reporting GHC bugs.
+# V = 0
+
 # -------- 1. A Performance/Distribution build--------------------------------
 
 ifeq "$(BuildFlavour)" "perf"

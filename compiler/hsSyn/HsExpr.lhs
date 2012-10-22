@@ -3,13 +3,6 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 {-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
 
 -- | Abstract Haskell syntax for expressions.
@@ -160,16 +153,16 @@ data HsExpr id
   | SectionR    (LHsExpr id)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operand
 
-  | ExplicitTuple		-- Used for explicit tuples and sections thereof
-        [HsTupArg id] 
+  | ExplicitTuple               -- Used for explicit tuples and sections thereof
+        [HsTupArg id]
         Boxity
 
   | HsCase      (LHsExpr id)
                 (MatchGroup id (LHsExpr id))
 
   | HsIf        (Maybe (SyntaxExpr id)) -- cond function
-    		       		        -- Nothing => use the built-in 'if'
-					-- See Note [Rebindable if]
+                                        -- Nothing => use the built-in 'if'
+                                        -- See Note [Rebindable if]
                 (LHsExpr id)    --  predicate
                 (LHsExpr id)    --  then part
                 (LHsExpr id)    --  else part
@@ -202,8 +195,8 @@ data HsExpr id
   -- Record update
   | RecordUpd   (LHsExpr id)
                 (HsRecordBinds id)
---		(HsMatchGroup Id)  -- Filled in by the type checker to be 
---				   -- a match that does the job
+--              (HsMatchGroup Id)  -- Filled in by the type checker to be
+--                                 -- a match that does the job
                 [DataCon]          -- Filled in by the type checker to the
                                    -- _non-empty_ list of DataCons that have
                                    -- all the upd'd fields
@@ -249,7 +242,7 @@ data HsExpr id
   | HsSpliceE (HsSplice id)
 
   | HsQuasiQuoteE (HsQuasiQuote id)
-	-- See Note [Quasi-quote overview] in TcSplice
+        -- See Note [Quasi-quote overview] in TcSplice
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -260,7 +253,7 @@ data HsExpr id
 
   ---------------------------------------
   -- The following are commands, not expressions proper
-  -- They are only used in the parsing stage and are removed 
+  -- They are only used in the parsing stage and are removed
   --    immediately in parser.RdrHsSyn.checkCommand
   | HsArrApp            -- Arrow tail, or arrow application (f -< arg)
         (LHsExpr id)    -- arrow expression, f
@@ -323,8 +316,8 @@ data HsExpr id
 --  (,a,) is represented by  ExplicitTuple [Mising ty1, Present a, Missing ty3]
 --  Which in turn stands for (\x:ty1 \y:ty2. (x,a,y))
 data HsTupArg id
-  = Present (LHsExpr id)	-- The argument
-  | Missing PostTcType		-- The argument is missing, but this is its type
+  = Present (LHsExpr id)        -- The argument
+  | Missing PostTcType          -- The argument is missing, but this is its type
   deriving (Data, Typeable)
 
 tupArgPresent :: HsTupArg id -> Bool
@@ -343,7 +336,7 @@ HsPar (and ParPat in patterns, HsParTy in types) is used as follows
   * Generally HsPar is optional; the pretty printer adds parens where
     necessary.  Eg (HsApp f (HsApp g x)) is fine, and prints 'f (g x)'
 
-  * HsPars are pretty printed as '( .. )' regardless of whether 
+  * HsPars are pretty printed as '( .. )' regardless of whether
     or not they are strictly necssary
 
   * HsPars are respected when rearranging operator fixities.
@@ -352,10 +345,10 @@ HsPar (and ParPat in patterns, HsParTy in types) is used as follows
 Note [Sections in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Sections should always appear wrapped in an HsPar, thus
-	 HsPar (SectionR ...)
-The parser parses sections in a wider variety of situations 
+         HsPar (SectionR ...)
+The parser parses sections in a wider variety of situations
 (See Note [Parsing sections]), but the renamer checks for those
-parens.  This invariant makes pretty-printing easier; we don't need 
+parens.  This invariant makes pretty-printing easier; we don't need
 a special case for adding the parens round sections.
 
 Note [Rebindable if]
@@ -364,7 +357,7 @@ The rebindable syntax for 'if' is a bit special, because when
 rebindable syntax is *off* we do not want to treat
    (if c then t else e)
 as if it was an application (ifThenElse c t e).  Why not?
-Because we allow an 'if' to return *unboxed* results, thus 
+Because we allow an 'if' to return *unboxed* results, thus
   if blah then 3# else 4#
 whereas that would not be possible using a all to a polymorphic function
 (because you can't call a polymorphic function at an unboxed type).
@@ -612,7 +605,7 @@ pprParendExpr expr
         -- I think that is usually (always?) right
 
 hsExprNeedsParens :: HsExpr id -> Bool
--- True of expressions for which '(e)' and 'e' 
+-- True of expressions for which '(e)' and 'e'
 -- mean the same thing
 hsExprNeedsParens (ArithSeq {})       = False
 hsExprNeedsParens (PArrSeq {})        = False
@@ -632,7 +625,7 @@ hsExprNeedsParens (HsDo sc _ _)
 hsExprNeedsParens _ = True
 
 
-isAtomicHsExpr :: HsExpr id -> Bool 
+isAtomicHsExpr :: HsExpr id -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})     = True
 isAtomicHsExpr (HsLit {})     = True
@@ -655,7 +648,7 @@ We re-use HsExpr to represent these.
 \begin{code}
 type LHsCmd id = Located (HsCmd id)
 
-data HsCmd id 
+data HsCmd id
   = HsCmdArrApp         -- Arrow tail, or arrow application (f -< arg)
         (LHsExpr id)    -- arrow expression, f
         (LHsExpr id)    -- input expression, arg
@@ -672,7 +665,7 @@ data HsCmd id
         (Maybe Fixity)  -- fixity (filled in by the renamer), for forms that
                         -- were converted from OpApp's by the renamer
         [LHsCmdTop id]  -- argument commands
-  
+
   | HsCmdApp    (LHsCmd id)
                 (LHsExpr id)
 
@@ -896,7 +889,7 @@ pprMatches ctxt (MatchGroup matches _)
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndr idL, OutputableBndr idR, Outputable body) 
+pprFunBind :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
            => idL -> Bool -> MatchGroup idR body -> SDoc
 pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
 
@@ -930,9 +923,9 @@ pprMatch ctxt (Match pats maybe_ty grhss)
                   pp_infix = pprParendLPat pat1 <+> ppr fun <+> pprParendLPat pat2
 
             LambdaExpr -> (char '\\', pats)
-	    
+
             _  -> ASSERT( null pats1 )
-                  (ppr pat1, [])	-- No parens around the single pat
+                  (ppr pat1, [])        -- No parens around the single pat
 
     (pat1:pats1) = pats
     (pat2:pats2) = pats1
@@ -985,14 +978,14 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 -- The SyntaxExprs in here are used *only* for do-notation and monad
 -- comprehensions, which have rebindable syntax. Otherwise they are unused.
 data StmtLR idL idR body -- body should always be (LHs**** idR)
-  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp, 
-    	      -- and (after the renamer) DoExpr, MDoExpr
+  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp,
+              -- and (after the renamer) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
                body
                (SyntaxExpr idR)   -- The return operator, used only for MonadComp
-	       		   	  -- For ListComp, PArrComp, we use the baked-in 'return'
-				  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
-	       		   	  -- See Note [Monad Comprehensions]
+                                  -- For ListComp, PArrComp, we use the baked-in 'return'
+                                  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
+                                  -- See Note [Monad Comprehensions]
   | BindStmt (LPat idL)
              body
              (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
@@ -1013,26 +1006,26 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR)           -- Polymorphic `mzip` for monad comprehensions
              (SyntaxExpr idR)           -- The `>>=` operator
                                         -- See notes [Monad Comprehensions]
-  	    -- After renaming, the ids are the binders 
-  	    -- bound by the stmts and used after themp
+            -- After renaming, the ids are the binders
+            -- bound by the stmts and used after themp
 
   | TransStmt {
       trS_form  :: TransForm,
       trS_stmts :: [ExprLStmt idL],   -- Stmts to the *left* of the 'group'
-	            	              -- which generates the tuples to be grouped
+                                      -- which generates the tuples to be grouped
 
       trS_bndrs :: [(idR, idR)],      -- See Note [TransStmt binder map]
-				
+
       trS_using :: LHsExpr idR,
       trS_by :: Maybe (LHsExpr idR),  -- "by e" (optional)
-	-- Invariant: if trS_form = GroupBy, then grp_by = Just e
+        -- Invariant: if trS_form = GroupBy, then grp_by = Just e
 
-      trS_ret :: SyntaxExpr idR,      -- The monomorphic 'return' function for 
-                                       -- the inner monad comprehensions
+      trS_ret :: SyntaxExpr idR,      -- The monomorphic 'return' function for
+                                      -- the inner monad comprehensions
       trS_bind :: SyntaxExpr idR,     -- The '(>>=)' operator
       trS_fmap :: SyntaxExpr idR      -- The polymorphic 'fmap' function for desugaring
-      		   	      	       -- Only for 'group' forms
-    }                                  -- See Note [Monad Comprehensions]
+                                      -- Only for 'group' forms
+    }                                 -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
   | RecStmt
@@ -1040,16 +1033,16 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
 
         -- The next two fields are only valid after renaming
      , recS_later_ids :: [idR] -- The ids are a subset of the variables bound by the
-  		               -- stmts that are used in stmts that follow the RecStmt
+                               -- stmts that are used in stmts that follow the RecStmt
 
      , recS_rec_ids :: [idR]   -- Ditto, but these variables are the "recursive" ones,
-                   	       -- that are used before they are bound in the stmts of
-                   	       -- the RecStmt. 
-	-- An Id can be in both groups
-	-- Both sets of Ids are (now) treated monomorphically
-	-- See Note [How RecStmt works] for why they are separate
+                               -- that are used before they are bound in the stmts of
+                               -- the RecStmt.
+        -- An Id can be in both groups
+        -- Both sets of Ids are (now) treated monomorphically
+        -- See Note [How RecStmt works] for why they are separate
 
-	-- Rebindable syntax
+        -- Rebindable syntax
      , recS_bind_fn :: SyntaxExpr idR -- The bind function
      , recS_ret_fn  :: SyntaxExpr idR -- The return function
      , recS_mfix_fn :: SyntaxExpr idR -- The mfix function
@@ -1062,22 +1055,22 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                      -- returned by the recursion.
                                      -- They may not quite be the Ids themselves,
                                      -- because the Id may be *polymorphic*, but
-                                     -- the returned thing has to be *monomorphic*, 
-				     -- so they may be type applications
+                                     -- the returned thing has to be *monomorphic*,
+                                     -- so they may be type applications
 
       , recS_ret_ty :: PostTcType    -- The type of of do { stmts; return (a,b,c) }
-      		       		     -- With rebindable syntax the type might not
-				     -- be quite as simple as (m (tya, tyb, tyc)).
+                                     -- With rebindable syntax the type might not
+                                     -- be quite as simple as (m (tya, tyb, tyc)).
       }
   deriving (Data, Typeable)
 
-data TransForm	 -- The 'f' below is the 'using' function, 'e' is the by function
+data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
-  | GroupForm	   -- then group using f   or    then group by e using f (depending on trS_by)
+  | GroupForm    -- then group using f   or    then group by e using f (depending on trS_by)
   deriving (Data, Typeable)
 
 data ParStmtBlock idL idR
-  = ParStmtBlock 
+  = ParStmtBlock
         [ExprLStmt idL]
         [idR]              -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
@@ -1086,10 +1079,10 @@ data ParStmtBlock idL idR
 
 Note [The type of bind in Stmts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some Stmts, notably BindStmt, keep the (>>=) bind operator.  
-We do NOT assume that it has type  
+Some Stmts, notably BindStmt, keep the (>>=) bind operator.
+We do NOT assume that it has type
     (>>=) :: m a -> (a -> m b) -> m b
-In some cases (see Trac #303, #1537) it might have a more 
+In some cases (see Trac #303, #1537) it might have a more
 exotic type, such as
     (>>=) :: m i j a -> (a -> m j k b) -> m i k b
 So we must be careful not to make assumptions about the type.
@@ -1101,18 +1094,18 @@ The [(idR,idR)] in a TransStmt behaves as follows:
 
   * Before renaming: []
 
-  * After renaming: 
-    	  [ (x27,x27), ..., (z35,z35) ]
-    These are the variables 
+  * After renaming:
+          [ (x27,x27), ..., (z35,z35) ]
+    These are the variables
        bound by the stmts to the left of the 'group'
-       and used either in the 'by' clause, 
+       and used either in the 'by' clause,
                 or     in the stmts following the 'group'
     Each item is a pair of identical variables.
 
-  * After typechecking: 
-    	  [ (x27:Int, x27:[Int]), ..., (z35:Bool, z35:[Bool]) ]
+  * After typechecking:
+          [ (x27:Int, x27:[Int]), ..., (z35:Bool, z35:[Bool]) ]
     Each pair has the same unique, but different *types*.
-   
+
 Note [BodyStmt]
 ~~~~~~~~~~~~~~~
 BodyStmts are a bit tricky, because what they mean
@@ -1152,9 +1145,9 @@ Example:
    HsDo [ BindStmt x ex
 
         , RecStmt { recS_rec_ids   = [a, c]
-                  , recS_stmts 	   = [ BindStmt b (return (a,c))
-                  	       	     , LetStmt a = ...b...
-                  	       	     , BindStmt c ec ]
+                  , recS_stmts     = [ BindStmt b (return (a,c))
+                                     , LetStmt a = ...b...
+                                     , BindStmt c ec ]
                   , recS_later_ids = [a, b]
 
         , return (a b) ]
@@ -1168,19 +1161,19 @@ Why do we need *both* rec_ids and later_ids?  For monads they could be
 combined into a single set of variables, but not for arrows.  That
 follows from the types of the respective feedback operators:
 
-	mfix :: MonadFix m => (a -> m a) -> m a
-	loop :: ArrowLoop a => a (b,d) (c,d) -> a b c
+        mfix :: MonadFix m => (a -> m a) -> m a
+        loop :: ArrowLoop a => a (b,d) (c,d) -> a b c
 
-* For mfix, the 'a' covers the union of the later_ids and the rec_ids 
-* For 'loop', 'c' is the later_ids and 'd' is the rec_ids 
+* For mfix, the 'a' covers the union of the later_ids and the rec_ids
+* For 'loop', 'c' is the later_ids and 'd' is the rec_ids
 
 Note [Typing a RecStmt]
 ~~~~~~~~~~~~~~~~~~~~~~~
 A (RecStmt stmts) types as if you had written
 
   (v1,..,vn, _, ..., _) <- mfix (\~(_, ..., _, r1, ..., rm) ->
-                        	 do { stmts 
-                        	    ; return (v1,..vn, r1, ..., rm) })
+                                 do { stmts
+                                    ; return (v1,..vn, r1, ..., rm) })
 
 where v1..vn are the later_ids
       r1..rm are the rec_ids
@@ -1221,11 +1214,11 @@ In any other context than 'MonadComp', the fields for most of these
 
 
 \begin{code}
-instance (OutputableBndr idL, OutputableBndr idR) 
+instance (OutputableBndr idL, OutputableBndr idR)
     => Outputable (ParStmtBlock idL idR) where
   ppr (ParStmtBlock stmts _ _) = interpp'SP stmts
 
-instance (OutputableBndr idL, OutputableBndr idR, Outputable body) 
+instance (OutputableBndr idL, OutputableBndr idR, Outputable body)
          => Outputable (StmtLR idL idR body) where
     ppr stmt = pprStmt stmt
 
@@ -1242,7 +1235,7 @@ pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
-  = ptext (sLit "rec") <+> 
+  = ptext (sLit "rec") <+>
     vcat [ ppr_do_stmts segment
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
@@ -1274,24 +1267,24 @@ pprDo PArrComp      stmts = paBrackets  $ pprComp stmts
 pprDo MonadComp     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: (OutputableBndr idL, OutputableBndr idR, Outputable body) 
+ppr_do_stmts :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
              => [LStmtLR idL idR body] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
-ppr_do_stmts stmts 
+ppr_do_stmts stmts
   = lbrace <+> pprDeeperList vcat (punctuate semi (map ppr stmts))
            <+> rbrace
 
-pprComp :: (OutputableBndr id, Outputable body) 
+pprComp :: (OutputableBndr id, Outputable body)
         => [LStmt id body] -> SDoc
-pprComp quals	  -- Prints:  body | qual1, ..., qualn 
+pprComp quals     -- Prints:  body | qual1, ..., qualn
   | not (null quals)
   , L _ (LastStmt body _) <- last quals
   = hang (ppr body <+> char '|') 2 (pprQuals (dropTail 1 quals))
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
-pprQuals :: (OutputableBndr id, Outputable body) 
+pprQuals :: (OutputableBndr id, Outputable body)
         => [LStmt id body] -> SDoc
 -- Show list comprehension qualifiers separated by commas
 pprQuals quals = interpp'SP quals
@@ -1327,7 +1320,7 @@ pprSplice (HsSplice n e)
 
 data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | PatBr (LPat id)      -- [p| pat   |]
-                  | DecBrL [LHsDecl id]	 -- [d| decls |]; result of parser
+                  | DecBrL [LHsDecl id]  -- [d| decls |]; result of parser
                   | DecBrG (HsGroup id)  -- [d| decls |]; result of renamer
                   | TypBr (LHsType id)   -- [t| type  |]
                   | VarBr Bool id        -- True: 'x, False: ''T
@@ -1339,11 +1332,11 @@ instance OutputableBndr id => Outputable (HsBracket id) where
 
 
 pprHsBracket :: OutputableBndr id => HsBracket id -> SDoc
-pprHsBracket (ExpBr e) 	 = thBrackets empty (ppr e)
-pprHsBracket (PatBr p) 	 = thBrackets (char 'p') (ppr p)
+pprHsBracket (ExpBr e)   = thBrackets empty (ppr e)
+pprHsBracket (PatBr p)   = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBrG gp) = thBrackets (char 'd') (ppr gp)
 pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
-pprHsBracket (TypBr t) 	 = thBrackets (char 't') (ppr t)
+pprHsBracket (TypBr t)   = thBrackets (char 't') (ppr t)
 pprHsBracket (VarBr True n)  = char '\''         <> ppr n
 pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
 
@@ -1403,10 +1396,10 @@ data HsMatchContext id  -- Context of a Match
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
 
-  | StmtCtxt (HsStmtContext id) -- Pattern of a do-stmt, list comprehension, 
-    	     		    	-- pattern guard, etc
+  | StmtCtxt (HsStmtContext id) -- Pattern of a do-stmt, list comprehension,
+                                -- pattern guard, etc
 
-  | ThPatQuote			-- A Template Haskell pattern quotation [p| (a,b) |]
+  | ThPatQuote                  -- A Template Haskell pattern quotation [p| (a,b) |]
   deriving (Data, Typeable)
 
 data HsStmtContext id
@@ -1414,9 +1407,9 @@ data HsStmtContext id
   | MonadComp
   | PArrComp                             -- Parallel array comprehension
 
-  | DoExpr				 -- do { ... }
-  | MDoExpr                              -- mdo { ... }  ie recursive do-expression 
-  | ArrowExpr				 -- do-notation in an arrow-command context
+  | DoExpr                               -- do { ... }
+  | MDoExpr                              -- mdo { ... }  ie recursive do-expression
+  | ArrowExpr                            -- do-notation in an arrow-command context
 
   | GhciStmtCtxt                         -- A command-line Stmt in GHCi pat <- rhs
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
@@ -1428,9 +1421,9 @@ data HsStmtContext id
 \begin{code}
 isListCompExpr :: HsStmtContext id -> Bool
 -- Uses syntax [ e | quals ]
-isListCompExpr ListComp  	 = True
-isListCompExpr PArrComp  	 = True
-isListCompExpr MonadComp 	 = True  
+isListCompExpr ListComp          = True
+isListCompExpr PArrComp          = True
+isListCompExpr MonadComp         = True
 isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
 isListCompExpr (TransStmtCtxt c) = isListCompExpr c
 isListCompExpr _                 = False
@@ -1457,14 +1450,14 @@ matchSeparator ThPatQuote   = panic "unused"
 
 \begin{code}
 pprMatchContext :: Outputable id => HsMatchContext id -> SDoc
-pprMatchContext ctxt 
+pprMatchContext ctxt
   | want_an ctxt = ptext (sLit "an") <+> pprMatchContextNoun ctxt
   | otherwise    = ptext (sLit "a")  <+> pprMatchContextNoun ctxt
   where
-    want_an (FunRhs {}) = True	-- Use "an" in front
+    want_an (FunRhs {}) = True  -- Use "an" in front
     want_an ProcExpr    = True
     want_an _           = False
-                 
+
 pprMatchContextNoun :: Outputable id => HsMatchContext id -> SDoc
 pprMatchContextNoun (FunRhs fun _)  = ptext (sLit "equation for")
                                       <+> quotes (ppr fun)
@@ -1538,17 +1531,17 @@ matchContextErrString (StmtCtxt PArrComp)          = ptext (sLit "array comprehe
 
 \begin{code}
 pprMatchInCtxt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
-	       => HsMatchContext idL -> Match idR body -> SDoc
-pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon) 
-			     4 (pprMatch ctxt match)
+               => HsMatchContext idL -> Match idR body -> SDoc
+pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon)
+                             4 (pprMatch ctxt match)
 
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
-   	       => HsStmtContext idL -> StmtLR idL idR body -> SDoc
+               => HsStmtContext idL -> StmtLR idL idR body -> SDoc
 pprStmtInCtxt ctxt (LastStmt e _)
   | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (ptext (sLit "In the expression:")) 2 (ppr e)
 
-pprStmtInCtxt ctxt stmt 
+pprStmtInCtxt ctxt stmt
   = hang (ptext (sLit "In a stmt of") <+> pprAStmtContext ctxt <> colon)
        2 (ppr_stmt stmt)
   where
