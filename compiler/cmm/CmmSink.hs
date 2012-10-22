@@ -464,8 +464,8 @@ conflicts dflags (r, rhs, addr) node
   -- foreign call.  See Note [foreign calls clobber GlobalRegs].
   | CmmUnsafeForeignCall{} <- node, anyCallerSavesRegs dflags rhs = True
 
-  -- (5) foreign calls clobber memory, but not heap/stack memory
-  | CmmUnsafeForeignCall{} <- node, AnyMem <- addr                = True
+  -- (5) foreign calls clobber heap: see Note [foreign calls clobber heap]
+  | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
 
   -- (6) native calls clobber any memory
   | CmmCall{} <- node, memConflicts addr AnyMem                   = True
@@ -522,6 +522,21 @@ data AbsMem
 --  functions in Cmm then there might well be reads of heap memory
 --  that was written in the same basic block.  To take advantage of
 --  non-aliasing of heap memory we will have to be more clever.
+
+-- Note [foreign calls clobber]
+--
+-- It is tempting to say that foreign calls clobber only
+-- non-heap/stack memory, but unfortunately we break this invariant in
+-- the RTS.  For example, in stg_catch_retry_frame we call
+-- stmCommitNestedTransaction() which modifies the contents of the
+-- TRec it is passed (this actually caused incorrect code to be
+-- generated).
+--
+-- Since the invariant is true for the majority of foreign calls,
+-- perhaps we ought to have a special annotation for calls that can
+-- modify heap/stack memory.  For now we just use the conservative
+-- definition here.
+
 
 bothMems :: AbsMem -> AbsMem -> AbsMem
 bothMems NoMem    x         = x
