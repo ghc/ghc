@@ -708,7 +708,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_loc = d1 }) 
                     wi@(CFunEqCan { cc_ev = ev2, cc_fun = tc2
                                   , cc_tyargs = args2, cc_rhs = xi2, cc_loc = d2 })
-  | fl1 `canSolve` fl2 
+  | i_solves_w && (not (w_solves_i && isMetaTyVarTy xi1))
+               -- See Note [Carefully solve the right CFunEqCan]
   = ASSERT( lhss_match )   -- extractRelevantInerts ensures this
     do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
@@ -752,11 +753,37 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
     mk_sym_co x = mkTcSymCo (evTermCoercion x)
     fl1 = ctEvFlavour ev1
     fl2 = ctEvFlavour ev2
-    
-doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 
+    i_solves_w = fl1 `canSolve` fl2 
+    w_solves_i = fl2 `canSolve` fl1 
+    
+
+doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 \end{code}
 
+Note [Carefully solve the right CFunEqCan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the constraints
+  c1 :: F Int ~ a      -- Arising from an application line 5
+  c2 :: F Int ~ Bool   -- Arising from an application line 10
+Suppose that 'a' is a unification variable, arising only from 
+flattening.  So there is no error on line 5; it's just a flattening
+variable.  But there is (or might be) an error on line 10.
+
+Two ways to combine them, leaving either (Plan A)
+  c1 :: F Int ~ a      -- Arising from an application line 5
+  c3 :: a ~ Bool       -- Arising from an application line 10
+or (Plan B)
+  c2 :: F Int ~ Bool   -- Arising from an application line 10
+  c4 :: a ~ Bool       -- Arising from an application line 5
+
+Plan A will unify c3, leaving c1 :: F Int ~ Bool as an error
+on the *totally innocent* line 5.  An example is test SimpleFail16
+where the expected/actual message comes out backwards if we use
+the wrong plan.
+
+The second is the right thing to do.  Hence the isMetaTyVarTy
+test when solving pairwise CFunEqCan.
 
 Note [Shadowing of Implicit Parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
