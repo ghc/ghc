@@ -299,7 +299,7 @@ again:                                                          \
   /* Perform the operation */                                   \
   (res) = ccall mp_fun(mp_tmp "ptr", ul);                       \
                                                                 \
-  return (res);                                                 \
+  return (TO_W_(res));                                          \
 }
 
 #define GMP_TAKE1_RET1(name,mp_fun)                             \
