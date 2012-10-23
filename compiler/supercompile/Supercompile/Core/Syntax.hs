@@ -20,14 +20,17 @@ import Id       (Id, isId, idType, idInlinePragma)
 import PrimOp   (primOpType)
 import Literal  (Literal, literalType)
 import Type     (Type, mkTyVarTy, applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy_maybe, eqType)
+import TypeRep  (Type(..))
+import Kind
 import Coercion (CoVar, Coercion, coercionType, coercionKind, mkCvSubst, mkAxInstCo, mkReflCo, isReflCo)
+import qualified Coercion as Coercion
 import PrimOp   (PrimOp)
 import Pair     (pSnd)
 import PprCore  ()
 
 
 mkSymCo :: InScopeSet -> NormalCo -> NormalCo
-mkSymCo iss co = optCoercion (mkCvSubst iss []) co
+mkSymCo iss co = optCoercion (mkCvSubst iss []) (Coercion.mkSymCo co)
 
 mkTransCo :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
 mkTransCo = opt_trans
