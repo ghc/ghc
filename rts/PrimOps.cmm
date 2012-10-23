@@ -252,7 +252,7 @@ stg_newMutVarzh ( gcptr init )
 {
     W_ mv;
 
-    ALLOC_PRIM (SIZEOF_StgMutVar);
+    ALLOC_PRIM_P (SIZEOF_StgMutVar, stg_newMutVarzh, init);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
@@ -1154,7 +1154,7 @@ stg_newMVarzh ()
 {
     W_ mvar;
 
-    ALLOC_PRIM (SIZEOF_StgMVar);
+    ALLOC_PRIM_ (SIZEOF_StgMVar, stg_newMVarzh);
   
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
     SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
