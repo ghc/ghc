@@ -25,6 +25,7 @@ import ErrUtils
 import HscTypes
 import Control.Monad
 import Outputable
+import Platform
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -156,6 +157,7 @@ cpsTop hsc_env proc =
             return (cafEnv, [g])
 
   where dflags = hsc_dflags hsc_env
+        platform = targetPlatform dflags
         dump = dumpGraph dflags
         dump' = dumpWith dflags
 
@@ -177,6 +179,10 @@ cpsTop hsc_env proc =
         -- the entry point.
         splitting_proc_points = hscTarget dflags /= HscAsm
                              || not (tablesNextToCode dflags)
+                             || usingDarwinX86Pic
+        usingDarwinX86Pic = platformArch platform == ArchX86
+                         && platformOS platform == OSDarwin
+                         && gopt Opt_PIC dflags
 
 runUniqSM :: UniqSM a -> IO a
 runUniqSM m = do
