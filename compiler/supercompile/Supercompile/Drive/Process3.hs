@@ -661,7 +661,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                     -- This means that we preferred to roll back to something which gives an MSG with the *smallest possible* renaming (i.e. is more specific).
                     -- This is the opposite of what I've implemented below (FIXME).
                     -- TODO: maybe it actually would be OK (for SC termination) to roll back to h0 at (*)? Though it would mean dumping any tiebacks to h2 unnecessarily.
-                    moreSpecific (RightGivesTypeGen _ _ _rn_l) (RightGivesTypeGen _ _ _rn_r)
+                    moreSpecific (RightGivesTypeGen _ _s_l rn_l) (RightGivesTypeGen _ _s_r rn_r)
                       -- OK, here is what I have concluded after long thought.
                       -- As long as we DON'T CREATE A PROMISE when type generalising, then there will be a always be a maximum of one
                       -- possible type generalisation. A simple example demonstrates the principal behind this. Imagine that there were two
@@ -678,12 +678,15 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                       -- type generalise it against the earlier promise (i.e. f Int Char) and hence would have driven (f alpha beta) without
                       -- recording (f Float Bool). Now when we come to supercompile (f Int Bool) we can just tie back to (f alpha beta),
                       -- which is absolutely what we want.
-                      = error "moreSpecific: two possible type gens, this should not happen!" -- renamingSize rn_r <= renamingSize rn_l
+                      | pREINITALIZE_MEMO_TABLE
+                      = renamingSize rn_r <= renamingSize rn_l -- NB: although the argument above *is* true, we can have two type-genable promises due to memoiser preinit!
+                      | otherwise
+                      = pprPanic "moreSpecific: two possible type gens, this should not happen!" (ppr rn_l $$ ppr rn_r $$ pPrintFullState quietStatePrettiness _s_l $$ pPrintFullState quietStatePrettiness _s_r)
                     -- Prefer instance matches to type generalisation (don't have a good sense about what is best here):
                     moreSpecific (RightIsInstance _ _ _) _ = True
                     moreSpecific _ (RightIsInstance _ _ _) = False
 
-                    --renamingSize (_, tv_subst, co_subst) = sumMap typeSize (varEnvElts tv_subst) + sumMap coercionSize (varEnvElts co_subst)
+                    renamingSize (_, tv_subst, co_subst) = sumMap typeSize (varEnvElts tv_subst) + sumMap coercionSize (varEnvElts co_subst)
 
                     -- TODO: it might be OK to insist the incoming renaming is invertible, but this should definitely work:
                     isEmptyRenaming (_, tv_subst, co_subst) = all isTyVarTy (varEnvElts tv_subst) && all isCoVarCo (varEnvElts co_subst)
