@@ -30,9 +30,10 @@ import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
 import MkCore     (mkWildValBinder)
-import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
+import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo, mkSymCo)
 import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConWorkId)
 import VarSet
+import Var        (tyVarKind)
 import Id
 import MkId       (realWorldPrimId)
 import FastString (fsLit)
@@ -175,7 +176,7 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     -- which can literall never be used.
     varUnfolding x
       | Just pop <- isPrimOpId_maybe x     = Right $ primOpUnfolding pop
-      | Just dc <- isDataConWorkId_maybe x = Right $ dataUnfolding dc
+      | Just dc <- isDataConWorkId_maybe x = dataUnfolding dc
       | otherwise                          = case S.shouldExposeUnfolding x of
         Left why_not -> Left why_not
         Right super  -> case realIdUnfolding x of
@@ -194,9 +195,11 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     dataUnfolding dc
       | Just co_axiom <- newTyConCo_maybe (dataConTyCon dc)
       , let [x] = xs
-      = S.tyLambdas as $ S.lambdas [x] $ S.var x `S.cast` mkAxInstCo co_axiom (map mkTyVarTy as)
+      = Right $ S.tyLambdas as $ S.lambdas [x] $ S.var x `S.cast` mkSymCo (mkAxInstCo co_axiom (map mkTyVarTy as)) -- Axiom LHS = TyCon, RHS = Rep Type
+      | any (not . S.canAbstractOverTyVarOfKind . tyVarKind) as
+      = Left "some type variable which we cannot abstract over"
       | otherwise
-      = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
+      = Right $ S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
       where as = dataConAllTyVars dc
             arg_tys = dataConRepArgTys dc
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys

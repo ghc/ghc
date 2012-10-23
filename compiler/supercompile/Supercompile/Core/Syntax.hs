@@ -272,6 +272,26 @@ mkTransCastBy _   cast_by1          Uncast           = cast_by1
 mkTransCastBy ids (CastBy co1 _tg1) (CastBy co2 tg2) = castBy (mkTransCo ids co1 co2) tg2
 
 
+canAbstractOverTyVarOfKind :: Kind -> Bool
+canAbstractOverTyVarOfKind = ok
+  where
+    -- TODO: I'm not 100% sure of the correctness of this check
+    -- In particular, I don't think we need to check for non-conforming
+    -- kinds in "negative" positions since they would only appear if the
+    -- definition site had erroneously abstracted over a non-conforming
+    -- kind. For example, this *should* never be allowed:
+    --   data Foo (a :: * -> #) = Bar (a Int)
+    --   Foo :: (* -> #) -> *
+    --   Bar :: forall (a :: * -> #). a Int -> Foo a
+    ok k | isOpenTypeKind k || isUbxTupleKind k || isArgTypeKind k || isUnliftedTypeKind k = False
+    ok (TyVarTy _)     = True -- This is OK because kinds dont get generalised, and we assume all incoming kind instantiations satisfy the kind invariant
+    ok (AppTy k1 k2)   = ok k1 && ok k2
+    ok (TyConApp _ ks) = all ok ks
+    ok (FunTy k1 k2)   = ok k1 && ok k2
+    ok (ForAllTy _ k)  = ok k
+    ok (LitTy _)       = True
+
+
 valueType :: Copointed ann => ValueF ann -> Type
 valueType (TyLambda a e)      = mkForAllTy a (termType e)
 valueType (Lambda x e)        = idType x `mkFunTy` termType e
