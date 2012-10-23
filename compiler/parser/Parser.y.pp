@@ -72,7 +72,13 @@ import Control.Monad    ( mplus )
 
 {-
 -----------------------------------------------------------------------------
-24 Februar 2006
+12 October 2012
+
+Conflicts: 43 shift/reduce
+           1 reduce/reduce
+
+-----------------------------------------------------------------------------
+24 February 2006
 
 Conflicts: 33 shift/reduce
            1 reduce/reduce
