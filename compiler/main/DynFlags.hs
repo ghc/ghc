@@ -1026,7 +1026,10 @@ wayGeneralFlags platform WayDyn =
             -- different from the current one.
             OSMinGW32 -> [Opt_PIC]
             OSDarwin  -> [Opt_PIC]
-            OSLinux   -> [Opt_PIC]
+            OSLinux   -> [Opt_PIC] -- This needs to be here for GHCi to work:
+                                   -- GHCi links objects into a .so before
+                                   -- loading the .so using the system linker.
+                                   -- Only PIC objects can be linked into a .so.
             _         -> []
 wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
 wayGeneralFlags _ WayEventLog = []
@@ -2550,18 +2553,19 @@ defaultFlags settings
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
-    ++ (case platformOS platform of
-        OSDarwin ->
-            case platformArch platform of
-            ArchX86_64         -> [Opt_PIC]
-            _                  -> []
-        _ -> [])
+    ++ default_PIC platform
 
     ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
         else [Opt_Static])
 
     where platform = sTargetPlatform settings
+
+default_PIC :: Platform -> [GeneralFlag]
+default_PIC platform =
+  case (platformOS platform, platformArch platform) of
+    (OSDarwin, ArchX86_64) -> [Opt_PIC]
+    _                      -> []
 
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
@@ -2834,7 +2838,14 @@ addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
               mapM_ setGeneralFlag $ wayGeneralFlags platform w
 
 removeWay :: Way -> DynP ()
-removeWay w = upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
+removeWay w = do
+  upd (\dfs -> dfs { ways = filter (w /=) (ways dfs) })
+  dfs <- liftEwM getCmdLineState
+  let platform = targetPlatform dfs
+  -- XXX: wayExtras?
+  mapM_ unSetGeneralFlag $ wayGeneralFlags platform w
+  -- turn Opt_PIC back on if necessary for this platform:
+  mapM_ setGeneralFlag $ default_PIC platform
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
