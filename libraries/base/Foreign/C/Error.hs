@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
-{-# OPTIONS_GHC -#include "HsBase.h" #-}
 
 -----------------------------------------------------------------------------
 -- |
