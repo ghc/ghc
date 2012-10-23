@@ -48,7 +48,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isTyVar, isId, tyVarKind, varType, setVarType)
-import Id         (idType, zapFragileIdInfo, localiseId, isDictId, isGlobalId)
+import Id         (idType, zapIdOccInfo, zapFragileIdInfo, localiseId, isDictId, isGlobalId)
 import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
 import Coercion   (Coercion(..), isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
 import TyCon      (PrimRep(..))
@@ -402,10 +402,10 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         
         -- FIXME: update other comments about memocache preinit
         -- We can and should do memocache preinit even if we still use "let"-bindings in the heap with associated terms
-        letty_preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
+        letty_preinit_with = [ res
                              | (x', hb) <- M.toList h''_binds_globalid
                              , Just in_e_def <- [heapBindingTerm hb]
-                             , (heap', accessor_e, anned_e') <- eta heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
+                             , res <- eta [] heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
         
         -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
         -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
@@ -418,9 +418,9 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         preinit_heap = Heap (preinit_h_avail `M.union` h_fvs) ids'
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
-        preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
+        preinit_with = [ res
                        | (x', in_e_def) <- h_unfoldings
-                       , (heap', accessor_e, anned_e') <- eta preinit_heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
+                       , res <- eta [] preinit_heap (var x') in_e_def (annedTerm (annedTag (snd in_e_def)) (Var x'))]
 
         -- FIXME: instead of adding unfoldings as Let, (in order to sidestep the bug where Let stuff will be underspecialised)
         -- we should add it them as normal bindings but pre-initialise the memo cache. Of course this will be bad in the case
@@ -455,22 +455,28 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 --
 -- NB: given an unfolding (f = \x y -> e) will return memo entries for all the states (\x y -> e), (\y -> e), e, f, (f x) and (f x y).
 -- Because we do not reduce before matching, both are necessary!
-eta :: Heap -> FVedTerm -> In AnnedTerm -> AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
-eta heap tieback_e1 in_e_def e_call = (heap, tieback_e1, in_e_def) : (heap, tieback_e1, renamedTerm e_call) : case normalise (maxBound, heap, Loco False, in_e_def) of
-  (_, Heap h ids, k, anned_qa)
-    | Answer (rn, v) <- extract anned_qa
-    , Just a_cast <- isCastStack_maybe k
-    , let tieback_e2 = case a_cast of
-            Uncast      -> tieback_e1
-            CastBy co _ -> tieback_e1 `cast` mkSymCo ids co
-          mb_res@(~(Just (_, x, _, _))) = case v of
-             Lambda   x e_def_body -> Just (tieback_e2 `app`   x',           x, e_def_body, annedTerm (annedTag e_def_body) (e_call `App`   x'))
-             TyLambda a e_def_body -> Just (tieback_e2 `tyApp` mkTyVarTy x', a, e_def_body, annedTerm (annedTag e_def_body) (e_call `TyApp` mkTyVarTy x'))
-             _                     -> Nothing
-          (ids', rn', x') = renameNonRecBinder ids rn x
-    , Just (tieback_e2, _, e_def_body, e_call_body) <- mb_res
-    -> eta (Heap (M.insert x' lambdaBound h) ids') tieback_e2 (rn', e_def_body) e_call_body
-  _ -> []
+eta :: [Var] -> Heap -> FVedTerm -> In AnnedTerm -> AnnedTerm -> [(State, FVedTerm)]
+eta xs' heap tieback_e1 in_e_def e_call1 = res in_e_def : res (renamedTerm e_call1) : case normalise (maxBound, heap, Loco False, in_e_def) of
+    (_, Heap h ids, k, anned_qa)
+      | Answer (rn, v) <- extract anned_qa
+      , Just a_cast <- isCastStack_maybe k
+      , let (tieback_e2, e_call2) = case a_cast of
+              Uncast       -> (tieback_e1,               e_call1)
+              CastBy co tg -> (tieback_e1 `cast` sym_co, annedTerm tg (e_call1 `Cast` sym_co))
+                where sym_co = mkSymCo ids co
+            mb_res@(~(Just (_, x, _, _))) = case v of
+               -- NB: must zap binder occ info in case it is marked as dead, we can't mark the occurrence site we use for the fulfilment as dead!
+               Lambda   x e_def_body -> Just (tieback_e2 `app`   x',           zapIdOccInfo x, e_def_body, annedTerm (annedTag e_def_body) (e_call2 `App`   x'))
+               TyLambda a e_def_body -> Just (tieback_e2 `tyApp` mkTyVarTy x', a,              e_def_body, annedTerm (annedTag e_def_body) (e_call2 `TyApp` mkTyVarTy x'))
+               _                     -> Nothing
+            (ids', rn', x') = renameNonRecBinder ids rn x
+      , Just (tieback_e2, _, e_def_body, e_call_body) <- mb_res
+      -> eta (x':xs') (Heap (M.insert x' lambdaBound h) ids') tieback_e2 (rn', e_def_body) e_call_body
+    _ -> []
+  where res anned_e' = (case gc (normalise (maxBound, heap, Loco False, anned_e')) of (steps, Heap h ids, k, in_e') -> (steps, Heap (foldr (\x' -> M.insert x' lambdaBound) h xs') ids, k, in_e'), tieback_e1)
+          -- NB: have to add the xs' back into the State after GC because some lambdaBounds from eta-expansion
+          -- might not referenced in the body of the expanded lambda, but WILL referenced from the
+          -- application to x' that we use to fulfill, in which case gcing would leave some variables free in that tieback!
 
 -- FIXME: broken right now because we need to rewrite free variables within binders as well (i.e. rules, specialisations etc). Very tedious!
 {-# INLINE rewriteGlobals #-}
@@ -917,6 +923,9 @@ data AbsVar = AbsVar {
                         -- Live variables *will* be free in the result of applyAbsVars. Guaranteed not to shadow other AbsVars/any h-functions
     absVarVar :: Var    -- ^ The 'Var' itself
   }
+
+instance Outputable AbsVar where
+    ppr x = ppr (absVarVar x) <+> (if absVarDead x then text "(dead)" else empty)
 
 mkLiveAbsVar :: Var -> AbsVar
 mkLiveAbsVar x = AbsVar { absVarDead = False, absVarVar = x }
