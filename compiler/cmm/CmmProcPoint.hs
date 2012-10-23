@@ -234,9 +234,10 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      --    the proc point is a callPP)
      -- Due to common blockification, we may overestimate the set of procpoints.
      let add_label map pp = mapInsert pp lbls map
-           where lbls | pp == entry = (entry_label, Just (toInfoLbl entry_label))
-                      | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> 
-                                                    Just (infoTblLbl pp))
+           where lbls | pp == entry = (entry_label, fmap cit_lbl (mapLookup entry info_tbls))
+                      | otherwise   = (block_lbl, guard (setMember pp callPPs) >>
+                                                    Just (toInfoLbl block_lbl))
+                      where block_lbl = blockLbl pp
 
          procLabels :: LabelMap (CLabel, Maybe CLabel)
          procLabels = foldl add_label mapEmpty
@@ -288,23 +289,25 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
 
      graphEnv <- foldM add_jumps emptyBlockMap $ mapToList graphEnv
 
-     let to_proc (bid, g) = case expectJust "pp label" $ mapLookup bid procLabels of
-             (lbl, Just info_lbl)
-               | bid == entry
-               -> CmmProc (TopInfo {info_tbls  = info_tbls,
-                                    stack_info = stack_info})
-                          top_l (replacePPIds g)
-               | otherwise
-               -> CmmProc (TopInfo {info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl), stack_info=stack_info})
-                          lbl (replacePPIds g)
-             (lbl, Nothing)
-               -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info})
-                          lbl (replacePPIds g)
-            where
-             stack_info = StackInfo { arg_space = 0
-                                    , updfr_space =  Nothing
-                                    , do_layout = True }
-                          -- cannot use panic, this is printed by -ddump-cmmz
+     let to_proc (bid, g)
+             | bid == entry
+             =  CmmProc (TopInfo {info_tbls  = info_tbls,
+                                  stack_info = stack_info})
+                        top_l (replacePPIds g)
+             | otherwise
+             = case expectJust "pp label" $ mapLookup bid procLabels of
+                 (lbl, Just info_lbl)
+                    -> CmmProc (TopInfo { info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
+                                        , stack_info=stack_info})
+                               lbl (replacePPIds g)
+                 (lbl, Nothing)
+                    -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info})
+                               lbl (replacePPIds g)
+                where
+                 stack_info = StackInfo { arg_space = 0
+                                        , updfr_space =  Nothing
+                                        , do_layout = True }
+                               -- cannot use panic, this is printed by -ddump-cmmz
 
          -- References to procpoint IDs can now be replaced with the
          -- infotable's label

@@ -459,11 +459,11 @@ run_thread:
         // conserve power (see #1623).  Re-enable it here.
         nat prev;
         prev = xchg((P_)&recent_activity, ACTIVITY_YES);
-#ifndef PROFILING
         if (prev == ACTIVITY_DONE_GC) {
+#ifndef PROFILING
             startTimer();
-        }
 #endif
+        }
         break;
     }
     case ACTIVITY_INACTIVE:

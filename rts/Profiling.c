@@ -1078,8 +1078,10 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
         case CONSTR_STATIC:
         case CONSTR_NOCAF_STATIC:
             desc = GET_CON_DESC(itbl_to_con_itbl(info));
-        default:
+            break;
+       default:
             desc = closure_type_names[info->type];
+            break;
         }
         fprintf(stderr, "*** Exception (reporting due to +RTS -xc): (%s), stack trace: \n  ", desc);
     }

@@ -213,7 +213,7 @@ RTS_THUNK(stg_ap_5_upd);
 RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
-/* standard application routines (see also rts/gen_apply.py, 
+/* standard application routines (see also utils/genapply, 
  * and compiler/codeGen/CgStackery.lhs).
  */
 RTS_RET(stg_ap_v);
@@ -470,10 +470,10 @@ extern StgWord RTS_VAR(stable_ptr_table);
 // Profiling.c
 extern unsigned int RTS_VAR(era);
 extern unsigned int RTS_VAR(entering_PAP);
-extern StgWord      RTS_VAR(CC_LIST);               /* registered CC list */
+extern StgWord      RTS_VAR(CC_LIST);          /* registered CC list */
 extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_SYSTEM[];
-extern unsigned int RTS_VAR(CC_ID);	/* global ids */
+extern unsigned int RTS_VAR(CC_ID);            /* global ids */
 extern unsigned int RTS_VAR(CCS_ID);
 
 #endif
