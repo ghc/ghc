@@ -183,6 +183,20 @@ cmmMachOpFoldM dflags mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], ar
    | not (isLit arg1) && not (isPicReg arg1)
    = Just (cmmMachOpFold dflags mop1 [arg1, cmmMachOpFold dflags mop2 [arg3,arg2]])
 
+-- special case: (PicBaseReg + lit) + N  ==>  PicBaseReg + (lit+N)
+--
+-- this is better because lit+N is a single link-time constant (e.g. a
+-- CmmLabelOff), so the right-hand expression needs only one
+-- instruction, whereas the left needs two.  This happens when pointer
+-- tagging gives us label+offset, and PIC turns the label into
+-- PicBaseReg + label.
+--
+cmmMachOpFoldM _ MO_Add{} [ CmmMachOp op@MO_Add{} [pic, CmmLit lit]
+                          , CmmLit (CmmInt n rep) ]
+  | isPicReg pic
+  = Just $ CmmMachOp op [pic, CmmLit $ cmmOffsetLit lit off ]
+  where off = fromIntegral (narrowS rep n)
+
 -- Make a RegOff if we can
 cmmMachOpFoldM _ (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
   = Just $ cmmRegOff reg (fromIntegral (narrowS rep n))
