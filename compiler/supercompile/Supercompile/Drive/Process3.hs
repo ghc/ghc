@@ -342,9 +342,9 @@ tryMSG opt = bothWays $ \shallow_state state -> do
 
 pprMSGResult :: MSGResult -> SDoc
 pprMSGResult (Pair (deeds_l, heap_l, rn_l, k_l) (deeds_r, heap_r, rn_r, k_r), (heap, k, qa))
-  = pPrintFullState quietStatePrettiness (emptyDeeds, heap, k, qa) $$
-    ppr rn_l $$ pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
-    ppr rn_r $$ pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
+  = {- ppr (case heap   of Heap h   _ -> M.keysSet h)   $$ -} pPrintFullState quietStatePrettiness (emptyDeeds, heap, k, qa) $$
+    {- ppr (case heap_l of Heap h_l _ -> M.keysSet h_l) $$ -} ppr rn_l $$ pPrintFullState quietStatePrettiness (deeds_l, heap_l, k_l, fmap Question (annedVar (mkTag 0) nullAddrId)) $$
+    {- ppr (case heap_r of Heap h_r _ -> M.keysSet h_r) $$ -} ppr rn_r $$ pPrintFullState quietStatePrettiness (deeds_r, heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))
 
 renameSCResult :: InScopeSet -> In FVedTerm -> ScpM (PureHeap, FVedTerm)
 renameSCResult ids (rn_r, e) = do
@@ -772,6 +772,7 @@ preinitalise states_fulfils
   | not pREINITALIZE_MEMO_TABLE = return () -- If you do this, expect your output code to grow a lot!
   | otherwise = forM_ states_fulfils $ \(state, e') -> do
     ScpM $ StateT $ \s -> do
+        --unless (isEmptyVarSet (stateUncoveredVars state)) $ pprPanic "preinitalise" (pPrintFullState fullStatePrettiness state $$ ppr e')
         let (ms', _p) = promise (scpMemoState s) (state, snd (reduceForMatch state))
         return ((), s { scpMemoState = ms' })
     fulfillM (emptyDeeds, e')
