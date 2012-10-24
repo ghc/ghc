@@ -633,18 +633,26 @@ instance Integral Int64 where
 
 
 divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
+
+-- Define div in terms of quot, being careful to avoid overflow (#7233)
 x# `divInt64#` y#
-    | (x# `gtInt64#` intToInt64# 0#) && (y# `ltInt64#` intToInt64# 0#)
-        = ((x# `minusInt64#` y#) `minusInt64#` intToInt64# 1#) `quotInt64#` y#
-    | (x# `ltInt64#` intToInt64# 0#) && (y# `gtInt64#` intToInt64# 0#)
-        = ((x# `minusInt64#` y#) `plusInt64#` intToInt64# 1#) `quotInt64#` y#
-    | otherwise                = x# `quotInt64#` y#
+    | (x# `gtInt64#` zero) && (y# `ltInt64#` zero)
+        = ((x# `minusInt64#` one) `quotInt64#` y#) `minusInt64#` one
+    | (x# `ltInt64#` zero) && (y# `gtInt64#` zero)
+        = ((x# `plusInt64#` one)  `quotInt64#` y#) `minusInt64#` one
+    | otherwise
+        = x# `quotInt64#` y#
+    where
+    !zero = intToInt64# 0#
+    !one  = intToInt64# 1#
+
 x# `modInt64#` y#
-    | (x# `gtInt64#` intToInt64# 0#) && (y# `ltInt64#` intToInt64# 0#) ||
-      (x# `ltInt64#` intToInt64# 0#) && (y# `gtInt64#` intToInt64# 0#)
-        = if r# `neInt64#` intToInt64# 0# then r# `plusInt64#` y# else intToInt64# 0#
+    | (x# `gtInt64#` zero) && (y# `ltInt64#` zero) ||
+      (x# `ltInt64#` zero) && (y# `gtInt64#` zero)
+        = if r# `neInt64#` zero then r# `plusInt64#` y# else zero
     | otherwise = r#
     where
+    !zero = intToInt64# 0#
     !r# = x# `remInt64#` y#
 
 instance Read Int64 where
