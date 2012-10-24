@@ -63,3 +63,5 @@ test('T7014',
      extra_clean(['T7014.simpl']),
      run_command,
      ['$MAKE -s --no-print-directory T7014'])
+
+test('T7233', normal, compile_and_run, [''])
