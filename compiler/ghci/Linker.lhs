@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2005-2006
+% (c) The University of Glasgow 2005-2012
 %
 \begin{code}
 -- | The dynamic linker for GHCi.
@@ -1239,7 +1239,7 @@ searchForLibUsingGcc dflags so dirs = do
       else return (Just file)
 
 -- ----------------------------------------------------------------------------
--- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
+-- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
