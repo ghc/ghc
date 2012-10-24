@@ -38,15 +38,6 @@ ifneq "$$($1_$2_HS_SRCS)" ""
 	    $$(filter-out -split-objs, $$($1_$2_$$(firstword $$($1_$2_WAYS))_ALL_HC_OPTS)) \
 	    $$($1_$2_HS_SRCS)
 endif
-# We use the GHCI_WAY object files when doing TH for all ways. We
-# therefore need the GHCI_WAY object files available when compiling
-# the other ways, in case we're compiling something that uses TH.
-ifneq "$$(filter $$(GHCI_WAY),$$($1_$2_WAYS))" ""
-	$$(foreach w,$$(filter-out $$(GHCI_WAY),$$($1_$2_WAYS)),\
-	    $$(foreach o,$$($1_$2_$$w_HS_OBJS),\
-	        $$(call make-command,\
-	            echo "$$o: $$(basename $$o).$$($$(GHCI_WAY)_osuf)" >> $$@.tmp)))
-endif
 	echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp
 ifneq "$$($1_$2_SLASH_MODS)" ""
 	for dir in $$(sort $$(foreach mod,$$($1_$2_SLASH_MODS),$1/$2/build/$$(dir $$(mod)))); do \
