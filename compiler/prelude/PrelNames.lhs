@@ -270,6 +270,10 @@ basicKnownKeyNames
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName,
 
+        -- Float/Double
+        rationalToFloatName,
+        rationalToDoubleName,
+
         -- MonadFix
         monadFixClassName, mfixName,
 
@@ -931,6 +935,11 @@ realToFracName      = varQual  gHC_REAL (fsLit "realToFrac") realToFracIdKey
 floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual  gHC_FLOAT (fsLit "Floating") floatingClassKey
 realFloatClassName = clsQual  gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
+
+-- other GHC.Float functions
+rationalToFloatName, rationalToDoubleName :: Name
+rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
+rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
 -- Class Ix
 ixClassName :: Name
@@ -1613,6 +1622,10 @@ dollarIdKey           = mkPreludeMiscIdUnique 123
 
 coercionTokenIdKey :: Unique
 coercionTokenIdKey    = mkPreludeMiscIdUnique 124
+
+rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
+rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
+rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
 
 -- dotnet interop
 unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,

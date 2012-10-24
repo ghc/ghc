@@ -459,11 +459,11 @@ run_thread:
         // conserve power (see #1623).  Re-enable it here.
         nat prev;
         prev = xchg((P_)&recent_activity, ACTIVITY_YES);
-#ifndef PROFILING
         if (prev == ACTIVITY_DONE_GC) {
+#ifndef PROFILING
             startTimer();
-        }
 #endif
+        }
         break;
     }
     case ACTIVITY_INACTIVE:
@@ -2777,7 +2777,7 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
       
     case CATCH_RETRY_FRAME:
 	debugTrace(DEBUG_stm,
-		   "found CATCH_RETRY_FRAME at %p during retrry", p);
+                   "found CATCH_RETRY_FRAME at %p during retry", p);
         tso->stackobj->sp = p;
 	return CATCH_RETRY_FRAME;
       

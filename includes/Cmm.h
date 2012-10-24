@@ -381,6 +381,9 @@
     TICK_ALLOC_PRIM(SIZEOF_StgHeader,bytes-SIZEOF_StgHeader,0); \
     CCCS_ALLOC(bytes);
 
+#define ALLOC_PRIM_(bytes,fun)                                  \
+    ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,GC_PRIM(fun));
+
 #define ALLOC_PRIM_P(bytes,fun,arg)                             \
     ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,GC_PRIM_P(fun,arg));
 
