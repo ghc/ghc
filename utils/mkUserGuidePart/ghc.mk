@@ -10,13 +10,10 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/mkUserGuidePart_dist_MODULES         = Main
+utils/mkUserGuidePart_USES_CABAL           = YES
+utils/mkUserGuidePart_PACKAGE              = mkUserGuidePart
 utils/mkUserGuidePart_dist_PROG            = mkUserGuidePart$(exeext)
 utils/mkUserGuidePart_dist_INSTALL_INPLACE = YES
 utils/mkUserGuidePart_dist_PROGRAM_WAY     = v
-utils/mkUserGuidePart_HC_OPTS              = -package ghc
-
-utils/mkUserGuidePart/dist/build/Main.o: $(ALL_STAGE1_LIBS)
-utils/mkUserGuidePart/dist/build/Main.o: $(compiler_stage2_v_LIB)
 
 $(eval $(call build-prog,utils/mkUserGuidePart,dist,1))

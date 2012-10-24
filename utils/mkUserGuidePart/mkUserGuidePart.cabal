@@ -1,0 +1,18 @@
+Name: mkUserGuidePart
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+-- XXX Author:
+-- XXX Maintainer:
+Synopsis: XXX
+Description:
+	XXX
+build-type: Simple
+cabal-version: >=1.2
+
+Executable mkUserGuidePart
+    Main-Is: Main.hs
+    Build-Depends: base       >= 3   && < 5,
+                   ghc
+
