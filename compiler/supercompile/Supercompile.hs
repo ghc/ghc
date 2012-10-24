@@ -17,6 +17,7 @@ module Supercompile (supercompileProgram, supercompileProgramSelective) where
 -- Probably can't/shouldn't do this if the wildcard binder y is used in the RHS.
 
 import Supercompile.GHC
+import Supercompile.StaticFlags
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
@@ -263,7 +264,7 @@ supercompile e = -- liftM (termToCoreExpr . snd) $
   where unfs = termUnfoldings e'
         -- NB: ensure we mark any child bindings of bindings marked SUPERINLINABLE in *this module* as SUPERINLINABLE,
         -- just like we would if we imported a SUPERINLINABLE binding
-        e' = superinlinableLexically False $ runParseM anfUniqSupply' $ coreExprToTerm e
+        e' = superinlinableLexically mODULE_SUPERINLINABLE $ runParseM anfUniqSupply' $ coreExprToTerm e
 
 supercompileProgram :: [CoreBind] -> IO [CoreBind]
 supercompileProgram binds = supercompileProgramSelective selector binds
