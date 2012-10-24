@@ -35,28 +35,24 @@ ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
 $$(INPLACE_WRAPPER): $$($1_$2_SHELL_WRAPPER_NAME)
 endif
 $$(INPLACE_WRAPPER): $$($1_$2_INPLACE)
-	$$(call removeFiles,                                                  $$@)
-	echo '#!$$(SHELL)'                                                 >> $$@
-	echo 'executablename="$$(TOP)/$$<"'                                >> $$@
-	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'                           >> $$@
-	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'                            >> $$@
-	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'                         >> $$@
-	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                >> $$@
+	$$(call removeFiles,                                                    $$@)
+	echo '#!$$(SHELL)'                                                   >> $$@
+	echo 'executablename="$$(TOP)/$$<"'                                  >> $$@
+	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'                             >> $$@
+	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'                              >> $$@
+	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'                           >> $$@
+	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                  >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
-ifeq "$$(TargetOS_CPP)" "linux"
-	echo 'export LD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH):$$$$LD_LIBRARY_PATH"' >> $$@
-else ifeq "$$(TargetOS_CPP)" "darwin"
-	echo 'export DYLD_LIBRARY_PATH="$$($1_$2_DEP_LIB_DIRS_SEARCHPATH):$$$$DYLD_LIBRARY_PATH"' >> $$@
-endif
+	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_DIRS_SEARCHPATH))' >> $$@
 endif
 ifeq "$$($1_$2_SHELL_WRAPPER)" "YES"
-	cat $$($1_$2_SHELL_WRAPPER_NAME)                                   >> $$@
+	cat $$($1_$2_SHELL_WRAPPER_NAME)                                     >> $$@
 else
-	echo 'exec "$$$$executablename" $$$${1+"$$$$@"}'                   >> $$@
+	echo 'exec "$$$$executablename" $$$${1+"$$$$@"}'                     >> $$@
 endif
-	$$(EXECUTABLE_FILE)                                                   $$@
+	$$(EXECUTABLE_FILE)                                                     $$@
 
 endif
 
@@ -89,6 +85,25 @@ install_$1_$2_wrapper:
 	$$($1_$2_INSTALL_SHELL_WRAPPER_EXTRA)
 	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
 	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
+
+endif
+
+ifeq "$$($1_$2_WANT_BINDIST_WRAPPER)" "YES"
+
+$1_$2_BINDIST_WRAPPER = $1/$2/build/tmp/$$($1_$2_PROG)-bindist
+
+all_$1_$2 : $$($1_$2_BINDIST_WRAPPER)
+
+BINDIST_EXTRAS += $$($1_$2_BINDIST_WRAPPER)
+
+$$($1_$2_BINDIST_WRAPPER): $1/$2/build/tmp/$$($1_$2_PROG)
+	$$(call removeFiles,                                                  $$@)
+	echo '#!$$(SHELL)'                                                 >> $$@
+ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
+	echo '$$(call prependLibraryPath,$$($1_$2_DEP_LIB_REL_DIRS_SEARCHPATH))' >> $$@
+endif
+	echo 'exec "$$<" $$$${1+"$$$$@"}'                                  >> $$@
+	$$(EXECUTABLE_FILE)                                                   $$@
 
 endif
 

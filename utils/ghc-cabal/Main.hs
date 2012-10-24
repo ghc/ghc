@@ -366,10 +366,22 @@ generate config_args distdir directory
                         -- the RTS's library-dirs here.
               _ -> error "No (or multiple) ghc rts package is registered!!"
 
-          dep_ids = map snd (externalPackageDeps lbi)
+          dep_ids  = map snd (externalPackageDeps lbi)
+          deps     = map display dep_ids
+          depNames = map (display . packageName) dep_ids
 
-      let libraryDirs = forDeps Installed.libraryDirs
           transitive_dep_ids = map Installed.sourcePackageId dep_pkgs
+          transitiveDeps = map display transitive_dep_ids
+          transitiveDepNames = map (display . packageName) transitive_dep_ids
+
+          libraryDirs = forDeps Installed.libraryDirs
+          -- The mkLibraryRelDir function is a bit of a hack.
+          -- Ideally it should be handled in the makefiles instead.
+          mkLibraryRelDir "rts"   = "rts/dist/build"
+          mkLibraryRelDir "ghc"   = "compiler/stage2/build"
+          mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
+          mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
+          libraryRelDirs = map mkLibraryRelDir transitiveDepNames
       wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
       wrappedLibraryDirs <- wrap libraryDirs
 
@@ -379,10 +391,10 @@ generate config_args distdir directory
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords (map display (otherModules bi)),
                 variablePrefix ++ "_SYNOPSIS =" ++ synopsis pd,
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
-                variablePrefix ++ "_DEPS = " ++ unwords (map display dep_ids),
-                variablePrefix ++ "_DEP_NAMES = " ++ unwords (map (display . packageName) dep_ids),
-                variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords (map display transitive_dep_ids),
-                variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords (map (display . packageName) transitive_dep_ids),
+                variablePrefix ++ "_DEPS = " ++ unwords deps,
+                variablePrefix ++ "_DEP_NAMES = " ++ unwords depNames,
+                variablePrefix ++ "_TRANSITIVE_DEPS = " ++ unwords transitiveDeps,
+                variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
@@ -406,6 +418,7 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_CC_OPTS = "                    ++ unwords (forDeps Installed.ccOptions),
                 variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "     ++ unwords wrappedLibraryDirs,
                 variablePrefix ++ "_DEP_LIB_DIRS_SEARCHPATH = "        ++ mkSearchPath libraryDirs,
+                variablePrefix ++ "_DEP_LIB_REL_DIRS_SEARCHPATH = "    ++ mkSearchPath libraryRelDirs,
                 variablePrefix ++ "_DEP_EXTRA_LIBS = "                 ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "                    ++ unwords (forDeps Installed.ldOptions),
                 variablePrefix ++ "_BUILD_GHCI_LIB = "                 ++ boolToYesNo (withGHCiLib lbi),

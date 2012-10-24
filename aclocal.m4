@@ -1794,7 +1794,7 @@ AC_MSG_NOTICE(Building in-tree ghc-pwd)
 ])
 
 AC_DEFUN([FP_BINDIST_GHC_PWD],[
-    GHC_PWD=utils/ghc-pwd/dist-install/build/tmp/ghc-pwd
+    GHC_PWD=utils/ghc-pwd/dist-install/build/tmp/ghc-pwd-bindist
 ])
 
 AC_DEFUN([FP_FIND_ROOT],[
