@@ -1067,7 +1067,7 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
     {
         char *desc;
         StgInfoTable *info;
-        info = get_itbl(exception);
+        info = get_itbl(UNTAG_CLOSURE(exception));
         switch (info->type) {
         case CONSTR:
         case CONSTR_1_0:
