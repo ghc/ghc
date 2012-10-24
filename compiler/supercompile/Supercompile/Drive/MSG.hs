@@ -12,6 +12,7 @@ import Supercompile.Core.Syntax
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.FreeVars
 import Supercompile.Evaluator.Syntax
+import Supercompile.Evaluator.Residualise
 
 --import qualified Supercompile.GHC as GHC
 import Supercompile.Utilities hiding (guard)
@@ -702,7 +703,11 @@ isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
 msg :: MSGMode -> State -> State -> MSG' MSGResult
-msg = {- pprTrace "examples" (example1 $$ example2) -} msg'
+msg mm state_l state_r = {- pprTrace "examples" (example1 $$ example2) -}
+                         --(if isEmptyVarSet (stateUncoveredVars state_l) then id else pprPanic "msgl" (pPrintFullState fullStatePrettiness state_l $$ ppr (stateUncoveredVars state_l))) $
+                         --(if isEmptyVarSet (stateUncoveredVars state_r) then id else pprPanic "msgr" (pPrintFullState fullStatePrettiness state_r $$ ppr (stateUncoveredVars state_r))) $
+                         --(\res -> case res of Left _ -> res; Right (Pair l r, common) -> let xs = stateFreeVars common; f (_, Heap h _, rn, k) x = let off = mkVarSet (map (renameId rn) (varSetElems xs)) in if off `subVarSet` (dataSetToVarSet (M.keysSet h) `unionVarSet` stackBoundVars k) then x else pprPanic "fff" (ppr off) in f l $ f r $ res) $
+                         msg' mm state_l state_r
 msg' mm (deeds_l, heap_l, k_l, qa_l) (deeds_r, heap_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
     liftM (first (liftA2 (\deeds (heap, rn, k) -> (deeds, heap, rn, k)) (Pair deeds_l deeds_r))) $ msgLoop mm (heap_l, heap_r) (qa_l, qa_r) (k_l, k_r)
 
@@ -1191,7 +1196,7 @@ suck :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU ()
 suck sel x = join $ suck' sel x
 
 suck' :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU (MSGU ())
-suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x
+suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x -- NB: don't panic here if lookup fails because we might just have removed the var from the mapping
 
 suckStack :: Int -> MSGU ()
 suckStack i = {- trace ("suckStack:" ++ show i) $ -} join $ flip fmap get $ \s -> IM.findWithDefault (return ()) i (msgSuckStack s)
@@ -1271,7 +1276,7 @@ msgLoop mm (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) (qa_l, qa_r) (in
                       modify_ $ \s -> s { msgLR = mdfy_lr (msgLR s) $ \s_lr -> s_lr { msgLRHeap = M.insert x_lr hb_lr (msgLRHeap s_lr)
                                                                                     , msgLRSuckVar = msgLRSuckVar s_lr `delVarEnv` x_lr
                                                                                     , msgLRAvailableHeap = if heapBindingCheap hb_lr then msgLRAvailableHeap s_lr else M.delete x_lr (msgLRAvailableHeap s_lr) } }
-                      sucks xtrct_lr (heapBindingFreeVars hb_lr)
+                      sucks xtrct_lr (varBndrFreeVars x_lr `unionVarSet` heapBindingFreeVars hb_lr)
 
           {-
           -- NB: I can try to avoid generalisation when e_l or e_r is just a heap-bound variable. We do this by floating the non-variable into a new heap binding
