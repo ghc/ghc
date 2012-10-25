@@ -261,6 +261,7 @@ RTS_RET(stg_ret_f);
 RTS_RET(stg_ret_d);
 RTS_RET(stg_ret_l);
 
+RTS_FUN_DECL(stg_gc_prim);
 RTS_FUN_DECL(stg_gc_prim_p);
 RTS_FUN_DECL(stg_gc_prim_pp);
 RTS_FUN_DECL(stg_gc_prim_n);
@@ -392,6 +393,7 @@ RTS_FUN_DECL(stg_deRefStablePtrzh);
 RTS_FUN_DECL(stg_forkzh);
 RTS_FUN_DECL(stg_forkOnzh);
 RTS_FUN_DECL(stg_yieldzh);
+RTS_FUN_DECL(stg_killMyself);
 RTS_FUN_DECL(stg_killThreadzh);
 RTS_FUN_DECL(stg_getMaskingStatezh);
 RTS_FUN_DECL(stg_maskAsyncExceptionszh);
