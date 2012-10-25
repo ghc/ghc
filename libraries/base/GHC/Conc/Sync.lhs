@@ -113,12 +113,14 @@ import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
 import GHC.IO
+import GHC.IO.Encoding.UTF8
 import GHC.IO.Exception
 import GHC.Exception
+import qualified GHC.Foreign
 import GHC.IORef
 import GHC.MVar
+import GHC.Ptr
 import GHC.Real         ( fromIntegral )
-import GHC.Pack         ( packCString# )
 import GHC.Show         ( Show(..), showString )
 import GHC.Weak
 
@@ -427,10 +429,10 @@ Other applications like the graphical Concurrent Haskell Debugger
 -}
 
 labelThread :: ThreadId -> String -> IO ()
-labelThread (ThreadId t) str = IO $ \ s ->
-   let !ps  = packCString# str
-       !adr = byteArrayContents# ps in
-     case (labelThread# t adr s) of s1 -> (# s1, () #)
+labelThread (ThreadId t) str =
+    GHC.Foreign.withCString utf8 str $ \(Ptr p) ->
+    IO $ \ s ->
+     case labelThread# t p s of s1 -> (# s1, () #)
 
 --      Nota Bene: 'pseq' used to be 'seq'
 --                 but 'seq' is now defined in PrelGHC
