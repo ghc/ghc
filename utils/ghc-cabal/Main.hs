@@ -182,7 +182,7 @@ doRegister :: FilePath -> FilePath -> FilePath -> FilePath
            -> String -> [String]
            -> IO ()
 doRegister ghc ghcpkg topdir directory distDir
-           _ myPrefix myLibdir myDocdir
+           myDestDir myPrefix myLibdir myDocdir
            relocatableBuildStr args
  = withCurrentDirectory directory $ do
      relocatableBuild <- case relocatableBuildStr of
@@ -210,7 +210,7 @@ doRegister ghc ghcpkg topdir directory distDir
                     programFindLocation = \_ -> return (Just ghc) }
                 ghcPkgProgram' = ghcPkgProgram {
                     programPostConf = \_ _ -> return $ ["--global-package-db", ghcpkgconf]
-                                                    ++ ["--force"],
+                                                    ++ ["--force" | not (null myDestDir) ],
                     programFindLocation = \_ -> return (Just ghcpkg) }
                 configurePrograms ps conf = foldM (flip (configureProgram verbosity)) conf ps
 
