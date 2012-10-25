@@ -17,7 +17,7 @@ module Main(main) where
 import Text.PrettyPrint
 import Data.Word
 import Data.Bits
-import Data.List        ( intersperse )
+import Data.List        ( intersperse, nub, sort )
 import System.Exit
 import System.Environment
 import System.IO
@@ -135,6 +135,18 @@ regRep _       = "W_"
 loadSpWordOff :: String -> Int -> Doc
 loadSpWordOff rep off = text rep <> text "[Sp+WDS(" <> int off <> text ")]"
 
+-- Make a jump
+mkJump :: RegStatus -- Registerised status
+       -> Doc       -- Jump target
+       -> [Reg]     -- Registers that are definitely live
+       -> [ArgRep]  -- Jump arguments
+       -> Doc
+mkJump regstatus jump live args =
+    text "jump " <> jump <+> brackets (hcat (punctuate comma (map text regs)))
+  where
+   (reg_locs, _, _) = assignRegs regstatus 0 args
+   regs             = (nub . sort) (live ++ map fst reg_locs)
+
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: [ArgRep] -> Word32
 mkBitmap args = foldr f 0 args
@@ -178,7 +190,21 @@ mb_tag_node arity | Just tag <- tagForArity arity = mkTagStmt tag <> semi
 
 mkTagStmt tag = text ("R1 = R1 + "++ show tag)
 
-genMkPAP regstatus macro jump ticker disamb
+genMkPAP :: RegStatus -- Register status
+         -> String    -- Macro
+         -> String    -- Jump target
+         -> [Reg]     -- Registers that are definitely live
+         -> String    -- Ticker
+         -> String    -- Disamb
+         -> Bool      -- Don't load argument registers before jump if True
+         -> Bool      -- Arguments already in registers if True
+         -> Bool      -- Is a PAP if True
+         -> [ArgRep]  -- Arguments
+         -> Int       -- Size of all arguments
+         -> Doc       -- info label
+         -> Bool      -- Is a function
+         -> Doc
+genMkPAP regstatus macro jump live ticker disamb
         no_load_regs    -- don't load argument regs before jumping
         args_in_regs    -- arguments are already in regs
         is_pap args all_args_size fun_info_label
@@ -232,7 +258,7 @@ genMkPAP regstatus macro jump ticker disamb
             if is_fun_case then mb_tag_node arity else empty,
             if overflow_regs
                 then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
-                else text "jump " <> text jump <+> text "[*]" <> semi
+                else mkJump regstatus (text jump) live (if no_load_regs then [] else args) <> semi
             ]) $$
            text "}"
 
@@ -334,7 +360,7 @@ genMkPAP regstatus macro jump ticker disamb
                 then text "R2 = " <> fun_info_label <> semi
                 else empty,
             if is_fun_case then mb_tag_node n_args else empty,
-            text "jump " <> text jump <+> text "[*]" <> semi
+            mkJump regstatus (text jump) live (if no_load_regs then [] else args) <> semi
           ])
 
 -- The LARGER ARITY cases:
@@ -411,12 +437,18 @@ tagForArity :: Int -> Maybe Int
 tagForArity i | i < tAG_BITS_MAX = Just i
               | otherwise        = Nothing
 
+enterFastPathHelper :: Int
+                    -> RegStatus
+                    -> Bool
+                    -> Bool
+                    -> [ArgRep]
+                    -> Doc
 enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
   vcat [text "if (GETTAG(R1)==" <> int tag <> text ") {",
         reg_doc,
         text "  Sp_adj(" <> int sp' <> text ");",
         -- enter, but adjust offset with tag
-        text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ") [*];",
+        text "  " <> mkJump regstatus (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args <> semi,
         text "}"
        ]
   -- I don't totally understand this code, I copied it from
@@ -552,7 +584,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgBCO_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" "FUN" "BCO"
+          genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" ["R1"] "FUN" "BCO"
                 True{-stack apply-} False{-args on stack-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}False
          ]),
@@ -571,7 +603,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
+          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
                 False{-reg apply-} False{-args on stack-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}True
          ]),
@@ -585,7 +617,7 @@ genApply regstatus args =
         nest 4 (vcat [
           text "arity = TO_W_(StgPAP_arity(R1));",
           text "ASSERT(arity > 0);",
-          genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" "PAP" "PAP"
+          genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" ["R1", "R2"] "PAP" "PAP"
                 True{-stack apply-} False{-args on stack-} True{-is a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}False
          ]),
@@ -686,7 +718,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
             text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
             text "ASSERT(arity > 0);",
-            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
+            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" ["R1"] "FUN" "FUN"
                 False{-reg apply-} True{-args in regs-} False{-not a PAP-}
                 args all_args_size fun_info_label {- tag stmt -}True
            ]),
@@ -701,7 +733,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             text "jump" <+> fun_ret_label <+> text "[*]" <> semi
+             mkJump regstatus fun_ret_label [] [] <> semi
           ]),
           char '}'
         ]),
@@ -739,7 +771,7 @@ genStackApply regstatus args =
    (assign_regs, sp') = loadRegArgs regstatus 0 args
    body = vcat [assign_regs,
                 text "Sp_adj" <> parens (int sp') <> semi,
-                text "jump %GET_ENTRY(UNTAG(R1)) [*];"
+                mkJump regstatus (text "%GET_ENTRY(UNTAG(R1))") ["R1"] args <> semi
                 ]
 
 -- -----------------------------------------------------------------------------
