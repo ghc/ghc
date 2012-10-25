@@ -78,6 +78,9 @@ class TestConfig:
         self.way_flags = {}
         self.way_rts_flags = {}
 
+        # Do we have vanilla libraries?
+        self.have_vanilla = False
+
         # Do we have profiling support?
         self.have_profiling = False
 

@@ -20,6 +20,12 @@ $(eval $(call canonicalise,PREFIX))
 PKGCONF = local.db
 LGHC_PKG = '$(GHC_PKG)' --no-user-package-db -f '$(PKGCONF)'
 
+ifeq "$(GhcDynamicByDefault)" "YES"
+HI_SUF = dyn_hi
+else
+HI_SUF = hi
+endif
+
 safePkg01:
 	'$(MAKE)' cleanSafePkg01
 	'$(TEST_HC)' --make -o setup Setup.hs -v0
@@ -29,7 +35,7 @@ safePkg01:
 # we get a warning if dynlibs are enabled by default that:
 # 	Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
+	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(VANILLA) $(PROF) $(DYN)
 	./setup build -v0
 	./setup copy -v0
 	./setup register --inplace -v0
@@ -37,28 +43,28 @@ safePkg01:
 	$(LGHC_PKG) field safePkg01-1.0 trusted
 	echo
 	echo 'M_SafePkg'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg2'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg2.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg2.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg3'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg3.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg3.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg4'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg4.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg4.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg5'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg5.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg5.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg6'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg6.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg6.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg7'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg7.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg7.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg8'
-	'$(TEST_HC)' --show-iface dist/build/M_SafePkg8.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg8.$(HI_SUF) | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'Testing setting trust'
 	$(LGHC_PKG) trust safePkg01-1.0

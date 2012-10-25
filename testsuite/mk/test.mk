@@ -46,7 +46,14 @@ RUNTEST_OPTS += -e ghc_with_native_codegen=0
 endif
 
 HASKELL98_LIBDIR := $(shell "$(GHC_PKG)" field haskell98 library-dirs | sed 's/^[^:]*: *//')
+HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*.a ]; then echo YES; else echo NO; fi)
 HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*_p.a ]; then echo YES; else echo NO; fi)
+
+ifeq "$(HAVE_VANILLA)" "YES"
+RUNTEST_OPTS += -e ghc_with_vanilla=1
+else
+RUNTEST_OPTS += -e ghc_with_vanilla=0
+endif
 
 ifeq "$(HAVE_PROFILING)" "YES"
 RUNTEST_OPTS += -e ghc_with_profiling=1
@@ -82,8 +89,10 @@ endif
 
 ifeq "$(GhcDynamicByDefault)" "YES"
 RUNTEST_OPTS += -e ghc_dynamic_by_default=True
+CABAL_MINIMAL_BUILD = --enable-shared --disable-library-vanilla
 else
 RUNTEST_OPTS += -e ghc_dynamic_by_default=False
+CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared
 endif
 
 ifeq "$(GhcWithSMP)" "YES"

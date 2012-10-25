@@ -20,6 +20,6 @@ package:
 	
 	echo "[]" >$(LOCAL_PKGCONF)
 	
-	./setup configure -v0 --prefix="$(PREFIX)" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=$(LOCAL_PKGCONF)
+	./setup configure $(CABAL_MINIMAL_BUILD) -v0 --prefix="$(PREFIX)" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=$(LOCAL_PKGCONF)
 	./setup build -v0
 	./setup install -v0
