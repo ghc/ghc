@@ -29,7 +29,7 @@ GhcLibHcOpts    += -O -dcore-lint
 
 # We define DefaultFastGhcLibWays in this style so that the value is
 # correct even if the user alters DYNAMIC_BY_DEFAULT
-DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),v dyn,v)
+DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),dyn,v)
 
 ifeq "$(ValidateSpeed)" "FAST"
 GhcLibWays     = $(DefaultFastGhcLibWays)
