@@ -384,6 +384,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
                 -- usages of the regs on the RHS to 2.
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
+                        || l `elem` skipped
                         || not (okToInline dflags rhs node)
 
         occurs_once = not (l `elemRegSet` live)
@@ -415,6 +416,15 @@ tryToInline dflags live node assigs = go usages node [] assigs
 --
 -- For now we do nothing, because this would require putting
 -- everything inside UniqSM.
+--
+-- One more variant of this (#7366):
+--
+--   [ y = e, y = z ]
+--
+-- If we don't want to inline y = e, because y is used many times, we
+-- might still be tempted to inline y = z (because we always inline
+-- trivial rhs's).  But of course we can't, because y is equal to e,
+-- not z.
 
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
