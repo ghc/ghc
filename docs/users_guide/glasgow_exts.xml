@@ -9511,7 +9511,7 @@ Sometimes, however, this approach is over-cautious, and we <emphasis>do</emphasi
 rule to fire, even though doing so would duplicate redex.  There is no way that GHC can work out
 when this is a good idea, so we provide the CONLIKE pragma to declare it, thus:
 <programlisting>
-{-# INLINE[1] CONLIKE f #-}
+{-# INLINE CONLIKE [1] f #-}
 f x = <replaceable>blah</replaceable>
 </programlisting>
 CONLIKE is a modifier to an INLINE or NOINLINE pragma.  It specifies that an application
