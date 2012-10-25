@@ -1306,6 +1306,30 @@ bootstrapping-files: $(libffi_HEADERS)
 .DELETE_ON_ERROR:
 
 # -----------------------------------------------------------------------------
+
+ifeq "$(HADDOCK_DOCS)" "YES"
+BINDIST_HADDOCK_FLAG = --with-haddock="$(BINDIST_PREFIX)/bin/haddock"
+endif
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+BINDIST_LIBRARY_FLAGS = --enable-shared --disable-library-vanilla
+else
+BINDIST_LIBRARY_FLAGS = --enable-library-vanilla --disable-shared
+endif
+BINDIST_LIBRARY_FLAGS += --disable-library-prof
+
+.PHONY: validate_build_transformers
+validate_build_transformers:
+	cd libraries/transformers && "$(BINDIST_PREFIX)/bin/ghc" --make Setup
+	cd libraries/transformers && ./Setup configure --with-ghc="$(BINDIST_PREFIX)/bin/ghc" $(BINDIST_HADDOCK_FLAG) $(BINDIST_LIBRARY_FLAGS) --global --builddir=dist-bindist --prefix="$(BINDIST_PREFIX)"
+	cd libraries/transformers && ./Setup build   --builddir=dist-bindist
+ifeq "$(HADDOCK_DOCS)" "YES"
+	cd libraries/transformers && ./Setup haddock --builddir=dist-bindist
+endif
+	cd libraries/transformers && ./Setup install --builddir=dist-bindist
+	cd libraries/transformers && ./Setup clean   --builddir=dist-bindist
+	cd libraries/transformers && rm -f Setup Setup.exe Setup.hi Setup.o
+
+# -----------------------------------------------------------------------------
 # Numbered phase targets
 
 .PHONY: phase_0_builds
