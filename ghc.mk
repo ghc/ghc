@@ -187,8 +187,10 @@ $(foreach way,$(ALL_WAYS),\
 
 ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 GHCI_WAY = dyn
+HADDOCK_WAY = dyn
 else
 GHCI_WAY = v
+HADDOCK_WAY = v
 endif
 
 # -----------------------------------------------------------------------------
