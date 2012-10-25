@@ -18,7 +18,7 @@ $(call profStart, build-package-data($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-ifeq "$$(filter p,$$($1_$2_WAYS))" "v"
+ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
 else
 $1_$2_CONFIGURE_OPTS += --disable-library-vanilla
