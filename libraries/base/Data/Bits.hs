@@ -252,18 +252,22 @@ class Eq a => Bits a where
 class Bits b => FiniteBits b where
     finiteBitSize :: b -> Int
 
+-- The defaults below are written with lambdas so that e.g.
+--     bit = bitDefault
+-- is fully applied, so inlining will happen
+
 -- | Default implementation for 'bit'.
 --
 -- Note that: @bitDefault i = 1 `shiftL` i@
 bitDefault :: (Bits a, Num a) => Int -> a
-bitDefault i = 1 `shiftL` i
+bitDefault = \i -> 1 `shiftL` i
 {-# INLINE bitDefault #-}
 
 -- | Default implementation for 'testBit'.
 --
 -- Note that: @testBitDefault x i = (x .&. bit i) /= 0@
 testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
-testBitDefault x i = (x .&. bit i) /= 0
+testBitDefault = \x i -> (x .&. bit i) /= 0
 {-# INLINE testBitDefault #-}
 
 -- | Default implementation for 'popCount'.
