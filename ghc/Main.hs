@@ -292,7 +292,7 @@ checkOptions mode dflags srcs objs = do
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when (notNull (filter (not . wayRTSOnly) (ways dflags))
+   when ((filter (not . wayRTSOnly) (ways dflags) /= defaultWays (settings dflags))
          && isInterpretiveMode mode) $
       do ghcError (UsageError
                    "--interactive can't be used with -prof or -unreg.")
