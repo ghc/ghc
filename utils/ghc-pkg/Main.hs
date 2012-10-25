@@ -49,7 +49,7 @@ import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
 #if defined(mingw32_HOST_OS)
--- mingw32 needs these for getExecDir, GHC <6.12 needs them for openNewFile
+-- mingw32 needs these for getExecDir
 import Foreign
 import Foreign.C
 #endif
