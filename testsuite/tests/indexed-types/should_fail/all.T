@@ -79,3 +79,11 @@ test('ExtraTcsUntch', normal, compile_fail, [''])
 test('T7010', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
+test('T7354a',
+     extra_clean(['T7354b.o', 'T7354b.hi']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7354a'])
+
+
+
+
