@@ -216,8 +216,8 @@ instCallConstraints orig preds
   | null preds 
   = return idHsWrapper
   | otherwise
-  = do { traceTc "instCallConstraints" (pprTheta preds)
-       ; evs <- mapM go preds
+  = do { evs <- mapM go preds
+       ; traceTc "instCallConstraints" (ppr evs)
        ; return (mkWpEvApps evs) }
   where
     go pred 
