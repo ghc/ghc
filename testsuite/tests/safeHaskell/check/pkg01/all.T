@@ -4,10 +4,20 @@ def f( opts ):
 
 setTestOpts(f)
 
+if config.have_vanilla:
+    vanilla = '--enable-library-vanilla'
+else:
+    vanilla = '--disable-library-vanilla'
+
 if config.have_profiling:
     prof = '--enable-library-profiling'
 else:
-    prof = ''
+    prof = '--disable-library-profiling'
+
+if config.have_shared_libs:
+    dyn = '--enable-shared'
+else:
+    dyn = '--disable-shared'
 
 # Test building a package, that trust values are set correctly
 # and can be changed correctly
@@ -16,7 +26,7 @@ test('safePkg01',
       # clean_cmd('$MAKE -s --no-print-directory cleanSafePkg01'),
       alone],
      run_command, 
-     ['$MAKE -s --no-print-directory safePkg01 PROF=' + prof])
+     ['$MAKE -s --no-print-directory safePkg01 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn])
 
 # Fail since we enable package trust
 test('ImpSafe01', normal, compile_fail, ['-fpackage-trust -distrust base'])
