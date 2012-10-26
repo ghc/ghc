@@ -55,12 +55,11 @@ import Kind
 import TyCon
 import TysWiredIn
 import Var
-import VarSet
 import VarEnv
 import ErrUtils
 import DynFlags
 import BasicTypes
-import Maybes ( allMaybes, isJust )
+import Maybes ( isJust )
 import Util
 import Outputable
 import FastString
@@ -767,22 +766,19 @@ uUnfilledVar origin swapped tv1 details1 non_var_ty2  -- ty2 is not a type varia
       MetaTv { mtv_info = TauTv, mtv_ref = ref1 }
         -> do { mb_ty2' <- checkTauTvUpdate tv1 non_var_ty2
               ; case mb_ty2' of
-                  Nothing   -> do { traceTc "Occ/kind defer" (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                                                              $$ ppr non_var_ty2 $$ ppr (typeKind non_var_ty2))
-                                  ; defer }
                   Just ty2' -> updateMeta tv1 ref1 ty2'
+                  Nothing   -> do { traceTc "Occ/kind defer" 
+                                        (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
+                                         $$ ppr non_var_ty2 $$ ppr (typeKind non_var_ty2))
+                                  ; defer }
               }
 
       _other -> do { traceTc "Skolem defer" (ppr tv1); defer }	-- Skolems of all sorts
   where
-    defer | Just ty2' <- tcView non_var_ty2	-- Note [Avoid deferring]
-    	    	         	   		-- non_var_ty2 isn't expanded yet
-          = uUnfilledVar origin swapped tv1 details1 ty2'
-          | otherwise
-          = unSwap swapped (uType_defer origin) (mkTyVarTy tv1) non_var_ty2
-          -- Occurs check or an untouchable: just defer
-	  -- NB: occurs check isn't necessarily fatal: 
-	  --     eg tv1 occured in type family parameter
+    defer = unSwap swapped (uType_defer origin) (mkTyVarTy tv1) non_var_ty2
+               -- Occurs check or an untouchable: just defer
+	       -- NB: occurs check isn't necessarily fatal: 
+	       --     eg tv1 occured in type family parameter
 
 ----------------
 uUnfilledVars :: CtOrigin
@@ -839,7 +835,6 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 -- We are about to update the TauTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that kind(ty) is a sub-kind of kind(tv)
---       (c) that ty does not contain any type families, see Note [Type family sharing]
 -- 
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with, 
@@ -856,52 +851,65 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 -- we return Nothing, leaving it to the later constraint simplifier to
 -- sort matters out.
 
--- Used in debug meesages only
-_ppr_sub :: Maybe Ordering -> SDoc
-_ppr_sub (Just LT) = text "LT"
-_ppr_sub (Just EQ) = text "EQ"
-_ppr_sub (Just GT) = text "GT"
-_ppr_sub Nothing   = text "Nothing"
-
 checkTauTvUpdate tv ty
-  = do { ty'   <- zonkTcType ty
-       ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty')
---       ; traceTc "checktttv" (ppr tv $$ ppr ty' $$ ppr (tyVarKind tv) $$ ppr (typeKind ty') $$ _ppr_sub sub_k)
+  = do { ty1   <- zonkTcType ty
+       ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty1)
        ; case sub_k of
-           Nothing -> return Nothing
-           Just LT -> return Nothing
-           _       -> return (ok ty') }
+           Nothing           -> return Nothing
+           Just LT           -> return Nothing
+           _  | defer_me ty1   -- Quick test
+              -> -- Failed quick test so try harder
+                 case occurCheckExpand tv ty1 of 
+                   Nothing -> return Nothing
+                   Just ty2 | defer_me ty2 -> return Nothing
+                            | otherwise    -> return (Just ty2)
+              | otherwise   -> return (Just ty1) }
   where 
-    ok :: TcType -> Maybe TcType 
-    -- Checks that tv does not occur in the arg type
-    -- expanding type synonyms where necessary to make this so
-    -- eg type Phantom a = Bool
-    --     ok (tv -> Int)         = Nothing
-    --     ok (x -> Int)          = Just (x -> Int)
-    --     ok (Phantom tv -> Int) = Just (Bool -> Int)
-    ok (TyVarTy tv') | not (tv == tv') = Just (TyVarTy tv') 
-    ok this_ty@(TyConApp tc tys) 
-      | not (isSynFamilyTyCon tc), Just tys' <- allMaybes (map ok tys) 
-      = Just (TyConApp tc tys') 
-      | isSynTyCon tc, Just ty_expanded <- tcView this_ty
-      = ok ty_expanded -- See Note [Type synonyms and the occur check] 
-    ok ty@(LitTy {}) = Just ty
-    ok (FunTy arg res) | Just arg' <- ok arg, Just res' <- ok res
-                       = Just (FunTy arg' res') 
-    ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 
-                       = Just (AppTy fun' arg') 
-    ok (ForAllTy tv1 ty1) | Just ty1' <- ok ty1 = Just (ForAllTy tv1 ty1') 
-    -- Fall-through 
-    ok _ty = Nothing 
+    defer_me :: TcType -> Bool
+    -- Checks for (a) occurrence of tv
+    --            (b) type family applicatios
+    -- See Note [Conservative unification check]
+    defer_me (LitTy {})        = False
+    defer_me (TyVarTy tv')     = tv == tv'
+    defer_me (TyConApp tc tys) = isSynFamilyTyCon tc || any defer_me tys
+    defer_me (FunTy arg res)   = defer_me arg || defer_me res
+    defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
+    defer_me (ForAllTy _ ty)   = defer_me ty
 \end{code}
 
-Note [Avoid deferring]
-~~~~~~~~~~~~~~~~~~~~~~
-We try to avoid creating deferred constraints only for efficiency.
-Example (Trac #4917)
+Note [Conservative unification check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When unifying (tv ~ rhs), w try to avoid creating deferred constraints
+only for efficiency.  However, we do not unify (the defer_me check) if
+  a) There's an occurs check (tv is in fvs(rhs))
+  b) There's a type-function call in 'rhs'
+
+If we fail defer_me we use occurCheckExpand to try to make it pass,
+(see Note [Type synonyms and the occur check]) and then use defer_me
+again to check.  Example: Trac #4917)
        a ~ Const a b
 where type Const a b = a.  We can solve this immediately, even when
 'a' is a skolem, just by expanding the synonym.
+
+We always defer type-function calls, even if it's be perfectly safe to
+unify, eg (a ~ F [b]).  Reason: this ensures that the constraint
+solver gets to see, and hence simplify the type-function call, which
+in turn might simplify the type of an inferred function.  Test ghci046
+is a case in point.
+
+More mysteriously, test T7010 gave a horrible error 
+  T7010.hs:29:21:
+    Couldn't match type `Serial (ValueTuple Float)' with `IO Float'
+    Expected type: (ValueTuple Vector, ValueTuple Vector)
+      Actual type: (ValueTuple Vector, ValueTuple Vector)
+because an insoluble type function constraint got mixed up with
+a soluble one when flattening.  I never fully understood this, but
+deferring type-function applications made it go away :-(.
+T5853 also got a less-good error message with more aggressive
+unification of type functions.
+
+Moreover the Note [Type family sharing] gives another reason, but
+again I'm not sure if it's really valid.
 
 Note [Type synonyms and the occur check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -928,8 +936,7 @@ the underlying definition of the type synonym.
 The same applies later on in the constraint interaction code; see TcInteract, 
 function @occ_check_ok@. 
 
-
-Note [Type family sharing]
+Note [Type family sharing]  
 ~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 We must avoid eagerly unifying type variables to types that contain function symbols, 
 because this may lead to loss of sharing, and in turn, in very poor performance of the
@@ -942,7 +949,7 @@ constraint simplifier. Assume that we have a wanted constraint:
   D m2, 
   D m3 
 } 
-where D is some type class. If we eagerly unify m1 := [F m2], m2 := [F m3], m3 := [F m2], 
+where D is some type class. If we eagerly unify m1 := [F m2], m2 := [F m3], m3 := [F m4], 
 then, after zonking, our constraint simplifier will be faced with the following wanted 
 constraint: 
 { 
@@ -950,12 +957,19 @@ constraint:
   D [F [F m4]], 
   D [F m4] 
 } 
-which has to be flattened by the constraint solver. However, because the sharing is lost, 
-an polynomially larger number of flatten skolems will be created and the constraint sets 
-we are working with will be polynomially larger. 
+which has to be flattened by the constraint solver. In the absence of
+a flat-cache, this may generate a polynomially larger number of
+flatten skolems and the constraint sets we are working with will be
+polynomially larger.
 
-Instead, if we defer the unifications m1 := [F m2], etc. we will only be generating three 
-flatten skolems, which is the maximum possible sharing arising from the original constraint. 
+Instead, if we defer the unifications m1 := [F m2], etc. we will only
+be generating three flatten skolems, which is the maximum possible
+sharing arising from the original constraint.  That's why we used to
+use a local "ok" function, a variant of TcType.occurCheckExpand.
+
+HOWEVER, we *do* now have a flat-cache, which effectively recovers the
+sharing, so there's no great harm in losing it -- and it's generally
+more efficient to do the unification up-front.
 
 \begin{code}
 data LookupTyVarResult	-- The result of a lookupTcTyVar call
@@ -1125,14 +1139,16 @@ uUnboundKVar kv1 k2@(TyVarTy kv2)
   = do { writeMetaTyVar kv1 k2; return (Just EQ) }
 
 uUnboundKVar kv1 non_var_k2
-  = do  { k2' <- zonkTcKind non_var_k2
-        ; let k2'' = defaultKind k2'
+  | isSigTyVar kv1
+  = return Nothing
+  | otherwise
+  = do { k2a <- zonkTcKind non_var_k2
+       ; let k2b = defaultKind k2a
                 -- MetaKindVars must be bound only to simple kinds
 
-        ; if not (elemVarSet kv1 (tyVarsOfType k2''))
-          && not (isSigTyVar kv1)
-          then do { writeMetaTyVar kv1 k2''; return (Just EQ) }
-          else return Nothing }
+       ; case occurCheckExpand kv1 k2b of
+           Just k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
+           _        -> return Nothing }
 
 mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 mkKindErrorCtxt ty1 ty2 k1 k2 env0

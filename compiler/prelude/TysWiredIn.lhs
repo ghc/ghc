@@ -322,10 +322,10 @@ tupleTyCon UnboxedTuple i = fst (unboxedTupleArr ! i)
 tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
 
 promotedTupleTyCon :: TupleSort -> Arity -> TyCon
-promotedTupleTyCon sort i = buildPromotedTyCon (tupleTyCon sort i)
+promotedTupleTyCon sort i = promoteTyCon (tupleTyCon sort i)
 
 promotedTupleDataCon :: TupleSort -> Arity -> TyCon
-promotedTupleDataCon sort i = buildPromotedDataCon (tupleCon sort i)
+promotedTupleDataCon sort i = promoteDataCon (tupleCon sort i)
 
 tupleCon :: TupleSort -> Arity -> DataCon
 tupleCon sort i | i > mAX_TUPLE_SIZE = snd (mk_tuple sort i)	-- Build one specially
@@ -605,7 +605,7 @@ mkPromotedListTy :: Type -> Type
 mkPromotedListTy ty = mkTyConApp promotedListTyCon [ty]
 
 promotedListTyCon :: TyCon
-promotedListTyCon = buildPromotedTyCon listTyCon
+promotedListTyCon = promoteTyCon listTyCon
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon

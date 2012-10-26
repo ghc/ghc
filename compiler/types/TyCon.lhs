@@ -607,7 +607,7 @@ via the PromotedTyCon alternative in TyCon.
   kind signature on the forall'd variable; so the tc_kind field of
   PromotedTyCon is not identical to the dataConUserType of the
   DataCon.  But it's the same modulo changing the variable kinds,
-  done by Kind.promoteType.
+  done by DataCon.promoteType.
 
 * Small note: We promote the *user* type of the DataCon.  Eg
      data T = MkT {-# UNPACK #-} !(Bool, Bool)

@@ -45,8 +45,8 @@ module DataCon (
         deepSplitProductType_maybe,
 
         -- ** Promotion related functions
-        promoteType, isPromotableType, isPromotableTyCon,
-        buildPromotedTyCon, buildPromotedDataCon,
+        isPromotableTyCon, promoteTyCon, 
+        promoteDataCon, promoteDataCon_maybe
     ) where
 
 #include "HsVersions.h"
@@ -386,9 +386,11 @@ data DataCon
 	-- An entirely separate wrapper function is built in TcTyDecls
 	dcIds :: DataConIds,
 
-	dcInfix :: Bool		-- True <=> declared infix
+	dcInfix :: Bool,	-- True <=> declared infix
 				-- Used for Template Haskell and 'deriving' only
 				-- The actual fixity is stored elsewhere
+
+        dcPromoted :: Maybe TyCon    -- The promoted TyCon if this DataCon is promotable
   }
   deriving Data.Typeable.Typeable
 
@@ -519,10 +521,7 @@ mkDataCon name declared_infix
 -- so the error is detected properly... it's just that asaertions here
 -- are a little dodgy.
 
-  = -- ASSERT( not (any isEqPred theta) )
-	-- We don't currently allow any equality predicates on
-	-- a data constructor (apart from the GADT ones in eq_spec)
-    con
+  = con
   where
     is_vanilla = null ex_tvs && null eq_spec && null theta
     con = MkData {dcName = name, dcUnique = nameUnique name, 
@@ -537,7 +536,8 @@ mkDataCon name declared_infix
 		  dcStrictMarks = arg_stricts, 
 		  dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcRepType = ty,
-		  dcIds = ids }
+		  dcIds = ids,
+                  dcPromoted = mb_promoted }
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -558,6 +558,16 @@ mkDataCon name declared_infix
     ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
 	  mkFunTys rep_arg_tys $
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+
+    mb_promoted 
+      | is_vanilla   -- No existentials or context
+      , all (isLiftedTypeKind . tyVarKind) univ_tvs
+      , all isPromotableType orig_arg_tys
+      = Just (mkPromotedDataCon con name (getUnique name) prom_kind arity)
+      | otherwise 
+      = Nothing          
+    prom_kind = promoteType (dataConUserType con)
+    arity     = dataConSourceArity con
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
@@ -978,24 +988,22 @@ computeRep stricts tys
 %*                                                                      *
 %************************************************************************
 
-These two 'buildPromoted..' functions are here because
+These two 'promoted..' functions are here because
  * They belong together
- * 'buildPromotedTyCon' is used by promoteType
- * 'buildPromotedTyCon' depends on DataCon stuff
+ * 'promoteTyCon'  is used by promoteType
+ * 'prmoteDataCon' depends on DataCon stuff
 
 \begin{code}
-buildPromotedTyCon :: TyCon -> TyCon
-buildPromotedTyCon tc
-  = mkPromotedTyCon tc (promoteKind (tyConKind tc))
+promoteDataCon :: DataCon -> TyCon
+promoteDataCon (MkData { dcPromoted = Just tc }) = tc
+promoteDataCon dc = pprPanic "promoteDataCon" (ppr dc)
 
-buildPromotedDataCon :: DataCon -> TyCon
-buildPromotedDataCon dc 
-  = ASSERT ( isPromotableType ty )
-    mkPromotedDataCon dc (getName dc) (getUnique dc) kind arity
-  where 
-    ty    = dataConUserType dc
-    kind  = promoteType ty
-    arity = dataConSourceArity dc
+promoteDataCon_maybe :: DataCon -> Maybe TyCon
+promoteDataCon_maybe (MkData { dcPromoted = mb_tc }) = mb_tc
+
+promoteTyCon :: TyCon -> TyCon
+promoteTyCon tc
+  = mkPromotedTyCon tc (promoteKind (tyConKind tc))
 \end{code}
 
 Note [Promoting a Type to a Kind]
@@ -1017,16 +1025,11 @@ The transformation from type to kind is done by promoteType
 
 \begin{code}
 isPromotableType :: Type -> Bool
-isPromotableType ty
-  = all (isLiftedTypeKind . tyVarKind) tvs
-    && go rho
-  where
-    (tvs, rho) = splitForAllTys ty
-    go (TyConApp tc tys) | Just n <- isPromotableTyCon tc
-                         = tys `lengthIs` n && all go tys
-    go (FunTy arg res)   = go arg && go res
-    go (TyVarTy tvar)    = tvar `elem` tvs
-    go _                 = False
+isPromotableType (TyConApp tc tys) 
+  | Just n <- isPromotableTyCon tc = tys `lengthIs` n && all isPromotableType tys
+isPromotableType (FunTy arg res)   = isPromotableType arg && isPromotableType res
+isPromotableType (TyVarTy {})      = True
+isPromotableType _                 = False
 
 -- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
 isPromotableTyCon :: TyCon -> Maybe Int
@@ -1048,7 +1051,7 @@ promoteType ty
     kvs = [ mkKindVar (tyVarName tv) superKind | tv <- tvs ]
     env = zipVarEnv tvs kvs
 
-    go (TyConApp tc tys) = mkTyConApp (buildPromotedTyCon tc) (map go tys)
+    go (TyConApp tc tys) = mkTyConApp (promoteTyCon tc) (map go tys)
     go (FunTy arg res)   = mkArrowKind (go arg) (go res)
     go (TyVarTy tv)      | Just kv <- lookupVarEnv env tv 
                          = TyVarTy kv

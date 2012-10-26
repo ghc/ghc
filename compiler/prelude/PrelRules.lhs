@@ -12,7 +12,7 @@ ToDo:
    (i1 + i2) only if it results in a valid Float.
 
 \begin{code}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module PrelRules ( primOpRules, builtinRules ) where

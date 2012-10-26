@@ -182,6 +182,7 @@ runSolverPipeline pipeline workItem
            ContinueWith ct -> do { traceFireTcS ct (ptext (sLit "Kept as inert:") <+> ppr ct)
                                  ; traceTcS "End solver pipeline (not discharged) }" $
                                        vcat [ ptext (sLit "final_item = ") <+> ppr ct
+                                            , pprTvBndrs (varSetElems $ tyVarsOfCt ct)
                                             , ptext (sLit "inerts     = ") <+> ppr final_is]
                                  ; insertInertItemTcS ct }
        }
@@ -234,26 +235,6 @@ thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
                        The spontaneous-solve Stage
 *                                                                               *
 *********************************************************************************
-
-Note [Efficient Orientation] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are two cases where we have to be careful about 
-orienting equalities to get better efficiency. 
-
-Case 1: In Rewriting Equalities (function rewriteEqLHS) 
-
-    When rewriting two equalities with the same LHS:
-          (a)  (tv ~ xi1) 
-          (b)  (tv ~ xi2) 
-    We have a choice of producing work (xi1 ~ xi2) (up-to the
-    canonicalization invariants) However, to prevent the inert items
-    from getting kicked out of the inerts first, we prefer to
-    canonicalize (xi1 ~ xi2) if (b) comes from the inert set, or (xi2
-    ~ xi1) if (a) comes from the inert set.
-    
-Case 2: Functional Dependencies 
-    Again, we should prefer, if possible, the inert variables on the RHS
 
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
@@ -707,7 +688,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_loc = d1 }) 
                     wi@(CFunEqCan { cc_ev = ev2, cc_fun = tc2
                                   , cc_tyargs = args2, cc_rhs = xi2, cc_loc = d2 })
-  | fl1 `canSolve` fl2 
+  | i_solves_w && (not (w_solves_i && isMetaTyVarTy xi1))
+               -- See Note [Carefully solve the right CFunEqCan]
   = ASSERT( lhss_match )   -- extractRelevantInerts ensures this
     do { traceTcS "interact with inerts: FunEq/FunEq" $ 
          vcat [ text "workItem =" <+> ppr wi
@@ -721,8 +703,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
 
        ; ctevs <- xCtFlavor ev2 [mkTcEqPred xi2 xi1] xev
-                         -- No caching!  See Note [Cache-caused loops]
-                         -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+             -- No caching!  See Note [Cache-caused loops]
+             -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
        ; emitWorkNC d2 ctevs 
        ; return (IRWorkItemConsumed "FunEq/FunEq") }
 
@@ -740,7 +722,7 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` evTermCoercion x)]
 
        ; ctevs <- xCtFlavor ev1 [mkTcEqPred xi2 xi1] xev 
-                  -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+             -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
        ; emitWorkNC d1 ctevs 
        ; return (IRInertConsumed "FunEq/FunEq") }
@@ -751,11 +733,59 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
     mk_sym_co x = mkTcSymCo (evTermCoercion x)
     fl1 = ctEvFlavour ev1
     fl2 = ctEvFlavour ev2
-    
-doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 
+    i_solves_w = fl1 `canSolve` fl2 
+    w_solves_i = fl2 `canSolve` fl1 
+    
+
+doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 \end{code}
 
+Note [Efficient Orientation] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are interacting two FunEqCans with the same LHS:
+          (inert)  ci :: (F ty ~ xi_i) 
+          (work)   cw :: (F ty ~ xi_w) 
+We prefer to keep the inert (else we pass the work item on down
+the pipeline, which is a bit silly).  If we keep the inert, we
+will (a) discharge 'cw' 
+     (b) produce a new equality work-item (xi_w ~ xi_i)
+Notice the orientation (xi_w ~ xi_i) NOT (xi_i ~ xi_w):
+    new_work :: xi_w ~ xi_i
+    cw := ci ; sym new_work
+Why?  Consider the simplest case when xi1 is a type variable.  If
+we generate xi1~xi2, porcessing that constraint will kick out 'ci'.
+If we generate xi2~xi1, there is less chance of that happening.
+Of course it can and should still happen if xi1=a, xi1=Int, say.
+But we want to avoid it happening needlessly.
+
+Similarly, if we *can't* keep the inert item (because inert is Wanted,
+and work is Given, say), we prefer to orient the new equality (xi_i ~
+xi_w).
+
+Note [Carefully solve the right CFunEqCan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the constraints
+  c1 :: F Int ~ a      -- Arising from an application line 5
+  c2 :: F Int ~ Bool   -- Arising from an application line 10
+Suppose that 'a' is a unification variable, arising only from 
+flattening.  So there is no error on line 5; it's just a flattening
+variable.  But there is (or might be) an error on line 10.
+
+Two ways to combine them, leaving either (Plan A)
+  c1 :: F Int ~ a      -- Arising from an application line 5
+  c3 :: a ~ Bool       -- Arising from an application line 10
+or (Plan B)
+  c2 :: F Int ~ Bool   -- Arising from an application line 10
+  c4 :: a ~ Bool       -- Arising from an application line 5
+
+Plan A will unify c3, leaving c1 :: F Int ~ Bool as an error
+on the *totally innocent* line 5.  An example is test SimpleFail16
+where the expected/actual message comes out backwards if we use
+the wrong plan.
+
+The second is the right thing to do.  Hence the isMetaTyVarTy
+test when solving pairwise CFunEqCan.
 
 Note [Shadowing of Implicit Parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

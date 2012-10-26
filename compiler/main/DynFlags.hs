@@ -495,7 +495,6 @@ data ExtensionFlag
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
    | Opt_UnicodeSyntax
-   | Opt_PolymorphicComponents
    | Opt_ExistentialQuantification
    | Opt_MagicHash
    | Opt_EmptyDataDecls
@@ -509,7 +508,6 @@ data ExtensionFlag
    | Opt_TupleSections
    | Opt_PatternGuards
    | Opt_LiberalTypeSynonyms
-   | Opt_Rank2Types
    | Opt_RankNTypes
    | Opt_ImpredicativeTypes
    | Opt_TypeOperators
@@ -2447,7 +2445,6 @@ xFlags = [
   ( "PatternGuards",                    Opt_PatternGuards, nop ),
   ( "UnicodeSyntax",                    Opt_UnicodeSyntax, nop ),
   ( "MagicHash",                        Opt_MagicHash, nop ),
-  ( "PolymorphicComponents",            Opt_PolymorphicComponents, nop ),
   ( "ExistentialQuantification",        Opt_ExistentialQuantification, nop ),
   ( "KindSignatures",                   Opt_KindSignatures, nop ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
@@ -2460,7 +2457,10 @@ xFlags = [
   ( "CApiFFI",                          Opt_CApiFFI, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
   ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
-  ( "Rank2Types",                       Opt_Rank2Types, nop ),
+  ( "PolymorphicComponents",            Opt_RankNTypes, 
+     deprecatedForExtension "RankNTypes" ),
+  ( "Rank2Types",                       Opt_RankNTypes, 
+     deprecatedForExtension "RankNTypes" ),
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
@@ -2576,11 +2576,9 @@ default_PIC platform =
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
   = [ (Opt_RankNTypes,                turnOn, Opt_ExplicitForAll)
-    , (Opt_Rank2Types,                turnOn, Opt_ExplicitForAll)
     , (Opt_ScopedTypeVariables,       turnOn, Opt_ExplicitForAll)
     , (Opt_LiberalTypeSynonyms,       turnOn, Opt_ExplicitForAll)
     , (Opt_ExistentialQuantification, turnOn, Opt_ExplicitForAll)
-    , (Opt_PolymorphicComponents,     turnOn, Opt_ExplicitForAll)
     , (Opt_FlexibleInstances,         turnOn, Opt_TypeSynonymInstances)
     , (Opt_FunctionalDependencies,    turnOn, Opt_MultiParamTypeClasses)
 
@@ -2729,7 +2727,6 @@ glasgowExtsFlags = [
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
            , Opt_MagicHash
-           , Opt_PolymorphicComponents
            , Opt_ExistentialQuantification
            , Opt_UnicodeSyntax
            , Opt_PostfixOperators

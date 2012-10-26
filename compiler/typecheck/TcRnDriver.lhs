@@ -1701,15 +1701,9 @@ tcRnGetInfo :: HscEnv
 --  *and* as a type or class constructor;
 -- hence the call to dataTcOccs, and we return up to two results
 tcRnGetInfo hsc_env name
-  = initTcPrintErrors hsc_env iNTERACTIVE $
-    tcRnGetInfo' hsc_env name
-
-tcRnGetInfo' :: HscEnv
-             -> Name
-             -> TcRn (TyThing, Fixity, [ClsInst])
-tcRnGetInfo' hsc_env name
   = let ictxt = hsc_IC hsc_env in
-    setInteractiveContext hsc_env ictxt $ do
+    initTcPrintErrors hsc_env iNTERACTIVE $
+    setInteractiveContext hsc_env ictxt  $ do
 
         -- Load the interface for all unqualified types and classes
         -- That way we will find all the instance declarations

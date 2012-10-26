@@ -16,7 +16,6 @@ module TcErrors(
 
 #include "HsVersions.h"
 
-import TcCanonical( occurCheckExpand )
 import TcRnTypes
 import TcRnMonad
 import TcMType
@@ -576,7 +575,6 @@ mkEqErr1 ctxt ct
     mk_wanted_extra orig@(TypeEqOrigin {})
       = mkExpectedActualMsg ty1 ty2 orig
 
-
     mk_wanted_extra (KindEqOrigin cty1 cty2 sub_o)
       = (Nothing, msg1 $$ msg2)
       where
@@ -596,8 +594,10 @@ mkEqErr_help, reportEqErr
    -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help ctxt extra ct oriented ty1 ty2
   | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr ctxt extra ct oriented tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr ctxt extra ct oriented tv2 ty1
+  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr ctxt extra ct swapped  tv2 ty1
   | otherwise                        = reportEqErr  ctxt extra ct oriented ty1 ty2
+  where
+    swapped = fmap flipSwap oriented
 
 reportEqErr ctxt extra1 ct oriented ty1 ty2
   = do { (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
@@ -621,9 +621,10 @@ mkTyVarEqErr ctxt extra ct oriented tv1 ty2
   = mkErrorMsg ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
   | isNothing (occurCheckExpand tv1 ty2)
-  = let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:") 2
-                           (sep [ppr ty1, char '~', ppr ty2])
-    in mkErrorMsg ctxt ct (occCheckMsg $$ extra)
+  = do { let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:")
+                              2 (sep [ppr ty1, char '~', ppr ty2])
+       ; (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
+       ; mkErrorMsg ctxt' ct (occCheckMsg $$ extra2 $$ extra) }
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
@@ -701,7 +702,7 @@ isUserSkolem ctxt tv
     is_user_skol_info _ = True
 
 misMatchOrCND :: ReportErrCtxt -> Ct -> Maybe SwapFlag -> TcType -> TcType -> SDoc
--- If oriented then ty1 is expected, ty2 is actual
+-- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt ct oriented ty1 ty2
   | null givens || 
     (isRigid ty1 && isRigid ty2) || 
@@ -713,7 +714,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
   = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
-    orig   = TypeEqOrigin ty1 ty2
+    orig   = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
@@ -767,13 +768,13 @@ kindErrorMsg ty1 ty2
 
 --------------------
 misMatchMsg :: Maybe SwapFlag -> TcType -> TcType -> SDoc	   -- Types are already tidy
--- If oriented then ty1 is expected, ty2 is actual
+-- If oriented then ty1 is actual, ty2 is expected
 misMatchMsg oriented ty1 ty2  
   | Just IsSwapped <- oriented
   = misMatchMsg (Just NotSwapped) ty2 ty1
   | Just NotSwapped <- oriented
-  = sep [ ptext (sLit "Couldn't match expected") <+> what <+> quotes (ppr ty1)
-        , nest 12 $   ptext (sLit "with actual") <+> what <+> quotes (ppr ty2) ]
+  = sep [ ptext (sLit "Couldn't match expected") <+> what <+> quotes (ppr ty2)
+        , nest 12 $   ptext (sLit "with actual") <+> what <+> quotes (ppr ty1) ]
   | otherwise
   = sep [ ptext (sLit "Couldn't match") <+> what <+> quotes (ppr ty1)
         , nest 14 $ ptext (sLit "with") <+> quotes (ppr ty2) ]
@@ -782,9 +783,10 @@ misMatchMsg oriented ty1 ty2
          | otherwise  = ptext (sLit "type")
 
 mkExpectedActualMsg :: Type -> Type -> CtOrigin -> (Maybe SwapFlag, SDoc)
+-- NotSwapped means (actual, expected), IsSwapped is the reverse
 mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act, uo_expected = exp })
-  | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (Just IsSwapped,  empty)
-  | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (Just NotSwapped, empty)
+  | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (Just NotSwapped,  empty)
+  | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (Just IsSwapped, empty)
   | otherwise                                    = (Nothing, msg)
   where
     msg = vcat [ text "Expected type:" <+> ppr exp

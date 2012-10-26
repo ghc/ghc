@@ -64,7 +64,7 @@ module TcType (
   -- Predicates. 
   -- Again, newtypes are opaque
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
-  pickyEqType, eqKind, 
+  pickyEqType, eqKind,
   isSigmaTy, isOverloadedTy,
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
@@ -74,7 +74,7 @@ module TcType (
   
   ---------------------------------
   -- Misc type manipulators
-  deNoteType,
+  deNoteType, occurCheckExpand,
   orphNamesOfType, orphNamesOfDFunHead, orphNamesOfCo,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
@@ -554,25 +554,9 @@ tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
 tidyFreeTyVars (full_occ_env, var_env) tyvars 
-  = fst (tidyOpenTyVars (trimmed_occ_env, var_env) tv_list)
+  = fst (tidyOpenTyVars (full_occ_env, var_env) (varSetElems tyvars))
 
-  where
-    tv_list = varSetElems tyvars
-    
-    trimmed_occ_env = foldr mk_occ_env emptyOccEnv tv_list
-      -- The idea here is that we restrict the new TidyEnv to the 
-      -- _free_ vars of the type, so that we don't gratuitously rename
-      -- the _bound_ variables of the type
-
-    mk_occ_env :: TyVar -> TidyOccEnv -> TidyOccEnv
-    mk_occ_env tv env 
-       = case lookupOccEnv full_occ_env occ of
-            Just n  -> extendOccEnv env occ n
-            Nothing -> env
-       where
-         occ = getOccName tv
-
----------------
+        ---------------
 tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
 tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
 
@@ -614,9 +598,13 @@ tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
 -- and then uses 'tidyType' to work over the type itself
 tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
 tidyOpenType env ty
-  = (env', tidyType env' ty)
+  = (env', tidyType (trimmed_occ_env, var_env) ty)
   where
-    env' = tidyFreeTyVars env (tyVarsOfType ty)
+    (env'@(_, var_env), tvs') = tidyOpenTyVars env (varSetElems (tyVarsOfType ty))
+    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
+      -- The idea here was that we restrict the new TidyEnv to the 
+      -- _free_ vars of the type, so that we don't gratuitously rename
+      -- the _bound_ variables of the type.
 
 ---------------
 tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
@@ -1172,6 +1160,84 @@ pickyEqType ty1 ty2
     gos _   []       []       = True
     gos env (t1:ts1) (t2:ts2) = go env t1 t2 && gos env ts1 ts2
     gos _ _ _ = False
+\end{code}
+
+Note [Occurs check expansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+@occurCheckExpand tv xi@ expands synonyms in xi just enough to get rid
+of occurrences of tv outside type function arguments, if that is
+possible; otherwise, it returns Nothing.
+
+For example, suppose we have
+  type F a b = [a]
+Then
+  occurCheckExpand b (F Int b) = Just [Int]
+but
+  occurCheckExpand a (F a Int) = Nothing
+
+We don't promise to do the absolute minimum amount of expanding
+necessary, but we try not to do expansions we don't need to.  We
+prefer doing inner expansions first.  For example,
+  type F a b = (a, Int, a, [a])
+  type G b   = Char
+We have
+  occurCheckExpand b (F (G b)) = F Char
+even though we could also expand F to get rid of b.
+
+See also Note [Type synonyms and canonicalization] in TcCanonical
+
+\begin{code}
+occurCheckExpand :: TcTyVar -> Type -> Maybe Type
+-- See Note [Occurs check expansion]
+-- Check whether the given variable occurs in the given type.  We may
+-- have needed to do some type synonym unfolding in order to get rid
+-- of the variable, so we also return the unfolded version of the
+-- type, which is guaranteed to be syntactically free of the given
+-- type variable.  If the type is already syntactically free of the
+-- variable, then the same type is returned.
+
+occurCheckExpand tv ty
+  | not (tv `elemVarSet` tyVarsOfType ty) = Just ty
+  | otherwise                             = go ty
+  where
+    go t@(TyVarTy tv') | tv == tv' = Nothing
+                       | otherwise = Just t
+    go ty@(LitTy {}) = return ty
+    go (AppTy ty1 ty2) = do { ty1' <- go ty1
+           		    ; ty2' <- go ty2  
+           		    ; return (mkAppTy ty1' ty2') }
+    -- mkAppTy <$> go ty1 <*> go ty2
+    go (FunTy ty1 ty2) = do { ty1' <- go ty1 
+           		    ; ty2' <- go ty2 
+           		    ; return (mkFunTy ty1' ty2') } 
+    -- mkFunTy <$> go ty1 <*> go ty2
+    go ty@(ForAllTy {})
+       | tv `elemVarSet` tyVarsOfTypes tvs_knds = Nothing
+           -- Can't expand away the kinds unless we create 
+           -- fresh variables which we don't want to do at this point.
+       | otherwise = do { rho' <- go rho
+                        ; return (mkForAllTys tvs rho') }
+       where
+         (tvs,rho) = splitForAllTys ty
+         tvs_knds  = map tyVarKind tvs 
+
+    -- For a type constructor application, first try expanding away the
+    -- offending variable from the arguments.  If that doesn't work, next
+    -- see if the type constructor is a type synonym, and if so, expand
+    -- it and try again.
+    go ty@(TyConApp tc tys)
+{-
+      | isSynFamilyTyCon tc    -- It's ok for tv to occur under a type family application
+       = return ty             -- Eg.  (a ~ F a) is not an occur-check error
+                               -- NB This case can't occur during canonicalisation,
+                               --    because the arg is a Xi-type, but can occur in the
+                               --    call from TcErrors
+      | otherwise
+-}
+      = do { tys <- mapM go tys; return (mkTyConApp tc tys) }
+        `firstJust` -- First try to eliminate the tyvar from the args
+        do { ty <- tcView ty; go ty }
+                    -- Failing that, try to expand a synonym
 \end{code}
 
 %************************************************************************

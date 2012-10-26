@@ -212,19 +212,21 @@ instCallConstraints :: CtOrigin -> TcThetaType -> TcM HsWrapper
 -- Instantiates the TcTheta, puts all constraints thereby generated
 -- into the LIE, and returns a HsWrapper to enclose the call site.
 
-instCallConstraints _ [] = return idHsWrapper
-
-instCallConstraints origin (pred : preds)
-  | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred ty1 ty2)
-        ; co <- unifyType ty1 ty2
-	; co_fn <- instCallConstraints origin preds
-        ; return (co_fn <.> WpEvApp (EvCoercion co)) }
-
+instCallConstraints orig preds
+  | null preds 
+  = return idHsWrapper
   | otherwise
-  = do	{ ev_var <- emitWanted origin pred
-	; co_fn <- instCallConstraints origin preds
-	; return (co_fn <.> WpEvApp (EvId ev_var)) }
+  = do { evs <- mapM go preds
+       ; traceTc "instCallConstraints" (ppr evs)
+       ; return (mkWpEvApps evs) }
+  where
+    go pred 
+     | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
+     = do  { co <- unifyType ty1 ty2
+           ; return (EvCoercion co) }
+     | otherwise
+     = do { ev_var <- emitWanted orig pred
+     	  ; return (EvId ev_var) }
 
 ----------------
 instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()
@@ -522,6 +524,10 @@ hasEqualities givens = any (has_eq . evVarPred) givens
     has_eq' (ClassPred cls _tys) = any has_eq (classSCTheta cls)
     has_eq' (TuplePred ts)       = any has_eq ts
     has_eq' (IrredPred _)        = True -- Might have equalities in it after reduction?
+       -- This is conservative.  e.g. if there's a constraint function FC with
+       --    type instance FC Int = Show
+       -- then we won't float from inside a given constraint (FC Int a), even though
+       -- it's really the innocuous (Show a).  Too bad!  Add a type signature
 
 ---------------- Getting free tyvars -------------------------
 tyVarsOfCt :: Ct -> TcTyVarSet

@@ -675,7 +675,7 @@ exprIsWorkFree e = go 0 e
                                               [ go n rhs | (_,_,rhs) <- alts ]
          -- See Note [Case expressions are work-free]
     go _ (Let {})                     = False
-    go n (Var v)                      = n==0 || n < idArity v
+    go n (Var v)                      = isCheapApp v n
     go n (Tick t e) | tickishCounts t = False
                     | otherwise       = go n e
     go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
@@ -740,7 +740,6 @@ exprIsCheap = exprIsCheap' isCheapApp
 exprIsExpandable :: CoreExpr -> Bool
 exprIsExpandable = exprIsCheap' isExpandableApp -- See Note [CONLIKE pragma] in BasicTypes
 
-type CheapAppFun = Id -> Int -> Bool
 exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
 exprIsCheap' _        (Lit _)      = True
 exprIsCheap' _        (Type _)    = True
@@ -779,16 +778,26 @@ exprIsCheap' good_app other_expr        -- Applications and variables
     go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
                           | otherwise      = go f val_args
 
-    go (Var _) [] = True        -- Just a type application of a variable
-                                -- (f t1 t2 t3) counts as WHNF
+    go (Var _) [] = True        
+         -- Just a type application of a variable
+         -- (f t1 t2 t3) counts as WHNF
+         -- This case is probably handeld by the good_app case
+         -- below, which should have a case for n=0, but putting
+         -- it here too is belt and braces; and it's such a common
+         -- case that checking for null directly seems like a 
+         -- good plan
+
     go (Var f) args
+       | good_app f (length args) 
+       = go_pap args
+
+       | otherwise
         = case idDetails f of
-                RecSelId {}                  -> go_sel args
-                ClassOpId {}                 -> go_sel args
-                PrimOpId op                  -> go_primop op args
-                _ | good_app f (length args) -> go_pap args
-                  | isBottomingId f          -> True
-                  | otherwise                -> False
+                RecSelId {}         -> go_sel args
+                ClassOpId {}        -> go_sel args
+                PrimOpId op         -> go_primop op args
+                _ | isBottomingId f -> True
+                  | otherwise       -> False
                         -- Application of a function which
                         -- always gives bottom; we treat this as cheap
                         -- because it certainly doesn't need to be shared!
@@ -820,9 +829,17 @@ exprIsCheap' good_app other_expr        -- Applications and variables
                 -- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
                 --      there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 
+-------------------------------------
+type CheapAppFun = Id -> Int -> Bool  
+  -- Is an application of this function to n *value* args 
+  -- always cheap, assuming the arguments are cheap?  
+  -- Mainly true of partial applications, data constructors,
+  -- and of course true if the number of args is zero
+
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
-  = isDataConWorkId fn
+  =  isDataConWorkId fn 
+  || n_val_args == 0 
   || n_val_args < idArity fn
 
 isExpandableApp :: CheapAppFun
@@ -833,6 +850,7 @@ isExpandableApp fn n_val_args
   where
   -- See if all the arguments are PredTys (implicit params or classes)
   -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+  -- This incidentally picks up the (n_val_args = 0) case
      go 0 _ = True
      go n_val_args ty
        | Just (_, ty) <- splitForAllTy_maybe ty   = go n_val_args ty
