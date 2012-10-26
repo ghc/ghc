@@ -33,13 +33,15 @@ T2693.hs:18:23:
     In the second argument of `(+)', namely `snd x'
     In the expression: fst x + snd x
 
-T2693.hs:29:26:
+T2693.hs:28:20:
     Couldn't match type `TFn a0' with `PVR a1'
     The type variables `a0', `a1' are ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
-    Expected type: [PVR a1]
-      Actual type: [TFn a0]
-    Relevant bindings include pvs :: [TFn a0] (bound at T2693.hs:28:8)
-    In the second argument of `map', namely `pvs'
-    In the first argument of `min', namely `(map pvrX pvs)'
-    In the expression: (map pvrX pvs) `min` (map pvrX pvs)
+    Expected type: () -> Maybe (PVR a1)
+      Actual type: () -> Maybe (TFn a0)
+    In the first argument of `mapM', namely `g'
+    In a stmt of a 'do' block: pvs <- mapM g undefined
+    In the expression:
+      do { pvs <- mapM g undefined;
+           let n = (map pvrX pvs) `min` (map pvrX pvs);
+           undefined }
