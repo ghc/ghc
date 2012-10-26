@@ -84,16 +84,6 @@ libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 
 # Temporarily turn off unused-do-bind warnings for the time package
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind 
-
-
-# Rank2Types is deprecated, so switch off deprecation warnings
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
-libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
-libraries/dph/dph-lifted-copy_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
-# vector already has -Wwarn
-# Cabal already has -Wwarn
-
-
 # Temporary: mkTyCon is deprecated
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 # On Windows, there are also some unused import warnings
