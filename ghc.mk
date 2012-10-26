@@ -129,8 +129,14 @@ include mk/ways.mk
 include mk/custom-settings.mk
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$(GhcLibWays)" ""
-$(error $$(GhcLibWays) is empty, it must contain at least one way)
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(findstring dyn,$(GhcLibWays))" ""
+$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_BY_DEFAULT) is YES)
+endif
+else
+ifeq "$(findstring v,$(GhcLibWays))" ""
+$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
+endif
 endif
 endif
 
