@@ -46,7 +46,7 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
         printf("    , pc_OFFSET_" str " :: Int\n");                         \
         break;                                                              \
     case Gen_Haskell_Value:                                                 \
-        printf("    , pc_OFFSET_" str " = %" PRIdPTR "\n", (intptr_t)offset); \
+        printf("    , pc_OFFSET_" str " = %" PRIdPTR "\n", (intptr_t)(offset)); \
         break;                                                              \
     case Gen_Haskell_Wrappers:                                              \
         printf("oFFSET_" str " :: DynFlags -> Int\n");                      \
@@ -56,7 +56,7 @@ enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haske
         printf("    oFFSET_" str ",\n");                                    \
         break;                                                              \
     case Gen_Header:                                                        \
-        printf("#define OFFSET_" str " %" PRIdPTR "\n", (intptr_t)offset);  \
+        printf("#define OFFSET_" str " %" PRIdPTR "\n", (intptr_t)(offset));  \
         break;                                                              \
     }
 
