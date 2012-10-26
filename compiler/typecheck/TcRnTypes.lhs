@@ -909,10 +909,14 @@ data Ct
 Note [Ct/evidence invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If  ct :: Ct, then extra fields of 'ct' cache precisely the ctev_pred field
-of (cc_ev ct).   Eg for CDictCan, 
+of (cc_ev ct), and is fully rewritten wrt the substitution.   Eg for CDictCan, 
    ctev_pred (cc_ev ct) = (cc_class ct) (cc_tyargs ct)
 This holds by construction; look at the unique place where CDictCan is
-built (in TcCanonical)
+built (in TcCanonical).
+
+In contrast, the type of the evidence *term* (ccev_evtm or ctev_evar) in
+the evidence may *not* be fully zonked; we are careful not to look at it
+during constraint solving.  Seee Note [Evidence field of CtEvidence]
 
 \begin{code}
 mkNonCanonical :: CtLoc -> CtEvidence -> Ct
@@ -1228,13 +1232,13 @@ may be un-zonked.
 
 \begin{code}
 data CtEvidence 
-  = CtGiven { ctev_pred :: TcPredType
-            , ctev_evtm :: EvTerm }          -- See Note [Evidence field of CtEvidence]
+  = CtGiven { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
+            , ctev_evtm :: EvTerm }        -- See Note [Evidence field of CtEvidence]
     -- Truly given, not depending on subgoals
     -- NB: Spontaneous unifications belong here
     
-  | CtWanted { ctev_pred :: TcPredType
-             , ctev_evar :: EvVar }          -- See Note [Evidence field of CtEvidence]
+  | CtWanted { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
+             , ctev_evar :: EvVar }        -- See Note [Evidence field of CtEvidence]
     -- Wanted goal 
     
   | CtDerived { ctev_pred :: TcPredType }

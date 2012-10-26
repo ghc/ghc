@@ -236,26 +236,6 @@ thePipeline = [ ("canonicalization",        TcCanonical.canonicalize)
 *                                                                               *
 *********************************************************************************
 
-Note [Efficient Orientation] 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are two cases where we have to be careful about 
-orienting equalities to get better efficiency. 
-
-Case 1: In Rewriting Equalities (function rewriteEqLHS) 
-
-    When rewriting two equalities with the same LHS:
-          (a)  (tv ~ xi1) 
-          (b)  (tv ~ xi2) 
-    We have a choice of producing work (xi1 ~ xi2) (up-to the
-    canonicalization invariants) However, to prevent the inert items
-    from getting kicked out of the inerts first, we prefer to
-    canonicalize (xi1 ~ xi2) if (b) comes from the inert set, or (xi2
-    ~ xi1) if (a) comes from the inert set.
-    
-Case 2: Functional Dependencies 
-    Again, we should prefer, if possible, the inert variables on the RHS
-
 \begin{code}
 spontaneousSolveStage :: SimplifierStage 
 spontaneousSolveStage workItem
@@ -723,8 +703,8 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
 
        ; ctevs <- xCtFlavor ev2 [mkTcEqPred xi2 xi1] xev
-                         -- No caching!  See Note [Cache-caused loops]
-                         -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+             -- No caching!  See Note [Cache-caused loops]
+             -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
        ; emitWorkNC d2 ctevs 
        ; return (IRWorkItemConsumed "FunEq/FunEq") }
 
@@ -742,7 +722,7 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
              xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` evTermCoercion x)]
 
        ; ctevs <- xCtFlavor ev1 [mkTcEqPred xi2 xi1] xev 
-                  -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+             -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
 
        ; emitWorkNC d1 ctevs 
        ; return (IRInertConsumed "FunEq/FunEq") }
@@ -760,6 +740,28 @@ doInteractWithInert ii@(CFunEqCan { cc_ev = ev1, cc_fun = tc1
 
 doInteractWithInert _ _ = return (IRKeepGoing "NOP")
 \end{code}
+
+Note [Efficient Orientation] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are interacting two FunEqCans with the same LHS:
+          (inert)  ci :: (F ty ~ xi_i) 
+          (work)   cw :: (F ty ~ xi_w) 
+We prefer to keep the inert (else we pass the work item on down
+the pipeline, which is a bit silly).  If we keep the inert, we
+will (a) discharge 'cw' 
+     (b) produce a new equality work-item (xi_w ~ xi_i)
+Notice the orientation (xi_w ~ xi_i) NOT (xi_i ~ xi_w):
+    new_work :: xi_w ~ xi_i
+    cw := ci ; sym new_work
+Why?  Consider the simplest case when xi1 is a type variable.  If
+we generate xi1~xi2, porcessing that constraint will kick out 'ci'.
+If we generate xi2~xi1, there is less chance of that happening.
+Of course it can and should still happen if xi1=a, xi1=Int, say.
+But we want to avoid it happening needlessly.
+
+Similarly, if we *can't* keep the inert item (because inert is Wanted,
+and work is Given, say), we prefer to orient the new equality (xi_i ~
+xi_w).
 
 Note [Carefully solve the right CFunEqCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
