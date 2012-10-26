@@ -5002,7 +5002,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #        endif // arm_HOST_ARCH
 
          default:
-            errorBelch("%s: unhandled ELF relocation(Rel) type %" FMT_SizeT "\n",
+            errorBelch("%s: unhandled ELF relocation(Rel) type %" FMT_Word "\n",
                   oc->fileName, (W_)ELF_R_TYPE(info));
             return 0;
       }
@@ -5317,7 +5317,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
          default:
-            errorBelch("%s: unhandled ELF relocation(RelA) type %" FMT_SizeT "\n",
+            errorBelch("%s: unhandled ELF relocation(RelA) type %" FMT_Word "\n",
                   oc->fileName, (W_)ELF_R_TYPE(info));
             return 0;
       }
