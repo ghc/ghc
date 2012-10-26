@@ -914,9 +914,7 @@
             <entry>Enable <link linkend="explicit-foralls">explicit universal quantification</link>.
               Implied by <option>-XScopedTypeVariables</option>,
               <option>-XLiberalTypeSynonyms</option>,
-              <option>-XRank2Types</option>,
               <option>-XRankNTypes</option>,
-              <option>-XPolymorphicComponents</option>,
               <option>-XExistentialQuantification</option>
             </entry>
             <entry>dynamic</entry>
@@ -925,13 +923,13 @@
           <row>
             <entry><option>-XPolymorphicComponents</option></entry>
             <entry>Enable <link linkend="universal-quantification">polymorphic components for data constructors</link>.</entry>
-            <entry>dynamic</entry>
+            <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoPolymorphicComponents</option></entry>
           </row>
           <row>
             <entry><option>-XRank2Types</option></entry>
             <entry>Enable <link linkend="universal-quantification">rank-2 types</link>.</entry>
-            <entry>dynamic</entry>
+            <entry>dynamic, synonym for <option>-XRankNTypes</option></entry>
             <entry><option>-XNoRank2Types</option></entry>
           </row>
           <row>

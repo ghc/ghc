@@ -2457,11 +2457,11 @@ xFlags = [
   ( "CApiFFI",                          Opt_CApiFFI, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
   ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
-  ( "PolymorphicComponents",            Opt_RankNTypes, 
-     deprecatedForExtension "RankNTypes" ),
-  ( "Rank2Types",                       Opt_RankNTypes, 
-     deprecatedForExtension "RankNTypes" ),
+
+  ( "PolymorphicComponents",            Opt_RankNTypes, nop),
+  ( "Rank2Types",                       Opt_RankNTypes, nop),
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
+
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
   ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),

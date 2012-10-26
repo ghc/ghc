@@ -2071,9 +2071,7 @@ The following syntax is stolen:
 	Stolen (in types) by: <option>-XExplicitForAll</option>, and hence by
             <option>-XScopedTypeVariables</option>,
 	    <option>-XLiberalTypeSynonyms</option>,
-	    <option>-XRank2Types</option>,
 	    <option>-XRankNTypes</option>,
-	    <option>-XPolymorphicComponents</option>,
 	    <option>-XExistentialQuantification</option>
 	  </para></listitem>
       </varlistentry>
@@ -6384,20 +6382,12 @@ The function <literal>f3</literal> has a rank-3 type;
 it has rank-2 types on the left of a function arrow.
 </para>
 <para>
-GHC has three flags to control higher-rank types.  (All three imply <option>-XExplicitForAll</option>, <xref linkend="explicit-foralls"/>.)
-<itemizedlist>
-<listitem><para>
- <option>-XPolymorphicComponents</option>: data constructors (only) can have polymorphic argument types.
-</para></listitem>
-<listitem><para>
- <option>-XRank2Types</option>: any function (including data constructors) can have a rank-2 type.
-</para></listitem>
-<listitem><para>
- <option>-XRankNTypes</option>: any function (including data constructors) can have an arbitrary-rank type.
-That is,  you can nest <literal>forall</literal>s
+The language option <option>-XRankNTypes</option> (which implies <option>-XExplicitForAll</option>, <xref linkend="explicit-foralls"/>)
+enables higher-rank types.
+That is, you can nest <literal>forall</literal>s
 arbitrarily deep in function arrows.
-In particular, a forall-type (also called a "type scheme"),
-including an operational type class context, is legal:
+For example, a forall-type (also called a "type scheme"),
+including a type-class context, is legal:
 <itemizedlist>
 <listitem> <para> On the left or right (see <literal>f4</literal>, for example)
 of a function arrow </para> </listitem>
@@ -6407,13 +6397,18 @@ field type signatures.</para> </listitem>
 <listitem> <para> As the type of an implicit parameter </para> </listitem>
 <listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables"/>) </para> </listitem>
 </itemizedlist>
-</para></listitem>
-</itemizedlist>
-Either <option>-XRank2Types</option> or <option>-XRankNTypes</option> is also required for any 
+The <option>-XRankNTypes</option> option is also required for any 
 type with a <literal>forall</literal> or
 context to the right of an arrow (e.g. <literal>f :: Int -> forall a. a->a</literal>, or
 <literal>g :: Int -> Ord a => a -> a</literal>).  Such types are technically rank 1, but
 are clearly not Haskell-98, and an extra flag did not seem worth the bother.
+</para>
+
+<para>
+The obselete language options <option>-XPolymorphicComponents</option> and <option>-XRank2Types</option>
+are synonyms for <option>-XRankNTypes</option>.  They used to specify finer distinctions that
+GHC no longer makes.  (They should really elicit a deprecation warning, but they don't, purely 
+to avoid the need to library authors to change their old flags specifciations.)
 </para>
 
 <sect3 id="univ">
