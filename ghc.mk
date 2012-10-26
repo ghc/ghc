@@ -143,6 +143,7 @@ endif
 
 include rules/prof.mk
 include rules/trace.mk
+include rules/library-path.mk
 include rules/make-command.mk
 include rules/pretty_commands.mk
 
@@ -186,8 +187,10 @@ $(foreach way,$(ALL_WAYS),\
 
 ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 GHCI_WAY = dyn
+HADDOCK_WAY = dyn
 else
 GHCI_WAY = v
+HADDOCK_WAY = v
 endif
 
 # -----------------------------------------------------------------------------
@@ -480,6 +483,7 @@ utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/runghc/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/mkUserGuidePart/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/package.conf.inplace
@@ -820,7 +824,7 @@ define installLibsTo
 		case $$i in \
 		  *.a) \
 		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,$2); \
-		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
+		    $(RANLIB) $2/`basename $$i` ;; \
 		  *.dll) \
 		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
 		    $(STRIP_CMD) $2/$$i ;; \
@@ -1027,7 +1031,7 @@ unix-binary-dist-prep:
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
-	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" >> $(BIN_DIST_MK)
+	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
@@ -1302,6 +1306,30 @@ bootstrapping-files: $(includes_GHCCONSTANTS)
 bootstrapping-files: $(libffi_HEADERS)
 
 .DELETE_ON_ERROR:
+
+# -----------------------------------------------------------------------------
+
+ifeq "$(HADDOCK_DOCS)" "YES"
+BINDIST_HADDOCK_FLAG = --with-haddock="$(BINDIST_PREFIX)/bin/haddock"
+endif
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+BINDIST_LIBRARY_FLAGS = --enable-shared --disable-library-vanilla
+else
+BINDIST_LIBRARY_FLAGS = --enable-library-vanilla --disable-shared
+endif
+BINDIST_LIBRARY_FLAGS += --disable-library-prof
+
+.PHONY: validate_build_transformers
+validate_build_transformers:
+	cd libraries/transformers && "$(BINDIST_PREFIX)/bin/ghc" --make Setup
+	cd libraries/transformers && ./Setup configure --with-ghc="$(BINDIST_PREFIX)/bin/ghc" $(BINDIST_HADDOCK_FLAG) $(BINDIST_LIBRARY_FLAGS) --global --builddir=dist-bindist --prefix="$(BINDIST_PREFIX)"
+	cd libraries/transformers && ./Setup build   --builddir=dist-bindist
+ifeq "$(HADDOCK_DOCS)" "YES"
+	cd libraries/transformers && ./Setup haddock --builddir=dist-bindist
+endif
+	cd libraries/transformers && ./Setup install --builddir=dist-bindist
+	cd libraries/transformers && ./Setup clean   --builddir=dist-bindist
+	cd libraries/transformers && rm -f Setup Setup.exe Setup.hi Setup.o
 
 # -----------------------------------------------------------------------------
 # Numbered phase targets

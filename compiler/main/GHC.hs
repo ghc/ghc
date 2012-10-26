@@ -1260,7 +1260,7 @@ showRichTokenStream ts = go startLoc ts ""
                                        . (str ++)
                                        . go tokEnd ts
                  | otherwise -> ((replicate (tokLine - locLine) '\n') ++)
-                              . ((replicate tokCol ' ') ++)
+                               . ((replicate (tokCol - 1) ' ') ++)
                               . (str ++)
                               . go tokEnd ts
                   where (locLine, locCol) = (srcLocLine loc, srcLocCol loc)

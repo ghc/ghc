@@ -18,12 +18,22 @@ $(call profStart, build-package-data($1,$2,$3))
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
+ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
+$1_$2_CONFIGURE_OPTS += --enable-library-vanilla
+else
+$1_$2_CONFIGURE_OPTS += --disable-library-vanilla
+endif
+
 ifeq "$$(filter p,$$($1_$2_WAYS))" "p"
 $1_$2_CONFIGURE_OPTS += --enable-library-profiling
+else
+$1_$2_CONFIGURE_OPTS += --disable-library-profiling
 endif
 
 ifeq "$$(filter dyn,$$($1_$2_WAYS))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
+else
+$1_$2_CONFIGURE_OPTS += --disable-shared
 endif
 
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci

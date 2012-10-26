@@ -49,7 +49,7 @@ import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
 #if defined(mingw32_HOST_OS)
--- mingw32 needs these for getExecDir, GHC <6.12 needs them for openNewFile
+-- mingw32 needs these for getExecDir
 import Foreign
 import Foreign.C
 #endif
@@ -1471,32 +1471,38 @@ checkDuplicateDepends deps
 checkHSLib :: Verbosity -> [String] -> Bool -> String -> Validate ()
 checkHSLib verbosity dirs auto_ghci_libs lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
-  m <- liftIO $ doesFileExistOnPath batch_lib_file dirs
+      filenames = ["lib" ++ lib ++ ".a",
+                   "lib" ++ lib ++ ".p_a",
+                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
+                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
+                            lib ++ "-ghc" ++ Version.version ++ ".dll"]
+  m <- liftIO $ doesFileExistOnPath filenames dirs
   case m of
-    Nothing -> verror ForceFiles ("cannot find " ++ batch_lib_file ++
-                                   " on library path")
+    Nothing -> verror ForceFiles ("cannot find any of " ++ show filenames ++
+                                  " on library path")
     Just dir -> liftIO $ checkGHCiLib verbosity dir batch_lib_file lib auto_ghci_libs
 
-doesFileExistOnPath :: String -> [FilePath] -> IO (Maybe FilePath)
-doesFileExistOnPath file path = go path
-  where go []     = return Nothing
-        go (p:ps) = do b <- doesFileExistIn file p
-                       if b then return (Just p) else go ps
-
-doesFileExistIn :: String -> String -> IO Bool
-doesFileExistIn lib d = doesFileExist (d </> lib)
+doesFileExistOnPath :: [FilePath] -> [FilePath] -> IO (Maybe FilePath)
+doesFileExistOnPath filenames paths = go fullFilenames
+  where fullFilenames = [ (path, path </> filename)
+                        | filename <- filenames
+                        , path <- paths ]
+        go []             = return Nothing
+        go ((p, fp) : xs) = do b <- doesFileExist fp
+                               if b then return (Just p) else go xs
 
 checkModules :: InstalledPackageInfo -> Validate ()
 checkModules pkg = do
   mapM_ findModule (exposedModules pkg ++ hiddenModules pkg)
   where
-    findModule modl = do
-      -- there's no .hi file for GHC.Prim
-      if modl == fromString "GHC.Prim" then return () else do
-      let file = toFilePath modl <.> "hi"
-      m <- liftIO $ doesFileExistOnPath file (importDirs pkg)
+    findModule modl =
+      -- there's no interface file for GHC.Prim
+      unless (modl == fromString "GHC.Prim") $ do
+      let files = [ toFilePath modl <.> extension
+                  | extension <- ["hi", "p_hi", "dyn_hi" ] ]
+      m <- liftIO $ doesFileExistOnPath files (importDirs pkg)
       when (isNothing m) $
-         verror ForceFiles ("file " ++ file ++ " is missing")
+         verror ForceFiles ("cannot find any of " ++ show files)
 
 checkGHCiLib :: Verbosity -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib verbosity batch_lib_dir batch_lib_file lib auto_build

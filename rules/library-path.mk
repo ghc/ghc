@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2010 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -10,9 +10,12 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/mkUserGuidePart_USES_CABAL           = YES
-utils/mkUserGuidePart_PACKAGE              = mkUserGuidePart
-utils/mkUserGuidePart_dist_PROG            = mkUserGuidePart$(exeext)
-utils/mkUserGuidePart_dist_INSTALL_INPLACE = YES
+# $1 = paths to prepend
+ifeq "$(TargetOS_CPP)" "linux"
+prependLibraryPath = export LD_LIBRARY_PATH="$1:$$LD_LIBRARY_PATH"
+else ifeq "$(TargetOS_CPP)" "darwin"
+prependLibraryPath = export DYLD_LIBRARY_PATH="$1:$$DYLD_LIBRARY_PATH"
+else
+prependLibraryPath = $(error Do not know how to prependLibraryPath on $(TargetOS_CPP))
+endif
 
-$(eval $(call build-prog,utils/mkUserGuidePart,dist,1))
