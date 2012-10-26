@@ -76,4 +76,5 @@ test('Holdermans', normal, compile_fail,[''])
 test('T7328', normal, compile_fail,[''])
 test('T7332', normal, compile,[''])
 test('T7347', normal, compile_fail,[''])
+test('T7341', normal, compile_fail,[''])
 
