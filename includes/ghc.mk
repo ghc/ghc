@@ -34,7 +34,7 @@ includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 # Options
 #
 ifeq "$(GhcUnregisterised)" "YES"
-includes_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
 
 includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
@@ -125,6 +125,9 @@ endif
 	@echo "#define $(TargetOS_CPP)_TARGET_OS  1" >> $@  
 	@echo "#define TARGET_OS  \"$(TargetOS_CPP)\"" >> $@
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
+ifeq "$(GhcUnregisterised)" "YES"
+	@echo "#define UnregisterisedCompiler 1" >> $@
+endif
 	@echo >> $@
 	@echo "#endif /* __GHCPLATFORM_H__ */"          >> $@
 	@echo "Done."
