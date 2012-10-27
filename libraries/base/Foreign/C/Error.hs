@@ -19,7 +19,7 @@ module Foreign.C.Error (
 
   -- * Haskell representations of @errno@ values
 
-  Errno(..),            -- instance: Eq
+  Errno(..),
 
   -- ** Common @errno@ symbols
   -- | Different operating systems and\/or C libraries often support
@@ -42,44 +42,33 @@ module Foreign.C.Error (
   eTOOMANYREFS, eTXTBSY, eUSERS, eWOULDBLOCK, eXDEV,
 
   -- ** 'Errno' functions
-                        -- :: Errno
-  isValidErrno,         -- :: Errno -> Bool
+  isValidErrno,
 
   -- access to the current thread's "errno" value
   --
-  getErrno,             -- :: IO Errno
-  resetErrno,           -- :: IO ()
+  getErrno,
+  resetErrno,
 
   -- conversion of an "errno" value into IO error
   --
-  errnoToIOError,       -- :: String       -- location
-                        -- -> Errno        -- errno
-                        -- -> Maybe Handle -- handle
-                        -- -> Maybe String -- filename
-                        -- -> IOError
+  errnoToIOError,
 
   -- throw current "errno" value
   --
-  throwErrno,           -- ::                String               -> IO a
+  throwErrno,
 
   -- ** Guards for IO operations that may fail
 
-  throwErrnoIf,         -- :: (a -> Bool) -> String -> IO a       -> IO a
-  throwErrnoIf_,        -- :: (a -> Bool) -> String -> IO a       -> IO ()
-  throwErrnoIfRetry,    -- :: (a -> Bool) -> String -> IO a       -> IO a
-  throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
-  throwErrnoIfMinus1,   -- :: Num a 
-                        -- =>                String -> IO a       -> IO a
-  throwErrnoIfMinus1_,  -- :: Num a 
-                        -- =>                String -> IO a       -> IO ()
+  throwErrnoIf,
+  throwErrnoIf_,
+  throwErrnoIfRetry,
+  throwErrnoIfRetry_,
+  throwErrnoIfMinus1,
+  throwErrnoIfMinus1_,
   throwErrnoIfMinus1Retry,
-                        -- :: Num a 
-                        -- =>                String -> IO a       -> IO a
   throwErrnoIfMinus1Retry_,  
-                        -- :: Num a 
-                        -- =>                String -> IO a       -> IO ()
-  throwErrnoIfNull,     -- ::                String -> IO (Ptr a) -> IO (Ptr a)
-  throwErrnoIfNullRetry,-- ::                String -> IO (Ptr a) -> IO (Ptr a)
+  throwErrnoIfNull,
+  throwErrnoIfNullRetry,
 
   throwErrnoIfRetryMayBlock, 
   throwErrnoIfRetryMayBlock_,

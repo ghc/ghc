@@ -21,10 +21,10 @@
 module Debug.Trace (
         -- * Tracing
         -- $tracing
-        trace,            -- :: String -> a -> a
+        trace,
         traceShow,
         traceStack,
-        traceIO,          -- :: String -> IO ()
+        traceIO,
         putTraceMsg,
 
         -- * Eventlog tracing

@@ -20,19 +20,19 @@ module Numeric (
 
         -- * Showing
 
-        showSigned,       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+        showSigned,
 
-        showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
-        showInt,          -- :: Integral a => a -> ShowS
-        showHex,          -- :: Integral a => a -> ShowS
-        showOct,          -- :: Integral a => a -> ShowS
+        showIntAtBase,
+        showInt,
+        showHex,
+        showOct,
 
-        showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-        showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-        showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-        showFloat,        -- :: (RealFloat a) => a -> ShowS
+        showEFloat,
+        showFFloat,
+        showGFloat,
+        showFloat,
 
-        floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
+        floatToDigits,
 
         -- * Reading
 
@@ -40,21 +40,20 @@ module Numeric (
         -- and 'readDec' is the \`dual\' of 'showInt'.
         -- The inconsistent naming is a historical accident.
 
-        readSigned,       -- :: (Real a) => ReadS a -> ReadS a
+        readSigned,
 
-        readInt,          -- :: (Integral a) => a -> (Char -> Bool)
-                          --         -> (Char -> Int) -> ReadS a
-        readDec,          -- :: (Integral a) => ReadS a
-        readOct,          -- :: (Integral a) => ReadS a
-        readHex,          -- :: (Integral a) => ReadS a
+        readInt,
+        readDec,
+        readOct,
+        readHex,
 
-        readFloat,        -- :: (RealFloat a) => ReadS a
+        readFloat,
 
-        lexDigits,        -- :: ReadS String
+        lexDigits,
 
         -- * Miscellaneous
 
-        fromRat,          -- :: (RealFloat a) => Rational -> a
+        fromRat,
 
         ) where
 

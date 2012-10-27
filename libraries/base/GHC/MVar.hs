@@ -20,14 +20,14 @@
 module GHC.MVar (
         -- * MVars
           MVar(..)
-        , newMVar       -- :: a -> IO (MVar a)
-        , newEmptyMVar  -- :: IO (MVar a)
-        , takeMVar      -- :: MVar a -> IO a
-        , putMVar       -- :: MVar a -> a -> IO ()
-        , tryTakeMVar   -- :: MVar a -> IO (Maybe a)
-        , tryPutMVar    -- :: MVar a -> a -> IO Bool
-        , isEmptyMVar   -- :: MVar a -> IO Bool
-        , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
+        , newMVar
+        , newEmptyMVar
+        , takeMVar
+        , putMVar
+        , tryTakeMVar
+        , tryPutMVar
+        , isEmptyMVar
+        , addMVarFinalizer
     ) where
 
 import GHC.Base

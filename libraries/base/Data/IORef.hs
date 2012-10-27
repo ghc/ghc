@@ -19,17 +19,17 @@ module Data.IORef
   ( 
         -- * IORefs
         IORef,                -- abstract, instance of: Eq, Typeable
-        newIORef,             -- :: a -> IO (IORef a)
-        readIORef,            -- :: IORef a -> IO a
-        writeIORef,           -- :: IORef a -> a -> IO ()
-        modifyIORef,          -- :: IORef a -> (a -> a) -> IO ()
-        modifyIORef',         -- :: IORef a -> (a -> a) -> IO ()
-        atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
-        atomicModifyIORef',   -- :: IORef a -> (a -> (a,b)) -> IO b
+        newIORef,
+        readIORef,
+        writeIORef,
+        modifyIORef,
+        modifyIORef',
+        atomicModifyIORef,
+        atomicModifyIORef',
         atomicWriteIORef,
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
-        mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
+        mkWeakIORef,
 #endif
         -- ** Memory Model
 

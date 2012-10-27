@@ -19,10 +19,10 @@ module Data.Bool (
    -- * Booleans
    Bool(..),
    -- ** Operations 
-   (&&),        -- :: Bool -> Bool -> Bool
-   (||),        -- :: Bool -> Bool -> Bool
-   not,         -- :: Bool -> Bool
-   otherwise,   -- :: Bool
+   (&&),
+   (||),
+   not,
+   otherwise,
   ) where
 
 #ifdef __GLASGOW_HASKELL__

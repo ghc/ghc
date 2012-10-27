@@ -26,8 +26,8 @@
 module Foreign.C.String (   -- representation of strings in C
   -- * C strings
 
-  CString,           -- = Ptr CChar
-  CStringLen,        -- = (Ptr CChar, Int)
+  CString,
+  CStringLen,
 
   -- ** Using a locale-dependent encoding
 
@@ -42,20 +42,20 @@ module Foreign.C.String (   -- representation of strings in C
 
   -- conversion of C strings into Haskell strings
   --
-  peekCString,       -- :: CString    -> IO String
-  peekCStringLen,    -- :: CStringLen -> IO String
+  peekCString,
+  peekCStringLen,
 
   -- conversion of Haskell strings into C strings
   --
-  newCString,        -- :: String -> IO CString
-  newCStringLen,     -- :: String -> IO CStringLen
+  newCString,
+  newCStringLen,
 
   -- conversion of Haskell strings into C strings using temporary storage
   --
-  withCString,       -- :: String -> (CString    -> IO a) -> IO a
-  withCStringLen,    -- :: String -> (CStringLen -> IO a) -> IO a
+  withCString,
+  withCStringLen,
 
-  charIsRepresentable, -- :: Char -> IO Bool
+  charIsRepresentable,
 
   -- ** Using 8-bit characters
 
@@ -63,20 +63,20 @@ module Foreign.C.String (   -- representation of strings in C
   -- that are ignorant of Unicode.  These functions should be used with
   -- care, as a loss of information can occur.
 
-  castCharToCChar,   -- :: Char -> CChar
-  castCCharToChar,   -- :: CChar -> Char
+  castCharToCChar,
+  castCCharToChar,
 
-  castCharToCUChar,  -- :: Char -> CUChar
-  castCUCharToChar,  -- :: CUChar -> Char
-  castCharToCSChar,  -- :: Char -> CSChar
-  castCSCharToChar,  -- :: CSChar -> Char
+  castCharToCUChar,
+  castCUCharToChar,
+  castCharToCSChar,
+  castCSCharToChar,
 
-  peekCAString,      -- :: CString    -> IO String
-  peekCAStringLen,   -- :: CStringLen -> IO String
-  newCAString,       -- :: String -> IO CString
-  newCAStringLen,    -- :: String -> IO CStringLen
-  withCAString,      -- :: String -> (CString    -> IO a) -> IO a
-  withCAStringLen,   -- :: String -> (CStringLen -> IO a) -> IO a
+  peekCAString,
+  peekCAStringLen,
+  newCAString,
+  newCAStringLen,
+  withCAString,
+  withCAStringLen,
 
   -- * C wide strings
 
@@ -88,15 +88,15 @@ module Foreign.C.String (   -- representation of strings in C
   --
   -- * UTF-16 (as used on Windows systems).
 
-  CWString,          -- = Ptr CWchar
-  CWStringLen,       -- = (Ptr CWchar, Int)
+  CWString,
+  CWStringLen,
 
-  peekCWString,      -- :: CWString    -> IO String
-  peekCWStringLen,   -- :: CWStringLen -> IO String
-  newCWString,       -- :: String -> IO CWString
-  newCWStringLen,    -- :: String -> IO CWStringLen
-  withCWString,      -- :: String -> (CWString    -> IO a) -> IO a
-  withCWStringLen,   -- :: String -> (CWStringLen -> IO a) -> IO a
+  peekCWString,
+  peekCWStringLen,
+  newCWString,
+  newCWStringLen,
+  withCWString,
+  withCWStringLen,
 
   ) where
 

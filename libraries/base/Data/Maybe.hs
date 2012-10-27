@@ -17,19 +17,18 @@
 
 module Data.Maybe
    (
-     Maybe(Nothing,Just)-- instance of: Eq, Ord, Show, Read,
-                        --              Functor, Monad, MonadPlus
+     Maybe(Nothing,Just)
 
-   , maybe              -- :: b -> (a -> b) -> Maybe a -> b
+   , maybe
 
-   , isJust             -- :: Maybe a -> Bool
-   , isNothing          -- :: Maybe a -> Bool
-   , fromJust           -- :: Maybe a -> a
-   , fromMaybe          -- :: a -> Maybe a -> a
-   , listToMaybe        -- :: [a] -> Maybe a
-   , maybeToList        -- :: Maybe a -> [a]
-   , catMaybes          -- :: [Maybe a] -> [a]
-   , mapMaybe           -- :: (a -> Maybe b) -> [a] -> [b]
+   , isJust
+   , isNothing
+   , fromJust
+   , fromMaybe
+   , listToMaybe
+   , maybeToList
+   , catMaybes
+   , mapMaybe
    ) where
 
 #ifdef __GLASGOW_HASKELL__

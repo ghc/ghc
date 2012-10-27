@@ -19,10 +19,8 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.Fix (
-        MonadFix(
-           mfix -- :: (a -> m a) -> m a
-         ),
-        fix     -- :: (a -> a) -> a
+        MonadFix(mfix),
+        fix
   ) where
 
 import Prelude

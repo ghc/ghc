@@ -40,56 +40,56 @@ module GHC.Conc.Sync
         ( ThreadId(..)
 
         -- * Forking and suchlike
-        , forkIO        -- :: IO a -> IO ThreadId
+        , forkIO
         , forkIOUnmasked
         , forkIOWithUnmask
-        , forkOn      -- :: Int -> IO a -> IO ThreadId
+        , forkOn
         , forkOnIO    -- DEPRECATED
         , forkOnIOUnmasked
         , forkOnWithUnmask
-        , numCapabilities -- :: Int
-        , getNumCapabilities -- :: IO Int
-        , setNumCapabilities -- :: Int -> IO ()
-        , getNumProcessors   -- :: IO Int
-        , numSparks      -- :: IO Int
-        , childHandler  -- :: Exception -> IO ()
-        , myThreadId    -- :: IO ThreadId
-        , killThread    -- :: ThreadId -> IO ()
-        , throwTo       -- :: ThreadId -> Exception -> IO ()
-        , par           -- :: a -> b -> b
-        , pseq          -- :: a -> b -> b
+        , numCapabilities
+        , getNumCapabilities
+        , setNumCapabilities
+        , getNumProcessors
+        , numSparks
+        , childHandler
+        , myThreadId
+        , killThread
+        , throwTo
+        , par
+        , pseq
         , runSparks
-        , yield         -- :: IO ()
-        , labelThread   -- :: ThreadId -> String -> IO ()
-        , mkWeakThreadId -- :: ThreadId -> IO (Weak ThreadId)
+        , yield
+        , labelThread
+        , mkWeakThreadId
 
         , ThreadStatus(..), BlockReason(..)
-        , threadStatus  -- :: ThreadId -> IO ThreadStatus
+        , threadStatus
         , threadCapability
 
         -- * TVars
         , STM(..)
-        , atomically    -- :: STM a -> IO a
-        , retry         -- :: STM a
-        , orElse        -- :: STM a -> STM a -> STM a
-        , throwSTM      -- :: Exception e => e -> STM a
-        , catchSTM      -- :: Exception e => STM a -> (e -> STM a) -> STM a
-        , alwaysSucceeds -- :: STM a -> STM ()
-        , always        -- :: STM Bool -> STM ()
+        , atomically
+        , retry
+        , orElse
+        , throwSTM
+        , catchSTM
+        , alwaysSucceeds
+        , always
         , TVar(..)
-        , newTVar       -- :: a -> STM (TVar a)
-        , newTVarIO     -- :: a -> STM (TVar a)
-        , readTVar      -- :: TVar a -> STM a
-        , readTVarIO    -- :: TVar a -> IO a
-        , writeTVar     -- :: a -> TVar a -> STM ()
-        , unsafeIOToSTM -- :: IO a -> STM a
+        , newTVar
+        , newTVarIO
+        , readTVar
+        , readTVarIO
+        , writeTVar
+        , unsafeIOToSTM
 
         -- * Miscellaneous
         , withMVar
         , modifyMVar_
 
-        , setUncaughtExceptionHandler      -- :: (Exception -> IO ()) -> IO ()
-        , getUncaughtExceptionHandler      -- :: IO (Exception -> IO ())
+        , setUncaughtExceptionHandler
+        , getUncaughtExceptionHandler
 
         , reportError, reportStackOverflow
 

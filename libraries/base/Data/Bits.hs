@@ -21,30 +21,28 @@
 
 module Data.Bits ( 
   Bits(
-    (.&.), (.|.), xor, -- :: a -> a -> a
-    complement,        -- :: a -> a
-    shift,             -- :: a -> Int -> a
-    rotate,            -- :: a -> Int -> a
-    bit,               -- :: Int -> a
-    setBit,            -- :: a -> Int -> a
-    clearBit,          -- :: a -> Int -> a
-    complementBit,     -- :: a -> Int -> a
-    testBit,           -- :: a -> Int -> Bool
+    (.&.), (.|.), xor,
+    complement,
+    shift,
+    rotate,
+    bit,
+    setBit,
+    clearBit,
+    complementBit,
+    testBit,
     bitSizeMaybe,
-    bitSize,           -- :: a -> Int
-    isSigned,          -- :: a -> Bool
-    shiftL, shiftR,    -- :: a -> Int -> a
-    unsafeShiftL, unsafeShiftR,  -- :: a -> Int -> a
-    rotateL, rotateR,  -- :: a -> Int -> a
-    popCount           -- :: a -> Int
+    bitSize,
+    isSigned,
+    shiftL, shiftR,
+    unsafeShiftL, unsafeShiftR,
+    rotateL, rotateR,
+    popCount
   ),
   FiniteBits(finiteBitSize),
 
   bitDefault,
   testBitDefault,
   popCountDefault
-  -- instance Bits Int
-  -- instance Bits Integer
  ) where
 
 -- Defines the @Bits@ class containing bit-based operations.

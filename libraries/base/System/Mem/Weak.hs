@@ -55,15 +55,15 @@ module System.Mem.Weak (
 	Weak,	    		-- abstract
 
 	-- * The general interface
-	mkWeak,      		-- :: k -> v -> Maybe (IO ()) -> IO (Weak v)
-	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
-	finalize,		-- :: Weak v -> IO ()
+	mkWeak,
+	deRefWeak,
+	finalize,
 
 	-- * Specialised versions
-	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
-	addFinalizer, 		-- :: key -> IO () -> IO ()
-	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
-	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
+	mkWeakPtr,
+	addFinalizer,
+	mkWeakPair,
+	-- replaceFinaliser
 
 	-- * A precise semantics
 	

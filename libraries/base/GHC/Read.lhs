@@ -23,20 +23,20 @@ module GHC.Read
   ( Read(..)   -- class
 
   -- ReadS type
-  , ReadS      -- :: *; = String -> [(a,String)]
+  , ReadS
 
   -- H98 compatibility
-  , lex         -- :: ReadS String
-  , lexLitChar  -- :: ReadS String
-  , readLitChar -- :: ReadS Char
-  , lexDigits   -- :: ReadS String
+  , lex
+  , lexLitChar
+  , readLitChar
+  , lexDigits
 
   -- defining readers
-  , lexP       -- :: ReadPrec Lexeme
-  , paren      -- :: ReadPrec a -> ReadPrec a
-  , parens     -- :: ReadPrec a -> ReadPrec a
-  , list       -- :: ReadPrec a -> ReadPrec [a]
-  , choose     -- :: [(String, ReadPrec a)] -> ReadPrec a
+  , lexP
+  , paren
+  , parens
+  , list
+  , choose
   , readListDefault, readListPrecDefault
 
   -- Temporary

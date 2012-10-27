@@ -17,11 +17,11 @@
 
 module System.Environment
     (
-      getArgs,            -- :: IO [String]
-      getProgName,        -- :: IO String
-      getExecutablePath,  -- :: IO FilePath
-      getEnv,             -- :: String -> IO String
-      lookupEnv,          -- :: String -> IO (Maybe String)
+      getArgs,
+      getProgName,
+      getExecutablePath,
+      getEnv,
+      lookupEnv,
 #ifndef __NHC__
       withArgs,
       withProgName,

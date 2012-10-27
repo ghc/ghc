@@ -36,20 +36,20 @@ module Data.Char
     , GeneralCategory(..), generalCategory
 
     -- * Case conversion
-    , toUpper, toLower, toTitle  -- :: Char -> Char
+    , toUpper, toLower, toTitle
 
     -- * Single digit characters
-    , digitToInt        -- :: Char -> Int
-    , intToDigit        -- :: Int  -> Char
+    , digitToInt
+    , intToDigit
 
     -- * Numeric representations
-    , ord               -- :: Char -> Int
-    , chr               -- :: Int  -> Char
+    , ord
+    , chr
 
     -- * String representations
-    , showLitChar       -- :: Char -> ShowS
-    , lexLitChar        -- :: ReadS String
-    , readLitChar       -- :: ReadS Char 
+    , showLitChar
+    , lexLitChar
+    , readLitChar
     ) where
 
 #ifdef __GLASGOW_HASKELL__

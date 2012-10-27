@@ -18,10 +18,10 @@
 
 module System.Info
    (
-       os,		    -- :: String
-       arch,		    -- :: String
-       compilerName,	    -- :: String
-       compilerVersion	    -- :: Version
+       os,
+       arch,
+       compilerName,
+       compilerVersion
    ) where
 
 import Prelude
