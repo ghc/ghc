@@ -201,3 +201,4 @@ test('dodgy',
      multimod_compile,
      ['dodgy', '-v0'])
 test('T7167', normal, compile, [''])
+test('T7336', normal, compile, ['-Wall'])
