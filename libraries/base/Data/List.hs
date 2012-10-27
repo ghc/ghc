@@ -593,7 +593,7 @@ minimumBy cmp xs        =  foldl1 minBy xs
 -- | The 'genericLength' function is an overloaded version of 'length'.  In
 -- particular, instead of returning an 'Int', it returns any type which is
 -- an instance of 'Num'.  It is, however, less efficient than 'length'.
-genericLength           :: (Num i) => [b] -> i
+genericLength           :: (Num i) => [a] -> i
 {-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
 genericLength (_:l)     =  1 + genericLength l
@@ -626,7 +626,7 @@ genericDrop n (_:xs)    =  genericDrop (n-1) xs
 
 -- | The 'genericSplitAt' function is an overloaded version of 'splitAt', which
 -- accepts any 'Integral' value as the position at which to split.
-genericSplitAt          :: (Integral i) => i -> [b] -> ([b],[b])
+genericSplitAt          :: (Integral i) => i -> [a] -> ([a], [a])
 genericSplitAt n xs | n <= 0 =  ([],xs)
 genericSplitAt _ []     =  ([],[])
 genericSplitAt n (x:xs) =  (x:xs',xs'') where
@@ -634,7 +634,7 @@ genericSplitAt n (x:xs) =  (x:xs',xs'') where
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
-genericIndex :: (Integral a) => [b] -> a -> b
+genericIndex :: (Integral i) => [a] -> i -> a
 genericIndex (x:_)  0 = x
 genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
