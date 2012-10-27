@@ -41,17 +41,13 @@ module GHC.Read
 
   -- Temporary
   , readParen
-
-  -- XXX Can this be removed?
-  , readp
   )
  where
 
 import qualified Text.ParserCombinators.ReadP as P
 
 import Text.ParserCombinators.ReadP
-  ( ReadP
-  , ReadS
+  ( ReadS
   , readP_to_S
   )
 
@@ -682,9 +678,3 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readList     = readListDefault
 \end{code}
 
-\begin{code}
--- XXX Can this be removed?
-
-readp :: Read a => ReadP a
-readp = readPrec_to_P readPrec minPrec
-\end{code}
