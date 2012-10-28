@@ -179,11 +179,8 @@ _darcs/
 /mk/stamp-h
 /mk/validate.mk
 /rts/dist/
-/rts/AutoApply.*cmm
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
-/rts/sm/Evac_thr.c
-/rts/sm/Scav_thr.c
 /rts/package.conf.install
 /rts/package.conf.install.raw
 /stage3.package.conf
