@@ -2376,7 +2376,8 @@ fFlags = [
 fLangFlags :: [FlagSpec ExtensionFlag]
 fLangFlags = [
   ( "th",                               Opt_TemplateHaskell,
-    deprecatedForExtension "TemplateHaskell" >> checkTemplateHaskellOk ),
+    \on -> deprecatedForExtension "TemplateHaskell" on 
+        >> checkTemplateHaskellOk on ),
   ( "fi",                               Opt_ForeignFunctionInterface,
     deprecatedForExtension "ForeignFunctionInterface" ),
   ( "ffi",                              Opt_ForeignFunctionInterface,
@@ -2764,11 +2765,11 @@ setPackageTrust = do
     l <- getCurLoc
     upd $ \d -> d { pkgTrustOnLoc = l }
 
-setGenDeriving :: Bool -> DynP ()
+setGenDeriving :: TurnOnFlag -> DynP ()
 setGenDeriving True  = getCurLoc >>= \l -> upd (\d -> d { newDerivOnLoc = l })
 setGenDeriving False = return ()
 
-checkTemplateHaskellOk :: Bool -> DynP ()
+checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
 #ifdef GHCI
 checkTemplateHaskellOk turn_on
   | turn_on && rtsIsProfiled
