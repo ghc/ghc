@@ -121,9 +121,25 @@ wrapSrcSpanCps fn (L loc a)
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
 lookupConCps con_rdr 
   = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
-                    ; (r, fvs) <- k con_name
-                    ; return (r, fvs `plusFV` unitFV (unLoc con_name)) })
+                    ; k con_name })
+    -- We do not add the constructor name to the free vars
+    -- See Note [Patterns are not uses]
 \end{code}
+
+Note [Patterns are not uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  module Foo( f, g ) where
+  data T = T1 | T2
+
+  f T1 = True
+  f T2 = False
+
+  g _ = T1
+
+Arguaby we should report T2 as unused, even though it appears in a
+pattern, because it never occurs in a constructed position.  See
+Trac #7336.
 
 %*********************************************************
 %*							*
