@@ -71,7 +71,7 @@ utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/
 
 
 utils/ghc-pkg/dist/build/Version.hs \
-utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk $$(dir $$@)/.
+utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@
