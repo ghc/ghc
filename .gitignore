@@ -90,10 +90,7 @@ _darcs/
 /driver/ghc/dist/
 /driver/haddock/dist/
 /driver/ghci/dist/
-/driver/mangler/dist/ghc-asm
-/driver/mangler/dist/ghc-asm.prl
-/driver/split/dist/ghc-split
-/driver/split/dist/ghc-split.prl
+/driver/split/dist/
 /includes/dist-*/
 /libffi/dist-install/
 /libraries/*/dist-boot/
@@ -101,7 +98,12 @@ _darcs/
 /libraries/dist-haddock/
 /rts/dist/
 /utils/*/dist*/
-/utils/ghc-pwd/dist-boot/ghc-pwd
+/compiler/stage1/
+/compiler/stage2/
+/compiler/stage3/
+/ghc/stage1/
+/ghc/stage2/
+/ghc/stage3/
 
 # -----------------------------------------------------------------------------
 # specific generated files
@@ -114,9 +116,6 @@ _darcs/
 /ch02.html
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
-/compiler/stage1/
-/compiler/stage2/
-/compiler/stage3/
 /distrib/configure.ac
 /distrib/ghc.iss
 /docs/index.html
@@ -135,20 +134,11 @@ _darcs/
 /driver/ghci/ghci.res
 /driver/package.conf
 /driver/package.conf.inplace.old
-/driver/stamp-pkg-conf-rts
 /settings
 /ghc.spec
 /ghc/ghc-bin.cabal
-/ghc/stage1/
-/ghc/stage2/
-/ghc/stage3/
-/includes/DerivedConstants.h
-/includes/GHCConstants.h
 /includes/ghcautoconf.h
 /includes/ghcplatform.h
-/includes/mkDerivedConstantsHdr
-/includes/mkGHCConstants
-/inplace-datadir/
 /index.html
 /inplace/
 /libffi/build/
@@ -192,9 +182,6 @@ _darcs/
 /stage3.package.conf
 /testsuite_summary.txt
 /testlog
-/utils/ext-core/Driver
-/utils/ext-core/PrimEnv.hs
-/utils/genapply/genapply
 /utils/runghc/runghc.cabal
 
 /extra-gcc-opts
