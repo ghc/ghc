@@ -190,7 +190,6 @@ _darcs/
 /utils/ext-core/Driver
 /utils/ext-core/PrimEnv.hs
 /utils/genapply/genapply
-/utils/ghc-pkg/Version.hs
 /utils/ghc-pwd/dist-boot/ghc-pwd
 /utils/runghc/runghc.cabal
 
