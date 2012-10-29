@@ -85,6 +85,25 @@ _darcs/
 /utils/hsc2hs/
 
 # -----------------------------------------------------------------------------
+# Cabal dist directories
+
+/driver/ghc/dist/
+/driver/haddock/dist/
+/driver/ghci/dist/
+/driver/mangler/dist/ghc-asm
+/driver/mangler/dist/ghc-asm.prl
+/driver/split/dist/ghc-split
+/driver/split/dist/ghc-split.prl
+/includes/dist-*/
+/libffi/dist-install/
+/libraries/*/dist-boot/
+/libraries/*/dist-install/
+/libraries/dist-haddock/
+/rts/dist/
+/utils/*/dist*/
+/utils/ghc-pwd/dist-boot/ghc-pwd
+
+# -----------------------------------------------------------------------------
 # specific generated files
 
 /bindist-list
@@ -111,18 +130,11 @@ _darcs/
 /docs/users_guide/users_guide.ps
 /docs/users_guide/users_guide/
 /docs/users_guide/what_glasgow_exts_does.gen.xml
-/driver/ghc/dist/
-/driver/haddock/dist/
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
-/driver/ghci/dist/
 /driver/ghci/ghci.res
-/driver/mangler/dist/ghc-asm
-/driver/mangler/dist/ghc-asm.prl
 /driver/package.conf
 /driver/package.conf.inplace.old
-/driver/split/dist/ghc-split
-/driver/split/dist/ghc-split.prl
 /driver/stamp-pkg-conf-rts
 /settings
 /ghc.spec
@@ -132,7 +144,6 @@ _darcs/
 /ghc/stage3/
 /includes/DerivedConstants.h
 /includes/GHCConstants.h
-/includes/dist-*/
 /includes/ghcautoconf.h
 /includes/ghcplatform.h
 /includes/mkDerivedConstantsHdr
@@ -140,7 +151,6 @@ _darcs/
 /inplace-datadir/
 /index.html
 /inplace/
-/libffi/dist-install/
 /libffi/build/
 /libffi/ffi.h
 /libffi/package.conf.inplace
@@ -164,9 +174,6 @@ _darcs/
 /libraries/synopsis.png
 /libraries/stamp/
 /libraries/time/
-/libraries/*/dist-boot/
-/libraries/*/dist-install/
-/libraries/dist-haddock/
 /mk/are-validating.mk
 /mk/build.mk
 /mk/config.h
@@ -178,7 +185,6 @@ _darcs/
 /mk/project.mk.old
 /mk/stamp-h
 /mk/validate.mk
-/rts/dist/
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
 /rts/package.conf.install
@@ -186,11 +192,9 @@ _darcs/
 /stage3.package.conf
 /testsuite_summary.txt
 /testlog
-/utils/*/dist*/
 /utils/ext-core/Driver
 /utils/ext-core/PrimEnv.hs
 /utils/genapply/genapply
-/utils/ghc-pwd/dist-boot/ghc-pwd
 /utils/runghc/runghc.cabal
 
 /extra-gcc-opts
