@@ -16,8 +16,8 @@ _result :: a
 Stopped at <exception thrown>
 _exception :: e
 already at the beginning of the history
-_exception = SomeException (ErrorCall "foo")
+_exception = SomeException "foo"
 _result :: a = _
-_exception :: SomeException = SomeException (ErrorCall "foo")
+_exception :: SomeException = SomeException "foo"
 *** Exception: foo
 *** Exception: foo
