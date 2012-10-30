@@ -1013,8 +1013,6 @@ isRetainer( StgClosure *c )
     case MUT_VAR_DIRTY:
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
 
 	// thunks are retainers.
     case THUNK:
@@ -1071,6 +1069,9 @@ isRetainer( StgClosure *c )
     case ARR_WORDS:
 	// STM
     case TREC_CHUNK:
+        // immutable arrays
+    case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
 	return rtsFalse;
 
 	//

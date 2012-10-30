@@ -884,8 +884,8 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
       by defining what we mean by a retainer:</para>
 
       <blockquote>
-	<para>A retainer is either the system stack, or an unevaluated
-	closure (thunk).</para>
+        <para>A retainer is either the system stack, an unevaluated
+        closure (thunk), or an explicitly mutable object.</para>
       </blockquote>
 
       <para>In particular, constructors are <emphasis>not</emphasis>
