@@ -46,7 +46,7 @@ RUNTEST_OPTS += -e ghc_with_native_codegen=0
 endif
 
 HASKELL98_LIBDIR := $(shell "$(GHC_PKG)" field haskell98 library-dirs | sed 's/^[^:]*: *//')
-HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*.a ]; then echo YES; else echo NO; fi)
+HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*[0-9].a ]; then echo YES; else echo NO; fi)
 HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*_p.a ]; then echo YES; else echo NO; fi)
 
 ifeq "$(HAVE_VANILLA)" "YES"
