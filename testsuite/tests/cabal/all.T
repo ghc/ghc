@@ -1,5 +1,8 @@
 setTestOpts(only_compiler_types(['ghc']))
 
+def normaliseDynlibNames(str):
+    return re.sub('-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
+
 test('ghcpkg01',
      extra_clean(['local01.package.conf',
                   'local01.package.conf.old']),
@@ -11,8 +14,9 @@ test('ghcpkg02',
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
 test('ghcpkg03',
-     extra_clean(['local03.package.conf',
-                  'local03.package.conf.old']),
+     [extra_clean(['local03.package.conf',
+                   'local03.package.conf.old']),
+      normalise_fun(normaliseDynlibNames)],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
 test('ghcpkg04',
@@ -32,7 +36,8 @@ test('ghcpkg05',
                     'local05a.package.conf.old',
                     'local05b.package.conf',
                     'local05b.package.conf.old']),
-       normalise_fun(normalise_haddock_junk)
+       normalise_fun(two_normalisers(normalise_haddock_junk,
+                                     normaliseDynlibNames))
        ],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg05'])
