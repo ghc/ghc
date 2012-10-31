@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifndef __NHC__
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 #endif
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}

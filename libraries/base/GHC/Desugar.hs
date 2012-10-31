@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
-           , Rank2Types
+           , RankNTypes
            , ExistentialQuantification
   #-}
 

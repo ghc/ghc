@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, Rank2Types #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

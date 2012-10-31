@@ -4,7 +4,7 @@
            , BangPatterns
            , PatternGuards
            , NondecreasingIndentation
-           , Rank2Types
+           , RankNTypes
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
