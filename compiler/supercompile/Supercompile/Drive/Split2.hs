@@ -242,12 +242,12 @@ multEntered = M.unionWith (\_ _ -> ManyEntries)
 split :: (Applicative m, Monad m)
       => (State -> m            (Deeds, Out FVedTerm))
       -> State  -> m (ResidTags, Deeds, Out FVedTerm)
-split opt (_deeds, heap, k, qa) = recurse opt $ push (S.singleton FocusContext) (heap, k, QAFocus qa)
+split opt (deeds, heap, k, qa) = recurse opt $ push (S.singleton FocusContext) (deeds, heap, k, QAFocus qa)
 
 instanceSplit :: (Applicative m, Monad m)
               => (State                             -> m            (Deeds, Out FVedTerm))
               -> (Deeds, Heap, Stack, Out FVedTerm) -> m (ResidTags, Deeds, Out FVedTerm)
-instanceSplit opt (_deeds, heap, k, e) = recurse opt $ push (S.singleton FocusContext) (heap, k, OpaqueFocus e)
+instanceSplit opt (deeds, heap, k, e) = recurse opt $ push (S.singleton FocusContext) (deeds, heap, k, OpaqueFocus e)
 
 applyGeneraliser :: Generaliser -> State -> Maybe (S.Set Context)
 applyGeneraliser gen (_deeds, Heap h _, k, qa) = fmap (\(gen_kfs, gen_xs) -> S.fromList $ map StackContext (IS.elems gen_kfs) ++ map HeapContext (varSetElems gen_xs)) $ case gENERALISATION of
@@ -287,7 +287,7 @@ applyGeneraliser gen (_deeds, Heap h _, k, qa) = fmap (\(gen_kfs, gen_xs) -> S.f
 generaliseSplit :: (Applicative m, Monad m)
                 => (State -> m (Deeds, Out FVedTerm))
                 -> Generaliser -> State -> Maybe (m (ResidTags, Deeds, Out FVedTerm))
-generaliseSplit opt gen state@(_deeds, heap, k, qa) = flip fmap (applyGeneraliser gen state) $ \generalised -> recurse opt $ push generalised (heap, k, QAFocus qa)
+generaliseSplit opt gen state@(deeds, heap, k, qa) = flip fmap (applyGeneraliser gen state) $ \generalised -> recurse opt $ push generalised (deeds, heap, k, QAFocus qa)
 
 
 recurse :: (Applicative m, Monad m)
@@ -449,6 +449,23 @@ test11 = \_ -> f () + 1
 -}
 
 
+newtype DeedsA a = DeedsA { unDeedsA :: (Deeds, [Size], State [Deeds] a) }
+
+instance Functor DeedsA where
+    fmap = liftA
+
+instance Applicative DeedsA where
+    pure x = DeedsA (emptyDeeds, [], return x)
+    DeedsA (deeds1, sizes1, mf) <*> DeedsA (deeds2, sizes2, mx) = DeedsA (deeds1 `mappend` deeds, sizes1 ++ sizes2, mf <*> mx)
+
+one :: Deeds -> Size -> DeedsA Deeds
+one deeds sz = DeedsA (deeds, [sz], state $ \(deeds:deedss) -> (deeds, deedss))
+
+runDeedsA :: DeedsA a -> a
+runDeedsA (DeedsA (deeds, sizes, mx)) = x
+  where ([], x) = runState mx (splitDeeds deeds sizes)
+
+
 data PushFocus qa term = QAFocus qa
                        | TermFocus term
                        | OpaqueFocus FVedTerm
@@ -460,12 +477,36 @@ type PushedValue = Tagged (Coerced (ValueG State))
 type PushedQA    = Tagged (QAG (ValueG State))
 type PushedFocus = PushFocus PushedQA State
 
+traversePushedState :: Applicative t => (State -> t State)
+                    -> (PushedHeap, PushedStack, PushedFocus) -> t (PushedHeap, PushedStack, PushedFocus)
+traversePushedState f (heap, stack, focus) = liftA3 (,,) (traversePushedHeap f heap) (traversePushedStack f stack) (traversePushedFocus f focus)
+
+traversePushedHeap :: Applicative t => (State -> t State)
+                   -> PushedHeap -> t PushedHeap
+traversePushedHeap f = traverse traverse_heap_binding
+  where traverse_heap_binding = either (fmap Left . traversePushedValue f) (fmap Right . f)
+
+traversePushedValue :: Applicative t => (State -> t State)
+                    -> PushedValue -> t PushedValue
+traversePushedValue f = traverse (traverse (traverse f))
+
+traversePushedStack :: Applicative t => (State -> t State)
+                    -> PushedStack -> t PushedStack
+traversePushedStack f = traverse (traverse traverse_stack_frame)
+  where traverse_stack_frame
+
+traversePushedFocus :: Applicative t => (State -> t State)
+                    -> PushedFocus -> t PushedFocus
+traversePushedFocus f (QAFocus qa)    = fmap QAFocus $ traverse (traverse (traverse f)) qa
+traversePushedFocus f (TermFocus e)   = fmap TermFocus $ f e
+traversePushedFocus _ (OpaqueFocus e) = OpaqueFocus e
+
 -- FIXME: deal with deeds in here
 push :: S.Set Context
      -> (Heap, Stack, PushFocus (Anned QA) (In AnnedTerm))
-     -> (PushedHeap, PushedStack, PushedFocus)
-push generalised (Heap h ids, k, focus) = -- pprTrace "push" (ppr verts $$ ppr marked)
-                                          (h', k', focus')
+     -> (Deeds, PushedHeap, PushedStack, PushedFocus)
+push generalised (deeds, Heap h ids, k, focus) = -- pprTrace "push" (ppr verts $$ ppr marked)
+                                                 traversePushed (\(deeds, h, k, qa) -> ) (h', k', focus')
   where -- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
         --  < H | v | >
         -- and:

@@ -129,6 +129,10 @@ type Answer = In AnnedValue
 data QAG answer = Question Question
                 | Answer   answer
 
+instance Traversable QAG where
+    traverse _ (Question x) = pure $ Question x
+    traverse f (Answer a)   = fmap Answer (f a)
+
 type QA = QAG Answer
 
 instance Outputable QA where

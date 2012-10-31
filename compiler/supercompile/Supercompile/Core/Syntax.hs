@@ -152,6 +152,14 @@ data ValueG term = Literal Literal | Coercion Coercion
                  | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
                                                        -- NB: not a newtype DataCon
 
+instance Traverseable ValueG where
+    traverse f e = case e of
+      Literal l          -> pure $ Literal l
+      Coercion co        -> pure $ Coercion co
+      TyLambda a e       -> fmap (TyLambda a) $ f e
+      Lambda   x e       -> fmap (Lambda   x) $ f e
+      Data dc tys cos xs -> pure $ Data dc tys cos xs
+
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
         DataAlt dc as qs xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintBndr CaseBind) as ++ map (pPrintBndr CaseBind) qs ++ map (pPrintBndr CaseBind) xs)
