@@ -67,14 +67,13 @@ import NameEnv
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
+import DynFlags ( ExtensionFlag( Opt_DataKinds ), getDynFlags )
 import Unique
 import UniqSupply
 import Outputable
 import FastString
 import Util
 
-import Data.Maybe
 import Control.Monad ( unless, when, zipWithM )
 import PrelNames( ipClassName, funTyConKey )
 \end{code}
@@ -1229,7 +1228,8 @@ Here
 
  * Then unificaiton makes a_sig := a_sk
 
-That's why we must make a_sig a SigTv, not a SkolemTv, so that it can unify to a_sk.
+That's why we must make a_sig a MetaTv (albeit a SigTv), 
+not a SkolemTv, so that it can unify to a_sk.
 
 For RULE binders, though, things are a bit different (yuk).  
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
@@ -1340,6 +1340,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
       ; act_kind <- zonkTcKind act_kind
       ; traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind $$ ppr exp_kind)
       ; env0 <- tcInitTidyEnv
+      ; dflags <- getDynFlags
       ; let (exp_as, _) = splitKindFunTys exp_kind
             (act_as, _) = splitKindFunTys act_kind
             n_exp_as  = length exp_as
@@ -1351,11 +1352,15 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt)
 
             occurs_check 
                | Just act_tv <- tcGetTyVar_maybe act_kind
-               = isNothing (occurCheckExpand act_tv exp_kind)
+               = check_occ act_tv exp_kind
                | Just exp_tv <- tcGetTyVar_maybe exp_kind
-               = isNothing (occurCheckExpand exp_tv act_kind)
+               = check_occ exp_tv act_kind
                | otherwise 
                = False
+
+            check_occ tv k = case occurCheckExpand dflags tv k of
+                                OC_Occurs -> True
+                                _bad      -> False
 
             err | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
                 = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
