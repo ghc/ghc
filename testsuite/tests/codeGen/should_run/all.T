@@ -94,3 +94,9 @@ test('setByteArray', normal, compile_and_run, [''])
 test('6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])
 test('T7163', normal, compile_and_run, [''])
+
+# Gives different results when optimised, so restrict to just one way
+test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
+                req_profiling,
+                extra_hc_opts('-fprof-auto'),
+                extra_run_opts('+RTS -xc') ], compile_and_run, [''])
