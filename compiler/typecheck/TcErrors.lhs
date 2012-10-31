@@ -615,6 +615,7 @@ mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct
 mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round; see TcCanonical.reOrient
+  || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                              , extraTyVarInfo ctxt ty1 ty2
                              , extra ])
@@ -640,8 +641,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
-  -- it started life as a SigTv, else it'd have been unified.
-  -- So just report a mis-match here, without gettin into occurs-checks etc
+  -- it started life as a SigTv, else it'd have been unified, given
+  -- that there's no occurs-check or forall problem
   | (implic:_) <- cec_encl ctxt
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
