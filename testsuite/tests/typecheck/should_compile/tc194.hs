@@ -8,3 +8,4 @@ module ShouldCompile where
 
 f = \ (x :: forall a. a->a) -> (x True, x 'c')
 
+g (x :: forall a. a->a) = x
