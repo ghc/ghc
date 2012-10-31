@@ -1,10 +1,6 @@
 
 T7264.hs:13:19:
     Couldn't match type `a' with `forall r. r -> String'
-      `a' is untouchable
-        inside the constraints ()
-        bound by the inferred type of mkFoo2 :: a -> Maybe Foo
-        at T7264.hs:13:1-32
       `a' is a rigid type variable bound by
           the inferred type of mkFoo2 :: a -> Maybe Foo at T7264.hs:13:1
     Expected type: a -> Foo
