@@ -1,6 +1,7 @@
 
 T5934.hs:10:7:
-    No instance for (Num ((forall s. GenST s) -> Int))
-      arising from the literal `0'
+    Cannot instantiate unification variable `a0'
+    with a type involving foralls: (forall s. GenST s) -> Int
+      Perhaps you want -XImpredicativeTypes
     In the expression: 0
     In an equation for `run': run = 0
