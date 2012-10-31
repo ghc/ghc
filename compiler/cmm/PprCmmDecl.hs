@@ -92,9 +92,9 @@ pprCmmGroup tops
 pprTop :: (Outputable d, Outputable info, Outputable i)
        => GenCmmDecl d info i -> SDoc
 
-pprTop (CmmProc info lbl graph)
+pprTop (CmmProc info lbl live graph)
 
-  = vcat [ ppr lbl <> lparen <> rparen
+  = vcat [ ppr lbl <> lparen <> rparen <+> ptext (sLit "// ") <+> ppr live
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]

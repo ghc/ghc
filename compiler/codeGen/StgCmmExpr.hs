@@ -717,7 +717,7 @@ emitEnter fun = do
       --
       AssignTo res_regs _ -> do
        { lret <- newLabelC
-       ; let (off, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
+       ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
        ; lcall <- newLabelC
        ; updfr_off <- getUpdFrameOff
        ; let area = Young lret

@@ -71,6 +71,14 @@ data GenCmmDecl d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
      CLabel            -- Entry label
+     [GlobalReg]       -- Registers live on entry. Note that the set of live
+                       -- registers will be correct in generated C-- code, but
+                       -- not in hand-written C-- code. However,
+                       -- splitAtProcPoints calculates correct liveness
+                       -- information for CmmProc's. Right now only the LLVM
+                       -- back-end relies on correct liveness information and
+                       -- for that back-end we always call splitAtProcPoints, so
+                       -- all is good.
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData     -- Static data
@@ -100,8 +108,8 @@ data CmmTopInfo   = TopInfo { info_tbls  :: BlockEnv CmmInfoTable
                             , stack_info :: CmmStackInfo }
 
 topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
-topInfoTable (CmmProc infos _ g) = mapLookup (g_entry g) (info_tbls infos)
-topInfoTable _                   = Nothing
+topInfoTable (CmmProc infos _ _ g) = mapLookup (g_entry g) (info_tbls infos)
+topInfoTable _                     = Nothing
 
 data CmmStackInfo
    = StackInfo {

@@ -136,8 +136,17 @@ SharedLibsByDefaultPlatformList =               \
                          x86_64-unknown-linux   \
                          x86_64-apple-darwin
 
-DYNAMIC_BY_DEFAULT = $(if $(filter $(TARGETPLATFORM),\
-	$(SharedLibsByDefaultPlatformList)),YES,NO)
+# DYANMIC_BY_DEFAULT says whether this compiler will default to
+# building dynamic executables, i.e. -dynamic is on.  We do this for
+# certain platforms because it lets us use the system dynamic linker
+# instead of our own linker for GHCi.
+#
+# We do not enable this for an unregisterised build.  It is currently
+# unknown whether shared libraries (should) work when unregisterised.
+#
+DYNAMIC_BY_DEFAULT = $(strip $(if $(filter YES,$(GhcUnregisterised)),NO,\
+			  $(if $(filter $(TARGETPLATFORM),\
+				$(SharedLibsByDefaultPlatformList)),YES,NO)))
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and

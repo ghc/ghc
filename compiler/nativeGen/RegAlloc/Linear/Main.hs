@@ -150,12 +150,12 @@ regAlloc _ (CmmData sec d)
                 , Nothing
                 , Nothing )
 
-regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl [])
-        = return ( CmmProc info lbl (ListGraph [])
+regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+        = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
-regAlloc dflags (CmmProc static lbl sccs)
+regAlloc dflags (CmmProc static lbl live sccs)
         | LiveInfo info (Just first_id) (Just block_live) _     <- static
         = do
                 -- do register allocation on each component.
@@ -174,12 +174,12 @@ regAlloc dflags (CmmProc static lbl sccs)
                       | otherwise
                       = Nothing
 
-                return  ( CmmProc info lbl (ListGraph (first' : rest'))
+                return  ( CmmProc info lbl live (ListGraph (first' : rest'))
                         , extra_stack
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc _ (CmmProc _ _ _)
+regAlloc _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
 

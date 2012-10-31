@@ -24,6 +24,16 @@ $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
 $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
+# Setting hisuf/osuf is a kludge. If DYNAMIC_BY_DEFAULT is on, dyn is
+# the first way, and p is another way, then without this kludge we run
+#     ghc -M -hisuf dyn_hi -osuf dyn_o -dep-suffix dyn -dep-suffix p
+# which means we get dependencies for .dyn_hi/.dyn_o and .p_dyn_hi/.p_dyn_o
+# rather than .dyn_hi/.dyn_o and .p_hi/.p_o.
+# With the kludge we also get .hi/.o dependencies that we don't need, but
+# they don't do any harm.
+# We also specify -static, as otherwise we end up with some dependencies
+# on .dyn_dyn_hi files
+$1_$2_MKDEPENDHS_FLAGS += -static -hisuf hi -osuf o
 
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 
@@ -34,8 +44,9 @@ $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
 ifneq "$$($1_$2_HS_SRCS)" ""
-	"$$($1_$2_HC_MK_DEPEND)" -M $$($1_$2_MKDEPENDHS_FLAGS) \
+	"$$($1_$2_HC_MK_DEPEND)" -M \
 	    $$(filter-out -split-objs, $$($1_$2_$$(firstword $$($1_$2_WAYS))_ALL_HC_OPTS)) \
+	    $$($1_$2_MKDEPENDHS_FLAGS) \
 	    $$($1_$2_HS_SRCS)
 endif
 	echo "$1_$2_depfile_haskell_EXISTS = YES" >> $$@.tmp

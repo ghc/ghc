@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 -----------------------------------------------------------------------------
 --
 -- Old-style Cmm data types
@@ -86,8 +88,8 @@ type RawCmmDecl = GenCmmDecl CmmStatics (BlockEnv CmmStatics) (ListGraph CmmStmt
 data GenBasicBlock i = BasicBlock BlockId [i]
 type CmmBasicBlock   = GenBasicBlock CmmStmt
 
-instance UserOfLocalRegs i => UserOfLocalRegs (GenBasicBlock i) where
-    foldRegsUsed f set (BasicBlock _ l) = foldRegsUsed f set l
+instance UserOfRegs r i => UserOfRegs r (GenBasicBlock i) where
+    foldRegsUsed dflags f set (BasicBlock _ l) = foldRegsUsed dflags f set l
 
 -- | The branch block id is that of the first block in
 -- the branch, which is that branch's entry point
@@ -103,7 +105,7 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 -- | Returns the info table associated with the CmmDecl's entry point,
 -- if any.
 topInfoTable :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> Maybe i
-topInfoTable (CmmProc infos _ (ListGraph (b:_)))
+topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
   = mapLookup (blockId b) infos
 topInfoTable _
   = Nothing
@@ -116,8 +118,8 @@ cmmMapGraph    :: (g -> g') -> GenCmmGroup d h g -> GenCmmGroup d h g'
 cmmMapGraph f tops = map (cmmTopMapGraph f) tops
 
 cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
-cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
-cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
+cmmTopMapGraph f (CmmProc h l v g) = CmmProc h l v (f g)
+cmmTopMapGraph _ (CmmData s ds)    = CmmData s ds
 
 -----------------------------------------------------------------------------
 --              CmmStmt
@@ -156,7 +158,7 @@ data CmmStmt
 
   | CmmJump                       -- Jump to another C-- function,
       CmmExpr                       -- Target
-      (Maybe [GlobalReg])           -- Live registers at call site;
+      [GlobalReg]                   -- Live registers at call site;
                                     --      Nothing -> no information, assume
                                     --                 all live
                                     --      Just .. -> info on liveness, []
@@ -187,8 +189,8 @@ data CmmSafety
   | CmmInterruptible
 
 -- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
-instance UserOfLocalRegs CmmStmt where
-  foldRegsUsed f (set::b) s = stmt s set
+instance UserOfRegs LocalReg CmmStmt where
+  foldRegsUsed dflags f (set::b) s = stmt s set
     where
       stmt :: CmmStmt -> b -> b
       stmt (CmmNop)                  = id
@@ -202,18 +204,18 @@ instance UserOfLocalRegs CmmStmt where
       stmt (CmmJump e _)             = gen e
       stmt (CmmReturn)               = id
 
-      gen :: UserOfLocalRegs a => a -> b -> b
-      gen a set = foldRegsUsed f set a
+      gen :: UserOfRegs LocalReg a => a -> b -> b
+      gen a set = foldRegsUsed dflags f set a
 
-instance UserOfLocalRegs CmmCallTarget where
-    foldRegsUsed f set (CmmCallee e _)    = foldRegsUsed f set e
-    foldRegsUsed f set (CmmPrim _ mStmts) = foldRegsUsed f set mStmts
+instance UserOfRegs LocalReg CmmCallTarget where
+    foldRegsUsed dflags f set (CmmCallee e _)    = foldRegsUsed dflags f set e
+    foldRegsUsed dflags f set (CmmPrim _ mStmts) = foldRegsUsed dflags f set mStmts
 
-instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
-    foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
+instance UserOfRegs r a => UserOfRegs r (CmmHinted a) where
+    foldRegsUsed dflags f set a = foldRegsUsed dflags f set (hintlessCmm a)
 
-instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmHinted a) where
-    foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)
+instance DefinerOfRegs r a => DefinerOfRegs r (CmmHinted a) where
+    foldRegsDefd dflags f set a = foldRegsDefd dflags f set (hintlessCmm a)
 
 {-
 Discussion

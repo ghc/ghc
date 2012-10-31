@@ -1,16 +1,24 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module CmmExpr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
-    , GlobalReg(..), globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
+    , GlobalReg(..), isArgReg, globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
     , VGcPtr(..), vgcFlag       -- Temporary!
-    , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
-    , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
-            , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
-            , regSetToList
+
+    , DefinerOfRegs, UserOfRegs
+    , foldRegsDefd, foldRegsUsed, filterRegsUsed
+    , foldLocalRegsDefd, foldLocalRegsUsed
+
+    , RegSet, LocalRegSet, GlobalRegSet
+    , emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
+    , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
+    , regSetToList
     , regUsedIn
+    
     , Area(..)
     , module CmmMachOp
     , module CmmType
@@ -177,7 +185,7 @@ localRegType (LocalReg _ rep) = rep
 --    Register-use information for expressions and other types
 -----------------------------------------------------------------------------
 
--- | Sets of local registers
+-- | Sets of registers
 
 -- These are used for dataflow facts, and a common operation is taking
 -- the union of two RegSets and then asking whether the union is the
@@ -185,16 +193,19 @@ localRegType (LocalReg _ rep) = rep
 -- sizeUniqSet is O(n) whereas Set.size is O(1), so we use ordinary
 -- Sets.
 
-type RegSet              =  Set LocalReg
-emptyRegSet             :: RegSet
-nullRegSet              :: RegSet -> Bool
-elemRegSet              :: LocalReg -> RegSet -> Bool
-extendRegSet            :: RegSet -> LocalReg -> RegSet
-deleteFromRegSet        :: RegSet -> LocalReg -> RegSet
-mkRegSet                :: [LocalReg] -> RegSet
-minusRegSet, plusRegSet, timesRegSet :: RegSet -> RegSet -> RegSet
-sizeRegSet              :: RegSet -> Int
-regSetToList            :: RegSet -> [LocalReg]
+type RegSet r     = Set r
+type LocalRegSet  = RegSet LocalReg
+type GlobalRegSet = RegSet GlobalReg
+
+emptyRegSet             :: Ord r => RegSet r
+nullRegSet              :: Ord r => RegSet r -> Bool
+elemRegSet              :: Ord r => r -> RegSet r -> Bool
+extendRegSet            :: Ord r => RegSet r -> r -> RegSet r
+deleteFromRegSet        :: Ord r => RegSet r -> r -> RegSet r
+mkRegSet                :: Ord r => [r] -> RegSet r
+minusRegSet, plusRegSet, timesRegSet :: Ord r => RegSet r -> RegSet r -> RegSet r
+sizeRegSet              :: Ord r => RegSet r -> Int
+regSetToList            :: Ord r => RegSet r -> [r]
 
 emptyRegSet      = Set.empty
 nullRegSet       = Set.null
@@ -208,58 +219,75 @@ timesRegSet      = Set.intersection
 sizeRegSet       = Set.size
 regSetToList     = Set.toList
 
-class UserOfLocalRegs a where
-  foldRegsUsed :: (b -> LocalReg -> b) -> b -> a -> b
+class Ord r => UserOfRegs r a where
+  foldRegsUsed :: DynFlags -> (b -> r -> b) -> b -> a -> b
 
-class DefinerOfLocalRegs a where
-  foldRegsDefd :: (b -> LocalReg -> b) -> b -> a -> b
+foldLocalRegsUsed :: UserOfRegs LocalReg a
+                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+foldLocalRegsUsed = foldRegsUsed
 
-filterRegsUsed :: UserOfLocalRegs e => (LocalReg -> Bool) -> e -> RegSet
-filterRegsUsed p e =
-    foldRegsUsed (\regs r -> if p r then extendRegSet regs r else regs)
+class Ord r => DefinerOfRegs r a where
+  foldRegsDefd :: DynFlags -> (b -> r -> b) -> b -> a -> b
+
+foldLocalRegsDefd :: DefinerOfRegs LocalReg a
+                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+foldLocalRegsDefd = foldRegsDefd
+
+filterRegsUsed :: UserOfRegs r e => DynFlags -> (r -> Bool) -> e -> RegSet r
+filterRegsUsed dflags p e =
+    foldRegsUsed dflags
+                 (\regs r -> if p r then extendRegSet regs r else regs)
                  emptyRegSet e
 
-instance UserOfLocalRegs a => UserOfLocalRegs (Maybe a) where
-    foldRegsUsed f z (Just x) = foldRegsUsed f z x
-    foldRegsUsed _ z Nothing = z
+instance UserOfRegs LocalReg CmmReg where
+    foldRegsUsed _ f z (CmmLocal reg) = f z reg
+    foldRegsUsed _ _ z (CmmGlobal _)  = z
 
-instance UserOfLocalRegs CmmReg where
-    foldRegsUsed f z (CmmLocal reg) = f z reg
-    foldRegsUsed _ z (CmmGlobal _)  = z
+instance DefinerOfRegs LocalReg CmmReg where
+    foldRegsDefd _ f z (CmmLocal reg) = f z reg
+    foldRegsDefd _ _ z (CmmGlobal _)  = z
 
-instance DefinerOfLocalRegs CmmReg where
-    foldRegsDefd f z (CmmLocal reg) = f z reg
-    foldRegsDefd _ z (CmmGlobal _)  = z
+instance UserOfRegs GlobalReg CmmReg where
+    foldRegsUsed _ _ z (CmmLocal _)    = z
+    foldRegsUsed _ f z (CmmGlobal reg) = f z reg
 
-instance UserOfLocalRegs LocalReg where
-    foldRegsUsed f z r = f z r
+instance DefinerOfRegs GlobalReg CmmReg where
+    foldRegsDefd _ _ z (CmmLocal _)    = z
+    foldRegsDefd _ f z (CmmGlobal reg) = f z reg
 
-instance DefinerOfLocalRegs LocalReg where
-    foldRegsDefd f z r = f z r
+instance Ord r => UserOfRegs r r where
+    foldRegsUsed _ f z r = f z r
 
-instance UserOfLocalRegs RegSet where
-    foldRegsUsed f = Set.fold (flip f)
+instance Ord r => DefinerOfRegs r r where
+    foldRegsDefd _ f z r = f z r
 
-instance UserOfLocalRegs CmmExpr where
-  foldRegsUsed f z e = expr z e
+instance Ord r => UserOfRegs r (RegSet r) where
+    foldRegsUsed _ f = Set.fold (flip f)
+
+instance UserOfRegs r CmmReg => UserOfRegs r CmmExpr where
+  foldRegsUsed dflags f z e = expr z e
     where expr z (CmmLit _)          = z
-          expr z (CmmLoad addr _)    = foldRegsUsed f z addr
-          expr z (CmmReg r)          = foldRegsUsed f z r
-          expr z (CmmMachOp _ exprs) = foldRegsUsed f z exprs
-          expr z (CmmRegOff r _)     = foldRegsUsed f z r
+          expr z (CmmLoad addr _)    = foldRegsUsed dflags f z addr
+          expr z (CmmReg r)          = foldRegsUsed dflags f z r
+          expr z (CmmMachOp _ exprs) = foldRegsUsed dflags f z exprs
+          expr z (CmmRegOff r _)     = foldRegsUsed dflags f z r
           expr z (CmmStackSlot _ _)  = z
 
-instance UserOfLocalRegs a => UserOfLocalRegs [a] where
-  foldRegsUsed _ set [] = set
-  foldRegsUsed f set (x:xs) = foldRegsUsed f (foldRegsUsed f set x) xs
+instance UserOfRegs r a => UserOfRegs r (Maybe a) where
+    foldRegsUsed dflags f z (Just x) = foldRegsUsed dflags f z x
+    foldRegsUsed _      _ z Nothing = z
 
-instance DefinerOfLocalRegs a => DefinerOfLocalRegs [a] where
-  foldRegsDefd _ set [] = set
-  foldRegsDefd f set (x:xs) = foldRegsDefd f (foldRegsDefd f set x) xs
+instance UserOfRegs r a => UserOfRegs r [a] where
+  foldRegsUsed _      _ set [] = set
+  foldRegsUsed dflags f set (x:xs) = foldRegsUsed dflags f (foldRegsUsed dflags f set x) xs
 
-instance DefinerOfLocalRegs a => DefinerOfLocalRegs (Maybe a) where
-  foldRegsDefd _ set Nothing  = set
-  foldRegsDefd f set (Just x) = foldRegsDefd f set x
+instance DefinerOfRegs r a => DefinerOfRegs r [a] where
+  foldRegsDefd _      _ set [] = set
+  foldRegsDefd dflags f set (x:xs) = foldRegsDefd dflags f (foldRegsDefd dflags f set x) xs
+
+instance DefinerOfRegs r a => DefinerOfRegs r (Maybe a) where
+  foldRegsDefd _      _ set Nothing  = set
+  foldRegsDefd dflags f set (Just x) = foldRegsDefd dflags f set x
 
 -----------------------------------------------------------------------------
 -- Another reg utility
@@ -424,3 +452,10 @@ globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
                                             -- dynamically allocated closures
 globalRegType dflags _                 = bWord dflags
+
+isArgReg :: GlobalReg -> Bool
+isArgReg (VanillaReg {}) = True
+isArgReg (FloatReg {})   = True
+isArgReg (DoubleReg {})  = True
+isArgReg (LongReg {})    = True
+isArgReg _               = False

@@ -82,9 +82,9 @@
     Sp(-1) = CCCS;                              \
     Sp(-2) = stg_restore_cccs_info;             \
     Sp_adj(-2);                                 \
-    jump (target) [*]
+    jump (target) [R1]
 #else
-#define jump_SAVE_CCCS(target) jump (target) [*]
+#define jump_SAVE_CCCS(target) jump (target) [R1]
 #endif
 
 #endif /* APPLY_H */

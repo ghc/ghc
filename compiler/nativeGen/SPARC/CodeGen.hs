@@ -59,10 +59,10 @@ import Control.Monad    ( mapAndUnzipM )
 cmmTopCodeGen :: RawCmmDecl
               -> NatM [NatCmmDecl CmmStatics Instr]
 
-cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
+cmmTopCodeGen (CmmProc info lab live (ListGraph blocks))
  = do (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
 
-      let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
+      let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       let tops = proc : concat statics
 
       return tops

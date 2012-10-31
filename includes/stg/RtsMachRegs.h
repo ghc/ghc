@@ -15,6 +15,12 @@
 #ifndef RTSMACHREGS_H
 #define RTSMACHREGS_H
 
+#ifdef UnregisterisedCompiler
+#ifndef NO_REGS
+#define NO_REGS
+#endif
+#endif
+
 /*
  * Defining NO_REGS causes no global registers to be used.  NO_REGS is
  * typically defined by GHC, via a command-line option passed to gcc,

@@ -83,7 +83,7 @@ pprLlvmCmmDecl :: LlvmEnv -> Int -> LlvmCmmDecl -> (SDoc, [LlvmVar])
 pprLlvmCmmDecl _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
+pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl live (ListGraph blks))
   = let (idoc, ivar) = case mb_info of
                         Nothing -> (empty, [])
                         Just (Statics info_lbl dat)
@@ -98,7 +98,7 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
                       else Internal
             lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
-            fun = mkLlvmFunc env lbl' link  sec' lmblocks
+            fun = mkLlvmFunc env live lbl' link  sec' lmblocks
         in ppLlvmFunction fun
     ), ivar)
 

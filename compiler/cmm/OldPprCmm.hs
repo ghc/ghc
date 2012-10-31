@@ -161,7 +161,7 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: CmmExpr -> Maybe [GlobalReg] -> SDoc
+genJump :: CmmExpr -> [GlobalReg] -> SDoc
 genJump expr live =
     hcat [ ptext (sLit "jump")
          , space
@@ -171,7 +171,7 @@ genJump expr live =
                     CmmLoad (CmmReg _) _ -> pprExpr expr
                     _                    -> parens (pprExpr expr)
          , semi <+> ptext (sLit "// ")
-         , maybe empty ppr live]
+         , ppr live]
 
 -- --------------------------------------------------------------------------
 -- Return from a function. [1], Section 6.8.2 of version 1.128

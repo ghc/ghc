@@ -36,10 +36,16 @@ baseRegOffset dflags (FloatReg  1)       = oFFSET_StgRegTable_rF1 dflags
 baseRegOffset dflags (FloatReg  2)       = oFFSET_StgRegTable_rF2 dflags
 baseRegOffset dflags (FloatReg  3)       = oFFSET_StgRegTable_rF3 dflags
 baseRegOffset dflags (FloatReg  4)       = oFFSET_StgRegTable_rF4 dflags
-baseRegOffset _      (FloatReg  n)       = panic ("Registers above F4 are not supported (tried to use F" ++ show n ++ ")")
+baseRegOffset dflags (FloatReg  5)       = oFFSET_StgRegTable_rF5 dflags
+baseRegOffset dflags (FloatReg  6)       = oFFSET_StgRegTable_rF6 dflags
+baseRegOffset _      (FloatReg  n)       = panic ("Registers above F6 are not supported (tried to use F" ++ show n ++ ")")
 baseRegOffset dflags (DoubleReg 1)       = oFFSET_StgRegTable_rD1 dflags
 baseRegOffset dflags (DoubleReg 2)       = oFFSET_StgRegTable_rD2 dflags
-baseRegOffset _      (DoubleReg n)       = panic ("Registers above D2 are not supported (tried to use D" ++ show n ++ ")")
+baseRegOffset dflags (DoubleReg 3)       = oFFSET_StgRegTable_rD3 dflags
+baseRegOffset dflags (DoubleReg 4)       = oFFSET_StgRegTable_rD4 dflags
+baseRegOffset dflags (DoubleReg 5)       = oFFSET_StgRegTable_rD5 dflags
+baseRegOffset dflags (DoubleReg 6)       = oFFSET_StgRegTable_rD6 dflags
+baseRegOffset _      (DoubleReg n)       = panic ("Registers above D6 are not supported (tried to use D" ++ show n ++ ")")
 baseRegOffset dflags Sp                  = oFFSET_StgRegTable_rSp dflags
 baseRegOffset dflags SpLim               = oFFSET_StgRegTable_rSpLim dflags
 baseRegOffset dflags (LongReg 1)         = oFFSET_StgRegTable_rL1 dflags
@@ -90,9 +96,9 @@ get_Regtable_addr_from_offset dflags _ offset =
 fixStgRegisters :: DynFlags -> RawCmmDecl -> RawCmmDecl
 fixStgRegisters _ top@(CmmData _ _) = top
 
-fixStgRegisters dflags (CmmProc info lbl (ListGraph blocks)) =
+fixStgRegisters dflags (CmmProc info lbl live (ListGraph blocks)) =
   let blocks' = map (fixStgRegBlock dflags) blocks
-  in CmmProc info lbl $ ListGraph blocks'
+  in CmmProc info lbl live $ ListGraph blocks'
 
 fixStgRegBlock :: DynFlags -> CmmBasicBlock -> CmmBasicBlock
 fixStgRegBlock dflags (BasicBlock id stmts) =

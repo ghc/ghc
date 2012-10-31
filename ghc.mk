@@ -129,8 +129,14 @@ include mk/ways.mk
 include mk/custom-settings.mk
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifeq "$(GhcLibWays)" ""
-$(error $$(GhcLibWays) is empty, it must contain at least one way)
+ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
+ifeq "$(findstring dyn,$(GhcLibWays))" ""
+$(error dyn is not in $$(GhcLibWays), but $$(DYNAMIC_BY_DEFAULT) is YES)
+endif
+else
+ifeq "$(findstring v,$(GhcLibWays))" ""
+$(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
+endif
 endif
 endif
 
@@ -1223,12 +1229,16 @@ CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-# These four are no longer generated, but we still clean them for a while
+# These are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
 CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
+CLEAN_FILES += utils/ghc-pkg/Version.hs
+CLEAN_FILES += compiler/parser/Parser.y
+CLEAN_FILES += compiler/prelude/primops.txt
+CLEAN_FILES += $(wildcard compiler/primop*incl)
 
 clean : clean_files clean_libraries
 

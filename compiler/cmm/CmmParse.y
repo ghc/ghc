@@ -482,7 +482,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                    do let prof = NoProfilingInfo
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
                       return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
+                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
                                            , cit_rep = rep
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               []) }
@@ -497,7 +497,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                           bitmap = mkLiveness dflags (map Just (drop 1 live))
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
-                              Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
+                              Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
                                            , cit_rep = rep
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               live) }
@@ -609,8 +609,9 @@ safety  :: { Safety }
 vols    :: { [GlobalReg] }
         : '[' ']'                       { [] }
         | '[' '*' ']'                   {% do df <- getDynFlags
-                                         ; return (realArgRegs df) }
-                                           -- all of them
+                                         ; return (realArgRegsCover df) }
+                                           -- All of them. See comment attached
+                                           -- to realArgRegsCover
         | '[' globals ']'               { $2 }
 
 globals :: { [GlobalReg] }

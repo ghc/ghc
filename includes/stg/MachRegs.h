@@ -92,6 +92,7 @@
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
+#define MAX_REAL_SSE_REG     0
 
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
@@ -141,9 +142,22 @@
 #define REG_F2    xmm2
 #define REG_F3    xmm3
 #define REG_F4    xmm4
+#define REG_F5    xmm5
+#define REG_F6    xmm6
 
-#define REG_D1    xmm5
-#define REG_D2    xmm6
+#define REG_D1    xmm1
+#define REG_D2    xmm2
+#define REG_D3    xmm3
+#define REG_D4    xmm4
+#define REG_D5    xmm5
+#define REG_D6    xmm6
+
+#define REG_SSE1    xmm1
+#define REG_SSE2    xmm2
+#define REG_SSE3    xmm3
+#define REG_SSE4    xmm4
+#define REG_SSE5    xmm5
+#define REG_SSE6    xmm6
 
 #if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
@@ -156,16 +170,34 @@
 #define CALLER_SAVES_F2
 #define CALLER_SAVES_F3
 #define CALLER_SAVES_F4
+#define CALLER_SAVES_F5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_F6
+#endif
 
 #define CALLER_SAVES_D1
-#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_D2
+#define CALLER_SAVES_D3
+#define CALLER_SAVES_D4
+#define CALLER_SAVES_D5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_D6
+#endif
+
+#define CALLER_SAVES_SSE1
+#define CALLER_SAVES_SSE2
+#define CALLER_SAVES_SSE3
+#define CALLER_SAVES_SSE4
+#define CALLER_SAVES_SSE5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_SSE6
 #endif
 
 #define MAX_REAL_VANILLA_REG 6
-#define MAX_REAL_FLOAT_REG   4
-#define MAX_REAL_DOUBLE_REG  2
+#define MAX_REAL_FLOAT_REG   6
+#define MAX_REAL_DOUBLE_REG  6
 #define MAX_REAL_LONG_REG    0
+#define MAX_REAL_SSE_REG     6
 
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping
@@ -515,6 +547,24 @@
 #  define MAX_REAL_LONG_REG 1
 #  else
 #  define MAX_REAL_LONG_REG 0
+#  endif
+#endif
+
+#ifndef MAX_REAL_SSE_REG
+#  if   defined(REG_SSE6)
+#  define MAX_REAL_SSE_REG 6
+#  elif defined(REG_SSE5)
+#  define MAX_REAL_SSE_REG 5
+#  elif defined(REG_SSE4)
+#  define MAX_REAL_SSE_REG 4
+#  elif defined(REG_SSE3)
+#  define MAX_REAL_SSE_REG 3
+#  elif defined(REG_SSE2)
+#  define MAX_REAL_SSE_REG 2
+#  elif defined(REG_SSE1)
+#  define MAX_REAL_SSE_REG 1
+#  else
+#  define MAX_REAL_SSE_REG 0
 #  endif
 #endif
 
