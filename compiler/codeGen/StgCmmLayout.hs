@@ -126,7 +126,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
             AssignTo res_regs _ -> do
               k <- newLabelC
               let area = Young k
-                  (off, copyin) = copyInOflow dflags retConv area res_regs []
+                  (off, _, copyin) = copyInOflow dflags retConv area res_regs []
                   copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
                                    extra_stack
               emit (copyout <*> mkLabel k <*> copyin)
@@ -521,7 +521,7 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
         ; let args' = if node_points then (node : arg_regs) else arg_regs
               conv  = if nodeMustPointToIt dflags lf_info then NativeNodeCall
                                                           else NativeDirectCall
-              (offset, _) = mkCallEntry dflags conv args' []
+              (offset, _, _) = mkCallEntry dflags conv args' []
         ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
         }
 

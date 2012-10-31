@@ -286,11 +286,29 @@ callerSaves (FloatReg 3)      = True
 #ifdef CALLER_SAVES_F4
 callerSaves (FloatReg 4)      = True
 #endif
+#ifdef CALLER_SAVES_F5
+callerSaves (FloatReg 5)      = True
+#endif
+#ifdef CALLER_SAVES_F6
+callerSaves (FloatReg 6)      = True
+#endif
 #ifdef CALLER_SAVES_D1
 callerSaves (DoubleReg 1)     = True
 #endif
 #ifdef CALLER_SAVES_D2
 callerSaves (DoubleReg 2)     = True
+#endif
+#ifdef CALLER_SAVES_D3
+callerSaves (DoubleReg 3)     = True
+#endif
+#ifdef CALLER_SAVES_D4
+callerSaves (DoubleReg 4)     = True
+#endif
+#ifdef CALLER_SAVES_D5
+callerSaves (DoubleReg 5)     = True
+#endif
+#ifdef CALLER_SAVES_D6
+callerSaves (DoubleReg 6)     = True
 #endif
 #ifdef CALLER_SAVES_L1
 callerSaves (LongReg 1)       = True
@@ -362,6 +380,44 @@ activeStgRegs = [
 #ifdef REG_SpLim
     ,SpLim
 #endif
+#if MAX_REAL_SSE_REG != 0
+#ifdef REG_F1
+    ,FloatReg 1
+#endif
+#ifdef REG_D1
+    ,DoubleReg 1
+#endif
+#ifdef REG_F2
+    ,FloatReg 2
+#endif
+#ifdef REG_D2
+    ,DoubleReg 2
+#endif
+#ifdef REG_F3
+    ,FloatReg 3
+#endif
+#ifdef REG_D3
+    ,DoubleReg 3
+#endif
+#ifdef REG_F4
+    ,FloatReg 4
+#endif
+#ifdef REG_D4
+    ,DoubleReg 4
+#endif
+#ifdef REG_F5
+    ,FloatReg 5
+#endif
+#ifdef REG_D5
+    ,DoubleReg 5
+#endif
+#ifdef REG_F6
+    ,FloatReg 6
+#endif
+#ifdef REG_D6
+    ,DoubleReg 6
+#endif
+#else /* MAX_REAL_SSE_REG == 0 */
 #ifdef REG_F1
     ,FloatReg 1
 #endif
@@ -374,12 +430,31 @@ activeStgRegs = [
 #ifdef REG_F4
     ,FloatReg 4
 #endif
+#ifdef REG_F5
+    ,FloatReg 5
+#endif
+#ifdef REG_F6
+    ,FloatReg 6
+#endif
 #ifdef REG_D1
     ,DoubleReg 1
 #endif
 #ifdef REG_D2
     ,DoubleReg 2
 #endif
+#ifdef REG_D3
+    ,DoubleReg 3
+#endif
+#ifdef REG_D4
+    ,DoubleReg 4
+#endif
+#ifdef REG_D5
+    ,DoubleReg 5
+#endif
+#ifdef REG_D6
+    ,DoubleReg 6
+#endif
+#endif /* MAX_REAL_SSE_REG == 0 */
     ]
 
 haveRegBase :: Bool
@@ -439,6 +514,12 @@ globalRegMaybe (FloatReg 3)             = Just (RealRegSingle REG_F3)
 # ifdef REG_F4
 globalRegMaybe (FloatReg 4)             = Just (RealRegSingle REG_F4)
 # endif
+# ifdef REG_F5
+globalRegMaybe (FloatReg 5)             = Just (RealRegSingle REG_F5)
+# endif
+# ifdef REG_F6
+globalRegMaybe (FloatReg 6)             = Just (RealRegSingle REG_F6)
+# endif
 # ifdef REG_D1
 globalRegMaybe (DoubleReg 1)            =
 #  if MACHREGS_sparc
@@ -453,6 +534,38 @@ globalRegMaybe (DoubleReg 2)            =
                                           Just (RealRegPair REG_D2 (REG_D2 + 1))
 #  else
                                           Just (RealRegSingle REG_D2)
+#  endif
+# endif
+# ifdef REG_D3
+globalRegMaybe (DoubleReg 3)            =
+#  if MACHREGS_sparc
+                                          Just (RealRegPair REG_D3 (REG_D3 + 1))
+#  else
+                                          Just (RealRegSingle REG_D3)
+#  endif
+# endif
+# ifdef REG_D4
+globalRegMaybe (DoubleReg 4)            =
+#  if MACHREGS_sparc
+                                          Just (RealRegPair REG_D4 (REG_D4 + 1))
+#  else
+                                          Just (RealRegSingle REG_D4)
+#  endif
+# endif
+# ifdef REG_D5
+globalRegMaybe (DoubleReg 5)            =
+#  if MACHREGS_sparc
+                                          Just (RealRegPair REG_D5 (REG_D5 + 1))
+#  else
+                                          Just (RealRegSingle REG_D5)
+#  endif
+# endif
+# ifdef REG_D6
+globalRegMaybe (DoubleReg 6)            =
+#  if MACHREGS_sparc
+                                          Just (RealRegPair REG_D6 (REG_D6 + 1))
+#  else
+                                          Just (RealRegSingle REG_D6)
 #  endif
 # endif
 # ifdef REG_Sp
@@ -588,11 +701,29 @@ freeReg REG_F3 = fastBool False
 # ifdef REG_F4
 freeReg REG_F4 = fastBool False
 # endif
+# ifdef REG_F5
+freeReg REG_F5 = fastBool False
+# endif
+# ifdef REG_F6
+freeReg REG_F6 = fastBool False
+# endif
 # ifdef REG_D1
 freeReg REG_D1 = fastBool False
 # endif
 # ifdef REG_D2
 freeReg REG_D2 = fastBool False
+# endif
+# ifdef REG_D3
+freeReg REG_D3 = fastBool False
+# endif
+# ifdef REG_D4
+freeReg REG_D4 = fastBool False
+# endif
+# ifdef REG_D5
+freeReg REG_D5 = fastBool False
+# endif
+# ifdef REG_D6
+freeReg REG_D6 = fastBool False
 # endif
 # ifdef REG_Sp
 freeReg REG_Sp   = fastBool False
@@ -698,6 +829,12 @@ freeReg REG_F3  = fastBool False
 # ifdef REG_F4
 freeReg REG_F4  = fastBool False
 # endif
+# ifdef REG_F5
+freeReg REG_F5  = fastBool False
+# endif
+# ifdef REG_F6
+freeReg REG_F6  = fastBool False
+# endif
 # ifdef REG_D1
 freeReg REG_D1  = fastBool False
 # endif
@@ -709,6 +846,30 @@ freeReg REG_D2  = fastBool False
 # endif
 # ifdef REG_D2_2
 freeReg REG_D2_2 = fastBool False
+# endif
+# ifdef REG_D3
+freeReg REG_D3  = fastBool False
+# endif
+# ifdef REG_D3_2
+freeReg REG_D3_2 = fastBool False
+# endif
+# ifdef REG_D4
+freeReg REG_D4  = fastBool False
+# endif
+# ifdef REG_D4_2
+freeReg REG_D4_2 = fastBool False
+# endif
+# ifdef REG_D5
+freeReg REG_D5  = fastBool False
+# endif
+# ifdef REG_D5_2
+freeReg REG_D5_2 = fastBool False
+# endif
+# ifdef REG_D6
+freeReg REG_D6  = fastBool False
+# endif
+# ifdef REG_D6_2
+freeReg REG_D6_2 = fastBool False
 # endif
 # ifdef REG_Sp
 freeReg REG_Sp  = fastBool False

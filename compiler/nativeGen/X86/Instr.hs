@@ -828,8 +828,8 @@ allocMoreStack
   -> NatCmmDecl statics X86.Instr.Instr
 
 allocMoreStack _ _ top@(CmmData _ _) = top
-allocMoreStack platform amount (CmmProc info lbl (ListGraph code)) =
-        CmmProc info lbl (ListGraph (map insert_stack_insns code))
+allocMoreStack platform amount (CmmProc info lbl live (ListGraph code)) =
+        CmmProc info lbl live (ListGraph (map insert_stack_insns code))
   where
     alloc   = mkStackAllocInstr platform amount
     dealloc = mkStackDeallocInstr platform amount

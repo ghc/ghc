@@ -609,8 +609,9 @@ safety  :: { Safety }
 vols    :: { [GlobalReg] }
         : '[' ']'                       { [] }
         | '[' '*' ']'                   {% do df <- getDynFlags
-                                         ; return (realArgRegs df) }
-                                           -- all of them
+                                         ; return (realArgRegsCover df) }
+                                           -- All of them. See comment attached
+                                           -- to realArgRegsCover
         | '[' globals ']'               { $2 }
 
 globals :: { [GlobalReg] }

@@ -458,8 +458,14 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rF2);
     field_offset(StgRegTable, rF3);
     field_offset(StgRegTable, rF4);
+    field_offset(StgRegTable, rF5);
+    field_offset(StgRegTable, rF6);
     field_offset(StgRegTable, rD1);
     field_offset(StgRegTable, rD2);
+    field_offset(StgRegTable, rD3);
+    field_offset(StgRegTable, rD4);
+    field_offset(StgRegTable, rD5);
+    field_offset(StgRegTable, rD6);
     field_offset(StgRegTable, rL1);
     field_offset(StgRegTable, rSp);
     field_offset(StgRegTable, rSpLim);
@@ -736,9 +742,11 @@ main(int argc, char *argv[])
     constantInt("mAX_Float_REG",        MAX_FLOAT_REG);
     constantInt("mAX_Double_REG",       MAX_DOUBLE_REG);
     constantInt("mAX_Long_REG",         MAX_LONG_REG);
+    constantInt("mAX_SSE_REG",          MAX_SSE_REG);
     constantInt("mAX_Real_Vanilla_REG", MAX_REAL_VANILLA_REG);
     constantInt("mAX_Real_Float_REG",   MAX_REAL_FLOAT_REG);
     constantInt("mAX_Real_Double_REG",  MAX_REAL_DOUBLE_REG);
+    constantInt("mAX_Real_SSE_REG",     MAX_REAL_SSE_REG);
     constantInt("mAX_Real_Long_REG",    MAX_REAL_LONG_REG);
 
     // This tells the native code generator the size of the spill

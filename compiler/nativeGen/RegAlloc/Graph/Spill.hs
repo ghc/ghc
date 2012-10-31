@@ -91,7 +91,7 @@ regSpill_top platform regSlotMap cmm
         CmmData{}
          -> return cmm
 
-        CmmProc info label sccs
+        CmmProc info label live sccs
          |  LiveInfo static firstId mLiveVRegsOnEntry liveSlotsOnEntry <- info
          -> do
                 -- We should only passed Cmms with the liveness maps filled in,  but we'll
@@ -115,7 +115,7 @@ regSpill_top platform regSlotMap cmm
                 -- Apply the spiller to all the basic blocks in the CmmProc.
                 sccs'           <- mapM (mapSCCM (regSpill_block platform regSlotMap)) sccs
 
-                return  $ CmmProc info' label sccs'
+                return  $ CmmProc info' label live sccs'
 
  where  -- | Given a BlockId and the set of registers live in it,
         --   if registers in this block are being spilled to stack slots,

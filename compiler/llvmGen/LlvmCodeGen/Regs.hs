@@ -47,8 +47,14 @@ lmGlobalReg dflags suf reg
         FloatReg 2     -> floatGlobal $"F2" ++ suf
         FloatReg 3     -> floatGlobal $"F3" ++ suf
         FloatReg 4     -> floatGlobal $"F4" ++ suf
+        FloatReg 5     -> floatGlobal $"F5" ++ suf
+        FloatReg 6     -> floatGlobal $"F6" ++ suf
         DoubleReg 1    -> doubleGlobal $ "D1" ++ suf
         DoubleReg 2    -> doubleGlobal $ "D2" ++ suf
+        DoubleReg 3    -> doubleGlobal $ "D3" ++ suf
+        DoubleReg 4    -> doubleGlobal $ "D4" ++ suf
+        DoubleReg 5    -> doubleGlobal $ "D5" ++ suf
+        DoubleReg 6    -> doubleGlobal $ "D6" ++ suf
         _other         -> panic $ "LlvmCodeGen.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc

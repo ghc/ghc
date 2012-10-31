@@ -81,7 +81,7 @@ pprC tops = vcat $ intersperse blankLine $ map pprTop tops
 -- top level procs
 --
 pprTop :: RawCmmDecl -> SDoc
-pprTop proc@(CmmProc _ clbl (ListGraph blocks)) =
+pprTop proc@(CmmProc _ clbl _ (ListGraph blocks)) =
     (case topInfoTable proc of
        Nothing -> empty
        Just (Statics info_clbl info_dat) -> pprDataExterns info_dat $$

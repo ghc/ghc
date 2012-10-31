@@ -93,11 +93,11 @@ cmmTopCodeGen
         :: RawCmmDecl
         -> NatM [NatCmmDecl (Alignment, CmmStatics) Instr]
 
-cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen (CmmProc info lab live (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
   dflags <- getDynFlags
-  let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
+  let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
 
@@ -173,9 +173,8 @@ stmtToInstrs stmt = do
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
-jumpRegs :: DynFlags -> Maybe [GlobalReg] -> [Reg]
-jumpRegs dflags Nothing      = allHaskellArgRegs dflags
-jumpRegs dflags (Just gregs) = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
+jumpRegs :: DynFlags -> [GlobalReg] -> [Reg]
+jumpRegs dflags gregs = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
     where platform = targetPlatform dflags
 
 --------------------------------------------------------------------------------

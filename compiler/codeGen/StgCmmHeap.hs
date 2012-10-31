@@ -416,7 +416,7 @@ altOrNoEscapeHeapCheck checkYield regs code = do
       Nothing -> genericGC checkYield code
       Just gc -> do
         lret <- newLabelC
-        let (off, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
+        let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
         lcont <- newLabelC
         emitOutOfLine lret (copyin <*> mkBranch lcont)
         emitLabel lcont

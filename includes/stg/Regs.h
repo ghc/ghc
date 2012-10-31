@@ -73,8 +73,14 @@ typedef struct {
   StgFloat 	  rF2;
   StgFloat 	  rF3;
   StgFloat 	  rF4;
+  StgFloat 	  rF5;
+  StgFloat 	  rF6;
   StgDouble 	  rD1;
   StgDouble 	  rD2;
+  StgDouble 	  rD3;
+  StgDouble 	  rD4;
+  StgDouble 	  rD5;
+  StgDouble 	  rD6;
   StgWord64       rL1;
   StgPtr 	  rSp;
   StgPtr 	  rSpLim;
@@ -216,6 +222,18 @@ GLOBAL_REG_DECL(StgFloat,F4,REG_F4)
 #define F4 (BaseReg->rF4)
 #endif
 
+#if defined(REG_F5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgFloat,F5,REG_F5)
+#else
+#define F5 (BaseReg->rF5)
+#endif
+
+#if defined(REG_F6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgFloat,F6,REG_F6)
+#else
+#define F6 (BaseReg->rF6)
+#endif
+
 #if defined(REG_D1) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(StgDouble,D1,REG_D1)
 #else
@@ -226,6 +244,30 @@ GLOBAL_REG_DECL(StgDouble,D1,REG_D1)
 GLOBAL_REG_DECL(StgDouble,D2,REG_D2)
 #else
 #define D2 (BaseReg->rD2)
+#endif
+
+#if defined(REG_D3) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D3,REG_D3)
+#else
+#define D3 (BaseReg->rD3)
+#endif
+
+#if defined(REG_D4) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D4,REG_D4)
+#else
+#define D4 (BaseReg->rD4)
+#endif
+
+#if defined(REG_D5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D5,REG_D5)
+#else
+#define D5 (BaseReg->rD5)
+#endif
+
+#if defined(REG_D6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgDouble,D6,REG_D6)
+#else
+#define D6 (BaseReg->rD6)
 #endif
 
 #if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)
