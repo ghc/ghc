@@ -70,7 +70,9 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
       assign_regs assts (r:rs) regs | isVecType ty   = vec
                                     | isFloatType ty = float
                                     | otherwise      = int
-        where vec = (assts, (r:rs))
+        where vec = case (w, regs) of
+                      (W128, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
+                      _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss)) -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
                         (W32, (vs, f:fs, ds, ls, ss))

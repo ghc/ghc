@@ -167,12 +167,12 @@
 #define REG_D5    xmm5
 #define REG_D6    xmm6
 
-#define REG_SSE1    xmm1
-#define REG_SSE2    xmm2
-#define REG_SSE3    xmm3
-#define REG_SSE4    xmm4
-#define REG_SSE5    xmm5
-#define REG_SSE6    xmm6
+#define REG_XMM1    xmm1
+#define REG_XMM2    xmm2
+#define REG_XMM3    xmm3
+#define REG_XMM4    xmm4
+#define REG_XMM5    xmm5
+#define REG_XMM6    xmm6
 
 #if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
@@ -199,13 +199,13 @@
 #define CALLER_SAVES_D6
 #endif
 
-#define CALLER_SAVES_SSE1
-#define CALLER_SAVES_SSE2
-#define CALLER_SAVES_SSE3
-#define CALLER_SAVES_SSE4
-#define CALLER_SAVES_SSE5
+#define CALLER_SAVES_XMM1
+#define CALLER_SAVES_XMM2
+#define CALLER_SAVES_XMM3
+#define CALLER_SAVES_XMM4
+#define CALLER_SAVES_XMM5
 #if !defined(mingw32_HOST_OS)
-#define CALLER_SAVES_SSE6
+#define CALLER_SAVES_XMM6
 #endif
 
 #define MAX_REAL_VANILLA_REG 6

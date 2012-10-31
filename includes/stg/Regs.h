@@ -81,6 +81,12 @@ typedef struct {
   StgDouble 	  rD4;
   StgDouble 	  rD5;
   StgDouble 	  rD6;
+  StgWord128 	  rXMM1;
+  StgWord128 	  rXMM2;
+  StgWord128 	  rXMM3;
+  StgWord128 	  rXMM4;
+  StgWord128 	  rXMM5;
+  StgWord128 	  rXMM6;
   StgWord64       rL1;
   StgPtr 	  rSp;
   StgPtr 	  rSpLim;
@@ -268,6 +274,42 @@ GLOBAL_REG_DECL(StgDouble,D5,REG_D5)
 GLOBAL_REG_DECL(StgDouble,D6,REG_D6)
 #else
 #define D6 (BaseReg->rD6)
+#endif
+
+#if defined(REG_XMM1) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM1,REG_XMM1)
+#else
+#define XMM1 (BaseReg->rXMM1)
+#endif
+
+#if defined(REG_XMM2) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM2,REG_XMM2)
+#else
+#define XMM2 (BaseReg->rXMM2)
+#endif
+
+#if defined(REG_XMM3) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM3,REG_XMM3)
+#else
+#define XMM3 (BaseReg->rXMM3)
+#endif
+
+#if defined(REG_XMM4) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM4,REG_XMM4)
+#else
+#define XMM4 (BaseReg->rXMM4)
+#endif
+
+#if defined(REG_XMM5) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM5,REG_XMM5)
+#else
+#define XMM5 (BaseReg->rXMM5)
+#endif
+
+#if defined(REG_XMM6) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(StgWord128,XMM6,REG_XMM6)
+#else
+#define XMM6 (BaseReg->rXMM6)
 #endif
 
 #if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)

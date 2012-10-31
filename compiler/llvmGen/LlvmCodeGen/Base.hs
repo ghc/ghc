@@ -131,11 +131,12 @@ llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
 llvmFunArgs dflags live =
     map (lmGlobalRegArg dflags) (filter isPassed (activeStgRegs platform))
     where platform = targetPlatform dflags
-          isLive r = not (isFloat r) || r `elem` alwaysLive || r `elem` live
-          isPassed r = not (isFloat r) || isLive r
-          isFloat (FloatReg _)  = True
-          isFloat (DoubleReg _) = True
-          isFloat _             = False
+          isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
+          isPassed r = not (isSSE r) || isLive r
+          isSSE (FloatReg _)  = True
+          isSSE (DoubleReg _) = True
+          isSSE (XmmReg _)    = True
+          isSSE _             = False
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]

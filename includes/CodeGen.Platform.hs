@@ -388,11 +388,17 @@ activeStgRegs = [
 #ifdef REG_D1
     ,DoubleReg 1
 #endif
+#ifdef REG_XMM1
+    ,XmmReg 1
+#endif
 #ifdef REG_F2
     ,FloatReg 2
 #endif
 #ifdef REG_D2
     ,DoubleReg 2
+#endif
+#ifdef REG_XMM2
+    ,XmmReg 2
 #endif
 #ifdef REG_F3
     ,FloatReg 3
@@ -400,11 +406,17 @@ activeStgRegs = [
 #ifdef REG_D3
     ,DoubleReg 3
 #endif
+#ifdef REG_XMM3
+    ,XmmReg 3
+#endif
 #ifdef REG_F4
     ,FloatReg 4
 #endif
 #ifdef REG_D4
     ,DoubleReg 4
+#endif
+#ifdef REG_XMM4
+    ,XmmReg 4
 #endif
 #ifdef REG_F5
     ,FloatReg 5
@@ -412,11 +424,17 @@ activeStgRegs = [
 #ifdef REG_D5
     ,DoubleReg 5
 #endif
+#ifdef REG_XMM5
+    ,XmmReg 5
+#endif
 #ifdef REG_F6
     ,FloatReg 6
 #endif
 #ifdef REG_D6
     ,DoubleReg 6
+#endif
+#ifdef REG_XMM6
+    ,XmmReg 6
 #endif
 #else /* MAX_REAL_SSE_REG == 0 */
 #ifdef REG_F1
@@ -568,6 +586,14 @@ globalRegMaybe (DoubleReg 6)            =
 #  else
                                           Just (RealRegSingle REG_D6)
 #  endif
+# endif
+#if MAX_REAL_SSE_REG != 0
+globalRegMaybe (XmmReg 1)               = Just (RealRegSingle REG_XMM1)
+globalRegMaybe (XmmReg 2)               = Just (RealRegSingle REG_XMM2)
+globalRegMaybe (XmmReg 3)               = Just (RealRegSingle REG_XMM3)
+globalRegMaybe (XmmReg 4)               = Just (RealRegSingle REG_XMM4)
+globalRegMaybe (XmmReg 5)               = Just (RealRegSingle REG_XMM5)
+globalRegMaybe (XmmReg 6)               = Just (RealRegSingle REG_XMM6)
 # endif
 # ifdef REG_Sp
 globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)

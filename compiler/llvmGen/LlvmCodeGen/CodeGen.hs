@@ -470,6 +470,7 @@ castVar dflags v t
                       (vt, _) | isInt vt && isPointer t     -> LM_Inttoptr
                       (vt, _) | isPointer vt && isInt t     -> LM_Ptrtoint
                       (vt, _) | isPointer vt && isPointer t -> LM_Bitcast
+                      (vt, _) | isVector vt && isVector t   -> LM_Bitcast
 
                       (vt, _) -> panic $ "castVars: Can't cast this type ("
                                   ++ show vt ++ ") to (" ++ show t ++ ")"
@@ -582,16 +583,21 @@ genAssign env reg val = do
     let stmts = stmts1 `appOL` stmts2
 
     let ty = (pLower . getVarType) vreg
-    case isPointer ty && getVarType vval == llvmWord dflags of
-         -- Some registers are pointer types, so need to cast value to pointer
-         True -> do
-             (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
-             let s2 = Store v vreg
-             return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
+    case ty of
+      -- Some registers are pointer types, so need to cast value to pointer
+      LMPointer _ | getVarType vval == llvmWord dflags -> do
+          (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
+          let s2 = Store v vreg
+          return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
 
-         False -> do
-             let s1 = Store vval vreg
-             return (env2, stmts `snocOL` s1, top1 ++ top2)
+      LMVector _ _ -> do
+          (v, s1) <- doExpr ty $ Cast LM_Bitcast vval ty
+          let s2 = Store v vreg
+          return (env2, stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
+
+      _ -> do
+          let s1 = Store vval vreg
+          return (env2, stmts `snocOL` s1, top1 ++ top2)
 
 
 -- | CmmStore operation
@@ -884,14 +890,14 @@ genMachOp env _ op [x] = case op of
             vecty = LMVector len ty
             all0  = LMIntLit (-0) ty
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
-        in negate vecty all0s LM_MO_Sub
+        in negateVec vecty all0s LM_MO_Sub
 
     MO_VF_Neg len w ->
         let ty    = widthToLlvmFloat w
             vecty = LMVector len ty
             all0  = LMFloatLit (-0) ty
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
-        in negate vecty all0s LM_MO_FSub
+        in negateVec vecty all0s LM_MO_FSub
 
     -- Handle unsupported cases explicitly so we get a warning
     -- of missing case when new MachOps added
@@ -943,6 +949,9 @@ genMachOp env _ op [x] = case op of
 
     MO_VS_Quot    _ _ -> panicOp
     MO_VS_Rem     _ _ -> panicOp
+ 
+    MO_VF_Insert  _ _ -> panicOp
+    MO_VF_Extract _ _ -> panicOp
 
     MO_VF_Add     _ _ -> panicOp
     MO_VF_Sub     _ _ -> panicOp
@@ -956,6 +965,12 @@ genMachOp env _ op [x] = case op of
             (env', vx, stmts, top) <- exprToVar env x
             (v1, s1) <- doExpr ty $ LlvmOp negOp v2 vx
             return (env', v1, stmts `snocOL` s1, top)
+
+        negateVec ty v2 negOp = do
+            (env', vx, stmts1, top) <- exprToVar env x
+            ([vx'], stmts2) <- castVars dflags [(vx, ty)]
+            (v1, s1) <- doExpr ty $ LlvmOp negOp v2 vx'
+            return (env', v1, stmts1 `appOL` stmts2 `snocOL` s1, top)
 
         fiConv ty convOp = do
             (env', vx, stmts, top) <- exprToVar env x
@@ -1014,22 +1029,50 @@ genMachOp_fast env opt op r n e
 genMachOp_slow :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
 
 -- Element extraction
-genMachOp_slow env _ (MO_V_Extract {}) [val, idx] = do
+genMachOp_slow env _ (MO_V_Extract l w) [val, idx] = do
     (env1, vval, stmts1, top1) <- exprToVar env  val
     (env2, vidx, stmts2, top2) <- exprToVar env1 idx
-    let (LMVector _ ty)        =  getVarType vval
-    (v1, s1)                   <- doExpr ty $ Extract vval vidx
-    return (env2, v1, stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
+    ([vval'], stmts3)          <- castVars dflags [(vval, LMVector l ty)]
+    (v1, s1)                   <- doExpr ty $ Extract vval' vidx
+    return (env2, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL` s1, top1 ++ top2)
+  where
+    dflags = getDflags env
+    ty = widthToLlvmInt w
+
+genMachOp_slow env _ (MO_VF_Extract l w) [val, idx] = do
+    (env1, vval, stmts1, top1) <- exprToVar env  val
+    (env2, vidx, stmts2, top2) <- exprToVar env1 idx
+    ([vval'], stmts3)          <- castVars dflags [(vval, LMVector l ty)]
+    (v1, s1)                   <- doExpr ty $ Extract vval' vidx
+    return (env2, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL` s1, top1 ++ top2)
+  where
+    dflags = getDflags env
+    ty = widthToLlvmFloat w
 
 -- Element insertion
-genMachOp_slow env _ (MO_V_Insert {}) [val, elt, idx] = do
+genMachOp_slow env _ (MO_V_Insert l w) [val, elt, idx] = do
     (env1, vval, stmts1, top1) <- exprToVar env  val
     (env2, velt, stmts2, top2) <- exprToVar env1 elt
     (env3, vidx, stmts3, top3) <- exprToVar env2 idx
-    let ty                     =  getVarType vval
-    (v1, s1)                   <- doExpr ty $ Insert vval velt vidx
-    return (env3, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL` s1,
+    ([vval'], stmts4)          <- castVars dflags [(vval, ty)]
+    (v1, s1)                   <- doExpr ty $ Insert vval' velt vidx
+    return (env3, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL` s1,
             top1 ++ top2 ++ top3)
+  where
+    dflags = getDflags env
+    ty = LMVector l (widthToLlvmInt w)
+
+genMachOp_slow env _ (MO_VF_Insert l w) [val, elt, idx] = do
+    (env1, vval, stmts1, top1) <- exprToVar env  val
+    (env2, velt, stmts2, top2) <- exprToVar env1 elt
+    (env3, vidx, stmts3, top3) <- exprToVar env2 idx
+    ([vval'], stmts4)          <- castVars dflags [(vval, ty)]
+    (v1, s1)                   <- doExpr ty $ Insert vval' velt vidx
+    return (env3, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL` s1,
+            top1 ++ top2 ++ top3)
+  where
+    dflags = getDflags env
+    ty = LMVector l (widthToLlvmFloat w)
     
 -- Binary MachOp
 genMachOp_slow env opt op [x, y] = case op of
@@ -1080,17 +1123,17 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_U_Shr _ -> genBinMach LM_MO_LShr
     MO_S_Shr _ -> genBinMach LM_MO_AShr
 
-    MO_V_Add _ _   -> genBinMach LM_MO_Add
-    MO_V_Sub _ _   -> genBinMach LM_MO_Sub
-    MO_V_Mul _ _   -> genBinMach LM_MO_Mul
+    MO_V_Add l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Add
+    MO_V_Sub l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Sub
+    MO_V_Mul l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Mul
 
-    MO_VS_Quot _ _ -> genBinMach LM_MO_SDiv
-    MO_VS_Rem _ _  -> genBinMach LM_MO_SRem
+    MO_VS_Quot l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SDiv
+    MO_VS_Rem  l w -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_SRem
  
-    MO_VF_Add _ _  -> genBinMach LM_MO_FAdd
-    MO_VF_Sub _ _  -> genBinMach LM_MO_FSub
-    MO_VF_Mul _ _  -> genBinMach LM_MO_FMul
-    MO_VF_Quot _ _ -> genBinMach LM_MO_FDiv
+    MO_VF_Add  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FAdd
+    MO_VF_Sub  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FSub
+    MO_VF_Mul  l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FMul
+    MO_VF_Quot l w -> genCastBinMach (LMVector l (widthToLlvmFloat w)) LM_MO_FDiv
 
     MO_Not _       -> panicOp
     MO_S_Neg _     -> panicOp
@@ -1106,6 +1149,9 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_V_Extract {} -> panicOp
 
     MO_VS_Neg {} -> panicOp
+
+    MO_VF_Insert  {} -> panicOp
+    MO_VF_Extract {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
 
@@ -1134,6 +1180,14 @@ genMachOp_slow env opt op [x, y] = case op of
                                     `snocOL` dy `snocOL` s1
                     return (env2, v1, allStmts, top1 ++ top2)
 
+        binCastLlvmOp ty binOp = do
+            (env1, vx, stmts1, top1) <- exprToVar env x
+            (env2, vy, stmts2, top2) <- exprToVar env1 y
+            ([vx', vy'], stmts3) <- castVars dflags [(vx, ty), (vy, ty)]
+            (v1, s1) <- doExpr ty $ binOp vx' vy'
+            return (env2, v1, stmts1 `appOL` stmts2 `appOL` stmts3 `snocOL` s1,
+                    top1 ++ top2)
+
         -- | Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
@@ -1151,6 +1205,8 @@ genMachOp_slow env opt op [x, y] = case op of
                         ++ (show $ getVarType v1)
 
         genBinMach op = binLlvmOp getVarType (LlvmOp op)
+
+        genCastBinMach ty op = binCastLlvmOp ty (LlvmOp op)
 
         -- | Detect if overflow will occur in signed multiply of the two
         -- CmmExpr's. This is the LLVM assembly equivalent of the NCG
@@ -1427,10 +1483,11 @@ funEpilogue env live = do
     dflags = getDflags env
     platform = targetPlatform dflags
     isLive r = r `elem` alwaysLive || r `elem` live
-    isPassed r = not (isFloat r) || isLive r
-    isFloat (FloatReg _)  = True
-    isFloat (DoubleReg _) = True
-    isFloat _             = False
+    isPassed r = not (isSSE r) || isLive r
+    isSSE (FloatReg _)  = True
+    isSSE (DoubleReg _) = True
+    isSSE (XmmReg _)    = True
+    isSSE _             = False
     loadExpr r | isLive r = do
         let reg  = lmGlobalRegVar dflags r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg

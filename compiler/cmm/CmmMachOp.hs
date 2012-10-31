@@ -118,6 +118,10 @@ data MachOp
   | MO_VS_Rem  Length Width
   | MO_VS_Neg  Length Width
 
+  -- Floting point vector element insertion and extraction operations
+  | MO_VF_Insert  Length Width   -- Insert scalar into vector
+  | MO_VF_Extract Length Width   -- Extract scalar from vector
+
   -- Floating point vector operations
   | MO_VF_Add  Length Width  
   | MO_VF_Sub  Length Width  
@@ -360,22 +364,25 @@ machOpResultType dflags mop tys =
     MO_SF_Conv _ to     -> cmmFloat to
     MO_FF_Conv _ to     -> cmmFloat to
 
-    MO_V_Insert {}      -> ty1
-    MO_V_Extract {}     -> vecElemType ty1
-    
-    MO_V_Add {}         -> ty1
-    MO_V_Sub {}         -> ty1
-    MO_V_Mul {}         -> ty1
+    MO_V_Insert  l w    -> cmmVec l (cmmBits w)
+    MO_V_Extract _ w    -> cmmBits w
 
-    MO_VS_Quot {}       -> ty1
-    MO_VS_Rem {}        -> ty1
-    MO_VS_Neg {}        -> ty1
+    MO_V_Add l w        -> cmmVec l (cmmBits w)
+    MO_V_Sub l w        -> cmmVec l (cmmBits w)
+    MO_V_Mul l w        -> cmmVec l (cmmBits w)
 
-    MO_VF_Add {}        -> ty1
-    MO_VF_Sub {}        -> ty1
-    MO_VF_Mul {}        -> ty1
-    MO_VF_Quot {}       -> ty1
-    MO_VF_Neg {}        -> ty1
+    MO_VS_Quot l w      -> cmmVec l (cmmBits w)
+    MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
+
+    MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
+    MO_VF_Extract _ w   -> cmmFloat w
+
+    MO_VF_Add  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Sub  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
   where
     (ty1:_) = tys
 
@@ -443,8 +450,8 @@ machOpArgReps dflags op =
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]
 
-    MO_V_Insert  l r    -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
-    MO_V_Extract l r    -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth dflags]
+    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth dflags]
 
     MO_V_Add _ r        -> [r,r]
     MO_V_Sub _ r        -> [r,r]
@@ -453,6 +460,9 @@ machOpArgReps dflags op =
     MO_VS_Quot _ r      -> [r,r]
     MO_VS_Rem  _ r      -> [r,r]
     MO_VS_Neg  _ r      -> [r]
+
+    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
+    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
 
     MO_VF_Add  _ r      -> [r,r]
     MO_VF_Sub  _ r      -> [r,r]

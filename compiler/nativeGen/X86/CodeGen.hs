@@ -602,19 +602,21 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_FS_Conv from to -> coerceFP2Int from to x
       MO_SF_Conv from to -> coerceInt2FP from to x
 
-      MO_V_Insert {}  -> needLlvm
-      MO_V_Extract {} -> needLlvm
-      MO_V_Add {}     -> needLlvm
-      MO_V_Sub {}     -> needLlvm
-      MO_V_Mul {}     -> needLlvm
-      MO_VS_Quot {}   -> needLlvm
-      MO_VS_Rem {}    -> needLlvm
-      MO_VS_Neg {}    -> needLlvm
-      MO_VF_Add {}    -> needLlvm
-      MO_VF_Sub {}    -> needLlvm
-      MO_VF_Mul {}    -> needLlvm
-      MO_VF_Quot {}   -> needLlvm
-      MO_VF_Neg {}    -> needLlvm
+      MO_V_Insert {}   -> needLlvm
+      MO_V_Extract {}  -> needLlvm
+      MO_V_Add {}      -> needLlvm
+      MO_V_Sub {}      -> needLlvm
+      MO_V_Mul {}      -> needLlvm
+      MO_VS_Quot {}    -> needLlvm
+      MO_VS_Rem {}     -> needLlvm
+      MO_VS_Neg {}     -> needLlvm
+      MO_VF_Insert {}  -> needLlvm
+      MO_VF_Extract {} -> needLlvm
+      MO_VF_Add {}     -> needLlvm
+      MO_VF_Sub {}     -> needLlvm
+      MO_VF_Mul {}     -> needLlvm
+      MO_VF_Quot {}    -> needLlvm
+      MO_VF_Neg {}     -> needLlvm
 
       _other -> pprPanic "getRegister" (pprMachOp mop)
    where
@@ -708,19 +710,21 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_U_Shr rep -> shift_code rep SHR x y {-False-}
       MO_S_Shr rep -> shift_code rep SAR x y {-False-}
 
-      MO_V_Insert {}  -> needLlvm
-      MO_V_Extract {} -> needLlvm
-      MO_V_Add {}     -> needLlvm
-      MO_V_Sub {}     -> needLlvm
-      MO_V_Mul {}     -> needLlvm
-      MO_VS_Quot {}   -> needLlvm
-      MO_VS_Rem {}    -> needLlvm
-      MO_VS_Neg {}    -> needLlvm
-      MO_VF_Add {}    -> needLlvm
-      MO_VF_Sub {}    -> needLlvm
-      MO_VF_Mul {}    -> needLlvm
-      MO_VF_Quot {}   -> needLlvm
-      MO_VF_Neg {}    -> needLlvm
+      MO_V_Insert {}   -> needLlvm
+      MO_V_Extract {}  -> needLlvm
+      MO_V_Add {}      -> needLlvm
+      MO_V_Sub {}      -> needLlvm
+      MO_V_Mul {}      -> needLlvm
+      MO_VS_Quot {}    -> needLlvm
+      MO_VS_Rem {}     -> needLlvm
+      MO_VS_Neg {}     -> needLlvm
+      MO_VF_Insert {}  -> needLlvm
+      MO_VF_Extract {} -> needLlvm
+      MO_VF_Add {}     -> needLlvm
+      MO_VF_Sub {}     -> needLlvm
+      MO_VF_Mul {}     -> needLlvm
+      MO_VF_Quot {}    -> needLlvm
+      MO_VF_Neg {}     -> needLlvm
 
       _other -> pprPanic "getRegister(x86) - binary CmmMachOp (1)" (pprMachOp mop)
   where
@@ -2722,21 +2726,23 @@ sse2NegCode w x = do
   return (Any sz code)
 
 isVecExpr :: CmmExpr -> Bool
-isVecExpr (CmmMachOp (MO_V_Insert {}) _)  = True
-isVecExpr (CmmMachOp (MO_V_Extract {}) _) = True
-isVecExpr (CmmMachOp (MO_V_Add {}) _)     = True
-isVecExpr (CmmMachOp (MO_V_Sub {}) _)     = True
-isVecExpr (CmmMachOp (MO_V_Mul {}) _)     = True
-isVecExpr (CmmMachOp (MO_VS_Quot {}) _)   = True
-isVecExpr (CmmMachOp (MO_VS_Rem {}) _)    = True
-isVecExpr (CmmMachOp (MO_VS_Neg {}) _)    = True
-isVecExpr (CmmMachOp (MO_VF_Add {}) _)    = True
-isVecExpr (CmmMachOp (MO_VF_Sub {}) _)    = True
-isVecExpr (CmmMachOp (MO_VF_Mul {}) _)    = True
-isVecExpr (CmmMachOp (MO_VF_Quot {}) _)   = True
-isVecExpr (CmmMachOp (MO_VF_Neg {}) _)    = True
-isVecExpr (CmmMachOp _ [e])               = isVecExpr e
-isVecExpr _                               = False
+isVecExpr (CmmMachOp (MO_V_Insert {}) _)   = True
+isVecExpr (CmmMachOp (MO_V_Extract {}) _)  = True
+isVecExpr (CmmMachOp (MO_V_Add {}) _)      = True
+isVecExpr (CmmMachOp (MO_V_Sub {}) _)      = True
+isVecExpr (CmmMachOp (MO_V_Mul {}) _)      = True
+isVecExpr (CmmMachOp (MO_VS_Quot {}) _)    = True
+isVecExpr (CmmMachOp (MO_VS_Rem {}) _)     = True
+isVecExpr (CmmMachOp (MO_VS_Neg {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Insert {}) _)  = True
+isVecExpr (CmmMachOp (MO_VF_Extract {}) _) = True
+isVecExpr (CmmMachOp (MO_VF_Add {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Sub {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Mul {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Quot {}) _)    = True
+isVecExpr (CmmMachOp (MO_VF_Neg {}) _)     = True
+isVecExpr (CmmMachOp _ [e])                = isVecExpr e
+isVecExpr _                                = False
 
 needLlvm :: NatM a
 needLlvm =

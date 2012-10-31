@@ -1183,8 +1183,11 @@ doVecPackOp maybe_pre_write_cast ty z es res = do
 
     vecPack src (e : es) i = do
         dst <- newTemp ty
-        emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert len wid)
-                                             [CmmReg (CmmLocal src), cast e, iLit])
+        if isFloatType (vecElemType ty)
+          then emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Insert len wid)
+                                                    [CmmReg (CmmLocal src), cast e, iLit])
+          else emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert len wid)
+                                                    [CmmReg (CmmLocal src), cast e, iLit])
         vecPack dst es (i + 1)
       where
         -- vector indices are always 32-bits
@@ -1214,8 +1217,11 @@ doVecUnpackOp maybe_post_read_cast ty e res =
         return ()
 
     vecUnpack (r : rs) i = do
-        emitAssign (CmmLocal r) (cast (CmmMachOp (MO_V_Extract len wid)
-                                      [e, iLit]))
+        if isFloatType (vecElemType ty)
+          then emitAssign (CmmLocal r) (cast (CmmMachOp (MO_VF_Extract len wid)
+                                             [e, iLit]))
+          else emitAssign (CmmLocal r) (cast (CmmMachOp (MO_V_Extract len wid)
+                                             [e, iLit]))
         vecUnpack rs (i + 1)
       where
         -- vector indices are always 32-bits
@@ -1244,7 +1250,9 @@ doVecInsertOp maybe_pre_write_cast ty src e idx res = do
     -- vector indices are always 32-bits
     let idx' :: CmmExpr
         idx' = CmmMachOp (MO_SS_Conv (wordWidth dflags) W32) [idx]
-    emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, cast e, idx'])
+    if isFloatType (vecElemType ty)
+      then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, cast e, idx'])
+      else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, cast e, idx'])
   where
     cast :: CmmExpr -> CmmExpr
     cast val = case maybe_pre_write_cast of
