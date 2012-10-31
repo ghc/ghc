@@ -55,7 +55,7 @@ module Control.Concurrent (
         -- * Scheduling
 
         -- $conc_scheduling     
-        yield,                  -- :: IO ()
+        yield,
 
         -- ** Blocking
 
@@ -63,9 +63,9 @@ module Control.Concurrent (
 
 #ifdef __GLASGOW_HASKELL__
         -- ** Waiting
-        threadDelay,            -- :: Int -> IO ()
-        threadWaitRead,         -- :: Int -> IO ()
-        threadWaitWrite,        -- :: Int -> IO ()
+        threadDelay,
+        threadWaitRead,
+        threadWaitWrite,
 #endif
 
         -- * Communication abstractions

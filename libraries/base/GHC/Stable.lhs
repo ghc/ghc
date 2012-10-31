@@ -24,11 +24,11 @@
 -- #hide
 module GHC.Stable (
         StablePtr(..),
-        newStablePtr,         -- :: a -> IO (StablePtr a)    
-        deRefStablePtr,       -- :: StablePtr a -> a
-        freeStablePtr,        -- :: StablePtr a -> IO ()
-        castStablePtrToPtr,   -- :: StablePtr a -> Ptr ()
-        castPtrToStablePtr    -- :: Ptr () -> StablePtr a
+        newStablePtr,
+        deRefStablePtr,
+        freeStablePtr,
+        castStablePtrToPtr,
+        castPtrToStablePtr
     ) where
 
 import GHC.Ptr

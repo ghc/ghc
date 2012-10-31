@@ -23,35 +23,31 @@ module GHC.Read
   ( Read(..)   -- class
 
   -- ReadS type
-  , ReadS      -- :: *; = String -> [(a,String)]
+  , ReadS
 
   -- H98 compatibility
-  , lex         -- :: ReadS String
-  , lexLitChar  -- :: ReadS String
-  , readLitChar -- :: ReadS Char
-  , lexDigits   -- :: ReadS String
+  , lex
+  , lexLitChar
+  , readLitChar
+  , lexDigits
 
   -- defining readers
-  , lexP       -- :: ReadPrec Lexeme
-  , paren      -- :: ReadPrec a -> ReadPrec a
-  , parens     -- :: ReadPrec a -> ReadPrec a
-  , list       -- :: ReadPrec a -> ReadPrec [a]
-  , choose     -- :: [(String, ReadPrec a)] -> ReadPrec a
+  , lexP
+  , paren
+  , parens
+  , list
+  , choose
   , readListDefault, readListPrecDefault
 
   -- Temporary
   , readParen
-
-  -- XXX Can this be removed?
-  , readp
   )
  where
 
 import qualified Text.ParserCombinators.ReadP as P
 
 import Text.ParserCombinators.ReadP
-  ( ReadP
-  , ReadS
+  ( ReadS
   , readP_to_S
   )
 
@@ -682,9 +678,3 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readList     = readListDefault
 \end{code}
 
-\begin{code}
--- XXX Can this be removed?
-
-readp :: Read a => ReadP a
-readp = readPrec_to_P readPrec minPrec
-\end{code}

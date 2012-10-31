@@ -20,11 +20,11 @@
 module Foreign.StablePtr
         ( -- * Stable references to Haskell values
           StablePtr          -- abstract
-        , newStablePtr       -- :: a -> IO (StablePtr a)
-        , deRefStablePtr     -- :: StablePtr a -> IO a
-        , freeStablePtr      -- :: StablePtr a -> IO ()
-        , castStablePtrToPtr -- :: StablePtr a -> Ptr ()
-        , castPtrToStablePtr -- :: Ptr () -> StablePtr a
+        , newStablePtr
+        , deRefStablePtr
+        , freeStablePtr
+        , castStablePtrToPtr
+        , castPtrToStablePtr
         , -- ** The C-side interface
 
           -- $cinterface

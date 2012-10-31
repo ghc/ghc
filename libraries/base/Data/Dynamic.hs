@@ -33,9 +33,9 @@ module Data.Dynamic
         Dynamic,        -- abstract, instance of: Show, Typeable
 
         -- * Converting to and from @Dynamic@
-        toDyn,          -- :: Typeable a => a -> Dynamic
-        fromDyn,        -- :: Typeable a => Dynamic -> a -> a
-        fromDynamic,    -- :: Typeable a => Dynamic -> Maybe a
+        toDyn,
+        fromDyn,
+        fromDynamic,
         
         -- * Applying functions of dynamic type
         dynApply,

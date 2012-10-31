@@ -29,50 +29,50 @@ module Text.ParserCombinators.ReadP
   ( 
   -- * The 'ReadP' type
 #ifndef __NHC__
-  ReadP,      -- :: * -> *; instance Functor, Monad, MonadPlus
+  ReadP,
 #else
-  ReadPN,     -- :: * -> * -> *; instance Functor, Monad, MonadPlus
+  ReadPN,
 #endif
   
   -- * Primitive operations
-  get,        -- :: ReadP Char
-  look,       -- :: ReadP String
-  (+++),      -- :: ReadP a -> ReadP a -> ReadP a
-  (<++),      -- :: ReadP a -> ReadP a -> ReadP a
-  gather,     -- :: ReadP a -> ReadP (String, a)
+  get,
+  look,
+  (+++),
+  (<++),
+  gather,
   
   -- * Other operations
-  pfail,      -- :: ReadP a
-  eof,        -- :: ReadP ()
-  satisfy,    -- :: (Char -> Bool) -> ReadP Char
-  char,       -- :: Char -> ReadP Char
-  string,     -- :: String -> ReadP String
-  munch,      -- :: (Char -> Bool) -> ReadP String
-  munch1,     -- :: (Char -> Bool) -> ReadP String
-  skipSpaces, -- :: ReadP ()
-  choice,     -- :: [ReadP a] -> ReadP a
-  count,      -- :: Int -> ReadP a -> ReadP [a]
-  between,    -- :: ReadP open -> ReadP close -> ReadP a -> ReadP a
-  option,     -- :: a -> ReadP a -> ReadP a
-  optional,   -- :: ReadP a -> ReadP ()
-  many,       -- :: ReadP a -> ReadP [a]
-  many1,      -- :: ReadP a -> ReadP [a]
-  skipMany,   -- :: ReadP a -> ReadP ()
-  skipMany1,  -- :: ReadP a -> ReadP ()
-  sepBy,      -- :: ReadP a -> ReadP sep -> ReadP [a]
-  sepBy1,     -- :: ReadP a -> ReadP sep -> ReadP [a]
-  endBy,      -- :: ReadP a -> ReadP sep -> ReadP [a]
-  endBy1,     -- :: ReadP a -> ReadP sep -> ReadP [a]
-  chainr,     -- :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
-  chainl,     -- :: ReadP a -> ReadP (a -> a -> a) -> a -> ReadP a
-  chainl1,    -- :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
-  chainr1,    -- :: ReadP a -> ReadP (a -> a -> a) -> ReadP a
-  manyTill,   -- :: ReadP a -> ReadP end -> ReadP [a]
+  pfail,
+  eof,
+  satisfy,
+  char,
+  string,
+  munch,
+  munch1,
+  skipSpaces,
+  choice,
+  count,
+  between,
+  option,
+  optional,
+  many,
+  many1,
+  skipMany,
+  skipMany1,
+  sepBy,
+  sepBy1,
+  endBy,
+  endBy1,
+  chainr,
+  chainl,
+  chainl1,
+  chainr1,
+  manyTill,
   
   -- * Running a parser
-  ReadS,      -- :: *; = String -> [(a,String)]
-  readP_to_S, -- :: ReadP a -> ReadS a
-  readS_to_P, -- :: ReadS a -> ReadP a
+  ReadS,
+  readP_to_S,
+  readS_to_P,
   
   -- * Properties
   -- $properties

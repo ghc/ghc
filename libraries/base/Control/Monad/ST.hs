@@ -23,12 +23,12 @@
 module Control.Monad.ST (
         -- * The 'ST' Monad
         ST,             -- abstract, instance of Functor, Monad, Typeable.
-        runST,          -- :: (forall s. ST s a) -> a
-        fixST,          -- :: (a -> ST s a) -> ST s a
+        runST,
+        fixST,
 
         -- * Converting 'ST' to 'IO'
         RealWorld,              -- abstract
-        stToIO,                 -- :: ST RealWorld a -> IO a
+        stToIO,
 
         -- * Unsafe Functions
         unsafeInterleaveST,

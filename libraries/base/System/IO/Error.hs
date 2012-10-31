@@ -18,18 +18,16 @@
 module System.IO.Error (
 
     -- * I\/O errors
-    IOError,                    -- = IOException
+    IOError,
 
-    userError,                  -- :: String  -> IOError
+    userError,
 
-    mkIOError,                  -- :: IOErrorType -> String -> Maybe Handle
-                                --    -> Maybe FilePath -> IOError
+    mkIOError,
 
-    annotateIOError,            -- :: IOError -> String -> Maybe Handle
-                                --    -> Maybe FilePath -> IOError
+    annotateIOError,
 
     -- ** Classifying I\/O errors
-    isAlreadyExistsError,       -- :: IOError -> Bool
+    isAlreadyExistsError,
     isDoesNotExistError,
     isAlreadyInUseError,
     isFullError, 
@@ -39,22 +37,22 @@ module System.IO.Error (
     isUserError,
 
     -- ** Attributes of I\/O errors
-    ioeGetErrorType,            -- :: IOError -> IOErrorType
-    ioeGetLocation,             -- :: IOError -> String
-    ioeGetErrorString,          -- :: IOError -> String
-    ioeGetHandle,               -- :: IOError -> Maybe Handle
-    ioeGetFileName,             -- :: IOError -> Maybe FilePath
+    ioeGetErrorType,
+    ioeGetLocation,
+    ioeGetErrorString,
+    ioeGetHandle,
+    ioeGetFileName,
 
-    ioeSetErrorType,            -- :: IOError -> IOErrorType -> IOError
-    ioeSetErrorString,          -- :: IOError -> String -> IOError
-    ioeSetLocation,             -- :: IOError -> String -> IOError
-    ioeSetHandle,               -- :: IOError -> Handle -> IOError
-    ioeSetFileName,             -- :: IOError -> FilePath -> IOError
+    ioeSetErrorType,
+    ioeSetErrorString,
+    ioeSetLocation,
+    ioeSetHandle,
+    ioeSetFileName,
 
     -- * Types of I\/O error
     IOErrorType,                -- abstract
 
-    alreadyExistsErrorType,     -- :: IOErrorType
+    alreadyExistsErrorType,
     doesNotExistErrorType,
     alreadyInUseErrorType,
     fullErrorType,
@@ -64,7 +62,7 @@ module System.IO.Error (
     userErrorType,
 
     -- ** 'IOErrorType' predicates
-    isAlreadyExistsErrorType,   -- :: IOErrorType -> Bool
+    isAlreadyExistsErrorType,
     isDoesNotExistErrorType,
     isAlreadyInUseErrorType,
     isFullErrorType, 
@@ -75,12 +73,12 @@ module System.IO.Error (
 
     -- * Throwing and catching I\/O errors
 
-    ioError,                    -- :: IOError -> IO a
+    ioError,
 
-    catchIOError,               -- :: IO a -> (IOError -> IO a) -> IO a
-    tryIOError,                 -- :: IO a -> IO (Either IOError a)
+    catchIOError,
+    tryIOError,
 
-    modifyIOError,              -- :: (IOError -> IOError) -> IO a -> IO a
+    modifyIOError,
   ) where
 
 #ifndef __HUGS__

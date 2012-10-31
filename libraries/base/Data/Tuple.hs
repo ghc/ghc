@@ -18,11 +18,11 @@
 -----------------------------------------------------------------------------
 
 module Data.Tuple
-  ( fst         -- :: (a,b) -> a
-  , snd         -- :: (a,b) -> a
-  , curry       -- :: ((a, b) -> c) -> a -> b -> c
-  , uncurry     -- :: (a -> b -> c) -> ((a, b) -> c)
-  , swap        -- :: (a,b) -> (b,a)
+  ( fst
+  , snd
+  , curry
+  , uncurry
+  , swap
 #ifdef __NHC__
   , (,)(..)
   , (,,)(..)

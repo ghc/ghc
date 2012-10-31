@@ -24,16 +24,16 @@ module Control.Concurrent.Chan
         Chan,                   -- abstract
 
           -- * Operations
-        newChan,                -- :: IO (Chan a)
-        writeChan,              -- :: Chan a -> a -> IO ()
-        readChan,               -- :: Chan a -> IO a
-        dupChan,                -- :: Chan a -> IO (Chan a)
-        unGetChan,              -- :: Chan a -> a -> IO ()
-        isEmptyChan,            -- :: Chan a -> IO Bool
+        newChan,
+        writeChan,
+        readChan,
+        dupChan,
+        unGetChan,
+        isEmptyChan,
 
           -- * Stream interface
-        getChanContents,        -- :: Chan a -> IO [a]
-        writeList2Chan,         -- :: Chan a -> [a] -> IO ()
+        getChanContents,
+        writeList2Chan,
    ) where
 
 import Prelude

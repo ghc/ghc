@@ -19,7 +19,7 @@
 -----------------------------------------------------------------------------
 
 module System.Mem (
- 	performGC	-- :: IO ()
+        performGC
   ) where
  
 import Prelude

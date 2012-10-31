@@ -18,9 +18,9 @@
 module System.Exit
     (
       ExitCode(ExitSuccess,ExitFailure)
-    , exitWith      -- :: ExitCode -> IO a
-    , exitFailure   -- :: IO a
-    , exitSuccess   -- :: IO a
+    , exitWith
+    , exitFailure
+    , exitSuccess
   ) where
 
 import Prelude

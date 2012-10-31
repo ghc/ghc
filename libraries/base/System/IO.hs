@@ -19,12 +19,12 @@
 module System.IO (
     -- * The IO monad
 
-    IO,                        -- instance MonadFix
-    fixIO,                     -- :: (a -> IO a) -> IO a
+    IO,
+    fixIO,
 
     -- * Files and handles
 
-    FilePath,                  -- :: String
+    FilePath,
 
     Handle,             -- abstract, instance of: Eq, Show.
 
@@ -42,27 +42,27 @@ module System.IO (
     -- | Three handles are allocated during program initialisation,
     -- and are initially open.
 
-    stdin, stdout, stderr,   -- :: Handle
+    stdin, stdout, stderr,
 
     -- * Opening and closing files
 
     -- ** Opening files
 
     withFile,
-    openFile,                  -- :: FilePath -> IOMode -> IO Handle
+    openFile,
     IOMode(ReadMode,WriteMode,AppendMode,ReadWriteMode),
 
     -- ** Closing files
 
-    hClose,                    -- :: Handle -> IO ()
+    hClose,
 
     -- ** Special cases
 
     -- | These functions are also exported by the "Prelude".
 
-    readFile,                  -- :: FilePath -> IO String
-    writeFile,                 -- :: FilePath -> String -> IO ()
-    appendFile,                -- :: FilePath -> String -> IO ()
+    readFile,
+    writeFile,
+    appendFile,
 
     -- ** File locking
 
@@ -72,100 +72,100 @@ module System.IO (
 
     -- ** Determining and changing the size of a file
 
-    hFileSize,                 -- :: Handle -> IO Integer
+    hFileSize,
 #ifdef __GLASGOW_HASKELL__
-    hSetFileSize,              -- :: Handle -> Integer -> IO ()
+    hSetFileSize,
 #endif
 
     -- ** Detecting the end of input
 
-    hIsEOF,                    -- :: Handle -> IO Bool
-    isEOF,                     -- :: IO Bool
+    hIsEOF,
+    isEOF,
 
     -- ** Buffering operations
 
     BufferMode(NoBuffering,LineBuffering,BlockBuffering),
-    hSetBuffering,             -- :: Handle -> BufferMode -> IO ()
-    hGetBuffering,             -- :: Handle -> IO BufferMode
-    hFlush,                    -- :: Handle -> IO ()
+    hSetBuffering,
+    hGetBuffering,
+    hFlush,
 
     -- ** Repositioning handles
 
-    hGetPosn,                  -- :: Handle -> IO HandlePosn
-    hSetPosn,                  -- :: HandlePosn -> IO ()
+    hGetPosn,
+    hSetPosn,
     HandlePosn,                -- abstract, instance of: Eq, Show.
 
-    hSeek,                     -- :: Handle -> SeekMode -> Integer -> IO ()
+    hSeek,
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
 #if !defined(__NHC__)
-    hTell,                     -- :: Handle -> IO Integer
+    hTell,
 #endif
 
     -- ** Handle properties
 
-    hIsOpen, hIsClosed,        -- :: Handle -> IO Bool
-    hIsReadable, hIsWritable,  -- :: Handle -> IO Bool
-    hIsSeekable,               -- :: Handle -> IO Bool
+    hIsOpen, hIsClosed,
+    hIsReadable, hIsWritable,
+    hIsSeekable,
 
     -- ** Terminal operations (not portable: GHC\/Hugs only)
 
 #if !defined(__NHC__)
-    hIsTerminalDevice,          -- :: Handle -> IO Bool
+    hIsTerminalDevice,
 
-    hSetEcho,                   -- :: Handle -> Bool -> IO ()
-    hGetEcho,                   -- :: Handle -> IO Bool
+    hSetEcho,
+    hGetEcho,
 #endif
 
     -- ** Showing handle state (not portable: GHC only)
 
 #ifdef __GLASGOW_HASKELL__
-    hShow,                      -- :: Handle -> IO String
+    hShow,
 #endif
 
     -- * Text input and output
 
     -- ** Text input
 
-    hWaitForInput,             -- :: Handle -> Int -> IO Bool
-    hReady,                    -- :: Handle -> IO Bool
-    hGetChar,                  -- :: Handle -> IO Char
-    hGetLine,                  -- :: Handle -> IO [Char]
-    hLookAhead,                -- :: Handle -> IO Char
-    hGetContents,              -- :: Handle -> IO [Char]
+    hWaitForInput,
+    hReady,
+    hGetChar,
+    hGetLine,
+    hLookAhead,
+    hGetContents,
 
     -- ** Text output
 
-    hPutChar,                  -- :: Handle -> Char -> IO ()
-    hPutStr,                   -- :: Handle -> [Char] -> IO ()
-    hPutStrLn,                 -- :: Handle -> [Char] -> IO ()
-    hPrint,                    -- :: Show a => Handle -> a -> IO ()
+    hPutChar,
+    hPutStr,
+    hPutStrLn,
+    hPrint,
 
     -- ** Special cases for standard input and output
 
     -- | These functions are also exported by the "Prelude".
 
-    interact,                  -- :: (String -> String) -> IO ()
-    putChar,                   -- :: Char   -> IO ()
-    putStr,                    -- :: String -> IO () 
-    putStrLn,                  -- :: String -> IO ()
-    print,                     -- :: Show a => a -> IO ()
-    getChar,                   -- :: IO Char
-    getLine,                   -- :: IO String
-    getContents,               -- :: IO String
-    readIO,                    -- :: Read a => String -> IO a
-    readLn,                    -- :: Read a => IO a
+    interact,
+    putChar,
+    putStr,
+    putStrLn,
+    print,
+    getChar,
+    getLine,
+    getContents,
+    readIO,
+    readLn,
 
     -- * Binary input and output
 
     withBinaryFile,
-    openBinaryFile,            -- :: FilePath -> IOMode -> IO Handle
-    hSetBinaryMode,            -- :: Handle -> Bool -> IO ()
-    hPutBuf,                   -- :: Handle -> Ptr a -> Int -> IO ()
-    hGetBuf,                   -- :: Handle -> Ptr a -> Int -> IO Int
+    openBinaryFile,
+    hSetBinaryMode,
+    hPutBuf,
+    hGetBuf,
 #if !defined(__NHC__) && !defined(__HUGS__)
-    hGetBufSome,               -- :: Handle -> Ptr a -> Int -> IO Int
-    hPutBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
-    hGetBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
+    hGetBufSome,
+    hPutBufNonBlocking,
+    hGetBufNonBlocking,
 #endif
 
     -- * Temporary files

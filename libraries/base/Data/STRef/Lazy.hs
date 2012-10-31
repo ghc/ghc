@@ -16,11 +16,11 @@
 
 module Data.STRef.Lazy (
         -- * STRefs
-        ST.STRef,       -- abstract, instance Eq
-        newSTRef,       -- :: a -> ST s (STRef s a)
-        readSTRef,      -- :: STRef s a -> ST s a
-        writeSTRef,     -- :: STRef s a -> a -> ST s ()
-        modifySTRef     -- :: STRef s a -> (a -> a) -> ST s ()
+        ST.STRef,       -- abstract
+        newSTRef,
+        readSTRef,
+        writeSTRef,
+        modifySTRef
  ) where
 
 import Control.Monad.ST.Lazy.Safe

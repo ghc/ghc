@@ -141,7 +141,7 @@ module Control.Concurrent.MVar
         , modifyMVarMasked
 #ifndef __HUGS__
         , mkWeakMVar
-        , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
+        , addMVarFinalizer
 #endif
     ) where
 

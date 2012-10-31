@@ -32,10 +32,10 @@ module Data.Data (
 
         -- * The Data class for processing constructor applications
         Data(
-                gfoldl,         -- :: ... -> a -> c a
-                gunfold,        -- :: ... -> Constr -> c a
-                toConstr,       -- :: a -> Constr
-                dataTypeOf,     -- :: a -> DataType
+                gfoldl,
+                gunfold,
+                toConstr,
+                dataTypeOf,
                 dataCast1,      -- mediate types and unary type constructors
                 dataCast2,      -- mediate types and binary type constructors
                 -- Generic maps defined in terms of gfoldl 
@@ -50,54 +50,54 @@ module Data.Data (
             ),
 
         -- * Datatype representations
-        DataType,       -- abstract, instance of: Show
+        DataType,       -- abstract
         -- ** Constructors
-        mkDataType,     -- :: String   -> [Constr] -> DataType
-        mkIntType,      -- :: String -> DataType
-        mkFloatType,    -- :: String -> DataType
-        mkCharType,     -- :: String -> DataType
-        mkNoRepType,    -- :: String -> DataType
+        mkDataType,
+        mkIntType,
+        mkFloatType,
+        mkCharType,
+        mkNoRepType,
         -- ** Observers
-        dataTypeName,   -- :: DataType -> String
-        DataRep(..),    -- instance of: Eq, Show
-        dataTypeRep,    -- :: DataType -> DataRep
+        dataTypeName,
+        DataRep(..),
+        dataTypeRep,
         -- ** Convenience functions
-        repConstr,      -- :: DataType -> ConstrRep -> Constr
-        isAlgType,      -- :: DataType -> Bool
-        dataTypeConstrs,-- :: DataType -> [Constr]
-        indexConstr,    -- :: DataType -> ConIndex -> Constr
-        maxConstrIndex, -- :: DataType -> ConIndex
-        isNorepType,    -- :: DataType -> Bool
+        repConstr,
+        isAlgType,
+        dataTypeConstrs,
+        indexConstr,
+        maxConstrIndex,
+        isNorepType,
 
         -- * Data constructor representations
-        Constr,         -- abstract, instance of: Eq, Show
+        Constr,         -- abstract
         ConIndex,       -- alias for Int, start at 1
-        Fixity(..),     -- instance of: Eq, Show
+        Fixity(..),
         -- ** Constructors
-        mkConstr,       -- :: DataType -> String -> Fixity -> Constr
-        mkIntegralConstr,-- :: (Integral a) => DataType -> a -> Constr
-        mkRealConstr,   -- :: (Real a) => DataType -> a -> Constr
-        mkCharConstr,   -- :: DataType -> Char -> Constr
+        mkConstr,
+        mkIntegralConstr,
+        mkRealConstr,
+        mkCharConstr,
         -- ** Observers
-        constrType,     -- :: Constr   -> DataType
-        ConstrRep(..),  -- instance of: Eq, Show
-        constrRep,      -- :: Constr   -> ConstrRep
-        constrFields,   -- :: Constr   -> [String]
-        constrFixity,   -- :: Constr   -> Fixity
+        constrType,
+        ConstrRep(..),
+        constrRep,
+        constrFields,
+        constrFixity,
         -- ** Convenience function: algebraic data types
-        constrIndex,    -- :: Constr   -> ConIndex
+        constrIndex,
         -- ** From strings to constructors and vice versa: all data types
-        showConstr,     -- :: Constr   -> String
-        readConstr,     -- :: DataType -> String -> Maybe Constr
+        showConstr,
+        readConstr,
 
         -- * Convenience functions: take type constructors apart
-        tyconUQname,    -- :: String -> String
-        tyconModule,    -- :: String -> String
+        tyconUQname,
+        tyconModule,
 
         -- * Generic operations defined in terms of 'gunfold'
-        fromConstr,     -- :: Constr -> a
-        fromConstrB,    -- :: ... -> Constr -> a
-        fromConstrM     -- :: Monad m => ... -> Constr -> m a
+        fromConstr,
+        fromConstrB,
+        fromConstrM
 
   ) where
 

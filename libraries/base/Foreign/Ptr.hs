@@ -29,22 +29,22 @@ module Foreign.Ptr (
 
     -- * Data pointers
 
-    Ptr,      -- data Ptr a
-    nullPtr,      -- :: Ptr a
-    castPtr,      -- :: Ptr a -> Ptr b
-    plusPtr,      -- :: Ptr a -> Int -> Ptr b
-    alignPtr,     -- :: Ptr a -> Int -> Ptr a
-    minusPtr,     -- :: Ptr a -> Ptr b -> Int
+    Ptr,
+    nullPtr,
+    castPtr,
+    plusPtr,
+    alignPtr,
+    minusPtr,
 
     -- * Function pointers
 
-    FunPtr,      -- data FunPtr a
-    nullFunPtr,      -- :: FunPtr a
-    castFunPtr,      -- :: FunPtr a -> FunPtr b
-    castFunPtrToPtr, -- :: FunPtr a -> Ptr b
-    castPtrToFunPtr, -- :: Ptr a -> FunPtr b
+    FunPtr,
+    nullFunPtr,
+    castFunPtr,
+    castFunPtrToPtr,
+    castPtrToFunPtr,
 
-    freeHaskellFunPtr, -- :: FunPtr a -> IO ()
+    freeHaskellFunPtr,
     -- Free the function pointer created by foreign export dynamic.
 
 #ifndef __NHC__

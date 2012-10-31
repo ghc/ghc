@@ -23,27 +23,27 @@
 
 module Text.Read (
    -- * The 'Read' class
-   Read(..),            -- The Read class
-   ReadS,               -- String -> Maybe (a,String)
+   Read(..),
+   ReadS,
 
    -- * Haskell 98 functions
-   reads,               -- :: (Read a) => ReadS a
-   read,                -- :: (Read a) => String -> a
-   readParen,           -- :: Bool -> ReadS a -> ReadS a
-   lex,                 -- :: ReadS String
+   reads,
+   read,
+   readParen,
+   lex,
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),
-   lexP,                -- :: ReadPrec Lexeme
-   parens,              -- :: ReadPrec a -> ReadPrec a
+   lexP,
+   parens,
 #endif
 #ifdef __GLASGOW_HASKELL__
-   readListDefault,     -- :: Read a => ReadS [a]
-   readListPrecDefault, -- :: Read a => ReadPrec [a]
-   readEither,          -- :: Read a => String -> Either String a
-   readMaybe            -- :: Read a => String -> Maybe a
+   readListDefault,
+   readListPrecDefault,
+   readEither,
+   readMaybe
 #endif
 
  ) where

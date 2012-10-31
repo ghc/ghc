@@ -21,10 +21,10 @@ module Data.Ix
     (
     -- * The 'Ix' class
         Ix
-          ( range       -- :: (Ix a) => (a,a) -> [a]
-          , index       -- :: (Ix a) => (a,a) -> a   -> Int
-          , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
-          , rangeSize   -- :: (Ix a) => (a,a) -> Int
+          ( range
+          , index
+          , inRange
+          , rangeSize
           )
     -- Ix instances:
     --

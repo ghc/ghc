@@ -17,19 +17,19 @@
 
 module Text.Read.Lex
   -- lexing types
-  ( Lexeme(..)  -- :: *; Show, Eq
+  ( Lexeme(..)
 
   , numberToInteger, numberToRational, numberToRangedRational
 
   -- lexer
-  , lex         -- :: ReadP Lexeme      Skips leading spaces
-  , hsLex       -- :: ReadP String
-  , lexChar     -- :: ReadP Char        Reads just one char, with H98 escapes
+  , lex
+  , hsLex
+  , lexChar
 
-  , readIntP    -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
-  , readOctP    -- :: Num a => ReadP a
-  , readDecP    -- :: Num a => ReadP a
-  , readHexP    -- :: Num a => ReadP a
+  , readIntP
+  , readOctP
+  , readDecP
+  , readHexP
   )
  where
 
