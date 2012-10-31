@@ -83,63 +83,36 @@ so now we use the Win32 functions GetSystemTimeAsFileTime and SetFileTime.
 int
 main(int argc, char** argv)
 {
-  int i=0;
-  int fd;
-  int wBitSet = 0;
-  struct _stat sb;
-  FILETIME ft;
-  BOOL b;
-  HANDLE hFile;
+    int i;
+    FILETIME ft;
+    BOOL b;
+    HANDLE hFile;
 
-  if (argc == 1) {
-    fprintf(stderr, "Usage: %s <files>\n", argv[0]);
-    return 1;
-  }
-  
-  
-  while (i++ < (argc-1)) {
-    if ( (_access(argv[i], 00) < 0) && (errno == ENOENT || errno == EACCES) ) {
-       /* File doesn't exist, try creating it. */
-      if ( (fd = _open(argv[i], _O_CREAT | _O_EXCL | _O_TRUNC, _S_IREAD | _S_IWRITE)) < 0 ) {
-      	fprintf(stderr, "Unable to create %s, skipping.\n", argv[i]);
-      } else {
-      	_close(fd);
-      }
+    if (argc == 1) {
+        fprintf(stderr, "Usage: %s <files>\n", argv[0]);
+        return 1;
     }
-    if ( (_access(argv[i], 02)) < 0 ) {
-    	/* No write permission, try setting it first. */
-	if (_stat(argv[i], &sb) < 0) {
-	   fprintf(stderr, "Unable to change mod. time for %s  (%d)\n", argv[i], errno);
-	   continue;
-	}
-	if (_chmod(argv[i], (sb.st_mode & _S_IREAD) | _S_IWRITE) < 0) {
-	   fprintf(stderr, "Unable to change mod. time for %s  (%d)\n", argv[i], errno);
-	   continue;
-	}
-	wBitSet = 1;
+
+    for (i = 1; i < argc; i++) {
+        hFile = CreateFile(argv[i], GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            fprintf(stderr, "Unable to open %s\n", argv[i]);
+            exit(1);
+        }
+        GetSystemTimeAsFileTime(&ft);
+        b = SetFileTime(hFile, (LPFILETIME) NULL, (LPFILETIME) NULL, &ft);
+        if (b == 0) {
+            fprintf(stderr, "Unable to change mod. time for %s\n", argv[i]);
+            exit(1);
+        }
+        b = CloseHandle(hFile);
+        if (b == 0) {
+            fprintf(stderr, "Closing failed for %s\n", argv[i]);
+            exit(1);
+        }
     }
-    hFile = CreateFile(argv[i], GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-                       FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) {
-       fprintf(stderr, "Unable to open %s\n", argv[i]);
-       continue;
-    }
-    GetSystemTimeAsFileTime(&ft);
-    b = SetFileTime(hFile, (LPFILETIME) NULL, (LPFILETIME) NULL, &ft);
-    if (b == 0) {
-      fprintf(stderr, "Unable to change mod. time for %s\n", argv[i]);
-    }
-    b = CloseHandle(hFile);
-    if (b == 0) {
-      fprintf(stderr, "Closing failed for %s\n", argv[i]);
-    }
-    if (wBitSet) {
-	/* Turn the file back into a read-only file */
-   	_chmod(argv[i], (sb.st_mode & _S_IREAD));
-	wBitSet = 0;
-    }
-  }
-  
-  return 0;
+
+    return 0;
 }
 #endif
