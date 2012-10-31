@@ -372,8 +372,8 @@
    CCCS_ALLOC(bytes);
 
 #define HEAP_CHECK(bytes,failure)                       \
-    Hp = Hp + bytes;                                    \
-    if (Hp > HpLim) { HpAlloc = bytes; failure; }       \
+    Hp = Hp + (bytes);                                  \
+    if (Hp > HpLim) { HpAlloc = (bytes); failure; }     \
     TICK_ALLOC_HEAP_NOCTR(bytes);
 
 #define ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,failure)           \
@@ -400,8 +400,8 @@
 #define HP_CHK_P(bytes, fun, arg)               \
    HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
 
-#define ALLOC_P_TICKY(alloc, fun, arg)         \
-   HP_CHK_P(alloc);                           \
+#define ALLOC_P_TICKY(alloc, fun, arg)          \
+   HP_CHK_P(alloc);                             \
    TICK_ALLOC_HEAP_NOCTR(alloc);
 
 #define CHECK_GC()                                                      \
@@ -473,22 +473,22 @@
    }
 
 #define STK_CHK(n, fun)                         \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM(fun)                            \
     }
 
 #define STK_CHK_P(n, fun, arg)                  \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM_P(fun,arg)                      \
     }
 
 #define STK_CHK_PP(n, fun, arg1, arg2)          \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM_PP(fun,arg1,arg2)               \
     }
 
 #define STK_CHK_ENTER(n, closure)               \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         jump __stg_gc_enter_1(closure);         \
     }
 
