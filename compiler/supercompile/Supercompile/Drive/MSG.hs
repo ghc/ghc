@@ -12,7 +12,7 @@ import Supercompile.Core.Syntax
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.FreeVars
 import Supercompile.Evaluator.Syntax
-import Supercompile.Evaluator.Residualise
+--import Supercompile.Evaluator.Residualise
 
 --import qualified Supercompile.GHC as GHC
 import Supercompile.Utilities hiding (guard)
@@ -24,14 +24,14 @@ import Util
 import Coercion
 import CoreUtils  (hashCoercion, hashType {- , hashExpr -})
 import Name       (mkSystemVarName)
-import Var        (TyVar, mkTyVar, isTyVar, isId, varType, setVarType, tyVarKind, setTyVarKind, varName, idDetails, setIdDetails, idInfo, lazySetIdInfo, varUnique)
+import Var        (TyVar, mkTyVar, isTyVar, isId, varType, setVarType, tyVarKind, setTyVarKind, varName, idDetails, setIdDetails, idInfo, lazySetIdInfo {- , varUnique -})
 import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId, isGlobalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
-import Pair
+import Pair       (Pair(..))
 import Type       (mkTyConApp, mkAppTy, splitAppTys, getTyVar_maybe, isKindTy)
 import Kind
-import TysWiredIn (pairTyCon {- , tupleCon -})
+--import TysWiredIn (pairTyCon {- , tupleCon -})
 import TysPrim    (funTyCon)
 import TypeRep    (Type(..))
 import TrieMap    (TrieMap(..), CoercionMap, TypeMap)
@@ -41,8 +41,8 @@ import FastString (fsLit)
 --import BasicTypes (TupleSort(..))
 import qualified State
 
-import Id (mkTemplateLocals)
-import Type (mkFunTy)
+--import Id (mkTemplateLocals)
+--import Type (mkFunTy)
 import TysWiredIn
 import BasicTypes
 
@@ -66,7 +66,7 @@ traceSC :: String -> a -> a
 traceSC _ = id
 --traceSC = trace
 
-
+{-
 -- Demonstrates rollback due to heap work duplication
 example1 :: SDoc
 example1 = either text pPrint $ msg' (MSGMode (mkInScopeSet emptyVarSet)) state1 state2
@@ -90,7 +90,7 @@ example2 = either text pPrint $ msg' (MSGMode (mkInScopeSet emptyVarSet)) state1
     state2 = (emptyDeeds, Heap (M.fromList [(f, lambdaBound), (y, lambdaBound), (a, expensive), (b, expensive)]) (mkInScopeSet (mkVarSet [f, y, a, b])), Loco False, annedQA tg $ Answer $ renamedValue $ Data pairDC [intTy, intTy] [] [a, b])
 
     [a, b, f, y] = mkTemplateLocals [intTy, intTy, boolTy `mkFunTy` intTy, boolTy]
-
+-}
 
 rnBndr2' :: Applicative t => RnEnv2 -> Var -> Var -> MSGT t (RnEnv2, Var)
 rnBndr2' rn2 x_l x_r = MSG $ \_ s -> (s, pure (rnBndr2'' (msgInScopeSet s) rn2 x_l x_r))
@@ -189,24 +189,27 @@ instance Outputable Pending where
     ppr (PendingCoercion co_l co_r) = ppr co_l <+> text "<-c->" <+> ppr co_r
     --ppr (PendingTerm     e_l  e_r)  = ppr e_l  <+> text "<-e->" <+> ppr e_r
 
+-- NB: I strictified quite a bit of this stuff because I was getting stack overflows from the MSG module,
+-- seemingly related to building up a big thunk for the msgLRSuckVar field
+
 data MSGState = MSGState {
-    msgInScopeSet     :: InScopeSet,                                      -- We have to ensure all new vars introduced by MSG are distinct from each other
+    msgInScopeSet     :: !InScopeSet,                                      -- We have to ensure all new vars introduced by MSG are distinct from each other
     msgKnownVars      :: VarEnv (VarEnv Var), {- partial loop in range -} -- INVARIANT: the "known" maps are inverse to the pending list, except that PendingTerms are not recorded in
     msgKnownTypes     :: TypeMap (TypeMap TyVar),                         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
     msgKnownCoercions :: CoercionMap (CoercionMap CoVar),                 -- INVARIANT: all Vars in the range have extra information that has *already* been MSGed
-    msgLR             :: Pair MSGLRState,
+    msgLR             :: !(Pair MSGLRState),
     -- May only shrink:
-    msgSuckStack      :: IM.IntMap (MSGU ()),
+    msgSuckStack      :: !(IM.IntMap (MSGU ())),
     -- May grow and then shrink, a bit chaotically:
-    msgCommonHeap     :: PureHeap,
-    msgCommonStack    :: Stack
+    msgCommonHeap     :: !PureHeap,
+    msgCommonStack    :: !Stack
   }
 
 data MSGLRState = MSGLRState {
     -- May only shrink:
-    msgLRSuckVar        :: VarEnv (MSGU ()), -- Can be called to ensure that the given var is in the individual state
-    msgLRAvailableHeap  :: PureHeap,         -- Available heap
-    msgLRAvailableStack :: Stack,            -- Available stack
+    msgLRSuckVar        :: !(VarEnv (MSGU ())), -- Can be called to ensure that the given var is in the individual state
+    msgLRAvailableHeap  :: !PureHeap,           -- Available heap
+    msgLRAvailableStack :: !Stack,              -- Available stack
     -- May only grow:
     msgLRHeap           :: PureHeap,         -- Certainly-individual heap
     msgLRStack          :: Stack,            -- Certainly-individual stack
@@ -333,12 +336,14 @@ genCoercions q co_lrs = do
   sucks2 $ fmap tyCoVarsOfCo co_lrs
 
 -- Assumption: both input vars do not MSG, are flexi
-genVars, genVars' :: Var {- partial loop -} -> Generalised -> Pair Var -> MSGU ()
+genVars' {- , genVars -} :: Var {- partial loop -} -> Generalised -> Pair Var -> MSGU ()
+{-
 genVars x gen x_lrs = do
   -- Extend the renaming
   genVars' x gen x_lrs
   -- Ensure solitary FV is bound
   suck2 x_lrs
+-}
 genVars' x gen x_lrs = modify_ $ \s -> s { msgCommonHeap = M.insert x (if gen then generalisedLambdaBound else lambdaBound) (msgCommonHeap s)
                                          , msgLR = liftA2 (\x_lr s_lr -> s_lr { msgLRRenaming = insertVarRenaming (msgLRRenaming s_lr) x x_lr }) x_lrs (msgLR s) }
 
@@ -348,8 +353,13 @@ specGenVars x (Pair x_l x_r) = do
     Pair mb_hb_l mb_hb_r <- flip fmap get $ \s -> liftA2 (\x_lr lr_s -> M.lookup x_lr (msgLRAvailableHeap lr_s)) (Pair x_l x_r) (msgLR s)
     sucks <- liftA2 Pair (suck' pFst x_l) (suck' pSnd x_r)
     let hb_r_gen = maybe False heapBindingGeneralised mb_hb_r
-        gen = do genVars' x hb_r_gen (Pair x_l x_r)
-                 Foldable.sequenceA_ sucks
+        gen = do -- HACK: to prevent loops, explicitly dump x_l and x_r from msgLRSuckVar
+                 -- Not quite sure why this is causing loops, but it is (see "tak", in which
+                 -- it manifests as a stack overflow)
+                 --modify_ $ \s -> s { msgLR = liftA2 (\s_lr x_lr -> s_lr { msgLRSuckVar = msgLRSuckVar s_lr `delVarEnv` x_lr }) (msgLR s) (Pair x_l x_r) }
+                 genVars' x hb_r_gen (Pair x_l x_r)
+                 res <- Foldable.sequenceA_ sucks
+                 return res
     case (mb_hb_l, mb_hb_r) of
       (Just hb_l, Just hb_r)
         | Right hb_l_inj <- inject hb_l
@@ -393,7 +403,7 @@ specGenVars x (Pair x_l x_r) = do
                  | x_l == x_r && x_r == x -- Note [MSGing let-bounds]
                  -> return hb_r -- Right biased
                _ -> fail "msgLoop: non-unifiable heap bindings"
-      _ -> genVars x hb_r_gen (Pair x_l x_r)
+      _ -> gen
 
 lookupUpdateVE :: VarEnv (VarEnv Var) -> Var -> Var -> Either (Var -> VarEnv (VarEnv Var)) Var
 lookupUpdateVE mp x_l x_r = case mb_x_l_map >>= flip lookupVarEnv x_r of
@@ -1138,7 +1148,9 @@ initStack xs i (Car kf_l k_l) (Car kf_r k_r) = do
       _ -> return (xs, Nothing, Nothing)
     let suck = initSuckStackFrame i mb_x kf_l kf_r
     liftM (\(mxs, k_lrs, sucks) -> (maybe id (:) mb_mx mxs, liftA2 (\kf_lr (k_avail_lr, k_lr) -> (kf_lr `Car` k_avail_lr, k_lr)) (Pair kf_l kf_r) k_lrs, IM.insert i suck sucks)) $ initStack xs (i + 1) k_l k_r
-initStack _ i k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_l) (Loco (stackGeneralised k_r), k_r), IM.singleton i (sucks2 $ fmap stackFreeVars (Pair k_l k_r)))
+initStack _ i k_l k_r = return ([], Pair (Loco (stackGeneralised k_l), k_l) (Loco (stackGeneralised k_r), k_r), IM.singleton i tail_suck)
+  where tail_suck = do modify_ $ \s -> s { msgSuckStack = IM.delete i (msgSuckStack s) }
+                       sucks2 $ fmap stackFreeVars (Pair k_l k_r)
 
 initSuckStackFrame :: Int -> Maybe (Var {- partial loop -}, Pair Var) -> Tagged StackFrame -> Tagged StackFrame -> MSGU ()
 initSuckStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
@@ -1146,7 +1158,7 @@ initSuckStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
     modify_ $ \s -> s { msgSuckStack = IM.delete i (msgSuckStack s) }
     -- Rename the common update binder, if any
     maybe (return ()) (\(x, x_lrs) -> modify_ $ \s -> s { msgCommonHeap = M.insert x lambdaBound (msgCommonHeap s)
-                                                        , msgLR = liftA2 (\x_lr s_lr -> s_lr { msgLRRenaming = insertVarRenaming (msgLRRenaming s_lr) x x_lr }) x_lrs (msgLR s) }) mb_x
+                                                        , msgLR = liftA2 (\x_lr s_lr -> s_lr { {- not strictly necessary: msgLRSuckVar = M.delete x_lr (msgLRSuckVar x_lr), -} msgLRRenaming = insertVarRenaming (msgLRRenaming s_lr) x x_lr }) x_lrs (msgLR s) }) mb_x
     -- Suck in the following frames first to make the next logic easier to write
     suckStack (i + 1)
     -- Remove the frame from the common or available stacks..
@@ -1189,14 +1201,16 @@ sucks2 (Pair xs_l xs_r) = do { sucks pFst xs_l; sucks pSnd xs_r }
 sucks :: (Pair MSGLRState -> MSGLRState) -> VarSet -> MSGU ()
 sucks sel xs = foldVarSet (\x rest -> suck sel x >> rest) (return ()) xs
 
+{-
 suck2 :: Pair Var -> MSGU ()
 suck2 (Pair x_l x_r) = do { suck pFst x_l; suck pSnd x_r }
+-}
 
 suck :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU ()
 suck sel x = join $ suck' sel x
 
 suck' :: (Pair MSGLRState -> MSGLRState) -> Var -> MSGU (MSGU ())
-suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x -- NB: don't panic here if lookup fails because we might just have removed the var from the mapping
+suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> {- trace (show x ++ "{") $ (\res -> res `seq` trace "}" res) $ -} lookupWithDefaultVarEnv (msgLRSuckVar (sel (msgLR s))) (return ()) x -- NB: don't panic here if lookup fails because we might just have removed the var from the mapping
 
 suckStack :: Int -> MSGU ()
 suckStack i = {- trace ("suckStack:" ++ show i) $ -} join $ flip fmap get $ \s -> IM.findWithDefault (return ()) i (msgSuckStack s)
