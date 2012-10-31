@@ -32,11 +32,12 @@ test('T1969',
                                   # varies quite a lot with CLEANUP and BINDIST,
                                   # hence 10% range.
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 303930948, 1)),
+          compiler_stats_range_field('bytes allocated', 303930948, 5)),
                         # expected value: 215582916 (x86/Windows)
                         #                 221667908 (x86/OS X)
                         #                 274932264 (x86/Linux)
                         # 2012-10-08:     303930948 (x86/Linux, new codegen)
+                        # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 642594312, 1)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
@@ -154,19 +155,26 @@ test('T3064',
       # expected value: 14 (x86/Linux 28-06-2012):
       if_wordsize(32,
           compiler_stats_range_field('peak_megabytes_allocated', 14, 30)),
+
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),
+
       # expected value: 56380288 (x86/Linux) (28/6/2011)
+      #                 111189536 (x86/Windows) (30/10/12)
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 124952112, 10)),
+          compiler_stats_range_field('bytes allocated', 111189536, 10)),
+
+
       # expected value: 73259544 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 200000000,
                                                       280000000)),
+
       # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
           compiler_stats_range_field('max_bytes_used', 5511604, 20)),
+
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 8000000,
