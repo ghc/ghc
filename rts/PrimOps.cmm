@@ -1070,8 +1070,8 @@ stg_newTVarzh (P_ init)
 
 stg_readTVarzh (P_ tvar)
 {
-  W_ trec;
-  W_ result;
+  P_ trec;
+  P_ result;
 
   // Call to stmReadTVar may allocate
   MAYBE_GC_P (stg_readTVarzh, tvar);
