@@ -489,6 +489,7 @@ type PushedValue = Tagged (Coerced (ValueG State))
 type PushedQA    = Tagged (QAG (ValueG State))
 type PushedFocus = PushFocus PushedQA State
 
+-- NB: it is not necessary for the traversal order here to match that in "recurse", even when doing FCFS
 traversePushedState :: Applicative t => (State -> t State)
                     -> (PushedHeap, PushedStack, PushedFocus) -> t (PushedHeap, PushedStack, PushedFocus)
 traversePushedState f (heap, stack, focus) = liftA3 (,,) (traversePushedHeap f heap) (traversePushedStack f stack) (traversePushedFocus f focus)
