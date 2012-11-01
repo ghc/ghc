@@ -511,6 +511,12 @@
             <entry><option>-fno-break-on-error</option></entry>
           </row>
           <row>
+            <entry><option>-fghci-hist-size=<replaceable>n</replaceable></option></entry>
+            <entry><link linkend="ghci-debugger">Set the number of entries GHCi keeps for <literal>:history</literal></link></entry>
+            <entry>dynamic</entry>
+            <entry><option>(default is 50)</option></entry>
+          </row>
+          <row>
             <entry><option>-fprint-evld-with-show</option></entry>
             <entry><link linkend="breakpoints">Enable usage of Show instances in <literal>:print</literal></link></entry>
             <entry>dynamic</entry>

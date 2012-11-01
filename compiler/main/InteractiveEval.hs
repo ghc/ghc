@@ -220,13 +220,15 @@ runStmtWithLocation source linenumber expr step =
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
 
+            size = ghciHistSize idflags'
+
         case step of
           RunAndLogSteps ->
               traceRunStatus expr bindings tyThings
-                             breakMVar statusMVar status emptyHistory
+                             breakMVar statusMVar status (emptyHistory size)
           _other ->
               handleRunStatus expr bindings tyThings
-                               breakMVar statusMVar status emptyHistory
+                               breakMVar statusMVar status (emptyHistory size)
 
 runDecls :: GhcMonad m => String -> m [Name]
 runDecls = runDeclsWithLocation "<interactive>" 1
@@ -268,8 +270,8 @@ withVirtualCWD m = do
 parseImportDecl :: GhcMonad m => String -> m (ImportDecl RdrName)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 
-emptyHistory :: BoundedList History
-emptyHistory = nilBL 50 -- keep a log of length 50
+emptyHistory :: Int -> BoundedList History
+emptyHistory size = nilBL size
 
 handleRunStatus :: GhcMonad m =>
                    String-> ([TyThing],GlobalRdrEnv) -> [Id]

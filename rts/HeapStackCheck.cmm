@@ -221,7 +221,11 @@ INFO_TABLE_RET ( stg_enter_checkbh, RET_SMALL,
 {
     foreign "C" checkBlockingQueues(MyCapability() "ptr",
                                     CurrentTSO);
-    return (updatee);
+
+    // we need to return updatee now.  Note that it might be a pointer
+    // to an indirection or a tagged value, we don't know which, so we
+    // need to ENTER() rather than return().
+    ENTER(updatee);
 }
 
 /* -----------------------------------------------------------------------------

@@ -127,7 +127,7 @@ INFO_TABLE_RET( stg_ctoi_R1n, RET_BCO )
 {
     Sp_adj(-2);
     Sp(1) = R1;
-    Sp(0) = stg_ret_p_info;
+    Sp(0) = stg_ret_n_info;
     jump stg_yield_to_interpreter [];
 }
 
