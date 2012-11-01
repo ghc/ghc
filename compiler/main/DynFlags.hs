@@ -670,6 +670,8 @@ data DynFlags = DynFlags {
 
   maxWorkerArgs         :: Int,
 
+  ghciHistSize          :: Int,
+
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
   flushOut              :: FlushOut,
@@ -1226,6 +1228,8 @@ defaultDynFlags mySettings =
         ufDearOp            = 40,
 
         maxWorkerArgs = 10,
+
+        ghciHistSize = 50, -- keep a log of length 50 by default
 
         log_action = defaultLogAction,
         flushOut = defaultFlushOut,
@@ -2125,6 +2129,8 @@ dynamic_flags = [
   , Flag "funfolding-keeness-factor"     (floatSuffix (\n d -> d {ufKeenessFactor = n}))
 
   , Flag "fmax-worker-args" (intSuffix (\n d -> d {maxWorkerArgs = n}))
+
+  , Flag "fghci-hist-size" (intSuffix (\n d -> d {ghciHistSize = n}))
 
         ------ Profiling ----------------------------------------------------
 
