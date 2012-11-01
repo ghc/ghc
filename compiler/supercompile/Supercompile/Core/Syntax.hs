@@ -28,6 +28,8 @@ import PrimOp   (PrimOp)
 import Pair     (pSnd)
 import PprCore  ()
 
+import qualified Data.Traversable as Traversable
+
 
 mkSymCo :: InScopeSet -> NormalCo -> NormalCo
 mkSymCo iss co = optCoercion (mkCvSubst iss []) (Coercion.mkSymCo co)
@@ -152,7 +154,13 @@ data ValueG term = Literal Literal | Coercion Coercion
                  | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
                                                        -- NB: not a newtype DataCon
 
-instance Traverseable ValueG where
+instance Functor ValueG where
+    fmap = Traversable.fmapDefault
+
+instance Foldable ValueG where
+    foldMap = Traversable.foldMapDefault
+
+instance Traversable ValueG where
     traverse f e = case e of
       Literal l          -> pure $ Literal l
       Coercion co        -> pure $ Coercion co

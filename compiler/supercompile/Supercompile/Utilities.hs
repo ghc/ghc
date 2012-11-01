@@ -38,6 +38,7 @@ import Data.Ord
 import Data.List
 import Data.Foldable (Foldable(foldMap), forM_)
 import Data.Traversable (Traversable(traverse))
+import qualified Data.Traversable as Traversable
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
@@ -152,6 +153,13 @@ newtype PrettyDoc = PrettyDoc SDoc
 
 instance Outputable PrettyDoc where
     ppr (PrettyDoc doc) = doc
+
+
+instance Foldable ((,) a) where
+    foldMap = Traversable.foldMapDefault
+
+instance Traversable ((,) a) where
+    traverse f (x, y) = fmap ((,) x) (f y)
 
 
 newtype Identity a = I { unI :: a }

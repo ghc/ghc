@@ -199,9 +199,6 @@ oneResidTag (TG i _) = IM.singleton (unFin i) 1
 plusResidTags :: ResidTags -> ResidTags -> ResidTags
 plusResidTags = IM.unionWith (+)
 
-plusResidTagss :: [ResidTags] -> ResidTags
-plusResidTagss = IM.unionsWith (+)
-
 
 data Context = HeapContext Var
              | StackContext Int
@@ -292,17 +289,17 @@ generaliseSplit opt gen state@(deeds, heap, k, qa) = flip fmap (applyGeneraliser
 
 recurse :: (Applicative m, Monad m)
         => (State -> m (Deeds, Out FVedTerm))
-        -> (PushedHeap, PushedStack, PushedFocus) -> m (ResidTags, Deeds, Out FVedTerm)
-recurse opt (h', k', focus') = recurseFocus opt focus' >>= recurseStack opt k' >>= recurseHeap opt h'
+        -> (Deeds, PushedHeap, PushedStack, PushedFocus) -> m (ResidTags, Deeds, Out FVedTerm)
+recurse opt (deeds, h', k', focus') = recurseFocus opt focus' deeds >>= recurseStack opt k' >>= recurseHeap opt h'
 
 recurseFocus :: Applicative m
              => (State -> m (Deeds, Out FVedTerm))
-             -> PushedFocus -> m (ResidTags, Deeds, Out FVedTerm)
-recurseFocus opt (QAFocus (Tagged tg_qa qa)) = case qa of
-    Question x -> pure (oneResidTag tg_qa, emptyDeeds, var x)
-    Answer   a -> recurseAnswer opt (Tagged tg_qa a)
-recurseFocus opt (TermFocus state) = liftA (uncurry ((,,) emptyResidTags)) $ opt state
-recurseFocus _   (OpaqueFocus e)   = pure (emptyResidTags, emptyDeeds, e)
+             -> PushedFocus -> Deeds -> m (ResidTags, Deeds, Out FVedTerm)
+recurseFocus opt (QAFocus (Tagged tg_qa qa)) deeds = case qa of
+    Question x -> pure (oneResidTag tg_qa, deeds, var x)
+    Answer   a -> recurseAnswer opt deeds (Tagged tg_qa a)
+recurseFocus opt (TermFocus state) deeds = liftA (uncurry ((,,) emptyResidTags)) $ recurseState opt deeds state
+recurseFocus _   (OpaqueFocus e)   deeds = pure (emptyResidTags, deeds, e)
 
 recurseCoerced :: Applicative m
                => (Tagged a -> m (ResidTags, Deeds, Out FVedTerm))
@@ -312,13 +309,17 @@ recurseCoerced recurse (Tagged tg_co (CastBy co tg_a, a)) = fmap (\(resid, deeds
 
 recurseAnswer :: Applicative m
               => (State -> m (Deeds, Out FVedTerm))
-              -> Tagged (ValueG State) -> m (ResidTags, Deeds, Out FVedTerm)
-recurseAnswer opt (Tagged tg_v v) = liftA (uncurry ((,,) (oneResidTag tg_v))) $ case v of
-    Literal l          -> pure (emptyDeeds, value (Literal l))
-    Coercion co        -> pure (emptyDeeds, value (Coercion co))
-    Data dc tys cos xs -> pure (emptyDeeds, value (Data dc tys cos xs))
-    TyLambda a state   -> liftA (second (value . TyLambda a)) $ opt state
-    Lambda   x state   -> liftA (second (value . Lambda   x)) $ opt state
+              -> Deeds -> Tagged (ValueG State) -> m (ResidTags, Deeds, Out FVedTerm)
+recurseAnswer opt deeds (Tagged tg_v v) = liftA (uncurry ((,,) (oneResidTag tg_v))) $ case v of
+    Literal l          -> pure (deeds, value (Literal l))
+    Coercion co        -> pure (deeds, value (Coercion co))
+    Data dc tys cos xs -> pure (deeds, value (Data dc tys cos xs))
+    TyLambda a state   -> liftA (second (value . TyLambda a)) $ recurseState opt deeds state
+    Lambda   x state   -> liftA (second (value . Lambda   x)) $ recurseState opt deeds state
+
+recurseState :: (State -> m (Deeds, Out FVedTerm))
+             -> Deeds -> State -> m (Deeds, Out FVedTerm)
+recurseState opt deeds state = opt (deeds `addStateDeeds` state)
 
 recurseStack :: (Applicative m, Monad m)
              => (State -> m (Deeds, Out FVedTerm))
@@ -328,18 +329,20 @@ recurseStack opt k (init_resid_tgs, init_deeds, init_e) = (\f -> foldM f (init_r
       TyApply ty                  -> return (resid_tgs, deeds, xes, e `tyApp` ty)
       CoApply co                  -> return (resid_tgs, deeds, xes, e `coApp` co)
       Apply   x                   -> return (resid_tgs, deeds, xes, e `app`   x)
-      Scrutinise x ty alts        -> liftM ((\(extra_deedss, alts') -> (resid_tgs, plusDeedss extra_deedss `plusDeeds` deeds, xes, case_ e x ty alts')) . unzip) $ forM alts $ \(alt_con, state) -> liftM (second ((,) alt_con)) $ opt state
-      PrimApply pop tys as states -> (\(resid_tgss, as_deedss, as_es') (states_deedss, states_es') -> (plusResidTagss (resid_tgs:resid_tgss), plusDeedss as_deedss `plusDeeds` plusDeedss states_deedss `plusDeeds` deeds, xes, primOp pop tys (as_es' ++ e:states_es')))
-                                       <$> liftM unzip3 (mapM (recurseValue opt) as) <*> liftM unzip (mapM opt states)
-      StrictLet x state           -> liftM (\(extra_deeds, e') -> (resid_tgs, extra_deeds `plusDeeds` deeds, xes, let_ x e e')) $ opt state
+      Scrutinise x ty alts        -> liftM (\(deeds, alts') -> (resid_tgs, deeds, xes, case_ e x ty alts')) $ (\f -> mapAccumLM f deeds alts) $ \deeds (alt_con, state) ->
+                                        liftM (\(deeds, e) -> (deeds, (alt_con, e))) $ recurseState opt deeds state
+      PrimApply pop tys as states -> do (resid_tgs, deeds, as_es')     <- mapAccumLM' (recurseValue opt) resid_tgs deeds as
+                                        (           deeds, states_es') <- mapAccumLM  (recurseState opt)           deeds states
+                                        return (resid_tgs, deeds, xes, primOp pop tys (as_es' ++ e:states_es'))
+      StrictLet x state           -> liftM (\(extra_deeds, e') -> (resid_tgs, extra_deeds, xes, let_ x e e')) $ recurseState opt deeds state
       Update x                    -> return (resid_tgs, deeds, (x, e) : xes, var x)
       CastIt co                   -> return (resid_tgs, deeds, xes, e `cast` co)
     return (oneResidTag tg_kf `plusResidTags` resid_tgs, deeds, xes, e)
 
 recurseValue :: Applicative m
              => (State -> m (Deeds, Out FVedTerm))
-             -> PushedValue -> m (ResidTags, Deeds, Out FVedTerm)
-recurseValue = recurseCoerced . recurseAnswer
+             -> Deeds -> PushedValue -> m (ResidTags, Deeds, Out FVedTerm)
+recurseValue opt = recurseCoerced . recurseAnswer opt
 
 recurseHeap :: (Applicative m, Monad m)
             => (State -> m (Deeds, Out FVedTerm))
@@ -353,10 +356,16 @@ recurseHeap opt init_h (init_resid_tgs, init_deeds, init_xes, e)
   where go h resid_tgs deeds xes do_fvs
           -- | pprTrace "go" (ppr do_fvs $$ ppr (M.keysSet h)) False = undefined
           | M.null h_to_do = return (resid_tgs, deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)
-          | otherwise      = do (resid_tgss, extra_deedss, extra_xes) <- liftM unzip3 $ mapM (\(x, e) -> {- pprTrace "go1" (ppr x) $ -} liftM (third3 ((,) x)) $ either (recurseValue opt) (liftM (\(deeds, e) -> (emptyResidTags, deeds, e)) . opt) e) (M.toList h_to_do)
-                                go h' (plusResidTagss (resid_tgs:resid_tgss)) (plusDeedss extra_deedss `plusDeeds` deeds) (extra_xes ++ xes)
+          | otherwise      = do (resid_tgs, deeds, extra_xes) <- mapAccumLM' (\deeds (x, e) -> {- pprTrace "go1" (ppr x) $ -} liftM (third3 ((,) x)) $ either (recurseValue opt deeds) (liftM (\(deeds, e) -> (emptyResidTags, deeds, e)) . recurseState opt deeds) e) resid_tgs deeds (M.toList h_to_do)
+                                go h' resid_tgs deeds (extra_xes ++ xes)
                                    (foldr (\(x, e) do_fvs -> varBndrFreeVars x `unionVarSet` fvedTermFreeVars e `unionVarSet` do_fvs) emptyVarSet extra_xes)
          where (h_to_do, h') = M.partitionWithKey (\x _ -> x `elemVarSet` do_fvs) h
+
+mapAccumLM' :: Monad m => (Deeds -> x -> m (ResidTags, Deeds, y)) -> ResidTags -> Deeds -> [x] -> m (ResidTags, Deeds, [y])
+mapAccumLM' f resid_tgs deeds xs
+  = liftM (\((resid_tgs, deeds), ys) -> (resid_tgs, deeds, ys)) $
+      mapAccumLM (\(resid_tgs, deeds) x -> liftM (\(resid_tgs', deeds', y) -> ((resid_tgs `plusResidTags` resid_tgs', deeds'), y)) $ f deeds x)
+                 (resid_tgs, deeds) xs
 
 {-
 
@@ -449,21 +458,24 @@ test11 = \_ -> f () + 1
 -}
 
 
-newtype DeedsA a = DeedsA { unDeedsA :: (Deeds, [Size], State [Deeds] a) }
+newtype DeedsA a = DeedsA (Deeds, [Size], State.State [Deeds] a)
 
 instance Functor DeedsA where
     fmap = liftA
 
 instance Applicative DeedsA where
     pure x = DeedsA (emptyDeeds, [], return x)
-    DeedsA (deeds1, sizes1, mf) <*> DeedsA (deeds2, sizes2, mx) = DeedsA (deeds1 `mappend` deeds, sizes1 ++ sizes2, mf <*> mx)
+    DeedsA (deeds1, sizes1, mf) <*> DeedsA (deeds2, sizes2, mx) = DeedsA (deeds1 `plusDeeds` deeds2, sizes1 ++ sizes2, mf <*> mx)
 
-one :: Deeds -> Size -> DeedsA Deeds
-one deeds sz = DeedsA (deeds, [sz], state $ \(deeds:deedss) -> (deeds, deedss))
+yieldDeeds :: Deeds -> DeedsA ()
+yieldDeeds deeds = DeedsA (deeds, [], return ())
+
+askForDeeds :: Size -> DeedsA Deeds
+askForDeeds sz = DeedsA (emptyDeeds, [sz], State.state $ \(deeds:deedss) -> (deeds, deedss))
 
 runDeedsA :: DeedsA a -> a
 runDeedsA (DeedsA (deeds, sizes, mx)) = x
-  where ([], x) = runState mx (splitDeeds deeds sizes)
+  where (x, []) = State.runState mx (splitDeeds deeds sizes)
 
 
 data PushFocus qa term = QAFocus qa
@@ -493,20 +505,31 @@ traversePushedValue f = traverse (traverse (traverse f))
 traversePushedStack :: Applicative t => (State -> t State)
                     -> PushedStack -> t PushedStack
 traversePushedStack f = traverse (traverse traverse_stack_frame)
-  where traverse_stack_frame
+  where traverse_stack_frame kf = case kf of
+          TyApply ty              -> pure $ TyApply ty
+          CoApply co              -> pure $ CoApply co
+          Apply x                 -> pure $ Apply x
+          Scrutinise x ty alts    -> liftA (Scrutinise x ty) (traverse (traverse f) alts)
+          PrimApply pop tys as es -> liftA2 (PrimApply pop tys) (traverse (traversePushedValue f) as) (traverse f es)
+          StrictLet x e           -> liftA (StrictLet x) (f e)
+          Update x                -> pure $ Update x
+          CastIt co               -> pure $ CastIt co
 
 traversePushedFocus :: Applicative t => (State -> t State)
                     -> PushedFocus -> t PushedFocus
 traversePushedFocus f (QAFocus qa)    = fmap QAFocus $ traverse (traverse (traverse f)) qa
 traversePushedFocus f (TermFocus e)   = fmap TermFocus $ f e
-traversePushedFocus _ (OpaqueFocus e) = OpaqueFocus e
+traversePushedFocus _ (OpaqueFocus e) = pure $ OpaqueFocus e
 
--- FIXME: deal with deeds in here
 push :: S.Set Context
-     -> (Heap, Stack, PushFocus (Anned QA) (In AnnedTerm))
+     -> (Deeds, Heap, Stack, PushFocus (Anned QA) (In AnnedTerm))
      -> (Deeds, PushedHeap, PushedStack, PushedFocus)
 push generalised (deeds, Heap h ids, k, focus) = -- pprTrace "push" (ppr verts $$ ppr marked)
-                                                 traversePushed (\(deeds, h, k, qa) -> ) (h', k', focus')
+                                                 runDeedsA $
+                                                   liftA (\(deeds, (heap, stack, focus)) -> (deeds, heap, stack, focus)) $
+                                                     yieldDeeds deeds *>
+                                                       liftA2 (,) (askForDeeds 1)
+                                                                  (traversePushedState (\state -> liftA (`addStateDeeds` state) $ askForDeeds (stateSize state)) (h', k', focus'))
   where -- TODO: arguably I should try to get a QA for the thing in the focus. This will help in cases like where we MSG together:
         --  < H | v | >
         -- and:

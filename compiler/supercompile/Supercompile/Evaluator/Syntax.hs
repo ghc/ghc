@@ -22,6 +22,7 @@ import Coercion (coercionType, coercionKind, mkCoVarCo)
 
 import qualified Data.Map as M
 import qualified Data.Foldable as Foldable
+import qualified Data.Traversable as Traversable
 
 
 type Anned = O Tagged (O Sized FVed)
@@ -128,6 +129,12 @@ type Answer = In AnnedValue
 
 data QAG answer = Question Question
                 | Answer   answer
+
+instance Functor QAG where
+    fmap = Traversable.fmapDefault
+
+instance Foldable QAG where
+    foldMap = Traversable.foldMapDefault
 
 instance Traversable QAG where
     traverse _ (Question x) = pure $ Question x
