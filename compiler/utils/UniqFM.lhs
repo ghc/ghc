@@ -11,7 +11,7 @@ Basically, the things need to be in class @Uniquable@, and we use the
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
 The interface is based on @FiniteMap@s, but the implementation uses
-@Data.IntMap@, which is both maitained and faster than the past
+@Data.IntMap@, which is both maintained and faster than the past
 implementation (see commit log).
 
 The @UniqFM@ interface maps directly to Data.IntMap, only
