@@ -28,6 +28,7 @@ import Name
 import Type
 import TyCon
 import Coercion
+import TcEnv
 import TcType
 
 import CmmExpr
@@ -44,12 +45,10 @@ import FastString
 import DynFlags
 import Platform
 import Config
-import Encoding
 import OrdList
 import Pair
 import Util
 
-import Data.IORef
 import Data.Maybe
 import Data.List
 \end{code}
@@ -213,20 +212,12 @@ dsFCall fn_id co fcall mDeclHeader = do
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
-               do let wrapperRef = nextWrapperNum dflags
-                  wrapperNum <- liftIO $ readIORef wrapperRef
-                  liftIO $ writeIORef wrapperRef (wrapperNum + 1)
-                  thisMod <- getModuleDs
+               do thisMod <- getModuleDs
                   let pkg = packageIdString  (modulePackageId thisMod)
                       mod = moduleNameString (moduleName      thisMod)
-                      wrapperNameComponents = ["ghc_wrapper",
-                                               show wrapperNum,
-                                               pkg, mod,
-                                               unpackFS cName]
-                      wrapperName = mkFastString
-                                  $ zEncodeString
-                                  $ intercalate ":" wrapperNameComponents
-                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
+                      wrapperNameComponents = [pkg, mod, unpackFS cName]
+                  wrapperName <- mkWrapperName "ghc_wrapper" wrapperNameComponents
+                  let fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include <" <> ftext h <> text ">"

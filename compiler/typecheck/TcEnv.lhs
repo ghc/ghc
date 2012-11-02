@@ -50,7 +50,8 @@ module TcEnv(
 
         -- New Ids
         newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
-        mkStableIdFromString, mkStableIdFromName
+        mkStableIdFromString, mkStableIdFromName,
+        mkWrapperName
   ) where
 
 #include "HsVersions.h"
@@ -80,10 +81,15 @@ import HscTypes
 import DynFlags
 import SrcLoc
 import BasicTypes
+import Module
 import Outputable
+import Encoding
 import FastString
 import ListSetOps
 import Util
+
+import Data.IORef
+import Data.List
 \end{code}
 
 
@@ -750,13 +756,28 @@ mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM
 mkStableIdFromString str sig_ty loc occ_wrapper = do
     uniq <- newUnique
     mod <- getModule
-    let occ = mkVarOcc (str ++ '_' : show uniq) :: OccName
+    name <- mkWrapperName "stable" [packageIdString  (modulePackageId mod),
+                                    moduleNameString (moduleName      mod),
+                                    str]
+    let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
         id  = mkExportedLocalId gnm sig_ty :: Id
     return id
 
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
 mkStableIdFromName nm = mkStableIdFromString (getOccString nm)
+\end{code}
+
+\begin{code}
+mkWrapperName :: (MonadIO m, HasDynFlags m)
+              => String -> [String] -> m FastString
+mkWrapperName what components
+    = do dflags <- getDynFlags
+         let wrapperRef = nextWrapperNum dflags
+         wrapperNum <- liftIO $ readIORef wrapperRef
+         liftIO $ writeIORef wrapperRef (wrapperNum + 1)
+         let allComponents = what : show wrapperNum : components
+         return $ mkFastString $ zEncodeString $ intercalate ":" allComponents
 \end{code}
 
 %************************************************************************
