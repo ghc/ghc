@@ -59,7 +59,7 @@ if (ghc_with_dynamic_rts == 1):
     config.have_shared_libs = True
 
 config.ghc_dynamic_by_default = ghc_dynamic_by_default
-if (ghc_dynamic_by_default):
+if ghc_dynamic_by_default and ghc_with_vanilla == 1:
     config.run_ways.append('static')
 else:
     if (ghc_with_dynamic_rts == 1):
