@@ -1065,6 +1065,12 @@ doReturn exprs_code = do
   updfr_off <- getUpdFrameOff
   emit (mkReturnSimple dflags exprs updfr_off)
 
+mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturnSimple dflags actuals updfr_off =
+  mkReturn dflags e actuals updfr_off
+  where e = entryCode dflags (CmmLoad (CmmStackSlot Old updfr_off)
+                             (gcWord dflags))
+
 doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
 doRawJump expr_code vols = do
   dflags <- getDynFlags
