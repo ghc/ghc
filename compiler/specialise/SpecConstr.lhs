@@ -1378,9 +1378,13 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                            (arg_bndrs `zip` pats)
               fn_name    = idName fn
               fn_loc     = nameSrcSpan fn_name
-              spec_occ   = mkSpecOcc (nameOccName fn_name)
-              dflags     = sc_dflags env
-              rule_name  = mkFastString ("SC:" ++ showSDoc dflags (ppr fn <> int rule_number))
+              fn_occ     = nameOccName fn_name
+              spec_occ   = mkSpecOcc fn_occ
+              -- We use fn_occ rather than fn in the rule_name string
+              -- as we don't want the uniq to end up in the rule, and
+              -- hence in the ABI, as that can cause spurious ABI
+              -- changes (#4012).
+              rule_name  = mkFastString ("SC:" ++ occNameString fn_occ ++ show rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
 --      ; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $
 --        return ()
