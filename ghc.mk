@@ -138,6 +138,11 @@ ifeq "$(findstring v,$(GhcLibWays))" ""
 $(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
 endif
 endif
+ifeq "$(GhcProfiled)" "YES"
+ifeq "$(findstring p,$(GhcLibWays))" ""
+$(error p is not in $$(GhcLibWays), and $$(GhcProfiled) is YES)
+endif
+endif
 endif
 
 ifeq "$(phase)" ""
