@@ -519,7 +519,7 @@ gen_wrappers (Info _ entries)
      ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
      where
         specs = filter (not.dodgy) (filter is_primop entries)
-        (vecspecs, otherspecs) = partition (llvmOnlyTy . ty) specs
+        (vecspecs, otherspecs) = partition is_llvm_only specs
         tycons = foldr union [] $ map (tyconsIn . ty) specs
         (vectycons, othertycons) =
             (partition llvmOnlyTyCon . filter (`notElem` ["()", "Bool"])) tycons
@@ -543,11 +543,11 @@ gen_wrappers (Info _ entries)
               "parAtAbs#", "parAtRel#", "parAtForNow#" 
              ]
 
-        llvmOnlyTy :: Ty -> Bool
-        llvmOnlyTy (TyF ty1 ty2)      = llvmOnlyTy ty1 || llvmOnlyTy ty2
-        llvmOnlyTy (TyApp tycon tys)  = llvmOnlyTyCon tycon || any llvmOnlyTy tys
-        llvmOnlyTy (TyVar _)          = False
-        llvmOnlyTy (TyUTup tys)       = any llvmOnlyTy tys
+        is_llvm_only :: Entry -> Bool
+        is_llvm_only entry =
+            case lookup_attrib "llvm_only" (opts entry) of
+              Just (OptionTrue _) -> True
+              _                   -> False
 
         llvmOnlyTyCon :: TyCon -> Bool
         llvmOnlyTyCon "Int32#"    = True
