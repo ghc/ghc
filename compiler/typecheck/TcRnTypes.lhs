@@ -182,6 +182,9 @@ data Env gbl lcl
 instance ContainsDynFlags (Env gbl lcl) where
     extractDynFlags env = hsc_dflags (env_top env)
 
+instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
+    extractModule env = extractModule (env_gbl env)
+
 -- TcGblEnv describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
@@ -318,6 +321,9 @@ data TcGblEnv
                                              -- inferred this module
                                              -- as -XSafe (Safe Haskell)
     }
+
+instance ContainsModule TcGblEnv where
+    extractModule env = tcg_mod env
 
 data RecFieldEnv
   = RecFields (NameEnv [Name])  -- Maps a constructor name *in this module*

@@ -32,6 +32,7 @@ import TysPrim
 import Id
 import Var
 import VarSet
+import Module
 import Name
 import NameSet
 import NameEnv

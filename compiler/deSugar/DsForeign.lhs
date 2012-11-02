@@ -212,11 +212,7 @@ dsFCall fn_id co fcall mDeclHeader = do
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
-               do thisMod <- getModuleDs
-                  let pkg = packageIdString  (modulePackageId thisMod)
-                      mod = moduleNameString (moduleName      thisMod)
-                      wrapperNameComponents = [pkg, mod, unpackFS cName]
-                  wrapperName <- mkWrapperName "ghc_wrapper" wrapperNameComponents
+               do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)

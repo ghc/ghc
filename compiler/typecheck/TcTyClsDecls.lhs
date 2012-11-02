@@ -48,6 +48,7 @@ import MkCore		( rEC_SEL_ERROR_ID )
 import IdInfo
 import Var
 import VarSet
+import Module
 import Name
 import NameSet
 import NameEnv

@@ -756,9 +756,7 @@ mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM
 mkStableIdFromString str sig_ty loc occ_wrapper = do
     uniq <- newUnique
     mod <- getModule
-    name <- mkWrapperName "stable" [packageIdString  (modulePackageId mod),
-                                    moduleNameString (moduleName      mod),
-                                    str]
+    name <- mkWrapperName "stable" str
     let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
         id  = mkExportedLocalId gnm sig_ty :: Id
@@ -769,15 +767,18 @@ mkStableIdFromName nm = mkStableIdFromString (getOccString nm)
 \end{code}
 
 \begin{code}
-mkWrapperName :: (MonadIO m, HasDynFlags m)
-              => String -> [String] -> m FastString
-mkWrapperName what components
+mkWrapperName :: (MonadIO m, HasDynFlags m, HasModule m)
+              => String -> String -> m FastString
+mkWrapperName what nameBase
     = do dflags <- getDynFlags
+         thisMod <- getModule
          let wrapperRef = nextWrapperNum dflags
+             pkg = packageIdString  (modulePackageId thisMod)
+             mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ readIORef wrapperRef
          liftIO $ writeIORef wrapperRef (wrapperNum + 1)
-         let allComponents = what : show wrapperNum : components
-         return $ mkFastString $ zEncodeString $ intercalate ":" allComponents
+         let components = [what, show wrapperNum, pkg, mod, nameBase]
+         return $ mkFastString $ zEncodeString $ intercalate ":" components
 \end{code}
 
 %************************************************************************
