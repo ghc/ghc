@@ -44,10 +44,12 @@ import FastString
 import DynFlags
 import Platform
 import Config
+import Encoding
 import OrdList
 import Pair
 import Util
 
+import Data.IORef
 import Data.Maybe
 import Data.List
 \end{code}
@@ -211,11 +213,19 @@ dsFCall fn_id co fcall mDeclHeader = do
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
-               do fcall_uniq <- newUnique
-                  let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
-                                    mkFastString (showPpr dflags fcall_uniq) `appendFS`
-                                    mkFastString "_" `appendFS`
-                                    cName
+               do let wrapperRef = nextWrapperNum dflags
+                  wrapperNum <- liftIO $ readIORef wrapperRef
+                  liftIO $ writeIORef wrapperRef (wrapperNum + 1)
+                  thisMod <- getModuleDs
+                  let pkg = packageIdString  (modulePackageId thisMod)
+                      mod = moduleNameString (moduleName      thisMod)
+                      wrapperNameComponents = ["ghc_wrapper",
+                                               show wrapperNum,
+                                               pkg, mod,
+                                               unpackFS cName]
+                      wrapperName = mkFastString
+                                  $ zEncodeString
+                                  $ intercalate ":" wrapperNameComponents
                       fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)

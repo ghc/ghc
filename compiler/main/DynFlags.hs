@@ -690,7 +690,9 @@ data DynFlags = DynFlags {
 
   interactivePrint      :: Maybe String,
 
-  llvmVersion           :: IORef (Int)
+  llvmVersion           :: IORef (Int),
+
+  nextWrapperNum        :: IORef Int
  }
 
 class HasDynFlags m where
@@ -1111,12 +1113,14 @@ initDynFlags dflags = do
  refFilesToNotIntermediateClean <- newIORef []
  refGeneratedDumps <- newIORef Set.empty
  refLlvmVersion <- newIORef 28
+ wrapperNum <- newIORef 0
  return dflags{
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
         filesToNotIntermediateClean = refFilesToNotIntermediateClean,
         generatedDumps = refGeneratedDumps,
-        llvmVersion    = refLlvmVersion
+        llvmVersion    = refLlvmVersion,
+        nextWrapperNum = wrapperNum
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -1239,7 +1243,8 @@ defaultDynFlags mySettings =
         traceLevel = 1,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion",
-        interactivePrint = Nothing
+        interactivePrint = Nothing,
+        nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum"
       }
 
 defaultWays :: Settings -> [Way]
