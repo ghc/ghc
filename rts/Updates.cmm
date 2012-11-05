@@ -45,7 +45,9 @@ INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
                  UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,_unused,updatee) )
     return (P_ ret) /* the closure being returned */
 {
-    W_ v, i, tso, link;
+    W_ v;
+
+    if (HpAlloc != 0) { ccall barf("HpAlloc"); }
 
     // we know the closure is a BLACKHOLE
     v = StgInd_indirectee(updatee);
