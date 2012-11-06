@@ -67,6 +67,7 @@ import TysWiredIn
 import BasicTypes
 import UniqSet
 import UniqSupply
+import Module
 import PrelNames
 import Outputable
 import SrcLoc
@@ -759,7 +760,7 @@ mkOptTickBox (Just tickish) e = Tick tickish e
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique 	
-       this_mod <- getModuleDs
+       this_mod <- getModule
        let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
        let
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)

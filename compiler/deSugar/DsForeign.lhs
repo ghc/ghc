@@ -401,7 +401,7 @@ dsFExportDynamic :: Id
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
     fe_id <-  newSysLocalDs ty
-    mod <- getModuleDs
+    mod <- getModule
     dflags <- getDynFlags
     let
         -- hack: need to get at the name of the C stub we're about to generate.

@@ -16,7 +16,6 @@ module DsMonad (
         duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
         newFailLocalDs, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs,
-        getModuleDs,
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
@@ -351,9 +350,6 @@ the @SrcSpan@ being carried around.
 \begin{code}
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
-
-getModuleDs :: DsM Module
-getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }
