@@ -1184,8 +1184,8 @@ chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
 chooseBoxingStrategy dflags arg_ty bang
   = case choice of
       HsUnpack | dopt Opt_OmitInterfacePragmas dflags
-               -> return HsStrict
-      _other   -> return choice
+               -> HsStrict
+      _other   -> choice
   where
     choice :: HsBang
     choice = case bang of
