@@ -353,12 +353,19 @@ kind of situation:
 The following operations are guaranteed not to be interruptible:
 
  * operations on 'IORef' from "Data.IORef"
+
  * STM transactions that do not use 'retry'
+
  * everything from the @Foreign@ modules
+
  * everything from @Control.Exception@
+
  * @tryTakeMVar@, @tryPutMVar@, @isEmptyMVar@
+
  * @takeMVar@ if the @MVar@ is definitely full, and conversely @putMVar@ if the @MVar@ is definitely empty
+
  * @newEmptyMVar@, @newMVar@
+
  * @forkIO@, @forkIOUnmasked@, @myThreadId@
 
 -}
