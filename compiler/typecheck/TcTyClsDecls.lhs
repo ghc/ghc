@@ -1182,26 +1182,32 @@ conRepresentibleWithH98Syntax
 -- and reboxing more complicated
 chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
 chooseBoxingStrategy dflags arg_ty bang
-  = case bang of
-	HsNoBang -> HsNoBang
-	HsStrict -> let unbox_strict = dopt Opt_UnboxStrictFields dflags
-                    in if unbox_strict then (can_unbox HsStrict arg_ty)
-                                       else HsStrict
-	HsNoUnpack -> HsStrict
-	HsUnpack -> let omit_prags = dopt Opt_OmitInterfacePragmas dflags
-                        bang = can_unbox HsUnpackFailed arg_ty
-                    in if omit_prags && bang == HsUnpack
-                       then HsStrict
-                       else bang
-            -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
-	    -- See Trac #5252: unpacking means we must not conceal the
-	    --                 representation of the argument type
-            -- However: even when OmitInterfacePragmas is on, we still want
-            -- to know if we have HsUnpackFailed, because we omit a
-            -- warning in that case (#3966)
-        HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
-		       	  -- Source code never has shtes
+  = case choice of
+      HsUnpack | dopt Opt_OmitInterfacePragmas dflags
+               -> return HsStrict
+      _other   -> return choice
   where
+    choice :: HsBang
+    choice = case bang of
+      HsNoBang -> HsNoBang
+      HsStrict -> let unbox_strict = dopt Opt_UnboxStrictFields dflags
+                  in if unbox_strict then (can_unbox HsStrict arg_ty)
+                                     else HsStrict
+      HsNoUnpack -> HsStrict
+      HsUnpack -> let omit_prags = dopt Opt_OmitInterfacePragmas dflags
+                      bang = can_unbox HsUnpackFailed arg_ty
+                  in if omit_prags && bang == HsUnpack
+                     then HsStrict
+                     else bang
+          -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
+          -- See Trac #5252: unpacking means we must not conceal the
+          --                 representation of the argument type
+          -- However: even when OmitInterfacePragmas is on, we still want
+          -- to know if we have HsUnpackFailed, because we omit a
+          -- warning in that case (#3966)
+      HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
+                        -- Source code never has shtes
+
     can_unbox :: HsBang -> TcType -> HsBang
     -- Returns   HsUnpack  if we can unpack arg_ty
     -- 		 fail_bang if we know what arg_ty is but we can't unpack it
