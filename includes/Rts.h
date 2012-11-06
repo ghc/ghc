@@ -306,6 +306,12 @@ TICK_VAR(2)
 #define DEBUG_ONLY(s) doNothing()
 #endif
 
+#ifdef DEBUG
+#define DEBUG_IS_ON   1
+#else
+#define DEBUG_IS_ON   0
+#endif
+
 /* -----------------------------------------------------------------------------
    Useful macros and inline functions
    -------------------------------------------------------------------------- */

@@ -17,7 +17,6 @@ module Maybes (
         MaybeErr(..), -- Instance of Monad
         failME, isSuccess,
 
-        fmapM_maybe,
         orElse,
         mapCatMaybes,
         allMaybes,
@@ -83,14 +82,6 @@ mapCatMaybes f (x:xs) = case f x of
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` _ = x
 Nothing  `orElse` y = y
-\end{code}
-
-\begin{code}
-fmapM_maybe :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-fmapM_maybe _ Nothing = return Nothing
-fmapM_maybe f (Just x) = do
-        x' <- f x
-        return $ Just x'
 \end{code}
 
 %************************************************************************

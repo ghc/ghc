@@ -306,9 +306,7 @@ typedef struct {
   StgHeader                  header;
   StgClosure                *volatile current_value;
   StgTVarWatchQueue         *volatile first_watch_queue_entry;
-#if defined(THREADED_RTS)
   StgInt                     volatile num_updates;
-#endif
 } StgTVar;
 
 typedef struct {

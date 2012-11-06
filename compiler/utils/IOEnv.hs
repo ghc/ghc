@@ -32,6 +32,7 @@ module IOEnv (
 
 import DynFlags
 import Exception
+import Module
 import Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
@@ -92,6 +93,10 @@ instance Exception IOEnvFailure
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
     getDynFlags = do env <- getEnv
                      return $ extractDynFlags env
+
+instance ContainsModule env => HasModule (IOEnv env) where
+    getModule = do env <- getEnv
+                   return $ extractModule env
 
 ----------------------------------------------------------------------
 -- Fundmantal combinators specific to the monad

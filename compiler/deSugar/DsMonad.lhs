@@ -167,6 +167,9 @@ data DsGblEnv
         , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
         }
 
+instance ContainsModule DsGblEnv where
+    extractModule = ds_mod
+
 data DsLclEnv = DsLclEnv {
         ds_meta    :: DsMetaEnv,        -- Template Haskell bindings
         ds_loc     :: SrcSpan           -- to put in pattern-matching error msgs

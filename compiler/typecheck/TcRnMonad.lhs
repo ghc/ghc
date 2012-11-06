@@ -480,9 +480,6 @@ dumpOptTcRn flag doc = whenDOptM flag (dumpTcRn doc)
 %************************************************************************
 
 \begin{code}
-getModule :: TcRn Module
-getModule = do { env <- getGblEnv; return (tcg_mod env) }
-
 setModule :: Module -> TcRn a -> TcRn a
 setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
 
