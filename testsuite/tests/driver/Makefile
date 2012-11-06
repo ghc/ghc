@@ -402,11 +402,11 @@ DEPFILE200 = depend200
 # modify an existing dependency file.
 test200:
 	$(RM) $(DEPFILE200)
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-makefile $(DEPFILE200) D200
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-suffix "" -dep-makefile $(DEPFILE200) D200
 	test -f $(DEPFILE200)
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-makefile $(DEPFILE200) D200 B200.C A200
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-suffix "" -dep-makefile $(DEPFILE200) D200 B200.C A200
 	test -f $(DEPFILE200)
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -M -dep-suffix "" -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
 	test -f $(DEPFILE200)
 
 # -----------------------------------------------------------------------------
