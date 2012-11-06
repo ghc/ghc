@@ -86,3 +86,4 @@ test('hist001', normal, ghci_script, ['hist001.script'])
 test('2740', normal, ghci_script, ['2740.script'])
 
 test('getargs', normal, ghci_script, ['getargs.script'])
+test('T7386', normal, ghci_script, ['T7386.script'])
