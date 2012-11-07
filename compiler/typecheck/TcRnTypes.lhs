@@ -915,7 +915,7 @@ built (in TcCanonical).
 
 In contrast, the type of the evidence *term* (ccev_evtm or ctev_evar) in
 the evidence may *not* be fully zonked; we are careful not to look at it
-during constraint solving.  Seee Note [Evidence field of CtEvidence]
+during constraint solving.  See Note [Evidence field of CtEvidence]
 
 \begin{code}
 mkNonCanonical :: CtLoc -> CtEvidence -> Ct
