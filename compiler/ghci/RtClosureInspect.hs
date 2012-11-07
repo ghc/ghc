@@ -983,7 +983,7 @@ the "outside" type, D. So we can't straightforwardly decompose the
 "outside" type, and we end up in the "_" branch of the case.
 
 Then we match the dataConOrigResTy of the data constructor against the
-outside type, hoping to get a substituion that tells how to instantiate
+outside type, hoping to get a substitution that tells how to instantiate
 the *representation* type constructor.   This looks a bit delicate to
 me, but it seems to work.
 -}

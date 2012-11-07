@@ -487,7 +487,7 @@ The InertCans represents a collection of constraints with the following properti
          constraint solver that we rewrite types and constraints wrt
          to the inert substitution is TcCanonical/flattenTyVar.
 
-       - In the past we did try to have the inert substituion as
+       - In the past we did try to have the inert substitution as
          idempotent as possible but this would only be true for
          constraints of the same flavor, so in total the inert
          substitution could not be idempotent, due to flavor-related
