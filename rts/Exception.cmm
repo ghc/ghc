@@ -55,6 +55,9 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
 {
     CInt r;
 
+    P_ ret;
+    ret = R1;
+
     StgTSO_flags(CurrentTSO) = %lobits32(
       TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
 
@@ -68,18 +71,18 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
          * thread, which might result in the thread being killed.
          */
         Sp_adj(-2);
-        Sp(1) = R1;
+        Sp(1) = ret;
         Sp(0) = stg_ret_p_info;
         SAVE_THREAD_STATE();
-        (r) = ccall maybePerformBlockedException (MyCapability() "ptr", 
+        (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
                                                       CurrentTSO "ptr");
-
         if (r != 0::CInt) {
             if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
                 jump stg_threadFinished [];
             } else {
                 LOAD_THREAD_STATE();
                 ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+                R1 = ret;
                 jump %ENTRY_CODE(Sp(0)) [R1];
             }
         }
@@ -94,6 +97,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     }
 
     Sp_adj(1);
+    R1 = ret;
     jump %ENTRY_CODE(Sp(0)) [R1];
 }
 
@@ -184,7 +188,10 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
     W_ level;
 
     /* Args: R1 :: IO a */
-    STK_CHK_P (WDS(4), stg_unmaskAsyncExceptionszh, R1);
+    P_ io;
+    io = R1;
+
+    STK_CHK_P (WDS(4), stg_unmaskAsyncExceptionszh, io);
     /* 4 words: one for the unblock frame, 3 for setting up the
      * stack to call maybePerformBlockedException() below.
      */
@@ -222,11 +229,11 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
              */
             Sp_adj(-3);
             Sp(2) = stg_ap_v_info;
-            Sp(1) = R1;
+            Sp(1) = io;
             Sp(0) = stg_enter_info;
 
             SAVE_THREAD_STATE();
-            (r) = ccall maybePerformBlockedException (MyCapability() "ptr", 
+            (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
                                                       CurrentTSO "ptr");
 
             if (r != 0::CInt) {
@@ -235,6 +242,7 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
 	        } else {
 	            LOAD_THREAD_STATE();
 	            ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+                    R1 = io;
                     jump %ENTRY_CODE(Sp(0)) [R1];
 	        }
             } else {
@@ -246,6 +254,7 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
     }
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
+    R1 = io;
     jump stg_ap_v_fast [R1];
 }
 

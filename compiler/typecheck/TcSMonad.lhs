@@ -477,29 +477,34 @@ The InertCans represents a collection of constraints with the following properti
   
   7 Non-equality constraints are fully rewritten with respect to the equalities (CTyEqCan)
 
-  8 Equalities _do_not_ form an idempotent substitution but they are guarranteed to not have
-    any occurs errors. Additional notes: 
+  8 Equalities _do_not_ form an idempotent substitution, but they are
+    guaranteed to not have any occurs errors. Additional notes: 
 
-       - The lack of idempotence of the inert substitution implies that we must make sure 
-         that when we rewrite a constraint we apply the substitution /recursively/ to the 
-         types involved. Currently the one AND ONLY way in the whole constraint solver 
-         that we rewrite types and constraints wrt to the inert substitution is 
-         TcCanonical/flattenTyVar.
+       - The lack of idempotence of the inert substitution implies
+         that we must make sure that when we rewrite a constraint we
+         apply the substitution /recursively/ to the types
+         involved. Currently the one AND ONLY way in the whole
+         constraint solver that we rewrite types and constraints wrt
+         to the inert substitution is TcCanonical/flattenTyVar.
 
-       - In the past we did try to have the inert substituion as idempotent as possible but
-         this would only be true for constraints of the same flavor, so in total the inert 
-         substitution could not be idempotent, due to flavor-related issued. 
-         Note [Non-idempotent inert substitution] explains what is going on. 
+       - In the past we did try to have the inert substitution as
+         idempotent as possible but this would only be true for
+         constraints of the same flavor, so in total the inert
+         substitution could not be idempotent, due to flavor-related
+         issued.  Note [Non-idempotent inert substitution] explains
+         what is going on.
 
-       - Whenever a constraint ends up in the worklist we do recursively apply exhaustively
-         the inert substitution to it to check for occurs errors but if an equality is already
-         in the inert set and we can guarantee that adding a new equality will not cause the
-         first equality to have an occurs check then we do not rewrite the inert equality. 
-         This happens in TcInteract, rewriteInertEqsFromInertEq. 
+       - Whenever a constraint ends up in the worklist we do
+         recursively apply exhaustively the inert substitution to it
+         to check for occurs errors.  But if an equality is already in
+         the inert set and we can guarantee that adding a new equality
+         will not cause the first equality to have an occurs check
+         then we do not rewrite the inert equality.  This happens in
+         TcInteract, rewriteInertEqsFromInertEq.
          
-         See Note [Delicate equality kick-out] to see which inert equalities can safely stay
-         in the inert set and which must be kicked out to be rewritten and re-checked for 
-         occurs errors. 
+         See Note [Delicate equality kick-out] to see which inert
+         equalities can safely stay in the inert set and which must be
+         kicked out to be rewritten and re-checked for occurs errors.
 
   9 Given family or dictionary constraints don't mention touchable unification variables
 
@@ -1596,11 +1601,17 @@ Main purpose: create new evidence for new_pred;
                         Not                            Just new_evidence
 -}
 
--- If derived, don't even look at the coercion
--- NB: this allows us to sneak away with ``error'' thunks for 
--- coercions that come from derived ids (which don't exist!) 
 
-
+rewriteCtFlavor (CtDerived {}) new_pred _co
+  = -- If derived, don't even look at the coercion.
+    -- This is very important, DO NOT re-order the equations for
+    -- rewriteCtFlavor to put the isTcReflCo test first!  
+    -- Why?  Because for *Derived* constraints, c, the coercion, which 
+    -- was produced by flattening, may contain suspended calls to 
+    -- (ctEvTerm c), which fails for Derived constraints.
+    -- (Getting this wrong caused Trac #7384.)
+    newDerived new_pred
+        
 rewriteCtFlavor old_ev new_pred co
   | isTcReflCo co -- If just reflexivity then you may re-use the same variable
   = return (Just (if ctEvPred old_ev `eqType` new_pred
@@ -1612,9 +1623,6 @@ rewriteCtFlavor old_ev new_pred co
        -- However, if they *do* look the same, we'd prefer to stick with old_pred
        -- then retain the old type, so that error messages come out mentioning synonyms
 
-rewriteCtFlavor (CtDerived {}) new_pred _co
-  = newDerived new_pred
-        
 rewriteCtFlavor (CtGiven { ctev_evtm = old_tm }) new_pred co
   = do { new_ev <- newGivenEvVar new_pred new_tm  -- See Note [Bind new Givens immediately]
        ; return (Just new_ev) }

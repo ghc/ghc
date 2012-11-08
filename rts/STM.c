@@ -1648,18 +1648,3 @@ void stmWriteTVar(Capability *cap,
 }
 
 /*......................................................................*/
-
-StgTVar *stmNewTVar(Capability *cap,
-                    StgClosure *new_value) {
-  StgTVar *result;
-  result = (StgTVar *)allocate(cap, sizeofW(StgTVar));
-  SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
-  result -> current_value = new_value;
-  result -> first_watch_queue_entry = END_STM_WATCH_QUEUE;
-#if defined(THREADED_RTS)
-  result -> num_updates = 0;
-#endif
-  return result;
-}
-
-/*......................................................................*/

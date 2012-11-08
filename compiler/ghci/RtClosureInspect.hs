@@ -749,7 +749,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         -- In such case, we return a best approximation:
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
-		       traceTR (text "Nothing" <+> ppr dcname)
+		       traceTR (text "Not constructor" <+> ppr dcname)
                        let dflags = hsc_dflags hsc_env
                            tag = showPpr dflags dcname
                        vars     <- replicateM (length$ elems$ ptrs clos) 
@@ -758,7 +758,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                                               | (i, tv) <- zip [0..] vars]
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
-            traceTR (text "Just" <+> ppr dc)
+            traceTR (text "Is constructor" <+> (ppr dc $$ ppr my_ty))
             subTtypes <- getDataConArgTys dc my_ty
             subTerms <- extractSubTerms (\ty -> go (pred max_depth) ty ty) clos subTtypes
             return (Term my_ty (Right dc) a subTerms)
@@ -939,14 +939,16 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- not be fully known.  Moreover, the arg types might involve existentials;
 -- if so, make up fresh RTTI type variables for them
 getDataConArgTys dc con_app_ty
-  = do { (_, ex_tys, _) <- instTyVars ex_tvs
+  = do { (_, ex_tys, ex_subst) <- instTyVars ex_tvs
        ; let UnaryRep rep_con_app_ty = repType con_app_ty
+       ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty))
        ; ty_args <- case tcSplitTyConApp_maybe rep_con_app_ty of
                        Just (tc, ty_args) | dataConTyCon dc == tc
 		       	   -> ASSERT( univ_tvs `equalLength` ty_args) 
                               return ty_args
- 		       _   -> do { (_, ty_args, subst) <- instTyVars univ_tvs
-		       	         ; let res_ty = substTy subst (dataConOrigResTy dc)
+ 		       _   -> do { (_, ty_args, univ_subst) <- instTyVars univ_tvs
+		       	         ; let res_ty = substTy ex_subst (substTy univ_subst (dataConOrigResTy dc))
+                                   -- See Note [Constructor arg types]
                                  ; addConstraint rep_con_app_ty res_ty
                                  ; return ty_args }
 		-- It is necessary to check dataConTyCon dc == tc
@@ -954,10 +956,37 @@ getDataConArgTys dc con_app_ty
       		-- newtype and tcSplitTyConApp has not removed it. In
       		-- that case, we happily give up and don't match
        ; let subst = zipTopTvSubst (univ_tvs ++ ex_tvs) (ty_args ++ ex_tys)
+       ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr ty_args $$ ppr subst))
        ; return (substTys subst (dataConRepArgTys dc)) }
   where
     univ_tvs = dataConUnivTyVars dc
     ex_tvs   = dataConExTyVars dc
+
+{- Note [Constructor arg types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a GADT (cf Trac #7386)
+   data family D a b
+   data instance D [a] b where
+     MkT :: b -> D [a] (Maybe b)
+
+In getDataConArgTys
+* con_app_ty is the known type (from outside) of the constructor application, 
+  say D [Int] Bool
+
+* The data constructor MkT has a (representation) dataConTyCon = DList,
+  say where
+    data DList a b where
+      MkT :: b -> DList a (Maybe b)
+
+So the dataConTyCon of the data constructor, DList, differs from 
+the "outside" type, D. So we can't straightforwardly decompose the
+"outside" type, and we end up in the "_" branch of the case.
+
+Then we match the dataConOrigResTy of the data constructor against the
+outside type, hoping to get a substitution that tells how to instantiate
+the *representation* type constructor.   This looks a bit delicate to
+me, but it seems to work.
+-}
 
 -- Soundness checks
 --------------------
