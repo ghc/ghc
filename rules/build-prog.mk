@@ -170,20 +170,19 @@ ifeq "$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS)" ""
 # We don't want to link the GHC RTS into C-only programs. There's no
 # point, and it confuses the test that all GHC-compiled programs
 # were compiled with the right GHC.
-$1_$2_GHC_LD_OPTS = -no-auto-link-packages -no-hs-main
+$1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS += -no-auto-link-packages -no-hs-main
 endif
 
-ifneq "$3" "0"
-ifeq "$$(DYNAMIC_BY_DEFAULT)" "YES"
-ifeq "$$(TargetOS_CPP)" "linux"
-$1_$2_GHC_LD_OPTS = \
-    -fno-use-rpaths \
-    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
-else ifeq "$$(TargetOS_CPP)" "darwin"
-$1_$2_GHC_LD_OPTS = -optl-Wl,-headerpad_max_install_names
-endif
-endif
-endif
+# XXX
+# ifneq "$3" "0"
+# ifeq "$$(TargetOS_CPP)" "linux"
+# $1_$2_dyn_GHC_LD_OPTS += \
+#     -fno-use-rpaths \
+#     $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
+# else ifeq "$$(TargetOS_CPP)" "darwin"
+# $1_$2_dyn_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
+# endif
+# endif
 
 ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
@@ -199,7 +198,7 @@ $1/$2/build/tmp/$$($1_$2_PROG) : \
 
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
+	$$(call cmd,$1_$2_HC) -o $$@ $$($1_$2_$$($1_$2_PROGRAM_WAY)_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_GHC_LD_OPTS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
 ifeq "$$(TargetOS_CPP)" "darwin"
 ifneq "$3" "0"
 ifeq "$$($1_$2_PROGRAM_WAY)" "dyn"
