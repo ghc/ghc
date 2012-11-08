@@ -772,13 +772,25 @@ mkWrapperName :: (MonadIO m, HasDynFlags m, HasModule m)
 mkWrapperName what nameBase
     = do dflags <- getDynFlags
          thisMod <- getModule
-         let wrapperRef = nextWrapperNum dflags
+         let -- Note [Generating fresh names for ccall wrapper]
+             wrapperRef = nextWrapperNum dflags
              pkg = packageIdString  (modulePackageId thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ readIORef wrapperRef
          liftIO $ writeIORef wrapperRef (wrapperNum + 1)
          let components = [what, show wrapperNum, pkg, mod, nameBase]
          return $ mkFastString $ zEncodeString $ intercalate ":" components
+
+{-
+Note [Generating fresh names for FFI wrappers]
+
+We used to use a unique, rather than nextWrapperNum, to distinguish
+between FFI wrapper functions. However, the wrapper names that we
+generate are external names. This means that if a call to them ends up
+in an unfolding, then we can't alpha-rename them, and thus if the
+unique randomly changes from one compile to another then we get a
+spurious ABI change (#4012).
+-}
 \end{code}
 
 %************************************************************************
