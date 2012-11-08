@@ -34,9 +34,11 @@
 #if SIZEOF_VOID_P == SIZEOF_INT
 /* compiling for 32bit target */
 #define PRIdPTR "d"
-#else
+#elif SIZEOF_VOID_P == SIZEOF_LONG
 /* compiling for 64bit target */
 #define PRIdPTR "ld"
+#else
+#error Cannot find definition for PRIdPTR
 #endif
 #endif
 
