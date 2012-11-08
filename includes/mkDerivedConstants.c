@@ -30,6 +30,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !defined(PRIdPTR)
+#if SIZEOF_VOID_P == SIZEOF_INT
+/* compiling for 32bit target */
+#define PRIdPTR "d"
+#else
+/* compiling for 64bit target */
+#define PRIdPTR "ld"
+#endif
+#endif
+
 enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haskell_Exports, Gen_Header } mode;
 
 #define str(a,b) #a "_" #b
