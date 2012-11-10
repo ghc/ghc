@@ -35,6 +35,8 @@ if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
     config.run_ways.append('optasm')
 
+config.compiler_debugged = ghc_debugged
+
 if (ghc_with_vanilla == 1):
     config.have_vanilla = True
 

@@ -39,6 +39,8 @@ endif
 
 RUNTEST_OPTS += -e ghc_compiler_always_flags="'$(TEST_HC_OPTS)'"
 
+RUNTEST_OPTS += -e ghc_debugged=$(GhcDebugged)
+
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 RUNTEST_OPTS += -e ghc_with_native_codegen=1
 else

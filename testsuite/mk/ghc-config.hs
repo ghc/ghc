@@ -17,6 +17,7 @@ main = do
   let fields = read info :: [(String,String)]
 
   getGhcFieldOrFail fields "GhcStage" "Stage"
+  getGhcFieldOrFail fields "GhcDebugged" "Debug on"
   getGhcFieldOrFail fields "GhcWithNativeCodeGen" "Have native code generator"
   getGhcFieldOrFail fields "GhcWithInterpreter" "Have interpreter"
   getGhcFieldOrFail fields "GhcUnregisterised" "Unregisterised"

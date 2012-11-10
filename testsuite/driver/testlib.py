@@ -420,6 +420,12 @@ def if_compiler_ge( compiler, version, f ):
     else:
         return normal
 
+def if_compiler_debugged( f ):
+    if config.compiler_debugged:
+        return f
+    else:
+        return normal
+
 def namebase( nb ):
    return lambda opts, nb=nb: _namebase(opts, nb)
 
