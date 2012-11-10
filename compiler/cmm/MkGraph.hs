@@ -12,7 +12,7 @@ module MkGraph
   , mkJump, mkJumpExtra, mkDirectJump, mkForeignJump, mkForeignJumpExtra
   , mkRawJump
   , mkCbranch, mkSwitch
-  , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
+  , mkReturn, mkComment, mkCallEntry, mkBranch
   , copyInOflow, copyOutOflow
   , noExtraStack
   , toCall, Transfer(..)
@@ -22,7 +22,6 @@ where
 import BlockId
 import Cmm
 import CmmCallConv
-
 
 import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel, mkBranch, Shape(..))
 import DynFlags
@@ -241,11 +240,6 @@ mkReturn dflags e actuals updfr_off =
   lastWithArgs dflags Ret  Old NativeReturn actuals updfr_off $
     toCall e Nothing updfr_off 0
 
-mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkReturnSimple dflags actuals updfr_off =
-  mkReturn dflags e actuals updfr_off
-  where e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
-
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)
 
@@ -304,20 +298,20 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 copyInOflow  :: DynFlags -> Convention -> Area
              -> [CmmFormal]
              -> [CmmFormal]
-             -> (Int, CmmAGraph)
+             -> (Int, [GlobalReg], CmmAGraph)
 
 copyInOflow dflags conv area formals extra_stk
-  = (offset, catAGraphs $ map mkMiddle nodes)
-  where (offset, nodes) = copyIn dflags conv area formals extra_stk
+  = (offset, gregs, catAGraphs $ map mkMiddle nodes)
+  where (offset, gregs, nodes) = copyIn dflags conv area formals extra_stk
 
 -- Return the number of bytes used for copying arguments, as well as the
 -- instructions to copy the arguments.
 copyIn :: DynFlags -> Convention -> Area
        -> [CmmFormal]
        -> [CmmFormal]
-       -> (ByteOff, [CmmNode O O])
+       -> (ByteOff, [GlobalReg], [CmmNode O O])
 copyIn dflags conv area formals extra_stk
-  = (stk_size, map ci (stk_args ++ args))
+  = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
      ci (reg, RegisterParam r) =
           CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal r))
@@ -386,7 +380,7 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
 
 
 mkCallEntry :: DynFlags -> Convention -> [CmmFormal] -> [CmmFormal]
-            -> (Int, CmmAGraph)
+            -> (Int, [GlobalReg], CmmAGraph)
 mkCallEntry dflags conv formals extra_stk
   = copyInOflow dflags conv Old formals extra_stk
 

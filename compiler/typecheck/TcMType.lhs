@@ -24,6 +24,7 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,		-- Kind -> TcM TcType
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
+  newPolyFlexiTyVarTy,
   newMetaKindVar, newMetaKindVars, mkKindSigVar,
   mkTcTyVarName, cloneMetaTyVar, 
 
@@ -318,8 +319,9 @@ newMetaTyVar meta_info kind
   = do	{ uniq <- newUnique
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
-                        TauTv -> fsLit "t"
-                        SigTv -> fsLit "a"
+                        PolyTv -> fsLit "s"
+                        TauTv  -> fsLit "t"
+                        SigTv  -> fsLit "a"
         ; details <- newMetaDetails meta_info
 	; return (mkTcTyVar name kind details) }
 
@@ -437,6 +439,10 @@ newFlexiTyVarTy kind = do
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
+
+newPolyFlexiTyVarTy :: TcM TcType
+newPolyFlexiTyVarTy = do { tv <- newMetaTyVar PolyTv liftedTypeKind
+                         ; return (TyVarTy tv) }
 
 tcInstTyVars :: [TKVar] -> TcM ([TcTyVar], [TcType], TvSubst)
 -- Instantiate with META type variables

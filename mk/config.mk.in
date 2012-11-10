@@ -136,8 +136,17 @@ SharedLibsByDefaultPlatformList =               \
                          x86_64-unknown-linux   \
                          x86_64-apple-darwin
 
-DYNAMIC_BY_DEFAULT = $(if $(filter $(TARGETPLATFORM),\
-	$(SharedLibsByDefaultPlatformList)),YES,NO)
+# DYANMIC_BY_DEFAULT says whether this compiler will default to
+# building dynamic executables, i.e. -dynamic is on.  We do this for
+# certain platforms because it lets us use the system dynamic linker
+# instead of our own linker for GHCi.
+#
+# We do not enable this for an unregisterised build.  It is currently
+# unknown whether shared libraries (should) work when unregisterised.
+#
+DYNAMIC_BY_DEFAULT = $(strip $(if $(filter YES,$(GhcUnregisterised)),NO,\
+			  $(if $(filter $(TARGETPLATFORM),\
+				$(SharedLibsByDefaultPlatformList)),YES,NO)))
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -351,9 +360,11 @@ LAX_DEPENDENCIES = NO
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
 
-# For an optimised RTS (you probably don't want to change these; we build
-# a debugging RTS by default now.  Use -debug to get it).
-GhcRtsHcOpts=-optc-O2
+# Build an optimised RTS.  Remember that we need to turn on
+# optimisation both for C code (-optc-O2) and .cmm code (-O2).  For
+# the debugging RTS flavour, rts/ghc.mk overrides these to turn off
+# optimisation.
+GhcRtsHcOpts=-optc-O2 -O2
 GhcRtsCcOpts=-fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.

@@ -419,10 +419,10 @@ exactLog2 x_
 cmmLoopifyForC :: DynFlags -> RawCmmDecl -> RawCmmDecl
 -- XXX: revisit if we actually want to do this
 -- cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
-cmmLoopifyForC dflags (CmmProc infos entry_lbl
+cmmLoopifyForC dflags (CmmProc infos entry_lbl live
                  (ListGraph blocks@(BasicBlock top_id _ : _))) =
 --  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $
-  CmmProc infos entry_lbl (ListGraph blocks')
+  CmmProc infos entry_lbl live (ListGraph blocks')
   where blocks' = [ BasicBlock id (map do_stmt stmts)
                   | BasicBlock id stmts <- blocks ]
 

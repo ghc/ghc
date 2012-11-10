@@ -37,10 +37,10 @@ type LlvmStatements = OrdList LlvmStatement
 -- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: LlvmEnv -> RawCmmDecl -> UniqSM (LlvmEnv, [LlvmCmmDecl])
-genLlvmProc env proc0@(CmmProc _ lbl (ListGraph blocks)) = do
-    (env', lmblocks, lmdata) <- basicBlocksCodeGen env blocks ([], [])
+genLlvmProc env proc0@(CmmProc _ lbl live (ListGraph blocks)) = do
+    (env', lmblocks, lmdata) <- basicBlocksCodeGen env live blocks ([], [])
     let info = topInfoTable proc0
-        proc = CmmProc info lbl (ListGraph lmblocks)
+        proc = CmmProc info lbl live (ListGraph lmblocks)
     return (env', proc:lmdata)
 
 genLlvmProc _ _ = panic "genLlvmProc: case that shouldn't reach here!"
@@ -51,22 +51,23 @@ genLlvmProc _ _ = panic "genLlvmProc: case that shouldn't reach here!"
 
 -- | Generate code for a list of blocks that make up a complete procedure.
 basicBlocksCodeGen :: LlvmEnv
+                   -> LiveGlobalRegs
                    -> [CmmBasicBlock]
                    -> ( [LlvmBasicBlock] , [LlvmCmmDecl] )
                    -> UniqSM (LlvmEnv, [LlvmBasicBlock] , [LlvmCmmDecl] )
-basicBlocksCodeGen env ([]) (blocks, tops)
+basicBlocksCodeGen env live ([]) (blocks, tops)
   = do let dflags = getDflags env
        let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
        let ((BasicBlock id fstmts):rblks) = blocks'
-       let fblocks = (BasicBlock id $ funPrologue dflags ++ allocs' ++ fstmts):rblks
+       let fblocks = (BasicBlock id $ funPrologue dflags live ++ allocs' ++ fstmts):rblks
        return (env, fblocks, tops)
 
-basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
+basicBlocksCodeGen env live (block:blocks) (lblocks', ltops')
   = do (env', lb, lt) <- basicBlockCodeGen env block
        let lblocks = lblocks' ++ lb
        let ltops   = ltops' ++ lt
-       basicBlocksCodeGen env' blocks (lblocks, ltops)
+       basicBlocksCodeGen env' live blocks (lblocks, ltops)
 
 
 -- | Allocations need to be extracted so they can be moved to the entry
@@ -510,11 +511,11 @@ cmmPrimOpFunctions env mop
                           ++ " not supported here")
 
 -- | Tail function calls
-genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData
+genJump :: LlvmEnv -> CmmExpr -> [GlobalReg] -> UniqSM StmtData
 
 -- Call to known function
 genJump env (CmmLit (CmmLabel lbl)) live = do
-    (env', vf, stmts, top) <- getHsFunc env lbl
+    (env', vf, stmts, top) <- getHsFunc env live lbl
     (stgRegs, stgStmts) <- funEpilogue env live
     let s1  = Expr $ Call TailCall vf stgRegs llvmStdFunAttrs
     let s2  = Return Nothing
@@ -523,7 +524,7 @@ genJump env (CmmLit (CmmLabel lbl)) live = do
 
 -- Call to unknown function / address
 genJump env expr live = do
-    let fty = llvmFunTy (getDflags env)
+    let fty = llvmFunTy (getDflags env) live
     (env', vf, stmts, top) <- exprToVar env expr
 
     let cast = case getVarType vf of
@@ -1246,48 +1247,46 @@ genLit _ CmmHighStackMark
 --
 
 -- | Function prologue. Load STG arguments into variables for function.
-funPrologue :: DynFlags -> [LlvmStatement]
-funPrologue dflags = concat $ map getReg $ activeStgRegs platform
+funPrologue :: DynFlags -> LiveGlobalRegs -> [LlvmStatement]
+funPrologue dflags live = concat $ map getReg $ activeStgRegs platform
     where platform = targetPlatform dflags
+          isLive r = r `elem` alwaysLive || r `elem` live
           getReg rr =
             let reg   = lmGlobalRegVar dflags rr
                 arg   = lmGlobalRegArg dflags rr
+                ty    = (pLower . getVarType) reg
+                trash = LMLitVar $ LMUndefLit ty
                 alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
-            in [alloc, Store arg reg]
+            in 
+              if isLive rr
+              then [alloc, Store arg reg]
+              else [alloc, Store trash reg]
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.
 -- STG Liveness optimisation done here.
-funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
+funEpilogue :: LlvmEnv -> LiveGlobalRegs -> UniqSM ([LlvmVar], LlvmStatements)
 
 -- Have information and liveness optimisation is enabled
-funEpilogue env (Just live) | gopt Opt_RegLiveness dflags = do
-    loads <- mapM loadExpr (activeStgRegs platform)
+funEpilogue env live = do
+    loads <- mapM loadExpr (filter isPassed (activeStgRegs platform))
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
   where
     dflags = getDflags env
     platform = targetPlatform dflags
-    loadExpr r | r `elem` alwaysLive || r `elem` live = do
+    isLive r = r `elem` alwaysLive || r `elem` live
+    isPassed r = not (isFloat r) || isLive r
+    isFloat (FloatReg _)  = True
+    isFloat (DoubleReg _) = True
+    isFloat _             = False
+    loadExpr r | isLive r = do
         let reg  = lmGlobalRegVar dflags r
         (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
         return (v, unitOL s)
     loadExpr r = do
         let ty = (pLower . getVarType $ lmGlobalRegVar dflags r)
         return (LMLitVar $ LMUndefLit ty, unitOL Nop)
-
--- don't do liveness optimisation
-funEpilogue env _ = do
-    loads <- mapM loadExpr (activeStgRegs platform)
-    let (vars, stmts) = unzip loads
-    return (vars, concatOL stmts)
-  where
-    dflags = getDflags env
-    platform = targetPlatform dflags
-    loadExpr r = do
-        let reg  = lmGlobalRegVar dflags r
-        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
-        return (v, unitOL s)
 
 
 -- | A serries of statements to trash all the STG registers.
@@ -1317,8 +1316,8 @@ trashStmts dflags = concatOL $ map trashReg $ activeStgRegs platform
 --
 -- This is for Haskell functions, function type is assumed, so doesn't work
 -- with foreign functions.
-getHsFunc :: LlvmEnv -> CLabel -> UniqSM ExprData
-getHsFunc env lbl
+getHsFunc :: LlvmEnv -> LiveGlobalRegs -> CLabel -> UniqSM ExprData
+getHsFunc env live lbl
   = let dflags = getDflags env
         fn = strCLabel_llvm env lbl
         ty    = funLookup fn env
@@ -1332,13 +1331,13 @@ getHsFunc env lbl
         Just ty' -> do
             let fun = LMGlobalVar fn (pLift ty') ExternallyVisible
                             Nothing Nothing False
-            (v1, s1) <- doExpr (pLift (llvmFunTy dflags)) $
-                            Cast LM_Bitcast fun (pLift (llvmFunTy dflags))
+            (v1, s1) <- doExpr (pLift (llvmFunTy dflags live)) $
+                            Cast LM_Bitcast fun (pLift (llvmFunTy dflags live))
             return (env, v1, unitOL s1, [])
 
         -- label not in module, create external reference
         Nothing  -> do
-            let ty' = LMFunction $ llvmFunSig env lbl ExternallyVisible
+            let ty' = LMFunction $ llvmFunSig env live lbl ExternallyVisible
             let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing False
             let top = CmmData Data [([],[ty'])]
             let env' = funInsert fn ty' env

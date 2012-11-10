@@ -39,6 +39,7 @@ import RnTypes        ( bindSigTyVarsFV, rnHsSigType, rnLHsType, checkPrecMatch 
 import RnPat
 import RnEnv
 import DynFlags
+import Module
 import Name
 import NameEnv
 import NameSet

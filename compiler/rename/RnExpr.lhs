@@ -40,6 +40,7 @@ import DynFlags
 import BasicTypes	( FixityDirection(..) )
 import PrelNames
 
+import Module
 import Name
 import NameSet
 import RdrName

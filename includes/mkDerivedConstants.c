@@ -30,6 +30,18 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !defined(PRIdPTR)
+#if SIZEOF_VOID_P == SIZEOF_INT
+/* compiling for 32bit target */
+#define PRIdPTR "d"
+#elif SIZEOF_VOID_P == SIZEOF_LONG
+/* compiling for 64bit target */
+#define PRIdPTR "ld"
+#else
+#error Cannot find definition for PRIdPTR
+#endif
+#endif
+
 enum Mode { Gen_Haskell_Type, Gen_Haskell_Value, Gen_Haskell_Wrappers, Gen_Haskell_Exports, Gen_Header } mode;
 
 #define str(a,b) #a "_" #b
@@ -458,8 +470,14 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rF2);
     field_offset(StgRegTable, rF3);
     field_offset(StgRegTable, rF4);
+    field_offset(StgRegTable, rF5);
+    field_offset(StgRegTable, rF6);
     field_offset(StgRegTable, rD1);
     field_offset(StgRegTable, rD2);
+    field_offset(StgRegTable, rD3);
+    field_offset(StgRegTable, rD4);
+    field_offset(StgRegTable, rD5);
+    field_offset(StgRegTable, rD6);
     field_offset(StgRegTable, rL1);
     field_offset(StgRegTable, rSp);
     field_offset(StgRegTable, rSpLim);
@@ -625,7 +643,10 @@ main(int argc, char *argv[])
         closure_field(StgTVarWatchQueue, next_queue_entry);
         closure_field(StgTVarWatchQueue, prev_queue_entry);
 
+        closure_size(StgTVar);
         closure_field(StgTVar, current_value);
+        closure_field(StgTVar, first_watch_queue_entry);
+        closure_field(StgTVar, num_updates);
 
         closure_size(StgWeak);
         closure_field(StgWeak,link);
@@ -736,9 +757,11 @@ main(int argc, char *argv[])
     constantInt("mAX_Float_REG",        MAX_FLOAT_REG);
     constantInt("mAX_Double_REG",       MAX_DOUBLE_REG);
     constantInt("mAX_Long_REG",         MAX_LONG_REG);
+    constantInt("mAX_SSE_REG",          MAX_SSE_REG);
     constantInt("mAX_Real_Vanilla_REG", MAX_REAL_VANILLA_REG);
     constantInt("mAX_Real_Float_REG",   MAX_REAL_FLOAT_REG);
     constantInt("mAX_Real_Double_REG",  MAX_REAL_DOUBLE_REG);
+    constantInt("mAX_Real_SSE_REG",     MAX_REAL_SSE_REG);
     constantInt("mAX_Real_Long_REG",    MAX_REAL_LONG_REG);
 
     // This tells the native code generator the size of the spill

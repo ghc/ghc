@@ -614,7 +614,7 @@ Prelude>
     <sect2 id="ghci-decls">
       <title>Type, class and other declarations</title>
 
-      <para>[<emphasis role="bold">New in version 7.4.1</emphasis>] At the GHCi
+      <para>At the GHCi
       prompt you can also enter any top-level Haskell declaration,
       including <literal>data</literal>, <literal>type</literal>, <literal>newtype</literal>, <literal>class</literal>, <literal>instance</literal>, <literal>deriving</literal>,
       and <literal>foreign</literal> declarations.  For
@@ -662,6 +662,10 @@ Prelude>
       an attempt to distinguish it from the new <literal>T</literal>,
       which is displayed as simply <literal>T</literal>.</para>
 
+    <para>Class and type-family instance declarations are simply added to the list of available instances, with one
+    exception. Since type-family instances are not permitted to overlap, but you might want to re-define one,
+    a type-family instance <emphasis>replaces</emphasis> any earlier type instance with an identical left hand side.
+    (See <xref linkend="type-families"/>.)</para>
     </sect2>
 
     <sect2 id="ghci-scope">
@@ -1711,8 +1715,7 @@ a :: a
       <para>The history is only available when
         using <literal>:trace</literal>; the reason for this is we found that
         logging each breakpoint in the history cuts performance by a factor of
-        2 or more.  GHCi remembers the last 50 steps in the history (perhaps in
-        the future we'll make this configurable).</para>
+        2 or more.  By default, GHCi remembers the last 50 steps in the history, but this can be changed with the <option>-fghci-hist-size=<replaceable>n</replaceable></option><indexterm><primary><option>&ndash;fghci-hist-size</option></primary></indexterm> option).</para>
     </sect2>
 
     <sect2 id="ghci-debugger-exceptions">
@@ -2377,10 +2380,12 @@ Prelude> :. cmds.ghci
           <indexterm><primary><literal>:history</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Display the history of evaluation steps.  With a number,
-            displays that many steps (default: 20).  For use with
-            <literal>:trace</literal>; see <xref
-              linkend="tracing" />.</para>
+	  <para>Display the history of evaluation steps.  With a
+	  number, displays that many steps (default: 20).  For use
+	  with <literal>:trace</literal>; see <xref linkend="tracing"
+	  />.  To set the number of history entries stored by GHCi,
+	  use
+	  <option>-fghci-hist-size=<replaceable>n</replaceable></option>.</para>
 	</listitem>
       </varlistentry>
 

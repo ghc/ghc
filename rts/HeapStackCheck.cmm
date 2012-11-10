@@ -221,7 +221,11 @@ INFO_TABLE_RET ( stg_enter_checkbh, RET_SMALL,
 {
     foreign "C" checkBlockingQueues(MyCapability() "ptr",
                                     CurrentTSO);
-    return (updatee);
+
+    // we need to return updatee now.  Note that it might be a pointer
+    // to an indirection or a tagged value, we don't know which, so we
+    // need to ENTER() rather than return().
+    ENTER(updatee);
 }
 
 /* -----------------------------------------------------------------------------
@@ -509,7 +513,12 @@ INFO_TABLE_RET ( stg_block_takemvar, RET_SMALL, W_ info_ptr, P_ mvar )
 // code fragment executed just before we return to the scheduler
 stg_block_takemvar_finally
 {
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
     unlockClosure(R3, stg_MVAR_DIRTY_info);
+    R1 = r1;
+    R3 = r3;
     jump StgReturn [R1];
 }
 
@@ -532,7 +541,12 @@ INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, W_ info_ptr,
 // code fragment executed just before we return to the scheduler
 stg_block_putmvar_finally
 {
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
     unlockClosure(R3, stg_MVAR_DIRTY_info);
+    R1 = r1;
+    R3 = r3;
     jump StgReturn [R1];
 }
 
@@ -565,7 +579,10 @@ stg_block_throwto_finally
     // unlocked.  It may have been unlocked if we revoked the message
     // due to an exception being raised during threadPaused().
     if (StgHeader_info(StgTSO_block_info(CurrentTSO)) == stg_WHITEHOLE_info) {
+        W_ r1;
+        r1 = R1;
         unlockClosure(StgTSO_block_info(CurrentTSO), stg_MSG_THROWTO_info);
+        R1 = r1;
     }
     jump StgReturn [R1];
 }

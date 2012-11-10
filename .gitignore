@@ -85,6 +85,27 @@ _darcs/
 /utils/hsc2hs/
 
 # -----------------------------------------------------------------------------
+# Cabal dist directories
+
+/driver/ghc/dist/
+/driver/haddock/dist/
+/driver/ghci/dist/
+/driver/split/dist/
+/includes/dist-*/
+/libffi/dist-install/
+/libraries/*/dist-boot/
+/libraries/*/dist-install/
+/libraries/dist-haddock/
+/rts/dist/
+/utils/*/dist*/
+/compiler/stage1/
+/compiler/stage2/
+/compiler/stage3/
+/ghc/stage1/
+/ghc/stage2/
+/ghc/stage3/
+
+# -----------------------------------------------------------------------------
 # specific generated files
 
 /bindist-list
@@ -95,9 +116,6 @@ _darcs/
 /ch02.html
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
-/compiler/stage1/
-/compiler/stage2/
-/compiler/stage3/
 /distrib/configure.ac
 /distrib/ghc.iss
 /docs/index.html
@@ -111,36 +129,18 @@ _darcs/
 /docs/users_guide/users_guide.ps
 /docs/users_guide/users_guide/
 /docs/users_guide/what_glasgow_exts_does.gen.xml
-/driver/ghc/dist/
-/driver/haddock/dist/
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
-/driver/ghci/dist/
 /driver/ghci/ghci.res
-/driver/mangler/dist/ghc-asm
-/driver/mangler/dist/ghc-asm.prl
 /driver/package.conf
 /driver/package.conf.inplace.old
-/driver/split/dist/ghc-split
-/driver/split/dist/ghc-split.prl
-/driver/stamp-pkg-conf-rts
 /settings
 /ghc.spec
 /ghc/ghc-bin.cabal
-/ghc/stage1/
-/ghc/stage2/
-/ghc/stage3/
-/includes/DerivedConstants.h
-/includes/GHCConstants.h
-/includes/dist-*/
 /includes/ghcautoconf.h
 /includes/ghcplatform.h
-/includes/mkDerivedConstantsHdr
-/includes/mkGHCConstants
-/inplace-datadir/
 /index.html
 /inplace/
-/libffi/dist-install/
 /libffi/build/
 /libffi/ffi.h
 /libffi/package.conf.inplace
@@ -164,9 +164,6 @@ _darcs/
 /libraries/synopsis.png
 /libraries/stamp/
 /libraries/time/
-/libraries/*/dist-boot/
-/libraries/*/dist-install/
-/libraries/dist-haddock/
 /mk/are-validating.mk
 /mk/build.mk
 /mk/config.h
@@ -178,23 +175,13 @@ _darcs/
 /mk/project.mk.old
 /mk/stamp-h
 /mk/validate.mk
-/rts/dist/
-/rts/AutoApply.*cmm
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
-/rts/sm/Evac_thr.c
-/rts/sm/Scav_thr.c
 /rts/package.conf.install
 /rts/package.conf.install.raw
 /stage3.package.conf
 /testsuite_summary.txt
 /testlog
-/utils/*/dist*/
-/utils/ext-core/Driver
-/utils/ext-core/PrimEnv.hs
-/utils/genapply/genapply
-/utils/ghc-pkg/Version.hs
-/utils/ghc-pwd/dist-boot/ghc-pwd
 /utils/runghc/runghc.cabal
 
 /extra-gcc-opts

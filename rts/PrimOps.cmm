@@ -1062,16 +1062,23 @@ stg_newTVarzh (P_ init)
 {
     W_ tv;
 
-    MAYBE_GC_P (stg_newTVarzh, init);
-    ("ptr" tv) = ccall stmNewTVar(MyCapability() "ptr", init "ptr");
+    ALLOC_PRIM_P (SIZEOF_StgTVar, stg_newTVarzh, init);
+
+    tv = Hp - SIZEOF_StgTVar + WDS(1);
+    SET_HDR (tv, stg_TVAR_info, CCCS);
+
+    StgTVar_current_value(tv) = init;
+    StgTVar_first_watch_queue_entry(tv) = stg_END_STM_WATCH_QUEUE_closure;
+    StgTVar_num_updates(tv) = 0;
+
     return (tv);
 }
 
 
 stg_readTVarzh (P_ tvar)
 {
-  W_ trec;
-  W_ result;
+  P_ trec;
+  P_ result;
 
   // Call to stmReadTVar may allocate
   MAYBE_GC_P (stg_readTVarzh, tvar);

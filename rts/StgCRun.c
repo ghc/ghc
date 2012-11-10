@@ -131,7 +131,7 @@ StgWord8 *win32AllocStack(void)
  * ABI requires this (x64, Mac OSX 32bit/64bit) as well as interfacing with
  * other libraries through the FFI.
  *
- * As part of this arrangment we must maitain the stack at a 16-byte boundary
+ * As part of this arrangment we must maintain the stack at a 16-byte boundary
  * - word_size-bytes (so 16n - 4 for i386 and 16n - 8 for x64) on entry to a
  * procedure since both GCC and LLVM expect this. This is because the stack
  * should have been 16-byte boundary aligned and then a call made which pushes

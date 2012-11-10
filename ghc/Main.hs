@@ -110,7 +110,6 @@ main = do
                    ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
                    ShowNumVersion          -> putStrLn cProjectVersion
-                   Print str               -> putStrLn str
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
@@ -361,7 +360,6 @@ data PreStartupMode
   = ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowSupportedExtensions -- ghc --supported-extensions
-  | Print String            -- ghc --print-foo
 
 showVersionMode, showNumVersionMode, showSupportedExtensionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion

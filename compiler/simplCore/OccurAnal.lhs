@@ -1697,11 +1697,14 @@ Note [getProxies is subtle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The code for getProxies isn't all that obvious. Consider
 
-  case v |> cov  of x { DEFAULT ->
-  case x |> cox1 of y { DEFAULT ->
-  case x |> cox2 of z { DEFAULT -> r
+  case v |> cov  of x { DEFAULT -> {{ let v = x |> sym cov  }}
+  case x |> cox1 of y { DEFAULT -> {{ let x = y |> sym cox1 }}
+  case x |> cox2 of z { DEFAULT -> {{ let x = z |> sym cox2 }}
+  r
 
-These will give us a ProxyEnv looking like:
+Bindings in double braces are injected.
+
+At 'r', these will give us a ProxyEnv looking like:
   x |-> (x, [(y, cox1), (z, cox2)])
   v |-> (v, [(x, cov)])
 
@@ -1711,7 +1714,7 @@ From this we want to extract the bindings
     y = x |> cox1
 
 Notice that later bindings may mention earlier ones, and that
-we need to go "both ways".
+we can go "both ways".
 
 Note [Zap case binders in proxy bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

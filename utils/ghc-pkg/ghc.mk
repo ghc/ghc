@@ -51,7 +51,7 @@ endif
 #
 # ToDo: we might want to do this using ghc-cabal instead.
 #
-utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
+utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/dist/build/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
@@ -60,8 +60,9 @@ utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/
 	       -DBOOTSTRAPPING \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
-               -iutils/ghc-pkg \
+	       -iutils/ghc-pkg \
 	       -XCPP -XExistentialQuantification -XDeriveDataTypeable \
+	       -iutils/ghc-pkg/dist/build \
 	       -ilibraries/Cabal/Cabal \
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
@@ -69,7 +70,8 @@ utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/
 	       -ilibraries/bin-package-db
 
 
-utils/ghc-pkg/Version.hs: mk/project.mk
+utils/ghc-pkg/dist/build/Version.hs \
+utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@
@@ -77,9 +79,7 @@ utils/ghc-pkg/Version.hs: mk/project.mk
 	echo "targetOS   = \"$(TargetOS_CPP)\""        >> $@
 	echo "targetARCH = \"$(TargetArch_CPP)\""      >> $@
 
-$(eval $(call clean-target,utils/ghc-pkg,dist,\
-   utils/ghc-pkg/dist \
-   utils/ghc-pkg/Version.hs))
+$(eval $(call clean-target,utils/ghc-pkg,dist,utils/ghc-pkg/dist))
 
 # -----------------------------------------------------------------------------
 # Cross-compile case: Install our dist version
@@ -109,6 +109,9 @@ $(eval $(call shell-wrapper,utils/ghc-pkg,dist))
 else
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
 endif
+
+utils/ghc-pkg/dist-install/package-data.mk: \
+    utils/ghc-pkg/dist-install/build/Version.hs
 
 ifeq "$(Windows)" "NO"
 install: install_utils/ghc-pkg_link

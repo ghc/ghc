@@ -548,7 +548,8 @@ mkEqErr1 ctxt ct
   | isGiven ev
   = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
        ; let (given_loc, given_msg) = mk_given (cec_encl ctxt)
-       ; mkEqErr_help ctxt (given_msg $$ binds_msg) 
+       ; dflags <- getDynFlags
+       ; mkEqErr_help dflags ctxt (given_msg $$ binds_msg) 
                       (ct { cc_loc = given_loc}) -- Note [Inaccessible code]
                       Nothing ty1 ty2 }
 
@@ -556,7 +557,8 @@ mkEqErr1 ctxt ct
   = do { (ctxt, binds_msg) <- relevantBindings ctxt ct
        ; (ctxt, tidy_orig) <- zonkTidyOrigin ctxt (ctLocOrigin (cc_loc ct))
        ; let (is_oriented, wanted_msg) = mk_wanted_extra tidy_orig
-       ; mkEqErr_help ctxt (wanted_msg $$ binds_msg) 
+       ; dflags <- getDynFlags
+       ; mkEqErr_help dflags ctxt (wanted_msg $$ binds_msg) 
                       ct is_oriented ty1 ty2 }
   where
     ev         = cc_ev ct
@@ -587,44 +589,66 @@ mkEqErr1 ctxt ct
 
     mk_wanted_extra _ = (Nothing, empty)
 
-mkEqErr_help, reportEqErr 
-   :: ReportErrCtxt -> SDoc
-   -> Ct
-   -> Maybe SwapFlag   -- Nothing <=> not sure
-   -> TcType -> TcType -> TcM ErrMsg
-mkEqErr_help ctxt extra ct oriented ty1 ty2
-  | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr ctxt extra ct oriented tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr ctxt extra ct swapped  tv2 ty1
+mkEqErr_help :: DynFlags -> ReportErrCtxt -> SDoc
+             -> Ct          
+             -> Maybe SwapFlag   -- Nothing <=> not sure
+             -> TcType -> TcType -> TcM ErrMsg
+mkEqErr_help dflags ctxt extra ct oriented ty1 ty2
+  | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
+  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr dflags ctxt extra ct swapped  tv2 ty1
   | otherwise                        = reportEqErr  ctxt extra ct oriented ty1 ty2
   where
     swapped = fmap flipSwap oriented
 
+reportEqErr :: ReportErrCtxt -> SDoc
+            -> Ct    
+            -> Maybe SwapFlag   -- Nothing <=> not sure
+            -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt extra1 ct oriented ty1 ty2
   = do { (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
        ; mkErrorMsg ctxt' ct (vcat [ misMatchOrCND ctxt' ct oriented ty1 ty2
                                    , extra2, extra1]) }
 
-mkTyVarEqErr :: ReportErrCtxt -> SDoc -> Ct -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
+mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct 
+             -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr ctxt extra ct oriented tv1 ty2
-  -- Occurs check
-  |  isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
-     		   	     -- be oriented the other way round; see TcCanonical.reOrient
+mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
+  | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
+                            -- be oriented the other way round; see TcCanonical.reOrient
   || isSigTyVar tv1 && not (isTyVarTy ty2)
   = mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                              , extraTyVarInfo ctxt ty1 ty2
                              , extra ])
 
-  -- So tv is a meta tyvar, and presumably it is
-  -- an *untouchable* meta tyvar, else it'd have been unified
+  -- So tv is a meta tyvar (or started that way before we 
+  -- generalised it).  So presumably it is an *untouchable* 
+  -- meta tyvar or a SigTv, else it'd have been unified
   | not (k2 `tcIsSubKind` k1)   	 -- Kind error
   = mkErrorMsg ctxt ct $ (kindErrorMsg (mkTyVarTy tv1) ty2 $$ extra)
 
-  | isNothing (occurCheckExpand tv1 ty2)
+  | OC_Occurs <- occ_check_expand
   = do { let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:")
                               2 (sep [ppr ty1, char '~', ppr ty2])
        ; (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
        ; mkErrorMsg ctxt' ct (occCheckMsg $$ extra2 $$ extra) }
+
+  | OC_Forall <- occ_check_expand
+  = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
+                          <+> quotes (ppr tv1)
+                        , hang (ptext (sLit "with a type involving foralls:")) 2 (ppr ty2)
+                        , nest 2 (ptext (sLit "Perhaps you want -XImpredicativeTypes")) ]
+       ; mkErrorMsg ctxt ct msg }
+
+  -- If the immediately-enclosing implication has 'tv' a skolem, and
+  -- we know by now its an InferSkol kind of skolem, then presumably
+  -- it started life as a SigTv, else it'd have been unified, given
+  -- that there's no occurs-check or forall problem
+  | (implic:_) <- cec_encl ctxt
+  , Implic { ic_skols = skols } <- implic
+  , tv1 `elem` skols
+  = mkErrorMsg ctxt ct (vcat [ misMatchMsg oriented ty1 ty2
+                             , extraTyVarInfo ctxt ty1 ty2
+                             , extra ])
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
@@ -665,6 +689,7 @@ mkTyVarEqErr ctxt extra ct oriented tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, becuase F is a type function.
   where         
+    occ_check_expand = occurCheckExpand dflags tv1 ty2
     k1 	= tyVarKind tv1
     k2 	= typeKind ty2
     ty1 = mkTyVarTy tv1

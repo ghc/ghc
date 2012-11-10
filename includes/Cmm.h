@@ -194,7 +194,7 @@
 	if (predicate) {			\
 	    /*null*/;				\
 	} else {				\
-	    foreign "C" _assertFail(NULL, __LINE__); \
+	    foreign "C" _assertFail(NULL, __LINE__) never returns; \
         }
 #else
 #define ASSERT(p) /* nothing */
@@ -372,8 +372,8 @@
    CCCS_ALLOC(bytes);
 
 #define HEAP_CHECK(bytes,failure)                       \
-    Hp = Hp + bytes;                                    \
-    if (Hp > HpLim) { HpAlloc = bytes; failure; }       \
+    Hp = Hp + (bytes);                                  \
+    if (Hp > HpLim) { HpAlloc = (bytes); failure; }     \
     TICK_ALLOC_HEAP_NOCTR(bytes);
 
 #define ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,failure)           \
@@ -400,8 +400,8 @@
 #define HP_CHK_P(bytes, fun, arg)               \
    HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
 
-#define ALLOC_P_TICKY(alloc, fun, arg)         \
-   HP_CHK_P(alloc);                           \
+#define ALLOC_P_TICKY(alloc, fun, arg)          \
+   HP_CHK_P(alloc);                             \
    TICK_ALLOC_HEAP_NOCTR(alloc);
 
 #define CHECK_GC()                                                      \
@@ -473,22 +473,22 @@
    }
 
 #define STK_CHK(n, fun)                         \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM(fun)                            \
     }
 
 #define STK_CHK_P(n, fun, arg)                  \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM_P(fun,arg)                      \
     }
 
 #define STK_CHK_PP(n, fun, arg1, arg2)          \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         GC_PRIM_PP(fun,arg1,arg2)               \
     }
 
 #define STK_CHK_ENTER(n, closure)               \
-    if (Sp - n < SpLim) {                       \
+    if (Sp - (n) < SpLim) {                     \
         jump __stg_gc_enter_1(closure);         \
     }
 
@@ -682,8 +682,8 @@
 
 #define SAVE_STGREGS                            \
     W_ r1, r2, r3,  r4,  r5,  r6,  r7,  r8;     \
-    F_ f1, f2, f3, f4;                          \
-    D_ d1, d2;                                  \
+    F_ f1, f2, f3, f4, f5, f6;                  \
+    D_ d1, d2, d3, d4, d5, d6;                  \
     L_ l1;                                      \
                                                 \
     r1 = R1;                                    \
@@ -699,9 +699,15 @@
     f2 = F2;                                    \
     f3 = F3;                                    \
     f4 = F4;                                    \
+    f5 = F5;                                    \
+    f6 = F6;                                    \
                                                 \
     d1 = D1;                                    \
     d2 = D2;                                    \
+    d3 = D3;                                    \
+    d4 = D4;                                    \
+    d5 = D5;                                    \
+    d6 = D6;                                    \
                                                 \
     l1 = L1;
 
@@ -720,9 +726,15 @@
     F2 = f2;                                    \
     F3 = f3;                                    \
     F4 = f4;                                    \
+    F5 = f5;                                    \
+    F6 = f6;                                    \
                                                 \
     D1 = d1;                                    \
     D2 = d2;                                    \
+    D3 = d3;                                    \
+    D4 = d4;                                    \
+    D5 = d5;                                    \
+    D6 = d6;                                    \
                                                 \
     L1 = l1;
 

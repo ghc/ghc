@@ -79,7 +79,7 @@ slurpSpillCostInfo platform cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
-	countCmm (CmmProc info _ sccs)
+	countCmm (CmmProc info _ _ sccs)
 		= mapM_ (countBlock info)
 		$ flattenSCCs sccs
 

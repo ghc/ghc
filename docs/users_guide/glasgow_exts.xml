@@ -4891,6 +4891,7 @@ type instance G (a, Int)  = [a]
 type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
 </programlisting>
       </para>
+    <para> However see <xref linkend="ghci-decls"/> for the overlap rules in GHCi.</para>
     </sect3>
 
     <sect3 id="type-family-decidability">

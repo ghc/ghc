@@ -239,7 +239,7 @@ usageHeader prog = substProg prog $
   "    Prints the highest registered version of a package.\n" ++
   "\n" ++
   "  $p check\n" ++
-  "    Check the consistency of package depenencies and list broken packages.\n" ++
+  "    Check the consistency of package dependencies and list broken packages.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
   "  $p describe {pkg}\n" ++

@@ -290,7 +290,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
                 | gopt Opt_SplitObjs dflags = split_marker : tops
                 | otherwise                 = tops
 
-        split_marker = CmmProc mapEmpty mkSplitMarkerLabel (ListGraph [])
+        split_marker = CmmProc mapEmpty mkSplitMarkerLabel [] (ListGraph [])
 
 
 cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
@@ -550,8 +550,8 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 x86fp_kludge :: NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr
 x86fp_kludge top@(CmmData _ _) = top
-x86fp_kludge (CmmProc info lbl (ListGraph code)) =
-        CmmProc info lbl (ListGraph $ X86.Instr.i386_insert_ffrees code)
+x86fp_kludge (CmmProc info lbl live (ListGraph code)) =
+        CmmProc info lbl live (ListGraph $ X86.Instr.i386_insert_ffrees code)
 
 
 -- | Build a doc for all the imports.
@@ -627,8 +627,8 @@ sequenceTop
     => NcgImpl statics instr jumpDest -> NatCmmDecl statics instr -> NatCmmDecl statics instr
 
 sequenceTop _       top@(CmmData _ _) = top
-sequenceTop ncgImpl (CmmProc info lbl (ListGraph blocks)) =
-  CmmProc info lbl (ListGraph $ ncgMakeFarBranches ncgImpl $ sequenceBlocks info blocks)
+sequenceTop ncgImpl (CmmProc info lbl live (ListGraph blocks)) =
+  CmmProc info lbl live (ListGraph $ ncgMakeFarBranches ncgImpl $ sequenceBlocks info blocks)
 
 -- The algorithm is very simple (and stupid): we make a graph out of
 -- the blocks where there is an edge from one block to another iff the
@@ -744,7 +744,7 @@ generateJumpTables
         :: NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
 generateJumpTables ncgImpl xs = concatMap f xs
-    where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
+    where f p@(CmmProc _ _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
           g (BasicBlock _ xs) = catMaybes (map (generateJumpTableForInstr ncgImpl) xs)
 
@@ -768,10 +768,10 @@ build_mapping :: NcgImpl statics instr jumpDest
               -> GenCmmDecl d (BlockEnv t) (ListGraph instr)
               -> (GenCmmDecl d (BlockEnv t) (ListGraph instr), UniqFM jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, emptyUFM)
-build_mapping _ (CmmProc info lbl (ListGraph []))
-  = (CmmProc info lbl (ListGraph []), emptyUFM)
-build_mapping ncgImpl (CmmProc info lbl (ListGraph (head:blocks)))
-  = (CmmProc info lbl (ListGraph (head:others)), mapping)
+build_mapping _ (CmmProc info lbl live (ListGraph []))
+  = (CmmProc info lbl live (ListGraph []), emptyUFM)
+build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
+  = (CmmProc info lbl live (ListGraph (head:others)), mapping)
         -- drop the shorted blocks, but don't ever drop the first one,
         -- because it is pointed to by a global label.
   where
@@ -804,8 +804,8 @@ apply_mapping :: NcgImpl statics instr jumpDest
               -> GenCmmDecl statics h (ListGraph instr)
 apply_mapping ncgImpl ufm (CmmData sec statics)
   = CmmData sec (shortcutStatics ncgImpl (lookupUFM ufm) statics)
-apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
-  = CmmProc info lbl (ListGraph $ map short_bb blocks)
+apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
+  = CmmProc info lbl live (ListGraph $ map short_bb blocks)
   where
     short_bb (BasicBlock id insns) = BasicBlock id $! map short_insn insns
     short_insn i = shortcutJump ncgImpl (lookupUFM ufm) i
@@ -878,9 +878,9 @@ Ideas for other things we could do (put these in Hoopl please!):
 
 cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
-cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
+cmmToCmm dflags (CmmProc info lbl live (ListGraph blocks)) = runCmmOpt dflags $ do
   blocks' <- mapM cmmBlockConFold blocks
-  return $ CmmProc info lbl (ListGraph blocks')
+  return $ CmmProc info lbl live (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
 

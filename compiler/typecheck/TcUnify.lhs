@@ -160,6 +160,7 @@ matchExpectedFunTys herald arity orig_ty
     defer n_req fun_ty 
       = addErrCtxtM mk_ctxt $
         do { arg_tys <- newFlexiTyVarTys n_req openTypeKind
+                        -- See Note [Foralls to left of arrow]
            ; res_ty  <- newFlexiTyVarTy openTypeKind
            ; co   <- unifyType fun_ty (mkFunTys arg_tys res_ty)
            ; return (co, arg_tys, res_ty) }
@@ -179,6 +180,14 @@ matchExpectedFunTys herald arity orig_ty
 	     else ptext (sLit "has only") <+> speakN n_args]
 \end{code}
 
+Note [Foralls to left of arrow]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f (x :: forall a. a -> a) = x
+We give 'f' the type (alpha -> beta), and then want to unify
+the alpha with (forall a. a->a).  We want to the arg and result
+of (->) to have openTypeKind, and this also permits foralls, so
+we are ok.
 
 \begin{code}
 ----------------------
@@ -317,15 +326,24 @@ tcSubType origin ctxt ty_actual ty_expected
   = do { (sk_wrap, inst_wrap) 
             <- tcGen ctxt ty_expected $ \ _ sk_rho -> do
             { (in_wrap, in_rho) <- deeplyInstantiate origin ty_actual
-            ; cow <- unifyType in_rho sk_rho
+            ; cow <- unify in_rho sk_rho
             ; return (coToHsWrapper cow <.> in_wrap) }
        ; return (sk_wrap <.> inst_wrap) }
 
   | otherwise	-- Urgh!  It seems deeply weird to have equality
     		-- when actual is not a polytype, and it makes a big 
 		-- difference e.g. tcfail104
-  = do { cow <- unifyType ty_actual ty_expected
+  = do { cow <- unify ty_actual ty_expected
        ; return (coToHsWrapper cow) }
+  where
+    -- In the case of patterns we call tcSubType with (expected, actual)
+    -- rather than (actual, expected).   To get error messages the 
+    -- right way round we have to fiddle with the origin
+    unify ty1 ty2 = uType u_origin ty1 ty2
+      where
+         u_origin = case origin of 
+                      PatSigOrigin -> TypeEqOrigin { uo_actual = ty2, uo_expected = ty1 }
+                      _other       -> TypeEqOrigin { uo_actual = ty1, uo_expected = ty2 }
   
 tcInfer :: (TcType -> TcM a) -> TcM (a, TcType)
 tcInfer tc_infer = do { ty  <- newFlexiTyVarTy openTypeKind
@@ -763,8 +781,9 @@ uUnfilledVar origin swapped tv1 details1 (TyVarTy tv2)
 
 uUnfilledVar origin swapped tv1 details1 non_var_ty2  -- ty2 is not a type variable
   = case details1 of
-      MetaTv { mtv_info = TauTv, mtv_ref = ref1 }
-        -> do { mb_ty2' <- checkTauTvUpdate tv1 non_var_ty2
+      MetaTv { mtv_ref = ref1 }
+        -> do { dflags <- getDynFlags
+              ; mb_ty2' <- checkTauTvUpdate dflags tv1 non_var_ty2
               ; case mb_ty2' of
                   Just ty2' -> updateMeta tv1 ref1 ty2'
                   Nothing   -> do { traceTc "Occ/kind defer" 
@@ -830,9 +849,9 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
         -- type sig
 
 ----------------
-checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
+checkTauTvUpdate :: DynFlags -> TcTyVar -> TcType -> TcM (Maybe TcType)
 --    (checkTauTvUpdate tv ty)
--- We are about to update the TauTv tv with ty.
+-- We are about to update the TauTv/PolyTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that kind(ty) is a sub-kind of kind(tv)
 -- 
@@ -851,7 +870,11 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 -- we return Nothing, leaving it to the later constraint simplifier to
 -- sort matters out.
 
-checkTauTvUpdate tv ty
+checkTauTvUpdate dflags tv ty
+  | SigTv <- info
+  = ASSERT( not (isTyVarTy ty) )
+    return Nothing
+  | otherwise
   = do { ty1   <- zonkTcType ty
        ; sub_k <- unifyKindX (tyVarKind tv) (typeKind ty1)
        ; case sub_k of
@@ -859,12 +882,19 @@ checkTauTvUpdate tv ty
            Just LT           -> return Nothing
            _  | defer_me ty1   -- Quick test
               -> -- Failed quick test so try harder
-                 case occurCheckExpand tv ty1 of 
-                   Nothing -> return Nothing
-                   Just ty2 | defer_me ty2 -> return Nothing
-                            | otherwise    -> return (Just ty2)
+                 case occurCheckExpand dflags tv ty1 of 
+                   OC_OK ty2 | defer_me ty2 -> return Nothing
+                             | otherwise    -> return (Just ty2)
+                   _ -> return Nothing
               | otherwise   -> return (Just ty1) }
   where 
+    info = ASSERT2( isMetaTyVar tv, ppr tv ) metaTyVarInfo tv
+
+    impredicative = xopt Opt_ImpredicativeTypes dflags
+                 || isOpenTypeKind (tyVarKind tv)  
+                       -- Note [OpenTypeKind accepts foralls]
+                 || case info of { PolyTv -> True;  _ -> False }
+
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv
     --            (b) type family applicatios
@@ -874,8 +904,26 @@ checkTauTvUpdate tv ty
     defer_me (TyConApp tc tys) = isSynFamilyTyCon tc || any defer_me tys
     defer_me (FunTy arg res)   = defer_me arg || defer_me res
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
-    defer_me (ForAllTy _ ty)   = defer_me ty
+    defer_me (ForAllTy _ ty)   = not impredicative || defer_me ty
 \end{code}
+
+Note [OpenTypeKind accepts foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is a common paradigm:
+   foo :: (forall a. a -> a) -> Int
+   foo = error "urk"
+To make this work we need to instantiate 'error' with a polytype.
+A similar case is
+   bar :: Bool -> (forall a. a->a) -> Int
+   bar True = \x. (x 3)
+   bar False = error "urk"
+Here we need to instantiate 'error' with a polytype. 
+
+But 'error' has an OpenTypeKind type variable, precisely so that
+we can instantiate it with Int#.  So we also allow such type variables
+to be instantiate with foralls.  It's a bit of a hack, but seems
+straightforward.
+
 
 Note [Conservative unification check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1146,9 +1194,10 @@ uUnboundKVar kv1 non_var_k2
        ; let k2b = defaultKind k2a
                 -- MetaKindVars must be bound only to simple kinds
 
-       ; case occurCheckExpand kv1 k2b of
-           Just k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
-           _        -> return Nothing }
+       ; dflags <- getDynFlags 
+       ; case occurCheckExpand dflags kv1 k2b of
+           OC_OK k2c -> do { writeMetaTyVar kv1 k2c; return (Just EQ) }
+           _         -> return Nothing }
 
 mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 mkKindErrorCtxt ty1 ty2 k1 k2 env0

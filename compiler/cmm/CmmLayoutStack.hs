@@ -111,9 +111,9 @@ cmmLayoutStack dflags procpoints entry_args
 
     -- We need liveness info.  We could do removeDeadAssignments at
     -- the same time, but it buys nothing over doing cmmSink later,
-    -- and costs a lot more than just cmmLiveness.
+    -- and costs a lot more than just cmmLocalLiveness.
     -- (graph, liveness) <- removeDeadAssignments graph0
-    let (graph, liveness) = (graph0, cmmLiveness graph0)
+    let (graph, liveness) = (graph0, cmmLocalLiveness dflags graph0)
 
     -- pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
@@ -132,7 +132,7 @@ cmmLayoutStack dflags procpoints entry_args
 
 layout :: DynFlags
        -> BlockSet                      -- proc points
-       -> BlockEnv CmmLive              -- liveness
+       -> BlockEnv CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
 
@@ -319,7 +319,7 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: DynFlags -> ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
+   :: DynFlags -> ProcPointSet -> BlockEnv CmmLocalLive -> BlockEnv ByteOff
    -> BlockEnv StackMap -> StackMap
    -> Block CmmNode O O
    -> CmmNode O C
@@ -499,7 +499,7 @@ fixupStack old_stack new_stack = concatMap move new_locs
 setupStackFrame
              :: DynFlags
              -> BlockId                 -- label of continuation
-             -> BlockEnv CmmLive        -- liveness
+             -> BlockEnv CmmLocalLive   -- liveness
              -> ByteOff      -- updfr
              -> ByteOff      -- bytes of return values on stack
              -> StackMap     -- current StackMap
@@ -602,7 +602,7 @@ futureContinuation middle = foldBlockNodesB f middle Nothing
 -- on the stack and return the new StackMap and the assignments to do
 -- the saving.
 --
-allocate :: DynFlags -> ByteOff -> RegSet -> StackMap
+allocate :: DynFlags -> ByteOff -> LocalRegSet -> StackMap
          -> (StackMap, [CmmNode O O])
 allocate dflags ret_off live stackmap@StackMap{ sm_sp = sp0
                                               , sm_regs = regs0 }
@@ -847,8 +847,8 @@ elimStackStores stackmap stackmaps area_off nodes
 
 
 setInfoTableStackMap :: DynFlags -> BlockEnv StackMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l g)
-  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l g
+setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l v g)
+  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }

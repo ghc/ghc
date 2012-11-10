@@ -301,10 +301,10 @@ cleanTopBackward cmm
 	CmmData{}
 	 -> return cmm
 	
-	CmmProc info label sccs
+	CmmProc info label live sccs
 	 | LiveInfo _ _ _ liveSlotsOnEntry <- info
 	 -> do	sccs'	<- mapM (mapSCCM (cleanBlockBackward liveSlotsOnEntry)) sccs
-		return	$ CmmProc info label sccs' 
+		return	$ CmmProc info label live sccs' 
 
 
 cleanBlockBackward 

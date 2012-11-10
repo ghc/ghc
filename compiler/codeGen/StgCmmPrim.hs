@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module StgCmmPrim (
    cgOpApp,
    cgPrimOp -- internal(ish), used by cgCase to get code for a
@@ -36,7 +29,7 @@ import BasicTypes
 import MkGraph
 import StgSyn
 import Cmm
-import Type	( Type, tyConAppTyCon )
+import Type     ( Type, tyConAppTyCon )
 import TyCon
 import CLabel
 import CmmUtils
@@ -51,62 +44,62 @@ import Control.Monad (liftM)
 import Data.Bits
 
 ------------------------------------------------------------------------
---	Primitive operations and foreign calls
+--      Primitive operations and foreign calls
 ------------------------------------------------------------------------
 
 {- Note [Foreign call results]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A foreign call always returns an unboxed tuple of results, one
 of which is the state token.  This seems to happen even for pure
-calls. 
+calls.
 
 Even if we returned a single result for pure calls, it'd still be
 right to wrap it in a singleton unboxed tuple, because the result
 might be a Haskell closure pointer, we don't want to evaluate it. -}
 
 ----------------------------------
-cgOpApp :: StgOp	-- The op
-	-> [StgArg]	-- Arguments
-	-> Type		-- Result type (always an unboxed tuple)
+cgOpApp :: StgOp        -- The op
+        -> [StgArg]     -- Arguments
+        -> Type         -- Result type (always an unboxed tuple)
         -> FCode ReturnKind
 
--- Foreign calls 
-cgOpApp (StgFCallOp fcall _) stg_args res_ty 
+-- Foreign calls
+cgOpApp (StgFCallOp fcall _) stg_args res_ty
   = cgForeignCall fcall stg_args res_ty
       -- Note [Foreign call results]
 
--- tagToEnum# is special: we need to pull the constructor 
+-- tagToEnum# is special: we need to pull the constructor
 -- out of the table, and perform an appropriate return.
 
-cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty 
+cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
   = ASSERT(isEnumerationTyCon tycon)
-    do	{ dflags <- getDynFlags
+    do  { dflags <- getDynFlags
         ; args' <- getNonVoidArgAmodes [arg]
         ; let amode = case args' of [amode] -> amode
                                     _ -> panic "TagToEnumOp had void arg"
-	; emitReturn [tagToClosure dflags tycon amode] }
+        ; emitReturn [tagToClosure dflags tycon amode] }
    where
-	  -- If you're reading this code in the attempt to figure
-	  -- out why the compiler panic'ed here, it is probably because
-	  -- you used tagToEnum# in a non-monomorphic setting, e.g., 
-	  --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
-	  -- That won't work.
-	tycon = tyConAppTyCon res_ty
+          -- If you're reading this code in the attempt to figure
+          -- out why the compiler panic'ed here, it is probably because
+          -- you used tagToEnum# in a non-monomorphic setting, e.g.,
+          --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
+          -- That won't work.
+        tycon = tyConAppTyCon res_ty
 
 cgOpApp (StgPrimOp primop) args res_ty
   | primOpOutOfLine primop
-  = do	{ cmm_args <- getNonVoidArgAmodes args
+  = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
   | ReturnsPrim VoidRep <- result_info
-  = do cgPrimOp [] primop args 
+  = do cgPrimOp [] primop args
        emitReturn []
 
   | ReturnsPrim rep <- result_info
   = do dflags <- getDynFlags
        res <- newTemp (primRepCmmType dflags rep)
-       cgPrimOp [res] primop args 
+       cgPrimOp [res] primop args
        emitReturn [CmmReg (CmmLocal res)]
 
   | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
@@ -116,7 +109,7 @@ cgOpApp (StgPrimOp primop) args res_ty
 
   | ReturnsAlg tycon <- result_info
   , isEnumerationTyCon tycon
-	-- c.f. cgExpr (...TagToEnumOp...)
+        -- c.f. cgExpr (...TagToEnumOp...)
   = do dflags <- getDynFlags
        tag_reg <- newTemp (bWord dflags)
        cgPrimOp [tag_reg] primop args
@@ -128,15 +121,15 @@ cgOpApp (StgPrimOp primop) args res_ty
      result_info = getPrimOpResultInfo primop
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
-  = do	{ cmm_args <- getNonVoidArgAmodes args
+  = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
 ---------------------------------------------------
-cgPrimOp   :: [LocalReg]	-- where to put the results
-	   -> PrimOp		-- the op
-	   -> [StgArg]		-- arguments
-	   -> FCode ()
+cgPrimOp   :: [LocalReg]        -- where to put the results
+           -> PrimOp            -- the op
+           -> [StgArg]          -- arguments
+           -> FCode ()
 
 cgPrimOp results op args
   = do dflags <- getDynFlags
@@ -145,35 +138,35 @@ cgPrimOp results op args
 
 
 ------------------------------------------------------------------------
---	Emitting code for a primop
+--      Emitting code for a primop
 ------------------------------------------------------------------------
 
 emitPrimOp :: DynFlags
-           -> [LocalReg]	-- where to put the results
-	   -> PrimOp		-- the op
-	   -> [CmmExpr]		-- arguments
-	   -> FCode ()
+           -> [LocalReg]        -- where to put the results
+           -> PrimOp            -- the op
+           -> [CmmExpr]         -- arguments
+           -> FCode ()
 
 -- First we handle various awkward cases specially.  The remaining
 -- easy cases are then handled by translateOp, defined below.
 
 emitPrimOp dflags [res_r,res_c] IntAddCOp [aa,bb]
-{- 
+{-
    With some bit-twiddling, we can define int{Add,Sub}Czh portably in
    C, and without needing any comparisons.  This may not be the
    fastest way to do it - if you have better code, please send it! --SDM
-  
+
    Return : r = a + b,  c = 0 if no overflow, 1 on overflow.
-  
-   We currently don't make use of the r value if c is != 0 (i.e. 
+
+   We currently don't make use of the r value if c is != 0 (i.e.
    overflow), we just convert to big integers and try again.  This
    could be improved by making r and c the correct values for
-   plugging into a new J#.  
-   
-   { r = ((I_)(a)) + ((I_)(b));					\
-     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
-         >> (BITS_IN (I_) - 1);					\
-   } 
+   plugging into a new J#.
+
+   { r = ((I_)(a)) + ((I_)(b));                                 \
+     c = ((StgWord)(~(((I_)(a))^((I_)(b))) & (((I_)(a))^r)))    \
+         >> (BITS_IN (I_) - 1);                                 \
+   }
    Wading through the mass of bracketry, it seems to reduce to:
    c = ( (~(a^b)) & (a^r) ) >>unsigned (BITS_IN(I_)-1)
 
@@ -181,22 +174,22 @@ emitPrimOp dflags [res_r,res_c] IntAddCOp [aa,bb]
    = emit $ catAGraphs [
         mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-	  CmmMachOp (mo_wordUShr dflags) [
-		CmmMachOp (mo_wordAnd dflags) [
-		    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
-		    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-		], 
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordNot dflags) [CmmMachOp (mo_wordXor dflags) [aa,bb]],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
                 mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-	  ]
+          ]
      ]
 
 
 emitPrimOp dflags [res_r,res_c] IntSubCOp [aa,bb]
 {- Similarly:
-   #define subIntCzh(r,c,a,b)					\
-   { r = ((I_)(a)) - ((I_)(b));					\
-     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))	\
-         >> (BITS_IN (I_) - 1);					\
+   #define subIntCzh(r,c,a,b)                                   \
+   { r = ((I_)(a)) - ((I_)(b));                                 \
+     c = ((StgWord)((((I_)(a))^((I_)(b))) & (((I_)(a))^r)))     \
+         >> (BITS_IN (I_) - 1);                                 \
    }
 
    c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
@@ -204,24 +197,24 @@ emitPrimOp dflags [res_r,res_c] IntSubCOp [aa,bb]
    = emit $ catAGraphs [
         mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
         mkAssign (CmmLocal res_c) $
-	  CmmMachOp (mo_wordUShr dflags) [
-		CmmMachOp (mo_wordAnd dflags) [
-		    CmmMachOp (mo_wordXor dflags) [aa,bb],
-		    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
-		], 
+          CmmMachOp (mo_wordUShr dflags) [
+                CmmMachOp (mo_wordAnd dflags) [
+                    CmmMachOp (mo_wordXor dflags) [aa,bb],
+                    CmmMachOp (mo_wordXor dflags) [aa, CmmReg (CmmLocal res_r)]
+                ],
                 mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
-	  ]
+          ]
      ]
 
 
 emitPrimOp _ [res] ParOp [arg]
-  = 
-	-- for now, just implement this in a C function
-	-- later, we might want to inline it.
+  =
+        -- for now, just implement this in a C function
+        -- later, we might want to inline it.
     emitCCall
-	[(res,NoHint)]
-    	(CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
-	[(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)] 
+        [(res,NoHint)]
+        (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
+        [(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)]
 
 emitPrimOp dflags [res] SparkOp [arg]
   = do
@@ -251,10 +244,10 @@ emitPrimOp dflags [res] ReadMutVarOp [mutv]
 
 emitPrimOp dflags [] WriteMutVarOp [mutv,var]
    = do emitStore (cmmOffsetW dflags mutv (fixedHdrSize dflags)) var
-	emitCCall
-		[{-no results-}]
-		(CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-		[(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
+        emitCCall
+                [{-no results-}]
+                (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+                [(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrWords *)(a))->bytes
@@ -279,7 +272,7 @@ emitPrimOp dflags [res] ByteArrayContents_Char [arg]
 emitPrimOp dflags [res] StableNameToIntOp [arg]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSize dflags) (bWord dflags))
 
---  #define eqStableNamezh(r,sn1,sn2)					\
+--  #define eqStableNamezh(r,sn1,sn2)                                   \
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 emitPrimOp dflags [res] EqStableNameOp [arg1,arg2]
    = emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [
@@ -303,13 +296,13 @@ emitPrimOp dflags [res] DataToTagOp [arg]
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
    objects, even if they are in old space.  When they become immutable,
-   they can be removed from this scavenge list.	 -}
+   they can be removed from this scavenge list.  -}
 
 --  #define unsafeFreezzeArrayzh(r,a)
---	{
+--      {
 --        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN0_info);
---	  r = a;
---	}
+--        r = a;
+--      }
 emitPrimOp _      [res] UnsafeFreezeArrayOp [arg]
    = emit $ catAGraphs
    [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
@@ -319,7 +312,7 @@ emitPrimOp _      [res] UnsafeFreezeArrayArrayOp [arg]
    [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 
---  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
+--  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)
 emitPrimOp _      [res] UnsafeFreezeByteArrayOp [arg]
    = emitAssign (CmmLocal res) arg
 
@@ -492,16 +485,11 @@ emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
 
 -- Population count
-emitPrimOp dflags [res] PopCnt8Op [w] =
-  emitPopCntCall res (CmmMachOp (mo_WordTo8 dflags) [w]) W8
-emitPrimOp dflags [res] PopCnt16Op [w] =
-  emitPopCntCall res (CmmMachOp (mo_WordTo16 dflags) [w]) W16
-emitPrimOp dflags [res] PopCnt32Op [w] =
-  emitPopCntCall res (CmmMachOp (mo_WordTo32 dflags) [w]) W32
-emitPrimOp _      [res] PopCnt64Op [w] =
-  emitPopCntCall res w W64 -- arg always has type W64, no need to narrow
-emitPrimOp dflags [res] PopCntOp [w] =
-  emitPopCntCall res w (wordWidth dflags)
+emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
+emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
+emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
+emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
+emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
@@ -695,9 +683,9 @@ nopOp Int2WordOp     = True
 nopOp Word2IntOp     = True
 nopOp Int2AddrOp     = True
 nopOp Addr2IntOp     = True
-nopOp ChrOp	     = True  -- Int# and Char# are rep'd the same
-nopOp OrdOp	     = True
-nopOp _		     = False
+nopOp ChrOp          = True  -- Int# and Char# are rep'd the same
+nopOp OrdOp          = True
+nopOp _              = False
 
 -- These PrimOps turn into double casts
 
@@ -708,7 +696,7 @@ narrowOp Narrow32IntOp  = Just (MO_SS_Conv, W32)
 narrowOp Narrow8WordOp  = Just (MO_UU_Conv, W8)
 narrowOp Narrow16WordOp = Just (MO_UU_Conv, W16)
 narrowOp Narrow32WordOp = Just (MO_UU_Conv, W32)
-narrowOp _ 		= Nothing
+narrowOp _              = Nothing
 
 -- Native word signless ops
 
@@ -879,7 +867,7 @@ doIndexByteArrayOp :: Maybe MachOp -> CmmType -> [LocalReg] -> [CmmExpr] -> FCod
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
    = do dflags <- getDynFlags
         mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx
-doIndexByteArrayOp _ _ _ _ 
+doIndexByteArrayOp _ _ _ _
    = panic "CgPrimOp: doIndexByteArrayOp"
 
 doReadPtrArrayOp ::  LocalReg -> CmmExpr -> CmmExpr -> FCode ()
@@ -898,7 +886,7 @@ doWriteByteArrayOp :: Maybe MachOp -> [LocalReg] -> [CmmExpr] -> FCode ()
 doWriteByteArrayOp maybe_pre_write_cast [] [addr,idx,val]
    = do dflags <- getDynFlags
         mkBasicIndexedWrite (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx val
-doWriteByteArrayOp _ _ _ 
+doWriteByteArrayOp _ _ _
    = panic "CgPrimOp: doWriteByteArrayOp"
 
 doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
@@ -915,13 +903,13 @@ doWritePtrArrayOp addr idx val
           (CmmMachOp (mo_wordUShr dflags) [idx,
                                            mkIntExpr dflags (mUT_ARR_PTRS_CARD_BITS dflags)])
          ) (CmmLit (CmmInt 1 W8))
-       
+
 loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
 loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
  where off = fixedHdrSize dflags * wORD_SIZE dflags + oFFSET_StgMutArrPtrs_ptrs dflags
 
 mkBasicIndexedRead :: ByteOff -> Maybe MachOp -> CmmType
-		   -> LocalReg -> CmmExpr -> CmmExpr -> FCode ()
+                   -> LocalReg -> CmmExpr -> CmmExpr -> FCode ()
 mkBasicIndexedRead off Nothing read_rep res base idx
    = do dflags <- getDynFlags
         emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off read_rep base idx)
@@ -931,7 +919,7 @@ mkBasicIndexedRead off (Just cast) read_rep res base idx
                                    cmmLoadIndexOffExpr dflags off read_rep base idx])
 
 mkBasicIndexedWrite :: ByteOff -> Maybe MachOp
-		   -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+                   -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 mkBasicIndexedWrite off Nothing base idx val
    = do dflags <- getDynFlags
         emitStore (cmmIndexOffExpr dflags off (typeWidth (cmmExprType dflags val)) base idx) val

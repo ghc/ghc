@@ -318,10 +318,13 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
        -- Make sure that the argument and result types have kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
-       -- ($) :: forall ab. (a->b) -> a -> b
-       ; a_ty <- newFlexiTyVarTy liftedTypeKind
-       ; b_ty <- newFlexiTyVarTy liftedTypeKind
+       --    (which gives a seg fault)
+       -- We do this by unifying with a MetaTv; but of course
+       -- it must allow foralls in the type it unifies with (hence PolyTv)!
 
+       -- ($) :: forall ab. (a->b) -> a -> b
+       ; a_ty <- newPolyFlexiTyVarTy
+       ; b_ty <- newPolyFlexiTyVarTy
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
 
        ; co_res <- unifyType b_ty res_ty        -- b ~ res

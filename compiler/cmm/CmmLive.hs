@@ -1,10 +1,14 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module CmmLive
-    ( CmmLive
-    , cmmLiveness
+    ( CmmLocalLive
+    , CmmGlobalLive
+    , cmmLocalLiveness
+    , cmmGlobalLiveness
     , liveLattice
     , noLiveOnEntry, xferLive, gen, kill, gen_kill
     , removeDeadAssignments
@@ -12,6 +16,7 @@ module CmmLive
 where
 
 import UniqSupply
+import DynFlags
 import BlockId
 import Cmm
 import CmmUtils
@@ -26,10 +31,14 @@ import Outputable
 -----------------------------------------------------------------------------
 
 -- | The variables live on entry to a block
-type CmmLive = RegSet
+type CmmLive r = RegSet r
+type CmmLocalLive = CmmLive LocalReg
+type CmmGlobalLive = CmmLive GlobalReg
 
 -- | The dataflow lattice
-liveLattice :: DataflowLattice CmmLive
+liveLattice :: Ord r => DataflowLattice (CmmLive r)
+{-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive LocalReg) #-}
+{-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive GlobalReg) #-}
 liveLattice = DataflowLattice "live LocalReg's" emptyRegSet add
     where add _ (OldFact old) (NewFact new) =
                (changeIf $ sizeRegSet join > sizeRegSet old, join)
@@ -37,58 +46,73 @@ liveLattice = DataflowLattice "live LocalReg's" emptyRegSet add
 
 
 -- | A mapping from block labels to the variables live on entry
-type BlockEntryLiveness = BlockEnv CmmLive
+type BlockEntryLiveness r = BlockEnv (CmmLive r)
 
 -----------------------------------------------------------------------------
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 
-cmmLiveness :: CmmGraph -> BlockEntryLiveness
-cmmLiveness graph =
-  check $ dataflowAnalBwd graph [] $ analBwd liveLattice xferLive
+cmmLocalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness LocalReg
+cmmLocalLiveness dflags graph =
+  check $ dataflowAnalBwd graph [] $ analBwd liveLattice (xferLive dflags)
   where entry = g_entry graph
         check facts = noLiveOnEntry entry
                         (expectJust "check" $ mapLookup entry facts) facts
 
+cmmGlobalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness GlobalReg
+cmmGlobalLiveness dflags graph =
+  dataflowAnalBwd graph [] $ analBwd liveLattice (xferLive dflags)
+
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
-noLiveOnEntry :: BlockId -> CmmLive -> a -> a
+noLiveOnEntry :: BlockId -> CmmLive LocalReg -> a -> a
 noLiveOnEntry bid in_fact x =
   if nullRegSet in_fact then x
   else pprPanic "LocalReg's live-in to graph" (ppr bid <+> ppr in_fact)
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
 -- notations, which should be familiar from the Dragon Book.
-gen  :: UserOfLocalRegs a    => a -> RegSet -> RegSet
-gen  a live = foldRegsUsed extendRegSet      live a
-kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
-kill a live = foldRegsDefd deleteFromRegSet live a
+gen  :: UserOfRegs r a => DynFlags -> a -> RegSet r -> RegSet r
+{-# INLINE gen #-}
+gen dflags a live = foldRegsUsed dflags extendRegSet live a
 
-gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a)
-          => a -> CmmLive -> CmmLive
-gen_kill a = gen a . kill a
+kill :: DefinerOfRegs r a => DynFlags -> a -> RegSet r -> RegSet r
+{-# INLINE kill #-}
+kill dflags a live = foldRegsDefd dflags deleteFromRegSet live a
+
+gen_kill :: (DefinerOfRegs r a, UserOfRegs r a)
+          => DynFlags -> a -> CmmLive r -> CmmLive r
+{-# INLINE gen_kill #-}
+gen_kill dflags a = gen dflags a . kill dflags a
 
 -- | The transfer function
-xferLive :: BwdTransfer CmmNode CmmLive
-xferLive = mkBTransfer3 fst mid lst
+xferLive :: forall r . ( UserOfRegs    r (CmmNode O O)
+                       , DefinerOfRegs r (CmmNode O O)
+                       , UserOfRegs    r (CmmNode O C)
+                       , DefinerOfRegs r (CmmNode O C))
+         => DynFlags -> BwdTransfer CmmNode (CmmLive r)
+{-# SPECIALIZE xferLive :: DynFlags -> BwdTransfer CmmNode (CmmLive LocalReg) #-}
+{-# SPECIALIZE xferLive :: DynFlags -> BwdTransfer CmmNode (CmmLive GlobalReg) #-}
+xferLive dflags = mkBTransfer3 fst mid lst
   where fst _ f = f
-        mid :: CmmNode O O -> CmmLive -> CmmLive
-        mid n f = gen_kill n f
-        lst :: CmmNode O C -> FactBase CmmLive -> CmmLive
-        lst n f = gen_kill n $ joinOutFacts liveLattice n f
+        mid :: CmmNode O O -> CmmLive r -> CmmLive r
+        mid n f = gen_kill dflags n f
+        lst :: CmmNode O C -> FactBase (CmmLive r) -> CmmLive r
+        lst n f = gen_kill dflags n $ joinOutFacts liveLattice n f
 
 -----------------------------------------------------------------------------
 -- Removing assignments to dead variables
 -----------------------------------------------------------------------------
 
-removeDeadAssignments :: CmmGraph -> UniqSM (CmmGraph, BlockEnv CmmLive)
-removeDeadAssignments g =
-   dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
+removeDeadAssignments :: DynFlags -> CmmGraph
+                      -> UniqSM (CmmGraph, BlockEnv CmmLocalLive)
+removeDeadAssignments dflags g =
+   dataflowPassBwd g [] $ analRewBwd liveLattice (xferLive dflags) rewrites
    where rewrites = mkBRewrite3 nothing middle nothing
          -- SDM: no need for deepBwdRw here, we only rewrite to empty
          -- Beware: deepBwdRw with one polymorphic function seems more
          -- reasonable here, but GHC panics while compiling, see bug
          -- #4045.
-         middle :: CmmNode O O -> Fact O CmmLive -> CmmReplGraph O O
+         middle :: CmmNode O O -> Fact O CmmLocalLive -> CmmReplGraph O O
          middle (CmmAssign (CmmLocal reg') _) live
                  | not (reg' `elemRegSet` live)
                  = return $ Just emptyGraph
@@ -99,5 +123,5 @@ removeDeadAssignments g =
                  = return $ Just emptyGraph
          middle _ _ = return Nothing
 
-         nothing :: CmmNode e x -> Fact x CmmLive -> CmmReplGraph e x
+         nothing :: CmmNode e x -> Fact x CmmLocalLive -> CmmReplGraph e x
          nothing _ _ = return Nothing

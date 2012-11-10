@@ -93,11 +93,11 @@ cmmTopCodeGen
         :: RawCmmDecl
         -> NatM [NatCmmDecl (Alignment, CmmStatics) Instr]
 
-cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen (CmmProc info lab live (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
   dflags <- getDynFlags
-  let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
+  let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
 
@@ -173,9 +173,8 @@ stmtToInstrs stmt = do
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
-jumpRegs :: DynFlags -> Maybe [GlobalReg] -> [Reg]
-jumpRegs dflags Nothing      = allHaskellArgRegs dflags
-jumpRegs dflags (Just gregs) = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
+jumpRegs :: DynFlags -> [GlobalReg] -> [Reg]
+jumpRegs dflags gregs = [ RegReal r | Just r <- map (globalRegMaybe platform) gregs ]
     where platform = targetPlatform dflags
 
 --------------------------------------------------------------------------------
@@ -1775,7 +1774,7 @@ genCCall32' dflags target dest_regs args = do
         let
             -- Align stack to 16n for calls, assuming a starting stack
             -- alignment of 16n - word_size on procedure entry. Which we
-            -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
+            -- maintain. See Note [rts/StgCRun.c : Stack Alignment on X86]
             sizes               = map (arg_size . cmmExprType dflags . hintlessCmm) (reverse args)
             raw_arg_size        = sum sizes + wORD_SIZE dflags
             arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
@@ -2035,7 +2034,7 @@ genCCall64' dflags target dest_regs args = do
 
     -- Align stack to 16n for calls, assuming a starting stack
     -- alignment of 16n - word_size on procedure entry. Which we
-    -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
+    -- maintain. See Note [rts/StgCRun.c : Stack Alignment on X86]
     (real_size, adjust_rsp) <-
         if (tot_arg_size + wORD_SIZE dflags) `rem` 16 == 0
             then return (tot_arg_size, nilOL)
