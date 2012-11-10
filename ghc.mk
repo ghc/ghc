@@ -662,6 +662,7 @@ BUILD_DIRS += \
    $(MAYBE_COMPILER) \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
+   utils/deriveConstants \
    utils/testremove \
    $(MAYBE_GHCTAGS) \
    utils/ghc-pwd \
@@ -1294,6 +1295,7 @@ distclean : clean
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
 	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
 	$(call removeTrees,utils/ghc-pwd/dist-boot)
+	$(call removeTrees,includes/dist-derivedconstants)
 	$(call removeTrees,inplace)
 	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 

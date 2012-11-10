@@ -1248,7 +1248,7 @@ defaultDynFlags mySettings =
       }
 
 defaultWays :: Settings -> [Way]
-defaultWays settings = if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
+defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then [WayDyn]
                        else []
 
@@ -2571,7 +2571,7 @@ defaultFlags settings
 
     ++ default_PIC platform
 
-    ++ (if pc_dYNAMIC_BY_DEFAULT (sPlatformConstants settings)
+    ++ (if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
         then wayGeneralFlags platform WayDyn
         else [Opt_Static])
 
