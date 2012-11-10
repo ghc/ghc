@@ -195,7 +195,7 @@ foldrM f z0 xs = foldl f' return xs z0
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the left, i.e. from left to right.
-foldlM :: (Foldable t, Monad m) => (a -> b -> m a) -> a -> t b -> m a
+foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 foldlM f z0 xs = foldr f' return xs z0
   where f' x k z = f z x >>= k
 
