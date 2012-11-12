@@ -42,7 +42,7 @@ llvmCodeGen dflags h us cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
                       foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
-        split p@(CmmProc h l live g) (d,e) =
+        split (CmmProc h l live g) (d,e) =
             let lbl = strCLabel_llvm env $
                         case mapLookup (g_entry g) h of
                           Nothing                   -> l

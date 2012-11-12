@@ -16,7 +16,6 @@ module CmmOpt (
 import CmmUtils
 import Cmm
 import DynFlags
-import CLabel
 
 import FastTypes
 import Outputable

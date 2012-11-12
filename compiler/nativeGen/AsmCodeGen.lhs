@@ -953,7 +953,6 @@ cmmStmtConFold stmt
 
         CmmCondBranch test true false
            -> do test' <- cmmExprConFold DataReference test
-                 dflags <- getDynFlags
                  return $ case test' of
                    CmmLit (CmmInt 0 _) -> CmmBranch false
                    CmmLit (CmmInt _ _) -> CmmBranch true

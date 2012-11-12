@@ -168,6 +168,7 @@ pprStmt :: CmmNode e x -> SDoc
 pprStmt stmt =
     sdocWithDynFlags $ \dflags ->
     case stmt of
+    CmmEntry _ -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it
                           -- XXX we probably want to emit these comments when
@@ -254,6 +255,8 @@ pprStmt stmt =
     CmmCall { cml_target = expr } -> mkJMP_ (pprExpr expr) <> semi
     CmmSwitch arg ids        -> sdocWithDynFlags $ \dflags ->
                                 pprSwitch dflags arg ids
+
+    _other -> pprPanic "PprC.pprStmt" (ppr stmt)
 
 type Hinted a = (a, ForeignHint)
 

@@ -19,7 +19,6 @@ import BlockId
 import DynFlags
 import Cmm hiding (topInfoTable)
 import Platform
-import Outputable
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.

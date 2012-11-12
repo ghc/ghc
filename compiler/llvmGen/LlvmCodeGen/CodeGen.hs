@@ -40,8 +40,8 @@ type LlvmStatements = OrdList LlvmStatement
 -- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: LlvmEnv -> RawCmmDecl -> UniqSM (LlvmEnv, [LlvmCmmDecl])
-genLlvmProc env proc0@(CmmProc infos lbl live graph) = do
-    let blocks = toBlockList graph
+genLlvmProc env (CmmProc infos lbl live graph) = do
+    let blocks = toBlockListEntryFirst graph
     (env', lmblocks, lmdata) <- basicBlocksCodeGen env live blocks ([], [])
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)
@@ -274,6 +274,7 @@ genCall env target res args = do
                                  _          -> CC_Ccc
                  CCallConv    -> CC_Ccc
                  CApiConv     -> CC_Ccc
+                 PrimCallConv -> panic "LlvmCodeGen.CodeGen.genCall: PrimCallConv"
 
             PrimTarget   _ -> CC_Ccc
 
