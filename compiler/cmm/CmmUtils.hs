@@ -51,9 +51,8 @@ module CmmUtils(
         -- * Operations that probably don't belong here
         modifyGraph,
 
-        lastNode, replaceLastNode,
         ofBlockMap, toBlockMap, insertBlock,
-        ofBlockList, toBlockList, bodyToBlockList,
+        ofBlockList, toBlockList, bodyToBlockList, toBlockListEntryFirst,
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
 
         analFwd, analBwd, analRewFwd, analRewBwd,
@@ -423,6 +422,17 @@ insertBlock block map =
 
 toBlockList :: CmmGraph -> [CmmBlock]
 toBlockList g = mapElems $ toBlockMap g
+
+-- | like 'toBlockList', but the entry block always comes first
+toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
+toBlockListEntryFirst g
+  | mapNull m  = []
+  | otherwise  = entry_block : others
+  where
+    m = toBlockMap g
+    entry_id = g_entry g
+    Just entry_block = mapLookup entry_id m
+    others = filter ((/= entry_id) . entryLabel) (mapElems m)
 
 ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
 ofBlockList entry blocks = CmmGraph { g_entry = entry

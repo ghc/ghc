@@ -25,7 +25,7 @@ import TargetReg
 
 import BlockId
 import CodeGen.Platform
-import OldCmm
+import Cmm
 import FastString
 import FastBool
 import Outputable

@@ -51,7 +51,7 @@ import CodeGen.Platform
 import Reg
 import RegClass
 
-import OldCmm
+import Cmm
 import CmmCallConv
 import CLabel           ( CLabel )
 import DynFlags

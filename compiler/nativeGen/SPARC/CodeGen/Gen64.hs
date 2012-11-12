@@ -28,7 +28,7 @@ import Instruction
 import Size
 import Reg
 
-import OldCmm
+import Cmm
 
 import DynFlags
 import OrdList

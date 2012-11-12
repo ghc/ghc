@@ -35,7 +35,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCmmExpr
     ( pprExpr, pprLit
-    , pprExpr9 {-only to import in OldPprCmm. When it dies, remove the export -}
     )
 where
 

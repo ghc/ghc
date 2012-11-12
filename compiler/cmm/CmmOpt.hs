@@ -8,14 +8,13 @@
 
 module CmmOpt (
         cmmMachOpFold,
-        cmmMachOpFoldM,
-        cmmLoopifyForC,
+        cmmMachOpFoldM
  ) where
 
 #include "HsVersions.h"
 
 import CmmUtils
-import OldCmm
+import Cmm
 import DynFlags
 import CLabel
 
@@ -416,6 +415,7 @@ exactLog2 x_
   except factorial, but what the hell.
 -}
 
+{-
 cmmLoopifyForC :: DynFlags -> RawCmmDecl -> RawCmmDecl
 -- XXX: revisit if we actually want to do this
 -- cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
@@ -434,6 +434,7 @@ cmmLoopifyForC dflags (CmmProc infos entry_lbl live
                  | otherwise               = entry_lbl
 
 cmmLoopifyForC _ top = top
+-}
 
 -- -----------------------------------------------------------------------------
 -- Utils

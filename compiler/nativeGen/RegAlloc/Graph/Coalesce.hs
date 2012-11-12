@@ -19,7 +19,7 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import OldCmm
+import Cmm
 import Bag
 import Digraph
 import UniqFM

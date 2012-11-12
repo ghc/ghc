@@ -119,13 +119,11 @@ import ProfInit
 import TyCon
 import Name
 import SimplStg         ( stg2stg )
-import qualified OldCmm as Old
-import qualified Cmm as New
+import Cmm
 import CmmParse         ( parseCmmFile )
 import CmmBuildInfoTables
 import CmmPipeline
 import CmmInfo
-import CmmCvt
 import CodeOutput
 import NameEnv          ( emptyNameEnv )
 import NameSet          ( emptyNameSet )
@@ -1353,7 +1351,7 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
         let initTopSRT = initUs_ us emptySRT
         dumpIfSet_dyn dflags Opt_D_dump_cmmz "Parsed Cmm" (ppr cmm)
         (_, cmmgroup) <- cmmPipeline hsc_env initTopSRT cmm
-        rawCmms <- cmmToRawCmm dflags (Stream.yield (cmmOfZgraph cmmgroup))
+        rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where
@@ -1368,7 +1366,7 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
                 -> CollectedCCs
                 -> [StgBinding]
                 -> HpcInfo
-                -> IO (Stream IO Old.CmmGroup ())
+                -> IO (Stream IO CmmGroup ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1376,7 +1374,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
-    let cmm_stream :: Stream IO New.CmmGroup ()
+    let cmm_stream :: Stream IO CmmGroup ()
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info
@@ -1407,7 +1405,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
                 (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT' cmmgroup
                 let srt | isEmptySRT topSRT = []
                         | otherwise         = srtToData topSRT
-                return (us',cmmOfZgraph (srt ++ cmmgroup))
+                return (us', srt ++ cmmgroup)
 
           in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
                 return ()
@@ -1418,10 +1416,10 @@ tryNewCodeGen hsc_env this_mod data_tycons
   
           let run_pipeline topSRT cmmgroup = do
                 (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup
-                return (topSRT,cmmOfZgraph cmmgroup)
+                return (topSRT,cmmgroup)
   
           in do topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
-                Stream.yield (cmmOfZgraph (srtToData topSRT))
+                Stream.yield (srtToData topSRT)
 
     let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" $ ppr a

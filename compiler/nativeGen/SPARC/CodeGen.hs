@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE GADTs #-}
 module SPARC.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,
@@ -38,7 +39,9 @@ import NCGMonad
 
 -- Our intermediate code:
 import BlockId
-import OldCmm
+import Cmm
+import CmmUtils
+import Hoopl
 import PIC
 import Reg
 import CLabel
@@ -59,8 +62,9 @@ import Control.Monad    ( mapAndUnzipM )
 cmmTopCodeGen :: RawCmmDecl
               -> NatM [NatCmmDecl CmmStatics Instr]
 
-cmmTopCodeGen (CmmProc info lab live (ListGraph blocks))
- = do (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
+cmmTopCodeGen (CmmProc info lab live graph)
+ = do let blocks = toBlockListEntryFirst graph
+      (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
 
       let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       let tops = proc : concat statics
@@ -76,12 +80,16 @@ cmmTopCodeGen (CmmData sec dat) = do
 --      are indicated by the NEWBLOCK instruction.  We must split up the
 --      instruction stream into basic blocks again.  Also, we extract
 --      LDATAs here too.
-basicBlockCodeGen :: CmmBasicBlock
+basicBlockCodeGen :: CmmBlock
                   -> NatM ( [NatBasicBlock Instr]
                           , [NatCmmDecl CmmStatics Instr])
 
-basicBlockCodeGen cmm@(BasicBlock id stmts) = do
-  instrs <- stmtsToInstrs stmts
+basicBlockCodeGen block = do
+  let (CmmEntry id, nodes, tail)  = blockSplit block
+      stmts = blockToList nodes
+  mid_instrs <- stmtsToInstrs stmts
+  tail_instrs <- stmtToInstrs tail
+  let instrs = mid_instrs `appOL` tail_instrs
   let
         (top,other_blocks,statics)
                 = foldrOL mkBlocks ([],[],[]) instrs
@@ -97,24 +105,23 @@ basicBlockCodeGen cmm@(BasicBlock id stmts) = do
 
         -- do intra-block sanity checking
         blocksChecked
-                = map (checkBlock cmm)
+                = map (checkBlock block)
                 $ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)
 
 
 -- | Convert some Cmm statements to SPARC instructions.
-stmtsToInstrs :: [CmmStmt] -> NatM InstrBlock
+stmtsToInstrs :: [CmmNode e x] -> NatM InstrBlock
 stmtsToInstrs stmts
    = do instrss <- mapM stmtToInstrs stmts
         return (concatOL instrss)
 
 
-stmtToInstrs :: CmmStmt -> NatM InstrBlock
+stmtToInstrs :: CmmNode e x -> NatM InstrBlock
 stmtToInstrs stmt = do
   dflags <- getDynFlags
   case stmt of
-    CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
 
     CmmAssign reg src
@@ -131,17 +138,19 @@ stmtToInstrs stmt = do
         where ty = cmmExprType dflags src
               size = cmmTypeSize ty
 
-    CmmCall target result_regs args _
+    CmmUnsafeForeignCall target result_regs args
        -> genCCall target result_regs args
 
     CmmBranch   id              -> genBranch id
-    CmmCondBranch arg id        -> genCondJump id arg
+    CmmCondBranch arg true false -> do b1 <- genCondJump true arg
+                                       b2 <- genBranch false
+                                       return (b1 `appOL` b2)
     CmmSwitch   arg ids         -> do dflags <- getDynFlags
                                       genSwitch dflags arg ids
-    CmmJump     arg _           -> genJump arg
+    CmmCall { cml_target = arg } -> genJump arg
 
-    CmmReturn
-     -> panic "stmtToInstrs: return statement should have been cps'd away"
+    _
+     -> panic "stmtToInstrs: statement should have been cps'd away"
 
 
 {-
@@ -369,9 +378,9 @@ generateJumpTableForInstr _ _ = Nothing
 -}
 
 genCCall
-    :: CmmCallTarget            -- function to call
-    -> [HintedCmmFormal]        -- where to put the result
-    -> [HintedCmmActual]        -- arguments (of mixed type)
+    :: ForeignTarget            -- function to call
+    -> [CmmFormal]        -- where to put the result
+    -> [CmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
 
@@ -382,28 +391,20 @@ genCCall
 --
 -- In the SPARC case we don't need a barrier.
 --
-genCCall (CmmPrim (MO_WriteBarrier) _) _ _
+genCCall (PrimTarget MO_WriteBarrier) _ _
  = do   return nilOL
 
-genCCall (CmmPrim _ (Just stmts)) _ _
-    = stmtsToInstrs stmts
-
-genCCall target dest_regs argsAndHints
+genCCall target dest_regs args0
  = do
         -- need to remove alignment information
-        let argsAndHints' | CmmPrim mop _ <- target,
+        let args | PrimTarget mop <- target,
                             (mop == MO_Memcpy ||
                              mop == MO_Memset ||
                              mop == MO_Memmove)
-                          = init argsAndHints
+                          = init args0
 
                           | otherwise
-                          = argsAndHints
-
-        -- strip hints from the arg regs
-        let args :: [CmmExpr]
-            args  = map hintlessCmm argsAndHints'
-
+                          = args0
 
         -- work out the arguments, and assign them to integer regs
         argcode_and_vregs       <- mapM arg_to_int_vregs args
@@ -416,14 +417,14 @@ genCCall target dest_regs argsAndHints
 
         -- deal with static vs dynamic call targets
         callinsns <- case target of
-                CmmCallee (CmmLit (CmmLabel lbl)) _ ->
+                ForeignTarget (CmmLit (CmmLabel lbl)) _ ->
                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
-                CmmCallee expr _
+                ForeignTarget expr _
                  -> do  (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
-                CmmPrim mop _
+                PrimTarget mop
                  -> do  res     <- outOfLineMachOp mop
                         lblOrMopExpr <- case res of
                                 Left lbl -> do
@@ -539,11 +540,11 @@ move_final (v:vs) (a:az) offset
 -- | Assign results returned from the call into their
 --      desination regs.
 --
-assign_code :: Platform -> [CmmHinted LocalReg] -> OrdList Instr
+assign_code :: Platform -> [LocalReg] -> OrdList Instr
 
 assign_code _ [] = nilOL
 
-assign_code platform [CmmHinted dest _hint]
+assign_code platform [dest]
  = let  rep     = localRegType dest
         width   = typeWidth rep
         r_dest  = getRegisterReg platform (CmmLocal dest)

@@ -21,7 +21,7 @@ import SPARC.Ppr	()
 import Instruction
 import Reg
 import Size
-import OldCmm
+import Cmm
 
 
 import Outputable

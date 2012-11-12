@@ -27,8 +27,7 @@ import RegClass
 import Reg
 import TargetReg
 
-import OldCmm
-import OldPprCmm()
+import PprCmm()
 import Outputable
 import UniqFM
 import UniqSet

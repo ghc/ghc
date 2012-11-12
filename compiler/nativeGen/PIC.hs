@@ -59,7 +59,7 @@ import NCGMonad
 
 
 import Hoopl
-import OldCmm
+import Cmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,

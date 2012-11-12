@@ -50,7 +50,7 @@ import Reg
 import RegClass
 import Size
 
-import OldCmm
+import Cmm
 import CLabel           ( CLabel )
 import Unique
 

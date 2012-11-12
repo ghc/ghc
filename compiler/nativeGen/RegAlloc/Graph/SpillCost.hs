@@ -31,7 +31,7 @@ import Reg
 import GraphBase
 
 import BlockId
-import OldCmm
+import Cmm
 import UniqFM
 import UniqSet
 import Digraph		(flattenSCCs)
