@@ -354,7 +354,10 @@ replaceBranches env cmmg
     last (CmmBranch id)          = CmmBranch (lookup id)
     last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
     last (CmmSwitch e tbl)       = CmmSwitch e (map (fmap lookup) tbl)
-    last l@(CmmCall {})          = l
+    last l@(CmmCall {})          = l { cml_cont = Nothing }
+            -- NB. remove the continuation of a CmmCall, since this
+            -- label will now be in a different CmmProc.  Not only
+            -- is this tidier, it stops CmmLint from complaining.
     last l@(CmmForeignCall {})   = l
     lookup id = fmap lookup (mapLookup id env) `orElse` id
             -- XXX: this is a recursive lookup, it follows chains
