@@ -2,20 +2,21 @@
 test('haddock.base',
      [unless_in_tree_compiler(skip)
      ,if_wordsize(64,
-          stats_num_field('peak_megabytes_allocated', 236,
-                                                      248))
+          stats_range_field('peak_megabytes_allocated', 249, 10))
                                         # 2012-08-14: 240 (amd64/Linux)
                                         # 2012-09-18: 237 (amd64/Linux)
+                                        # 2012-11-12: 249 (amd64/Linux)
      ,if_wordsize(32,
           stats_num_field('peak_megabytes_allocated', 110,
                                                       115))
                                         # 2012-08-14: 144 (x86/OSX)
                                         # 2012-10-30: 113 (x86/Windows)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 84794136, 2))
+          stats_range_field('max_bytes_used', 87265136, 10))
                                 # 2012-08-14: 87374568 (amd64/Linux)
                                 # 2012-08-21: 86428216 (amd64/Linux)
                                 # 2012-09-20: 84794136 (amd64/Linux)
+                                # 2012-11-12: 87265136 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 45574928, 1))
                                 # 2012-08-14: 45574928 (x86/OSX)
@@ -82,19 +83,21 @@ test('haddock.compiler',
                                         # 2012-08-14: 631 (x86/OSX)
                                         # 2012-10-30: 606 (x86/Windows)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 442768280, 2))
+          stats_range_field('max_bytes_used', 420105120, 10))
                                 # 2012-08-14: 428775544 (amd64/Linux)
                                 # 2012-09-20: 437618008 (amd64/Linux)
                                 # 2012-10-08: 442768280 (amd64/Linux)
+                                # 2012-11-12: 420105120 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 220847924, 1))
                                 # 2012-08-14: 231064920 (x86/OSX)
                                 # 2012-10-30: 220847924 (x86/Windows)
      ,if_wordsize(64,
-          stats_range_field('bytes allocated', 26882813032, 1))
+          stats_range_field('bytes allocated', 25990254632, 10))
                               # 2012-08-14: 26,070,600,504 (amd64/Linux)
                               # 2012-08-29: 26,353,100,288 (amd64/Linux, new CG)
                               # 2012-09-18: 26,882,813,032 (amd64/Linux)
+                              # 2012-11-12: 25,990,254,632 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('bytes allocated', 13773051312, 1))
                                  # 2012-08-14: 13471797488 (x86/OSX)
