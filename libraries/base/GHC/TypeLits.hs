@@ -27,6 +27,7 @@ module GHC.TypeLits
 
     -- * Functions on type nats
   , type (<=), type (<=?), type (+), type (*), type (^)
+  , type (-)
 
     -- * Destructing type-nat singletons.
   , isZero, IsZero(..)
@@ -105,6 +106,10 @@ type family (m :: Nat) * (n :: Nat) :: Nat
 
 -- | Exponentiation of type-level naturals.
 type family (m :: Nat) ^ (n :: Nat) :: Nat
+
+-- | Subtraction of type-level naturals.
+-- Note that this operation is unspecified for some inputs.
+type family (m :: Nat) - (n :: Nat) :: Nat
 
 
 --------------------------------------------------------------------------------
