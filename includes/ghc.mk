@@ -33,6 +33,11 @@ includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 #
 # Options
 #
+
+includes_CC_OPTS += $(SRC_CC_OPTS)
+includes_CC_OPTS += $(SRC_CC_WARNING_OPTS)
+includes_CC_OPTS += $(CONF_CC_OPTS_STAGE1)
+
 ifeq "$(GhcUnregisterised)" "YES"
 includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
