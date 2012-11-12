@@ -46,6 +46,7 @@ defaults
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity lazyDmd) TopRes) }
+   fixity           = Nothing
 
 
 -- Currently, documentation is produced using latex, so contents of
@@ -166,13 +167,16 @@ primtype Int#
 primop   IntAddOp    "+#"    Dyadic
    Int# -> Int# -> Int#
    with commutable = True
+        fixity = infixl 6
 
 primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
+   with fixity = infixl 6
 
 primop   IntMulOp    "*#" 
    Dyadic   Int# -> Int# -> Int#
    {Low word of signed integer multiply.}
    with commutable = True
+        fixity = infixl 7
 
 primop   IntMulMayOfloOp  "mulIntMayOflo#" 
    Dyadic   Int# -> Int# -> Int#
@@ -225,18 +229,26 @@ primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
    with code_size = 2
 
 primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
+
 primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
 
 primop   IntEqOp  "==#"   Compare
    Int# -> Int# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   IntNeOp  "/=#"   Compare
    Int# -> Int# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
+
 primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Bool
+   with fixity = infix 4
 
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
    with code_size = 0
@@ -401,32 +413,44 @@ section "Double#"
 primtype Double#
 
 primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
+
 primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
 
 primop DoubleEqOp "==##"   Compare
    Double# -> Double# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop DoubleNeOp "/=##"   Compare
    Double# -> Double# -> Bool
    with commutable = True
+        fixity = infix 4
 
 primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
+
 primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Bool
+   with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
    Double# -> Double# -> Double#
    with commutable = True
+        fixity = infixl 6
 
 primop   DoubleSubOp   "-##"   Dyadic   Double# -> Double# -> Double#
+   with fixity = infixl 6
 
 primop   DoubleMulOp   "*##"   Dyadic
    Double# -> Double# -> Double#
    with commutable = True
+        fixity = infixl 7
 
 primop   DoubleDivOp   "/##"   Dyadic
    Double# -> Double# -> Double#
    with can_fail = True
+        fixity = infixl 7
 
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 

@@ -40,6 +40,7 @@ data Option
    | OptionTrue   String          -- name = True
    | OptionString String String   -- name = { ... unparsed stuff ... }
    | OptionInteger String Int     -- name = <int>
+   | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
      deriving Show
 
 -- categorises primops
@@ -59,6 +60,13 @@ data Ty
 type TyVar = String
 type TyCon = String
 
+-- Follow definitions of Fixity and FixityDirection in GHC
+
+data Fixity = Fixity Int FixityDirection
+  deriving (Eq, Show)
+
+data FixityDirection = InfixN | InfixL | InfixR
+  deriving (Eq, Show)
 
 ------------------------------------------------------------------
 -- Sanity checking -----------------------------------------------
@@ -121,6 +129,7 @@ get_attrib_name (OptionFalse nm) = nm
 get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
 get_attrib_name (OptionInteger nm _) = nm
+get_attrib_name (OptionFixity _) = "fixity"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing
