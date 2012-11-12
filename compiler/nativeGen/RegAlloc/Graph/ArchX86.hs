@@ -1,10 +1,11 @@
--- | A description of the register set of the X86.
---      This isn't used directly in GHC proper.
---
---      See RegArchBase.hs for the reference.
---      See MachRegs.hs for the actual trivColorable function used in GHC.
---
 
+-- | A description of the register set of the X86.
+--
+--   This isn't used directly in GHC proper.
+--
+--   See RegArchBase.hs for the reference.
+--   See MachRegs.hs for the actual trivColorable function used in GHC.
+--
 module RegAlloc.Graph.ArchX86 (
         classOfReg,
         regsOfClass,
@@ -13,10 +14,9 @@ module RegAlloc.Graph.ArchX86 (
         worst,
         squeese,
 ) where
-
 import RegAlloc.Graph.ArchBase  (Reg(..), RegSub(..), RegClass(..))
-
 import UniqSet
+
 
 -- | Determine the class of a register
 classOfReg :: Reg -> RegClass
@@ -34,18 +34,21 @@ regsOfClass :: RegClass -> UniqSet Reg
 regsOfClass c
  = case c of
         ClassG32        
-         -> mkUniqSet     [ Reg ClassG32  i                     | i <- [0..7] ]
+         -> mkUniqSet   [ Reg ClassG32  i                     
+                        | i <- [0..7] ]
 
         ClassG16        
-         -> mkUniqSet     [ RegSub SubL16 (Reg ClassG32 i)      | i <- [0..7] ]
+         -> mkUniqSet   [ RegSub SubL16 (Reg ClassG32 i)
+                        | i <- [0..7] ]
 
         ClassG8 
          -> unionUniqSets
-                (mkUniqSet [ RegSub SubL8  (Reg ClassG32 i)     | i <- [0..3] ])
-                (mkUniqSet [ RegSub SubL8H (Reg ClassG32 i)     | i <- [0..3] ])
+                (mkUniqSet [ RegSub SubL8  (Reg ClassG32 i) | i <- [0..3] ])
+                (mkUniqSet [ RegSub SubL8H (Reg ClassG32 i) | i <- [0..3] ])
                         
         ClassF64        
-         -> mkUniqSet      [ Reg ClassF64  i                    | i <- [0..5] ]
+         -> mkUniqSet   [ Reg ClassF64  i
+                        | i <- [0..5] ]
         
 
 -- | Determine the common name of a reg
@@ -54,21 +57,23 @@ regName :: Reg -> Maybe String
 regName reg
  = case reg of
         Reg ClassG32 i  
-         | i <= 7       -> Just ([ "eax", "ebx", "ecx", "edx", "ebp", "esi", "edi", "esp" ] !! i)
+         | i <= 7-> Just $ [ "eax", "ebx", "ecx", "edx"
+                           , "ebp", "esi", "edi", "esp" ] !! i
 
         RegSub SubL16 (Reg ClassG32 i)
-         | i <= 7       -> Just ([ "ax", "bx", "cx", "dx", "bp", "si", "di", "sp"] !! i)
+         | i <= 7 -> Just $ [ "ax", "bx", "cx", "dx"
+                            , "bp", "si", "di", "sp"] !! i
          
         RegSub SubL8  (Reg ClassG32 i)
-         | i <= 3       -> Just ([ "al", "bl", "cl", "dl"] !! i)
+         | i <= 3 -> Just $ [ "al", "bl", "cl", "dl"] !! i
          
         RegSub SubL8H (Reg ClassG32 i)
-         | i <= 3       -> Just ([ "ah", "bh", "ch", "dh"] !! i)
+         | i <= 3 -> Just $ [ "ah", "bh", "ch", "dh"] !! i
 
-        _               -> Nothing
+        _         -> Nothing
 
         
--- | Which regs alias what other regs
+-- | Which regs alias what other regs.
 regAlias :: Reg -> UniqSet Reg
 regAlias reg
  = case reg of
@@ -78,12 +83,14 @@ regAlias reg
          
          -- for eax, ebx, ecx, eds
          |  i <= 3              
-         -> mkUniqSet $ [ Reg ClassG32 i, RegSub SubL16 reg, RegSub SubL8 reg, RegSub SubL8H reg ]
+         -> mkUniqSet 
+         $ [ Reg ClassG32 i,   RegSub SubL16 reg
+           , RegSub SubL8 reg, RegSub SubL8H reg ]
          
          -- for esi, edi, esp, ebp
          | 4 <= i && i <= 7     
-         -> mkUniqSet $ [ Reg ClassG32 i, RegSub SubL16 reg ]
-        
+         -> mkUniqSet 
+         $ [ Reg ClassG32 i,   RegSub SubL16 reg ]
         
         -- 16 bit subregs alias the whole reg
         RegSub SubL16 r@(Reg ClassG32 _)        
@@ -104,7 +111,6 @@ regAlias reg
 
 
 -- | Optimised versions of RegColorBase.{worst, squeese} specific to x86
-
 worst :: Int -> RegClass -> RegClass -> Int
 worst n classN classC
  = case classN of
@@ -138,7 +144,3 @@ squeese :: RegClass -> [(Int, RegClass)] -> Int
 squeese classN countCs
         = sum (map (\(i, classC) -> worst i classN classC) countCs)
         
-
-
-
-

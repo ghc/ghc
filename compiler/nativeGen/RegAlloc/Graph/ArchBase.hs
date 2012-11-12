@@ -1,17 +1,17 @@
 
 -- | Utils for calculating general worst, bound, squeese and free, functions.
 --
---      as per: "A Generalized Algorithm for Graph-Coloring Register Allocation"
---              Michael Smith, Normal Ramsey, Glenn Holloway.
---              PLDI 2004
+--   as per: "A Generalized Algorithm for Graph-Coloring Register Allocation"
+--           Michael Smith, Normal Ramsey, Glenn Holloway.
+--           PLDI 2004
 --      
---      These general versions are not used in GHC proper because they are too slow.
---      Instead, hand written optimised versions are provided for each architecture
---      in MachRegs*.hs 
+--   These general versions are not used in GHC proper because they are too slow.
+--   Instead, hand written optimised versions are provided for each architecture
+--   in MachRegs*.hs 
 --
---      This code is here because we can test the architecture specific code against it.
+--   This code is here because we can test the architecture specific code against
+--   it.
 --
-
 module RegAlloc.Graph.ArchBase (
         RegClass(..),
         Reg(..),
@@ -20,9 +20,7 @@ module RegAlloc.Graph.ArchBase (
         worst,
         bound,
         squeese
-)
-        
-where
+) where
 import UniqSet
 import Unique
 
@@ -64,6 +62,7 @@ instance Uniquable Reg where
         getUnique (RegSub _ (RegSub _ _))
           = error "RegArchBase.getUnique: can't have a sub-reg of a sub-reg."
 
+
 -- | A subcomponent of another register
 data RegSub
         = SubL16        -- lowest 16 bits
@@ -79,11 +78,10 @@ data RegSub
 --
 --      (worst neighbors classN classC) is the maximum number of potential
 --      colors for N that can be lost by coloring its neighbors.
-
+--
 -- This should be hand coded/cached for each particular architecture,
 --      because the compute time is very long..
-worst 
-        :: (RegClass    -> UniqSet Reg)
+worst   :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)
         -> Int -> RegClass -> RegClass -> Int
 
@@ -97,10 +95,12 @@ worst regsOfClass regAlias neighbors classN classC
         regsC           = regsOfClass classC
         
         -- all the possible subsets of c which have size < m
-        regsS           = filter (\s -> sizeUniqSet s >= 1 && sizeUniqSet s <= neighbors)
+        regsS           = filter (\s -> sizeUniqSet s >= 1 
+                                     && sizeUniqSet s <= neighbors)
                         $ powersetLS regsC
 
-        -- for each of the subsets of C, the regs which conflict with posiblities for N
+        -- for each of the subsets of C, the regs which conflict
+        -- with posiblities for N
         regsS_conflict 
                 = map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
 
@@ -110,8 +110,7 @@ worst regsOfClass regAlias neighbors classN classC
 -- | For a node N of classN and neighbors of classesC
 --      (bound classN classesC) is the maximum number of potential 
 --      colors for N that can be lost by coloring its neighbors.
-bound 
-        :: (RegClass    -> UniqSet Reg)
+bound   :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)
         -> RegClass -> [RegClass] -> Int
 
@@ -131,29 +130,25 @@ bound regsOfClass regAlias classN classesC
 
 -- | The total squeese on a particular node with a list of neighbors.
 --
---      A version of this should be constructed for each particular architecture,
---      possibly including uses of bound, so that alised registers don't get counted
---      twice, as per the paper.        
-squeese 
-        :: (RegClass    -> UniqSet Reg)
+--   A version of this should be constructed for each particular architecture,
+--   possibly including uses of bound, so that alised registers don't get
+--   counted twice, as per the paper.        
+squeese :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)
         -> RegClass -> [(Int, RegClass)] -> Int
 
 squeese regsOfClass regAlias classN countCs
-        = sum (map (\(i, classC) -> worst regsOfClass regAlias i classN classC) countCs)
+        = sum 
+        $ map (\(i, classC) -> worst regsOfClass regAlias i classN classC) 
+        $ countCs
         
 
 -- | powerset (for lists)
 powersetL :: [a] -> [[a]]
 powersetL       = map concat . mapM (\x -> [[],[x]])
-        
+
+
 -- | powersetLS (list of sets)
 powersetLS :: Uniquable a => UniqSet a -> [UniqSet a]
 powersetLS s    = map mkUniqSet $ powersetL $ uniqSetToList s
-
-{-
--- | unions (for sets)
-unionsS :: Ord a => Set (Set a) -> Set a
-unionsS ss      = Set.unions $ Set.toList ss
--}
 
