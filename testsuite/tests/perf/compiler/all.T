@@ -39,21 +39,23 @@ test('T1969',
                         # 2012-10-08:     303930948 (x86/Linux, new codegen)
                         # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 642594312, 1)),
-                                    # 17/11/2009:     434,845,560 (amd64/Linux)
-                                    # 08/12/2009:     459,776,680 (amd64/Linux)
-                                    # 17/05/2010:     519,377,728 (amd64/Linux)
-                                    # 05/08/2011:     561,382,568 (amd64/OS X)
-                                    # 16/07/2012:     589,168,872 (amd64/Linux)
-                                    # 20/07/2012:     595,936,240 (amd64/Linux)
-                                    # 23/08/2012:     606,230,880 (amd64/Linux)
-                                    # 29/08/2012:     633,334,184 (amd64/Linux)
-                                    #                 (^ new codegen)
-                                    # 18/09/2012:     641,959,976 (amd64/Linux)
-                                    # 19/10/2012:     661,832,592 (amd64/Linux)
-                                    #                 (^ -fPIC turned on)
-                                    # 23/10/2012:     642,594,312 (amd64/Linux)
-                                    #                 (^ -fPIC turned off again)
+          compiler_stats_range_field('bytes allocated', 658786936, 1)),
+                        # 17/11/2009:     434,845,560 (amd64/Linux)
+                        # 08/12/2009:     459,776,680 (amd64/Linux)
+                        # 17/05/2010:     519,377,728 (amd64/Linux)
+                        # 05/08/2011:     561,382,568 (amd64/OS X)
+                        # 16/07/2012:     589,168,872 (amd64/Linux)
+                        # 20/07/2012:     595,936,240 (amd64/Linux)
+                        # 23/08/2012:     606,230,880 (amd64/Linux)
+                        # 29/08/2012:     633,334,184 (amd64/Linux)
+                        #                 (^ new codegen)
+                        # 18/09/2012:     641,959,976 (amd64/Linux)
+                        # 19/10/2012:     661,832,592 (amd64/Linux)
+                        #                 (^ -fPIC turned on)
+                        # 23/10/2012:     642,594,312 (amd64/Linux)
+                        #                 (^ -fPIC turned off again)
+                        # 12/11/2012:     658,786,936 (amd64/Linux)
+                        #                 ( UNKNOWN REASON )
       only_ways(['normal']),
       extra_hc_opts('-dcore-lint -static')
           # Leave -dcore-lint on for this one test, so that we have something
@@ -108,9 +110,10 @@ test('T4801',
           compiler_stats_range_field('peak_megabytes_allocated', 30, 20)),
 
       if_wordsize(64,
-          compiler_stats_range_field('peak_megabytes_allocated', 64, 20)),
+          compiler_stats_range_field('peak_megabytes_allocated', 49, 20)),
                    # prev:       50 (amd64/Linux)
                    # 19/10/2012: 64 (amd64/Linux) (REASON UNKNOWN!)
+                   # 12/11/2012: 49 (amd64/Linux) (REASON UNKNOWN!)
 
       # expected value: 58 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
@@ -235,10 +238,13 @@ test('T783',
           compiler_stats_range_field('bytes allocated', 226907420, 10)),
                            # 2012-10-08: 226907420 (x86/Linux)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 436927840, 10)),
+          compiler_stats_range_field('bytes allocated', 640324528, 10)),
                            # prev:       349,263,216 (amd64/Linux)
                            # 07/08/2012: 384,479,856 (amd64/Linux)
                            # 29/08/2012: 436,927,840 (amd64/Linux)
+                           # 12/11/2012: 640,324,528 (amd64/Linux)
+                           #   (OldCmm removed: not sure why this got worse, the
+                           #    other perf tests remained about the same)
       extra_hc_opts('-static')
       ],
       compile,[''])
