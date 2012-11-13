@@ -885,9 +885,9 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
 
 stg_atomicallyzh (P_ stm)
 {
-  W_ old_trec;
-  W_ new_trec;
-  W_ code, next_invariant, frame_result;
+  P_ old_trec;
+  P_ new_trec;
+  P_ code, next_invariant, frame_result;
 
   // stmStartTransaction may allocate
   MAYBE_GC_P(stg_atomicallyzh, stm);

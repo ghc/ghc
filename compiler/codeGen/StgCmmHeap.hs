@@ -366,21 +366,17 @@ entryHeapCheck' is_fastf node arity args code
 
               Function (fast): call (NativeNode) stg_gc_fun(fun, args)
 
-              Function (slow): R1 = fun
-                               call (slow) stg_gc_fun(args)
-               XXX: this is a bit naughty, we should really pass R1 as an
-               argument and use a special calling convention.
+              Function (slow): call (slow) stg_gc_fun(fun, args)
            -}
            gc_call upd
                | is_thunk
-                 = mkJump dflags stg_gc_enter1 [node] upd
+                 = mkJump dflags NativeNodeCall stg_gc_enter1 [node] upd
 
                | is_fastf
-                 = mkJump dflags stg_gc_fun (node : args') upd
+                 = mkJump dflags NativeNodeCall stg_gc_fun (node : args') upd
 
                | otherwise
-                 = mkAssign nodeReg node <*>
-                   mkForeignJump dflags Slow stg_gc_fun args' upd
+                 = mkJump dflags Slow stg_gc_fun (node : args') upd
 
        updfr_sz <- getUpdFrameOff
 

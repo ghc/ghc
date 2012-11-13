@@ -499,6 +499,9 @@ checkSTACK (StgStack *stack)
 void
 checkTSO(StgTSO *tso)
 {
+    StgTSO *next;
+    const StgInfoTable *info;
+
     if (tso->what_next == ThreadKilled) {
       /* The garbage collector doesn't bother following any pointers
        * from dead threads, so don't check sanity here.  
@@ -506,9 +509,13 @@ checkTSO(StgTSO *tso)
       return;
     }
 
-    ASSERT(tso->_link == END_TSO_QUEUE || 
-           tso->_link->header.info == &stg_MVAR_TSO_QUEUE_info ||
-           tso->_link->header.info == &stg_TSO_info);
+    next = tso->_link;
+    info = (const StgInfoTable*) tso->header.info;
+
+    ASSERT(next == END_TSO_QUEUE ||
+           info == &stg_MVAR_TSO_QUEUE_info ||
+           info == &stg_TSO_info ||
+           info == &stg_WHITEHOLE_info); // happens due to STM doing lockTSO()
 
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole

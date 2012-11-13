@@ -9,7 +9,7 @@ module MkGraph
   , stackStubExpr
   , mkNop, mkAssign, mkStore, mkUnsafeCall, mkFinalCall, mkCallReturnsTo
   , mkJumpReturnsTo
-  , mkJump, mkJumpExtra, mkDirectJump, mkForeignJump, mkForeignJumpExtra
+  , mkJump, mkJumpExtra
   , mkRawJump
   , mkCbranch, mkSwitch
   , mkReturn, mkComment, mkCallEntry, mkBranch
@@ -188,10 +188,12 @@ mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkStore  l r  = mkMiddle $ CmmStore  l r
 
 ---------- Control transfer
-mkJump          :: DynFlags -> CmmExpr -> [CmmActual] -> UpdFrameOffset
+mkJump          :: DynFlags -> Convention -> CmmExpr
+                -> [CmmActual]
+                -> UpdFrameOffset
                 -> CmmAGraph
-mkJump dflags e actuals updfr_off =
-  lastWithArgs dflags Jump Old NativeNodeCall actuals updfr_off $
+mkJump dflags conv e actuals updfr_off =
+  lastWithArgs dflags Jump Old conv actuals updfr_off $
     toCall e Nothing updfr_off 0
 
 -- | A jump where the caller says what the live GlobalRegs are.  Used
@@ -203,28 +205,10 @@ mkRawJump dflags e updfr_off vols =
     \arg_space _  -> toCall e Nothing updfr_off 0 arg_space vols
 
 
-mkJumpExtra     :: DynFlags -> CmmExpr -> [CmmActual] -> UpdFrameOffset
-                -> [CmmActual] -> CmmAGraph
-mkJumpExtra dflags e actuals updfr_off extra_stack =
-  lastWithArgsAndExtraStack dflags Jump Old NativeNodeCall actuals updfr_off extra_stack $
-    toCall e Nothing updfr_off 0
-
-mkDirectJump    :: DynFlags -> CmmExpr -> [CmmActual] -> UpdFrameOffset
-                -> CmmAGraph
-mkDirectJump dflags e actuals updfr_off =
-  lastWithArgs dflags Jump Old NativeDirectCall actuals updfr_off $
-    toCall e Nothing updfr_off 0
-
-mkForeignJump   :: DynFlags
-                -> Convention -> CmmExpr -> [CmmActual] -> UpdFrameOffset
-                -> CmmAGraph
-mkForeignJump dflags conv e actuals updfr_off =
-  mkForeignJumpExtra dflags conv e actuals updfr_off noExtraStack
-
-mkForeignJumpExtra :: DynFlags -> Convention -> CmmExpr -> [CmmActual]
+mkJumpExtra :: DynFlags -> Convention -> CmmExpr -> [CmmActual]
                 -> UpdFrameOffset -> [CmmActual]
                 -> CmmAGraph
-mkForeignJumpExtra dflags conv e actuals updfr_off extra_stack =
+mkJumpExtra dflags conv e actuals updfr_off extra_stack =
   lastWithArgsAndExtraStack dflags Jump Old conv actuals updfr_off extra_stack $
     toCall e Nothing updfr_off 0
 
