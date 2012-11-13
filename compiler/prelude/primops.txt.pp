@@ -2068,26 +2068,6 @@ pseudoop   "seq"
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
 
-pseudoop   "lazy"
-   a -> a
-   { The {\tt lazy} function restrains strictness analysis a little. The call
-	{\tt (lazy e)} means the same as {\tt e}, but {\tt lazy} has a magical
-	property so far as strictness analysis is concerned: it is lazy in its first
-	argument, even though its semantics is strict. After strictness analysis has
-	run, calls to {\tt lazy} are inlined to be the identity function.
-
-	This behaviour is occasionally useful when controlling evaluation order.
-	Notably, {\tt lazy} is used in the library definition of {\tt Control.Parallel.par}:
-
-	{\tt par :: a -> b -> b}
-
-	{\tt par x y = case (par\# x) of \_ -> lazy y}
-
-	If {\tt lazy} were not lazy, {\tt par} would look strict in {\tt y} which
-	would defeat the whole purpose of {\tt par}.
-
-	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
-
 primtype Any k
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back. 
