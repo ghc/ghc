@@ -839,7 +839,7 @@ define installLibsTo
 		    $(RANLIB) $2/`basename $$i` ;; \
 		  *.dll) \
 		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
-		    $(STRIP_CMD) $2/$$i ;; \
+		    $(STRIP_CMD) $2/`basename $$i` ;; \
 		  *.so) \
 		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2) ;; \
 		  *.dylib) \
