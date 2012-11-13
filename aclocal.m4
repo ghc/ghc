@@ -1857,21 +1857,14 @@ case "$1" in
 
 # BOOTSTRAPPING_GHC_INFO_FIELD
 # --------------------------------
-# If the bootstrapping compiler is >= 7.1, then set the variable
-# $1 to the value of the ghc --info field $2. Otherwise, set it to
-# $3.
+# Set the variable $1 to the value of the ghc --info field $2.
 AC_DEFUN([BOOTSTRAPPING_GHC_INFO_FIELD],[
-if test $GhcCanonVersion -ge 701
+$1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
+tmp=${$1#\$topdir/}
+if test "${$1}" != "$tmp"
 then
-    $1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
-    tmp=${$1#\$topdir/}
-    if test "${$1}" != "$tmp"
-    then
-        topdir=`"$WithGhc" --print-libdir | sed 's#\\\\#/#g'`
-        $1="$topdir/$tmp"
-    fi
-else
-    $1=$3
+    topdir=`"$WithGhc" --print-libdir | sed 's#\\\\#/#g'`
+    $1="$topdir/$tmp"
 fi
 AC_SUBST($1)
 ])
