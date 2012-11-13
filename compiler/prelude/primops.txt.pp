@@ -2068,26 +2068,6 @@ pseudoop   "seq"
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
 
-pseudoop   "inline"
-   a -> a
-   { The call {\tt (inline f)} arranges that f is inlined, regardless of its size.
-	More precisely, the call {\tt (inline f)} rewrites to the right-hand side of
-	{\tt f}'s definition. This allows the programmer to control inlining from a
-	particular call site rather than the definition site of the function (c.f.
-	{\tt INLINE} pragmas in User's Guide, Section 7.10.3, "INLINE and NOINLINE
-	pragmas").
-
-	This inlining occurs regardless of the argument to the call or the size of
-	{\tt f}'s definition; it is unconditional. The main caveat is that {\tt f}'s
-	definition must be visible to the compiler. That is, {\tt f} must be
-	{\tt let}-bound in the current scope. If no inlining takes place, the
-	{\tt inline} function expands to the identity function in Phase zero; so its
-	use imposes no overhead.
-
-	It is good practice to mark the function with an INLINABLE pragma at
-        its definition, (a) so that GHC guarantees to expose its unfolding regardless
-        of size, and (b) so that you have control over exactly what is inlined. }
-
 pseudoop   "lazy"
    a -> a
    { The {\tt lazy} function restrains strictness analysis a little. The call
