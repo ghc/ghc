@@ -40,7 +40,9 @@ main = do opts <- parseArgs
                   do tmpdir  <- getOption "tmpdir"      o_tmpdir
                      gccProg <- getOption "gcc program" o_gccProg
                      nmProg  <- getOption "nm program"  o_nmProg
-                     rs <- getWanted tmpdir gccProg (o_gccFlags opts) nmProg
+                     let verbose = o_verbose opts
+                         gccFlags = o_gccFlags opts
+                     rs <- getWanted verbose tmpdir gccProg gccFlags nmProg
                      let haskellRs = [ what
                                      | (wh, what) <- rs
                                      , wh `elem` [Haskell, Both] ]
@@ -54,6 +56,7 @@ main = do opts <- parseArgs
                                     wh `elem` [Haskell, Both] ]
 
 data Options = Options {
+                   o_verbose :: Bool,
                    o_mode :: Maybe Mode,
                    o_tmpdir :: Maybe FilePath,
                    o_outputFilename :: Maybe FilePath,
@@ -67,6 +70,7 @@ parseArgs = do args <- getArgs
                opts <- f emptyOptions args
                return (opts {o_gccFlags = reverse (o_gccFlags opts)})
     where emptyOptions = Options {
+                             o_verbose = False,
                              o_mode = Nothing,
                              o_tmpdir = Nothing,
                              o_outputFilename = Nothing,
@@ -75,6 +79,8 @@ parseArgs = do args <- getArgs
                              o_nmProg = Nothing
                          }
           f opts [] = return opts
+          f opts ("-v" : args')
+              = f (opts {o_verbose = True}) args'
           f opts ("--gen-haskell-type" : args')
               = f (opts {o_mode = Just Gen_Haskell_Type}) args'
           f opts ("--gen-haskell-value" : args')
@@ -598,13 +604,13 @@ wanteds = concat
           ,constantNatural Haskell "ILDV_STATE_USE"    "LDV_STATE_USE"
           ]
 
-getWanted :: FilePath -> FilePath -> [String] -> FilePath -> IO Results
-getWanted tmpdir gccProgram gccFlags nmProgram
+getWanted :: Bool -> FilePath -> FilePath -> [String] -> FilePath -> IO Results
+getWanted verbose tmpdir gccProgram gccFlags nmProgram
     = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) wanteds)
              cFile = tmpdir </> "tmp.c"
              oFile = tmpdir </> "tmp.o"
          writeFile cFile cStuff
-         execute gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
+         execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- readProcess nmProgram [oFile] ""
          let ls = lines xs
              ms = map parseNmLine ls
@@ -631,7 +637,11 @@ getWanted tmpdir gccProgram gccFlags nmProgram
                      "#include <stdio.h>",
                      "#include <string.h>",
                      "",
+                     "#if defined(offsetof)",
+                     "#define OFFSET(s_type, field) offsetof(s_type, field)",
+                     "#else",
                      "#define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))",
+                     "#endif",
                      "#define FIELD_SIZE(s_type, field) ((size_t)sizeof(((s_type*)0)->field))",
                      "#define TYPE_SIZE(type) (sizeof(type))",
                      "#define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))",
@@ -851,8 +861,10 @@ die :: String -> IO a
 die err = do hPutStrLn stderr err
              exitFailure
 
-execute :: FilePath -> [String] -> IO ()
-execute prog args = do ec <- rawSystem prog args
-                       unless (ec == ExitSuccess) $
-                           die ("Executing " ++ show prog ++ " failed")
+execute :: Bool -> FilePath -> [String] -> IO ()
+execute verbose prog args
+ = do when verbose $ putStrLn $ showCommandForUser prog args
+      ec <- rawSystem prog args
+      unless (ec == ExitSuccess) $
+          die ("Executing " ++ show prog ++ " failed")
 
