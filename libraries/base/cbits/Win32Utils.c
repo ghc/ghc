@@ -80,34 +80,49 @@ static struct errentry errtable[] = {
 #define MIN_EACCES_RANGE ERROR_WRITE_PROTECT
 #define MAX_EACCES_RANGE ERROR_SHARING_BUFFER_EXCEEDED
 
-void maperrno (void)
+void maperrno(void)
 {
-	int i;
-	DWORD dwErrorCode;
+    errno = maperrno_func(GetLastError());
+}
 
-	dwErrorCode = GetLastError();
+int maperrno_func(DWORD dwErrorCode)
+{
+    int i;
 
-	/* check the table for the OS error code */
-	for (i = 0; i < ERRTABLESIZE; ++i)
-	{
-		if (dwErrorCode == errtable[i].oscode)
-		{
-			errno = errtable[i].errnocode;
-			return;
-		}
-	}
+    /* check the table for the OS error code */
+    for (i = 0; i < ERRTABLESIZE; ++i)
+        if (dwErrorCode == errtable[i].oscode)
+            return errtable[i].errnocode;
 
-	/* The error code wasn't in the table.  We check for a range of */
-	/* EACCES errors or exec failure errors (ENOEXEC).  Otherwise   */
-	/* EINVAL is returned.                                          */
+    /* The error code wasn't in the table.  We check for a range of */
+    /* EACCES errors or exec failure errors (ENOEXEC).  Otherwise   */
+    /* EINVAL is returned.                                          */
 
-	if (dwErrorCode >= MIN_EACCES_RANGE && dwErrorCode <= MAX_EACCES_RANGE)
-		errno = EACCES;
-	else
-		if (dwErrorCode >= MIN_EXEC_ERROR && dwErrorCode <= MAX_EXEC_ERROR)
-			errno = ENOEXEC;
-		else
-			errno = EINVAL;
+    if (dwErrorCode >= MIN_EACCES_RANGE && dwErrorCode <= MAX_EACCES_RANGE)
+        return EACCES;
+    else if (dwErrorCode >= MIN_EXEC_ERROR && dwErrorCode <= MAX_EXEC_ERROR)
+        return ENOEXEC;
+    else
+        return EINVAL;
+}
+
+LPWSTR base_getErrorMessage(DWORD err)
+{
+    LPWSTR what;
+    DWORD res;
+
+    res = FormatMessageW(
+              (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER),
+              NULL,
+              err,
+              MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), /* Default language */
+              (LPWSTR) &what,
+              0,
+              NULL
+          );
+    if (res == 0)
+        return NULL;
+    return what;
 }
 
 int get_unique_file_info(int fd, HsWord64 *dev, HsWord64 *ino)

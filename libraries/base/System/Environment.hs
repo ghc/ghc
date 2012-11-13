@@ -238,7 +238,7 @@ lookupEnv name = withCWString name $ \s -> try_size s 256
           | otherwise  -> peekCWString p_value >>= return . Just
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetEnvironmentVariableW"
-  c_GetEnvironmentVariable :: LPTSTR -> LPTSTR -> DWORD -> IO DWORD
+  c_GetEnvironmentVariable :: LPWSTR -> LPWSTR -> DWORD -> IO DWORD
 #else
 lookupEnv name =
     withCString name $ \s -> do

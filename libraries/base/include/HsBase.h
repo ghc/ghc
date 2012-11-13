@@ -141,6 +141,7 @@
 #if defined(__MINGW32__)
 /* in Win32Utils.c */
 extern void maperrno (void);
+extern int maperrno_func(DWORD dwErrorCode);
 extern HsWord64 getMonotonicUSec(void);
 #endif
 
