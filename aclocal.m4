@@ -543,19 +543,6 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 ])
 
 
-# FP_EVAL_STDERR(COMMAND)
-# -----------------------
-# Eval COMMAND, save its stderr (without lines resulting from shell tracing)
-# into the file conftest.err and the exit status in the variable fp_status.
-AC_DEFUN([FP_EVAL_STDERR],
-[{ (eval $1) 2>conftest.er1
-  fp_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  (exit $fp_status); }[]dnl
-])# FP_EVAL_STDERR
-
-
 # FP_ARG_WITH_PATH_GNU_PROG
 # --------------------
 # XXX
