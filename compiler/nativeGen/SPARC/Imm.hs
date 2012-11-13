@@ -15,7 +15,7 @@ module SPARC.Imm (
 
 where
 
-import OldCmm
+import Cmm
 import CLabel
 
 import Outputable

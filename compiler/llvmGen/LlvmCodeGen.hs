@@ -14,8 +14,9 @@ import LlvmCodeGen.Ppr
 import LlvmMangler
 
 import CgUtils ( fixStgRegisters )
-import OldCmm
-import OldPprCmm
+import Cmm
+import Hoopl
+import PprCmm
 
 import BufWrite
 import DynFlags
@@ -41,10 +42,11 @@ llvmCodeGen dflags h us cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
                       foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
-        split p@(CmmProc _ l live _) (d,e) =
-            let lbl = strCLabel_llvm env $ case topInfoTable p of
-                        Nothing                   -> l
-                        Just (Statics info_lbl _) -> info_lbl
+        split (CmmProc h l live g) (d,e) =
+            let lbl = strCLabel_llvm env $
+                        case mapLookup (g_entry g) h of
+                          Nothing                   -> l
+                          Just (Statics info_lbl _) -> info_lbl
                 env' = funInsert lbl (llvmFunTy dflags live) e
             in (d,env')
     in do
@@ -127,9 +129,6 @@ cmmProcLlvmGens dflags h _ _ [] _ ivars
                              pprLlvmData ([lmUsed], [])
 
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
- = cmmProcLlvmGens dflags h us env cmms count ivars
-
-cmmProcLlvmGens dflags h us env ((CmmProc _ _ _ (ListGraph [])) : cmms) count ivars
  = cmmProcLlvmGens dflags h us env cmms count ivars
 
 cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars = do

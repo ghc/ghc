@@ -173,7 +173,6 @@ Library
         CmmCallConv
         CmmCommonBlockElim
         CmmContFlowOpt
-        CmmCvt
         CmmExpr
         CmmInfo
         CmmLex
@@ -190,10 +189,6 @@ Library
         CmmUtils
         CmmLayoutStack
         MkGraph
-        OldCmm
-        OldCmmLint
-        OldCmmUtils
-        OldPprCmm
         PprBase
         PprC
         PprCmm

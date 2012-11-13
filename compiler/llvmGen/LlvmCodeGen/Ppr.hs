@@ -14,7 +14,7 @@ import LlvmCodeGen.Data
 import LlvmCodeGen.Regs
 
 import CLabel
-import OldCmm
+import Cmm
 import Platform
 
 import FastString

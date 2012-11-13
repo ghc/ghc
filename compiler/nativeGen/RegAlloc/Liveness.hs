@@ -33,8 +33,8 @@ import Reg
 import Instruction
 
 import BlockId
-import OldCmm hiding (RegSet)
-import OldPprCmm()
+import Cmm hiding (RegSet)
+import PprCmm()
 
 import Digraph
 import DynFlags
@@ -690,10 +690,11 @@ regLiveness platform (CmmProc info lbl live sccs)
 
 -- -----------------------------------------------------------------------------
 -- | Check ordering of Blocks
---   The computeLiveness function requires SCCs to be in reverse dependent order.
---   If they're not the liveness information will be wrong, and we'll get a bad allocation.
---   Better to check for this precondition explicitly or some other poor sucker will
---   waste a day staring at bad assembly code..
+--   The computeLiveness function requires SCCs to be in reverse
+--   dependent order.  If they're not the liveness information will be
+--   wrong, and we'll get a bad allocation.  Better to check for this
+--   precondition explicitly or some other poor sucker will waste a
+--   day staring at bad assembly code..
 --
 checkIsReverseDependent
         :: Instruction instr

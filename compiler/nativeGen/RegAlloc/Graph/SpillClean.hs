@@ -39,7 +39,7 @@ import Instruction
 import Reg
 
 import BlockId
-import OldCmm
+import Cmm
 import UniqSet
 import UniqFM
 import Unique

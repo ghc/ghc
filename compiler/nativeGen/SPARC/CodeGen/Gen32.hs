@@ -29,7 +29,7 @@ import NCGMonad
 import Size
 import Reg
 
-import OldCmm
+import Cmm
 
 import Control.Monad (liftM)
 import DynFlags

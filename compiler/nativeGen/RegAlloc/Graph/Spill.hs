@@ -11,7 +11,7 @@ where
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import OldCmm hiding (RegSet)
+import Cmm hiding (RegSet)
 import BlockId
 
 import State

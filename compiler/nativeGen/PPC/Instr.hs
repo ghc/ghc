@@ -36,7 +36,7 @@ import Reg
 import CodeGen.Platform
 import BlockId
 import DynFlags
-import OldCmm
+import Cmm
 import FastString
 import CLabel
 import Outputable

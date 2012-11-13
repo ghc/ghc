@@ -12,7 +12,8 @@
 
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual,
-     UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
+     UpdFrameOffset, Convention(..),
+     ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
@@ -280,6 +281,17 @@ data ForeignTarget        -- The target of a foreign call
   | PrimTarget            -- A possibly-side-effecting machine operation
         CallishMachOp            -- Which one
   deriving Eq
+
+foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+foreignTargetHints target
+  = ( res_hints ++ repeat NoHint
+    , arg_hints ++ repeat NoHint )
+  where
+    (res_hints, arg_hints) =
+       case target of
+          PrimTarget op -> callishMachOpHints op
+          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _) ->
+             (res_hints, arg_hints)
 
 --------------------------------------------------
 -- Instances of register and slot users / definers

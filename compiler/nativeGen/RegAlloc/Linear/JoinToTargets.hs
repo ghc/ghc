@@ -17,7 +17,6 @@ import Instruction
 import Reg
 
 import BlockId
-import OldCmm  hiding (RegSet)
 import Digraph
 import DynFlags
 import Outputable

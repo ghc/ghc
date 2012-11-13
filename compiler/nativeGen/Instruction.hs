@@ -2,9 +2,12 @@
 module Instruction (
         RegUsage(..),
         noUsage,
+        GenBasicBlock(..), blockId,
+        ListGraph(..),
         NatCmm,
         NatCmmDecl,
         NatBasicBlock,
+        topInfoTable,
         Instruction(..)
 )
 
@@ -14,7 +17,7 @@ import Reg
 
 import BlockId
 import DynFlags
-import OldCmm
+import Cmm hiding (topInfoTable)
 import Platform
 
 -- | Holds a list of source and destination registers used by a
@@ -33,7 +36,6 @@ data RegUsage
 -- | No regs read or written to.
 noUsage :: RegUsage
 noUsage  = RU [] []
-
 
 -- Our flavours of the Cmm types
 -- Type synonyms for Cmm populated with native code
@@ -54,6 +56,13 @@ type NatBasicBlock instr
         = GenBasicBlock instr
 
 
+-- | Returns the info table associated with the CmmDecl's entry point,
+-- if any.
+topInfoTable :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> Maybe i
+topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
+  = mapLookup (blockId b) infos
+topInfoTable _
+  = Nothing
 
 
 -- | Common things that we can do with instructions, on all architectures.

@@ -8,7 +8,12 @@ module Cmm (
      CmmDecl, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
      CmmBlock,
+     RawCmmDecl, RawCmmGroup,
      Section(..), CmmStatics(..), CmmStatic(..),
+
+     -- ** Blocks containing lists
+     GenBasicBlock(..), blockId,
+     ListGraph(..), pprBBlock,
 
      -- * Cmm graphs
      CmmReplGraph, GenCmmReplGraph, CmmFwdRewrite, CmmBwdRewrite,
@@ -31,6 +36,7 @@ import SMRep
 import CmmExpr
 import UniqSupply
 import Compiler.Hoopl
+import Outputable
 
 import Data.Word        ( Word8 )
 
@@ -50,6 +56,7 @@ type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
 type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
+type RawCmmGroup = GenCmmGroup CmmStatics (BlockEnv CmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -62,7 +69,6 @@ type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
 --
 -- We expect there to be two main instances of this type:
 --   (a) C--, i.e. populated with various C-- constructs
---       (Cmm and RawCmm in OldCmm.hs)
 --   (b) Native code, populated with data/instructions
 
 -- | A top-level chunk, abstracted over the type of the contents of
@@ -86,6 +92,12 @@ data GenCmmDecl d h g
         d
 
 type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
+
+type RawCmmDecl
+   = GenCmmDecl
+        CmmStatics
+        (BlockEnv CmmStatics)
+        CmmGraph
 
 -----------------------------------------------------------------------------
 --     Graphs
@@ -176,4 +188,29 @@ data CmmStatics
    = Statics
        CLabel      -- Label of statics
        [CmmStatic] -- The static data itself
+
+-- -----------------------------------------------------------------------------
+-- Basic blocks consisting of lists
+
+-- These are used by the LLVM and NCG backends, when populating Cmm
+-- with lists of instructions.
+
+data GenBasicBlock i = BasicBlock BlockId [i]
+
+-- | The branch block id is that of the first block in
+-- the branch, which is that branch's entry point
+blockId :: GenBasicBlock i -> BlockId
+blockId (BasicBlock blk_id _ ) = blk_id
+
+newtype ListGraph i = ListGraph [GenBasicBlock i]
+
+instance Outputable instr => Outputable (ListGraph instr) where
+    ppr (ListGraph blocks) = vcat (map ppr blocks)
+
+instance Outputable instr => Outputable (GenBasicBlock instr) where
+    ppr = pprBBlock
+
+pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
+pprBBlock (BasicBlock ident stmts) =
+    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
 
