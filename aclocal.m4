@@ -1043,25 +1043,6 @@ fi
 ])# FP_PROG_AR_NEEDS_RANLIB
 
 
-dnl
-dnl AC_SHEBANG_PERL - can we she-bang perl?
-dnl
-AC_DEFUN([FPTOOLS_SHEBANG_PERL],
-[AC_CACHE_CHECK([if your perl works in shell scripts], fptools_cv_shebang_perl,
-[echo "#!$PerlCmd"'
-exit $1;
-' > conftest
-chmod u+x conftest
-(SHELL=/bin/sh; export SHELL; ./conftest 69 > /dev/null)
-if test $? -ne 69; then
-   fptools_cv_shebang_perl=yes
-else
-   fptools_cv_shebang_perl=no
-fi
-rm -f conftest
-])])
-
-
 # FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the

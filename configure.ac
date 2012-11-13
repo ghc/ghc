@@ -548,9 +548,6 @@ cygwin32|mingw32)
     ;;
 esac
 
-dnl ** does #! path/to/perl work? (sometimes it's too long...)
-FPTOOLS_SHEBANG_PERL
-
 dnl ** check for Python
 AC_PATH_PROG(PythonCmd,python)
 
