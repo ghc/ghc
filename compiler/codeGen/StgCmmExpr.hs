@@ -685,8 +685,8 @@ emitEnter fun = do
       -- test, just generating an enter.
       Return _ -> do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
-        ; emit $ mkForeignJump dflags NativeNodeCall entry
-                    [cmmUntag dflags fun] updfr_off
+        ; emit $ mkJump dflags NativeNodeCall entry
+                        [cmmUntag dflags fun] updfr_off
         ; return AssignedDirectly
         }
 

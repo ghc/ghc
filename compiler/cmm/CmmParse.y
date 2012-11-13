@@ -1086,7 +1086,7 @@ doJumpWithStack expr_code stk_code args_code = do
   stk_args <- sequence stk_code
   args <- sequence args_code
   updfr_off <- getUpdFrameOff
-  emit (mkJumpExtra dflags expr args updfr_off stk_args)
+  emit (mkJumpExtra dflags NativeNodeCall expr args updfr_off stk_args)
 
 doCall :: CmmParse CmmExpr -> [CmmParse LocalReg] -> [CmmParse CmmExpr]
        -> CmmParse ()

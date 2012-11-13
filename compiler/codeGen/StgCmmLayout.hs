@@ -121,7 +121,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
 	; updfr_off <- getUpdFrameOff
         ; case sequel of
             Return _ -> do
-              emit $ mkForeignJumpExtra dflags callConv fun args updfr_off extra_stack
+              emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
               return AssignedDirectly
             AssignTo res_regs _ -> do
               k <- newLabelC
