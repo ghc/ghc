@@ -99,6 +99,7 @@ module GHC.Base
         module GHC.Base,
         module GHC.Classes,
         module GHC.CString,
+        module GHC.Magic,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
@@ -108,6 +109,7 @@ module GHC.Base
 import GHC.Types
 import GHC.Classes
 import GHC.CString
+import GHC.Magic
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
@@ -509,17 +511,6 @@ maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 -- | Identity function.
 id                      :: a -> a
 id x                    =  x
-
--- | The call '(lazy e)' means the same as 'e', but 'lazy' has a 
--- magical strictness property: it is lazy in its first argument, 
--- even though its semantics is strict.
-lazy :: a -> a
-lazy x = x
--- Implementation note: its strictness and unfolding are over-ridden
--- by the definition in MkId.lhs; in both cases to nothing at all.
--- That way, 'lazy' does not get inlined, and the strictness analyser
--- sees it as lazy.  Then the worker/wrapper phase inlines it.
--- Result: happiness
 
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.
