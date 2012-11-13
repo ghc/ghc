@@ -40,9 +40,6 @@ dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
 
-dnl ** Find sort command (for the benefit of Win32 environs)
-FP_PROG_SORT
-
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
 
