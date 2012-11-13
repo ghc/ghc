@@ -995,6 +995,9 @@ cLoad expr rep
            in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
       else char '*' <> parens (cCast (machRepPtrCType rep) expr)
     where -- On these platforms, unaligned loads are known to cause problems
+          bewareLoadStoreAlignment ArchAlpha    = True
+          bewareLoadStoreAlignment ArchMipseb   = True
+          bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
           bewareLoadStoreAlignment _            = False
 

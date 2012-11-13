@@ -48,6 +48,9 @@ data Arch
           , armISAExt :: [ArmISAExt]
           , armABI    :: ArmABI
           }
+        | ArchAlpha
+        | ArchMipseb
+        | ArchMipsel
         deriving (Read, Show, Eq)
 
 
