@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline ) where
+module GHC.Magic ( inline, lazy ) where
 
 -- | The call '(inline f)' arranges that 'f' is inlined, regardless of
 -- its size. More precisely, the call '(inline f)' rewrites to the
@@ -37,4 +37,30 @@ module GHC.Magic ( inline ) where
 {-# NOINLINE[0] inline #-}
 inline :: a -> a
 inline x = x
+
+-- | The 'lazy' function restrains strictness analysis a little. The
+-- call '(lazy e)' means the same as 'e', but 'lazy' has a magical
+-- property so far as strictness analysis is concerned: it is lazy in
+-- its first argument, even though its semantics is strict. After
+-- strictness analysis has run, calls to 'lazy' are inlined to be the
+-- identity function.
+--
+-- This behaviour is occasionally useful when controlling evaluation
+-- order. Notably, 'lazy' is used in the library definition of
+-- 'Control.Parallel.par':
+--
+-- > par :: a -> b -> b
+-- > par x y = case (par# x) of _ -> lazy y
+--
+-- If 'lazy' were not lazy, 'par' would look strict in 'y' which
+-- would defeat the whole purpose of 'par'.
+--
+-- Like 'seq', the argument of 'lazy' can have an unboxed type.
+lazy :: a -> a
+lazy x = x
+-- Implementation note: its strictness and unfolding are over-ridden
+-- by the definition in MkId.lhs; in both cases to nothing at all.
+-- That way, 'lazy' does not get inlined, and the strictness analyser
+-- sees it as lazy.  Then the worker/wrapper phase inlines it.
+-- Result: happiness
 
