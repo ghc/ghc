@@ -1452,9 +1452,18 @@ AC_SUBST([ProjectPatchLevel])
 # here, because there exist partially-working implementations of
 # timer_create() in certain versions of Linux (see bug #1933).
 #
-AC_DEFUN([FP_CHECK_TIMER_CREATE],
-if test "$cross_compiling" = "no" ; then
-  [AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
+AC_DEFUN([FP_CHECK_TIMER_CREATE],[
+AC_CHECK_FUNC([timer_create],[HAVE_timer_create=yes],[HAVE_timer_create=no])
+
+if test "$HAVE_timer_create" = "yes"
+then
+  if test "$cross_compiling" = "yes"
+  then
+    # We can't test timer_create when we're cross-compiling, so we
+    # optimistiaclly assume that it actually works properly.
+    AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)])
+  else
+  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
@@ -1577,6 +1586,7 @@ case $fptools_cv_timer_create_works in
     yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
                    [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
 esac
+  fi
 fi
 ])
 
