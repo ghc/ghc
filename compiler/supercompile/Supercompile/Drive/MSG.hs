@@ -44,7 +44,6 @@ import qualified State
 --import Id (mkTemplateLocals)
 --import Type (mkFunTy)
 import TysWiredIn
-import BasicTypes
 
 
 import Control.Monad (join)
@@ -128,7 +127,8 @@ type MSG' = Either String
 -- Information on the context which we are currently in
 data MSGEnv = MSGEnv {
     msgLostWorkSharing :: Bool,
-    msgMode :: MSGMode
+    msgMode :: MSGMode,
+    msgTopRn2 :: RnEnv2
   }
 
 msgLoseWorkSharing :: MSG a -> MSG a
@@ -231,7 +231,7 @@ msgPendStackBinder :: Var {- looped -} -> Var -> Var -> StackInitM (Var {- parti
 msgPendStackBinder x_looped x_l x_r = State.state $ \(iss, known) -> let x0 = zapVarExtraInfo x_r
                                                                          x1 = uniqAway iss x0
                                                                          x = x1 `unloopVar` x_looped
-                                                                     in ((x, msgBndrExtras top_rn2 x1 x_l x_r), (extendInScopeSet iss x1, extendVarEnv known x_l (unitVarEnv x_r x)))
+                                                                     in ((x, getTopRnEnv2 >>= \top_rn2 -> msgBndrExtras top_rn2 x1 x_l x_r), (extendInScopeSet iss x1, extendVarEnv known x_l (unitVarEnv x_r x)))
 
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var {- partial loop -}
@@ -379,6 +379,7 @@ specGenVars x (Pair x_l x_r) = do
                                                                                                                                   , msgLRSuckVar = extendVarEnv (msgLRSuckVar s_lr) x_lr gen })
                                                           (Pair x_l x_r) (Pair in_e_l in_e_r) (msgLR s) }
                        -- Finally, the point: MSG together the heap binding RHSes
+                       top_rn2 <- getTopRnEnv2
                        in_e <- flip recoverM (msgIn renameAnnedTerm annedTermFreeVars msgTerm top_rn2 in_e_l in_e_r) $ do
                          -- Optimisation: attempt to match using the "common heap vars" trick.
                          -- If this fails we can always try to match in a legit manner, but I
@@ -468,6 +469,9 @@ instance Error t => MonadFix (MSGT t) where
 recoverM :: (Error t, Applicative t') => MSGT t a -> MSGT t' a -> MSGT t' a
 recoverM mx1 mx2 = MSG $ \e s0 -> let (s1, tx) = unMSG mx1 e s0
                                   in fmap (\x -> (s1, pure x)) tx `recover` \_ -> unMSG mx2 e s1
+
+getTopRnEnv2 :: Applicative t => MSGT t RnEnv2
+getTopRnEnv2 = MSG $ \e s -> (s, pure (msgTopRn2 e))
 
 
 -- INVARIANT: neither incoming Var may be bound rigidly (rigid only matches against rigid)
@@ -712,7 +716,7 @@ msgMatch inst_mtch (Pair (_, Heap h_l _, rn_l, k_l) (deeds_r, heap_r@(Heap h_r _
 isTypeRenamingNonTrivial :: Renaming -> FreeVars -> Bool
 isTypeRenamingNonTrivial rn fvs = (\f -> foldVarSet f False fvs) $ \x rest -> (isTyVar x && isNothing (getTyVar_maybe (lookupTyVarSubst rn x))) || rest
 
-msg :: MSGMode -> State -> State -> MSG' MSGResult
+msg, msg' :: MSGMode -> State -> State -> MSG' MSGResult
 msg mm state_l state_r = {- pprTrace "examples" (example1 $$ example2) -}
                          --(if isEmptyVarSet (stateUncoveredVars state_l) then id else pprPanic "msgl" (pPrintFullState fullStatePrettiness state_l $$ ppr (stateUncoveredVars state_l))) $
                          --(if isEmptyVarSet (stateUncoveredVars state_r) then id else pprPanic "msgr" (pPrintFullState fullStatePrettiness state_r $$ ppr (stateUncoveredVars state_r))) $
@@ -1176,15 +1180,15 @@ initSuckStackFrame i mb_x (Tagged tg_l kf_l) (Tagged tg_r kf_r) = do
     -- Ensure that all FVs of the newly-individualised frame are bound
     sucks2 $ fmap stackFrameFreeVars (Pair kf_l kf_r)
 
-msgStack :: Int -> MSGU ()
-msgStack i = do
+msgStack :: RnEnv2 -> Int -> MSGU ()
+msgStack top_rn2 i = do
     k_avail_lrs <- flip fmap get $ \s -> fmap msgLRAvailableStack (msgLR s)
     flip recoverM (suckStack i) $ do
         Pair (kf_l `Car` k_avail_l') (kf_r `Car` k_avail_r') <- return k_avail_lrs
         modify_ $ \s -> s { msgLR = liftA2 (\k_avail_lr' s_lr -> s_lr { msgLRAvailableStack = k_avail_lr' }) (Pair k_avail_l' k_avail_r') (msgLR s) }
         void $ mfix $ \kf -> do modify_ $ \s -> s { msgCommonStack = trainAppend (msgCommonStack s) (\_ -> kf `Car` Loco (stackGeneralised k_avail_r')) } -- Right biased
-                                msgStackFrame kf_l kf_r
-        msgu $ msgStack (i + 1)
+                                msgStackFrame top_rn2 kf_l kf_r
+        msgu $ msgStack top_rn2 (i + 1)
 
 get :: Applicative t => MSGT t MSGState
 get = MSG $ \_ s -> (s, pure s)
@@ -1215,8 +1219,8 @@ suck' sel x = {- trace ("suck':" ++ show x) $ -} flip fmap get $ \s -> {- trace 
 suckStack :: Int -> MSGU ()
 suckStack i = {- trace ("suckStack:" ++ show i) $ -} join $ flip fmap get $ \s -> IM.findWithDefault (return ()) i (msgSuckStack s)
 
-msgStackFrame :: Tagged StackFrame -> Tagged StackFrame -> MSG (Tagged StackFrame)
-msgStackFrame kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
+msgStackFrame :: RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG (Tagged StackFrame)
+msgStackFrame top_rn2 kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
   where
     go :: StackFrame -> StackFrame -> MSG StackFrame
     go (Apply x_l')                          (Apply x_r')                          = liftM Apply $ msgVar top_rn2 x_l' x_r'
@@ -1230,6 +1234,7 @@ msgStackFrame kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_
       -- we took the time to extend the "known" mappings for every possible update pair we might come across
     go _ _ = fail "msgStackFrame"
 
+-- ~~~~ NB: these two paragraphs are wrong
 -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
 -- binders allocated for rigid binders are *allowed* to shadow things bound in h_l/h_r.
 -- The only things they may not shadow are things bound in the eventual common heap,
@@ -1238,8 +1243,19 @@ msgStackFrame kf_l kf_r = liftM (Tagged (tag kf_r)) $ go (tagee kf_l) (tagee kf_
 -- Indeed it is better to not include ids_l/ids_r so that the new common heap/stack
 -- binders often often have exactly the same uniques as their counterparts in the
 -- incoming states. This aids debugging.
-top_rn2 :: RnEnv2
-top_rn2 = mkRnEnv2 emptyInScopeSet
+
+
+-- NB: it **IS** necessary to include the ids_l/ids_r in this InScopeSet. Reason:
+--   1. The set is used by msgIn to rename the left/right before MSGing: we do not want
+--      this renaming process to e.g. rename a local lambda binder on the left/right to shadow
+--      a heap/stack binder on the left/right!
+--   2. This set is used to choose fresh local binders in the common term. We can't have
+--      these shadowing any variables in the *intersection* of the left/right in scope sets
+--      because msgPend is allowed to choose such variables as the names of binders in the common term
+--      (see the mb_eq stuff). If we don't include the ids_l/ids_r then these new common binders
+--      might be shadowed by e.g. a common lambda binder.
+mkTopRn2 :: InScopeSet -> InScopeSet -> RnEnv2
+mkTopRn2 ids_l ids_r = mkRnEnv2 (ids_l `unionInScope` ids_r)
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
 msgLoop :: MSGMode -> (Heap, Heap) -> (Anned QA, Anned QA) -> (Stack, Stack)
@@ -1249,16 +1265,18 @@ msgLoop mm (Heap init_h_l init_ids_l, Heap init_h_r init_ids_r) (qa_l, qa_r) (in
                                           (Pair init_ids_l init_ids_r) (msgLR msg_s'),
                                    (Heap (msgCommonHeap msg_s') (msgInScopeSet msg_s'), msgCommonStack msg_s', e))
   where
+    top_rn2 = mkTopRn2 init_ids_l init_ids_r
+
     (msg_s', mb_res) = runMSG msg_e msg_s $ do
       xs <- sequence mxs
-      msgu $ msgStack 0
+      msgu $ msgStack top_rn2 0
       liftM ((,) xs) $ msgAnned annedQA (msgQA top_rn2) qa_l qa_r
 
     -- NB: knot-tied to feed the MSGed binders into the range of the "known" map generated by initStack
     Right (xs, _) = mb_res
     ((mxs, k_lrs, suck_stack), (ids, known_vars)) = State.runState (initStack xs 0 init_k_l init_k_r) (msgCommonHeapVars mm, emptyVarEnv)
 
-    msg_e = MSGEnv False mm
+    msg_e = MSGEnv False mm top_rn2
     msg_s = MSGState {
         msgInScopeSet     = ids,
         msgKnownVars      = known_vars,
