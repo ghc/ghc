@@ -74,31 +74,31 @@ data RegAllocStats statics instr
 
         -- a successful coloring
         | RegAllocStatsColored
-        { -- ^ Code we tried to allocate registers for.
+        { -- | Code we tried to allocate registers for.
           raCode          :: [LiveCmmDecl statics instr]
 
-          -- ^ Uncolored graph.
+          -- | Uncolored graph.
         , raGraph         :: Color.Graph VirtualReg RegClass RealReg
 
-          -- ^ Coalesced and colored graph.
+          -- | Coalesced and colored graph.
         , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg
 
-          -- ^ Tegs that were coaleced.
+          -- | Regs that were coaleced.
         , raCoalesced     :: UniqFM VirtualReg
 
-          -- ^ Code with coalescings applied.
+          -- | Code with coalescings applied.
         , raCodeCoalesced :: [LiveCmmDecl statics instr]
 
-          -- ^ Code with vregs replaced by hregs.
+          -- | Code with vregs replaced by hregs.
         , raPatched       :: [LiveCmmDecl statics instr]
 
-          -- ^ Code with unneeded spill\/reloads cleaned out.
+          -- | Code with unneeded spill\/reloads cleaned out.
         , raSpillClean    :: [LiveCmmDecl statics instr]
 
-          -- ^ Final code.
+          -- | Final code.
         , raFinal         :: [NatCmmDecl statics instr]
 
-          -- ^ Spill\/reload\/reg-reg moves present in this code.
+          -- | Spill\/reload\/reg-reg moves present in this code.
         , raSRMs          :: (Int, Int, Int) }
 
 
