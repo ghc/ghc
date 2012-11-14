@@ -271,7 +271,7 @@ terminateM :: String -> State -> (forall b. RollbackState -> ScpM b) -> ScpM a -
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                      (env { scpStopCount = scpStopCount env + 1})
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state (\x -> trace ("back to " ++ show shallow_h) (shallow_rb x)))) s)                                      (env { scpStopCount = scpStopCount env + 1})
         Continue hist'
           -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistoryState = hist' })) (env { scpNodeKey = generatedKey hist', scpProcessHistoryEnv = hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
