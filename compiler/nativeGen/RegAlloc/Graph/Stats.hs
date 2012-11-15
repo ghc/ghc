@@ -1,6 +1,6 @@
--- | Carries interesting info for debugging / profiling of the
---      graph coloring register allocator.
 
+-- | Carries interesting info for debugging / profiling of the
+--   graph coloring register allocator.
 module RegAlloc.Graph.Stats (
         RegAllocStats (..),
 
@@ -11,9 +11,7 @@ module RegAlloc.Graph.Stats (
         pprStatsLifeConflict,
 
         countSRMs, addSRM
-)
-
-where
+) where
 
 #include "nativeGen/NCG.h"
 
@@ -27,8 +25,7 @@ import RegClass
 import Reg
 import TargetReg
 
-import OldCmm
-import OldPprCmm()
+import PprCmm()
 import Outputable
 import UniqFM
 import UniqSet
@@ -36,36 +33,77 @@ import State
 
 import Data.List
 
+
+-- | Holds interesting statistics from the register allocator.
 data RegAllocStats statics instr
 
-        -- initial graph
+        -- Information about the initial conflict graph.
         = RegAllocStatsStart
-        { raLiveCmm     :: [LiveCmmDecl statics instr]                  -- ^ initial code, with liveness
-        , raGraph       :: Color.Graph VirtualReg RegClass RealReg      -- ^ the initial, uncolored graph
-        , raSpillCosts  :: SpillCostInfo }                              -- ^ information to help choose which regs to spill
+        { -- | Initial code, with liveness.
+          raLiveCmm     :: [LiveCmmDecl statics instr]                  
 
-        -- a spill stage
+          -- | The initial, uncolored graph.
+        , raGraph       :: Color.Graph VirtualReg RegClass RealReg      
+
+          -- | Information to help choose which regs to spill.
+        , raSpillCosts  :: SpillCostInfo }                              
+
+
+        -- Information about an intermediate graph.
+        -- This is one that we couldn't color, so had to insert spill code
+        -- instruction stream.
         | RegAllocStatsSpill
-        { raCode        :: [LiveCmmDecl statics instr]                  -- ^ the code we tried to allocate registers for
-        , raGraph       :: Color.Graph VirtualReg RegClass RealReg      -- ^ the partially colored graph
-        , raCoalesced   :: UniqFM VirtualReg                            -- ^ the regs that were coaleced
-        , raSpillStats  :: SpillStats                                   -- ^ spiller stats
-        , raSpillCosts  :: SpillCostInfo                                -- ^ number of instrs each reg lives for
-        , raSpilled     :: [LiveCmmDecl statics instr] }                -- ^ code with spill instructions added
+        { -- | Code we tried to allocate registers for.
+          raCode        :: [LiveCmmDecl statics instr]                  
+
+          -- | Partially colored graph.
+        , raGraph       :: Color.Graph VirtualReg RegClass RealReg
+
+          -- | The regs that were coaleced.
+        , raCoalesced   :: UniqFM VirtualReg                            
+
+          -- | Spiller stats.
+        , raSpillStats  :: SpillStats                                   
+
+          -- | Number of instructions each reg lives for.
+        , raSpillCosts  :: SpillCostInfo                                
+
+          -- | Code with spill instructions added.
+        , raSpilled     :: [LiveCmmDecl statics instr] }                
+
 
         -- a successful coloring
         | RegAllocStatsColored
-        { raCode          :: [LiveCmmDecl statics instr]                -- ^ the code we tried to allocate registers for
-        , raGraph         :: Color.Graph VirtualReg RegClass RealReg    -- ^ the uncolored graph
-        , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg    -- ^ the coalesced and colored graph
-        , raCoalesced     :: UniqFM VirtualReg                          -- ^ the regs that were coaleced
-        , raCodeCoalesced :: [LiveCmmDecl statics instr]                -- ^ code with coalescings applied
-        , raPatched       :: [LiveCmmDecl statics instr]                -- ^ code with vregs replaced by hregs
-        , raSpillClean    :: [LiveCmmDecl statics instr]                -- ^ code with unneeded spill\/reloads cleaned out
-        , raFinal         :: [NatCmmDecl statics instr]                 -- ^ final code
-        , raSRMs          :: (Int, Int, Int) }                          -- ^ spill\/reload\/reg-reg moves present in this code
+        { -- | Code we tried to allocate registers for.
+          raCode          :: [LiveCmmDecl statics instr]
 
-instance (Outputable statics, Outputable instr) => Outputable (RegAllocStats statics instr) where
+          -- | Uncolored graph.
+        , raGraph         :: Color.Graph VirtualReg RegClass RealReg
+
+          -- | Coalesced and colored graph.
+        , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg
+
+          -- | Regs that were coaleced.
+        , raCoalesced     :: UniqFM VirtualReg
+
+          -- | Code with coalescings applied.
+        , raCodeCoalesced :: [LiveCmmDecl statics instr]
+
+          -- | Code with vregs replaced by hregs.
+        , raPatched       :: [LiveCmmDecl statics instr]
+
+          -- | Code with unneeded spill\/reloads cleaned out.
+        , raSpillClean    :: [LiveCmmDecl statics instr]
+
+          -- | Final code.
+        , raFinal         :: [NatCmmDecl statics instr]
+
+          -- | Spill\/reload\/reg-reg moves present in this code.
+        , raSRMs          :: (Int, Int, Int) }
+
+
+instance (Outputable statics, Outputable instr) 
+       => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{}) = sdocWithPlatform $ \platform ->
            text "#  Start"
@@ -102,7 +140,8 @@ instance (Outputable statics, Outputable instr) => Outputable (RegAllocStats sta
         $$ ppr (raSpilled s)
 
 
- ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) }) = sdocWithPlatform $ \platform ->
+ ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) }) 
+    = sdocWithPlatform $ \platform ->
            text "#  Colored"
 
         $$ text "#  Code with liveness information."
@@ -144,6 +183,7 @@ instance (Outputable statics, Outputable instr) => Outputable (RegAllocStats sta
         $$ (text "#          reloads inserted: " <> int reloads)
         $$ (text "#   reg-reg moves remaining: " <> int moves)
         $$ text ""
+
 
 -- | Do all the different analysis on this list of RegAllocStats
 pprStats
@@ -194,6 +234,7 @@ pprStatsLifetimes stats
         $$ (vcat $ map ppr $ eltsUFM lifeBins)
         $$ text "\n")
 
+
 binLifetimeCount :: UniqFM (VirtualReg, Int) -> UniqFM (Int, Int)
 binLifetimeCount fm
  = let  lifes   = map (\l -> (l, (l, 1)))
@@ -226,7 +267,7 @@ pprStatsConflict stats
 --      good for making a scatter plot.
 pprStatsLifeConflict
         :: [RegAllocStats statics instr]
-        -> Color.Graph VirtualReg RegClass RealReg      -- ^ global register conflict graph
+        -> Color.Graph VirtualReg RegClass RealReg -- ^ global register conflict graph
         -> SDoc
 
 pprStatsLifeConflict stats graph
@@ -261,15 +302,21 @@ countSRMs
 countSRMs cmm
         = execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
 
-countSRM_block :: Instruction instr
-               => GenBasicBlock (LiveInstr instr)
-               -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))
+
+countSRM_block 
+        :: Instruction instr
+        => GenBasicBlock (LiveInstr instr)
+        -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))
+
 countSRM_block (BasicBlock i instrs)
  = do   instrs' <- mapM countSRM_instr instrs
         return  $ BasicBlock i instrs'
 
-countSRM_instr :: Instruction instr
-               => LiveInstr instr -> State (Int, Int, Int) (LiveInstr instr)
+
+countSRM_instr
+        :: Instruction instr
+        => LiveInstr instr -> State (Int, Int, Int) (LiveInstr instr)
+
 countSRM_instr li
         | LiveInstr SPILL{} _    <- li
         = do    modify  $ \(s, r, m)    -> (s + 1, r, m)
@@ -287,11 +334,12 @@ countSRM_instr li
         | otherwise
         =       return li
 
+
 -- sigh..
 addSRM :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
 addSRM (s1, r1, m1) (s2, r2, m2)
-        = let !s = s1 + s2
-              !r = r1 + r2
-              !m = m1 + m2
-          in (s, r, m)
+ = let  !s = s1 + s2
+        !r = r1 + r2
+        !m = m1 + m2
+   in   (s, r, m)
 

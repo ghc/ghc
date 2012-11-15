@@ -138,6 +138,11 @@ ifeq "$(findstring v,$(GhcLibWays))" ""
 $(error v is not in $$(GhcLibWays), and $$(DYNAMIC_BY_DEFAULT) is not YES)
 endif
 endif
+ifeq "$(GhcProfiled)" "YES"
+ifeq "$(findstring p,$(GhcLibWays))" ""
+$(error p is not in $$(GhcLibWays), and $$(GhcProfiled) is YES)
+endif
+endif
 endif
 
 ifeq "$(phase)" ""
@@ -657,6 +662,7 @@ BUILD_DIRS += \
    $(MAYBE_COMPILER) \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
+   utils/deriveConstants \
    utils/testremove \
    $(MAYBE_GHCTAGS) \
    utils/ghc-pwd \
@@ -833,7 +839,7 @@ define installLibsTo
 		    $(RANLIB) $2/`basename $$i` ;; \
 		  *.dll) \
 		    $(call INSTALL_PROGRAM,$(INSTALL_OPTS),$$i,$2) ; \
-		    $(STRIP_CMD) $2/$$i ;; \
+		    $(STRIP_CMD) $2/`basename $$i` ;; \
 		  *.so) \
 		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,$2) ;; \
 		  *.dylib) \
@@ -1289,6 +1295,7 @@ distclean : clean
 	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
 	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
 	$(call removeTrees,utils/ghc-pwd/dist-boot)
+	$(call removeTrees,includes/dist-derivedconstants)
 	$(call removeTrees,inplace)
 	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 

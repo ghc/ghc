@@ -64,7 +64,7 @@ ghc_stage3_MORE_HC_OPTS += -threaded
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-ghc_stage2_MORE_HC_OPTS += -prof
+ghc_stage2_PROGRAM_WAY = p
 endif
 
 ghc_stage1_PROG = ghc-stage1$(exeext)

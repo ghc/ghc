@@ -28,6 +28,7 @@ import Name
 import Type
 import TyCon
 import Coercion
+import TcEnv
 import TcType
 
 import CmmExpr
@@ -211,12 +212,8 @@ dsFCall fn_id co fcall mDeclHeader = do
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
-               do fcall_uniq <- newUnique
-                  let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
-                                    mkFastString (showPpr dflags fcall_uniq) `appendFS`
-                                    mkFastString "_" `appendFS`
-                                    cName
-                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
+               do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
+                  let fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include <" <> ftext h <> text ">"
@@ -404,7 +401,7 @@ dsFExportDynamic :: Id
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
     fe_id <-  newSysLocalDs ty
-    mod <- getModuleDs
+    mod <- getModule
     dflags <- getDynFlags
     let
         -- hack: need to get at the name of the C stub we're about to generate.

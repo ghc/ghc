@@ -173,7 +173,16 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT, armABI = \$ARM_ABI}\""
             ;;
-        alpha|mips|mipseb|mipsel|hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
+        alpha)
+            test -z "[$]2" || eval "[$]2=ArchAlpha"
+            ;;
+        mips|mipseb)
+            test -z "[$]2" || eval "[$]2=ArchMipseb"
+            ;;
+        mipsel)
+            test -z "[$]2" || eval "[$]2=ArchMipsel"
+            ;;
+        hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -534,19 +543,6 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 ])
 
 
-# FP_EVAL_STDERR(COMMAND)
-# -----------------------
-# Eval COMMAND, save its stderr (without lines resulting from shell tracing)
-# into the file conftest.err and the exit status in the variable fp_status.
-AC_DEFUN([FP_EVAL_STDERR],
-[{ (eval $1) 2>conftest.er1
-  fp_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  (exit $fp_status); }[]dnl
-])# FP_EVAL_STDERR
-
-
 # FP_ARG_WITH_PATH_GNU_PROG
 # --------------------
 # XXX
@@ -766,28 +762,6 @@ IFS=$fp_save_IFS
 AS_IF([test "$fp_num1" $2 "$fp_num2"], [$4], [$5])[]dnl
 ])# FP_COMPARE_VERSIONS
 
-
-dnl
-dnl Check for GreenCard and version.
-dnl
-AC_DEFUN([FPTOOLS_GREENCARD],
-[
-AC_PATH_PROG(GreenCardCmd,greencard)
-AC_CACHE_CHECK([for version of greencard], fptools_cv_greencard_version,
-changequote(, )dnl
-[if test x"$GreenCardCmd" != x; then
-   fptools_cv_greencard_version="`$GreenCardCmd --version |
-			  grep 'version' | sed -e 's/greencard. version \([^ ]*\).*/\1/g'`"
-else
-   fptools_cv_greencard_version=""
-fi
-changequote([, ])dnl
-])
-FP_COMPARE_VERSIONS([$fptools_cv_greencard_version],[-lt],[$1],
-  [AC_MSG_ERROR([greencard version $1 or later is required (found '$fptools_cv_greencard_version')])])[]dnl
-GreenCardVersion=$fptools_cv_greencard_version
-AC_SUBST(GreenCardVersion)
-])
 
 dnl
 dnl Check for Happy and version.  If we're building GHC, then we need
@@ -1069,25 +1043,6 @@ fi
 ])# FP_PROG_AR_NEEDS_RANLIB
 
 
-dnl
-dnl AC_SHEBANG_PERL - can we she-bang perl?
-dnl
-AC_DEFUN([FPTOOLS_SHEBANG_PERL],
-[AC_CACHE_CHECK([if your perl works in shell scripts], fptools_cv_shebang_perl,
-[echo "#!$PerlCmd"'
-exit $1;
-' > conftest
-chmod u+x conftest
-(SHELL=/bin/sh; export SHELL; ./conftest 69 > /dev/null)
-if test $? -ne 69; then
-   fptools_cv_shebang_perl=yes
-else
-   fptools_cv_shebang_perl=no
-fi
-rm -f conftest
-])])
-
-
 # FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
@@ -1187,25 +1142,6 @@ rm -f conftest.txt conftest.out
 AC_SUBST([FindCmd])[]dnl
 ])# FP_PROG_FIND
 
-
-# FP_PROG_SORT
-# ------------
-# Find a Unix-like sort
-AC_DEFUN([FP_PROG_SORT],
-[AC_PATH_PROG([fp_prog_sort], [sort])
-echo conwip > conftest.txt
-$fp_prog_sort -f conftest.txt > conftest.out 2>&1
-if grep 'conwip' conftest.out > /dev/null 2>&1 ; then
-  # The goods
-  SortCmd="$fp_prog_sort"
-else
-  # Summink else..pick next one.
-  AC_MSG_WARN([$fp_prog_sort looks like a non-*nix sort, ignoring it])
-  FP_CHECK_PROG([SortCmd], [sort], [], [], [$fp_prog_sort])
-fi
-rm -f conftest.txt conftest.out
-AC_SUBST([SortCmd])[]dnl
-])# FP_PROG_SORT
 
 dnl
 dnl FPTOOLS_NOCACHE_CHECK prints a message, then sets the
@@ -1405,59 +1341,6 @@ fi
 ])# FP_CHECK_DOCBOOK_DTD
 
 
-# FP_GEN_FO
-# ------------------
-# Generates a formatting objects document in conftest.fo.
-AC_DEFUN([FP_GEN_FO],
-[rm -f conftest.fo
-cat > conftest.fo << EOF
-<?xml version="1.0"?>
-<fo:root xmlns:fo="http://www.w3.org/1999/XSL/Format">
-  <fo:layout-master-set>
-    <fo:simple-page-master master-name="blank">
-      <fo:region-body/>
-    </fo:simple-page-master>
-  </fo:layout-master-set>
-  <fo:page-sequence master-reference="blank">
-    <fo:flow flow-name="xsl-region-body">
-      <fo:block>
-        Test!
-      </fo:block>
-    </fo:flow>
-  </fo:page-sequence>
-</fo:root>
-EOF
-]) # FP_GEN_FO
-
-
-# FP_PROG_FOP
-# -----------
-# Set the output variable 'FopCmd' to the first working 'fop' in the current
-# 'PATH'. Note that /usr/bin/fop is broken in SuSE 9.1 (unpatched), so try
-# /usr/share/fop/fop.sh in that case (or no 'fop'), too.
-AC_DEFUN([FP_PROG_FOP],
-[AC_PATH_PROGS([FopCmd1], [fop fop.sh])
-if test -n "$FopCmd1"; then
-  AC_CACHE_CHECK([for $FopCmd1 usability], [fp_cv_fop_usability],
-    [FP_GEN_FO
-    if "$FopCmd1" -fo conftest.fo -ps conftest.ps > /dev/null 2>&1; then
-      fp_cv_fop_usability=yes
-    else
-      fp_cv_fop_usability=no
-    fi
-    rm -rf conftest*])
-  if test x"$fp_cv_fop_usability" = xyes; then
-     FopCmd=$FopCmd1
-  fi
-fi
-if test -z "$FopCmd"; then
-  AC_PATH_PROGS([FopCmd2], [fop.sh], , [/usr/share/fop])
-  FopCmd=$FopCmd2
-fi
-AC_SUBST([FopCmd])
-])# FP_PROG_FOP
-
-
 # FP_PROG_GHC_PKG
 # ----------------
 # Try to find a ghc-pkg matching the ghc mentioned in the environment variable
@@ -1569,9 +1452,18 @@ AC_SUBST([ProjectPatchLevel])
 # here, because there exist partially-working implementations of
 # timer_create() in certain versions of Linux (see bug #1933).
 #
-AC_DEFUN([FP_CHECK_TIMER_CREATE],
-if test "$cross_compiling" = "no" ; then
-  [AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
+AC_DEFUN([FP_CHECK_TIMER_CREATE],[
+AC_CHECK_FUNC([timer_create],[HAVE_timer_create=yes],[HAVE_timer_create=no])
+
+if test "$HAVE_timer_create" = "yes"
+then
+  if test "$cross_compiling" = "yes"
+  then
+    # We can't test timer_create when we're cross-compiling, so we
+    # optimistiaclly assume that it actually works properly.
+    AC_DEFINE([USE_TIMER_CREATE], 1,  [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)])
+  else
+  AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
@@ -1694,6 +1586,7 @@ case $fptools_cv_timer_create_works in
     yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
                    [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
 esac
+  fi
 fi
 ])
 
@@ -1936,21 +1829,14 @@ case "$1" in
 
 # BOOTSTRAPPING_GHC_INFO_FIELD
 # --------------------------------
-# If the bootstrapping compiler is >= 7.1, then set the variable
-# $1 to the value of the ghc --info field $2. Otherwise, set it to
-# $3.
+# Set the variable $1 to the value of the ghc --info field $2.
 AC_DEFUN([BOOTSTRAPPING_GHC_INFO_FIELD],[
-if test $GhcCanonVersion -ge 701
+$1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
+tmp=${$1#\$topdir/}
+if test "${$1}" != "$tmp"
 then
-    $1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
-    tmp=${$1#\$topdir/}
-    if test "${$1}" != "$tmp"
-    then
-        topdir=`"$WithGhc" --print-libdir | sed 's#\\\\#/#g'`
-        $1="$topdir/$tmp"
-    fi
-else
-    $1=$3
+    topdir=`"$WithGhc" --print-libdir | sed 's#\\\\#/#g'`
+    $1="$topdir/$tmp"
 fi
 AC_SUBST($1)
 ])

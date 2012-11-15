@@ -40,9 +40,6 @@ dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
 
-dnl ** Find sort command (for the benefit of Win32 environs)
-FP_PROG_SORT
-
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
 
@@ -131,12 +128,12 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os],['unkown'])
-  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command],['$(CC)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([OS_STAGE0],[target os])
+  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
   if test "x$OS_STAGE0" != "xOSDarwin"; then
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
-    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
-    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
+    BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
+    BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
   else
     AR_STAGE0='$(AR)'
     AR_OPTS_STAGE0='$(AR_OPTS)'
@@ -551,9 +548,6 @@ cygwin32|mingw32)
     ;;
 esac
 
-dnl ** does #! path/to/perl work? (sometimes it's too long...)
-FPTOOLS_SHEBANG_PERL
-
 dnl ** check for Python
 AC_PATH_PROG(PythonCmd,python)
 
@@ -779,20 +773,6 @@ dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
 
-if test "$cross_compiling" = "no" ; then
-    AC_TRY_RUN([
-    #include <sys/types.h>
-    #include <sys/time.h>
-    int main(void) {
-      struct itimerval tval;
-      tval.it_value.tv_sec = 1;
-      tval.it_value.tv_usec = 0;
-      tval.it_interval = tval.it_value;
-      return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
-    }
-    ],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
-fi
-
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
 AC_CHECK_DECLS([ctime_r], , ,
@@ -861,7 +841,7 @@ FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
 AC_CHECK_LIB(rt, clock_gettime)
-AC_CHECK_FUNCS(clock_gettime timer_create timer_settime)
+AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
 dnl ** check for Apple's "interesting" long double compatibility scheme

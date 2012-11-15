@@ -755,19 +755,61 @@ See also Note [Implicit TyThings] in HscTypes
 %*                                                                      *
 %************************************************************************
 
-A PrimRep is somewhat similar to a CgRep (see codeGen/SMRep) and a
-MachRep (see cmm/CmmExpr), although each of these types has a distinct
-and clearly defined purpose:
+Note [rep swamp]
 
-  - A PrimRep is a CgRep + information about signedness + information
-    about primitive pointers (AddrRep).  Signedness and primitive
-    pointers are required when passing a primitive type to a foreign
-    function, but aren't needed for call/return conventions of Haskell
-    functions.
+GHC has a rich selection of types that represent "primitive types" of
+one kind or another.  Each of them makes a different set of
+distinctions, and mostly the differences are for good reasons,
+although it's probably true that we could merge some of these.
 
-  - A MachRep is a basic machine type (non-void, doesn't contain
-    information on pointerhood or signedness, but contains some
-    reps that don't have corresponding Haskell types).
+Roughly in order of "includes more information":
+
+ - A Width (cmm/CmmType) is simply a binary value with the specified
+   number of bits.  It may represent a signed or unsigned integer, a
+   floating-point value, or an address.
+
+    data Width = W8 | W16 | W32 | W64 | W80 | W128
+
+ - Size, which is used in the native code generator, is Width +
+   floating point information.
+
+   data Size = II8 | II16 | II32 | II64 | FF32 | FF64 | FF80
+
+   it is necessary because e.g. the instruction to move a 64-bit float
+   on x86 (movsd) is different from the instruction to move a 64-bit
+   integer (movq), so the mov instruction is parameterised by Size.
+
+ - CmmType wraps Width with more information: GC ptr, float, or
+   other value.
+
+    data CmmType = CmmType CmmCat Width
+    
+    data CmmCat     -- "Category" (not exported)
+       = GcPtrCat   -- GC pointer
+       | BitsCat    -- Non-pointer
+       | FloatCat   -- Float
+
+   It is important to have GcPtr information in Cmm, since we generate
+   info tables containing pointerhood for the GC from this.  As for
+   why we have float (and not signed/unsigned) here, see Note [Signed
+   vs unsigned].
+
+ - ArgRep makes only the distinctions necessary for the call and
+   return conventions of the STG machine.  It is essentially CmmType
+   + void.
+
+ - PrimRep makes a few more distinctions than ArgRep: it divides
+   non-GC-pointers into signed/unsigned and addresses, information
+   that is necessary for passing these values to foreign functions.
+
+There's another tension here: whether the type encodes its size in
+bytes, or whether its size depends on the machine word size.  Width
+and CmmType have the size built-in, whereas ArgRep and PrimRep do not.
+
+This means to turn an ArgRep/PrimRep into a CmmType requires DynFlags.
+
+On the other hand, CmmType includes some "nonsense" values, such as
+CmmType GcPtrCat W32 on a 64-bit machine.
 
 \begin{code}
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that

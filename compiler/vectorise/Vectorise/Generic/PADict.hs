@@ -13,7 +13,7 @@ import BasicTypes
 import CoreSyn
 import CoreUtils
 import CoreUnfold
-import DsMonad
+import Module
 import TyCon
 import Type
 import Id
@@ -58,7 +58,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
  = polyAbstract tvs $ \args ->    -- The args are the dictionaries we lambda abstract over; and they
                                   -- are put in the envt, so when we need a (PA a) we can find it in
                                   -- the envt; they don't include the silent superclass args yet
-   do { mod <- liftDs getModuleDs
+   do { mod <- liftDs getModule
       ; let dfun_name = mkLocalisedOccName mod mkPADFunOcc vect_tc_name
    
           -- The superclass dictionary is a (silent) argument if the tycon is polymorphic...

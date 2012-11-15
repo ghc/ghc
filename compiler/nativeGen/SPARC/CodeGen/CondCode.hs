@@ -24,7 +24,7 @@ import SPARC.Base
 import NCGMonad
 import Size
 
-import OldCmm
+import Cmm
 
 import OrdList
 import Outputable

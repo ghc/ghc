@@ -22,18 +22,8 @@ $1_$2_depfile_c_asm = $$($1_$2_depfile_base).c_asm
 
 $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
-$1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
+$1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(patsubst %o,%,$$($$(way)_osuf))")
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
-# Setting hisuf/osuf is a kludge. If DYNAMIC_BY_DEFAULT is on, dyn is
-# the first way, and p is another way, then without this kludge we run
-#     ghc -M -hisuf dyn_hi -osuf dyn_o -dep-suffix dyn -dep-suffix p
-# which means we get dependencies for .dyn_hi/.dyn_o and .p_dyn_hi/.p_dyn_o
-# rather than .dyn_hi/.dyn_o and .p_hi/.p_o.
-# With the kludge we also get .hi/.o dependencies that we don't need, but
-# they don't do any harm.
-# We also specify -static, as otherwise we end up with some dependencies
-# on .dyn_dyn_hi files
-$1_$2_MKDEPENDHS_FLAGS += -static -hisuf hi -osuf o
 
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 

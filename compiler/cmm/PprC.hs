@@ -16,6 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE GADTs #-}
 module PprC (
         writeCs,
         pprStringInCStyle
@@ -27,8 +28,10 @@ module PprC (
 import BlockId
 import CLabel
 import ForeignCall
-import OldCmm
-import OldPprCmm ()
+import Cmm hiding (pprBBlock)
+import PprCmm ()
+import Hoopl
+import CmmUtils
 
 -- Utils
 import CPrim
@@ -81,8 +84,9 @@ pprC tops = vcat $ intersperse blankLine $ map pprTop tops
 -- top level procs
 --
 pprTop :: RawCmmDecl -> SDoc
-pprTop proc@(CmmProc _ clbl _ (ListGraph blocks)) =
-    (case topInfoTable proc of
+pprTop (CmmProc infos clbl _ graph) =
+
+    (case mapLookup (g_entry graph) infos of
        Nothing -> empty
        Just (Statics info_clbl info_dat) -> pprDataExterns info_dat $$
                                             pprWordArray info_clbl info_dat) $$
@@ -93,16 +97,12 @@ pprTop proc@(CmmProc _ clbl _ (ListGraph blocks)) =
                     then mkFN_ else mkIF_) (ppr clbl) <+> lbrace,
            nest 8 temp_decls,
            nest 8 mkFB_,
-           case blocks of
-               [] -> empty
-               -- the first block doesn't get a label:
-               (BasicBlock _ stmts : rest) ->
-                    nest 8 (vcat (map pprStmt stmts)) $$
-                       vcat (map pprBBlock rest),
+           vcat (map pprBBlock blocks),
            nest 8 mkFE_,
            rbrace ]
     )
   where
+        blocks = toBlockList graph
         (temp_decls, extern_decls) = pprTempAndExternDecls blocks
 
 
@@ -133,14 +133,12 @@ pprTop (CmmData _section (Statics lbl lits)) =
 -- as many jumps as possible into fall throughs.
 --
 
-pprBBlock :: CmmBasicBlock -> SDoc
-pprBBlock (BasicBlock lbl stmts) =
-    if null stmts then
-        pprTrace "pprC.pprBBlock: curious empty code block for"
-                        (pprBlockId lbl) empty
-    else
-        nest 4 (pprBlockId lbl <> colon) $$
-        nest 8 (vcat (map pprStmt stmts))
+pprBBlock :: CmmBlock -> SDoc
+pprBBlock block =
+  nest 4 (pprBlockId lbl <> colon) $$
+  nest 8 (vcat (map pprStmt (blockToList nodes)) $$ pprStmt last)
+ where
+  (CmmEntry lbl, nodes, last)  = blockSplit block
 
 -- --------------------------------------------------------------------------
 -- Info tables. Just arrays of words.
@@ -165,13 +163,12 @@ pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
 -- Statements.
 --
 
-pprStmt :: CmmStmt -> SDoc
+pprStmt :: CmmNode e x -> SDoc
 
 pprStmt stmt =
     sdocWithDynFlags $ \dflags ->
     case stmt of
-    CmmReturn    -> panic "pprStmt: return statement should have been cps'd away"
-    CmmNop       -> empty
+    CmmEntry _ -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it
                           -- XXX we probably want to emit these comments when
@@ -191,14 +188,20 @@ pprStmt stmt =
         where
           rep = cmmExprType dflags src
 
-    CmmCall (CmmCallee fn cconv) results args ret ->
+    CmmUnsafeForeignCall target@(ForeignTarget fn conv) results args ->
         maybe_proto $$
         fnCall
         where
-        cast_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
+        (res_hints, arg_hints) = foreignTargetHints target
+        hresults = zip results res_hints
+        hargs    = zip args arg_hints
+
+        ForeignConvention cconv _ _ ret = conv
+
+        cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
         real_fun_proto lbl = char ';' <>
-                        pprCFunType (ppr lbl) cconv results args <>
+                        pprCFunType (ppr lbl) cconv hresults hargs <>
                         noreturn_attr <> semi
 
         noreturn_attr = case ret of
@@ -210,7 +213,7 @@ pprStmt stmt =
             case fn of
               CmmLit (CmmLabel lbl)
                 | StdCallConv <- cconv ->
-                    let myCall = pprCall (ppr lbl) cconv results args
+                    let myCall = pprCall (ppr lbl) cconv hresults hargs
                     in (real_fun_proto lbl, myCall)
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
@@ -218,40 +221,46 @@ pprStmt stmt =
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    let myCall = pprCall (ppr lbl) cconv results args
+                    let myCall = pprCall (ppr lbl) cconv hresults hargs
                     in (real_fun_proto lbl, myCall)
                 | not (isMathFun lbl) ->
-                    pprForeignCall (ppr lbl) cconv results args
+                    pprForeignCall (ppr lbl) cconv hresults hargs
               _ ->
                    (empty {- no proto -},
-                    pprCall cast_fn cconv results args <> semi)
+                    pprCall cast_fn cconv hresults hargs <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim _ (Just stmts)) _ _ _ ->
-        vcat $ map pprStmt stmts
-
-    CmmCall (CmmPrim op _) results args _ret ->
+    CmmUnsafeForeignCall target@(PrimTarget op) results args ->
         proto $$ fn_call
       where
         cconv = CCallConv
         fn = pprCallishMachOp_for_C op
+
+        (res_hints, arg_hints) = foreignTargetHints target
+        hresults = zip results res_hints
+        hargs    = zip args arg_hints
+
         (proto, fn_call)
           -- The mem primops carry an extra alignment arg, must drop it.
           -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
           | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
-          = pprForeignCall fn cconv results (init args)
+          = pprForeignCall fn cconv hresults (init hargs)
           | otherwise
-          = (empty, pprCall fn cconv results args)
+          = (empty, pprCall fn cconv hresults hargs)
 
     CmmBranch ident          -> pprBranch ident
-    CmmCondBranch expr ident -> pprCondBranch expr ident
-    CmmJump lbl _            -> mkJMP_(pprExpr lbl) <> semi
+    CmmCondBranch expr yes no -> pprCondBranch expr yes no
+    CmmCall { cml_target = expr } -> mkJMP_ (pprExpr expr) <> semi
     CmmSwitch arg ids        -> sdocWithDynFlags $ \dflags ->
                                 pprSwitch dflags arg ids
 
-pprForeignCall :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual]
+    _other -> pprPanic "PprC.pprStmt" (ppr stmt)
+
+type Hinted a = (a, ForeignHint)
+
+pprForeignCall :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual]
                -> (SDoc, SDoc)
 pprForeignCall fn cconv results args = (proto, fn_call)
   where
@@ -263,14 +272,14 @@ pprForeignCall fn cconv results args = (proto, fn_call)
     cast_fn = parens (parens (pprCFunType (char '*') cconv results args) <> fn)
     proto = ptext (sLit ";EF_(") <> fn <> char ')' <> semi
 
-pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
+pprCFunType :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
   = sdocWithDynFlags $ \dflags ->
     let res_type [] = ptext (sLit "void")
-        res_type [CmmHinted one hint] = machRepHintCType (localRegType one) hint
+        res_type [(one, hint)] = machRepHintCType (localRegType one) hint
         res_type _ = panic "pprCFunType: only void or 1 return value supported"
 
-        arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprType dflags expr) hint
+        arg_type (expr, hint) = machRepHintCType (cmmExprType dflags expr) hint
     in res_type ress <+>
        parens (ccallConvAttribute cconv <> ppr_fn) <>
        parens (commafy (map arg_type args))
@@ -283,11 +292,11 @@ pprBranch ident = ptext (sLit "goto") <+> pprBlockId ident <> semi
 
 -- ---------------------------------------------------------------------
 -- conditional branches to local labels
-pprCondBranch :: CmmExpr -> BlockId -> SDoc
-pprCondBranch expr ident
+pprCondBranch :: CmmExpr -> BlockId -> BlockId -> SDoc
+pprCondBranch expr yes no
         = hsep [ ptext (sLit "if") , parens(pprExpr expr) ,
-                        ptext (sLit "goto") , (pprBlockId ident) <> semi ]
-
+                        ptext (sLit "goto"), pprBlockId yes,
+                        ptext (sLit "else"), pprBlockId no <> semi ]
 
 -- ---------------------------------------------------------------------
 -- a local table branch
@@ -831,7 +840,7 @@ pprLocalReg (LocalReg uniq _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
+pprCall :: SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
 pprCall ppr_fn cconv results args
   | not (is_cishCC cconv)
   = panic $ "pprCall: unknown calling convention"
@@ -841,18 +850,18 @@ pprCall ppr_fn cconv results args
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where
      ppr_assign []           rhs = rhs
-     ppr_assign [CmmHinted one hint] rhs
+     ppr_assign [(one,hint)] rhs
          = pprLocalReg one <> ptext (sLit " = ")
                  <> pprUnHint hint (localRegType one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
-     pprArg (CmmHinted expr AddrHint)
+     pprArg (expr, AddrHint)
         = cCast (ptext (sLit "void *")) expr
         -- see comment by machRepHintCType below
-     pprArg (CmmHinted expr SignedHint)
+     pprArg (expr, SignedHint)
         = sdocWithDynFlags $ \dflags ->
           cCast (machRep_S_CType $ typeWidth $ cmmExprType dflags expr) expr
-     pprArg (CmmHinted expr _other)
+     pprArg (expr, _other)
         = pprExpr expr
 
      pprUnHint AddrHint   rep = parens (machRepCType rep)
@@ -871,7 +880,7 @@ is_cishCC PrimCallConv = False
 -- Find and print local and external declarations for a list of
 -- Cmm statements.
 --
-pprTempAndExternDecls :: [CmmBasicBlock] -> (SDoc{-temps-}, SDoc{-externs-})
+pprTempAndExternDecls :: [CmmBlock] -> (SDoc{-temps-}, SDoc{-externs-})
 pprTempAndExternDecls stmts
   = (vcat (map pprTempDecl (uniqSetToList temps)),
      vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls)))
@@ -930,8 +939,9 @@ te_Static :: CmmStatic -> TE ()
 te_Static (CmmStaticLit lit) = te_Lit lit
 te_Static _ = return ()
 
-te_BB :: CmmBasicBlock -> TE ()
-te_BB (BasicBlock _ ss)         = mapM_ te_Stmt ss
+te_BB :: CmmBlock -> TE ()
+te_BB block = mapM_ te_Stmt (blockToList mid) >> te_Stmt last
+  where (_, mid, last) = blockSplit block
 
 te_Lit :: CmmLit -> TE ()
 te_Lit (CmmLabel l) = te_lbl l
@@ -939,21 +949,21 @@ te_Lit (CmmLabelOff l _) = te_lbl l
 te_Lit (CmmLabelDiffOff l1 _ _) = te_lbl l1
 te_Lit _ = return ()
 
-te_Stmt :: CmmStmt -> TE ()
+te_Stmt :: CmmNode e x -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
-te_Stmt (CmmCall target rs es _) = do te_Target target
-                                      mapM_ (te_temp.hintlessCmm) rs
-                                      mapM_ (te_Expr.hintlessCmm) es
-te_Stmt (CmmCondBranch e _)     = te_Expr e
+te_Stmt (CmmUnsafeForeignCall target rs es)
+  = do  te_Target target
+        mapM_ te_temp rs
+        mapM_ te_Expr es
+te_Stmt (CmmCondBranch e _ _)   = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e
-te_Stmt (CmmJump e _)           = te_Expr e
+te_Stmt (CmmCall { cml_target = e }) = te_Expr e
 te_Stmt _                       = return ()
 
-te_Target :: CmmCallTarget -> TE ()
-te_Target (CmmCallee {})           = return ()
-te_Target (CmmPrim _ Nothing)      = return ()
-te_Target (CmmPrim _ (Just stmts)) = mapM_ te_Stmt stmts
+te_Target :: ForeignTarget -> TE ()
+te_Target (ForeignTarget e _)      = te_Expr e
+te_Target (PrimTarget{})           = return ()
 
 te_Expr :: CmmExpr -> TE ()
 te_Expr (CmmLit lit)            = te_Lit lit
@@ -985,6 +995,9 @@ cLoad expr rep
            in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
       else char '*' <> parens (cCast (machRepPtrCType rep) expr)
     where -- On these platforms, unaligned loads are known to cause problems
+          bewareLoadStoreAlignment ArchAlpha    = True
+          bewareLoadStoreAlignment ArchMipseb   = True
+          bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
           bewareLoadStoreAlignment _            = False
 

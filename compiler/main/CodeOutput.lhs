@@ -15,9 +15,9 @@ import UniqSupply       ( mkSplitUniqSupply )
 
 import Finder           ( mkStubPaths )
 import PprC             ( writeCs )
-import OldCmmLint       ( cmmLint )
+import CmmLint          ( cmmLint )
 import Packages
-import OldCmm           ( RawCmmGroup )
+import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
 import Config

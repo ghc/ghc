@@ -116,7 +116,7 @@ import Instruction
 import Reg
 
 import BlockId
-import OldCmm hiding (RegSet)
+import Cmm hiding (RegSet)
 
 import Digraph
 import DynFlags
@@ -208,6 +208,9 @@ linearRegAlloc dflags first_id block_live sccs
       ArchPPC       -> linearRegAlloc' dflags (frInitFreeRegs platform :: PPC.FreeRegs)    first_id block_live sccs
       ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
       ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
+      ArchAlpha     -> panic "linearRegAlloc ArchAlpha"
+      ArchMipseb    -> panic "linearRegAlloc ArchMipseb"
+      ArchMipsel    -> panic "linearRegAlloc ArchMipsel"
       ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'
@@ -743,12 +746,13 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
                 Just (InMem slot) | reading   -> doSpill (ReadMem slot)
                                   | otherwise -> doSpill WriteMem
                 Nothing | reading   ->
-                   -- pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr r)
-                   -- ToDo: This case should be a panic, but we
-                   -- sometimes see an unreachable basic block which
-                   -- triggers this because the register allocator
-                   -- will start with an empty assignment.
-                   doSpill WriteNew
+                   pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr r)
+                   -- NOTE: if the input to the NCG contains some
+                   -- unreachable blocks with junk code, this panic
+                   -- might be triggered.  Make sure you only feed
+                   -- sensible code into the NCG.  In CmmPipeline we
+                   -- call removeUnreachableBlocks at the end for this
+                   -- reason.
 
                         | otherwise -> doSpill WriteNew
 

@@ -56,7 +56,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                (_,   NativeReturn)     -> getRegsWithNode dflags
                -- GC calling convention *must* put values in registers
                (_,   GC)               -> allRegs dflags
-               (_,   Slow)             -> noRegs
+               (_,   Slow)             -> nodeOnly
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
       -- (even if there are still available registers for args of a
@@ -172,8 +172,8 @@ allRegs dflags = (allVanillaRegs dflags,
                   allLongRegs dflags,
                   allSseRegs dflags)
 
-noRegs :: AvailRegs
-noRegs  = ([], [], [], [], [])
+nodeOnly :: AvailRegs
+nodeOnly = ([VanillaReg 1], [], [], [], [])
 
 globalArgRegs :: DynFlags -> [GlobalReg]
 globalArgRegs dflags = map ($ VGcPtr) (allVanillaRegs dflags) ++

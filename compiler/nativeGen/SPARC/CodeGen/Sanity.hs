@@ -19,14 +19,14 @@ import SPARC.Instr
 import SPARC.Ppr	()
 import Instruction
 
-import OldCmm
+import Cmm
 
 import Outputable
 
 
 -- | Enforce intra-block invariants.
 --
-checkBlock :: CmmBasicBlock
+checkBlock :: CmmBlock
            -> NatBasicBlock Instr
            -> NatBasicBlock Instr
 

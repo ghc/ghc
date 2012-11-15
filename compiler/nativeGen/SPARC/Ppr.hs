@@ -35,8 +35,8 @@ import Reg
 import Size
 import PprBase
 
-import OldCmm
-import OldPprCmm()
+import Cmm hiding (topInfoTable)
+import PprCmm()
 import CLabel
 import BlockId
 

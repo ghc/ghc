@@ -30,7 +30,7 @@ import Reg
 import RegClass
 import TargetReg
 
-import OldCmm
+import Cmm hiding (topInfoTable)
 import BlockId
 
 import CLabel

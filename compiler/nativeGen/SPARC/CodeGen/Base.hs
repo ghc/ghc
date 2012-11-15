@@ -30,8 +30,7 @@ import Reg
 
 import CodeGen.Platform
 import DynFlags
-import OldCmm
-import OldPprCmm ()
+import Cmm
 import Platform
 
 import Outputable

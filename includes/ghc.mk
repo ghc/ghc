@@ -33,6 +33,11 @@ includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 #
 # Options
 #
+
+includes_CC_OPTS += $(SRC_CC_OPTS)
+includes_CC_OPTS += $(SRC_CC_WARNING_OPTS)
+includes_CC_OPTS += $(CONF_CC_OPTS_STAGE1)
+
 ifeq "$(GhcUnregisterised)" "YES"
 includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
@@ -143,79 +148,45 @@ includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/plat
 includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
 includes_GHCCONSTANTS_HASKELL_EXPORTS = includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs
 
-INSTALL_LIBS += includes/dist-derivedconstants/header/platformConstants
+INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
-ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
-
-DerivedConstants.h :
-	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
-	@exit 1
-
-else
-
-includes_dist-derivedconstants_C_SRCS = mkDerivedConstants.c
-includes_dist-derivedconstants_PROG   = mkDerivedConstants$(exeext)
-includes_dist-derivedconstants_INSTALL_INPLACE = YES
-
-$(eval $(call build-prog,includes,dist-derivedconstants,0))
-
-$(includes_dist-derivedconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_FILES) $$(rts_H_FILES)
-includes/dist-derivedconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
-
-ifneq "$(AlienScript)" ""
-$(INPLACE_BIN)/mkDerivedConstants$(exeext): includes/$(includes_dist-derivedconstants_C_SRCS) | $$(dir $$@)/.
-	$(WhatGccIsCalled) -o $@ $< $(CFLAGS) $(includes_CC_OPTS)
-endif
+DERIVE_CONSTANTS_FLAGS += --gcc-program "$(WhatGccIsCalled)"
+DERIVE_CONSTANTS_FLAGS += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
+DERIVE_CONSTANTS_FLAGS += --nm-program "$(NM)"
 
 ifneq "$(BINDIST)" "YES"
-$(includes_DERIVEDCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< >$@
-else
-	$(AlienScript) run ./$< >$@
-endif
+$(includes_DERIVEDCONSTANTS):           $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_CONFIG) $$(includes_H_PLATFORM) $$(includes_H_FILES) $$(rts_H_FILES)
 
-$(includes_GHCCONSTANTS_HASKELL_TYPE) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< --gen-haskell-type >$@
-else
-	$(AlienScript) run ./$< --gen-haskell-type >$@
-endif
+$(includes_DERIVEDCONSTANTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_VALUE) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< --gen-haskell-value >$@
-else
-	$(AlienScript) run ./$< --gen-haskell-value >$@
-endif
+$(includes_GHCCONSTANTS_HASKELL_TYPE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+	$< --gen-haskell-type -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< --gen-haskell-wrappers >$@
-else
-	$(AlienScript) run ./$< --gen-haskell-wrappers >$@
-endif
+$(includes_GHCCONSTANTS_HASKELL_VALUE): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
-ifeq "$(AlienScript)" ""
-	./$< --gen-haskell-exports >$@
-else
-	$(AlienScript) run ./$< --gen-haskell-exports >$@
-endif
-endif
+$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
+$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(INPLACE_BIN)/deriveConstants$(exeext) | $$(dir $$@)/.
+	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
 # ---------------------------------------------------------------------------
 # Install all header files
 
 $(eval $(call clean-target,includes,,\
-  $(includes_H_CONFIG) $(includes_H_PLATFORM) \
-  $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
+  $(includes_H_CONFIG) $(includes_H_PLATFORM)))
 
 $(eval $(call all-target,includes,,\
   $(includes_H_CONFIG) $(includes_H_PLATFORM) \
-  $(includes_GHCCONSTANTS_HASKELL_TYPE) $(includes_GHCCONSTANTS_HASKELL_VALUE) $(includes_DERIVEDCONSTANTS)))
+  $(includes_GHCCONSTANTS_HASKELL_TYPE) \
+  $(includes_GHCCONSTANTS_HASKELL_VALUE) \
+  $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
+  $(includes_GHCCONSTANTS_HASKELL_EXPORTS) \
+  $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes
 

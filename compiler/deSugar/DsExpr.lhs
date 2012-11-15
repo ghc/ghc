@@ -42,6 +42,7 @@ import MkCore
 import DynFlags
 import CostCentre
 import Id
+import Module
 import VarSet
 import VarEnv
 import DataCon
@@ -296,7 +297,7 @@ dsExpr (ExplicitTuple tup_args boxity)
                            (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
-    mod_name <- getModuleDs
+    mod_name <- getModule
     count <- goptM Opt_ProfCountEntries
     uniq <- newUnique
     Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr

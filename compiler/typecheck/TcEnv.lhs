@@ -50,7 +50,8 @@ module TcEnv(
 
         -- New Ids
         newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
-        mkStableIdFromString, mkStableIdFromName
+        mkStableIdFromString, mkStableIdFromName,
+        mkWrapperName
   ) where
 
 #include "HsVersions.h"
@@ -80,10 +81,15 @@ import HscTypes
 import DynFlags
 import SrcLoc
 import BasicTypes
+import Module
 import Outputable
+import Encoding
 import FastString
 import ListSetOps
 import Util
+
+import Data.IORef
+import Data.List
 \end{code}
 
 
@@ -750,13 +756,41 @@ mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM
 mkStableIdFromString str sig_ty loc occ_wrapper = do
     uniq <- newUnique
     mod <- getModule
-    let occ = mkVarOcc (str ++ '_' : show uniq) :: OccName
+    name <- mkWrapperName "stable" str
+    let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
         id  = mkExportedLocalId gnm sig_ty :: Id
     return id
 
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
 mkStableIdFromName nm = mkStableIdFromString (getOccString nm)
+\end{code}
+
+\begin{code}
+mkWrapperName :: (MonadIO m, HasDynFlags m, HasModule m)
+              => String -> String -> m FastString
+mkWrapperName what nameBase
+    = do dflags <- getDynFlags
+         thisMod <- getModule
+         let -- Note [Generating fresh names for ccall wrapper]
+             wrapperRef = nextWrapperNum dflags
+             pkg = packageIdString  (modulePackageId thisMod)
+             mod = moduleNameString (moduleName      thisMod)
+         wrapperNum <- liftIO $ readIORef wrapperRef
+         liftIO $ writeIORef wrapperRef (wrapperNum + 1)
+         let components = [what, show wrapperNum, pkg, mod, nameBase]
+         return $ mkFastString $ zEncodeString $ intercalate ":" components
+
+{-
+Note [Generating fresh names for FFI wrappers]
+
+We used to use a unique, rather than nextWrapperNum, to distinguish
+between FFI wrapper functions. However, the wrapper names that we
+generate are external names. This means that if a call to them ends up
+in an unfolding, then we can't alpha-rename them, and thus if the
+unique randomly changes from one compile to another then we get a
+spurious ABI change (#4012).
+-}
 \end{code}
 
 %************************************************************************

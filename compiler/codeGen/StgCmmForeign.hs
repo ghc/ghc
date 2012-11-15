@@ -306,6 +306,11 @@ loadThreadState dflags tso stack = do
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
         mkAssign spLim (cmmOffsetW dflags (cmmOffset dflags (CmmReg (CmmLocal stack)) (stack_STACK dflags))
                                     (rESERVED_STACK_WORDS dflags)),
+        -- HpAlloc = 0;
+        --   HpAlloc is assumed to be set to non-zero only by a failed
+        --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
+        mkAssign hpAlloc (zeroExpr dflags),
+
         openNursery dflags,
         -- and load the current cost centre stack from the TSO when profiling:
         if gopt Opt_SccProfilingOn dflags then
@@ -367,13 +372,14 @@ stgHp             = CmmReg hp
 stgCurrentTSO     = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
-sp, spLim, hp, hpLim, currentTSO, currentNursery :: CmmReg
+sp, spLim, hp, hpLim, currentTSO, currentNursery, hpAlloc :: CmmReg
 sp                = CmmGlobal Sp
 spLim             = CmmGlobal SpLim
 hp                = CmmGlobal Hp
 hpLim             = CmmGlobal HpLim
 currentTSO        = CmmGlobal CurrentTSO
 currentNursery    = CmmGlobal CurrentNursery
+hpAlloc           = CmmGlobal HpAlloc
 
 -- -----------------------------------------------------------------------------
 -- For certain types passed to foreign calls, we adjust the actual

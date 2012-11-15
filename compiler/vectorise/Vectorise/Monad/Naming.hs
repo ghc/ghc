@@ -19,6 +19,7 @@ import DsMonad
 import TcType
 import Type
 import Var
+import Module
 import Name
 import SrcLoc
 import MkId
@@ -37,7 +38,7 @@ import Control.Monad
 --
 mkLocalisedName :: (Maybe String -> OccName -> OccName) -> Name -> VM Name
 mkLocalisedName mk_occ name
-  = do { mod <- liftDs getModuleDs
+  = do { mod <- liftDs getModule
        ; u   <- liftDs newUnique
        ; let occ_name = mkLocalisedOccName mod mk_occ name
 
@@ -86,7 +87,7 @@ cloneVar var = liftM (setIdUnique var) (liftDs newUnique)
 --
 newExportedVar :: OccName -> Type -> VM Var
 newExportedVar occ_name ty 
- = do mod <- liftDs getModuleDs
+ = do mod <- liftDs getModule
       u   <- liftDs newUnique
 
       let name = mkExternalName u mod occ_name noSrcSpan

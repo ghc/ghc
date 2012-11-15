@@ -29,7 +29,7 @@ where
 import PPC.Instr
 
 import BlockId
-import OldCmm
+import Cmm
 import CLabel
 
 import Unique

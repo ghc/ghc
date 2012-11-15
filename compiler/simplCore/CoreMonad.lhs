@@ -72,7 +72,7 @@ import PprCore
 import CoreUtils
 import CoreLint		( lintCoreBindings )
 import HscTypes
-import Module           ( Module )
+import Module
 import DynFlags
 import StaticFlags	
 import Rules            ( RuleBase )
@@ -863,9 +863,6 @@ getHscEnv = read cr_hsc_env
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
 
-getModule :: CoreM Module
-getModule = read cr_module
-
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
@@ -873,6 +870,9 @@ addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
 instance HasDynFlags CoreM where
     getDynFlags = fmap hsc_dflags getHscEnv
+
+instance HasModule CoreM where
+    getModule = read cr_module
 
 -- | The original name cache is the current mapping from 'Module' and
 -- 'OccName' to a compiler-wide unique 'Name'

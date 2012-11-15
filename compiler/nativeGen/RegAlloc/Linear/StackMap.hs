@@ -1,26 +1,19 @@
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- | The assignment of virtual registers to stack slots
 
--- 	We have lots of stack slots. Memory-to-memory moves are a pain on most
--- 	architectures. Therefore, we avoid having to generate memory-to-memory moves
--- 	by simply giving every virtual register its own stack slot.
+--      We have lots of stack slots. Memory-to-memory moves are a pain on most
+--      architectures. Therefore, we avoid having to generate memory-to-memory moves
+--      by simply giving every virtual register its own stack slot.
 
--- 	The StackMap stack map keeps track of virtual register - stack slot
--- 	associations and of which stack slots are still free. Once it has been
--- 	associated, a stack slot is never "freed" or removed from the StackMap again,
--- 	it remains associated until we are done with the current CmmProc.
+--      The StackMap stack map keeps track of virtual register - stack slot
+--      associations and of which stack slots are still free. Once it has been
+--      associated, a stack slot is never "freed" or removed from the StackMap again,
+--      it remains associated until we are done with the current CmmProc.
 --
 module RegAlloc.Linear.StackMap (
-	StackSlot,
-	StackMap(..),
-	emptyStackMap,
+        StackSlot,
+        StackMap(..),
+        emptyStackMap,
         getStackSlotFor,
         getStackUse
 )
@@ -36,12 +29,12 @@ import Unique
 type StackSlot = Int
 
 data StackMap 
-	= StackMap 
-	{ -- | The slots that are still available to be allocated.
+        = StackMap 
+        { -- | The slots that are still available to be allocated.
           stackMapNextFreeSlot  :: !Int
 
-	  -- | Assignment of vregs to stack slots.
-	, stackMapAssignment	:: UniqFM StackSlot }
+          -- | Assignment of vregs to stack slots.
+        , stackMapAssignment    :: UniqFM StackSlot }
 
 
 -- | An empty stack map, with all slots available.
@@ -50,7 +43,7 @@ emptyStackMap _ = StackMap 0 emptyUFM
 
 
 -- | If this vreg unique already has a stack assignment then return the slot number,
---	otherwise allocate a new slot, and update the map.
+--      otherwise allocate a new slot, and update the map.
 --
 getStackSlotFor :: StackMap -> Unique -> (StackMap, Int)
 

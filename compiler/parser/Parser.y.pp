@@ -1887,6 +1887,7 @@ tyconsym :: { Located RdrName }
         : CONSYM                        { L1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                        { L1 $! mkUnqual tcClsName (getVARSYM $1) }
         | '*'                           { L1 $! mkUnqual tcClsName (fsLit "*")    }
+        | '-'                           { L1 $! mkUnqual tcClsName (fsLit "-")    }
 
 
 -----------------------------------------------------------------------------

@@ -1,11 +1,4 @@
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- | Free regs map for PowerPC
 module RegAlloc.Linear.PPC.FreeRegs
 where
@@ -33,7 +26,7 @@ import Data.Bits
 -- 32-bit words).
 
 data FreeRegs = FreeRegs !Word32 !Word32
-	      deriving( Show )	-- The Show is used in an ASSERT
+              deriving( Show )  -- The Show is used in an ASSERT
 
 noFreeRegs :: FreeRegs
 noFreeRegs = FreeRegs 0 0
@@ -44,12 +37,12 @@ releaseReg (RealRegSingle r) (FreeRegs g f)
     | otherwise = FreeRegs (g .|. (1 `shiftL` r)) f
 
 releaseReg _ _
-	= panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
+        = panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
     
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldr releaseReg noFreeRegs (allocatableRegs platform)
 
-getFreeRegs :: RegClass -> FreeRegs -> [RealReg]	-- lazilly
+getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazilly
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
@@ -65,4 +58,4 @@ allocateReg (RealRegSingle r) (FreeRegs g f)
     | otherwise = FreeRegs (g .&. complement (1 `shiftL` r)) f
 
 allocateReg _ _
-	= panic "RegAlloc.Linear.PPC.allocateReg: bad reg"
+        = panic "RegAlloc.Linear.PPC.allocateReg: bad reg"

@@ -134,6 +134,8 @@ cpsTop hsc_env proc =
                   return $ if optLevel dflags >= 1
                              then map (cmmCfgOptsProc splitting_proc_points) gs
                              else gs
+            gs <- return (map removeUnreachableBlocksProc gs)
+                -- Note [unreachable blocks]
             dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
             return (cafEnv, gs)
@@ -152,6 +154,8 @@ cpsTop hsc_env proc =
                  return $ if optLevel dflags >= 1
                              then cmmCfgOptsProc splitting_proc_points g
                              else g
+            g <- return (removeUnreachableBlocksProc g)
+                -- Note [unreachable blocks]
             dump' Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
             return (cafEnv, [g])
@@ -212,7 +216,15 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 
 -}
 
+{- Note [unreachable blocks]
 
+The control-flow optimiser sometimes leaves unreachable blocks behind
+containing junk code.  If these blocks make it into the native code
+generator then they trigger a register allocator panic because they
+refer to undefined LocalRegs, so we must eliminate any unreachable
+blocks before passing the code onwards.
+
+-}
 
 runUniqSM :: UniqSM a -> IO a
 runUniqSM m = do

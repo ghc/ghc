@@ -23,6 +23,7 @@ import DsMonad
 import DsUtils
 import TysWiredIn
 import PrelNames
+import Module
 import Name
 import SrcLoc
 import Outputable
@@ -146,7 +147,7 @@ isTrueLHsExpr (L _ (HsTick tickish e))
 isTrueLHsExpr (L _ (HsBinTick ixT _ e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do e <- ticks x
-                     this_mod <- getModuleDs
+                     this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e

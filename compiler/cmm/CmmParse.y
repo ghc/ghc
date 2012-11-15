@@ -1065,6 +1065,12 @@ doReturn exprs_code = do
   updfr_off <- getUpdFrameOff
   emit (mkReturnSimple dflags exprs updfr_off)
 
+mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturnSimple dflags actuals updfr_off =
+  mkReturn dflags e actuals updfr_off
+  where e = entryCode dflags (CmmLoad (CmmStackSlot Old updfr_off)
+                             (gcWord dflags))
+
 doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
 doRawJump expr_code vols = do
   dflags <- getDynFlags
@@ -1080,7 +1086,7 @@ doJumpWithStack expr_code stk_code args_code = do
   stk_args <- sequence stk_code
   args <- sequence args_code
   updfr_off <- getUpdFrameOff
-  emit (mkJumpExtra dflags expr args updfr_off stk_args)
+  emit (mkJumpExtra dflags NativeNodeCall expr args updfr_off stk_args)
 
 doCall :: CmmParse CmmExpr -> [CmmParse LocalReg] -> [CmmParse CmmExpr]
        -> CmmParse ()

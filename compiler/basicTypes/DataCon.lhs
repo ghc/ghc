@@ -273,7 +273,7 @@ data DataCon
 	--	dcExTyVars    = [x,y]
 	--	dcEqSpec      = [a~(x,y)]
 	--	dcOtherTheta  = [x~y, Ord x]	
-	--	dcOrigArgTys  = [a,List b]
+	--	dcOrigArgTys  = [x,y]
 	--	dcRepTyCon       = T
 
 	dcVanilla :: Bool,	-- True <=> This is a vanilla Haskell 98 data constructor

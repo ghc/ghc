@@ -52,7 +52,7 @@ import Name
 import NameSet
 import NameEnv
 import Avail
-import Module           ( ModuleName, moduleName )
+import Module
 import UniqFM
 import DataCon          ( dataConFieldLabels, dataConTyCon )
 import TyCon            ( isTupleTyCon, tyConArity )

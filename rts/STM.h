@@ -183,14 +183,6 @@ StgBool stmReWait(Capability *cap, StgTSO *tso);
 
 /*----------------------------------------------------------------------
 
-   TVar management operations
-   --------------------------
-*/
-
-StgTVar *stmNewTVar(Capability *cap, StgClosure *new_value);
-
-/*----------------------------------------------------------------------
-
    Data access operations
    ----------------------
 */

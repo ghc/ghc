@@ -24,10 +24,11 @@
  * to the scheduler marking the thread as finished.
  */
 
-#define CHECK_SENSIBLE_REGS() \
-    ASSERT(Hp != 0);			\
-    ASSERT(Sp != 0);			\
-    ASSERT(SpLim != 0);			\
+#define CHECK_SENSIBLE_REGS()                           \
+    ASSERT(Hp != 0);                                    \
+    ASSERT(HpAlloc == 0);                               \
+    ASSERT(Sp != 0);                                    \
+    ASSERT(SpLim != 0);                                 \
     ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
 
 /* -----------------------------------------------------------------------------

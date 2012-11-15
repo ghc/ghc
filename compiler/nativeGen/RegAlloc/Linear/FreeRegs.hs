@@ -1,11 +1,4 @@
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module RegAlloc.Linear.FreeRegs (
     FR(..),
     maxSpillSlots
@@ -27,12 +20,12 @@ import Platform
 -- This needs to be *efficient*
 -- Here's an inefficient 'executable specification' of the FreeRegs data type:
 --
---	type FreeRegs = [RegNo]
---	noFreeRegs = 0
---	releaseReg n f = if n `elem` f then f else (n : f)
---	initFreeRegs = allocatableRegs
---	getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
---	allocateReg f r = filter (/= r) f
+--      type FreeRegs = [RegNo]
+--      noFreeRegs = 0
+--      releaseReg n f = if n `elem` f then f else (n : f)
+--      initFreeRegs = allocatableRegs
+--      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
+--      allocateReg f r = filter (/= r) f
 
 import qualified RegAlloc.Linear.PPC.FreeRegs    as PPC
 import qualified RegAlloc.Linear.SPARC.FreeRegs  as SPARC
@@ -82,5 +75,8 @@ maxSpillSlots dflags
                 ArchSPARC     -> SPARC.Instr.maxSpillSlots dflags
                 ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
                 ArchPPC_64    -> panic "maxSpillSlots ArchPPC_64"
+                ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
+                ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
+                ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
                 ArchUnknown   -> panic "maxSpillSlots ArchUnknown"
 

@@ -35,7 +35,7 @@ import PprBase
 import BlockId
 import BasicTypes       (Alignment)
 import DynFlags
-import OldCmm
+import Cmm              hiding (topInfoTable)
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
 import Platform

@@ -45,7 +45,6 @@ if test -z "$PerlCmd"; then
    echo "Perhaps it is already installed, but not in your PATH?"
    exit 1
 fi
-FPTOOLS_SHEBANG_PERL
 
 #
 dnl ** figure out how to do a BSD-ish install **

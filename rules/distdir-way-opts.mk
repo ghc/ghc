@@ -172,6 +172,18 @@ $1_$2_DIST_LD_OPTS = \
  $$(foreach opt,$$($1_$2_DEP_EXTRA_LIBS),-l$$(opt)) \
  $$($1_$2_DEP_LD_OPTS)
 
+ifeq "$3" "dyn"
+ifneq "$4" "0"
+ifeq "$$(TargetOS_CPP)" "linux"
+$1_$2_$3_GHC_LD_OPTS += \
+    -fno-use-rpaths \
+    $$(foreach d,$$($1_$2_TRANSITIVE_DEPS),-optl-Wl$$(comma)-rpath -optl-Wl$$(comma)'$$$$ORIGIN/../$$d')
+else ifeq "$$(TargetOS_CPP)" "darwin"
+$1_$2_$3_GHC_LD_OPTS += -optl-Wl,-headerpad_max_install_names
+endif
+endif
+endif
+
 # c.f. Cabal's Distribution.Simple.PreProcess.ppHsc2hs
 # We use '' around cflags and lflags to handle paths with backslashes in
 # on Windows
