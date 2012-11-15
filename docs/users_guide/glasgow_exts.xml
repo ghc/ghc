@@ -4065,6 +4065,45 @@ The part before the "<literal>=&gt;</literal>" is the
 "<literal>=&gt;</literal>" is the <emphasis>head</emphasis> of the instance declaration.
 </para>
 
+<sect3 id="instance-resolution">
+<title>Instance resolution</title>
+
+<para>
+When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
+it tries to match every instance declaration against the
+constraint,
+by instantiating the head of the instance declaration.  Consider
+these declarations:
+<programlisting>
+  instance context1 => C Int a     where ...  -- (A)
+  instance context2 => C a   Bool  where ...  -- (B)
+</programlisting>
+GHC's default behaviour is that <emphasis>exactly one instance must match the
+constraint it is trying to resolve</emphasis>.
+For example, the constraint <literal>C Int Bool</literal> matches instances (A) and (B),
+and hence would be rejected; while <literal>C Int Char</literal> matches only (A)
+and hence (A) is chosen.</para>
+
+<para>
+Notice that
+<itemizedlist>
+<listitem><para>
+When matching, GHC takes
+no account of the context of the instance declaration
+(<literal>context1</literal> etc).
+</para></listitem>
+<listitem><para>
+It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
+including both declarations (A) and (B), say); an error is only reported if a
+particular constraint matches more than one.
+</para></listitem>
+</itemizedlist>
+See also <xref linkend="instance-overlap"/> for flags that loosen the 
+instance resolution rules.
+</para>
+
+</sect3>
+
 <sect3 id="flexible-instance-head">
 <title>Relaxed rules for the instance head</title>
 
@@ -4073,7 +4112,11 @@ In Haskell 98 the head of an instance declaration
 must be of the form <literal>C (T a1 ... an)</literal>, where
 <literal>C</literal> is the class, <literal>T</literal> is a data type constructor,
 and the <literal>a1 ... an</literal> are distinct type variables.
-GHC relaxes these rules in two ways.
+In the case of multi-parameter type classes, this rule applies to each parameter of
+the instance head.  (Arguably it should be OK if just one has this form and the others
+are type variables, but that's the rules at the moment.)</para>
+
+<para>GHC relaxes this rule in two ways.
 <itemizedlist>
 <listitem><para>
 With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
@@ -4283,8 +4326,10 @@ with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 
 <sect3 id="instance-overlap">
 <title>Overlapping instances</title>
+
 <para>
-In general, <emphasis>GHC requires that that it be unambiguous which instance
+In general, as discussed in <xref linkend="instance-resolution"/>, 
+<emphasis>GHC requires that it be unambiguous which instance
 declaration
 should be used to resolve a type-class constraint</emphasis>. This behaviour
 can be modified by two flags: <option>-XOverlappingInstances</option>
@@ -4296,32 +4341,17 @@ and <option>-XIncoherentInstances</option>
 flags are dynamic flags, and can be set on a per-module basis, using
 an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
 <para>
-When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
-it tries to match every instance declaration against the
-constraint,
-by instantiating the head of the instance declaration.  For example, consider
-these declarations:
+The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
+the instance resolution described in <xref linkend="instance-resolution"/>, by
+allowing more than one instance to match, <emphasis>provided there is a most specific one</emphasis>.  
+For example, consider
 <programlisting>
   instance context1 => C Int a     where ...  -- (A)
   instance context2 => C a   Bool  where ...  -- (B)
   instance context3 => C Int [a]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-The instances (A) and (B) match the constraint <literal>C Int Bool</literal>,
-but (C) and (D) do not.  When matching, GHC takes
-no account of the context of the instance declaration
-(<literal>context1</literal> etc).
-GHC's default behaviour is that <emphasis>exactly one instance must match the
-constraint it is trying to resolve</emphasis>.
-It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
-including both declarations (A) and (B), say); an error is only reported if a
-particular constraint matches more than one.
-</para>
-
-<para>
-The <option>-XOverlappingInstances</option> flag instructs GHC to allow
-more than one instance to match, provided there is a most specific one.  For
-example, the constraint <literal>C Int [Int]</literal> matches instances (A),
+The constraint <literal>C Int [Int]</literal> matches instances (A),
 (C) and (D), but the last is more specific, and hence is chosen.  If there is no
 most-specific match, the program is rejected.
 </para>
@@ -4336,10 +4366,11 @@ Suppose that from the RHS of <literal>f</literal> we get the constraint
 GHC does not commit to instance (C), because in a particular
 call of <literal>f</literal>, <literal>b</literal> might be instantiate
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.
-(If you add the flag <option>-XIncoherentInstances</option>,
+So GHC rejects the program.</para>
+<para>
+If, however, you add the flag <option>-XIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about
-the problem of subsequent instantiations.)
+the problem of subsequent instantiations.
 </para>
 <para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to
