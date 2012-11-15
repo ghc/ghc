@@ -201,6 +201,25 @@ genCall _ (PrimTarget (MO_UF_Conv _)) [_] args =
     panic $ "genCall: Too many arguments to MO_UF_Conv. " ++
     "Can only handle 1, given" ++ show (length args) ++ "."
 
+-- Handle prefetching data
+genCall env t@(PrimTarget MO_Prefetch_Data) [] args = do
+    let dflags = getDflags env
+        argTy = [i8Ptr, i32, i32, i32]
+        funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
+                             CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
+
+    let (_, arg_hints) = foreignTargetHints t
+    let args_hints' = zip args arg_hints
+    (env1, argVars, stmts1, top1) <- arg_vars env args_hints' ([], nilOL, [])
+    (env2, fptr, stmts2, top2)    <- getFunPtr env1 funTy t
+    (argVars', stmts3)            <- castVars dflags $ zip argVars argTy
+
+    let arguments = argVars' ++ [mkIntLit i32 0, mkIntLit i32 3, mkIntLit i32 1]
+        call = Expr $ Call StdCall fptr arguments []
+        stmts = stmts1 `appOL` stmts2 `appOL` stmts3
+                `appOL` trashStmts (getDflags env) `snocOL` call
+    return (env2, stmts, top1 ++ top2)
+
 -- Handle popcnt function specifically since GHC only really has i32 and i64
 -- types and things like Word8 are backed by an i32 and just present a logical
 -- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
@@ -520,6 +539,8 @@ cmmPrimOpFunctions env mop
     MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
+
+    MO_Prefetch_Data -> fsLit "llvm.prefetch"
 
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported

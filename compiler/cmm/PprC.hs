@@ -759,6 +759,7 @@ pprCallishMachOp_for_C mop
         MO_Add2       {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
+        MO_Prefetch_Data -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 

@@ -2678,6 +2678,24 @@ primop  WriteOffAddrOp_Int64AsInt64X2 "writeInt64OffAddrAsInt64X2#" GenPrimOp
         llvm_only = True
    
 ------------------------------------------------------------------------
+section "Prefetch" 
+	{Prefetch operations}
+------------------------------------------------------------------------
+
+primop PrefetchByteArrayOp "prefetchByteArray#" GenPrimOp
+   ByteArray# -> Int# -> ByteArray#
+   with llvm_only = True
+
+primop PrefetchMutableByteArrayOp "prefetchMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> State# s
+   with has_side_effects = True
+        llvm_only = True
+
+primop PrefetchAddrOp "prefetchAddr#" GenPrimOp
+   Addr# -> Int# -> Addr#
+   with llvm_only = True
+
+------------------------------------------------------------------------
 ---                                                                  ---
 ------------------------------------------------------------------------
 

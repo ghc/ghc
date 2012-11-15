@@ -265,6 +265,15 @@ emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
 emitPrimOp _ res@[] TouchOp args@[_arg]
    = do emitPrimCall res MO_Touch args
 
+emitPrimOp _ res@[] PrefetchByteArrayOp args@[_arg]
+   = do emitPrimCall res MO_Prefetch_Data args
+
+emitPrimOp _ res@[] PrefetchMutableByteArrayOp args@[_arg]
+   = do emitPrimCall res MO_Prefetch_Data args
+
+emitPrimOp _ res@[] PrefetchAddrOp args@[_arg]
+   = do emitPrimCall res MO_Prefetch_Data args
+
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp dflags [res] ByteArrayContents_Char [arg]
    = emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
@@ -618,6 +627,11 @@ emitPrimOp _ res@[_,_] Int64X2UnpackOp [arg] =
 
 emitPrimOp _ [res] Int64X2InsertOp [v,e,i] =
     doVecInsertOp Nothing vec2b64 v e i res
+
+-- Prefetch
+emitPrimOp _ res PrefetchByteArrayOp        args = doPrefetchByteArrayOp res args
+emitPrimOp _ res PrefetchMutableByteArrayOp args = doPrefetchByteArrayOp res args
+emitPrimOp _ res PrefetchAddrOp             args = doPrefetchAddrOp res args
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
@@ -1264,6 +1278,39 @@ doVecInsertOp maybe_pre_write_cast ty src e idx res = do
 
     wid :: Width
     wid = typeWidth (vecElemType ty)
+
+------------------------------------------------------------------------------
+-- Helpers for translating prefetching.
+
+doPrefetchByteArrayOp :: [LocalReg]
+                      -> [CmmExpr]
+                      -> FCode ()
+doPrefetchByteArrayOp res [addr,idx]
+   = do dflags <- getDynFlags
+        mkBasicPrefetch (arrWordsHdrSize dflags) res addr idx
+doPrefetchByteArrayOp _ _
+   = panic "StgCmmPrim: doPrefetchByteArrayOp"
+
+doPrefetchAddrOp :: [LocalReg]
+                 -> [CmmExpr]
+                 -> FCode ()
+doPrefetchAddrOp res [addr,idx]
+   = mkBasicPrefetch 0 res addr idx
+doPrefetchAddrOp _ _
+   = panic "StgCmmPrim: doPrefetchAddrOp"
+
+mkBasicPrefetch :: ByteOff      -- Initial offset in bytes
+                -> [LocalReg]   -- Destination
+                -> CmmExpr      -- Base address
+                -> CmmExpr      -- Index
+                -> FCode ()
+mkBasicPrefetch off res base idx
+   = do dflags <- getDynFlags
+        emitPrimCall [] MO_Prefetch_Data [cmmIndexExpr dflags W8 (cmmOffsetB dflags base off) idx]
+        case res of
+          []    -> return ()
+          [reg] -> emitAssign (CmmLocal reg) base
+          _     -> panic "StgCmmPrim: mkBasicPrefetch"
 
 -- ----------------------------------------------------------------------------
 -- Copying byte arrays
