@@ -57,7 +57,7 @@ dEPTH_LIIMT = Just (lookup_def_int "-fsupercompiler-depth-limit" maxBound)
 --dEPTH_LIIMT = Just 10
 
 pOSITIVE_INFORMATION :: Bool
-pOSITIVE_INFORMATION = lookUp $ fsLit "-fsupercompiler-positive-information"
+pOSITIVE_INFORMATION = not $ lookUp $ fsLit "-fsupercompiler-no-positive-information"
 --pOSITIVE_INFORMATION = True
 
 -- In favour of preinitialization:

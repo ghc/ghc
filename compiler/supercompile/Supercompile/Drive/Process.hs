@@ -888,21 +888,25 @@ reduceWithStats :: State -> (SCStats, State)
 reduceWithStats state = case reduce' state of (_, stats, state') -> (stats, state')
 
 reduce' :: State -> (Bool, SCStats, State)
-reduce' orig_state = go False (mkLinearHistory rEDUCE_WQO) orig_state
+reduce' orig_state = go 0 False init_hist orig_state
   where
+    init_hist = mkLinearHistory rEDUCE_WQO
+
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
-    go can_step hist state
+    go n can_step hist state
       = -- traceRender ("reduce:step", pPrintFullState state) $
         case step state of
           Just (deeds, heap, k, e)
            | Just deeds' <- if bOUND_STEPS then claimStep deeds else Just deeds
            , let state' = (deeds', heap, k, e)
            -> case terminate hist (gc state) of
-            Continue hist' -> go True hist' state'
-            Stop old_state -> pprTrace "reduce-stop" {--} (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) {--} -- empty
-                              -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
-                              -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
-                              (can_step, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
+                Continue hist' -> go n True hist' state'
+                Stop old_state
+                  | n > 0      -> go (n - 1) True init_hist state' -- FIXME: huge hack
+                  | otherwise  -> pprTrace "reduce-stop" {--} (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) {--} -- empty
+                                  -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
+                                  -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
+                                  (can_step, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
            | otherwise -> pprTrace "reduce-stop(deeds)" empty $
                           (True, mempty, state)
           _ -> (can_step, mempty, state)

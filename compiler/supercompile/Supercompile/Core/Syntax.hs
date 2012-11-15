@@ -134,11 +134,33 @@ data TermF ann = Var Id
                | TyApp (ann (TermF ann)) Type
                | CoApp (ann (TermF ann)) Coercion
                | App (ann (TermF ann)) Id
-               | PrimOp PrimOp [Type] [ann (TermF ann)]     -- FIXME: arguably we have just Vars as arguments for better Tag behaviour (otherwise improving the arguments is hidden by the Tag on the whole PrimOp stack frames). FIXME: in fact, we need to change this because *NOT ALL PRIMOP ARGUMENTS ARE STRICT* (e.g. the lazy polymorphic arguments to newMutVar#, newArray#). FIXME: the reason I haven't done this is because it means I should remove the PrimApply frame, which breaks the "question or answer" evaluator normalisation property.
+               | PrimOp PrimOp [Type] [ann (TermF ann)]
                | Case (ann (TermF ann)) Id Type [AltF ann]  -- NB: unlike GHC, for convenience we allow the list of alternatives to be empty
                | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case evaluation changes. Unlike GHC, we do NOT assume the RHSes of unlifted bindings are ok-for-speculation.
                | LetRec [(Id, ann (TermF ann))] (ann (TermF ann))
                | Cast (ann (TermF ann)) Coercion
+
+-- FIXME: arguably we have just Vars as arguments in PrimOp for better Tag behaviour
+-- (otherwise improving the arguments is hidden by the Tag on the whole PrimOp stack frames).
+--
+-- FIXME: in fact, we need to change this because *NOT ALL PRIMOP ARGUMENTS ARE STRICT* (e.g.
+-- the lazy polymorphic arguments to newMutVar#, newArray#).
+--
+-- FIXME: the reason I haven't done this is because it means I should remove the PrimApply frame,
+-- which breaks the "question or answer" evaluator normalisation property. Probably what I should
+-- do is just remove PrimOp and stop generating wrappers for PrimOps, so they are treated as normal Vars.
+-- We can then special case them in the evaluator's "force", using rules to pretend like they have a RHS.
+-- The only problem with this is that if there are no wrappers there is no guarantee of saturation,
+-- but we can probably ignore that.
+--
+-- FIXME: the way I'm splitting PrimApply isn't right. If we have
+--  case ((case [x] of I# x# -> x#) +# (case y of I# y# -> y#)) of
+--    0 -> ...; _ -> e[x, y]
+-- Then I want to eventually split to e[I# x#, I# y#]. At the moment we will only split to e[I# x, y]!
+-- This could be achieved in the current framework by splitting to
+--  case (x# +# (case [y] of I# y# -> y#)) of ...
+-- (Where the focus is now on y rather than x, and we put x# in the first set of arguments to PrimApply
+-- as if x# were an answer.) If we just removed the PrimApply frame then we wouldn't need to worry about this though.
 
 type Alt = AltF Identity
 type TaggedAlt = AltF Tagged

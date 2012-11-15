@@ -146,8 +146,8 @@ mkLiftedTupleSelector xs want_x tup_e
          [(DataAlt (tupleCon UnboxedTuple n), xs, Var want_x)]
   where n = length xs
 
-termUnfoldings :: S.Term -> [(Var, S.Term)]
-termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
+termUnfoldings :: {-(Module -> ModIface) ->-} S.Term -> [(Var, S.Term)]
+termUnfoldings {-mod_finder-} e = go (S.termFreeVars e) emptyVarSet [] []
   where
     go new_fvs all_fvs all_xwhy_nots all_xes
       | isEmptyVarSet added_fvs = pprTrace "termUnfoldings" (vcat [hang (text why_not <> text ":") 2 (vcat (map ppr xs)) | (why_not, xs) <- groups snd fst all_xwhy_nots]) $
@@ -164,6 +164,21 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
                                                      Right e      -> (             xwhy_nots, (x, e):xes))
                            ([], []) added_fvs
 
+    {-
+    -- Returns true for function name like workers which are not typed by the user but tend to be exported into interface files
+    x `probablyWorkerFor` y
+      | Just mod_x <- nameModule_maybe (varName x)
+      , Just mod_y <- nameModule_maybe (varName y)
+      , mod_x == mod_y
+      -- Both names in the same module! Now just check that x was not actually originally exported by that module.
+      -- FIXME: this doesn't work because we might have a user-written but non-exported helper, we don't want
+      -- to ignore the SUPERINLINABLE pragma on that!!
+      , let iface = mod_finder mod_x
+            mod_exports_set = availsToNameSet (mi_exports iface)
+      = not $ varName x `elemNameSet` mod_exports_set
+      | otherwise
+      = False
+    -}
 
     -- NB: at this point we have already done prepareTerm, so used local bindings will be pushed into "e"
     -- already. Thus all this code basically only affects imported functions. In this way, we exactly match
@@ -257,22 +272,37 @@ superinlinableLexically ctxt = term
 
 
 
-supercompile :: CoreExpr -> IO CoreExpr
-supercompile e = -- liftM (termToCoreExpr . snd) $
+supercompile :: {-(Module -> ModIface) -> -} CoreExpr -> IO CoreExpr
+supercompile {-mod_finder-} e = -- liftM (termToCoreExpr . snd) $
                  return $ termToCoreExpr $
                  S.supercompile (M.fromList unfs) e'
-  where unfs = termUnfoldings e'
+  where unfs = termUnfoldings {-mod_finder-} e'
         -- NB: ensure we mark any child bindings of bindings marked SUPERINLINABLE in *this module* as SUPERINLINABLE,
         -- just like we would if we imported a SUPERINLINABLE binding
         e' = superinlinableLexically mODULE_SUPERINLINABLE $ runParseM anfUniqSupply' $ coreExprToTerm e
 
 supercompileProgram :: [CoreBind] -> IO [CoreBind]
-supercompileProgram binds = supercompileProgramSelective selector binds
+supercompileProgram binds = do
+    {-mod_finder <- mkModuleFinder-}
+    supercompileProgramSelective {-mod_finder-} selector binds
   where selector | any idSupercompilePragma (bindersOfBinds binds) = idSupercompilePragma
                  | otherwise                                       = const True
 
-supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
-supercompileProgramSelective should_sc binds = liftM (\e' -> [Rec $ (x, e') : rebuild x]) (supercompile e)
+{-
+mkModuleFinder :: CoreM (Module -> ModIface)
+mkModuleFinder = do
+    hsc_env <- getHscEnv
+    eps <- liftIO $ hscEPS hsc_env
+    let hpt = hsc_HPT hsc_env
+        dflags = hsc_dflags hsc_env
+    -- All referenced modules should be loaded by this point, so this should always succeed:
+    return $ \mod -> case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
+      Nothing    -> panic "mkModuleFinder"
+      Just iface -> iface
+-}
+
+supercompileProgramSelective :: {-(Module -> ModIface) ->-} (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
+supercompileProgramSelective {-mod_finder-} should_sc binds = liftM (\e' -> [Rec $ (x, e') : rebuild x]) (supercompile {-mod_finder-} e)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
         -- NB: we assume no-shadowing at top level, which is probably reasonable
         flat_binds = flattenBinds binds

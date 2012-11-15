@@ -24,6 +24,8 @@ import TyCon
 import Type
 import PrelRules
 import Id
+import Module
+import Name (nameModule_maybe)
 import IdInfo (isShortableIdInfo)
 import DataCon
 import Pair
@@ -556,6 +558,10 @@ step' normalising ei_state = {-# SCC "step'" #-}
 -- we construct the unfoldings in the first place.
 shouldExposeUnfolding :: Id -> Either String Superinlinable
 shouldExposeUnfolding x = case inl_inline inl_prag of
+    -- FIXME: God help my soul
+    _ | Just mod <- nameModule_maybe (idName x)
+      , moduleName mod `elem` map mkModuleName ["Data.Complex", "GHC.List"]
+      -> Right True
     -- NB: we don't check the activation on INLINE things because so many activations
     -- are used to ensure that e.g. RULE-based fusion works properly, and NOINLINE will
     -- generally impede supercompiler-directed fusion.

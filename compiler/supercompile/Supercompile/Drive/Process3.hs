@@ -228,7 +228,7 @@ rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
                        (FS fulfilments, rolled_back)
          | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
          where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
-   in ScpState {
+   in trace (replicate (length spine_rolled_back) '}') $ ScpState {
        scpMemoState = MS {
            -- The most recent promise in s' always has no work done on it, so don't report dumping for it
            promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
@@ -271,7 +271,7 @@ terminateM :: String -> State -> (forall b. RollbackState -> ScpM b) -> ScpM a -
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state (\x -> trace ("back to " ++ show shallow_h) (shallow_rb x)))) s)                                      (env { scpStopCount = scpStopCount env + 1})
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state (\x -> trace ("back to " ++ shallow_h) (shallow_rb x)))) s)                                      (env { scpStopCount = scpStopCount env + 1})
         Continue hist'
           -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistoryState = hist' })) (env { scpNodeKey = generatedKey hist', scpProcessHistoryEnv = hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
@@ -597,7 +597,9 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                                                                         (_, e'_l) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_l, e')
                                                                                         refulfillM p e'_l
                                                                                     ; return (deeds, e'_r) })) $
-                     bestChoice [ ((p, is_ancestor), mr)
+                     listToMaybe $
+                     sortBest (\(p, _) -> if dumped p then Just (fun p) else Nothing)
+                              [ ((p, is_ancestor), mr)
                                 | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
                                 , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
                                                                      | (p_parent, p_siblings) <- parented_ps
@@ -614,11 +616,6 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                 --                                      match' mm (meaning p) reduced_state]
                                 , Just mr <- [{- trace "match" $ (\res -> trace "match'" res) -} (msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch)]
-                                {--}
-                                , if dumped p
-                                   then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
-                                   else True
-                                {--}
                                 ] of Just (skip, res) -> pure $ if skip then (res, s) else remember (\_ _ -> liftM ((,) False) res)
                                      Nothing          | CheckOnly <- memo_how
                                                       -> pure (liftM snd $ opt Nothing state, s)
@@ -627,14 +624,14 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
       where (_state_did_reduce, reduced_state) = reduceForMatch state
 
             -- Prefer more exact matches (see Note [Instance matching and loops]: it is essential to choose exact matches over instances)
-            bestChoice :: forall promise.
-                          [(promise, MSGMatchResult)]
-                       -> Maybe (Bool, (promise, MSGMatchResult))
-            bestChoice = go Nothing
-              where go mb_best [] = fmap ((,) False) mb_best
-                    go mb_best (this@(_, mr):rest)
-                      | mostSpecific mr = Just (True, this) -- Stop early upon exact match (as an optimisation)
-                      | otherwise       = go (Just (maybe this (\best@(_, best_mr) -> if mr `moreSpecific` best_mr then this else best) mb_best)) rest
+            sortBest :: forall promise.
+                        (promise -> Maybe Var)
+                     -> [(promise, MSGMatchResult)]
+                     -> [(Bool, (promise, MSGMatchResult))]
+            sortBest dumped ress = filter (\(_, (p, _)) -> case dumped p of Just fun -> pprTraceSC "tieback-to-dumped" (ppr fun) False; Nothing -> True) $
+                                          map ((,) True) best_ress ++ map ((,) False) (sortBy ((\x y -> if x `moreSpecific` y then LT else GT) `on` snd) other_ress)
+              where -- Stop early upon exact match (as an optimisation)
+                    (best_ress, other_ress) = partition (mostSpecific . snd) ress
 
                     mostSpecific :: MSGMatchResult -> Bool
                     mostSpecific (RightIsInstance (Heap h _) rn k) = isPureHeapEmpty h && isStackEmpty k && isEmptyRenaming rn
