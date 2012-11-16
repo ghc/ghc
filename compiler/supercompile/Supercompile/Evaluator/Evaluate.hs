@@ -562,6 +562,9 @@ shouldExposeUnfolding x = case inl_inline inl_prag of
     _ | Just mod <- nameModule_maybe (idName x)
       , moduleName mod `elem` map mkModuleName ["Data.Complex", "GHC.List"]
       -> Right True
+    -- These get wrappers generated for them: be very eager to inline the wrappers
+      | isPrimOpId x || isDataConWorkId x
+      -> Right True
     -- NB: we don't check the activation on INLINE things because so many activations
     -- are used to ensure that e.g. RULE-based fusion works properly, and NOINLINE will
     -- generally impede supercompiler-directed fusion.

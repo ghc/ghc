@@ -191,6 +191,7 @@ termUnfoldings {-mod_finder-} e = go (S.termFreeVars e) emptyVarSet [] []
     -- We still do check shouldExposeUnfolding here because we can avoid parsing+tagging those unfoldings
     -- which can literall never be used.
     varUnfolding x
+      -- NB: probably want to ensure these are all considered superinlinable by shouldExposeUnfolding for the evaluator
       | Just pop <- isPrimOpId_maybe x     = Right $ primOpUnfolding pop
       | Just dc <- isDataConWorkId_maybe x = dataUnfolding dc
       | otherwise                          = case S.shouldExposeUnfolding x of
