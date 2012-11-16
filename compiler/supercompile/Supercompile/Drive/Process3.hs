@@ -287,7 +287,7 @@ sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)) -- Bool records w
 sc' mb_h state = {- pprTrace "sc'" (trce1 state) $ -} {-# SCC "sc'" #-} case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> -- traceRenderM "!sc" (PrettyDoc (pPrintFullState quietStatePrettiness state)) >>
                                                    my_split state
-  Just h  -> flip catchM try_generalise $ \rb ->
+  Just h  -> flip catchM my_generalise $ \rb ->
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $ do
@@ -296,11 +296,9 @@ sc' mb_h state = {- pprTrace "sc'" (trce1 state) $ -} {-# SCC "sc'" #-} case mb_
                                                            case mb_shallow_gen of
                                                              Just shallow_gen | sC_ROLLBACK           -> trace "sc-stop(rb,gen)"   $ shallow_rb shallow_gen
                                                              Nothing | sC_ROLLBACK, Nothing <- mb_gen -> trace "sc-stop(rb,split)" $ shallow_rb (split sc shallow_state)
-                                                             _ -> case mb_gen of Just gen             -> trace "sc-stop(gen)"      $ try_generalise gen
-                                                                                 Nothing              -> trace "sc-stop(split)"    $ try_generalise (split sc state))
+                                                             _ -> case mb_gen of Just gen             -> trace "sc-stop(gen)"      $ my_generalise gen
+                                                                                 Nothing              -> trace "sc-stop(split)"    $ my_generalise (split sc state))
   where
-    try_generalise gen = my_generalise gen
-
     -- FIXME: the "could have tied back" case is reachable (e.g. exp3_8 with unfoldings as internal bindings), and it doesn't appear to be
     -- because of dumped promises (no "dumped" in output). I'm reasonably sure this should not happen :(
     trce shallow_h shallow_state = pprTraceSC ("Embedding:" ++ shallow_h)
@@ -325,6 +323,41 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
   where gen = mK_GENERALISER shallow_state state
 
 -- NB: this cannot return (Just, Nothing)
+tryMSG opt shallow_state state = case msgMaybe mode shallow_state state of
+    -- If we fail this way round, we should certainly fail the other way round too
+    Nothing -> (Nothing, Nothing)
+    Just msg_result@(Pair l r, _)
+      | let Just msg_result_sym = msgMaybe mode state shallow_state -- Will certainly succeed, but with tags of shallow_state
+      -> pprTrace "MSG success" (pprMSGResult msg_result) $ -- NB: pretty print MSG the "correct" way around even if we roll back
+         case (trivialMSG l, trivialMSG r) of
+           -- Both trivial: we have certainly discovered a variable generalisation (not an instance match, or we would have tied back)
+           -- Perhaps ideally we would just SC our deep state normally, but that is awkward. Instead we will rollback and generalise,
+           -- but it might be unsafe to generalise without rolling back (we might not be throwing any info away)
+           (True, True)   -> (Just (genFrom msg_result_sym), Nothing)
+           -- Trivial on the LHS only: probably an instance match. Unsafe to roll back because we might not throw any info away.
+           (True, False)  -> (Nothing,                       Just (genFrom msg_result))
+           -- Trivial on the RHS only: kind of weird. Perhaps ideally we would just reduce+split our deep state normally, but it's a bit
+           -- awkward to arrange that. Instead we will accept generalising the earlier state.
+           (False, True)  -> (Just (genFrom msg_result_sym), Nothing)
+           -- Non-trivial on both sides: can either rollback or not, doesn't matter. We throw away info either way.
+           (False, False) -> (Just (genFrom msg_result_sym), Just (genFrom msg_result))
+
+  where
+    trivialMSG (_, Heap h_lr _, _, k_lr) = isPureHeapEmpty h_lr && isStackEmpty k_lr
+
+    genFrom (Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) = do
+      let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
+      (deeds', e) <- sc (deeds, heap, k, qa)
+      -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
+      -- NB: adding some new bindings to h_r for the h functions is a bit of a hack because:
+      --  1. It only serves to suppress errors from "split" which occur when e' refers to some variables not bound in the heap
+      --  2. These new dummy bindings will never be passed down to any recursive invocation of opt
+      (h_hs, e') <- renameSCResult ids (rn_r, e)
+      instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
+
+    mode = MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }
+
+{-
 tryMSG opt = bothWays $ \shallow_state state -> do
   msg_result@(Pair _ (deeds_r, heap_r@(Heap h_r ids_r), rn_r, k_r), (heap@(Heap _ ids), k, qa)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
   -- NB: have to check that we throw away *some* info via MSG or else we can get a loop where we
@@ -339,6 +372,7 @@ tryMSG opt = bothWays $ \shallow_state state -> do
     --  2. These new dummy bindings will never be passed down to any recursive invocation of opt
     (h_hs, e') <- renameSCResult ids (rn_r, e)
     instanceSplit opt (deeds' `plusDeeds` deeds_r', Heap (h_r `M.union` h_hs) ids_r, k_r, e')
+-}
 
 pprMSGResult :: MSGResult -> SDoc
 pprMSGResult (Pair (deeds_l, heap_l, rn_l, k_l) (deeds_r, heap_r, rn_r, k_r), (heap, k, qa))
