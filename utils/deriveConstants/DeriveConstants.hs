@@ -152,7 +152,7 @@ fieldOffset w theType theField = fieldOffset_ w nameBase theType theField
 fieldOffset_ :: Where -> Name -> String -> String -> Wanteds
 fieldOffset_ w nameBase theType theField = [(w, GetWord name (Fst (CExpr expr)))]
     where name = "OFFSET_" ++ nameBase
-          expr = "OFFSET(" ++ theType ++ ", " ++ theField ++ ")"
+          expr = "offsetof(" ++ theType ++ ", " ++ theField ++ ")"
 
 -- FieldType is for defining REP_x to be b32 etc
 -- These are both the C-- types used in a load
@@ -217,7 +217,7 @@ closureField w theType theField = closureField_ w nameBase theType theField
 
 closureFieldOffset_ :: Where -> Name -> String -> String -> Wanteds
 closureFieldOffset_ w nameBase theType theField
-    = defOffset w nameBase (CExpr ("OFFSET(" ++ theType ++ ", " ++ theField ++ ") - TYPE_SIZE(StgHeader)"))
+    = defOffset w nameBase (CExpr ("offsetof(" ++ theType ++ ", " ++ theField ++ ") - TYPE_SIZE(StgHeader)"))
 
 -- Size of a closure type, minus the header, named SIZEOF_<type>_NoHdr
 -- Also, we #define SIZEOF_<type> to be the size of the whole closure for .cmm.
@@ -241,7 +241,7 @@ closureFieldOffset :: Where -> String -> String -> Wanteds
 closureFieldOffset w theType theField
     = defOffset w nameBase (CExpr expr)
     where nameBase = theType ++ "_" ++ theField
-          expr = "OFFSET(" ++ theType ++ ", " ++ theField ++ ") - TYPE_SIZE(StgHeader)"
+          expr = "offsetof(" ++ theType ++ ", " ++ theField ++ ") - TYPE_SIZE(StgHeader)"
 
 thunkSize :: Where -> String -> Wanteds
 thunkSize w theType
@@ -637,14 +637,9 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
                      "#include <stdio.h>",
                      "#include <string.h>",
                      "",
-                     "#if defined(offsetof)",
-                     "#define OFFSET(s_type, field) offsetof(s_type, field)",
-                     "#else",
-                     "#define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))",
-                     "#endif",
                      "#define FIELD_SIZE(s_type, field) ((size_t)sizeof(((s_type*)0)->field))",
                      "#define TYPE_SIZE(type) (sizeof(type))",
-                     "#define FUN_OFFSET(sym) (OFFSET(Capability,f.sym) - OFFSET(Capability,r))",
+                     "#define FUN_OFFSET(sym) (offsetof(Capability,f.sym) - offsetof(Capability,r))",
                      "",
                      "#pragma GCC poison sizeof"
                      ]
