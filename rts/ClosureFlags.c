@@ -64,7 +64,8 @@ StgWord16 closure_flags[] = {
  [BLOCKING_QUEUE]	=  ( 	      _NS|         _MUT|_UPT           ),
  [MVAR_CLEAN]	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MVAR_DIRTY]	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [ARR_WORDS]		=  (_HNF|     _NS|              _UPT           ),
+ [TVAR]                 =  (_HNF|     _NS|         _MUT|_UPT           ),
+ [ARR_WORDS]            =  (_HNF|     _NS|              _UPT           ),
  [MUT_ARR_PTRS_CLEAN]  	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MUT_ARR_PTRS_DIRTY]  	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MUT_ARR_PTRS_FROZEN0]	=  (_HNF|     _NS|         _MUT|_UPT           ),
@@ -83,6 +84,6 @@ StgWord16 closure_flags[] = {
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 60
+#if N_CLOSURE_TYPES != 61
 #error Closure types changed: update ClosureFlags.c!
 #endif

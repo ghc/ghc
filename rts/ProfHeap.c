@@ -988,7 +988,8 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case MVAR_CLEAN:
             case MVAR_DIRTY:
-	    case WEAK:
+            case TVAR:
+            case WEAK:
 	    case PRIM:
 	    case MUT_PRIM:
 	    case MUT_VAR_CLEAN:

@@ -474,8 +474,11 @@ INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
    STM
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_TVAR, 2, 1, MUT_PRIM, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR object entered!") never returns; }
+INFO_TABLE(stg_TVAR_CLEAN, 2, 1, TVAR, "TVAR", "TVAR")
+{ foreign "C" barf("TVAR_CLEAN object entered!") never returns; }
+
+INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR")
+{ foreign "C" barf("TVAR_DIRTY object entered!") never returns; }
 
 INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
 { foreign "C" barf("TVAR_WATCH_QUEUE object entered!") never returns; }

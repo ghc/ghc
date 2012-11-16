@@ -424,6 +424,23 @@ scavenge_block (bdescr *bd)
 	break;
     }
 
+    case TVAR:
+    {
+	StgTVar *tvar = ((StgTVar *)p);
+	gct->eager_promotion = rtsFalse;
+        evacuate((StgClosure **)&tvar->current_value);
+        evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    tvar->header.info = &stg_TVAR_DIRTY_info;
+	} else {
+	    tvar->header.info = &stg_TVAR_CLEAN_info;
+	}
+	p += sizeofW(StgTVar);
+	break;
+    }
+
     case FUN_2_0:
 	scavenge_fun_srt(info);
 	evacuate(&((StgClosure *)p)->payload[1]);
@@ -783,6 +800,22 @@ scavenge_mark_stack(void)
             break;
         }
 
+        case TVAR:
+        {
+            StgTVar *tvar = ((StgTVar *)p);
+            gct->eager_promotion = rtsFalse;
+            evacuate((StgClosure **)&tvar->current_value);
+            evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+            gct->eager_promotion = saved_eager_promotion;
+
+            if (gct->failed_to_evac) {
+                tvar->header.info = &stg_TVAR_DIRTY_info;
+            } else {
+                tvar->header.info = &stg_TVAR_CLEAN_info;
+            }
+            break;
+        }
+
 	case FUN_2_0:
 	    scavenge_fun_srt(info);
 	    evacuate(&((StgClosure *)p)->payload[1]);
@@ -1088,6 +1121,22 @@ scavenge_one(StgPtr p)
 	break;
     }
 
+    case TVAR:
+    {
+	StgTVar *tvar = ((StgTVar *)p);
+	gct->eager_promotion = rtsFalse;
+        evacuate((StgClosure **)&tvar->current_value);
+        evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+	gct->eager_promotion = saved_eager_promotion;
+
+	if (gct->failed_to_evac) {
+	    tvar->header.info = &stg_TVAR_DIRTY_info;
+	} else {
+	    tvar->header.info = &stg_TVAR_CLEAN_info;
+	}
+        break;
+    }
+
     case THUNK:
     case THUNK_1_0:
     case THUNK_0_1:
@@ -1363,10 +1412,26 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    case MVAR_CLEAN:
 		barf("MVAR_CLEAN on mutable list");
 	    case MVAR_DIRTY:
-		mutlist_MVARS++; break;
-	    default:
-		mutlist_OTHERS++; break;
-	    }
+                mutlist_MVARS++; break;
+            case TVAR:
+                mutlist_TVAR++; break;
+            case TREC_CHUNK:
+                mutlist_TREC_CHUNK++; break;
+            case MUT_PRIM:
+                if (((StgClosure*)p)->header.info == &stg_TVAR_WATCH_QUEUE_info)
+                    mutlist_TVAR_WATCH_QUEUE++;
+                else if (((StgClosure*)p)->header.info == &stg_TREC_HEADER_info)
+                    mutlist_TREC_HEADER++;
+                else if (((StgClosure*)p)->header.info == &stg_ATOMIC_INVARIANT_info)
+                    mutlist_ATOMIC_INVARIANT++;
+                else if (((StgClosure*)p)->header.info == &stg_INVARIANT_CHECK_QUEUE_info)
+                    mutlist_INVARIANT_CHECK_QUEUE++;
+                else
+                    mutlist_OTHERS++;
+                break;
+            default:
+                mutlist_OTHERS++; break;
+            }
 #endif
 
 	    // Check whether this object is "clean", that is it
