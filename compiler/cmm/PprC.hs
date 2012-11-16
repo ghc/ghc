@@ -230,6 +230,8 @@ pprStmt stmt =
                     pprCall cast_fn cconv hresults hargs <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
+    CmmUnsafeForeignCall (PrimTarget MO_Touch) _results _args -> empty
+
     CmmUnsafeForeignCall target@(PrimTarget op) results args ->
         proto $$ fn_call
       where
