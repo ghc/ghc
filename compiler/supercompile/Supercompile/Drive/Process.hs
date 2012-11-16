@@ -696,7 +696,8 @@ nothingSpeculated = S.empty
 -- FIXME: if I speculate roughly in dependency order then GHCs inlining heuristics will have more information
 -- to work with in the reduce invocations
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
-speculate speculated (stats, (deeds, heap, k, in_e)) = (speculated', (stats', (deeds', heap', k, in_e)))
+speculate speculated (stats, state) | not sPECULATION = (speculated,  (stats, state))
+speculate speculated (stats, (deeds, heap, k, in_e))  = (speculated', (stats', (deeds', heap', k, in_e)))
   where (speculated', (stats', deeds', heap')) = speculateHeap speculated (stats, deeds, heap)
 
 --type SpecRB = SpecHistory -> SpecM (SpecHistory, Deeds, Heap)
