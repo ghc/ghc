@@ -162,6 +162,12 @@ printClosure( StgClosure *obj )
 	printStdObjPayload(obj);
 	break;
 
+    case MUT_PRIM:
+        debugBelch("MUT_PRIM(");
+	printPtr((StgPtr)obj->header.info);
+	printStdObjPayload(obj);
+	break;
+
     case THUNK:
     case THUNK_1_0: case THUNK_0_1:
     case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
@@ -321,6 +327,13 @@ printClosure( StgClosure *obj )
         {
 	  StgMVar* mv = (StgMVar*)obj;
 	  debugBelch("MVAR(head=%p, tail=%p, value=%p)\n", mv->head, mv->tail, mv->value);
+          break;
+        }
+
+    case TVAR:
+        {
+          StgTVar* tv = (StgTVar*)obj;
+          debugBelch("TVAR(value=%p, wq=%p, num_updates=%" FMT_Word ")\n", tv->current_value, tv->first_watch_queue_entry, tv->num_updates);
           break;
         }
 
@@ -1089,6 +1102,7 @@ char *closure_type_names[] = {
  [BLACKHOLE]             = "BLACKHOLE",
  [MVAR_CLEAN]            = "MVAR_CLEAN",
  [MVAR_DIRTY]            = "MVAR_DIRTY",
+ [TVAR]                  = "TVAR",
  [ARR_WORDS]             = "ARR_WORDS",
  [MUT_ARR_PTRS_CLEAN]    = "MUT_ARR_PTRS_CLEAN",
  [MUT_ARR_PTRS_DIRTY]    = "MUT_ARR_PTRS_DIRTY",

@@ -540,13 +540,6 @@ loop:
   case WHITEHOLE:
       goto loop;
 
-  case MUT_VAR_CLEAN:
-  case MUT_VAR_DIRTY:
-  case MVAR_CLEAN:
-  case MVAR_DIRTY:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
-      return;
-
   // For ints and chars of low value, save space by replacing references to
   //	these with closures with references to common, shared ones in the RTS.
   //
@@ -646,6 +639,11 @@ loop:
       goto loop;
   }
 
+  case MUT_VAR_CLEAN:
+  case MUT_VAR_DIRTY:
+  case MVAR_CLEAN:
+  case MVAR_DIRTY:
+  case TVAR:
   case BLOCKING_QUEUE:
   case WEAK:
   case PRIM:

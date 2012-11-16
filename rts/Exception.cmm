@@ -475,7 +475,7 @@ retry_pop_stack:
       W_ trec, outer;
       W_ r;
       trec = StgTSO_trec(CurrentTSO);
-      (r) = ccall stmValidateNestOfTransactions(trec "ptr");
+      (r) = ccall stmValidateNestOfTransactions(MyCapability() "ptr", trec "ptr");
       outer  = StgTRecHeader_enclosing_trec(trec);
       ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");

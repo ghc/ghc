@@ -91,6 +91,7 @@
 #include "STM.h"
 #include "Trace.h"
 #include "Threads.h"
+#include "sm/Storage.h"
 
 #include <stdio.h>
 
@@ -195,13 +196,15 @@ static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED,
   return result;
 }
 
-static void unlock_tvar(StgTRecHeader *trec STG_UNUSED,
-                        StgTVar *s STG_UNUSED,
+static void unlock_tvar(Capability *cap,
+                        StgTRecHeader *trec STG_UNUSED,
+                        StgTVar *s,
                         StgClosure *c,
                         StgBool force_update) {
   TRACE("%p : unlock_tvar(%p)", trec, s);
   if (force_update) {
     s -> current_value = c;
+    dirty_TVAR(cap,s);
   }
 }
 
@@ -252,14 +255,16 @@ static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED,
   return result;
 }
 
-static void *unlock_tvar(StgTRecHeader *trec STG_UNUSED,
-                         StgTVar *s STG_UNUSED,
+static void *unlock_tvar(Capability *cap,
+                         StgTRecHeader *trec STG_UNUSED,
+                         StgTVar *s,
                          StgClosure *c,
                          StgBool force_update) {
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT (smp_locked == trec);
   if (force_update) {
     s -> current_value = c;
+    dirty_TVAR(cap,s);
   }
 }
 
@@ -311,13 +316,15 @@ static StgClosure *lock_tvar(StgTRecHeader *trec,
   return result;
 }
 
-static void unlock_tvar(StgTRecHeader *trec STG_UNUSED,
+static void unlock_tvar(Capability *cap,
+                        StgTRecHeader *trec STG_UNUSED,
                         StgTVar *s,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(s -> current_value == (StgClosure *)trec);
   s -> current_value = c;
+  dirty_TVAR(cap,s);
 }
 
 static StgBool cond_lock_tvar(StgTRecHeader *trec, 
@@ -585,6 +592,7 @@ static void build_watch_queue_entries_for_trec(Capability *cap,
     }
     s -> first_watch_queue_entry = q;
     e -> new_value = (StgClosure *) q;
+    dirty_TVAR(cap,s); // we modified first_watch_queue_entry
   });
 }
 
@@ -621,9 +629,10 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
     } else {
       ASSERT (s -> first_watch_queue_entry == q);
       s -> first_watch_queue_entry = nq;
+      dirty_TVAR(cap,s); // we modified first_watch_queue_entry
     }
     free_stg_tvar_watch_queue(cap, q);
-    unlock_tvar(trec, s, saw, FALSE);
+    unlock_tvar(cap, trec, s, saw, FALSE);
   });
 }
  
@@ -758,7 +767,8 @@ static StgBool tvar_is_locked(StgTVar *s, StgTRecHeader *h) {
 // the TVars involved.  "revert_all" is not set in commit operations
 // where we don't lock TVars that have been read from but not updated.
 
-static void revert_ownership(StgTRecHeader *trec STG_UNUSED,
+static void revert_ownership(Capability *cap STG_UNUSED,
+                             StgTRecHeader *trec STG_UNUSED,
                              StgBool revert_all STG_UNUSED) {
 #if defined(STM_FG_LOCKS) 
   FOR_EACH_ENTRY(trec, e, {
@@ -766,7 +776,7 @@ static void revert_ownership(StgTRecHeader *trec STG_UNUSED,
       StgTVar *s;
       s = e -> tvar;
       if (tvar_is_locked(s, trec)) {
-        unlock_tvar(trec, s, e -> expected_value, TRUE);
+          unlock_tvar(cap, trec, s, e -> expected_value, TRUE);
       }
     }
   });
@@ -788,7 +798,8 @@ static void revert_ownership(StgTRecHeader *trec STG_UNUSED,
 //     to ensure that an atomic snapshot of all of these locations has been
 //     seen.
 
-static StgBool validate_and_acquire_ownership (StgTRecHeader *trec, 
+static StgBool validate_and_acquire_ownership (Capability *cap,
+                                               StgTRecHeader *trec,
                                                int acquire_all,
                                                int retain_ownership) {
   StgBool result;
@@ -836,7 +847,7 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
   }
 
   if ((!result) || (!retain_ownership)) {
-    revert_ownership(trec, acquire_all);
+      revert_ownership(cap, trec, acquire_all);
   }
   
   return result;
@@ -1020,7 +1031,7 @@ void stmCondemnTransaction(Capability *cap,
 
 /*......................................................................*/
 
-StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
+StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *t;
   StgBool result;
 
@@ -1035,7 +1046,7 @@ StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
   t = trec;
   result = TRUE;
   while (t != NO_TREC) {
-    result &= validate_and_acquire_ownership(t, TRUE, FALSE);
+    result &= validate_and_acquire_ownership(cap, t, TRUE, FALSE);
     t = t -> enclosing_trec;
   }
 
@@ -1107,7 +1118,8 @@ static void disconnect_invariant(Capability *cap,
 	} else {
 	  ASSERT (s -> first_watch_queue_entry == q);
 	  s -> first_watch_queue_entry = nq;
-	}
+          dirty_TVAR(cap,s); // we modified first_watch_queue_entry
+        }
 	TRACE("  found it in watch queue entry %p", q);
 	free_stg_tvar_watch_queue(cap, q);
 	DEBUG_ONLY( found = TRUE );
@@ -1147,6 +1159,7 @@ static void connect_invariant_to_trec(Capability *cap,
       fq -> prev_queue_entry = q;
     }
     s -> first_watch_queue_entry = q;
+    dirty_TVAR(cap,s); // we modified first_watch_queue_entry
   });
 
   inv -> last_execution = my_execution;
@@ -1248,7 +1261,7 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
 	  }
 	}
 
-	unlock_tvar(trec, s, old, FALSE);
+        unlock_tvar(cap, trec, s, old, FALSE);
       }
     }
     c = c -> prev_chunk;
@@ -1337,7 +1350,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
   use_read_phase = ((config_use_read_phase) && (!touched_invariants));
 
-  result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
+  result = validate_and_acquire_ownership(cap, trec, (!use_read_phase), TRUE);
   if (result) {
     // We now know that all the updated locations hold their expected values.
     ASSERT (trec -> state == TREC_ACTIVE);
@@ -1397,12 +1410,12 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
           IF_STM_FG_LOCKS({
             s -> num_updates ++;
           });
-          unlock_tvar(trec, s, e -> new_value, TRUE);
+          unlock_tvar(cap, trec, s, e -> new_value, TRUE);
         } 
         ACQ_ASSERT(!tvar_is_locked(s, trec));
       });
     } else {
-      revert_ownership(trec, FALSE);
+        revert_ownership(cap, trec, FALSE);
     }
   } 
 
@@ -1427,7 +1440,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   lock_stm(trec);
 
   et = trec -> enclosing_trec;
-  result = validate_and_acquire_ownership(trec, (!config_use_read_phase), TRUE);
+  result = validate_and_acquire_ownership(cap, trec, (!config_use_read_phase), TRUE);
   if (result) {
     // We now know that all the updated locations hold their expected values.
 
@@ -1448,13 +1461,13 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
 	StgTVar *s;
 	s = e -> tvar;
 	if (entry_is_update(e)) {
-	  unlock_tvar(trec, s, e -> expected_value, FALSE);
+            unlock_tvar(cap, trec, s, e -> expected_value, FALSE);
 	}
 	merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
 	ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
       });
     } else {
-      revert_ownership(trec, FALSE);
+        revert_ownership(cap, trec, FALSE);
     }
   } 
 
@@ -1478,7 +1491,7 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
           (trec -> state == TREC_CONDEMNED));
 
   lock_stm(trec);
-  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
+  result = validate_and_acquire_ownership(cap, trec, TRUE, TRUE);
   if (result) {
     // The transaction is valid so far so we can actually start waiting.
     // (Otherwise the transaction was not valid and the thread will have to
@@ -1510,8 +1523,8 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
 
 
 void
-stmWaitUnlock(Capability *cap STG_UNUSED, StgTRecHeader *trec) {
-    revert_ownership(trec, TRUE);
+stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
+    revert_ownership(cap, trec, TRUE);
     unlock_stm(trec);
 }
 
@@ -1528,14 +1541,14 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
           (trec -> state == TREC_CONDEMNED));
 
   lock_stm(trec);
-  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
+  result = validate_and_acquire_ownership(cap, trec, TRUE, TRUE);
   TRACE("%p : validation %s", trec, result ? "succeeded" : "failed");
   if (result) {
     // The transaction remains valid -- do nothing because it is already on
     // the wait queues
     ASSERT (trec -> state == TREC_WAITING);
     park_tso(tso);
-    revert_ownership(trec, TRUE);
+    revert_ownership(cap, trec, TRUE);
   } else {
     // The transcation has become invalid.  We can now remove it from the wait
     // queues.

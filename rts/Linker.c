@@ -1085,6 +1085,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_deRefWeakzh)                                    \
       SymI_HasProto(stg_deRefStablePtrzh)                               \
       SymI_HasProto(dirty_MUT_VAR)                                      \
+      SymI_HasProto(dirty_TVAR)                                         \
       SymI_HasProto(stg_forkzh)                                         \
       SymI_HasProto(stg_forkOnzh)                                       \
       SymI_HasProto(forkProcess)                                        \
@@ -1219,6 +1220,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(startTimer)                                         \
       SymI_HasProto(stg_MVAR_CLEAN_info)                                \
       SymI_HasProto(stg_MVAR_DIRTY_info)                                \
+      SymI_HasProto(stg_TVAR_CLEAN_info)                                \
+      SymI_HasProto(stg_TVAR_DIRTY_info)                                \
       SymI_HasProto(stg_IND_STATIC_info)                                \
       SymI_HasProto(stg_ARR_WORDS_info)                                 \
       SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
