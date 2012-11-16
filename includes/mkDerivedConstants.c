@@ -200,7 +200,7 @@ main(int argc, char *argv[])
 
     printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
-    printf("#define BLOCKS_PER_MBLOCK  %" FMT_SizeT "\n", (W_)BLOCKS_PER_MBLOCK);
+    printf("#define BLOCKS_PER_MBLOCK  %" FMT_Word "\n", (W_)BLOCKS_PER_MBLOCK);
     // could be derived, but better to save doing the calculation twice
 
     printf("\n\n");
