@@ -2,24 +2,19 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-LOCAL_PKGCONF=local.package.conf
-PKG_NAME=simple-plugin
+clean.%:
+	rm -rf pkg.$*
 
-clean:
-	rm -f setup
-	rm -f $(LOCAL_PKGCONF)
-	rm -rf dist
-	rm -rf install
-	rm -f Setup.hi Setup.o
+HERE := $(abspath .)
+$(eval $(call canonicalise,HERE))
 
-PREFIX := $(abspath install)
-$(eval $(call canonicalise,PREFIX))
-
-package:
-	"$(TEST_HC)" --make -v0 -o setup Setup.hs
+package.%:
+	$(MAKE) clean.$*
+	mkdir pkg.$*
+	"$(TEST_HC)" -outputdir pkg.$* --make -v0 -o pkg.$*/setup Setup.hs
 	
-	echo "[]" >$(LOCAL_PKGCONF)
+	echo "[]" > pkg.$*/local.package.conf
 	
-	./setup configure $(CABAL_MINIMAL_BUILD) -v0 --prefix="$(PREFIX)" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=$(LOCAL_PKGCONF)
-	./setup build -v0
-	./setup install -v0
+	pkg.$*/setup configure --distdir pkg.$*/dist -v0 $(CABAL_MINIMAL_BUILD) --prefix="$(HERE)/pkg.$*/install" --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=pkg.$*/local.package.conf
+	pkg.$*/setup build     --distdir pkg.$*/dist -v0
+	pkg.$*/setup install   --distdir pkg.$*/dist -v0
