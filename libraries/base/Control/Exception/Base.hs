@@ -452,11 +452,6 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- up to the next enclosing exception handler.
 --
 -- >  try a = catch (Right `liftM` a) (return . Left)
---
--- Note that "System.IO.Error" also exports a function called
--- 'System.IO.Error.try' with a similar type to 'Control.Exception.try',
--- except that it catches only the IO and user families of exceptions
--- (as required by the Haskell 98 @IO@ module).
 
 try :: Exception e => IO a -> IO (Either e a)
 try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
