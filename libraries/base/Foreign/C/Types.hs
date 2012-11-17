@@ -51,7 +51,7 @@ module Foreign.C.Types
         , CClock(..),   CTime(..),    CUSeconds(..), CSUSeconds(..)
 
         -- extracted from CTime, because we don't want this comment in
-        -- the Haskell 2010 report:
+        -- the Haskell language reports:
 
         -- | To convert 'CTime' to 'Data.Time.UTCTime', use the following formula:
         --
