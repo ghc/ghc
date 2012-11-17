@@ -1,7 +1,7 @@
 # Test GHCi works with Safe Haskell
 
 def normaliseBytestringPackage(str):
-    return re.sub('bytestring-[0-9.]+', 'bytestring-<VERSION>.', str)
+    return re.sub('bytestring-[0-9.]+', 'bytestring-<VERSION>', str)
 
 test('p1', normal, ghci_script, ['p1.script'])
 test('p2', normal, ghci_script, ['p2.script'])

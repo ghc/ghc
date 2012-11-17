@@ -1,4 +1,4 @@
-local.db:
+pdb.safePkg01/local.db:
     safePkg01-1.0
 
 trusted: False
