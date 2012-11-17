@@ -634,6 +634,7 @@ getWanted verbose tmpdir gccProgram gccFlags nmProgram
                      "#include \"Capability.h\"",
                      "",
                      "#include <inttypes.h>",
+                     "#include <stddef.h>",
                      "#include <stdio.h>",
                      "#include <string.h>",
                      "",
