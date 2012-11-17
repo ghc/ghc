@@ -53,9 +53,9 @@ module Foreign.C.Types
         -- extracted from CTime, because we don't want this comment in
         -- the Haskell language reports:
 
-        -- | To convert 'CTime' to 'Data.Time.UTCTime', use the following formula:
+        -- | To convert 'CTime' to 'Data.Time.UTCTime', use the following:
         --
-        -- >  posixSecondsToUTCTime (realToFrac :: POSIXTime)
+        -- > \t -> posixSecondsToUTCTime (realToFrac t :: POSIXTime)
         --
 
           -- ** Floating types
