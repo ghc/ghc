@@ -11,9 +11,9 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- The Prelude: a standard module imported by default into all Haskell
--- modules.  For more documentation, see the Haskell 2010 Report
--- <http://www.haskell.org/onlinereport/haskell2010>.
+-- The Prelude: a standard module. The Prelude is imported by default
+-- into all Haskell modules unless either there is an explicit import
+-- statement for it, or the NoImplicitPrelude extension is enabled.
 --
 -----------------------------------------------------------------------------
 
