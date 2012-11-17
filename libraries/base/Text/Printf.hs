@@ -101,7 +101,7 @@ class PrintfType t where
 class HPrintfType t where
     hspr :: Handle -> String -> [UPrintf] -> t
 
-{- not allowed in Haskell 98
+{- not allowed in Haskell 2010
 instance PrintfType String where
     spr fmt args = uprintf fmt (reverse args)
 -}
@@ -130,7 +130,7 @@ class PrintfArg a where
 instance PrintfArg Char where
     toUPrintf c = UChar c
 
-{- not allowed in Haskell 98
+{- not allowed in Haskell 2010
 instance PrintfArg String where
     toUPrintf s = UString s
 -}

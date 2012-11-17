@@ -19,7 +19,7 @@
 
 -- #hide
 module GHC.List (
-   -- [] (..),          -- Not Haskell 98; built in syntax
+   -- [] (..),          -- built-in syntax; can't be used in export list
 
    map, (++), filter, concat,
    head, last, tail, init, null, length, (!!),

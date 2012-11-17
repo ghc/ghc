@@ -217,7 +217,7 @@ nonblock_flags = o_NONBLOCK
 
 -- | Make a 'FD' from an existing file descriptor.  Fails if the FD
 -- refers to a directory.  If the FD refers to a file, `mkFD` locks
--- the file according to the Haskell 98 single writer/multiple reader
+-- the file according to the Haskell 2010 single writer/multiple reader
 -- locking semantics (this is why we need the `IOMode` argument too).
 mkFD :: CInt
      -> IOMode

@@ -430,7 +430,7 @@ arrEleBottom = error "(Array.!): undefined array element"
 -- for given indices within these bounds.
 --
 -- The array is undefined (i.e. bottom) if any index in the list is
--- out of bounds.  The Haskell 98 Report further specifies that if any
+-- out of bounds.  The Haskell 2010 Report further specifies that if any
 -- two associations in the list have the same index, the value at that
 -- index is undefined (i.e. bottom).  However in GHC's implementation,
 -- the value at such an index is the value part of the last association
@@ -644,7 +644,7 @@ adjust f marr# (I# i#, new) next
 -- is the same matrix, except with the diagonal zeroed.
 --
 -- Repeated indices in the association list are handled as for 'array':
--- Haskell 98 specifies that the resulting array is undefined (i.e. bottom),
+-- Haskell 2010 specifies that the resulting array is undefined (i.e. bottom),
 -- but GHC's implementation uses the last association for each index.
 {-# INLINE (//) #-}
 (//) :: Ix i => Array i e -> [(i, e)] -> Array i e

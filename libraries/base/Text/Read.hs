@@ -16,7 +16,7 @@
 -- The "Text.Read" library is the canonical library to import for
 -- 'Read'-class facilities.  For GHC only, it offers an extended and much
 -- improved 'Read' class, which constitutes a proposed alternative to the 
--- Haskell 98 'Read'.  In particular, writing parsers is easier, and
+-- Haskell 2010 'Read'.  In particular, writing parsers is easier, and
 -- the parsers are much more efficient.
 --
 -----------------------------------------------------------------------------
@@ -26,7 +26,7 @@ module Text.Read (
    Read(..),
    ReadS,
 
-   -- * Haskell 98 functions
+   -- * Haskell 2010 functions
    reads,
    read,
    readParen,

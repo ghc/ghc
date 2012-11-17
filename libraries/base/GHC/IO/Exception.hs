@@ -194,12 +194,12 @@ ioError         =  ioException
 -- ---------------------------------------------------------------------------
 -- IOError type
 
--- | The Haskell 98 type for exceptions in the 'IO' monad.
+-- | The Haskell 2010 type for exceptions in the 'IO' monad.
 -- Any I\/O operation may raise an 'IOError' instead of returning a result.
 -- For a more general type of exception, including also those that arise
 -- in pure code, see "Control.Exception.Exception".
 --
--- In Haskell 98, this is an opaque type.
+-- In Haskell 2010, this is an opaque type.
 type IOError = IOException
 
 -- |Exceptions that occur in the @IO@ monad.
@@ -226,7 +226,7 @@ instance Eq IOException where
 
 -- | An abstract type that contains a value for each variant of 'IOError'.
 data IOErrorType
-  -- Haskell 98:
+  -- Haskell 2010:
   = AlreadyExists
   | NoSuchThing
   | ResourceBusy
