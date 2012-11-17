@@ -73,7 +73,7 @@ import Foreign.Storable      ( Storable(sizeOf, poke) )
 
 --------------------------------------------------------------------------------
 
--- To avoid non-H98 stuff like existentially quantified data constructors, we
+-- To avoid non-H2010 stuff like existentially quantified data constructors, we
 -- simply use pointers to () below. Not very nice, but...
 
 -- | A memory pool.
