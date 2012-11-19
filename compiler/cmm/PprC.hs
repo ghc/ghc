@@ -102,7 +102,7 @@ pprTop (CmmProc infos clbl _ graph) =
            rbrace ]
     )
   where
-        blocks = toBlockList graph
+        blocks = toBlockListEntryFirst graph
         (temp_decls, extern_decls) = pprTempAndExternDecls blocks
 
 
