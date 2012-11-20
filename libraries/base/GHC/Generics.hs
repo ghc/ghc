@@ -8,6 +8,24 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE DeriveGeneric          #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.Generics
+-- Copyright   :  (c) Universiteit Utrecht 2010-2011, University of Oxford 2012
+-- License     :  see libraries/base/LICENSE
+-- 
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable
+--
+-- Support for generic programming with a sum-of-products view. 
+-- For more information, please visit the HaskellWiki page
+-- (<http://www.haskell.org/haskellwiki/GHC.Generics>)
+-- or use the generic-deriving package on Hackage:
+-- <http://hackage.haskell.org/package/generic-deriving>.
+-- 
+-----------------------------------------------------------------------------
+
 module GHC.Generics  (
   -- * Generic representation types
     V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..)
