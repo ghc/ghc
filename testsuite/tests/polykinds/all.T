@@ -78,4 +78,5 @@ test('T7332', normal, compile,[''])
 test('T7347', normal, compile_fail,[''])
 test('T7341', normal, compile_fail,[''])
 test('T7422', normal, compile,[''])
+test('T7433', normal, compile_fail,[''])
 
