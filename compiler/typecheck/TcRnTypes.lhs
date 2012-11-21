@@ -591,6 +591,7 @@ data PromotionErr
 
   | RecDataConPE     -- Data constructor in a reuursive loop
                      -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
+  | NoDataKinds      -- -XDataKinds not enabled
 
 instance Outputable TcTyThing where     -- Debugging only
    ppr (AGlobal g)      = pprTyThing g
@@ -608,6 +609,7 @@ instance Outputable PromotionErr where
   ppr TyConPE      = text "TyConPE"
   ppr FamDataConPE = text "FamDataConPE"
   ppr RecDataConPE = text "RecDataConPE"
+  ppr NoDataKinds  = text "NoDataKinds"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
@@ -621,6 +623,7 @@ pprPECategory ClassPE      = ptext (sLit "Class")
 pprPECategory TyConPE      = ptext (sLit "Type constructor")
 pprPECategory FamDataConPE = ptext (sLit "Data constructor")
 pprPECategory RecDataConPE = ptext (sLit "Data constructor")
+pprPECategory NoDataKinds  = ptext (sLit "Data constructor")
 \end{code}
 
 

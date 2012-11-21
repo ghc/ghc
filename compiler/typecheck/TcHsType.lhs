@@ -607,7 +607,9 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
 
            AGlobal (ADataCon dc)
              | Just tc <- promoteDataCon_maybe dc
-             -> inst_tycon (mkTyConApp tc) (tyConKind tc)
+             -> do { data_kinds <- xoptM Opt_DataKinds
+                   ; unless data_kinds $ promotionErr name NoDataKinds
+                   ; inst_tycon (mkTyConApp tc) (tyConKind tc) }
              | otherwise -> failWithTc (quotes (ppr dc) <+> ptext (sLit "of type")
                             <+> quotes (ppr (dataConUserType dc)) <+> ptext (sLit "is not promotable"))
 
@@ -1516,6 +1518,7 @@ promotionErr name err
   where
     reason = case err of
                FamDataConPE -> ptext (sLit "it comes from a data family instance")
+               NoDataKinds  -> ptext (sLit "Perhaps you intended to use -XDataKinds")
                _ -> ptext (sLit "it is defined and used in the same recursive group")
 \end{code}
 
