@@ -1,5 +1,5 @@
 
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2012
 % (c) The GRASP Project, Glasgow University, 1992-2002
 %
 
@@ -784,7 +784,7 @@ emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
 -- | Union two ImportAvails
 --
 -- This function is a key part of Import handling, basically
--- for each import we create a seperate ImportAvails structure
+-- for each import we create a separate ImportAvails structure
 -- and then union them all together with this function.
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails

@@ -1,6 +1,6 @@
 -- -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 2005
+-- (c) The University of Glasgow, 2005-2012
 --
 -- The GHC API
 --
@@ -369,7 +369,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
   inner
 
 -- | Install a default cleanup handler to remove temporary files deposited by
--- a GHC run.  This is seperate from 'defaultErrorHandler', because you might
+-- a GHC run.  This is separate from 'defaultErrorHandler', because you might
 -- want to override the error handling, but still get the ordinary cleanup
 -- behaviour.
 defaultCleanupHandler :: (ExceptionMonad m, MonadIO m) =>
