@@ -23,6 +23,7 @@ SRC_HC_OPTS     += $(WERROR) -Wall
 
 GhcStage1HcOpts += -fwarn-tabs
 GhcStage2HcOpts += -fwarn-tabs
+utils/hpc_dist-install_EXTRA_HC_OPTS += -fwarn-tabs
 
 #####################
 SRC_HC_OPTS     += -H64m -O0
