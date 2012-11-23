@@ -190,7 +190,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else 
-GhcWithInterpreter=NO
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_BY_DEFAULT)),YES,NO)
 endif
 
 # GhcEnableTablesNextToCode tells us whether the target architecture
