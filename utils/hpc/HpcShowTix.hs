@@ -13,6 +13,7 @@ showtix_options
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . outputOpt
 
 showtix_plugin :: Plugin

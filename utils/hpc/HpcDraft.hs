@@ -18,6 +18,7 @@ draft_options
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . outputOpt
 
 draft_plugin :: Plugin

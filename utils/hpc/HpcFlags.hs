@@ -13,7 +13,7 @@ data Flags = Flags
   { outputFile          :: String
   , includeMods         :: Set.Set String
   , excludeMods         :: Set.Set String
-  , hpcDir              :: String
+  , hpcDirs             :: [String]
   , srcDirs             :: [String]
   , destDir             :: String
 
@@ -34,7 +34,7 @@ default_flags = Flags
   { outputFile          = "-"
   , includeMods         = Set.empty
   , excludeMods         = Set.empty
-  , hpcDir              = ".hpc"
+  , hpcDirs             = [".hpc"]
   , srcDirs             = []
   , destDir             = "."
 
@@ -72,7 +72,8 @@ anArg flag detail argtype fn = (:) $ Option [] [flag] (ReqArg fn argtype) detail
 infoArg :: String -> FlagOptSeq
 infoArg info = (:) $ Option [] [] (NoArg $ id) info
 
-excludeOpt, includeOpt, hpcDirOpt, srcDirOpt, destDirOpt, outputOpt,
+excludeOpt, includeOpt, hpcDirOpt, resetHpcDirsOpt, srcDirOpt,
+    destDirOpt, outputOpt,
     perModuleOpt, decListOpt, xmlOutputOpt, funTotalsOpt,
     altHighlightOpt, combineFunOpt, combineFunOptInfo, mapFunOpt,
     mapFunOptInfo, unionModuleOpt :: FlagOptSeq
@@ -82,9 +83,13 @@ excludeOpt      = anArg "exclude"    "exclude MODULE and/or PACKAGE" "[PACKAGE:]
 includeOpt      = anArg "include"    "include MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"
                 $ \ a f -> f { includeMods = a `Set.insert` includeMods f }
 
-hpcDirOpt        = anArg "hpcdir"     "sub-directory that contains .mix files" "DIR"
-                   (\ a f -> f { hpcDir = a })
+hpcDirOpt       = anArg "hpcdir"     "append sub-directory that contains .mix files" "DIR"
+                   (\ a f -> f { hpcDirs = hpcDirs f ++ [a] })
                 .  infoArg "default .hpc [rarely used]"
+
+resetHpcDirsOpt = noArg "reset-hpcdirs" "empty the list of hpcdir's"
+                   (\ f -> f { hpcDirs = [] })
+                .  infoArg "[rarely used]"
 
 srcDirOpt       = anArg "srcdir"     "path to source directory of .hs files" "DIR"
                   (\ a f -> f { srcDirs = srcDirs f ++ [a] })
@@ -130,8 +135,9 @@ unionModuleOpt = noArg "union"
 -------------------------------------------------------------------------------
 
 readMixWithFlags :: Flags -> Either String TixModule -> IO Mix
-readMixWithFlags flags modu = readMix [ dir ++  "/" ++ hpcDir flags
+readMixWithFlags flags modu = readMix [ dir ++  "/" ++ hpcDir
                                       | dir <- srcDirs flags
+                                      , hpcDir <- hpcDirs flags
                                       ] modu
 
 -------------------------------------------------------------------------------

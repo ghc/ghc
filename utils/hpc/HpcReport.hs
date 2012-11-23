@@ -272,6 +272,7 @@ report_options
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . xmlOutputOpt
 
 

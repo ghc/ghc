@@ -13,6 +13,7 @@ overlay_options :: FlagOptSeq
 overlay_options
         = srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . outputOpt
 
 overlay_plugin :: Plugin
