@@ -2091,6 +2091,7 @@ pseudoop   "seq"
    a -> b -> b
    { Evaluates its first argument to head normal form, and then returns its second
 	argument as the result. }
+   with fixity = infixr 0
 
 primtype Any k
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
