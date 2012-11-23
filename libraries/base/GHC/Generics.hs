@@ -188,7 +188,8 @@ class Generic a where
   to    :: (Rep a) x -> a
 
 
--- | Representable types of kind * -> * (not yet derivable)
+-- | Representable types of kind * -> *.
+-- This class is derivable in GHC with the DeriveGeneric flag on.
 class Generic1 f where
   -- | Generic representation type
   type Rep1 f :: * -> *
