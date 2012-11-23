@@ -31,6 +31,7 @@ Executable hpc
                    HpcReport
                    HpcShowTix
                    HpcUtils
+                   Paths_hpc_bin
 
     if flag(base4)
         Build-Depends: base       >= 4   && < 5

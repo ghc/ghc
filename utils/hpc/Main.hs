@@ -1,17 +1,19 @@
 -- (c) 2007 Andy Gill
 
 -- Main driver for Hpc
-import HpcFlags
+import Data.Version
 import System.Environment
 import System.Exit
 import System.Console.GetOpt
 
+import HpcFlags
 import HpcReport
 import HpcMarkup
 import HpcCombine
 import HpcShowTix
 import HpcDraft
 import HpcOverlay
+import Paths_hpc_bin
 
 helpList :: IO ()
 helpList =
@@ -132,7 +134,7 @@ version_plugin = Plugin { name = "version"
 		   }
 
 version_main :: Flags -> [String] -> IO ()
-version_main _ _ = putStrLn $ "hpc tools, version 0.6"
+version_main _ _ = putStrLn ("hpc tools, version " ++ showVersion version)
 
 
 ------------------------------------------------------------------------------
