@@ -18,4 +18,3 @@ T7438.hs:6:14:
       acc :: t (bound at T7438.hs:6:8)
     In the expression: acc
     In an equation for `go': go Nil acc = acc
-make[2]: *** [T7438] Error 1

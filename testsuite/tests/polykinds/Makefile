@@ -31,4 +31,4 @@ T7022:
 T7438:
 	$(RM) -f T7438.hi T7438.o T7438a.hi T7438a.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7438a.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7438.hs
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T7438.hs
