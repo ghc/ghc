@@ -148,6 +148,10 @@ else
 DYNAMIC_BY_DEFAULT = YES
 endif
 
+# For now, we unconditionally disable dynamic-by-default, as the
+# cabal-install's that are in the wild don't handle it properly.
+DYNAMIC_BY_DEFAULT = NO
+
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
 # run without any support for architecture-specific assembly mangling,
