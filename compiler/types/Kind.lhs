@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2012
 %
 
 \begin{code}
@@ -80,11 +80,11 @@ The special thing about types of kind Constraint is that
    engine inserts an extra argument of type (Ord a) at every call site
    to f.
 
-Howver, once type inference is over, there is *no* distinction between 
+However, once type inference is over, there is *no* distinction between 
 Constraint and *.  Indeed we can have coercions between the two. Consider
    class C a where
      op :: a -> a
-For this single-method class we may genreate a newtype, which in turn 
+For this single-method class we may generate a newtype, which in turn 
 generates an axiom witnessing
     Ord a ~ (a -> a)
 so on the left we have Constraint, and on the right we have *.
