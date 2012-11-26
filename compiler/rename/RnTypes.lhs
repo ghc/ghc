@@ -370,9 +370,17 @@ bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                  , kv <- kvs ]
              all_kvs = filterOut (`elemLocalRdrEnv` rdr_env) $
                        nub (kv_bndrs ++ kvs_from_tv_bndrs)
+             overlap_kvs = [ kv | kv <- all_kvs, any ((==) kv . hsLTyVarName) tvs ]
+                -- These variables appear both as kind and type variables
+                -- in the same declaration; eg  type family  T (x :: *) (y :: x)
+                -- We disallow this: too confusing!
+
        ; poly_kind <- xoptM Opt_PolyKinds
        ; unless (poly_kind || null all_kvs) 
                 (addErr (badKindBndrs doc all_kvs))
+       ; unless (null overlap_kvs) 
+                (addErr (overlappingKindVars doc overlap_kvs))
+
        ; loc <- getSrcSpanM
        ; kv_names <- mapM (newLocalBndrRn . L loc) all_kvs
        ; bindLocalNamesFV kv_names $ 
@@ -427,6 +435,13 @@ rnHsBndrSig doc (HsWB { hswb_cts = ty@(L loc _) }) thing_inside
     do { (ty', fvs1) <- rnLHsType doc ty
        ; (res, fvs2) <- thing_inside (HsWB { hswb_cts = ty', hswb_kvs = kv_names, hswb_tvs = tv_names })
        ; return (res, fvs1 `plusFV` fvs2) } }
+
+overlappingKindVars :: HsDocContext -> [RdrName] -> SDoc
+overlappingKindVars doc kvs
+  = vcat [ ptext (sLit "Kind variable") <> plural kvs <+> 
+           ptext (sLit "also used as type variable") <> plural kvs 
+           <> colon <+> pprQuotedList kvs
+         , docOfHsDocContext doc ]
 
 badKindBndrs :: HsDocContext -> [RdrName] -> SDoc
 badKindBndrs doc kvs
