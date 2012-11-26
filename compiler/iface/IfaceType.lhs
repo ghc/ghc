@@ -195,7 +195,7 @@ pprParendIfaceType = ppr_ty tYCON_PREC
 isIfacePredTy :: IfaceType -> Bool
 isIfacePredTy _  = False
 -- FIXME: fix this to print iface pred tys correctly
--- isIfacePredTy ty = ifaceTypeKind ty `eqKind` constraintKind
+-- isIfacePredTy ty = isConstraintKind (ifaceTypeKind ty)
 
 ppr_ty :: Int -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
