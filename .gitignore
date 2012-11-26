@@ -43,20 +43,14 @@ _darcs/
 # sub-repositories
 
 /ghc-tarballs/
-/libraries/Cabal/
-/libraries/Win32/
 /libraries/array/
 /libraries/base/
-/libraries/binary/
-/libraries/bytestring/
-/libraries/containers/
 /libraries/deepseq/
 /libraries/directory/
 /libraries/dph/
 /libraries/extensible-exceptions/
 /libraries/filepath/
 /libraries/ghc-prim/
-/libraries/haskeline/
 /libraries/haskell2010/
 /libraries/haskell98/
 /libraries/hoopl/
@@ -67,18 +61,12 @@ _darcs/
 /libraries/old-locale/
 /libraries/old-time/
 /libraries/parallel/
-/libraries/pretty/
-/libraries/primitive/
 /libraries/process/
 /libraries/random/
 /libraries/stm/
 /libraries/template-haskell/
-/libraries/terminfo/
-/libraries/transformers
 /libraries/unix/
 /libraries/utf8-string/
-/libraries/vector/
-/libraries/xhtml/
 /nofib/
 /testsuite/
 /utils/haddock/

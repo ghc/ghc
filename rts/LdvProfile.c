@@ -63,6 +63,7 @@ processHeapClosureForDead( StgClosure *c )
     case STACK:
     case MVAR_CLEAN:
     case MVAR_DIRTY:
+    case TVAR:
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN:

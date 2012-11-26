@@ -845,6 +845,15 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
     }
 }
 
+void
+dirty_TVAR(Capability *cap, StgTVar *p)
+{
+    if (p->header.info == &stg_TVAR_CLEAN_info) {
+        p->header.info = &stg_TVAR_DIRTY_info;
+        recordClosureMutated(cap,(StgClosure*)p);
+    }
+}
+
 // Setting a TSO's link field with a write barrier.
 // It is *not* necessary to call this function when
 //    * setting the link field to END_TSO_QUEUE

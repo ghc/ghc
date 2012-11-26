@@ -38,6 +38,7 @@ import TcRnMonad
 import Constants
 import PrelNames
 import PrelInfo
+import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
 import MkId     ( seqId )
 import Rules
 import Annotations
@@ -604,8 +605,9 @@ ghcPrimIface
         mi_fix_fn  = mkIfaceFixCache fixities
     }           
   where
-    fixities = [(getOccName seqId, Fixity 0 InfixR)]
-                        -- seq is infixr 0
+    fixities = (getOccName seqId, Fixity 0 InfixR)  -- seq is infixr 0
+             : mapMaybe mkFixity allThePrimOps
+    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 \end{code}
 
 %*********************************************************

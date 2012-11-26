@@ -132,21 +132,25 @@ endif
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	$(SharedLibsPlatformList)),YES,NO)
 
-SharedLibsByDefaultPlatformList =               \
-                         x86_64-unknown-linux   \
-                         x86_64-apple-darwin
-
-# DYANMIC_BY_DEFAULT says whether this compiler will default to
+# DYNAMIC_BY_DEFAULT says whether this compiler will default to
 # building dynamic executables, i.e. -dynamic is on.  We do this for
-# certain platforms because it lets us use the system dynamic linker
+# most platforms because it lets us use the system dynamic linker
 # instead of our own linker for GHCi.
 #
-# We do not enable this for an unregisterised build.  It is currently
-# unknown whether shared libraries (should) work when unregisterised.
+# Currently this isn't possible on Windows, and we have not yet enabled
+# it on i386 while we consider the performance implications.
 #
-DYNAMIC_BY_DEFAULT = $(strip $(if $(filter YES,$(GhcUnregisterised)),NO,\
-			  $(if $(filter $(TARGETPLATFORM),\
-				$(SharedLibsByDefaultPlatformList)),YES,NO)))
+ifeq "$(TargetOS_CPP)" "mingw32"
+DYNAMIC_BY_DEFAULT = NO
+else ifeq "$(TargetArch_CPP)" "i386"
+DYNAMIC_BY_DEFAULT = NO
+else
+DYNAMIC_BY_DEFAULT = YES
+endif
+
+# For now, we unconditionally disable dynamic-by-default, as the
+# cabal-install's that are in the wild don't handle it properly.
+DYNAMIC_BY_DEFAULT = NO
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -190,7 +194,7 @@ ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(Targe
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else 
-GhcWithInterpreter=NO
+GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_BY_DEFAULT)),YES,NO)
 endif
 
 # GhcEnableTablesNextToCode tells us whether the target architecture

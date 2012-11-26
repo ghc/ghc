@@ -69,10 +69,11 @@ extern Mutex sm_mutex;
 #endif
 
 /* -----------------------------------------------------------------------------
-   The write barrier for MVARs
+   The write barrier for MVARs and TVARs
    -------------------------------------------------------------------------- */
 
 void dirty_MVAR(StgRegTable *reg, StgClosure *p);
+void dirty_TVAR(Capability *cap, StgTVar *p);
 
 /* -----------------------------------------------------------------------------
    Nursery manipulation

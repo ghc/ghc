@@ -84,6 +84,11 @@ data Token = TEOF
            | TString String
            | TNoBraces String
            | TInteger Int
+           | TFixity
+           | TInfixN
+           | TInfixL
+           | TInfixR
+           | TNothing
     deriving Show
 
 -- Actions

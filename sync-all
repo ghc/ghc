@@ -117,6 +117,16 @@ sub parsePackages {
     }
 }
 
+sub tryReadFile {
+    my $filename = shift;
+    my @lines;
+
+    open (FH, $filename) or return "";
+    @lines = <FH>;
+    close FH;
+    return join('', @lines);
+}
+
 sub message {
     if ($verbose >= 2) {
         print "@_\n";
@@ -289,7 +299,7 @@ sub scmall {
         # Construct the path for this package in the repo we pulled from
         $path = "$repo_base/$remotepath";
 
-        if ($command =~ /^(?:g|ge|get)$/) {
+        if ($command eq "get") {
             # Skip any repositories we have not included the tag for
             if (not defined($tags{$tag})) {
                 $tags{$tag} = 0;
@@ -343,7 +353,7 @@ sub scmall {
         }
 
         # Work out the arguments we should give to the SCM
-        if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
+        if ($command eq "status") {
             if ($scm eq "darcs") {
                 $command = "whatsnew";
             }
@@ -358,21 +368,21 @@ sub scmall {
             $ignore_failure = 1;
             scm ($localpath, $scm, $command, @args);
         }
-        elsif ($command =~ /^commit$/) {
+        elsif ($command eq "commit") {
             # git fails if there is nothing to commit, so ignore failures
             $ignore_failure = 1;
             scm ($localpath, $scm, "commit", @args);
         }
-        elsif ($command =~ /^(?:pus|push)$/) {
+        elsif ($command eq "push") {
             scm ($localpath, $scm, "push", @args);
         }
-        elsif ($command =~ /^(?:pul|pull)$/) {
+        elsif ($command eq "pull") {
             scm ($localpath, $scm, "pull", @args);
         }
-        elsif ($command =~ /^(?:new-workdir)$/) {
+        elsif ($command eq "new-workdir") {
             gitNewWorkdir ($localpath, @args);
         }
-        elsif ($command =~ /^(?:s|se|sen|send)$/) {
+        elsif ($command eq "send") {
             if ($scm eq "darcs") {
                 $command = "send";
             }
@@ -384,17 +394,17 @@ sub scmall {
             }
             scm ($localpath, $scm, $command, @args);
         }
-        elsif ($command =~ /^fetch$/) {
+        elsif ($command eq "fetch") {
             scm ($localpath, $scm, "fetch", @args);
         }
-        elsif ($command =~ /^new$/) {
+        elsif ($command eq "new") {
             my @scm_args = ("log", "$branch_name..");
             scm ($localpath, $scm, @scm_args, @args);
         }
-        elsif ($command =~ /^log$/) {
+        elsif ($command eq "log") {
             scm ($localpath, $scm, "log", @args);
         }
-        elsif ($command =~ /^remote$/) {
+        elsif ($command eq "remote") {
             my @scm_args;
             $ignore_failure = 1;
             if ($subcommand eq 'add') {
@@ -408,51 +418,51 @@ sub scmall {
             }
             scm ($localpath, $scm, @scm_args, @args);
         }
-        elsif ($command =~ /^checkout$/) {
+        elsif ($command eq "checkout") {
             # Not all repos are necessarily branched, so ignore failure
             $ignore_failure = 1;
             scm ($localpath, $scm, "checkout", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^grep$/) {
+        elsif ($command eq "grep") {
             # Hack around 'git grep' failing if there are no matches
             $ignore_failure = 1;
             scm ($localpath, $scm, "grep", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^diff$/) {
+        elsif ($command eq "diff") {
             scm ($localpath, $scm, "diff", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^clean$/) {
+        elsif ($command eq "clean") {
             scm ($localpath, $scm, "clean", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^reset$/) {
+        elsif ($command eq "reset") {
             scm ($localpath, $scm, "reset", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^branch$/) {
+        elsif ($command eq "branch") {
             scm ($localpath, $scm, "branch", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^config$/) {
+        elsif ($command eq "config") {
             scm ($localpath, $scm, "config", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^repack$/) {
+        elsif ($command eq "repack") {
             scm ($localpath, $scm, "repack", @args)
                 if $scm eq "git"
         }
-        elsif ($command =~ /^format-patch$/) {
+        elsif ($command eq "format-patch") {
             scm ($localpath, $scm, "format-patch", @args)
                 if $scm eq "git"
         }
-        elsif ($command =~ /^gc$/) {
+        elsif ($command eq "gc") {
             scm ($localpath, $scm, "gc", @args)
                 unless $scm eq "darcs";
         }
-        elsif ($command =~ /^tag$/) {
+        elsif ($command eq "tag") {
             scm ($localpath, $scm, "tag", @args);
         }
         else {
@@ -730,7 +740,35 @@ sub main {
     }
     else {
         # Give the command and rest of the arguments to the main loop
-        scmall @_;
+        # We normalise command names here to avoid duplicating the
+        # abbreviations that we allow.
+        my $command = shift;
+
+        if ($command =~ /^(?:g|ge|get)$/) {
+            $command = "get";
+        }
+        elsif ($command =~ /^(?:pus|push)$/) {
+            $command = "push";
+        }
+        elsif ($command =~ /^(?:pul|pull)$/) {
+            $command = "pull";
+        }
+        elsif ($command =~ /^(?:s|se|sen|send)$/) {
+            $command = "send";
+        }
+        elsif ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
+            $command = "status";
+        }
+
+        scmall ($command, @_);
+
+        if ($command eq "get" or $command eq "pull") {
+            my $gitConfig = &tryReadFile(".git/config");
+            if ($gitConfig !~ /submodule/) {
+                &scm(".", "git", "submodule", "init");
+            }
+            &scm(".", "git", "submodule", "update");
+        }
     }
 }
 

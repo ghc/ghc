@@ -61,6 +61,11 @@ main = getArgs >>= \args ->
                                        "strictness" 
                                        "primOpStrictness" p_o_specs)
 
+                      "--fixity"
+                         -> putStr (gen_switch_from_attribs
+                                       "fixity"
+                                       "primOpFixity" p_o_specs)
+
                       "--primop-primop-info" 
                          -> putStr (gen_primop_info p_o_specs)
 
@@ -94,6 +99,7 @@ known_args
        "--code-size",
        "--can-fail",
        "--strictness",
+       "--fixity",
        "--primop-primop-info",
        "--primop-tag",
        "--primop-list",
@@ -142,6 +148,7 @@ gen_hs_source (Info defaults entries) =
            opt (OptionTrue n)     = n ++ " = True"
            opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
            opt (OptionInteger n v) = n ++ " = " ++ show v
+           opt (OptionFixity mf) = "fixity" ++ " = " ++ show mf
 
            hdr s@(Section {})                    = sec s
            hdr (PrimOpSpec { name = n })         = wrapOp n ++ ","
@@ -159,7 +166,9 @@ gen_hs_source (Info defaults entries) =
 
            spec o = comm : decls
              where decls = case o of
-                        PrimOpSpec { name = n, ty = t }   ->
+                        PrimOpSpec { name = n, ty = t, opts = options } ->
+                            [ pprFixity fixity n | OptionFixity (Just fixity) <- options ]
+                            ++
                             [ wrapOp n ++ " :: " ++ pprTy t,
                               wrapOp n ++ " = let x = x in x" ]
                         PseudoOpSpec { name = n, ty = t } ->
@@ -190,6 +199,8 @@ gen_hs_source (Info defaults entries) =
                       mk (c:cs)    = c : mk cs
            escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
                 where special = "/'`\"@<"
+
+           pprFixity (Fixity i d) n = pprFixityDir d ++ " " ++ show i ++ " " ++ n
 
 pprTy :: Ty -> String
 pprTy = pty
@@ -396,6 +407,7 @@ gen_latex_doc (Info defaults entries)
               ++ mk_commutable o ++ "}{"
               ++ mk_needs_wrapper o ++ "}{"
               ++ mk_can_fail o ++ "}{"
+              ++ mk_fixity o ++ "}{"
               ++ latex_encode (mk_strictness o) ++ "}{"
               ++ "}"
 
@@ -411,13 +423,19 @@ gen_latex_doc (Info defaults entries)
                Just (OptionFalse _) -> if_false
                Just (OptionString _ _) -> error "String value for boolean option"
                Just (OptionInteger _ _) -> error "Integer value for boolean option"
+               Just (OptionFixity _) -> error "Fixity value for boolean option"
                Nothing -> ""
            
            mk_strictness o = 
              case lookup_attrib "strictness" o of
                Just (OptionString _ s) -> s  -- for now
-               Just _ -> error "Boolean value for strictness"
+               Just _ -> error "Wrong value for strictness"
                Nothing -> "" 
+
+           mk_fixity o = case lookup_attrib "fixity" o of
+             Just (OptionFixity (Just (Fixity i d)))
+               -> pprFixityDir d ++ " " ++ show i
+             _ -> ""
 
            zencode xs =
              case maybe_tuple xs of
@@ -554,6 +572,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionTrue _)     = "True"
          getAltRhs (OptionInteger _ i) = show i
          getAltRhs (OptionString _ s) = s
+         getAltRhs (OptionFixity mf) = show mf
 
          mkAlt po
             = case lookup_attrib attrib_name (opts po) of
@@ -675,6 +694,11 @@ ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")
 
+pprFixityDir :: FixityDirection -> String
+pprFixityDir InfixN = "infix"
+pprFixityDir InfixL = "infixl"
+pprFixityDir InfixR = "infixr"
+
 listify :: [String] -> String
 listify ss = "[" ++ concat (intersperse ", " ss) ++ "]"
 
@@ -696,4 +720,3 @@ tyconsIn (TyUTup tys)   = foldr union [] $ map tyconsIn tys
 
 arity :: Ty -> Int
 arity = length . fst . flatTys
-

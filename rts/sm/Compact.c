@@ -603,6 +603,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case MUT_PRIM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
+    case TVAR:
     case BLACKHOLE:
     case BLOCKING_QUEUE:
     {

@@ -464,7 +464,7 @@ data Tickish id =
 -- cannot discard a tick, and the compiler should preserve the number
 -- of ticks as far as possible.
 --
--- Hwever, we stil allow the simplifier to increase or decrease
+-- However, we still allow the simplifier to increase or decrease
 -- sharing, so in practice the actual number of ticks may vary, except
 -- that we never change the value from zero to non-zero or vice versa.
 --

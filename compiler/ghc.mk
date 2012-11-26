@@ -240,6 +240,7 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-code-size.hs-incl        \
                     primop-can-fail.hs-incl         \
                     primop-strictness.hs-incl       \
+                    primop-fixity.hs-incl       \
                     primop-primop-info.hs-incl
 
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
@@ -276,6 +277,8 @@ compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.t
 	"$$(GENPRIMOP_INPLACE)" --can-fail           < $$< > $$@
 compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
 	"$$(GENPRIMOP_INPLACE)" --strictness         < $$< > $$@
+compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
+	"$$(GENPRIMOP_INPLACE)" --fixity             < $$< > $$@
 compiler/stage$1/build/primop-primop-info.hs-incl: compiler/stage$1/build/primops.txt $$(GENPRIMOP_INPLACE)
 	"$$(GENPRIMOP_INPLACE)" --primop-primop-info < $$< > $$@
 

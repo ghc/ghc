@@ -189,7 +189,7 @@ Instead we use a cunning trick.
    iff its argument satisfies exprIsConApp_maybe.  This is done in
    MkId mkDictSelId
 
- * We make 'df' CONLIKE, so that shared uses stil match; eg
+ * We make 'df' CONLIKE, so that shared uses still match; eg
       let d = df d1 d2
       in ...(op2 d)...(op1 d)...
 
@@ -246,7 +246,7 @@ careful when we have
       op = ...
 then we'll get an INLINE pragma on $cop_list but it's important that
 $cop_list only inlines when it's applied to *two* arguments (the
-dictionary and the list argument).  So we nust not eta-expand $df
+dictionary and the list argument).  So we must not eta-expand $df
 above.  We ensure that this doesn't happen by putting an INLINE
 pragma on the dfun itself; after all, it ends up being just a cast.
 
@@ -309,7 +309,7 @@ instance.
 
 Why is this justified?  Because we generate a (C [a]) constraint in
 a context in which 'a' cannot be instantiated to anything that matches
-other overlapping instances, or else we would not be excecuting this
+other overlapping instances, or else we would not be executing this
 version of op1 in the first place.
 
 It might even be a bit disguised:
@@ -323,7 +323,7 @@ It might even be a bit disguised:
 Precisely this is used in package 'regex-base', module Context.hs.
 See the overlapping instances for RegexContext, and the fact that they
 call 'nullFail' just like the example above.  The DoCon package also
-does the same thing; it shows up in module Fraction.hs
+does the same thing; it shows up in module Fraction.hs.
 
 Conclusion: when typechecking the methods in a C [a] instance, we want to
 treat the 'a' as an *existential* type variable, in the sense described

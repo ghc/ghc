@@ -43,6 +43,11 @@ import Syntax
     monadic         { TMonadic }
     compare         { TCompare }
     genprimop       { TGenPrimOp }
+    fixity          { TFixity }
+    infix           { TInfixN }
+    infixl          { TInfixL }
+    infixr          { TInfixR }
+    nothing         { TNothing }
     thats_all_folks { TThatsAllFolks }
     lowerName       { TLowerName $$ }
     upperName       { TUpperName $$ }
@@ -67,6 +72,14 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | lowerName '=' true                { OptionTrue   $1 }
         | lowerName '=' pStuffBetweenBraces { OptionString $1 $3 }
         | lowerName '=' integer             { OptionInteger $1 $3 }
+        | fixity    '=' pInfix              { OptionFixity $3 }
+
+pInfix :: { Maybe Fixity }
+pInfix : infix  integer { Just $ Fixity $2 InfixN }
+       | infixl integer { Just $ Fixity $2 InfixL }
+       | infixr integer { Just $ Fixity $2 InfixR }
+       | nothing        { Nothing }
+
 
 pEntries :: { [Entry] }
 pEntries : pEntry pEntries { $1 : $2 }

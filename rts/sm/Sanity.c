@@ -282,6 +282,7 @@ checkClosure( StgClosure* p )
     case MUT_PRIM:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
+    case TVAR:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:
@@ -510,7 +511,7 @@ checkTSO(StgTSO *tso)
     }
 
     next = tso->_link;
-    info = (const StgInfoTable*) tso->header.info;
+    info = (const StgInfoTable*) tso->_link->header.info;
 
     ASSERT(next == END_TSO_QUEUE ||
            info == &stg_MVAR_TSO_QUEUE_info ||

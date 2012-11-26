@@ -1161,6 +1161,12 @@
             <entry>dynamic</entry>
             <entry><option>-</option></entry>
           </row>
+          <row>
+            <entry><option>-XTypeHoles</option></entry>
+            <entry>Enable <link linkend="type-holes">holes</link> in expressions.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-</option></entry>
+          </row>
         </tbody>
       </tgroup>
     </informaltable>

@@ -2,13 +2,13 @@ module HpcLexer where
 
 import Data.Char
 
-data Token 
-	= ID String
+data Token
+        = ID String
         | SYM Char
         | INT Int
         | STR String
-	| CAT String
-	deriving (Eq,Show)
+        | CAT String
+        deriving (Eq,Show)
 
 initLexer :: String -> [Token]
 initLexer str = [ t | (_,_,t) <- lexer str 1 1 ]
@@ -18,7 +18,7 @@ lexer (c:cs) line column
   | c == '\n' = lexer cs (succ line) 1
   | c == '\"' = lexerSTR cs line (succ column)
   | c == '[' = lexerCAT cs "" line (succ column)
-  | c `elem` "{};-:" 
+  | c `elem` "{};-:"
               = (line,column,SYM c) : lexer cs line (succ column)
   | isSpace c = lexer cs        line (succ column)
   | isAlpha c = lexerKW  cs [c] line (succ column)
@@ -54,4 +54,4 @@ test :: IO ()
 test = do
           t <- readFile "EXAMPLE.tc"
           print (initLexer t)
-          
+

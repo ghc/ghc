@@ -4065,6 +4065,45 @@ The part before the "<literal>=&gt;</literal>" is the
 "<literal>=&gt;</literal>" is the <emphasis>head</emphasis> of the instance declaration.
 </para>
 
+<sect3 id="instance-resolution">
+<title>Instance resolution</title>
+
+<para>
+When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
+it tries to match every instance declaration against the
+constraint,
+by instantiating the head of the instance declaration.  Consider
+these declarations:
+<programlisting>
+  instance context1 => C Int a     where ...  -- (A)
+  instance context2 => C a   Bool  where ...  -- (B)
+</programlisting>
+GHC's default behaviour is that <emphasis>exactly one instance must match the
+constraint it is trying to resolve</emphasis>.
+For example, the constraint <literal>C Int Bool</literal> matches instances (A) and (B),
+and hence would be rejected; while <literal>C Int Char</literal> matches only (A)
+and hence (A) is chosen.</para>
+
+<para>
+Notice that
+<itemizedlist>
+<listitem><para>
+When matching, GHC takes
+no account of the context of the instance declaration
+(<literal>context1</literal> etc).
+</para></listitem>
+<listitem><para>
+It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
+including both declarations (A) and (B), say); an error is only reported if a
+particular constraint matches more than one.
+</para></listitem>
+</itemizedlist>
+See also <xref linkend="instance-overlap"/> for flags that loosen the 
+instance resolution rules.
+</para>
+
+</sect3>
+
 <sect3 id="flexible-instance-head">
 <title>Relaxed rules for the instance head</title>
 
@@ -4073,7 +4112,11 @@ In Haskell 98 the head of an instance declaration
 must be of the form <literal>C (T a1 ... an)</literal>, where
 <literal>C</literal> is the class, <literal>T</literal> is a data type constructor,
 and the <literal>a1 ... an</literal> are distinct type variables.
-GHC relaxes these rules in two ways.
+In the case of multi-parameter type classes, this rule applies to each parameter of
+the instance head.  (Arguably it should be OK if just one has this form and the others
+are type variables, but that's the rules at the moment.)</para>
+
+<para>GHC relaxes this rule in two ways.
 <itemizedlist>
 <listitem><para>
 With the <option>-XTypeSynonymInstances</option> flag, instance heads may use type
@@ -4283,8 +4326,10 @@ with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 
 <sect3 id="instance-overlap">
 <title>Overlapping instances</title>
+
 <para>
-In general, <emphasis>GHC requires that that it be unambiguous which instance
+In general, as discussed in <xref linkend="instance-resolution"/>, 
+<emphasis>GHC requires that it be unambiguous which instance
 declaration
 should be used to resolve a type-class constraint</emphasis>. This behaviour
 can be modified by two flags: <option>-XOverlappingInstances</option>
@@ -4296,32 +4341,17 @@ and <option>-XIncoherentInstances</option>
 flags are dynamic flags, and can be set on a per-module basis, using
 an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
 <para>
-When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
-it tries to match every instance declaration against the
-constraint,
-by instantiating the head of the instance declaration.  For example, consider
-these declarations:
+The <option>-XOverlappingInstances</option> flag instructs GHC to loosen
+the instance resolution described in <xref linkend="instance-resolution"/>, by
+allowing more than one instance to match, <emphasis>provided there is a most specific one</emphasis>.  
+For example, consider
 <programlisting>
   instance context1 => C Int a     where ...  -- (A)
   instance context2 => C a   Bool  where ...  -- (B)
   instance context3 => C Int [a]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-The instances (A) and (B) match the constraint <literal>C Int Bool</literal>,
-but (C) and (D) do not.  When matching, GHC takes
-no account of the context of the instance declaration
-(<literal>context1</literal> etc).
-GHC's default behaviour is that <emphasis>exactly one instance must match the
-constraint it is trying to resolve</emphasis>.
-It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
-including both declarations (A) and (B), say); an error is only reported if a
-particular constraint matches more than one.
-</para>
-
-<para>
-The <option>-XOverlappingInstances</option> flag instructs GHC to allow
-more than one instance to match, provided there is a most specific one.  For
-example, the constraint <literal>C Int [Int]</literal> matches instances (A),
+The constraint <literal>C Int [Int]</literal> matches instances (A),
 (C) and (D), but the last is more specific, and hence is chosen.  If there is no
 most-specific match, the program is rejected.
 </para>
@@ -4336,10 +4366,11 @@ Suppose that from the RHS of <literal>f</literal> we get the constraint
 GHC does not commit to instance (C), because in a particular
 call of <literal>f</literal>, <literal>b</literal> might be instantiate
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.
-(If you add the flag <option>-XIncoherentInstances</option>,
+So GHC rejects the program.</para>
+<para>
+If, however, you add the flag <option>-XIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about
-the problem of subsequent instantiations.)
+the problem of subsequent instantiations.
 </para>
 <para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to
@@ -7038,6 +7069,86 @@ If you supply a type signature, then the flag has no effect.
 </para>
 </sect2>
 
+<sect2 id="type-holes">
+<title>Type Holes</title>
+
+<para>Type hole support is enabled with the option
+<option>-XTypeHoles</option>.</para>
+
+<para>
+The goal of the type holes extension is not to change the type system, but to help with writing Haskell
+code. Type holes can be used to obtain extra information from the type checker, which might otherwise be hard
+to get.
+Normally, the type checker is used to decide if a module is well typed or not. Using GHCi,
+users can inspect the (inferred) type signatures of all top-level bindings. However, determining the
+type of a single term is still hard. Yet while writing code, it could be helpful to know the type of
+the term you're about to write.
+</para>
+
+<para>
+This extension allows special placeholders, written as <literal>_</literal>, to be used as an expression.
+During compilation these holes will generate an error message describing what type is expected there.
+The error includes helpful information about the origin of type variables and a list of local bindings
+that might help fill the hole with actual code.
+</para>
+
+<para>
+For example, compiling the following module with GHC:
+<programlisting>
+f :: a -> a
+f x = _
+</programlisting>
+Will fail with the following error:
+<programlisting>
+hole.hs:2:7:
+    Found hole `_' with type a
+    Where: `a' is a rigid type variable bound by
+               the type signature for f :: a -> a at hole.hs:1:6
+    Relevant bindings include
+      f :: a -> a (bound at hole.hs:2:1)
+      x :: a (bound at hole.hs:2:3)
+    In the expression: _
+    In an equation for `f': f x = _
+</programlisting>
+</para>
+
+<para>
+Multiple type holes can be used to find common type variables between expressions. For example:
+<programlisting>
+sum :: [Int] -> Int
+sum x = foldr _ _ _
+</programlisting>
+Shows:
+<programlisting>
+holes.hs:2:15:
+    Found hole `_' with type a0 -> Int -> Int
+    Where: `a0' is an ambiguous type variable
+    In the first argument of `foldr', namely `_'
+    In the expression: foldr _ _ _
+    In an equation for `sum': sum x = foldr _ _ _
+
+holes.hs:2:17:
+    Found hole `_' with type Int
+    In the second argument of `foldr', namely `_'
+    In the expression: foldr _ _ _
+    In an equation for `sum': sum x = foldr _ _ _
+
+holes.hs:2:19:
+    Found hole `_' with type [a0]
+    Where: `a0' is an ambiguous type variable
+    In the third argument of `foldr', namely `_'
+    In the expression: foldr _ _ _
+    In an equation for `sum': sum x = foldr _ _ _
+</programlisting>
+</para>
+
+<para>
+Holes work together well with <link linkend="defer-type-errors">deferring type errors to runtime</link>:
+with <literal>-fdefer-type-errors</literal>, the error from a hole is also deferred, effctively making the hole
+typecheck just like <literal>undefined</literal>, but with the added benefit that it will show its warning message
+if it gets evaluated. This way, other parts of the code can still be executed and tested.
+</para>
+</sect2>
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
 

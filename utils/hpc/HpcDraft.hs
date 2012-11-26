@@ -13,41 +13,42 @@ import Data.Tree
 
 ------------------------------------------------------------------------------
 draft_options :: FlagOptSeq
-draft_options 
+draft_options
         = excludeOpt
         . includeOpt
         . srcDirOpt
         . hpcDirOpt
+        . resetHpcDirsOpt
         . outputOpt
-       	 
+
 draft_plugin :: Plugin
 draft_plugin = Plugin { name = "draft"
-	      	       , usage = "[OPTION] .. <TIX_FILE>" 
-		       , options = draft_options 
-		       , summary = "Generate draft overlay that provides 100% coverage"
-		       , implementation = draft_main
-		       , init_flags = default_flags
-		       , final_flags = default_final_flags
-		       }
+                       , usage = "[OPTION] .. <TIX_FILE>"
+                       , options = draft_options
+                       , summary = "Generate draft overlay that provides 100% coverage"
+                       , implementation = draft_main
+                       , init_flags = default_flags
+                       , final_flags = default_final_flags
+                       }
 
 ------------------------------------------------------------------------------
 
 draft_main :: Flags -> [String] -> IO ()
 draft_main _        []              = error "draft_main: unhandled case: []"
 draft_main hpcflags (progName:mods) = do
-  let hpcflags1 = hpcflags 
-      		{ includeMods = Set.fromList mods 
-  	      	     	 	   `Set.union` 
-				includeMods hpcflags }
-  let prog = getTixFileName $ progName 
-  tix <- readTix prog  
+  let hpcflags1 = hpcflags
+                { includeMods = Set.fromList mods
+                                   `Set.union`
+                                includeMods hpcflags }
+  let prog = getTixFileName $ progName
+  tix <- readTix prog
   case tix of
     Just (Tix tickCounts) -> do
-	outs <- sequence
-		      [ makeDraft hpcflags1 tixModule
-	   	      | tixModule@(TixModule m _ _ _) <- tickCounts
-		      , allowModule hpcflags1 m 
-		      ]
+        outs <- sequence
+                      [ makeDraft hpcflags1 tixModule
+                      | tixModule@(TixModule m _ _ _) <- tickCounts
+                      , allowModule hpcflags1 m
+                      ]
         case outputFile hpcflags1 of
          "-" -> putStrLn (unlines outs)
          out -> writeFile out (unlines outs)
@@ -55,13 +56,13 @@ draft_main hpcflags (progName:mods) = do
 
 
 makeDraft :: Flags -> TixModule -> IO String
-makeDraft hpcflags tix = do 
+makeDraft hpcflags tix = do
   let modu = tixModuleName tix
       tixs = tixModuleTixs tix
 
   (Mix filepath _ _ _ entries) <- readMixWithFlags hpcflags (Right tix)
 
-  let forest = createMixEntryDom 
+  let forest = createMixEntryDom
               [ (srcspan,(box,v > 0))
               | ((srcspan,box),v) <- zip entries tixs
               ]
@@ -77,7 +78,7 @@ makeDraft hpcflags tix = do
       hsMap = Map.fromList (zip [1..] $ lines hs)
 
   let quoteString = show
-  
+
   let firstLine pos = case fromHpcPos pos of
                         (ln,_,_,_) -> ln
 
@@ -88,10 +89,10 @@ makeDraft hpcflags tix = do
                               ++ "on line " ++ show (firstLine pos) ++ ";"
       showPleaseTick d (TickExp pos) =
                      spaces d ++ "tick "
-                              ++ if '\n' `elem` txt 
+                              ++ if '\n' `elem` txt
                                  then "at position " ++ show pos ++ ";"
                                  else quoteString txt ++ " "  ++ "on line " ++ show (firstLine pos) ++ ";"
-                             
+
           where
                   txt = grabHpcPos hsMap pos
 
@@ -133,8 +134,8 @@ findNotTickedFromTree (Node (pos,(TopLevelBox nm,False):_) _)
 findNotTickedFromTree (Node (pos,(LocalBox nm,False):_) _)
   = [ TickFun nm pos ]
 findNotTickedFromTree (Node (pos,(TopLevelBox nm,True):_) children)
-  = mkTickInside nm pos (findNotTickedFromList children) []                           
-findNotTickedFromTree (Node (pos,_:others) children) = 
+  = mkTickInside nm pos (findNotTickedFromList children) []
+findNotTickedFromTree (Node (pos,_:others) children) =
                       findNotTickedFromTree (Node (pos,others) children)
 findNotTickedFromTree (Node (_, []) children) = findNotTickedFromList children
 

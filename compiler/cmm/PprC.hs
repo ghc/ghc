@@ -102,7 +102,7 @@ pprTop (CmmProc infos clbl _ graph) =
            rbrace ]
     )
   where
-        blocks = toBlockList graph
+        blocks = toBlockListEntryFirst graph
         (temp_decls, extern_decls) = pprTempAndExternDecls blocks
 
 
@@ -230,6 +230,8 @@ pprStmt stmt =
                     pprCall cast_fn cconv hresults hargs <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
+    CmmUnsafeForeignCall (PrimTarget MO_Touch) _results _args -> empty
+
     CmmUnsafeForeignCall target@(PrimTarget op) results args ->
         proto $$ fn_call
       where
@@ -295,8 +297,8 @@ pprBranch ident = ptext (sLit "goto") <+> pprBlockId ident <> semi
 pprCondBranch :: CmmExpr -> BlockId -> BlockId -> SDoc
 pprCondBranch expr yes no
         = hsep [ ptext (sLit "if") , parens(pprExpr expr) ,
-                        ptext (sLit "goto"), pprBlockId yes,
-                        ptext (sLit "else"), pprBlockId no <> semi ]
+                        ptext (sLit "goto"), pprBlockId yes <> semi,
+                        ptext (sLit "else goto"), pprBlockId no <> semi ]
 
 -- ---------------------------------------------------------------------
 -- a local table branch
