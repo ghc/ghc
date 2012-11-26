@@ -68,7 +68,8 @@ import NameEnv
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
+import ErrUtils
+import DynFlags
 import Unique
 import UniqSupply
 import Outputable
@@ -404,15 +405,26 @@ tc_hs_type hs_ty@(HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ct
   | isLiftedTypeKind exp_k = tc_tuple hs_ty HsBoxedTuple      tys exp_kind
   | otherwise
   = do { k <- newMetaKindVar
-       ; tau_tys <- tc_hs_arg_tys (ptext (sLit "a tuple")) tys (repeat k)
-       ; k' <- zonkTcKind k
-       ; if isConstraintKind k' then
-            finish_tuple hs_ty HsConstraintTuple tau_tys exp_kind
-         else if isLiftedTypeKind k' then
-            finish_tuple hs_ty HsBoxedTuple tau_tys exp_kind
-         else
-            tc_tuple hs_ty HsBoxedTuple tys exp_kind }
-         -- It's not clear what the kind is, so assume *, and
+       ; (msgs, mb_tau_tys) <- tryTc (tc_hs_arg_tys (ptext (sLit "a tuple")) tys (repeat k))
+       ; k <- zonkTcKind k
+           -- Do the experiment inside a 'tryTc' because errors can be
+           -- confusing.  Eg Trac #7410 (Either Int, Int), we do not want to get
+           -- an error saying "the second argument of a tuple should have kind *->*"
+
+       ; case mb_tau_tys of
+           Just tau_tys 
+             | not (isEmptyMessages msgs) -> try_again k
+             | isConstraintKind k         -> go_for HsConstraintTuple tau_tys
+             | isLiftedTypeKind k         -> go_for HsBoxedTuple      tau_tys
+             | otherwise                  -> try_again k
+           Nothing                        -> try_again k }
+   where
+     go_for sort tau_tys = finish_tuple hs_ty sort tau_tys exp_kind
+
+     try_again k
+       | isConstraintKind k = tc_tuple hs_ty HsConstraintTuple tys exp_kind
+       | otherwise          = tc_tuple hs_ty HsBoxedTuple      tys exp_kind
+         -- It's not clear what the kind is, so make best guess and
          -- check the arguments again to give good error messages
          -- in eg. `(Maybe, Maybe)`
 
