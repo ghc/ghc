@@ -12,7 +12,7 @@ module ErrUtils (
         MsgDoc, mkLocMessage, pprMessageBag, pprErrMsgBag, pprErrMsgBagWithLoc,
         pprLocErrMsg, makeIntoWarning,
         
-        errorsFound, emptyMessages,
+        errorsFound, emptyMessages, isEmptyMessages,
         mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
         printBagOfErrors, 
         warnIsErrorMsg, mkLongWarnMsg,
@@ -135,6 +135,9 @@ mkPlainWarnMsg dflags locn        msg       = mk_err_msg dflags SevWarning locn 
 ----------------
 emptyMessages :: Messages
 emptyMessages = (emptyBag, emptyBag)
+
+isEmptyMessages :: Messages -> Bool
+isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
 warnIsErrorMsg :: DynFlags -> ErrMsg
 warnIsErrorMsg dflags
