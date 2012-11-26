@@ -77,4 +77,6 @@ test('T7328', normal, compile_fail,[''])
 test('T7332', normal, compile,[''])
 test('T7347', normal, compile_fail,[''])
 test('T7341', normal, compile_fail,[''])
-
+test('T7422', normal, compile,[''])
+test('T7433', normal, compile_fail,[''])
+test('T7438', normal, run_command, ['$MAKE -s --no-print-directory T7438'])

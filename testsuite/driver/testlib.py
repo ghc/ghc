@@ -447,9 +447,6 @@ def unless_tag( tag, f ):
         return normal
 
 # ---
-def alone(opts):
-    opts.alone = True
-
 def high_memory_usage(opts):
     opts.alone = True
 
