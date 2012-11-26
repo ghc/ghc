@@ -892,7 +892,7 @@ tcTopSrcDecls boot_details
 
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
-        (fi_ids, fi_decls) <- tcForeignImports foreign_decls ;
+        (fi_ids, fi_decls, fi_gres) <- tcForeignImports foreign_decls ;
         tcExtendGlobalValEnv fi_ids     $ do {
 
                 -- Default declarations
@@ -918,7 +918,7 @@ tcTopSrcDecls boot_details
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
-        (foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
+        (foe_binds, foe_decls, foe_gres) <- tcForeignExports foreign_decls ;
 
                 -- Annotations
         annotations <- tcAnnotations annotation_decls ;
@@ -934,6 +934,12 @@ tcTopSrcDecls boot_details
         let { all_binds = inst_binds     `unionBags`
                           foe_binds
 
+            ; fo_gres = fi_gres `unionBags` foe_gres
+            ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre) 
+                                emptyFVs fo_gres
+            ; fo_rdr_names :: [RdrName]
+            ; fo_rdr_names = foldrBag gre_to_rdr_name [] fo_gres
+
             ; sig_names = mkNameSet (collectHsValBinders val_binds)
                           `minusNameSet` getTypeSigNames val_binds
 
@@ -944,10 +950,27 @@ tcTopSrcDecls boot_details
                                  , tcg_rules = tcg_rules tcg_env ++ rules
                                  , tcg_vects = tcg_vects tcg_env ++ vects
                                  , tcg_anns  = tcg_anns tcg_env ++ annotations
-                                 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
+                                 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls
+                                 , tcg_dus   = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
+                                 -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
+
+        addUsedRdrNames fo_rdr_names ;
 
         return (tcg_env', tcl_env)
     }}}}}}
+  where
+    gre_to_rdr_name :: GlobalRdrElt -> [RdrName] -> [RdrName]
+        -- For *imported* newtype data constructors, we want to
+        -- make sure that at least one of the imports for them is used
+        -- See Note [Newtype constructor usage in foreign declarations]
+    gre_to_rdr_name gre rdrs
+      = case gre_prov gre of
+           LocalDef          -> rdrs
+           Imported []       -> panic "gre_to_rdr_name: Imported []"
+           Imported (is : _) -> mkRdrQual modName occName : rdrs
+              where
+                modName = is_as (is_decl is)
+                occName = nameOccName (gre_name gre)
 
 ---------------------------
 tcTyClsInstDecls :: ModDetails 

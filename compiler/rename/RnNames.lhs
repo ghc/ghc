@@ -1342,7 +1342,7 @@ findImportUsage imports rdr_env rdrs
   = map unused_decl imports
   where
     import_usage :: ImportMap
-    import_usage = foldr (addUsedRdrName rdr_env) Map.empty rdrs
+    import_usage = foldr (extendImportMap rdr_env) Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, unused_imps)
@@ -1364,11 +1364,11 @@ findImportUsage imports rdr_env rdrs
 
                         _other -> []    -- No explicit import list => no unused-name list
 
-addUsedRdrName :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
+extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
 -- For a used RdrName, find all the import decls that brought
 -- it into scope; choose one of them (bestImport), and record
 -- the RdrName in that import decl's entry in the ImportMap
-addUsedRdrName rdr_env rdr imp_map
+extendImportMap rdr_env rdr imp_map
   | [gre] <- lookupGRE_RdrName rdr rdr_env
   , Imported imps <- gre_prov gre
   = add_imp gre (bestImport imps) imp_map

@@ -233,14 +233,9 @@ data TcGblEnv
           -- things bound in this module. Also store Safe Haskell info
           -- here about transative trusted packaage requirements.
 
-        tcg_dus :: DefUses,
-          -- ^ What is defined in this module and what is used.
-          -- The latter is used to generate
-          --
-          --  (a) version tracking; no need to recompile if these things have
-          --      not changed version stamp
-          --
-          --  (b) unused-import info
+        tcg_dus :: DefUses,   -- ^ What is defined in this module and what is used.
+        tcg_used_rdrnames :: TcRef (Set RdrName),
+          -- See Note [Tracking unused binding and imports]
 
         tcg_keep :: TcRef NameSet,
           -- ^ Locally-defined top-level names to keep alive.
@@ -286,10 +281,6 @@ data TcGblEnv
         tcg_rn_imports :: [LImportDecl Name],
                 -- Keep the renamed imports regardless.  They are not
                 -- voluminous and are needed if you want to report unused imports
-
-        tcg_used_rdrnames :: TcRef (Set RdrName),
-                -- The set of used *imported* (not locally-defined) RdrNames
-                -- Used only to report unused import declarations
 
         tcg_rn_decls :: Maybe (HsGroup Name),
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
@@ -338,6 +329,29 @@ data RecFieldEnv
         -- module.  For imported modules, we get the same info from the
         -- TypeEnv
 \end{code}
+
+Note [Tracking unused binding and imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We gather two sorts of usage information
+ * tcg_dus (defs/uses)
+      Records *defined* Names (local, top-level)
+          and *used*    Names (local or imported)
+
+      Used (a) to report "defined but not used"
+               (see RnNames.reportUnusedNames)
+           (b) to generate version-tracking usage info in interface
+               files (see MkIface.mkUsedNames)
+   This usage info is mainly gathered by the renamer's 
+   gathering of free-variables
+
+ * tcg_used_rdrnames
+      Records used *imported* (not locally-defined) RdrNames
+      Used only to report unused import declarations
+      Notice that they are RdrNames, not Names, so we can
+      tell whether the reference was qualified or unqualified, which
+      is esssential in deciding whether a particular import decl 
+      is unnecessary.  This info isn't present in Names.
+
 
 %************************************************************************
 %*                                                                      *
