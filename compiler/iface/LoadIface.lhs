@@ -14,7 +14,7 @@ module LoadIface (
 
         -- IfM functions
         loadInterface, loadWiredInHomeIface, 
-        loadSysInterface, loadUserInterface, 
+        loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface,    -- Used when reading the module's old interface
         loadDecls,      -- Should move to TcIface and be renamed
         initExternalPackageState,
@@ -159,6 +159,10 @@ loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
 loadUserInterface is_boot doc mod_name 
   = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
 
+loadPluginInterface :: SDoc -> Module -> IfM lcl ModIface
+loadPluginInterface doc mod_name
+  = loadInterfaceWithException doc mod_name ImportByPlugin
+
 ------------------
 -- | A wrapper for 'loadInterface' that throws an exception if it fails
 loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
@@ -267,32 +271,36 @@ loadInterface doc_str mod from
 
         ; updateEps_  $ \ eps -> 
            if elemModuleEnv mod (eps_PIT eps) then eps else
-            eps { 
-              eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
-              eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-              eps_rule_base    = extendRuleBaseList (eps_rule_base eps) 
-                                                    new_eps_rules,
-              eps_inst_env     = extendInstEnvList (eps_inst_env eps)  
-                                                   new_eps_insts,
-              eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
-                                                      new_eps_fam_insts,
-              eps_vect_info    = plusVectInfo (eps_vect_info eps) 
-                                              new_eps_vect_info,
-              eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
-                                                  new_eps_anns,
-              eps_mod_fam_inst_env
-                               = let
-                                   fam_inst_env = 
-                                     extendFamInstEnvList emptyFamInstEnv
-                                                          new_eps_fam_insts
-                                 in
-                                 extendModuleEnv (eps_mod_fam_inst_env eps)
-                                                 mod
-                                                 fam_inst_env,
-              eps_stats        = addEpsInStats (eps_stats eps) 
-                                               (length new_eps_decls)
-                                               (length new_eps_insts)
-                                               (length new_eps_rules) }
+              case from of  -- See Note [Care with plugin imports]
+                ImportByPlugin -> eps {
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls}
+                _              -> eps {
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+                  eps_rule_base    = extendRuleBaseList (eps_rule_base eps) 
+                                                        new_eps_rules,
+                  eps_inst_env     = extendInstEnvList (eps_inst_env eps)  
+                                                       new_eps_insts,
+                  eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
+                                                          new_eps_fam_insts,
+                  eps_vect_info    = plusVectInfo (eps_vect_info eps) 
+                                                  new_eps_vect_info,
+                  eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
+                                                      new_eps_anns,
+                  eps_mod_fam_inst_env
+                                   = let
+                                       fam_inst_env = 
+                                         extendFamInstEnvList emptyFamInstEnv
+                                                              new_eps_fam_insts
+                                     in
+                                     extendModuleEnv (eps_mod_fam_inst_env eps)
+                                                     mod
+                                                     fam_inst_env,
+                  eps_stats        = addEpsInStats (eps_stats eps) 
+                                                   (length new_eps_decls)
+                                                   (length new_eps_insts)
+                                                   (length new_eps_rules) }
 
         ; return (Succeeded final_iface)
     }}}}
@@ -306,6 +314,9 @@ wantHiBootFile dflags eps mod from
           | usr_boot && not this_package
           -> Failed (badSourceImport mod)
           | otherwise -> Succeeded usr_boot
+
+       ImportByPlugin
+          -> Succeeded False
 
        ImportBySystem
           | not this_package   -- If the module to be imported is not from this package
@@ -329,16 +340,25 @@ badSourceImport mod
           <+> quotes (ppr (modulePackageId mod)))
 \end{code}
 
-{-
-Used to be used for the loadInterface sanity check on system imports. That has been removed, but I'm leaving this in pending
-review of this decision by SPJ - MCB 10/2008
+Note [Care with plugin imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When dynamically loading a plugin (via loadPluginInterface) we
+populate the same External Package State (EPS), even though plugin
+modules are to link with the compiler itself, and not with the 
+compiled program.  That's fine: mostly the EPS is just a cache for
+the interace files on disk.
 
-badDepMsg :: Module -> SDoc
-badDepMsg mod 
-  = hang (ptext (sLit "Interface file inconsistency:"))
-       2 (sep [ptext (sLit "home-package module") <+> quotes (ppr mod) <+> ptext (sLit "is needed,"), 
-               ptext (sLit "but is not listed in the dependencies of the interfaces directly imported by the module being compiled")])
--}
+But it's NOT ok for the RULES or instance environment.  We do not want
+to fire a RULE from the plugin on the code we are compiling, otherwise
+the code we are compiling will have a reference to a RHS of the rule
+that exists only in the compiler!  This actually happened to Daniel,
+via a RULE arising from a specialisation of (^) in the plugin.
+
+Solution: when loading plugins, do not extend the rule and instance
+environments.  We are only interested in the type environment, so that
+we can check that the plugin exports a function with the type that the
+compiler expects.
+
 
 \begin{code}
 -----------------------------------------------------
