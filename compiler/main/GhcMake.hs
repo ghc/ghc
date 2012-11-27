@@ -238,11 +238,18 @@ load how_much = do
         stable_mg = 
             [ AcyclicSCC ms
             | AcyclicSCC ms <- full_mg,
-              ms_mod_name ms `elem` stable_obj++stable_bco,
-              ms_mod_name ms `notElem` [ ms_mod_name ms' | 
-                                            AcyclicSCC ms' <- partial_mg ] ]
+              ms_mod_name ms `elem` stable_obj++stable_bco ]
+ 
+        -- the modules from partial_mg that are not also stable
+        -- NB. also keep cycles, we need to emit an error message later
+        unstable_mg = filter not_stable partial_mg
+          where not_stable (CyclicSCC _) = True
+                not_stable (AcyclicSCC ms)
+                   = ms_mod_name ms `notElem` stable_obj++stable_bco
 
-        mg = stable_mg ++ partial_mg
+        -- Load all the stable modules first, before attempting to load
+        -- an unstable module (#7231).
+        mg = stable_mg ++ unstable_mg
 
     -- clean up between compilations
     let cleanup hsc_env = intermediateCleanTempFiles dflags
