@@ -38,6 +38,10 @@ module Documentation.Haddock (
   Hyperlink(..),
   DocMarkup(..),
   Documentation(..),
+  ArgMap,
+  AliasMap,
+  WarningMap,
+  DocMap,
   HaddockModInfo(..),
   markup,
 
