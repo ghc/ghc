@@ -230,14 +230,14 @@ readPackageConfig dflags conf_file = do
        else do
             isfile <- doesFileExist conf_file
             when (not isfile) $
-              ghcError $ InstallationError $
+              throwGhcException $ InstallationError $
                 "can't find a package database at " ++ conf_file
             debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
             str <- readFile conf_file
             case reads str of
                 [(configs, rest)]
                     | all isSpace rest -> return (map installedPackageInfoToPackageConfig configs)
-                _ -> ghcError $ InstallationError $
+                _ -> throwGhcException $ InstallationError $
                         "invalid package database file " ++ conf_file
 
   let
@@ -410,12 +410,12 @@ packageFlagErr :: DynFlags
 -- for missing DPH package we emit a more helpful error message, because
 -- this may be the result of using -fdph-par or -fdph-seq.
 packageFlagErr dflags (ExposePackage pkg) [] | is_dph_package pkg
-  = ghcError (CmdLineError (showSDoc dflags $ dph_err))
+  = throwGhcException (CmdLineError (showSDoc dflags $ dph_err))
   where dph_err = text "the " <> text pkg <> text " package is not installed."
                   $$ text "To install it: \"cabal install dph\"."
         is_dph_package pkg = "dph" `isPrefixOf` pkg
 
-packageFlagErr dflags flag reasons = ghcError (CmdLineError (showSDoc dflags $ err))
+packageFlagErr dflags flag reasons = throwGhcException (CmdLineError (showSDoc dflags $ err))
   where err = text "cannot satisfy " <> ppr_flag <>
                 (if null reasons then empty else text ": ") $$
               nest 4 (ppr_reasons $$
@@ -983,7 +983,7 @@ closeDeps dflags pkg_map ipid_map ps
 throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
 throwErr dflags m
               = case m of
-                Failed e    -> ghcError (CmdLineError (showSDoc dflags e))
+                Failed e    -> throwGhcException (CmdLineError (showSDoc dflags e))
                 Succeeded r -> return r
 
 closeDepsErr :: PackageConfigMap
@@ -1017,7 +1017,7 @@ add_package pkg_db ipid_map ps (p, mb_parent)
 
 missingPackageErr :: DynFlags -> String -> IO a
 missingPackageErr dflags p
-    = ghcError (CmdLineError (showSDoc dflags (missingPackageMsg p)))
+    = throwGhcException (CmdLineError (showSDoc dflags (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc
 missingPackageMsg p = ptext (sLit "unknown package:") <+> text p

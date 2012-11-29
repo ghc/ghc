@@ -341,7 +341,7 @@ interactiveUI config srcs maybe_exprs = do
    -- this up front and emit a helpful error message (#2197)
    i <- liftIO $ isProfiled
    when (i /= 0) $
-     ghcError (InstallationError "GHCi cannot be used when compiled with -prof")
+     throwGhcException (InstallationError "GHCi cannot be used when compiled with -prof")
 
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
@@ -1007,7 +1007,7 @@ help _ = do
 -- :info
 
 info :: String -> InputT GHCi ()
-info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
+info "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = handleSourceError GHC.printException $ do
     unqual <- GHC.getPrintUnqual
     dflags <- getDynFlags
@@ -1105,7 +1105,7 @@ editFile str =
      st <- lift getGHCiState
      let cmd = editor st
      when (null cmd)
-       $ ghcError (CmdLineError "editor not set, use :set editor")
+       $ throwGhcException (CmdLineError "editor not set, use :set editor")
      code <- liftIO $ system (cmd ++ ' ':file)
      when (code == ExitSuccess)
        $ reloadModule ""
@@ -1137,7 +1137,7 @@ chooseEditFile =
          do targets <- GHC.getTargets
             case msum (map fromTarget targets) of
               Just file -> return file
-              Nothing   -> ghcError (CmdLineError "No files to edit.")
+              Nothing   -> throwGhcException (CmdLineError "No files to edit.")
 
   where fromTarget (GHC.Target (GHC.TargetFile f _) _ _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
@@ -1160,7 +1160,7 @@ defineMacro overwrite s = do
                                       unlines defined)
         else do
   if (not overwrite && macro_name `elem` defined)
-        then ghcError (CmdLineError
+        then throwGhcException (CmdLineError
                 ("macro '" ++ macro_name ++ "' is already defined"))
         else do
 
@@ -1195,7 +1195,7 @@ undefineMacro str = mapM_ undef (words str)
  where undef macro_name = do
         cmds <- liftIO (readIORef macros_ref)
         if (macro_name `notElem` map cmdName cmds)
-           then ghcError (CmdLineError
+           then throwGhcException (CmdLineError
                 ("macro '" ++ macro_name ++ "' is not defined"))
            else do
             liftIO (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
@@ -1438,14 +1438,14 @@ scriptCmd :: String -> InputT GHCi ()
 scriptCmd ws = do
   case words ws of
     [s]    -> runScript s
-    _      -> ghcError (CmdLineError "syntax:  :script <filename>")
+    _      -> throwGhcException (CmdLineError "syntax:  :script <filename>")
 
 runScript :: String    -- ^ filename
            -> InputT GHCi ()
 runScript filename = do
   either_script <- liftIO $ tryIO (openFile filename ReadMode)
   case either_script of
-    Left _err    -> ghcError (CmdLineError $ "IO error:  \""++filename++"\" "
+    Left _err    -> throwGhcException (CmdLineError $ "IO error:  \""++filename++"\" "
                       ++(ioeGetErrorString _err))
     Right script -> do
       st <- lift $ getGHCiState
@@ -1477,18 +1477,18 @@ isSafeCmd m =
             isSafeModule md
         [] -> do md <- guessCurrentModule "issafe"
                  isSafeModule md
-        _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
+        _ -> throwGhcException (CmdLineError "syntax:  :issafe <module>")
 
 isSafeModule :: Module -> InputT GHCi ()
 isSafeModule m = do
     mb_mod_info <- GHC.getModuleInfo m
     when (isNothing mb_mod_info)
-         (ghcError $ CmdLineError $ "unknown module: " ++ mname)
+         (throwGhcException $ CmdLineError $ "unknown module: " ++ mname)
 
     dflags <- getDynFlags
     let iface = GHC.modInfoIface $ fromJust mb_mod_info
     when (isNothing iface)
-         (ghcError $ CmdLineError $ "can't load interface file for module: " ++
+         (throwGhcException $ CmdLineError $ "can't load interface file for module: " ++
                                     (GHC.moduleNameString $ GHC.moduleName m))
 
     (msafe, pkgs) <- GHC.moduleTrustReqs m
@@ -1538,7 +1538,7 @@ browseCmd bang m =
         browseModule bang md True
     [] -> do md <- guessCurrentModule ("browse" ++ if bang then "!" else "")
              browseModule bang md True
-    _ -> ghcError (CmdLineError "syntax:  :browse <module>")
+    _ -> throwGhcException (CmdLineError "syntax:  :browse <module>")
 
 guessCurrentModule :: String -> InputT GHCi Module
 -- Guess which module the user wants to browse.  Pick
@@ -1546,7 +1546,7 @@ guessCurrentModule :: String -> InputT GHCi Module
 -- recently-added module occurs last, it seems.
 guessCurrentModule cmd
   = do imports <- GHC.getContext
-       when (null imports) $ ghcError $
+       when (null imports) $ throwGhcException $
           CmdLineError (':' : cmd ++ ": no current module")
        case (head imports) of
           IIModule m -> GHC.findModule m Nothing
@@ -1563,7 +1563,7 @@ browseModule bang modl exports_only = do
 
   mb_mod_info <- GHC.getModuleInfo modl
   case mb_mod_info of
-    Nothing -> ghcError (CmdLineError ("unknown module: " ++
+    Nothing -> throwGhcException (CmdLineError ("unknown module: " ++
                                 GHC.moduleNameString (GHC.moduleName modl)))
     Just mod_info -> do
         dflags <- getDynFlags
@@ -1641,7 +1641,7 @@ browseModule bang modl exports_only = do
 moduleCmd :: String -> GHCi ()
 moduleCmd str
   | all sensible strs = cmd
-  | otherwise = ghcError (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
+  | otherwise = throwGhcException (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
     (cmd, strs) =
         case str of
@@ -1742,7 +1742,7 @@ checkAdd ii = do
   let safe = safeLanguageOn dflags
   case ii of
     IIModule modname
-       | safe -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
+       | safe -> throwGhcException $ CmdLineError "can't use * imports with Safe Haskell"
        | otherwise -> wantInterpretedModuleName modname >> return ()
 
     IIDecl d -> do
@@ -1751,7 +1751,7 @@ checkAdd ii = do
        m <- GHC.lookupModule modname pkgqual
        when safe $ do
            t <- GHC.isModuleTrusted m
-           when (not t) $ ghcError $ ProgramError $ ""
+           when (not t) $ throwGhcException $ ProgramError $ ""
 
 -- -----------------------------------------------------------------------------
 -- Update the GHC API's view of the context
@@ -2002,7 +2002,7 @@ newDynFlags interactive_only minus_opts = do
 
       liftIO $ handleFlagWarnings idflags1 warns
       when (not $ null leftovers)
-           (ghcError . CmdLineError
+           (throwGhcException . CmdLineError
             $ "Some flags have not been recognized: "
             ++ (concat . intersperse ", " $ map unLoc leftovers))
 
@@ -2056,7 +2056,7 @@ unsetOptions str
            ]
 
          no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
-         no_flag f = ghcError (ProgramError ("don't know how to reverse " ++ f))
+         no_flag f = throwGhcException (ProgramError ("don't know how to reverse " ++ f))
 
      in if (not (null rest3))
            then liftIO (putStrLn ("unknown option: '" ++ head rest3 ++ "'"))
@@ -2128,7 +2128,7 @@ showCmd str = do
         ["languages"] -> showLanguages -- backwards compat
         ["language"]  -> showLanguages
         ["lang"]      -> showLanguages -- useful abbreviation
-        _ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
+        _ -> throwGhcException (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
                                      "               | breaks | context | packages | language ]"))
 
 showiCmd :: String -> GHCi ()
@@ -2137,7 +2137,7 @@ showiCmd str = do
         ["languages"]  -> showiLanguages -- backwards compat
         ["language"]   -> showiLanguages
         ["lang"]       -> showiLanguages -- useful abbreviation
-        _ -> ghcError (CmdLineError ("syntax:  :showi language"))
+        _ -> throwGhcException (CmdLineError ("syntax:  :showi language"))
 
 showImports :: GHCi ()
 showImports = do
@@ -2585,7 +2585,7 @@ breakByModuleLine md line args
    | otherwise = breakSyntax
 
 breakSyntax :: a
-breakSyntax = ghcError (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
+breakSyntax = throwGhcException (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet md lookupTickTree = do
@@ -2987,10 +2987,10 @@ wantInterpretedModuleName modname = do
    let str = moduleNameString modname
    dflags <- getDynFlags
    when (GHC.modulePackageId modl /= thisPackage dflags) $
-      ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
+      throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $
-       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
+       throwGhcException (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
    return modl
 
 wantNameFromInterpretedModule :: GHC.GhcMonad m

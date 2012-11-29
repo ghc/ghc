@@ -952,7 +952,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
             let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
-                     | otherwise = ghcError (ProgramError "module does not exist")
+                     | otherwise = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVertices (seq root (reachableG graph root))
 
 type SummaryNode = (ModSummary, Int, [Int])
@@ -1425,7 +1425,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
                 | otherwise                     = False
 
         when needs_preprocessing $
-           ghcError (ProgramError "buffer needs preprocesing; interactive check disabled")
+           throwGhcException (ProgramError "buffer needs preprocesing; interactive check disabled")
 
         return (dflags', src_fn, buf)
 

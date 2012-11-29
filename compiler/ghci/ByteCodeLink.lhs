@@ -240,7 +240,7 @@ lookupIE dflags ie con_nm
 
 linkFail :: String -> String -> IO a
 linkFail who what
-   = ghcError (ProgramError $
+   = throwGhcException (ProgramError $
         unlines [ "",who
                 , "During interactive linking, GHCi couldn't find the following symbol:"
                 , ' ' : ' ' : what
