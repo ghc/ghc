@@ -21,7 +21,6 @@ import DynFlags
 import Control.Monad
 import Foreign
 import Foreign.C
-import Text.Printf
 
 ----------------------------------------------------------------------------
 
@@ -46,7 +45,7 @@ prepForeignCall dflags cconv arg_types result_type
     r <- ffi_prep_cif cif abi (fromIntegral n_args) res_ty arg_arr
     if (r /= fFI_OK)
        then throwGhcException (InstallationError
-                        (printf "prepForeignCallFailed: %d" (show r)))
+                                   ("prepForeignCallFailed: " ++ show r))
        else return cif
 
 convToABI :: CCallConv -> C_ffi_abi
