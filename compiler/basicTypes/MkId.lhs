@@ -749,9 +749,14 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
                 
     info = noCafIdInfo
-           `setSpecInfo`          mkSpecInfo (primOpRules prim_op name)
-           `setArityInfo`         arity
+           `setSpecInfo`       mkSpecInfo (primOpRules prim_op name)
+           `setArityInfo`      arity
            `setStrictnessInfo` Just strict_sig
+           `setInlinePragInfo` neverInlinePragma
+               -- We give PrimOps a NOINLINE pragma so that we don't
+               -- get silly warnings from Desugar.dsRule (the inline_shadows_rule
+               -- test) about a RULE conflicting with a possible inlining
+               -- cf Trac #7287
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
 -- a fresh unique, a type that is correct for this particular ccall,
