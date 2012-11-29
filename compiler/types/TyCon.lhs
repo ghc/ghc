@@ -53,6 +53,7 @@ module TyCon(
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
         isImplicitTyCon,
+        isEmptyDataTyCon,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -72,6 +73,7 @@ module TyCon(
         algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
+        tyConSingleFieldDataCon_maybe,
 
         -- ** Manipulating TyCons
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -88,7 +90,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
-import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
+import {-# SOURCE #-} DataCon ( DataCon, dataConRepArgTys, isVanillaDataCon )
 
 import Var
 import Class
@@ -1074,6 +1076,18 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
 isDataTyCon (TupleTyCon {tyConTupleSort = sort}) = isBoxed (tupleSortBoxity sort)
 isDataTyCon _ = False
 
+isEmptyDataTyCon :: TyCon -> Bool
+isEmptyDataTyCon (AlgTyCon {algTcRhs = DataTyCon { data_cons = [data_con] } })
+    = isEmptyDataCon data_con
+isEmptyDataTyCon (TupleTyCon {dataCon = data_con })
+    = isEmptyDataCon data_con
+isEmptyDataTyCon _ = False
+
+isEmptyDataCon :: DataCon -> Bool
+isEmptyDataCon data_con = case dataConRepArgTys data_con of
+    [] -> True
+    _  -> False
+
 -- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to
 -- themselves, even via coercions (except for unsafeCoerce).
 -- This excludes newtypes, type functions, type synonyms.
@@ -1127,6 +1141,27 @@ isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     _           -> False
 isProductTyCon (TupleTyCon {})  = True
 isProductTyCon _                = False
+
+-- | If the given 'TyCon' has a /single/ data constructor with a /single/ field,
+-- i.e. it is a @data@ type with one alternative and one field, or a @newtype@
+-- then the type of that field is returned. If the 'TyCon' has a single
+-- constructor with more than one field, more than one constructor, or
+-- represents a primitive or function type constructor then @Nothing@ is
+-- returned. In any other case, the function panics
+tyConSingleFieldDataCon_maybe :: TyCon -> Maybe Type
+tyConSingleFieldDataCon_maybe tc@(AlgTyCon {}) = case algTcRhs tc of
+    DataTyCon{ data_cons = [data_con] }
+        | isVanillaDataCon data_con -> case dataConRepArgTys data_con of
+            [ty] -> Just ty
+            _    -> Nothing
+        | otherwise -> Nothing
+    NewTyCon { data_con = data_con }
+        ->  case dataConRepArgTys data_con of
+            [ty] -> Just ty
+            _    -> pprPanic "tyConSingleFieldDataCon_maybe"
+                    (ppr $ dataConRepArgTys data_con)
+    _           -> Nothing
+tyConSingleFieldDataCon_maybe _                = Nothing
 
 -- | Is this a 'TyCon' representing a type synonym (@type@)?
 isSynTyCon :: TyCon -> Bool

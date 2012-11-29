@@ -2,9 +2,11 @@
 module DataCon where
 import Name( Name )
 import {-# SOURCE #-} TyCon( TyCon )
+import {-# SOURCE #-} TypeRep (Type)
 
 data DataCon
 dataConName      :: DataCon -> Name
+dataConRepArgTys :: DataCon -> [Type]
 dataConTyCon     :: DataCon -> TyCon
 isVanillaDataCon :: DataCon -> Bool
 instance Eq DataCon

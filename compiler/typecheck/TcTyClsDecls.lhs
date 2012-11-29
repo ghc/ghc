@@ -37,6 +37,7 @@ import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
+import qualified TysPrim
 import TysWiredIn( unitTy )
 import Type
 import Kind
@@ -1208,6 +1209,9 @@ chooseBoxingStrategy dflags arg_ty bang
 	               HsNoBang -> HsNoBang
 	               HsStrict | gopt Opt_UnboxStrictFields dflags
                                 -> can_unbox HsStrict arg_ty
+	                        | gopt Opt_UnboxStrictPrimitiveFields dflags &&
+                                  can_unbox_prim arg_ty
+                                -> HsUnpack
                                 | otherwise -> HsStrict
                        HsNoUnpack -> HsStrict
 	               HsUnpack   -> can_unbox HsUnpackFailed arg_ty
@@ -1234,6 +1238,49 @@ chooseBoxingStrategy dflags arg_ty bang
                  else HsUnpack
 
               | otherwise -> fail_bang
+
+    -- TODO: Deal with type synonyms?
+
+    can_unbox_prim :: TcType -> Bool
+    -- We unpack any field which final unpacked size would be smaller
+    -- or equal to the size of a pointer.
+    can_unbox_prim arg_ty
+       = case splitTyConApp_maybe arg_ty of
+            Nothing -> False
+
+            Just (arg_tycon, _)
+              | isAbstractTyCon arg_tycon -> False
+                      -- See Note [Don't complain about UNPACK on abstract TyCons]
+              | isPrimTyCon arg_tycon &&
+                arg_tycon `elem` ptrSizedPrimTyCons -> True
+              -- TODO: Check that the PrimTyCon corresponds to a type
+              -- with pointer-sized representation.
+              | isEmptyDataTyCon arg_tycon -> True
+              | not (isRecursiveTyCon arg_tycon)        -- Note [Recusive unboxing]
+              , Just ty <- tyConSingleFieldDataCon_maybe arg_tycon
+              -> can_unbox_prim ty
+              | otherwise -> False
+
+ptrSizedPrimTyCons :: [TyCon]
+ptrSizedPrimTyCons =
+    [ TysPrim.addrPrimTyCon
+    , TysPrim.arrayPrimTyCon
+    , TysPrim.byteArrayPrimTyCon
+    , TysPrim.arrayArrayPrimTyCon
+    , TysPrim.charPrimTyCon
+    , TysPrim.doublePrimTyCon
+    , TysPrim.floatPrimTyCon
+    , TysPrim.intPrimTyCon
+    , TysPrim.int32PrimTyCon
+    , TysPrim.int64PrimTyCon
+    , TysPrim.mutableArrayPrimTyCon
+    , TysPrim.mutableByteArrayPrimTyCon
+    , TysPrim.mutableArrayArrayPrimTyCon
+    , TysPrim.wordPrimTyCon
+    , TysPrim.word32PrimTyCon
+    , TysPrim.word64PrimTyCon
+    ]
+
 \end{code}
 
 Note [Don't complain about UNPACK on abstract TyCons]

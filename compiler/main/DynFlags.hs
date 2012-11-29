@@ -269,6 +269,7 @@ data GeneralFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
+   | Opt_UnboxStrictPrimitiveFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
    | Opt_Vectorise
@@ -2359,6 +2360,7 @@ fFlags = [
   ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
   ( "case-merge",                       Opt_CaseMerge, nop ),
   ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
+  ( "unbox-strict-primitive-fields",    Opt_UnboxStrictPrimitiveFields, nop ),
   ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "excess-precision",                 Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
