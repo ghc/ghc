@@ -93,7 +93,7 @@ module Type (
 
 	-- * Type comparison
         eqType, eqTypeX, eqTypes, cmpType, cmpTypes, 
-	eqPred, eqPredX, cmpPred, eqKind,
+	eqPred, eqPredX, cmpPred, eqKind, eqTyVarBndrs,
 
 	-- * Forcing evaluation of types
         seqType, seqTypes,
@@ -1178,6 +1178,17 @@ eqPred = eqType
 
 eqPredX :: RnEnv2 -> PredType -> PredType -> Bool
 eqPredX env p1 p2 = isEqual $ cmpTypeX env p1 p2
+
+eqTyVarBndrs :: RnEnv2 -> [TyVar] -> [TyVar] -> Maybe RnEnv2
+-- Check that the tyvar lists are the same length
+-- and have matching kinds; if so, extend the RnEnv2
+-- Returns Nothing if they don't match
+eqTyVarBndrs env [] []
+ = Just env
+eqTyVarBndrs env (tv1:tvs1) (tv2:tvs2)
+ | eqTypeX env (tyVarKind tv1) (tyVarKind tv2)
+ = eqTyVarBndrs (rnBndr2 env tv1 tv2) tvs1 tvs2
+eqTyVarBndrs _ _ _= Nothing
 \end{code}
 
 Now here comes the real worker
@@ -1208,7 +1219,8 @@ cmpTypeX env t1 t2 | Just t1' <- coreView t1 = cmpTypeX env t1' t2
 -- So the RHS has a data type
 
 cmpTypeX env (TyVarTy tv1)       (TyVarTy tv2)       = rnOccL env tv1 `compare` rnOccR env tv2
-cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
+cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv1)
+                                                       `thenCmp` cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2

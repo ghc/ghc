@@ -63,7 +63,6 @@ import CoreSyn
 import ErrUtils
 import Id
 import VarEnv
-import Var
 import Module
 import UniqFM
 import Name
@@ -726,15 +725,12 @@ checkBootTyCon tc1 tc2
 
   | Just c1 <- tyConClass_maybe tc1
   , Just c2 <- tyConClass_maybe tc2
-  = let
-       (clas_tyvars1, clas_fds1, sc_theta1, _, ats1, op_stuff1)
+  , let (clas_tvs1, clas_fds1, sc_theta1, _, ats1, op_stuff1)
           = classExtraBigSig c1
-       (clas_tyvars2, clas_fds2, sc_theta2, _, ats2, op_stuff2)
+        (clas_tvs2, clas_fds2, sc_theta2, _, ats2, op_stuff2)
           = classExtraBigSig c2
-
-       env0 = mkRnEnv2 emptyInScopeSet
-       env = rnBndrs2 env0 clas_tyvars1 clas_tyvars2
-
+  , Just env <- eqTyVarBndrs emptyRnEnv2 clas_tvs1 clas_tvs2
+  = let
        eqSig (id1, def_meth1) (id2, def_meth2)
          = idName id1 == idName id2 &&
            eqTypeX env op_ty1 op_ty2 &&
@@ -751,18 +747,15 @@ checkBootTyCon tc1 tc2
 
        -- Ignore the location of the defaults
        eqATDef (ATD tvs1 ty_pats1 ty1 _loc1) (ATD tvs2 ty_pats2 ty2 _loc2)
-         = eqListBy same_kind tvs1 tvs2 &&
-           eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
+         | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
+         = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
            eqTypeX env ty1 ty2
-         where env = rnBndrs2 env0 tvs1 tvs2
+         | otherwise = False
 
        eqFD (as1,bs1) (as2,bs2) =
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
          eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
-
-       same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
     in
-       eqListBy same_kind clas_tyvars1 clas_tyvars2 &&
              -- Checks kind of class
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
@@ -772,23 +765,20 @@ checkBootTyCon tc1 tc2
         eqListBy eqAT ats1 ats2)
 
   | isSynTyCon tc1 && isSynTyCon tc2
+  , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    let tvs1 = tyConTyVars tc1; tvs2 = tyConTyVars tc2
-        env = rnBndrs2 env0 tvs1 tvs2
-
-        eqSynRhs SynFamilyTyCon SynFamilyTyCon
+    let eqSynRhs SynFamilyTyCon SynFamilyTyCon
             = True
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
             = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
-    equalLength tvs1 tvs2 &&
     eqSynRhs (synTyConRhs tc1) (synTyConRhs tc2)
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
+  , Just env <- eqTyVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    eqKind (tyConKind tc1) (tyConKind tc2) &&
-    eqListBy eqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
+    eqListBy (eqPredX env) (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
   | isForeignTyCon tc1 && isForeignTyCon tc2
@@ -797,8 +787,6 @@ checkBootTyCon tc1 tc2
 
   | otherwise = False
   where
-        env0 = mkRnEnv2 emptyInScopeSet
-
         eqAlgRhs (AbstractTyCon dis1) rhs2
           | dis1      = isDistinctAlgRhs rhs2   --Check compatibility
           | otherwise = True
@@ -815,6 +803,9 @@ checkBootTyCon tc1 tc2
           && dataConStrictMarks c1 == dataConStrictMarks c2
           && dataConFieldLabels c1 == dataConFieldLabels c2
           && eqType (dataConUserType c1) (dataConUserType c2)
+
+emptyRnEnv2 :: RnEnv2
+emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 
 ----------------
 missingBootThing :: Name -> String -> SDoc
