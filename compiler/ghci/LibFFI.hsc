@@ -16,9 +16,9 @@ module LibFFI (
 import TyCon
 import ForeignCall
 import Panic
--- import Outputable
 import DynFlags
 
+import Control.Monad
 import Foreign
 import Foreign.C
 import Text.Printf
@@ -38,8 +38,8 @@ prepForeignCall dflags cconv arg_types result_type
   = do
     let n_args = length arg_types
     arg_arr <- mallocArray n_args
-    let init_arg (ty,n) = pokeElemOff arg_arr n (primRepToFFIType dflags ty)
-    mapM_ init_arg (zip arg_types [0..])
+    let init_arg ty n = pokeElemOff arg_arr n (primRepToFFIType dflags ty)
+    zipWithM_ init_arg arg_types [0..]
     cif <- mallocBytes (#const sizeof(ffi_cif))
     let abi = convToABI cconv
     let res_ty = primRepToFFIType dflags result_type
