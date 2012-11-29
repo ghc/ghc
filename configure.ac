@@ -137,7 +137,7 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
    AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],
-  [UseSystemLibFFI="NO"])
+  [AC_MSG_ERROR([Cannot find system libffi])])
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"
 ])

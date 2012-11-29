@@ -493,7 +493,10 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
-$(rts_dist_depfile_c_asm) : $(libffi_HEADERS) $(DTRACEPROBES_H)
+$(rts_dist_depfile_c_asm) : $(DTRACEPROBES_H)
+ifneq "$(UseSystemLibFFI)" "YES"
+$(rts_dist_depfile_c_asm) : $(libffi_HEADERS)
+endif
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported

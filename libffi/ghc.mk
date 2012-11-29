@@ -44,6 +44,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
+	false ffi
 	$(call removeFiles,$(libffi_STAMP_STATIC_CONFIGURE))
 	$(call removeFiles,$(libffi_STAMP_STATIC_BUILD))
 	$(call removeFiles,$(libffi_STAMP_STATIC_INSTALL))

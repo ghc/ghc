@@ -618,18 +618,12 @@ else
 MAYBE_GHCI=driver/ghci
 endif
 
-ifeq "$(UseSystemLibFFI)" "YES"
-MAYBE_LIBFFI=
-else
-MAYBE_LIBFFI=libffi
-endif
-
 BUILD_DIRS += \
    driver \
    $(MAYBE_GHCI) \
    driver/ghc \
    driver/haddock \
-   $(MAYBE_LIBFFI) \
+   libffi \
    includes \
    rts
 
