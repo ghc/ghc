@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, KindSignatures #-}
+{-# LANGUAGE RankNTypes, KindSignatures #-}
 {-# OPTIONS_GHC -Werror #-}
 
 -- Trac #959

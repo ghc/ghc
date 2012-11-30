@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, Rank2Types #-}
+{-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, RankNTypes #-}
 module T5655 where
 
 import GHC.Prim (Constraint)
@@ -23,4 +23,5 @@ f = ap (ETwice . twice)
 foo :: ETwice
 foo = ETwice (5 :: Int)
 
+bar :: IO ()
 bar = ap print (f foo)

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE UndecidableInstances #-}
 

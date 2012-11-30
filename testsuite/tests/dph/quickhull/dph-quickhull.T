@@ -1,12 +1,8 @@
 
 test    ('dph-quickhull-copy-opt' 
-        , [ alone
+        , [ high_memory_usage
+          , outputdir('copy-opt')
           , skip_if_fast
-          , extra_clean(['Main.hi', 'Main.o',
-                         'QuickHullVect.hi', 'QuickHullVect.o',
-                         'SVG.hi', 'SVG.o',
-                         'TestData.hi', 'TestData.o',
-                         'Types.hi', 'Types.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -16,13 +12,9 @@ test    ('dph-quickhull-copy-opt'
 
 
 test    ('dph-quickhull-vseg-opt' 
-        , [ alone
+        , [ high_memory_usage
+          , outputdir('vseg-opt')
           , skip_if_fast
-          , extra_clean(['Main.hi', 'Main.o',
-                         'QuickHullVect.hi', 'QuickHullVect.o',
-                         'SVG.hi', 'SVG.o',
-                         'TestData.hi', 'TestData.o',
-                         'Types.hi', 'Types.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -32,12 +24,7 @@ test    ('dph-quickhull-vseg-opt'
 
 
 test    ('dph-quickhull-copy-fast' 
-        , [ alone
-          , extra_clean(['Main.hi', 'Main.o',
-                         'QuickHullVect.hi', 'QuickHullVect.o',
-                         'SVG.hi', 'SVG.o',
-                         'TestData.hi', 'TestData.o',
-                         'Types.hi', 'Types.o'])
+        , [ outputdir('copy-fast')
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -47,12 +34,7 @@ test    ('dph-quickhull-copy-fast'
 
 
 test    ('dph-quickhull-vseg-fast' 
-        , [ alone
-          , extra_clean(['Main.hi', 'Main.o',
-                         'QuickHullVect.hi', 'QuickHullVect.o',
-                         'SVG.hi', 'SVG.o',
-                         'TestData.hi', 'TestData.o',
-                         'Types.hi', 'Types.o'])
+        , [ outputdir('vseg-fast')
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 

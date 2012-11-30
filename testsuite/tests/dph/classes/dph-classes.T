@@ -1,6 +1,5 @@
 test    ('dph-classes-vseg-fast' 
-        , [ alone
-          , extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])
+        , [ extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 

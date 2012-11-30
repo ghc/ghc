@@ -5,6 +5,7 @@
 # This allows us to use the "with X:" syntax with python 2.5:
 from __future__ import with_statement
 
+import shutil
 import sys
 import os
 import errno
@@ -14,6 +15,7 @@ import traceback
 import copy
 import glob
 import types
+import math
 
 have_subprocess = False
 try:
@@ -218,6 +220,14 @@ def _exit_code( opts, v ):
 
 # -----
 
+def timeout_multiplier( val ):
+    return lambda opts, v=val: _timeout_multiplier(opts, v)
+
+def _timeout_multiplier( opts, v ):
+    opts.timeout_multiplier = v
+
+# -----
+
 def extra_run_opts( val ):
     return lambda opts, v=val: _extra_run_opts(opts, v);
 
@@ -296,7 +306,7 @@ def if_platform( plat, f ):
     else:
         return normal
 
-def if_not_platform( plat, f ):
+def unless_platform( plat, f ):
     if config.platform != plat:
         return f
     else:
@@ -320,6 +330,12 @@ def if_arch( arch, f ):
     else:
         return normal
 
+def unless_arch( arch, f ):
+    if config.arch == arch:
+        return normal
+    else:
+        return f
+
 def if_wordsize( ws, f ):
     if config.wordsize == str(ws):
         return f
@@ -339,6 +355,12 @@ def if_cygwin( f ):
         return normal
 
 # ---
+
+def if_ghci_dynamic( f ):
+    if config.ghc_dynamic_by_default:
+        return f
+    else:
+        return normal
 
 def if_in_tree_compiler( f ):
     if config.in_tree_compiler:
@@ -398,6 +420,12 @@ def if_compiler_ge( compiler, version, f ):
     else:
         return normal
 
+def if_compiler_debugged( f ):
+    if config.compiler_debugged:
+        return f
+    else:
+        return normal
+
 def namebase( nb ):
    return lambda opts, nb=nb: _namebase(opts, nb)
 
@@ -419,7 +447,7 @@ def unless_tag( tag, f ):
         return normal
 
 # ---
-def alone(opts):
+def high_memory_usage(opts):
     opts.alone = True
 
 # ---
@@ -434,6 +462,12 @@ def objc_src( opts ):
 
 def objcpp_src( opts ):
     opts.objcpp_src = 1;
+
+def outputdir( odir ):
+    return lambda opts, d=odir: _outputdir(opts, d)
+
+def _outputdir( opts, odir ):
+    opts.outputdir = odir;
 
 # ----
 
@@ -524,31 +558,22 @@ def newTestDir( dir ):
 # -----------------------------------------------------------------------------
 # Actually doing tests
 
-allTests = []
+parallelTests = []
+aloneTests = []
 allTestNames = set([])
 
-def runTest (opts, name, setup, func, args):
-    n = 1
-
-    if type(setup) is types.ListType:
-       setup = composes(setup)
-
-    setup(opts)
-
-    if opts.alone:
-        n = config.threads
-
+def runTest (opts, name, func, args):
     ok = 0
 
     if config.use_threads:
         t.thread_pool.acquire()
         try:
-            while config.threads<(t.running_threads+n):
+            while config.threads<(t.running_threads+1):
                 t.thread_pool.wait()
-            t.running_threads = t.running_threads+n
+            t.running_threads = t.running_threads+1
             ok=1
             t.thread_pool.release()
-            thread.start_new_thread(test_common_thread, (n, name, opts, func, args))
+            thread.start_new_thread(test_common_thread, (name, opts, func, args))
         except:
             if not ok:
                 t.thread_pool.release()
@@ -558,23 +583,34 @@ def runTest (opts, name, setup, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
-    global allTests
+    global aloneTests
+    global parallelTests
     global allTestNames
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
     myTestOpts = copy.copy(thisdir_testopts)
-    allTests += [lambda : runTest(myTestOpts, name, setup, func, args)]
+
+    if type(setup) is types.ListType:
+       setup = composes(setup)
+
+    setup(myTestOpts)
+
+    thisTest = lambda : runTest(myTestOpts, name, func, args)
+    if myTestOpts.alone:
+        aloneTests.append(thisTest)
+    else:
+        parallelTests.append(thisTest)
     allTestNames.add(name)
 
 if config.use_threads:
-    def test_common_thread(n, name, opts, func, args):
+    def test_common_thread(name, opts, func, args):
         t.lock.acquire()
         try:
             test_common_work(name,opts,func,args)
         finally:
             t.lock.release()
             t.thread_pool.acquire()
-            t.running_threads = t.running_threads - n
+            t.running_threads = t.running_threads - 1
             t.thread_pool.notify()
             t.thread_pool.release()
 
@@ -659,6 +695,13 @@ def test_common_work (name, opts, func, args):
 
             clean(getTestOpts().clean_files)
 
+            if getTestOpts().outputdir != None:
+                odir = in_testdir(getTestOpts().outputdir)
+                try:
+                    shutil.rmtree(odir)
+                except:
+                    pass
+
             try:
                 cleanCmd = getTestOpts().clean_cmd
                 if cleanCmd != None:
@@ -713,7 +756,7 @@ def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
 
     try:
-        print '=====>', full_name, t.total_tests, 'of', len(allTests), \
+        print '=====>', full_name, t.total_tests, 'of', len(allTestNames), \
                         str([t.n_unexpected_passes,   \
                              t.n_unexpected_failures, \
                              t.n_framework_failures])
@@ -862,6 +905,8 @@ def ghci_script( name, way, script ):
     # actually testing the recompilation behaviour in the GHCi tests.
     flags = filter(lambda f: f != '-fforce-recomp', getTestOpts().compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
@@ -928,6 +973,33 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
                            two_normalisers(two_normalisers(getTestOpts().extra_errmsg_normaliser, normalise_errmsg), normalise_whitespace), \
                            expected_stderr_file, actual_stderr_file):
         return failBecause('stderr mismatch')
+
+    # no problems found, this test passed
+    return passed()
+
+def compile_cmp_asm( name, way, extra_hc_opts ):
+    print 'Compile only, extra args = ', extra_hc_opts
+    pretest_cleanup(name)
+    result = simple_build( name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0, 0)
+
+    if badResult(result):
+        return result
+
+    # the actual stderr should always match the expected, regardless
+    # of whether we expected the compilation to fail or not (successful
+    # compilations may generate warnings).
+
+    if getTestOpts().with_namebase == None:
+        namebase = name
+    else:
+        namebase = getTestOpts().with_namebase
+
+    (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
+    actual_asm_file = qualify(name, 's')
+
+    if not compare_outputs('asm', two_normalisers(normalise_errmsg, normalise_asm), \
+                           expected_asm_file, actual_asm_file):
+        return failBecause('asm mismatch')
 
     # no problems found, this test passed
     return passed()
@@ -1087,9 +1159,11 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    comp_flags = getTestOpts().compiler_always_flags
+    comp_flags = copy.copy(getTestOpts().compiler_always_flags)
     if noforce:
         comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
+    if getTestOpts().outputdir != None:
+        comp_flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
@@ -1156,7 +1230,7 @@ def simple_run( name, way, prog, args ):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if len(opts.stats_num_fields) > 0:
+    if len(opts.stats_num_fields) + len(opts.stats_range_fields) > 0:
         args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if opts.no_stdin:
@@ -1176,13 +1250,13 @@ def simple_run( name, way, prog, args ):
         + stdin_comes_from         \
         + redirection
 
-    if getTestOpts().cmd_wrapper != None:
-        cmd = getTestOpts().cmd_wrapper(cmd);
+    if opts.cmd_wrapper != None:
+        cmd = opts.cmd_wrapper(cmd);
 
-    cmd = 'cd ' + getTestOpts().testdir + ' && ' + cmd
+    cmd = 'cd ' + opts.testdir + ' && ' + cmd
 
     # run the command
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=opts.timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1198,9 +1272,11 @@ def simple_run( name, way, prog, args ):
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        if not opts.combined_output and not check_stderr_ok(name):
+        bad_stderr = not opts.combined_output and not check_stderr_ok(name)
+        bad_stdout = not check_stdout_ok(name)
+        if bad_stderr:
             return failBecause('bad stderr')
-        if not check_stdout_ok(name):
+        if bad_stdout:
             return failBecause('bad stdout')
         # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
         if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
@@ -1272,8 +1348,12 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     script.close()
 
+    flags = copy.copy(getTestOpts().compiler_always_flags)
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
+
     cmd = "'" + config.compiler + "' " \
-          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
+          + join(flags,' ') + ' ' \
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
@@ -1285,7 +1365,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
-    result = runCmdFor(name, cmd)
+    result = runCmdFor(name, cmd, timeout_multiplier=getTestOpts().timeout_multiplier)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1365,9 +1445,12 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     else:
         to_do = ' --make ' + top_mod + ' '
 
+    flags = copy.copy(getTestOpts().compiler_always_flags)
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
+          + join(flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
@@ -1394,6 +1477,8 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         to_compile = string.replace(deplist2,'.hs,', '.hcr');
 
     flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
+    if getTestOpts().outputdir != None:
+        flags.extend(["-outputdir", getTestOpts().outputdir])
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
@@ -1663,6 +1748,27 @@ def normalise_output( str ):
     str = re.sub('([^\\s])\\.exe', '\\1', str)
     return str
 
+def normalise_asm( str ):
+    lines = str.split('\n')
+    # Only keep instructions and labels not starting with a dot.
+    metadata = re.compile('^[ \t]*\\..*$')
+    out = []
+    for line in lines:
+      # Drop metadata directives (e.g. ".type")
+      if not metadata.match(line):
+        line = re.sub('@plt', '', line)
+        instr = line.lstrip().split()
+        # Drop empty lines.
+        if not instr:
+          continue
+        # Drop operands, except for call instructions.
+        elif instr[0] == 'call':
+          out.append(instr[0] + ' ' + instr[1])
+        else:
+          out.append(instr[0])
+    out = '\n'.join(out)
+    return out
+
 def if_verbose( n, str ):
     if config.verbose >= n:
         print str
@@ -1712,23 +1818,24 @@ def runCmd( cmd ):
         r = os.system(cmd)
     return r << 8
 
-def runCmdFor( name, cmd ):
+def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
     if_verbose( 1, cmd )
     r = 0
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
+    timeout = int(math.ceil(config.timeout * timeout_multiplier))
 
     if config.timeout_prog != '':
         if config.check_files_written:
             fn = name + ".strace"
             r = rawSystem(["strace", "-o", fn, "-fF", "-e", "creat,open,chdir,clone,vfork",
-                           config.timeout_prog, str(config.timeout),
+                           config.timeout_prog, str(timeout),
                            cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
-            r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
+            r = rawSystem([config.timeout_prog, str(timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
@@ -2002,6 +2109,14 @@ def platform_wordsize_qualify( name, suff ):
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.
 def pretest_cleanup(name):
+   if getTestOpts().outputdir != None:
+       odir = in_testdir(getTestOpts().outputdir)
+       try:
+           shutil.rmtree(odir)
+       except:
+           pass
+       os.mkdir(odir)
+
    rm_no_fail(qualify(name,'comp.stderr'))
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name,'run.stdout'))
@@ -2106,4 +2221,3 @@ def getStdout(cmd):
         return stdout
     else:
         raise Exception("Need subprocess to get stdout, but don't have it")
-

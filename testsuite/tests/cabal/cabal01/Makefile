@@ -24,7 +24,11 @@ cabal01:
 	'$(TEST_HC)' --make -o setup Setup.lhs -v0
 
 	'$(GHC_PKG)' init local.db
-	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(PROF)
+# We don't make use of -rtsopts in this test, and if it's enabled then
+# we get a warning if dynlibs are enabled by default that:
+# 	Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+# so we filter the flag out
+	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(VANILLA) $(PROF) $(DYN)
 	./setup build -v0
 	./setup copy -v0
 	echo install1:

@@ -17,6 +17,6 @@ test('2578', normal, run_command, ['$MAKE -s --no-print-directory 2578'])
 # skip llvm on i386 as we don't support fPIC
 test('jmp_tbl', if_arch('i386', omit_ways(['llvm', 'optllvm'])), compile, ['-fPIC -O'])
 test('massive_array',
-     [ if_arch('i386', expect_broken(7213)),
-       if_arch('i386', omit_ways(['llvm', 'optllvm'])) ],
+     [ if_arch('i386', omit_ways(['llvm', 'optllvm'])) ],
      compile, ['-fPIC'])
+test('T7237', normal, compile, [''])

@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, GADTs, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, GADTs, FlexibleContexts #-}
 {-# OPTIONS_GHC -O2 #-}
 
 -- This one make SpecConstr generate bogus code (hence -O2), 

@@ -260,13 +260,16 @@ for file in t_files:
 # Now run all the tests
 if config.use_threads:
     t.running_threads=0
-for oneTest in allTests:
+for oneTest in parallelTests:
     oneTest()
 if config.use_threads:
     t.thread_pool.acquire()
     while t.running_threads>0:
         t.thread_pool.wait()
     t.thread_pool.release()
+config.use_threads = False
+for oneTest in aloneTests:
+    oneTest()
         
 summary(t, sys.stdout)
 

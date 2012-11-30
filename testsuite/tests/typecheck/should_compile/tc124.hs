@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- !!! Rank 2 polymorphism
 -- Both f and g are rejected by Hugs [April 2001]

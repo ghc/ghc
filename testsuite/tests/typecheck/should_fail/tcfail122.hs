@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, KindSignatures #-}
+{-# LANGUAGE RankNTypes, KindSignatures #-}
 
 module ShouldFail where
 

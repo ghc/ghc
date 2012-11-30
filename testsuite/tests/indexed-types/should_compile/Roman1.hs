@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, Rank2Types #-}
+{-# LANGUAGE TypeFamilies, RankNTypes #-}
 
 -- This test made the type checker produce an
 -- ill-kinded coercion term.

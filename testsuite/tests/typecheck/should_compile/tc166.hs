@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             ExistentialQuantification, Rank2Types,
+             ExistentialQuantification, RankNTypes,
              FlexibleInstances #-}
 
 -- Arguably, the type signature for f1 should be enough to make

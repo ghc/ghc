@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, Rank2Types #-}
+{-# LANGUAGE ImplicitParams, RankNTypes #-}
 
 -- Rank-2 types with implicit parameters.
 -- GHC 5.02 erroneously rejected this

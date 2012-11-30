@@ -225,10 +225,13 @@ deriving instance Show a => Show (Alt a b)
 
 instance Rec (PHom (->) (->)) (FAlt a) (Alt a) where
   _in = mkPHom f g where
+    f,g :: FAlt a (Alt a) s -> Alt a s
     f FZero = Zero
     f (FSucc1 a b) = Succ1 a b
     g (FSucc2 a b) = Succ2 a b
+
   out = mkPHom f g where
+    f,g :: Alt a s -> FAlt a (Alt a) s
     f Zero = FZero
     f (Succ1 a b) = FSucc1 a b
     g (Succ2 a b) = FSucc2 a b
@@ -252,8 +255,11 @@ type PairUpResult a = K2 [(a, a)] (a, [(a, a)])
 pairUp :: Alt a Fst -> [(a, a)]
 pairUp xs = let (K21 xss) = (fstPHom (fold (mkPHom phi psi))) xs in xss 
  where
-   phi FZero = K21 []
+   phi :: FAlt y (K2 v (r,[(y,r)])) s -> K2 [(y,r)] (y,z) s
+   phi FZero                       = K21 []
    phi (FSucc1 x1 (K22 (x2, xss))) = K21 ((x1, x2):xss) 
+
+   psi :: FAlt y (K2 z w) s -> K2 [x] (y,z) s
    psi (FSucc2 x (K21 xss)) = K22 (x, xss) 
 
 main = print (Succ1 (0::Int) $ Succ2 1 $ Succ1 2 $ Succ2 3 $ Succ1 4 $ Succ2 5 Zero)

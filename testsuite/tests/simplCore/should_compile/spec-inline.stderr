@@ -109,7 +109,7 @@ Roman.foo2 :: GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, WorkFree=False, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = GHC.Types.I# 6
 
@@ -118,7 +118,7 @@ Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, WorkFree=False, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 

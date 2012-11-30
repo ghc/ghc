@@ -63,6 +63,21 @@ test('T7128', normal, compile,[''])
 test('T7151', normal, compile_fail,[''])
 test('T7095', normal, compile,[''])
 test('T7090', normal, compile,[''])
-test('T7176', expect_broken(7176), compile,[''])
-
-
+test('T7272',
+     extra_clean(['T7272a.hi', 'T7272a.o']),
+     multimod_compile,
+     ['T7272.hs', '-v0'])
+test('T7176', normal, compile,[''])
+test('T7224', normal, compile_fail,[''])
+test('T7230', normal, compile_fail,[''])
+test('T7238', normal, compile,[''])
+test('T7278', normal, compile_fail,[''])
+test('Holdermans', normal, compile_fail,[''])
+test('T7328', normal, compile_fail,[''])
+test('T7332', normal, compile,[''])
+test('T7347', normal, compile_fail,[''])
+test('T7341', normal, compile_fail,[''])
+test('T7422', normal, compile,[''])
+test('T7433', normal, compile_fail,[''])
+test('T7438', normal, run_command, ['$MAKE -s --no-print-directory T7438'])
+test('T7404', normal, compile_fail,[''])

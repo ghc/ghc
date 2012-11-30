@@ -1,10 +1,16 @@
 
 T3950.hs:15:13:
     Couldn't match kind `* -> *' with `*'
-    Expected type: w (Id p)
-      Actual type: Sealed (Id p0 x0)
-    Kind incompatibility when matching types:
+    When matching types
       w :: (* -> * -> *) -> *
       Sealed :: (* -> *) -> *
+    Expected type: w (Id p)
+      Actual type: Sealed (Id p0 x0)
     In the first argument of `Just', namely rp'
     In the expression: Just rp'
+    In an equation for `rp':
+        rp _
+          = Just rp'
+          where
+              rp' :: Sealed (Id p x)
+              rp' = undefined

@@ -1,7 +1,5 @@
 
 tcfail160.hs:7:8:
-    Kind mis-match
     The first argument of `T' should have kind `* -> *',
-    but `Int' has kind `*'
-    In the type signature for `g':
-      g :: T Int
+      but `Int' has kind `*'
+    In the type signature for `g': g :: T Int

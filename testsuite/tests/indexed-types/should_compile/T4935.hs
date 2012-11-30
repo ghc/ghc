@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, Rank2Types, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies, RankNTypes, ScopedTypeVariables #-}
 module T4935 where
 
 import Control.Applicative

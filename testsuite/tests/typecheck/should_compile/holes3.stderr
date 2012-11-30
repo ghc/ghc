@@ -1,0 +1,26 @@
+
+holes3.hs:7:5:
+    Found hole `_' with type t
+    Where: `t' is a rigid type variable bound by
+               the inferred type of f :: t at holes3.hs:7:1
+    Relevant bindings include f :: t (bound at holes3.hs:7:1)
+    In the expression: _
+    In an equation for `f': f = _
+
+holes3.hs:10:7:
+    Found hole `_' with type Char
+    In the expression: _
+    In an equation for `g': g x = _
+
+holes3.hs:12:5:
+    Found hole `_' with type [Char]
+    In the first argument of `(++)', namely `_'
+    In the expression: _ ++ "a"
+    In an equation for `h': h = _ ++ "a"
+
+holes3.hs:15:15:
+    Found hole `_' with type b0
+    Where: `b0' is an ambiguous type variable
+    In the second argument of `const', namely `_'
+    In the expression: const y _
+    In an equation for `z': z y = const y _

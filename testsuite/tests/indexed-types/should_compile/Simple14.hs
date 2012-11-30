@@ -5,13 +5,13 @@ module Simple14 where
 data EQ_ x y = EQ_
 
 eqE :: EQ_ x y -> (x~y => EQ_ z z) -> p
-eqE = undefined
+eqE = error "eqE"
 
 eqI :: EQ_ x x
-eqI = undefined
+eqI = error "eqI"
 
 ntI :: (forall p. EQ_ x y -> p) -> EQ_ x y
-ntI = undefined
+ntI = error "ntI" 
 
 foo :: forall m n. EQ_ (Maybe m) (Maybe n)
 foo = ntI (`eqE` (eqI :: EQ_ m n))

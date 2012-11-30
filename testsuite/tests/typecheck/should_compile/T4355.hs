@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, ExistentialQuantification, Rank2Types, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, PatternGuards, DatatypeContexts #-}
+{-# LANGUAGE DeriveDataTypeable, ExistentialQuantification, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, PatternGuards, DatatypeContexts #-}
 
 module T4355 where
 
