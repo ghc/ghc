@@ -356,14 +356,16 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
           ; checkCaseAlts e scrut_ty alts
           ; return alt_ty } }
 
+-- This case can't happen; linting types in expressions gets routed through
+-- lintCoreArgs
 lintCoreExpr (Type ty)
-  = do { ty' <- lintInTy ty
-       ; return (typeKind ty') }
+  = pprPanic "lintCoreExpr" (ppr ty)
 
 lintCoreExpr (Coercion co)
   = do { co' <- lintInCo co
        ; let Pair ty1 ty2 = coercionKind co'
        ; return (mkCoercionType ty1 ty2) }
+
 \end{code}
 
 Note [Kind instantiation in coercions]
