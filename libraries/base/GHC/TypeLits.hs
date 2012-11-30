@@ -92,7 +92,7 @@ class SingI a where
   sing :: Sing a
 
 --------------------------------------------------------------------------------
--- | Comparsion of type-level naturals.
+-- | Comparison of type-level naturals.
 class (m <=? n) ~ True => (m :: Nat) <= (n :: Nat)
 instance ((m <=? n) ~ True) => m <= n
 
