@@ -2,6 +2,9 @@
 def f( opts ):
   opts.only_ways = ['normal']
 
+def normaliseArrayPackage(str):
+    return re.sub('array-[0-9]+(\.[0-9]+)*', 'array-<VERSION>', str)
+
 def normaliseBytestringPackage(str):
     return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
 
@@ -28,7 +31,8 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 # and can be changed correctly
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
-      normalise_fun(normaliseBytestringPackage)],
+      two_normalisers(normalise_fun(normaliseArrayPackage),
+                      normalise_fun(normaliseBytestringPackage))],
      run_command, 
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
