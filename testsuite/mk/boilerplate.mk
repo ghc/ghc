@@ -126,6 +126,9 @@ GS = gs
 CP = cp
 RM = rm -f
 PYTHON = python
+ifeq "$(shell $(SHELL) -c 'python2 -c 0' 2> /dev/null && echo exists)" "exists"
+PYTHON = python2
+endif
 
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
