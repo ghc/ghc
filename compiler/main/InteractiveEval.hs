@@ -890,8 +890,8 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
-getInfo name
+getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
+getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
@@ -900,8 +900,10 @@ getInfo name
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
            return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
   where
-    plausible rdr_env ispec     -- Dfun involving only names that are in ic_rn_glb_env
-        = all ok $ nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec
+    plausible rdr_env ispec
+          -- Dfun involving only names that are in ic_rn_glb_env
+        = allInfo
+       || all ok (nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec)
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
           ok n | n == name         = True       -- The one we looked for in the first place!

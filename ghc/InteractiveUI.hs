@@ -155,7 +155,8 @@ ghciCommands = [
   ("forward",   keepGoing forwardCmd,           noCompletion),
   ("help",      keepGoing help,                 noCompletion),
   ("history",   keepGoing historyCmd,           noCompletion),
-  ("info",      keepGoing' info,                completeIdentifier),
+  ("info",      keepGoing' (info False),        completeIdentifier),
+  ("info!",     keepGoing' (info True),         completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
   ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
@@ -237,7 +238,8 @@ defFullHelpText =
   "   :edit                       edit last module\n" ++
   "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
   "   :help, :?                   display this list of commands\n" ++
-  "   :info [<name> ...]          display information about the given names\n" ++
+  "   :info[!] [<name> ...]       display information about the given names\n" ++
+  "                               (!: do not filter instances)\n" ++
   "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
   "   :kind <type>                show the kind of <type>\n" ++
   "   :load [*]<module> ...       load module(s) and their dependents\n" ++
@@ -1006,20 +1008,20 @@ help _ = do
 -----------------------------------------------------------------------------
 -- :info
 
-info :: String -> InputT GHCi ()
-info "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info s  = handleSourceError GHC.printException $ do
+info :: Bool -> String -> InputT GHCi ()
+info _ "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
+info allInfo s  = handleSourceError GHC.printException $ do
     unqual <- GHC.getPrintUnqual
     dflags <- getDynFlags
-    sdocs  <- mapM infoThing (words s)
+    sdocs  <- mapM (infoThing allInfo) (words s)
     mapM_ (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs
 
-infoThing :: GHC.GhcMonad m => String -> m SDoc
-infoThing str = do
+infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
+infoThing allInfo str = do
     dflags    <- getDynFlags
     let pefas = gopt Opt_PrintExplicitForalls dflags
     names     <- GHC.parseName str
-    mb_stuffs <- mapM GHC.getInfo names
+    mb_stuffs <- mapM (GHC.getInfo allInfo) names
     let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map (pprInfo pefas) filtered)
 
@@ -2185,7 +2187,7 @@ showBindings = do
     makeDoc tt = do
         dflags    <- getDynFlags
         let pefas = gopt Opt_PrintExplicitForalls dflags
-        mb_stuff <- GHC.getInfo (getName tt)
+        mb_stuff <- GHC.getInfo False (getName tt)
         return $ maybe (text "") (pprTT pefas) mb_stuff
     pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
     pprTT pefas (thing, fixity, _insts) =
