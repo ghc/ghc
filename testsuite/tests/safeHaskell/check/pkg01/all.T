@@ -31,8 +31,8 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 # and can be changed correctly
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
-      two_normalisers(normalise_fun(normaliseArrayPackage),
-                      normalise_fun(normaliseBytestringPackage))],
+      normalise_fun(two_normalisers(normaliseArrayPackage,
+                                    normaliseBytestringPackage))],
      run_command, 
      ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
