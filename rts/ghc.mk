@@ -194,6 +194,12 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/b
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -l$(LIBFFI_WINDOWS_LIB) `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
+ifneq "$(UseSystemLibFFI)" "YES"
+LIBFFI_LIBS = -Lrts/dist/build -lffi 
+else
+# flags will be taken care of in rts/libs.depend
+LIBFFI_LIBS =
+endif
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_dist_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
