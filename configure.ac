@@ -603,9 +603,6 @@ cygwin32|mingw32)
     ;;
 esac
 
-dnl ** check for Python
-AC_PATH_PROG(PythonCmd,python)
-
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 3.0
@@ -1029,7 +1026,6 @@ echo ["\
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)
    Alex     : $AlexCmd ($AlexVersion)
-   Python   : $PythonCmd
    Perl     : $PerlCmd
    dblatex  : $DblatexCmd
    xsltproc : $XsltprocCmd"]
