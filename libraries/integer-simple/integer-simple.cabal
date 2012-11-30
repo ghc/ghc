@@ -1,5 +1,5 @@
 name:           integer-simple
-version:        0.1.0.1
+version:        0.1.1.0
 -- GHC 7.6.1 released with 0.1.0.1
 license:        BSD3
 license-file:   LICENSE
