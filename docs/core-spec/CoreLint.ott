@@ -115,8 +115,6 @@ G |-ty t : k2
 ---------------------------------------------------- :: Case
 G |-tm case e as z_s return t of </ alti // i /> : t
 
-% Type case of lintCoreExpr omitted because it is irrelevant
-
 G |-co g : t1 ~#k t2
 -------------------- :: Coercion
 G |-tm g : t1 ~#k t2
