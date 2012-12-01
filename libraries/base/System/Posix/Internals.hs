@@ -191,20 +191,26 @@ fdGetMode fd = do
 withFilePath :: FilePath -> (CWString -> IO a) -> IO a
 withFilePath = withCWString
 
+newFilePath :: FilePath -> IO CWString
+newFilePath = newCWString
+
 peekFilePath :: CWString -> IO FilePath
 peekFilePath = peekCWString
 #else
 
 withFilePath :: FilePath -> (CString -> IO a) -> IO a
+newFilePath :: FilePath -> IO CString
 peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
 #if __GLASGOW_HASKELL__
 withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
+newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
 peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
 peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 #else
 withFilePath = withCString
+newFilePath = newCString
 peekFilePath = peekCString
 peekFilePathLen = peekCStringLen
 #endif
