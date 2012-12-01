@@ -114,6 +114,8 @@ import qualified Data.Data as Data hiding ( TyCon )
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.
 
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Coercion 
   -- These ones mirror the shape of types
   = Refl Type  -- See Note [Refl invariant]
@@ -154,6 +156,8 @@ data Coercion
   | InstCo Coercion Type
   deriving (Data.Data, Data.Typeable)
 
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data LeftOrRight = CLeft | CRight 
                  deriving( Eq, Data.Data, Data.Typeable )
 
