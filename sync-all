@@ -300,6 +300,8 @@ sub scmall {
         $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
+            next if $remotepath eq "-"; # "git submodule init/update" will get this later
+
             # Skip any repositories we have not included the tag for
             if (not defined($tags{$tag})) {
                 $tags{$tag} = 0;
