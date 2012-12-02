@@ -34,3 +34,6 @@
 [submodule "libraries/vector"]
 	path = libraries/vector
 	url = http://darcs.haskell.org/libraries/vector.git/
+[submodule "libraries/time"]
+	path = libraries/time
+	url = http://darcs.haskell.org/libraries/time.git/

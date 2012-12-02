@@ -70,6 +70,7 @@ libraries/pretty                -           -                                   
 libraries/process               -           packages/process.git                git
 libraries/template-haskell      -           packages/template-haskell.git       git
 libraries/terminfo              -           -                                   git
+libraries/time                  -           -                                   git
 libraries/transformers          -           -                                   git
 libraries/unix                  -           packages/unix.git                   git
 libraries/Win32                 -           -                                   git
