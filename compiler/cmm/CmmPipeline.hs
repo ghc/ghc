@@ -183,14 +183,15 @@ cpsTop hsc_env proc =
         -- the entry point.
         splitting_proc_points = hscTarget dflags /= HscAsm
                              || not (tablesNextToCode dflags)
-                             || usingInconsistentPicReg -- Note [darwin-x86-pic]
+                             || -- Note [inconsistent-pic-reg]
+                                usingInconsistentPicReg
         usingInconsistentPicReg = ( platformArch platform == ArchX86 ||
                                     platformArch platform == ArchPPC
                                   )
                                && platformOS platform == OSDarwin
                                && gopt Opt_PIC dflags
 
-{- Note [darwin-x86-pic]
+{- Note [inconsistent-pic-reg]
 
 On x86/Darwin, PIC is implemented by inserting a sequence like
 
