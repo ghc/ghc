@@ -773,6 +773,15 @@ sub main {
 
         scmall ($command, @_);
 
+        if ($command eq "get") {
+            &scm(".", "git", "submodule", "init");
+        }
+        if ($command eq "pull") {
+            my $gitConfig = &tryReadFile(".git/config");
+            if ($gitConfig !~ /submodule/) {
+                &scm(".", "git", "submodule", "init");
+            }
+        }
         if ($command eq "get" or $command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
