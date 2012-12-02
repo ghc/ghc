@@ -859,6 +859,20 @@ EOF
         chdir($pwd);
     }
 
+    message "== Checking for old time from tarball";
+    if (! -d "libraries/time/.git") {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old time package in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/time"), and then run
+"./sync-all get" to get the new repository.
+============================
+EOF
+    }
+
     $? = $ec;
 }
 
