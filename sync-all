@@ -869,7 +869,7 @@ EOF
     }
 
     message "== Checking for old time from tarball";
-    if (! -d "libraries/time/.git") {
+    if (! -e "libraries/time/.git") {
             print <<EOF;
 ============================
 ATTENTION!
