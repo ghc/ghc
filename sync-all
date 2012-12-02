@@ -379,7 +379,16 @@ sub scmall {
             scm ($localpath, $scm, "push", @args);
         }
         elsif ($command eq "pull") {
-            scm ($localpath, $scm, "pull", @args);
+            my $realcmd;
+            if ($remotepath eq "-") {
+                # Only fetch for the submodules. "git submodule update"
+                # will take care of making us point to the right commit.
+                $realcmd = "fetch";
+            }
+            else {
+                $realcmd = "pull";
+            }
+            scm ($localpath, $scm, $realcmd, @args);
         }
         elsif ($command eq "new-workdir") {
             gitNewWorkdir ($localpath, @args);
