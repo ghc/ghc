@@ -107,8 +107,8 @@ threadWaitSTM evt fd = mask_ $ do
         do mevt <- readTVar m
            case mevt of
              Nothing -> retry
-             Just evt -> 
-               if evt `eventIs` evtClose
+             Just evt' ->
+               if evt' `eventIs` evtClose
                then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
                else return ()
   return (waitAction, unregisterFd_ mgr reg >> return ())
