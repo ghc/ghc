@@ -380,15 +380,19 @@ sub scmall {
         }
         elsif ($command eq "pull") {
             my $realcmd;
+            my @realargs;
             if ($remotepath eq "-") {
                 # Only fetch for the submodules. "git submodule update"
                 # will take care of making us point to the right commit.
                 $realcmd = "fetch";
+                # we like "sync-all pull --rebase" to work:
+                @realargs = grep(!/--rebase/,@args);
             }
             else {
                 $realcmd = "pull";
+                @realargs = @args;
             }
-            scm ($localpath, $scm, $realcmd, @args);
+            scm ($localpath, $scm, $realcmd, @realargs);
         }
         elsif ($command eq "new-workdir") {
             gitNewWorkdir ($localpath, @args);
