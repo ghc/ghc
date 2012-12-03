@@ -935,6 +935,15 @@ runTcSWithEvBinds ev_binds_var tcs
        ; inert_var <- TcM.newTcRef is 
        ; wl_var <- TcM.newTcRef wl
 
+       -- The "low end" of the untouchable range should come from the
+       -- ambient tcl_untch; the high end is the highest allocated to
+       -- date. 'untouch' used (in 7.6.1, entirely wrongly) to be
+       -- set to NoUntouchables, causing #7453.
+       -- All this is done much better in 7.8.
+       ; tc_lenv <- TcM.getLclEnv
+       ; tcm_high <- TcM.readTcRef (tcl_meta tc_lenv)
+       ; let untouch = TouchableRange tcm_low tcm_high
+             tcm_low = tcl_untch tc_lenv
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
                           , tcs_untch    = (untouch, emptyVarSet) -- No Tcs untouchables yet
@@ -960,7 +969,6 @@ runTcSWithEvBinds ev_binds_var tcs
        ; return res }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
-    untouch = NoUntouchables
     is = emptyInert
     wl = emptyWorkList
     
