@@ -1321,22 +1321,34 @@ warnUnusedImportDecls gbl_env
         -- it just doesn't seem worth it
 \end{code}
 
+
+Note [The ImportMap]
+~~~~~~~~~~~~~~~~~~~~
+The ImportMap is a short-lived intermediate data struture records, for
+each import declaration, what stuff brought into scope by that
+declaration is actually used in the module.
+
+The SrcLoc is the location of the END of a particular 'import'
+declaration.  Why *END*?  Becuase we don't want to get confused
+by the implicit Prelude import. Consider (Trac #7476) the module
+    import Foo( foo )
+    main = print foo
+There is an implicit 'import Prelude(print)', and it gets a SrcSpan
+of line 1:1 (just the point, not a span). If we use the *START* of
+the SrcSpan to identify the import decl, we'll confuse the implicit
+import Prelude with the explicit 'import Foo'.  So we use the END.
+It's just a cheap hack; we could equally well use the Span too.
+
+The AvailInfos are the things imported from that decl (just a list,
+not normalised).
+
 \begin{code}
+type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
+
 findImportUsage :: [LImportDecl Name]
                 -> GlobalRdrEnv
                 -> [RdrName]
                 -> [ImportDeclUsage]
-
-type ImportMap = Map SrcLoc [AvailInfo]
--- The intermediate data struture records, for each import
--- declaration, what stuff brought into scope by that
--- declaration is actually used in the module.
---
--- The SrcLoc is the location of the start
--- of a particular 'import' declaration
---
--- The AvailInfos are the things imported from that decl
--- (just a list, not normalised)
 
 findImportUsage imports rdr_env rdrs
   = map unused_decl imports
@@ -1347,7 +1359,8 @@ findImportUsage imports rdr_env rdrs
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, nubAvails used_avails, unused_imps)
       where
-        used_avails = Map.lookup (srcSpanStart loc) import_usage `orElse` []
+        used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
+                      -- srcSpanEnd: see Note [The ImportMap]
         dont_report_as_unused = foldr add emptyNameSet used_avails
         add (Avail n) s = s `addOneToNameSet` n
         add (AvailTC n ns) s = s `addListToNameSet` (n:ns)
@@ -1380,7 +1393,8 @@ extendImportMap rdr_env rdr imp_map
       = Map.insertWith add decl_loc [avail] imp_map
       where
         add _ avails = avail : avails -- add is really just a specialised (++)
-        decl_loc = srcSpanStart (is_dloc imp_decl_spec)
+        decl_loc = srcSpanEnd (is_dloc imp_decl_spec)
+                   -- For srcSpanEnd see Note [The ImportMap]
         name     = gre_name gre
         avail    = case gre_par gre of
                       ParentIs p                  -> AvailTC p [name]
