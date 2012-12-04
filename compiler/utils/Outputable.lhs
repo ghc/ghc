@@ -898,7 +898,8 @@ plural _   = char 's'
 
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = panicDoc
+pprPanic s doc
+ = throwGhcException (Panic (s ++ "\n" ++ showSDoc unsafeGlobalDynFlags doc))
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"
