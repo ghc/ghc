@@ -1465,7 +1465,7 @@ bcIdUnaryType x = case repType (idType x) of
 -- See bug #1257
 unboxedTupleException :: a
 unboxedTupleException
-   = ghcError
+   = throwGhcException
         (ProgramError
            ("Error: bytecode compiler can't handle unboxed tuples.\n"++
             "  Possibly due to foreign import/export decls in source.\n"++

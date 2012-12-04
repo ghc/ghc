@@ -86,6 +86,61 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 
+# system libffi
+
+AC_ARG_WITH([system-libffi],
+[AC_HELP_STRING([--with-system-libffi],
+  [Use system provided libffi for RTS [default=no]])
+])
+
+AS_IF([test "x$with_system_libffi" = "xyes"],
+  [UseSystemLibFFI="YES"], [UseSystemLibFFI="NO"]
+)
+
+
+AC_SUBST(UseSystemLibFFI)
+
+AC_ARG_WITH([ffi-includes],
+[AC_HELP_STRING([--with-ffi-includes=ARG]
+  [Find includes for libffi in ARG [default=system default]])
+],
+[
+ if test "x$UseSystemLibFFI" != "xYES"; then
+    AC_MSG_WARN([--with-ffi-includes will be ignored, --with-system-libffi not set])
+ else
+    FFIIncludeDir="$withval"
+    LIBFFI_CFLAGS="-I $withval" 
+ fi
+])
+
+AC_SUBST(FFIIncludeDir)
+
+AC_ARG_WITH([ffi-libraries],
+[AC_HELP_STRING([--with-ffi-libraries=ARG]
+  [Find libffi in ARG [default=system default]])
+],
+[
+ if test "x$UseSystemLibFFI" != "xYES"; then
+    AC_MSG_WARN([--with-ffi-libraries will be ignored, --with-system-libffi not set])
+ else
+    FFILibDir="$withval" LIBFFI_LDFLAGS="-L$withval"
+ fi
+])
+
+AC_SUBST(FFILibDir)
+
+AS_IF([test "$UseSystemLibFFI" = "YES"], [
+ CFLAGS2="$CFLAGS"
+ CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
+ LDFLAGS2="$LDFLAGS"
+ LDFLAGS="$LIBFFI_LDFLAGS $LDFLAGS"
+ AC_CHECK_LIB(ffi, ffi_call,
+  [AC_CHECK_HEADERS([ffi.h], [break], [])
+   AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],
+  [AC_MSG_ERROR([Cannot find system libffi])])
+ CFLAGS="$CFLAGS2"
+ LDFLAGS="$LDFLAGS2"
+])
 
 dnl ** Tell the make system which OS we are using
 dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
@@ -548,9 +603,6 @@ cygwin32|mingw32)
     ;;
 esac
 
-dnl ** check for Python
-AC_PATH_PROG(PythonCmd,python)
-
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 3.0
@@ -974,7 +1026,6 @@ echo ["\
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)
    Alex     : $AlexCmd ($AlexVersion)
-   Python   : $PythonCmd
    Perl     : $PerlCmd
    dblatex  : $DblatexCmd
    xsltproc : $XsltprocCmd"]

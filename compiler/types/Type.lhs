@@ -805,6 +805,8 @@ applyTys :: Type -> [KindOrType] -> Type
 -- This term should have type (Int -> Int), but notice that
 -- there are more type args than foralls in 'undefined's type.
 
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 applyTys ty args = applyTysD empty ty args
 
 applyTysD :: SDoc -> Type -> [Type] -> Type	-- Debug version

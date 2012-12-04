@@ -380,6 +380,13 @@ GhcRtsWithPapi = NO
 PapiLibDir=
 PapiIncludeDir=
 
+# Configuration for libffi
+UseSystemLibFFI=@UseSystemLibFFI@
+# Flags to go into package.conf for rts
+FFILibDir=@FFILibDir@
+FFIIncludeDir=@FFIIncludeDir@
+
+
 ################################################################################
 #
 #		Paths (see paths.mk)
@@ -708,7 +715,6 @@ LN_S			= @LN_S@
 MV			= mv
 NROFF			= nroff
 PERL 			= @PerlCmd@
-PYTHON			= @PythonCmd@
 PIC			= pic
 RANLIB			= @RANLIB@
 SED			= @SedCmd@

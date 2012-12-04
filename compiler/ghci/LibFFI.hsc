@@ -8,13 +8,6 @@
 
 #include <ffi.h>
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSp
--- for details
-
 module LibFFI (
   ForeignCallToken,
   prepForeignCall
@@ -23,12 +16,11 @@ module LibFFI (
 import TyCon
 import ForeignCall
 import Panic
--- import Outputable
 import DynFlags
 
+import Control.Monad
 import Foreign
 import Foreign.C
-import Text.Printf
 
 ----------------------------------------------------------------------------
 
@@ -45,17 +37,17 @@ prepForeignCall dflags cconv arg_types result_type
   = do
     let n_args = length arg_types
     arg_arr <- mallocArray n_args
-    let init_arg (ty,n) = pokeElemOff arg_arr n (primRepToFFIType dflags ty)
-    mapM_ init_arg (zip arg_types [0..])
+    let init_arg ty n = pokeElemOff arg_arr n (primRepToFFIType dflags ty)
+    zipWithM_ init_arg arg_types [0..]
     cif <- mallocBytes (#const sizeof(ffi_cif))
     let abi = convToABI cconv
     let res_ty = primRepToFFIType dflags result_type
     r <- ffi_prep_cif cif abi (fromIntegral n_args) res_ty arg_arr
     if (r /= fFI_OK)
-       then ghcError (InstallationError 
-                        (printf "prepForeignCallFailed: %d" (show r)))
+       then throwGhcException (InstallationError
+                                   ("prepForeignCallFailed: " ++ show r))
        else return cif
-    
+
 convToABI :: CCallConv -> C_ffi_abi
 convToABI CCallConv   = fFI_DEFAULT_ABI
 #if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
@@ -69,7 +61,7 @@ primRepToFFIType :: DynFlags -> PrimRep -> Ptr C_ffi_type
 primRepToFFIType dflags r
   = case r of
      VoidRep     -> ffi_type_void
-     IntRep	 -> signed_word
+     IntRep      -> signed_word
      WordRep     -> unsigned_word
      Int64Rep    -> ffi_type_sint64
      Word64Rep   -> ffi_type_uint64
@@ -118,10 +110,10 @@ fFI_STDCALL     = (#const FFI_STDCALL)
 #endif
 
 -- ffi_status ffi_prep_cif(ffi_cif *cif,
--- 			ffi_abi abi,
--- 			unsigned int nargs,
--- 			ffi_type *rtype,
--- 			ffi_type **atypes);
+--                         ffi_abi abi,
+--                         unsigned int nargs,
+--                         ffi_type *rtype,
+--                         ffi_type **atypes);
 
 foreign import ccall "ffi_prep_cif"
   ffi_prep_cif :: Ptr C_ffi_cif         -- cif
@@ -134,9 +126,9 @@ foreign import ccall "ffi_prep_cif"
 -- Currently unused:
 
 -- void ffi_call(ffi_cif *cif,
--- 	      void (*fn)(),
--- 	      void *rvalue,
--- 	      void **avalue);
+--               void (*fn)(),
+--               void *rvalue,
+--               void **avalue);
 
 -- foreign import ccall "ffi_call"
 --   ffi_call :: Ptr C_ffi_cif             -- cif

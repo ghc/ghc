@@ -300,6 +300,8 @@ sub scmall {
         $path = "$repo_base/$remotepath";
 
         if ($command eq "get") {
+            next if $remotepath eq "-"; # "git submodule init/update" will get this later
+
             # Skip any repositories we have not included the tag for
             if (not defined($tags{$tag})) {
                 $tags{$tag} = 0;
@@ -377,7 +379,20 @@ sub scmall {
             scm ($localpath, $scm, "push", @args);
         }
         elsif ($command eq "pull") {
-            scm ($localpath, $scm, "pull", @args);
+            my $realcmd;
+            my @realargs;
+            if ($remotepath eq "-") {
+                # Only fetch for the submodules. "git submodule update"
+                # will take care of making us point to the right commit.
+                $realcmd = "fetch";
+                # we like "sync-all pull --rebase" to work:
+                @realargs = grep(!/--rebase/,@args);
+            }
+            else {
+                $realcmd = "pull";
+                @realargs = @args;
+            }
+            scm ($localpath, $scm, $realcmd, @realargs);
         }
         elsif ($command eq "new-workdir") {
             gitNewWorkdir ($localpath, @args);
@@ -762,6 +777,15 @@ sub main {
 
         scmall ($command, @_);
 
+        if ($command eq "get") {
+            &scm(".", "git", "submodule", "init");
+        }
+        if ($command eq "pull") {
+            my $gitConfig = &tryReadFile(".git/config");
+            if ($gitConfig !~ /submodule/) {
+                &scm(".", "git", "submodule", "init");
+            }
+        }
         if ($command eq "get" or $command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
@@ -846,6 +870,20 @@ Please remove it (e.g. "rm -r libraries/Cabal"), and then run
 EOF
         }
         chdir($pwd);
+    }
+
+    message "== Checking for old time from tarball";
+    if (! -e "libraries/time/.git") {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old time package in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/time"), and then run
+"./sync-all get" to get the new repository.
+============================
+EOF
     }
 
     $? = $ec;

@@ -107,8 +107,10 @@ $(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
 endif
 
 ifneq "$(BINDIST)" "YES"
+ifneq "$(UseSystemLibFFI)" "YES"
 rts_ffi_objs_stamp = rts/dist/ffi/stamp
 rts_ffi_objs       = rts/dist/ffi/*.o
+
 $(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) $(TOUCH_DEP) | $$(dir $$@)/.
 	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
 	"$(TOUCH_CMD)" $@
@@ -120,6 +122,7 @@ rts/dist/build/libffi$(soext): libffi/build/inst/lib/libffi$(soext)
 
 rts/dist/build/$(LIBFFI_DLL): libffi/build/inst/bin/$(LIBFFI_DLL)
 	cp $< $@
+endif
 endif
 
 #-----------------------------------------------------------------------------
@@ -177,6 +180,12 @@ endif
 
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
+ifneq "$(UseSystemLibFFI)" "YES"
+rts_dist_FFI_SO = rts/dist/build/libffi$(soext)
+else
+rts_dist_FFI_SO =
+endif
+
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32" 
@@ -185,10 +194,16 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/b
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -l$(LIBFFI_WINDOWS_LIB) `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend rts/dist/build/libffi$$(soext)
+ifneq "$(UseSystemLibFFI)" "YES"
+LIBFFI_LIBS = -Lrts/dist/build -lffi 
+else
+# flags will be taken care of in rts/libs.depend
+LIBFFI_LIBS =
+endif
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_dist_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages -Lrts/dist/build -lffi `cat rts/libs.depend` $$(rts_$1_OBJS) \
+	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/libs.depend` $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 endif
 else
@@ -377,10 +392,16 @@ rts/dist/build/AutoApply_HC_OPTS += -fno-PIC -static
 endif
 endif
 
+# add CFLAGS for libffi
 # ffi.h triggers prototype warnings, so disable them here:
-rts/Interpreter_CC_OPTS += -Wno-strict-prototypes
-rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes
-rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes
+ifeq "$(UseSystemLibFFI)" "YES"
+LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
+else
+LIBFFI_CFLAGS =
+endif
+rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 
 # inlining warnings happen in Compact
 rts/sm/Compact_CC_OPTS += -Wno-inline
@@ -438,6 +459,21 @@ rts_PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=""
 
 endif
 
+#-----------------------------------------------------------------------------
+# Use system provided libffi
+
+ifeq "$(UseSystemLibFFI)" "YES"
+
+rts_PACKAGE_CPP_OPTS    += -DFFI_INCLUDE_DIR=$(FFIIncludeDir)
+rts_PACKAGE_CPP_OPTS    += -DFFI_LIB_DIR=$(FFILibDir)
+
+else # UseSystemLibFFI==YES
+
+rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=""
+rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=""
+
+endif
+
 # -----------------------------------------------------------------------------
 # dependencies
 
@@ -463,7 +499,10 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
-$(rts_dist_depfile_c_asm) : $(libffi_HEADERS) $(DTRACEPROBES_H)
+$(rts_dist_depfile_c_asm) : $(DTRACEPROBES_H)
+ifneq "$(UseSystemLibFFI)" "YES"
+$(rts_dist_depfile_c_asm) : $(libffi_HEADERS)
+endif
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
@@ -515,7 +554,9 @@ RTS_INSTALL_LIBS += $(ALL_RTS_LIBS)
 RTS_INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
 RTS_INSTALL_LIBS += $(wildcard rts/dist/build/$(LIBFFI_DLL))
 
+ifneq "$(UseSystemLibFFI)" "YES"
 install: install_libffi_headers
+endif
 
 .PHONY: install_libffi_headers
 install_libffi_headers :

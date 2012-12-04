@@ -10,7 +10,7 @@ some unnecessary loops in the module dependency graph.
 \begin{code}
 module Panic (
      GhcException(..), showGhcException, throwGhcException, handleGhcException,
-     ghcError, progName,
+     progName,
      pgmError,
 
      panic, sorry, panicFastInt, assertPanic, trace,
@@ -172,10 +172,6 @@ showGhcException exception
                 ExitSuccess   -> (0::Int)
                 ExitFailure x -> x
 
-
--- | Alias for `throwGhcException`
-ghcError :: GhcException -> a
-ghcError e = Exception.throw e
 
 throwGhcException :: GhcException -> a
 throwGhcException = Exception.throw

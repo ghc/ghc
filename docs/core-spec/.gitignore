@@ -1,0 +1,5 @@
+*.aux
+*.log
+*.fdb_latexmk
+CoreOtt.tex
+core-spec.tex
