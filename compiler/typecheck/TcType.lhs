@@ -447,6 +447,7 @@ uf will get unified *once more* to (F Int).
 
 \begin{code}
 newtype Untouchables = Untouchables Int
+  -- See Note [Untouchable type variables] for what this Int is
 
 noUntouchables :: Untouchables
 noUntouchables = Untouchables 0   -- 0 = outermost level
