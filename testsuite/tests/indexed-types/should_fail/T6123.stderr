@@ -1,10 +1,11 @@
 
 T6123.hs:10:14:
-    Couldn't match expected type `a0' with actual type `Id a0'
+    Occurs check: cannot construct the infinite type: a0 ~ Id a0
     The type variable `a0' is ambiguous
-    Possible cause: the monomorphism restriction applied to the following:
-      cundefined :: a0 (bound at T6123.hs:10:1)
+    Possible cause: the monomorphism restriction applied to:
+      `cundefined'
     Probable fix: give these definition(s) an explicit type signature
                   or use -XNoMonomorphismRestriction
+    Relevant bindings include cundefined :: a0 (bound at T6123.hs:10:1)
     In the expression: cid undefined
     In an equation for `cundefined': cundefined = cid undefined

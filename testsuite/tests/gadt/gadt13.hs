@@ -2,6 +2,9 @@
 
 -- This should fail, because there is no annotation on shw,
 -- but it succeeds in 6.4.1
+--
+-- It fails again with 7.8 because Outside in doesn't
+-- unify under an equality constraint
 
 module ShouldFail where
 

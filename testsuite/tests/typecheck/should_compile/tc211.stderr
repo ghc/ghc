@@ -1,6 +1,6 @@
 
 tc211.hs:15:22:
-    Couldn't match type `forall a1. a1 -> a1' with `a -> a'
+    Couldn't match type `forall a6. a6 -> a6' with `a -> a'
     Expected type: [a -> a]
       Actual type: [forall a. a -> a]
     In the first argument of `head', namely `foo'
@@ -14,9 +14,9 @@ tc211.hs:15:22:
         (head foo) foo
 
 tc211.hs:70:9:
-    Couldn't match type `forall a1. a1 -> a1' with `a -> a'
+    Couldn't match type `forall a7. a7 -> a7' with `a6 -> a6'
     Expected type: List (forall a. a -> a)
-                   -> (forall a. a -> a) -> a -> a
+                   -> (forall a. a -> a) -> a6 -> a6
       Actual type: List (forall a. a -> a)
                    -> (forall a. a -> a) -> forall a. a -> a
     In the expression:

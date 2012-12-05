@@ -1,0 +1,14 @@
+#include "Cmm.h"
+
+// Check that we propagate the constants into the branch
+callMemcpy (W_ dst, W_ src)
+{
+    W_ size;
+    W_ alig;
+    size = 16;
+    alig = 4;
+    if (dst != 0) {
+      prim %memcpy(dst, src, size, alig);
+    }
+    return ();
+}

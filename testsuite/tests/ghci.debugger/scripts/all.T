@@ -35,7 +35,10 @@ test('print031', normal, ghci_script, ['print031.script'])
 test('print032', normal, ghci_script, ['print032.script'])
 test('print033', normal, ghci_script, ['print033.script'])
 test('print034', normal, ghci_script, ['print034.script'])
-test('print035', normal, ghci_script, ['print035.script'])
+test('print035',
+     if_ghci_dynamic(expect_broken(7326)),
+     ghci_script,
+     ['print035.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])
@@ -83,3 +86,4 @@ test('hist001', normal, ghci_script, ['hist001.script'])
 test('2740', normal, ghci_script, ['2740.script'])
 
 test('getargs', normal, ghci_script, ['getargs.script'])
+test('T7386', normal, ghci_script, ['T7386.script'])

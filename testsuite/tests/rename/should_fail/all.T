@@ -36,7 +36,6 @@ test('rnfail035', normal, compile_fail, [''])
 # Missing:
 # test('rnfail037', normal, compile_fail, [''])
 
-test('rnfail038', normal, compile_fail, [''])
 test('rnfail039', normal, compile_fail, [''])
 
 test('rnfail040',
@@ -104,3 +103,6 @@ test('T5892b', normal, compile_fail, [''])
 test('T5951', normal, compile_fail, [''])
 test('T6060', normal, compile_fail, [''])
 test('T6148', normal, compile_fail, [''])
+test('T7164', normal, compile_fail, [''])
+test('T7338', normal, compile_fail, [''])
+test('T7338a', normal, compile_fail, [''])

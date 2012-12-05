@@ -1,5 +1,5 @@
 
-{-# OPTIONS_GHC -XPolymorphicComponents #-}
+{-# LANGUAGE RankNTypes #-}
 
 module ShouldCompile where
 

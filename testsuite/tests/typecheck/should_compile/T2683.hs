@@ -1,5 +1,5 @@
 {-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses,
-             FunctionalDependencies, Rank2Types #-}
+             FunctionalDependencies, RankNTypes #-}
 
 module Q where
 
@@ -9,10 +9,10 @@ class Transformer t a | t -> a where
 data EL a = forall l. EL (l a)
 
 unEL :: EL a -> (forall l. l a -> b) -> b
-unEL = undefined
+unEL = error "unEL"
 
 transform' :: (Transformer t a) => t -> EL a -> EL a
-transform' = undefined
+transform' = error "transform'"
 
 data MultiToggleS ts a = MultiToggleS ts
 

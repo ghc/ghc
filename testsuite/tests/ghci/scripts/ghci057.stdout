@@ -40,6 +40,7 @@ base language is: Haskell2010
 with the following modifiers:
   -XGADTs
   -XGADTSyntax
+  -XNoMonomorphismRestriction
   -XNoDatatypeContexts
   -XNondecreasingIndentation
   -XMonoLocalBinds

@@ -1,8 +1,4 @@
 
-rn066.hs:10:3: Warning:
-    In the use of `op' (imported from Rn066_A):
-    "Is that really a good idea?"
-
 rn066.hs:13:7: Warning:
     In the use of `op' (imported from Rn066_A):
     "Is that really a good idea?"

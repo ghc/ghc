@@ -1,5 +1,5 @@
 local01.package.conf:
-
+    (no packages)
 Reading package info from "test.pkg" ... done.
 name: testpkg
 version: 1.2.3.4
@@ -219,5 +219,5 @@ haddock-html:
 pkgroot: 
 
 local01.package.conf:
-
+    (no packages)
 Reading package info from "test3.pkg" ... done.

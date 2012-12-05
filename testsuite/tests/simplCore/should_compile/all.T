@@ -35,6 +35,7 @@ test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
 test('rule2', only_ways(['optasm']), compile, ['-dsuppress-uniques'])
+test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
@@ -149,3 +150,9 @@ test('T4138',
      ['$MAKE -s --no-print-directory T4138'])
 test('T7088', normal, compile, [''])
 test('T6082-RULE', normal, compile, [''])
+test('T7165',
+     extra_clean(['T7165a.hi', 'T7165a.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7165'])
+test('T7287', normal, compile, [''])
+

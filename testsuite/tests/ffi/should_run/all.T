@@ -212,3 +212,10 @@ test('capi_value',
      ['capi_value_c.c'])
 
 test('7170', exit_code(1), compile_and_run, [''])
+
+test('T4012',
+     [extra_clean(['T4012_A.hi', 'T4012_A.o', 'T4012_B.hi', 'T4012_B.o']),
+      expect_broken_for(7388, ['ghci'])],
+     multimod_compile_and_run,
+     ['T4012', ''])
+

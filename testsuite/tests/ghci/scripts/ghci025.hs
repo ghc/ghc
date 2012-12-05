@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes, MultiParamTypeClasses #-}
 
 module T where
 

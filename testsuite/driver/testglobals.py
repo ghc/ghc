@@ -78,6 +78,9 @@ class TestConfig:
         self.way_flags = {}
         self.way_rts_flags = {}
 
+        # Do we have vanilla libraries?
+        self.have_vanilla = False
+
         # Do we have profiling support?
         self.have_profiling = False
 
@@ -231,6 +234,9 @@ class TestOptions:
        self.objc_src   = 0
        self.objcpp_src = 0
 
+       # Should we put .hi/.o files in a subdirectory?
+       self.outputdir = None
+
        # Command to run before the test
        self.pre_cmd = None
 
@@ -254,6 +260,9 @@ class TestOptions:
 
        # Should we redirect stdout and stderr to a single file?
        self.combined_output = False
+
+       # How should the timeout be adjusted on this test?
+       self.timeout_multiplier = 1.0
 
 # The default set of options
 global default_testopts

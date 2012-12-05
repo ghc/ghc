@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, Rank2Types #-}
+{-# LANGUAGE TypeFamilies, RankNTypes #-}
 
 
 module ShouldFail where

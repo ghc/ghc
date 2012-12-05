@@ -8,4 +8,5 @@ module ShouldFail where
 
 f x = True
 
-h v = (f 3#, f 4.3#, f True)
+h v = f 3#
+-- h v = (f 3#, f 4.3#, f True)

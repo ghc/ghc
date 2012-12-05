@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
 -- Test the handling of conditionals in rank-n stuff
 -- Should fail, regardless of branch ordering

@@ -26,11 +26,19 @@ config.other_ways         = ['extcore','optextcore',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'threaded1_ls', 'threaded2_hT',
-                             'llvm', 'debugllvm' ]
+                             'llvm', 'debugllvm',
+                             'profllvm', 'profoptllvm', 'profthreadedllvm',
+                             'threaded1llvm', 'threaded2llvm',
+                             'dynllvm']
 
 if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
     config.run_ways.append('optasm')
+
+config.compiler_debugged = ghc_debugged
+
+if (ghc_with_vanilla == 1):
+    config.have_vanilla = True
 
 if (ghc_with_profiling == 1):
     config.have_profiling = True
@@ -51,7 +59,13 @@ if (ghc_with_threaded_rts == 1):
 
 if (ghc_with_dynamic_rts == 1):
     config.have_shared_libs = True
-    config.run_ways.append('dyn')
+
+config.ghc_dynamic_by_default = ghc_dynamic_by_default
+if ghc_dynamic_by_default and ghc_with_vanilla == 1:
+    config.run_ways.append('static')
+else:
+    if (ghc_with_dynamic_rts == 1):
+        config.run_ways.append('dyn')
 
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
@@ -70,9 +84,9 @@ config.way_flags = {
     'llvm'         : ['-fllvm'],
     'optllvm'      : ['-O', '-fllvm'],
     'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
-    'prof'         : ['-prof', '-auto-all', '-fasm'],
-    'profasm'      : ['-O', '-prof', '-auto-all'],
-    'profthreaded' : ['-O', '-prof', '-auto-all', '-threaded'],
+    'prof'         : ['-prof', '-static', '-auto-all', '-fasm'],
+    'profasm'      : ['-O', '-prof', '-static', '-auto-all'],
+    'profthreaded' : ['-O', '-prof', '-static', '-auto-all', '-threaded'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
     'extcore'      : ['-fext-core'],
     'optextcore'   : ['-O', '-fext-core'],
@@ -81,12 +95,20 @@ config.way_flags = {
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
     'threaded2_hT' : ['-O', '-threaded'],
     'hpc'          : ['-O', '-fhpc' ],
-    'prof_hc_hb'   : ['-O', '-prof', '-auto-all'],
-    'prof_hb'      : ['-O', '-prof', '-auto-all'],
-    'prof_hd'      : ['-O', '-prof', '-auto-all'],
-    'prof_hy'      : ['-O', '-prof', '-auto-all'],
-    'prof_hr'      : ['-O', '-prof', '-auto-all'],
-    'dyn'          : ['-O', '-dynamic']
+    'prof_hc_hb'   : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hb'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hd'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hy'      : ['-O', '-prof', '-static', '-auto-all'],
+    'prof_hr'      : ['-O', '-prof', '-static', '-auto-all'],
+    'dyn'          : ['-O', '-dynamic'],
+    'static'       : ['-O', '-static'],
+    # llvm variants...
+    'profllvm'         : ['-prof', '-static', '-auto-all', '-fllvm'],
+    'profoptllvm'      : ['-O', '-prof', '-static', '-auto-all', '-fllvm'],
+    'profthreadedllvm' : ['-O', '-prof', '-static', '-auto-all', '-threaded', '-fllvm'],
+    'threaded1llvm'    : ['-threaded', '-debug', '-fllvm'],
+    'threaded2llvm'    : ['-O', '-threaded', '-eventlog', '-fllvm'],
+    'dynllvm'          : ['-O', '-dynamic', '-fllvm']
    }
 
 config.way_rts_flags = { 
@@ -112,7 +134,15 @@ config.way_rts_flags = {
     'prof_hd'      : ['-hd'],
     'prof_hy'      : ['-hy'],
     'prof_hr'      : ['-hr'],
-    'dyn'          : []
+    'dyn'          : [],
+    'static'       : [],
+    # llvm variants...
+    'profllvm'         : ['-p'],
+    'profoptllvm'      : ['-hc', '-p'],
+    'profthreadedllvm' : ['-p'],
+    'threaded1llvm'    : [],
+    'threaded2llvm'    : ['-N2 -ls'],
+    'dynllvm'          : []
    }
 
 # Useful classes of ways that can be used with only_ways() and

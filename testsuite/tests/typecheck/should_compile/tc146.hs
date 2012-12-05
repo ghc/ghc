@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- The interesting thign about this one is that
 -- there's an unbound type variable of kind *->*

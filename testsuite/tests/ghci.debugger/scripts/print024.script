@@ -3,7 +3,7 @@
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
 :l ../Test
 
-let a = MkT 1
+let a = MkT (1 :: Integer)
 seq a ()
 :p a
 a

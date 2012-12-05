@@ -16,7 +16,7 @@ elif config.platform.startswith('sparc-'):
 
 if testFile != 'nothing':
  test   ('dph-smvm-copy'
-        , [ alone
+        , [ outputdir('copy')
           , skip_if_fast
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
@@ -28,7 +28,7 @@ if testFile != 'nothing':
           , '-Odph -package dph-lifted-copy -package dph-prim-par'])
 
  test   ('dph-smvm-vseg'
-        , [ alone
+        , [ outputdir('vseg')
           , skip_if_fast
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')

@@ -1,5 +1,5 @@
 :load break026
-:step foldl (+) 0 [1..5]
+:step foldl (+) 0 [1::Integer .. 5]
 :step
 :step
 :step
@@ -9,7 +9,7 @@
         -- answer should be 1
 
 :load break026
-:step foldl (+) 0 [1..5]
+:step foldl (+) 0 [1::Integer .. 5]
 :step
 :step
 :step

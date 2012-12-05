@@ -1,1 +1,1 @@
-exists Nothing :: Existential (Maybe *) kp
+exists Nothing :: Existential (Maybe *) mp

@@ -35,7 +35,7 @@ prep:
 
 prep.%:
 	cd $* && "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -v0 --make -o setup Setup.hs
-	cd $* && ./setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
+	cd $* && ./setup configure $(CABAL_MINIMAL_BUILD) -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
 	cd $* && ./setup build -v0
 	cd $* && ./setup register -v0 --inplace
 

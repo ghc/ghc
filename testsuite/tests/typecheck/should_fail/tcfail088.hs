@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, FlexibleInstances #-}
+{-# LANGUAGE RankNTypes, FlexibleInstances #-}
 
 -- !!! Check that forall types can't be arguments
 module ShouldFail where

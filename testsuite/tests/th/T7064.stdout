@@ -19,8 +19,8 @@ instance GHC.Classes.Eq a_0 => GHC.Classes.Eq (T_1 a_0)
     GHC.Real.fromIntegral
     = GHC.Base.id :: forall a_0 . a_0 -> a_0 #-}
 {-# RULES "rule2" [1]
-    forall (x_1627391611 :: a_1627391612) . GHC.Real.fromIntegral x_1627391611
-    = x_1627391611 #-}
+    forall (x_0 :: a_1) . GHC.Real.fromIntegral x_0
+    = x_0 #-}
 {-# RULES "rule3" [~1]
-    forall (x_1627391609 :: a_1627391610) . GHC.Real.fromIntegral x_1627391609
-    = x_1627391609 #-}
+    forall (x_0 :: a_1) . GHC.Real.fromIntegral x_0
+    = x_0 #-}

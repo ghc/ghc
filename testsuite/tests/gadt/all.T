@@ -11,12 +11,12 @@ test('gadt3', normal, compile, [''])
 test('gadt4', skip_if_fast, compile_and_run, [''])
 test('gadt5', skip_if_fast, compile_and_run, [''])
 test('gadt6', normal, compile, [''])
-test('gadt7', normal, compile, [''])
+test('gadt7', normal, compile_fail, [''])
 test('gadt8', normal, compile, [''])
 test('gadt9', normal, compile, [''])
 test('gadt10', normal, compile_fail, [''])
 test('gadt11', normal, compile_fail, [''])
-test('gadt13', normal, compile, [''])
+test('gadt13', normal, compile_fail, [''])
 test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
@@ -73,7 +73,7 @@ test('data2', normal, compile, [''])
 test('termination', normal, compile, [''])
 test('set', normal, compile, [''])
 test('scoped', normal, compile, [''])
-test('gadt-escape1', normal, compile, [''])
+test('gadt-escape1', normal, compile_fail, [''])
 
 # New ones from Dimitrios
 
@@ -91,7 +91,7 @@ test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
 test('T1999', normal, compile, [''])
-test('T1999a', expect_broken(1999), compile, [''])
+test('T1999a', normal, compile, [''])
 
 test('T2587', normal, compile, [''])
 test('T2040', normal, compile, [''])
@@ -113,3 +113,10 @@ test('T5424',
      ['T5424', '-v0 -O0'])
 
 test('FloatEq', normal, compile, [''])
+test('T7205', normal, compile, [''])
+test('T7293', normal, compile_fail, [''])
+test('T7294', normal, compile, [''])
+test('T7321',
+     extra_clean(['T7321a.hi', 'T7321a.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T7321'])

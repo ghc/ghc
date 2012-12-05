@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- These ones failed with 5.04.  They need a coercion
 -- in the pattern matching compiler, so they are a bit

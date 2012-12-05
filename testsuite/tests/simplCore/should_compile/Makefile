@@ -83,3 +83,8 @@ T4138:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T4138.hs -ddump-simpl > T4138.simpl
 	grep -c 'F#' T4138.simpl
 
+T7165:
+	$(RM) -f T7165.hi T7165a.hi T7165a.o T7165.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O2 T7165a.hs -dcore-lint
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O2 T7165.hs -dcore-lint
+

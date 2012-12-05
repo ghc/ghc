@@ -12,6 +12,9 @@ hval = Hidden (ExpInt 0) (ExpInt 1)
 -- With the type sig this is ok, but without it maybe
 -- should be rejected becuase the result type is wobbly
 --    weird1 :: ExpGADT Int
+--
+-- And indeed it is rejected by GHC 7.8 because OutsideIn
+-- doesn't unify under an equality constraint.
 
 weird1 = case (hval :: Hidden) of Hidden (ExpInt _) a -> a
   -- Hidden t (ExpInt (co :: t ~ Int) _ :: ExpGADT t) (a :: ExpGADT t)
