@@ -61,6 +61,8 @@ import FastString
 import Fingerprint
 
 import Control.Monad
+import Data.IORef
+import System.FilePath
 \end{code}
 
 
@@ -515,7 +517,9 @@ findAndReadIface doc_str mod hi_boot_file
                        if thisPackage dflags == modulePackageId mod &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
-                           else read_file file_path
+                           else do r <- read_file file_path
+                                   checkBuildDynamicToo r
+                                   return r
                    err -> do
                        traceIf (ptext (sLit "...not found"))
                        dflags <- getDynFlags
@@ -532,6 +536,21 @@ findAndReadIface doc_str mod hi_boot_file
                     | otherwise ->
                       return (Succeeded (iface, file_path))
                             -- Don't forget to fill in the package name...
+          checkBuildDynamicToo (Succeeded (iface, filePath)) = do
+              dflags <- getDynFlags
+              when (gopt Opt_BuildDynamicToo dflags) $ do
+                  let ref = canGenerateDynamicToo dflags
+                  b <- liftIO $ readIORef ref
+                  when b $ do
+                      let dynFilePath = replaceExtension filePath (dynHiSuf dflags)
+                      r <- read_file dynFilePath
+                      case r of
+                          Succeeded (dynIface, _)
+                           | mi_mod_hash iface == mi_mod_hash dynIface ->
+                              return ()
+                          _ ->
+                              liftIO $ writeIORef ref False
+          checkBuildDynamicToo _ = return ()
 \end{code}
 
 @readIface@ tries just the one file.

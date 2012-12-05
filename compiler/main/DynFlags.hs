@@ -371,6 +371,8 @@ data GeneralFlag
    | Opt_KeepRawTokenStream
    | Opt_KeepLlvmFiles
 
+   | Opt_BuildDynamicToo
+
    -- safe haskell flags
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
@@ -575,6 +577,10 @@ data DynFlags = DynFlags {
   objectSuf             :: String,
   hcSuf                 :: String,
   hiSuf                 :: String,
+
+  canGenerateDynamicToo :: IORef Bool,
+  dynObjectSuf          :: String,
+  dynHiSuf              :: String,
 
   outputFile            :: Maybe String,
   outputHi              :: Maybe String,
@@ -1108,6 +1114,7 @@ wayOptP _ WayNDP      = []
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
+ refCanGenerateDynamicToo <- newIORef False
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refFilesToNotIntermediateClean <- newIORef []
@@ -1115,6 +1122,7 @@ initDynFlags dflags = do
  refLlvmVersion <- newIORef 28
  wrapperNum <- newIORef 0
  return dflags{
+        canGenerateDynamicToo = refCanGenerateDynamicToo,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
         filesToNotIntermediateClean = refFilesToNotIntermediateClean,
@@ -1164,6 +1172,10 @@ defaultDynFlags mySettings =
         objectSuf               = phaseInputExt StopLn,
         hcSuf                   = phaseInputExt HCc,
         hiSuf                   = "hi",
+
+        canGenerateDynamicToo   = panic "defaultDynFlags: No canGenerateDynamicToo",
+        dynObjectSuf            = "dyn_" ++ phaseInputExt StopLn,
+        dynHiSuf                = "dyn_hi",
 
         pluginModNames          = [],
         pluginModNameOpts       = [],
@@ -1533,6 +1545,7 @@ getVerbFlags dflags
   | otherwise             = []
 
 setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
+         setDynObjectSuf, setDynHiSuf,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptc, addOptP,
@@ -1552,9 +1565,11 @@ setDumpDir    f d = d{ dumpDir    = Just f}
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f . setDumpDir f
 setDylibInstallName  f d = d{ dylibInstallName = Just f}
 
-setObjectSuf  f d = d{ objectSuf  = f}
-setHiSuf      f d = d{ hiSuf      = f}
-setHcSuf      f d = d{ hcSuf      = f}
+setObjectSuf    f d = d{ objectSuf    = f}
+setDynObjectSuf f d = d{ dynObjectSuf = f}
+setHiSuf        f d = d{ hiSuf        = f}
+setDynHiSuf     f d = d{ dynHiSuf     = f}
+setHcSuf        f d = d{ hcSuf        = f}
 
 setOutputFile f d = d{ outputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
@@ -1934,14 +1949,18 @@ dynamic_flags = [
   , Flag "o"                 (sepArg (setOutputFile . Just))
   , Flag "ohi"               (hasArg (setOutputHi . Just ))
   , Flag "osuf"              (hasArg setObjectSuf)
+  , Flag "dynosuf"           (hasArg setDynObjectSuf)
   , Flag "hcsuf"             (hasArg setHcSuf)
   , Flag "hisuf"             (hasArg setHiSuf)
+  , Flag "dynhisuf"          (hasArg setDynHiSuf)
   , Flag "hidir"             (hasArg setHiDir)
   , Flag "tmpdir"            (hasArg setTmpDir)
   , Flag "stubdir"           (hasArg setStubDir)
   , Flag "dumpdir"           (hasArg setDumpDir)
   , Flag "outputdir"         (hasArg setOutputDir)
   , Flag "ddump-file-prefix" (hasArg (setDumpPrefixForce . Just))
+
+  , Flag "dynamic-too"       (NoArg (setGeneralFlag Opt_BuildDynamicToo))
 
         ------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
