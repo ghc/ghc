@@ -5530,8 +5530,9 @@ The following restrictions apply to promotion:
  higher-kinded datatypes such as <literal>data Fix f = In (f (Fix f))</literal>,
  or datatypes whose kinds involve promoted types such as
  <literal>Vec :: * -> Nat -> *</literal>.</para></listitem>
- <listitem><para>We do not promote datatypes whose constructors are kind
- polymorphic, involve constraints, or use existential quantification.
+ <listitem><para>We do not promote data constructors that are kind
+ polymorphic, involve constraints, mention type or data families, or involve types that
+ are not promotable.
  </para></listitem>
  <listitem><para>We do not promote data family instances (<xref linkend="data-families"/>).
  </para></listitem>
@@ -5586,7 +5587,7 @@ Note that this requires <option>-XTypeOperators</option>.
 <sect2 id="promoted-literals">
 <title>Promoted Literals</title>
 <para>
-Numeric and string literals are prmoted to the type level, giving convenient
+Numeric and string literals are promoted to the type level, giving convenient
 access to a large number of predefined type-level constants.  Numeric literals
 are of kind <literal>Nat</literal>, while string literals are of kind
 <literal>Symbol</literal>.  These kinds are defined in the module
@@ -5626,6 +5627,46 @@ example = from (Point 1 2) (Get :: Label "x")
 </programlisting>
 </para>
 </sect2>
+
+<sect2 id="promotion-existentials">
+<title>Promoting existential data constructors</title>
+<para>
+Note that we do promote existential data constructors that are otherwise suitable.
+For example, consider the following:
+<programlisting>
+data Ex :: * where
+  MkEx :: forall a. a -> Ex
+</programlisting>
+Both the type <literal>Ex</literal> and the data constructor <literal>MkEx</literal>
+get promoted, with the polymorphic kind <literal>'MkEx :: forall k. k -> Ex</literal>. 
+Somewhat surprisingly, you can write a type family to extract the member
+of a type-level existential:
+<programlisting>
+type family UnEx (ex :: Ex) :: k
+type instance UnEx (MkEx x) = x
+</programlisting>
+At first blush, <literal>UnEx</literal> seems poorly-kinded. The return kind
+<literal>k</literal> is not mentioned in the arguments, and thus it would seem
+that an instance would have to return a member of <literal>k</literal> 
+<emphasis>for any</emphasis> <literal>k</literal>. However, this is not the
+case. The type family <literal>UnEx</literal> is a kind-indexed type family.
+The return kind <literal>k</literal> is an implicit parameter to <literal>UnEx</literal>.
+The elaborated definitions are as follows:
+<programlisting>
+type family UnEx (k :: BOX) (ex :: Ex) :: k
+type instance UnEx k (MkEx k x) = x
+</programlisting>
+Thus, the instance triggers only when the implicit parameter to <literal>UnEx</literal>
+matches the implicit parameter to <literal>MkEx</literal>. Because <literal>k</literal>
+is actually a parameter to <literal>UnEx</literal>, the kind is not escaping the
+existential, and the above code is valid.
+</para>
+
+<para>
+See also <ulink url="http://hackage.haskell.org/trac/ghc/ticket/7347">Trac #7347</ulink>.
+</para>
+</sect2>
+
 
 </sect1>
 
