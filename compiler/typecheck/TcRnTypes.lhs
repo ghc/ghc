@@ -836,11 +836,14 @@ The @WhereFrom@ type controls where the renamer looks for an interface file
 data WhereFrom
   = ImportByUser IsBootInterface        -- Ordinary user import (perhaps {-# SOURCE #-})
   | ImportBySystem                      -- Non user import.
+  | ImportByPlugin                      -- Importing a plugin; 
+                                        -- See Note [Care with plugin imports] in LoadIface
 
 instance Outputable WhereFrom where
   ppr (ImportByUser is_boot) | is_boot     = ptext (sLit "{- SOURCE -}")
                              | otherwise   = empty
   ppr ImportBySystem                       = ptext (sLit "{- SYSTEM -}")
+  ppr ImportByPlugin                       = ptext (sLit "{- PLUGIN -}")
 \end{code}
 
 %************************************************************************
