@@ -85,51 +85,8 @@ sub sanity_check_tree {
 # Create libraries/*/{ghc.mk,GNUmakefile}
 sub boot_pkgs {
     my @library_dirs = ();
-    my @tarballs = glob("libraries/tarballs/*");
 
-    my $tarball;
     my $package;
-    my $stamp;
-
-    for $tarball (@tarballs) {
-        $package = $tarball;
-        $package =~ s#^libraries/tarballs/##;
-        $package =~ s/-[0-9.]*(-snapshot)?\.tar\.gz$//;
-
-        # Sanity check, so we don't rmtree the wrong thing below
-        if (($package eq "") || ($package =~ m#[/.\\]#)) {
-            die "Bad package name: $package";
-        }
-
-        if (-d "libraries/$package/_darcs") {
-            print "Ignoring libraries/$package as it looks like a darcs checkout\n"
-        }
-        elsif (-d "libraries/$package/.git") {
-            print "Ignoring libraries/$package as it looks like a git checkout\n"
-        }
-        else {
-            if (! -d "libraries/stamp") {
-                mkdir "libraries/stamp";
-            }
-            $stamp = "libraries/stamp/$package";
-            if ((! -d "libraries/$package") || (! -f "$stamp")
-             || ((-M "libraries/stamp/$package") > (-M $tarball))) {
-                print "Unpacking $package\n";
-                if (-d "libraries/$package") {
-                    &rmtree("libraries/$package")
-                        or die "Can't remove libraries/$package: $!";
-                }
-                mkdir "libraries/$package"
-                    or die "Can't create libraries/$package: $!";
-                system ("sh", "-c", "cd 'libraries/$package' && { cat ../../$tarball | gzip -d | tar xf - ; } && mv */* .") == 0
-                    or die "Failed to unpack $package";
-                open STAMP, "> $stamp"
-                    or die "Failed to open stamp file: $!";
-                close STAMP
-                    or die "Failed to close stamp file: $!";
-            }
-        }
-    }
 
     for $package (glob "libraries/*/") {
         $package =~ s/\/$//;

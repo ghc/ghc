@@ -57,10 +57,10 @@ parseStaticFlagsFull :: [Flag IO] -> [Located String]
                      -> IO ([Located String], [Located String])
 parseStaticFlagsFull flagsAvailable args = do
   ready <- readIORef v_opt_C_ready
-  when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
+  when ready $ throwGhcException (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
   (leftover, errs, warns) <- processArgs flagsAvailable args
-  when (not (null errs)) $ ghcError $ errorsToGhcException errs
+  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -129,7 +129,7 @@ decodeSize str
   | c == "K" || c == "k" = truncate (n * 1000)
   | c == "M" || c == "m" = truncate (n * 1000 * 1000)
   | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
-  | otherwise            = ghcError (CmdLineError ("can't decode size: " ++ str))
+  | otherwise            = throwGhcException (CmdLineError ("can't decode size: " ++ str))
   where (m, c) = span pred str
         n      = readRational m
         pred c = isDigit c || c == '.'

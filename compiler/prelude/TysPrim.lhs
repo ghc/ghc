@@ -311,6 +311,8 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   superKind
 --------------------------
 -- ... and now their names
 
+-- If you edit these, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 superKindTyConName      = mkPrimTyConName (fsLit "BOX") superKindTyConKey superKindTyCon
 anyKindTyConName          = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
 liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon

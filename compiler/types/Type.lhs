@@ -58,7 +58,7 @@ module Type (
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
         
         -- Deconstructing predicate types
-        PredTree(..), predTreePredType, classifyPredType,
+        PredTree(..), classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
         getEqPredTys, getEqPredTys_maybe,
 
@@ -152,7 +152,7 @@ import VarSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon, mkBoxedTupleTy )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon )
 import PrelNames ( eqTyConKey, ipClassNameKey, 
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 
@@ -805,6 +805,8 @@ applyTys :: Type -> [KindOrType] -> Type
 -- This term should have type (Int -> Int), but notice that
 -- there are more type args than foralls in 'undefined's type.
 
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 applyTys ty args = applyTysD empty ty args
 
 applyTysD :: SDoc -> Type -> [Type] -> Type	-- Debug version
@@ -951,12 +953,6 @@ data PredTree = ClassPred Class [Type]
               | EqPred Type Type
               | TuplePred [PredType]
               | IrredPred PredType
-
-predTreePredType :: PredTree -> PredType
-predTreePredType (ClassPred clas tys) = mkClassPred clas tys
-predTreePredType (EqPred ty1 ty2)     = mkEqPred ty1 ty2
-predTreePredType (TuplePred tys)      = mkBoxedTupleTy tys
-predTreePredType (IrredPred ty)       = ty
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of

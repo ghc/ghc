@@ -391,6 +391,7 @@ data DataCon
 				-- The actual fixity is stored elsewhere
 
         dcPromoted :: Maybe TyCon    -- The promoted TyCon if this DataCon is promotable
+                                     -- See Note [Promoted data constructors] in TyCon
   }
   deriving Data.Typeable.Typeable
 
@@ -559,9 +560,10 @@ mkDataCon name declared_infix
 	  mkFunTys rep_arg_tys $
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
-    mb_promoted 
-      | is_vanilla   -- No existentials or context
-      , all (isLiftedTypeKind . tyVarKind) univ_tvs
+    mb_promoted   -- See Note [Promoted data constructors] in TyCon
+      | all (isLiftedTypeKind . tyVarKind) (univ_tvs ++ ex_tvs)
+                          -- No kind polymorphism, and all of kind *
+      , null full_theta   -- No constraints
       , all isPromotableType orig_arg_tys
       = Just (mkPromotedDataCon con name (getUnique name) prom_kind arity)
       | otherwise 

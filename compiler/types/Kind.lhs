@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2006-2012
 %
 
 \begin{code}
@@ -80,11 +80,11 @@ The special thing about types of kind Constraint is that
    engine inserts an extra argument of type (Ord a) at every call site
    to f.
 
-Howver, once type inference is over, there is *no* distinction between 
+However, once type inference is over, there is *no* distinction between 
 Constraint and *.  Indeed we can have coercions between the two. Consider
    class C a where
      op :: a -> a
-For this single-method class we may genreate a newtype, which in turn 
+For this single-method class we may generate a newtype, which in turn 
 generates an axiom witnessing
     Ord a ~ (a -> a)
 so on the left we have Constraint, and on the right we have *.
@@ -217,6 +217,8 @@ isSubKind :: Kind -> Kind -> Bool
 -- Sub-kinding is extremely simple and does not look
 -- under arrrows or type constructors
 
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
   | isPromotedTyCon kc1 || isPromotedTyCon kc2
     -- handles promoted kinds (List *, Nat, etc.)
@@ -230,6 +232,9 @@ isSubKind k1 k2 = eqKind k1 k2
 
 isSubKindCon :: TyCon -> TyCon -> Bool
 -- ^ @kc1 \`isSubKindCon\` kc2@ checks that @kc1@ <: @kc2@
+
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 isSubKindCon kc1 kc2
   | kc1 == kc2              = True
   | isOpenTypeKindCon kc2   = isSubOpenTypeKindCon kc1 

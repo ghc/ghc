@@ -213,7 +213,7 @@ data IfaceIdInfo
 --      (In earlier GHCs we used to drop IdInfo immediately on reading,
 --       but we do not do that now.  Instead it's discarded when the
 --       ModIface is read into the various decl pools.)
---   * The version comparsion sees that new (=NoInfo) differs from old (=HasInfo *)
+--   * The version comparison sees that new (=NoInfo) differs from old (=HasInfo *)
 --      and so gives a new version.
 
 data IfaceInfoItem

@@ -33,6 +33,9 @@ extra-libraries:
 #ifdef HAVE_LIBDL
 			      , "dl"
 #endif
+#ifdef HAVE_LIBFFI
+                              , "ffi"
+#endif
 #ifdef mingw32_HOST_OS
 			      ,"wsock32"    /* for the linker */
 			      ,"gdi32"      /* for the linker */

@@ -87,6 +87,9 @@ import qualified Data.Data        as Data hiding ( TyCon )
 
 \begin{code}
 -- | The key representation of types within the compiler
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Type
   = TyVarTy Var	-- ^ Vanilla type or kind variable (*never* a coercion variable)
 

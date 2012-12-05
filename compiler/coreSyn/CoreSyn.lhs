@@ -261,6 +261,9 @@ These data types are the heart of the compiler
 -- *  A type: this should only show up at the top level of an Arg
 --
 -- *  A coercion
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Expr b
   = Var	  Id
   | Lit   Literal
@@ -281,9 +284,15 @@ type Arg b = Expr b
 -- | A case split alternative. Consists of the constructor leading to the alternative,
 -- the variables bound from the constructor, and the expression to be executed given that binding.
 -- The default alternative is @(DEFAULT, [], rhs)@
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 type Alt b = (AltCon, [b], Expr b)
 
 -- | A case alternative constructor (i.e. pattern match)
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data AltCon 
   = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
                       -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
@@ -296,6 +305,9 @@ data AltCon
    deriving (Eq, Ord, Data, Typeable)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Bind b = NonRec b (Expr b)
 	    | Rec [(b, (Expr b))]
   deriving (Data, Typeable)
@@ -423,6 +435,9 @@ unboxed type.
 
 \begin{code}
 -- | Allows attaching extra information to points in expressions
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 data Tickish id =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
     -- added by the desugarer as a result of -auto-all, or added by
@@ -1049,6 +1064,9 @@ a list of CoreBind
    chunks.  
 
 \begin{code}
+
+-- If you edit this type, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 type CoreProgram = [CoreBind]	-- See Note [CoreProgram]
 
 -- | The common case for the type of binders and variables when
@@ -1213,6 +1231,8 @@ varsToCoreExprs vs = map varToCoreExpr vs
 \begin{code}
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.lhs
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 

@@ -1297,7 +1297,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
              err -> noModError dflags noSrcSpan mod_name err
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
-modNotLoadedError dflags m loc = ghcError $ CmdLineError $ showSDoc dflags $
+modNotLoadedError dflags m loc = throwGhcException $ CmdLineError $ showSDoc dflags $
    text "module is not loaded:" <+> 
    quotes (ppr (moduleName m)) <+>
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))

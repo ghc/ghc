@@ -500,7 +500,10 @@ $(foreach way,$$(compiler_stage3_WAYS),\
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 
 # LibFFI.hs #includes ffi.h
+ifneq "$(UseSystemLibFFI)" "YES"
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)
+endif
+
 # On Windows it seems we also need to link directly to libffi
 ifeq "$(HostOS_CPP)" "mingw32"
 define windowsDynLinkToFfi

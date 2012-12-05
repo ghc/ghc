@@ -468,7 +468,7 @@ resume canLogSpan step
        resume = ic_resume ic
 
    case resume of
-     [] -> ghcError (ProgramError "not stopped at a breakpoint")
+     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
@@ -525,16 +525,16 @@ moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
 moveHist fn = do
   hsc_env <- getSession
   case ic_resume (hsc_IC hsc_env) of
-     [] -> ghcError (ProgramError "not stopped at a breakpoint")
+     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         let ix = resumeHistoryIx r
             history = resumeHistory r
             new_ix = fn ix
         --
         when (new_ix > length history) $
-           ghcError (ProgramError "no more logged breakpoints")
+           throwGhcException (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $
-           ghcError (ProgramError "already at the beginning of the history")
+           throwGhcException (ProgramError "already at the beginning of the history")
 
         let
           update_ic apStack mb_info = do
@@ -816,7 +816,7 @@ setContext imports
        ; let dflags = hsc_dflags hsc_env
        ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
        ; case all_env_err of
-           Left (mod, err) -> ghcError (formatError dflags mod err)
+           Left (mod, err) -> throwGhcException (formatError dflags mod err)
            Right all_env -> do {
        ; let old_ic        = hsc_IC hsc_env
              final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env
@@ -890,8 +890,8 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
-getInfo name
+getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
+getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
@@ -900,8 +900,10 @@ getInfo name
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
            return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
   where
-    plausible rdr_env ispec     -- Dfun involving only names that are in ic_rn_glb_env
-        = all ok $ nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec
+    plausible rdr_env ispec
+          -- Dfun involving only names that are in ic_rn_glb_env
+        = allInfo
+       || all ok (nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec)
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
           ok n | n == name         = True       -- The one we looked for in the first place!

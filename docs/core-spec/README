@@ -1,0 +1,83 @@
+GHC FORMALISM
+=============
+
+This directory contains the source code (and built pdf, for convenience) for a
+formalism of the core language in GHC, properly called System FC. Though a
+good handful of papers have been published about the language, these papers
+paraphrase a slice of the language, useful for exposition. The document here
+contains the official description of the language, as it is implemented in
+GHC.
+
+Building
+--------
+
+The built pdf is tracked in the git repository, so you should not need to build
+unless you are editing the source code. If you do need to build, you will need
+Ott [1] and LaTeX (with latexmk) in your path. Just run 'make'. 'make clean'
+gets rid of all generated files, including the pdf.
+
+Details
+-------
+
+The source files here are written in Ott [1], a language and toolset designed
+to help in writing language formalisms. While the syntax of the language is a
+little finnicky to write out at first, it is remarkably easy to make
+incremental edits. Ott can be used to generate both LaTeX code and definitions
+for proof assistants. Here, we use it only to produce LaTeX. Ott also has a
+filter mode, where it processes a .mng file, looking for snippets enclosed
+like [[ ... ]]. Ott will process the contents of these brackets and translate
+into LaTeX math-mode code. Thus, the file core-spec.mng is the source for
+core-spec.tex, which gets processed into core-spec.pdf.
+
+The file CoreSyn.ott contains the grammar of System FC, mostly extracted from
+compiler/coreSyn/CoreSyn.lhs. Here are a few pointers to help those of you
+unfamiliar with Ott:
+
+- The {{ ... }} snippets are called "homs", and they assist ott in translating
+your notation to LaTeX. Three different homs are used:
+  * tex-preamble contains literal LaTeX code to be pasted into the output
+  * com marks a comment, which is rendered to the right of the structure being
+    defined
+  * tex marks a LaTeX typesetting of the structure being defined. It can use
+    [[ ... ]] to refer to metavariables used the structure definition.
+
+- The </ ... // ... /> notation is used for lists. Please see the Ott manual
+  [2] for more info.
+
+- Ott requires that all lexemes are separated by whitespace in their initial
+  definition.
+
+- The M that appears between the :: on some lines means "meta". It is used for
+  a production that is not a proper constructor of the form being defined. For
+  example, the production ( t ) should be considered to be a type, but it is
+  not a separate constructor. Meta productions are not included when
+  typsetting the form with its productions.
+
+- There are two special forms:
+  * The 'terminal' form contains productions for all terminal symbols that
+    require special typesetting through their tex homs.
+  * The 'formula' form contains productions for all valid formulae that can be
+    used in the premises of an inductive rule. (The 'judgement' production
+    refers to defined judgements in the rules.)
+
+- See the Ott manual [2] for the 'parsing' section at the bottom. These rules
+  help disambiguate otherwise-ambiguous parses. Getting these right is hard,
+  so if you have trouble, you're not alone.
+
+- In one place, it was necessary to use an @ symbol to disambiguate parses. The
+  @ symbol is not typeset and is used solely for disambiguation. Feel free to use
+  it if necessary to disambiguate other parses.
+
+The file CoreLint.ott contains inductively defined judgements for many of the
+functions in compiler/coreSyn/CoreLint.lhs. Each judgement is labeled with an
+abbreviation to distinguish it from the others. These abbreviations appear in
+the source code right after a turnstile |-. The declaration for each judgment
+contains a reference to the function it represents. Each rule is labeled with
+the constructor in question, if applicable. Note that these labels are
+mandatory in Ott.
+
+If you need help with these files or do not know how to edit them, please
+contact Richard Eisenberg (eir@cis.upenn.edu).
+
+[1] http://www.cl.cam.ac.uk/~pes20/ott/
+[2] http://www.cl.cam.ac.uk/~pes20/ott/ott_manual_0.21.2.pdf

@@ -222,7 +222,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
-ghciUI _ _ = ghcError (CmdLineError "not built for interactive use")
+ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
 ghciUI     = interactiveUI defaultGhciSettings
 #endif
@@ -293,18 +293,18 @@ checkOptions mode dflags srcs objs = do
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= defaultWays (settings dflags))
          && isInterpretiveMode mode) $
-      do ghcError (UsageError
+      do throwGhcException (UsageError
                    "--interactive can't be used with -prof or -unreg.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
-        then ghcError (UsageError "-ohi can only be used when compiling a single source file")
+        then throwGhcException (UsageError "-ohi can only be used when compiling a single source file")
         else do
 
         -- -o sanity checking
    if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
          && not (isLinkMode mode))
-        then ghcError (UsageError "can't apply -o to multiple source files")
+        then throwGhcException (UsageError "can't apply -o to multiple source files")
         else do
 
    let not_linking = not (isLinkMode mode) || isNoLink (ghcLink dflags)
@@ -315,7 +315,7 @@ checkOptions mode dflags srcs objs = do
         -- Check that there are some input files
         -- (except in the interactive case)
    if null srcs && (null objs || not_linking) && needsInputsMode mode
-        then ghcError (UsageError "no input files")
+        then throwGhcException (UsageError "no input files")
         else do
 
      -- Verify that output files point somewhere sensible.
@@ -346,7 +346,7 @@ verifyOutputFiles dflags = do
      when (not flg) (nonExistentDir "-ohi" hi)
  where
    nonExistentDir flg dir =
-     ghcError (CmdLineError ("error: directory portion of " ++
+     throwGhcException (CmdLineError ("error: directory portion of " ++
                              show dir ++ " does not exist (used with " ++
                              show flg ++ " option.)"))
 
@@ -492,7 +492,7 @@ parseModeFlags args = do
              Nothing     -> doMakeMode
              Just (m, _) -> m
       errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
-  when (not (null errs)) $ ghcError $ errorsToGhcException errs
+  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
   return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
@@ -768,7 +768,7 @@ abiHash strs = do
          r <- findImportedModule hsc_env modname Nothing
          case r of
            Found _ m -> return m
-           _error    -> ghcError $ CmdLineError $ showSDoc dflags $
+           _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
   mods <- mapM find_it (map fst strs)
@@ -789,7 +789,7 @@ abiHash strs = do
 -- Util
 
 unknownFlagsErr :: [String] -> a
-unknownFlagsErr fs = ghcError $ UsageError $ concatMap oneError fs
+unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
   where
     oneError f =
         "unrecognised flag: " ++ f ++ "\n" ++
