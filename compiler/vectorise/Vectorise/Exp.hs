@@ -1031,23 +1031,20 @@ vectAvoidInfo pvs ce@(fvs, AnnCase e var ty alts)
   = do 
     { ceVI           <- vectAvoidInfoTypeOf ce
     ; eVI            <- vectAvoidInfo pvs e
-    ; isScalarTy     <- isScalar . annExprType $ e
-    ; altsVI         <- mapM (vectAvoidInfoAlt (isVIParr eVI && not isScalarTy)) alts
-    ; allScalarBndrs <- anyM allScalarAltBndrs altsVI
+    ; altsVI         <- mapM (vectAvoidInfoAlt (isVIParr eVI)) alts
     ; let alteVIs = [eVI | (_, _, eVI) <- altsVI]
-          vi | isVIParr eVI && not allScalarBndrs = VIParr
-             | otherwise                          
-             =  foldl unlessVIParrExpr ceVI alteVIs
+          vi      =  foldl unlessVIParrExpr ceVI (eVI:alteVIs)  -- NB: same effect as in the paper
     ; viTrace ce vi (eVI : alteVIs)
     ; return ((fvs, vi), AnnCase eVI var ty altsVI)
     }
   where
-    vectAvoidInfoAlt isScalarScrut (con, bndrs, e) = (con, bndrs,) <$> vectAvoidInfo altPvs e
-      where
-        altPvs | isScalarScrut = pvs
-               | otherwise     = pvs `extendVarSetList` bndrs
-
-    allScalarAltBndrs (_, bndrs, _) = allScalarVarType bndrs
+    vectAvoidInfoAlt scrutIsPar (con, bndrs, e) 
+      = do
+        { allScalar <- allScalarVarType bndrs
+        ; let altPvs | scrutIsPar && not allScalar = pvs `extendVarSetList` bndrs
+                     | otherwise                   = pvs
+        ; (con, bndrs,) <$> vectAvoidInfo altPvs e
+        }
 
 vectAvoidInfo pvs (fvs, AnnCast e (fvs_ann, ann))
   = do 
