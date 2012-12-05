@@ -20,11 +20,6 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >= 1.2.3
 
-Flag dynlibs
-    Description: Dynamic library support
-    Default: False
-    Manual: True
-
 Flag ghci
     Description: Build GHCi support.
     Default: False
@@ -101,9 +96,8 @@ Library
     c-sources:
         parser/cutils.c
 
-    if flag(dynlibs)
-        c-sources:
-            ghci/keepCAFsForGHCi.c
+    c-sources:
+        ghci/keepCAFsForGHCi.c
 
     hs-source-dirs:
         basicTypes

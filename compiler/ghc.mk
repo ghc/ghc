@@ -314,12 +314,6 @@ ifeq "$(BuildSharedLibs)" "YES"
 # so we don't build it the dyn way; see trac #5987
 ifneq "$(TargetOS_CPP)" "mingw32"
 compiler_stage2_CONFIGURE_OPTS += --enable-shared
-# If we are going to use dynamic libraries instead of .o files for ghci,
-# we will need to always retain CAFs in the compiler.
-# ghci/keepCAFsForGHCi contains a GNU C __attribute__((constructor))
-# function which sets the keepCAFs flag for the RTS before any Haskell
-# code is run.
-compiler_stage2_CONFIGURE_OPTS += --flags=dynlibs
 endif
 endif
 
@@ -450,6 +444,20 @@ endif
 $(eval $(call build-package,compiler,stage1,0))
 $(eval $(call build-package,compiler,stage2,1))
 $(eval $(call build-package,compiler,stage3,2))
+
+# We only want to turn keepCAFs on if we will be loading dynamic
+# Haskell libraries with GHCi. We therefore filter the object file
+# out for non-dynamic ways.
+define keepCAFsForGHCiDynOnly
+# $1 = stage
+# $2 = way
+ifeq "$$(findstring dyn, $1)" ""
+compiler_stage$1_$2_C_OBJS := $$(filter-out %/keepCAFsForGHCi.o,$$(compiler_stage$1_$2_C_OBJS))
+endif
+endef
+$(foreach w,$(compiler_stage1_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,1,$w)))
+$(foreach w,$(compiler_stage2_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,2,$w)))
+$(foreach w,$(compiler_stage3_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,3,$w)))
 
 # after build-package, because that adds --enable-library-for-ghci
 # to compiler_stage*_CONFIGURE_OPTS:
