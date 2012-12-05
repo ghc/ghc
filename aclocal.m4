@@ -1049,7 +1049,7 @@ fi
 # output variable GccVersion.
 AC_DEFUN([FP_GCC_VERSION],
 [AC_REQUIRE([AC_PROG_CC])
-if test -z "$GCC"
+if test -z "$CC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
