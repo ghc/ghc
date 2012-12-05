@@ -1124,7 +1124,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
              read_result <- readIface (ms_mod mod_summary) iface_path False
              case read_result of
                  Failed err -> do
-                     traceIf (text "FYI: cannont read old interface file:" $$ nest 4 err)
+                     traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
                      return Nothing
                  Succeeded iface -> do
                      traceIf (text "Read the interface file" <+> text iface_path)
