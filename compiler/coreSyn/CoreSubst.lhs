@@ -749,12 +749,11 @@ substVects subst = map (substVect subst)
 
 ------------------
 substVect :: Subst -> CoreVect -> CoreVect
-substVect _subst (Vect   v Nothing)    = Vect v Nothing
-substVect subst  (Vect   v (Just rhs)) = Vect v (Just (simpleOptExprWith subst rhs))
-substVect _subst vd@(NoVect _)         = vd
-substVect _subst vd@(VectType _ _ _)   = vd
-substVect _subst vd@(VectClass _)      = vd
-substVect _subst vd@(VectInst _)       = vd
+substVect subst  (Vect v rhs)        = Vect v (simpleOptExprWith subst rhs)
+substVect _subst vd@(NoVect _)       = vd
+substVect _subst vd@(VectType _ _ _) = vd
+substVect _subst vd@(VectClass _)    = vd
+substVect _subst vd@(VectInst _)     = vd
 
 ------------------
 substVarSet :: Subst -> VarSet -> VarSet

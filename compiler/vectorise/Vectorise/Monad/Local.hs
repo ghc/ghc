@@ -44,20 +44,24 @@ updLEnv f  = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 --
 localV :: VM a -> VM a
 localV p 
- = do  env <- readLEnv id
-  x   <- p
-  setLEnv env
-  return x
+  = do  
+    { env <- readLEnv id
+    ; x   <- p
+    ; setLEnv env
+    ; return x
+    }
 
 -- |Perform a computation in an empty local environment.
 --
 closedV :: VM a -> VM a
 closedV p 
- = do  env <- readLEnv id
-  setLEnv (emptyLocalEnv { local_bind_name = local_bind_name env })
-  x   <- p
-  setLEnv env
-  return x
+  = do
+    { env <- readLEnv id
+    ; setLEnv (emptyLocalEnv { local_bind_name = local_bind_name env })
+    ; x   <- p
+    ; setLEnv env
+    ; return x
+    }
 
 -- |Get the name of the local binding currently being vectorised.
 --

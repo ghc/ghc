@@ -84,16 +84,16 @@ identityConv (AppTy {})    = noV $ text "identityConv: type appl. changes under 
 identityConv (FunTy {})    = noV $ text "identityConv: function type changes under vectorisation"
 identityConv (ForAllTy {}) = noV $ text "identityConv: quantified type changes under vectorisation"
 
--- |Check that this type constructor is neutral under type vectorisation — i.e., it is not altered
--- by vectorisation as they contain no parallel arrays.
+-- |Check that this type constructor is not changed by vectorisation — i.e., it does not embed any
+-- parallel arrays.
 --
 identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
-  | isBoxedTupleTyCon tc = return ()
-  | isUnLiftedTyCon tc   = return ()
-  | otherwise 
-  = do tc' <- maybeV notVectErr (lookupTyCon tc)
-       if tc == tc' then return () else noV idErr
+  = do 
+    { tc' <- lookupTyCon tc
+    ; case tc' of 
+        Nothing -> return ()
+        Just _  -> noV idErr
+    }
   where
-    notVectErr = text "identityConvTyCon: no vectorised version for type constructor" <+> ppr tc
-    idErr      = text "identityConvTyCon: type constructor contains parallel arrays"   <+> ppr tc
+    idErr = text "identityConvTyCon: type constructor contains parallel arrays" <+> ppr tc

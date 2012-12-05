@@ -542,10 +542,10 @@ tidyInstances tidy_dfun ispecs
 \begin{code}
 tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
 tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
-                                         , vectInfoScalarVars   = scalarVars
+                                         , vectInfoParallelVars = parallelVars
                                          })
   = info { vectInfoVar          = tidy_vars
-         , vectInfoScalarVars   = tidy_scalarVars
+         , vectInfoParallelVars = tidy_parallelVars
          }
   where
       -- we only export mappings whose domain and co-domain is exported (otherwise, the iface is
@@ -559,9 +559,9 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
-    tidy_scalarVars = mkVarSet [ lookup_var var
-                               | var <- varSetElems scalarVars
-                               , isGlobalId var || isExportedId var]
+    tidy_parallelVars = mkVarSet [ lookup_var var
+                                 | var <- varSetElems parallelVars
+                                 , isGlobalId var || isExportedId var]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
