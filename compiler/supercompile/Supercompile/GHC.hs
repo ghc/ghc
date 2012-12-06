@@ -55,7 +55,7 @@ desc = desc' . unI
 desc' :: S.TermF Identity -> Description
 desc' (S.Var x)            = Opaque (S.varString x)
 desc' (S.Value _)          = Opaque "value"
-desc' (S.TyApp e1 _)       = argOf (desc e1)
+desc' (S.TyApp e1 _)       = desc e1 -- NB: no argOf for type arguments because they don't get ANFed, so it's a bit redundant
 desc' (S.CoApp e1 _)       = argOf (desc e1)
 desc' (S.App e1 _)         = argOf (desc e1)
 desc' (S.PrimOp pop as es) = foldr (\() d -> argOf d) (Opaque (show pop)) (map (const ()) as ++ map (const ()) es)

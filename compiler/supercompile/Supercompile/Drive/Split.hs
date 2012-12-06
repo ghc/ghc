@@ -201,7 +201,7 @@ generalise :: MonadStatics m
 generalise gen (deeds, Heap h ids, k, qa) = do
     let named_k = nameStack k
     
-    (gen_kfs, gen_xs') <- case gENERALISATION of
+    (gen_kfs, gen_xs') <- case sPLIT_GENERALISATION_TYPE of
         NoGeneralisation -> Nothing
         AllEligible -> guard (not (IS.null gen_kfs) || not (isEmptyVarSet gen_xs'')) >> return (gen_kfs, gen_xs'')
           where gen_kfs = IS.fromList [i   | (i, kf) <- trainCars named_k, generaliseStackFrame gen kf]

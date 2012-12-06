@@ -56,6 +56,9 @@ dEPTH_LIIMT :: Maybe Int
 dEPTH_LIIMT = Just (lookup_def_int "-fsupercompiler-depth-limit" maxBound)
 --dEPTH_LIIMT = Just 10
 
+rEDUCE_STOP_LIMIT :: Int
+rEDUCE_STOP_LIMIT = lookup_def_int "-fsupercompiler-reduce-stop-limit" 1
+
 pOSITIVE_INFORMATION :: Bool
 pOSITIVE_INFORMATION = not $ lookUp $ fsLit "-fsupercompiler-no-positive-information"
 --pOSITIVE_INFORMATION = True
@@ -218,14 +221,20 @@ tAG_COLLECTION = parseEnum "-fsupercompiler-tag-collection" (TBT False) [("bags"
 
 data GeneralisationType = NoGeneralisation | AllEligible | DependencyOrder Bool | StackFirst
 
-gENERALISATION :: GeneralisationType
-gENERALISATION = parseEnum "-fsupercompiler-generalisation" StackFirst [("none", NoGeneralisation), ("all-eligible", AllEligible), ("first-reachable", DependencyOrder True), ("last-reachable", DependencyOrder False), ("stack-first", StackFirst)]
+sPLIT_GENERALISATION_TYPE :: GeneralisationType
+sPLIT_GENERALISATION_TYPE = parseEnum "-fsupercompiler-split-generalisation-type" StackFirst [("none", NoGeneralisation), ("all-eligible", AllEligible), ("first-reachable", DependencyOrder True), ("last-reachable", DependencyOrder False), ("stack-first", StackFirst)]
 
 oCCURRENCE_GENERALISATION :: Bool
 oCCURRENCE_GENERALISATION = not $ lookUp $ fsLit "-fsupercompiler-no-occurrence-generalisation"
 
+gENERALISATION :: Bool
+gENERALISATION = not $ lookUp $ fsLit "-fsupercompiler-no-generalisation"
+
+mSG_GENERALISATION :: Bool
+mSG_GENERALISATION = not $ lookUp $ fsLit "-fsupercompiler-no-msg-generalisation"
+
 tYPE_GEN :: Bool
-tYPE_GEN = True
+tYPE_GEN = not $ lookUp $ fsLit "-fsupercompiler-no-type-generalisation"
 
 eVALUATE_PRIMOPS :: Bool
 eVALUATE_PRIMOPS = not $ lookUp $ fsLit "-fsupercompiler-no-primops"

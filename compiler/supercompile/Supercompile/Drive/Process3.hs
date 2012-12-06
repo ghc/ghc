@@ -291,8 +291,9 @@ sc' mb_h state = {- pprTrace "sc'" (trce1 state) $ -} {-# SCC "sc'" #-} case mb_
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $ do
-                                                           let (mb_shallow_gen, mb_gen) = zipPair mplus mplus (tryMSG sc shallow_state state)
-                                                                                                              (tryTaG sc shallow_state state)
+                                                           let (mb_shallow_gen, mb_gen) | not gENERALISATION = (Nothing, Nothing)
+                                                                                        | otherwise = zipPair mplus mplus (tryMSG sc shallow_state state)
+                                                                                                                          (tryTaG sc shallow_state state)
                                                            case mb_shallow_gen of
                                                              Just shallow_gen | sC_ROLLBACK           -> trace "sc-stop(rb,gen)"   $ shallow_rb shallow_gen
                                                              Nothing | sC_ROLLBACK, Nothing <- mb_gen -> trace "sc-stop(rb,split)" $ shallow_rb (split sc shallow_state)
@@ -323,7 +324,9 @@ tryTaG opt shallow_state state = bothWays (\_ -> generaliseSplit opt gen) shallo
   where gen = mK_GENERALISER shallow_state state
 
 -- NB: this cannot return (Just, Nothing)
-tryMSG opt shallow_state state = case msgMaybe mode shallow_state state of
+tryMSG opt shallow_state state
+  | not mSG_GENERALISATION = (Nothing, Nothing)
+  | otherwise = case msgMaybe mode shallow_state state of
     -- If we fail this way round, we should certainly fail the other way round too
     Nothing -> (Nothing, Nothing)
     Just msg_result@(Pair l r, _)
@@ -620,7 +623,9 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                         -- NB: don't record a promise for type generalisation! This is OK for termination because all type gens
                         -- are non-trivial so we will eventually have to stop genning. Furthermore, it means that we can't end
                         -- up with a FIXME: continue
-                       RightGivesTypeGen rn_l s rn_r -> trace "typegen" $ (True, do { (deeds, e') <- memo_opt s
+                       RightGivesTypeGen rn_l s rn_r -> -- pprTrace "typegen" (pPrintFullState fullStatePrettiness state $$ pPrintFullState fullStatePrettiness s) $
+                                                        trace "typegen" $
+                                                                          (True, do { (deeds, e') <- memo_opt s
                                                                                     ; (_, e'_r) <- renameSCResult (case s of (_, Heap _ ids, _, _) -> ids) (rn_r, e')
                                                                                       -- OH MY GOD:
                                                                                       --  - If we do memo-rollback or sc-rollback then we CAN'T overwrite old fulfilments
@@ -662,9 +667,13 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                         (promise -> Maybe Var)
                      -> [(promise, MSGMatchResult)]
                      -> [(Bool, (promise, MSGMatchResult))]
-            sortBest dumped ress = filter (\(_, (p, _)) -> case dumped p of Just fun -> pprTraceSC "tieback-to-dumped" (ppr fun) False; Nothing -> True) $
-                                          map ((,) True) best_ress ++ map ((,) False) (sortBy ((\x y -> if x `moreSpecific` y then LT else GT) `on` snd) other_ress)
-              where -- Stop early upon exact match (as an optimisation)
+            sortBest dumped ress = filter suitable $ map ((,) True) best_ress ++ map ((,) False) (sortBy ((\x y -> if x `moreSpecific` y then LT else GT) `on` snd) other_ress)
+              where suitable (_, (p, mr))
+                      | Just fun <- dumped p                     = pprTraceSC "tieback-to-dumped" (ppr fun) False
+                      | not tYPE_GEN, RightGivesTypeGen {} <- mr = False
+                      | otherwise                                = True
+
+                    -- Stop early upon exact match (as an optimisation)
                     (best_ress, other_ress) = partition (mostSpecific . snd) ress
 
                     mostSpecific :: MSGMatchResult -> Bool

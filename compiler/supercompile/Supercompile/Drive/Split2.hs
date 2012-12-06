@@ -247,7 +247,7 @@ instanceSplit :: (Applicative m, Monad m)
 instanceSplit opt (deeds, heap, k, e) = recurse opt $ push (S.singleton FocusContext) (deeds, heap, k, OpaqueFocus e)
 
 applyGeneraliser :: Generaliser -> State -> Maybe (S.Set Context)
-applyGeneraliser gen (_deeds, Heap h _, k, qa) = fmap (\(gen_kfs, gen_xs) -> S.fromList $ map StackContext (IS.elems gen_kfs) ++ map HeapContext (varSetElems gen_xs)) $ case gENERALISATION of
+applyGeneraliser gen (_deeds, Heap h _, k, qa) = fmap (\(gen_kfs, gen_xs) -> S.fromList $ map StackContext (IS.elems gen_kfs) ++ map HeapContext (varSetElems gen_xs)) $ case sPLIT_GENERALISATION_TYPE of
     NoGeneralisation -> Nothing
     AllEligible -> guard (not (IS.null gen_kfs) || not (isEmptyVarSet gen_xs'')) >> return (gen_kfs, gen_xs'')
       where gen_kfs = IS.fromList [i   | (i, kf) <- named_k, generaliseStackFrame gen kf]

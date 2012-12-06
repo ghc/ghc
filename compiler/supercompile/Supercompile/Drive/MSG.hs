@@ -34,6 +34,7 @@ import Kind
 --import TysWiredIn (pairTyCon {- , tupleCon -})
 import TysPrim    (funTyCon)
 import TypeRep    (Type(..))
+import Type       (coreView)
 import TrieMap    (TrieMap(..), CoercionMap, TypeMap)
 import Rules      (mkSpecInfo, roughTopNames)
 import Unique     (mkUniqueGrimily)
@@ -879,8 +880,16 @@ msgType rn2 ty_l ty_r = case checkEqual (isKindTy ty_l) (isKindTy ty_r) of
 msgType' :: Bool -> RnEnv2 -> Type -> Type -> MSG Type
 msgType' _         rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r -- NB: if this fails, one of the two sides is unfloatable, so don't try to generalise
 msgType' are_kinds rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType' are_kinds rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r) -- NB: arguments not necessarily at same level, but type constructor must be
-msgType' _         _   (TyConApp tc_l [])    (TyConApp tc_r [])    | tc_l == tc_r = return (TyConApp tc_r [])
-msgType' are_kinds rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) | not (null tys_l) || not (null tys_r) = msgType' are_kinds rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
+msgType' are_kinds rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r)
+  -- Special case so we can avoid splitting most type synonyms, also prevents loops in the case where we have (TyConApp tc []) on each side so breaking apart TyConApp would be a NOP
+  | tc_l == tc_r && length tys_l == length tys_r = liftM (TyConApp tc_r) (zipWithEqualM (msgType rn2) tys_l tys_r)
+msgType' are_kinds rn2 ty_l ty_r
+  -- MUST look through type synonyms because otherwise we might succeed in generalising when given (ShowsS `msgType` (a -> b)), which would be a disaster
+  | Just ty_l' <- coreView ty_l                  = msgType' are_kinds rn2 ty_l' ty_r
+  | Just ty_r' <- coreView ty_r                  = msgType' are_kinds rn2 ty_l ty_r'
+msgType' are_kinds rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r)
+  -- Must look through synonyms *before* we break apart TyConApps since coreView won't work any other way
+  | not (null tys_l) || not (null tys_r)         = msgType' are_kinds rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
 msgType' are_kinds rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType' are_kinds rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
 msgType' are_kinds rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType' are_kinds rn2 ty_l ty_r
 msgType' _         _   (LitTy l_l)           (LitTy l_r)           | l_l == l_r = return (LitTy l_r)

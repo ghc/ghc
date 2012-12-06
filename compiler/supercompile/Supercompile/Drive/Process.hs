@@ -889,7 +889,7 @@ reduceWithStats :: State -> (SCStats, State)
 reduceWithStats state = case reduce' state of (_, stats, state') -> (stats, state')
 
 reduce' :: State -> (Bool, SCStats, State)
-reduce' orig_state = go 0 False init_hist orig_state
+reduce' orig_state = go rEDUCE_STOP_LIMIT False init_hist orig_state
   where
     init_hist = mkLinearHistory rEDUCE_WQO
 
@@ -903,7 +903,7 @@ reduce' orig_state = go 0 False init_hist orig_state
            -> case terminate hist (gc state) of
                 Continue hist' -> go n True hist' state'
                 Stop old_state
-                  | n > 0      -> go (n - 1) True init_hist state' -- FIXME: huge hack
+                  | n > 1      -> go (n - 1) True init_hist state' -- FIXME: huge hack
                   | otherwise  -> pprTrace "reduce-stop" {--} (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) {--} -- empty
                                   -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                                   -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $

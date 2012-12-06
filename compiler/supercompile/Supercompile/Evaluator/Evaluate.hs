@@ -560,7 +560,24 @@ shouldExposeUnfolding :: Id -> Either String Superinlinable
 shouldExposeUnfolding x = case inl_inline inl_prag of
     -- FIXME: God help my soul
     _ | Just mod <- nameModule_maybe (idName x)
-      , moduleName mod `elem` map mkModuleName ["Data.Complex", "GHC.List"]
+      , moduleName mod `elem` map mkModuleName [
+          "Data.Complex", "GHC.List",
+          "QSort", -- awards
+          "Checker", "Lisplikefns", "Rewritefns", "Rulebasetext", -- boyer2
+          "Auxil", "Interval", "Key", "Prog", -- cichelli
+          "MonadState", "MonadTrans", -- cryptarithm2
+          "StateMonad", -- cse
+          "Knowledge", "Result", "Search", "Table", "Match", -- expert
+          "Fourier", "Complex_Vectors", -- fft2
+          "RA", "RC", "RG", "RU", "Types", -- nucleic2
+          "ChessSetArray", "ChessSetList", "KnightHeuristic", "Queue", "Sort", -- knights
+          "Mandel", -- mandel
+          "Move", "Problem", "Solution", -- mate
+          "Board", "Game", "Prog", "Tree", "Wins", -- minimax
+          "CharSeq", "Pretty", -- pretty
+          "IntLib", "MyRandom", "Prime", -- primetest
+          "Digraph" -- scc
+        ]
       -> Right True
     -- These get wrappers generated for them: be very eager to inline the wrappers
       | isPrimOpId x || isDataConWorkId x
