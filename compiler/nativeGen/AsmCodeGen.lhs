@@ -151,10 +151,11 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> Stream IO RawCmmGroup () -> IO ()
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> Stream IO RawCmmGroup ()
+              -> IO UniqSupply
 nativeCodeGen dflags h us cmms
  = let platform = targetPlatform dflags
-       nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+       nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO UniqSupply
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -239,7 +240,7 @@ noAllocMoreStack amount _
 nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
-               -> Handle -> UniqSupply -> Stream IO RawCmmGroup () -> IO ()
+               -> Handle -> UniqSupply -> Stream IO RawCmmGroup () -> IO UniqSupply
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
         let platform = targetPlatform dflags
@@ -248,7 +249,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        (imports, prof) <- cmmNativeGenStream dflags ncgImpl bufh us split_cmms [] [] 0
+        (imports, prof, us') <- cmmNativeGenStream dflags ncgImpl bufh us split_cmms [] [] 0
         bFlush bufh
 
         let (native, colorStats, linearStats)
@@ -293,7 +294,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
                 $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat imports)
 
-        return  ()
+        return us'
 
  where  add_split tops
                 | gopt Opt_SplitObjs dflags = split_marker : tops
@@ -316,13 +317,14 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
               -> IO ( [[CLabel]],
                       [([NatCmmDecl statics instr],
                       Maybe [Color.RegAllocStats statics instr],
-                      Maybe [Linear.RegAllocStats])] )
+                      Maybe [Linear.RegAllocStats])],
+                      UniqSupply )
 
 cmmNativeGenStream dflags ncgImpl h us cmm_stream impAcc profAcc count
  = do
         r <- Stream.runStream cmm_stream
         case r of
-          Left () -> return (reverse impAcc, reverse profAcc)
+          Left () -> return (reverse impAcc, reverse profAcc, us)
           Right (cmms, cmm_stream') -> do
             (impAcc,profAcc,us') <- cmmNativeGens dflags ncgImpl h us cmms
                                               impAcc profAcc count
