@@ -571,8 +571,10 @@ f $ x                   =  f x
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
 until                   :: (a -> Bool) -> (a -> a) -> a -> a
-until p f x | p x       =  x
-            | otherwise =  until p f (f x)
+until p f = go
+  where
+    go x | p x          = x
+         | otherwise    = go (f x)
 
 -- | 'asTypeOf' is a type-restricted version of 'const'.  It is usually
 -- used as an infix operator, and its typing forces its first argument
