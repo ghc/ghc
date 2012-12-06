@@ -870,16 +870,17 @@ rules   :: { OrdList (LHsDecl RdrName) }
         |  {- empty -}                          { nilOL }
 
 rule    :: { LHsDecl RdrName }
-        : STRING activation rule_forall infixexp '=' exp
+        : STRING rule_activation rule_forall infixexp '=' exp
              { LL $ RuleD (HsRule (getSTRING $1) 
                                   ($2 `orElse` AlwaysActive) 
                                   $3 $4 placeHolderNames $6 placeHolderNames) }
 
-activation :: { Maybe Activation } 
+-- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
+rule_activation :: { Maybe Activation } 
         : {- empty -}                           { Nothing }
-        | explicit_activation                   { Just $1 }
+        | rule_explicit_activation              { Just $1 }
 
-explicit_activation :: { Activation }  -- In brackets
+rule_explicit_activation :: { Activation }  -- In brackets
         : '[' INTEGER ']'               { ActiveAfter  (fromInteger (getINTEGER $2)) }
         | '[' '~' INTEGER ']'           { ActiveBefore (fromInteger (getINTEGER $3)) }
         | '[' '~' ']'                   { NeverActive }
@@ -1373,6 +1374,14 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                             | t <- $5] }
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 { LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
+
+activation :: { Maybe Activation } 
+        : {- empty -}                           { Nothing }
+        | explicit_activation                   { Just $1 }
+
+explicit_activation :: { Activation }  -- In brackets
+        : '[' INTEGER ']'               { ActiveAfter  (fromInteger (getINTEGER $2)) }
+        | '[' '~' INTEGER ']'           { ActiveBefore (fromInteger (getINTEGER $3)) }
 
 -----------------------------------------------------------------------------
 -- Expressions

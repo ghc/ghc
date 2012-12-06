@@ -9469,6 +9469,9 @@ The "[2]" means that the rule is active in Phase 2 and subsequent phases.  The i
 notation "[~2]" is also accepted, meaning that the rule is active up to, but not including,
 Phase 2.
 </para>
+<para>
+Rules support the special phase-control notation "[~]", which means the rule is never active.
+</para>
 </listitem>
 
 
