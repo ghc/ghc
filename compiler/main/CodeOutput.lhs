@@ -83,7 +83,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
         ; return stubs_exist
         }
 
-doOutput :: String -> (Handle -> IO ()) -> IO ()
+doOutput :: String -> (Handle -> IO a) -> IO a
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 \end{code}
 
@@ -144,9 +144,10 @@ outputAsm dflags filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       {-# SCC "OutputAsm" #-} doOutput filenm $
+       _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
            \f -> {-# SCC "NativeCodeGen" #-}
                  nativeCodeGen dflags f ncg_uniqs cmm_stream
+       return ()
 
  | otherwise
   = panic "This compiler was built without a native code generator"

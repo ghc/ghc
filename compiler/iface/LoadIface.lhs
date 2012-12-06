@@ -61,6 +61,8 @@ import FastString
 import Fingerprint
 
 import Control.Monad
+import Data.IORef
+import System.FilePath
 \end{code}
 
 
@@ -504,57 +506,71 @@ findAndReadIface :: SDoc -> Module
         -- sometimes it's ok to fail... see notes with loadInterface
 
 findAndReadIface doc_str mod hi_boot_file
-  = do  { traceIf (sep [hsep [ptext (sLit "Reading"), 
-                              if hi_boot_file 
-                                then ptext (sLit "[boot]") 
-                                else empty,
-                              ptext (sLit "interface for"), 
-                              ppr mod <> semi],
-                        nest 4 (ptext (sLit "reason:") <+> doc_str)])
+  = do traceIf (sep [hsep [ptext (sLit "Reading"), 
+                           if hi_boot_file 
+                             then ptext (sLit "[boot]") 
+                             else empty,
+                           ptext (sLit "interface for"), 
+                           ppr mod <> semi],
+                     nest 4 (ptext (sLit "reason:") <+> doc_str)])
 
-        -- Check for GHC.Prim, and return its static interface
-        ; dflags <- getDynFlags
-        ; if mod == gHC_PRIM
-          then return (Succeeded (ghcPrimIface,
+       -- Check for GHC.Prim, and return its static interface
+       if mod == gHC_PRIM
+           then return (Succeeded (ghcPrimIface,
                                    "<built in interface for GHC.Prim>"))
-          else do
+           else do
+               dflags <- getDynFlags
+               -- Look for the file
+               hsc_env <- getTopEnv
+               mb_found <- liftIO (findExactModule hsc_env mod)
+               case mb_found of
+                   Found loc mod -> do 
 
-        -- Look for the file
-        ; hsc_env <- getTopEnv
-        ; mb_found <- liftIO (findExactModule hsc_env mod)
-        ; case mb_found of {
-              
-              Found loc mod -> do 
+                       -- Found file, so read it
+                       let file_path = addBootSuffix_maybe hi_boot_file
+                                                           (ml_hi_file loc)
 
-        -- Found file, so read it
-        { let { file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc) }
-
-        -- If the interface is in the current package then if we could
-        -- load it would already be in the HPT and we assume that our
-        -- callers checked that.
-        ; if thisPackage dflags == modulePackageId mod
-                && not (isOneShot (ghcMode dflags))
-            then return (Failed (homeModError mod loc))
-            else do {
-
-        ; traceIf (ptext (sLit "readIFace") <+> text file_path)
-        ; read_result <- readIface mod file_path hi_boot_file
-        ; case read_result of
-            Failed err -> return (Failed (badIfaceFile file_path err))
-            Succeeded iface 
-                | mi_module iface /= mod ->
-                  return (Failed (wrongIfaceModErr iface mod file_path))
-                | otherwise ->
-                  return (Succeeded (iface, file_path))
-                        -- Don't forget to fill in the package name...
-        }}
-            ; err -> do
-                { traceIf (ptext (sLit "...not found"))
-                ; dflags <- getDynFlags
-                ; return (Failed (cannotFindInterface dflags 
-                                        (moduleName mod) err)) }
-        }
-        }
+                       -- If the interface is in the current package
+                       -- then if we could load it would already be in
+                       -- the HPT and we assume that our callers checked
+                       -- that.
+                       if thisPackage dflags == modulePackageId mod &&
+                          not (isOneShot (ghcMode dflags))
+                           then return (Failed (homeModError mod loc))
+                           else do r <- read_file file_path
+                                   checkBuildDynamicToo r
+                                   return r
+                   err -> do
+                       traceIf (ptext (sLit "...not found"))
+                       dflags <- getDynFlags
+                       return (Failed (cannotFindInterface dflags 
+                                           (moduleName mod) err))
+    where read_file file_path = do
+              traceIf (ptext (sLit "readIFace") <+> text file_path)
+              read_result <- readIface mod file_path hi_boot_file
+              case read_result of
+                Failed err -> return (Failed (badIfaceFile file_path err))
+                Succeeded iface 
+                    | mi_module iface /= mod ->
+                      return (Failed (wrongIfaceModErr iface mod file_path))
+                    | otherwise ->
+                      return (Succeeded (iface, file_path))
+                            -- Don't forget to fill in the package name...
+          checkBuildDynamicToo (Succeeded (iface, filePath)) = do
+              dflags <- getDynFlags
+              when (gopt Opt_BuildDynamicToo dflags) $ do
+                  let ref = canGenerateDynamicToo dflags
+                  b <- liftIO $ readIORef ref
+                  when b $ do
+                      let dynFilePath = replaceExtension filePath (dynHiSuf dflags)
+                      r <- read_file dynFilePath
+                      case r of
+                          Succeeded (dynIface, _)
+                           | mi_mod_hash iface == mi_mod_hash dynIface ->
+                              return ()
+                          _ ->
+                              liftIO $ writeIORef ref False
+          checkBuildDynamicToo _ = return ()
 \end{code}
 
 @readIface@ tries just the one file.
