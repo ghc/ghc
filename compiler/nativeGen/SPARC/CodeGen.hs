@@ -641,6 +641,8 @@ outOfLineMachOp_table mop
         MO_F64_Cosh   -> fsLit "cosh"
         MO_F64_Tanh   -> fsLit "tanh"
 
+        MO_UF_Conv w -> fsLit $ word2FloatLabel w
+
         MO_Memcpy    -> fsLit "memcpy"
         MO_Memset    -> fsLit "memset"
         MO_Memmove   -> fsLit "memmove"
