@@ -1001,6 +1001,9 @@ cLoad expr rep
           bewareLoadStoreAlignment ArchMipseb   = True
           bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
+          -- Pessimistically assume that they will also cause problems
+          -- on unknown arches
+          bewareLoadStoreAlignment ArchUnknown  = True
           bewareLoadStoreAlignment _            = False
 
 isCmmWordType :: DynFlags -> CmmType -> Bool
