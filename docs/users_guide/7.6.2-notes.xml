@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-6-2">
+  <title>Release notes for version 7.6.2</title>
+
+  <para>
+    The 7.6.2 release is a bugfix release. The changes relative to
+    7.6.1 are listed below.
+  </para>
+
+  <sect2>
+    <title>GHC</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            A long-standing typechecker bug which allowed
+            <literal>unsafeCoerce</literal> to be written has been
+            fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug has been fixed that caused GHC to sometimes not
+            realise that recompilation was necessary.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            If both <literal>-H</literal> and a
+            <literal>-M&lt;size&gt;</literal> flag are given, then
+            GHC will no longer exceed the maximum heap size.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            An off-by-one error, which could cause segfaults, in the
+            RTS flag parsing has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            Various bugs that could cause GHC to panic when compiling
+            certain source files have been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            Some bugs in type checking the
+            <literal>DataKinds</literal> and
+            <literal>PolyKinds</literal>
+            extensions have been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            Performance of compiled programs has been improved in
+            some cases.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug in the RTS, which caused programs to keep waking up
+            when they should be idle, has been fixed. This will
+            particularly help long-running often-idle programs such as
+            xmonad.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            It is now possible to build on Sparc/Solaris with a
+            non-GNU linker.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug which caused GHCi to fail to start on some 64bit
+            Windows installations has been fixed. GHCi can now only
+            use a 32bit address space on 64bit Windows.
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Haddock</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            Haddock now handles deprecation messages for re-exported
+            entities correctly.
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Hsc2hs</title>
+
+    <itemizedlist>
+       <listitem>
+          <para>
+            Hsc2hs now handles absolute filenames on Windows correctly.
+          </para>
+       </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+           <listitem>
+              <para>
+                Version number 4.6.0.1 (was 4.6.0.0)
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                A bug in division of 64bit values on 32bit platforms has
+                been fixed.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                The <literal>labelThread</literal> function now handles
+                Unicode values correctly.
+              </para>
+           </listitem>
+           <listitem>
+              <para>
+                There have been some build fixes for building on NetBSD.
+              </para>
+           </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.10.0.2 (was 0.10.0.0)
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    A bug has been fixed that could cause programs using
+                    <literal>ByteString</literal>s to give the wrong
+                    result.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.2.0.1 (was 1.2.0.0)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.6.0.1 (was 2.6.0.0)
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    Fixed a bug which caused memory corruption when
+                    <literal>putEnv</literal> is used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+  </sect2>
+</sect1>
+
