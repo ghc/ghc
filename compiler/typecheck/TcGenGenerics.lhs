@@ -324,17 +324,15 @@ canDoGenerics1_w rep_tc
     representable ty = case tcSplitTyConApp_maybe ty of
       Nothing -> return Nothing
       -- if it's a type constructor, it has to be representable
-      Just (tc, tc_args) -> do
+      Just (tc, _) -> do
         let n = tyConName tc
         s <- S.get
         -- internally assume that recursive occurrences are OK
         if n `elem` s then return Nothing else do
           S.put (n : s)
-          fmap {-maybe-} (\_ -> bad_app tc) -- don't give the message, just name what wasn't representable
-            `fmap` {-state-} case canDoGenerics tc tc_args of
-              j@(Just _) -> return j
-              -- only check Generic1 if it passes Generic
-              Nothing -> canDoGenerics1_w tc
+          fmap {-maybe-} (\_ -> bad_app tc) -- don't give the message, just
+                                            -- name what wasn't representable
+            `fmap` {-state-} canDoGenerics1_w tc
 
     existential = (ptext . sLit) "must not have existential arguments"
     covariant   = (ptext . sLit) "must not use the last type parameter in a function argument"
