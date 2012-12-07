@@ -37,7 +37,6 @@ import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
-import qualified TysPrim
 import TysWiredIn( unitTy )
 import Type
 import Kind
@@ -1251,8 +1250,8 @@ chooseBoxingStrategy dflags arg_ty bang
             Just (arg_tycon, _)
               | isAbstractTyCon arg_tycon -> False
                       -- See Note [Don't complain about UNPACK on abstract TyCons]
-              | isPrimTyCon arg_tycon &&
-                arg_tycon `elem` ptrSizedPrimTyCons -> True
+              | isPrimTyCon arg_tycon && hasPtrSizedRep (tyConPrimRep arg_tycon)
+              -> True
               -- TODO: Check that the PrimTyCon corresponds to a type
               -- with pointer-sized representation.
               | isEmptyDataTyCon arg_tycon -> True
@@ -1261,25 +1260,22 @@ chooseBoxingStrategy dflags arg_ty bang
               -> can_unbox_prim ty
               | otherwise -> False
 
-ptrSizedPrimTyCons :: [TyCon]
-ptrSizedPrimTyCons =
-    [ TysPrim.addrPrimTyCon
-    , TysPrim.arrayPrimTyCon
-    , TysPrim.byteArrayPrimTyCon
-    , TysPrim.arrayArrayPrimTyCon
-    , TysPrim.charPrimTyCon
-    , TysPrim.doublePrimTyCon
-    , TysPrim.floatPrimTyCon
-    , TysPrim.intPrimTyCon
-    , TysPrim.int32PrimTyCon
-    , TysPrim.int64PrimTyCon
-    , TysPrim.mutableArrayPrimTyCon
-    , TysPrim.mutableByteArrayPrimTyCon
-    , TysPrim.mutableArrayArrayPrimTyCon
-    , TysPrim.wordPrimTyCon
-    , TysPrim.word32PrimTyCon
-    , TysPrim.word64PrimTyCon
-    ]
+
+-- | Return True if representation can be considered pointer-sized (or
+-- smaller) in the context of unpacking.
+hasPtrSizedRep :: PrimRep -> Bool
+-- We explicitly enumerate the PrimReps so that if another PrimRep is
+-- ever added we'll get a pattern match warning which will make sure
+-- we consider the new case here:
+hasPtrSizedRep IntRep   = True
+hasPtrSizedRep WordRep  = True
+hasPtrSizedRep Int64Rep = True  -- See Note [Primitive size exception]
+hasPtrSizedRep Word64Rep= True  -- See Note [Primitive size exception]
+hasPtrSizedRep FloatRep = True  -- NB. might not take a full word
+hasPtrSizedRep DoubleRep= True  -- See Note [Primitive size exception]
+hasPtrSizedRep AddrRep  = True
+hasPtrSizedRep PtrRep   = True
+hasPtrSizedRep VoidRep  = True
 
 \end{code}
 
@@ -1306,6 +1302,13 @@ good for T, because then we'd get an infinite number of arguments.
 But it's the *argument* type that matters. This is fine:
 	data S = MkS S !Int
 because Int is non-recursive.
+
+Note [Primitive size exception]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For consistency reasons we make an exception to the size requirement
+for Doubles, Word64s, and Int64s on 32-bit architectures. Not doing so
+might have surprising performance implications if code is moved from a
+64-bit to a 32-bit architecture.
 
 
 %************************************************************************
