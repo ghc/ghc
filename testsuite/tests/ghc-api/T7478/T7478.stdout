@@ -1,0 +1,8 @@
+----- 0 ------
+(0,"[1 of 2] Compiling B                ( B.hs, B.o )")
+(0,"[2 of 2] Compiling Main             ( A.hs, A.o )")
+----- 1 ------
+(1,"[2 of 2] Compiling Main             ( A.hs, A.o )")
+----- 2 ------
+(2,"[1 of 1] Compiling Main             ( C.hs, C.o )")
+(2,"Linking A ...")
