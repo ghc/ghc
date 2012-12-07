@@ -29,9 +29,8 @@ extra-source-files:
   haddock.spec
   haskell.vim
   src/haddock.sh
--- The test files shouldn't have to go here, but the source files for
--- the test-suite stanzas don't get picked up by `cabal sdist`.
-  tests/html-test/run.lhs
+  html-test/src/*.hs
+  html-test/ref/*.html
 
 data-dir:   resources
 data-files: html/frames.html
@@ -198,6 +197,10 @@ test-suite spec
       test
     , test/nanospec
     , src
+
+  other-modules:
+      Test.Hspec
+      Haddock.ParseSpec
 
   build-depends:
       base
