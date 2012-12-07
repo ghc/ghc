@@ -294,7 +294,7 @@ canDoGenerics1_w rep_tc
 
     check_vanilla :: DataCon -> Maybe SDoc
     check_vanilla con | isVanillaDataCon con = Nothing
-    		      | otherwise	     = Just (bad con existential)
+                      | otherwise            = Just (bad con existential)
 
     -- the Bool is if the parameter occurs in the type
     ft_check :: DataCon -> FFoldType (Bool, S.State [Name] (Maybe SDoc))
@@ -306,7 +306,7 @@ canDoGenerics1_w rep_tc
                         -- applications, so we must compensate with extra logic
                         -- to ensure that the variable only occurs as the last
                         -- argument.
-	      	      , ft_fun = \x y -> if fst x then (True, return $ Just $ bad con wrong_arg)
+                      , ft_fun = \x y -> if fst x then (True, return $ Just $ bad con wrong_arg)
                                          else x `bmplus` y
                       , ft_tup = \_ xs ->
                           if not (null xs) && any fst (init xs)
