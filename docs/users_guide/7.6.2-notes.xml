@@ -75,6 +75,13 @@
 
        <listitem>
           <para>
+            A bug in the RTS, which could cause programs to hang or
+            segfault just before they terminate, has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
             It is now possible to build on Sparc/Solaris with a
             non-GNU linker.
           </para>
@@ -85,6 +92,57 @@
             A bug which caused GHCi to fail to start on some 64bit
             Windows installations has been fixed. GHCi can now only
             use a 32bit address space on 64bit Windows.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            An interaction between Template Haskell and
+            <literal>-fdefer-type-errors</literal> that could cause
+            segfaults has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            If reloading some modules fails, GHCi will now not unload
+            modules that are unaffected by the failure.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug that caused crashes when
+            <literal>threadDelay</literal> is used with large arguments
+            has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug which could cause segfaults when the
+            <literal>-xc</literal> RTS flag is used has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug which caused duplicate type signatures to not be
+            reported in some circumstance has been fixed.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            Using the <literal>-fth</literal> flag now gives a
+            deprecated message.
+          </para>
+       </listitem>
+
+       <listitem>
+          <para>
+            A bug that could cause spurious warnings when making rules
+            involving primops has been fixed.
           </para>
        </listitem>
     </itemizedlist>
