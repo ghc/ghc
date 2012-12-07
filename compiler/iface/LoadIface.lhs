@@ -568,8 +568,12 @@ findAndReadIface doc_str mod hi_boot_file
                           Succeeded (dynIface, _)
                            | mi_mod_hash iface == mi_mod_hash dynIface ->
                               return ()
-                          _ ->
-                              liftIO $ writeIORef ref False
+                           | otherwise ->
+                              do traceIf (text "Dynamic hash doesn't match")
+                                 liftIO $ writeIORef ref False
+                          Failed err ->
+                              do traceIf (text "Failed to load dynamic interface file:" $$ err)
+                                 liftIO $ writeIORef ref False
           checkBuildDynamicToo _ = return ()
 \end{code}
 

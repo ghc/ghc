@@ -1115,7 +1115,7 @@ wayOptP _ WayNDP      = []
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- refCanGenerateDynamicToo <- newIORef False
+ refCanGenerateDynamicToo <- newIORef True
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refFilesToNotIntermediateClean <- newIORef []
