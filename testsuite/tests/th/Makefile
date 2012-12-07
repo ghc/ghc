@@ -8,6 +8,9 @@ T2386:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T2386_Lib.hs -fforce-recomp
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T2386.hs -fforce-recomp
 
+T7445:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T7445a.hs -fforce-recomp
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T7445.hs -fforce-recomp
 
 HC_OPTS = -XTemplateHaskell -package template-haskell
 
