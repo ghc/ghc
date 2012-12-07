@@ -1,3 +1,14 @@
+Changes in version 2.13.2
+
+ * Handle HsExplicitListTy in renameer (#213)
+
+ * Allow haddock markup in deprecation messages
+
+ * Export more types from Documentation.Haddock
+
+ * Include everything that is required to run the test suite with the cabal
+   package (#230)
+
 Changes in version 2.13.1
 
  * Hide instances that are "internal" to a module
