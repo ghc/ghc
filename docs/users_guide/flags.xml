@@ -1740,6 +1740,14 @@
           </row>
 
           <row>
+            <entry><option>-funbox-strict-primitive-fields</option></entry>
+            <entry>Flatten strict constructor fields with a
+              pointer-sized representation</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-unbox-strict-primitive-fields</option></entry>
+          </row>
+
+          <row>
             <entry><option>-funfolding-creation-threshold</option></entry>
             <entry>Tweak unfolding settings</entry>
             <entry>dynamic</entry>
