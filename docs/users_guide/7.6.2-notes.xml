@@ -145,6 +145,14 @@
             involving primops has been fixed.
           </para>
        </listitem>
+
+       <listitem>
+          <para>
+            The GHC API now consistently uses new
+            <literal>DynFlags</literal> which are set with
+            <literal>setSessionDynFlags</literal>.
+          </para>
+       </listitem>
     </itemizedlist>
   </sect2>
 
