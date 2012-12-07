@@ -1871,9 +1871,9 @@ f "2"    = 2
             <para>This option causes all constructor fields which are marked
             strict (i.e. &ldquo;!&rdquo;) and which representation is smaller or
             equal to the size of a pointer to be unpacked if possible. It is
-            equivalent to adding an <literal>UNPACK</literal> pragma to every
-            strict constructor field that fullfills the size restriction. (see
-            <xref linkend="unpack-pragma"/>).
+            equivalent to adding an <literal>UNPACK</literal> pragma (see <xref
+            linkend="unpack-pragma"/>) to every strict constructor field that
+            fullfills the size restriction.
             </para>
 
             <para>This option is less of a sledgehammer than
@@ -1882,6 +1882,13 @@ f "2"    = 2
             to turn on unboxing by default you can disable it for certain
             constructor fields using the <literal>NOUNPACK</literal> pragma (see
             <xref linkend="nounpack-pragma"/>).</para>
+
+            <para>
+            Note that for consistency <literal>Double</literal>,
+            <literal>Word64</literal>, and <literal>Int64</literal> constructor
+            fields are unpacked on 32-bit platforms, even though they are
+            technically larger than a pointer on those platforms.
+            </para>
           </listitem>
         </varlistentry>
 
