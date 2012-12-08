@@ -970,7 +970,7 @@ data Way
   | WayGran
   | WayNDP
   | WayDyn
-  deriving (Eq,Ord)
+  deriving (Eq, Ord, Show)
 
 allowed_combination :: [Way] -> Bool
 allowed_combination way = and [ x `allowedWith` y
@@ -1119,7 +1119,8 @@ doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0
                                          hiSuf = dynHiSuf dflags2,
                                          objectSuf = dynObjectSuf dflags2
                                      }
-                       in dflags3
+                           dflags4 = updateWays dflags3
+                       in dflags4
 
 -----------------------------------------------------------------------------
 
@@ -1759,14 +1760,8 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
-
-      theWays = sort $ nub $ ways dflags2
-      theBuildTag = mkBuildTag (filter (not . wayRTSOnly) theWays)
-      dflags3 = dflags2 {
-                    ways        = theWays,
-                    buildTag    = theBuildTag,
-                    rtsBuildTag = mkBuildTag theWays
-                }
+      dflags3 = updateWays dflags2
+      theWays = ways dflags3
 
   unless (allowed_combination theWays) $
       throwGhcException (CmdLineError ("combination not supported: "  ++
@@ -1778,6 +1773,15 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
 
+updateWays :: DynFlags -> DynFlags
+updateWays dflags
+    = let theWays = sort $ nub $ ways dflags
+          theBuildTag = mkBuildTag (filter (not . wayRTSOnly) theWays)
+      in dflags {
+             ways        = theWays,
+             buildTag    = theBuildTag,
+             rtsBuildTag = mkBuildTag theWays
+         }
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.

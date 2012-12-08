@@ -561,7 +561,7 @@ findAndReadIface doc_str mod hi_boot_file
               when (gopt Opt_BuildDynamicToo dflags) $ do
                   let ref = canGenerateDynamicToo dflags
                   b <- liftIO $ readIORef ref
-                  when b $ do
+                  when b $ withDoDynamicToo $ do
                       let dynFilePath = replaceExtension filePath (dynHiSuf dflags)
                       r <- read_file dynFilePath
                       case r of

@@ -306,6 +306,15 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 \end{code}
 
 \begin{code}
+withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+withDoDynamicToo m = do env <- getEnv
+                        let dflags = extractDynFlags env
+                            dflags' = doDynamicToo dflags
+                            env' = replaceDynFlags env dflags'
+                        setEnv env' m
+\end{code}
+
+\begin{code}
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
 
