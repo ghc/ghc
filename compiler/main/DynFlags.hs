@@ -707,6 +707,7 @@ class HasDynFlags m where
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
+    replaceDynFlags :: t -> DynFlags -> t
 
 data ProfAuto
   = NoProfAuto         -- ^ no SCC annotations added

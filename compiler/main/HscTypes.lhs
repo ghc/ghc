@@ -326,6 +326,10 @@ data HscEnv
                 -- 'TcRunTypes.TcGblEnv'
  }
 
+instance ContainsDynFlags HscEnv where
+    extractDynFlags env = hsc_dflags env
+    replaceDynFlags env dflags = env {hsc_dflags = dflags}
+
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
