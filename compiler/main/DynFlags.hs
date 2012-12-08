@@ -27,6 +27,7 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,
+        doDynamicToo,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1047,16 +1048,16 @@ wayGeneralFlags _ WayPar      = [Opt_Parallel]
 wayGeneralFlags _ WayGran     = [Opt_GranMacros]
 wayGeneralFlags _ WayNDP      = []
 
-wayExtras :: Platform -> Way -> DynP ()
-wayExtras _ WayThreaded = return ()
-wayExtras _ WayDebug    = return ()
-wayExtras _ WayDyn      = return ()
-wayExtras _ WayProf     = return ()
-wayExtras _ WayEventLog = return ()
-wayExtras _ WayPar      = exposePackage "concurrent"
-wayExtras _ WayGran     = exposePackage "concurrent"
-wayExtras _ WayNDP      = do setExtensionFlag Opt_ParallelArrays
-                             setGeneralFlag Opt_Vectorise
+wayExtras :: Platform -> Way -> DynFlags -> DynFlags
+wayExtras _ WayThreaded dflags = dflags
+wayExtras _ WayDebug    dflags = dflags
+wayExtras _ WayDyn      dflags = dflags
+wayExtras _ WayProf     dflags = dflags
+wayExtras _ WayEventLog dflags = dflags
+wayExtras _ WayPar      dflags = exposePackage' "concurrent" dflags
+wayExtras _ WayGran     dflags = exposePackage' "concurrent" dflags
+wayExtras _ WayNDP      dflags = setExtensionFlag' Opt_ParallelArrays
+                               $ setGeneralFlag' Opt_Vectorise dflags
 
 wayOptc :: Platform -> Way -> [String]
 wayOptc platform WayThreaded = case platformOS platform of
@@ -1110,6 +1111,15 @@ wayOptP _ WayEventLog = ["-DTRACING"]
 wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
 wayOptP _ WayGran     = ["-D__GRANSIM__"]
 wayOptP _ WayNDP      = []
+
+doDynamicToo :: DynFlags -> DynFlags
+doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0
+                           dflags2 = addWay' WayDyn dflags1
+                           dflags3 = dflags2 {
+                                         hiSuf = dynHiSuf dflags2,
+                                         objectSuf = dynObjectSuf dflags2
+                                     }
+                       in dflags3
 
 -----------------------------------------------------------------------------
 
@@ -2865,11 +2875,14 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 --------------------------
 addWay :: Way -> DynP ()
-addWay w = do upd (\dfs -> dfs { ways = w : ways dfs })
-              dfs <- liftEwM getCmdLineState
-              let platform = targetPlatform dfs
-              wayExtras platform w
-              mapM_ setGeneralFlag $ wayGeneralFlags platform w
+addWay w = upd (addWay' w)
+
+addWay' :: Way -> DynFlags -> DynFlags
+addWay' w dflags0 = let platform = targetPlatform dflags0
+                        dflags1 = dflags0 { ways = w : ways dflags0 }
+                        dflags2 = wayExtras platform w dflags1
+                        dflags3 = foldr setGeneralFlag' dflags2 (wayGeneralFlags platform w)
+                    in dflags3
 
 removeWay :: Way -> DynP ()
 removeWay w = do
@@ -2883,8 +2896,13 @@ removeWay w = do
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
-setGeneralFlag   f = upd (\dfs -> gopt_set dfs f)
-unSetGeneralFlag f = upd (\dfs -> gopt_unset dfs f)
+setGeneralFlag   f = upd (setGeneralFlag' f)
+unSetGeneralFlag f = upd (unSetGeneralFlag' f)
+
+setGeneralFlag' :: GeneralFlag -> DynFlags -> DynFlags
+setGeneralFlag' f dflags = gopt_set dflags f
+unSetGeneralFlag' :: GeneralFlag -> DynFlags -> DynFlags
+unSetGeneralFlag' f dflags = gopt_unset dflags f
 
 --------------------------
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
@@ -2893,17 +2911,20 @@ unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
-setExtensionFlag f = do upd (\dfs -> xopt_set dfs f)
-                        sequence_ deps
+setExtensionFlag f = upd (setExtensionFlag' f)
+unSetExtensionFlag f = upd (unSetExtensionFlag' f)
+
+setExtensionFlag', unSetExtensionFlag' :: ExtensionFlag -> DynFlags -> DynFlags
+setExtensionFlag' f dflags = foldr ($) (xopt_set dflags f) deps
   where
-    deps = [ if turn_on then setExtensionFlag   d
-                        else unSetExtensionFlag d
+    deps = [ if turn_on then setExtensionFlag'   d
+                        else unSetExtensionFlag' d
            | (f', turn_on, d) <- impliedFlags, f' == f ]
         -- When you set f, set the ones it implies
         -- NB: use setExtensionFlag recursively, in case the implied flags
         --     implies further flags
 
-unSetExtensionFlag f = upd (\dfs -> xopt_unset dfs f)
+unSetExtensionFlag' f dflags = xopt_unset dflags f
    -- When you un-set f, however, we don't un-set the things it implies
    --      (except for -fno-glasgow-exts, which is treated specially)
 
@@ -2973,8 +2994,7 @@ clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
 exposePackage, exposePackageId, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
-exposePackage p =
-  upd (\s -> s{ packageFlags = ExposePackage p : packageFlags s })
+exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags = ExposePackageId p : packageFlags s })
 hidePackage p =
@@ -2985,6 +3005,10 @@ trustPackage p = exposePackage p >> -- both trust and distrust also expose a pac
   upd (\s -> s{ packageFlags = TrustPackage p : packageFlags s })
 distrustPackage p = exposePackage p >>
   upd (\s -> s{ packageFlags = DistrustPackage p : packageFlags s })
+
+exposePackage' :: String -> DynFlags -> DynFlags
+exposePackage' p dflags
+    = dflags { packageFlags = ExposePackage p : packageFlags dflags }
 
 setPackageName :: String -> DynFlags -> DynFlags
 setPackageName p s =  s{ thisPackage = stringToPackageId p }
