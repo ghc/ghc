@@ -170,16 +170,21 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
                                        ++ [tycon | VectClass tycon              <- vectClassDecls])
                                       \\ tycons
                
-               -- {-# VECTORISE [SCALAR] type T = Tv -#} (imported & local tycons with an /RHS/)
-             vectTyConsWithRHS      = [ (tycon, rhs, isScalar) 
-                                      | VectType isScalar tycon (Just rhs) <- vectTypeDecls]
+               -- {-# VECTORISE type T = Tv -#} (imported & local tycons with an /RHS/)
+             vectTyConsWithRHS      = [ (tycon, rhs)
+                                      | VectType False tycon (Just rhs) <- vectTypeDecls]
+
+               -- {-# VECTORISE SCALAR type T = Tv -#} (imported & local tycons with an /RHS/)
+             scalarTyConsWithRHS    = [ (tycon, rhs) 
+                                      | VectType True  tycon (Just rhs) <- vectTypeDecls]
 
                -- {-# VECTORISE SCALAR type T -#} (imported & local /scalar/ tycons without an RHS)
              scalarTyConsNoRHS      = [tycon | VectType True tycon Nothing <- vectTypeDecls]
 
                -- Check that is not a VECTORISE SCALAR tycon nor VECTORISE tycons with explicit rhs?
              vectSpecialTyConNames  = mkNameSet . map tyConName $ 
-                                        scalarTyConsNoRHS ++ map fst3 vectTyConsWithRHS
+                                        scalarTyConsNoRHS ++ 
+                                        map fst (vectTyConsWithRHS ++ scalarTyConsWithRHS)
              notVectSpecialTyCon tc = not $ (tyConName tc) `elemNameSet` vectSpecialTyConNames
 
          -- Build a map containing all vectorised type constructor. If the vectorised type
@@ -191,7 +196,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
              vectTyConFlavour = vectTyConBase 
                                 `plusNameEnv` 
                                 mkNameEnv [ (tyConName tycon, True) 
-                                          | (tycon, _, _) <- vectTyConsWithRHS]
+                                          | (tycon, _) <- vectTyConsWithRHS ++ scalarTyConsWithRHS]
                                 `plusNameEnv`
                                 mkNameEnv [ (tyConName tycon, False)  -- original representation
                                           | tycon <- scalarTyConsNoRHS]
@@ -208,16 +213,16 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- Furthermore, 'par_tcs' are those type constructors (converted or not) whose
            -- definition, directly or indirectly, depends on parallel arrays. Finally, 'drop_tcs'
            -- are all type constructors that cannot be vectorised.
-       ; parallelTyCons <- (`addListToNameSet` map (tyConName . fst3) vectTyConsWithRHS) <$> 
+       ; parallelTyCons <- (`addListToNameSet` map (tyConName . fst) vectTyConsWithRHS) <$>
                              globalParallelTyCons
        ; let maybeVectoriseTyCons = filter notVectSpecialTyCon tycons ++ impVectTyCons
              (conv_tcs, keep_tcs, par_tcs, drop_tcs)
                = classifyTyCons vectTyConFlavour parallelTyCons maybeVectoriseTyCons
-             
-       ; traceVt " VECT SCALAR    : " $ ppr (scalarTyConsNoRHS ++ 
-                                             [tycon | (tycon, _, True) <- vectTyConsWithRHS])
+
+       ; traceVt " known parallel : " $ ppr parallelTyCons
+       ; traceVt " VECT SCALAR    : " $ ppr (scalarTyConsNoRHS ++ map fst scalarTyConsWithRHS)
        ; traceVt " VECT [class]   : " $ ppr impVectTyCons
-       ; traceVt " VECT with rhs  : " $ ppr (map fst3 vectTyConsWithRHS)
+       ; traceVt " VECT with rhs  : " $ ppr (map fst (vectTyConsWithRHS ++ scalarTyConsWithRHS))
        ; traceVt " -- after classification (local and VECT [class] tycons) --" empty
        ; traceVt " reuse          : " $ ppr keep_tcs
        ; traceVt " convert        : " $ ppr conv_tcs
@@ -230,7 +235,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            emitVt "Warning: cannot vectorise these type constructors:" $ 
              pprQuotedList drop_tcs_nosyn $$ explanation
 
-       ; mapM_ addParallelTyConAndCons $ par_tcs ++ [tc | (tc, _, False) <- vectTyConsWithRHS]
+       ; mapM_ addParallelTyConAndCons $ par_tcs ++ map fst vectTyConsWithRHS
 
        ; let mapping =      
                     -- Type constructors that we found we don't need to vectorise and those
@@ -240,7 +245,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
                   [(tycon, tycon, False) | tycon <- keep_tcs ++ scalarTyConsNoRHS]
                     -- We do the same for type constructors declared VECTORISE SCALAR /without/
                     -- an explicit right-hand side
-               ++ [(tycon, vTycon, True) | (tycon, vTycon, _) <- vectTyConsWithRHS]
+               ++ [(tycon, vTycon, True) | (tycon, vTycon) <- vectTyConsWithRHS ++ scalarTyConsWithRHS]
        ; syn_tcs <- catMaybes <$> mapM defTyConDataCons mapping
 
            -- Vectorise all the data type declarations that we can and must vectorise (enter the
