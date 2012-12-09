@@ -243,20 +243,29 @@ liftSimpleAndCase aexpr@((fvs, _vi), AnnCase expr bndr t alts)
     { vi <- vectAvoidInfoTypeOf expr
     ; if (vi == VISimple)
       then
-        return $ liftSimple aexpr  -- if the scrutinee is scalar, we need no special treatment
+        liftSimple aexpr  -- if the scrutinee is scalar, we need no special treatment
       else do
       { alts' <- mapM (\(ac, bndrs, aexpr) -> (ac, bndrs,) <$> liftSimpleAndCase aexpr) alts
       ; return ((fvs, vi), AnnCase expr bndr t alts')
       }
     }
-liftSimpleAndCase aexpr = return $ liftSimple aexpr
+liftSimpleAndCase aexpr = liftSimple aexpr
 
-liftSimple :: CoreExprWithVectInfo -> CoreExprWithVectInfo
-liftSimple ((fvs, vi), expr) 
-  = ASSERT(vi == VISimple)
-    mkAnnApps (mkAnnLams vars fvs expr) vars
+liftSimple :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
+liftSimple aexpr@((fvs_orig, VISimple), expr) 
+  = do 
+    { let liftedExpr = mkAnnApps (mkAnnLams vars fvs expr) vars
+
+    ; traceVt "encapsulate:" $ ppr (deAnnotate aexpr) $$ text "==>" $$ ppr (deAnnotate liftedExpr)
+
+    ; return $ liftedExpr
+    }
   where
     vars = varSetElems fvs
+    fvs  = filterVarSet isToplevel fvs_orig -- only include 'Id's that are not toplevel
+    
+    isToplevel v | isId v    = not . uf_is_top . realIdUnfolding $ v
+                 | otherwise = False
 
     mkAnnLams :: [Var] -> VarSet -> AnnExpr' Var (VarSet, VectAvoidInfo) -> CoreExprWithVectInfo
     mkAnnLams []     fvs expr = ASSERT(isEmptyVarSet fvs)
@@ -270,23 +279,31 @@ liftSimple ((fvs, vi), expr)
     mkAnnApp :: CoreExprWithVectInfo -> Var -> CoreExprWithVectInfo
     mkAnnApp aexpr@((fvs, _vi), _expr) v 
       = ((fvs `extendVarSet` v, VISimple), AnnApp aexpr ((unitVarSet v, VISimple), AnnVar v))
+liftSimple aexpr
+  = pprPanic "Vectorise.Exp.liftSimple: not simple" $ ppr (deAnnotate aexpr)
+
 
 -- |Vectorise an expression.
 --
 vectExpr :: CoreExprWithVectInfo -> VM VExpr
 
-vectExpr (_, AnnVar v)
+-- !!!FIXME: needs to check for VIEncaps regardless of syntactic form first; in case it is of functional type
+
+vectExpr aexpr@(_, AnnVar v)
+  | (isFunTy . varType $ v) && isVIEncaps aexpr
+  = vectFnExpr False False aexpr
+  | otherwise
   = vectVar v
 
 vectExpr (_, AnnLit lit)
   = vectConst $ Lit lit
 
-vectExpr e@(_, AnnLam bndr _)
-  | isId bndr = vectFnExpr True False e
+vectExpr aexpr@(_, AnnLam bndr _)
+  | isId bndr = vectFnExpr True False aexpr
   | otherwise 
   = do 
     { dflags <- getDynFlags
-    ; cantVectorise dflags "Unexpected type lambda (vectExpr)" $ ppr (deAnnotate e)
+    ; cantVectorise dflags "Unexpected type lambda (vectExpr)" $ ppr (deAnnotate aexpr)
     }
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
@@ -408,14 +425,18 @@ vectFnExpr inline loop_breaker expr@(_ann, AnnLam bndr body)
     ; vbody <- vectFnExpr inline loop_breaker body
     ; return $ mapVect (mkLams [vectorised vBndr]) vbody
     }
-    -- non-predicate abstraction: vectorise as a scalar computation
+    -- encapsulated non-predicate abstraction: vectorise as a scalar computation
   | isId bndr && isVIEncaps expr
   = vectScalarFun . deAnnotate $ expr
     -- non-predicate abstraction: vectorise as a non-scalar computation
   | isId bndr
   = vectLam inline loop_breaker expr
-vectFnExpr _ _  expr
-    -- not an abstraction: vectorise as a vanilla expression
+vectFnExpr _ _ expr
+    -- encapsulated function: vectorise as a scalar computation
+  | (isFunTy . annExprType $ expr) && isVIEncaps expr
+  = vectScalarFun . deAnnotate $ expr
+  | otherwise
+    -- not an abstraction: vectorise as a non-scalar vanilla expression
   = vectExpr expr
 
 -- |Vectorise type and dictionary applications.
@@ -543,7 +564,7 @@ vectDictExpr (Coercion coe)
 vectScalarFun :: CoreExpr -> VM VExpr
 vectScalarFun expr 
   = do 
-    { traceVt "vectScalarFun" (ppr expr) 
+    { traceVt "vectorise scalar functions:" (ppr expr) 
     ; let (arg_tys, res_ty) = splitFunTys (exprType expr)
     ; mkScalarFun arg_tys res_ty expr
     }

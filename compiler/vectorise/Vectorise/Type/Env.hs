@@ -205,11 +205,13 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- these are being handled separately.  NB: Some type constructors may be marked SCALAR
            -- /and/ have an explicit right-hand side.)
            --
-           -- Furthermore, 'par_tcs' and 'drop_tcs' are those type constructors that we cannot
-           -- vectorise, and of those, only the 'par_tcs' involve parallel arrays.
-       ; parallelTyCons <- globalParallelTyCons
+           -- Furthermore, 'par_tcs' are those type constructors (converted or not) whose
+           -- definition, directly or indirectly, depends on parallel arrays. Finally, 'drop_tcs'
+           -- are all type constructors that cannot be vectorised.
+       ; parallelTyCons <- (`addListToNameSet` map (tyConName . fst3) vectTyConsWithRHS) <$> 
+                             globalParallelTyCons
        ; let maybeVectoriseTyCons = filter notVectSpecialTyCon tycons ++ impVectTyCons
-             (conv_tcs, keep_tcs, par_tcs, drop_tcs) 
+             (conv_tcs, keep_tcs, par_tcs, drop_tcs)
                = classifyTyCons vectTyConFlavour parallelTyCons maybeVectoriseTyCons
              
        ; traceVt " VECT SCALAR    : " $ ppr (scalarTyConsNoRHS ++ 
@@ -223,12 +225,12 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- warn the user about unvectorised type constructors
        ; let explanation    = ptext (sLit "(They use unsupported language extensions") $$
                               ptext (sLit "or depend on type constructors that are not vectorised)")
-             drop_tcs_nosyn = filter (not . isSynTyCon) (par_tcs ++ drop_tcs)
+             drop_tcs_nosyn = filter (not . isSynTyCon) drop_tcs
        ; unless (null drop_tcs_nosyn) $
            emitVt "Warning: cannot vectorise these type constructors:" $ 
              pprQuotedList drop_tcs_nosyn $$ explanation
 
-       ; mapM_ addParallelTyConAndCons $ conv_tcs ++ par_tcs
+       ; mapM_ addParallelTyConAndCons $ par_tcs ++ [tc | (tc, _, False) <- vectTyConsWithRHS]
 
        ; let mapping =      
                     -- Type constructors that we found we don't need to vectorise and those

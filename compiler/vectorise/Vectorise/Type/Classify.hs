@@ -42,37 +42,37 @@ import Digraph
 -- * tycons which haven't been converted (because they can't or weren't vectorised) are not
 --   elements of the map
 --
-classifyTyCons :: UniqFM Bool                   -- ^type constructor vectorisation status
-               -> NameSet                       -- ^tycons involving parallel arrays
-               -> [TyCon]                       -- ^type constructors that need to be classified
-               -> ( [TyCon]                     -- to be converted
-                  , [TyCon]                     -- need not be converted (but could be)
-                  , [TyCon]                     -- can't be converted, but involve parallel arrays
-                  , [TyCon]                     -- can't be converted and have no parallel arrays
+classifyTyCons :: UniqFM Bool                  -- ^type constructor vectorisation status
+               -> NameSet                      -- ^tycons involving parallel arrays
+               -> [TyCon]                      -- ^type constructors that need to be classified
+               -> ( [TyCon]                    -- to be converted
+                  , [TyCon]                    -- need not be converted (but could be)
+                  , [TyCon]                    -- involve parallel arrays (whether converted or not)
+                  , [TyCon]                    -- can't be converted
                   )
 classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyCons (tyConGroups tcs)
   where
     classify conv keep par novect _  _   []               = (conv, keep, par, novect)
     classify conv keep par novect cs pts ((tcs, ds) : rs)
       | can_convert && must_convert
-      = classify (tcs ++ conv) keep par novect (cs `addListToUFM` [(tc, True)  | tc <- tcs]) pts' rs
+      = classify (tcs ++ conv) keep (par ++ tcs_par) novect (cs `addListToUFM` [(tc, True)  | tc <- tcs]) pts' rs
       | can_convert
-      = classify conv (tcs ++ keep) par novect (cs `addListToUFM` [(tc, False) | tc <- tcs]) pts' rs
-      | has_parr
-      = classify conv keep (tcs ++ par) novect cs pts' rs
+      = classify conv (tcs ++ keep) (par ++ tcs_par) novect (cs `addListToUFM` [(tc, False) | tc <- tcs]) pts' rs
       | otherwise
-      = classify conv keep par (tcs ++ novect) cs pts' rs
+      = classify conv keep (par ++ tcs_par) (tcs ++ novect) cs pts' rs
       where
         refs = ds `delListFromUniqSet` tcs
         
-        pts' | has_parr  = pts `addListToNameSet` map tyConName tcs
-             | otherwise = pts
+          -- the tycons that directly or indirectly depend on parallel arrays
+        tcs_par | any ((`elemNameSet` parTyCons) . tyConName) . eltsUFM $ refs = tcs
+                | otherwise                                                    = []
+
+        pts' = pts `addListToNameSet` map tyConName tcs_par
 
         can_convert  = (isNullUFM (refs `minusUFM` cs) && all convertable tcs)
                        || isShowClass tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
                        && (not . isShowClass $ tcs)
-        has_parr     = any ((`elemNameSet` parTyCons) . tyConName) . eltsUFM $ refs
 
         -- We currently admit Haskell 2011-style data and newtype declarations as well as type
         -- constructors representing classes.
