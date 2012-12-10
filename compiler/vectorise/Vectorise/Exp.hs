@@ -287,24 +287,19 @@ liftSimple aexpr
 --
 vectExpr :: CoreExprWithVectInfo -> VM VExpr
 
--- !!!FIXME: needs to check for VIEncaps regardless of syntactic form first; in case it is of functional type
+vectExpr aexpr
+    -- encapsulated expression of functional type => try to vectorise as a scalar subcomputation
+  | (isFunTy . annExprType $ aexpr) && isVIEncaps aexpr
+  = vectFnExpr True False aexpr
 
-vectExpr aexpr@(_, AnnVar v)
-  | (isFunTy . varType $ v) && isVIEncaps aexpr
-  = vectFnExpr False False aexpr
-  | otherwise
+vectExpr (_, AnnVar v)
   = vectVar v
 
 vectExpr (_, AnnLit lit)
   = vectConst $ Lit lit
 
 vectExpr aexpr@(_, AnnLam bndr _)
-  | isId bndr = vectFnExpr True False aexpr
-  | otherwise 
-  = do 
-    { dflags <- getDynFlags
-    ; cantVectorise dflags "Unexpected type lambda (vectExpr)" $ ppr (deAnnotate aexpr)
-    }
+  = vectFnExpr True False aexpr
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
   --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint
@@ -416,7 +411,7 @@ vectFnExpr :: Bool                  -- ^If we process the RHS of a binding, whet
            -> Bool                  -- ^Whether the binding is a loop breaker
            -> CoreExprWithVectInfo  -- ^Expression to vectorise; must have an outer `AnnLam`
            -> VM VExpr
-vectFnExpr inline loop_breaker expr@(_ann, AnnLam bndr body)
+vectFnExpr inline loop_breaker aexpr@(_ann, AnnLam bndr body)
     -- predicate abstraction: leave as a normal abstraction, but vectorise the predicate type
   | isId bndr
     && isPredTy (idType bndr)
@@ -426,18 +421,24 @@ vectFnExpr inline loop_breaker expr@(_ann, AnnLam bndr body)
     ; return $ mapVect (mkLams [vectorised vBndr]) vbody
     }
     -- encapsulated non-predicate abstraction: vectorise as a scalar computation
-  | isId bndr && isVIEncaps expr
-  = vectScalarFun . deAnnotate $ expr
+  | isId bndr && isVIEncaps aexpr
+  = vectScalarFun . deAnnotate $ aexpr
     -- non-predicate abstraction: vectorise as a non-scalar computation
   | isId bndr
-  = vectLam inline loop_breaker expr
-vectFnExpr _ _ expr
+  = vectLam inline loop_breaker aexpr
+  | otherwise 
+  = do 
+    { dflags <- getDynFlags
+    ; cantVectorise dflags "Vectorise.Exp.vectFnExpr: Unexpected type lambda" $ 
+        ppr (deAnnotate aexpr)
+    }
+vectFnExpr _ _ aexpr
     -- encapsulated function: vectorise as a scalar computation
-  | (isFunTy . annExprType $ expr) && isVIEncaps expr
-  = vectScalarFun . deAnnotate $ expr
+  | (isFunTy . annExprType $ aexpr) && isVIEncaps aexpr
+  = vectScalarFun . deAnnotate $ aexpr
   | otherwise
     -- not an abstraction: vectorise as a non-scalar vanilla expression
-  = vectExpr expr
+  = pprPanic "Vectorise.Exp.vectFnExpr: unexpected expression" (ppr . deAnnotate $ aexpr)
 
 -- |Vectorise type and dictionary applications.
 --
@@ -967,9 +968,6 @@ vectAvoidInfo pvs ce@(fvs, AnnVar v)
             then return VIParr
             else vectAvoidInfoTypeOf ce
     ; viTrace ce vi [] 
-
-    ; vit <- vectAvoidInfoTypeOf ce   -- TEMPORARY
-    ; traceVt ("  AnnVar: vectAvoidInfoTypeOf: " ++ show vit) empty
 
     ; return ((fvs, vi), AnnVar v)
     }
