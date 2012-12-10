@@ -72,6 +72,8 @@ module Control.Concurrent (
 
         module Control.Concurrent.MVar,
         module Control.Concurrent.Chan,
+        module Control.Concurrent.QSem,
+        module Control.Concurrent.QSemN,
 
 #ifdef __GLASGOW_HASKELL__
         -- * Bound Threads
@@ -137,6 +139,8 @@ import Hugs.ConcBase
 
 import Control.Concurrent.MVar
 import Control.Concurrent.Chan
+import Control.Concurrent.QSem
+import Control.Concurrent.QSemN
 
 #ifdef __HUGS__
 type ThreadId = ()
