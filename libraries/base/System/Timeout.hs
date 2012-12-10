@@ -26,7 +26,9 @@ module System.Timeout ( timeout ) where
 
 #ifdef __GLASGOW_HASKELL__
 import Control.Concurrent
-import Control.Exception   (Exception, handleJust, bracket)
+import Control.Exception   (Exception(..), handleJust, bracket,
+                            asyncExceptionToException,
+                            asyncExceptionFromException)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
 
@@ -40,7 +42,11 @@ INSTANCE_TYPEABLE0(Timeout,timeoutTc,"Timeout")
 instance Show Timeout where
     show _ = "<<timeout>>"
 
-instance Exception Timeout
+-- Timeout is a child of SomeAsyncException
+instance Exception Timeout where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
+
 #endif /* !__GLASGOW_HASKELL__ */
 
 -- |Wrap an 'IO' computation to time out and return @Nothing@ in case no result

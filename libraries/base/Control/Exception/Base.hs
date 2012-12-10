@@ -33,7 +33,8 @@ module Control.Exception.Base (
         ArithException(..),
         ArrayException(..),
         AssertionFailed(..),
-        AsyncException(..),
+        SomeAsyncException(..), AsyncException(..),
+        asyncExceptionToException, asyncExceptionFromException,
 
 #if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),

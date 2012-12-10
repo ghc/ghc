@@ -10,6 +10,7 @@
            , DeriveDataTypeable
            , StandaloneDeriving
            , RankNTypes
+           , PatternGuards
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -327,18 +328,12 @@ childHandler :: SomeException -> IO ()
 childHandler err = catchException (real_handler err) childHandler
 
 real_handler :: SomeException -> IO ()
-real_handler se@(SomeException ex) =
-  -- ignore thread GC and killThread exceptions:
-  case cast ex of
-  Just BlockedIndefinitelyOnMVar        -> return ()
-  _ -> case cast ex of
-       Just BlockedIndefinitelyOnSTM    -> return ()
-       _ -> case cast ex of
-            Just ThreadKilled           -> return ()
-            _ -> case cast ex of
-                 -- report all others:
-                 Just StackOverflow     -> reportStackOverflow
-                 _                      -> reportError se
+real_handler se
+  | Just BlockedIndefinitelyOnMVar <- fromException se  =  return ()
+  | Just BlockedIndefinitelyOnSTM  <- fromException se  =  return ()
+  | Just ThreadKilled              <- fromException se  =  return ()
+  | Just StackOverflow             <- fromException se  =  reportStackOverflow
+  | otherwise                                           =  reportError se
 
 {- | 'killThread' raises the 'ThreadKilled' exception in the given
 thread (GHC only).

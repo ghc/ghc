@@ -44,7 +44,9 @@ module Control.Exception (
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         ArrayException(..),     -- instance Eq, Ord, Show, Typeable, Exception
         AssertionFailed(..),
+        SomeAsyncException(..),
         AsyncException(..),     -- instance Eq, Ord, Show, Typeable, Exception
+        asyncExceptionToException, asyncExceptionFromException,
 
 #if __GLASGOW_HASKELL__ || __HUGS__
         NonTermination(..),
