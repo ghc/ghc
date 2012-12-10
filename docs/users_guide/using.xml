@@ -1868,12 +1868,27 @@ f "2"    = 2
             <indexterm><primary>constructor fields, strict</primary></indexterm>
           </term>
           <listitem>
-            <para>This option causes all constructor fields which are marked
-            strict (i.e. &ldquo;!&rdquo;) and which representation is smaller or
-            equal to the size of a pointer to be unpacked if possible. It is
-            equivalent to adding an <literal>UNPACK</literal> pragma (see <xref
-            linkend="unpack-pragma"/>) to every strict constructor field that
-            fullfills the size restriction.
+            <para>This option causes all constructor fields which are
+            marked strict (i.e. &ldquo;!&rdquo;) and which
+            representation is smaller or equal to the size of a
+            pointer to be unpacked, if possible. It is equivalent to
+            adding an <literal>UNPACK</literal> pragma (see <xref
+            linkend="unpack-pragma"/>) to every strict constructor
+            field that fullfills the size restriction.
+            </para>
+
+            <para>For example, the constructor fields in the following
+            data types
+<programlisting>
+data A = A !Int
+data B = B !A
+newtype C = C B
+data D = D !C
+</programlisting>
+            would all be represented by a single
+            <literal>Int#</literal> (see <xref linkend="primitives"/>)
+            value with
+            <option>-funbox-strict-primitive-fields</option> enabled.
             </para>
 
             <para>This option is less of a sledgehammer than
