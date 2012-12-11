@@ -257,7 +257,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        ((imports, prof), us') <- cmmNativeGenStream dflags ncgImpl us split_cmms (bufh, ([], [])) 0
+        ((imports, prof), us') <- cmmNativeGenStream dflags ncgImpl us split_cmms (bufh, ([], []))
         bFlush bufh
 
         let (native, colorStats, linearStats)
@@ -317,10 +317,9 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
               -> UniqSupply
               -> Stream IO RawCmmGroup ()
               -> NativeGenState statics instr
-              -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGenStream dflags ncgImpl us cmm_stream ngs@(h, nga) count
+cmmNativeGenStream dflags ncgImpl us cmm_stream ngs@(h, nga)
  = do
         r <- Stream.runStream cmm_stream
         case r of
@@ -329,8 +328,8 @@ cmmNativeGenStream dflags ncgImpl us cmm_stream ngs@(h, nga) count
             (impAcc, profAcc) ->
               return ((reverse impAcc, reverse profAcc), us)
           Right (cmms, cmm_stream') -> do
-            (nga',us') <- cmmNativeGens dflags ncgImpl us cmms ngs count
-            cmmNativeGenStream dflags ncgImpl us' cmm_stream' (h, nga') count
+            (nga',us') <- cmmNativeGens dflags ncgImpl us cmms ngs 0
+            cmmNativeGenStream dflags ncgImpl us' cmm_stream' (h, nga')
 
 -- | Do native code generation on all these cmms.
 --
