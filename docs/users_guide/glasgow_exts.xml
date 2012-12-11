@@ -1999,6 +1999,9 @@ import "network" Network.Socket
     available from multiple packages, or is present in both the
     current package being built and an external package.</para>
 
+  <para>The special package name <literal>this</literal> can be used to
+    refer to the current package being built.</para>
+
   <para>Note: you probably don't need to use this feature, it was
     added mainly so that we can build backwards-compatible versions of
     packages when APIs change.  It can lead to fragile dependencies in
