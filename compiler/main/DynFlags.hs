@@ -27,7 +27,7 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,
-        doDynamicToo,
+        whenGeneratingDynamicToo, ifGeneratingDynamicToo, doDynamicToo,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1111,6 +1111,17 @@ wayOptP _ WayEventLog = ["-DTRACING"]
 wayOptP _ WayPar      = ["-D__PARALLEL_HASKELL__"]
 wayOptP _ WayGran     = ["-D__GRANSIM__"]
 wayOptP _ WayNDP      = []
+
+whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
+whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
+
+ifGeneratingDynamicToo :: MonadIO m => DynFlags -> m a -> m a -> m a
+ifGeneratingDynamicToo dflags f g
+    = if gopt Opt_BuildDynamicToo dflags
+      then do let ref = canGenerateDynamicToo dflags
+              b <- liftIO $ readIORef ref
+              if b then f else g
+      else g
 
 doDynamicToo :: DynFlags -> DynFlags
 doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0

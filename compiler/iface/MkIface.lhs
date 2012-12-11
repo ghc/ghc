@@ -387,11 +387,10 @@ mkIface_ hsc_env maybe_old_fingerprint
        } 
 
 -----------------------------
-writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
-writeIfaceFile dflags location new_iface
+writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
+writeIfaceFile dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
-    where hi_file_path = ml_hi_file location
 
 
 -- -----------------------------------------------------------------------------
