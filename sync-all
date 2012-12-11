@@ -5,6 +5,8 @@ use Cwd;
 
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
+my $initial_working_directory;
+
 my $defaultrepo;
 my @packages;
 my $verbose = 2;
@@ -143,13 +145,11 @@ sub gitNewWorkdir {
     my $dir = shift;
     my $target = shift;
     my $target_dir = "$target/$dir";
-    my $pwd;
 
     if ($dir eq '.') {
         message "== running git-new-workdir . $target_dir @_";
     } else {
         message "== $dir: running git-new-workdir . $target_dir @_";
-        $pwd = getcwd();
         chdir($dir);
     }
 
@@ -158,20 +158,18 @@ sub gitNewWorkdir {
         or die "git-new-workdir failed: $?";
 
     if ($dir ne '.') {
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 }
 
 sub scm {
     my $dir = shift;
     my $scm = shift;
-    my $pwd;
 
     if ($dir eq '.') {
         message "== running $scm @_";
     } else {
         message "== $dir: running $scm @_";
-        $pwd = getcwd();
         chdir($dir);
     }
 
@@ -180,7 +178,7 @@ sub scm {
         or die "$scm failed: $?";
 
     if ($dir ne '.') {
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 }
 
@@ -196,9 +194,7 @@ sub scmall {
     my $subcommand;
 
     my $path;
-    my $wd_before = getcwd;
 
-    my $pwd;
     my @args;
 
     my $started;
@@ -796,9 +792,14 @@ sub main {
     }
 }
 
+BEGIN {
+    $initial_working_directory = getcwd();
+}
+
 END {
     my $ec = $?;
-    my $pwd = getcwd();
+
+    chdir($initial_working_directory);
 
     message "== Checking for old haddock repo";
     if (-d "utils/haddock/.git") {
@@ -815,7 +816,7 @@ Please remove it (e.g. "rm -r utils/haddock"), and then run
 ============================
 EOF
         }
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 
     message "== Checking for old binary repo";
@@ -833,7 +834,7 @@ Please remove it (e.g. "rm -r libraries/binary"), and then run
 ============================
 EOF
         }
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 
     message "== Checking for old mtl repo";
@@ -851,7 +852,7 @@ Please remove it (e.g. "rm -r libraries/mtl"), and then run
 ============================
 EOF
         }
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 
     message "== Checking for old Cabal repo";
@@ -869,7 +870,7 @@ Please remove it (e.g. "rm -r libraries/Cabal"), and then run
 ============================
 EOF
         }
-        chdir($pwd);
+        chdir($initial_working_directory);
     }
 
     message "== Checking for old time from tarball";
