@@ -80,6 +80,7 @@ import qualified Stream
 
 import Data.List
 import Data.Maybe
+import Control.Exception
 import Control.Monad
 import System.IO
 
@@ -363,19 +364,16 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
                 $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
                 $ vcat $ map (pprNatCmmDecl ncgImpl) native
 
-           -- carefully evaluate this strictly.  Binding it with 'let'
-           -- and then using 'seq' doesn't work, because the let
-           -- apparently gets inlined first.
-        lsPprNative <- return $!
+        let !lsPprNative =
                 if  dopt Opt_D_dump_asm       dflags
                  || dopt Opt_D_dump_asm_stats dflags
                         then native
                         else []
 
-        count' <- return $! count + 1;
+        let !count' = count + 1
 
         -- force evaulation all this stuff to avoid space leaks
-        {-# SCC "seqString" #-} seqString (showSDoc dflags $ vcat $ map ppr imports) `seq` return ()
+        {-# SCC "seqString" #-} evaluate $ seqString (showSDoc dflags $ vcat $ map ppr imports)
 
         cmmNativeGens dflags ncgImpl
             h us' cmms
@@ -384,7 +382,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
                         count'
 
  where  seqString []            = ()
-        seqString (x:xs)        = x `seq` seqString xs `seq` ()
+        seqString (x:xs)        = x `seq` seqString xs
 
 
 -- | Complete native code generation phase for a single top-level chunk of Cmm.
