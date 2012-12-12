@@ -262,9 +262,13 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
     }
   where
     vars = varSetElems fvs
-    fvs  = filterVarSet isToplevel fvs_orig -- only include 'Id's that are not toplevel
+    fvs  = filterVarSet (not . isToplevel) fvs_orig -- only include 'Id's that are not toplevel
     
-    isToplevel v | isId v    = not . uf_is_top . realIdUnfolding $ v
+    isToplevel v | isId v    = case realIdUnfolding v of
+                                 NoUnfolding                     -> False
+                                 OtherCon      {}                -> True
+                                 DFunUnfolding {}                -> True 
+                                 CoreUnfolding {uf_is_top = top} -> top 
                  | otherwise = False
 
     mkAnnLams :: [Var] -> VarSet -> AnnExpr' Var (VarSet, VectAvoidInfo) -> CoreExprWithVectInfo
@@ -438,7 +442,8 @@ vectFnExpr _ _ aexpr
   = vectScalarFun . deAnnotate $ aexpr
   | otherwise
     -- not an abstraction: vectorise as a non-scalar vanilla expression
-  = pprPanic "Vectorise.Exp.vectFnExpr: unexpected expression" (ppr . deAnnotate $ aexpr)
+    -- NB: we can get here legitimately due to the recursion in the first case above
+  = vectExpr aexpr
 
 -- |Vectorise type and dictionary applications.
 --
