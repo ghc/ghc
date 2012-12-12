@@ -388,7 +388,7 @@ cmmNativeGens' ncgImpl us (cmm : cmms) (h, dflags, (impAcc, profAcc)) count
 
         let !count' = count + 1
 
-        -- force evaulation all this stuff to avoid space leaks
+        -- force evaluation all this stuff to avoid space leaks
         {-# SCC "seqString" #-} evaluate $ seqString (showSDoc dflags $ vcat $ map ppr imports)
 
         cmmNativeGens' ncgImpl
