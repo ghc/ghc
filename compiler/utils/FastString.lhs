@@ -31,7 +31,7 @@ module FastString
         mkFastStringFastBytes,
         foreignPtrToFastBytes,
         fastStringToFastBytes,
-        fastZStringToFastBytes,
+        fastZStringToByteString,
         mkFastBytesByteList,
         unsafeMkFastBytesString,
         bytesFB,
@@ -108,6 +108,9 @@ import FastFunctions
 import Panic
 import Util
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8  as BS
+import qualified Data.ByteString.Unsafe as BS
 import Foreign.C
 import GHC.Exts
 import System.IO
@@ -164,8 +167,8 @@ mkFastStringFastBytes (FastBytes len fp)
 fastStringToFastBytes :: FastString -> FastBytes
 fastStringToFastBytes f = fs_fb f
 
-fastZStringToFastBytes :: FastZString -> FastBytes
-fastZStringToFastBytes (FastZString fb) = fb
+fastZStringToByteString :: FastZString -> ByteString
+fastZStringToByteString (FastZString bs) = bs
 
 mkFastBytesByteList :: [Word8] -> FastBytes
 mkFastBytesByteList bs =
@@ -228,21 +231,20 @@ hPutFB handle (FastBytes len fp)
 
 -- -----------------------------------------------------------------------------
 
-newtype FastZString = FastZString FastBytes
+newtype FastZString = FastZString ByteString
 
 hPutFZS :: Handle -> FastZString -> IO ()
-hPutFZS handle (FastZString fb) = hPutFB handle fb
+hPutFZS handle (FastZString bs) = BS.hPut handle bs
 
 zString :: FastZString -> String
-zString (FastZString (FastBytes n_bytes buf)) =
-    inlinePerformIO $ withForeignPtr buf $ \ptr ->
-        peekCAStringLen (castPtr ptr, n_bytes)
+zString (FastZString bs) =
+    inlinePerformIO $ BS.unsafeUseAsCStringLen bs peekCAStringLen
 
 lengthFZS :: FastZString -> Int
-lengthFZS (FastZString fb) = lengthFB fb
+lengthFZS (FastZString bs) = BS.length bs
 
 mkFastZStringString :: String -> FastZString
-mkFastZStringString str = FastZString (unsafeMkFastBytesString str)
+mkFastZStringString str = FastZString (BS.pack str)
 
 -- -----------------------------------------------------------------------------
 
