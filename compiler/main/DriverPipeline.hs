@@ -1117,7 +1117,8 @@ runPhase cc_phase input_fn dflags
         -- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
         -- regardless of the ordering.
         --
-        -- This is a temporary hack.
+        -- This is a temporary hack. See #2872, commit
+        -- 5bd3072ac30216a505151601884ac88bf404c9f2
                        ++ (if platformArch platform == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
