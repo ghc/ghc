@@ -156,6 +156,7 @@ vectTopBind b@(NonRec var expr)
             -- 'VECTORISE' pragma => just use the provided vectorised rhs
           do
           { traceVt "VECTORISE" $ ppr var
+          ; addGlobalParallelVar var
           ; return $ Just (False, inlineMe, expr')
           }
         Nothing         ->
