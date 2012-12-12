@@ -588,7 +588,7 @@ makeImportsDoc dflags imports
             -- On recent versions of Darwin, the linker supports
             -- dead-stripping of code and data on a per-symbol basis.
             -- There's a hack to make this work in PprMach.pprNatCmmDecl.
-            (if platformHasSubsectionsViaSymbols (targetPlatform dflags)
+            (if platformHasSubsectionsViaSymbols platform
              then text ".subsections_via_symbols"
              else empty)
             $$
@@ -598,28 +598,27 @@ makeImportsDoc dflags imports
                 -- will not use an executable stack, which is good for
                 -- security. GHC generated code does not need an executable
                 -- stack so add the note in:
-            (if platformHasGnuNonexecStack (targetPlatform dflags)
+            (if platformHasGnuNonexecStack platform
              then text ".section .note.GNU-stack,\"\",@progbits"
              else empty)
             $$
                 -- And just because every other compiler does, lets stick in
                 -- an identifier directive: .ident "GHC x.y.z"
-            (if platformHasIdentDirective (targetPlatform dflags)
+            (if platformHasIdentDirective platform
              then let compilerIdent = text "GHC" <+> text cProjectVersion
                    in text ".ident" <+> doubleQuotes compilerIdent
              else empty)
 
  where
+        platform = targetPlatform dflags
+        arch = platformArch platform
+        os   = platformOS   platform
+
         -- Generate "symbol stubs" for all external symbols that might
         -- come from a dynamic library.
         dyld_stubs :: [CLabel] -> SDoc
 {-      dyld_stubs imps = vcat $ map pprDyldSymbolStub $
                                     map head $ group $ sort imps-}
-
-        platform = targetPlatform dflags
-        arch = platformArch platform
-        os   = platformOS   platform
-
         -- (Hack) sometimes two Labels pretty-print the same, but have
         -- different uniques; so we compare their text versions...
         dyld_stubs imps
