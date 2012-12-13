@@ -74,6 +74,7 @@ import BasicTypes
 
 import Foreign
 import Data.Array
+import qualified Data.ByteString.Unsafe as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
@@ -720,17 +721,16 @@ getFS bh = do fb <- getFB bh
               mkFastStringFastBytes fb
 
 putFB :: BinHandle -> FastBytes -> IO ()
-putFB bh (FastBytes l buf) = do
+putFB bh bs =
+  BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
   put_ bh l
-  withForeignPtr buf $ \ptr ->
-    let
+  let
         go n | n == l    = return ()
              | otherwise = do
-                b <- peekElemOff ptr n
+                b <- peekElemOff (castPtr ptr) n
                 putByte bh b
                 go (n+1)
-   in
-   go 0
+  go 0
 
 {- -- possible faster version, not quite there yet:
 getFB bh@BinMem{} = do

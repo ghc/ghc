@@ -94,8 +94,7 @@ bPutFZS :: BufHandle -> FastZString -> IO ()
 bPutFZS b fs = bPutBS b $ fastZStringToByteString fs
 
 bPutFB :: BufHandle -> FastBytes -> IO ()
-bPutFB b (FastBytes len fp) =
- withForeignPtr fp $ \ptr -> bPutCStringLen b (castPtr ptr, len)
+bPutFB b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b
 
 bPutBS :: BufHandle -> ByteString -> IO ()
 bPutBS b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b
