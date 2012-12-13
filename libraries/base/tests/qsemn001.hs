@@ -33,61 +33,61 @@ tests = [
 
 semn :: Assertion
 semn = do
-  c <- newTChanIO
+  c <- newEmptyMVar
   q <- new 0
-  t1 <- forkIO $ do wait q 1; atomically $ writeTChan c 'a'
+  t1 <- forkIO $ do wait q 1;  putMVar c 'a'
   threadDelay 10000
-  t2 <- forkIO $ do wait q 2; atomically $ writeTChan c 'b'
+  t2 <- forkIO $ do wait q 2;  putMVar c 'b'
   threadDelay 10000
-  t3 <- forkIO $ do wait q 3; atomically $ writeTChan c 'c'
+  t3 <- forkIO $ do wait q 3;  putMVar c 'c'
   threadDelay 10000
   signal q 1
-  a <- atomically $ readTChan c
+  a <-  takeMVar c
   signal q 2
-  b <- atomically $ readTChan c
+  b <-  takeMVar c
   signal q 3
-  c <- atomically $ readTChan c
+  c <-  takeMVar c
   [a,b,c] @?= "abc"
 
 semn2 :: Assertion
 semn2 = do
-  c <- newTChanIO
+  c <- newEmptyMVar
   q <- new 0
-  t1 <- forkIO $ do wait q 1; threadDelay 10000; atomically $ writeTChan c 'a'
+  t1 <- forkIO $ do wait q 1; threadDelay 10000;  putMVar c 'a'
   threadDelay 10000
-  t2 <- forkIO $ do wait q 2; threadDelay 20000; atomically $ writeTChan c 'b'
+  t2 <- forkIO $ do wait q 2; threadDelay 20000;  putMVar c 'b'
   threadDelay 10000
-  t3 <- forkIO $ do wait q 3; threadDelay 30000; atomically $ writeTChan c 'c'
+  t3 <- forkIO $ do wait q 3; threadDelay 30000;  putMVar c 'c'
   threadDelay 10000
   signal q 6
-  a <- atomically $ readTChan c
-  b <- atomically $ readTChan c
-  c <- atomically $ readTChan c
+  a <-  takeMVar c
+  b <-  takeMVar c
+  c <-  takeMVar c
   [a,b,c] @?= "abc"
 
 semn3 :: Assertion
 semn3 = do
-  c <- newTChanIO
+  c <- newEmptyMVar
   q <- new 0
-  t1 <- forkIO $ do wait q 1; threadDelay 10000; atomically $ writeTChan c 'a'
+  t1 <- forkIO $ do wait q 1; threadDelay 10000;  putMVar c 'a'
   threadDelay 10000
-  t2 <- forkIO $ do wait q 2; threadDelay 20000; atomically $ writeTChan c 'b'
+  t2 <- forkIO $ do wait q 2; threadDelay 20000;  putMVar c 'b'
   threadDelay 10000
-  t3 <- forkIO $ do wait q 3; threadDelay 30000; atomically $ writeTChan c 'c'
+  t3 <- forkIO $ do wait q 3; threadDelay 30000;  putMVar c 'c'
   threadDelay 10000
   signal q 3
-  a <- atomically $ readTChan c
-  b <- atomically $ readTChan c
+  a <-  takeMVar c
+  b <-  takeMVar c
   threadDelay 10000
   [a,b] @?= "ab"
-  d <- atomically $ isEmptyTChan c
+  d <-  isEmptyMVar c
   d @?= True
   signal q 1
   threadDelay 10000
-  d <- atomically $ isEmptyTChan c
+  d <-  isEmptyMVar c
   d @?= True
   signal q 2
-  x <- atomically $ readTChan c
+  x <-  takeMVar c
   x @?= 'c'
 
 semn_kill :: Assertion
