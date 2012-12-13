@@ -1110,9 +1110,18 @@ foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
 %*********************************************************
 
 \begin{code}
+
+word2Double :: Word -> Double
+word2Double (W# w) = D# (word2Double# w)
+
+word2Float :: Word -> Float
+word2Float (W# w) = F# (word2Float# w)
+
 {-# RULES
 "fromIntegral/Int->Float"   fromIntegral = int2Float
 "fromIntegral/Int->Double"  fromIntegral = int2Double
+"fromIntegral/Word->Float"  fromIntegral = word2Float
+"fromIntegral/Word->Double" fromIntegral = word2Double
 "realToFrac/Float->Float"   realToFrac   = id :: Float -> Float
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float
