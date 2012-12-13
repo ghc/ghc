@@ -63,6 +63,8 @@ import BreakArray
 import Data.Maybe
 import Module
 
+import qualified Data.ByteString        as BS
+import qualified Data.ByteString.Unsafe as BS
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
@@ -1266,18 +1268,18 @@ pushAtom _ _ (AnnLit lit) = do
      where
         pushStr s
            = let getMallocvilleAddr
-                    = case s of
-                         FastBytes n fp ->
+                    =
                             -- we could grab the Ptr from the ForeignPtr,
                             -- but then we have no way to control its lifetime.
                             -- In reality it'll probably stay alive long enoungh
                             -- by virtue of the global FastString table, but
                             -- to be on the safe side we copy the string into
                             -- a malloc'd area of memory.
-                                do ptr <- ioToBc (mallocBytes (n+1))
+                                do let n = BS.length s
+                                   ptr <- ioToBc (mallocBytes (n+1))
                                    recordMallocBc ptr
                                    ioToBc (
-                                      withForeignPtr fp $ \p -> do
+                                      BS.unsafeUseAsCString s $ \p -> do
                                          memcpy ptr p (fromIntegral n)
                                          pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
                                          return ptr
