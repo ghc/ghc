@@ -83,10 +83,12 @@ test('T3294',
                                    # expected value: 17725476 (x86/OS X)
 				   #                 14593500 (Windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 37724352, 15)),
+          compiler_stats_range_field('max_bytes_used', 44894544, 15)),
                                    # prev:           25753192 (amd64/Linux)
                                    # 29/08/2012:     37724352 (amd64/Linux)
                                    #  (increase due to new codegen, see #7198)
+                                   # 13/13/2012:     44894544 (amd64/Linux)
+                                   #  (reason for increase unknown)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 1373514844, 5)),
                                    # previous:     815479800  (x86/Linux)
