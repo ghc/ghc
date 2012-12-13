@@ -119,5 +119,5 @@ test('5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
 test('T7034', normal, compile_and_run, [''])
 
-test('qsem001', normal, compile_and_run, [''])
-test('qsemn001', normal, compile_and_run, [''])
+test('qsem001', expect_broken(7497), compile_and_run, [''])
+test('qsemn001', expect_broken(7497), compile_and_run, [''])
