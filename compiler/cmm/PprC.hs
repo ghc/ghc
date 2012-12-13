@@ -681,6 +681,7 @@ pprCallishMachOp_for_C mop
         MO_Memset       -> ptext (sLit "memset")
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
+        (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
 
         MO_S_QuotRem  {} -> unsupported
         MO_U_QuotRem  {} -> unsupported
