@@ -217,12 +217,11 @@ typedef StgFunPtr       F_;
 
 /* -----------------------------------------------------------------------------
    Tail calls
-
-   This needs to be up near the top as the register line on alpha needs
-   to be before all procedures (inline & out-of-line).
    -------------------------------------------------------------------------- */
 
-#include "stg/TailCalls.h"
+#define JMP_(cont) return((StgFunPtr)(cont))
+#define FB_
+#define FE_
 
 /* -----------------------------------------------------------------------------
    Other Stg stuff...
