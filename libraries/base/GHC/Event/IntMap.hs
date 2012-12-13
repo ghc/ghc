@@ -333,15 +333,15 @@ branchMask p1 p2
 
 -- | Return a word where only the highest bit is set.
 highestBitMask :: Nat -> Nat
-highestBitMask x1 = let x2 = x1 .|. x1 `shiftR` 1
-                        x3 = x2 .|. x2 `shiftR` 2
-                        x4 = x3 .|. x3 `shiftR` 4
-                        x5 = x4 .|. x4 `shiftR` 8
-                        x6 = x5 .|. x5 `shiftR` 16
+highestBitMask x1 = let x2 = x1 .|. x1 `shiftRL` 1
+                        x3 = x2 .|. x2 `shiftRL` 2
+                        x4 = x3 .|. x3 `shiftRL` 4
+                        x5 = x4 .|. x4 `shiftRL` 8
+                        x6 = x5 .|. x5 `shiftRL` 16
 #if !(WORD_SIZE_IN_BITS==32)
-                        x7 = x6 .|. x6 `shiftR` 32
-                     in x7 `xor` (x7 `shiftR` 1)
+                        x7 = x6 .|. x6 `shiftRL` 32
+                     in x7 `xor` (x7 `shiftRL` 1)
 #else
-                     in x6 `xor` (x6 `shiftR` 1)
+                     in x6 `xor` (x6 `shiftRL` 1)
 #endif
 {-# INLINE highestBitMask #-}
