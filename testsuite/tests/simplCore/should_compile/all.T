@@ -35,6 +35,7 @@ test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
 test('rule2', only_ways(['optasm']), compile, ['-dsuppress-uniques'])
+test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])

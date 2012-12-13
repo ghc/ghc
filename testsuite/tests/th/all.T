@@ -196,7 +196,7 @@ test('TH_unresolvedInfix2',
      compile_fail,
      ['-v0'])
 
-test('T5358', normal, compile_fail, [''])
+test('T5358', normal, compile_fail, [' -v0'])
 test('T5379', normal, compile_and_run, [''])
 test('T5404', normal, compile, ['-v0'])
 test('T5410', normal, compile_and_run, ['-v0'])
@@ -254,3 +254,7 @@ test('T7092', extra_clean(['T7092a.hi','T7092a.o']),
               multimod_compile, ['T7092','-v0'])
 test('T7276', normal, compile_fail, ['-v0'])
 test('T7276a', combined_output, ghci_script, ['T7276a.script'])
+
+test('T7445', extra_clean(['T7445a.hi', 'T7445a.o']),
+	      run_command,
+	      ['$MAKE -s --no-print-directory T7445'] )
