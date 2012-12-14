@@ -470,7 +470,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 \begin{code}
 hashLiteral :: Literal -> Int
 hashLiteral (MachChar c)        = ord c + 1000  -- Keep it out of range of common ints
-hashLiteral (MachStr s)         = hashFB s
+hashLiteral (MachStr s)         = hashByteString s
 hashLiteral (MachNullAddr)      = 0
 hashLiteral (MachInt i)         = hashInteger i
 hashLiteral (MachInt64 i)       = hashInteger i

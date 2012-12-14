@@ -33,7 +33,7 @@ module FastString
         fastStringToFastBytes,
         fastZStringToByteString,
         unsafeMkFastBytesString,
-        hashFB,
+        hashByteString,
 
         -- * FastZString
         FastZString,
@@ -162,13 +162,10 @@ pokeCAString ptr str =
   in
   go str 0
 
-hashFB :: FastBytes -> Int
-hashFB bs
+hashByteString :: ByteString -> Int
+hashByteString bs
     = inlinePerformIO $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
       return $ hashStr (castPtr ptr) len
-
-hPutFB :: Handle -> FastBytes -> IO ()
-hPutFB = BS.hPut
 
 -- -----------------------------------------------------------------------------
 
@@ -515,7 +512,7 @@ getFastStringTable = do
 -- |Outputs a 'FastString' with /no decoding at all/, that is, you
 -- get the actual bytes in the 'FastString' written to the 'Handle'.
 hPutFS :: Handle -> FastString -> IO ()
-hPutFS handle fs = hPutFB handle $ fastStringToFastBytes fs
+hPutFS handle fs = BS.hPut handle $ fastStringToFastBytes fs
 
 -- ToDo: we'll probably want an hPutFSLocal, or something, to output
 -- in the current locale's encoding (for error messages and suchlike).
