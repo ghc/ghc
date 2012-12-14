@@ -49,12 +49,19 @@ endif
 
 BASE_LIBDIR := $(shell "$(GHC_PKG)" field base library-dirs | sed 's/^[^:]*: *//')
 HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(BASE_LIBDIR))/Prelude.hi ]; then echo YES; else echo NO; fi)
-HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(BASE_LIBDIR))/Prelude.p_a ]; then echo YES; else echo NO; fi)
+HAVE_DYNAMIC := $(shell if [ -f $(subst \,/,$(BASE_LIBDIR))/Prelude.dyn_hi ]; then echo YES; else echo NO; fi)
+HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(BASE_LIBDIR))/Prelude.p_hi ]; then echo YES; else echo NO; fi)
 
 ifeq "$(HAVE_VANILLA)" "YES"
 RUNTEST_OPTS += -e ghc_with_vanilla=1
 else
 RUNTEST_OPTS += -e ghc_with_vanilla=0
+endif
+
+ifeq "$(HAVE_DYNAMIC)" "YES"
+RUNTEST_OPTS += -e ghc_with_dynamic=1
+else
+RUNTEST_OPTS += -e ghc_with_dynamic=0
 endif
 
 ifeq "$(HAVE_PROFILING)" "YES"
