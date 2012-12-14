@@ -1,11 +1,9 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2008
+ * (c) The GHC Team, 1998-2012
  *
  * ---------------------------------------------------------------------------*/
 
-/* TODO: do we need PosixSource.h ? it lives in rts/ not public includes/ */
-/* #include "PosixSource.h" */
 #include "Rts.h"
 
 #include "gmp.h"
@@ -23,8 +21,8 @@ static void initAllocForGMP( void ) __attribute__((constructor));
    and co. The heap objects we use are ByteArray#s which of course have their
    usual header word or two. But gmp doesn't know about ghc heap objects and
    header words. So our allocator has to make a ByteArray# and return a pointer
-   to its interior! When the gmp function returns we recieve that interior
-   pointer. Then we look back a couple words to get the propper ByteArray#
+   to its interior! When the gmp function returns we receive that interior
+   pointer. Then we look back a couple words to get the proper ByteArray#
    pointer (which then gets returned as a ByteArray# and thus get tracked
    properly by the GC).
 
