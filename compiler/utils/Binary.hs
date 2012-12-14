@@ -716,7 +716,7 @@ type SymbolTable = Array Int Name
 ---------------------------------------------------------
 
 putFS :: BinHandle -> FastString -> IO ()
-putFS bh fs = putBS bh $ fastStringToFastBytes fs
+putFS bh fs = putBS bh $ fastStringToByteString fs
 
 getFS :: BinHandle -> IO FastString
 getFS bh = do bs <- getBS bh

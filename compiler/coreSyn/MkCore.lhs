@@ -284,11 +284,11 @@ mkStringExprFS str
 
   | all safeChar chars
   = do unpack_id <- lookupId unpackCStringName
-       return (App (Var unpack_id) (Lit (MachStr (fastStringToFastBytes str))))
+       return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))
 
   | otherwise
   = do unpack_id <- lookupId unpackCStringUtf8Name
-       return (App (Var unpack_id) (Lit (MachStr (fastStringToFastBytes str))))
+       return (App (Var unpack_id) (Lit (MachStr (fastStringToByteString str))))
 
   where
     chars = unpackFS str

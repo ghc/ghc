@@ -1707,7 +1707,7 @@ mkRecSelBind (tycon, sel_name)
     inst_tys = tyConAppArgs data_ty
 
     unit_rhs = mkLHsTupleExpr []
-    msg_lit = HsStringPrim $ unsafeMkFastBytesString $
+    msg_lit = HsStringPrim $ unsafeMkByteString $
               occNameString (getOccName sel_name)
 
 ---------------

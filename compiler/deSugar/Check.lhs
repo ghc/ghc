@@ -445,7 +445,7 @@ get_lit :: Pat id -> Maybe HsLit
 get_lit (LitPat lit)                                      = Just lit
 get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg negate              mb i))
 get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg negateFractionalLit mb f))
-get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim (fastStringToFastBytes s))
+get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim (fastStringToByteString s))
 get_lit _                                                 = Nothing
 
 mb_neg :: (a -> a) -> Maybe b -> a -> a

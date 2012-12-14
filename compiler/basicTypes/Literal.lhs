@@ -56,6 +56,7 @@ import DynFlags
 import UniqFM
 import Util
 
+import Data.ByteString (ByteString)
 import Data.Int
 import Data.Ratio
 import Data.Word
@@ -85,7 +86,7 @@ data Literal
         -- First the primitive guys
     MachChar    Char            -- ^ @Char#@ - at least 31 bits. Create with 'mkMachChar'
 
-  | MachStr     FastBytes       -- ^ A string-literal: stored and emitted
+  | MachStr     ByteString      -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @'\0'@
                                 -- terminator. Create with 'mkMachString'
@@ -250,7 +251,7 @@ mkMachChar = MachChar
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkMachString :: String -> Literal
 -- stored UTF-8 encoded
-mkMachString s = MachStr (fastStringToFastBytes $ mkFastString s)
+mkMachString s = MachStr (fastStringToByteString $ mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger = LitInteger

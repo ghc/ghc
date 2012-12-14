@@ -88,13 +88,10 @@ bPutStr (BufHandle buf r hdl) str = do
 		loop cs (i+1)
   
 bPutFS :: BufHandle -> FastString -> IO ()
-bPutFS b fs = bPutFB b $ fastStringToFastBytes fs
+bPutFS b fs = bPutBS b $ fastStringToByteString fs
 
 bPutFZS :: BufHandle -> FastZString -> IO ()
 bPutFZS b fs = bPutBS b $ fastZStringToByteString fs
-
-bPutFB :: BufHandle -> FastBytes -> IO ()
-bPutFB b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b
 
 bPutBS :: BufHandle -> ByteString -> IO ()
 bPutBS b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b
