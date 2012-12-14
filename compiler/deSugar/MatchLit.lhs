@@ -263,7 +263,7 @@ matchLiterals (var:vars) ty sub_groups
     wrap_str_guard eq_str (MachStr s, mr)
 	= do { -- We now have to convert back to FastString. Perhaps there
 	       -- should be separate MachBytes and MachStr constructors?
-	       s'     <- liftIO $ mkFastStringFastBytes s
+	       s'     <- liftIO $ mkFastStringByteString s
 	     ; lit    <- mkStringExprFS s'
 	     ; let pred = mkApps (Var eq_str) [Var var, lit]
 	     ; return (mkGuardedMatchResult pred mr) }

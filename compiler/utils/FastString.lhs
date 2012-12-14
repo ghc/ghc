@@ -28,8 +28,8 @@ module FastString
        (
         -- * FastBytes
         FastBytes,
-        mkFastStringFastBytes,
         fastStringToFastBytes,
+        mkFastStringByteString,
         fastZStringToByteString,
         unsafeMkFastBytesString,
         hashByteString,
@@ -130,9 +130,6 @@ import GHC.Base         ( unpackCString# )
 
 
 type FastBytes = ByteString
-
-mkFastStringFastBytes :: FastBytes -> IO FastString
-mkFastStringFastBytes bs = mkFastStringByteString bs
 
 fastStringToFastBytes :: FastString -> FastBytes
 fastStringToFastBytes f = fs_fb f
@@ -449,7 +446,7 @@ zEncodeFS fs@(FastString _ _ _ ref) =
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = inlinePerformIO
-                 $ mkFastStringFastBytes
+                 $ mkFastStringByteString
                  $ BS.append (fastStringToFastBytes fs1)
                              (fastStringToFastBytes fs2)
 

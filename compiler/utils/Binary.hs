@@ -720,7 +720,7 @@ putFS bh fs = putBS bh $ fastStringToFastBytes fs
 
 getFS :: BinHandle -> IO FastString
 getFS bh = do bs <- getBS bh
-              mkFastStringFastBytes bs
+              mkFastStringByteString bs
 
 putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =
