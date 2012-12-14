@@ -1007,7 +1007,7 @@ infixtype :: { LHsType RdrName }
 strict_mark :: { Located HsBang }
         : '!'                           { L1 HsStrict }
         | '{-# UNPACK' '#-}' '!'        { LL HsUnpack }
-        | '{-# NOUNPACK' '#-}' '!'      { LL HsNoUnpack }
+        | '{-# NOUNPACK' '#-}' '!'      { LL HsStrict }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }

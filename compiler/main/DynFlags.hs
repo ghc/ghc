@@ -2360,7 +2360,7 @@ fFlags = [
   ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
   ( "case-merge",                       Opt_CaseMerge, nop ),
   ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
-  ( "unbox-strict-primitive-fields",    Opt_UnboxStrictPrimitiveFields, nop ),
+  ( "unbox-small-strict-fields",        Opt_UnboxSmallStrictFields, nop ),
   ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "excess-precision",                 Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),

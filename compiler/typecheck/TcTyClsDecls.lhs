@@ -37,7 +37,6 @@ import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
-import qualified TysPrim
 import TysWiredIn( unitTy )
 import Type
 import Kind
@@ -655,17 +654,12 @@ tcTyDefn calc_isrec tc_name tvs kind
                  , td_cons = cons })
   = do { extra_tvs <- tcDataKindSig kind
        ; let is_rec     = calc_isrec tc_name
-             h98_syntax = consUseH98Syntax cons
              final_tvs  = tvs ++ extra_tvs
        ; stupid_theta <- tcHsContext ctxt
        ; kind_signatures <- xoptM Opt_KindSignatures
-       ; existential_ok  <- xoptM Opt_ExistentialQuantification
-       ; gadt_ok         <- xoptM Opt_GADTs
        ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
-       ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
 
              -- Check that we don't use kind signatures without Glasgow extensions
-       ; 
        ; case mb_ksig of
            Nothing   -> return ()
            Just hs_k -> do { checkTc (kind_signatures) (badSigTyDecl tc_name)
@@ -673,11 +667,11 @@ tcTyDefn calc_isrec tc_name tvs kind
                            ; checkKind kind tc_kind
                            ; return () }
 
-       ; dataDeclChecks tc_name new_or_data stupid_theta cons
+       ; h98_syntax <- dataDeclChecks tc_name new_or_data stupid_theta cons
 
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
-             ; data_cons <- tcConDecls new_or_data ex_ok tycon (final_tvs, res_ty) cons
+             ; data_cons <- tcConDecls new_or_data tycon (final_tvs, res_ty) cons
              ; tc_rhs <-
                  if null cons && is_boot 	      -- In a hs-boot file, empty cons means
                  then return totallyAbstractTyConRhs  -- "don't know"; hence totally Abstract
@@ -947,7 +941,7 @@ So we
 %************************************************************************
 
 \begin{code}
-dataDeclChecks :: Name -> NewOrData -> ThetaType -> [LConDecl Name] -> TcM ()
+dataDeclChecks :: Name -> NewOrData -> ThetaType -> [LConDecl Name] -> TcM Bool
 dataDeclChecks tc_name new_or_data stupid_theta cons
   = do {   -- Check that we don't use GADT syntax in H98 world
          gadtSyntax_ok <- xoptM Opt_GADTSyntax
@@ -968,25 +962,32 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
        ; empty_data_decls <- xoptM Opt_EmptyDataDecls
        ; is_boot <- tcIsHsBoot	-- Are we compiling an hs-boot file?
        ; checkTc (not (null cons) || empty_data_decls || is_boot)
-                 (emptyConDeclsErr tc_name) }
+                 (emptyConDeclsErr tc_name)
+       ; return h98_syntax }
     
+
 -----------------------------------
-tcConDecls :: NewOrData -> Bool -> TyCon -> ([TyVar], Type)
+consUseH98Syntax :: [LConDecl a] -> Bool
+consUseH98Syntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = False
+consUseH98Syntax _                                             = True
+		 -- All constructors have same shape
+
+-----------------------------------
+tcConDecls :: NewOrData -> TyCon -> ([TyVar], Type)
 	   -> [LConDecl Name] -> TcM [DataCon]
-tcConDecls new_or_data ex_ok rep_tycon res_tmpl cons
-  = mapM (addLocM (tcConDecl new_or_data ex_ok rep_tycon res_tmpl)) cons
+tcConDecls new_or_data rep_tycon res_tmpl cons
+  = mapM (addLocM (tcConDecl new_or_data rep_tycon res_tmpl)) cons
 
 tcConDecl :: NewOrData
-          -> Bool		-- True <=> -XExistentialQuantificaton or -XGADTs
 	  -> TyCon 		-- Representation tycon
 	  -> ([TyVar], Type)	-- Return type template (with its template tyvars)
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl new_or_data existential_ok rep_tycon res_tmpl 	-- Data types
-	  con@(ConDecl { con_name = name
-                       , con_qvars = hs_tvs, con_cxt = hs_ctxt
-                       , con_details = hs_details, con_res = hs_res_ty })
+tcConDecl new_or_data rep_tycon res_tmpl 	-- Data types
+	  (ConDecl { con_name = name
+                   , con_qvars = hs_tvs, con_cxt = hs_ctxt
+                   , con_details = hs_details, con_res = hs_res_ty })
   = addErrCtxt (dataConCtxt name) $
     do { traceTc "tcConDecl 1" (ppr name)
        ; (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) 
@@ -1017,9 +1018,6 @@ tcConDecl new_or_data existential_ok rep_tycon res_tmpl 	-- Data types
        ; res_ty  <- case res_ty of
                       ResTyH98     -> return ResTyH98
                       ResTyGADT ty -> ResTyGADT <$> zonkTcTypeToType ze ty
-
-       ; checkTc (existential_ok || conRepresentibleWithH98Syntax con)
-	         (badExistential name)
 
        ; let (univ_tvs, ex_tvs, eq_preds, res_ty')
                 = rejigConRes res_tmpl qtkvs res_ty
@@ -1054,10 +1052,7 @@ tcConArg new_or_data bty
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsConArgType new_or_data bty
         ; traceTc "tcConArg 2" (ppr bty)
-        ; dflags <- getDynFlags
-        ; let strict_mark = chooseBoxingStrategy dflags arg_ty (getBangStrictness bty)
-                            -- Must be computed lazily
-	; return (arg_ty, strict_mark) }
+	; return (arg_ty, getBangStrictness bty) }
 
 tcConRes :: ResType (LHsType Name) -> TcM (ResType Type)
 tcConRes ResTyH98           = return ResTyH98
@@ -1124,9 +1119,8 @@ rejigConRes (tmpl_tvs, res_tmpl) dc_tvs (ResTyGADT res_ty)
                        new_tmpl = updateTyVarKind (substTy subst) tmpl
       | otherwise = pprPanic "tcResultType" (ppr res_ty)
     ex_tvs = dc_tvs `minusList` univ_tvs
+\end{code}
 
-
-{-
 Note [Substitution in template variables kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1160,153 +1154,6 @@ which is why we create new_tmpl.
 
 The template substitution only maps kind variables to kind variables,
 since GADTs are not kind indexed.
-
--}
-
-
-consUseH98Syntax :: [LConDecl a] -> Bool
-consUseH98Syntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = False
-consUseH98Syntax _                                             = True
-		 -- All constructors have same shape
-
-conRepresentibleWithH98Syntax :: ConDecl Name -> Bool
-conRepresentibleWithH98Syntax
-    (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyH98 })
-        = null (hsQTvBndrs tvs) && null (unLoc ctxt)
-conRepresentibleWithH98Syntax
-    (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyGADT (L _ t) })
-        = null (unLoc ctxt) && f t (hsLTyVarNames tvs)
-    where -- Each type variable should be used exactly once in the
-          -- result type, and the result type must just be the type
-          -- constructor applied to type variables
-          f (HsAppTy (L _ t1) (L _ (HsTyVar v2))) vs
-              = (v2 `elem` vs) && f t1 (delete v2 vs)
-          f (HsTyVar _) [] = True
-          f _ _ = False
-
--------------------
-
--- We attempt to unbox/unpack a strict field when either:
---   (i)  The field is marked '!!', or
---   (ii) The field is marked '!', and the -funbox-strict-fields flag is on.
---
--- We have turned off unboxing of newtypes because coercions make unboxing 
--- and reboxing more complicated
-chooseBoxingStrategy :: DynFlags -> TcType -> HsBang -> HsBang
-chooseBoxingStrategy dflags arg_ty bang
-  = case initial_choice of
-      HsUnpack | gopt Opt_OmitInterfacePragmas dflags
-               -> HsStrict
-      _other   -> initial_choice
-       -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
-       -- See Trac #5252: unpacking means we must not conceal the
-       --                 representation of the argument type
-       -- However: even when OmitInterfacePragmas is on, we still want
-       -- to know if we have HsUnpackFailed, because we omit a
-       -- warning in that case (#3966)
-  where
-    initial_choice = case bang of
-	               HsNoBang -> HsNoBang
-	               HsStrict | gopt Opt_UnboxStrictFields dflags
-                                -> can_unbox HsStrict arg_ty
-	                        | gopt Opt_UnboxStrictPrimitiveFields dflags &&
-                                  can_unbox_prim arg_ty
-                                -> HsUnpack
-                                | otherwise -> HsStrict
-                       HsNoUnpack -> HsStrict
-	               HsUnpack   -> can_unbox HsUnpackFailed arg_ty
-                       HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
-		                    	  -- Source code never has HsUnpackFailed
-
-    can_unbox :: HsBang -> TcType -> HsBang
-    -- Returns   HsUnpack  if we can unpack arg_ty
-    -- 		 fail_bang if we know what arg_ty is but we can't unpack it
-    -- 		 HsStrict  if it's abstract, so we don't know whether or not we can unbox it
-    can_unbox fail_bang arg_ty 
-       = case splitTyConApp_maybe arg_ty of
-	    Nothing -> fail_bang
-
-	    Just (arg_tycon, tycon_args) 
-              | isAbstractTyCon arg_tycon -> HsStrict	
-                      -- See Note [Don't complain about UNPACK on abstract TyCons]
-              | not (isRecursiveTyCon arg_tycon) 	-- Note [Recusive unboxing]
-	      , isProductTyCon arg_tycon 
-	      	    -- We can unbox if the type is a chain of newtypes 
-		    -- with a product tycon at the end
-              -> if isNewTyCon arg_tycon 
-                 then can_unbox fail_bang (newTyConInstRhs arg_tycon tycon_args)
-                 else HsUnpack
-
-              | otherwise -> fail_bang
-
-    -- TODO: Deal with type synonyms?
-
-    can_unbox_prim :: TcType -> Bool
-    -- We unpack any field which final unpacked size would be smaller
-    -- or equal to the size of a pointer.
-    can_unbox_prim arg_ty
-       = case splitTyConApp_maybe arg_ty of
-            Nothing -> False
-
-            Just (arg_tycon, _)
-              | isAbstractTyCon arg_tycon -> False
-                      -- See Note [Don't complain about UNPACK on abstract TyCons]
-              | isPrimTyCon arg_tycon &&
-                arg_tycon `elem` ptrSizedPrimTyCons -> True
-              -- TODO: Check that the PrimTyCon corresponds to a type
-              -- with pointer-sized representation.
-              | isEmptyDataTyCon arg_tycon -> True
-              | not (isRecursiveTyCon arg_tycon)        -- Note [Recusive unboxing]
-              , Just ty <- tyConSingleFieldDataCon_maybe arg_tycon
-              -> can_unbox_prim ty
-              | otherwise -> False
-
-ptrSizedPrimTyCons :: [TyCon]
-ptrSizedPrimTyCons =
-    [ TysPrim.addrPrimTyCon
-    , TysPrim.arrayPrimTyCon
-    , TysPrim.byteArrayPrimTyCon
-    , TysPrim.arrayArrayPrimTyCon
-    , TysPrim.charPrimTyCon
-    , TysPrim.doublePrimTyCon
-    , TysPrim.floatPrimTyCon
-    , TysPrim.intPrimTyCon
-    , TysPrim.int32PrimTyCon
-    , TysPrim.int64PrimTyCon
-    , TysPrim.mutableArrayPrimTyCon
-    , TysPrim.mutableByteArrayPrimTyCon
-    , TysPrim.mutableArrayArrayPrimTyCon
-    , TysPrim.wordPrimTyCon
-    , TysPrim.word32PrimTyCon
-    , TysPrim.word64PrimTyCon
-    ]
-
-\end{code}
-
-Note [Don't complain about UNPACK on abstract TyCons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are going to complain about UnpackFailed, but if we say
-   data T = MkT {-# UNPACK #-} !Wobble
-and Wobble is a newtype imported from a module that was compiled 
-without optimisation, we don't want to complain. Because it might
-be fine when optimsation is on.  I think this happens when Haddock
-is working over (say) GHC souce files.
-
-Note [Recursive unboxing]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Be careful not to try to unbox this!
-	data T = MkT {-# UNPACK #-} !T Int
-Reason: consider
-  data R = MkR {-# UNPACK #-} !S Int
-  data S = MkS {-# UNPACK #-} !Int
-The representation arguments of MkR are the *representation* arguments
-of S (plus Int); the rep args of MkS are Int#.  This is obviously no
-good for T, because then we'd get an infinite number of arguments.
-
-But it's the *argument* type that matters. This is fine:
-	data S = MkS S !Int
-because Int is non-recursive.
-
 
 %************************************************************************
 %*									*
@@ -1376,7 +1223,11 @@ checkValidTyCon tc
 	
 	-- Check arg types of data constructors
        ; traceTc "cvtc2" (ppr tc)
-       ; mapM_ (checkValidDataCon tc) data_cons
+
+       ; existential_ok  <- xoptM Opt_ExistentialQuantification
+       ; gadt_ok         <- xoptM Opt_GADTs
+       ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
+       ; mapM_ (checkValidDataCon ex_ok tc) data_cons
 
 	-- Check that fields with the same name share a type
        ; mapM_ check_fields groups }
@@ -1436,8 +1287,8 @@ checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
     mb_subst2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
 
 -------------------------------
-checkValidDataCon :: TyCon -> DataCon -> TcM ()
-checkValidDataCon tc con
+checkValidDataCon :: Bool -> TyCon -> DataCon -> TcM ()
+checkValidDataCon existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
     do	{ traceTc "Validity of data con" (ppr con)
@@ -1457,7 +1308,10 @@ checkValidDataCon tc con
 	; checkValidType ctxt (dataConUserType con)
 	; when (isNewTyCon tc) (checkNewDataCon con)
 
-        ; mapM_ check_bang (dataConStrictMarks con `zip` [1..])
+        ; mapM_ check_bang (zip3 (dataConStrictMarks con) (dataConRepBangs con) [1..])
+
+        ; checkTc (existential_ok || isVanillaDataCon con)
+ 	          (badExistential con)
 
         ; checkTc (not (any (isKindVar . fst) (dataConEqSpec con)))
                   (badGadtKindCon con)
@@ -1466,8 +1320,12 @@ checkValidDataCon tc con
     }
   where
     ctxt = ConArgCtxt (dataConName con) 
-    check_bang (HsUnpackFailed, n) = addWarnTc (cant_unbox_msg n)
-    check_bang _                   = return ()
+    check_bang (HsBang want_unpack, rep_bang, n) 
+      | want_unpack
+      , case rep_bang of { HsUnpack -> False; _ -> True }
+      = addWarnTc (cant_unbox_msg n)
+    check_bang _
+      = return ()
 
     cant_unbox_msg n = sep [ ptext (sLit "Ignoring unusable UNPACK pragma on the")
                            , speakNth n <+> ptext (sLit "argument of") <+> quotes (ppr con)]
@@ -1899,7 +1757,7 @@ badGadtDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XGADTs to allow GADTs")) ]
 
-badExistential :: Located Name -> SDoc
+badExistential :: DataCon -> SDoc
 badExistential con_name
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr con_name) <+>
 		ptext (sLit "has existential type variables, a context, or a specialised result type"))

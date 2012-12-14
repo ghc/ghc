@@ -76,7 +76,7 @@ module TysWiredIn (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} MkId( mkDataConIds )
+import {-# SOURCE #-} MkId( mkDataConWorkId )
 
 -- friends:
 import PrelNames
@@ -277,16 +277,14 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
 		arg_tys (mkTyConApp tycon (mkTyVarTys tyvars)) 
 		tycon
 		[]	-- No stupid theta
-		(mkDataConIds bogus_wrap_name wrk_name data_con)
-		
+                (mkDataConWorkId wrk_name data_con)
+		NoDataConRep	-- Wired-in types are too simple to need wrappers
 
     modu     = ASSERT( isExternalName dc_name ) 
 	       nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_name = mkWiredInName modu wrk_occ wrk_key
 			     (AnId (dataConWorkId data_con)) UserSyntax
-    bogus_wrap_name = pprPanic "Wired-in data wrapper id" (ppr dc_name)
-	-- Wired-in types are too simple to need wrappers
 \end{code}
 
 

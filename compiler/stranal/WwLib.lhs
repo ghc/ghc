@@ -19,20 +19,21 @@ import CoreSyn
 import CoreUtils	( exprType )
 import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda, setIdUnfolding,
-                          setIdInfo
+                          setIdInfo, setIdType
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon
 import Demand		( Demand(..), DmdResult(..), Demands(..) ) 
 import MkCore		( mkRuntimeErrorApp, aBSENT_ERROR_ID )
-import MkId		( realWorldPrimId, voidArgId, 
-                          mkUnpackCase, mkProductBox )
+import MkId		( realWorldPrimId, voidArgId
+                        , wrapNewTypeBody, unwrapNewTypeBody )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type
-import Coercion         ( mkSymCo, splitNewTypeRepCo_maybe )
+import Coercion         ( mkSymCo, instNewTyCon_maybe, splitNewTypeRepCo_maybe )
 import BasicTypes	( TupleSort(..) )
 import Literal		( absentLiteralOf )
+import TyCon
 import UniqSupply
 import Unique
 import Util		( zipWithEqual )
@@ -413,6 +414,62 @@ mkWWstr_one dflags arg
 ----------------------
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
+\end{code}
+
+
+
+\begin{code}
+mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
+-- (mkUnpackCase x e args Con body)
+--      returns
+-- case (e `cast` ...) of bndr { Con args -> body }
+-- 
+-- the type of the bndr passed in is irrelevent
+mkUnpackCase bndr arg unpk_args boxing_con body
+  = Case cast_arg (setIdType bndr bndr_ty) (exprType body) [(DataAlt boxing_con, unpk_args, body)]
+  where
+  (cast_arg, bndr_ty) = go (idType bndr) arg
+  go ty arg 
+    | (tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
+    , isNewTyCon tycon && not (isRecursiveTyCon tycon)
+    = go (newTyConInstRhs tycon tycon_args) 
+         (unwrapNewTypeBody tycon tycon_args arg)
+    | otherwise = (arg, ty)
+
+mkProductBox :: [Id] -> Type -> CoreExpr
+mkProductBox arg_ids ty 
+  = result_expr
+  where 
+    (tycon, tycon_args, pack_con, _con_arg_tys) = splitProductType "mkProductBox" ty
+
+    result_expr
+      | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
+      = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
+      | otherwise = mkConApp pack_con (map Type tycon_args ++ varsToCoreExprs arg_ids)
+
+    wrap expr = wrapNewTypeBody tycon tycon_args expr
+
+-- | As 'splitProductType_maybe', but in turn instantiates the 'TyCon' returned
+-- and hence recursively tries to unpack it as far as it able to
+deepSplitProductType_maybe :: Type -> Maybe (TyCon, [Type], DataCon, [Type])
+deepSplitProductType_maybe ty
+  = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
+       ; let {result 
+             | Just (ty', _co) <- instNewTyCon_maybe tycon tycon_args
+	     , not (isRecursiveTyCon tycon)
+             = deepSplitProductType_maybe ty'	-- Ignore the coercion?
+             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive
+					   -- newtypes nor through families
+             | otherwise = Just res}
+       ; result
+       }
+
+-- | As 'deepSplitProductType_maybe', but panics if the 'Type' is not a product type
+deepSplitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
+deepSplitProductType str ty 
+  = case deepSplitProductType_maybe ty of
+      Just stuff -> stuff
+      Nothing -> pprPanic (str ++ ": not a product") (pprType ty)
 \end{code}
 
 
