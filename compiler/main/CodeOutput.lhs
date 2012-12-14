@@ -144,9 +144,17 @@ outputAsm dflags filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
-           \f -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags f ncg_uniqs cmm_stream
+       let filenmDyn = filenm ++ "-dyn"
+           withHandles f = doOutput filenm $ \h ->
+                           ifGeneratingDynamicToo dflags
+                               (doOutput filenmDyn $ \dynH ->
+                                   f [(h, dflags),
+                                      (dynH, doDynamicToo dflags)])
+                               (f [(h, dflags)])
+
+       _ <- {-# SCC "OutputAsm" #-} withHandles $
+           \hs -> {-# SCC "NativeCodeGen" #-}
+                 nativeCodeGen dflags hs ncg_uniqs cmm_stream
        return ()
 
  | otherwise

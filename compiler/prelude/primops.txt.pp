@@ -259,6 +259,9 @@ primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
 primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
 primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
 
+primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
+primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
 	 {Shift left.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}

@@ -1862,6 +1862,53 @@ f "2"    = 2
 
         <varlistentry>
           <term>
+            <option>-funbox-strict-primitive-fields</option>:
+            <indexterm><primary><option>-funbox-strict-primitive-fields</option></primary></indexterm>
+            <indexterm><primary>strict constructor fields</primary></indexterm>
+            <indexterm><primary>constructor fields, strict</primary></indexterm>
+          </term>
+          <listitem>
+            <para>This option causes all constructor fields which are
+            marked strict (i.e. &ldquo;!&rdquo;) and which
+            representation is smaller or equal to the size of a
+            pointer to be unpacked, if possible. It is equivalent to
+            adding an <literal>UNPACK</literal> pragma (see <xref
+            linkend="unpack-pragma"/>) to every strict constructor
+            field that fullfills the size restriction.
+            </para>
+
+            <para>For example, the constructor fields in the following
+            data types
+<programlisting>
+data A = A !Int
+data B = B !A
+newtype C = C B
+data D = D !C
+</programlisting>
+            would all be represented by a single
+            <literal>Int#</literal> (see <xref linkend="primitives"/>)
+            value with
+            <option>-funbox-strict-primitive-fields</option> enabled.
+            </para>
+
+            <para>This option is less of a sledgehammer than
+            <option>-funbox-strict-fields</option>: it should rarely make things
+            worse. If you use <option>-funbox-strict-primitive-fields</option>
+            to turn on unboxing by default you can disable it for certain
+            constructor fields using the <literal>NOUNPACK</literal> pragma (see
+            <xref linkend="nounpack-pragma"/>).</para>
+
+            <para>
+            Note that for consistency <literal>Double</literal>,
+            <literal>Word64</literal>, and <literal>Int64</literal> constructor
+            fields are unpacked on 32-bit platforms, even though they are
+            technically larger than a pointer on those platforms.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <option>-fspec-constr</option>
             <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
           </term>

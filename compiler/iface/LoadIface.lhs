@@ -558,18 +558,20 @@ findAndReadIface doc_str mod hi_boot_file
                             -- Don't forget to fill in the package name...
           checkBuildDynamicToo (Succeeded (iface, filePath)) = do
               dflags <- getDynFlags
-              when (gopt Opt_BuildDynamicToo dflags) $ do
+              whenGeneratingDynamicToo dflags $ withDoDynamicToo $ do
                   let ref = canGenerateDynamicToo dflags
-                  b <- liftIO $ readIORef ref
-                  when b $ do
-                      let dynFilePath = replaceExtension filePath (dynHiSuf dflags)
-                      r <- read_file dynFilePath
-                      case r of
-                          Succeeded (dynIface, _)
-                           | mi_mod_hash iface == mi_mod_hash dynIface ->
-                              return ()
-                          _ ->
-                              liftIO $ writeIORef ref False
+                      dynFilePath = replaceExtension filePath (dynHiSuf dflags)
+                  r <- read_file dynFilePath
+                  case r of
+                      Succeeded (dynIface, _)
+                       | mi_mod_hash iface == mi_mod_hash dynIface ->
+                          return ()
+                       | otherwise ->
+                          do traceIf (text "Dynamic hash doesn't match")
+                             liftIO $ writeIORef ref False
+                      Failed err ->
+                          do traceIf (text "Failed to load dynamic interface file:" $$ err)
+                             liftIO $ writeIORef ref False
           checkBuildDynamicToo _ = return ()
 \end{code}
 

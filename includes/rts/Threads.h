@@ -57,6 +57,9 @@ HsBool rtsSupportsBoundThreads (void);
 // The number of Capabilities
 extern unsigned int n_capabilities;
 
+// The number of Capabilities that are not disabled
+extern nat enabled_capabilities;
+
 #if !IN_STG_CODE
 extern Capability MainCapability;
 #endif

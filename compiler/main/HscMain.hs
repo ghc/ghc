@@ -1242,9 +1242,16 @@ hscNormalIface simpl_result mb_old_iface = do
 hscWriteIface :: ModIface -> Bool -> ModSummary -> Hsc ()
 hscWriteIface iface no_change mod_summary = do
     dflags <- getDynFlags
+    let ifaceFile = ml_hi_file (ms_location mod_summary)
     unless no_change $
         {-# SCC "writeIface" #-}
-        liftIO $ writeIfaceFile dflags (ms_location mod_summary) iface
+        liftIO $ writeIfaceFile dflags ifaceFile iface
+    whenGeneratingDynamicToo dflags $ liftIO $ do
+        -- TODO: We should do a no_change check for the dynamic
+        --       interface file too
+        let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
+            dynDflags = doDynamicToo dflags
+        writeIfaceFile dynDflags dynIfaceFile iface
 
 -- | Compile to hard-code.
 hscGenHardCode :: CgGuts -> ModSummary

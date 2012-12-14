@@ -491,6 +491,12 @@ emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
+-- Unsigned int to floating point conversions
+emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
+                                            (MO_UF_Conv W32) [w]
+emitPrimOp _      [res] Word2DoubleOp [w] = emitPrimCall [res]
+                                            (MO_UF_Conv W64) [w]
+
 -- The rest just translate straightforwardly
 emitPrimOp dflags [res] op [arg]
    | nopOp op

@@ -181,6 +181,8 @@ data Env gbl lcl
 
 instance ContainsDynFlags (Env gbl lcl) where
     extractDynFlags env = hsc_dflags (env_top env)
+    replaceDynFlags env dflags
+        = env {env_top = replaceDynFlags (env_top env) dflags}
 
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)

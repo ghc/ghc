@@ -1117,7 +1117,8 @@ runPhase cc_phase input_fn dflags
         -- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
         -- regardless of the ordering.
         --
-        -- This is a temporary hack.
+        -- This is a temporary hack. See #2872, commit
+        -- 5bd3072ac30216a505151601884ac88bf404c9f2
                        ++ (if platformArch platform == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
@@ -1203,7 +1204,8 @@ runPhase As input_fn dflags
         -- might be a hierarchical module.
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
-        liftIO $ as_prog dflags
+        let runAssembler inputFilename outputFilename
+                = liftIO $ as_prog dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 
@@ -1218,11 +1220,17 @@ runPhase As input_fn dflags
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
-                       ++ [ SysTools.Option "-c"
-                          , SysTools.FileOption "" input_fn
+                       ++ [ SysTools.Option "-x", SysTools.Option "assembler"
+                          , SysTools.Option "-c"
+                          , SysTools.FileOption "" inputFilename
                           , SysTools.Option "-o"
-                          , SysTools.FileOption "" output_fn
+                          , SysTools.FileOption "" outputFilename
                           ])
+
+        runAssembler input_fn output_fn
+        whenGeneratingDynamicToo dflags $
+            runAssembler (input_fn ++ "-dyn")
+                         (replaceExtension output_fn (dynObjectSuf dflags))
 
         return (next_phase, output_fn)
 

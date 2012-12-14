@@ -441,6 +441,8 @@ data CallishMachOp
   | MO_F32_Exp
   | MO_F32_Sqrt
 
+  | MO_UF_Conv Width
+
   | MO_S_QuotRem Width
   | MO_U_QuotRem Width
   | MO_U_QuotRem2 Width
