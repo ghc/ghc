@@ -65,6 +65,7 @@ import DynFlags
 import FastString
 import Outputable
 
+import qualified Data.ByteString as BS
 import Data.Char
 import Data.List
 import Data.Ord
@@ -79,7 +80,7 @@ import Data.Maybe
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = newByteStringCLit (bytesFB s)
+cgLit (MachStr s) = newByteStringCLit (BS.unpack s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = do dflags <- getDynFlags
                        return (mkSimpleLit dflags other_lit)

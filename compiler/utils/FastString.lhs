@@ -34,10 +34,7 @@ module FastString
         fastZStringToByteString,
         mkFastBytesByteList,
         unsafeMkFastBytesString,
-        bytesFB,
         hashFB,
-        lengthFB,
-        appendFB,
 
         -- * FastZString
         FastZString,
@@ -175,20 +172,10 @@ pokeCAString ptr str =
   in
   go str 0
 
--- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
-bytesFB :: FastBytes -> [Word8]
-bytesFB = BS.unpack
-
 hashFB :: FastBytes -> Int
 hashFB bs
     = inlinePerformIO $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
       return $ hashStr (castPtr ptr) len
-
-lengthFB :: FastBytes -> Int
-lengthFB f = BS.length f
-
-appendFB :: FastBytes -> FastBytes -> FastBytes
-appendFB = BS.append
 
 hPutFB :: Handle -> FastBytes -> IO ()
 hPutFB = BS.hPut
@@ -473,7 +460,7 @@ unpackFS (FastString _ _ bs _) =
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> [Word8]
-bytesFS fs = bytesFB $ fastStringToFastBytes fs
+bytesFS fs = BS.unpack $ fastStringToFastBytes fs
 
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this
@@ -494,8 +481,8 @@ zEncodeFS fs@(FastString _ _ _ ref) =
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = inlinePerformIO
                  $ mkFastStringFastBytes
-                 $ appendFB (fastStringToFastBytes fs1)
-                            (fastStringToFastBytes fs2)
+                 $ BS.append (fastStringToFastBytes fs1)
+                             (fastStringToFastBytes fs2)
 
 concatFS :: [FastString] -> FastString
 concatFS ls = mkFastString (Prelude.concat (map unpackFS ls)) -- ToDo: do better

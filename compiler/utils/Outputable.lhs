@@ -84,6 +84,7 @@ import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
 
+import qualified Data.ByteString as BS
 import Data.Char
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
@@ -740,7 +741,7 @@ pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
 -- | Special combinator for showing string literals.
 pprHsBytes :: FastBytes -> SDoc
-pprHsBytes fb = let escaped = concatMap escape $ bytesFB fb
+pprHsBytes fb = let escaped = concatMap escape $ BS.unpack fb
                 in vcat (map text (showMultiLineString escaped)) <> char '#'
     where escape :: Word8 -> String
           escape w = let c = chr (fromIntegral w)
