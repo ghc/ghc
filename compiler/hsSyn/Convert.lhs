@@ -30,6 +30,7 @@ import Util
 import FastString
 import Outputable
 
+import qualified Data.ByteString as BS
 import Control.Monad( unless )
 
 import Language.Haskell.TH as TH hiding (sigP)
@@ -752,7 +753,7 @@ cvtLit (CharL c)       = do { force c; return $ HsChar c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString s' }
-cvtLit (StringPrimL s) = do { let { s' = mkFastBytesByteList s }
+cvtLit (StringPrimL s) = do { let { s' = BS.pack s }
                             ; force s'
                             ; return $ HsStringPrim s' }
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"

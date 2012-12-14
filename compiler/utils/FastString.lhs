@@ -32,7 +32,6 @@ module FastString
         foreignPtrToFastBytes,
         fastStringToFastBytes,
         fastZStringToByteString,
-        mkFastBytesByteList,
         unsafeMkFastBytesString,
         hashFB,
 
@@ -144,15 +143,6 @@ fastStringToFastBytes f = fs_fb f
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
-
-mkFastBytesByteList :: [Word8] -> FastBytes
-mkFastBytesByteList bs =
-  inlinePerformIO $ do
-    let l = Prelude.length bs
-    buf <- mallocForeignPtrBytes l
-    withForeignPtr buf $ \ptr -> do
-      pokeArray (castPtr ptr) bs
-      return $ foreignPtrToFastBytes buf l
 
 -- This will drop information if any character > '\xFF'
 unsafeMkFastBytesString :: String -> FastBytes
