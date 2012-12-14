@@ -29,7 +29,6 @@ module FastString
         -- * FastBytes
         FastBytes,
         mkFastStringFastBytes,
-        foreignPtrToFastBytes,
         fastStringToFastBytes,
         fastZStringToByteString,
         unsafeMkFastBytesString,
@@ -132,9 +131,6 @@ import GHC.Base         ( unpackCString# )
 
 type FastBytes = ByteString
 
-foreignPtrToFastBytes :: ForeignPtr Word8 -> Int -> FastBytes
-foreignPtrToFastBytes fp len = BS.fromForeignPtr fp 0 len
-
 mkFastStringFastBytes :: FastBytes -> IO FastString
 mkFastStringFastBytes bs = mkFastStringByteString bs
 
@@ -146,21 +142,7 @@ fastZStringToByteString (FastZString bs) = bs
 
 -- This will drop information if any character > '\xFF'
 unsafeMkFastBytesString :: String -> FastBytes
-unsafeMkFastBytesString str =
-  inlinePerformIO $ do
-    let l = Prelude.length str
-    buf <- mallocForeignPtrBytes l
-    withForeignPtr buf $ \ptr -> do
-      pokeCAString (castPtr ptr) str
-      return $ foreignPtrToFastBytes buf l
-
-pokeCAString :: Ptr CChar -> String -> IO ()
-pokeCAString ptr str =
-  let
-        go []     !_ = return ()
-        go (c:cs) n  = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
-  in
-  go str 0
+unsafeMkFastBytesString = BSC.pack
 
 hashByteString :: ByteString -> Int
 hashByteString bs
