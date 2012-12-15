@@ -13,7 +13,8 @@ module PPC.Instr (
     archWordSize,
     RI(..),
     Instr(..),
-    maxSpillSlots
+    maxSpillSlots,
+    allocMoreStack
 )
 
 where
@@ -57,9 +58,57 @@ instance Instruction Instr where
         mkRegRegMoveInstr _     = ppc_mkRegRegMoveInstr
         takeRegRegMoveInstr     = ppc_takeRegRegMoveInstr
         mkJumpInstr             = ppc_mkJumpInstr
-        mkStackAllocInstr       = panic "no ppc_mkStackAllocInstr"
-        mkStackDeallocInstr     = panic "no ppc_mkStackDeallocInstr"
+        mkStackAllocInstr       = ppc_mkStackAllocInstr
+        mkStackDeallocInstr     = ppc_mkStackDeallocInstr
 
+
+ppc_mkStackAllocInstr :: Platform -> Int -> Instr
+ppc_mkStackAllocInstr platform amount
+  = case platformArch platform of
+      ArchPPC -> -- SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
+                 ADD sp sp (RIImm (ImmInt (-amount)))
+      arch -> panic $ "ppc_mkStackAllocInstr " ++ show arch
+
+ppc_mkStackDeallocInstr :: Platform -> Int -> Instr
+ppc_mkStackDeallocInstr platform amount
+  = case platformArch platform of
+      ArchPPC -> -- ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
+                 ADD sp sp (RIImm (ImmInt amount))
+      arch -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
+
+allocMoreStack
+  :: Platform
+  -> Int
+  -> NatCmmDecl statics PPC.Instr.Instr
+  -> NatCmmDecl statics PPC.Instr.Instr
+
+allocMoreStack _ _ top@(CmmData _ _) = top
+allocMoreStack platform amount (CmmProc info lbl live (ListGraph code)) =
+        CmmProc info lbl live (ListGraph (map insert_stack_insns code))
+  where
+    alloc   = mkStackAllocInstr platform amount
+    dealloc = mkStackDeallocInstr platform amount
+
+    is_entry_point id = id `mapMember` info
+
+    insert_stack_insns (BasicBlock id insns)
+       | is_entry_point id  = BasicBlock id (alloc : block')
+       | otherwise          = BasicBlock id block'
+       where
+         block' = insertBeforeNonlocalTransfers dealloc insns
+
+insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
+insertBeforeNonlocalTransfers insert insns
+     = foldr p [] insns
+     where p insn r = case insn of
+                        BCC    _ _  -> insert : insn : r
+                        BCCFAR _ _  -> insert : insn : r
+                        JMP    _    -> insert : insn : r
+                        MTCTR  _    -> insert : insn : r
+                        BCTR   _ _  -> insert : insn : r
+                        BL     _ _  -> insert : insn : r
+                        BCTRL  _    -> insert : insn : r
+                        _           -> insn : r
 
 -- -----------------------------------------------------------------------------
 -- Machine's assembly language
@@ -386,25 +435,20 @@ ppc_mkLoadInstr dflags reg delta slot
     in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
-spillSlotSize :: Int
-spillSlotSize = 8
+spillSlotSize :: DynFlags -> Int
+spillSlotSize dflags = if is32Bit then 12 else 8
+    where is32Bit = target32Bit (targetPlatform dflags)
 
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize) - 1
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize dflags) - 1
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
 spillSlotToOffset :: DynFlags -> Int -> Int
 spillSlotToOffset dflags slot
-   | slot >= 0 && slot < maxSpillSlots dflags
-   = 64 + spillSlotSize * slot
-   | otherwise
-   = pprPanic "spillSlotToOffset:"
-          (   text "invalid spill location: " <> int slot
-          $$  text "maxSpillSlots:          " <> int (maxSpillSlots dflags))
-
+   = 64 + spillSlotSize dflags * slot
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta

@@ -188,7 +188,7 @@ nativeCodeGen dflags hds us cmms
                          ,maxSpillSlots             = PPC.Instr.maxSpillSlots dflags
                          ,allocatableRegs           = PPC.Regs.allocatableRegs platform
                          ,ncg_x86fp_kludge          = id
-                         ,ncgAllocMoreStack         = noAllocMoreStack
+                         ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
                          ,ncgExpandTop              = id
                          ,ncgMakeFarBranches        = makeFarBranches
                      }
