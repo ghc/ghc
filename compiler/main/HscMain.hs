@@ -1250,8 +1250,9 @@ hscWriteIface iface no_change mod_summary = do
         -- TODO: We should do a no_change check for the dynamic
         --       interface file too
         let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
+            dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
             dynDflags = doDynamicToo dflags
-        writeIfaceFile dynDflags dynIfaceFile iface
+        writeIfaceFile dynDflags dynIfaceFile' iface
 
 -- | Compile to hard-code.
 hscGenHardCode :: CgGuts -> ModSummary
