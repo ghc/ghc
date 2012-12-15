@@ -210,7 +210,9 @@ vectTopBind b@(Rec binds)
         ; cantVectorise dflags noVectoriseErr (ppr b)
         }
       else do 
-    {   -- For all bindings *with* a pragma, just use the pragma-supplied vectorised expression
+    { traceVt "[Vanilla]" $ vcat [ppr var <+> char '=' <+> ppr expr | (var, expr) <- binds]
+    
+       -- For all bindings *with* a pragma, just use the pragma-supplied vectorised expression
     ; newBindsWPragma  <- concat <$>
                           sequence [ vectTopBindAndConvert bind inlineMe expr'
                                    | (bind, (_, Just (_, expr'))) <- zip binds vectDecls]
