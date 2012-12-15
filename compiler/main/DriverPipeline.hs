@@ -1241,7 +1241,7 @@ runPhase As input_fn dflags
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
-                       ++ [ SysTools.Option "-x", SysTools.Option "assembler"
+                       ++ [ SysTools.Option "-x", SysTools.Option "assembler-with-cpp"
                           , SysTools.Option "-c"
                           , SysTools.FileOption "" inputFilename
                           , SysTools.Option "-o"
