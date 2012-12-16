@@ -34,7 +34,11 @@ import Digraph
 -- vectorised. The third result list are those type constructors that we cannot convert (either
 -- because they use language extensions or because they dependent on type constructors for which
 -- no vectorised version is available).
-
+--
+-- NB: In order to be able to vectorise a type constructor, we require members of the depending set
+--     (i.e., those type constructors that the current one depends on) to be vectorised only if they
+--     are also parallel (i.e., appear in the second argument to the function).
+--
 -- The first argument determines the /conversion status/ of external type constructors as follows:
 --
 -- * tycons which have converted versions are mapped to 'True'
@@ -69,7 +73,8 @@ classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyC
 
         pts' = pts `addListToNameSet` map tyConName tcs_par
 
-        can_convert  = (isNullUFM (refs `minusUFM` cs) && all convertable tcs)
+        can_convert  = (isNullUFM (filterUniqSet ((`elemNameSet` pts) . tyConName) (refs `minusUFM` cs)) 
+                        && all convertable tcs)
                        || isShowClass tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
                        && (not . isShowClass $ tcs)
