@@ -700,7 +700,7 @@ data DynFlags = DynFlags {
 
   interactivePrint      :: Maybe String,
 
-  llvmVersion           :: IORef (Int),
+  llvmVersion           :: IORef Int,
 
   nextWrapperNum        :: IORef Int
  }
