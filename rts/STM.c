@@ -696,32 +696,56 @@ static void merge_update_into(Capability *cap,
 /*......................................................................*/
 
 static void merge_read_into(Capability *cap,
-			    StgTRecHeader *t,
+                            StgTRecHeader *trec,
 			    StgTVar *tvar,
-			    StgClosure *expected_value) {
+                            StgClosure *expected_value)
+{
   int found;
-  
-  // Look for an entry in this trec
+  StgTRecHeader *t;
+
   found = FALSE;
-  FOR_EACH_ENTRY(t, e, {
-    StgTVar *s;
-    s = e -> tvar;
-    if (s == tvar) {
-      found = TRUE;
-      if (e -> expected_value != expected_value) {
-        // Must abort if the two entries start from different values
-        TRACE("%p : read entries inconsistent at %p (%p vs %p)", 
-              t, tvar, e -> expected_value, expected_value);
-        t -> state = TREC_CONDEMNED;
-      } 
-      BREAK_FOR_EACH;
-    }
-  });
+
+  //
+  // See #7493
+  //
+  // We need to look for an existing entry *anywhere* in the stack of
+  // nested transactions.  Otherwise, in stmCommitNestedTransaction()
+  // we can't tell the difference between
+  //
+  //   (1) a read-only entry
+  //   (2) an entry that writes back the original value
+  //
+  // Since in both cases e->new_value == e->expected_value. But in (1)
+  // we want to do nothing, and in (2) we want to update e->new_value
+  // in the outer transaction.
+  //
+  // Here we deal with the first possibility: we never create a
+  // read-only entry in an inner transaction if there is an existing
+  // outer entry; so we never have an inner read and an outer update.
+  // So then in stmCommitNestedTransaction() we know we can always
+  // write e->new_value over the outer entry, because the inner entry
+  // is the most up to date.
+  //
+  for (t = trec; !found && t != NO_TREC; t = t -> enclosing_trec)
+  {
+    FOR_EACH_ENTRY(t, e, {
+      if (e -> tvar == tvar) {
+        found = TRUE;
+        if (e -> expected_value != expected_value) {
+            // Must abort if the two entries start from different values
+            TRACE("%p : read entries inconsistent at %p (%p vs %p)",
+                  t, tvar, e -> expected_value, expected_value);
+            t -> state = TREC_CONDEMNED;
+        }
+        BREAK_FOR_EACH;
+      }
+    });
+  }
 
   if (!found) {
-    // No entry so far in this trec
+    // No entry found
     TRecEntry *ne;
-    ne = get_new_entry(cap, t);
+    ne = get_new_entry(cap, trec);
     ne -> tvar = tvar;
     ne -> expected_value = expected_value;
     ne -> new_value = expected_value;
