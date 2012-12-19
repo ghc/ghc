@@ -84,13 +84,16 @@ synifyATDefault tc = noLoc (synifyAxiom ax)
   where Just ax = tyConFamilyCoercion_maybe tc
 
 synifyAxiom :: CoAxiom -> FamInstDecl Name
-synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
+synifyAxiom (CoAxiom { co_ax_tvs = tkvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
   | Just (tc, args) <- tcSplitTyConApp_maybe lhs
   = let name      = synifyName tc
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
+        (kvs, tvs) = partition isKindVar tkvs
     in FamInstDecl { fid_tycon = name 
-                   , fid_pats = HsWB { hswb_cts = typats, hswb_kvs = [], hswb_tvs = map tyVarName tvs }
+                   , fid_pats = HsWB { hswb_cts = typats
+                                     , hswb_kvs = map tyVarName kvs
+                                     , hswb_tvs = map tyVarName tvs }
                    , fid_defn = TySynonym hs_rhs_ty, fid_fvs = placeHolderNames }
   | otherwise
   = error "synifyAxiom" 
@@ -194,11 +197,14 @@ synifyDataCon use_gadt_syntax dc = noLoc $
 
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
-            in case bang of
-                 HsUnpackFailed -> noLoc $ HsBangTy HsStrict tySyn
-                 HsNoBang       -> tySyn
-                      -- HsNoBang never appears, it's implied instead.
-                 _              -> noLoc $ HsBangTy bang tySyn
+                src_bang = case bang of
+                             HsUnpack -> HsBang True
+                             HsStrict -> HsBang False
+                             _        -> bang
+            in case src_bang of
+                 HsNoBang -> tySyn
+                 _        -> noLoc $ HsBangTy bang tySyn
+            -- HsNoBang never appears, it's implied instead.
           )
           arg_tys (dataConStrictMarks dc)
   field_tys = zipWith (\field synTy -> ConDeclField
