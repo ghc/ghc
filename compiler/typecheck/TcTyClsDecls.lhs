@@ -272,8 +272,7 @@ kcTyClGroup decls
 
 	  -- Step 1: Bind kind variables for non-synonyms
         ; let (syn_decls, non_syn_decls) = partition (isSynDecl . unLoc) decls
-	; initial_kinds <- 
-                           getInitialKinds TopLevel non_syn_decls
+	; initial_kinds <- getInitialKinds TopLevel non_syn_decls
         ; traceTc "kcTyClGroup: initial kinds" (ppr initial_kinds)
 
         -- Step 2: Set initial envt, kind-check the synonyms
@@ -1638,7 +1637,7 @@ mkRecSelBind (tycon, sel_name)
     -- Add catch-all default case unless the case is exhaustive
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
-    deflt | not (any is_unused all_cons) = []
+    deflt | all dealt_with all_cons = []
 	  | otherwise = [mkSimpleMatch [L loc (WildPat placeHolderType)] 
 	    	      	    (mkHsApp (L loc (HsVar (getName rEC_SEL_ERROR_ID)))
     	      		    	     (L loc (HsLit msg_lit)))]
@@ -1646,9 +1645,14 @@ mkRecSelBind (tycon, sel_name)
 	-- Do not add a default case unless there are unmatched
 	-- constructors.  We must take account of GADTs, else we
 	-- get overlap warning messages from the pattern-match checker
-    is_unused con = not (con `elem` cons_w_field 
-			 || dataConCannotMatch inst_tys con)
-    inst_tys = tyConAppArgs data_ty
+        -- NB: we need to pass type args for the *representation* TyCon
+        --     to dataConCannotMatch, hence the calculation of inst_tys
+        --     This matters in data families
+        --              data instance T Int a where
+        --                 A :: { fld :: Int } -> T Int Bool
+        --                 B :: { fld :: Int } -> T Int Char
+    dealt_with con = con `elem` cons_w_field || dataConCannotMatch inst_tys con
+    inst_tys = substTyVars (mkTopTvSubst (dataConEqSpec con1)) (dataConUnivTyVars con1)
 
     unit_rhs = mkLHsTupleExpr []
     msg_lit = HsStringPrim $ mkFastString $ 
