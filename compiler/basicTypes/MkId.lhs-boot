@@ -1,12 +1,14 @@
 \begin{code}
 module MkId where
 import Name( Name )
-import DataCon( DataCon, DataConIds )
+import Var( Id )
+import {-# SOURCE #-} DataCon( DataCon )
 import {-# SOURCE #-} PrimOp( PrimOp )
-import Id( Id )
 
-mkDataConIds :: Name -> Name -> DataCon -> DataConIds
-mkPrimOpId :: PrimOp -> Id
+data DataConBoxer
+
+mkDataConWorkId :: Name -> DataCon -> Id
+mkPrimOpId      :: PrimOp -> Id
 \end{code}
 
 

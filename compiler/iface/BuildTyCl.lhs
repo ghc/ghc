@@ -39,6 +39,7 @@ import Coercion
 
 import DynFlags
 import TcRnMonad
+import UniqSupply
 import Util
 import Outputable
 \end{code}
@@ -155,14 +156,17 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 	-- code, which (for Haskell source anyway) will be in the DataName name
 	-- space, and puts it into the VarName name space
 
+        ; us <- newUniqueSupply
+        ; dflags <- getDynFlags
 	; let
 		stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
 		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
 				     univ_tvs ex_tvs eq_spec ctxt
 				     arg_tys res_ty rep_tycon
-				     stupid_ctxt dc_ids
-		dc_ids = mkDataConIds wrap_name work_name data_con
+				     stupid_ctxt dc_wrk dc_rep
+                dc_wrk = mkDataConWorkId work_name data_con
+                dc_rep = initUs_ us (mkDataConRep dflags wrap_name data_con)
 
 	; return data_con }
 

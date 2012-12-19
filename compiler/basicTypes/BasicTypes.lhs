@@ -62,7 +62,7 @@ module BasicTypes(
 
         EP(..),
 
-	HsBang(..), isBanged, isMarkedUnboxed, 
+	HsBang(..), isBanged, 
         StrictnessMark(..), isMarkedStrict,
 
 	DefMethSpec(..),
@@ -585,32 +585,25 @@ e.g. 	data T = MkT !Int !(Bool,Bool)
 -------------------------
 -- HsBang describes what the *programmer* wrote
 -- This info is retained in the DataCon.dcStrictMarks field
-data HsBang = HsNoBang	
+data HsBang = HsNoBang	       -- Lazy field
 
-	    | HsStrict	
+	    | HsBang Bool      -- Source-language '!' bang
+                               --  True <=> also an {-# UNPACK #-} pragma
 
-	    | HsUnpack	       -- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
-
-	    | HsUnpackFailed   -- An UNPACK pragma that we could not make 
-	      		       -- use of, because the type isn't unboxable; 
-                               -- equivalant to HsStrict except for checkValidDataCon
-            | HsNoUnpack       -- {-# NOUNPACK #-} ! (GHC extension, meaning "strict but not unboxed")
+	    | HsUnpack	       -- Definite commitment: this field is strict and unboxed
+            | HsStrict         -- Definite commitment: this field is strict but not unboxed
   deriving (Eq, Data, Typeable)
 
 instance Outputable HsBang where
     ppr HsNoBang       = empty
-    ppr HsStrict       = char '!'
-    ppr HsUnpack       = ptext (sLit "{-# UNPACK #-} !")
-    ppr HsUnpackFailed = ptext (sLit "{-# UNPACK (failed) #-} !")
-    ppr HsNoUnpack     = ptext (sLit "{-# NOUNPACK #-} !")
+    ppr (HsBang True)  = ptext (sLit "{-# UNPACK #-} !")
+    ppr (HsBang False) = char '!'
+    ppr HsUnpack       = ptext (sLit "Unpacked")
+    ppr HsStrict       = ptext (sLit "SrictNotUnpacked")
 
 isBanged :: HsBang -> Bool
 isBanged HsNoBang = False
 isBanged _        = True
-
-isMarkedUnboxed :: HsBang -> Bool
-isMarkedUnboxed HsUnpack = True
-isMarkedUnboxed _        = False
 
 -------------------------
 -- StrictnessMark is internal only, used to indicate strictness 

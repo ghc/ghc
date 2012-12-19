@@ -749,19 +749,20 @@ instance Binary InlineSpec where
                   _ -> return NoInline
 
 instance Binary HsBang where
-    put_ bh HsNoBang        = putByte bh 0
-    put_ bh HsStrict        = putByte bh 1
-    put_ bh HsUnpack        = putByte bh 2
-    put_ bh HsUnpackFailed  = putByte bh 3
-    put_ bh HsNoUnpack      = putByte bh 4
+    put_ bh HsNoBang       = putByte bh 0
+    put_ bh (HsBang False) = putByte bh 1
+    put_ bh (HsBang True)  = putByte bh 2
+    put_ bh HsUnpack       = putByte bh 3
+    put_ bh HsStrict       = putByte bh 4
+
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return HsNoBang
-              1 -> do return HsStrict
-              2 -> do return HsUnpack
-              3 -> do return HsUnpackFailed
-              _ -> do return HsNoUnpack
+              1 -> do return (HsBang False)
+              2 -> do return (HsBang True)
+              3 -> do return HsUnpack
+              _ -> do return HsStrict
 
 instance Binary TupleSort where
     put_ bh BoxedTuple      = putByte bh 0

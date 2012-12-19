@@ -2391,7 +2391,7 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-          <literal>:info</literal> <replaceable>name</replaceable> ...
+          <literal>:info</literal><optional><literal>!</literal></optional><replaceable>name</replaceable> ...
           <indexterm><primary><literal>:info</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -2410,6 +2410,9 @@ Prelude> :. cmds.ghci
 	  and (b) all the other things mentioned in the instance
 	  are in scope (either qualified or otherwise) as a result of
 	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
+          The command <literal>:info!</literal> works in a similar fashion
+          but it removes restriction (b), showing all instances that are in
+          scope and mention <replaceable>name</replaceable> in their head.
 	</listitem>
       </varlistentry>
 

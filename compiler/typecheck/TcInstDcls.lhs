@@ -612,16 +612,15 @@ tcFamInstDecl1 fam_tc
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
 
        ; stupid_theta <- tcHsContext ctxt
-       ; dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta cons
+       ; h98_syntax <- dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta cons
 
          -- Construct representation tycon
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newImplicitBinder rep_tc_name mkInstTyCoOcc
-       ; let ex_ok = True       -- Existentials ok for type families!
-             orig_res_ty = mkTyConApp fam_tc pats'
+       ; let orig_res_ty = mkTyConApp fam_tc pats'
 
        ; (rep_tc, fam_inst) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcConDecls new_or_data ex_ok rec_rep_tc
+           do { data_cons <- tcConDecls new_or_data rec_rep_tc
                                        (tvs', orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
@@ -641,10 +640,6 @@ tcFamInstDecl1 fam_tc
          -- Remember to check validity; no recursion to worry about here
        ; checkValidTyCon rep_tc
        ; return fam_inst } }
-    where
-       h98_syntax = case cons of      -- All constructors have same shape
-                        L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
-                        _ -> True
 
 
 ----------------

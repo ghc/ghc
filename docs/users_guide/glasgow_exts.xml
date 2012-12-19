@@ -7098,18 +7098,53 @@ pattern binding must have the same context.  For example, this is fine:
 </para>
 </sect2>
 
-<sect2 id="mono-local-binds">
-<title>Monomorphic local bindings</title>
-<para>
-We are actively thinking of simplifying GHC's type system, by <emphasis>not generalising local bindings</emphasis>.
-The rationale is described in the paper
-<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">Let should not be generalised</ulink>.
+<sect2 id="monomorphism">
+<title>Switching off the dreaded Monomorphism Restriction</title>
+          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
+
+<para>Haskell's monomorphism restriction (see
+<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
+4.5.5</ulink>
+of the Haskell Report)
+can be completely switched off by
+<option>-XNoMonomorphismRestriction</option>.
 </para>
+</sect2>
+
+
+<sect2 id="mono-local-binds">
+<title>Let-generalisation</title>
 <para>
-The experimental new behaviour is enabled by the flag <option>-XMonoLocalBinds</option>.  The effect is
-that local (that is, non-top-level) bindings without a type signature are not generalised at all.  You can
-think of it as an extreme (but much more predictable) version of the Monomorphism Restriction.
-If you supply a type signature, then the flag has no effect.
+An ML-style language usually generalises the type of any let-bound or where-bound variable,
+so that it is as polymorphic as possible.
+With the flag <option>-XMonoLocalBinds</option> GHC implements a slightly more conservative policy: 
+<emphasis>it generalises only "closed" bindings</emphasis>.
+A binding is considered "closed" if either
+<itemizedlist>
+<listitem><para>It is one of the top-level bindings of a module, or </para></listitem>
+<listitem><para>Its free variables are all themselves closed</para></listitem>
+</itemizedlist>
+For example, consider
+<programlisting>
+f x = x + 1
+g x = let h y = f y * 2
+          k z = z+x
+      in  h x + k x
+</programlisting>
+Here <literal>f</literal> and <literal>g</literal> are closed because they are bound at top level.
+Also <literal>h</literal> is closed because its only free variable <literal>f</literal> is closed.
+But <literal>k</literal> is not closed because it mentions <literal>x</literal> which is locally bound.
+Another way to think of it is this: all closed bindings <literal>could</literal> be defined at top level.
+(In the example, we could move <literal>h</literal> to top level.)
+</para><para>
+All of this applies only to bindings that lack an explicit type signature, so that GHC has to 
+infer its type.  If you supply a type signature, then that fixes type of the binding, end of story.
+</para><para>
+The rationale for this more conservative strategy is given in 
+<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions".
+</para><para>
+The flag <option>-XMonoLocalBinds</option> is implied by <option>-XTypeFamilies</option> and <option>-XGADTs</option>.  You can switch it off again
+with <option>-XNoMonoLocalBinds</option> but type inference becomes less predicatable if you do so. (Read the papers!)
 </para>
 </sect2>
 
@@ -7130,7 +7165,7 @@ the term you're about to write.
 </para>
 
 <para>
-This extension allows special placeholders, written as <literal>_</literal>, to be used as an expression.
+This extension allows special placeholders, written as "<literal>_</literal>", to be used as an expression.
 During compilation these holes will generate an error message describing what type is expected there.
 The error includes helpful information about the origin of type variables and a list of local bindings
 that might help fill the hole with actual code.
@@ -7142,7 +7177,7 @@ For example, compiling the following module with GHC:
 f :: a -> a
 f x = _
 </programlisting>
-Will fail with the following error:
+will fail with the following error:
 <programlisting>
 hole.hs:2:7:
     Found hole `_' with type a
@@ -10304,51 +10339,6 @@ Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
 
 </sect1>
 
-
-<sect1 id="monomorphism">
-<title>Control over monomorphism</title>
-
-<para>GHC supports two flags that control the way in which generalisation is
-carried out at let and where bindings.
-</para>
-
-<sect2>
-<title>Switching off the dreaded Monomorphism Restriction</title>
-          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
-
-<para>Haskell's monomorphism restriction (see
-<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
-4.5.5</ulink>
-of the Haskell Report)
-can be completely switched off by
-<option>-XNoMonomorphismRestriction</option>.
-</para>
-</sect2>
-
-<sect2>
-<title>Monomorphic pattern bindings</title>
-          <indexterm><primary><option>-XNoMonoPatBinds</option></primary></indexterm>
-          <indexterm><primary><option>-XMonoPatBinds</option></primary></indexterm>
-
-	  <para> As an experimental change, we are exploring the possibility of
-	  making pattern bindings monomorphic; that is, not generalised at all.
-	    A pattern binding is a binding whose LHS has no function arguments,
-	    and is not a simple variable.  For example:
-<programlisting>
-  f x = x                    -- Not a pattern binding
-  f = \x -> x                -- Not a pattern binding
-  f :: Int -> Int = \x -> x  -- Not a pattern binding
-
-  (g,h) = e                  -- A pattern binding
-  (f) = e                    -- A pattern binding
-  [x] = e                    -- A pattern binding
-</programlisting>
-Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
-default</emphasis>.  Use <option>-XNoMonoPatBinds</option> to recover the
-standard behaviour.
-</para>
-</sect2>
-</sect1>
 
 
 <!-- Emacs stuff:

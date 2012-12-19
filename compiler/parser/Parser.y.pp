@@ -1005,9 +1005,9 @@ infixtype :: { LHsType RdrName }
         | btype tyvarop  type    { LL $ mkHsOpTy $1 $2 $3 }
 
 strict_mark :: { Located HsBang }
-        : '!'                           { L1 HsStrict }
-        | '{-# UNPACK' '#-}' '!'        { LL HsUnpack }
-        | '{-# NOUNPACK' '#-}' '!'      { LL HsNoUnpack }
+        : '!'                           { L1 (HsBang False) }
+        | '{-# UNPACK' '#-}' '!'        { LL (HsBang True) }
+        | '{-# NOUNPACK' '#-}' '!'      { LL HsStrict }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
