@@ -47,7 +47,6 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
-import Util
 
 import Control.Monad
 \end{code}
@@ -213,11 +212,11 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
-  = ASSERT( null arg_tys )
-    do checkCg checkCOrAsmOrLlvmOrInterp
+  -- Foreign import label
+  = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
+       check (null arg_tys && isFFILabelTy res_ty) (illegalForeignLabelErr sig_ty)
        cconv' <- checkCConv cconv
        return (CImport cconv' safety mh l)
 
@@ -482,6 +481,11 @@ Warnings
 check :: Bool -> MsgDoc -> TcM ()
 check True _       = return ()
 check _    the_err = addErrTc the_err
+
+illegalForeignLabelErr :: Type -> SDoc
+illegalForeignLabelErr ty
+  = vcat [ illegalForeignTyErr empty ty
+         , ptext (sLit "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)") ]
 
 illegalForeignTyErr :: SDoc -> Type -> SDoc
 illegalForeignTyErr arg_or_res ty
