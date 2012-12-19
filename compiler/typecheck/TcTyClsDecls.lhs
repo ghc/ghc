@@ -1224,10 +1224,11 @@ checkValidTyCon tc
 	-- Check arg types of data constructors
        ; traceTc "cvtc2" (ppr tc)
 
+       ; dflags          <- getDynFlags
        ; existential_ok  <- xoptM Opt_ExistentialQuantification
        ; gadt_ok         <- xoptM Opt_GADTs
        ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
-       ; mapM_ (checkValidDataCon ex_ok tc) data_cons
+       ; mapM_ (checkValidDataCon dflags ex_ok tc) data_cons
 
 	-- Check that fields with the same name share a type
        ; mapM_ check_fields groups }
@@ -1287,8 +1288,8 @@ checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
     mb_subst2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
 
 -------------------------------
-checkValidDataCon :: Bool -> TyCon -> DataCon -> TcM ()
-checkValidDataCon existential_ok tc con
+checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
+checkValidDataCon dflags existential_ok tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
     do	{ traceTc "Validity of data con" (ppr con)
@@ -1323,6 +1324,9 @@ checkValidDataCon existential_ok tc con
     check_bang (HsBang want_unpack, rep_bang, n) 
       | want_unpack
       , case rep_bang of { HsUnpack -> False; _ -> True }
+      , not (gopt Opt_OmitInterfacePragmas dflags)  
+           -- If not optimising, se don't unpack, so don't complain!
+           -- See MkId.dataConArgRep, the (HsBang True) case
       = addWarnTc (cant_unbox_msg n)
     check_bang _
       = return ()

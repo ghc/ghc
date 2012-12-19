@@ -583,7 +583,9 @@ dataConArgRep _ arg_ty HsNoBang
 
 dataConArgRep dflags arg_ty (HsBang False)   -- No {-# UNPACK #-} pragma
   | gopt Opt_OmitInterfacePragmas dflags
-  = strict_but_not_unpacked arg_ty   -- Don't unpack if -fomit-iface-pragmas
+  = strict_but_not_unpacked arg_ty   -- Don't unpack if we aren't optimising; 
+                                     -- rather arbitrarily, we use -fomit-iface-pragmas
+                                     -- as the indication
 
   | (True, rep_tys, unbox, box) <- dataConArgUnpack arg_ty
   ,  gopt Opt_UnboxStrictFields dflags
@@ -610,7 +612,6 @@ dataConArgRep _ arg_ty HsUnpack
   = (HsUnpack, rep_tys, unbox, box)
   | otherwise -- An interface file specified Unpacked, but we couldn't unpack it
   = pprPanic "dataConArgRep" (ppr arg_ty) 
-
 strict_but_not_unpacked :: Type -> (HsBang, [(Type,StrictnessMark)], Unboxer, Boxer)
 strict_but_not_unpacked arg_ty
   = (HsStrict, [(arg_ty, MarkedStrict)], seqUnboxer, unitBoxer)

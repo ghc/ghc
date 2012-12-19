@@ -341,6 +341,7 @@ data DataCon
 		-- The OrigResTy is T [a], but the dcRepTyCon might be :T123
 
 	-- Now the strictness annotations and field labels of the constructor
+        -- See Note [Bangs on data constructor arguments]
 	dcArgBangs :: [HsBang],
 		-- Strictness annotations as decided by the compiler.  
 		-- Matches 1-1 with dcOrigArgTys
@@ -407,6 +408,8 @@ data DataConRep
 
         , dcr_bangs :: [HsBang]  -- The actual decisions made (including failures)
                                  -- 1-1 with orig_arg_tys
+                                 -- See Note [Bangs on data constructor arguments]
+
     }
 -- Algebraic data types always have a worker, and
 -- may or may not have a wrapper, depending on whether
@@ -459,6 +462,25 @@ Here
 but the rep type is
 	Trep :: Int# -> a -> T a
 Actually, the unboxed part isn't implemented yet!
+
+Note [Bangs on data constructor arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T = MkT !Int {-# UNPACK #-} !Int Bool
+Its dcArgBangs field records the *users* specifications, in this case
+    [HsBang False, HsBang True, HsNoBang]
+See the declaration of HsBang in BasicTypes
+
+The dcr_bangs field of the dcRep field records the *actual, decided*
+representation of the data constructor.  Without -O this might be
+    [HsStrict, HsStrict, HsNoBang]
+With -O it might be
+    [HsStrict, HsUnpack, HsNoBang]
+With -funbox-small-strict-fields it might be
+    [HsUnpack, HsUnpack, HsNoBang]
+
+For imported data types, the dcArgBangs field is just the same as the
+dcr_bangs field; we don't know what the user originally said.
 
 
 %************************************************************************

@@ -591,7 +591,7 @@ data HsBang = HsNoBang	       -- Lazy field
                                --  True <=> also an {-# UNPACK #-} pragma
 
 	    | HsUnpack	       -- Definite commitment: this field is strict and unboxed
-            | HsStrict         -- Definite commitment: this field is strict but not unboxec
+            | HsStrict         -- Definite commitment: this field is strict but not unboxed
   deriving (Eq, Data, Typeable)
 
 instance Outputable HsBang where

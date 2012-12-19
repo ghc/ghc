@@ -1862,8 +1862,8 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>-funbox-strict-primitive-fields</option>:
-            <indexterm><primary><option>-funbox-strict-primitive-fields</option></primary></indexterm>
+            <option>-funbox-small-strict-fields</option>:
+            <indexterm><primary><option>-funbox-small-strict-fields</option></primary></indexterm>
             <indexterm><primary>strict constructor fields</primary></indexterm>
             <indexterm><primary>constructor fields, strict</primary></indexterm>
           </term>
@@ -1874,7 +1874,7 @@ f "2"    = 2
             pointer to be unpacked, if possible. It is equivalent to
             adding an <literal>UNPACK</literal> pragma (see <xref
             linkend="unpack-pragma"/>) to every strict constructor
-            field that fullfills the size restriction.
+            field that fulfils the size restriction.
             </para>
 
             <para>For example, the constructor fields in the following
@@ -1888,12 +1888,12 @@ data D = D !C
             would all be represented by a single
             <literal>Int#</literal> (see <xref linkend="primitives"/>)
             value with
-            <option>-funbox-strict-primitive-fields</option> enabled.
+            <option>-funbox-small-strict-fields</option> enabled.
             </para>
 
             <para>This option is less of a sledgehammer than
             <option>-funbox-strict-fields</option>: it should rarely make things
-            worse. If you use <option>-funbox-strict-primitive-fields</option>
+            worse. If you use <option>-funbox-small-strict-fields</option>
             to turn on unboxing by default you can disable it for certain
             constructor fields using the <literal>NOUNPACK</literal> pragma (see
             <xref linkend="nounpack-pragma"/>).</para>
