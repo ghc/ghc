@@ -2410,8 +2410,8 @@ Prelude> :. cmds.ghci
 	  and (b) all the other things mentioned in the instance
 	  are in scope (either qualified or otherwise) as a result of
 	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
-          The command <literal>:info!</literal> works in a similar fasion
-          but it removes restriction (b), showing all instancds that are in
+          The command <literal>:info!</literal> works in a similar fashion
+          but it removes restriction (b), showing all instances that are in
           scope and mention <replaceable>name</replaceable> in their head.
 	</listitem>
       </varlistentry>
