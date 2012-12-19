@@ -911,7 +911,7 @@ classDataCon clas = case tyConDataCons (classTyCon clas) of
 dataConCannotMatch :: [Type] -> DataCon -> Bool
 -- Returns True iff the data con *definitely cannot* match a 
 --		    scrutinee of type (T tys)
---		    where T is the type constructor for the data con
+--		    where T is the dcRepTyCon for the data con
 -- NB: look at *all* equality constraints, not only those
 --     in dataConEqSpec; see Trac #5168
 dataConCannotMatch tys con
@@ -923,7 +923,8 @@ dataConCannotMatch tys con
   where
     dc_tvs  = dataConUnivTyVars con
     theta   = dataConTheta con
-    subst   = zipTopTvSubst dc_tvs tys
+    subst   = ASSERT2( length dc_tvs == length tys, ppr con $$ ppr dc_tvs $$ ppr tys ) 
+              zipTopTvSubst dc_tvs tys
 
     -- TODO: could gather equalities from superclasses too
     predEqs pred = case classifyPredType pred of

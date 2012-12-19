@@ -398,7 +398,9 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
     inst_axiom = famInstAxiom fam_inst
     (fam, tys) = famInstLHS fam_inst
     skol_tys   = mkTyVarTys skol_tvs
-    tys1       = substTys (zipTopTvSubst (coAxiomTyVars inst_axiom) skol_tys) tys
+    ax_tvs     = coAxiomTyVars inst_axiom
+    tys1       = ASSERT2( length ax_tvs == length skol_tys, ppr inst_axiom $$ ppr skol_tys )
+                 substTys (zipTopTvSubst ax_tvs skol_tys) tys
         -- In example above,   fam tys' = F [b]
 
     my_unify old_fam_inst tpl_tvs tpl_tys match_tys
