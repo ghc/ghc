@@ -32,6 +32,7 @@ import CodeGen.Platform
 import BlockId
 import DynFlags
 import Cmm
+import CmmInfo
 import FastString
 import CLabel
 import Outputable
@@ -515,9 +516,10 @@ ppc_takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: [NatBasicBlock Instr]
+        :: BlockEnv CmmStatics
         -> [NatBasicBlock Instr]
-makeFarBranches blocks
+        -> [NatBasicBlock Instr]
+makeFarBranches info_env blocks
     | last blockAddresses < nearLimit = blocks
     | otherwise = zipWith handleBlock blockAddresses blocks
     where
@@ -536,10 +538,10 @@ makeFarBranches blocks
             where Just targetAddr = lookupUFM blockAddressMap tgt
         makeFar _ other            = other
 
-        nearLimit = 7000 -- 8192 instructions are allowed; let's keep some
-                         -- distance, as we have a few pseudo-insns that are
-                         -- pretty-printed as multiple instructions,
-                         -- and it's just not worth the effort to calculate
-                         -- things exactly
+        -- 8192 instructions are allowed; let's keep some distance, as
+        -- we have a few pseudo-insns that are pretty-printed as
+        -- multiple instructions, and it's just not worth the effort
+        -- to calculate things exactly
+        nearLimit = 7000 - mapSize info_env * maxRetInfoTableSizeW
 
         blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddresses

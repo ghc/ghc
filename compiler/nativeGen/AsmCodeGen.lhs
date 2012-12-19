@@ -147,7 +147,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr -> UniqSM (NatCmmDecl statics instr),
-    ncgMakeFarBranches        :: [NatBasicBlock instr] -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: BlockEnv CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr]
     }
 
 --------------------
@@ -190,7 +190,7 @@ x86_64NcgImpl dflags
        ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = id
+       ,ncgMakeFarBranches        = const id
    }
     where platform = targetPlatform dflags
 
@@ -228,7 +228,7 @@ sparcNcgImpl dflags
        ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = noAllocMoreStack
        ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
-       ,ncgMakeFarBranches        = id
+       ,ncgMakeFarBranches        = const id
    }
 
 --
@@ -661,7 +661,7 @@ sequenceTop
 
 sequenceTop _       top@(CmmData _ _) = top
 sequenceTop ncgImpl (CmmProc info lbl live (ListGraph blocks)) =
-  CmmProc info lbl live (ListGraph $ ncgMakeFarBranches ncgImpl $ sequenceBlocks info blocks)
+  CmmProc info lbl live (ListGraph $ ncgMakeFarBranches ncgImpl info $ sequenceBlocks info blocks)
 
 -- The algorithm is very simple (and stupid): we make a graph out of
 -- the blocks where there is an edge from one block to another iff the
