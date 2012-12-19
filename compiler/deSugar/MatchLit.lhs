@@ -133,7 +133,7 @@ hsLitKey _      (HsCharPrim    c) = MachChar   c
 hsLitKey _      (HsStringPrim  s) = MachStr    s
 hsLitKey _      (HsFloatPrim   f) = MachFloat  (fl_value f)
 hsLitKey _      (HsDoublePrim  d) = MachDouble (fl_value d)
-hsLitKey _      (HsString s)      = MachStr    (fastStringToFastBytes s)
+hsLitKey _      (HsString s)      = MachStr    (fastStringToByteString s)
 hsLitKey _      l                 = pprPanic "hsLitKey" (ppr l)
 
 hsOverLitKey :: OutputableBndr a => HsOverLit a -> Bool -> Literal
@@ -145,7 +145,7 @@ litValKey (HsIntegral i)   False = MachInt i
 litValKey (HsIntegral i)   True  = MachInt (-i)
 litValKey (HsFractional r) False = MachFloat (fl_value r)
 litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
-litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr (fastStringToFastBytes s)
+litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr (fastStringToByteString s)
 \end{code}
 
 %************************************************************************
@@ -263,7 +263,7 @@ matchLiterals (var:vars) ty sub_groups
     wrap_str_guard eq_str (MachStr s, mr)
 	= do { -- We now have to convert back to FastString. Perhaps there
 	       -- should be separate MachBytes and MachStr constructors?
-	       s'     <- liftIO $ mkFastStringFastBytes s
+	       s'     <- liftIO $ mkFastStringByteString s
 	     ; lit    <- mkStringExprFS s'
 	     ; let pred = mkApps (Var eq_str) [Var var, lit]
 	     ; return (mkGuardedMatchResult pred mr) }

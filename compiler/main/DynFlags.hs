@@ -27,7 +27,9 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,
-        whenGeneratingDynamicToo, ifGeneratingDynamicToo, doDynamicToo,
+        whenGeneratingDynamicToo, ifGeneratingDynamicToo,
+        whenCannotGenerateDynamicToo,
+        doDynamicToo,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1116,12 +1118,24 @@ whenGeneratingDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
 whenGeneratingDynamicToo dflags f = ifGeneratingDynamicToo dflags f (return ())
 
 ifGeneratingDynamicToo :: MonadIO m => DynFlags -> m a -> m a -> m a
-ifGeneratingDynamicToo dflags f g
+ifGeneratingDynamicToo dflags f g = generateDynamicTooConditional dflags f g g
+
+whenCannotGenerateDynamicToo :: MonadIO m => DynFlags -> m () -> m ()
+whenCannotGenerateDynamicToo dflags f
+    = ifCannotGenerateDynamicToo dflags f (return ())
+
+ifCannotGenerateDynamicToo :: MonadIO m => DynFlags -> m a -> m a -> m a
+ifCannotGenerateDynamicToo dflags f g
+    = generateDynamicTooConditional dflags g f g
+
+generateDynamicTooConditional :: MonadIO m
+                              => DynFlags -> m a -> m a -> m a -> m a
+generateDynamicTooConditional dflags canGen cannotGen notTryingToGen
     = if gopt Opt_BuildDynamicToo dflags
       then do let ref = canGenerateDynamicToo dflags
               b <- liftIO $ readIORef ref
-              if b then f else g
-      else g
+              if b then canGen else cannotGen
+      else notTryingToGen
 
 doDynamicToo :: DynFlags -> DynFlags
 doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0

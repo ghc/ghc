@@ -152,75 +152,85 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> [(Handle, DynFlags)] -> UniqSupply -> Stream IO RawCmmGroup ()
+nativeCodeGen :: DynFlags -> [(Handle, DynFlags)] -> UniqSupply
+              -> Stream IO RawCmmGroup ()
               -> IO UniqSupply
 nativeCodeGen dflags hds us cmms
  = let platform = targetPlatform dflags
-       nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO UniqSupply
+       nCG' :: (Outputable statics, Outputable instr, Instruction instr)
+            => NcgImpl statics instr jumpDest -> IO UniqSupply
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl hds us cmms
-       x86NcgImpl = NcgImpl {
-                         cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
-                        ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr dflags
-                        ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
-                        ,canShortcut               = X86.Instr.canShortcut
-                        ,shortcutStatics           = X86.Instr.shortcutStatics
-                        ,shortcutJump              = X86.Instr.shortcutJump
-                        ,pprNatCmmDecl              = X86.Ppr.pprNatCmmDecl
-                        ,maxSpillSlots             = X86.Instr.maxSpillSlots dflags
-                        ,allocatableRegs           = X86.Regs.allocatableRegs platform
-                        ,ncg_x86fp_kludge          = id
-                        ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
-                        ,ncgExpandTop              = id
-                        ,ncgMakeFarBranches        = id
-                    }
    in case platformArch platform of
-                 ArchX86    -> nCG' (x86NcgImpl { ncg_x86fp_kludge = map x86fp_kludge })
-                 ArchX86_64 -> nCG' x86NcgImpl
-                 ArchPPC ->
-                     nCG' $ NcgImpl {
-                          cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
-                         ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr dflags
-                         ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
-                         ,canShortcut               = PPC.RegInfo.canShortcut
-                         ,shortcutStatics           = PPC.RegInfo.shortcutStatics
-                         ,shortcutJump              = PPC.RegInfo.shortcutJump
-                         ,pprNatCmmDecl              = PPC.Ppr.pprNatCmmDecl
-                         ,maxSpillSlots             = PPC.Instr.maxSpillSlots dflags
-                         ,allocatableRegs           = PPC.Regs.allocatableRegs platform
-                         ,ncg_x86fp_kludge          = id
-                         ,ncgAllocMoreStack         = noAllocMoreStack
-                         ,ncgExpandTop              = id
-                         ,ncgMakeFarBranches        = makeFarBranches
-                     }
-                 ArchSPARC ->
-                     nCG' $ NcgImpl {
-                          cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
-                         ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr dflags
-                         ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
-                         ,canShortcut               = SPARC.ShortcutJump.canShortcut
-                         ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
-                         ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
-                         ,pprNatCmmDecl              = SPARC.Ppr.pprNatCmmDecl
-                         ,maxSpillSlots             = SPARC.Instr.maxSpillSlots dflags
-                         ,allocatableRegs           = SPARC.Regs.allocatableRegs
-                         ,ncg_x86fp_kludge          = id
-                         ,ncgAllocMoreStack         = noAllocMoreStack
-                         ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
-                         ,ncgMakeFarBranches        = id
-                     }
-                 ArchARM _ _ _ ->
-                     panic "nativeCodeGen: No NCG for ARM"
-                 ArchPPC_64 ->
-                     panic "nativeCodeGen: No NCG for PPC 64"
-                 ArchAlpha ->
-                     panic "nativeCodeGen: No NCG for Alpha"
-                 ArchMipseb ->
-                     panic "nativeCodeGen: No NCG for mipseb"
-                 ArchMipsel ->
-                     panic "nativeCodeGen: No NCG for mipsel"
-                 ArchUnknown ->
-                     panic "nativeCodeGen: No NCG for unknown arch"
+      ArchX86     -> nCG' (x86NcgImpl    dflags)
+      ArchX86_64  -> nCG' (x86_64NcgImpl dflags)
+      ArchPPC     -> nCG' (ppcNcgImpl    dflags)
+      ArchSPARC   -> nCG' (sparcNcgImpl  dflags)
+      ArchARM {}  -> panic "nativeCodeGen: No NCG for ARM"
+      ArchPPC_64  -> panic "nativeCodeGen: No NCG for PPC 64"
+      ArchAlpha   -> panic "nativeCodeGen: No NCG for Alpha"
+      ArchMipseb  -> panic "nativeCodeGen: No NCG for mipseb"
+      ArchMipsel  -> panic "nativeCodeGen: No NCG for mipsel"
+      ArchUnknown -> panic "nativeCodeGen: No NCG for unknown arch"
 
+x86NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest
+x86NcgImpl dflags
+ = (x86_64NcgImpl dflags) { ncg_x86fp_kludge = map x86fp_kludge }
+
+x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest
+x86_64NcgImpl dflags
+ = NcgImpl {
+        cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr dflags
+       ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
+       ,canShortcut               = X86.Instr.canShortcut
+       ,shortcutStatics           = X86.Instr.shortcutStatics
+       ,shortcutJump              = X86.Instr.shortcutJump
+       ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl
+       ,maxSpillSlots             = X86.Instr.maxSpillSlots dflags
+       ,allocatableRegs           = X86.Regs.allocatableRegs platform
+       ,ncg_x86fp_kludge          = id
+       ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
+       ,ncgExpandTop              = id
+       ,ncgMakeFarBranches        = id
+   }
+    where platform = targetPlatform dflags
+
+ppcNcgImpl :: DynFlags -> NcgImpl CmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
+ppcNcgImpl dflags
+ = NcgImpl {
+        cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr dflags
+       ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
+       ,canShortcut               = PPC.RegInfo.canShortcut
+       ,shortcutStatics           = PPC.RegInfo.shortcutStatics
+       ,shortcutJump              = PPC.RegInfo.shortcutJump
+       ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl
+       ,maxSpillSlots             = PPC.Instr.maxSpillSlots dflags
+       ,allocatableRegs           = PPC.Regs.allocatableRegs platform
+       ,ncg_x86fp_kludge          = id
+       ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
+       ,ncgExpandTop              = id
+       ,ncgMakeFarBranches        = makeFarBranches
+   }
+    where platform = targetPlatform dflags
+
+sparcNcgImpl :: DynFlags -> NcgImpl CmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
+sparcNcgImpl dflags
+ = NcgImpl {
+        cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr dflags
+       ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
+       ,canShortcut               = SPARC.ShortcutJump.canShortcut
+       ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
+       ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
+       ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl
+       ,maxSpillSlots             = SPARC.Instr.maxSpillSlots dflags
+       ,allocatableRegs           = SPARC.Regs.allocatableRegs
+       ,ncg_x86fp_kludge          = id
+       ,ncgAllocMoreStack         = noAllocMoreStack
+       ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
+       ,ncgMakeFarBranches        = id
+   }
 
 --
 -- Allocating more stack space for spilling is currently only

@@ -49,6 +49,7 @@ import Util
 
 import Control.Monad
 import Data.Bits as Bits
+import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
@@ -932,7 +933,7 @@ match_append_lit _ [Type ty1,
     c1 `cheapEqExpr` c2
   = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
-                   `App` Lit (MachStr (s1 `appendFB` s2))
+                   `App` Lit (MachStr (s1 `BS.append` s2))
                    `App` c1
                    `App` n)
 

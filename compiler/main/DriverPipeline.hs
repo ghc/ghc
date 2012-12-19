@@ -501,9 +501,30 @@ runPipeline
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
   -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
-
 runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
-            mb_basename output maybe_loc maybe_stub_o
+             mb_basename output maybe_loc maybe_stub_o
+    = do r <- runPipeline' stop_phase hsc_env0 (input_fn, mb_phase)
+                           mb_basename output maybe_loc maybe_stub_o
+         let dflags = extractDynFlags hsc_env0
+         whenCannotGenerateDynamicToo dflags $ do
+             let dflags' = doDynamicToo dflags
+             hsc_env1 <- newHscEnv dflags'
+             _ <- runPipeline' stop_phase hsc_env1 (input_fn, mb_phase)
+                               mb_basename output maybe_loc maybe_stub_o
+             return ()
+         return r
+
+runPipeline'
+  :: Phase                      -- ^ When to stop
+  -> HscEnv                     -- ^ Compilation environment
+  -> (FilePath,Maybe Phase)     -- ^ Input filename (and maybe -x suffix)
+  -> Maybe FilePath             -- ^ original basename (if different from ^^^)
+  -> PipelineOutput             -- ^ Output filename
+  -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
+  -> Maybe FilePath             -- ^ stub object, if we have one
+  -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
+runPipeline' stop_phase hsc_env0 (input_fn, mb_phase)
+             mb_basename output maybe_loc maybe_stub_o
   = do
   let dflags0 = hsc_dflags hsc_env0
       (input_basename, suffix) = splitExtension input_fn
@@ -1220,7 +1241,7 @@ runPhase As input_fn dflags
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
-                       ++ [ SysTools.Option "-x", SysTools.Option "assembler"
+                       ++ [ SysTools.Option "-x", SysTools.Option "assembler-with-cpp"
                           , SysTools.Option "-c"
                           , SysTools.FileOption "" inputFilename
                           , SysTools.Option "-o"

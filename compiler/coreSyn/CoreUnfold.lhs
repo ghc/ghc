@@ -68,6 +68,7 @@ import FastString
 import Outputable
 import ForeignCall
 
+import qualified Data.ByteString as BS
 import Data.Maybe
 \end{code}
 
@@ -535,7 +536,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
 litSize (LitInteger {}) = 100	-- Note [Size of literal integers]
-litSize (MachStr str)   = 10 + 10 * ((lengthFB str + 3) `div` 4)
+litSize (MachStr str)   = 10 + 10 * ((BS.length str + 3) `div` 4)
 	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]

@@ -9,7 +9,7 @@
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-module X86.Instr (Instr(..), Operand(..),
+module X86.Instr (Instr(..), Operand(..), JumpDest,
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordSize)

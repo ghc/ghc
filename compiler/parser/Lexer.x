@@ -77,6 +77,7 @@ import Util             ( readRational )
 
 import Control.Monad
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -552,7 +553,7 @@ data Token
   | ITrational   FractionalLit
 
   | ITprimchar   Char
-  | ITprimstring FastBytes
+  | ITprimstring ByteString
   | ITprimint    Integer
   | ITprimword   Integer
   | ITprimfloat  FractionalLit
@@ -1244,8 +1245,8 @@ lex_string s = do
                    setInput i
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
-                    else let fb = unsafeMkFastBytesString (reverse s)
-                         in return (ITprimstring fb)
+                    else let bs = unsafeMkByteString (reverse s)
+                         in return (ITprimstring bs)
               _other ->
                 return (ITstring (mkFastString (reverse s)))
           else

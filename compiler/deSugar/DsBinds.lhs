@@ -776,7 +776,7 @@ dsEvTerm (EvSuperClass d n)
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where 
     errorId = rUNTIME_ERROR_ID
-    litMsg  = Lit (MachStr (fastStringToFastBytes msg))
+    litMsg  = Lit (MachStr (fastStringToByteString msg))
 
 dsEvTerm (EvLit l) =
   case l of
