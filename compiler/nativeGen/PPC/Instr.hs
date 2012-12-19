@@ -14,7 +14,8 @@ module PPC.Instr (
     RI(..),
     Instr(..),
     maxSpillSlots,
-    allocMoreStack
+    allocMoreStack,
+    makeFarBranches
 )
 
 where
@@ -36,6 +37,7 @@ import CLabel
 import Outputable
 import Platform
 import FastBool
+import UniqFM (listToUFM, lookupUFM)
 import UniqSupply
 
 --------------------------------------------------------------------------------
@@ -505,3 +507,39 @@ ppc_mkJumpInstr id
 ppc_takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
 ppc_takeRegRegMoveInstr (MR dst src) = Just (src,dst)
 ppc_takeRegRegMoveInstr _  = Nothing
+
+-- -----------------------------------------------------------------------------
+-- Making far branches
+
+-- Conditional branches on PowerPC are limited to +-32KB; if our Procs get too
+-- big, we have to work around this limitation.
+
+makeFarBranches
+        :: [NatBasicBlock Instr]
+        -> [NatBasicBlock Instr]
+makeFarBranches blocks
+    | last blockAddresses < nearLimit = blocks
+    | otherwise = zipWith handleBlock blockAddresses blocks
+    where
+        blockAddresses = scanl (+) 0 $ map blockLen blocks
+        blockLen (BasicBlock _ instrs) = length instrs
+
+        handleBlock addr (BasicBlock id instrs)
+                = BasicBlock id (zipWith makeFar [addr..] instrs)
+
+        makeFar _ (BCC ALWAYS tgt) = BCC ALWAYS tgt
+        makeFar addr (BCC cond tgt)
+            | abs (addr - targetAddr) >= nearLimit
+            = BCCFAR cond tgt
+            | otherwise
+            = BCC cond tgt
+            where Just targetAddr = lookupUFM blockAddressMap tgt
+        makeFar _ other            = other
+
+        nearLimit = 7000 -- 8192 instructions are allowed; let's keep some
+                         -- distance, as we have a few pseudo-insns that are
+                         -- pretty-printed as multiple instructions,
+                         -- and it's just not worth the effort to calculate
+                         -- things exactly
+
+        blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddresses

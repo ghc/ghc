@@ -27,7 +27,6 @@ import qualified SPARC.ShortcutJump
 import qualified SPARC.CodeGen.Expand
 
 import qualified PPC.CodeGen
-import qualified PPC.Cond
 import qualified PPC.Regs
 import qualified PPC.RegInfo
 import qualified PPC.Instr
@@ -210,7 +209,7 @@ ppcNcgImpl dflags
        ,ncg_x86fp_kludge          = id
        ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = makeFarBranches
+       ,ncgMakeFarBranches        = PPC.Instr.makeFarBranches
    }
     where platform = targetPlatform dflags
 
@@ -732,42 +731,6 @@ reorder id accum (b@(block,id',out) : rest)
   | id == id'  = (True, (block,id,out) : reverse accum ++ rest)
   | otherwise  = reorder id (b:accum) rest
 
-
--- -----------------------------------------------------------------------------
--- Making far branches
-
--- Conditional branches on PowerPC are limited to +-32KB; if our Procs get too
--- big, we have to work around this limitation.
-
-makeFarBranches
-        :: [NatBasicBlock PPC.Instr.Instr]
-        -> [NatBasicBlock PPC.Instr.Instr]
-makeFarBranches blocks
-    | last blockAddresses < nearLimit = blocks
-    | otherwise = zipWith handleBlock blockAddresses blocks
-    where
-        blockAddresses = scanl (+) 0 $ map blockLen blocks
-        blockLen (BasicBlock _ instrs) = length instrs
-
-        handleBlock addr (BasicBlock id instrs)
-                = BasicBlock id (zipWith makeFar [addr..] instrs)
-
-        makeFar _ (PPC.Instr.BCC PPC.Cond.ALWAYS tgt) = PPC.Instr.BCC PPC.Cond.ALWAYS tgt
-        makeFar addr (PPC.Instr.BCC cond tgt)
-            | abs (addr - targetAddr) >= nearLimit
-            = PPC.Instr.BCCFAR cond tgt
-            | otherwise
-            = PPC.Instr.BCC cond tgt
-            where Just targetAddr = lookupUFM blockAddressMap tgt
-        makeFar _ other            = other
-
-        nearLimit = 7000 -- 8192 instructions are allowed; let's keep some
-                         -- distance, as we have a few pseudo-insns that are
-                         -- pretty-printed as multiple instructions,
-                         -- and it's just not worth the effort to calculate
-                         -- things exactly
-
-        blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddresses
 
 -- -----------------------------------------------------------------------------
 -- Generate jump tables
