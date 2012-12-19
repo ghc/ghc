@@ -152,7 +152,7 @@ import VarSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeStringKind )
 import PrelNames ( eqTyConKey, ipClassNameKey, 
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 

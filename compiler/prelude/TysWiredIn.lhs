@@ -64,6 +64,9 @@ module TysWiredIn (
         -- * Unit
 	unitTy,
 
+        -- * Kinds
+	typeNatKindCon, typeNatKind, typeStringKindCon, typeStringKind,
+
         -- * Parallel arrays
 	mkPArrTy,
 	parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
@@ -148,6 +151,8 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , listTyCon
 	      , parrTyCon
               , eqTyCon
+              , typeNatKindCon
+              , typeStringKindCon
     	      ]
            ++ (case cIntegerLibraryType of
                IntegerGMP -> [integerTyCon]
@@ -192,6 +197,11 @@ floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float") fl
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floatDataConKey floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
+
+-- Kinds
+typeNatKindConName, typeStringKindConName :: Name
+typeNatKindConName    = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Nat")    typeNatKindConNameKey    typeNatKindCon
+typeStringKindConName = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "Symbol") typeStringKindConNameKey typeStringKindCon 
 
 -- For integer-gmp only:
 integerRealTyConName :: Name
@@ -285,6 +295,25 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_name = mkWiredInName modu wrk_occ wrk_key
 			     (AnId (dataConWorkId data_con)) UserSyntax
+\end{code}
+
+
+%************************************************************************
+%*									*
+      Kinds
+%*									*
+%************************************************************************
+
+\begin{code}
+typeNatKindCon, typeStringKindCon :: TyCon 
+-- data Nat
+-- data Symbol
+typeNatKindCon    = pcNonRecDataTyCon typeNatKindConName    Nothing [] []
+typeStringKindCon = pcNonRecDataTyCon typeStringKindConName Nothing [] []
+
+typeNatKind, typeStringKind :: Kind
+typeNatKind    = TyConApp (promoteTyCon typeNatKindCon)    []
+typeStringKind = TyConApp (promoteTyCon typeStringKindCon) []
 \end{code}
 
 
