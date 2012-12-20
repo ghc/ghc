@@ -37,5 +37,7 @@ module GHC.Event
     ) where
 
 import GHC.Event.Manager
+import GHC.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
+                               updateTimeout, unregisterTimeout)
 import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
 
