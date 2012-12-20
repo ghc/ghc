@@ -50,16 +50,17 @@ module GHC.Event.Manager
 
 import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
 import Control.Exception (finally)
-import Control.Monad ((=<<), forM_, liftM, sequence_, when)
+import Control.Monad ((=<<), forM_, liftM, sequence_, when, replicateM)
 import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mappend, mconcat, mempty)
+import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
 import GHC.List (filter)
 import GHC.Num (Num(..))
-import GHC.Real ((/), fromIntegral )
+import GHC.Real ((/), fromIntegral, mod)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
@@ -107,14 +108,22 @@ data State = Created
 -- | The event manager state.
 data EventManager = EventManager
     { emBackend      :: !Backend
-    , emFds          :: {-# UNPACK #-} !(MVar (IM.IntMap [FdData]))
+    , emFds          :: {-# UNPACK #-} !(Array Int (MVar (IM.IntMap [FdData])))
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
     }
 
+callbackArraySize :: Int
+callbackArraySize = 32
+
+hashFd :: Fd -> Int
+hashFd fd = fromIntegral fd `mod` callbackArraySize
+{-# INLINE hashFd #-}
+
 callbackTableVar :: EventManager -> Fd -> MVar (IM.IntMap [FdData])
-callbackTableVar mgr _ = emFds mgr
+callbackTableVar mgr fd = emFds mgr ! hashFd fd
+{-# INLINE callbackTableVar #-}
 ------------------------------------------------------------------------
 -- Creation
 
@@ -143,7 +152,8 @@ new = newWith =<< newDefaultBackend
 
 newWith :: Backend -> IO EventManager
 newWith be = do
-  iofds <- newMVar IM.empty
+  iofds <- fmap (listArray (0, callbackArraySize-1)) $
+           replicateM callbackArraySize (newMVar IM.empty)
   ctrl <- newControl False
   state <- newIORef Created
   us <- newSource
@@ -214,9 +224,9 @@ step mgr@EventManager{..} = do
 -- event manager ought to be woken.
 registerFd_ :: EventManager -> IOCallback -> Fd -> Event
             -> IO (FdKey, Bool)
-registerFd_ EventManager{..} cb fd evs = do
+registerFd_ mgr@(EventManager{..}) cb fd evs = do
   u <- newUnique emUniqueSource
-  modifyMVar emFds $ \oldMap -> do
+  modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
     let fd'  = fromIntegral fd
         reg  = FdKey fd u
         !fdd = FdData reg evs cb
@@ -257,8 +267,8 @@ pairEvents prev m fd = let l = eventsOf prev
 -- event manager thread.  The return value indicates whether the event
 -- manager ought to be woken.
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
-unregisterFd_ EventManager{..} (FdKey fd u) =
-  modifyMVar emFds $ \oldMap -> do
+unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
+  modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
     let dropReg cbs = case filter ((/= u) . keyUnique . fdKey) cbs of
                           []   -> Nothing
                           cbs' -> Just cbs'
@@ -280,7 +290,7 @@ unregisterFd mgr reg = do
 -- | Close a file descriptor in a race-safe way.
 closeFd :: EventManager -> (Fd -> IO ()) -> Fd -> IO ()
 closeFd mgr close fd = do
-  fds <- modifyMVar (emFds mgr) $ \oldMap -> do
+  fds <- modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
     close fd
     case IM.delete (fromIntegral fd) oldMap of
       (Nothing,  _)       -> return (oldMap, [])
@@ -307,7 +317,7 @@ closeFd_ mgr oldMap fd = do
 -- | Call the callbacks corresponding to the given file descriptor.
 onFdEvent :: EventManager -> Fd -> Event -> IO ()
 onFdEvent mgr fd evs = do
-  fds <- readMVar (emFds mgr)
+  fds <- readMVar (callbackTableVar mgr fd)
   case IM.lookup (fromIntegral fd) fds of
       Just cbs -> forM_ cbs $ \(FdData reg ev cb) ->
                     when (evs `I.eventIs` ev) $ cb reg evs
