@@ -13,7 +13,6 @@ module GHC.Event
       EventManager
 
       -- * Creation
-    , new
     , getSystemEventManager
 
       -- * Running
