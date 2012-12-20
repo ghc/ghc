@@ -39,7 +39,7 @@ import System.Posix.Types (Fd)
 -- run /earlier/ than specified.
 threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
-  Just mgr <- getSystemEventManager
+  mgr <- getSystemEventManager
   m <- newEmptyMVar
   reg <- registerTimeout mgr usecs (putMVar m ())
   takeMVar m `onException` M.unregisterTimeout mgr reg
@@ -50,7 +50,7 @@ threadDelay usecs = mask_ $ do
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
   t <- atomically $ newTVar False
-  Just mgr <- getSystemEventManager
+  mgr <- getSystemEventManager
   _ <- registerTimeout mgr usecs . atomically $ writeTVar t True
   return t
 
@@ -83,13 +83,13 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd = do
-  Just mgr <- getSystemEventManager
+  mgr <- getSystemEventManager
   M.closeFd mgr close fd
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
-  Just mgr <- getSystemEventManager
+  mgr <- getSystemEventManager
   reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> putMVar m e) fd evt
   evt' <- takeMVar m `onException` unregisterFd_ mgr reg
   if evt' `eventIs` evtClose
@@ -100,7 +100,7 @@ threadWait evt fd = mask_ $ do
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
   m <- newTVarIO Nothing
-  Just mgr <- getSystemEventManager 
+  mgr <- getSystemEventManager 
   reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> atomically (writeTVar m (Just e))) fd evt
   let waitAction =
         do mevt <- readTVar m
@@ -141,8 +141,10 @@ threadWaitWriteSTM = threadWaitSTM evtWrite
 --
 -- This function always returns 'Just' the system event manager when using the
 -- threaded RTS and 'Nothing' otherwise.
-getSystemEventManager :: IO (Maybe EventManager)
-getSystemEventManager = readIORef eventManager
+getSystemEventManager :: IO EventManager
+getSystemEventManager = do 
+  Just mgr <- readIORef eventManager
+  return mgr
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
