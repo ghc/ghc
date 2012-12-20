@@ -30,6 +30,7 @@ import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_, registerTimeout)
 import qualified GHC.Event.Manager as M
+import qualified GHC.Event.TimerManager as TM
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
 
@@ -43,8 +44,8 @@ threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
   mgr <- getSystemTimerManager
   m <- newEmptyMVar
-  reg <- registerTimeout mgr usecs (putMVar m ())
-  takeMVar m `onException` M.unregisterTimeout mgr reg
+  reg <- TM.registerTimeout mgr usecs (putMVar m ())
+  takeMVar m `onException` TM.unregisterTimeout mgr reg
 
 -- | Set the value of returned TVar to True after a given number of
 -- microseconds. The caveats associated with threadDelay also apply.
@@ -53,7 +54,7 @@ registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
   t <- atomically $ newTVar False
   mgr <- getSystemTimerManager
-  _ <- registerTimeout mgr usecs . atomically $ writeTVar t True
+  _ <- TM.registerTimeout mgr usecs . atomically $ writeTVar t True
   return t
 
 -- | Block the current thread until data is available to read from the
@@ -166,7 +167,7 @@ ioManager = unsafePerformIO $ do
    m <- newMVar Nothing
    sharedCAF m getOrSetSystemEventThreadIOManagerThreadStore
 
-getSystemTimerManager :: IO EventManager
+getSystemTimerManager :: IO TM.TimerManager
 getSystemTimerManager = do 
   Just mgr <- readIORef timerManager
   return mgr
@@ -174,7 +175,7 @@ getSystemTimerManager = do
 foreign import ccall unsafe "getOrSetSystemTimerThreadEventManagerStore"
     getOrSetSystemTimerThreadEventManagerStore :: Ptr a -> IO (Ptr a)
 
-timerManager :: IORef (Maybe EventManager)
+timerManager :: IORef (Maybe TM.TimerManager)
 timerManager = unsafePerformIO $ do
     em <- newIORef Nothing
     sharedCAF em getOrSetSystemTimerThreadEventManagerStore
@@ -231,9 +232,9 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
           Nothing -> return ()
           Just em -> M.shutdown em
   let create = do
-        !mgr <- new True
+        !mgr <- TM.new True
         writeIORef timerManager $ Just mgr
-        !t <- forkIO $ loop mgr `finally` shutdownEM
+        !t <- forkIO $ TM.loop mgr `finally` shutdownEM
         labelThread t "TimerManager"
         return $ Just t
   case old of
@@ -251,7 +252,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
           mem <- readIORef timerManager
           _ <- case mem of
                  Nothing -> return ()
-                 Just em -> M.cleanup em
+                 Just em -> TM.cleanup em
           create
         _other         -> return st
 

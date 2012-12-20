@@ -244,6 +244,7 @@ Library {
             GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager
+            GHC.Event.TimerManager
             GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread
