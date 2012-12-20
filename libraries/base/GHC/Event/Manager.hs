@@ -180,14 +180,14 @@ newDefaultBackend = error "no back end for this platform"
 #endif
 
 -- | Create a new event manager.
-new :: Bool -> IO EventManager
-new shouldRegister = newWith shouldRegister =<< newDefaultBackend
+new :: IO EventManager
+new = newWith =<< newDefaultBackend
 
-newWith :: Bool -> Backend -> IO EventManager
-newWith shouldRegister be = do
+newWith :: Backend -> IO EventManager
+newWith be = do
   iofds <- newMVar IM.empty
   timeouts <- newIORef id
-  ctrl <- newControl shouldRegister
+  ctrl <- newControl False
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do

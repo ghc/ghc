@@ -200,7 +200,7 @@ ensureIOManagerIsRunning
 startIOManagerThread :: IO ()
 startIOManagerThread = modifyMVar_ ioManager $ \old -> do
   let create = do
-        !mgr <- new False
+        !mgr <- new
         writeIORef eventManager $ Just mgr
         !t <- forkIO $ loop mgr
         labelThread t "IOManager"
@@ -232,7 +232,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
           Nothing -> return ()
           Just em -> M.shutdown em
   let create = do
-        !mgr <- TM.new True
+        !mgr <- TM.new
         writeIORef timerManager $ Just mgr
         !t <- forkIO $ TM.loop mgr `finally` shutdownEM
         labelThread t "TimerManager"

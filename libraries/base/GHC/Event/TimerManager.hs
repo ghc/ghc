@@ -149,13 +149,13 @@ newDefaultBackend = error "no back end for this platform"
 #endif
 
 -- | Create a new event manager.
-new :: Bool -> IO TimerManager
-new shouldRegister = newWith shouldRegister =<< newDefaultBackend
+new :: IO TimerManager
+new = newWith =<< newDefaultBackend
 
-newWith :: Bool -> Backend -> IO TimerManager
-newWith shouldRegister be = do
+newWith :: Backend -> IO TimerManager
+newWith be = do
   timeouts <- newIORef id
-  ctrl <- newControl shouldRegister
+  ctrl <- newControl True
   state <- newIORef Created
   us <- newSource
   _ <- mkWeakIORef state $ do
