@@ -333,9 +333,10 @@ traceRunStatus expr bindings final_ids
              status <-
                  withBreakAction True (hsc_dflags hsc_env)
                                       breakMVar statusMVar $ do
-                   liftIO $ withInterruptsSentTo tid $ do
+                   liftIO $ mask_ $ do
                        putMVar breakMVar ()  -- awaken the stopped thread
-                       takeMVar statusMVar   -- and wait for the result
+                       redirectInterrupts tid $
+                         takeMVar statusMVar   -- and wait for the result
              traceRunStatus expr bindings final_ids
                             breakMVar statusMVar status history'
      _other ->
@@ -385,13 +386,38 @@ sandboxIO dflags statusMVar thing =
      in if gopt Opt_GhciSandbox dflags
         then do tid <- forkIO $ do res <- runIt
                                    putMVar statusMVar res -- empty: can't block
-                withInterruptsSentTo tid $ takeMVar statusMVar
+                redirectInterrupts tid $
+                  takeMVar statusMVar
+
         else -- GLUT on OS X needs to run on the main thread. If you
              -- try to use it from another thread then you just get a
              -- white rectangle rendered. For this, or anything else
              -- with such restrictions, you can turn the GHCi sandbox off
              -- and things will be run in the main thread.
+             --
+             -- BUT, note that the debugging features (breakpoints,
+             -- tracing, etc.) need the expression to be running in a
+             -- separate thread, so debugging is only enabled when
+             -- using the sandbox.
              runIt
+
+--
+-- While we're waiting for the sandbox thread to return a result, if
+-- the current thread receives an asynchronous exception we re-throw
+-- it at the sandbox thread and continue to wait.
+--
+-- This is for two reasons:
+--
+--  * So that ^C interrupts runStmt (e.g. in GHCi), allowing the
+--    computation to run its exception handlers before returning the
+--    exception result to the caller of runStmt.
+--
+--  * clients of the GHC API can terminate a runStmt in progress
+--    without knowing the ThreadId of the sandbox thread (#1381)
+--
+redirectInterrupts :: ThreadId -> IO a -> IO a
+redirectInterrupts target wait
+  = wait `catch` \e -> do throwTo target (e :: SomeException); wait
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -416,12 +442,6 @@ rethrow dflags io = Exception.catch io $ \se -> do
                          _ -> poke exceptionFlag 0
 
                 Exception.throwIO se
-
-withInterruptsSentTo :: ThreadId -> IO r -> IO r
-withInterruptsSentTo thread get_result = do
-  bracket (pushInterruptTargetThread thread)
-          (\_ -> popInterruptTargetThread)
-          (\_ -> get_result)
 
 -- This function sets up the interpreter for catching breakpoints, and
 -- resets everything when the computation has stopped running.  This
@@ -495,10 +515,11 @@ resume canLogSpan step
                withVirtualCWD $ do
                 withBreakAction (isStep step) (hsc_dflags hsc_env)
                                         breakMVar statusMVar $ do
-                status <- liftIO $ withInterruptsSentTo tid $ do
+                status <- liftIO $ mask_ $ do
                              putMVar breakMVar ()
                                       -- this awakens the stopped thread...
-                             takeMVar statusMVar
+                             redirectInterrupts tid $
+                               takeMVar statusMVar
                                       -- and wait for the result
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case info of
