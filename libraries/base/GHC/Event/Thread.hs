@@ -173,7 +173,7 @@ ensureIOManagerIsRunning
 startIOManagerThread :: IO ()
 startIOManagerThread = modifyMVar_ ioManager $ \old -> do
   let create = do
-        !mgr <- new
+        !mgr <- new True
         writeIORef eventManager $ Just mgr
         !t <- forkIO $ loop mgr
         labelThread t "IOManager"

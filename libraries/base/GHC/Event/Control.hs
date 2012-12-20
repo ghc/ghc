@@ -79,8 +79,8 @@ wakeupReadFd = controlEventFd
 
 -- | Create the structure (usually a pipe) used for waking up the IO
 -- manager thread from another thread.
-newControl :: IO Control
-newControl = allocaArray 2 $ \fds -> do
+newControl :: Bool -> IO Control
+newControl shouldRegister = allocaArray 2 $ \fds -> do
   let createPipe = do
         throwErrnoIfMinus1_ "pipe" $ c_pipe fds
         rd <- peekElemOff fds 0
@@ -92,15 +92,15 @@ newControl = allocaArray 2 $ \fds -> do
         setCloseOnExec wr
         return (rd, wr)
   (ctrl_rd, ctrl_wr) <- createPipe
-  c_setIOManagerControlFd ctrl_wr
+  when shouldRegister $ c_setIOManagerControlFd ctrl_wr
 #if defined(HAVE_EVENTFD)
   ev <- throwErrnoIfMinus1 "eventfd" $ c_eventfd 0 0
   setNonBlockingFD ev True
   setCloseOnExec ev
-  c_setIOManagerWakeupFd ev
+  when shouldRegister $ c_setIOManagerWakeupFd ev
 #else
   (wake_rd, wake_wr) <- createPipe
-  c_setIOManagerWakeupFd wake_wr
+  when shouldRegister $ c_setIOManagerWakeupFd wake_wr
 #endif
   return W { controlReadFd  = fromIntegral ctrl_rd
            , controlWriteFd = fromIntegral ctrl_wr
