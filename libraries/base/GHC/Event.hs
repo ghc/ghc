@@ -15,13 +15,6 @@ module GHC.Event
       -- * Creation
     , getSystemEventManager
 
-      -- * Running
-    , loop
-
-    -- ** Stepwise running
-    , step
-    , shutdown
-
       -- * Registering interest in I/O events
     , Event
     , evtRead
