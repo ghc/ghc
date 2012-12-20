@@ -3,6 +3,7 @@
 
 module GHC.Event.Thread
     ( getSystemEventManager
+    , getSystemTimerManager
     , ensureIOManagerIsRunning
     , threadWaitRead
     , threadWaitWrite
@@ -13,6 +14,7 @@ module GHC.Event.Thread
     , registerDelay
     ) where
 
+import Control.Exception (finally)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (Maybe(..))
 import Foreign.C.Error (eBADF, errnoToIOError)
@@ -39,7 +41,7 @@ import System.Posix.Types (Fd)
 -- run /earlier/ than specified.
 threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
-  mgr <- getSystemEventManager
+  mgr <- getSystemTimerManager
   m <- newEmptyMVar
   reg <- registerTimeout mgr usecs (putMVar m ())
   takeMVar m `onException` M.unregisterTimeout mgr reg
@@ -50,7 +52,7 @@ threadDelay usecs = mask_ $ do
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
   t <- atomically $ newTVar False
-  mgr <- getSystemEventManager
+  mgr <- getSystemTimerManager
   _ <- registerTimeout mgr usecs . atomically $ writeTVar t True
   return t
 
@@ -164,16 +166,40 @@ ioManager = unsafePerformIO $ do
    m <- newMVar Nothing
    sharedCAF m getOrSetSystemEventThreadIOManagerThreadStore
 
+getSystemTimerManager :: IO EventManager
+getSystemTimerManager = do 
+  Just mgr <- readIORef timerManager
+  return mgr
+
+foreign import ccall unsafe "getOrSetSystemTimerThreadEventManagerStore"
+    getOrSetSystemTimerThreadEventManagerStore :: Ptr a -> IO (Ptr a)
+
+timerManager :: IORef (Maybe EventManager)
+timerManager = unsafePerformIO $ do
+    em <- newIORef Nothing
+    sharedCAF em getOrSetSystemTimerThreadEventManagerStore
+{-# NOINLINE timerManager #-}
+
+foreign import ccall unsafe "getOrSetSystemTimerThreadIOManagerThreadStore"
+    getOrSetSystemTimerThreadIOManagerThreadStore :: Ptr a -> IO (Ptr a)
+
+{-# NOINLINE timerManagerThreadVar #-}
+timerManagerThreadVar :: MVar (Maybe ThreadId)
+timerManagerThreadVar = unsafePerformIO $ do
+   m <- newMVar Nothing
+   sharedCAF m getOrSetSystemTimerThreadIOManagerThreadStore
+
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
   | not threaded = return ()
   | otherwise = do
       startIOManagerThread
+      startTimerManagerThread
 
 startIOManagerThread :: IO ()
 startIOManagerThread = modifyMVar_ ioManager $ \old -> do
   let create = do
-        !mgr <- new True
+        !mgr <- new False
         writeIORef eventManager $ Just mgr
         !t <- forkIO $ loop mgr
         labelThread t "IOManager"
@@ -191,6 +217,38 @@ startIOManagerThread = modifyMVar_ ioManager $ \old -> do
           -- open pipes and everything else related to the event manager.
           -- See #4449
           mem <- readIORef eventManager
+          _ <- case mem of
+                 Nothing -> return ()
+                 Just em -> M.cleanup em
+          create
+        _other         -> return st
+
+startTimerManagerThread :: IO ()
+startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
+  let shutdownEM = do
+        mem <- readIORef eventManager
+        case mem of
+          Nothing -> return ()
+          Just em -> M.shutdown em
+  let create = do
+        !mgr <- new True
+        writeIORef timerManager $ Just mgr
+        !t <- forkIO $ loop mgr `finally` shutdownEM
+        labelThread t "TimerManager"
+        return $ Just t
+  case old of
+    Nothing            -> create
+    st@(Just t) -> do
+      s <- threadStatus t
+      case s of
+        ThreadFinished -> create
+        ThreadDied     -> do 
+          -- Sanity check: if the thread has died, there is a chance
+          -- that event manager is still alive. This could happend during
+          -- the fork, for example. In this case we should clean up
+          -- open pipes and everything else related to the event manager.
+          -- See #4449
+          mem <- readIORef timerManager
           _ <- case mem of
                  Nothing -> return ()
                  Just em -> M.cleanup em

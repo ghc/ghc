@@ -14,6 +14,7 @@ module GHC.Event
 
       -- * Creation
     , getSystemEventManager
+    , getSystemTimerManager
 
       -- * Registering interest in I/O events
     , Event
@@ -36,5 +37,5 @@ module GHC.Event
     ) where
 
 import GHC.Event.Manager
-import GHC.Event.Thread (getSystemEventManager)
+import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
 
