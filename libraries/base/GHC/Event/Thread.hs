@@ -15,22 +15,28 @@ module GHC.Event.Thread
     ) where
 
 import Control.Exception (finally)
+import Control.Monad (forM, forM_, zipWithM_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.Ptr (Ptr)
 import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, newTVar, sharedCAF,
+                      numCapabilities, threadCapability, myThreadId, forkOn,
                       threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
+import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
-                             new, registerFd, unregisterFd_, registerTimeout)
+                             new, registerFd, unregisterFd_)
+import qualified GHC.Event.IntMap as IM
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
+import GHC.Num ((-))
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
 
@@ -86,8 +92,21 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd = do
-  mgr <- getSystemEventManager
-  M.closeFd mgr close fd
+  tableVars <- forM [0,1..numCapabilities-1] (getCallbackTableVar fd)
+  mask_ $ do
+    tables <- forM tableVars (takeMVar.snd)
+    close fd
+    zipWithM_
+      (\(mgr,tableVar) table -> M.closeFd_ mgr table fd >>= putMVar tableVar)
+      tableVars
+      tables
+
+getCallbackTableVar :: Fd
+                       -> Int
+                       -> IO (EventManager, MVar (IM.IntMap [M.FdData]))
+getCallbackTableVar fd cap =
+  do Just (_,!mgr) <- readIOArray eventManager cap
+     return (mgr, M.callbackTableVar mgr fd)
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
@@ -145,26 +164,28 @@ threadWaitWriteSTM = threadWaitSTM evtWrite
 -- This function always returns 'Just' the system event manager when using the
 -- threaded RTS and 'Nothing' otherwise.
 getSystemEventManager :: IO EventManager
-getSystemEventManager = do 
-  Just mgr <- readIORef eventManager
+getSystemEventManager = do
+  t <- myThreadId
+  (cap, _) <- threadCapability t
+  Just (_,mgr) <- readIOArray eventManager cap
   return mgr
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
 
-eventManager :: IORef (Maybe EventManager)
+eventManager :: IOArray Int (Maybe (ThreadId, EventManager))
 eventManager = unsafePerformIO $ do
-    em <- newIORef Nothing
+    em <- newIOArray (0, numCapabilities - 1) Nothing
     sharedCAF em getOrSetSystemEventThreadEventManagerStore
 {-# NOINLINE eventManager #-}
 
 foreign import ccall unsafe "getOrSetSystemEventThreadIOManagerThreadStore"
     getOrSetSystemEventThreadIOManagerThreadStore :: Ptr a -> IO (Ptr a)
 
-{-# NOINLINE ioManager #-}
-ioManager :: MVar (Maybe ThreadId)
-ioManager = unsafePerformIO $ do
-   m <- newMVar Nothing
+{-# NOINLINE ioManagerLock #-}
+ioManagerLock :: MVar ()
+ioManagerLock = unsafePerformIO $ do
+   m <- newMVar ()
    sharedCAF m getOrSetSystemEventThreadIOManagerThreadStore
 
 getSystemTimerManager :: IO TM.TimerManager
@@ -194,20 +215,25 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
   | not threaded = return ()
   | otherwise = do
-      startIOManagerThread
+      startIOManagerThreads
       startTimerManagerThread
 
-startIOManagerThread :: IO ()
-startIOManagerThread = modifyMVar_ ioManager $ \old -> do
+startIOManagerThreads :: IO ()
+startIOManagerThreads =
+  modifyMVar_ ioManagerLock $ \_ ->
+  forM_ [0,1..numCapabilities-1] startIOManagerThread
+  
+startIOManagerThread :: Int -> IO ()
+startIOManagerThread i = do
   let create = do
         !mgr <- new
-        writeIORef eventManager $ Just mgr
-        !t <- forkIO $ loop mgr
+        !t <- forkOn i $ loop mgr
         labelThread t "IOManager"
-        return $ Just t
+        writeIOArray eventManager i (Just (t,mgr))
+  old <- readIOArray eventManager i
   case old of
     Nothing            -> create
-    st@(Just t) -> do
+    Just (t,em) -> do
       s <- threadStatus t
       case s of
         ThreadFinished -> create
@@ -217,24 +243,16 @@ startIOManagerThread = modifyMVar_ ioManager $ \old -> do
           -- the fork, for example. In this case we should clean up
           -- open pipes and everything else related to the event manager.
           -- See #4449
-          mem <- readIORef eventManager
-          _ <- case mem of
-                 Nothing -> return ()
-                 Just em -> M.cleanup em
+          M.cleanup em
           create
-        _other         -> return st
+        _other         -> return ()
 
 startTimerManagerThread :: IO ()
 startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
-  let shutdownEM = do
-        mem <- readIORef eventManager
-        case mem of
-          Nothing -> return ()
-          Just em -> M.shutdown em
   let create = do
         !mgr <- TM.new
         writeIORef timerManager $ Just mgr
-        !t <- forkIO $ TM.loop mgr `finally` shutdownEM
+        !t <- forkIO $ TM.loop mgr `finally` shutdownManagers
         labelThread t "TimerManager"
         return $ Just t
   case old of
@@ -255,5 +273,13 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
                  Just em -> TM.cleanup em
           create
         _other         -> return st
+
+shutdownManagers :: IO ()
+shutdownManagers =
+  do forM_ [0,1..numCapabilities-1] $ \i -> do
+       mmgr <- readIOArray eventManager i
+       case mmgr of
+         Nothing -> return ()
+         Just (_,mgr) -> M.shutdown mgr
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool

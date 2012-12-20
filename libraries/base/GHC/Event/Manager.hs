@@ -25,17 +25,22 @@ module GHC.Event.Manager
     , cleanup
     , wakeManager
 
+      -- * State
+    , callbackTableVar
+
       -- * Registering interest in I/O events
     , Event
     , evtRead
     , evtWrite
     , IOCallback
     , FdKey(keyFd)
+    , FdData
     , registerFd_
     , registerFd
     , unregisterFd_
     , unregisterFd
     , closeFd
+    , closeFd_
     ) where
 
 #include "EventConfig.h"
@@ -108,6 +113,8 @@ data EventManager = EventManager
     , emControl      :: {-# UNPACK #-} !Control
     }
 
+callbackTableVar :: EventManager -> Fd -> MVar (IM.IntMap [FdData])
+callbackTableVar mgr _ = emFds mgr
 ------------------------------------------------------------------------
 -- Creation
 
@@ -282,6 +289,18 @@ closeFd mgr close fd = do
         return (newMap, fds)
   forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
 
+-- | Does everything that closeFd does, except for updating the callback tables.
+-- It assumes the caller will update the callback tables and that the caller
+-- holds the callback table lock for the fd.
+closeFd_ :: EventManager -> IM.IntMap [FdData] -> Fd -> IO (IM.IntMap [FdData])
+closeFd_ mgr oldMap fd = do
+  case IM.delete (fromIntegral fd) oldMap of
+    (Nothing,  _)       -> return oldMap
+    (Just fds, !newMap) -> do
+      let oldEvs = eventsOf fds
+      I.modifyFd (emBackend mgr) fd oldEvs mempty
+      forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
+      return newMap
 ------------------------------------------------------------------------
 -- Utilities
 
