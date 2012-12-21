@@ -32,7 +32,7 @@ module GHC.Read
   , lexDigits
 
   -- defining readers
-  , lexP
+  , lexP, expectP
   , paren
   , parens
   , list
@@ -270,12 +270,15 @@ lexP :: ReadPrec L.Lexeme
 -- ^ Parse a single lexeme
 lexP = lift L.lex
 
+expectP :: L.Lexeme -> ReadPrec ()
+expectP lexeme = lift (L.expect lexeme)
+
 paren :: ReadPrec a -> ReadPrec a
 -- ^ @(paren p)@ parses \"(P0)\"
 --      where @p@ parses \"P0\" in precedence context zero
-paren p = do L.Punc "(" <- lexP
-             x          <- reset p
-             L.Punc ")" <- lexP
+paren p = do expectP (L.Punc "(")
+             x <- reset p
+             expectP (L.Punc ")")
              return x
 
 parens :: ReadPrec a -> ReadPrec a
@@ -292,7 +295,7 @@ list :: ReadPrec a -> ReadPrec [a]
 -- using the usual square-bracket syntax.
 list readx =
   parens
-  ( do L.Punc "[" <- lexP
+  ( do expectP (L.Punc "[")
        (listRest False +++ listNext)
   )
  where
@@ -408,12 +411,12 @@ parenthesis-like objects such as (...) and [...] can be an argument to
 instance Read a => Read (Maybe a) where
   readPrec =
     parens
-    (do L.Ident "Nothing" <- lexP
+    (do expectP (L.Ident "Nothing")
         return Nothing
      +++
      prec appPrec (
-        do L.Ident "Just" <- lexP
-           x              <- step readPrec
+        do expectP (L.Ident "Just")
+           x <- step readPrec
            return (Just x))
     )
 
@@ -427,7 +430,7 @@ instance Read a => Read [a] where
 
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readPrec = parens $ prec appPrec $
-               do L.Ident "array" <- lexP
+               do expectP (L.Ident "array")
                   theBounds <- step readPrec
                   vals   <- step readPrec
                   return (array theBounds vals)
@@ -504,9 +507,9 @@ instance (Integral a, Read a) => Read (Ratio a) where
   readPrec =
     parens
     ( prec ratioPrec
-      ( do x            <- step readPrec
-           L.Symbol "%" <- lexP
-           y            <- step readPrec
+      ( do x <- step readPrec
+           expectP (L.Symbol "%")
+           y <- step readPrec
            return (x % y)
       )
     )
@@ -543,7 +546,7 @@ wrap_tup :: ReadPrec a -> ReadPrec a
 wrap_tup p = parens (paren p)
 
 read_comma :: ReadPrec ()
-read_comma = do { L.Punc "," <- lexP; return () }
+read_comma = expectP (L.Punc ",")
 
 read_tup2 :: (Read a, Read b) => ReadPrec (a,b)
 -- Reads "a , b"  no parens!

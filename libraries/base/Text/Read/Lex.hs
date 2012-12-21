@@ -22,7 +22,7 @@ module Text.Read.Lex
   , numberToInteger, numberToRational, numberToRangedRational
 
   -- lexer
-  , lex
+  , lex, expect
   , hsLex
   , lexChar
 
@@ -143,6 +143,11 @@ numberToRational (MkDecimal iPart mFPart mExp)
 
 lex :: ReadP Lexeme
 lex = skipSpaces >> lexToken
+
+expect :: Lexeme -> ReadP ()
+expect lexeme = do { skipSpaces 
+                   ; thing <- lexToken
+                   ; if thing == lexeme then return () else pfail }
 
 hsLex :: ReadP String
 -- ^ Haskell lexer: returns the lexed string, rather than the lexeme
