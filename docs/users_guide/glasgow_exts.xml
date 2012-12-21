@@ -5528,7 +5528,10 @@ kinds have sort <literal>BOX</literal>.
 <para>
 The following restrictions apply to promotion:
 <itemizedlist>
- <listitem><para>We only promote datatypes whose kinds are of the form
+ <listitem><para>We promote <literal>data</literal> types and <literal>newtypes</literal>,
+    but not type synonyms, or type/data families (<xref linkend="type-families"/>).
+  </para></listitem>
+ <listitem><para>We only promote types whose kinds are of the form
  <literal>* -> ... -> * -> *</literal>. In particular, we do not promote
  higher-kinded datatypes such as <literal>data Fix f = In (f (Fix f))</literal>,
  or datatypes whose kinds involve promoted types such as
@@ -5536,8 +5539,6 @@ The following restrictions apply to promotion:
  <listitem><para>We do not promote data constructors that are kind
  polymorphic, involve constraints, mention type or data families, or involve types that
  are not promotable.
- </para></listitem>
- <listitem><para>We do not promote data family instances (<xref linkend="data-families"/>).
  </para></listitem>
 </itemizedlist>
 </para>
