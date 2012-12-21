@@ -58,6 +58,7 @@ import Data.Monoid (mappend, mconcat, mempty)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
+import GHC.Conc.Sync (yield)
 import GHC.List (filter)
 import GHC.Num (Num(..))
 import GHC.Real ((/), fromIntegral, mod)
@@ -208,13 +209,22 @@ loop mgr@EventManager{..} = do
                       show state
  where
   go = do running <- step mgr
-          when running go
+          when running (yield >> go)
 
 step :: EventManager -> IO Bool
 step mgr@EventManager{..} = do
-  I.poll emBackend (Just Forever) (onFdEvent mgr)
+  waitForIO
   state <- readIORef emState
   state `seq` return (state == Running)
+  where
+    waitForIO = do
+      n1 <- I.poll emBackend Nothing (onFdEvent mgr)
+      when (n1 <= 0) $ do
+        yield
+        n2 <- I.poll emBackend Nothing (onFdEvent mgr)
+        when (n2 <= 0) $ do
+          _ <- I.poll emBackend (Just Forever) (onFdEvent mgr)
+          return ()
 
 ------------------------------------------------------------------------
 -- Registering interest in I/O events
