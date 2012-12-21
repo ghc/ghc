@@ -128,9 +128,9 @@ callbackTableVar mgr fd = emFds mgr ! hashFd fd
 ------------------------------------------------------------------------
 -- Creation
 
-handleControlEvent :: EventManager -> FdKey -> Event -> IO ()
-handleControlEvent mgr reg _evt = do
-  msg <- readControlMessage (emControl mgr) (keyFd reg)
+handleControlEvent :: EventManager -> Fd -> Event -> IO ()
+handleControlEvent mgr fd _evt = do
+  msg <- readControlMessage (emControl mgr) fd
   case msg of
     CMsgWakeup      -> return ()
     CMsgDie         -> writeIORef (emState mgr) Finished
@@ -169,9 +169,12 @@ newWith be = do
                          , emUniqueSource = us
                          , emControl = ctrl
                          }
-  _ <- registerFd_ mgr (handleControlEvent mgr) (controlReadFd ctrl) evtRead
-  _ <- registerFd_ mgr (handleControlEvent mgr) (wakeupReadFd ctrl) evtRead
+  registerControlFd mgr (controlReadFd ctrl) evtRead
+  registerControlFd mgr (wakeupReadFd ctrl) evtRead
   return mgr
+
+registerControlFd :: EventManager -> Fd -> Event -> IO ()
+registerControlFd mgr fd evs = I.modifyFd (emBackend mgr) fd mempty evs
 
 -- | Asynchronously shuts down the event manager, if running.
 shutdown :: EventManager -> IO ()
@@ -324,12 +327,14 @@ closeFd_ mgr oldMap fd = do
 
 -- | Call the callbacks corresponding to the given file descriptor.
 onFdEvent :: EventManager -> Fd -> Event -> IO ()
-onFdEvent mgr fd evs = do
-  fds <- readMVar (callbackTableVar mgr fd)
-  case IM.lookup (fromIntegral fd) fds of
-      Just cbs -> forM_ cbs $ \(FdData reg ev cb) ->
-                    when (evs `I.eventIs` ev) $ cb reg evs
-      Nothing  -> return ()
+onFdEvent mgr fd evs =
+  if fd == controlReadFd (emControl mgr) || fd == wakeupReadFd (emControl mgr)
+  then handleControlEvent mgr fd evs
+  else do fds <- readMVar (callbackTableVar mgr fd)
+          case IM.lookup (fromIntegral fd) fds of
+            Just cbs -> forM_ cbs $ \(FdData reg ev cb) ->
+                        when (evs `I.eventIs` ev) $ cb reg evs
+            Nothing  -> return ()
 
 nullToNothing :: [a] -> Maybe [a]
 nullToNothing []       = Nothing
