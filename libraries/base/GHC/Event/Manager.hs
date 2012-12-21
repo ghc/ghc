@@ -55,6 +55,7 @@ import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mappend, mconcat, mempty)
+import Data.Tuple (snd)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
@@ -241,17 +242,26 @@ registerFd_ :: EventManager -> IOCallback -> Fd -> Event
             -> IO (FdKey, Bool)
 registerFd_ mgr@(EventManager{..}) cb fd evs = do
   u <- newUnique emUniqueSource
-  modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
-    let fd'  = fromIntegral fd
-        reg  = FdKey fd u
-        !fdd = FdData reg evs cb
-        (!newMap, (oldEvs, newEvs)) =
+  let fd'  = fromIntegral fd
+      reg  = FdKey fd u
+      !fdd = FdData reg evs cb
+  modifyMVar (callbackTableVar mgr fd) $ \oldMap -> 
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+    if emOneShot
+    then case IM.insertWith (++) fd' [fdd] oldMap of
+      (Nothing,   n) -> do I.modifyFdOnce emBackend fd evs
+                           return (n, (reg, False))
+      (Just prev, n) -> do I.modifyFdOnce emBackend fd (combineEvents evs prev)
+                           return (n, (reg, False))
+    else
+#endif      
+      let (!newMap, (oldEvs, newEvs)) =
             case IM.insertWith (++) fd' [fdd] oldMap of
               (Nothing,   n) -> (n, (mempty, evs))
               (Just prev, n) -> (n, (eventsOf prev, combineEvents evs prev))
-        modify = oldEvs /= newEvs
-    when modify $ I.modifyFd emBackend fd oldEvs newEvs
-    return (newMap, (reg, modify))
+          modify = oldEvs /= newEvs
+      in do when modify $ I.modifyFd emBackend fd oldEvs newEvs
+            return (newMap, (reg, modify))
 {-# INLINE registerFd_ #-}
 
 combineEvents :: Event -> [FdData] -> Event
@@ -296,7 +306,10 @@ unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
               (Nothing,   _)    -> (oldMap, (mempty, mempty))
               (Just prev, newm) -> (newm, pairEvents prev newm fd')
         modify = oldEvs /= newEvs
-    when modify $ I.modifyFd emBackend fd oldEvs newEvs
+    when modify $
+      if emOneShot && newEvs /= mempty
+      then I.modifyFdOnce emBackend fd newEvs
+      else I.modifyFd emBackend fd oldEvs newEvs
     return (newMap, modify)
 
 -- | Drop a previous file descriptor registration.
@@ -337,12 +350,51 @@ onFdEvent :: EventManager -> Fd -> Event -> IO ()
 onFdEvent mgr fd evs =
   if fd == controlReadFd (emControl mgr) || fd == wakeupReadFd (emControl mgr)
   then handleControlEvent mgr fd evs
-  else do fds <- readMVar (callbackTableVar mgr fd)
-          case IM.lookup (fromIntegral fd) fds of
-            Just cbs -> forM_ cbs $ \(FdData reg ev cb) -> do
-              when (emOneShot mgr) $ void $ unregisterFd_ mgr reg
-              when (evs `I.eventIs` ev) $ cb reg evs
-            Nothing  -> return ()
+  else
+    if emOneShot mgr
+    then
+      do fdds <- modifyMVar (callbackTableVar mgr fd) $ \oldMap ->
+            case IM.delete fd' oldMap of
+              (Nothing, _)       -> return (oldMap, [])
+              (Just cbs, newmap) -> selectCallbacks newmap cbs
+         forM_ fdds $ \(FdData reg _ cb) -> cb reg evs
+    else 
+      do fds <- readMVar (callbackTableVar mgr fd)
+         case IM.lookup fd' fds of
+           Just cbs -> forM_ cbs $ \(FdData reg ev cb) -> do
+             when (evs `I.eventIs` ev) $ cb reg evs
+           Nothing  -> return ()
+  where
+    fd' :: Int
+    fd' = fromIntegral fd
+
+    selectCallbacks ::
+      IM.IntMap [FdData] -> [FdData] -> IO (IM.IntMap [FdData], [FdData])
+    selectCallbacks curmap cbs = aux cbs [] []
+      where
+        -- nothing to rearm.
+        aux [] _    []          =
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+           return (curmap, cbs)
+#else
+          do I.modifyFd (emBackend mgr) fd (eventsOf cbs) mempty
+             return (curmap, cbs)
+#endif
+        -- reinsert and rearm; note that we already have the lock on the
+        -- callback table for this fd, and we deleted above, so we know there
+        -- is no entry in the table for this fd.
+        aux [] fdds saved@(_:_) = do
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)          
+          I.modifyFdOnce (emBackend mgr) fd $ eventsOf saved
+#else
+          I.modifyFd (emBackend mgr) fd (eventsOf cbs) $ eventsOf saved
+#endif    
+          return (snd $ IM.insertWith (\_ _ -> saved) fd' saved curmap, fdds)
+
+        -- continue, saving those callbacks that don't match the event
+        aux (fdd@(FdData _ evs' _) : cbs') fdds saved
+          | evs `I.eventIs` evs' = aux cbs' (fdd:fdds) saved
+          | otherwise            = aux cbs' fdds (fdd:saved)
 
 nullToNothing :: [a] -> Maybe [a]
 nullToNothing []       = Nothing
