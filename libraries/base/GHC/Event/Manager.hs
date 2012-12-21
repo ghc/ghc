@@ -62,7 +62,7 @@ import GHC.Conc.Signal (runHandlers)
 import GHC.Conc.Sync (yield)
 import GHC.List (filter)
 import GHC.Num (Num(..))
-import GHC.Real ((/), fromIntegral, mod)
+import GHC.Real (fromIntegral, mod)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
