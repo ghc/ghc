@@ -281,7 +281,12 @@ registerFd mgr cb fd evs = do
 
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
-wakeManager mgr = sendWakeup (emControl mgr)
+wakeManager mgr =
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+  return ()
+#else    
+  sendWakeup (emControl mgr)
+#endif
 
 eventsOf :: [FdData] -> Event
 eventsOf = mconcat . map fdEvents
