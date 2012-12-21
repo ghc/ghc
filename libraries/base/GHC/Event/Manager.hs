@@ -50,7 +50,7 @@ module GHC.Event.Manager
 
 import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
 import Control.Exception (finally)
-import Control.Monad ((=<<), forM_, liftM, sequence_, when, replicateM)
+import Control.Monad ((=<<), forM_, liftM, sequence_, when, replicateM, void)
 import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
@@ -113,6 +113,7 @@ data EventManager = EventManager
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
+    , emOneShot      :: {-# UNPACK #-} !Bool
     }
 
 callbackArraySize :: Int
@@ -148,11 +149,11 @@ newDefaultBackend = error "no back end for this platform"
 #endif
 
 -- | Create a new event manager.
-new :: IO EventManager
-new = newWith =<< newDefaultBackend
+new :: Bool -> IO EventManager
+new oneShot = newWith oneShot =<< newDefaultBackend
 
-newWith :: Backend -> IO EventManager
-newWith be = do
+newWith :: Bool -> Backend -> IO EventManager
+newWith oneShot be = do
   iofds <- fmap (listArray (0, callbackArraySize-1)) $
            replicateM callbackArraySize (newMVar IM.empty)
   ctrl <- newControl False
@@ -168,6 +169,7 @@ newWith be = do
                          , emState = state
                          , emUniqueSource = us
                          , emControl = ctrl
+                         , emOneShot = oneShot
                          }
   registerControlFd mgr (controlReadFd ctrl) evtRead
   registerControlFd mgr (wakeupReadFd ctrl) evtRead
@@ -332,8 +334,9 @@ onFdEvent mgr fd evs =
   then handleControlEvent mgr fd evs
   else do fds <- readMVar (callbackTableVar mgr fd)
           case IM.lookup (fromIntegral fd) fds of
-            Just cbs -> forM_ cbs $ \(FdData reg ev cb) ->
-                        when (evs `I.eventIs` ev) $ cb reg evs
+            Just cbs -> forM_ cbs $ \(FdData reg ev cb) -> do
+              when (emOneShot mgr) $ void $ unregisterFd_ mgr reg
+              when (evs `I.eventIs` ev) $ cb reg evs
             Nothing  -> return ()
 
 nullToNothing :: [a] -> Maybe [a]

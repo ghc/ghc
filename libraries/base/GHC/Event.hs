@@ -14,6 +14,7 @@ module GHC.Event
 
       -- * Creation
     , getSystemEventManager
+    , new
     , getSystemTimerManager
 
       -- * Registering interest in I/O events
