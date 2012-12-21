@@ -59,11 +59,7 @@ import System.Posix.Types (Fd)
 import qualified GHC.Event.Internal as I
 import qualified GHC.Event.PSQ as Q
 
-#if defined(HAVE_KQUEUE)
-import qualified GHC.Event.KQueue as KQueue
-#elif defined(HAVE_EPOLL)
-import qualified GHC.Event.EPoll  as EPoll
-#elif defined(HAVE_POLL)
+#if defined(HAVE_POLL)
 import qualified GHC.Event.Poll   as Poll
 #else
 # error not implemented for this operating system
@@ -138,11 +134,7 @@ handleControlEvent mgr fd _evt = do
     CMsgSignal fp s -> runHandlers fp s
 
 newDefaultBackend :: IO Backend
-#if defined(HAVE_KQUEUE)
-newDefaultBackend = KQueue.new
-#elif defined(HAVE_EPOLL)
-newDefaultBackend = EPoll.new
-#elif defined(HAVE_POLL)
+#if defined(HAVE_POLL)
 newDefaultBackend = Poll.new
 #else
 newDefaultBackend = error "no back end for this platform"
