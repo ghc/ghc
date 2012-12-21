@@ -1035,8 +1035,9 @@ isPromotableType _                 = False
 -- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
 isPromotableTyCon :: TyCon -> Maybe Int
 isPromotableTyCon tc
-  | isDataTyCon tc  -- Only *data* types can be promoted, not newtypes
-    		    -- not synonyms, not type families
+  | isDataTyCon tc || isNewTyCon tc
+       -- Only *data* and *newtype* types can be promoted, 
+       -- not synonyms, not type/data families
   , all isLiftedTypeKind (res:args) = Just $ length args
   | otherwise                       = Nothing
   where
