@@ -773,21 +773,23 @@ sub main {
 
         scmall ($command, @_);
 
+        my @submodule_args = grep(/^-q/,@_);
+
         if ($command eq "get") {
-            &scm(".", "git", "submodule", "init");
+            &scm(".", "git", "submodule", "init", @submodule_args);
         }
         if ($command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &scm(".", "git", "submodule", "init");
+                &scm(".", "git", "submodule", "init", @submodule_args);
             }
         }
         if ($command eq "get" or $command eq "pull") {
             my $gitConfig = &tryReadFile(".git/config");
             if ($gitConfig !~ /submodule/) {
-                &scm(".", "git", "submodule", "init");
+                &scm(".", "git", "submodule", "init", @submodule_args);
             }
-            &scm(".", "git", "submodule", "update");
+            &scm(".", "git", "submodule", "update", @submodule_args);
         }
     }
 }

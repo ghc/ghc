@@ -1297,7 +1297,7 @@ hscGenHardCode cgguts mod_summary = do
         rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
                    cmmToRawCmm dflags cmms
 
-        let dump a = do dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm"
+        let dump a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_raw "Raw Cmm"
                            (ppr a)
                         return a
             rawcmms1 = Stream.mapM dump rawcmms0
@@ -1356,7 +1356,7 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
     liftIO $ do
         us <- mkSplitUniqSupply 'S'
         let initTopSRT = initUs_ us emptySRT
-        dumpIfSet_dyn dflags Opt_D_dump_cmmz "Parsed Cmm" (ppr cmm)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm "Parsed Cmm" (ppr cmm)
         (_, cmmgroup) <- cmmPipeline hsc_env initTopSRT cmm
         rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
@@ -1391,7 +1391,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
         -- CmmGroup on input may produce many CmmGroups on output due
         -- to proc-point splitting).
 
-    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz
+    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                        "Cmm produced by new codegen" (ppr a)
                      return a
 
@@ -1429,7 +1429,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
                 Stream.yield (srtToData topSRT)
 
     let
-        dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" $ ppr a
+        dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" $ ppr a
                      return a
 
         ppr_stream2 = Stream.mapM dump2 pipeline_stream
