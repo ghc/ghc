@@ -279,9 +279,7 @@ pairEvents prev m fd = let l = eventsOf prev
 unregisterFd_ :: EventManager -> FdKey -> IO Bool
 unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
   modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
-    let dropReg cbs = case filter ((/= u) . keyUnique . fdKey) cbs of
-                          []   -> Nothing
-                          cbs' -> Just cbs'
+    let dropReg = nullToNothing . filter ((/= u) . keyUnique . fdKey) 
         fd' = fromIntegral fd
         (!newMap, (oldEvs, newEvs)) =
             case IM.updateWith dropReg fd' oldMap of
@@ -332,3 +330,7 @@ onFdEvent mgr fd evs = do
       Just cbs -> forM_ cbs $ \(FdData reg ev cb) ->
                     when (evs `I.eventIs` ev) $ cb reg evs
       Nothing  -> return ()
+
+nullToNothing :: [a] -> Maybe [a]
+nullToNothing []       = Nothing
+nullToNothing xs@(_:_) = Just xs
