@@ -212,7 +212,7 @@ loop mgr@EventManager{..} = do
 
 step :: EventManager -> IO Bool
 step mgr@EventManager{..} = do
-  I.poll emBackend Forever (onFdEvent mgr)
+  I.poll emBackend (Just Forever) (onFdEvent mgr)
   state <- readIORef emState
   state `seq` return (state == Running)
 

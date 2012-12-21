@@ -23,6 +23,7 @@ module GHC.Event.Internal
 
 import Data.Bits ((.|.), (.&.))
 import Data.List (foldl', intercalate)
+import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 import System.Posix.Types (Fd)
@@ -90,9 +91,9 @@ data Backend = forall a. Backend {
     -- | Poll backend for new events.  The provided callback is called
     -- once per file descriptor with new events.
     , _bePoll :: a                          -- backend state
-              -> Timeout                    -- timeout in milliseconds
+              -> Maybe Timeout              -- timeout in milliseconds ('Nothing' for non-blocking poll)
               -> (Fd -> Event -> IO ())     -- I/O callback
-              -> IO ()
+              -> IO Int
 
     -- | Register, modify, or unregister interest in the given events
     -- on the given file descriptor.
@@ -105,7 +106,7 @@ data Backend = forall a. Backend {
     , _beDelete :: a -> IO ()
     }
 
-backend :: (a -> Timeout -> (Fd -> Event -> IO ()) -> IO ())
+backend :: (a -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int)
         -> (a -> Fd -> Event -> Event -> IO ())
         -> (a -> IO ())
         -> a
@@ -113,7 +114,7 @@ backend :: (a -> Timeout -> (Fd -> Event -> IO ()) -> IO ())
 backend bPoll bModifyFd bDelete state = Backend state bPoll bModifyFd bDelete
 {-# INLINE backend #-}
 
-poll :: Backend -> Timeout -> (Fd -> Event -> IO ()) -> IO ()
+poll :: Backend -> Maybe Timeout -> (Fd -> Event -> IO ()) -> IO Int
 poll (Backend bState bPoll _ _) = bPoll bState
 {-# INLINE poll #-}
 
