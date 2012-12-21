@@ -248,7 +248,7 @@ registerFd_ mgr@(EventManager{..}) cb fd evs = do
         (!newMap, (oldEvs, newEvs)) =
             case IM.insertWith (++) fd' [fdd] oldMap of
               (Nothing,   n) -> (n, (mempty, evs))
-              (Just prev, n) -> (n, pairEvents prev newMap fd')
+              (Just prev, n) -> (n, pairEvents prev n fd')
         modify = oldEvs /= newEvs
     when modify $ I.modifyFd emBackend fd oldEvs newEvs
     return (newMap, (reg, modify))
