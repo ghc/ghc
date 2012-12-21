@@ -248,11 +248,16 @@ registerFd_ mgr@(EventManager{..}) cb fd evs = do
         (!newMap, (oldEvs, newEvs)) =
             case IM.insertWith (++) fd' [fdd] oldMap of
               (Nothing,   n) -> (n, (mempty, evs))
-              (Just prev, n) -> (n, pairEvents prev n fd')
+              (Just prev, n) -> (n, (eventsOf prev, combineEvents evs prev))
         modify = oldEvs /= newEvs
     when modify $ I.modifyFd emBackend fd oldEvs newEvs
     return (newMap, (reg, modify))
 {-# INLINE registerFd_ #-}
+
+combineEvents :: Event -> [FdData] -> Event
+combineEvents ev [fdd] = mappend ev (fdEvents fdd)
+combineEvents ev fdds  = mappend ev (eventsOf fdds)
+{-# INLINE combineEvents #-}
 
 -- | @registerFd mgr cb fd evs@ registers interest in the events @evs@
 -- on the file descriptor @fd@.  @cb@ is called for each event that
