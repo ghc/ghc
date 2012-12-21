@@ -106,7 +106,9 @@ toFilter evt
   | otherwise                 = filterWrite
 
 modifyFdOnce :: EventQueue -> Fd -> E.Event -> IO ()
-modifyFdOnce = error "modifyFdOnce not supported in KQueue backend"
+modifyFdOnce q fd evt = do
+    let !ev = event fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF
+    kqueueControl (kqueueFd q) ev
 
 poll :: EventQueue
      -> Maybe Timeout
@@ -225,11 +227,12 @@ newtype Flag = Flag Word32
 #else
 newtype Flag = Flag Word16
 #endif
-    deriving (Eq, Show, Storable)
+    deriving (Bits, Eq, Num, Show, Storable)
 
 #{enum Flag, Flag
  , flagAdd     = EV_ADD
  , flagDelete  = EV_DELETE
+ , flagOneshot = EV_ONESHOT
  }
 
 #if SIZEOF_KEV_FILTER == 4 /*kevent.filter: uint32_t or uint16_t. */
