@@ -9471,6 +9471,9 @@ Phase 2.
 </para>
 <para>
 Rules support the special phase-control notation "[~]", which means the rule is never active.
+This feature supports plugins (see <xref linkend="compiler-plugins"/>), by making it possible
+to define a RULE that is never run by GHC, but is nevertheless parsed, typechecked etc, so that
+it is available to the plugin.
 </para>
 </listitem>
 
