@@ -254,3 +254,15 @@ test('T7257',
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
+
+test('Conversions',
+     [if_wordsize(32,
+          stats_range_field('bytes allocated', 55316, 5)),
+                           # 2012-12-18: Guessed 64-bit value / 2
+      if_wordsize(64,
+          stats_range_field('bytes allocated', 110632, 5)),
+                           # 2012-12-18: 109608 (amd64/OS X)
+
+      only_ways(['normal'])
+     ],
+    compile_and_run, ['-O'])

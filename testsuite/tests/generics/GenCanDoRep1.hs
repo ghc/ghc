@@ -16,5 +16,9 @@ data B a = B0 | B1
 data C a = C0 | C1 { c11 :: a, c12 :: (C a) }
   deriving (Generic, Generic1)
 
+data D a = D (Either Int a) deriving Generic1
+
+data E a = E (Either Int (E a)) deriving Generic1
+
 data (:*:) a b = a :*: b
   deriving (Generic, Generic1)

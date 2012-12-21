@@ -40,6 +40,9 @@ config.compiler_debugged = ghc_debugged
 if (ghc_with_vanilla == 1):
     config.have_vanilla = True
 
+if (ghc_with_dynamic == 1):
+    config.have_dynamic = True
+
 if (ghc_with_profiling == 1):
     config.have_profiling = True
     config.compile_ways.append('profasm')
