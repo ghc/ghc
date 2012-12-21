@@ -49,6 +49,7 @@ import System.Posix.Types (Fd)
 #if defined(HAVE_EVENTFD)
 import Data.Word (Word64)
 import Foreign.C.Error (throwErrnoIfMinus1)
+import Foreign.C.Types (CULong(..))
 #else
 import Foreign.C.Error (eAGAIN, eWOULDBLOCK, getErrno, throwErrno)
 #endif
@@ -167,10 +168,9 @@ readControlMessage ctrl fd
 
 sendWakeup :: Control -> IO ()
 #if defined(HAVE_EVENTFD)
-sendWakeup c = alloca $ \p -> do
-  poke p (1 :: Word64)
+sendWakeup c =
   throwErrnoIfMinus1_ "sendWakeup" $
-    c_write (fromIntegral (controlEventFd c)) (castPtr p) 8
+  c_eventfd_write (fromIntegral (controlEventFd c)) 1    
 #else
 sendWakeup c = do
   n <- sendMessage (wakeupWriteFd c) CMsgWakeup
@@ -197,6 +197,9 @@ sendMessage fd msg = alloca $ \p -> do
 #if defined(HAVE_EVENTFD)
 foreign import ccall unsafe "sys/eventfd.h eventfd"
    c_eventfd :: CInt -> CInt -> IO CInt
+
+foreign import ccall unsafe "sys/eventfd.h eventfd_write"
+   c_eventfd_write :: CInt -> CULong -> IO CInt                
 #endif
 
 -- Used to tell the RTS how it can send messages to the I/O manager.
