@@ -40,12 +40,13 @@ available = False
 
 #include <sys/epoll.h>
 
-import Control.Monad (when)
+import Control.Monad (unless, when)
 import Data.Bits (Bits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
 import Data.Word (Word32)
-import Foreign.C.Error (throwErrnoIfMinus1, throwErrnoIfMinus1_)
+import Foreign.C.Error (eNOENT, getErrno, throwErrno,
+                        throwErrnoIfMinus1, throwErrnoIfMinus1_)
 import Foreign.C.Types (CInt(..))
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr)
@@ -76,7 +77,7 @@ new :: IO E.Backend
 new = do
   epfd <- epollCreate
   evts <- A.new 64
-  let !be = E.backend poll modifyFd delete (EPoll epfd evts)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts)
   return be
 
 delete :: EPoll -> IO ()
@@ -92,6 +93,18 @@ modifyFd ep fd oevt nevt = with (Event (fromEvent nevt) fd) $
   where op | oevt == mempty = controlOpAdd
            | nevt == mempty = controlOpDelete
            | otherwise      = controlOpModify
+
+modifyFdOnce :: EPoll -> Fd -> E.Event -> IO ()
+modifyFdOnce ep fd evt =
+  do let !ev = fromEvent evt .|. epollOneShot
+     res <- with (Event ev fd) $
+            epollControl_ (epollFd ep) controlOpModify fd
+     unless (res == 0) $ do
+         err <- getErrno
+         if err == eNOENT then
+             with (Event ev fd) $ epollControl (epollFd ep) controlOpAdd fd
+           else
+             throwErrno "modifyFdOnce"
 
 -- | Select a set of file descriptors which are ready for I/O
 -- operations and call @f@ for all ready file descriptors, passing the
@@ -155,6 +168,7 @@ newtype EventType = EventType {
  , epollOut = EPOLLOUT
  , epollErr = EPOLLERR
  , epollHup = EPOLLHUP
+ , epollOneShot = EPOLLONESHOT              
  }
 
 -- | Create a new epoll context, returning a file descriptor associated with the context.
@@ -174,8 +188,12 @@ epollCreate = do
   return epollFd'
 
 epollControl :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO ()
-epollControl (EPollFd epfd) (ControlOp op) (Fd fd) event =
-    throwErrnoIfMinus1_ "epollControl" $ c_epoll_ctl epfd op fd event
+epollControl epfd op fd event =
+    throwErrnoIfMinus1_ "epollControl" $ epollControl_ epfd op fd event
+
+epollControl_ :: EPollFd -> ControlOp -> Fd -> Ptr Event -> IO CInt
+epollControl_ (EPollFd epfd) (ControlOp op) (Fd fd) event =
+    c_epoll_ctl epfd op fd event
 
 epollWait :: EPollFd -> Ptr Event -> Int -> Int -> IO Int
 epollWait (EPollFd epfd) events numEvents timeout =

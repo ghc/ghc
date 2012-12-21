@@ -86,7 +86,7 @@ new = do
   changesArr <- A.empty
   changes <- newMVar changesArr 
   events <- A.new 64
-  let !be = E.backend poll modifyFd delete (EventQueue qfd changes events)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (EventQueue qfd changes events)
   return be
 
 delete :: EventQueue -> IO ()
@@ -101,6 +101,9 @@ modifyFd q fd oevt nevt = withMVar (eqChanges q) $ \ch -> do
   when (oevt `E.eventIs` E.evtWrite) $ addChange filterWrite flagDelete
   when (nevt `E.eventIs` E.evtRead)  $ addChange filterRead flagAdd
   when (nevt `E.eventIs` E.evtWrite) $ addChange filterWrite flagAdd
+
+modifyFdOnce :: EventQueue -> Fd -> E.Event -> IO ()
+modifyFdOnce = error "modifyFdOnce not supported in KQueue backend"
 
 poll :: EventQueue
      -> Maybe Timeout
