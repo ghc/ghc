@@ -114,7 +114,7 @@ data EventManager = EventManager
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
-    , emOneShot      :: {-# UNPACK #-} !Bool
+    , emOneShot      :: !Bool
     }
 
 callbackArraySize :: Int
