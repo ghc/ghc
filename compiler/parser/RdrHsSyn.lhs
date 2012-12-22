@@ -10,8 +10,9 @@ module RdrHsSyn (
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
         mkClassDecl, 
         mkTyData, mkFamInstData, 
-        mkTySynonym, mkFamInstSynonym,
-        mkTyFamily, 
+        mkTySynonym, mkTyFamInstEqn, mkTyFamInstGroup,
+        mkTyFamInst, 
+        mkFamDecl, 
         splitCon, mkInlinePragma,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
         mkTyLit,
@@ -112,7 +113,7 @@ mkClassDecl :: SrcSpan
             -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, at_defs, docs) = cvBindsAndSigs (unLoc where_cls)
+  = do { let (binds, sigs, ats, at_defs, _, docs) = cvBindsAndSigs (unLoc where_cls)
              cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
@@ -133,9 +134,9 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = defn,
-                                 tcdFVs = placeHolderNames })) }
+       ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
+                                   tcdDataDefn = defn,
+                                   tcdFVs = placeHolderNames })) }
 
 mkFamInstData :: SrcSpan
          -> NewOrData
@@ -144,12 +145,12 @@ mkFamInstData :: SrcSpan
          -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
-         -> P (LFamInstDecl RdrName)
+         -> P (LDataFamInstDecl RdrName)
 mkFamInstData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
-                                    , fid_defn = defn, fid_fvs = placeHolderNames })) }
+       ; return (L loc (DataFamInstDecl { dfid_tycon = tc, dfid_pats = mkHsWithBndrs tparams
+                                        , dfid_defn = defn, dfid_fvs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
            -> Maybe CType
@@ -157,15 +158,15 @@ mkDataDefn :: NewOrData
            -> Maybe (LHsKind RdrName)
            -> [LConDecl RdrName]
            -> Maybe [LHsType RdrName]
-           -> P (HsTyDefn RdrName)
+           -> P (HsDataDefn RdrName)
 mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; return (TyData { td_ND = new_or_data, td_cType = cType
-                        , td_ctxt = cxt 
-                        , td_cons = data_cons
-                        , td_kindSig = ksig
-                        , td_derivs = maybe_deriv }) }
+       ; return (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                            , dd_ctxt = cxt 
+                            , dd_cons = data_cons
+                            , dd_kindSig = ksig
+                            , dd_derivs = maybe_deriv }) }
 
 mkTySynonym :: SrcSpan
             -> LHsType RdrName  -- LHS
@@ -174,29 +175,42 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
-       ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = TySynonym { td_synRhs = rhs },
-                                 tcdFVs = placeHolderNames })) }
+       ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars,
+                                 tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
-mkFamInstSynonym :: SrcSpan
-            -> LHsType RdrName  -- LHS
-            -> LHsType RdrName  -- RHS
-            -> P (LFamInstDecl RdrName)
-mkFamInstSynonym loc lhs rhs
+mkTyFamInstEqn :: SrcSpan
+               -> LHsType RdrName
+               -> LHsType RdrName
+               -> P (LTyFamInstEqn RdrName)
+mkTyFamInstEqn loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
-                                    , fid_defn = TySynonym { td_synRhs = rhs }
-                                    , fid_fvs = placeHolderNames })) }
+       ; return (L loc (TyFamInstEqn { tfie_tycon = tc
+                                     , tfie_pats  = mkHsWithBndrs tparams
+                                     , tfie_rhs   = rhs })) }
 
-mkTyFamily :: SrcSpan
-           -> FamilyFlavour
-           -> LHsType RdrName   -- LHS
-           -> Maybe (LHsKind RdrName) -- Optional kind signature
-           -> P (LTyClDecl RdrName)
-mkTyFamily loc flavour lhs ksig
+mkTyFamInst :: SrcSpan
+            -> LTyFamInstEqn RdrName
+            -> P (LTyFamInstDecl RdrName)
+mkTyFamInst loc eqn
+  = return (L loc (TyFamInstDecl { tfid_eqns  = [eqn]
+                                 , tfid_group = False
+                                 , tfid_fvs   = placeHolderNames }))
+
+mkTyFamInstGroup :: [LTyFamInstEqn RdrName]
+                 -> TyFamInstDecl RdrName
+mkTyFamInstGroup eqns = TyFamInstDecl { tfid_eqns  = eqns
+                                      , tfid_group = True
+                                      , tfid_fvs   = placeHolderNames }
+
+mkFamDecl :: SrcSpan
+          -> FamilyFlavour
+          -> LHsType RdrName   -- LHS
+          -> Maybe (LHsKind RdrName) -- Optional kind signature
+          -> P (LFamilyDecl RdrName)
+mkFamDecl loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
-       ; return (L loc (TyFamily flavour tc tyvars ksig)) }
+       ; return (L loc (FamilyDecl flavour tc tyvars ksig)) }
 
 mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 -- If the user wrote
@@ -249,30 +263,32 @@ cvTopDecls decls = go (fromOL decls)
 cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case cvBindsAndSigs binding of
-      (mbs, sigs, fam_ds, fam_insts, _) 
-         -> ASSERT( null fam_ds && null fam_insts )
+      (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _) 
+         -> ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
             ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag ( LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName]
-          , [LFamInstDecl RdrName], [LDocDecl])
+  -> (Bag ( LHsBind RdrName), [LSig RdrName], [LFamilyDecl RdrName]
+          , [LTyFamInstDecl RdrName], [LDataFamInstDecl RdrName], [LDocDecl])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs  fb = go (fromOL fb)
   where
-    go []                  = (emptyBag, [], [], [], [])
-    go (L l (SigD s) : ds) = (bs, L l s : ss, ts, fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, fis, docs)
+    go []                  = (emptyBag, [], [], [], [], [])
+    go (L l (SigD s) : ds) = (bs, L l s : ss, ts, tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts, tfis, dfis, docs)
                            where (b', ds')    = getMonoBind (L l b) ds
-                                 (bs, ss, ts, fis, docs) = go ds'
-    go (L l (TyClD t@(TyFamily {})) : ds) = (bs, ss, L l t : ts, fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (InstD (FamInstD { lid_inst = fi })) : ds) = (bs, ss, ts, L l fi : fis, docs)
-                           where (bs, ss, ts, fis, docs) = go ds
-    go (L l (DocD d) : ds) =  (bs, ss, ts, fis, (L l d) : docs)
-                           where (bs, ss, ts, fis, docs) = go ds
+                                 (bs, ss, ts, tfis, dfis, docs) = go ds'
+    go (L l (TyClD (FamDecl t)) : ds) = (bs, ss, L l t : ts, tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (InstD (TyFamInstD { tfid_inst = tfi })) : ds) = (bs, ss, ts, L l tfi : tfis, dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (InstD (DataFamInstD { dfid_inst = dfi })) : ds) = (bs, ss, ts, tfis, L l dfi : dfis, docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
+    go (L l (DocD d) : ds) =  (bs, ss, ts, tfis, dfis, (L l d) : docs)
+                           where (bs, ss, ts, tfis, dfis, docs) = go ds
     go (L _ d : _) = pprPanic "cvBindsAndSigs" (ppr d)
 
 -----------------------------------------------------------------------------

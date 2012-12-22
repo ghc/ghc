@@ -15,6 +15,7 @@ import CoreUtils
 import CoreUnfold
 import Module
 import TyCon
+import CoAxiom
 import Type
 import Id
 import Var
@@ -47,7 +48,8 @@ import FastString
 --
 buildPADict
         :: TyCon        -- ^ tycon of the type being vectorised.
-        -> CoAxiom      -- ^ Coercion between the type and 
+        -> CoAxiom Unbranched
+                        -- ^ Coercion between the type and 
                         --     its vectorised representation.
         -> TyCon        -- ^ PData  instance tycon
         -> TyCon        -- ^ PDatas instance tycon

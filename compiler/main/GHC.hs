@@ -181,7 +181,7 @@ module GHC (
         ClsInst, 
         instanceDFunId, 
         pprInstance, pprInstanceHdr,
-        pprFamInst, pprFamInstHdr,
+        pprFamInst,
 
         -- ** Types and Kinds
         Type, splitForAllTys, funResultTy, 
@@ -1004,7 +1004,7 @@ getBindings = withSession $ \hsc_env ->
     return $ icInScopeTTs $ hsc_IC hsc_env
 
 -- | Return the instances for the current interactive session.
-getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
+getInsts :: GhcMonad m => m ([ClsInst], [FamInst Branched])
 getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 

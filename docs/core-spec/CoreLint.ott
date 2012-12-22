@@ -222,15 +222,19 @@ k0 <: k1
 --------------------- :: InstCo
 G |-co g t0 : s[m |-> t0] ~#k t[n |-> t0]
 
-</ G |-co gi : si ~#ki ti // i />
-</ substi @ // i /> = inits(</ [ ni |-> si ] // i />)
-</ ni = zi_k'i // i />
-</ ki <: substi(k'i) // i />
-s' = s </ [ ni |-> si ] // i />
-t' = t </ [ ni |-> ti ] // i />
-G |-ty s' : k
+C = T </ axBranchkk // kk />
+0 <= ind < length </ axBranchkk // kk />
+forall </ ni // i />. (</ s1j // j /> ~> t1) = (</ axBranchkk // kk />)[ind]
+</ G |-co gi : s'i ~#k'i t'i // i />
+</ substi @ // i /> = inits(</ [ ni |-> s'i ] // i />)
+</ ni = zi_ki // i />
+</ k'i <: substi(ki) // i />
+no_conflict(C, </ s2j // j />, ind-1)
+</ s2j = s1j </ [ni |-> s'i] // i/> // j />
+t2 = t1 </ [ni |-> t'i] // i />
+G |-ty t2 : k
 ------------------------------------------------------ :: AxiomInstCo
-G |-co (forall </ ni // i />. (s ~ t)) </ gi // i /> : s' ~#k t'
+G |-co C ind </ gi // i /> : T </ s2j // j /> ~#k t2
 
 defn G |- ki k ok ::  :: lintKind :: 'K_'
   {{ com Kind validity, \coderef{coreSyn/CoreLint.lhs}{lintKind} }}
@@ -398,3 +402,17 @@ Constraint <: *
 
 ------------------ :: LiftedConstraint
 * <: Constraint
+
+defn no_conflict ( C , </ sj // j /> , ind ) ::  :: check_no_conflict :: 'NoConflict_'
+  {{ com Branched axiom conflict checking, \coderef{coreSyn/CoreLint.lhs}{lintCoercion\#check\_no\_conflict} }}
+by
+
+------------------------------------------------ :: NoBranch
+no_conflict(C, </ si // i/>, -1)
+
+C = T </ axBranchkk // kk />
+forall </ ni // i />. (</ tj // j /> ~> t') = (</ axBranchkk // kk />)[ind]
+apart(</ sj // j />, </ tj // j />)
+no_conflict(C, </ sj // j />, ind-1)
+------------------------------------------------ :: Branch
+no_conflict(C, </ sj // j />, ind)

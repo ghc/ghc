@@ -26,7 +26,8 @@ module MkId (
 
         wrapNewTypeBody, unwrapNewTypeBody,
         wrapFamInstBody, unwrapFamInstScrut,
-        wrapTypeFamInstBody, unwrapTypeFamInstScrut,
+        wrapTypeFamInstBody, wrapTypeUnbranchedFamInstBody, unwrapTypeFamInstScrut,
+        unwrapTypeUnbranchedFamInstScrut,
 
         DataConBoxer(..), mkDataConRep, mkDataConWorkId,
 
@@ -47,13 +48,15 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
-import Coercion	        ( mkReflCo, mkAxInstCo, mkSymCo, coercionKind, mkUnsafeCo )
+import Coercion	        ( mkReflCo, mkAxInstCo, mkSymCo, coercionKind, mkUnsafeCo,
+                          mkUnbranchedAxInstCo )
 import TcType
 import MkCore
 import CoreUtils	( exprType, mkCast )
 import CoreUnfold
 import Literal
 import TyCon
+import CoAxiom
 import Class
 import VarSet
 import Name
@@ -647,7 +650,7 @@ dataConArgUnpack arg_ty
     unbox_tc_app tc tc_args con
       | isNewTyCon tc
       , let rep_ty = newTyConInstRhs tc tc_args
-            co     = mkAxInstCo (newTyConCo tc) tc_args  -- arg_ty ~ rep_ty
+            co     = mkUnbranchedAxInstCo (newTyConCo tc) tc_args  -- arg_ty ~ rep_ty
       , (yes, rep_tys, unbox_rep, box_rep) <- dataConArgUnpack rep_ty
       = ( yes, rep_tys
         , \ arg_id ->
@@ -661,7 +664,7 @@ dataConArgUnpack arg_ty
                        UnitBox -> do { rep_id <- newLocal (substTy subst rep_ty)
                                      ; return ([rep_id], Var rep_id) }
                        Boxer boxer -> boxer subst
-             ; let sco = mkAxInstCo (newTyConCo tc) (substTys subst tc_args)
+             ; let sco = mkUnbranchedAxInstCo (newTyConCo tc) (substTys subst tc_args)
              ; return (rep_ids, rep_expr `Cast` mkSymCo sco) } )
         
       | otherwise
@@ -769,7 +772,7 @@ wrapNewTypeBody tycon args result_expr
     wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
-    co = mkAxInstCo (newTyConCo tycon) args
+    co = mkUnbranchedAxInstCo (newTyConCo tycon) args
 
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
@@ -779,7 +782,7 @@ wrapNewTypeBody tycon args result_expr
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
-    mkCast result_expr (mkAxInstCo (newTyConCo tycon) args)
+    mkCast result_expr (mkUnbranchedAxInstCo (newTyConCo tycon) args)
 
 -- If the type constructor is a representation type of a data instance, wrap
 -- the expression into a cast adjusting the expression type, which is an
@@ -789,26 +792,34 @@ unwrapNewTypeBody tycon args result_expr
 wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast body (mkSymCo (mkAxInstCo co_con args))
+  = mkCast body (mkSymCo (mkUnbranchedAxInstCo co_con args))
   | otherwise
   = body
 
 -- Same as `wrapFamInstBody`, but for type family instances, which are
 -- represented by a `CoAxiom`, and not a `TyCon`
-wrapTypeFamInstBody :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
-wrapTypeFamInstBody axiom args body
-  = mkCast body (mkSymCo (mkAxInstCo axiom args))
+wrapTypeFamInstBody :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeFamInstBody axiom ind args body
+  = mkCast body (mkSymCo (mkAxInstCo axiom ind args))
+
+wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeUnbranchedFamInstBody axiom
+  = wrapTypeFamInstBody axiom 0
 
 unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast scrut (mkAxInstCo co_con args)
+  = mkCast scrut (mkUnbranchedAxInstCo co_con args) -- data instances only
   | otherwise
   = scrut
 
-unwrapTypeFamInstScrut :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
-unwrapTypeFamInstScrut axiom args scrut
-  = mkCast scrut (mkAxInstCo axiom args)
+unwrapTypeFamInstScrut :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeFamInstScrut axiom ind args scrut
+  = mkCast scrut (mkAxInstCo axiom ind args)
+
+unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeUnbranchedFamInstScrut axiom
+  = unwrapTypeFamInstScrut axiom 0
 \end{code}
 
 

@@ -1480,15 +1480,17 @@ doTopReactFunEq _ct fl fun_tc args xi loc
     do { match_res <- matchFam fun_tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of {
            Nothing -> return NoTopInt ;
-           Just (famInst, rep_tys) -> 
+           Just (FamInstMatch { fim_instance = famInst
+                              , fim_index    = index
+                              , fim_tys      = rep_tys }) -> 
 
     -- Found a top-level instance
     do {    -- Add it to the solved goals
          unless (isDerived fl) (addSolvedFunEq fam_ty fl xi)
 
        ; let coe_ax = famInstAxiom famInst 
-       ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax rep_tys)
-                      (mkAxInstRHS coe_ax rep_tys) } } } } }
+       ; succeed_with "Fun/Top" (mkTcAxInstCo coe_ax index rep_tys)
+                      (mkAxInstRHS coe_ax index rep_tys) } } } } }
   where
     fam_ty = mkTyConApp fun_tc args
 

@@ -20,7 +20,7 @@ module IfaceSyn (
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
-        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
+        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..), IfaceAxBranch(..),
 
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
@@ -102,10 +102,10 @@ data IfaceDecl
                                                 --   with the class recursive?
     }
 
-  | IfaceAxiom { ifName   :: OccName       -- Axiom name
-               , ifTyVars :: [IfaceTvBndr] -- Axiom tyvars
-               , ifLHS    :: IfaceType     -- Axiom LHS
-               , ifRHS    :: IfaceType }   -- and RHS
+  | IfaceAxiom { ifName       :: OccName,        -- Axiom name
+                 ifTyCon      :: IfaceTyCon,     -- LHS TyCon
+                 ifAxBranches :: [IfaceAxBranch] -- Branches
+    }
 
   | IfaceForeign { ifName :: OccName,           -- Needs expanding when we move
                                                 -- beyond .NET
@@ -125,6 +125,11 @@ data IfaceATDefault = IfaceATD [IfaceTvBndr] [IfaceType] IfaceType
         --   1. TyVars of the RHS and family arguments (including the class TVs)
         --   3. The instantiated family arguments
         --   2. The RHS of the synonym
+
+-- this is just like CoAxBranch
+data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars :: [IfaceTvBndr]
+                                   , ifaxbLHS    :: [IfaceType]
+                                   , ifaxbRHS    :: IfaceType }
 
 data IfaceConDecls
   = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
@@ -165,11 +170,15 @@ data IfaceClsInst
         -- If this instance decl is *used*, we'll record a usage on the dfun;
         -- and if the head does not change it won't be used if it wasn't before
 
+-- The ifFamInstTys field of IfaceFamInst contains a list of the rough
+-- match types, one per branch... but each "rough match types" is itself
+-- a list of Maybe IfaceTyCon. So, we get [[Maybe IfaceTyCon]].
 data IfaceFamInst
-  = IfaceFamInst { ifFamInstFam   :: IfExtName           -- Family name
-                 , ifFamInstTys   :: [Maybe IfaceTyCon]  -- Rough match types
-                 , ifFamInstAxiom :: IfExtName           -- The axiom
-                 , ifFamInstOrph  :: Maybe OccName       -- Just like IfaceClsInst
+  = IfaceFamInst { ifFamInstFam   :: IfExtName            -- Family name
+                 , ifFamInstGroup :: Bool                 -- Is this a group?
+                 , ifFamInstTys   :: [[Maybe IfaceTyCon]] -- See above
+                 , ifFamInstAxiom :: IfExtName            -- The axiom
+                 , ifFamInstOrph  :: Maybe OccName        -- Just like IfaceClsInst
                  }
 
 data IfaceRule
@@ -517,10 +526,13 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
                 sep (map ppr ats),
                 sep (map ppr sigs)])
 
-pprIfaceDecl (IfaceAxiom {ifName = name, ifTyVars = tyvars,
-                          ifLHS = lhs, ifRHS = rhs})
-  = hang (ptext (sLit "axiom") <+> ppr name <+> ppr tyvars)
-       2 (dcolon <+> ppr lhs <+> text "~#" <+> ppr rhs)
+pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branches })
+  = hang (ptext (sLit "axiom") <+> ppr name <> colon)
+       2 (vcat $ map (pprIfaceAxBranch tycon) branches)
+
+pprIfaceAxBranch :: IfaceTyCon -> IfaceAxBranch -> SDoc
+pprIfaceAxBranch tc (IfaceAxBranch { ifaxbTyVars = tyvars, ifaxbLHS = lhs, ifaxbRHS = rhs })
+  = pprIfaceTvBndrs tyvars <> dot <+> ppr (IfaceTyConApp tc lhs) <+> text "~#" <+> ppr rhs
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing = ptext (sLit "No C type associated")
@@ -606,10 +618,10 @@ instance Outputable IfaceClsInst where
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
-  ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcs,
+  ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcss,
                      ifFamInstAxiom = tycon_ax})
     = hang (ptext (sLit "family instance") <+>
-            ppr fam <+> brackets (pprWithCommas ppr_rough mb_tcs))
+            ppr fam <+> pprWithCommas (brackets . pprWithCommas ppr_rough) mb_tcss)
          2 (equals <+> ppr tycon_ax)
 
 ppr_rough :: Maybe IfaceTyCon -> SDoc
@@ -787,9 +799,16 @@ freeNamesIfDecl d@IfaceClass{} =
   fnList freeNamesIfAT     (ifATs d) &&&
   fnList freeNamesIfClsSig (ifSigs d)
 freeNamesIfDecl d@IfaceAxiom{} =
-  freeNamesIfTvBndrs (ifTyVars d) &&&
-  freeNamesIfType (ifLHS d) &&&
-  freeNamesIfType (ifRHS d)
+  freeNamesIfTc (ifTyCon d) &&&
+  fnList freeNamesIfAxBranch (ifAxBranches d)
+
+freeNamesIfAxBranch :: IfaceAxBranch -> NameSet
+freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars = tyvars
+                                   , ifaxbLHS    = lhs
+                                   , ifaxbRHS    = rhs }) =
+  freeNamesIfTvBndrs tyvars &&&
+  fnList freeNamesIfType lhs &&&
+  freeNamesIfType rhs
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
 freeNamesIfIdDetails (IfRecSelId tc _) = freeNamesIfTc tc
@@ -920,7 +939,7 @@ freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 -- ToDo: shouldn't we include IfaceIntTc & co.?
 
 freeNamesIfCo :: IfaceCoCon -> NameSet
-freeNamesIfCo (IfaceCoAx tc) = unitNameSet tc
+freeNamesIfCo (IfaceCoAx tc _) = unitNameSet tc
 -- ToDo: include IfaceIPCoAx? Probably not necessary.
 freeNamesIfCo _ = emptyNameSet
 

@@ -25,12 +25,10 @@ module Coercion (
         isReflCo_maybe,
         mkCoercionType,
 
-        -- ** Functions over coercion axioms
-        coAxiomSplitLHS,
-
 	-- ** Constructing coercions
         mkReflCo, mkCoVarCo, 
-        mkAxInstCo, mkAxInstRHS,
+        mkAxInstCo, mkUnbranchedAxInstCo, mkAxInstRHS,
+        mkUnbranchedAxInstRHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkNthCo, mkLRCo,
 	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
@@ -84,6 +82,7 @@ import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
 import TyCon
+import CoAxiom
 import Var
 import VarEnv
 import VarSet
@@ -143,9 +142,10 @@ data Coercion
 
   -- These are special
   | CoVarCo CoVar
-  | AxiomInstCo CoAxiom [Coercion]  -- The coercion arguments always *precisely*
-                                    -- saturate arity of CoAxiom.
-                                    -- See [Coercion axioms applied to coercions]
+  | AxiomInstCo (CoAxiom Branched) Int [Coercion]
+     -- The coercion arguments always *precisely* saturate arity of CoAxiom.
+     -- See [Coercion axioms applied to coercions]
+     -- See also [CoAxiom index]
   | UnsafeCo Type Type
   | SymCo Coercion
   | TransCo Coercion Coercion
@@ -222,6 +222,18 @@ Now we have
 
 which can be optimized to F g.
 
+Note [CoAxiom index]
+~~~~~~~~~~~~~~~~~~~~
+A CoAxiom has 1 or more branches. Each branch has contains a list
+of the free type variables in that branch, the LHS type patterns,
+and the RHS type for that branch. When we apply an axiom to a list
+of coercions, we must choose which branch of the axiom we wish to
+use, as the different branches may have different numbers of free
+type variables. (The number of type patterns is always the same
+among branches, but that doesn't quite concern us here.)
+
+The Int in the AxiomInstCo constructor is the 0-indexed number
+of the chosen branch.
 
 Note [Forall coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -292,24 +304,6 @@ may turn into
        C (Nth 0 g) ....
 Now (Nth 0 g) will optimise to Refl, but perhaps not instantly.
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Coercion axioms}
-%*                                                                      *
-%************************************************************************
-These functions are not in TyCon because they need knowledge about
-the type representation (from TypeRep)
-
-\begin{code}
--- If `ax :: F a ~ b`, and `F` is a family instance, returns (F, [a])
-coAxiomSplitLHS :: CoAxiom -> (TyCon, [Type])
-coAxiomSplitLHS ax
-  = case splitTyConApp_maybe (coAxiomLHS ax) of
-      Just (tc,tys) -> (tc,tys)
-      Nothing       -> pprPanic "coAxiomSplitLHS" (ppr ax)
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection{Coercion variables}
@@ -345,7 +339,7 @@ tyCoVarsOfCo (TyConAppCo _ cos)  = tyCoVarsOfCos cos
 tyCoVarsOfCo (AppCo co1 co2)     = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
 tyCoVarsOfCo (ForAllCo tv co)    = tyCoVarsOfCo co `delVarSet` tv
 tyCoVarsOfCo (CoVarCo v)         = unitVarSet v
-tyCoVarsOfCo (AxiomInstCo _ cos) = tyCoVarsOfCos cos
+tyCoVarsOfCo (AxiomInstCo _ _ cos) = tyCoVarsOfCos cos
 tyCoVarsOfCo (UnsafeCo ty1 ty2)  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 tyCoVarsOfCo (SymCo co)          = tyCoVarsOfCo co
 tyCoVarsOfCo (TransCo co1 co2)   = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
@@ -363,7 +357,7 @@ coVarsOfCo (TyConAppCo _ cos)  = coVarsOfCos cos
 coVarsOfCo (AppCo co1 co2)     = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (ForAllCo _ co)     = coVarsOfCo co
 coVarsOfCo (CoVarCo v)         = unitVarSet v
-coVarsOfCo (AxiomInstCo _ cos) = coVarsOfCos cos
+coVarsOfCo (AxiomInstCo _ _ cos) = coVarsOfCos cos
 coVarsOfCo (UnsafeCo _ _)      = emptyVarSet
 coVarsOfCo (SymCo co)          = coVarsOfCo co
 coVarsOfCo (TransCo co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
@@ -380,7 +374,7 @@ coercionSize (TyConAppCo _ cos)  = 1 + sum (map coercionSize cos)
 coercionSize (AppCo co1 co2)     = coercionSize co1 + coercionSize co2
 coercionSize (ForAllCo _ co)     = 1 + coercionSize co
 coercionSize (CoVarCo _)         = 1
-coercionSize (AxiomInstCo _ cos) = 1 + sum (map coercionSize cos)
+coercionSize (AxiomInstCo _ _ cos) = 1 + sum (map coercionSize cos)
 coercionSize (UnsafeCo ty1 ty2)  = typeSize ty1 + typeSize ty2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
@@ -420,7 +414,10 @@ ppr_co p (AppCo co1 co2)       = maybeParen p TyConPrec $
                                  pprCo co1 <+> ppr_co TyConPrec co2
 ppr_co p co@(ForAllCo {})      = ppr_forall_co p co
 ppr_co _ (CoVarCo cv)          = parenSymOcc (getOccName cv) (ppr cv)
-ppr_co p (AxiomInstCo con cos) = pprTypeNameApp p ppr_co (getName con) cos
+ppr_co p (AxiomInstCo con index cos)
+  = angleBrackets (pprPrefixApp p 
+                    (ppr (getName con) <> brackets (ppr index))
+                    (map (ppr_co TyConPrec) cos))
 
 ppr_co p co@(TransCo {}) = maybeParen p FunPrec $
                            case trans_co_list co [] of
@@ -464,11 +461,16 @@ ppr_forall_co p ty
 \end{code}
 
 \begin{code}
-pprCoAxiom :: CoAxiom -> SDoc
-pprCoAxiom ax
-  = sep [ ptext (sLit "axiom") <+> 
-            sep [ ppr ax, nest 2 (pprTvBndrs (co_ax_tvs ax)) ]
-        , nest 2 (dcolon <+> pprEqPred (Pair (co_ax_lhs ax) (co_ax_rhs ax))) ]
+pprCoAxiom :: CoAxiom br -> SDoc
+pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
+  = hang (ptext (sLit "axiom") <+> ppr ax <+> dcolon)
+       2 (vcat (map (pprCoAxBranch tc) $ fromBranchList branches))
+
+pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranch tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
+  = ptext (sLit "forall") <+> pprTvBndrs tvs <> dot <+> 
+      pprEqPred (Pair (mkTyConApp tc lhs) rhs)
+
 \end{code}
 
 %************************************************************************
@@ -559,31 +561,41 @@ mkCoVarCo cv
 mkReflCo :: Type -> Coercion
 mkReflCo = Refl
 
-mkAxInstCo :: CoAxiom -> [Type] -> Coercion
+mkAxInstCo :: CoAxiom br -> Int -> [Type] -> Coercion
 -- mkAxInstCo can legitimately be called over-staturated; 
 -- i.e. with more type arguments than the coercion requires
-mkAxInstCo ax tys
-  | arity == n_tys = AxiomInstCo ax rtys
+mkAxInstCo ax index tys
+  | arity == n_tys = AxiomInstCo ax_br index rtys
   | otherwise      = ASSERT( arity < n_tys )
-                     foldl AppCo (AxiomInstCo ax (take arity rtys))
+                     foldl AppCo (AxiomInstCo ax_br index (take arity rtys))
                                  (drop arity rtys)
   where
     n_tys = length tys
-    arity = coAxiomArity ax
+    arity = coAxiomArity ax index
     rtys  = map Refl tys
+    ax_br = toBranchedAxiom ax
 
-mkAxInstRHS :: CoAxiom -> [Type] -> Type
+-- to be used only with unbranched axioms
+mkUnbranchedAxInstCo :: CoAxiom Unbranched -> [Type] -> Coercion
+mkUnbranchedAxInstCo ax tys
+  = mkAxInstCo ax 0 tys
+
+mkAxInstRHS :: CoAxiom br -> Int -> [Type] -> Type
 -- Instantiate the axiom with specified types,
 -- returning the instantiated RHS
 -- A companion to mkAxInstCo: 
---    mkAxInstRhs ax tys = snd (coercionKind (mkAxInstCo ax tys))
-mkAxInstRHS ax tys
+--    mkAxInstRhs ax index tys = snd (coercionKind (mkAxInstCo ax index tys))
+mkAxInstRHS ax index tys
   = ASSERT( tvs `equalLength` tys1 ) 
     mkAppTys rhs' tys2
   where
-    tvs          = coAxiomTyVars ax
+    branch       = coAxiomNthBranch ax index
+    tvs          = coAxBranchTyVars branch
     (tys1, tys2) = splitAtList tvs tys
-    rhs'         = substTyWith tvs tys1 (coAxiomRHS ax)
+    rhs'         = substTyWith tvs tys1 (coAxBranchRHS branch)
+
+mkUnbranchedAxInstRHS :: CoAxiom Unbranched -> [Type] -> Type
+mkUnbranchedAxInstRHS ax = mkAxInstRHS ax 0
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 mkAppCo :: Coercion -> Coercion -> Coercion
@@ -686,14 +698,16 @@ mkUnsafeCo ty1 ty2 = UnsafeCo ty1 ty2
 --   'CoAxiom', the 'TyVar's the arguments expected by the @newtype@ and
 --   the type the appropriate right hand side of the @newtype@, with
 --   the free variables a subset of those 'TyVar's.
-mkNewTypeCo :: Name -> TyCon -> [TyVar] -> Type -> CoAxiom
+mkNewTypeCo :: Name -> TyCon -> [TyVar] -> Type -> CoAxiom Unbranched
 mkNewTypeCo name tycon tvs rhs_ty
   = CoAxiom { co_ax_unique   = nameUnique name
             , co_ax_name     = name
             , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
-            , co_ax_tvs      = tvs
-            , co_ax_lhs      = mkTyConApp tycon (mkTyVarTys tvs)
-            , co_ax_rhs      = rhs_ty }
+            , co_ax_tc       = tycon
+            , co_ax_branches = FirstBranch branch }
+  where branch = CoAxBranch { cab_tvs = tvs
+                            , cab_lhs = mkTyVarTys tvs
+                            , cab_rhs = rhs_ty }
 
 mkPiCos :: [Var] -> Coercion -> Coercion
 mkPiCos vs co = foldr mkPiCo co vs
@@ -729,7 +743,7 @@ instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)
 instNewTyCon_maybe tc tys
   | Just (tvs, ty, co_tc) <- unwrapNewTyCon_maybe tc
   = ASSERT( tys `lengthIs` tyConArity tc )
-    Just (substTyWith tvs tys ty, mkAxInstCo co_tc tys)
+    Just (substTyWith tvs tys ty, mkUnbranchedAxInstCo co_tc tys)
   | otherwise
   = Nothing
 
@@ -773,8 +787,9 @@ coreEqCoercion2 env (ForAllCo v1 co1) (ForAllCo v2 co2)
 coreEqCoercion2 env (CoVarCo cv1) (CoVarCo cv2)
   = rnOccL env cv1 == rnOccR env cv2
 
-coreEqCoercion2 env (AxiomInstCo con1 cos1) (AxiomInstCo con2 cos2)
+coreEqCoercion2 env (AxiomInstCo con1 ind1 cos1) (AxiomInstCo con2 ind2 cos2)
   = con1 == con2
+    && ind1 == ind2
     && all2 (coreEqCoercion2 env) cos1 cos2
 
 coreEqCoercion2 env (UnsafeCo ty11 ty12) (UnsafeCo ty21 ty22)
@@ -926,7 +941,7 @@ subst_co subst co
                                  (subst', tv') ->
                                    ForAllCo tv' $! subst_co subst' co
     go (CoVarCo cv)          = substCoVar subst cv
-    go (AxiomInstCo con cos) = AxiomInstCo con $! map go cos
+    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! map go cos
     go (UnsafeCo ty1 ty2)    = (UnsafeCo $! go_ty ty1) $! go_ty ty2
     go (SymCo co)            = mkSymCo (go co)
     go (TransCo co1 co2)     = mkTransCo (go co1) (go co2)
@@ -1100,7 +1115,7 @@ seqCo (TyConAppCo tc cos)   = tc `seq` seqCos cos
 seqCo (AppCo co1 co2)       = seqCo co1 `seq` seqCo co2
 seqCo (ForAllCo tv co)      = tv `seq` seqCo co
 seqCo (CoVarCo cv)          = cv `seq` ()
-seqCo (AxiomInstCo con cos) = con `seq` seqCos cos
+seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
 seqCo (UnsafeCo ty1 ty2)    = seqType ty1 `seq` seqType ty2
 seqCo (SymCo co)            = seqCo co
 seqCo (TransCo co1 co2)     = seqCo co1 `seq` seqCo co2
@@ -1140,9 +1155,12 @@ coercionKind co = go co
     go (AppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
     go (ForAllCo tv co)     = mkForAllTy tv <$> go co
     go (CoVarCo cv)         = toPair $ coVarKind cv
-    go (AxiomInstCo ax cos) = let Pair tys1 tys2 = sequenceA $ map go cos 
-                              in  Pair (substTyWith (co_ax_tvs ax) tys1 (co_ax_lhs ax)) 
-                                       (substTyWith (co_ax_tvs ax) tys2 (co_ax_rhs ax))
+    go (AxiomInstCo ax ind cos)
+      = let branch         = coAxiomNthBranch ax ind
+            tvs            = coAxBranchTyVars branch
+            Pair tys1 tys2 = sequenceA $ map go cos 
+        in  Pair (substTyWith tvs tys1 (coAxNthLHS ax ind))
+                 (substTyWith tvs tys2 (coAxBranchRHS branch))
     go (UnsafeCo ty1 ty2)   = Pair ty1 ty2
     go (SymCo co)           = swap $ go co
     go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)

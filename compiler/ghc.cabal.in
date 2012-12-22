@@ -384,6 +384,7 @@ Library
         FunDeps
         InstEnv
         TyCon
+        CoAxiom
         Kind
         Type
         TypeRep

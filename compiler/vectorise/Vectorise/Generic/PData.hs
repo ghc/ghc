@@ -27,7 +27,7 @@ import Control.Monad
 
 -- buildPDataTyCon ------------------------------------------------------------
 -- | Build the PData instance tycon for a given type constructor.
-buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
+buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
 buildPDataTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst
@@ -38,7 +38,7 @@ buildPDataTyCon orig_tc vect_tc repr
  where
     orig_name = tyConName orig_tc
 
-buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM FamInst
+buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM (FamInst Unbranched)
 buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
@@ -85,7 +85,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
 
 -- buildPDatasTyCon -----------------------------------------------------------
 -- | Build the PDatas instance tycon for a given type constructor.
-buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
+buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
 buildPDatasTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst
