@@ -29,9 +29,13 @@ module GHC.TypeLits
   , type (<=), type (<=?), type (+), type (*), type (^)
   , type (-)
 
+    -- * Comparing for equality
+  , type (:~:) (..), eqSingNat, eqSingSym
+
     -- * Destructing type-nat singletons.
   , isZero, IsZero(..)
   , isEven, IsEven(..)
+
 
     -- * Matching on type-nats
   , Nat1(..), FromNat1
@@ -214,5 +218,41 @@ data Nat1 = Zero | Succ Nat1
 type family FromNat1 (n :: Nat1) :: Nat
 type instance FromNat1 Zero     = 0
 type instance FromNat1 (Succ n) = 1 + FromNat1 n
+
+--------------------------------------------------------------------------------
+
+-- | A type that provides evidence for equality between two types.
+data (:~:) :: k -> k -> * where
+  Refl :: a :~: a
+
+instance Show (a :~: b) where
+  show Refl = "Refl"
+
+{- | Check if two type-natural singletons of potentially different types
+are indeed the same, by comparing their runtime representations.
+
+WARNING: in combination with `unsafeSingNat` this may lead to unsoudness:
+
+> eqSingNat (sing :: Sing 1) (unsafeSingNat 1 :: Sing 2)
+> == Just (Refl :: 1 :~: 2)
+-}
+
+eqSingNat :: Sing (m :: Nat) -> Sing (n :: Nat) -> Maybe (m :~: n)
+eqSingNat x y
+  | fromSing x == fromSing y  = Just (unsafeCoerce Refl)
+  | otherwise                 = Nothing
+
+
+{- | Check if two symbol singletons of potentially different types
+are indeed the same, by comparing their runtime representations.
+WARNING: in combination with `unsafeSingSymbol` this may lead to unsoudness
+(see `eqSingNat` for an example).
+-}
+
+eqSingSym:: Sing (m :: Symbol) -> Sing (n :: Symbol) -> Maybe (m :~: n)
+eqSingSym x y
+  | fromSing x == fromSing y  = Just (unsafeCoerce Refl)
+  | otherwise                 = Nothing
+
 
 
