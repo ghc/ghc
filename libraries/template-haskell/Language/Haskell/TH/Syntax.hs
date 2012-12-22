@@ -1170,7 +1170,19 @@ data Dec
   | NewtypeInstD Cxt Name [Type]
          Con [Name]               -- ^ @{ newtype instance Cxt x => T [x] = A (B x)
                                   --       deriving (Z,W)}@
-  | TySynInstD Name [Type] Type   -- ^ @{ type instance T (Maybe x) = (x,x) }@
+  | TySynInstD Name [TySynEqn]    -- ^
+                                  -- @
+                                  -- { type instance where { T ... = ... 
+                                  --                       ; T ... = ... } }
+                                  -- @
+                                  --
+                                  --  @type instance T ... = ...@ is used when
+                                  --  the list has length 1
+  deriving( Show, Eq, Data, Typeable )
+
+-- | One equation of a (branched) type family instance. The arguments are the
+-- left-hand-side type patterns and the right-hand-side result.
+data TySynEqn = TySynEqn [Type] Type
   deriving( Show, Eq, Data, Typeable )
 
 data FunDep = FunDep [Name] [Name]

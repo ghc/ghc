@@ -36,6 +36,7 @@ type StrictTypeQ    = Q StrictType
 type VarStrictTypeQ = Q VarStrictType
 type FieldExpQ      = Q FieldExp
 type RuleBndrQ      = Q RuleBndr
+type TySynEqnQ      = Q TySynEqn
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -423,12 +424,18 @@ newtypeInstD ctxt tc tys con derivs =
     con1  <- con
     return (NewtypeInstD ctxt1 tc tys1 con1 derivs)
 
-tySynInstD :: Name -> [TypeQ] -> TypeQ -> DecQ
-tySynInstD tc tys rhs = 
+tySynInstD :: Name -> [TySynEqnQ] -> DecQ
+tySynInstD tc eqns = 
   do 
-    tys1 <- sequence tys
+    eqns1 <- sequence eqns
+    return (TySynInstD tc eqns1)
+
+tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
+tySynEqn lhs rhs =
+  do
+    lhs1 <- sequence lhs
     rhs1 <- rhs
-    return (TySynInstD tc tys1 rhs1)
+    return (TySynEqn lhs1 rhs1)
 
 cxt :: [PredQ] -> CxtQ
 cxt = sequence

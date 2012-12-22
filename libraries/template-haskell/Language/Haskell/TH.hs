@@ -52,7 +52,7 @@ module Language.Haskell.TH(
 	Dec(..), Con(..), Clause(..), 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	Inline(..), RuleMatch(..), Phases(..), RuleBndr(..),
-	FunDep(..), FamFlavour(..),
+	FunDep(..), FamFlavour(..), TySynEqn(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
@@ -65,7 +65,7 @@ module Language.Haskell.TH(
     -- ** Abbreviations
         InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ, MatchQ, ClauseQ,
         BodyQ, GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
-        RuleBndrQ,
+        RuleBndrQ, TySynEqnQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -116,7 +116,7 @@ module Language.Haskell.TH(
     -- **** Type Family / Data Family
     familyNoKindD, familyKindD, dataInstD,
     newtypeInstD, tySynInstD,
-    typeFam, dataFam,
+    typeFam, dataFam, tySynEqn,
     -- **** Foreign Function Interface (FFI)
     cCall, stdCall, unsafe, safe, forImpD,
     -- **** Pragmas
