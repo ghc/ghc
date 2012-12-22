@@ -126,22 +126,20 @@ toInstalledDescription = hmi_description . instInfo
 restrictTo :: [Name] -> LHsDecl Name -> LHsDecl Name
 restrictTo names (L loc decl) = L loc $ case decl of
   TyClD d | isDataDecl d  -> 
-    TyClD (d { tcdTyDefn = restrictTyDefn names (tcdTyDefn d) })
+    TyClD (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
   TyClD d | isClassDecl d ->
     TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
                tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
 
-restrictTyDefn :: [Name] -> HsTyDefn Name -> HsTyDefn Name
-restrictTyDefn _ defn@(TySynonym {})
-  = defn
-restrictTyDefn names defn@(TyData { td_ND = new_or_data, td_cons = cons })
+restrictDataDefn :: [Name] -> HsDataDefn Name -> HsDataDefn Name
+restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
   | DataType <- new_or_data
-  = defn { td_cons = restrictCons names cons }
+  = defn { dd_cons = restrictCons names cons }
   | otherwise    -- Newtype
   = case restrictCons names cons of
-      []    -> defn { td_ND = DataType, td_cons = [] }
-      [con] -> defn { td_cons = [con] }
+      []    -> defn { dd_ND = DataType, dd_cons = [] }
+      [con] -> defn { dd_cons = [con] }
       _ -> error "Should not happen"
 
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
@@ -169,8 +167,8 @@ restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
 restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 
 
-restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]
-restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
+restrictATs :: [Name] -> [LFamilyDecl Name] -> [LFamilyDecl Name]
+restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
 emptyHsQTvs :: LHsTyVarBndrs Name
 -- This function is here, rather than in HsTypes, because it *renamed*, but

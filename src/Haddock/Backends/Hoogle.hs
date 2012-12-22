@@ -112,9 +112,8 @@ operator x = x
 ppExport :: DynFlags -> ExportItem Name -> [String]
 ppExport dflags (ExportDecl decl dc subdocs _) = ppDocumentation dflags (fst dc) ++ f (unL decl)
     where
-        f (TyClD d@TyDecl{})
-            | isDataDecl d      = ppData dflags d subdocs
-            | otherwise         = ppSynonym dflags d
+        f (TyClD d@DataDecl{})  = ppData dflags d subdocs
+        f (TyClD d@SynDecl{})   = ppSynonym dflags d
         f (TyClD d@ClassDecl{}) = ppClass dflags d
         f (ForD (ForeignImport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
         f (ForD (ForeignExport name typ _ _)) = ppSig dflags $ TypeSig [name] typ
@@ -145,8 +144,8 @@ ppClass dflags x = out dflags x{tcdSigs=[]} :
         f (HsForAllTy a b con d) = HsForAllTy a b (reL (context : unLoc con)) d
         f t = HsForAllTy Implicit emptyHsQTvs (reL [context]) (reL t)
 
-        context = nlHsTyConApp (unL $ tcdLName x)
-            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tcdTyVars x)))
+        context = nlHsTyConApp (tcdName x)
+            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tyClDeclTyVars x)))
 
 
 ppInstance :: DynFlags -> ClsInst -> [String]
@@ -157,9 +156,9 @@ ppSynonym :: DynFlags -> TyClDecl Name -> [String]
 ppSynonym dflags x = [out dflags x]
 
 ppData :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppData dflags decl@(TyDecl { tcdTyDefn = defn }) subdocs
-    = showData decl{ tcdTyDefn = defn { td_cons=[],td_derivs=Nothing }} :
-      concatMap (ppCtor dflags decl subdocs . unL) (td_cons defn)
+ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
+    = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=Nothing }} :
+      concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
     where
         
         -- GHC gives out "data Bar =", we want to delete the equals
@@ -167,7 +166,7 @@ ppData dflags decl@(TyDecl { tcdTyDefn = defn }) subdocs
         showData d = unwords $ map f $ if last xs == "=" then init xs else xs
             where
                 xs = words $ out dflags d
-                nam = out dflags $ tcdLName d
+                nam = out dflags $ tyClDeclLName d
                 f w = if w == nam then operator nam else w
 ppData _ _ _ = panic "ppData"
 
@@ -196,7 +195,7 @@ ppCtor dflags dat subdocs con = lookupCon dflags subdocs (con_name con)
 
         resType = case con_res con of
             ResTyH98 -> apps $ map (reL . HsTyVar) $ 
-                        unL (tcdLName dat) : [hsTyVarName v | L _ (v@UserTyVar {}) <- hsQTvBndrs $ tcdTyVars dat]
+                        (tcdName dat) : [hsTyVarName v | L _ (v@UserTyVar {}) <- hsQTvBndrs $ tyClDeclTyVars dat]
             ResTyGADT x -> x
 
 

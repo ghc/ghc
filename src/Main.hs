@@ -54,11 +54,11 @@ import qualified GHC.Paths as GhcPaths
 import Paths_haddock
 #endif
 
-import GHC hiding (flags, verbosity)
+import GHC hiding (verbosity)
 import Config
-import DynFlags hiding (flags, verbosity)
+import DynFlags hiding (verbosity)
 import StaticFlags (saveStaticFlagGlobals, restoreStaticFlagGlobals)
-import Panic (panic, handleGhcException)
+import Panic (handleGhcException)
 import Module
 
 import Control.Monad.Fix (MonadFix)

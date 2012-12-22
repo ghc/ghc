@@ -243,7 +243,7 @@ ppDocGroup lev doc = sec lev <> braces doc
 
 declNames :: LHsDecl DocName -> [DocName]
 declNames (L _ decl) = case decl of
-  TyClD d  -> [unLoc $ tcdLName d]
+  TyClD d  -> [tcdName d]
   SigD (TypeSig lnames _) -> map unLoc lnames
   _ -> error "declaration not supported by declNames"
 
@@ -275,10 +275,10 @@ ppDecl :: LHsDecl DocName
        -> LaTeX
 
 ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
-  TyClD d@(TyFamily {})          -> ppTyFam False loc doc d unicode
-  TyClD d@(TyDecl{ tcdTyDefn = defn })   
-      | isHsDataDefn defn        -> ppDataDecl instances subdocs loc doc d unicode
-      | otherwise                -> ppTySyn loc (doc, fnArgsDoc) d unicode
+  TyClD d@(FamDecl {})          -> ppTyFam False loc doc d unicode
+  TyClD d@(DataDecl {})   
+                                -> ppDataDecl instances subdocs loc doc d unicode
+  TyClD d@(SynDecl {})          -> ppTySyn loc (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
 --  TyClD d@(TySynonym {})         
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
@@ -311,8 +311,8 @@ ppFor _ _ _ _ =
 -- we skip type patterns for now
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
 
-ppTySyn loc doc (TyDecl { tcdLName = L _ name, tcdTyVars = ltyvars
-                        , tcdTyDefn = TySynonym { td_synRhs = ltype } }) unicode
+ppTySyn loc doc (SynDecl { tcdLName = L _ name, tcdTyVars = ltyvars
+                         , tcdRhs = ltype }) unicode
   = ppTypeOrFunSig loc [name] (unLoc ltype) doc (full, hdr, char '=') unicode
   where
     hdr  = hsep (keyword "type" : ppDocBinder name : ppTyVars ltyvars)
@@ -549,7 +549,7 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
    $$ instancesBit
 
   where
-    cons      = td_cons (tcdTyDefn dataDecl)
+    cons      = dd_cons (tcdDataDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
     body = catMaybes [constrBit, documentationToLaTeX doc]
@@ -694,8 +694,8 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: TyClDecl DocName -> Bool -> LaTeX
-ppDataHeader (TyDecl { tcdLName = L _ name, tcdTyVars = tyvars
-                     , tcdTyDefn = TyData { td_ND = nd, td_ctxt = ctxt } }) unicode
+ppDataHeader (DataDecl { tcdLName = L _ name, tcdTyVars = tyvars
+                       , tcdDataDefn = HsDataDefn { dd_ND = nd, dd_ctxt = ctxt } }) unicode
   = -- newtype or data
     (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
     -- context

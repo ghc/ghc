@@ -268,7 +268,7 @@ mkMaps dflags gre instances decls = do
     instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
 
     names :: HsDecl Name -> [Name]
-    names (InstD (ClsInstD { cid_poly_ty = L l _ })) = maybeToList (M.lookup l instanceMap)  -- See note [2].
+    names (InstD (ClsInstD (ClsInstDecl { cid_poly_ty = L l _ }))) = maybeToList (M.lookup l instanceMap)  -- See note [2].
     names decl = getMainDeclBinder decl
 
 -- Note [2]:
@@ -296,7 +296,7 @@ subordinates (TyClD decl)
                 ]
     dataSubs = constrs ++ fields
       where
-        cons = map unL $ (td_cons (tcdTyDefn decl))
+        cons = map unL $ (dd_cons (tcdDataDefn decl))
         constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c, M.empty)
                   | c <- cons ]
         fields  = [ (unL n, maybeToList $ fmap unL doc, M.empty)
@@ -312,7 +312,7 @@ typeDocs d =
   case d of
     SigD (TypeSig _ ty) -> docs (unLoc ty)
     ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
-    TyClD (TyDecl { tcdTyDefn = TySynonym {td_synRhs = ty}}) -> docs (unLoc ty)
+    TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
     _ -> M.empty
   where
     go n (HsForAllTy _ _ _ ty) = go n (unLoc ty)
@@ -331,7 +331,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
     docs  = mkDecls tcdDocs DocD class_
     defs  = mkDecls (bagToList . tcdMeths) ValD class_
     sigs  = mkDecls tcdSigs SigD class_
-    ats   = mkDecls tcdATs TyClD class_
+    ats   = mkDecls tcdATs (TyClD . FamDecl) class_
 
 
 -- | The top-level declarations of a module that we care about,
@@ -374,7 +374,11 @@ warnAboutFilteredDecls :: DynFlags -> Module -> [LHsDecl Name] -> ErrMsgM ()
 warnAboutFilteredDecls dflags mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
-        nub [ unLoc (fid_tycon d) | L _ (InstD (FamInstD { lid_inst = d })) <- decls ]
+        nub (concat [[ unLoc (tfie_tycon eqn)
+                     | L _ (InstD (TyFamInstD (TyFamInstDecl { tfid_eqns = eqns }))) <- decls
+                     , L _ eqn <- eqns ],
+                     [ unLoc (dfid_tycon d)
+                     | L _ (InstD (DataFamInstD { dfid_inst = d })) <- decls ]])
 
   unless (null typeInstances) $
     tell [
@@ -383,8 +387,11 @@ warnAboutFilteredDecls dflags mdl decls = do
       ++ "will be filtered out:\n  " ++ (intercalate ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
-  let instances = nub [ pretty dflags i | L _ (InstD (ClsInstD { cid_poly_ty = i, cid_fam_insts = ats })) <- decls
-                                 , not (null ats) ]
+  let instances = nub [ pretty dflags i | L _ (InstD (ClsInstD (ClsInstDecl
+                                                { cid_poly_ty = i
+                                                , cid_tyfam_insts = ats
+                                                , cid_datafam_insts = adts }))) <- decls
+                                 , not (null ats) || not (null adts) ]
 
   unless (null instances) $
     tell [
@@ -734,11 +741,11 @@ extractDecl name mdl decl
           _ -> error "internal: extractDecl"
       TyClD d | isDataDecl d ->
         let (n, tyvar_names) = name_and_tyvars d
-            L pos sig = extractRecSel name mdl n tyvar_names (td_cons (tcdTyDefn d))
+            L pos sig = extractRecSel name mdl n tyvar_names (dd_cons (tcdDataDefn d))
         in L pos (SigD sig)
       _ -> error "internal: extractDecl"
   where
-    name_and_tyvars d = (unLoc (tcdLName d), hsLTyVarLocNames (tcdTyVars d))
+    name_and_tyvars d = (tcdName d, hsLTyVarLocNames (tyClDeclTyVars d))
 
 
 toTypeNoLoc :: Located Name -> LHsType Name
