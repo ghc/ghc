@@ -1,6 +1,11 @@
 
-SimpleFail2a.hs:11:3:
+SimpleFail2a.hs:11:11:
     Type indexes must match class instance head
     Found `a' but expected `Int'
-    In the data instance declaration for `Sd'
+    In the data declaration for `Sd'
     In the instance declaration for `C Int'
+
+SimpleFail2a.hs:11:11:
+    Conflicting family instance declarations:
+      Sd a -- Defined at SimpleFail2a.hs:11:11
+      Sd Int -- Defined at SimpleFail2a.hs:12:11

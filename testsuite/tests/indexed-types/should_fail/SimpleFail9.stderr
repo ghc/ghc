@@ -1,6 +1,6 @@
 
-SimpleFail9.hs:13:3:
+SimpleFail9.hs:13:8:
     Type indexes must match class instance head
     Found `(b, Int)' but expected `(a, Int)'
-    In the data instance declaration for `S7'
+    In the data declaration for `S7'
     In the instance declaration for `C7 Char (a, Int)'
