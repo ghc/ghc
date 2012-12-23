@@ -7,7 +7,6 @@
            , TypeSynonymInstances
            , FlexibleInstances
   #-}
-
 module GHC.Event.Manager
     ( -- * Types
       EventManager
@@ -22,6 +21,7 @@ module GHC.Event.Manager
     , loop
     , step
     , shutdown
+    , release
     , cleanup
     , wakeManager
 
@@ -48,8 +48,9 @@ module GHC.Event.Manager
 ------------------------------------------------------------------------
 -- Imports
 
-import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar)
-import Control.Exception (finally)
+import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar, putMVar,
+                                tryPutMVar, takeMVar)
+import Control.Exception (onException)
 import Control.Monad ((=<<), forM_, liftM, sequence_, when, replicateM, void)
 import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
@@ -104,6 +105,7 @@ type IOCallback = FdKey -> Event -> IO ()
 data State = Created
            | Running
            | Dying
+           | Releasing
            | Finished
              deriving (Eq, Show)
 
@@ -115,6 +117,7 @@ data EventManager = EventManager
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
     , emOneShot      :: !Bool
+    , emLock         :: MVar ()
     }
 
 callbackArraySize :: Int
@@ -165,12 +168,14 @@ newWith oneShot be = do
                when (st /= Finished) $ do
                  I.delete be
                  closeControl ctrl
+  lockVar <- newMVar ()
   let mgr = EventManager { emBackend = be
                          , emFds = iofds
                          , emState = state
                          , emUniqueSource = us
                          , emControl = ctrl
                          , emOneShot = oneShot
+                         , emLock = lockVar
                          }
   registerControlFd mgr (controlReadFd ctrl) evtRead
   registerControlFd mgr (wakeupReadFd ctrl) evtRead
@@ -185,12 +190,20 @@ shutdown mgr = do
   state <- atomicModifyIORef (emState mgr) $ \s -> (Dying, s)
   when (state == Running) $ sendDie (emControl mgr)
 
+-- | Asynchronously tell the thread executing the event
+-- manager loop to exit.
+release :: EventManager -> IO ()
+release EventManager{..} = do
+  state <- atomicModifyIORef emState $ \s -> (Releasing, s)
+  when (state == Running) $ sendWakeup emControl
+
 finished :: EventManager -> IO Bool
 finished mgr = (== Finished) `liftM` readIORef (emState mgr)
 
 cleanup :: EventManager -> IO ()
 cleanup EventManager{..} = do
   writeIORef emState Finished
+  void $ tryPutMVar emLock ()
   I.delete emBackend
   closeControl emControl
 
@@ -204,24 +217,30 @@ cleanup EventManager{..} = do
 -- closes all of its control resources when it finishes.
 loop :: EventManager -> IO ()
 loop mgr@EventManager{..} = do
+  void $ takeMVar emLock
   state <- atomicModifyIORef emState $ \s -> case s of
     Created -> (Running, s)
+    Releasing -> (Running, s)
     _       -> (s, s)
   case state of
-    Created -> go `finally` cleanup mgr
-    Dying   -> cleanup mgr
-    _       -> do cleanup mgr
-                  error $ "GHC.Event.Manager.loop: state is already " ++
-                      show state
+    Created   -> go `onException` cleanup mgr
+    Releasing -> go `onException` cleanup mgr
+    Dying     -> cleanup mgr
+    _         -> do cleanup mgr
+                    error $ "GHC.Event.Manager.loop: state is already " ++
+                            show state
  where
-  go = do running <- step mgr
-          when running (yield >> go)
+  go = do state <- step mgr
+          case state of
+            Running   -> yield >> go
+            Releasing -> putMVar emLock ()
+            _         -> cleanup mgr
 
-step :: EventManager -> IO Bool
+step :: EventManager -> IO State
 step mgr@EventManager{..} = do
   waitForIO
   state <- readIORef emState
-  state `seq` return (state == Running)
+  state `seq` return state
   where
     waitForIO = do
       n1 <- I.poll emBackend Nothing (onFdEvent mgr)
