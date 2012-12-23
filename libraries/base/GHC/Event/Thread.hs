@@ -25,7 +25,7 @@ import Foreign.Ptr (Ptr)
 import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
-                      numCapabilities, threadCapability, myThreadId, forkOn,
+                      getNumCapabilities, threadCapability, myThreadId, forkOn,
                       threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
@@ -175,7 +175,8 @@ foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
 
 eventManager :: IORef (IOArray Int (Maybe (ThreadId, EventManager)))
 eventManager = unsafePerformIO $ do
-    eventManagerArray <- newIOArray (0, numCapabilities - 1) Nothing
+    numCaps <- getNumCapabilities
+    eventManagerArray <- newIOArray (0, numCaps - 1) Nothing
     em <- newIORef eventManagerArray
     sharedCAF em getOrSetSystemEventThreadEventManagerStore
 {-# NOINLINE eventManager #-}
