@@ -198,7 +198,7 @@ synifyDataCon use_gadt_syntax dc = noLoc $
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
                 src_bang = case bang of
-                             HsUnpack -> HsBang True
+                             HsUnpack {} -> HsBang True
                              HsStrict -> HsBang False
                              _        -> bang
             in case src_bang of
