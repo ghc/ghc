@@ -16,7 +16,7 @@ import DynFlags
 import TcRnMonad
 import FamInst
 import TcEnv
-import TcTyClsDecls( tcFamTyPats, tcAddFamInstCtxt )
+import TcTyClsDecls( tcFamTyPats, tcAddDataFamInstCtxt )
 import TcClassDcl( tcAddDeclCtxt )      -- Small helper
 import TcGenDeriv                       -- Deriv stuff
 import TcGenGenerics
@@ -43,6 +43,7 @@ import RdrName
 import Name
 import NameSet
 import TyCon
+import CoAxiom
 import TcType
 import Var
 import VarSet
@@ -348,8 +349,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
-                   -> Bag TyCon    -- ^ Empty data constructors
-                   -> Bag FamInst  -- ^ Rep type family instances
+                   -> Bag TyCon                 -- ^ Empty data constructors
+                   -> Bag (FamInst Unbranched)  -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
@@ -363,6 +364,12 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
+-- Prints the representable type family instance
+pprRepTy :: FamInst Unbranched -> SDoc
+pprRepTy fi@(FamInst { fi_branches = FirstBranch (FamInstBranch { fib_lhs = lhs
+                                                                , fib_rhs = rhs }) })
+  = ptext (sLit "type") <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
+      equals <+> ppr rhs 
 
 
 -- As of 24 April 2012, this only shares MetaTyCons between derivations of
@@ -379,13 +386,6 @@ commonAuxiliaries = foldM snoc ([], emptyBag) where
            | any ((rep_tycon ==) . fst) cas = return acc
            | otherwise = do (ca, new_stuff) <- m
                             return $ ((rep_tycon, ca) : cas, stuff `unionBags` new_stuff)
-
-
-
--- Prints the representable type family instance
-pprRepTy :: FamInst -> SDoc
-pprRepTy fi
-  = pprFamInstHdr fi <+> ptext (sLit "=") <+> ppr (coAxiomRHS (famInstAxiom fi))
 
 renameDeriv :: Bool
             -> [InstInfo RdrName]
@@ -487,8 +487,8 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
 ------------------------------------------------------------------
 deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
-deriveTyDecl (L _ decl@(TyDecl { tcdLName = L _ tc_name
-                               , tcdTyDefn = TyData { td_derivs = Just preds } }))
+deriveTyDecl (L _ decl@(DataDecl { tcdLName = L _ tc_name
+                                 , tcdDataDefn = HsDataDefn { dd_derivs = Just preds } }))
   = tcAddDeclCtxt decl $
     do { tc <- tcLookupTyCon tc_name
        ; let tvs = tyConTyVars tc
@@ -499,16 +499,17 @@ deriveTyDecl _ = return []
 
 ------------------------------------------------------------------
 deriveInstDecl :: LInstDecl Name -> TcM [EarlyDerivSpec]
-deriveInstDecl (L _ (FamInstD { lid_inst = fam_inst }))
+deriveInstDecl (L _ (TyFamInstD {})) = return []
+deriveInstDecl (L _ (DataFamInstD { dfid_inst = fam_inst }))
   = deriveFamInst fam_inst
-deriveInstDecl (L _ (ClsInstD { cid_fam_insts = fam_insts }))
+deriveInstDecl (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fam_insts } }))
   = concatMapM (deriveFamInst . unLoc) fam_insts
 
 ------------------------------------------------------------------
-deriveFamInst :: FamInstDecl Name -> TcM [EarlyDerivSpec]
-deriveFamInst decl@(FamInstDecl { fid_tycon = L _ tc_name, fid_pats = pats
-                                , fid_defn = TyData { td_derivs = Just preds } })
-  = tcAddFamInstCtxt decl $
+deriveFamInst :: DataFamInstDecl Name -> TcM [EarlyDerivSpec]
+deriveFamInst decl@(DataFamInstDecl { dfid_tycon = L _ tc_name, dfid_pats = pats
+                                    , dfid_defn = HsDataDefn { dd_derivs = Just preds } })
+  = tcAddDataFamInstCtxt decl $
     do { fam_tc <- tcLookupTyCon tc_name
        ; tcFamTyPats fam_tc pats (\_ -> return ()) $ \ tvs' pats' _ ->
          mapM (deriveTyData tvs' fam_tc pats') preds }
@@ -1527,10 +1528,10 @@ genInst standalone_deriv oflag comauxs
 
     inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
-              Just co_con -> mkTcAxInstCo co_con rep_tc_args
+              Just co_con -> mkTcUnbranchedAxInstCo co_con rep_tc_args
               Nothing     -> id_co
               -- Not a family => rep_tycon = main tycon
-    co2 = mkTcAxInstCo (newTyConCo rep_tycon) rep_tc_args
+    co2 = mkTcUnbranchedAxInstCo (newTyConCo rep_tycon) rep_tc_args
     co  = mkTcForAllCos tvs (co1 `mkTcTransCo` co2)
     id_co = mkTcReflCo (mkTyConApp rep_tycon rep_tc_args)
 

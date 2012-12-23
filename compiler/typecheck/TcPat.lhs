@@ -753,7 +753,7 @@ matchExpectedConTy data_tc pat_ty
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
        	     -- co1 : T (ty1,ty2) ~ pat_ty
 
-       ; let co2 = mkTcAxInstCo co_tc tys
+       ; let co2 = mkTcUnbranchedAxInstCo co_tc tys
        	     -- co2 : T (ty1,ty2) ~ T7 ty1 ty2
 
        ; return (mkTcSymCo co2 `mkTcTransCo` co1, tys) }

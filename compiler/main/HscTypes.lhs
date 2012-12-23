@@ -138,6 +138,7 @@ import Type
 import Annotations
 import Class
 import TyCon
+import CoAxiom
 import DataCon
 import PrelNames        ( gHC_PRIM, ioTyConName, printName )
 import Packages hiding  ( Version(..) )
@@ -455,7 +456,7 @@ lookupIfaceByModule dflags hpt pit mod
 -- modules imported by this one, directly or indirectly, and are in the Home
 -- Package Table.  This ensures that we don't see instances from modules @--make@
 -- compiled before this one, but which are not below this one.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst Branched])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
@@ -776,7 +777,7 @@ data ModDetails
         md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,       -- ^ Local type environment for this particular module
         md_insts     :: ![ClsInst],    -- ^ 'DFunId's for the instances in this module
-        md_fam_insts :: ![FamInst],
+        md_fam_insts :: ![FamInst Branched],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
@@ -821,8 +822,9 @@ data ModGuts
                                          -- ToDo: I'm unconvinced this is actually used anywhere
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
-        mg_insts     :: ![ClsInst],     -- ^ Class instances declared in this module
-        mg_fam_insts :: ![FamInst],      -- ^ Family instances declared in this module
+        mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
+        mg_fam_insts :: ![FamInst Branched], 
+                                         -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
@@ -951,7 +953,7 @@ data InteractiveContext
              -- ^ Variables defined automatically by the system (e.g.
              -- record field selectors).  See Notes [ic_sys_vars]
 
-         ic_instances  :: ([ClsInst], [FamInst]),
+         ic_instances  :: ([ClsInst], [FamInst Branched]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -1121,7 +1123,7 @@ exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
 This is handled by the qual_mod component of PrintUnqualified, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
-    \begin{code}
+\begin{code}
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics
 mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
@@ -1281,7 +1283,7 @@ extras_plus thing = thing : implicitTyThings thing
 -- For newtypes (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
-  | Just co <- newTyConCo_maybe tc = [ACoAxiom co]
+  | Just co <- newTyConCo_maybe tc = [ACoAxiom $ toBranchedAxiom co]
   | otherwise                      = []
 
 -- | Returns @True@ if there should be no interface-file declaration
@@ -1353,7 +1355,7 @@ type TypeEnv = NameEnv TyThing
 emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
-typeEnvCoAxioms :: TypeEnv -> [CoAxiom]
+typeEnvCoAxioms :: TypeEnv -> [CoAxiom Branched]
 typeEnvIds      :: TypeEnv -> [Id]
 typeEnvDataCons :: TypeEnv -> [DataCon]
 typeEnvClasses  :: TypeEnv -> [Class]
@@ -1377,7 +1379,7 @@ mkTypeEnvWithImplicits things =
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
 
-typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst] -> TypeEnv
+typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst Branched] -> TypeEnv
 typeEnvFromEntities ids tcs famInsts =
   mkTypeEnv (   map AnId ids
              ++ map ATyCon all_tcs
@@ -1418,7 +1420,8 @@ lookupType dflags hpt pte name
   -- in one-shot, we don't use the HPT
   | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg
   = do hm <- lookupUFM hpt (moduleName mod) -- Maybe monad
-       lookupNameEnv (md_types (hm_details hm)) name
+       x <- lookupNameEnv (md_types (hm_details hm)) name
+       return x
   | otherwise
   = lookupNameEnv pte name
   where 
@@ -1443,7 +1446,7 @@ tyThingTyCon (ATyCon tc) = tc
 tyThingTyCon other       = pprPanic "tyThingTyCon" (pprTyThing other)
 
 -- | Get the 'CoAxiom' from a 'TyThing' if it is a coercion axiom thing. Panics otherwise
-tyThingCoAxiom :: TyThing -> CoAxiom
+tyThingCoAxiom :: TyThing -> CoAxiom Branched
 tyThingCoAxiom (ACoAxiom ax) = ax
 tyThingCoAxiom other         = pprPanic "tyThingCoAxiom" (pprTyThing other)
 

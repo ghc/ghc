@@ -4861,31 +4861,66 @@ F Bool             -- WRONG: unsaturated application
   <sect3 id="type-instance-declarations">
     <title>Type instance declarations</title>
     <para>
-      Instance declarations of type families are very similar to standard type
-      synonym declarations.  The only two differences are that the
-      keyword <literal>type</literal> is followed
-      by <literal>instance</literal> and that some or all of the type
-      arguments can be non-variable types, but may not contain forall types or
-      type synonym families. However, data families are generally allowed, and
-      type synonyms are allowed as long as they are fully applied and expand
-      to a type that is admissible - these are the exact same requirements as
-      for data instances.  For example, the <literal>[e]</literal> instance
-      for <literal>Elem</literal> is
+      There are two forms of type family instance declaration: unbranched and
+      branched. Branched instances list any number of alternatives, to be
+      checked in order from top to bottom, similarly to normal function
+      declarations. Unbranched instances supply only one left-hand side.
+
+      Unbranched instance declarations of type families are very similar to
+      standard type synonym declarations. The only two differences are that
+      the keyword <literal>type</literal> is followed by
+      <literal>instance</literal> and that some or all of the type arguments
+      can be non-variable types, but may not contain forall types or type
+      synonym families. However, data families are generally allowed, and type
+      synonyms are allowed as long as they are fully applied and expand to a
+      type that is admissible - these are the exact same requirements as for
+      data instances. For example, the <literal>[e]</literal> instance for
+      <literal>Elem</literal> is
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
     </para>
+
+    <para>
+      Branched instance declarations, on the other hand, allow many different
+      left-hand-side type patterns. These patterns are tried in order, from
+      top to bottom, when simplifying a type family application. A branched instance
+      declaration is introduced by <literal>type instance where</literal>. For example:
+<programlisting>
+type instance where
+  F Int  = Double
+  F Bool = Char
+  F a    = String
+</programlisting>
+      In this example, we declare an instance for <literal>F</literal> such
+      that <literal>F Int</literal> simplifies to <literal>Double</literal>,
+      <literal>F Bool</literal> simplifies to <literal>Char</literal>, and for
+      any other type <literal>a</literal> that is known not to be
+      <literal>Int</literal> or <literal>Bool</literal>, <literal>F
+      a</literal> simplifies to <literal>String</literal>. Note that GHC must
+      be sure that <literal>a</literal> cannot unify with
+      <literal>Int</literal> or <literal>Bool</literal> in that last case; if
+      a programmer specifies just <literal>F a</literal> in their code, GHC will
+      not be able to simplify the type. After all, <literal>a</literal> might later
+      be instantiated with <literal>Int</literal>.
+    </para>
+
+    <para>
+      Branched instances and unbranched instances may be mixed freely for the same
+      type family.
+    </para>
+
     <para>
       Type family instance declarations are only legitimate when an
       appropriate family declaration is in scope - just like class instances
-      require the class declaration to be visible.  Moreover, each instance
+      require the class declaration to be visible. Moreover, each instance
       declaration has to conform to the kind determined by its family
       declaration, and the number of type parameters in an instance
       declaration must match the number of type parameters in the family
-      declaration.   Finally, the right-hand side of a type instance must be a
+      declaration. Finally, the right-hand side of a type instance must be a
       monotype (i.e., it may not include foralls) and after the expansion of
       all saturated vanilla type synonyms, no synonyms, except family synonyms
-      may remain.  Here are some examples of admissible and illegal type
+      may remain. Here are some examples of admissible and illegal type
       instances:
 <programlisting>
 type family F a :: *
@@ -4894,6 +4929,13 @@ type instance F String             = Char        -- OK!
 type instance F (F a)              = a           -- WRONG: type parameter mentions a type family
 type instance F (forall a. (a, b)) = b           -- WRONG: a forall type appears in a type parameter
 type instance F Float              = forall a.a  -- WRONG: right-hand side may not be a forall type
+type instance where                              -- OK!
+  F (Maybe Int)  = Int
+  F (Maybe Bool) = Bool
+  F (Maybe a)    = String
+type instance where            -- WRONG: conflicts with earlier instances (see below)
+  F Int = Float
+  F a   = [a]
 
 type family G a b :: * -> *
 type instance G Int            = (,)     -- WRONG: must be two type parameters
@@ -4904,15 +4946,17 @@ type instance G Int Char Float = Double  -- WRONG: must be two type parameters
     <sect3 id="type-family-overlap">
       <title>Overlap of type synonym instances</title>
       <para>
-	The instance declarations of a type family used in a single program
-	may only overlap if the right-hand sides of the overlapping instances
-	coincide for the overlapping types.  More formally, two instance
-	declarations overlap if there is a substitution that makes the
-	left-hand sides of the instances syntactically the same.  Whenever
-	that is the case, the right-hand sides of the instances must also be
-	syntactically equal under the same substitution.  This condition is
-	independent of whether the type family is associated or not, and it is
-	not only a matter of consistency, but one of type safety.
+	The unbranched instance declarations of a type family used in a single
+	program may only overlap if the right-hand sides of the overlapping
+	instances coincide for the overlapping types. More formally, two
+	instance declarations overlap if there is a substitution that makes
+	the left-hand sides of the instances syntactically the same. Whenever
+	that is the case, if the instances are unbranched, the right-hand
+	sides of the instances must also be syntactically equal under the same
+	substitution. This condition is independent of whether the type family
+	is associated or not, and it is not only a matter of consistency, but
+	one of type safety. Branched instances are not permitted to overlap
+	with any other instances, branched or unbranched.
       </para>
       <para>
 	Here are two example to illustrate the condition under which overlap
@@ -4923,6 +4967,10 @@ type instance F (Int, b) = [b]   -- overlap permitted
 
 type instance G (a, Int)  = [a]
 type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
+
+type instance H Int = Int
+type instance where              -- ILLEGAL overlap, as branched instances may not overlap
+  H a = a
 </programlisting>
       </para>
     <para> However see <xref linkend="ghci-decls"/> for the overlap rules in GHCi.</para>
@@ -5054,6 +5102,10 @@ instance GMapKey Flob where
         <literal>(GMap Flob ...)</literal>, this facility is most useful when
         the free indexed parameter is of a kind with a finite number of alternatives
         (unlike <literal>*</literal>).
+      </para>
+
+      <para>
+	Branched associated type instances are not currently supported.
       </para>
     </sect3>
 

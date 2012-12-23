@@ -110,7 +110,7 @@ synTyConsOfType ty
 \begin{code}
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
 mkSynEdges syn_decls = [ (ldecl, name, nameSetToList fvs)
-                       | ldecl@(L _ (TyDecl { tcdLName = L _ name
+                       | ldecl@(L _ (SynDecl { tcdLName = L _ name
                                             , tcdFVs = fvs })) <- syn_decls ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]

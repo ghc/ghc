@@ -51,6 +51,7 @@ import PrelNames hiding (error_RDR)
 import PrimOp
 import SrcLoc
 import TyCon
+import CoAxiom
 import TcType
 import TysPrim
 import TysWiredIn
@@ -85,8 +86,8 @@ data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
 
   -- Generics
-  | DerivTyCon TyCon      -- New data types
-  | DerivFamInst FamInst  -- New type family instances
+  | DerivTyCon TyCon                   -- New data types
+  | DerivFamInst (FamInst Unbranched)  -- New type family instances
 
   -- New top-level auxiliary bindings
   | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
@@ -1801,7 +1802,7 @@ type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
                               ( Bag (LHsBind RdrName, LSig RdrName)
                                 -- Extra bindings (used by Generic only)
                               , Bag TyCon   -- Extra top-level datatypes
-                              , Bag FamInst -- Extra family instances
+                              , Bag (FamInst Unbranched) -- Extra family instances
                               , Bag (InstInfo RdrName)) -- Extra instances
 
 genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
