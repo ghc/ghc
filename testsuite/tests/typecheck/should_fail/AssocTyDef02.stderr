@@ -1,5 +1,5 @@
 
-AssocTyDef02.hs:6:5:
+AssocTyDef02.hs:6:10:
     Type indexes must match class instance head
     Found `b' but expected `a'
     In the type synonym instance default declaration for `Typ'

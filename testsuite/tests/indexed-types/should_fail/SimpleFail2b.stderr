@@ -1,5 +1,5 @@
 
 SimpleFail2b.hs:9:11:
     Conflicting family instance declarations:
-      data Sd Int -- Defined at SimpleFail2b.hs:9:11
-      data Sd Int -- Defined at SimpleFail2b.hs:10:11
+      Sd Int -- Defined at SimpleFail2b.hs:9:11
+      Sd Int -- Defined at SimpleFail2b.hs:10:11

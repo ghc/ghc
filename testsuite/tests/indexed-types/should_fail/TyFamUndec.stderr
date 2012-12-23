@@ -1,17 +1,17 @@
 
-TyFamUndec.hs:6:1:
+TyFamUndec.hs:6:15:
     Variable `b' occurs more often than in the instance head
       in the type family application: T (b, b)
     (Use -XUndecidableInstances to permit this)
     In the type instance declaration for `T'
 
-TyFamUndec.hs:7:1:
+TyFamUndec.hs:7:15:
     Application is no smaller than the instance head
       in the type family application: T (a, Maybe b)
     (Use -XUndecidableInstances to permit this)
     In the type instance declaration for `T'
 
-TyFamUndec.hs:8:1:
+TyFamUndec.hs:8:15:
     Nested type family application
       in the type family application: T (a, T b)
     (Use -XUndecidableInstances to permit this)
