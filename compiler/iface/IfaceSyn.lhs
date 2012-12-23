@@ -20,7 +20,7 @@ module IfaceSyn (
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
-        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
+        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..), IfaceBang(..),
 
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
@@ -149,8 +149,11 @@ data IfaceConDecl
         ifConCtxt    :: IfaceContext,           -- Non-stupid context
         ifConArgTys  :: [IfaceType],            -- Arg types
         ifConFields  :: [OccName],              -- ...ditto... (field labels)
-        ifConStricts :: [HsBang]}               -- Empty (meaning all lazy),
+        ifConStricts :: [IfaceBang]}            -- Empty (meaning all lazy),
                                                 -- or 1-1 corresp with arg tys
+
+data IfaceBang
+  = IfNoBang | IfStrict | IfUnpack | IfUnpackCo IfaceCoercion
 
 data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
@@ -572,8 +575,10 @@ pprIfaceConDecl tc
          ppUnless (null fields) $
             nest 4 (ptext (sLit "Fields:") <+> hsep (map ppr fields))]
   where
-    ppr_bang HsNoBang = char '_'        -- Want to see these
-    ppr_bang bang     = ppr bang
+    ppr_bang IfNoBang = char '_'        -- Want to see these
+    ppr_bang IfStrict = char '!'
+    ppr_bang IfUnpack = ptext (sLit "!!")
+    ppr_bang (IfUnpackCo co) = ptext (sLit "!!") <> pprParendIfaceType co
 
     main_payload = ppr name <+> dcolon <+>
                    pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau

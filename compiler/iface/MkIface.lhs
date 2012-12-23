@@ -1505,7 +1505,7 @@ tyConToIfaceDecl env tycon
                     ifConArgTys  = map (tidyToIfaceType env2) arg_tys,
                     ifConFields  = map getOccName 
                                        (dataConFieldLabels data_con),
-                    ifConStricts = dataConRepBangs data_con }
+                    ifConStricts = map (toIfaceBang env2) (dataConRepBangs data_con) }
         where
           (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 
@@ -1516,6 +1516,12 @@ tyConToIfaceDecl env tycon
           to_eq_spec spec = [ (getOccName (tidyTyVar env2 tv), tidyToIfaceType env2 ty) 
                             | (tv,ty) <- spec]
 
+toIfaceBang :: TidyEnv -> HsBang -> IfaceBang
+toIfaceBang _    HsNoBang            = IfNoBang
+toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
+toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (coToIfaceType (tidyCo env co))
+toIfaceBang _   HsStrict             = IfStrict
+toIfaceBang _   (HsBang {})          = panic "toIfaceBang"
 
 classToIfaceDecl :: TidyEnv -> Class -> IfaceDecl
 classToIfaceDecl env clas

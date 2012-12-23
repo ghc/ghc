@@ -38,6 +38,7 @@ import TcHsType
 import TcMType
 import TcType
 import TysWiredIn( unitTy )
+import FamInst
 import Type
 import Kind
 import Class
@@ -1022,7 +1023,8 @@ tcConDecl new_or_data rep_tycon res_tmpl 	-- Data types
                 = rejigConRes res_tmpl qtkvs res_ty
 
        ; traceTc "tcConDecl 3" (ppr name)
-       ; buildDataCon (unLoc name) is_infix
+       ; fam_envs <- tcGetFamInstEnvs 
+       ; buildDataCon fam_envs (unLoc name) is_infix
     		      stricts field_lbls
     		      univ_tvs ex_tvs eq_preds ctxt arg_tys
 		      res_ty' rep_tycon
@@ -1322,7 +1324,7 @@ checkValidDataCon dflags existential_ok tc con
     ctxt = ConArgCtxt (dataConName con) 
     check_bang (HsBang want_unpack, rep_bang, n) 
       | want_unpack
-      , case rep_bang of { HsUnpack -> False; _ -> True }
+      , case rep_bang of { HsUnpack {} -> False; _ -> True }
       , not (gopt Opt_OmitInterfacePragmas dflags)  
            -- If not optimising, se don't unpack, so don't complain!
            -- See MkId.dataConArgRep, the (HsBang True) case

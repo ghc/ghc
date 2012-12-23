@@ -12,6 +12,7 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Generic.Description
 import Vectorise.Utils
+import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
 import BasicTypes
 import BuildTyCl
@@ -69,8 +70,8 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
  = do let tvs   = tyConTyVars vect_tc
       dc_name   <- mkLocalisedName mkPDataDataConOcc orig_name
       comp_tys  <- mkSumTys repr_sel_ty mkPDataType repr
-
-      liftDs $ buildDataCon dc_name
+      fam_envs  <- readGEnv global_fam_inst_env
+      liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             (map (const HsNoBang) comp_tys)
                             []                     -- no field labels
@@ -108,8 +109,8 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       dc_name        <- mkLocalisedName mkPDatasDataConOcc orig_name
 
       comp_tys  <- mkSumTys repr_sels_ty mkPDatasType repr
-
-      liftDs $ buildDataCon dc_name
+      fam_envs <- readGEnv global_fam_inst_env
+      liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             (map (const HsNoBang) comp_tys)
                             []                     -- no field labels

@@ -801,7 +801,7 @@ checkBootTyCon tc1 tc2
     eqCon c1 c2
       =  dataConName c1 == dataConName c2
       && dataConIsInfix c1 == dataConIsInfix c2
-      && dataConStrictMarks c1 == dataConStrictMarks c2
+      && eqListBy eqHsBang (dataConStrictMarks c1) (dataConStrictMarks c2)
       && dataConFieldLabels c1 == dataConFieldLabels c2
       && eqType (dataConUserType c1) (dataConUserType c2)
 
