@@ -24,12 +24,13 @@ import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.Ptr (Ptr)
 import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
-                      labelThread, modifyMVar_, newTVar, sharedCAF,
+                      labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
                       numCapabilities, threadCapability, myThreadId, forkOn,
                       threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
-import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray)
+import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
+                    boundsIOArray)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
@@ -93,7 +94,11 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd = do
-  tableVars <- forM [0,1..numCapabilities-1] (getCallbackTableVar fd)
+  eventManagerArray <- readIORef eventManager
+  let (low, high) = boundsIOArray eventManagerArray
+  tableVars <- forM [low..high] $ \i -> do
+    Just (_,!mgr) <- readIOArray eventManagerArray i
+    return (mgr, M.callbackTableVar mgr fd)
   mask_ $ do
     tables <- forM tableVars (takeMVar.snd)
     close fd
@@ -101,13 +106,6 @@ closeFdWith close fd = do
       (\(mgr,tableVar) table -> M.closeFd_ mgr table fd >>= putMVar tableVar)
       tableVars
       tables
-
-getCallbackTableVar :: Fd
-                       -> Int
-                       -> IO (EventManager, MVar (IM.IntMap [M.FdData]))
-getCallbackTableVar fd cap =
-  do Just (_,!mgr) <- readIOArray eventManager cap
-     return (mgr, M.callbackTableVar mgr fd)
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
@@ -168,15 +166,17 @@ getSystemEventManager :: IO EventManager
 getSystemEventManager = do
   t <- myThreadId
   (cap, _) <- threadCapability t
-  Just (_,mgr) <- readIOArray eventManager cap
+  eventManagerArray <- readIORef eventManager
+  Just (_,mgr) <- readIOArray eventManagerArray cap
   return mgr
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
 
-eventManager :: IOArray Int (Maybe (ThreadId, EventManager))
+eventManager :: IORef (IOArray Int (Maybe (ThreadId, EventManager)))
 eventManager = unsafePerformIO $ do
-    em <- newIOArray (0, numCapabilities - 1) Nothing
+    eventManagerArray <- newIOArray (0, numCapabilities - 1) Nothing
+    em <- newIORef eventManagerArray
     sharedCAF em getOrSetSystemEventThreadEventManagerStore
 {-# NOINLINE eventManager #-}
 
@@ -220,18 +220,21 @@ ensureIOManagerIsRunning
       startTimerManagerThread
 
 startIOManagerThreads :: IO ()
-startIOManagerThreads =
-  modifyMVar_ ioManagerLock $ \_ ->
-  forM_ [0,1..numCapabilities-1] startIOManagerThread
+startIOManagerThreads = do
+  eventManagerArray <- readIORef eventManager
+  let (low, high) = boundsIOArray eventManagerArray
+  withMVar ioManagerLock $ \_ ->
+    forM_ [low..high] startIOManagerThread
   
 startIOManagerThread :: Int -> IO ()
 startIOManagerThread i = do
+  eventManagerArray <- readIORef eventManager
   let create = do
         !mgr <- new True
         !t <- forkOn i $ loop mgr
         labelThread t "IOManager"
-        writeIOArray eventManager i (Just (t,mgr))
-  old <- readIOArray eventManager i
+        writeIOArray eventManagerArray i (Just (t,mgr))
+  old <- readIOArray eventManagerArray i
   case old of
     Nothing            -> create
     Just (t,em) -> do
@@ -277,8 +280,10 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
 
 shutdownManagers :: IO ()
 shutdownManagers =
-  do forM_ [0,1..numCapabilities-1] $ \i -> do
-       mmgr <- readIOArray eventManager i
+  do eventManagerArray <- readIORef eventManager
+     let (low, high) = boundsIOArray eventManagerArray
+     forM_ [low..high] $ \i -> do
+       mmgr <- readIOArray eventManagerArray i
        case mmgr of
          Nothing -> return ()
          Just (_,mgr) -> M.shutdown mgr
