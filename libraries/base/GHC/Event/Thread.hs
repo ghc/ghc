@@ -225,11 +225,12 @@ startIOManagerThreads = do
   eventManagerArray <- readIORef eventManager
   let (low, high) = boundsIOArray eventManagerArray
   withMVar ioManagerLock $ \_ ->
-    forM_ [low..high] startIOManagerThread
+    forM_ [low..high] (startIOManagerThread eventManagerArray)
   
-startIOManagerThread :: Int -> IO ()
-startIOManagerThread i = do
-  eventManagerArray <- readIORef eventManager
+startIOManagerThread :: IOArray Int (Maybe (ThreadId, EventManager))
+                        -> Int
+                        -> IO ()
+startIOManagerThread eventManagerArray i = do
   let create = do
         !mgr <- new True
         !t <- forkOn i $ loop mgr
