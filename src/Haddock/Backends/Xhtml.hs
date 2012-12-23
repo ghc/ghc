@@ -556,10 +556,10 @@ processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
 processForMiniSynopsis mdl unicode qual (ExportDecl (L _loc decl0) _doc _ _insts) =
   ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
-        (TyFamily{}) -> [ppTyFamHeader True False d unicode qual]
-        (TyDecl{ tcdTyDefn = TyData {} }) -> [keyword "data" <+> b]
-        (TyDecl{ tcdTyDefn = TySynonym {} }) -> [keyword "type" <+> b]
-        (ClassDecl {})    -> [keyword "class" <+> b]
+        (FamDecl decl)    -> [ppTyFamHeader True False decl unicode qual]
+        (DataDecl{})   -> [keyword "data" <+> b]
+        (SynDecl{})    -> [keyword "type" <+> b]
+        (ClassDecl {}) -> [keyword "class" <+> b]
         _ -> []
     SigD (TypeSig lnames (L _ _)) ->
       map (ppNameMini mdl . nameOccName . getName . unLoc) lnames
@@ -578,8 +578,8 @@ ppNameMini mdl nm =
 
 ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
 ppTyClBinderWithVarsMini mdl decl =
-  let n = unLoc $ tcdLName decl
-      ns = tyvarNames $ tcdTyVars decl
+  let n = tcdName decl
+      ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
   in ppTypeApp n ns (ppNameMini mdl . nameOccName . getName) ppTyName
 
 

@@ -53,7 +53,7 @@ attachToExportItem :: Interface -> IfaceMap -> InstIfaceMap -> ExportItem Name -
 attachToExportItem iface ifaceMap instIfaceMap export =
   case export of
     ExportDecl { expItemDecl = L _ (TyClD d) } -> do
-      mb_info <- getAllInfo (unLoc (tcdLName d))
+      mb_info <- getAllInfo (tcdName d)
       let export' =
             export {
               expItemInstances =

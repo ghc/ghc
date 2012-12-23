@@ -147,7 +147,7 @@ isValD _ = False
 
 
 declATs :: HsDecl a -> [a]
-declATs (TyClD d) | isClassDecl d = map (tcdName . unL) $ tcdATs d
+declATs (TyClD d) | isClassDecl d = map (unL . fdLName . unL) $ tcdATs d
 declATs _ = []
 
 
@@ -215,9 +215,9 @@ instance Parent (ConDecl Name) where
 
 instance Parent (TyClDecl Name) where
   children d
-    | isDataDecl  d = map (unL . con_name . unL) . td_cons . tcdTyDefn $ d
+    | isDataDecl  d = map (unL . con_name . unL) . dd_cons . tcdDataDefn $ d
     | isClassDecl d =
-        map (tcdName . unL) (tcdATs d) ++
+        map (unL . fdLName . unL) (tcdATs d) ++
         [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
@@ -231,8 +231,8 @@ family = getName &&& children
 -- child to its grand-children, recursively.
 families :: TyClDecl Name -> [(Name, [Name])]
 families d
-  | isDataDecl  d = family d : map (family . unL) (td_cons (tcdTyDefn d))
-  | isClassDecl d = family d : concatMap (families . unL) (tcdATs d)
+  | isDataDecl  d = family d : map (family . unL) (dd_cons (tcdDataDefn d))
+  | isClassDecl d = [family d]
   | otherwise     = []
 
 
