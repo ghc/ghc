@@ -199,10 +199,10 @@ canEvNC :: CtLoc -> CtEvidence -> TcS StopOrContinue
 -- Called only for non-canonical EvVars 
 canEvNC d ev 
   = case classifyPredType (ctEvPred ev) of
-      ClassPred cls tys -> canClassNC d ev cls tys 
-      EqPred ty1 ty2    -> canEqNC    d ev ty1 ty2 
-      TuplePred tys     -> canTuple   d ev tys
-      IrredPred {}      -> canIrred   d ev 
+      ClassPred cls tys -> traceTcS "canEvNC:cls" (ppr cls <+> ppr tys) >> canClassNC d ev cls tys 
+      EqPred ty1 ty2    -> traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)   >> canEqNC    d ev ty1 ty2 
+      TuplePred tys     -> traceTcS "canEvNC:tup" (ppr tys)             >> canTuple   d ev tys
+      IrredPred {}      -> traceTcS "canEvNC:irred" (ppr (ctEvPred ev)) >> canIrred   d ev 
 \end{code}
 
 
@@ -249,6 +249,8 @@ canClass d ev cls tys
        ; let co = mkTcTyConAppCo (classTyCon cls) cos 
              xi = mkClassPred cls xis
        ; mb <- rewriteCtFlavor ev xi co
+       ; traceTcS "canClass" (vcat [ ppr ev <+> ppr cls <+> ppr tys 
+                                   , ppr xi, ppr mb ])
        ; case mb of
            Nothing -> return Stop
            Just new_ev -> continueWith $ 
