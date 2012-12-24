@@ -141,11 +141,12 @@ test('T4801',
                                                      12000000)),
       # expected value: 10290952 (windows)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 18619912, 15)),
+          compiler_stats_range_field('max_bytes_used', 21657520, 15)),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
                 # 19/10/2012: 26882576 (-fPIC turned on)
                 # 19/10/2012: 18619912 (-fPIC turned off)
+                # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('max_bytes_used', 20000000,
                                                      23000000)),
