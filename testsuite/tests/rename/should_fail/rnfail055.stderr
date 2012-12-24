@@ -75,7 +75,7 @@ RnFail055.hs-boot:23:6:
     Boot file:   data T6
                      No C type associated
                      RecFlag NonRecursive
-                     = T6 :: Int -> T6 HasWrapper Stricts: SrictNotUnpacked
+                     = T6 :: Int -> T6 HasWrapper Stricts: !
                      FamilyInstance: none
 
 RnFail055.hs-boot:25:6:
