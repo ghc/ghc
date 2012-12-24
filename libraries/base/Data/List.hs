@@ -1033,8 +1033,13 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 
 {-# SPECIALISE sum     :: [Int] -> Int #-}
 {-# SPECIALISE sum     :: [Integer] -> Integer #-}
+{-# INLINABLE sum #-}
 {-# SPECIALISE product :: [Int] -> Int #-}
 {-# SPECIALISE product :: [Integer] -> Integer #-}
+{-# INLINABLE product #-}
+-- We make 'sum' and 'product' inlinable so that we get specialisations
+-- at other types.  See, for example, Trac #7507.
+
 -- | The 'sum' function computes the sum of a finite list of numbers.
 sum                     :: (Num a) => [a] -> a
 -- | The 'product' function computes the product of a finite list of numbers.
