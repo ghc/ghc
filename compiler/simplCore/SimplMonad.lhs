@@ -7,7 +7,7 @@
 module SimplMonad (
         -- The monad
         SimplM,
-        initSmpl,
+        initSmpl, traceSmpl,
         getSimplRules, getFamEnvs,
 
         -- Unique supply
@@ -29,6 +29,7 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
+import Control.Monad    ( when )
 \end{code}
 
 %************************************************************************
@@ -121,6 +122,13 @@ thenSmpl_ m k
 -- {-# SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
 -- {-# SPECIALIZE mapAndUnzipM :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c]) #-}
 -- {-# SPECIALIZE mapAccumLM   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
+
+traceSmpl :: String -> SDoc -> SimplM ()
+traceSmpl herald doc
+  = do { dflags <- getDynFlags
+       ; when (dopt Opt_D_dump_simpl_trace dflags) $ liftIO $ 
+         printInfoForUser dflags alwaysQualify $
+         hang (text herald) 2 doc }
 \end{code}
 
 
