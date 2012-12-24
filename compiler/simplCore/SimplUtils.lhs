@@ -1497,20 +1497,80 @@ of the inner case y, which give us nowhere to go!
 \begin{code}
 prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
-prepareAlts scrut case_bndr' alts = do
-    us <- getUniquesM
-    -- Case binder is needed just for its type. Note that as an
-    --   OutId, it has maximum information; this is important.
-    --   Test simpl013 is an example
-    let (imposs_deflt_cons, refined_deflt, alts') = filterAlts us (varType case_bndr') imposs_cons alts
-    when refined_deflt $ tick (FillInCaseDefault case_bndr')
-    return (imposs_deflt_cons, alts')
+prepareAlts scrut case_bndr' alts
+           -- Case binder is needed just for its type. Note that as an
+           --   OutId, it has maximum information; this is important.
+           --   Test simpl013 is an example
+  = do { us <- getUniquesM
+       ; let (imposs_deflt_cons, refined_deflt, alts') 
+                = filterAlts us (varType case_bndr') imposs_cons alts
+       ; when refined_deflt $ tick (FillInCaseDefault case_bndr')
+ 
+       ; alts'' <- combineIdenticalAlts case_bndr' alts'
+       ; return (imposs_deflt_cons, alts'') }
   where
     imposs_cons = case scrut of
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
 \end{code}
 
+Note [Combine identical alterantives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ If several alternatives are identical, merge them into
+ a single DEFAULT alternative.  I've occasionally seen this
+ making a big difference:
+
+     case e of               =====>     case e of
+       C _ -> f x                         D v -> ....v....
+       D v -> ....v....                   DEFAULT -> f x
+       DEFAULT -> f x
+
+The point is that we merge common RHSs, at least for the DEFAULT case.
+[One could do something more elaborate but I've never seen it needed.]
+To avoid an expensive test, we just merge branches equal to the *first*
+alternative; this picks up the common cases
+     a) all branches equal
+     b) some branches equal to the DEFAULT (which occurs first)
+
+The case where Combine Identical Alternatives transformation showed up
+was like this (base/Foreign/C/Err/Error.lhs):
+
+        x | p `is` 1 -> e1
+          | p `is` 2 -> e2
+        ...etc...
+
+where @is@ was something like
+
+        p `is` n = p /= (-1) && p == n
+
+This gave rise to a horrible sequence of cases
+
+        case p of
+          (-1) -> $j p
+          1    -> e1
+          DEFAULT -> $j p
+
+and similarly in cascade for all the join points!
+
+NB: it's important that all this is done in [InAlt], *before* we work
+on the alternatives themselves, because Simpify.simplAlt may zap the
+occurrence info on the binders in the alternatives, which in turn
+defeats combineIdenticalAlts (see Trac #7360).
+
+\begin{code}
+combineIdenticalAlts :: OutId -> [InAlt] -> SimplM [InAlt]
+-- See Note [Combine identical alterantives]
+combineIdenticalAlts case_bndr ((_con1,bndrs1,rhs1) : con_alts)
+  | all isDeadBinder bndrs1                     -- Remember the default
+  , length filtered_alts < length con_alts      -- alternative comes first
+  = do  { tick (AltMerge case_bndr)
+        ; return ((DEFAULT, [], rhs1) : filtered_alts) }
+  where
+    filtered_alts = filterOut identical_to_alt1 con_alts
+    identical_to_alt1 (_con,bndrs,rhs) = all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1
+
+combineIdenticalAlts _ alts = return alts
+\end{code}
 
 
 %************************************************************************
@@ -1546,43 +1606,6 @@ mkCase tries these things
                 False -> False
 
     and similar friends.
-
-3.  Merge identical alternatives.
-    If several alternatives are identical, merge them into
-    a single DEFAULT alternative.  I've occasionally seen this
-    making a big difference:
-
-        case e of               =====>     case e of
-          C _ -> f x                         D v -> ....v....
-          D v -> ....v....                   DEFAULT -> f x
-          DEFAULT -> f x
-
-   The point is that we merge common RHSs, at least for the DEFAULT case.
-   [One could do something more elaborate but I've never seen it needed.]
-   To avoid an expensive test, we just merge branches equal to the *first*
-   alternative; this picks up the common cases
-        a) all branches equal
-        b) some branches equal to the DEFAULT (which occurs first)
-
-The case where Merge Identical Alternatives transformation showed up
-was like this (base/Foreign/C/Err/Error.lhs):
-
-        x | p `is` 1 -> e1
-          | p `is` 2 -> e2
-        ...etc...
-
-where @is@ was something like
-
-        p `is` n = p /= (-1) && p == n
-
-This gave rise to a horrible sequence of cases
-
-        case p of
-          (-1) -> $j p
-          1    -> e1
-          DEFAULT -> $j p
-
-and similarly in cascade for all the join points!
 
 
 \begin{code}
@@ -1667,20 +1690,6 @@ mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
 
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
-
---------------------------------------------------
---      3. Merge Identical Alternatives
---------------------------------------------------
-mkCase1 dflags scrut case_bndr alts_ty ((_con1,bndrs1,rhs1) : con_alts)
-  | all isDeadBinder bndrs1                     -- Remember the default
-  , length filtered_alts < length con_alts      -- alternative comes first
-        -- Also Note [Dead binders]
-  = do  { tick (AltMerge case_bndr)
-        ; mkCase2 dflags scrut case_bndr alts_ty alts' }
-  where
-    alts' = (DEFAULT, [], rhs1) : filtered_alts
-    filtered_alts         = filter keep con_alts
-    keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
 
 mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 
