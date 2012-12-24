@@ -37,7 +37,7 @@ import BasicTypes       ( isMarkedStrict, Arity )
 import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
-import Maybes           ( orElse, isNothing )
+import Maybes           ( orElse )
 import Control.Monad
 import Data.List        ( mapAccumL )
 import Outputable
@@ -1880,8 +1880,8 @@ so there were additional complications if the scrutinee was a variable.
 Now the binder-swap stuff is done in the occurrence analyer; see
 OccurAnal Note [Binder swap].
 
-Note [zapOccInfo]
-~~~~~~~~~~~~~~~~~
+Note [knownCon occ info]
+~~~~~~~~~~~~~~~~~~~~~~~~
 If the case binder is not dead, then neither are the pattern bound
 variables:
         case <any> of x { (a,b) ->
@@ -1892,8 +1892,13 @@ The point is that we bring into the envt a binding
 after the outer case, and that makes (a,b) alive.  At least we do unless
 the case binder is guaranteed dead.
 
-In practice, the scrutinee is almost always a variable, so we pretty
-much always zap the OccInfo of the binders.  It doesn't matter much though.
+Note [Case alternative occ info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we are simply reconstructing a case (the common case), we always
+zap the occurrence info on the binders in the alternatives.  Even
+if the case binder is dead, the scrutinee is usually a variable, and *that*
+can bring the case-alternative binders back to life.  
+See Note [Add unfolding for scrutinee]
 
 Note [Improving seq]
 ~~~~~~~~~~~~~~~~~~~
@@ -1970,9 +1975,7 @@ simplAlts env scrut case_bndr alts cont'
           -- NB: it's possible that the returned in_alts is empty: this is handled
           -- by the caller (rebuildCase) in the missingAlt function
 
-        ; let mb_var_scrut = case scrut' of { Var v -> Just v; _ -> Nothing }
-        ; alts' <- mapM (simplAlt alt_env' mb_var_scrut
-                             imposs_deflt_cons case_bndr' cont') in_alts
+        ; alts' <- mapM (simplAlt alt_env' (Just scrut) imposs_deflt_cons case_bndr' cont') in_alts
         ; -- pprTrace "simplAlts" (ppr case_bndr $$ ppr alts_ty $$ ppr alts_ty' $$ ppr alts $$ ppr cont') $
           return (scrut', case_bndr', alts') }
 
@@ -1996,7 +1999,7 @@ improveSeq _ env scrut _ case_bndr1 _
 
 ------------------------------------
 simplAlt :: SimplEnv
-         -> Maybe OutId    -- Scrutinee
+         -> Maybe OutExpr  -- The scrutinee
          -> [AltCon]       -- These constructors can't be present when
                            -- matching the DEFAULT alternative
          -> OutId          -- The case binder
@@ -2004,26 +2007,22 @@ simplAlt :: SimplEnv
          -> InAlt
          -> SimplM OutAlt
 
-simplAlt env scrut imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
+simplAlt env _ imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
   = ASSERT( null bndrs )
-    do  { let env' = addBinderUnfolding env scrut case_bndr'
+    do  { let env' = addBinderUnfolding env case_bndr'
                                         (mkOtherCon imposs_deflt_cons)
                 -- Record the constructors that the case-binder *can't* be.
         ; rhs' <- simplExprC env' rhs cont'
         ; return (DEFAULT, [], rhs') }
 
-simplAlt env scrut _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
+simplAlt env scrut' _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
   = ASSERT( null bndrs )
-    do  { dflags <- getDynFlags
-        ; let env' = addBinderUnfolding env scrut case_bndr'
-                                        (mkSimpleUnfolding dflags (Lit lit))
+    do  { env' <- addAltUnfoldings env scrut' case_bndr' (Lit lit)
         ; rhs' <- simplExprC env' rhs cont'
         ; return (LitAlt lit, [], rhs') }
 
-simplAlt env scrut _ case_bndr' cont' (DataAlt con, vs, rhs)
-  = do  { dflags <- getDynFlags
-
-                -- Deal with the pattern-bound variables
+simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
+  = do  {       -- Deal with the pattern-bound variables
                 -- Mark the ones that are in ! positions in the
                 -- data constructor as certainly-evaluated.
                 -- NB: simplLamBinders preserves this eval info
@@ -2032,10 +2031,10 @@ simplAlt env scrut _ case_bndr' cont' (DataAlt con, vs, rhs)
 
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
-              con_args  = map Type inst_tys' ++ varsToCoreExprs vs'
-              unf       = mkSimpleUnfolding dflags (mkConApp con con_args)
-              env''     = addBinderUnfolding env' scrut case_bndr' unf
+              con_app :: OutExpr
+              con_app   = mkConApp con (map Type inst_tys' ++ varsToCoreExprs vs')
 
+        ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (DataAlt con, vs', rhs') }
   where
@@ -2057,28 +2056,30 @@ simplAlt env scrut _ case_bndr' cont' (DataAlt con, vs, rhs)
             | isMarkedStrict str = evald_v  : go vs' strs
             | otherwise          = zapped_v : go vs' strs
             where
-              zapped_v = zapBndrOccInfo keep_occ_info v
+              zapped_v = zapIdOccInfo v   -- See Note [Case alternative occ info]
               evald_v  = zapped_v `setIdUnfolding` evaldUnfolding
           go _ _ = pprPanic "cat_evals" (ppr con $$ ppr vs $$ ppr the_strs)
 
-        -- See Note [zapOccInfo]
-        -- zap_occ_info: if the case binder is alive, then we add the unfolding
-        --      case_bndr = C vs
-        -- to the envt; so vs are now very much alive
-        -- Note [Aug06] I can't see why this actually matters, but it's neater
-        --        case e of t { (a,b) -> ...(case t of (p,q) -> p)... }
-        --   ==>  case e of t { (a,b) -> ...(a)... }
-        -- Look, Ma, a is alive now.
-    keep_occ_info = isDeadBinder case_bndr' && isNothing scrut
 
-addBinderUnfolding :: SimplEnv -> Maybe OutId -> Id -> Unfolding -> SimplEnv
-addBinderUnfolding env scrut bndr unf
-  = case scrut of
-       Just v -> modifyInScope env1 (v `setIdUnfolding` unf)
-       _      -> env1
-  where
-    env1 = modifyInScope env bndr_w_unf
-    bndr_w_unf = bndr `setIdUnfolding` unf
+addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplM SimplEnv
+addAltUnfoldings env scrut case_bndr con_app
+  = do { dflags <- getDynFlags
+       ; let con_app_unf = mkSimpleUnfolding dflags con_app
+             env1 = addBinderUnfolding env case_bndr con_app_unf
+
+             -- See Note [Add unfolding for scrutinee]
+             env2 = case scrut of
+           	      Just (Var v)           -> addBinderUnfolding env1 v con_app_unf
+           	      Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
+                                                mkSimpleUnfolding dflags (Cast con_app (mkSymCo co))
+           	      _                      -> env1
+              
+       ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
+       ; return env2 }
+
+addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
+addBinderUnfolding env bndr unf
+  = modifyInScope env (bndr `setIdUnfolding` unf)
 
 zapBndrOccInfo :: Bool -> Id -> Id
 -- Consider  case e of b { (a,b) -> ... }
@@ -2112,6 +2113,17 @@ simplifier sweep instead of two.
 
 Exactly the same issue arises in SpecConstr;
 see Note [Add scrutinee to ValueEnv too] in SpecConstr
+
+HOWEVER, given
+  case x of y { Just a -> r1; Nothing -> r2 }
+we do not want to add the unfolding x -> y to 'x', which might seem cool,
+since 'y' itself has different unfoldings in r1 and r2.  Reason: if we
+did that, we'd have to zap y's deadness info and that is a very useful
+piece of information.  
+
+So instead we add the unfolding x -> Just a, and x -> Nothing in the
+respective RHSs.
+
 
 %************************************************************************
 %*                                                                      *
@@ -2161,7 +2173,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
              -- occur in the RHS; and simplNonRecX may therefore discard
              -- it via postInlineUnconditionally.
              -- Nevertheless we must keep it if the case-binder is alive,
-             -- because it may be used in the con_app.  See Note [zapOccInfo]
+             -- because it may be used in the con_app.  See Note [knownCon occ info]
            ; env'' <- simplNonRecX env' b' arg
            ; bind_args env'' bs' args }
 
