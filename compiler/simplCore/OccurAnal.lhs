@@ -21,7 +21,7 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp, mkCast )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp )
 import Id
 import Name( localiseName )
 import BasicTypes
@@ -38,7 +38,6 @@ import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique
 import UniqFM
 import Util
-import Bag
 import Outputable
 import FastString
 import Data.List
@@ -1234,7 +1233,7 @@ occAnal env expr@(Lam _ _)
     (really_final_usage,
      mkLams tagged_binders body') }
   where
-    env_body        = vanillaCtxt (trimOccEnv env binders)
+    env_body        = vanillaCtxt env
                         -- Body is (no longer) an RhsContext
     (binders, body) = collectBinders expr
     binders'        = oneShotGroup env binders
@@ -1265,7 +1264,7 @@ occAnal env (Case scrut bndr ty alts)
           Nothing -> (usage,                  setIdOccInfo bndr IAmDead)
           Just _  -> (usage `delVarEnv` bndr, setIdOccInfo bndr NoOccInfo)
 
-    alt_env      = mkAltEnv env scrut bndr
+    alt_env = mkAltEnv env scrut bndr
     occ_anal_alt = occAnalAlt alt_env bndr
 
     occ_anal_scrut (Var v) (alt1 : other_alts)
@@ -1277,11 +1276,9 @@ occAnal env (Case scrut bndr ty alts)
         = occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt
 
 occAnal env (Let bind body)
-  = case occAnal env_body body                    of { (body_usage, body') ->
-    case occAnalBind env env_body emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
+  = case occAnal env body                                of { (body_usage, body') ->
+    case occAnalBind env env emptyVarEnv bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
-  where
-    env_body = trimOccEnv env (bindersOf bind)
 
 occAnalArgs :: OccEnv -> [CoreExpr] -> (UsageDetails, [CoreExpr])
 occAnalArgs env args
@@ -1406,33 +1403,29 @@ life, beause it binds 'y' to (a,b) (imagine got inlined and
 scrutinised y).
 
 \begin{code}
-occAnalAlt :: OccEnv
+occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
            -> CoreBndr
            -> CoreAlt
            -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt env case_bndr (con, bndrs, rhs)
-  = let
-        env' = trimOccEnv env bndrs
-    in
-    case occAnal env' rhs of { (rhs_usage1, rhs1) ->
+occAnalAlt (env, scrut_bind) case_bndr (con, bndrs, rhs)
+  = case occAnal env rhs of { (rhs_usage1, rhs1) ->
     let
-        proxies = getProxies env' case_bndr
-        (rhs_usage2, rhs2) = foldrBag wrapProxy (rhs_usage1, rhs1) proxies
+        (rhs_usage2, rhs2) = wrapProxy scrut_bind case_bndr rhs_usage1 rhs1 
         (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage2 bndrs
         bndrs' = tagged_bndrs      -- See Note [Binders in case alternatives]
     in
     (alt_usg, (con, bndrs', rhs2)) }
 
-wrapProxy :: ProxyBind -> (UsageDetails, CoreExpr) -> (UsageDetails, CoreExpr)
-wrapProxy (bndr, rhs_var, co) (body_usg, body)
-  | not (bndr `usedIn` body_usg)
-  = (body_usg, body)
-  | otherwise
-  = (body_usg' +++ rhs_usg, Let (NonRec tagged_bndr rhs) body)
+wrapProxy :: Maybe (Id, CoreExpr) -> Id -> UsageDetails -> CoreExpr -> (UsageDetails, CoreExpr)
+wrapProxy (Just (scrut_var, rhs)) case_bndr body_usg body
+  | scrut_var `usedIn` body_usg
+  = ( body_usg' +++ unitVarEnv case_bndr NoOccInfo
+    , Let (NonRec tagged_scrut_var rhs) body )
   where
-    (body_usg', tagged_bndr) = tagBinder body_usg bndr
-    rhs_usg = unitVarEnv rhs_var NoOccInfo      -- We don't need exact info
-    rhs = mkCast (Var (zapIdOccInfo rhs_var)) co -- See Note [Zap case binders in proxy bindings]
+    (body_usg', tagged_scrut_var) = tagBinder body_usg scrut_var
+    
+wrapProxy _ _ body_usg body 
+  = (body_usg, body)
 \end{code}
 
 
@@ -1444,12 +1437,14 @@ wrapProxy (bndr, rhs_var, co) (body_usg, body)
 
 \begin{code}
 data OccEnv
-  = OccEnv { occ_encl     :: !OccEncl      -- Enclosing context information
-           , occ_ctxt     :: !CtxtTy       -- Tells about linearity
-           , occ_proxy    :: ProxyEnv
-           , occ_rule_act :: Activation -> Bool   -- Which rules are active
+  = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
+           , occ_ctxt       :: !CtxtTy       -- Tells about linearity
+           , occ_gbl_scrut  :: GlobalScruts
+           , occ_rule_act   :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
     }
+
+type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 
 -----------------------------
 -- OccEncl is used to control whether to inline into constructor arguments
@@ -1484,7 +1479,7 @@ initOccEnv :: (Activation -> Bool) -> OccEnv
 initOccEnv active_rule
   = OccEnv { occ_encl  = OccVanilla
            , occ_ctxt  = []
-           , occ_proxy = PE emptyVarEnv emptyVarSet
+           , occ_gbl_scrut = emptyVarSet --  PE emptyVarEnv emptyVarSet
            , occ_rule_act = active_rule }
 
 vanillaCtxt :: OccEnv -> OccEnv
@@ -1561,61 +1556,9 @@ extendFvs env s
 
 %************************************************************************
 %*                                                                      *
-                    ProxyEnv
+                    Binder swap
 %*                                                                      *
 %************************************************************************
-
-\begin{code}
-data ProxyEnv   -- See Note [ProxyEnv]
-   = PE (IdEnv  -- Domain = scrutinee variables
-           (Id,                  -- The scrutinee variable again
-            [(Id,Coercion)]))    -- The case binders that it maps to
-        VarSet  -- Free variables of both range and domain
-\end{code}
-
-Note [ProxyEnv]
-~~~~~~~~~~~~~~~
-The ProxyEnv keeps track of the connection between case binders and
-scrutinee.  Specifically, if
-     sc |-> (sc, [...(cb, co)...])
-is a binding in the ProxyEnv, then
-     cb = sc |> coi
-Typically we add such a binding when encountering the case expression
-     case (sc |> coi) of cb { ... }
-
-Things to note:
-  * The domain of the ProxyEnv is the variable (or casted variable)
-    scrutinees of enclosing cases.  This is additionally used
-    to ensure we gather occurrence info even for GlobalId scrutinees;
-    see Note [Binder swap for GlobalId scrutinee]
-
-  * The ProxyEnv is just an optimisation; you can throw away any
-    element without losing correctness.  And we do so when pushing
-    it inside a binding (see trimProxyEnv).
-
-  * One scrutinee might map to many case binders:  Eg
-      case sc of cb1 { DEFAULT -> ....case sc of cb2 { ... } .. }
-
-INVARIANTS
- * If sc1 |-> (sc2, [...(cb, co)...]), then sc1==sc2
-   It's a UniqFM and we sometimes need the domain Id
-
- * Any particular case binder 'cb' occurs only once in entire range
-
- * No loops
-
-The Main Reason for having a ProxyEnv is so that when we encounter
-    case e of cb { pi -> ri }
-we can find all the in-scope variables derivable from 'cb',
-and effectively add let-bindings for them (or at least for the
-ones *mentioned* in ri) thus:
-    case e of cb { pi -> let { x = ..cb..; y = ...cb.. }
-                         in ri }
-In this way we'll replace occurrences of 'x', 'y' with 'cb',
-which implements the Binder-swap idea (see Note [Binder swap])
-
-The function getProxies finds these bindings; then we
-add just the necessary ones, using wrapProxy.
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
@@ -1686,35 +1629,12 @@ When the scrutinee is a GlobalId we must take care in two ways
 
  i) In order to *know* whether 'x' occurs free in the RHS, we need its
     occurrence info. BUT, we don't gather occurrence info for
-    GlobalIds.  That's one use for the (small) occ_proxy env in OccEnv is
-    for: it says "gather occurrence info for these.
+    GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in 
+    OccEnv is for: it says "gather occurrence info for these.
 
  ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
      has an External Name. See, for example, SimplEnv Note [Global Ids in
      the substitution].
-
-Note [getProxies is subtle]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The code for getProxies isn't all that obvious. Consider
-
-  case v |> cov  of x { DEFAULT -> {{ let v = x |> sym cov  }}
-  case x |> cox1 of y { DEFAULT -> {{ let x = y |> sym cox1 }}
-  case x |> cox2 of z { DEFAULT -> {{ let x = z |> sym cox2 }}
-  r
-
-Bindings in double braces are injected.
-
-At 'r', these will give us a ProxyEnv looking like:
-  x |-> (x, [(y, cox1), (z, cox2)])
-  v |-> (v, [(x, cov)])
-
-From this we want to extract the bindings
-    x = z |> sym cox2
-    v = x |> sym cov
-    y = x |> cox1
-
-Notice that later bindings may mention earlier ones, and that
-we can go "both ways".
 
 Note [Zap case binders in proxy bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1789,110 +1709,28 @@ binder-swap unconditionally and still get occurrence analysis
 information right.
 
 \begin{code}
-extendProxyEnv :: ProxyEnv -> Id -> Coercion -> Id -> ProxyEnv
--- (extendPE x co y) typically arises from
---                case (x |> co) of y { ... }
--- It extends the proxy env with the binding
---                     y = x |> co
-extendProxyEnv pe scrut co case_bndr
-  | scrut == case_bndr = PE env1 fvs1   -- If case_bndr shadows scrut,
-  | otherwise          = PE env2 fvs2   --   don't extend
-  where
-    PE env1 fvs1 = trimProxyEnv pe [case_bndr]
-    env2 = extendVarEnv_Acc add single env1 scrut1 (case_bndr,co)
-    single cb_co = (scrut1, [cb_co])
-    add cb_co (x, cb_cos) = (x, cb_co:cb_cos)
-    fvs2 = fvs1 `unionVarSet`  tyCoVarsOfCo co
-                `extendVarSet` case_bndr
-                `extendVarSet` scrut1
+mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
+-- Does two things: a) makes the occ_ctxt = OccVanilla
+--                  b) extends the GlobalScruts if possible
+--                  c) returns a proxy mapping, binding the scrutinee
+--                     to the case binder, if possible
+mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
+  = case scrut of
+      Var v           -> add_scrut v case_bndr'
+      Cast (Var v) co -> add_scrut v (Cast case_bndr' (mkSymCo co))
+                          -- See Note [Case of cast]
+      _               -> (env { occ_encl = OccVanilla }, Nothing)
 
-    scrut1 = mkLocalId (localiseName (idName scrut)) (idType scrut)
+  where
+    add_scrut v rhs = ( env { occ_encl = OccVanilla, occ_gbl_scrut = pe `extendVarSet` v }
+                      , Just (localise v, rhs) )
+
+    case_bndr' = Var (zapIdOccInfo case_bndr) -- See Note [Zap case binders in proxy bindings]
+    localise scrut_var = mkLocalId (localiseName (idName scrut_var)) (idType scrut_var)
         -- Localise the scrut_var before shadowing it; we're making a
         -- new binding for it, and it might have an External Name, or
         -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
         -- Also we don't want any INLINE or NOINLINE pragmas!
-
------------
-type ProxyBind = (Id, Id, Coercion)
-     -- (scrut variable, case-binder variable, coercion)
-
-getProxies :: OccEnv -> Id -> Bag ProxyBind
--- Return a bunch of bindings [...(xi,ei)...]
--- such that  let { ...; xi=ei; ... } binds the xi using y alone
--- See Note [getProxies is subtle]
-getProxies (OccEnv { occ_proxy = PE pe _ }) case_bndr
-  = -- pprTrace "wrapProxies" (ppr case_bndr) $
-    go_fwd case_bndr
-  where
-    fwd_pe :: IdEnv (Id, Coercion)
-    fwd_pe = foldVarEnv add1 emptyVarEnv pe
-           where
-             add1 (x,ycos) env = foldr (add2 x) env ycos
-             add2 x (y,co) env = extendVarEnv env y (x,co)
-
-    go_fwd :: Id -> Bag ProxyBind
-        -- Return bindings derivable from case_bndr
-    go_fwd case_bndr = -- pprTrace "go_fwd" (vcat [ppr case_bndr, text "fwd_pe =" <+> ppr fwd_pe,
-                       --                         text "pe =" <+> ppr pe]) $
-                       go_fwd' case_bndr
-
-    go_fwd' case_bndr
-        | Just (scrut, co) <- lookupVarEnv fwd_pe case_bndr
-        = unitBag (scrut,  case_bndr, mkSymCo co)
-          `unionBags` go_fwd scrut
-          `unionBags` go_bwd scrut [pr | pr@(cb,_) <- lookup_bwd scrut
-                                       , cb /= case_bndr]
-        | otherwise
-        = emptyBag
-
-    lookup_bwd :: Id -> [(Id, Coercion)]
-        -- Return case_bndrs that are connected to scrut
-    lookup_bwd scrut = case lookupVarEnv pe scrut of
-                          Nothing          -> []
-                          Just (_, cb_cos) -> cb_cos
-
-    go_bwd :: Id -> [(Id, Coercion)] -> Bag ProxyBind
-    go_bwd scrut cb_cos = foldr (unionBags . go_bwd1 scrut) emptyBag cb_cos
-
-    go_bwd1 :: Id -> (Id, Coercion) -> Bag ProxyBind
-    go_bwd1 scrut (case_bndr, co)
-       = -- pprTrace "go_bwd1" (ppr case_bndr) $
-         unitBag (case_bndr, scrut, co)
-         `unionBags` go_bwd case_bndr (lookup_bwd case_bndr)
-
------------
-mkAltEnv :: OccEnv -> CoreExpr -> Id -> OccEnv
--- Does two things: a) makes the occ_ctxt = OccVanilla
---                  b) extends the ProxyEnv if possible
-mkAltEnv env scrut cb
-  = env { occ_encl  = OccVanilla, occ_proxy = pe' }
-  where
-    pe  = occ_proxy env
-    pe' = case scrut of
-             Var v           -> extendProxyEnv pe v (mkReflCo (idType v)) cb
-             Cast (Var v) co -> extendProxyEnv pe v co                    cb
-             _other          -> trimProxyEnv pe [cb]
-
------------
-trimOccEnv :: OccEnv -> [CoreBndr] -> OccEnv
-trimOccEnv env bndrs = env { occ_proxy = trimProxyEnv (occ_proxy env) bndrs }
-
------------
-trimProxyEnv :: ProxyEnv -> [CoreBndr] -> ProxyEnv
--- We are about to push this ProxyEnv inside a binding for 'bndrs'
--- So dump any ProxyEnv bindings which mention any of the bndrs
-trimProxyEnv (PE pe fvs) bndrs
-  | not (bndr_set `intersectsVarSet` fvs)
-  = PE pe fvs
-  | otherwise
-  = PE pe' (fvs `minusVarSet` bndr_set)
-  where
-    pe' = mapVarEnv trim pe
-    bndr_set = mkVarSet bndrs
-    trim (scrut, cb_cos) | scrut `elemVarSet` bndr_set = (scrut, [])
-                         | otherwise = (scrut, filterOut discard cb_cos)
-    discard (cb,co) = bndr_set `intersectsVarSet`
-                      extendVarSet (tyCoVarsOfCo co) cb
 \end{code}
 
 
@@ -1985,8 +1823,7 @@ mkOneOcc env id int_cxt
   | isLocalId id
   = unitVarEnv id (OneOcc False True int_cxt)
 
-  | PE env _ <- occ_proxy env
-  , id `elemVarEnv` env
+  | id `elemVarEnv` occ_gbl_scrut env
   = unitVarEnv id NoOccInfo
 
   | otherwise
