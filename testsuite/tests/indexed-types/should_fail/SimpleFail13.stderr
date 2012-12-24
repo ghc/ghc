@@ -3,6 +3,6 @@ SimpleFail13.hs:9:1:
     Illegal type synonym family application in instance: [C a]
     In the data instance declaration for `D'
 
-SimpleFail13.hs:13:1:
+SimpleFail13.hs:13:15:
     Illegal type synonym family application in instance: [C a]
     In the type instance declaration for `E'

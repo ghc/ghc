@@ -1,5 +1,5 @@
 
 SimpleFail11d.hs:8:15:
     Conflicting family instance declarations:
-      data instance C9 [Int] [a] -- Defined at SimpleFail11d.hs:8:15
-      data instance C9 [a] [Int] -- Defined at SimpleFail11d.hs:10:15
+      C9 [Int] [a] -- Defined at SimpleFail11d.hs:8:15
+      C9 [a] [Int] -- Defined at SimpleFail11d.hs:10:15

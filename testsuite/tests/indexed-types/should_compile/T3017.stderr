@@ -15,7 +15,7 @@ TYPE CONSTRUCTORS
       = L :: forall a. [a] -> ListColl a Stricts: _
       FamilyInstance: none
 COERCION AXIOMS
-  axiom Foo.TFCo:R:ElemListColl a :: Elem (ListColl a) ~# a
+  axiom Foo.TFCo:R:ElemListColl :: forall a. Elem (ListColl a) ~# a
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES

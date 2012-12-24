@@ -1,0 +1,5 @@
+
+TH_TyInstWhere2.hs:9:4: Warning:
+    type instance where
+    TH_TyInstWhere2.F a_0 a_0 = 'GHC.Types.True
+    TH_TyInstWhere2.F a_1 b_2 = 'GHC.Types.False
