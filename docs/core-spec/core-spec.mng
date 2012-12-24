@@ -145,7 +145,10 @@ Is it a left projection or a right projection?
 
 Axioms:
 
-\gram{\ottC}
+\gram{
+\ottC\ottinterrule
+\ottaxBranch
+}
 
 \subsection{Type constructors}
 
@@ -268,8 +271,7 @@ folding the substitution over the kinds for kind-checking.
 
 \subsection{Name consistency}
 
-There are two very similar checks for names, one declared as a local function
-within \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding}:
+There are two very similar checks for names, one declared as a local function:
 
 \ottdefnlintSingleBindingXXlintBinder{}
 
@@ -302,5 +304,18 @@ within \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding}:
 \subsection{Sub-kinding}
 
 \ottdefnisSubKind{}
+
+\subsection{Branched axiom conflict checking}
+
+The following judgment is used within \ottdrulename{Co\_AxiomInstCo} to make
+sure that a type family application cannot unify with any previous branch
+in the axiom.
+
+\ottdefncheckXXnoXXconflict{}
+
+The judgment $[[apart]]$ checks to see whether two lists of types are surely apart.
+It checks to see if \coderef{types/Unify.lhs}{tcApartTys} returns \texttt{SurelyApart}.
+Two types are apart if neither type is a type family application and if they do not
+unify.
 
 \end{document}

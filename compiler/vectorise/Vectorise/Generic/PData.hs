@@ -12,6 +12,7 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Generic.Description
 import Vectorise.Utils
+import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
 import BasicTypes
 import BuildTyCl
@@ -27,7 +28,7 @@ import Control.Monad
 
 -- buildPDataTyCon ------------------------------------------------------------
 -- | Build the PData instance tycon for a given type constructor.
-buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
+buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
 buildPDataTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst
@@ -38,7 +39,7 @@ buildPDataTyCon orig_tc vect_tc repr
  where
     orig_name = tyConName orig_tc
 
-buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM FamInst
+buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM (FamInst Unbranched)
 buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
@@ -69,8 +70,8 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
  = do let tvs   = tyConTyVars vect_tc
       dc_name   <- mkLocalisedName mkPDataDataConOcc orig_name
       comp_tys  <- mkSumTys repr_sel_ty mkPDataType repr
-
-      liftDs $ buildDataCon dc_name
+      fam_envs  <- readGEnv global_fam_inst_env
+      liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             (map (const HsNoBang) comp_tys)
                             []                     -- no field labels
@@ -85,7 +86,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
 
 -- buildPDatasTyCon -----------------------------------------------------------
 -- | Build the PDatas instance tycon for a given type constructor.
-buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM FamInst
+buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM (FamInst Unbranched)
 buildPDatasTyCon orig_tc vect_tc repr 
  = fixV $ \fam_inst ->
    do let repr_tc = dataFamInstRepTyCon fam_inst
@@ -108,8 +109,8 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       dc_name        <- mkLocalisedName mkPDatasDataConOcc orig_name
 
       comp_tys  <- mkSumTys repr_sels_ty mkPDatasType repr
-
-      liftDs $ buildDataCon dc_name
+      fam_envs <- readGEnv global_fam_inst_env
+      liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             (map (const HsNoBang) comp_tys)
                             []                     -- no field labels

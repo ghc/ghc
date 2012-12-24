@@ -488,6 +488,8 @@ tc_rn_src_decls boot_details ds
         setEnvs (tcg_env, tcl_env) $
         case group_tail of {
            Nothing -> do { tcg_env <- checkMain ;       -- Check for `main'
+                           traceTc "returning from tc_rn_src_decls: " $
+                             ppr $ nameEnvElts $ tcg_type_env tcg_env ; -- RAE
                            return (tcg_env, tcl_env)
                       } ;
 
@@ -801,7 +803,7 @@ checkBootTyCon tc1 tc2
     eqCon c1 c2
       =  dataConName c1 == dataConName c2
       && dataConIsInfix c1 == dataConIsInfix c2
-      && dataConStrictMarks c1 == dataConStrictMarks c2
+      && eqListBy eqHsBang (dataConStrictMarks c1) (dataConStrictMarks c2)
       && dataConFieldLabels c1 == dataConFieldLabels c2
       && eqType (dataConUserType c1) (dataConUserType c2)
 
@@ -955,7 +957,7 @@ tcTopSrcDecls boot_details
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
         addUsedRdrNames fo_rdr_names ;
-
+        traceTc "Tc8: type_env: " (ppr $ nameEnvElts $ tcg_type_env tcg_env') ; -- RAE
         return (tcg_env', tcl_env)
     }}}}}}
   where
@@ -992,13 +994,14 @@ tcTyClsInstDecls boot_details tycl_decls inst_decls deriv_decls
   where
     -- get_cons extracts the *constructor* bindings of the declaration
     get_cons :: LInstDecl Name -> [Name]
-    get_cons (L _ (FamInstD { lid_inst = fid }))       = get_fi_cons fid
-    get_cons (L _ (ClsInstD { cid_fam_insts = fids })) = concatMap (get_fi_cons . unLoc) fids
+    get_cons (L _ (TyFamInstD {}))                     = []
+    get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
+    get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
+      = concatMap (get_fi_cons . unLoc) fids
 
-    get_fi_cons :: FamInstDecl Name -> [Name]
-    get_fi_cons (FamInstDecl { fid_defn = TyData { td_cons = cons } }) 
+    get_fi_cons :: DataFamInstDecl Name -> [Name]
+    get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } }) 
       = map (unLoc . con_name . unLoc) cons
-    get_fi_cons (FamInstDecl {}) = []
 \end{code}
 
 Note [AFamDataCon: not promoting data family constructors]
@@ -1634,6 +1637,8 @@ tcRnDeclsi hsc_env ictxt local_decls =
 
     tcg_env'' <- setGlobalTypeEnv tcg_env' final_type_env
 
+    traceTc "returning from tcRnDeclsi: " $ ppr $ nameEnvElts $ tcg_type_env tcg_env'' -- RAE
+
     return tcg_env''
 
 
@@ -1865,7 +1870,7 @@ ppr_types insts type_env
         -- that the type checker has invented.  Top-level user-defined things
         -- have External names.
 
-ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
+ppr_tycons :: [FamInst br] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env
   = vcat [ text "TYPE CONSTRUCTORS"
          ,   nest 2 (ppr_tydecls tycons)
@@ -1883,7 +1888,7 @@ ppr_insts :: [ClsInst] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
 
-ppr_fam_insts :: [FamInst] -> SDoc
+ppr_fam_insts :: [FamInst br] -> SDoc
 ppr_fam_insts []        = empty
 ppr_fam_insts fam_insts =
   text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)

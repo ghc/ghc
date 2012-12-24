@@ -5,6 +5,7 @@ module Vectorise.Type.TyConDecl (
 
 import Vectorise.Type.Type
 import Vectorise.Monad
+import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 import BuildTyCl
 import Class
 import Type
@@ -169,7 +170,8 @@ vectDataCon dc
        ; tycon'  <- vectTyCon tycon
        ; arg_tys <- mapM vectType rep_arg_tys
        ; let ret_ty = mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)
-       ; liftDs $ buildDataCon
+       ; fam_envs  <- readGEnv global_fam_inst_env
+       ; liftDs $ buildDataCon fam_envs
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
                     (dataConStrictMarks dc)        -- strictness as original constructor

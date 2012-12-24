@@ -122,7 +122,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     spec_info (Just (False, _)) = (0,0,0,0,0,1,0)
     spec_info (Just (True, _))  = (0,0,0,0,0,0,1)
 
-    data_info (TyDecl { tcdTyDefn = TyData {td_cons = cs, td_derivs = derivs}})
+    data_info (DataDecl { tcdDataDefn = HsDataDefn {dd_cons = cs, dd_derivs = derivs}})
         = (length cs, case derivs of Nothing -> 0
                                      Just ds -> length ds)
     data_info _ = (0,0)
@@ -133,20 +133,17 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info _ = (0,0)
 
-    inst_info (FamInstD { lid_inst = d }) 
-        = case countATDecl d of
-           (tyd, dtd) -> (0,0,0,tyd,dtd)
-    inst_info (ClsInstD { cid_binds = inst_meths, cid_sigs = inst_sigs, cid_fam_insts = ats })
+    inst_info (TyFamInstD {}) = (0,0,0,1,0)
+    inst_info (DataFamInstD {}) = (0,0,0,0,1)
+    inst_info (ClsInstD { cid_inst = ClsInstDecl {cid_binds = inst_meths
+                                                 , cid_sigs = inst_sigs
+                                                 , cid_tyfam_insts = ats
+                                                 , cid_datafam_insts = adts } })
         = case count_sigs (map unLoc inst_sigs) of
             (_,_,ss,is,_) ->
-              case foldr add2 (0, 0) (map (countATDecl . unLoc) ats) of
-                (tyDecl, dtDecl) ->
                   (addpr (foldr add2 (0,0) 
                            (map (count_bind.unLoc) (bagToList inst_meths))), 
-                   ss, is, tyDecl, dtDecl)
-        where
-    countATDecl (FamInstDecl { fid_defn = TyData    {} }) = (0, 1)
-    countATDecl (FamInstDecl { fid_defn = TySynonym {} }) = (1, 0)
+                   ss, is, length ats, length adts)
 
     addpr :: (Int,Int) -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)

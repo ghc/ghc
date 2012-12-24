@@ -38,6 +38,7 @@ import MkId
 import IdInfo
 import Class
 import TyCon
+import CoAxiom
 import DataCon
 import PrelNames
 import TysWiredIn
@@ -454,13 +455,18 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
     tc_parent tyvars (Just ax_name)
       = ASSERT( isNoParent parent )
         do { ax <- tcIfaceCoAxiom ax_name
-           ; let (fam_tc, fam_tys) = coAxiomSplitLHS ax
-                 subst = zipTopTvSubst (coAxiomTyVars ax) (mkTyVarTys tyvars)
+           ; let fam_tc = coAxiomTyCon ax
+                 ax_unbr = toUnbranchedAxiom ax
+                 -- data families don't have branches:
+                 branch = coAxiomSingleBranch ax_unbr
+                 ax_tvs = coAxBranchTyVars branch
+                 ax_lhs = coAxBranchLHS branch
+                 subst = zipTopTvSubst ax_tvs (mkTyVarTys tyvars)
                             -- The subst matches the tyvar of the TyCon
                             -- with those from the CoAxiom.  They aren't
                             -- necessarily the same, since the two may be
                             -- gotten from separate interface-file declarations
-           ; return (FamInstTyCon ax fam_tc (substTys subst fam_tys)) }
+           ; return (FamInstTyCon ax_unbr fam_tc (substTys subst ax_lhs)) }
 
 tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
                                   ifSynRhs = mb_rhs_ty,
@@ -538,19 +544,25 @@ tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
         ; return (ATyCon (mkForeignTyCon name ext_name 
                                          liftedTypeKind 0)) }
 
-tc_iface_decl _ _ (IfaceAxiom {ifName = tc_occ, ifTyVars = tv_bndrs,
-                               ifLHS = lhs, ifRHS = rhs })
-  = bindIfaceTyVars tv_bndrs $ \ tvs -> do
-    { tc_name <- lookupIfaceTop tc_occ
-    ; tc_lhs  <- tcIfaceType lhs
-    ; tc_rhs  <- tcIfaceType rhs
-    ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
-                          , co_ax_name     = tc_name
-                          , co_ax_implicit = False
-                          , co_ax_tvs      = tvs
-                          , co_ax_lhs      = tc_lhs
-                          , co_ax_rhs      = tc_rhs }
-    ; return (ACoAxiom axiom) }
+tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = branches})
+  = do { tc_name     <- lookupIfaceTop ax_occ
+       ; tc_tycon    <- tcIfaceTyCon tc
+       ; tc_branches <- mapM tc_branch branches
+       ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
+                             , co_ax_name     = tc_name
+                             , co_ax_tc       = tc_tycon
+                             , co_ax_branches = toBranchList tc_branches
+                             , co_ax_implicit = False }
+       ; return (ACoAxiom axiom) }
+  where tc_branch :: IfaceAxBranch -> IfL CoAxBranch
+        tc_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs })
+          = bindIfaceTyVars tv_bndrs $ \ tvs -> do
+            { tc_lhs <- mapM tcIfaceType lhs
+            ; tc_rhs <- tcIfaceType rhs
+            ; let branch = CoAxBranch { cab_tvs = tvs
+                                      , cab_lhs = tc_lhs
+                                      , cab_rhs = tc_rhs }
+            ; return branch }
 
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons
@@ -566,7 +578,7 @@ tcIfaceDataCons tycon_name tycon _ if_cons
                          ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs,
                          ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = field_lbls,
-                         ifConStricts = stricts})
+                         ifConStricts = if_stricts})
      = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
        bindIfaceTyVars ex_tvs    $ \ ex_tyvars -> do
         { name  <- lookupIfaceTop occ
@@ -583,17 +595,26 @@ tcIfaceDataCons tycon_name tycon _ if_cons
                 ; return (eq_spec, theta, arg_tys) }
         ; lbl_names <- mapM lookupIfaceTop field_lbls
 
+        ; stricts <- mapM tc_strict if_stricts
+
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon 
                                 (substTyVars (mkTopTvSubst eq_spec) univ_tyvars)
 
-        ; buildDataCon name is_infix
+        ; buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr name))
+                       name is_infix
                        stricts lbl_names
                        univ_tyvars ex_tyvars 
                        eq_spec theta 
                        arg_tys orig_res_ty tycon
         }
     mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
+
+    tc_strict IfNoBang = return HsNoBang
+    tc_strict IfStrict = return HsStrict
+    tc_strict IfUnpack = return (HsUnpack Nothing)
+    tc_strict (IfUnpackCo if_co) = do { co <- tcIfaceCo if_co
+                                      ; return (HsUnpack (Just co)) }
 
 tcIfaceEqSpec :: [(OccName, IfaceType)] -> IfL [(TyVar, Type)]
 tcIfaceEqSpec spec
@@ -637,13 +658,13 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 
-tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
-tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
-                             , ifFamInstAxiom = axiom_name } )
+tcIfaceFamInst :: IfaceFamInst -> IfL (FamInst Branched)
+tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcss
+                             , ifFamInstGroup = group, ifFamInstAxiom = axiom_name } )
     = do { axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
                      tcIfaceCoAxiom axiom_name
-         ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-         ; return (mkImportedFamInst fam mb_tcs' axiom') }
+         ; let mb_tcss' = map (map (fmap ifaceTyConName)) mb_tcss
+         ; return (mkImportedFamInst fam group mb_tcss' axiom') }
 \end{code}
 
 
@@ -953,7 +974,9 @@ tcIfaceCo (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' ->
 
 tcIfaceCoApp :: IfaceCoCon -> [IfaceType] -> IfL Coercion
 tcIfaceCoApp IfaceReflCo      [t]     = Refl         <$> tcIfaceType t
-tcIfaceCoApp (IfaceCoAx n)    ts      = AxiomInstCo  <$> tcIfaceCoAxiom n <*> mapM tcIfaceCo ts
+tcIfaceCoApp (IfaceCoAx n i)  ts      = AxiomInstCo  <$> tcIfaceCoAxiom n
+                                                     <*> pure i
+                                                     <*> mapM tcIfaceCo ts
 tcIfaceCoApp IfaceUnsafeCo    [t1,t2] = UnsafeCo     <$> tcIfaceType t1 <*> tcIfaceType t2
 tcIfaceCoApp IfaceSymCo       [t]     = SymCo        <$> tcIfaceCo t
 tcIfaceCoApp IfaceTransCo     [t1,t2] = TransCo      <$> tcIfaceCo t1 <*> tcIfaceCo t2
@@ -1378,7 +1401,7 @@ tcIfaceKindCon (IfaceTc name)
 
            _ -> pprPanic "tcIfaceKindCon" (ppr name $$ ppr thing) }
 
-tcIfaceCoAxiom :: Name -> IfL CoAxiom
+tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
                          ; return (tyThingCoAxiom thing) }
 

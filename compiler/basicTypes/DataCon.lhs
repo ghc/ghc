@@ -14,7 +14,7 @@
 
 module DataCon (
         -- * Main data types
-	DataCon, DataConRep(..),
+	DataCon, DataConRep(..), HsBang(..), StrictnessMark(..),
 	ConTag,
 	
 	-- ** Type construction
@@ -39,6 +39,7 @@ module DataCon (
 	-- ** Predicates on DataCons
 	isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
 	isVanillaDataCon, classDataCon, dataConCannotMatch,
+        isBanged, isMarkedStrict, eqHsBang,
 
         -- * Splitting product types
 	splitProductType_maybe, splitProductType, 
@@ -54,6 +55,7 @@ import {-# SOURCE #-} MkId( DataConBoxer )
 import Type
 import TypeRep( Type(..) )  -- Used in promoteType
 import PrelNames( liftedTypeKindTyConKey )
+import Coercion
 import Kind
 import Unify
 import TyCon
@@ -436,6 +438,25 @@ data DataConRep
 -- but that makes it less likely that rules will match
 -- when we bring bits of unfoldings together.)
 
+-------------------------
+-- HsBang describes what the *programmer* wrote
+-- This info is retained in the DataCon.dcStrictMarks field
+data HsBang 
+  = HsNoBang	       -- Lazy field
+
+  | HsBang Bool      -- Source-language '!' bang
+                     --  True <=> also an {-# UNPACK #-} pragma
+
+  | HsUnpack              -- Definite commitment: this field is strict and unboxed
+       (Maybe Coercion)   --    co :: arg-ty ~ product-ty
+
+  | HsStrict            -- Definite commitment: this field is strict but not unboxed
+  deriving (Data.Data, Data.Typeable)
+
+-------------------------
+-- StrictnessMark is internal only, used to indicate strictness 
+-- of the DataCon *worker* fields
+data StrictnessMark = MarkedStrict | NotMarkedStrict	
 
 -- | Type of the tags associated with each constructor possibility
 type ConTag = Int
@@ -515,6 +536,35 @@ instance Data.Data DataCon where
     toConstr _   = abstractConstr "DataCon"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "DataCon"
+
+instance Outputable HsBang where
+    ppr HsNoBang             = empty
+    ppr (HsBang True)        = ptext (sLit "{-# UNPACK #-} !")
+    ppr (HsBang False)       = char '!'
+    ppr (HsUnpack Nothing)   = ptext (sLit "Unpk")
+    ppr (HsUnpack (Just co)) = ptext (sLit "Unpk") <> parens (ppr co)
+    ppr HsStrict             = ptext (sLit "SrictNotUnpacked")
+
+instance Outputable StrictnessMark where
+  ppr MarkedStrict     = ptext (sLit "!")
+  ppr NotMarkedStrict  = empty
+
+
+eqHsBang :: HsBang -> HsBang -> Bool
+eqHsBang HsNoBang             HsNoBang             = True
+eqHsBang HsStrict             HsStrict             = True
+eqHsBang (HsBang b1)          (HsBang b2)          = b1 == b2
+eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)   = True
+eqHsBang (HsUnpack (Just c1)) (HsUnpack (Just c2)) = eqType (coercionType c1) (coercionType c2)
+eqHsBang _ _ = False
+
+isBanged :: HsBang -> Bool
+isBanged HsNoBang = False
+isBanged _        = True
+
+isMarkedStrict :: StrictnessMark -> Bool
+isMarkedStrict NotMarkedStrict = False
+isMarkedStrict _               = True   -- All others are strict
 \end{code}
 
 

@@ -153,7 +153,7 @@ mkBootModDetailsTc hsc_env
         }
   where
 
-mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst] -> TypeEnv
+mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst Branched] -> TypeEnv
 mkBootTypeEnv exports ids tcs fam_insts
   = tidyTypeEnv True $
        typeEnvFromEntities final_ids tcs fam_insts
