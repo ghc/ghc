@@ -266,3 +266,6 @@ test('Conversions',
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
+
+test('T7507', normal, compile_and_run, ['-O'])
+# For 7507, stack overflow is the bad case
