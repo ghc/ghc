@@ -2,7 +2,6 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import Control.Concurrent.STM
 
 new = newQSemN
 wait = waitQSemN
