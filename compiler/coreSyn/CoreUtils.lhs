@@ -1625,7 +1625,7 @@ There are some particularly delicate points here:
       f = \x. f x
   to
       f = f
-  Which might change a terminiating program (think (f `seq` e)) to a
+  Which might change a terminating program (think (f `seq` e)) to a
   non-terminating one.  So we check for being a loop breaker first.
 
   However for GlobalIds we can look at the arity; and for primops we
