@@ -23,6 +23,8 @@ module Data.Either (
    either,
    lefts,
    rights,
+   isLeft,
+   isRight,
    partitionEithers,
  ) where
 
@@ -96,6 +98,16 @@ partitionEithers = foldr (either left right) ([],[])
  where
   left  a ~(l, r) = (a:l, r)
   right a ~(l, r) = (l, a:r)
+
+-- | Return `True` if the given value is a `Left`-value, `False` otherwise.
+isLeft :: Either a b -> Bool
+isLeft (Left  _) = True
+isLeft (Right _) = False
+
+-- | Return `True` if the given value is a `Right`-value, `False` otherwise.
+isRight :: Either a b -> Bool
+isRight (Left  _) = False
+isRight (Right _) = True
 
 {-
 {--------------------------------------------------------------------
