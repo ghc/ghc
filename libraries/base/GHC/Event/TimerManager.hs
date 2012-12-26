@@ -51,8 +51,7 @@ import GHC.Real ((/), fromIntegral )
 import GHC.Show (Show(..))
 import GHC.Event.Clock (getMonotonicTime)
 import GHC.Event.Control
-import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
-                           Timeout(..))
+import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
@@ -206,7 +205,7 @@ loop mgr@TimerManager{..} = do
 step :: TimerManager -> TimeoutQueue -> IO (Bool, TimeoutQueue)
 step mgr@TimerManager{..} tq = do
   (timeout, q') <- mkTimeout tq
-  I.poll emBackend (Just timeout) (handleControlEvent mgr)
+  _ <- I.poll emBackend (Just timeout) (handleControlEvent mgr)
   state <- readIORef emState
   state `seq` return (state == Running, q')
  where
