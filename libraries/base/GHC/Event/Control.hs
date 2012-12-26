@@ -170,7 +170,7 @@ sendWakeup :: Control -> IO ()
 #if defined(HAVE_EVENTFD)
 sendWakeup c =
   throwErrnoIfMinus1_ "sendWakeup" $
-  c_eventfd_write (fromIntegral (controlEventFd c)) 1    
+  c_eventfd_write (fromIntegral (controlEventFd c)) 1
 #else
 sendWakeup c = do
   n <- sendMessage (wakeupWriteFd c) CMsgWakeup
@@ -199,7 +199,7 @@ foreign import ccall unsafe "sys/eventfd.h eventfd"
    c_eventfd :: CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "sys/eventfd.h eventfd_write"
-   c_eventfd_write :: CInt -> CULong -> IO CInt                
+   c_eventfd_write :: CInt -> CULong -> IO CInt
 #endif
 
 -- Used to tell the RTS how it can send messages to the I/O manager.
@@ -208,4 +208,3 @@ foreign import ccall "setIOManagerControlFd"
 
 foreign import ccall "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
-
