@@ -81,24 +81,24 @@ data KQueue = KQueue {
 
 new :: IO E.Backend
 new = do
-  qfd <- kqueue
+  kqfd <- kqueue
   events <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue qfd events)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue kqfd events)
   return be
 
 delete :: KQueue -> IO ()
-delete q = do
-  _ <- c_close . fromKQueueFd . kqueueFd $ q
+delete kq = do
+  _ <- c_close . fromKQueueFd . kqueueFd $ kq
   return ()
 
 modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO ()
-modifyFd q fd oevt nevt
+modifyFd kq fd oevt nevt
   | nevt == mempty = do
       let !ev = event fd (toFilter oevt) flagDelete noteEOF
-      kqueueControl (kqueueFd q) ev
+      kqueueControl (kqueueFd kq) ev
   | otherwise      = do
       let !ev = event fd (toFilter nevt) flagAdd noteEOF
-      kqueueControl (kqueueFd q) ev
+      kqueueControl (kqueueFd kq) ev
 
 toFilter :: E.Event -> Filter
 toFilter evt
@@ -106,9 +106,9 @@ toFilter evt
   | otherwise                 = filterWrite
 
 modifyFdOnce :: KQueue -> Fd -> E.Event -> IO ()
-modifyFdOnce q fd evt = do
+modifyFdOnce kq fd evt = do
     let !ev = event fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF
-    kqueueControl (kqueueFd q) ev
+    kqueueControl (kqueueFd kq) ev
 
 poll :: KQueue
      -> Maybe Timeout
