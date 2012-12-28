@@ -116,10 +116,11 @@ poll :: KQueue
      -> IO Int
 poll kq mtimeout f = do
     let events = kqueueEvents kq
+        fd = kqueueFd kq
 
     n <- A.unsafeLoad events $ \es cap -> case mtimeout of
-      Just timeout -> kqueueWait (kqueueFd kq) es cap $ fromTimeout timeout
-      Nothing      -> kqueueWaitNonBlock (kqueueFd kq) es cap
+      Just timeout -> kqueueWait fd es cap $ fromTimeout timeout
+      Nothing      -> kqueueWaitNonBlock fd es cap
 
     when (n > 0) $ do
         A.forM_ events $ \e -> f (fromIntegral (ident e)) (toEvent (filter e))

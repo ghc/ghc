@@ -115,12 +115,13 @@ poll :: EPoll                     -- ^ state
      -> IO Int
 poll ep mtimeout f = do
   let events = epollEvents ep
+      fd = epollFd ep
 
   -- Will return zero if the system call was interupted, in which case
   -- we just return (and try again later.)
   n <- A.unsafeLoad events $ \es cap -> case mtimeout of
-    Just timeout -> epollWait (epollFd ep) es cap $ fromTimeout timeout
-    Nothing      -> epollWaitNonBlock (epollFd ep) es cap
+    Just timeout -> epollWait fd es cap $ fromTimeout timeout
+    Nothing      -> epollWaitNonBlock fd es cap
 
   when (n > 0) $ do
     A.forM_ events $ \e -> f (eventFd e) (toEvent (eventTypes e))
