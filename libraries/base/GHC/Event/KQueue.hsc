@@ -74,57 +74,57 @@ available = True
 ------------------------------------------------------------------------
 -- Exported interface
 
-data EventQueue = EventQueue {
-      eqFd       :: {-# UNPACK #-} !QueueFd
-    , eqEvents   :: {-# UNPACK #-} !(A.Array Event)
+data KQueue = KQueue {
+      kqueueFd     :: {-# UNPACK #-} !QueueFd
+    , kqueueEvents :: {-# UNPACK #-} !(A.Array Event)
     }
 
 new :: IO E.Backend
 new = do
   qfd <- kqueue
   events <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (EventQueue qfd events)
+  let !be = E.backend poll modifyFd modifyFdOnce delete (KQueue qfd events)
   return be
 
-delete :: EventQueue -> IO ()
+delete :: KQueue -> IO ()
 delete q = do
-  _ <- c_close . fromQueueFd . eqFd $ q
+  _ <- c_close . fromQueueFd . kqueueFd $ q
   return ()
 
-modifyFd :: EventQueue -> Fd -> E.Event -> E.Event -> IO ()
+modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO ()
 modifyFd q fd oevt nevt
   | nevt == mempty = do
       let !ev = event fd (toFilter oevt) flagDelete noteEOF
-      kqueueControl (eqFd q) ev
+      kqueueControl (kqueueFd q) ev
   | otherwise      = do
       let !ev = event fd (toFilter nevt) flagAdd noteEOF
-      kqueueControl (eqFd q) ev
+      kqueueControl (kqueueFd q) ev
 
 toFilter :: E.Event -> Filter
 toFilter evt
   | evt `E.eventIs` E.evtRead = filterRead
   | otherwise                 = filterWrite
 
-modifyFdOnce :: EventQueue -> Fd -> E.Event -> IO ()
+modifyFdOnce :: KQueue -> Fd -> E.Event -> IO ()
 modifyFdOnce q fd evt = do
     let !ev = event fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF
-    kqueueControl (eqFd q) ev
+    kqueueControl (kqueueFd q) ev
 
-poll :: EventQueue
+poll :: KQueue
      -> Maybe Timeout
      -> (Fd -> E.Event -> IO ())
      -> IO Int
-poll EventQueue{..} mtout f = do
-    n <- A.unsafeLoad eqEvents $ \evp cap ->
+poll KQueue{..} mtout f = do
+    n <- A.unsafeLoad kqueueEvents $ \evp cap ->
       case mtout of
         Just tout -> withTimeSpec (fromTimeout tout) $
-                     kevent True eqFd nullPtr 0 evp cap
+                     kevent True kqueueFd nullPtr 0 evp cap
         Nothing   -> withTimeSpec (TimeSpec 0 0) $
-                     kevent False eqFd nullPtr 0 evp cap
+                     kevent False kqueueFd nullPtr 0 evp cap
     when (n > 0) $ do
-        cap <- A.capacity eqEvents
-        when (n == cap) $ A.ensureCapacity eqEvents (2 * cap)
-        A.forM_ eqEvents $ \e -> f (fromIntegral (ident e)) (toEvent (filter e))
+        cap <- A.capacity kqueueEvents
+        when (n == cap) $ A.ensureCapacity kqueueEvents (2 * cap)
+        A.forM_ kqueueEvents $ \e -> f (fromIntegral (ident e)) (toEvent (filter e))
     return n
 ------------------------------------------------------------------------
 -- FFI binding
