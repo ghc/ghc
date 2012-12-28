@@ -75,7 +75,7 @@ available = True
 -- Exported interface
 
 data KQueue = KQueue {
-      kqueueFd     :: {-# UNPACK #-} !QueueFd
+      kqueueFd     :: {-# UNPACK #-} !KQueueFd
     , kqueueEvents :: {-# UNPACK #-} !(A.Array Event)
     }
 
@@ -88,7 +88,7 @@ new = do
 
 delete :: KQueue -> IO ()
 delete q = do
-  _ <- c_close . fromQueueFd . kqueueFd $ q
+  _ <- c_close . fromKQueueFd . kqueueFd $ q
   return ()
 
 modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO ()
@@ -129,8 +129,8 @@ poll KQueue{..} mtout f = do
 ------------------------------------------------------------------------
 -- FFI binding
 
-newtype QueueFd = QueueFd {
-      fromQueueFd :: CInt
+newtype KQueueFd = KQueueFd {
+      fromKQueueFd :: CInt
     } deriving (Eq, Show)
 
 #if defined(HAVE_KEVENT64)
@@ -266,17 +266,17 @@ instance Storable TimeSpec where
         #{poke struct timespec, tv_sec} ptr (tv_sec ts)
         #{poke struct timespec, tv_nsec} ptr (tv_nsec ts)
 
-kqueue :: IO QueueFd
-kqueue = QueueFd `fmap` throwErrnoIfMinus1 "kqueue" c_kqueue
+kqueue :: IO KQueueFd
+kqueue = KQueueFd `fmap` throwErrnoIfMinus1 "kqueue" c_kqueue
 
-kqueueControl :: QueueFd -> Event -> IO ()
+kqueueControl :: KQueueFd -> Event -> IO ()
 kqueueControl kfd ev = void $
     withTimeSpec (TimeSpec 0 0) $ \tp ->
         withEvent ev $ \evp -> kevent False kfd evp 1 nullPtr 0 tp
 
 -- TODO: We cannot retry on EINTR as the timeout would be wrong.
 -- Perhaps we should just return without calling any callbacks.
-kevent :: Bool -> QueueFd -> Ptr Event -> Int -> Ptr Event -> Int -> Ptr TimeSpec
+kevent :: Bool -> KQueueFd -> Ptr Event -> Int -> Ptr Event -> Int -> Ptr TimeSpec
        -> IO Int
 kevent safe k chs chlen evs evlen ts
     = fmap fromIntegral $ E.throwErrnoIfMinus1NoRetry "kevent" $
@@ -321,15 +321,15 @@ foreign import ccall unsafe "kqueue"
 
 #if defined(HAVE_KEVENT64)
 foreign import ccall safe "kevent64"
-    c_kevent64 :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
+    c_kevent64 :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                -> Ptr TimeSpec -> IO CInt
 
 foreign import ccall unsafe "kevent64"
-    c_kevent64_unsafe :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
+    c_kevent64_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                       -> Ptr TimeSpec -> IO CInt               
 #elif defined(HAVE_KEVENT)
 foreign import capi safe "sys/event.h kevent"
-    c_kevent :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
+    c_kevent :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
              -> Ptr TimeSpec -> IO CInt
 
 foreign import ccall unsafe "kevent"
