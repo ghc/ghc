@@ -108,7 +108,7 @@ toFilter evt
 modifyFdOnce :: EventQueue -> Fd -> E.Event -> IO ()
 modifyFdOnce q fd evt = do
     let !ev = event fd (toFilter evt) (flagAdd .|. flagOneshot) noteEOF
-    kqueueControl (kqueueFd q) ev
+    kqueueControl (eqFd q) ev
 
 poll :: EventQueue
      -> Maybe Timeout
@@ -269,7 +269,7 @@ instance Storable TimeSpec where
 kqueue :: IO QueueFd
 kqueue = QueueFd `fmap` throwErrnoIfMinus1 "kqueue" c_kqueue
 
-kqueueControl :: KQueueFd -> Event -> IO ()
+kqueueControl :: QueueFd -> Event -> IO ()
 kqueueControl kfd ev = void $
     withTimeSpec (TimeSpec 0 0) $ \tp ->
         withEvent ev $ \evp -> kevent False kfd evp 1 nullPtr 0 tp
@@ -289,6 +289,9 @@ kevent safe k chs chlen evs evlen ts
       then c_kevent k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
       else c_kevent_unsafe k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
 #endif
+
+withEvent :: Event -> (Ptr Event -> IO a) -> IO a
+withEvent ev f = alloca $ \ptr -> poke ptr ev >> f ptr
 
 withTimeSpec :: TimeSpec -> (Ptr TimeSpec -> IO a) -> IO a
 withTimeSpec ts f =
@@ -322,7 +325,7 @@ foreign import ccall safe "kevent64"
                -> Ptr TimeSpec -> IO CInt
 
 foreign import ccall unsafe "kevent64"
-    c_kevent64_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
+    c_kevent64_unsafe :: QueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
                       -> Ptr TimeSpec -> IO CInt               
 #elif defined(HAVE_KEVENT)
 foreign import capi safe "sys/event.h kevent"
