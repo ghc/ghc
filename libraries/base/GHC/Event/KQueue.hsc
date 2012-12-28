@@ -114,17 +114,17 @@ poll :: KQueue
      -> Maybe Timeout
      -> (Fd -> E.Event -> IO ())
      -> IO Int
-poll KQueue{..} mtout f = do
-    n <- A.unsafeLoad kqueueEvents $ \evp cap ->
-      case mtout of
-        Just tout -> withTimeSpec (fromTimeout tout) $
-                     kevent True kqueueFd nullPtr 0 evp cap
-        Nothing   -> withTimeSpec (TimeSpec 0 0) $
-                     kevent False kqueueFd nullPtr 0 evp cap
+poll kq mtimeout f = do
+    let events = kqueueEvents kq
+
+    n <- A.unsafeLoad events $ \es cap -> case mtimeout of
+      Just timeout -> kqueueWait (kqueueFd kq) es cap $ fromTimeout timeout
+      Nothing      -> kqueueWaitNonBlock (kqueueFd kq) es cap
+
     when (n > 0) $ do
-        cap <- A.capacity kqueueEvents
-        when (n == cap) $ A.ensureCapacity kqueueEvents (2 * cap)
-        A.forM_ kqueueEvents $ \e -> f (fromIntegral (ident e)) (toEvent (filter e))
+        A.forM_ events $ \e -> f (fromIntegral (ident e)) (toEvent (filter e))
+        cap <- A.capacity events
+        when (n == cap) $ A.ensureCapacity events (2 * cap)
     return n
 ------------------------------------------------------------------------
 -- FFI binding
@@ -273,6 +273,14 @@ kqueueControl :: KQueueFd -> Event -> IO ()
 kqueueControl kfd ev = void $
     withTimeSpec (TimeSpec 0 0) $ \tp ->
         withEvent ev $ \evp -> kevent False kfd evp 1 nullPtr 0 tp
+
+kqueueWait :: KQueueFd -> Ptr Event -> Int -> TimeSpec -> IO Int
+kqueueWait fd es cap tm =
+    withTimeSpec tm $ kevent True fd nullPtr 0 es cap
+
+kqueueWaitNonBlock :: KQueueFd -> Ptr Event -> Int -> IO Int
+kqueueWaitNonBlock fd es cap =
+    withTimeSpec (TimeSpec 0 0) $ kevent False fd nullPtr 0 es cap
 
 -- TODO: We cannot retry on EINTR as the timeout would be wrong.
 -- Perhaps we should just return without calling any callbacks.
