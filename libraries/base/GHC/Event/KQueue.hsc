@@ -303,11 +303,9 @@ withEvent :: Event -> (Ptr Event -> IO a) -> IO a
 withEvent ev f = alloca $ \ptr -> poke ptr ev >> f ptr
 
 withTimeSpec :: TimeSpec -> (Ptr TimeSpec -> IO a) -> IO a
-withTimeSpec ts f =
-    if tv_sec ts < 0 then
-        f nullPtr
-      else
-        alloca $ \ptr -> poke ptr ts >> f ptr
+withTimeSpec ts f
+  | tv_sec ts < 0 = f nullPtr
+  | otherwise     = alloca $ \ptr -> poke ptr ts >> f ptr
 
 fromTimeout :: Timeout -> TimeSpec
 fromTimeout Forever     = TimeSpec (-1) (-1)
@@ -321,9 +319,9 @@ fromTimeout (Timeout s) = TimeSpec (toEnum sec) (toEnum nanosec)
 
 toEvent :: Filter -> E.Event
 toEvent (Filter f)
-    | f == (#const EVFILT_READ) = E.evtRead
-    | f == (#const EVFILT_WRITE) = E.evtWrite
-    | otherwise = error $ "toEvent: unknown filter " ++ show f
+  | f == (#const EVFILT_READ) = E.evtRead
+  | f == (#const EVFILT_WRITE) = E.evtWrite
+  | otherwise = error $ "toEvent: unknown filter " ++ show f
 
 foreign import ccall unsafe "kqueue"
     c_kqueue :: IO CInt
