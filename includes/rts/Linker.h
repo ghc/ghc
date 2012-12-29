@@ -25,9 +25,6 @@ typedef char    pathchar;
 /* initialize the object linker */
 void initLinker( void );
 
-/* insert a stable symbol in the hash table */
-void insertStableSymbol(pathchar* obj_name, char* key, StgPtr data);
-
 /* insert a symbol in the hash table */
 void insertSymbol(pathchar* obj_name, char* key, void* data);
 

@@ -27,7 +27,6 @@
 #include "RtsUtils.h"
 #include "Trace.h"
 #include "StgPrimFloat.h" // for __int_encodeFloat etc.
-#include "Stable.h"
 #include "Proftimer.h"
 #include "GetEnv.h"
 
@@ -140,9 +139,6 @@
 
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
-
-/* Hash table mapping symbol names to StgStablePtr */
-static /*Str*/HashTable *stablehash;
 
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;     /* initially empty */
@@ -1139,7 +1135,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_killThreadzh)                                   \
       SymI_HasProto(loadArchive)                                        \
       SymI_HasProto(loadObj)                                            \
-      SymI_HasProto(insertStableSymbol)                                 \
       SymI_HasProto(insertSymbol)                                       \
       SymI_HasProto(lookupSymbol)                                       \
       SymI_HasProto(stg_makeStablePtrzh)                                \
@@ -1540,7 +1535,6 @@ initLinker( void )
 #if defined(THREADED_RTS) && (defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO))
     initMutex(&dl_mutex);
 #endif
-    stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
@@ -1867,17 +1861,6 @@ error:
    barf("addDLL: not implemented on this platform");
 #  endif
 }
-
-/* -----------------------------------------------------------------------------
- * insert a stable symbol in the hash table
- */
-
-void
-insertStableSymbol(pathchar* obj_name, char* key, StgPtr p)
-{
-  ghciInsertStrHashTable(obj_name, stablehash, key, getStablePtr(p));
-}
-
 
 /* -----------------------------------------------------------------------------
  * insert a symbol in the hash table
@@ -4974,8 +4957,6 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #ifdef i386_HOST_ARCH
       Elf_Addr  value;
 #endif
-      StgStablePtr stablePtr;
-      StgPtr stableVal;
 #ifdef arm_HOST_ARCH
       int is_target_thm=0, T=0;
 #endif
@@ -4998,16 +4979,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
          } else {
             symbol = strtab + sym.st_name;
-            stablePtr = (StgStablePtr)lookupHashTable(stablehash, (StgWord)symbol);
-            if (NULL == stablePtr) {
-              /* No, so look up the name in our global table. */
-              S_tmp = lookupSymbol( symbol );
-              S = (Elf_Addr)S_tmp;
-            } else {
-              stableVal = deRefStablePtr( stablePtr );
-              S_tmp = stableVal;
-              S = (Elf_Addr)S_tmp;
-            }
+            S_tmp = lookupSymbol( symbol );
+            S = (Elf_Addr)S_tmp;
          }
          if (!S) {
             errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
