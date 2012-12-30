@@ -66,6 +66,8 @@ module Control.Concurrent (
         threadDelay,
         threadWaitRead,
         threadWaitWrite,
+        threadWaitReadSTM,
+        threadWaitWriteSTM,
 #endif
 
         -- * Communication abstractions
@@ -116,7 +118,8 @@ import Control.Exception.Base as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception
-import GHC.Conc hiding (threadWaitRead, threadWaitWrite)
+import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
+                        threadWaitReadSTM, threadWaitWriteSTM)
 import qualified GHC.Conc
 import GHC.IO           ( IO(..), unsafeInterleaveIO, unsafeUnmask )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
@@ -130,6 +133,7 @@ import Control.Monad    ( when )
 #ifdef mingw32_HOST_OS
 import Foreign.C
 import System.IO
+import Data.Maybe (Maybe(..))
 #endif
 #endif
 
@@ -446,6 +450,50 @@ threadWaitWrite fd
   | otherwise = error "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
+#endif
+
+-- | Returns an STM action that can be used to wait for data
+-- to read from a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitReadSTM :: Fd -> IO (STM (), IO ())
+threadWaitReadSTM fd
+#ifdef mingw32_HOST_OS
+  | threaded = do v <- newTVarIO Nothing
+                  mask_ $ forkIO $ do result <- try (waitFd fd 0)
+                                      atomically (writeTVar v $ Just result)
+                  let waitAction = do result <- readTVar v
+                                      case result of
+                                        Nothing         -> retry
+                                        Just (Right ()) -> return ()
+                                        Just (Left e)   -> throwSTM e
+                  let killAction = return ()
+                  return (waitAction, killAction)
+  | otherwise = error "threadWaitReadSTM requires -threaded on Windows"
+#else
+  = GHC.Conc.threadWaitReadSTM fd
+#endif
+
+-- | Returns an STM action that can be used to wait until data
+-- can be written to a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
+threadWaitWriteSTM fd 
+#ifdef mingw32_HOST_OS
+  | threaded = do v <- newTVarIO Nothing
+                  mask_ $ forkIO $ do result <- try (waitFd fd 1)
+                                      atomically (writeTVar v $ Just result)
+                  let waitAction = do result <- readTVar v
+                                      case result of
+                                        Nothing         -> retry
+                                        Just (Right ()) -> return ()
+                                        Just (Left e)   -> throwSTM e
+                  let killAction = return ()
+                  return (waitAction, killAction)
+  | otherwise = error "threadWaitWriteSTM requires -threaded on Windows"
+#else
+  = GHC.Conc.threadWaitWriteSTM fd
 #endif
 
 #ifdef mingw32_HOST_OS

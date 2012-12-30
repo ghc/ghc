@@ -38,6 +38,8 @@ module GHC.Conc.IO
         , registerDelay
         , threadWaitRead
         , threadWaitWrite
+        , threadWaitReadSTM
+        , threadWaitWriteSTM
         , closeFdWith
 
 #ifdef mingw32_HOST_OS
@@ -107,6 +109,44 @@ threadWaitWrite fd
         case fromIntegral fd of { I# fd# ->
         case waitWrite# fd# s of { s' -> (# s', () #)
         }}
+
+-- | Returns an STM action that can be used to wait for data
+-- to read from a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitReadSTM fd 
+#ifndef mingw32_HOST_OS
+  | threaded  = Event.threadWaitReadSTM fd
+#endif
+  | otherwise = do
+      m <- Sync.newTVarIO False
+      Sync.forkIO $ do
+        threadWaitRead fd
+        Sync.atomically $ Sync.writeTVar m True
+      let waitAction = do b <- Sync.readTVar m
+                          if b then return () else retry
+      let killAction = return ()
+      return (waitAction, killAction)
+
+-- | Returns an STM action that can be used to wait until data
+-- can be written to a file descriptor. The second returned value
+-- is an IO action that can be used to deregister interest
+-- in the file descriptor.
+threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitWriteSTM fd 
+#ifndef mingw32_HOST_OS
+  | threaded  = Event.threadWaitWriteSTM fd
+#endif
+  | otherwise = do
+      m <- Sync.newTVarIO False
+      Sync.forkIO $ do
+        threadWaitWrite fd
+        Sync.atomically $ Sync.writeTVar m True
+      let waitAction = do b <- Sync.readTVar m
+                          if b then return () else retry
+      let killAction = return ()
+      return (waitAction, killAction)
 
 -- | Close a file descriptor in a concurrency-safe way (GHC only).  If
 -- you are using 'threadWaitRead' or 'threadWaitWrite' to perform

@@ -62,6 +62,8 @@ module GHC.Conc
         , registerDelay
         , threadWaitRead
         , threadWaitWrite
+        , threadWaitReadSTM
+        , threadWaitWriteSTM
         , closeFdWith
 
         -- * TVars
