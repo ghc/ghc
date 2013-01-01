@@ -496,7 +496,7 @@ data EvTerm
                                  -- selector Id.  We count up from _0_
 
   | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
-                                 -- Note [EvLit]
+                                 -- Note [SingI and EvLit]
 
   deriving( Data.Data, Data.Typeable)
 
@@ -550,27 +550,26 @@ Conclusion: a new wanted coercion variable should be made mutable.
  from super classes will be "given" and hence rigid]
 
 
-Note [EvLit]
-~~~~~~~~~~~~
+Note [SingI and EvLit]
+~~~~~~~~~~~~~~~~~~~~~~
 A part of the type-level literals implementation is the class "SingI",
 which provides a "smart" constructor for defining singleton values.
+Here is the key stuff from GHC.TypeLits
 
-newtype Sing n = Sing (SingRep n)
+  class SingI n where
+    sing :: Sing n
 
-class SingI n where
-  sing :: Sing n
-
-type family SingRep a
-type instance SingRep (a :: Nat)    = Integer
-type instance SingRep (a :: Symbol) = String
+  data family Sing (n::k)
+  newtype instance Sing (n :: Nat)    = SNat Integer
+  newtype instance Sing (s :: Symbol) = SSym String
 
 Conceptually, this class has infinitely many instances:
 
-instance Sing 0       where sing = Sing 0
-instance Sing 1       where sing = Sing 1
-instance Sing 2       where sing = Sing 2
-instance Sing "hello" where sing = Sing "hello"
-...
+  instance Sing 0       where sing = SNat 0
+  instance Sing 1       where sing = SNat 1
+  instance Sing 2       where sing = SNat 2
+  instance Sing "hello" where sing = SSym "hello"
+  ...
 
 In practice, we solve "SingI" predicates in the type-checker because we can't
 have infinately many instances.  The evidence (aka "dictionary")
