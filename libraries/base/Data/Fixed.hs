@@ -28,7 +28,7 @@ module Data.Fixed
 (
     div',mod',divMod',
 
-    Fixed,HasResolution(..),
+    Fixed(..), HasResolution(..),
     showFixed,
     E0,Uni,
     E1,Deci,
