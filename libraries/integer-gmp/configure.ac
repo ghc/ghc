@@ -50,7 +50,7 @@ else
     LOOK_FOR_GMP_LIB
     LOOK_FOR_GMP_FRAMEWORK
 fi
-if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "NO"
+if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "YES"
 then
     AC_CHECK_HEADER([gmp.h], , [AC_MSG_ERROR([Cannot find gmp.h])])
 fi
