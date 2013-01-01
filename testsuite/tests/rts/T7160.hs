@@ -3,9 +3,10 @@ import GHC.ForeignPtr
 import GHC.Ptr
 import System.Mem
 
--- one should really use own C function rather than this varargs one to avoid
--- possible ABI issues
-foreign import ccall "&debugBelch" fun :: FunPtr (Ptr () -> Ptr () -> IO ())
+-- Don't use debugBelch() directly, because we cannot call varargs functions
+-- using the FFI (doing so produces a segfault on 64-bit Linux, for example).
+-- See Debug.Trace.traceIO, which also uses debugBelch2.
+foreign import ccall "&debugBelch2" fun :: FunPtr (Ptr () -> Ptr () -> IO ())
 
 new name = do
     p <- newForeignPtr_ (Ptr name)
