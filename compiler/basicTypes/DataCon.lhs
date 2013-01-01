@@ -14,7 +14,7 @@
 
 module DataCon (
         -- * Main data types
-	DataCon, DataConIds(..),
+	DataCon, DataConRep(..), HsBang(..), StrictnessMark(..),
 	ConTag,
 	
 	-- ** Type construction
@@ -30,19 +30,19 @@ module DataCon (
 	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
-	dataConStrictMarks, dataConExStricts,
+	dataConStrictMarks, 
 	dataConSourceArity, dataConRepArity, dataConRepRepArity,
 	dataConIsInfix,
 	dataConWorkId, dataConWrapId, dataConWrapId_maybe, dataConImplicitIds,
-	dataConRepStrictness,
+	dataConRepStrictness, dataConRepBangs, dataConBoxer,
 	
 	-- ** Predicates on DataCons
 	isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
 	isVanillaDataCon, classDataCon, dataConCannotMatch,
+        isBanged, isMarkedStrict, eqHsBang,
 
         -- * Splitting product types
-	splitProductType_maybe, splitProductType, deepSplitProductType,
-        deepSplitProductType_maybe,
+	splitProductType_maybe, splitProductType, 
 
         -- ** Promotion related functions
         isPromotableTyCon, promoteTyCon, 
@@ -51,12 +51,13 @@ module DataCon (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} MkId( DataConBoxer )
 import Type
 import TypeRep( Type(..) )  -- Used in promoteType
 import PrelNames( liftedTypeKindTyConKey )
+import Coercion
 import Kind
 import Unify
-import Coercion
 import TyCon
 import Class
 import Name
@@ -342,24 +343,28 @@ data DataCon
 		-- The OrigResTy is T [a], but the dcRepTyCon might be :T123
 
 	-- Now the strictness annotations and field labels of the constructor
-	dcStrictMarks :: [HsBang],
+        -- See Note [Bangs on data constructor arguments]
+	dcArgBangs :: [HsBang],
 		-- Strictness annotations as decided by the compiler.  
-		-- Does *not* include the existential dictionaries
-		-- length = dataConSourceArity dataCon
+		-- Matches 1-1 with dcOrigArgTys
+		-- Hence length = dataConSourceArity dataCon
 
 	dcFields  :: [FieldLabel],
 		-- Field labels for this constructor, in the
 		-- same order as the dcOrigArgTys; 
 		-- length = 0 (if not a record) or dataConSourceArity.
 
-	-- Constructor representation
-	dcRepArgTys :: [Type],	-- Final, representation argument types, 
-				-- after unboxing and flattening,
-				-- and *including* all existential evidence args
+	-- The curried worker function that corresponds to the constructor:
+	-- It doesn't have an unfolding; the code generator saturates these Ids
+	-- and allocates a real constructor when it finds one.
+	dcWorkId :: Id,
 
-	dcRepStrictness :: [StrictnessMark],
-                -- One for each *representation* *value* argument
-		-- See also Note [Data-con worker strictness] in MkId.lhs
+	-- Constructor representation
+        dcRep      :: DataConRep,
+
+        -- Cached
+        dcRepArity    :: Arity,  -- == length dataConRepArgTys
+        dcSourceArity :: Arity,  -- == length dcOrigArgTys
 
 	-- Result type of constructor is T t1..tn
 	dcRepTyCon  :: TyCon,		-- Result tycon, T
@@ -379,13 +384,6 @@ data DataCon
 	-- used in CoreLint.
 
 
-	-- The curried worker function that corresponds to the constructor:
-	-- It doesn't have an unfolding; the code generator saturates these Ids
-	-- and allocates a real constructor when it finds one.
-	--
-	-- An entirely separate wrapper function is built in TcTyDecls
-	dcIds :: DataConIds,
-
 	dcInfix :: Bool,	-- True <=> declared infix
 				-- Used for Template Haskell and 'deriving' only
 				-- The actual fixity is stored elsewhere
@@ -395,29 +393,70 @@ data DataCon
   }
   deriving Data.Typeable.Typeable
 
--- | Contains the Ids of the data constructor functions
-data DataConIds
-  = DCIds (Maybe Id) Id 	-- Algebraic data types always have a worker, and
-				-- may or may not have a wrapper, depending on whether
-				-- the wrapper does anything.  Newtypes just have a worker
+data DataConRep 
+  = NoDataConRep              -- No wrapper
 
-	-- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
+  | DCR { dcr_wrap_id :: Id   -- Takes src args, unboxes/flattens, 
+                              -- and constructs the representation
 
-	-- The wrapper takes dcOrigArgTys as its arguments
-	-- The worker takes dcRepArgTys as its arguments
-	-- If the worker is absent, dcRepArgTys is the same as dcOrigArgTys
+        , dcr_boxer   :: DataConBoxer
 
-	-- The 'Nothing' case of DCIds is important
-	-- Not only is this efficient,
-	-- but it also ensures that the wrapper is replaced
-	-- by the worker (because it *is* the worker)
-	-- even when there are no args. E.g. in
-	-- 		f (:) x
-	-- the (:) *is* the worker.
-	-- This is really important in rule matching,
-	-- (We could match on the wrappers,
-	-- but that makes it less likely that rules will match
-	-- when we bring bits of unfoldings together.)
+        , dcr_arg_tys :: [Type]  -- Final, representation argument types, 
+                                 -- after unboxing and flattening,
+                                 -- and *including* all evidence args
+
+        , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
+		-- See also Note [Data-con worker strictness] in MkId.lhs
+
+        , dcr_bangs :: [HsBang]  -- The actual decisions made (including failures)
+                                 -- 1-1 with orig_arg_tys
+                                 -- See Note [Bangs on data constructor arguments]
+
+    }
+-- Algebraic data types always have a worker, and
+-- may or may not have a wrapper, depending on whether
+-- the wrapper does anything.  
+--
+-- Data types have a worker with no unfolding
+-- Newtypes just have a worker, which has a compulsory unfolding (just a cast)
+
+-- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
+
+-- The wrapper (if it exists) takes dcOrigArgTys as its arguments
+-- The worker takes dataConRepArgTys as its arguments
+-- If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
+
+-- The 'NoDataConRep' case is important
+-- Not only is this efficient,
+-- but it also ensures that the wrapper is replaced
+-- by the worker (because it *is* the worker)
+-- even when there are no args. E.g. in
+-- 		f (:) x
+-- the (:) *is* the worker.
+-- This is really important in rule matching,
+-- (We could match on the wrappers,
+-- but that makes it less likely that rules will match
+-- when we bring bits of unfoldings together.)
+
+-------------------------
+-- HsBang describes what the *programmer* wrote
+-- This info is retained in the DataCon.dcStrictMarks field
+data HsBang 
+  = HsNoBang	       -- Lazy field
+
+  | HsBang Bool      -- Source-language '!' bang
+                     --  True <=> also an {-# UNPACK #-} pragma
+
+  | HsUnpack              -- Definite commitment: this field is strict and unboxed
+       (Maybe Coercion)   --    co :: arg-ty ~ product-ty
+
+  | HsStrict            -- Definite commitment: this field is strict but not unboxed
+  deriving (Data.Data, Data.Typeable)
+
+-------------------------
+-- StrictnessMark is internal only, used to indicate strictness 
+-- of the DataCon *worker* fields
+data StrictnessMark = MarkedStrict | NotMarkedStrict	
 
 -- | Type of the tags associated with each constructor possibility
 type ConTag = Int
@@ -444,6 +483,25 @@ Here
 but the rep type is
 	Trep :: Int# -> a -> T a
 Actually, the unboxed part isn't implemented yet!
+
+Note [Bangs on data constructor arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T = MkT !Int {-# UNPACK #-} !Int Bool
+Its dcArgBangs field records the *users* specifications, in this case
+    [HsBang False, HsBang True, HsNoBang]
+See the declaration of HsBang in BasicTypes
+
+The dcr_bangs field of the dcRep field records the *actual, decided*
+representation of the data constructor.  Without -O this might be
+    [HsStrict, HsStrict, HsNoBang]
+With -O it might be
+    [HsStrict, HsUnpack, HsNoBang]
+With -funbox-small-strict-fields it might be
+    [HsUnpack, HsUnpack, HsNoBang]
+
+For imported data types, the dcArgBangs field is just the same as the
+dcr_bangs field; we don't know what the user originally said.
 
 
 %************************************************************************
@@ -478,6 +536,35 @@ instance Data.Data DataCon where
     toConstr _   = abstractConstr "DataCon"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "DataCon"
+
+instance Outputable HsBang where
+    ppr HsNoBang             = empty
+    ppr (HsBang True)        = ptext (sLit "{-# UNPACK #-} !")
+    ppr (HsBang False)       = char '!'
+    ppr (HsUnpack Nothing)   = ptext (sLit "Unpk")
+    ppr (HsUnpack (Just co)) = ptext (sLit "Unpk") <> parens (ppr co)
+    ppr HsStrict             = ptext (sLit "SrictNotUnpacked")
+
+instance Outputable StrictnessMark where
+  ppr MarkedStrict     = ptext (sLit "!")
+  ppr NotMarkedStrict  = empty
+
+
+eqHsBang :: HsBang -> HsBang -> Bool
+eqHsBang HsNoBang             HsNoBang             = True
+eqHsBang HsStrict             HsStrict             = True
+eqHsBang (HsBang b1)          (HsBang b2)          = b1 == b2
+eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)   = True
+eqHsBang (HsUnpack (Just c1)) (HsUnpack (Just c2)) = eqType (coercionType c1) (coercionType c2)
+eqHsBang _ _ = False
+
+isBanged :: HsBang -> Bool
+isBanged HsNoBang = False
+isBanged _        = True
+
+isMarkedStrict :: StrictnessMark -> Bool
+isMarkedStrict NotMarkedStrict = False
+isMarkedStrict _               = True   -- All others are strict
 \end{code}
 
 
@@ -503,7 +590,8 @@ mkDataCon :: Name
 	  -> TyCon              -- ^ Representation type constructor
 	  -> ThetaType          -- ^ The "stupid theta", context of the data declaration 
 				--   e.g. @data Eq a => T a ...@
-	  -> DataConIds         -- ^ The Ids of the actual builder functions
+          -> Id                 -- ^ Worker Id
+	  -> DataConRep         -- ^ Representation
 	  -> DataCon
   -- Can get the tag from the TyCon
 
@@ -513,7 +601,7 @@ mkDataCon name declared_infix
 	  univ_tvs ex_tvs 
 	  eq_spec theta
 	  orig_arg_tys orig_res_ty rep_tycon
-	  stupid_theta ids
+	  stupid_theta work_id rep
 -- Warning: mkDataCon is not a good place to check invariants. 
 -- If the programmer writes the wrong result type in the decl, thus:
 --	data T a where { MkT :: S }
@@ -533,37 +621,30 @@ mkDataCon name declared_infix
 		  dcStupidTheta = stupid_theta, 
 		  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
 		  dcRepTyCon = rep_tycon, 
-		  dcRepArgTys = rep_arg_tys,
-		  dcStrictMarks = arg_stricts, 
-		  dcRepStrictness = rep_arg_stricts,
-		  dcFields = fields, dcTag = tag, dcRepType = ty,
-		  dcIds = ids,
+		  dcArgBangs = arg_stricts, 
+		  dcFields = fields, dcTag = tag, dcRepType = rep_ty,
+		  dcWorkId = work_id,
+                  dcRep = rep, 
+                  dcSourceArity = length orig_arg_tys,
+                  dcRepArity = length rep_arg_tys,
                   dcPromoted = mb_promoted }
 
-	-- Strictness marks for source-args
-	--	*after unboxing choices*, 
-	-- but  *including existential dictionaries*
 	-- 
 	-- The 'arg_stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
-    full_theta   = eqSpecPreds eq_spec ++ theta
-    real_arg_tys = full_theta                         ++ orig_arg_tys
-    real_stricts = map mk_pred_strict_mark full_theta ++ arg_stricts
-
-	-- Representation arguments and demands
-	-- To do: eliminate duplication with MkId
-    (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
-    ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
-	  mkFunTys rep_arg_tys $
-	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+    rep_arg_tys = dataConRepArgTys con
+    rep_ty = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
+	     mkFunTys rep_arg_tys $
+	     mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
     mb_promoted   -- See Note [Promoted data constructors] in TyCon
       | all (isLiftedTypeKind . tyVarKind) (univ_tvs ++ ex_tvs)
                           -- No kind polymorphism, and all of kind *
-      , null full_theta   -- No constraints
+      , null eq_spec   -- No constraints
+      , null theta
       , all isPromotableType orig_arg_tys
       = Just (mkPromotedDataCon con name (getUnique name) prom_kind arity)
       | otherwise 
@@ -573,11 +654,6 @@ mkDataCon name declared_infix
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
-
-mk_pred_strict_mark :: PredType -> HsBang
-mk_pred_strict_mark pred 
-  | isEqPred pred = HsUnpack	-- Note [Unpack equality predicates]
-  | otherwise     = HsNoBang
 \end{code}
 
 Note [Unpack equality predicates]
@@ -647,31 +723,32 @@ dataConTheta (MkData { dcEqSpec = eq_spec, dcOtherTheta = theta })
 -- be different from the obvious one written in the source program. Panics
 -- if there is no such 'Id' for this 'DataCon'
 dataConWorkId :: DataCon -> Id
-dataConWorkId dc = case dcIds dc of
-			DCIds _ wrk_id -> wrk_id
+dataConWorkId dc = dcWorkId dc
 
 -- | Get the Id of the 'DataCon' wrapper: a function that wraps the "actual"
 -- constructor so it has the type visible in the source program: c.f. 'dataConWorkId'.
 -- Returns Nothing if there is no wrapper, which occurs for an algebraic data constructor 
 -- and also for a newtype (whose constructor is inlined compulsorily)
 dataConWrapId_maybe :: DataCon -> Maybe Id
-dataConWrapId_maybe dc = case dcIds dc of
-				DCIds mb_wrap _ -> mb_wrap
+dataConWrapId_maybe dc = case dcRep dc of
+                           NoDataConRep -> Nothing
+                           DCR { dcr_wrap_id = wrap_id } -> Just wrap_id
 
 -- | Returns an Id which looks like the Haskell-source constructor by using
 -- the wrapper if it exists (see 'dataConWrapId_maybe') and failing over to
 -- the worker (see 'dataConWorkId')
 dataConWrapId :: DataCon -> Id
-dataConWrapId dc = case dcIds dc of
-			DCIds (Just wrap) _   -> wrap
-			DCIds Nothing     wrk -> wrk	    -- worker=wrapper
+dataConWrapId dc = case dcRep dc of
+                     NoDataConRep-> dcWorkId dc    -- worker=wrapper
+                     DCR { dcr_wrap_id = wrap_id } -> wrap_id
 
 -- | Find all the 'Id's implicitly brought into scope by the data constructor. Currently,
 -- the union of the 'dataConWorkId' and the 'dataConWrapId'
 dataConImplicitIds :: DataCon -> [Id]
-dataConImplicitIds dc = case dcIds dc of
-			  DCIds (Just wrap) work -> [wrap,work]
-			  DCIds Nothing     work -> [work]
+dataConImplicitIds (MkData { dcWorkId = work, dcRep = rep})
+  = case rep of
+       NoDataConRep               -> [work]
+       DCR { dcr_wrap_id = wrap } -> [wrap,work]
 
 -- | The labels for the fields of this particular 'DataCon'
 dataConFieldLabels :: DataCon -> [FieldLabel]
@@ -687,22 +764,18 @@ dataConFieldType con label
 -- | The strictness markings decided on by the compiler.  Does not include those for
 -- existential dictionaries.  The list is in one-to-one correspondence with the arity of the 'DataCon'
 dataConStrictMarks :: DataCon -> [HsBang]
-dataConStrictMarks = dcStrictMarks
-
--- | Strictness of evidence arguments to the wrapper function
-dataConExStricts :: DataCon -> [HsBang]
--- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_pred_strict_mark (dataConTheta dc)
+dataConStrictMarks = dcArgBangs
 
 -- | Source-level arity of the data constructor
 dataConSourceArity :: DataCon -> Arity
-dataConSourceArity dc = length (dcOrigArgTys dc)
+dataConSourceArity (MkData { dcSourceArity = arity }) = arity
 
 -- | Gives the number of actual fields in the /representation/ of the 
 -- data constructor. This may be more than appear in the source code;
 -- the extra ones are the existentially quantified dictionaries
 dataConRepArity :: DataCon -> Arity
-dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
+dataConRepArity (MkData { dcRepArity = arity }) = arity
+
 
 -- | The number of fields in the /representation/ of the constructor
 -- AFTER taking into account the unpacking of any unboxed tuple fields
@@ -715,12 +788,23 @@ isNullarySrcDataCon dc = null (dcOrigArgTys dc)
 
 -- | Return whether there are any argument types for this 'DataCon's runtime representation type
 isNullaryRepDataCon :: DataCon -> Bool
-isNullaryRepDataCon dc = null (dcRepArgTys dc)
+isNullaryRepDataCon dc = dataConRepArity dc == 0
 
 dataConRepStrictness :: DataCon -> [StrictnessMark]
 -- ^ Give the demands on the arguments of a
 -- Core constructor application (Con dc args)
-dataConRepStrictness dc = dcRepStrictness dc
+dataConRepStrictness dc = case dcRep dc of
+                            NoDataConRep -> [NotMarkedStrict | _ <- dataConRepArgTys dc]
+                            DCR { dcr_stricts = strs } -> strs
+
+dataConRepBangs :: DataCon -> [HsBang]
+dataConRepBangs dc = case dcRep dc of
+                       NoDataConRep -> dcArgBangs dc
+                       DCR { dcr_bangs = bangs } -> bangs
+
+dataConBoxer :: DataCon -> Maybe DataConBoxer
+dataConBoxer (MkData { dcRep = DCR { dcr_boxer = boxer } }) = Just boxer
+dataConBoxer _ = Nothing 
 
 -- | The \"signature\" of the 'DataCon' returns, in order:
 --
@@ -798,13 +882,12 @@ dataConInstArgTys :: DataCon	-- ^ A datacon with no existentials or equality con
 				-- class dictionary, with superclasses)
 	      	  -> [Type] 	-- ^ Instantiated at these types
 	      	  -> [Type]
-dataConInstArgTys dc@(MkData {dcRepArgTys = rep_arg_tys, 
-			      dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
+dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
 			      dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2 ( length univ_tvs == length inst_tys 
            , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2 ( null ex_tvs && null eq_spec, ppr dc )        
-   map (substTyWith univ_tvs inst_tys) rep_arg_tys
+   map (substTyWith univ_tvs inst_tys) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
@@ -831,10 +914,16 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 dataConOrigArgTys :: DataCon -> [Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
 
--- | Returns the arg types of the worker, including all dictionaries, after any 
+-- | Returns the arg types of the worker, including *all* evidence, after any 
 -- flattening has been done and without substituting for any type variables
 dataConRepArgTys :: DataCon -> [Type]
-dataConRepArgTys dc = dcRepArgTys dc
+dataConRepArgTys (MkData { dcRep = rep 
+                         , dcEqSpec = eq_spec
+                         , dcOtherTheta = theta
+		         , dcOrigArgTys = orig_arg_tys })
+  = case rep of
+      NoDataConRep -> ASSERT( null eq_spec ) theta ++ orig_arg_tys
+      DCR { dcr_arg_tys = arg_tys } -> arg_tys
 \end{code}
 
 \begin{code}
@@ -872,7 +961,7 @@ classDataCon clas = case tyConDataCons (classTyCon clas) of
 dataConCannotMatch :: [Type] -> DataCon -> Bool
 -- Returns True iff the data con *definitely cannot* match a 
 --		    scrutinee of type (T tys)
---		    where T is the type constructor for the data con
+--		    where T is the dcRepTyCon for the data con
 -- NB: look at *all* equality constraints, not only those
 --     in dataConEqSpec; see Trac #5168
 dataConCannotMatch tys con
@@ -884,7 +973,8 @@ dataConCannotMatch tys con
   where
     dc_tvs  = dataConUnivTyVars con
     theta   = dataConTheta con
-    subst   = zipTopTvSubst dc_tvs tys
+    subst   = ASSERT2( length dc_tvs == length tys, ppr con $$ ppr dc_tvs $$ ppr tys ) 
+              zipTopTvSubst dc_tvs tys
 
     -- TODO: could gather equalities from superclasses too
     predEqs pred = case classifyPredType pred of
@@ -940,47 +1030,6 @@ splitProductType str ty
   = case splitProductType_maybe ty of
 	Just stuff -> stuff
 	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
-
-
--- | As 'splitProductType_maybe', but in turn instantiates the 'TyCon' returned
--- and hence recursively tries to unpack it as far as it able to
-deepSplitProductType_maybe :: Type -> Maybe (TyCon, [Type], DataCon, [Type])
-deepSplitProductType_maybe ty
-  = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
-       ; let {result 
-             | Just (ty', _co) <- instNewTyCon_maybe tycon tycon_args
-	     , not (isRecursiveTyCon tycon)
-             = deepSplitProductType_maybe ty'	-- Ignore the coercion?
-             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive
-					   -- newtypes nor through families
-             | otherwise = Just res}
-       ; result
-       }
-
--- | As 'deepSplitProductType_maybe', but panics if the 'Type' is not a product type
-deepSplitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
-deepSplitProductType str ty 
-  = case deepSplitProductType_maybe ty of
-      Just stuff -> stuff
-      Nothing -> pprPanic (str ++ ": not a product") (pprType ty)
-
--- | Compute the representation type strictness and type suitable for a 'DataCon'
-computeRep :: [HsBang]			-- ^ Original argument strictness
-	   -> [Type]			-- ^ Original argument types
-	   -> ([StrictnessMark],	-- Representation arg strictness
-	       [Type])			-- And type
-
-computeRep stricts tys
-  = unzip $ concat $ zipWithEqual "computeRep" unbox stricts tys
-  where
-    unbox HsNoBang       ty = [(NotMarkedStrict, ty)]
-    unbox HsStrict       ty = [(MarkedStrict,    ty)]
-    unbox HsNoUnpack     ty = [(MarkedStrict,    ty)]
-    unbox HsUnpackFailed ty = [(MarkedStrict,    ty)]
-    unbox HsUnpack ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
-                      where
-                        (_tycon, _tycon_args, arg_dc, arg_tys) 
-                           = deepSplitProductType "unbox_strict_arg_ty" ty
 \end{code}
 
 
@@ -1036,8 +1085,9 @@ isPromotableType _                 = False
 -- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
 isPromotableTyCon :: TyCon -> Maybe Int
 isPromotableTyCon tc
-  | isDataTyCon tc  -- Only *data* types can be promoted, not newtypes
-    		    -- not synonyms, not type families
+  | isDataTyCon tc || isNewTyCon tc
+       -- Only *data* and *newtype* types can be promoted, 
+       -- not synonyms, not type/data families
   , all isLiftedTypeKind (res:args) = Just $ length args
   | otherwise                       = Nothing
   where

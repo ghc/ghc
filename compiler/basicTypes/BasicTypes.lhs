@@ -62,9 +62,6 @@ module BasicTypes(
 
         EP(..),
 
-	HsBang(..), isBanged, isMarkedUnboxed, 
-        StrictnessMark(..), isMarkedStrict,
-
 	DefMethSpec(..),
         SwapFlag(..), flipSwap, unSwap,
 
@@ -571,61 +568,6 @@ instance Outputable OccInfo where
 	  pp_args | int_cxt   = char '!'
 		  | otherwise = empty
 \end{code}
-
-%************************************************************************
-%*									*
-		Strictness indication
-%*									*
-%************************************************************************
-
-The strictness annotations on types in data type declarations
-e.g. 	data T = MkT !Int !(Bool,Bool)
-
-\begin{code}
--------------------------
--- HsBang describes what the *programmer* wrote
--- This info is retained in the DataCon.dcStrictMarks field
-data HsBang = HsNoBang	
-
-	    | HsStrict	
-
-	    | HsUnpack	       -- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
-
-	    | HsUnpackFailed   -- An UNPACK pragma that we could not make 
-	      		       -- use of, because the type isn't unboxable; 
-                               -- equivalant to HsStrict except for checkValidDataCon
-            | HsNoUnpack       -- {-# NOUNPACK #-} ! (GHC extension, meaning "strict but not unboxed")
-  deriving (Eq, Data, Typeable)
-
-instance Outputable HsBang where
-    ppr HsNoBang       = empty
-    ppr HsStrict       = char '!'
-    ppr HsUnpack       = ptext (sLit "{-# UNPACK #-} !")
-    ppr HsUnpackFailed = ptext (sLit "{-# UNPACK (failed) #-} !")
-    ppr HsNoUnpack     = ptext (sLit "{-# NOUNPACK #-} !")
-
-isBanged :: HsBang -> Bool
-isBanged HsNoBang = False
-isBanged _        = True
-
-isMarkedUnboxed :: HsBang -> Bool
-isMarkedUnboxed HsUnpack = True
-isMarkedUnboxed _        = False
-
--------------------------
--- StrictnessMark is internal only, used to indicate strictness 
--- of the DataCon *worker* fields
-data StrictnessMark = MarkedStrict | NotMarkedStrict	
-
-instance Outputable StrictnessMark where
-  ppr MarkedStrict     = ptext (sLit "!")
-  ppr NotMarkedStrict  = empty
-
-isMarkedStrict :: StrictnessMark -> Bool
-isMarkedStrict NotMarkedStrict = False
-isMarkedStrict _               = True   -- All others are strict
-\end{code}
-
 
 %************************************************************************
 %*									*

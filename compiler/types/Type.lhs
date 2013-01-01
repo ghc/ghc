@@ -45,6 +45,8 @@ module Type (
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
+
+        coAxNthLHS,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -152,9 +154,10 @@ import VarSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeStringKind )
 import PrelNames ( eqTyConKey, ipClassNameKey, 
                    constraintKindTyConKey, liftedTypeKindTyConKey )
+import CoAxiom
 
 -- others
 import Unique		( Unique, hasKey )
@@ -1034,10 +1037,18 @@ mkFamilyTyConApp :: TyCon -> [Type] -> Type
 -- > mkFamilyTyConApp :RTL Int  =  T (Maybe Int)
 mkFamilyTyConApp tc tys
   | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
-  , let fam_subst = zipTopTvSubst (tyConTyVars tc) tys
+  , let tvs = tyConTyVars tc
+        fam_subst = ASSERT2( length tvs == length tys, ppr tc <+> ppr tys )
+                    zipTopTvSubst tvs tys
   = mkTyConApp fam_tc (substTys fam_subst fam_tys)
   | otherwise
   = mkTyConApp tc tys
+
+-- | Get the type on the LHS of a coercion induced by a type/data
+-- family instance.
+coAxNthLHS :: CoAxiom br -> Int -> Type
+coAxNthLHS ax ind =
+  mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
 -- | Pretty prints a 'TyCon', using the family instance in case of a
 -- representation tycon.  For example:
@@ -1615,13 +1626,11 @@ typeKind _ty@(FunTy _arg res)
     where
       k = typeKind res
 
-
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind l =
   case l of
     NumTyLit _ -> typeNatKind
     StrTyLit _ -> typeStringKind
-
 \end{code}
 
 Kind inference

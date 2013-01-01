@@ -20,6 +20,7 @@ import Module
 import CoreSyn
 import HscTypes	
 import TyCon
+import CoAxiom
 -- import Class
 import TypeRep
 import Type
@@ -112,7 +113,7 @@ collect_tdefs _ _ tdefs = tdefs
 qtc :: DynFlags -> TyCon -> C.Qual C.Tcon
 qtc dflags = make_con_qid dflags . tyConName
 
-qcc :: DynFlags -> CoAxiom -> C.Qual C.Tcon
+qcc :: DynFlags -> CoAxiom br -> C.Qual C.Tcon
 qcc dflags = make_con_qid dflags . co_ax_name
 
 make_cdef :: DynFlags -> DataCon -> C.Cdef
@@ -322,7 +323,7 @@ make_co dflags (TyConAppCo tc cos)   = make_conAppCo dflags (qtc dflags tc) cos
 make_co dflags (AppCo c1 c2)         = C.Tapp (make_co dflags c1) (make_co dflags c2)
 make_co dflags (ForAllCo tv co)      = C.Tforall (make_tbind tv) (make_co dflags co)
 make_co _      (CoVarCo cv)          = C.Tvar (make_var_id (coVarName cv))
-make_co dflags (AxiomInstCo cc cos)  = make_conAppCo dflags (qcc dflags cc) cos
+make_co dflags (AxiomInstCo cc ind cos) = C.AxiomCoercion (qcc dflags cc) ind (map (make_co dflags) cos)
 make_co dflags (UnsafeCo t1 t2)      = C.UnsafeCoercion (make_ty dflags t1) (make_ty dflags t2)
 make_co dflags (SymCo co)            = C.SymCoercion (make_co dflags co)
 make_co dflags (TransCo c1 c2)       = C.TransCoercion (make_co dflags c1) (make_co dflags c2)

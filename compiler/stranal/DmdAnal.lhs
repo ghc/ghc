@@ -27,7 +27,7 @@ import PprCore
 import Coercion		( isCoVarType )
 import CoreUtils	( exprIsHNF, exprIsTrivial )
 import CoreArity	( exprArity )
-import DataCon		( dataConTyCon, dataConRepStrictness )
+import DataCon		( dataConTyCon, dataConRepStrictness, isMarkedStrict )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
 import Id		( Id, idType, idInlineActivation,
 			  isDataConWorkId, isGlobalId, idArity,
@@ -45,7 +45,7 @@ import Type		( isUnLiftedType, eqType, tyConAppTyCon_maybe )
 import Coercion         ( coercionKind )
 import Util
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
-			  RecFlag(..), isRec, isMarkedStrict )
+			  RecFlag(..), isRec )
 import Maybes		( orElse, expectJust )
 import Outputable
 import Pair

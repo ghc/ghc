@@ -4861,31 +4861,66 @@ F Bool             -- WRONG: unsaturated application
   <sect3 id="type-instance-declarations">
     <title>Type instance declarations</title>
     <para>
-      Instance declarations of type families are very similar to standard type
-      synonym declarations.  The only two differences are that the
-      keyword <literal>type</literal> is followed
-      by <literal>instance</literal> and that some or all of the type
-      arguments can be non-variable types, but may not contain forall types or
-      type synonym families. However, data families are generally allowed, and
-      type synonyms are allowed as long as they are fully applied and expand
-      to a type that is admissible - these are the exact same requirements as
-      for data instances.  For example, the <literal>[e]</literal> instance
-      for <literal>Elem</literal> is
+      There are two forms of type family instance declaration: unbranched and
+      branched. Branched instances list any number of alternatives, to be
+      checked in order from top to bottom, similarly to normal function
+      declarations. Unbranched instances supply only one left-hand side.
+
+      Unbranched instance declarations of type families are very similar to
+      standard type synonym declarations. The only two differences are that
+      the keyword <literal>type</literal> is followed by
+      <literal>instance</literal> and that some or all of the type arguments
+      can be non-variable types, but may not contain forall types or type
+      synonym families. However, data families are generally allowed, and type
+      synonyms are allowed as long as they are fully applied and expand to a
+      type that is admissible - these are the exact same requirements as for
+      data instances. For example, the <literal>[e]</literal> instance for
+      <literal>Elem</literal> is
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
     </para>
+
+    <para>
+      Branched instance declarations, on the other hand, allow many different
+      left-hand-side type patterns. These patterns are tried in order, from
+      top to bottom, when simplifying a type family application. A branched instance
+      declaration is introduced by <literal>type instance where</literal>. For example:
+<programlisting>
+type instance where
+  F Int  = Double
+  F Bool = Char
+  F a    = String
+</programlisting>
+      In this example, we declare an instance for <literal>F</literal> such
+      that <literal>F Int</literal> simplifies to <literal>Double</literal>,
+      <literal>F Bool</literal> simplifies to <literal>Char</literal>, and for
+      any other type <literal>a</literal> that is known not to be
+      <literal>Int</literal> or <literal>Bool</literal>, <literal>F
+      a</literal> simplifies to <literal>String</literal>. Note that GHC must
+      be sure that <literal>a</literal> cannot unify with
+      <literal>Int</literal> or <literal>Bool</literal> in that last case; if
+      a programmer specifies just <literal>F a</literal> in their code, GHC will
+      not be able to simplify the type. After all, <literal>a</literal> might later
+      be instantiated with <literal>Int</literal>.
+    </para>
+
+    <para>
+      Branched instances and unbranched instances may be mixed freely for the same
+      type family.
+    </para>
+
     <para>
       Type family instance declarations are only legitimate when an
       appropriate family declaration is in scope - just like class instances
-      require the class declaration to be visible.  Moreover, each instance
+      require the class declaration to be visible. Moreover, each instance
       declaration has to conform to the kind determined by its family
       declaration, and the number of type parameters in an instance
       declaration must match the number of type parameters in the family
-      declaration.   Finally, the right-hand side of a type instance must be a
+      declaration. Finally, the right-hand side of a type instance must be a
       monotype (i.e., it may not include foralls) and after the expansion of
       all saturated vanilla type synonyms, no synonyms, except family synonyms
-      may remain.  Here are some examples of admissible and illegal type
+      may remain. Here are some examples of admissible and illegal type
       instances:
 <programlisting>
 type family F a :: *
@@ -4894,6 +4929,13 @@ type instance F String             = Char        -- OK!
 type instance F (F a)              = a           -- WRONG: type parameter mentions a type family
 type instance F (forall a. (a, b)) = b           -- WRONG: a forall type appears in a type parameter
 type instance F Float              = forall a.a  -- WRONG: right-hand side may not be a forall type
+type instance where                              -- OK!
+  F (Maybe Int)  = Int
+  F (Maybe Bool) = Bool
+  F (Maybe a)    = String
+type instance where            -- WRONG: conflicts with earlier instances (see below)
+  F Int = Float
+  F a   = [a]
 
 type family G a b :: * -> *
 type instance G Int            = (,)     -- WRONG: must be two type parameters
@@ -4904,15 +4946,17 @@ type instance G Int Char Float = Double  -- WRONG: must be two type parameters
     <sect3 id="type-family-overlap">
       <title>Overlap of type synonym instances</title>
       <para>
-	The instance declarations of a type family used in a single program
-	may only overlap if the right-hand sides of the overlapping instances
-	coincide for the overlapping types.  More formally, two instance
-	declarations overlap if there is a substitution that makes the
-	left-hand sides of the instances syntactically the same.  Whenever
-	that is the case, the right-hand sides of the instances must also be
-	syntactically equal under the same substitution.  This condition is
-	independent of whether the type family is associated or not, and it is
-	not only a matter of consistency, but one of type safety.
+	The unbranched instance declarations of a type family used in a single
+	program may only overlap if the right-hand sides of the overlapping
+	instances coincide for the overlapping types. More formally, two
+	instance declarations overlap if there is a substitution that makes
+	the left-hand sides of the instances syntactically the same. Whenever
+	that is the case, if the instances are unbranched, the right-hand
+	sides of the instances must also be syntactically equal under the same
+	substitution. This condition is independent of whether the type family
+	is associated or not, and it is not only a matter of consistency, but
+	one of type safety. Branched instances are not permitted to overlap
+	with any other instances, branched or unbranched.
       </para>
       <para>
 	Here are two example to illustrate the condition under which overlap
@@ -4923,6 +4967,10 @@ type instance F (Int, b) = [b]   -- overlap permitted
 
 type instance G (a, Int)  = [a]
 type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
+
+type instance H Int = Int
+type instance where              -- ILLEGAL overlap, as branched instances may not overlap
+  H a = a
 </programlisting>
       </para>
     <para> However see <xref linkend="ghci-decls"/> for the overlap rules in GHCi.</para>
@@ -5054,6 +5102,10 @@ instance GMapKey Flob where
         <literal>(GMap Flob ...)</literal>, this facility is most useful when
         the free indexed parameter is of a kind with a finite number of alternatives
         (unlike <literal>*</literal>).
+      </para>
+
+      <para>
+	Branched associated type instances are not currently supported.
       </para>
     </sect3>
 
@@ -5528,7 +5580,10 @@ kinds have sort <literal>BOX</literal>.
 <para>
 The following restrictions apply to promotion:
 <itemizedlist>
- <listitem><para>We only promote datatypes whose kinds are of the form
+ <listitem><para>We promote <literal>data</literal> types and <literal>newtypes</literal>,
+    but not type synonyms, or type/data families (<xref linkend="type-families"/>).
+  </para></listitem>
+ <listitem><para>We only promote types whose kinds are of the form
  <literal>* -> ... -> * -> *</literal>. In particular, we do not promote
  higher-kinded datatypes such as <literal>data Fix f = In (f (Fix f))</literal>,
  or datatypes whose kinds involve promoted types such as
@@ -5536,8 +5591,6 @@ The following restrictions apply to promotion:
  <listitem><para>We do not promote data constructors that are kind
  polymorphic, involve constraints, mention type or data families, or involve types that
  are not promotable.
- </para></listitem>
- <listitem><para>We do not promote data family instances (<xref linkend="data-families"/>).
  </para></listitem>
 </itemizedlist>
 </para>
@@ -7098,18 +7151,53 @@ pattern binding must have the same context.  For example, this is fine:
 </para>
 </sect2>
 
-<sect2 id="mono-local-binds">
-<title>Monomorphic local bindings</title>
-<para>
-We are actively thinking of simplifying GHC's type system, by <emphasis>not generalising local bindings</emphasis>.
-The rationale is described in the paper
-<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">Let should not be generalised</ulink>.
+<sect2 id="monomorphism">
+<title>Switching off the dreaded Monomorphism Restriction</title>
+          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
+
+<para>Haskell's monomorphism restriction (see
+<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
+4.5.5</ulink>
+of the Haskell Report)
+can be completely switched off by
+<option>-XNoMonomorphismRestriction</option>.
 </para>
+</sect2>
+
+
+<sect2 id="mono-local-binds">
+<title>Let-generalisation</title>
 <para>
-The experimental new behaviour is enabled by the flag <option>-XMonoLocalBinds</option>.  The effect is
-that local (that is, non-top-level) bindings without a type signature are not generalised at all.  You can
-think of it as an extreme (but much more predictable) version of the Monomorphism Restriction.
-If you supply a type signature, then the flag has no effect.
+An ML-style language usually generalises the type of any let-bound or where-bound variable,
+so that it is as polymorphic as possible.
+With the flag <option>-XMonoLocalBinds</option> GHC implements a slightly more conservative policy: 
+<emphasis>it generalises only "closed" bindings</emphasis>.
+A binding is considered "closed" if either
+<itemizedlist>
+<listitem><para>It is one of the top-level bindings of a module, or </para></listitem>
+<listitem><para>Its free variables are all themselves closed</para></listitem>
+</itemizedlist>
+For example, consider
+<programlisting>
+f x = x + 1
+g x = let h y = f y * 2
+          k z = z+x
+      in  h x + k x
+</programlisting>
+Here <literal>f</literal> and <literal>g</literal> are closed because they are bound at top level.
+Also <literal>h</literal> is closed because its only free variable <literal>f</literal> is closed.
+But <literal>k</literal> is not closed because it mentions <literal>x</literal> which is locally bound.
+Another way to think of it is this: all closed bindings <literal>could</literal> be defined at top level.
+(In the example, we could move <literal>h</literal> to top level.)
+</para><para>
+All of this applies only to bindings that lack an explicit type signature, so that GHC has to 
+infer its type.  If you supply a type signature, then that fixes type of the binding, end of story.
+</para><para>
+The rationale for this more conservative strategy is given in 
+<ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">the papers</ulink> "Let should not be generalised" and "Modular type inference with local assumptions".
+</para><para>
+The flag <option>-XMonoLocalBinds</option> is implied by <option>-XTypeFamilies</option> and <option>-XGADTs</option>.  You can switch it off again
+with <option>-XNoMonoLocalBinds</option> but type inference becomes less predicatable if you do so. (Read the papers!)
 </para>
 </sect2>
 
@@ -7130,7 +7218,7 @@ the term you're about to write.
 </para>
 
 <para>
-This extension allows special placeholders, written as <literal>_</literal>, to be used as an expression.
+This extension allows special placeholders, written as "<literal>_</literal>", to be used as an expression.
 During compilation these holes will generate an error message describing what type is expected there.
 The error includes helpful information about the origin of type variables and a list of local bindings
 that might help fill the hole with actual code.
@@ -7142,7 +7230,7 @@ For example, compiling the following module with GHC:
 f :: a -> a
 f x = _
 </programlisting>
-Will fail with the following error:
+will fail with the following error:
 <programlisting>
 hole.hs:2:7:
     Found hole `_' with type a
@@ -9433,6 +9521,12 @@ The "[2]" means that the rule is active in Phase 2 and subsequent phases.  The i
 notation "[~2]" is also accepted, meaning that the rule is active up to, but not including,
 Phase 2.
 </para>
+<para>
+Rules support the special phase-control notation "[~]", which means the rule is never active.
+This feature supports plugins (see <xref linkend="compiler-plugins"/>), by making it possible
+to define a RULE that is never run by GHC, but is nevertheless parsed, typechecked etc, so that
+it is available to the plugin.
+</para>
 </listitem>
 
 
@@ -10304,51 +10398,6 @@ Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
 
 </sect1>
 
-
-<sect1 id="monomorphism">
-<title>Control over monomorphism</title>
-
-<para>GHC supports two flags that control the way in which generalisation is
-carried out at let and where bindings.
-</para>
-
-<sect2>
-<title>Switching off the dreaded Monomorphism Restriction</title>
-          <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
-
-<para>Haskell's monomorphism restriction (see
-<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
-4.5.5</ulink>
-of the Haskell Report)
-can be completely switched off by
-<option>-XNoMonomorphismRestriction</option>.
-</para>
-</sect2>
-
-<sect2>
-<title>Monomorphic pattern bindings</title>
-          <indexterm><primary><option>-XNoMonoPatBinds</option></primary></indexterm>
-          <indexterm><primary><option>-XMonoPatBinds</option></primary></indexterm>
-
-	  <para> As an experimental change, we are exploring the possibility of
-	  making pattern bindings monomorphic; that is, not generalised at all.
-	    A pattern binding is a binding whose LHS has no function arguments,
-	    and is not a simple variable.  For example:
-<programlisting>
-  f x = x                    -- Not a pattern binding
-  f = \x -> x                -- Not a pattern binding
-  f :: Int -> Int = \x -> x  -- Not a pattern binding
-
-  (g,h) = e                  -- A pattern binding
-  (f) = e                    -- A pattern binding
-  [x] = e                    -- A pattern binding
-</programlisting>
-Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
-default</emphasis>.  Use <option>-XNoMonoPatBinds</option> to recover the
-standard behaviour.
-</para>
-</sect2>
-</sect1>
 
 
 <!-- Emacs stuff:

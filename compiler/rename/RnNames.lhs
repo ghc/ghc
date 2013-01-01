@@ -531,21 +531,26 @@ getLocalNonValBinders fixity_env
              ; return (AvailTC main_name names) }
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (FamInstD { lid_inst = d })) 
-      = do { avail <- new_ti Nothing d
+    new_assoc (L _ (TyFamInstD {})) = return []
+      -- type instances don't bind new names 
+    
+    new_assoc (L _ (DataFamInstD { dfid_inst = d }))
+      = do { avail <- new_di Nothing d
            ; return [avail] }
-    new_assoc (L _ (ClsInstD { cid_poly_ty = inst_ty, cid_fam_insts = ats }))
+    new_assoc (L _ (ClsInstD { cid_inst = ClsInstDecl
+                             { cid_poly_ty = inst_ty
+                             , cid_datafam_insts = adts } }))
       | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
-           ; mapM (new_ti (Just cls_nm) . unLoc) ats }
+           ; mapM (new_di (Just cls_nm) . unLoc) adts }
       | otherwise
       = return []     -- Do not crash on ill-formed instances
                       -- Eg   instance !Show Int   Trac #3811c
 
-    new_ti :: Maybe Name -> FamInstDecl RdrName -> RnM AvailInfo
-    new_ti mb_cls ti_decl  -- ONLY for type/data instances
-        = do { main_name <- lookupFamInstName mb_cls (fid_tycon ti_decl)
-             ; sub_names <- mapM newTopSrcBinder (hsFamInstBinders ti_decl)
+    new_di :: Maybe Name -> DataFamInstDecl RdrName -> RnM AvailInfo
+    new_di mb_cls ti_decl
+        = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
+             ; sub_names <- mapM newTopSrcBinder (hsDataFamInstBinders ti_decl)
              ; return (AvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
 \end{code}

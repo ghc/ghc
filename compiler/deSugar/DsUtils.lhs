@@ -316,10 +316,14 @@ mkCoAlgCaseMatchResult dflags var ty match_alts
     mk_case fail = do alts <- mapM (mk_alt fail) sorted_alts
                       return (mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts))
 
-    mk_alt fail (con, args, MatchResult _ body_fn) = do
-          body <- body_fn fail
-          us <- newUniqueSupply
-          return (mkReboxingAlt (uniqsFromSupply us) con args body)
+    mk_alt fail (con, args, MatchResult _ body_fn)
+      = do { body <- body_fn fail
+           ; case dataConBoxer con of {
+                Nothing -> return (DataAlt con, args, body) ;
+                Just (DCB boxer) -> 
+        do { us <- newUniqueSupply
+           ; let (rep_ids, binds) = initUs_ us (boxer ty_args args)
+           ; return (DataAlt con, rep_ids, mkLets binds body) } } }
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]

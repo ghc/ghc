@@ -17,7 +17,6 @@ module Kind (
 	-- Kinds
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, constraintKind,
         mkArrowKind, mkArrowKinds,
-        typeNatKind, typeStringKind,
 
         -- Kind constructors...
         anyKindTyCon, liftedTypeKindTyCon, openTypeKindTyCon,

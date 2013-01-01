@@ -504,12 +504,15 @@ tc_hs_type ty@(HsSpliceTy {}) _exp_kind
 tc_hs_type (HsWrapTy {}) _exp_kind 
   = panic "tc_hs_type HsWrapTy"  -- We kind checked something twice
 
-tc_hs_type hs_ty@(HsTyLit tl) exp_kind = do
-  let (ty,k) = case tl of
-                 HsNumTy n -> (mkNumLitTy n, typeNatKind)
-                 HsStrTy s -> (mkStrLitTy s,  typeStringKind)
-  checkExpectedKind hs_ty k exp_kind
-  return ty
+tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind 
+  = do { checkExpectedKind hs_ty typeNatKind exp_kind
+       ; checkWiredInTyCon typeNatKindCon
+       ; return (mkNumLitTy n) }
+
+tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind 
+  = do { checkExpectedKind hs_ty typeStringKind exp_kind
+       ; checkWiredInTyCon typeStringKindCon
+       ; return (mkStrLitTy s) }
 
 ---------------------------
 tc_tuple :: HsType Name -> HsTupleSort -> [LHsType Name] -> ExpKind -> TcM TcType

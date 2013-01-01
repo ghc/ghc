@@ -16,7 +16,7 @@ metavar alpha {{ tex \alpha }}, beta {{ tex \beta }} ::=
 metavar N ::=   {{ com Type-level constructor names }}
 metavar K ::=   {{ com Term-level data constructor names }}
 
-indexvar i, j ::= {{ com Indices to be used in lists }}
+indexvar i, j, kk {{ tex k }} ::= {{ com Indices to be used in lists }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Syntax  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,7 +101,7 @@ g {{ tex \gamma }} :: 'Coercion_' ::= {{ com Coercions, \coderef{types/Coercion.
   | g1 g2                   ::   :: AppCo         {{ com Application }}
   | forall n . g            ::   :: ForAllCo      {{ com Polymorphism }}
   | n                       ::   :: CoVarCo       {{ com Variable }}
-  | C </ gi // i />         ::   :: AxiomInstCo   {{ com Axiom application }}
+  | C ind </ gj // j />     ::   :: AxiomInstCo   {{ com Axiom application }}
   | t1 ==>! t2              ::   :: UnsafeCo      {{ com Unsafe coercion }}
   | sym g                   ::   :: SymCo         {{ com Symmetry }}
   | g1 ; g2                 ::   :: TransCo       {{ com Transitivity }}
@@ -116,8 +116,12 @@ LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/Co
   | Right            ::   :: CRight               {{ com Right projection }}
 
 C :: 'CoAxiom_' ::= {{ com Axioms, \coderef{types/TyCon.lhs}{CoAxiom} }}
-  | forall </ ni // i /> . ( s ~ t )   ::   :: CoAxiom  {{ com Axiom }}
+  | T </ axBranchi // ; // i />    ::   :: CoAxiom  {{ com Axiom }}
   | ( C )                              :: M :: Parens   {{ com Parentheses }}
+
+axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{types/TyCon.lhs}{CoAxBranch} }}
+  | forall </ ni // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com Axiom branch }}
+  | ( </ axBranchi // i /> ) [ ind ]               :: M :: lookup      {{ com List lookup }}
 
 %% TYCONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -162,10 +166,13 @@ subst :: 'Subst_' ::= {{ com List of type substitutions }}
   | [ n |-> t ]        ::   :: Mapping
   | </ substi // i />  ::   :: List
 
-nat {{ tex \mathbb{N} }} :: 'Nat_' ::= {{ com Natural numbers }}
-  | i                       ::   :: index
-  | length </ ti // i />    :: M :: length
-  | tyConArity T            :: M :: tyConArity
+ind :: 'Ind_' ::= {{ com Indices, numbers }}
+  | i                           ::   :: index
+  | length </ ti // i />        :: M :: length_t
+  | length </ axBranchi // i /> :: M :: length_axBranch
+  | tyConArity T                :: M :: tyConArity
+  | ind - 1                     :: M :: decrement
+  | -1                          :: M :: minusOne
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Terminals  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -220,6 +227,8 @@ terminals :: 'terminals_' ::=
   | dataConRepType :: :: dataConRepType   {{ tex \textsf{dataConRepType} }}
   | isNewTyCon   ::   :: isNewTyCon       {{ tex \textsf{isNewTyCon} }}
   | Constraint   ::   :: Constraint       {{ tex \textsf{Constraint} }}
+  | no_conflict  ::   :: no_conflict      {{ tex \textsf{no\_conflict} }}
+  | apart        ::   :: apart            {{ tex \textsf{apart} }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -233,8 +242,8 @@ formula :: 'formula_' ::=
   | t1 /= t2                           ::   :: type_inequality
   | e1 /=e e2                          ::   :: expr_inequality
     {{ tex [[e1]] \neq [[e2]] }}
-  | rf                                 ::   :: rf_formula
-  | tlf                                ::   :: tlf_formula
+  | 0 <= ind1 < ind2                   ::   :: in_bounds
+    {{ tex 0 \leq [[ind1]] < [[ind2]] }}
   | g1 = g2                            ::   :: co_rewrite
   | no_duplicates </ zi // i />        ::   :: no_duplicates_name
   | no_duplicates </ bindingi // i />  ::   :: no_duplicates_binding
@@ -247,8 +256,8 @@ formula :: 'formula_' ::=
   | vars1 = vars2                      ::   :: vars_rewrite
   | </ Gi @ // i /> = inits ( </ nj // j /> ) :: :: context_folding
   | </ substi @ // i /> = inits ( </ [ nj |-> tj ] // j /> ) :: :: subst_folding
-  | nat1 = nat2                        ::   :: eq_nat
-  | nat1 < nat2                        ::   :: lt
+  | ind1 = ind2                        ::   :: eq_ind
+  | ind1 < ind2                        ::   :: lt
   | G |- tylit lit : k                 ::   :: lintTyLit
     {{ tex [[G]] \labeledjudge{tylit} [[lit]] : [[k]] }}
   | isNewTyCon T                       ::   :: isNewTyCon
@@ -258,6 +267,9 @@ formula :: 'formula_' ::=
   | t is_a_coercion                    ::   :: is_a_coercion
     {{ tex \exists \tau_1, \tau_2, \kappa \text{ s.t.~} [[t]] =
            \tau_1 \mathop{ {\sim}_{\#}^{\kappa} } \tau_2 }}
+  | axBranch1 = axBranch2              ::   :: branch_rewrite
+  | C1 = C2                            ::   :: axiom_rewrite
+  | apart ( </ ti // i /> , </ sj // j /> ) :: :: apart
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -281,3 +293,4 @@ Subst_Mapping <= Type_TySubstList
 Subst_List <= Type_TySubstList
 
 Subst_Mapping <= Type_TySubstListPost
+

@@ -173,20 +173,19 @@ data DumpFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
-   | Opt_D_dump_raw_cmm
-   | Opt_D_dump_cmmz
-   -- All of the cmmz subflags (there are a lot!)  Automatically
-   -- enabled if you run -ddump-cmmz
-   | Opt_D_dump_cmmz_cfg
-   | Opt_D_dump_cmmz_cbe
-   | Opt_D_dump_cmmz_proc
-   | Opt_D_dump_cmmz_rewrite
-   | Opt_D_dump_cmmz_sp
-   | Opt_D_dump_cmmz_procmap
-   | Opt_D_dump_cmmz_split
-   | Opt_D_dump_cmmz_info
-   -- end cmmz subflags
-   | Opt_D_dump_cps_cmm
+   | Opt_D_dump_cmm_raw
+   -- All of the cmm subflags (there are a lot!)  Automatically
+   -- enabled if you run -ddump-cmm
+   | Opt_D_dump_cmm_cfg
+   | Opt_D_dump_cmm_cbe
+   | Opt_D_dump_cmm_proc
+   | Opt_D_dump_cmm_rewrite
+   | Opt_D_dump_cmm_sp
+   | Opt_D_dump_cmm_procmap
+   | Opt_D_dump_cmm_split
+   | Opt_D_dump_cmm_info
+   | Opt_D_dump_cmm_cps
+   -- end cmm subflags
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
@@ -272,7 +271,7 @@ data GeneralFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
-   | Opt_UnboxStrictPrimitiveFields
+   | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
    | Opt_Vectorise
@@ -2065,18 +2064,17 @@ dynamic_flags = [
   , Flag "dstg-stats"     (NoArg (setGeneralFlag Opt_StgStats))
 
   , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
-  , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
-  , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
-  , Flag "ddump-cmmz-cfg"          (setDumpFlag Opt_D_dump_cmmz_cfg)
-  , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
-  , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)
-  , Flag "ddump-cmmz-rewrite"      (setDumpFlag Opt_D_dump_cmmz_rewrite)
-  , Flag "ddump-cmmz-sp"           (setDumpFlag Opt_D_dump_cmmz_sp)
-  , Flag "ddump-cmmz-procmap"      (setDumpFlag Opt_D_dump_cmmz_procmap)
-  , Flag "ddump-cmmz-split"        (setDumpFlag Opt_D_dump_cmmz_split)
-  , Flag "ddump-cmmz-info"         (setDumpFlag Opt_D_dump_cmmz_info)
+  , Flag "ddump-cmm-raw"           (setDumpFlag Opt_D_dump_cmm_raw)
+  , Flag "ddump-cmm-cfg"           (setDumpFlag Opt_D_dump_cmm_cfg)
+  , Flag "ddump-cmm-cbe"           (setDumpFlag Opt_D_dump_cmm_cbe)
+  , Flag "ddump-cmm-proc"          (setDumpFlag Opt_D_dump_cmm_proc)
+  , Flag "ddump-cmm-rewrite"       (setDumpFlag Opt_D_dump_cmm_rewrite)
+  , Flag "ddump-cmm-sp"            (setDumpFlag Opt_D_dump_cmm_sp)
+  , Flag "ddump-cmm-procmap"       (setDumpFlag Opt_D_dump_cmm_procmap)
+  , Flag "ddump-cmm-split"         (setDumpFlag Opt_D_dump_cmm_split)
+  , Flag "ddump-cmm-info"          (setDumpFlag Opt_D_dump_cmm_info)
+  , Flag "ddump-cmm-cps"           (setDumpFlag Opt_D_dump_cmm_cps)
   , Flag "ddump-core-stats"        (setDumpFlag Opt_D_dump_core_stats)
-  , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
   , Flag "ddump-asm"               (setDumpFlag Opt_D_dump_asm)
   , Flag "ddump-asm-native"        (setDumpFlag Opt_D_dump_asm_native)
   , Flag "ddump-asm-liveness"      (setDumpFlag Opt_D_dump_asm_liveness)
@@ -2400,7 +2398,7 @@ fFlags = [
   ( "do-eta-reduction",                 Opt_DoEtaReduction, nop ),
   ( "case-merge",                       Opt_CaseMerge, nop ),
   ( "unbox-strict-fields",              Opt_UnboxStrictFields, nop ),
-  ( "unbox-strict-primitive-fields",    Opt_UnboxStrictPrimitiveFields, nop ),
+  ( "unbox-small-strict-fields",        Opt_UnboxSmallStrictFields, nop ),
   ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "excess-precision",                 Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),

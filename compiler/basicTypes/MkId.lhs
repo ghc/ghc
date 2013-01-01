@@ -22,12 +22,14 @@ have a standard form, namely:
 module MkId (
         mkDictFunId, mkDictFunTy, mkDictSelId,
 
-        mkDataConIds, mkPrimOpId, mkFCallId,
+        mkPrimOpId, mkFCallId,
 
-        mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
+        wrapNewTypeBody, unwrapNewTypeBody,
         wrapFamInstBody, unwrapFamInstScrut,
-        wrapTypeFamInstBody, unwrapTypeFamInstScrut,
-        mkUnpackCase, mkProductBox,
+        wrapTypeFamInstBody, wrapTypeUnbranchedFamInstBody, unwrapTypeFamInstScrut,
+        unwrapTypeUnbranchedFamInstScrut,
+
+        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -46,6 +48,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import FamInstEnv
 import Coercion
 import TcType
 import MkCore
@@ -53,7 +56,9 @@ import CoreUtils	( exprType, mkCast )
 import CoreUnfold
 import Literal
 import TyCon
+import CoAxiom
 import Class
+import NameSet
 import VarSet
 import Name
 import PrimOp
@@ -65,6 +70,7 @@ import IdInfo
 import Demand
 import CoreSyn
 import Unique
+import UniqSupply
 import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
@@ -224,173 +230,6 @@ Hence we translate to
         -- Coercion from family type to representation type
   Co7T a :: T [a] ~ :R7T a
 
-\begin{code}
-mkDataConIds :: Name -> Name -> DataCon -> DataConIds
-mkDataConIds wrap_name wkr_name data_con
-  | isNewTyCon tycon                    -- Newtype, only has a worker
-  = DCIds Nothing nt_work_id                 
-
-  | any isBanged all_strict_marks      -- Algebraic, needs wrapper
-    || not (null eq_spec)              -- NB: LoadIface.ifaceDeclImplicitBndrs
-    || isFamInstTyCon tycon            --     depends on this test
-  = DCIds (Just alg_wrap_id) wrk_id
-
-  | otherwise                                -- Algebraic, no wrapper
-  = DCIds Nothing wrk_id
-  where
-    (univ_tvs, ex_tvs, eq_spec, 
-     other_theta, orig_arg_tys, res_ty) = dataConFullSig data_con
-    tycon = dataConTyCon data_con       -- The representation TyCon (not family)
-
-        ----------- Worker (algebraic data types only) --------------
-        -- The *worker* for the data constructor is the function that
-        -- takes the representation arguments and builds the constructor.
-    wrk_id = mkGlobalId (DataConWorkId data_con) wkr_name
-                        (dataConRepType data_con) wkr_info
-
-    wkr_arity = dataConRepArity data_con
-    wkr_info  = noCafIdInfo
-                `setArityInfo`       wkr_arity
-                `setStrictnessInfo`  Just wkr_sig
-                `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
-                                                        -- even if arity = 0
-
-    wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) cpr_info)
-        --      Note [Data-con worker strictness]
-        -- Notice that we do *not* say the worker is strict
-        -- even if the data constructor is declared strict
-        --      e.g.    data T = MkT !(Int,Int)
-        -- Why?  Because the *wrapper* is strict (and its unfolding has case
-        -- expresssions that do the evals) but the *worker* itself is not.
-        -- If we pretend it is strict then when we see
-        --      case x of y -> $wMkT y
-        -- the simplifier thinks that y is "sure to be evaluated" (because
-        --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
-        --
-        -- When the simplifer sees a pattern 
-        --      case e of MkT x -> ...
-        -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
-        -- but that's fine... dataConRepStrictness comes from the data con
-        -- not from the worker Id.
-
-    cpr_info | isProductTyCon tycon && 
-               isDataTyCon tycon    &&
-               wkr_arity > 0        &&
-               wkr_arity <= mAX_CPR_SIZE        = retCPR
-             | otherwise                        = TopRes
-        -- RetCPR is only true for products that are real data types;
-        -- that is, not unboxed tuples or [non-recursive] newtypes
-
-        ----------- Workers for newtypes --------------
-    nt_work_id   = mkGlobalId (DataConWrapId data_con) wkr_name wrap_ty nt_work_info
-    nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
-                  `setArityInfo` 1      -- Arity 1
-                  `setInlinePragInfo`    alwaysInlinePragma
-                  `setUnfoldingInfo`     newtype_unf
-    id_arg1      = mkTemplateLocal 1 (head orig_arg_tys)
-    newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
-                            isSingleton orig_arg_tys, ppr data_con  )
-			      -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $ 
-                   mkLams wrap_tvs $ Lam id_arg1 $ 
-                   wrapNewTypeBody tycon res_ty_args (Var id_arg1)
-
-
-        ----------- Wrapper --------------
-        -- We used to include the stupid theta in the wrapper's args
-        -- but now we don't.  Instead the type checker just injects these
-        -- extra constraints where necessary.
-    wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
-    res_ty_args = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-    ev_tys      = other_theta
-    wrap_ty     = mkForAllTys wrap_tvs $ 
-                  mkFunTys ev_tys $
-                  mkFunTys orig_arg_tys $ res_ty
-
-        ----------- Wrappers for algebraic data types -------------- 
-    alg_wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty alg_wrap_info
-    alg_wrap_info = noCafIdInfo
-                    `setArityInfo`         wrap_arity
-                        -- It's important to specify the arity, so that partial
-                        -- applications are treated as values
-		    `setInlinePragInfo`    alwaysInlinePragma
-                    `setUnfoldingInfo`     wrap_unf
-                    `setStrictnessInfo` Just wrap_sig
-                        -- We need to get the CAF info right here because TidyPgm
-                        -- does not tidy the IdInfo of implicit bindings (like the wrapper)
-                        -- so it not make sure that the CAF info is sane
-
-    all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
-    wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds cpr_info)
-    wrap_stricts = dropList eq_spec all_strict_marks
-    wrap_arg_dmds = map mk_dmd wrap_stricts
-    mk_dmd str | isBanged str = evalDmd
-               | otherwise    = lazyDmd
-        -- The Cpr info can be important inside INLINE rhss, where the
-        -- wrapper constructor isn't inlined.
-        -- And the argument strictness can be important too; we
-        -- may not inline a contructor when it is partially applied.
-        -- For example:
-        --      data W = C !Int !Int !Int
-        --      ...(let w = C x in ...(w p q)...)...
-        -- we want to see that w is strict in its two arguments
-
-    wrap_unf = mkInlineUnfolding (Just (length ev_args + length id_args)) wrap_rhs
-    wrap_rhs = mkLams wrap_tvs $ 
-               mkLams ev_args $
-               mkLams id_args $
-               foldr mk_case con_app 
-                     (zip (ev_args ++ id_args) wrap_stricts)
-                     i3 []
-	     -- The ev_args is the evidence arguments *other than* the eq_spec
-	     -- Because we are going to apply the eq_spec args manually in the
-	     -- wrapper
-
-    con_app _ rep_ids = wrapFamInstBody tycon res_ty_args $
-                          Var wrk_id `mkTyApps`  res_ty_args
-                                     `mkVarApps` ex_tvs                 
-                                     `mkCoApps`  map (mkReflCo . snd) eq_spec
-                                     `mkVarApps` reverse rep_ids
-                            -- Dont box the eq_spec coercions since they are
-                            -- marked as HsUnpack by mk_dict_strict_mark
-
-    (ev_args,i2) = mkLocals 1  ev_tys
-    (id_args,i3) = mkLocals i2 orig_arg_tys
-    wrap_arity   = i3-1
-
-    mk_case 
-           :: (Id, HsBang)      -- Arg, strictness
-           -> (Int -> [Id] -> CoreExpr) -- Body
-           -> Int                       -- Next rep arg id
-           -> [Id]                      -- Rep args so far, reversed
-           -> CoreExpr
-    mk_case (arg,strict) body i rep_args
-          = case strict of
-                HsNoBang -> body i (arg:rep_args)
-                HsUnpack -> unboxProduct i (Var arg) (idType arg) the_body 
-                      where
-                        the_body i con_args = body i (reverse con_args ++ rep_args)
-                _other  -- HsUnpackFailed and HsStrict
-                   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
-                   | otherwise -> Case (Var arg) arg res_ty 
-                                       [(DEFAULT,[], body i (arg:rep_args))]
-
-mAX_CPR_SIZE :: Arity
-mAX_CPR_SIZE = 10
--- We do not treat very big tuples as CPR-ish:
---      a) for a start we get into trouble because there aren't 
---         "enough" unboxed tuple types (a tiresome restriction, 
---         but hard to fix), 
---      b) more importantly, big unboxed tuples get returned mainly
---         on the stack, and are often then allocated in the heap
---         by the caller.  So doing CPR for them may in fact make
---         things worse.
-
-mkLocals :: Int -> [Type] -> ([Id], Int)
-mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
-               where
-                 n = length tys
-\end{code}
 
 Note [Newtype datacons]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -528,136 +367,414 @@ dictSelRule val_index n_ty_args _ _ id_unf args
 %*                                                                      *
 %************************************************************************
 
+
 \begin{code}
--- unbox a product type...
--- we will recurse into newtypes, casting along the way, and unbox at the
--- first product data constructor we find. e.g.
---  
---   data PairInt = PairInt Int Int
---   newtype S = MkS PairInt
---   newtype T = MkT S
---
--- If we have e = MkT (MkS (PairInt 0 1)) and some body expecting a list of
--- ids, we get (modulo int passing)
---
---   case (e `cast` CoT) `cast` CoS of
---     PairInt a b -> body [a,b]
---
--- The Ints passed around are just for creating fresh locals
-unboxProduct :: Int -> CoreExpr -> Type -> (Int -> [Id] -> CoreExpr) -> CoreExpr
-unboxProduct i arg arg_ty body
-  = result
-  where 
-    result = mkUnpackCase the_id arg con_args boxing_con rhs
-    (_tycon, _tycon_args, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
-    ([the_id], i') = mkLocals i [arg_ty]
-    (con_args, i'') = mkLocals i' tys
-    rhs = body i'' con_args
-
-mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
--- (mkUnpackCase x e args Con body)
---      returns
--- case (e `cast` ...) of bndr { Con args -> body }
--- 
--- the type of the bndr passed in is irrelevent
-mkUnpackCase bndr arg unpk_args boxing_con body
-  = Case cast_arg (setIdType bndr bndr_ty) (exprType body) [(DataAlt boxing_con, unpk_args, body)]
-  where
-  (cast_arg, bndr_ty) = go (idType bndr) arg
-  go ty arg 
-    | (tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
-    , isNewTyCon tycon && not (isRecursiveTyCon tycon)
-    = go (newTyConInstRhs tycon tycon_args) 
-         (unwrapNewTypeBody tycon tycon_args arg)
-    | otherwise = (arg, ty)
-
--- ...and the dual
-reboxProduct :: [Unique]     -- uniques to create new local binders
-             -> Type         -- type of product to box
-             -> ([Unique],   -- remaining uniques
-                 CoreExpr,   -- boxed product
-                 [Id])       -- Ids being boxed into product
-reboxProduct us ty
-  = let 
-        (_tycon, _tycon_args, _pack_con, con_arg_tys) = deepSplitProductType "reboxProduct" ty
- 
-        us' = dropList con_arg_tys us
-
-        arg_ids  = zipWith (mkSysLocal (fsLit "rb")) us con_arg_tys
-
-        bind_rhs = mkProductBox arg_ids ty
-
-    in
-      (us', bind_rhs, arg_ids)
-
-mkProductBox :: [Id] -> Type -> CoreExpr
-mkProductBox arg_ids ty 
-  = result_expr
-  where 
-    (tycon, tycon_args, pack_con, _con_arg_tys) = splitProductType "mkProductBox" ty
-
-    result_expr
-      | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
-      = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
-      | otherwise = mkConApp pack_con (map Type tycon_args ++ varsToCoreExprs arg_ids)
-
-    wrap expr = wrapNewTypeBody tycon tycon_args expr
-
-
--- (mkReboxingAlt us con xs rhs) basically constructs the case
--- alternative (con, xs, rhs)
--- but it does the reboxing necessary to construct the *source* 
--- arguments, xs, from the representation arguments ys.
--- For example:
---      data T = MkT !(Int,Int) Bool
---
--- mkReboxingAlt MkT [x,b] r 
---      = (DataAlt MkT, [y::Int,z::Int,b], let x = (y,z) in r)
---
--- mkDataAlt should really be in DataCon, but it can't because
--- it manipulates CoreSyn.
-
-mkReboxingAlt
-  :: [Unique] -- Uniques for the new Ids
-  -> DataCon
-  -> [Var]    -- Source-level args, *including* all evidence vars 
-  -> CoreExpr -- RHS
-  -> CoreAlt
-
-mkReboxingAlt us con args rhs
-  | not (any isMarkedUnboxed stricts)
-  = (DataAlt con, args, rhs)
-
+mkDataConWorkId :: Name -> DataCon -> Id
+mkDataConWorkId wkr_name data_con
+  | isNewTyCon tycon
+  = mkGlobalId (DataConWrapId data_con) wkr_name nt_wrap_ty nt_work_info
   | otherwise
-  = let
-        (binds, args') = go args stricts us
-    in
-    (DataAlt con, args', mkLets binds rhs)
+  = mkGlobalId (DataConWorkId data_con) wkr_name alg_wkr_ty wkr_info
 
   where
-    stricts = dataConExStricts con ++ dataConStrictMarks con
+    tycon = dataConTyCon data_con
 
-    go [] _stricts _us = ([], [])
+        ----------- Workers for data types --------------
+    alg_wkr_ty = dataConRepType data_con
+    wkr_arity = dataConRepArity data_con
+    wkr_info  = noCafIdInfo
+                `setArityInfo`       wkr_arity
+                `setStrictnessInfo`  Just wkr_sig
+                `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
+                                                     -- even if arity = 0
 
-    -- Type variable case
-    go (arg:args) stricts us 
-      | isTyVar arg
-      = let (binds, args') = go args stricts us
-        in  (binds, arg:args')
+    wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) (dataConCPR data_con))
+        --      Note [Data-con worker strictness]
+        -- Notice that we do *not* say the worker is strict
+        -- even if the data constructor is declared strict
+        --      e.g.    data T = MkT !(Int,Int)
+        -- Why?  Because the *wrapper* is strict (and its unfolding has case
+        -- expresssions that do the evals) but the *worker* itself is not.
+        -- If we pretend it is strict then when we see
+        --      case x of y -> $wMkT y
+        -- the simplifier thinks that y is "sure to be evaluated" (because
+        --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+        --
+        -- When the simplifer sees a pattern 
+        --      case e of MkT x -> ...
+        -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
+        -- but that's fine... dataConRepStrictness comes from the data con
+        -- not from the worker Id.
 
-        -- Term variable case
-    go (arg:args) (str:stricts) us
-      | isMarkedUnboxed str
-      = let (binds, unpacked_args')        = go args stricts us'
-            (us', bind_rhs, unpacked_args) = reboxProduct us (idType arg)
-        in
-            (NonRec arg bind_rhs : binds, unpacked_args ++ unpacked_args')
-      | otherwise
-      = let (binds, args') = go args stricts us
-        in  (binds, arg:args')
-    go (_ : _) [] _ = panic "mkReboxingAlt"
+        ----------- Workers for newtypes --------------
+    (nt_tvs, _, nt_arg_tys, _) = dataConSig data_con
+    res_ty_args  = mkTyVarTys nt_tvs
+    nt_wrap_ty   = dataConUserType data_con
+    nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
+                  `setArityInfo` 1      -- Arity 1
+                  `setInlinePragInfo`    alwaysInlinePragma
+                  `setUnfoldingInfo`     newtype_unf
+    id_arg1      = mkTemplateLocal 1 (head nt_arg_tys)
+    newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
+                            isSingleton nt_arg_tys, ppr data_con  )
+			      -- Note [Newtype datacons]
+                   mkCompulsoryUnfolding $ 
+                   mkLams nt_tvs $ Lam id_arg1 $ 
+                   wrapNewTypeBody tycon res_ty_args (Var id_arg1)
+
+dataConCPR :: DataCon -> DmdResult
+dataConCPR con
+  | isProductTyCon tycon
+  , isDataTyCon tycon
+  , wkr_arity > 0
+  , wkr_arity <= mAX_CPR_SIZE
+  = retCPR
+  | otherwise
+  = TopRes
+        -- RetCPR is only true for products that are real data types;
+        -- that is, not unboxed tuples or [non-recursive] newtypes
+  where
+    tycon = dataConTyCon con
+    wkr_arity = dataConRepArity con
+
+    mAX_CPR_SIZE :: Arity
+    mAX_CPR_SIZE = 10
+    -- We do not treat very big tuples as CPR-ish:
+    --      a) for a start we get into trouble because there aren't 
+    --         "enough" unboxed tuple types (a tiresome restriction, 
+    --         but hard to fix), 
+    --      b) more importantly, big unboxed tuples get returned mainly
+    --         on the stack, and are often then allocated in the heap
+    --         by the caller.  So doing CPR for them may in fact make
+    --         things worse.
 \end{code}
 
+-------------------------------------------------
+--         Data constructor representation
+-- 
+-- This is where we decide how to wrap/unwrap the 
+-- constructor fields
+--
+--------------------------------------------------
+
+
+\begin{code}
+type Unboxer = Var -> UniqSM ([Var], CoreExpr -> CoreExpr)
+  -- Unbox: bind rep vars by decomposing src var
+
+data Boxer = UnitBox | Boxer (TvSubst -> UniqSM ([Var], CoreExpr))
+  -- Box:   build src arg using these rep vars
+
+newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
+                       -- Bind these src-level vars, returning the
+                       -- rep-level vars to bind in the pattern
+
+mkDataConRep :: DynFlags -> FamInstEnvs -> Name -> DataCon -> UniqSM DataConRep
+mkDataConRep dflags fam_envs wrap_name data_con
+  | not wrapper_reqd
+  = return NoDataConRep
+
+  | otherwise
+  = do { wrap_args <- mapM newLocal wrap_arg_tys
+       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers) 
+                                 initial_wrap_app
+
+       ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
+             wrap_info = noCafIdInfo
+                    	 `setArityInfo`         wrap_arity
+                    	     -- It's important to specify the arity, so that partial
+                    	     -- applications are treated as values
+		    	 `setInlinePragInfo`    alwaysInlinePragma
+                    	 `setUnfoldingInfo`     wrap_unf
+                    	 `setStrictnessInfo`    Just wrap_sig
+                    	     -- We need to get the CAF info right here because TidyPgm
+                    	     -- does not tidy the IdInfo of implicit bindings (like the wrapper)
+                    	     -- so it not make sure that the CAF info is sane
+
+    	     wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds (dataConCPR data_con))
+    	     wrap_arg_dmds = map mk_dmd (dropList eq_spec wrap_bangs)
+    	     mk_dmd str | isBanged str = evalDmd
+    	                | otherwise    = lazyDmd
+    	         -- The Cpr info can be important inside INLINE rhss, where the
+    	         -- wrapper constructor isn't inlined.
+    	         -- And the argument strictness can be important too; we
+    	         -- may not inline a contructor when it is partially applied.
+    	         -- For example:
+    	         --      data W = C !Int !Int !Int
+    	         --      ...(let w = C x in ...(w p q)...)...
+    	         -- we want to see that w is strict in its two arguments
+
+    	     wrap_unf = mkInlineUnfolding (Just wrap_arity) wrap_rhs
+             wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
+    	     wrap_rhs = mkLams wrap_tvs $ 
+    	                mkLams wrap_args $
+    	                wrapFamInstBody tycon res_ty_args $
+                        wrap_body
+
+       ; return (DCR { dcr_wrap_id = wrap_id
+                     , dcr_boxer   = mk_boxer boxers
+                     , dcr_arg_tys = rep_tys
+                     , dcr_stricts = rep_strs
+                     , dcr_bangs   = dropList ev_tys wrap_bangs }) }
+
+  where
+    (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _) = dataConFullSig data_con
+    res_ty_args  = substTyVars (mkTopTvSubst eq_spec) univ_tvs
+    tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
+    wrap_ty      = dataConUserType data_con
+    ev_tys       = eqSpecPreds eq_spec ++ theta
+    all_arg_tys  = ev_tys                         ++ orig_arg_tys
+    orig_bangs   = map mk_pred_strict_mark ev_tys ++ dataConStrictMarks data_con
+
+    wrap_arg_tys = theta ++ orig_arg_tys
+    wrap_arity   = length wrap_arg_tys
+    	     -- The wrap_args are the arguments *other than* the eq_spec
+    	     -- Because we are going to apply the eq_spec args manually in the
+    	     -- wrapper
+
+    (wrap_bangs, rep_tys_w_strs, wrappers)
+       = unzip3 (zipWith (dataConArgRep dflags fam_envs) all_arg_tys orig_bangs)
+    (unboxers, boxers) = unzip wrappers
+    (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
+
+    wrapper_reqd = not (isNewTyCon tycon)  -- Newtypes have only a worker
+                && (any isBanged orig_bangs   -- Some forcing/unboxing
+                                              -- (includes eq_spec)
+                    || isFamInstTyCon tycon)  -- Cast result
+
+    initial_wrap_app = Var (dataConWorkId data_con)
+                      `mkTyApps`  res_ty_args
+    	              `mkVarApps` ex_tvs                 
+    	              `mkCoApps`  map (mkReflCo . snd) eq_spec
+    	                -- Dont box the eq_spec coercions since they are
+    	                -- marked as HsUnpack by mk_dict_strict_mark
+
+    mk_boxer :: [Boxer] -> DataConBoxer
+    mk_boxer boxers = DCB (\ ty_args src_vars -> 
+                      do { let ex_vars = takeList ex_tvs src_vars
+                               subst1 = mkTopTvSubst (univ_tvs `zip` ty_args)
+                               subst2 = extendTvSubstList subst1 ex_tvs 
+                                                          (mkTyVarTys ex_vars)
+                         ; (rep_ids, binds) <- go subst2 boxers (dropList ex_tvs src_vars)
+                         ; return (ex_vars ++ rep_ids, binds) } )
+
+    go _ [] src_vars = ASSERT2( null src_vars, ppr data_con ) return ([], [])
+    go subst (UnitBox : boxers) (src_var : src_vars)
+      = do { (rep_ids2, binds) <- go subst boxers src_vars
+           ; return (src_var : rep_ids2, binds) }
+    go subst (Boxer boxer : boxers) (src_var : src_vars)
+      = do { (rep_ids1, arg)  <- boxer subst
+           ; (rep_ids2, binds) <- go subst boxers src_vars
+           ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
+    go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
+
+    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
+    mk_rep_app [] con_app 
+      = return con_app
+    mk_rep_app ((wrap_arg, unboxer) : prs) con_app 
+      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
+           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
+           ; return (unbox_fn expr) }
+
+-------------------------
+newLocal :: Type -> UniqSM Var
+newLocal ty = do { uniq <- getUniqueUs 
+                 ; return (mkSysLocal (fsLit "dt") uniq ty) }
+
+-------------------------
+dataConArgRep
+   :: DynFlags 
+   -> FamInstEnvs
+   -> Type -> HsBang
+   -> ( HsBang   -- Like input but with HsUnpackFailed if necy
+      , [(Type, StrictnessMark)]   -- Rep types
+      , (Unboxer, Boxer) )
+
+dataConArgRep _ _ arg_ty HsNoBang
+  = (HsNoBang, [(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
+
+dataConArgRep dflags fam_envs arg_ty (HsBang user_unpack_prag) 
+  | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
+          -- Don't unpack if we aren't optimising; 
+          -- rather arbitrarily, we use -fomit-iface-pragmas
+          -- as the indication
+  , let mb_co   = topNormaliseType fam_envs arg_ty
+        arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
+  , isUnpackableType fam_envs arg_ty'
+  , (rep_tys, wrappers) <- dataConArgUnpack arg_ty'
+  , user_unpack_prag
+    || gopt Opt_UnboxStrictFields dflags
+    || (gopt Opt_UnboxSmallStrictFields dflags 
+        && length rep_tys <= 1)  -- See Note [Unpack one-wide fields]
+  = case mb_co of
+      Nothing          -> (HsUnpack Nothing,   rep_tys, wrappers)
+      Just (co,rep_ty) -> (HsUnpack (Just co), rep_tys, wrapCo co rep_ty wrappers)
+
+  | otherwise  -- Record the strict-but-no-unpack decision
+  = strict_but_not_unpacked arg_ty
+
+dataConArgRep _ _ arg_ty HsStrict
+  = strict_but_not_unpacked arg_ty
+
+dataConArgRep _ _ arg_ty (HsUnpack Nothing)
+  | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
+  = (HsUnpack Nothing, rep_tys, wrappers)
+
+dataConArgRep _ _ _ (HsUnpack (Just co))
+  | let co_rep_ty = pSnd (coercionKind co)
+  , (rep_tys, wrappers) <- dataConArgUnpack co_rep_ty
+  = (HsUnpack (Just co), rep_tys, wrapCo co co_rep_ty wrappers)
+
+strict_but_not_unpacked :: Type -> (HsBang, [(Type,StrictnessMark)], (Unboxer, Boxer))
+strict_but_not_unpacked arg_ty
+  = (HsStrict, [(arg_ty, MarkedStrict)], (seqUnboxer, unitBoxer))
+
+-------------------------
+wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
+wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
+  = (unboxer, boxer)
+  where
+    unboxer arg_id = do { rep_id <- newLocal rep_ty
+                        ; (rep_ids, rep_fn) <- unbox_rep rep_id
+                        ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
+                        ; return (rep_ids, Let co_bind . rep_fn) }
+    boxer = Boxer $ \ subst -> 
+            do { (rep_ids, rep_expr) 
+                    <- case box_rep of
+                         UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
+                                       ; return ([rep_id], Var rep_id) }
+                         Boxer boxer -> boxer subst
+               ; let sco = substCo (tvCvSubst subst) co
+               ; return (rep_ids, rep_expr `Cast` mkSymCo sco) }
+
+------------------------
+seqUnboxer :: Unboxer
+seqUnboxer v = return ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
+
+unitUnboxer :: Unboxer
+unitUnboxer v = return ([v], \e -> e)
+
+unitBoxer :: Boxer
+unitBoxer = UnitBox
+
+-------------------------
+dataConArgUnpack
+   :: Type
+   ->  ( [(Type, StrictnessMark)]   -- Rep types
+       , (Unboxer, Boxer) )
+
+dataConArgUnpack arg_ty
+  | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
+  , Just con <- tyConSingleDataCon_maybe tc
+  , let rep_tys = dataConInstArgTys con tc_args
+  = ASSERT( isVanillaDataCon con )
+    ( rep_tys `zip` dataConRepStrictness con
+    ,( \ arg_id ->
+       do { rep_ids <- mapM newLocal rep_tys
+          ; let unbox_fn body
+                  = Case (Var arg_id) arg_id (exprType body)
+                         [(DataAlt con, rep_ids, body)]
+          ; return (rep_ids, unbox_fn) }
+     , Boxer $ \ subst ->
+       do { rep_ids <- mapM (newLocal . TcType.substTy subst) rep_tys
+          ; return (rep_ids, Var (dataConWorkId con)
+                             `mkTyApps` (substTys subst tc_args)
+                             `mkVarApps` rep_ids ) } ) )
+  | otherwise
+  = pprPanic "dataConArgUnpack" (ppr arg_ty)
+    -- An interface file specified Unpacked, but we couldn't unpack it
+
+isUnpackableType :: FamInstEnvs -> Type -> Bool
+-- True if we can unpack the UNPACK fields of the constructor
+-- without involving the NameSet tycons
+isUnpackableType fam_envs ty
+  | Just (tc, _) <- splitTyConApp_maybe ty
+  , Just con <- tyConSingleDataCon_maybe tc
+  , isVanillaDataCon con
+  = ok_con_args (unitNameSet (getName tc)) con
+  | otherwise
+  = False
+  where
+    ok_arg tcs (ty, bang) = no_unpack bang || ok_ty tcs norm_ty
+        where
+          norm_ty = case topNormaliseType fam_envs ty of
+                      Just (_, ty) -> ty
+                      Nothing      -> ty
+    ok_ty tcs ty
+      | Just (tc, _) <- splitTyConApp_maybe ty
+      , let tc_name = getName tc
+      =  not (tc_name `elemNameSet` tcs)
+      && case tyConSingleDataCon_maybe tc of
+            Just con | isVanillaDataCon con
+                    -> ok_con_args (tcs `addOneToNameSet` getName tc) con
+            _ -> True
+      | otherwise 
+      = True
+
+    ok_con_args tcs con
+       = all (ok_arg tcs) (dataConOrigArgTys con `zip` dataConStrictMarks con)
+
+    no_unpack (HsBang True)   = False
+    no_unpack (HsUnpack {})   = False
+    no_unpack _               = True
+\end{code}
+
+Note [Unpack one-wide fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The flag UnboxSmallStrictFields ensures that any field that can
+(safely) be unboxed to a word-sized unboxed field, should be so unboxed.
+For example:
+
+    data A = A Int#
+    newtype B = B A
+    data C = C !B
+    data D = D !C
+    data E = E !()
+    data F = F !D
+    data G = G !F !F
+
+All of these should have an Int# as their representation, except
+G which should have two Int#s.  
+
+However 
+
+    data T = T !(S Int)
+    data S = S !a
+
+Here we can represent T with an Int#.
+
+Note [Recursive unboxing]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Be careful not to try to unbox this!
+	data T = MkT {-# UNPACK #-} !T Int
+Reason: consider
+  data R = MkR {-# UNPACK #-} !S Int
+  data S = MkS {-# UNPACK #-} !Int
+The representation arguments of MkR are the *representation* arguments
+of S (plus Int); the rep args of MkS are Int#.  This is obviously no
+good for T, because then we'd get an infinite number of arguments.
+
+But it's the *argument* type that matters. This is fine:
+	data S = MkS S !Int
+because Int is non-recursive.
+
+
+Note [Unpack equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have a GADT with a contructor C :: (a~[b]) => b -> T a
+we definitely want that equality predicate *unboxed* so that it
+takes no space at all.  This is easily done: just give it
+an UNPACK pragma. The rest of the unpack/repack code does the
+heavy lifting.  This one line makes every GADT take a word less
+space for each equality predicate, so it's pretty important!
+
+
+\begin{code}
+mk_pred_strict_mark :: PredType -> HsBang
+mk_pred_strict_mark pred 
+  | isEqPred pred = HsUnpack Nothing	-- Note [Unpack equality predicates]
+  | otherwise     = HsNoBang
+\end{code}
 
 %************************************************************************
 %*                                                                      *
@@ -690,7 +807,7 @@ wrapNewTypeBody tycon args result_expr
     wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
-    co = mkAxInstCo (newTyConCo tycon) args
+    co = mkUnbranchedAxInstCo (newTyConCo tycon) args
 
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
@@ -700,7 +817,7 @@ wrapNewTypeBody tycon args result_expr
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
-    mkCast result_expr (mkAxInstCo (newTyConCo tycon) args)
+    mkCast result_expr (mkUnbranchedAxInstCo (newTyConCo tycon) args)
 
 -- If the type constructor is a representation type of a data instance, wrap
 -- the expression into a cast adjusting the expression type, which is an
@@ -710,26 +827,34 @@ unwrapNewTypeBody tycon args result_expr
 wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast body (mkSymCo (mkAxInstCo co_con args))
+  = mkCast body (mkSymCo (mkUnbranchedAxInstCo co_con args))
   | otherwise
   = body
 
 -- Same as `wrapFamInstBody`, but for type family instances, which are
 -- represented by a `CoAxiom`, and not a `TyCon`
-wrapTypeFamInstBody :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
-wrapTypeFamInstBody axiom args body
-  = mkCast body (mkSymCo (mkAxInstCo axiom args))
+wrapTypeFamInstBody :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeFamInstBody axiom ind args body
+  = mkCast body (mkSymCo (mkAxInstCo axiom ind args))
+
+wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeUnbranchedFamInstBody axiom
+  = wrapTypeFamInstBody axiom 0
 
 unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast scrut (mkAxInstCo co_con args)
+  = mkCast scrut (mkUnbranchedAxInstCo co_con args) -- data instances only
   | otherwise
   = scrut
 
-unwrapTypeFamInstScrut :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
-unwrapTypeFamInstScrut axiom args scrut
-  = mkCast scrut (mkAxInstCo axiom args)
+unwrapTypeFamInstScrut :: CoAxiom br -> Int -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeFamInstScrut axiom ind args scrut
+  = mkCast scrut (mkAxInstCo axiom ind args)
+
+unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeUnbranchedFamInstScrut axiom
+  = unwrapTypeFamInstScrut axiom 0
 \end{code}
 
 

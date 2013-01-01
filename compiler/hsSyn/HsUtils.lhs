@@ -68,7 +68,7 @@ module HsUtils(
   collectLStmtBinders, collectStmtBinders,
 
   hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
-  hsForeignDeclsBinders, hsGroupBinders, hsFamInstBinders,
+  hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
   
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -639,32 +639,35 @@ hsLTyClDeclBinders (L _ d) = hsTyClDeclBinders d
 
 -------------------
 hsTyClDeclBinders :: Eq name => TyClDecl name -> [Located name]
-hsTyClDeclBinders (TyFamily    {tcdLName = name}) = [name]
+hsTyClDeclBinders (FamDecl { tcdFam = FamilyDecl { fdLName = name} }) = [name]
 hsTyClDeclBinders (ForeignType {tcdLName = name}) = [name]
+hsTyClDeclBinders (SynDecl     {tcdLName = name}) = [name]
 
 hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
-                             , tcdATs = ats, tcdATDefs = fam_insts })
+                             , tcdATs = ats })
   = cls_name : 
-    concatMap hsLTyClDeclBinders ats ++ 
-    concatMap (hsFamInstBinders . unLoc) fam_insts ++
+    map (fdLName . unLoc) ats ++ 
     [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
-hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn }) 
-  = name : hsTyDefnBinders defn
+hsTyClDeclBinders (DataDecl { tcdLName = name, tcdDataDefn = defn }) 
+  = name : hsDataDefnBinders defn
 
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
-hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
-hsInstDeclBinders (FamInstD { lid_inst = fi }) = hsFamInstBinders fi
+hsInstDeclBinders (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } })
+  = concatMap (hsDataFamInstBinders . unLoc) dfis
+hsInstDeclBinders (DataFamInstD { dfid_inst = fi }) = hsDataFamInstBinders fi
+hsInstDeclBinders (TyFamInstD {}) = []
 
 -------------------
-hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]
-hsFamInstBinders (FamInstDecl { fid_defn = defn }) = hsTyDefnBinders defn
+hsDataFamInstBinders :: Eq name => DataFamInstDecl name -> [Located name]
+hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
+  = hsDataDefnBinders defn
+  -- There can't be repeated symbols because only data instances have binders
 
 -------------------
-hsTyDefnBinders :: Eq name => HsTyDefn name -> [Located name]
-hsTyDefnBinders (TySynonym {})              = []
-hsTyDefnBinders (TyData { td_cons = cons }) = hsConDeclsBinders cons
+hsDataDefnBinders :: Eq name => HsDataDefn name -> [Located name]
+hsDataDefnBinders (HsDataDefn { dd_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------

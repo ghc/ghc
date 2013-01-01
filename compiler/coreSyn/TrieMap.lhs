@@ -465,7 +465,7 @@ data CoercionMap a
        , km_app    :: CoercionMap (CoercionMap a)
        , km_forall :: CoercionMap (TypeMap a)
        , km_var    :: VarMap a
-       , km_axiom  :: NameEnv (ListMap CoercionMap a)
+       , km_axiom  :: NameEnv (IntMap.IntMap (ListMap CoercionMap a))
        , km_unsafe :: TypeMap (TypeMap a)
        , km_sym    :: CoercionMap a
        , km_trans  :: CoercionMap (CoercionMap a)
@@ -503,7 +503,7 @@ mapC f (KM { km_refl = krefl, km_tc_app = ktc
        , km_app    = mapTM (mapTM f) kapp
        , km_forall = mapTM (mapTM f) kforall
        , km_var    = mapTM f kvar
-       , km_axiom  = mapNameEnv (mapTM f) kax
+       , km_axiom  = mapNameEnv (IntMap.map (mapTM f)) kax
        , km_unsafe = mapTM (mapTM f) kunsafe
        , km_sym    = mapTM f ksym
        , km_trans  = mapTM (mapTM f) ktrans
@@ -517,36 +517,36 @@ lkC env co m
   | EmptyKM <- m = Nothing
   | otherwise    = go co m
   where
-    go (Refl ty)           = km_refl   >.> lkT env ty
-    go (TyConAppCo tc cs)  = km_tc_app >.> lkNamed tc >=> lkList (lkC env) cs
-    go (AxiomInstCo ax cs) = km_axiom  >.> lkNamed ax >=> lkList (lkC env) cs
-    go (AppCo c1 c2)       = km_app    >.> lkC env c1 >=> lkC env c2
-    go (TransCo c1 c2)     = km_trans  >.> lkC env c1 >=> lkC env c2
-    go (UnsafeCo t1 t2)    = km_unsafe >.> lkT env t1 >=> lkT env t2
-    go (InstCo c t)        = km_inst   >.> lkC env c  >=> lkT env t
-    go (ForAllCo v c)      = km_forall >.> lkC (extendCME env v) c >=> lkBndr env v
-    go (CoVarCo v)         = km_var    >.> lkVar env v
-    go (SymCo c)           = km_sym    >.> lkC env c
-    go (NthCo n c)         = km_nth    >.> lookupTM n >=> lkC env c
-    go (LRCo CLeft  c)     = km_left   >.> lkC env c
-    go (LRCo CRight c)     = km_right  >.> lkC env c
+    go (Refl ty)               = km_refl   >.> lkT env ty
+    go (TyConAppCo tc cs)      = km_tc_app >.> lkNamed tc >=> lkList (lkC env) cs
+    go (AxiomInstCo ax ind cs) = km_axiom  >.> lkNamed ax >=> lookupTM ind >=> lkList (lkC env) cs
+    go (AppCo c1 c2)           = km_app    >.> lkC env c1 >=> lkC env c2
+    go (TransCo c1 c2)         = km_trans  >.> lkC env c1 >=> lkC env c2
+    go (UnsafeCo t1 t2)        = km_unsafe >.> lkT env t1 >=> lkT env t2
+    go (InstCo c t)            = km_inst   >.> lkC env c  >=> lkT env t
+    go (ForAllCo v c)          = km_forall >.> lkC (extendCME env v) c >=> lkBndr env v
+    go (CoVarCo v)             = km_var    >.> lkVar env v
+    go (SymCo c)               = km_sym    >.> lkC env c
+    go (NthCo n c)             = km_nth    >.> lookupTM n >=> lkC env c
+    go (LRCo CLeft  c)         = km_left   >.> lkC env c
+    go (LRCo CRight c)         = km_right  >.> lkC env c
 
 xtC :: CmEnv -> Coercion -> XT a -> CoercionMap a -> CoercionMap a
 xtC env co f EmptyKM = xtC env co f wrapEmptyKM
-xtC env (Refl ty)           f m = m { km_refl   = km_refl m   |> xtT env ty f }
-xtC env (TyConAppCo tc cs)  f m = m { km_tc_app = km_tc_app m |> xtNamed tc |>> xtList (xtC env) cs f }
-xtC env (AxiomInstCo ax cs) f m = m { km_axiom  = km_axiom m  |> xtNamed ax |>> xtList (xtC env) cs f }
-xtC env (AppCo c1 c2)       f m = m { km_app    = km_app m    |> xtC env c1 |>> xtC env c2 f }
-xtC env (TransCo c1 c2)     f m = m { km_trans  = km_trans m  |> xtC env c1 |>> xtC env c2 f }
-xtC env (UnsafeCo t1 t2)    f m = m { km_unsafe = km_unsafe m |> xtT env t1 |>> xtT env t2 f }
-xtC env (InstCo c t)        f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
-xtC env (ForAllCo v c)      f m = m { km_forall = km_forall m |> xtC (extendCME env v) c 
-                                                  |>> xtBndr env v f }
-xtC env (CoVarCo v)         f m = m { km_var 	= km_var m   |> xtVar env v f }
-xtC env (SymCo c)           f m = m { km_sym 	= km_sym m   |> xtC env   c f }
-xtC env (NthCo n c)         f m = m { km_nth 	= km_nth m   |> xtInt n |>> xtC env c f } 
-xtC env (LRCo CLeft  c)     f m = m { km_left 	= km_left  m |> xtC env c f } 
-xtC env (LRCo CRight c)     f m = m { km_right 	= km_right m |> xtC env c f } 
+xtC env (Refl ty)               f m = m { km_refl   = km_refl m   |> xtT env ty f }
+xtC env (TyConAppCo tc cs)      f m = m { km_tc_app = km_tc_app m |> xtNamed tc |>> xtList (xtC env) cs f }
+xtC env (AxiomInstCo ax ind cs) f m = m { km_axiom  = km_axiom m  |> xtNamed ax |>> xtInt ind |>> xtList (xtC env) cs f }
+xtC env (AppCo c1 c2)           f m = m { km_app    = km_app m    |> xtC env c1 |>> xtC env c2 f }
+xtC env (TransCo c1 c2)         f m = m { km_trans  = km_trans m  |> xtC env c1 |>> xtC env c2 f }
+xtC env (UnsafeCo t1 t2)        f m = m { km_unsafe = km_unsafe m |> xtT env t1 |>> xtT env t2 f }
+xtC env (InstCo c t)            f m = m { km_inst   = km_inst m   |> xtC env c  |>> xtT env t  f }
+xtC env (ForAllCo v c)          f m = m { km_forall = km_forall m |> xtC (extendCME env v) c 
+                                                      |>> xtBndr env v f }
+xtC env (CoVarCo v)             f m = m { km_var    = km_var m |> xtVar env  v f }
+xtC env (SymCo c)               f m = m { km_sym    = km_sym m |> xtC env    c f }
+xtC env (NthCo n c)             f m = m { km_nth    = km_nth m |> xtInt n |>> xtC env c f } 
+xtC env (LRCo CLeft  c)         f m = m { km_left   = km_left  m |> xtC env c f } 
+xtC env (LRCo CRight c)         f m = m { km_right  = km_right m |> xtC env c f } 
 
 fdC :: (a -> b -> b) -> CoercionMap a -> b -> b
 fdC _ EmptyKM = \z -> z
@@ -555,7 +555,7 @@ fdC k m = foldTM k (km_refl m)
         . foldTM (foldTM k) (km_app m)
         . foldTM (foldTM k) (km_forall m)
         . foldTM k (km_var m)
-        . foldTM (foldTM k) (km_axiom m)
+        . foldTM (foldTM (foldTM k)) (km_axiom m)
         . foldTM (foldTM k) (km_unsafe m)
         . foldTM k (km_sym m)
         . foldTM (foldTM k) (km_trans m)

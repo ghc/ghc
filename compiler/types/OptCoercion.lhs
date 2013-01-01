@@ -18,6 +18,7 @@ import Coercion
 import Type hiding( substTyVarBndr, substTy, extendTvSubst )
 import TcType       ( exactTyVarsOfType )
 import TyCon
+import CoAxiom
 import Var
 import VarSet
 import VarEnv
@@ -119,12 +120,12 @@ opt_co' env sym (CoVarCo cv)
                 ASSERT( isCoVar cv )
                 wrapSym sym (CoVarCo cv)
 
-opt_co' env sym (AxiomInstCo con cos)
+opt_co' env sym (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms
     -- e.g. if g is a top-level axiom
     --   g a : f a ~ a
     -- then (sym (g ty)) /= g (sym ty) !!
-  = wrapSym sym $ AxiomInstCo con (map (opt_co env False) cos)
+  = wrapSym sym $ AxiomInstCo con ind (map (opt_co env False) cos)
       -- Note that the_co does *not* have sym pushed into it
 
 opt_co' env sym (UnsafeCo ty1 ty2)
@@ -288,29 +289,31 @@ opt_trans_rule is co1 co2
 opt_trans_rule is co1 co2
 
   -- TrPushAxR/TrPushSymAxR
-  | Just (sym, con, cos1) <- co1_is_axiom_maybe
-  , Just cos2 <- matchAxiom sym con co2
+  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , Just cos2 <- matchAxiom sym con ind co2
   = fireTransRule "TrPushAxR" co1 co2 $
     if sym 
-    then SymCo $ AxiomInstCo con (opt_transList is (map mkSymCo cos2) cos1)
-    else         AxiomInstCo con (opt_transList is cos1 cos2)
+    then SymCo $ AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
+    else         AxiomInstCo con ind (opt_transList is cos1 cos2)
 
   -- TrPushAxL/TrPushSymAxL
-  | Just (sym, con, cos2) <- co2_is_axiom_maybe
-  , Just cos1 <- matchAxiom (not sym) con co1
+  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , Just cos1 <- matchAxiom (not sym) con ind co1
   = fireTransRule "TrPushAxL" co1 co2 $
     if sym 
-    then SymCo $ AxiomInstCo con (opt_transList is cos2 (map mkSymCo cos1))
-    else         AxiomInstCo con (opt_transList is cos1 cos2)
+    then SymCo $ AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
+    else         AxiomInstCo con ind (opt_transList is cos1 cos2)
 
   -- TrPushAxSym/TrPushSymAx
-  | Just (sym1, con1, cos1) <- co1_is_axiom_maybe
-  , Just (sym2, con2, cos2) <- co2_is_axiom_maybe
+  | Just (sym1, con1, ind1, cos1) <- co1_is_axiom_maybe
+  , Just (sym2, con2, ind2, cos2) <- co2_is_axiom_maybe
   , con1 == con2
+  , ind1 == ind2
   , sym1 == not sym2
-  , let qtvs = co_ax_tvs con1
-        lhs  = co_ax_lhs con1 
-        rhs  = co_ax_rhs con1 
+  , let branch = coAxiomNthBranch con1 ind1
+        qtvs = coAxBranchTyVars branch
+        lhs  = coAxNthLHS con1 ind1
+        rhs  = coAxBranchRHS branch
         pivot_tvs = exactTyVarsOfType (if sym2 then rhs else lhs)
   , all (`elemVarSet` pivot_tvs) qtvs
   = fireTransRule "TrPushAxSym" co1 co2 $
@@ -341,20 +344,23 @@ wrapSym sym co | sym       = SymCo co
                | otherwise = co
 
 -----------
-isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom, [Coercion])
+isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom Branched, Int, [Coercion])
 isAxiom_maybe (SymCo co) 
-  | Just (sym, con, cos) <- isAxiom_maybe co
-  = Just (not sym, con, cos)
-isAxiom_maybe (AxiomInstCo con cos)
-  = Just (False, con, cos)
+  | Just (sym, con, ind, cos) <- isAxiom_maybe co
+  = Just (not sym, con, ind, cos)
+isAxiom_maybe (AxiomInstCo con ind cos)
+  = Just (False, con, ind, cos)
 isAxiom_maybe _ = Nothing
 
 matchAxiom :: Bool -- True = match LHS, False = match RHS
-           -> CoAxiom -> Coercion -> Maybe [Coercion]
+           -> CoAxiom br -> Int -> Coercion -> Maybe [Coercion]
 -- If we succeed in matching, then *all the quantified type variables are bound*
 -- E.g.   if tvs = [a,b], lhs/rhs = [b], we'll fail
-matchAxiom sym (CoAxiom { co_ax_tvs = qtvs, co_ax_lhs = lhs, co_ax_rhs = rhs }) co
-  = case liftCoMatch (mkVarSet qtvs) (if sym then lhs else rhs) co of
+matchAxiom sym ax@(CoAxiom { co_ax_tc = tc }) ind co
+  = let (CoAxBranch { cab_tvs = qtvs
+                    , cab_lhs = lhs
+                    , cab_rhs = rhs }) = coAxiomNthBranch ax ind in
+    case liftCoMatch (mkVarSet qtvs) (if sym then (mkTyConApp tc lhs) else rhs) co of
       Nothing    -> Nothing
       Just subst -> allMaybes (map (liftCoSubstTyVar subst) qtvs)
 
