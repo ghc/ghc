@@ -39,6 +39,10 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
 endif
 
+ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
+libraries/integer-gmp_CC_OPTS += --with-gmp-framework-preferred
+endif
+
 libraries/integer-gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
 libraries/integer-gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 

@@ -27,38 +27,33 @@ AC_ARG_WITH([gmp-libraries],
     [GMP_LIB_DIRS=$withval; LDFLAGS="-L$withval"],
     [GMP_LIB_DIRS=])
 
+AC_ARG_WITH([gmp-framework-preferred],
+  [AC_HELP_STRING([--with-gmp-framework-preferred],
+    [on OSX, prefer the GMP framework to the gmp lib])],
+    [GMP_PREFER_FRAMEWORK=YES],
+    [GMP_PREFER_FRAMEWORK=NO])
 
 dnl--------------------------------------------------------------------
-dnl * Check whether this machine has gmp/gmp3 installed
+dnl * Detect gmp
 dnl--------------------------------------------------------------------
 
-AC_CHECK_LIB([gmp],  [__gmpz_fdiv_qr],
-             [HaveLibGmp=YES; GMP_LIBS=gmp],
-             [HaveLibGmp=NO;  GMP_LIBS=])
-if test "$HaveLibGmp" = "NO"; then
-AC_CHECK_LIB([gmp3], [__gmpz_fdiv_qr],
-             [HaveLibGmp=YES; GMP_LIBS=gmp3],
-             [HaveLibGmp=NO;  GMP_LIBS=])
+HaveLibGmp=NO
+GMP_LIBS=
+HaveFrameworkGMP=NO
+GMP_FRAMEWORK=
+
+if test "$GMP_PREFER_FRAMEWORK" = "YES"
+then
+    LOOK_FOR_GMP_FRAMEWORK
+    LOOK_FOR_GMP_LIB
+else
+    LOOK_FOR_GMP_LIB
+    LOOK_FOR_GMP_FRAMEWORK
 fi
-
-dnl--------------------------------------------------------------------
-dnl * Mac OS X only: check for GMP.framework
-dnl--------------------------------------------------------------------
-
-case $target_os in
-  darwin*)
-    AC_MSG_CHECKING([for GMP.framework])
-    save_libs="$LIBS"
-    LIBS="-framework GMP"
-    AC_TRY_LINK_FUNC(__gmpz_fdiv_qr,
-      [HaveFrameworkGMP=YES; GMP_FRAMEWORK=GMP; GMP_LIBS=],
-      [HaveFrameworkGMP=NO])
-    LIBS="$save_libs"
-    AC_MSG_RESULT([$HaveFrameworkGMP])
-    ;;
-esac
-
-AC_CHECK_HEADER([gmp.h], , [HaveFrameworkGMP=NO; HaveLibGmp=NO; GMP_LIBS=])
+if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "NO"
+then
+    AC_CHECK_HEADER([gmp.h], , [AC_MSG_ERROR([Cannot find gmp.h])])
+fi
 
 dnl--------------------------------------------------------------------
 dnl * Make sure we got some form of gmp
