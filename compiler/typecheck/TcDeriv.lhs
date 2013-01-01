@@ -33,6 +33,7 @@ import RnEnv
 import RnSource   ( addTcgDUs )
 import HscTypes
 
+import Id( idType )
 import Class
 import Type
 import ErrUtils
@@ -323,7 +324,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
         -- the stand-alone derived instances (@insts1@) are used when inferring
         -- the contexts for "deriving" clauses' instances (@infer_specs@)
         ; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
-                           inferInstanceContexts overlap_flag infer_specs
+                         inferInstanceContexts overlap_flag infer_specs
 
         ; insts2 <- mapM (genInst False overlap_flag commonAuxs) final_specs
 
@@ -426,12 +427,11 @@ renameDeriv is_boot inst_infos bagBinds
                 -- scope (yuk), and rename the method binds
            ASSERT( null sigs )
            bindLocalNames (map Var.varName tyvars) $
-           do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) binds
+           do { (rn_binds, fvs) <- rnMethodBinds (is_cls_nm inst) (\_ -> []) binds
               ; let binds' = VanillaInst rn_binds [] standalone_deriv
               ; return (inst_info { iBinds = binds' }, fvs) }
         where
-          (tyvars,_, clas,_) = instanceHead inst
-          clas_nm            = className clas
+          (tyvars, _) = tcSplitForAllTys (idType (instanceDFunId inst))
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -1378,8 +1378,7 @@ inferInstanceContexts oflag infer_specs
       | otherwise
       = do {      -- Extend the inst info from the explicit instance decls
                   -- with the current set of solutions, and simplify each RHS
-             let inst_specs = zipWithEqual "add_solns" (mkInstance oflag)
-                                           current_solns infer_specs
+             inst_specs <- zipWithM (mkInstance oflag) current_solns infer_specs
            ; new_solns <- checkNoErrs $
                           extendLocalInstEnv inst_specs $
                           mapM gen_soln infer_specs
@@ -1413,13 +1412,14 @@ inferInstanceContexts oflag infer_specs
         the_pred = mkClassPred clas inst_tys
 
 ------------------------------------------------------------------
-mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> ClsInst
+mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> TcM ClsInst
 mkInstance overlap_flag theta
-            (DS { ds_name = dfun_name
-                , ds_tvs = tyvars, ds_cls = clas, ds_tys = tys })
-  = mkLocalInstance dfun overlap_flag
+           (DS { ds_name = dfun_name
+               , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
+  = do { (subst, tvs') <- tcInstSkolTyVars tvs
+       ; return (mkLocalInstance dfun overlap_flag tvs' clas (substTys subst tys)) }
   where
-    dfun = mkDictFunId dfun_name tyvars theta clas tys
+    dfun = mkDictFunId dfun_name tvs theta clas tys
 
 
 extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
@@ -1512,21 +1512,21 @@ genInst standalone_deriv oflag comauxs
                  , ds_theta = theta, ds_newtype = is_newtype
                  , ds_name = name, ds_cls = clas })
   | is_newtype
-  = return (InstInfo { iSpec   = inst_spec
-                     , iBinds  = NewTypeDerived co rep_tycon }, emptyBag)
+  = do { inst_spec <- mkInstance oflag theta spec
+       ; return (InstInfo { iSpec   = inst_spec
+                          , iBinds  = NewTypeDerived co rep_tycon }, emptyBag) }
 
   | otherwise
   = do { fix_env <- getFixityEnv
        ; (meth_binds, deriv_stuff) <- genDerivStuff (getSrcSpan name)
                                         fix_env clas name rep_tycon
                                         (lookup rep_tycon comauxs)
+       ; inst_spec <- mkInstance oflag theta spec
        ; let inst_info = InstInfo { iSpec   = inst_spec
                                   , iBinds  = VanillaInst meth_binds []
                                                 standalone_deriv }
        ; return ( inst_info, deriv_stuff) }
   where
-
-    inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
               Just co_con -> mkTcUnbranchedAxInstCo co_con rep_tc_args
               Nothing     -> id_co

@@ -421,7 +421,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 , deriv_binds)
     }}
   where
-    typInstCheck ty = is_cls (iSpec ty) `elem` typeableClassNames
+    typInstCheck ty = is_cls_nm (iSpec ty) `elem` typeableClassNames
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
 
@@ -550,8 +550,11 @@ tcClsInstDecl (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                 -- Dfun location is that of instance *header*
 
         ; overlap_flag <- getOverlapFlag
+        ; (subst, tyvars') <- tcInstSkolTyVars tyvars
         ; let dfun  	= mkDictFunId dfun_name tyvars theta clas inst_tys
-              ispec 	= mkLocalInstance dfun overlap_flag
+              ispec 	= mkLocalInstance dfun overlap_flag tyvars' clas (substTys subst inst_tys)
+                            -- Be sure to freshen those type variables, 
+                            -- so they are sure not to appear in any lookup
               inst_info = InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False }
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }

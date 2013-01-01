@@ -1308,8 +1308,9 @@ reifyClassInstance i
        ; let head_ty = foldl TH.AppT (TH.ConT (reifyName cls)) thtypes
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
-     (_tvs, theta, cls, types) = instanceHead i
-     n_silent = dfunNSilent (instanceDFunId i)
+     (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
+     dfun     = instanceDFunId i
+     n_silent = dfunNSilent dfun
 
 ------------------------------
 reifyFamilyInstance :: FamInst br -> TcM TH.Dec

@@ -700,7 +700,7 @@ pprInstInfoDetails info
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of
-                           (_, _, cls, [ty]) -> (cls, ty)
+                           (_, cls, [ty]) -> (cls, ty)
                            _ -> panic "simpleInstInfoClsTy"
 
 simpleInstInfoTy :: InstInfo a -> Type

@@ -1096,23 +1096,20 @@ tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
 
 -----------------------
-tcSplitDFunTy :: Type -> ([TyVar], Int, Class, [Type])
+tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- Split the type of a dictionary function
 -- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
 -- have non-Pred arguments, such as
 --     df :: forall m. (forall b. Eq b => Eq (m b)) -> C m
+-- 
+-- Also NB splitFunTys, not tcSplitFunTys; 
+-- the latter  specifically stops at PredTy arguments, 
+-- and we don't want to do that here
 tcSplitDFunTy ty 
-  = case tcSplitForAllTys ty   of { (tvs, rho)  ->
-    case split_dfun_args 0 rho of { (n_theta, tau) ->
-    case tcSplitDFunHead tau   of { (clas, tys) ->
-    (tvs, n_theta, clas, tys) }}}
-  where
-    -- Count the context of the dfun.  This can be a mix of
-    -- coercion and class constraints; or (in the general NDP case)
-    -- some other function argument
-    split_dfun_args n ty | Just ty' <- tcView ty = split_dfun_args n ty'
-    split_dfun_args n (FunTy _ ty)     = split_dfun_args (n+1) ty
-    split_dfun_args n ty               = (n, ty)
+  = case tcSplitForAllTys ty   of { (tvs, rho)   ->
+    case splitFunTys rho       of { (theta, tau) ->  
+    case tcSplitDFunHead tau   of { (clas, tys)  ->
+    (tvs, theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys

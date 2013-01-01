@@ -1604,8 +1604,9 @@ getFS x = occNameFS (getOccName x)
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
-instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag,
-                                is_cls = cls_name, is_tcs = mb_tcs })
+instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
+                             , is_cls_nm = cls_name, is_cls = cls
+                             , is_tys = tys, is_tcs = mb_tcs })
   = ASSERT( cls_name == className cls )
     IfaceClsInst { ifDFun    = dfun_name,
                 ifOFlag   = oflag,
@@ -1621,8 +1622,6 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag,
     is_local name = nameIsLocalOrFrom mod name
 
         -- Compute orphanhood.  See Note [Orphans] in IfaceSyn
-    (_, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
-                -- Slightly awkward: we need the Class to get the fundeps
     (tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
 
