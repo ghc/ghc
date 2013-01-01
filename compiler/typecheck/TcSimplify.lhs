@@ -799,8 +799,7 @@ solveImplication inerts
                  , ic_wanted = wanteds
                  , ic_info   = info
                  , ic_env    = env })
-  = 
-    do { traceTcS "solveImplication {" (ppr imp) 
+  = do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve the nested constraints
          -- NB: 'inerts' has empty inert_fsks

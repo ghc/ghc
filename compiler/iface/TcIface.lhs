@@ -653,8 +653,8 @@ look at it.
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs })
-  = do { dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
-                     tcIfaceExtId dfun_occ
+  = do { dfun <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
+                 tcIfaceExtId dfun_occ
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 

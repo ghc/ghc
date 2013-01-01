@@ -818,15 +818,17 @@ pprConDecl decl@(ConDecl { con_details = InfixCon ty1 ty2, con_res = ResTyGADT {
 
 %************************************************************************
 %*                                                                      *
-\subsection[InstDecl]{An instance declaration}
+                Instance declarations
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
--- see note [Family instance equation groups]
+----------------- Type synonym family instances -------------
+
+-- See note [Family instance equation groups]
 type LTyFamInstEqn name = Located (TyFamInstEqn name)
 
--- | one equation in a family instance declaration
+-- | One equation in a family instance declaration
 data TyFamInstEqn name   
   = TyFamInstEqn
        { tfie_tycon :: Located name
@@ -839,12 +841,15 @@ data TyFamInstEqn name
 type LTyFamInstDecl name = Located (TyFamInstDecl name)
 data TyFamInstDecl name 
   = TyFamInstDecl
-       { tfid_eqns     :: [LTyFamInstEqn name] -- ^ list of (possibly-overlapping) eqns 
-       , tfid_group :: Bool                  -- was this declared with the "where" syntax?
-       , tfid_fvs      :: NameSet }          -- the group is type-checked as one,
-                                             -- so one NameSet will do
-               -- INVARIANT: tfid_group == False --> length tfid_eqns == 1
+       { tfid_eqns  :: [LTyFamInstEqn name] -- ^ list of (possibly-overlapping) eqns 
+       , tfid_group :: Bool                 -- Was this declared with the "where" syntax?
+       , tfid_fvs   :: NameSet }            -- The group is type-checked as one,
+                                            --   so one NameSet will do
+       -- INVARIANT: tfid_group == False --> length tfid_eqns == 1
   deriving( Typeable, Data )
+
+
+----------------- Data family instances -------------
 
 type LDataFamInstDecl name = Located (DataFamInstDecl name)
 data DataFamInstDecl name
@@ -857,15 +862,8 @@ data DataFamInstDecl name
        , dfid_fvs   :: NameSet }                    -- free vars for dependency analysis
   deriving( Typeable, Data )
 
-type LInstDecl name = Located (InstDecl name)
-data InstDecl name  -- Both class and family instances
-  = ClsInstD    
-      { cid_inst  :: ClsInstDecl name }
-  | DataFamInstD              -- data family instance
-      { dfid_inst :: DataFamInstDecl name }
-  | TyFamInstD              -- type family instance
-      { tfid_inst :: TyFamInstDecl name }
-  deriving (Data, Typeable)
+
+----------------- Class instances -------------
 
 type LClsInstDecl name = Located (ClsInstDecl name)
 data ClsInstDecl name
@@ -880,6 +878,18 @@ data ClsInstDecl name
       }
   deriving (Data, Typeable)
 
+
+----------------- Instances of all kinds -------------
+
+type LInstDecl name = Located (InstDecl name)
+data InstDecl name  -- Both class and family instances
+  = ClsInstD    
+      { cid_inst  :: ClsInstDecl name }
+  | DataFamInstD              -- data family instance
+      { dfid_inst :: DataFamInstDecl name }
+  | TyFamInstD              -- type family instance
+      { tfid_inst :: TyFamInstDecl name }
+  deriving (Data, Typeable)
 \end{code}
 
 Note [Family instance declaration binders]
