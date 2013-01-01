@@ -1809,7 +1809,7 @@ predUndecErr pred msg = sep [msg,
 
 nomoreMsg :: [TcTyVar] -> SDoc
 nomoreMsg tvs 
-  = sep [ ptext (sLit "Variable") <+> plural tvs <+> quotes (pprWithCommas ppr tvs) 
+  = sep [ ptext (sLit "Variable") <> plural tvs <+> quotes (pprWithCommas ppr tvs) 
         , (if isSingleton tvs then ptext (sLit "occurs")
                                   else ptext (sLit "occur"))
           <+> ptext (sLit "more often than in the instance head") ]
