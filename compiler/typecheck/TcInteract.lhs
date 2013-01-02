@@ -1728,7 +1728,8 @@ matchClassInst _ clas [ k, ty ] _
 
   where
   {- This adds a coercion that will convert the literal into a dictionary
-     of the appropriate type.  The coercion happens in 3 steps:
+     of the appropriate type.  See Note [SingI and EvLit] in TcEvidence.
+     The coercion happens in 3 steps:
 
      evLit    -> Sing_k_n   -- literal to representation of data family
      Sing_k_n -> Sing k n   -- representation of data family to data family
