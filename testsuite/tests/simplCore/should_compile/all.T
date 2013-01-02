@@ -155,4 +155,4 @@ test('T7165',
      run_command,
      ['$MAKE -s --no-print-directory T7165'])
 test('T7287', normal, compile, [''])
-
+test('T7360', only_ways(['optasm']), compile, ['-ddump-simpl -dsuppress-uniques'])

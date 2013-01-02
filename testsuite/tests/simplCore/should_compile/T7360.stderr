@@ -1,0 +1,47 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 20, types: 17, coercions: 0}
+
+T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
+[GblId[DataConWrapper],
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType S,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
+         Tmpl= \ (dt [Occ=Once] :: GHC.Types.Int) ->
+                 case dt of dt { __DEFAULT -> T7360.Foo3 dt }}]
+T7360.$WFoo3 =
+  \ (dt [Occ=Once] :: GHC.Types.Int) ->
+    case dt of dt { __DEFAULT -> T7360.Foo3 dt }
+
+T7360.fun1 :: T7360.Foo -> ()
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType S,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=True)}]
+T7360.fun1 =
+  \ (x :: T7360.Foo) -> case x of _ { __DEFAULT -> GHC.Tuple.() }
+
+T7360.fun2 :: forall a. [a] -> GHC.Types.Int
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType Sm,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@ a) (x [Occ=Once] :: [a]) ->
+                 case GHC.List.$wlen @ a x 0 of ww { __DEFAULT ->
+                 GHC.Types.I# ww
+                 }}]
+T7360.fun2 =
+  \ (@ a) (x :: [a]) ->
+    case GHC.List.$wlen @ a x 0 of ww { __DEFAULT -> GHC.Types.I# ww }
+
+
+
