@@ -95,12 +95,14 @@ pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
 pkind k = pakind k
 
 paty, pbty, pty :: Ty -> Doc
+-- paty: print in parens, if non-atomic (like a name)
+-- pbty: print in parens, if arrow (used only for lhs of arrow)
+-- pty:  not in parens
 paty (Tvar n) = pname n
 paty (Tcon c) = pqname c
 paty t = parens (pty t)
 
 pbty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = parens(fsep [pbty t1, text "->",pty t2])
-pbty (Tapp t1 t2) = parens $ pappty t1 [t2] 
 pbty t = paty t
 
 pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t2]
@@ -115,7 +117,11 @@ pty (NthCoercion n t) =
   sep [text "%nth", int n, paty t]
 pty (InstCoercion t1 t2) =
   sep [text "%inst", paty t1, paty t2]
-pty t = pbty t
+pty (AxiomCoercion tc i cos) = 
+  pqname tc <+> int i <+> sep (map paty cos)
+pty ty@(Tapp {}) = pappty ty []
+pty ty@(Tvar {}) = paty ty
+pty ty@(Tcon {}) = paty ty
 
 pappty :: Ty -> [Ty] -> Doc
 pappty (Tapp t1 t2) ts = pappty t1 (t2:ts)
