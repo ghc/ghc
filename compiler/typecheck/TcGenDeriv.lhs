@@ -51,6 +51,7 @@ import PrelNames hiding (error_RDR)
 import PrimOp
 import SrcLoc
 import TyCon
+import CoAxiom
 import TcType
 import TysPrim
 import TysWiredIn
@@ -85,8 +86,8 @@ data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
 
   -- Generics
-  | DerivTyCon TyCon      -- New data types
-  | DerivFamInst FamInst  -- New type family instances
+  | DerivTyCon TyCon                   -- New data types
+  | DerivFamInst (FamInst Unbranched)  -- New type family instances
 
   -- New top-level auxiliary bindings
   | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
@@ -851,30 +852,29 @@ Example
          | T1 { f1 :: Int }
          | T2 T
 
-
 instance Read T where
   readPrec =
     parens
     ( prec 4 (
-        do x           <- ReadP.step Read.readPrec
-           Symbol "%%" <- Lex.lex
-           y           <- ReadP.step Read.readPrec
+        do x <- ReadP.step Read.readPrec
+           expectP (Symbol "%%")
+           y <- ReadP.step Read.readPrec
            return (x %% y))
       +++
       prec (appPrec+1) (
         -- Note the "+1" part; "T2 T1 {f1=3}" should parse ok
         -- Record construction binds even more tightly than application
-        do Ident "T1" <- Lex.lex
-           Punc '{' <- Lex.lex
-           Ident "f1" <- Lex.lex
-           Punc '=' <- Lex.lex
+        do expectP (Ident "T1")
+           expectP (Punc '{')
+           expectP (Ident "f1")
+           expectP (Punc '=')
            x          <- ReadP.reset Read.readPrec
-           Punc '}' <- Lex.lex
+           expectP (Punc '}')
            return (T1 { f1 = x }))
       +++
       prec appPrec (
-        do Ident "T2" <- Lex.lexP
-           x          <- ReadP.step Read.readPrec
+        do expectP (Ident "T2")
+           x <- ReadP.step Read.readPrec
            return (T2 x))
     )
 
@@ -882,6 +882,17 @@ instance Read T where
   readList     = readListDefault
 
 
+Note [Use expectP]
+~~~~~~~~~~~~~~~~~~
+Note that we use 
+   expectP (Ident "T1")
+rather than
+   Ident "T1" <- lexP
+The latter desugares to inline code for matching the Ident and the
+string, and this can be very voluminous. The former is much more
+compact.  Cf Trac #7258, although that also concerned non-linearity in
+the occurrence analyser, a separate issue.
+     
 \begin{code}
 gen_Read_binds :: FixityEnv -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 
@@ -983,11 +994,8 @@ gen_Read_binds get_fixity loc tycon
     mk_alt e1 e2       = genOpApp e1 alt_RDR e2                         -- e1 +++ e2
     mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p                -- prec p (do { ss ; b })
                                            , nlHsDo DoExpr (ss ++ [noLoc $ mkLastStmt b])]
-    bindLex pat        = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))      -- pat <- lexP
     con_app con as     = nlHsVarApps (getRdrName con) as                -- con as
     result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as) -- return (con as)
-
-    punc_pat s   = nlConPat punc_RDR   [nlLitPat (mkHsString s)]  -- Punc 'c'
 
     -- For constructors and field labels ending in '#', we hackily
     -- let the lexer generate two tokens, and look for both in sequence
@@ -995,12 +1003,14 @@ gen_Read_binds get_fixity loc tycon
     ident_h_pat s | Just (ss, '#') <- snocView s = [ ident_pat ss, symbol_pat "#" ]
                   | otherwise                    = [ ident_pat s ]
 
-    ident_pat  s = bindLex $ nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo" <- lexP
-    symbol_pat s = bindLex $ nlConPat symbol_RDR [nlLitPat (mkHsString s)]  -- Symbol ">>" <- lexP
+    bindLex pat  = noLoc (mkBodyStmt (nlHsApp (nlHsVar expectP_RDR) pat))  -- expectP p
+                   -- See Note [Use expectP]
+    ident_pat  s = bindLex $ nlHsApps ident_RDR  [nlHsLit (mkHsString s)]  -- expectP (Ident "foo")
+    symbol_pat s = bindLex $ nlHsApps symbol_RDR [nlHsLit (mkHsString s)]  -- expectP (Symbol ">>")
+    read_punc c  = bindLex $ nlHsApps punc_RDR   [nlHsLit (mkHsString c)]  -- expectP (Punc "<")
 
     data_con_str con = occNameString (getOccName con)
 
-    read_punc c = bindLex (punc_pat c)
     read_arg a ty = ASSERT( not (isUnLiftedType ty) )
                     noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
@@ -1801,7 +1811,7 @@ type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
                               ( Bag (LHsBind RdrName, LSig RdrName)
                                 -- Extra bindings (used by Generic only)
                               , Bag TyCon   -- Extra top-level datatypes
-                              , Bag FamInst -- Extra family instances
+                              , Bag (FamInst Unbranched) -- Extra family instances
                               , Bag (InstInfo RdrName)) -- Extra instances
 
 genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff

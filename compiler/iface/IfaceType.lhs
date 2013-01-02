@@ -32,6 +32,7 @@ import Coercion
 import TypeRep hiding( maybeParen )
 import Unique( hasKey )
 import TyCon
+import CoAxiom
 import Id
 import Var
 import TysWiredIn
@@ -89,7 +90,7 @@ newtype IfaceTyCon = IfaceTc { ifaceTyConName :: IfExtName }
 
   -- Coercion constructors
 data IfaceCoCon
-  = IfaceCoAx IfExtName
+  = IfaceCoAx IfExtName Int -- Int is 0-indexed branch number
   | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
   | IfaceTransCo   | IfaceInstCo
   | IfaceNthCo Int | IfaceLRCo LeftOrRight
@@ -264,7 +265,7 @@ instance Outputable IfaceTyCon where
   ppr = ppr . ifaceTyConName
 
 instance Outputable IfaceCoCon where
-  ppr (IfaceCoAx n)    = ppr n
+  ppr (IfaceCoAx n i)  = ppr n <> brackets (ppr i)
   ppr IfaceReflCo      = ptext (sLit "Refl")
   ppr IfaceUnsafeCo    = ptext (sLit "Unsafe")
   ppr IfaceSymCo       = ptext (sLit "Sym")
@@ -358,7 +359,8 @@ coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1)
 coToIfaceType (ForAllCo v co)       = IfaceForAllTy (toIfaceTvBndr v)
                                                     (coToIfaceType co)
 coToIfaceType (CoVarCo cv)          = IfaceTyVar  (toIfaceCoVar cv)
-coToIfaceType (AxiomInstCo con cos) = IfaceCoConApp (coAxiomToIfaceType con)
+coToIfaceType (AxiomInstCo con ind cos)
+                                    = IfaceCoConApp (coAxiomToIfaceType con ind)
                                                     (map coToIfaceType cos)
 coToIfaceType (UnsafeCo ty1 ty2)    = IfaceCoConApp IfaceUnsafeCo
                                                     [ toIfaceType ty1
@@ -376,7 +378,7 @@ coToIfaceType (InstCo co ty)        = IfaceCoConApp IfaceInstCo
                                                     [ coToIfaceType co
                                                     , toIfaceType ty ]
 
-coAxiomToIfaceType :: CoAxiom -> IfaceCoCon
-coAxiomToIfaceType con = IfaceCoAx (coAxiomName con)
+coAxiomToIfaceType :: CoAxiom br -> Int -> IfaceCoCon
+coAxiomToIfaceType con ind = IfaceCoAx (coAxiomName con) ind
 \end{code}
 

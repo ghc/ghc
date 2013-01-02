@@ -4861,31 +4861,66 @@ F Bool             -- WRONG: unsaturated application
   <sect3 id="type-instance-declarations">
     <title>Type instance declarations</title>
     <para>
-      Instance declarations of type families are very similar to standard type
-      synonym declarations.  The only two differences are that the
-      keyword <literal>type</literal> is followed
-      by <literal>instance</literal> and that some or all of the type
-      arguments can be non-variable types, but may not contain forall types or
-      type synonym families. However, data families are generally allowed, and
-      type synonyms are allowed as long as they are fully applied and expand
-      to a type that is admissible - these are the exact same requirements as
-      for data instances.  For example, the <literal>[e]</literal> instance
-      for <literal>Elem</literal> is
+      There are two forms of type family instance declaration: unbranched and
+      branched. Branched instances list any number of alternatives, to be
+      checked in order from top to bottom, similarly to normal function
+      declarations. Unbranched instances supply only one left-hand side.
+
+      Unbranched instance declarations of type families are very similar to
+      standard type synonym declarations. The only two differences are that
+      the keyword <literal>type</literal> is followed by
+      <literal>instance</literal> and that some or all of the type arguments
+      can be non-variable types, but may not contain forall types or type
+      synonym families. However, data families are generally allowed, and type
+      synonyms are allowed as long as they are fully applied and expand to a
+      type that is admissible - these are the exact same requirements as for
+      data instances. For example, the <literal>[e]</literal> instance for
+      <literal>Elem</literal> is
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
     </para>
+
+    <para>
+      Branched instance declarations, on the other hand, allow many different
+      left-hand-side type patterns. These patterns are tried in order, from
+      top to bottom, when simplifying a type family application. A branched instance
+      declaration is introduced by <literal>type instance where</literal>. For example:
+<programlisting>
+type instance where
+  F Int  = Double
+  F Bool = Char
+  F a    = String
+</programlisting>
+      In this example, we declare an instance for <literal>F</literal> such
+      that <literal>F Int</literal> simplifies to <literal>Double</literal>,
+      <literal>F Bool</literal> simplifies to <literal>Char</literal>, and for
+      any other type <literal>a</literal> that is known not to be
+      <literal>Int</literal> or <literal>Bool</literal>, <literal>F
+      a</literal> simplifies to <literal>String</literal>. Note that GHC must
+      be sure that <literal>a</literal> cannot unify with
+      <literal>Int</literal> or <literal>Bool</literal> in that last case; if
+      a programmer specifies just <literal>F a</literal> in their code, GHC will
+      not be able to simplify the type. After all, <literal>a</literal> might later
+      be instantiated with <literal>Int</literal>.
+    </para>
+
+    <para>
+      Branched instances and unbranched instances may be mixed freely for the same
+      type family.
+    </para>
+
     <para>
       Type family instance declarations are only legitimate when an
       appropriate family declaration is in scope - just like class instances
-      require the class declaration to be visible.  Moreover, each instance
+      require the class declaration to be visible. Moreover, each instance
       declaration has to conform to the kind determined by its family
       declaration, and the number of type parameters in an instance
       declaration must match the number of type parameters in the family
-      declaration.   Finally, the right-hand side of a type instance must be a
+      declaration. Finally, the right-hand side of a type instance must be a
       monotype (i.e., it may not include foralls) and after the expansion of
       all saturated vanilla type synonyms, no synonyms, except family synonyms
-      may remain.  Here are some examples of admissible and illegal type
+      may remain. Here are some examples of admissible and illegal type
       instances:
 <programlisting>
 type family F a :: *
@@ -4894,6 +4929,13 @@ type instance F String             = Char        -- OK!
 type instance F (F a)              = a           -- WRONG: type parameter mentions a type family
 type instance F (forall a. (a, b)) = b           -- WRONG: a forall type appears in a type parameter
 type instance F Float              = forall a.a  -- WRONG: right-hand side may not be a forall type
+type instance where                              -- OK!
+  F (Maybe Int)  = Int
+  F (Maybe Bool) = Bool
+  F (Maybe a)    = String
+type instance where            -- WRONG: conflicts with earlier instances (see below)
+  F Int = Float
+  F a   = [a]
 
 type family G a b :: * -> *
 type instance G Int            = (,)     -- WRONG: must be two type parameters
@@ -4904,15 +4946,17 @@ type instance G Int Char Float = Double  -- WRONG: must be two type parameters
     <sect3 id="type-family-overlap">
       <title>Overlap of type synonym instances</title>
       <para>
-	The instance declarations of a type family used in a single program
-	may only overlap if the right-hand sides of the overlapping instances
-	coincide for the overlapping types.  More formally, two instance
-	declarations overlap if there is a substitution that makes the
-	left-hand sides of the instances syntactically the same.  Whenever
-	that is the case, the right-hand sides of the instances must also be
-	syntactically equal under the same substitution.  This condition is
-	independent of whether the type family is associated or not, and it is
-	not only a matter of consistency, but one of type safety.
+	The unbranched instance declarations of a type family used in a single
+	program may only overlap if the right-hand sides of the overlapping
+	instances coincide for the overlapping types. More formally, two
+	instance declarations overlap if there is a substitution that makes
+	the left-hand sides of the instances syntactically the same. Whenever
+	that is the case, if the instances are unbranched, the right-hand
+	sides of the instances must also be syntactically equal under the same
+	substitution. This condition is independent of whether the type family
+	is associated or not, and it is not only a matter of consistency, but
+	one of type safety. Branched instances are not permitted to overlap
+	with any other instances, branched or unbranched.
       </para>
       <para>
 	Here are two example to illustrate the condition under which overlap
@@ -4923,6 +4967,10 @@ type instance F (Int, b) = [b]   -- overlap permitted
 
 type instance G (a, Int)  = [a]
 type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
+
+type instance H Int = Int
+type instance where              -- ILLEGAL overlap, as branched instances may not overlap
+  H a = a
 </programlisting>
       </para>
     <para> However see <xref linkend="ghci-decls"/> for the overlap rules in GHCi.</para>
@@ -5054,6 +5102,10 @@ instance GMapKey Flob where
         <literal>(GMap Flob ...)</literal>, this facility is most useful when
         the free indexed parameter is of a kind with a finite number of alternatives
         (unlike <literal>*</literal>).
+      </para>
+
+      <para>
+	Branched associated type instances are not currently supported.
       </para>
     </sect3>
 
@@ -6182,183 +6234,6 @@ inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
 </sect3>
 </sect2>
 
-    <!--   ======================= COMMENTED OUT ========================
-
-    We intend to remove linear implicit parameters, so I'm at least removing
-    them from the 6.6 user manual
-
-<sect2 id="linear-implicit-parameters">
-<title>Linear implicit parameters</title>
-<para>
-Linear implicit parameters are an idea developed by Koen Claessen,
-Mark Shields, and Simon PJ.  They address the long-standing
-problem that monads seem over-kill for certain sorts of problem, notably:
-</para>
-<itemizedlist>
-<listitem> <para> distributing a supply of unique names </para> </listitem>
-<listitem> <para> distributing a supply of random numbers </para> </listitem>
-<listitem> <para> distributing an oracle (as in QuickCheck) </para> </listitem>
-</itemizedlist>
-
-<para>
-Linear implicit parameters are just like ordinary implicit parameters,
-except that they are "linear"; that is, they cannot be copied, and
-must be explicitly "split" instead.  Linear implicit parameters are
-written '<literal>%x</literal>' instead of '<literal>?x</literal>'.
-(The '/' in the '%' suggests the split!)
-</para>
-<para>
-For example:
-<programlisting>
-    import GHC.Exts( Splittable )
-
-    data NameSupply = ...
-
-    splitNS :: NameSupply -> (NameSupply, NameSupply)
-    newName :: NameSupply -> Name
-
-    instance Splittable NameSupply where
-	split = splitNS
-
-
-    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
-    f env (Lam x e) = Lam x' (f env e)
-		    where
-		      x'   = newName %ns
-		      env' = extend env x x'
-    ...more equations for f...
-</programlisting>
-Notice that the implicit parameter %ns is consumed
-<itemizedlist>
-<listitem> <para> once by the call to <literal>newName</literal> </para> </listitem>
-<listitem> <para> once by the recursive call to <literal>f</literal> </para></listitem>
-</itemizedlist>
-</para>
-<para>
-So the translation done by the type checker makes
-the parameter explicit:
-<programlisting>
-    f :: NameSupply -> Env -> Expr -> Expr
-    f ns env (Lam x e) = Lam x' (f ns1 env e)
-		       where
-	 		 (ns1,ns2) = splitNS ns
-			 x' = newName ns2
-			 env = extend env x x'
-</programlisting>
-Notice the call to 'split' introduced by the type checker.
-How did it know to use 'splitNS'?  Because what it really did
-was to introduce a call to the overloaded function 'split',
-defined by the class <literal>Splittable</literal>:
-<programlisting>
-	class Splittable a where
-	  split :: a -> (a,a)
-</programlisting>
-The instance for <literal>Splittable NameSupply</literal> tells GHC how to implement
-split for name supplies.  But we can simply write
-<programlisting>
-	g x = (x, %ns, %ns)
-</programlisting>
-and GHC will infer
-<programlisting>
-	g :: (Splittable a, %ns :: a) => b -> (b,a,a)
-</programlisting>
-The <literal>Splittable</literal> class is built into GHC.  It's exported by module
-<literal>GHC.Exts</literal>.
-</para>
-<para>
-Other points:
-<itemizedlist>
-<listitem> <para> '<literal>?x</literal>' and '<literal>%x</literal>'
-are entirely distinct implicit parameters: you
-  can use them together and they won't interfere with each other. </para>
-</listitem>
-
-<listitem> <para> You can bind linear implicit parameters in 'with' clauses. </para> </listitem>
-
-<listitem> <para>You cannot have implicit parameters (whether linear or not)
-  in the context of a class or instance declaration. </para></listitem>
-</itemizedlist>
-</para>
-
-<sect3><title>Warnings</title>
-
-<para>
-The monomorphism restriction is even more important than usual.
-Consider the example above:
-<programlisting>
-    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
-    f env (Lam x e) = Lam x' (f env e)
-		    where
-		      x'   = newName %ns
-		      env' = extend env x x'
-</programlisting>
-If we replaced the two occurrences of x' by (newName %ns), which is
-usually a harmless thing to do, we get:
-<programlisting>
-    f :: (%ns :: NameSupply) => Env -> Expr -> Expr
-    f env (Lam x e) = Lam (newName %ns) (f env e)
-		    where
-		      env' = extend env x (newName %ns)
-</programlisting>
-But now the name supply is consumed in <emphasis>three</emphasis> places
-(the two calls to newName,and the recursive call to f), so
-the result is utterly different.  Urk!  We don't even have
-the beta rule.
-</para>
-<para>
-Well, this is an experimental change.  With implicit
-parameters we have already lost beta reduction anyway, and
-(as John Launchbury puts it) we can't sensibly reason about
-Haskell programs without knowing their typing.
-</para>
-
-</sect3>
-
-<sect3><title>Recursive functions</title>
-<para>Linear implicit parameters can be particularly tricky when you have a recursive function
-Consider
-<programlisting>
-        foo :: %x::T => Int -> [Int]
-        foo 0 = []
-        foo n = %x : foo (n-1)
-</programlisting>
-where T is some type in class Splittable.</para>
-<para>
-Do you get a list of all the same T's or all different T's
-(assuming that split gives two distinct T's back)?
-</para><para>
-If you supply the type signature, taking advantage of polymorphic
-recursion, you get what you'd probably expect.  Here's the
-translated term, where the implicit param is made explicit:
-<programlisting>
-        foo x 0 = []
-        foo x n = let (x1,x2) = split x
-                  in x1 : foo x2 (n-1)
-</programlisting>
-But if you don't supply a type signature, GHC uses the Hindley
-Milner trick of using a single monomorphic instance of the function
-for the recursive calls. That is what makes Hindley Milner type inference
-work.  So the translation becomes
-<programlisting>
-        foo x = let
-                  foom 0 = []
-                  foom n = x : foom (n-1)
-                in
-                foom
-</programlisting>
-Result: 'x' is not split, and you get a list of identical T's.  So the
-semantics of the program depends on whether or not foo has a type signature.
-Yikes!
-</para><para>
-You may say that this is a good reason to dislike linear implicit parameters
-and you'd be right.  That is why they are an experimental feature.
-</para>
-</sect3>
-
-</sect2>
-
-================ END OF Linear Implicit Parameters commented out -->
-
 <sect2 id="kinding">
 <title>Explicitly-kinded quantification</title>
 
@@ -6770,9 +6645,6 @@ it becomes possible to do so.
 <para>Lexically-scoped type variables are enabled by
 <option>-XScopedTypeVariables</option>.  This flag implies <option>-XRelaxedPolyRec</option>.
 </para>
-<para>Note: GHC 6.6 contains substantial changes to the way that scoped type
-variables work, compared to earlier releases.  Read this section
-carefully!</para>
 
 <sect3>
 <title>Overview</title>

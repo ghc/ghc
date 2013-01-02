@@ -23,7 +23,7 @@ import Name             ( mkSystemVarName, isExternalName )
 import Coercion hiding  ( substCo, substTy, substCoVar, extendTvSubst )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, isMarkedStrict )
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
 import Demand           ( isStrictDmd, StrictSig(..), dmdTypeDepth )
@@ -33,7 +33,7 @@ import CoreUtils
 import qualified CoreSubst
 import CoreArity
 import Rules            ( lookupRule, getRules )
-import BasicTypes       ( isMarkedStrict, Arity )
+import BasicTypes       ( Arity )
 import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )

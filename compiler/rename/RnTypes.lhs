@@ -28,7 +28,7 @@ module RnTypes (
         -- Binding related stuff
         bindSigTyVarsFV, bindHsTyVars, rnHsBndrSig,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-        extractRdrKindSigVars, extractTyDefnKindVars, filterInScope
+        extractRdrKindSigVars, extractDataDefnKindVars, filterInScope
   ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
@@ -958,14 +958,12 @@ extractRdrKindSigVars :: Maybe (LHsKind RdrName) -> [RdrName]
 extractRdrKindSigVars Nothing = []
 extractRdrKindSigVars (Just k) = nub (fst (extract_lkind k ([],[])))
 
-extractTyDefnKindVars :: HsTyDefn RdrName -> [RdrName]
+extractDataDefnKindVars :: HsDataDefn RdrName -> [RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls
 -- Eg    data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
 -- Here k should scope over the whole definition
-extractTyDefnKindVars (TySynonym { td_synRhs = ty}) 
-  = fst (extractHsTyRdrTyVars ty)
-extractTyDefnKindVars (TyData { td_ctxt = ctxt, td_kindSig = ksig
-                              , td_cons = cons, td_derivs = derivs })
+extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
+                                    , dd_cons = cons, dd_derivs = derivs })
   = fst $ extract_lctxt ctxt $
           extract_mb extract_lkind ksig $
           extract_mb extract_ltys derivs $

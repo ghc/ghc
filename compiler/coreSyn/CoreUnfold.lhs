@@ -101,8 +101,8 @@ mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
   = DFunUnfolding dfun_nargs data_con ops
   where
-    (tvs, n_theta, cls, _) = tcSplitDFunTy dfun_ty
-    dfun_nargs = length tvs + n_theta
+    (tvs, theta, cls, _) = tcSplitDFunTy dfun_ty
+    dfun_nargs = length tvs + length theta
     data_con   = classDataCon cls
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding

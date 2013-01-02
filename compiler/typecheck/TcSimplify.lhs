@@ -18,9 +18,9 @@ module TcSimplify(
 import TcRnTypes
 import TcRnMonad
 import TcErrors
-import TcMType
+import TcMType as TcM
 import TcType 
-import TcSMonad 
+import TcSMonad as TcS
 import TcInteract 
 import Inst
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
@@ -75,13 +75,13 @@ simplifyTop wanteds
     simpl_top :: WantedConstraints -> TcS WantedConstraints
     simpl_top wanteds
       = do { wc_first_go <- nestTcS (solve_wanteds_and_drop wanteds)
-           ; let meta_tvs = filter isMetaTyVar (varSetElems (tyVarsOfWC wc_first_go))
-                   -- tyVarsOfWC: post-simplification the WC should reflect
-                   --             all unifications that have happened
+           ; free_tvs <- TcS.zonkTyVarsAndFV (tyVarsOfWC wc_first_go) 
+           ; let meta_tvs = filterVarSet isMetaTyVar free_tvs
+                   -- zonkTyVarsAndFV: the wc_first_go is not yet zonked
                    -- filter isMetaTyVar: we might have runtime-skolems in GHCi, 
                    -- and we definitely don't want to try to assign to those!
 
-           ; mapM_ defaultTyVar meta_tvs   -- Has unification side effects
+           ; mapM_ defaultTyVar (varSetElems meta_tvs)   -- Has unification side effects
            ; simpl_top_loop wc_first_go }
     
     simpl_top_loop wc
@@ -406,7 +406,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        -- NB: quant_pred_candidates is already the fixpoint of any 
        --     unifications that may have happened
        ; gbl_tvs        <- tcGetGlobalTyVars
-       ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
+       ; zonked_tau_tvs <- TcM.zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
        ; let init_tvs  = zonked_tau_tvs `minusVarSet` gbl_tvs
              poly_qtvs = growThetaTyVars quant_pred_candidates init_tvs 
                          `minusVarSet` gbl_tvs
@@ -450,7 +450,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
 
             -- Step 7) Emit an implication
-       ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
+       ; minimal_bound_ev_vars <- mapM TcM.newEvVar minimal_flat_preds
        ; let implic = Implic { ic_untch    = pushUntouchables untch
                              , ic_skols    = qtvs_to_return
                              , ic_fsks     = []  -- wanted_tansformed arose only from solveWanteds
@@ -799,8 +799,7 @@ solveImplication inerts
                  , ic_wanted = wanteds
                  , ic_info   = info
                  , ic_env    = env })
-  = 
-    do { traceTcS "solveImplication {" (ppr imp) 
+  = do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve the nested constraints
          -- NB: 'inerts' has empty inert_fsks
@@ -847,7 +846,7 @@ floatEqualities skols can_given wanteds@(WC { wc_flat = flats })
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
   | otherwise 
   = do { let (float_eqs, remaining_flats) = partitionBag is_floatable flats
-       ; untch <- TcSMonad.getUntouchables
+       ; untch <- TcS.getUntouchables
        ; mapM_ (promoteTyVar untch) (varSetElems (tyVarsOfCts float_eqs))
        ; ty_binds <- getTcSTyBindsMap
        ; traceTcS "floatEqualities" (vcat [ text "Floated eqs =" <+> ppr float_eqs
@@ -877,7 +876,7 @@ promoteTyVar :: Untouchables -> TcTyVar  -> TcS ()
 -- invariant (MetaTvInv) in Note [Untouchable type variables] in TcType
 promoteTyVar untch tv 
   | isFloatedTouchableMetaTyVar untch tv
-  = do { cloned_tv <- TcSMonad.cloneMetaTyVar tv
+  = do { cloned_tv <- TcS.cloneMetaTyVar tv
        ; let rhs_tv = setMetaTyVarUntouchables cloned_tv untch
        ; setWantedTyBind tv (mkTyVarTy rhs_tv) }
   | otherwise
@@ -896,7 +895,7 @@ defaultTyVar :: TcTyVar -> TcS TcTyVar
 -- See Note [DefaultTyVar]
 defaultTyVar the_tv
   | not (k `eqKind` default_k)
-  = do { tv' <- TcSMonad.cloneMetaTyVar the_tv
+  = do { tv' <- TcS.cloneMetaTyVar the_tv
        ; let new_tv = setTyVarKind tv' default_k
        ; traceTcS "defaultTyVar" (ppr the_tv <+> ppr new_tv)
        ; setWantedTyBind the_tv (mkTyVarTy new_tv)
@@ -1269,7 +1268,7 @@ newFlatWanteds orig theta
        ; mapM (inst_to_wanted loc) theta }
   where 
     inst_to_wanted loc pty 
-          = do { v <- TcMType.newWantedEvVar pty 
+          = do { v <- TcM.newWantedEvVar pty 
                ; return $ mkNonCanonical loc $
                  CtWanted { ctev_evar = v
                           , ctev_pred = pty } }

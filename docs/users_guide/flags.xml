@@ -1236,6 +1236,13 @@
           </row>
 
           <row>
+            <entry><option>-fwarn-duplicate-constraints</option></entry>
+            <entry>warn when a constraint appears duplicated in a type signature</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-duplicate-constraints</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fwarn-duplicate-exports</option></entry>
             <entry>warn when an entity is exported multiple times</entry>
             <entry>dynamic</entry>

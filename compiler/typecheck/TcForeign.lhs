@@ -90,7 +90,7 @@ normaliseFfiType' env ty0 = go [] ty0
         = do { rdr_env <- getGlobalRdrEnv 
              ; case checkNewtypeFFI rdr_env rec_nts tc of
                  Nothing  -> children_only
-                 Just gre -> do { let nt_co = mkAxInstCo (newTyConCo tc) tys
+                 Just gre -> do { let nt_co = mkUnbranchedAxInstCo (newTyConCo tc) tys
                                 ; (co', ty', gres) <- go rec_nts' nt_rhs
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 

@@ -26,6 +26,7 @@ import CoreUtils
 import CoreUnfold
 import DataCon
 import TyCon
+import CoAxiom
 import Type
 import FamInstEnv
 import Id
@@ -139,12 +140,12 @@ import Data.List
 
 -- |Vectorise type constructor including class type constructors.
 --
-vectTypeEnv :: [TyCon]                  -- Type constructors defined in this module
-            -> [CoreVect]               -- All 'VECTORISE [SCALAR] type' declarations in this module
-            -> [CoreVect]               -- All 'VECTORISE class' declarations in this module
-            -> VM ( [TyCon]             -- old TyCons ++ new TyCons
-                  , [FamInst]           -- New type family instances.
-                  , [(Var, CoreExpr)])  -- New top level bindings.
+vectTypeEnv :: [TyCon]                   -- Type constructors defined in this module
+            -> [CoreVect]                -- All 'VECTORISE [SCALAR] type' declarations in this module
+            -> [CoreVect]                -- All 'VECTORISE class' declarations in this module
+            -> VM ( [TyCon]              -- old TyCons ++ new TyCons
+                  , [FamInst Unbranched] -- New type family instances.
+                  , [(Var, CoreExpr)])   -- New top level bindings.
 vectTypeEnv tycons vectTypeDecls vectClassDecls
   = do { traceVt "** vectTypeEnv" $ ppr tycons
 
@@ -339,7 +340,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
 
 -- Helpers --------------------------------------------------------------------
 
-buildTyConPADict :: TyCon -> CoAxiom -> TyCon -> TyCon -> VM Var
+buildTyConPADict :: TyCon -> CoAxiom Unbranched -> TyCon -> TyCon -> VM Var
 buildTyConPADict vect_tc prepr_ax pdata_tc pdatas_tc
  = tyConRepr vect_tc >>= buildPADict vect_tc prepr_ax pdata_tc pdatas_tc
 

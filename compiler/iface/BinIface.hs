@@ -748,21 +748,19 @@ instance Binary InlineSpec where
                   2 -> return Inlinable
                   _ -> return NoInline
 
-instance Binary HsBang where
-    put_ bh HsNoBang       = putByte bh 0
-    put_ bh (HsBang False) = putByte bh 1
-    put_ bh (HsBang True)  = putByte bh 2
-    put_ bh HsUnpack       = putByte bh 3
-    put_ bh HsStrict       = putByte bh 4
+instance Binary IfaceBang where
+    put_ bh IfNoBang        = putByte bh 0
+    put_ bh IfStrict        = putByte bh 1
+    put_ bh IfUnpack        = putByte bh 2
+    put_ bh (IfUnpackCo co) = putByte bh 3 >> put_ bh co
 
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return HsNoBang
-              1 -> do return (HsBang False)
-              2 -> do return (HsBang True)
-              3 -> do return HsUnpack
-              _ -> do return HsStrict
+              0 -> do return IfNoBang
+              1 -> do return IfStrict
+              2 -> do return IfUnpack
+              _ -> do { a <- get bh; return (IfUnpackCo a) }
 
 instance Binary TupleSort where
     put_ bh BoxedTuple      = putByte bh 0
@@ -1049,7 +1047,7 @@ instance Binary LeftOrRight where
                    _ -> return CRight }
 
 instance Binary IfaceCoCon where
-   put_ bh (IfaceCoAx n)       = do { putByte bh 0; put_ bh n }
+   put_ bh (IfaceCoAx n ind)   = do { putByte bh 0; put_ bh n; put_ bh ind }
    put_ bh IfaceReflCo         = putByte bh 1
    put_ bh IfaceUnsafeCo       = putByte bh 2
    put_ bh IfaceSymCo          = putByte bh 3
@@ -1061,7 +1059,7 @@ instance Binary IfaceCoCon where
    get bh = do
         h <- getByte bh
         case h of
-          0 -> do { n <- get bh; return (IfaceCoAx n) }
+          0 -> do { n <- get bh; ind <- get bh; return (IfaceCoAx n ind) }
           1 -> return IfaceReflCo 
           2 -> return IfaceUnsafeCo
           3 -> return IfaceSymCo
@@ -1356,12 +1354,11 @@ instance Binary IfaceDecl where
         put_ bh a6
         put_ bh a7
         
-    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
+    put_ bh (IfaceAxiom a1 a2 a3) = do
         putByte bh 5
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
-        put_ bh a4
 
     get bh = do
         h <- getByte bh
@@ -1401,9 +1398,19 @@ instance Binary IfaceDecl where
             _ -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
-                    a4 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-                    return (IfaceAxiom occ a2 a3 a4)
+                    return (IfaceAxiom occ a2 a3)
+
+instance Binary IfaceAxBranch where
+    put_ bh (IfaceAxBranch a1 a2 a3) = do
+        put_ bh a1
+        put_ bh a2
+        put_ bh a3
+    get bh = do
+        a1 <- get bh
+        a2 <- get bh
+        a3 <- get bh
+        return (IfaceAxBranch a1 a2 a3)
 
 instance Binary ty => Binary (SynTyConRhs ty) where
     put_ bh (SynFamilyTyCon a b) = putByte bh 0 >> put_ bh a >> put_ bh b
@@ -1433,17 +1440,19 @@ instance Binary IfaceClsInst where
         return (IfaceClsInst cls tys dfun flag orph)
 
 instance Binary IfaceFamInst where
-    put_ bh (IfaceFamInst fam tys name orph) = do
+    put_ bh (IfaceFamInst fam group tys name orph) = do
         put_ bh fam
+        put_ bh group
         put_ bh tys
         put_ bh name
         put_ bh orph
     get bh = do
         fam      <- get bh
+        group    <- get bh
         tys      <- get bh
         name     <- get bh
         orph     <- get bh
-        return (IfaceFamInst fam tys name orph)
+        return (IfaceFamInst fam group tys name orph)
 
 instance Binary OverlapFlag where
     put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b

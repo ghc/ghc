@@ -1193,7 +1193,7 @@ exprIsConApp_maybe id_unf expr
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding dfun_nargs con ops <- unfolding
         , length args == dfun_nargs    -- See Note [DFun arity check]
-        , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
+        , let (dfun_tvs, _theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
               mk_arg (DFunPolyArg e) = mkApps e args
               mk_arg (DFunLamArg i)  = getNth args i

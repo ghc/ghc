@@ -114,11 +114,12 @@ do_loop :: DsCmdEnv -> Type -> Type -> Type -> CoreExpr -> CoreExpr
 do_loop ids b_ty c_ty d_ty f
   = mkApps (loop_id ids) [Type b_ty, Type d_ty, Type c_ty, f]
 
--- map_arrow (f :: b -> c) (g :: a c d) = arr f >>> g :: a b d
-do_map_arrow :: DsCmdEnv -> Type -> Type -> Type ->
+-- premap :: forall b c d. (b -> c) -> a c d -> a b d
+-- premap f g = arr f >>> g
+do_premap :: DsCmdEnv -> Type -> Type -> Type ->
 		CoreExpr -> CoreExpr -> CoreExpr
-do_map_arrow ids b_ty c_ty d_ty f c
-   = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) c
+do_premap ids b_ty c_ty d_ty f g
+   = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) g
 
 mkFailExpr :: HsMatchContext Id -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
@@ -242,7 +243,7 @@ Translation of arrow abstraction
 
 --	A | xs |- c :: [] t'  	    ---> c'
 --	--------------------------
---	A |- proc p -> c :: a t t'  ---> arr (\ p -> (xs)) >>> c'
+--	A |- proc p -> c :: a t t'  ---> premap (\ p -> (xs)) c'
 --
 --		where (xs) is the tuple of variables bound by p
 
@@ -259,7 +260,7 @@ dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids)) = do
     var <- selectSimpleMatchVarL pat
     match_code <- matchSimply (Var var) ProcExpr pat (mkBigCoreVarTup env_ids) fail_expr
     let pat_ty = hsLPatType pat
-        proc_code = do_map_arrow meth_ids pat_ty env_ty cmd_ty
+        proc_code = do_premap meth_ids pat_ty env_ty cmd_ty
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
@@ -292,7 +293,7 @@ dsCmd   :: DsCmdEnv		-- arrow combinators
 --	-----------------------------
 --	A | xs |- f -< arg :: [ts] t'
 --
---		---> arr (\ ((xs)*ts) -> (arg*ts)) >>> f
+--		---> premap (\ ((xs)*ts) -> (arg*ts)) f
 
 dsCmd ids local_vars stack res_ty
         (HsCmdArrApp arrow arg arrow_ty HsFirstOrderApp _)
@@ -305,7 +306,7 @@ dsCmd ids local_vars stack res_ty
     stack_ids  <- mapM newSysLocalDs stack
     core_make_arg <- matchEnvStack env_ids stack_ids
                       (foldl mkCorePairExpr core_arg (map Var stack_ids))
-    return (do_map_arrow ids
+    return (do_premap ids
               (envStackType env_ids stack)
               arg_ty
               res_ty
@@ -318,7 +319,7 @@ dsCmd ids local_vars stack res_ty
 --	------------------------------
 --	A | xs |- f -<< arg :: [ts] t'
 --
---		---> arr (\ ((xs)*ts) -> (f,(arg*ts))) >>> app
+--		---> premap (\ ((xs)*ts) -> (f,(arg*ts))) app
 
 dsCmd ids local_vars stack res_ty
         (HsCmdArrApp arrow arg arrow_ty HsHigherOrderApp _)
@@ -334,7 +335,7 @@ dsCmd ids local_vars stack res_ty
           (mkCorePairExpr core_arrow
              (foldl mkCorePairExpr core_arg (map Var stack_ids)))
                              
-    return (do_map_arrow ids
+    return (do_premap ids
               (envStackType env_ids stack)
               (mkCorePairTy arrow_ty arg_ty)
               res_ty
@@ -348,7 +349,7 @@ dsCmd ids local_vars stack res_ty
 --	------------------------
 --	A | xs |- c e :: [ts] t'
 --
---		---> arr (\ ((xs)*ts) -> let z = e in (((ys),z)*ts)) >>> c
+--		---> premap (\ ((xs)*ts) -> let z = e in (((ys),z)*ts)) c
 
 dsCmd ids local_vars stack res_ty (HsCmdApp cmd arg) env_ids = do
     core_arg <- dsLExpr arg
@@ -365,7 +366,7 @@ dsCmd ids local_vars stack res_ty (HsCmdApp cmd arg) env_ids = do
                         (buildEnvStack env_ids' (arg_id:stack_ids))
     -- match the environment and stack against the input
     core_map <- matchEnvStack env_ids stack_ids core_body
-    return (do_map_arrow ids
+    return (do_premap ids
                       (envStackType env_ids stack)
                       (envStackType env_ids' stack')
                       res_ty
@@ -378,7 +379,7 @@ dsCmd ids local_vars stack res_ty (HsCmdApp cmd arg) env_ids = do
 --	-----------------------------------------------
 --	A | xs |- \ p1 ... pk -> c :: [t1:...:tk:ts] t'
 --
---		---> arr (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) >>> c
+--		---> premap (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) c
 
 dsCmd ids local_vars stack res_ty
         (HsCmdLam (MatchGroup [L _ (Match pats _ (GRHSs [L _ (GRHS [] body)] _ ))] _))
@@ -405,7 +406,7 @@ dsCmd ids local_vars stack res_ty
     match_code <- matchSimplys (map Var actual_ids) LambdaExpr pats core_expr fail_expr
     -- match the old environment and stack against the input
     select_code <- matchEnvStack env_ids stack_ids match_code
-    return (do_map_arrow ids in_ty in_ty' res_ty select_code core_body,
+    return (do_premap ids in_ty in_ty' res_ty select_code core_body,
             free_vars `minusVarSet` pat_vars)
 
 dsCmd ids local_vars stack res_ty (HsCmdPar cmd) env_ids
@@ -417,9 +418,9 @@ dsCmd ids local_vars stack res_ty (HsCmdPar cmd) env_ids
 --	----------------------------------------
 --	A | xs |- if e then c1 else c2 :: [ts] t
 --
---		---> arr (\ ((xs)*ts) ->
---			if e then Left ((xs1)*ts) else Right ((xs2)*ts)) >>>
---		     c1 ||| c2
+--		---> premap (\ ((xs)*ts) ->
+--			 if e then Left ((xs1)*ts) else Right ((xs2)*ts))
+--		       (c1 ||| c2)
 
 dsCmd ids local_vars stack res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
         env_ids = do
@@ -450,7 +451,7 @@ dsCmd ids local_vars stack res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
        Nothing  -> matchEnvStack env_ids stack_ids $
                    mkIfThenElse core_cond core_left core_right
 
-    return (do_map_arrow ids in_ty sum_ty res_ty
+    return (do_premap ids in_ty sum_ty res_ty
                 core_if
                 (do_choice ids then_ty else_ty res_ty core_then core_else),
         fvs_cond `unionVarSet` fvs_then `unionVarSet` fvs_else)
@@ -463,11 +464,11 @@ Case commands are treated in much the same way as if commands
 
 is translated to
 
-	arr (\ ((xs)*ts) -> case e of
+	premap (\ ((xs)*ts) -> case e of
 		p1 -> (Left (Left (xs1)*ts))
 		p2 -> Left ((Right (xs2)*ts))
-		p3 -> Right ((xs3)*ts)) >>>
-	(c1 ||| c2) ||| c3
+		p3 -> Right ((xs3)*ts))
+	((c1 ||| c2) ||| c3)
 
 The idea is to extract the commands from the case, build a balanced tree
 of choices, and replace the commands with expressions that build tagged
@@ -532,14 +533,14 @@ dsCmd ids local_vars stack res_ty (HsCmdCase exp (MatchGroup matches match_ty))
     
     core_body <- dsExpr (HsCase exp (MatchGroup matches' match_ty'))
     core_matches <- matchEnvStack env_ids stack_ids core_body
-    return (do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
+    return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
             exprFreeIds core_body  `intersectVarSet` local_vars)
 
 --	A | ys |- c :: [ts] t
 --	----------------------------------
 --	A | xs |- let binds in c :: [ts] t
 --
---		---> arr (\ ((xs)*ts) -> let binds in ((ys)*ts)) >>> c
+--		---> premap (\ ((xs)*ts) -> let binds in ((ys)*ts)) c
 
 dsCmd ids local_vars stack res_ty (HsCmdLet binds body) env_ids = do
     let
@@ -552,7 +553,7 @@ dsCmd ids local_vars stack res_ty (HsCmdLet binds body) env_ids = do
     core_binds <- dsLocalBinds binds (buildEnvStack env_ids' stack_ids)
     -- match the old environment and stack against the input
     core_map <- matchEnvStack env_ids stack_ids core_binds
-    return (do_map_arrow ids
+    return (do_premap ids
                         (envStackType env_ids stack)
                         (envStackType env_ids' stack)
                         res_ty
@@ -583,7 +584,7 @@ dsCmd _ _ _ _ _ c = pprPanic "dsCmd" (ppr c)
 
 --	A | ys |- c :: [ts] t	(ys <= xs)
 --	---------------------
---	A | xs |- c :: [ts] t	---> arr_ts (\ (xs) -> (ys)) >>> c
+--	A | xs |- c :: [ts] t	---> premap_ts (\ (xs) -> (ys)) c
 
 dsTrimCmdArg
 	:: IdSet		-- set of local vars available to this command
@@ -600,7 +601,7 @@ dsTrimCmdArg local_vars env_ids (L _ (HsCmdTop cmd stack cmd_ty ids)) = do
         in_ty = envStackType env_ids stack
         in_ty' = envStackType env_ids' stack
         arg_code = if env_ids' == env_ids then core_cmd else
-                do_map_arrow meth_ids in_ty in_ty' cmd_ty trim_code core_cmd
+                do_premap meth_ids in_ty in_ty' cmd_ty trim_code core_cmd
     return (mkLets meth_binds arg_code, free_vars)
 
 -- Given A | xs |- c :: [ts] t, builds c with xs fed back.
@@ -700,8 +701,8 @@ dsCmdStmt
 --	------------------------------
 --	A | xs |- do { c; ss } :: [] t'
 --
---		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
---			arr snd >>> ss
+--		---> premap (\ (xs) -> ((xs1),(xs')))
+--			(first c >>> arr snd) >>> ss
 
 dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars [] c_ty cmd
@@ -714,7 +715,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 	before_c_ty = mkCorePairTy in_ty1 out_ty
 	after_c_ty = mkCorePairTy c_ty out_ty
     snd_fn <- mkSndExpr c_ty out_ty
-    return (do_map_arrow ids in_ty before_c_ty out_ty core_mux $
+    return (do_premap ids in_ty before_c_ty out_ty core_mux $
 		do_compose ids before_c_ty after_c_ty out_ty
 			(do_first ids in_ty1 c_ty out_ty core_cmd) $
 		do_arr ids after_c_ty out_ty snd_fn,
@@ -726,8 +727,8 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 --	-----------------------------------
 --	A | xs |- do { p <- c; ss } :: [] t'
 --
---		---> arr (\ (xs) -> ((xs1),(xs2))) >>> first c >>>
---			arr (\ (p, (xs2)) -> (xs')) >>> ss
+--		---> premap (\ (xs) -> ((xs1),(xs2)))
+--			(first c >>> arr (\ (p, (xs2)) -> (xs'))) >>> ss
 --
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
@@ -769,7 +770,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _) env_ids = do
 	in_ty1 = mkBigCoreVarTupTy env_ids1
 	in_ty2 = mkBigCoreVarTupTy env_ids2
 	before_c_ty = mkCorePairTy in_ty1 in_ty2
-    return (do_map_arrow ids in_ty before_c_ty out_ty core_mux $
+    return (do_premap ids in_ty before_c_ty out_ty core_mux $
 		do_compose ids before_c_ty after_c_ty out_ty
 			(do_first ids in_ty1 pat_ty in_ty2 core_cmd) $
 		do_arr ids after_c_ty out_ty proj_expr,
@@ -847,7 +848,7 @@ dsCmdStmt ids local_vars out_ids
     let
         env_ty = mkBigCoreVarTupTy env_ids
         out_ty = mkBigCoreVarTupTy out_ids
-        core_body = do_map_arrow ids env_ty pre_pair_ty out_ty
+        core_body = do_premap ids env_ty pre_pair_ty out_ty
                 pre_loop_fn
                 (do_compose ids pre_pair_ty post_pair_ty out_ty
                         (do_first ids env1_ty later_ty env2_ty
@@ -859,9 +860,8 @@ dsCmdStmt ids local_vars out_ids
 
 dsCmdStmt _ _ _ _ s = pprPanic "dsCmdStmt" (ppr s)
 
---	loop (arr (\ ((env1_ids), ~(rec_ids)) -> (env_ids)) >>>
---	      ss >>>
---	      arr (\ (out_ids) -> ((later_rets),(rec_rets))) >>>
+--	loop (premap (\ ((env1_ids), ~(rec_ids)) -> (env_ids))
+--	      (ss >>> arr (\ (out_ids) -> ((later_rets),(rec_rets))))) >>>
 
 dsRecCmd
         :: DsCmdEnv		-- arrow combinators
@@ -922,12 +922,12 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     squash_pair_fn <- matchEnvStack env1_ids [rec_id] core_body
 
-    -- loop (arr squash_pair_fn >>> ss >>> arr mk_pair_fn)
+    -- loop (premap squash_pair_fn (ss >>> arr mk_pair_fn))
 
     let
         env_ty = mkBigCoreVarTupTy env_ids
         core_loop = do_loop ids env1_ty later_ty rec_ty
-                (do_map_arrow ids in_pair_ty env_ty out_pair_ty
+                (do_premap ids in_pair_ty env_ty out_pair_ty
                         squash_pair_fn
                         (do_compose ids env_ty out_ty out_pair_ty
                                 core_stmts

@@ -56,6 +56,7 @@ import TcRnMonad
 import Class
 import Inst
 import TyCon
+import CoAxiom
 import DataCon
 import TcEvidence( TcEvBinds(..) )
 import Id
@@ -69,7 +70,6 @@ import SrcLoc
 import Outputable
 import Util
 import Data.List        ( mapAccumL )
-import Pair
 import Unique
 import Data.Maybe
 import BasicTypes
@@ -1022,7 +1022,7 @@ reifyInstances th_nm th_tys
               -> do { tys <- tc_types tc th_tys
                     ; inst_envs <- tcGetFamInstEnvs
                     ; let matches = lookupFamInstEnv inst_envs tc tys
-                    ; mapM (reifyFamilyInstance . fst) matches }
+                    ; mapM (reifyFamilyInstance . fim_instance) matches }
             _ -> bale_out (ppr_th th_nm <+> ptext (sLit "is not a class or type constructor"))
         }
   where
@@ -1198,15 +1198,16 @@ reifyThing (ATyVar tv tv1)
 reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 ------------------------------
-reifyAxiom :: CoAxiom -> TcM TH.Info
-reifyAxiom ax@(CoAxiom { co_ax_lhs = lhs, co_ax_rhs = rhs })
-  | Just (tc, args) <- tcSplitTyConApp_maybe lhs
+reifyAxiom :: CoAxiom br -> TcM TH.Info
+reifyAxiom (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
+  = do { eqns <- sequence $ brListMap reifyAxBranch branches
+       ; return (TH.TyConI (TH.TySynInstD (reifyName tc) eqns)) }
+
+reifyAxBranch :: CoAxBranch -> TcM TH.TySynEqn
+reifyAxBranch (CoAxBranch { cab_lhs = args, cab_rhs = rhs })
   = do { args' <- mapM reifyType args
        ; rhs'  <- reifyType rhs
-       ; return (TH.TyConI (TH.TySynInstD (reifyName tc) args' rhs') )}
-  | otherwise
-  = failWith (ptext (sLit "Can't reify the axiom") <+> ppr ax
-              <+> dcolon <+> pprEqPred (Pair lhs rhs))
+       ; return (TH.TySynEqn args' rhs') }
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
@@ -1307,29 +1308,35 @@ reifyClassInstance i
        ; let head_ty = foldl TH.AppT (TH.ConT (reifyName cls)) thtypes
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
-     (_tvs, theta, cls, types) = instanceHead i
-     n_silent = dfunNSilent (instanceDFunId i)
+     (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
+     dfun     = instanceDFunId i
+     n_silent = dfunNSilent dfun
 
 ------------------------------
-reifyFamilyInstance :: FamInst -> TcM TH.Dec
-reifyFamilyInstance fi
-  = case fi_flavor fi of
+reifyFamilyInstance :: FamInst br -> TcM TH.Dec
+reifyFamilyInstance fi@(FamInst { fi_flavor = flavor
+                                , fi_branches = branches
+                                , fi_fam = fam })
+  = case flavor of
       SynFamilyInst ->
-        do { th_tys <- reifyTypes (fi_tys fi)
-           ; rhs_ty <- reifyType (coAxiomRHS rep_ax)
-           ; return (TH.TySynInstD fam th_tys rhs_ty) }
+        do { th_eqns <- sequence $ brListMap reifyFamInstBranch branches
+           ; return (TH.TySynInstD (reifyName fam) th_eqns) }
 
       DataFamilyInst rep_tc ->
         do { let tvs = tyConTyVars rep_tc
-                 fam = reifyName (fi_fam fi)
+                 fam' = reifyName fam
+                 lhs = famInstBranchLHS $ famInstSingleBranch (toUnbranchedFamInst fi)
            ; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons rep_tc)
-           ; th_tys <- reifyTypes (fi_tys fi)
+           ; th_tys <- reifyTypes lhs
            ; return (if isNewTyCon rep_tc
-                     then TH.NewtypeInstD [] fam th_tys (head cons) []
-                     else TH.DataInstD    [] fam th_tys cons        []) }
-  where
-    rep_ax = fi_axiom fi
-    fam = reifyName (fi_fam fi)
+                     then TH.NewtypeInstD [] fam' th_tys (head cons) []
+                     else TH.DataInstD    [] fam' th_tys cons        []) }
+
+reifyFamInstBranch :: FamInstBranch -> TcM TH.TySynEqn
+reifyFamInstBranch (FamInstBranch { fib_lhs = lhs, fib_rhs = rhs })
+  = do { th_lhs <- reifyTypes lhs
+       ; th_rhs <- reifyType rhs
+       ; return (TH.TySynEqn th_lhs th_rhs) }
 
 ------------------------------
 reifyType :: TypeRep.Type -> TcM TH.Type
@@ -1479,10 +1486,12 @@ reifyFixity name
       conv_dir BasicTypes.InfixL = TH.InfixL
       conv_dir BasicTypes.InfixN = TH.InfixN
 
-reifyStrict :: BasicTypes.HsBang -> TH.Strict
-reifyStrict bang | bang == HsUnpack = TH.Unpacked
-                 | isBanged bang    = TH.IsStrict
-                 | otherwise        = TH.NotStrict
+reifyStrict :: DataCon.HsBang -> TH.Strict
+reifyStrict HsNoBang        = TH.NotStrict
+reifyStrict (HsBang False)  = TH.Unpacked
+reifyStrict (HsBang True)   = TH.Unpacked
+reifyStrict HsStrict        = TH.IsStrict
+reifyStrict (HsUnpack {})   = TH.Unpacked
 
 ------------------------------
 noTH :: LitString -> SDoc -> TcM a

@@ -12,15 +12,17 @@ TcTyClsDecls: Typecheck type and class declarations
 -- detab the module (please do the detabbing in a separate patch). See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
+{-# LANGUAGE TupleSections #-}
 
 module TcTyClsDecls (
 	tcTyAndClassDecls, tcAddImplicits,
 
 	-- Functions used by TcInstDcls to check 
 	-- data/type family instance declarations
-        kcTyDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
+        kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcSynFamInstDecl, tcFamTyPats, 
-        tcAddFamInstCtxt, wrongKindOfFamily, badATErr, wrongATArgErr
+        tcAddFamInstCtxt, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
+        wrongKindOfFamily, badATErr, wrongATArgErr
     ) where
 
 #include "HsVersions.h"
@@ -38,6 +40,7 @@ import TcHsType
 import TcMType
 import TcType
 import TysWiredIn( unitTy )
+import FamInst
 import Type
 import Kind
 import Class
@@ -148,8 +151,7 @@ tcTyClGroup boot_details tyclds
        ; tcExtendGlobalEnv tyclss $ do
        { traceTc "Starting validity check" (ppr tyclss)
        ; checkNoErrs $
-         mapM_ (recoverM (return ()) . addLocM checkValidTyCl) 
-               (flattenTyClDecls tyclds)
+         mapM_ (recoverM (return ()) . addLocM checkValidTyCl) tyclds
            -- We recover, which allows us to report multiple validity errors
            -- but we then fail if any are wrong.  Lacking the checkNoErrs
            -- we get Trac #7175
@@ -162,7 +164,7 @@ tcTyClGroup boot_details tyclds
 
 tcAddImplicits :: [TyThing] -> TcM TcGblEnv
 tcAddImplicits tyclss
- = tcExtendGlobalEnvImplicit implicit_things $ 
+ = tcExtendGlobalEnvImplicit implicit_things $
    tcRecSelBinds rec_sel_binds
  where
    implicit_things = concatMap implicitTyThings tyclss
@@ -184,13 +186,6 @@ zipRecTyClss kind_pairs rec_things
     get name = case lookupTypeEnv rec_type_env name of
                  Just (ATyCon tc) -> tc
                  other            -> pprPanic "zipRecTyClss" (ppr name <+> ppr other)
-
-flattenTyClDecls :: [LTyClDecl Name] -> [LTyClDecl Name]
--- Lift out the associated type declaraitons to top level
-flattenTyClDecls [] = []
-flattenTyClDecls (ld@(L _ d) : lds)
-  | isClassDecl d = ld : tcdATs d ++ flattenTyClDecls lds
-  | otherwise     = ld : flattenTyClDecls lds
 \end{code}
 
 
@@ -286,18 +281,16 @@ kcTyClGroup decls
 	     -- Step 4: generalisation
 	     -- Kind checking done for this group
              -- Now we have to kind generalize the flexis
-        ; res <- mapM (generalise (tcl_env lcl_env)) (flattenTyClDecls decls)
+        ; res <- concatMapM (generaliseTCD (tcl_env lcl_env)) decls
 
         ; traceTc "kcTyClGroup result" (ppr res)
         ; return res }
 
   where
-    generalise :: TcTypeEnv -> LTyClDecl Name -> TcM (Name, Kind)
+    generalise :: TcTypeEnv -> Name -> LHsTyVarBndrs Name -> TcM (Name, Kind)
     -- For polymorphic things this is a no-op
-    generalise kind_env (L _ decl)
-      = do { let name = tcdName decl
-                 tvs  = tcdTyVars decl
-           ; let kc_kind = case lookupNameEnv kind_env name of
+    generalise kind_env name tvs
+      = do { let kc_kind = case lookupNameEnv kind_env name of
                                Just (AThing k) -> k
                                _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
            ; kvs <- kindGeneralize (tyVarsOfType kc_kind) (hsLTyVarNames tvs)
@@ -306,14 +299,45 @@ kcTyClGroup decls
            ; traceTc "Generalise kind" (vcat [ ppr name, ppr kc_kind, ppr kvs, ppr kc_kind' ])
            ; return (name, mkForAllTys kvs kc_kind') }
 
+    generaliseTCD :: TcTypeEnv -> LTyClDecl Name -> TcM [(Name, Kind)]
+    generaliseTCD kind_env (L _ decl)
+      | ClassDecl { tcdLName = (L _ name), tcdTyVars = tyvars, tcdATs = ats } <- decl
+      = do { first <- generalise kind_env name tyvars
+           ; rest <- mapM ((generaliseFamDecl kind_env) . unLoc) ats
+           ; return (first : rest) }
+
+      | FamDecl { tcdFam = fam } <- decl
+      = do { res <- generaliseFamDecl kind_env fam
+           ; return [res] }
+
+      | ForeignType {} <- decl
+      = pprPanic "generaliseTCD" (ppr decl)
+
+      | otherwise
+      -- Note: tcdTyVars is safe here because we've eliminated FamDecl and ForeignType
+      = do { res <- generalise kind_env (tcdName decl) (tcdTyVars decl)
+           ; return [res] }
+
+    generaliseFamDecl :: TcTypeEnv -> FamilyDecl Name -> TcM (Name, Kind)
+    generaliseFamDecl kind_env (FamilyDecl { fdLName = L _ name, fdTyVars = tyvars })
+      = generalise kind_env name tyvars
+ 
+mk_thing_env :: [LTyClDecl Name] -> [(Name, TcTyThing)]
+mk_thing_env [] = []
+mk_thing_env (decl : decls)
+  | L _ (ClassDecl { tcdLName = L _ nm, tcdATs = ats }) <- decl
+  = (nm, APromotionErr ClassPE) :
+    (map (, APromotionErr TyConPE) $ map (unLoc . fdLName . unLoc) ats) ++
+    (mk_thing_env decls)
+
+  | otherwise
+  = (tcdName (unLoc decl), APromotionErr TyConPE) :
+    (mk_thing_env decls)
+
 getInitialKinds :: TopLevelFlag -> [LTyClDecl Name] -> TcM [(Name, TcTyThing)]
 getInitialKinds top_lvl decls
-  = tcExtendTcTyThingEnv [ (tcdName d, APromotionErr (mk_promotion_err d))
-                         | L _ d <- flattenTyClDecls decls] $
+  = tcExtendTcTyThingEnv (mk_thing_env decls) $
     concatMapM (addLocM (getInitialKind top_lvl)) decls
-  where
-    mk_promotion_err (ClassDecl {}) = ClassPE
-    mk_promotion_err _              = TyConPE
 
 getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
 -- Allocate a fresh kind variable for each TyCon and Class
@@ -333,7 +357,50 @@ getInitialKind :: TopLevelFlag -> TyClDecl Name -> TcM [(Name, TcTyThing)]
 -- 
 -- No family instances are passed to getInitialKinds
 
-getInitialKind top_lvl (TyFamily { tcdLName = L _ name, tcdTyVars = ktvs, tcdKindSig = ksig })
+getInitialKind top_lvl (FamDecl { tcdFam = decl }) = getFamDeclInitialKind top_lvl decl 
+getInitialKind _ (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
+  = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
+    do { inner_prs <- getFamDeclInitialKinds ats
+       ; let main_pr = (name, AThing (mkArrowKinds arg_kinds constraintKind))
+       ; return (main_pr : inner_prs) }
+
+getInitialKind _top_lvl decl@(SynDecl {}) = pprPanic "getInitialKind" (ppr decl)
+
+getInitialKind top_lvl (DataDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdDataDefn = defn })
+  | HsDataDefn { dd_kindSig = Just ksig, dd_cons = cons } <- defn
+  = ASSERT( isTopLevel top_lvl )
+    kcHsTyVarBndrs True ktvs $ \ arg_kinds -> 
+    do { res_k <- tcLHsKind ksig
+       ; let body_kind = mkArrowKinds arg_kinds res_k
+             kvs       = varSetElems (tyVarsOfType body_kind)
+             main_pr   = (name, AThing (mkForAllTys kvs body_kind))
+             inner_prs = [(unLoc (con_name con), APromotionErr RecDataConPE) | L _ con <- cons ]
+             -- See Note [Recusion and promoting data constructors]
+       ; return (main_pr : inner_prs) }
+ 
+  | HsDataDefn { dd_cons = cons } <- defn
+  = kcHsTyVarBndrs False ktvs $ \ arg_kinds -> 
+    do { let main_pr   = (name, AThing (mkArrowKinds arg_kinds liftedTypeKind))
+             inner_prs = [ (unLoc (con_name con), APromotionErr RecDataConPE) 
+                         | L _ con <- cons ]
+             -- See Note [Recusion and promoting data constructors]
+       ; return (main_pr : inner_prs) }
+
+getInitialKind _ (ForeignType { tcdLName = L _ name }) 
+  = return [(name, AThing liftedTypeKind)]
+
+getFamDeclInitialKinds :: [LFamilyDecl Name] -> TcM [(Name, TcTyThing)]
+getFamDeclInitialKinds decls
+  = tcExtendTcTyThingEnv [ (n, APromotionErr TyConPE)
+                         | L _ (FamilyDecl { fdLName = L _ n }) <- decls] $
+    concatMapM (addLocM (getFamDeclInitialKind NotTopLevel)) decls
+
+getFamDeclInitialKind :: TopLevelFlag
+                      -> FamilyDecl Name 
+                      -> TcM [(Name, TcTyThing)]
+getFamDeclInitialKind top_lvl (FamilyDecl { fdLName = L _ name
+                                          , fdTyVars = ktvs
+                                          , fdKindSig = ksig })
   | isTopLevel top_lvl 
   = kcHsTyVarBndrs True ktvs $ \ arg_kinds ->
     do { res_k <- case ksig of 
@@ -350,38 +417,6 @@ getInitialKind top_lvl (TyFamily { tcdLName = L _ name, tcdTyVars = ktvs, tcdKin
                     Nothing -> newMetaKindVar
        ; return [ (name, AThing (mkArrowKinds arg_kinds res_k)) ] }
 
-getInitialKind _ (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
-  = kcHsTyVarBndrs False ktvs $ \ arg_kinds ->
-    do { inner_prs <- getInitialKinds NotTopLevel ats
-       ; let main_pr = (name, AThing (mkArrowKinds arg_kinds constraintKind))
-       ; return (main_pr : inner_prs) }
-
-getInitialKind top_lvl decl@(TyDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdTyDefn = defn })
-  | TyData { td_kindSig = Just ksig, td_cons = cons } <- defn
-  = ASSERT( isTopLevel top_lvl )
-    kcHsTyVarBndrs True ktvs $ \ arg_kinds -> 
-    do { res_k <- tcLHsKind ksig
-       ; let body_kind = mkArrowKinds arg_kinds res_k
-             kvs       = varSetElems (tyVarsOfType body_kind)
-             main_pr   = (name, AThing (mkForAllTys kvs body_kind))
-             inner_prs = [(unLoc (con_name con), APromotionErr RecDataConPE) | L _ con <- cons ]
-             -- See Note [Recusion and promoting data constructors]
-       ; return (main_pr : inner_prs) }
- 
-  | TyData { td_cons = cons } <- defn
-  = kcHsTyVarBndrs False ktvs $ \ arg_kinds -> 
-    do { let main_pr   = (name, AThing (mkArrowKinds arg_kinds liftedTypeKind))
-             inner_prs = [ (unLoc (con_name con), APromotionErr RecDataConPE) 
-                         | L _ con <- cons ]
-             -- See Note [Recusion and promoting data constructors]
-       ; return (main_pr : inner_prs) }
-
-  | otherwise = pprPanic "getInitialKind" (ppr decl)
-
-getInitialKind _ (ForeignType { tcdLName = L _ name }) 
-  = return [(name, AThing liftedTypeKind)]
-
-
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)] -> TcM TcLclEnv	-- Kind bindings
 kcSynDecls [] = getLclEnv
@@ -397,8 +432,8 @@ kcSynDecl1 (CyclicSCC decls)       = do { recSynErr decls; failM }
 				     -- of out-of-scope tycons
 
 kcSynDecl :: TyClDecl Name -> TcM (Name, TcKind)
-kcSynDecl decl@(TyDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
-                       , tcdTyDefn = TySynonym { td_synRhs = rhs } })
+kcSynDecl decl@(SynDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
+                       , tcdRhs = rhs })
   -- Returns a possibly-unzonked kind
   = tcAddDeclCtxt decl $
     kcHsTyVarBndrs False hs_tvs $ \ ks ->
@@ -422,32 +457,31 @@ kcTyClDecl :: TyClDecl Name -> TcM ()
 --    result kind signature have aready been dealt with
 --    by getInitialKind, so we can ignore them here.
 
-kcTyClDecl decl@(TyDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdTyDefn = defn })
-  | TyData { td_cons = cons, td_kindSig = Just _ } <- defn
-  = mapM_ (wrapLocM kcConDecl) cons  
+kcTyClDecl (DataDecl { tcdLName = L _ name, tcdTyVars = hs_tvs, tcdDataDefn = defn })
+  | HsDataDefn { dd_cons = cons, dd_kindSig = Just _ } <- defn
+  = mapM_ (wrapLocM kcConDecl) cons
     -- hs_tvs and td_kindSig already dealt with in getInitialKind
-    -- Ignore the td_ctxt; heavily deprecated and inconvenient
+    -- Ignore the dd_ctxt; heavily deprecated and inconvenient
 
-  | TyData { td_ctxt = ctxt, td_cons = cons } <- defn
-  = kcTyClTyVars name hs_tvs $ 
+  | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
+  = kcTyClTyVars name hs_tvs $
     do	{ _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kcConDecl) cons }
 
-  | otherwise = pprPanic "kcTyClDecl" (ppr decl)
+kcTyClDecl decl@(SynDecl {}) = pprPanic "kcTyClDecl" (ppr decl)
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name, tcdTyVars = hs_tvs
-                       , tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
-  = kcTyClTyVars name hs_tvs $ 
+                       , tcdCtxt = ctxt, tcdSigs = sigs })
+  = kcTyClTyVars name hs_tvs $
     do	{ _ <- tcHsContext ctxt
-	; mapM_ (wrapLocM kcTyClDecl) ats
 	; mapM_ (wrapLocM kc_sig)     sigs }
   where
     kc_sig (TypeSig _ op_ty)    = discardResult (tcHsLiftedType op_ty)
     kc_sig (GenericSig _ op_ty) = discardResult (tcHsLiftedType op_ty)
     kc_sig _                    = return ()
 
-kcTyClDecl (TyFamily {})    = return ()
 kcTyClDecl (ForeignType {}) = return ()
+kcTyClDecl (FamDecl {})    = return ()
 
 -------------------
 kcConDecl :: ConDecl Name -> TcM ()
@@ -537,34 +571,22 @@ tcTyClDecl calc_isrec (L loc decl)
 
   -- "type family" declarations
 tcTyClDecl1 :: TyConParent -> (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
-tcTyClDecl1 parent _calc_isrec
-            (TyFamily {tcdFlavour = TypeFamily, tcdLName = L _ tc_name, tcdTyVars = tvs})
-  = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
-  { traceTc "type family:" (ppr tc_name)
-  ; checkFamFlag tc_name
-  ; let syn_rhs = SynFamilyTyCon { synf_open = True, synf_injective = False }
-  ; tycon <- buildSynTyCon tc_name tvs' syn_rhs kind parent
-  ; return [ATyCon tycon] }
-
-  -- "data family" declaration
-tcTyClDecl1 parent _calc_isrec
-              (TyFamily {tcdFlavour = DataFamily, tcdLName = L _ tc_name, tcdTyVars = tvs})
-  = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
-  { traceTc "data family:" (ppr tc_name)
-  ; checkFamFlag tc_name
-  ; extra_tvs <- tcDataKindSig kind
-  ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
-        tycon = buildAlgTyCon tc_name final_tvs Nothing []
-                              DataFamilyTyCon Recursive True parent
-  ; return [ATyCon tycon] }
+tcTyClDecl1 parent _calc_isrec (FamDecl { tcdFam = fd })
+  = tcFamDecl1 parent fd
 
   -- "type" synonym declaration
-tcTyClDecl1 _parent calc_isrec
-            (TyDecl { tcdLName = L _ tc_name, tcdTyVars = tvs, tcdTyDefn = defn })
-
+tcTyClDecl1 _parent _calc_isrec
+            (SynDecl { tcdLName = L _ tc_name, tcdTyVars = tvs, tcdRhs = rhs })
   = ASSERT( isNoParent _parent )
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> 
-    tcTyDefn calc_isrec tc_name tvs' kind defn
+    tcTySynRhs tc_name tvs' kind rhs
+
+  -- "data/newtype" declaration
+tcTyClDecl1 _parent calc_isrec
+            (DataDecl { tcdLName = L _ tc_name, tcdTyVars = tvs, tcdDataDefn = defn })
+  = ASSERT( isNoParent _parent )
+    tcTyClTyVars tc_name tvs $ \ tvs' kind -> 
+    tcDataDefn calc_isrec tc_name tvs' kind defn
 
 tcTyClDecl1 _parent calc_isrec
             (ClassDecl { tcdLName = L _ class_name, tcdTyVars = tvs
@@ -634,11 +656,31 @@ tcTyClDecl1 _ _
 \end{code}
 
 \begin{code}
-tcTyDefn :: (Name -> RecFlag) -> Name   
-         -> [TyVar] -> Kind
-         -> HsTyDefn Name -> TcM [TyThing]
-  -- NB: not used for newtype/data instances (whether associated or not)
-tcTyDefn _calc_isrec tc_name tvs kind (TySynonym { td_synRhs = hs_ty })
+tcFamDecl1 :: TyConParent -> FamilyDecl Name -> TcM [TyThing]
+tcFamDecl1 parent
+            (FamilyDecl {fdFlavour = TypeFamily, fdLName = L _ tc_name, fdTyVars = tvs})
+  = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
+  { traceTc "type family:" (ppr tc_name)
+  ; checkFamFlag tc_name
+  ; let syn_rhs = SynFamilyTyCon { synf_open = True, synf_injective = False }
+  ; tycon <- buildSynTyCon tc_name tvs' syn_rhs kind parent
+  ; return [ATyCon tycon] }
+
+tcFamDecl1 parent
+           (FamilyDecl {fdFlavour = DataFamily, fdLName = L _ tc_name, fdTyVars = tvs})
+  = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
+  { traceTc "data family:" (ppr tc_name)
+  ; checkFamFlag tc_name
+  ; extra_tvs <- tcDataKindSig kind
+  ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
+        tycon = buildAlgTyCon tc_name final_tvs Nothing []
+                              DataFamilyTyCon Recursive True parent
+  ; return [ATyCon tycon] }
+
+tcTySynRhs :: Name   
+           -> [TyVar] -> Kind
+           -> LHsType Name -> TcM [TyThing]
+tcTySynRhs tc_name tvs kind hs_ty
   = do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- tcCheckLHsType hs_ty kind
@@ -647,10 +689,14 @@ tcTyDefn _calc_isrec tc_name tvs kind (TySynonym { td_synRhs = hs_ty })
                                 kind NoParentTyCon
        ; return [ATyCon tycon] }
 
-tcTyDefn calc_isrec tc_name tvs kind
-         (TyData { td_ND = new_or_data, td_cType = cType
-                 , td_ctxt = ctxt, td_kindSig = mb_ksig
-                 , td_cons = cons })
+tcDataDefn :: (Name -> RecFlag) -> Name
+           -> [TyVar] -> Kind
+           -> HsDataDefn Name -> TcM [TyThing]
+  -- NB: not used for newtype/data instances (whether associated or not)
+tcDataDefn calc_isrec tc_name tvs kind
+         (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                     , dd_ctxt = ctxt, dd_kindSig = mb_ksig
+                     , dd_cons = cons })
   = do { extra_tvs <- tcDataKindSig kind
        ; let is_rec     = calc_isrec tc_name
              final_tvs  = tvs ++ extra_tvs
@@ -709,68 +755,86 @@ Note that:
 \begin{code}
 tcClassATs :: Name             -- The class name (not knot-tied)
            -> TyConParent      -- The class parent of this associated type
-           -> [LTyClDecl Name] -- Associated types. All FamTyCon
-           -> [LFamInstDecl Name] -- Associated type defaults. All SynTyCon
+           -> [LFamilyDecl Name] -- Associated types.
+           -> [LTyFamInstDecl Name] -- Associated type defaults.
            -> TcM [ClassATItem]
 tcClassATs class_name parent ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
          sequence_ [ failWithTc (badATErr class_name n)
-                   | L _ n <- map (fid_tycon . unLoc) at_defs
+                   | n <- map (tyFamInstDeclName . unLoc) at_defs
                    , not (n `elemNameSet` at_names) ]
        ; mapM tc_at ats }
   where
-    at_names = mkNameSet (map (tcdName . unLoc) ats)
+    at_names = mkNameSet (map (unLoc . fdLName . unLoc) ats)
 
-    at_defs_map :: NameEnv [LFamInstDecl Name]
+    at_defs_map :: NameEnv [LTyFamInstDecl Name]
     -- Maps an AT in 'ats' to a list of all its default defs in 'at_defs'
     at_defs_map = foldr (\at_def nenv -> extendNameEnv_C (++) nenv 
-                                              (famInstDeclName at_def) [at_def]) 
+                                          (tyFamInstDeclName (unLoc at_def)) [at_def]) 
                         emptyNameEnv at_defs
 
-    tc_at at = do { [ATyCon fam_tc] <- addLocM (tcTyClDecl1 parent
-                                                           (const Recursive)) at
-                  ; let at_defs = lookupNameEnv at_defs_map (tcdName (unLoc at))
+    tc_at at = do { [ATyCon fam_tc] <- addLocM (tcFamDecl1 parent) at
+                  ; let at_defs = lookupNameEnv at_defs_map (unLoc $ fdLName $ unLoc at)
                                         `orElse` []
-                  ; atd <- mapM (tcDefaultAssocDecl fam_tc) at_defs
+                  ; atd <- concatMapM (tcDefaultAssocDecl fam_tc) at_defs
                   ; return (fam_tc, atd) }
 
 -------------------------
-tcDefaultAssocDecl :: TyCon              -- ^ Family TyCon
-                   -> LFamInstDecl Name  -- ^ RHS
-                   -> TcM ATDefault      -- ^ Type checked RHS and free TyVars
+tcDefaultAssocDecl :: TyCon                -- ^ Family TyCon
+                   -> LTyFamInstDecl Name  -- ^ RHS
+                   -> TcM [ATDefault]      -- ^ Type checked RHS and free TyVars
 tcDefaultAssocDecl fam_tc (L loc decl)
   = setSrcSpan loc $
-    tcAddFamInstCtxt decl $
+    tcAddTyFamInstCtxt decl $
     do { traceTc "tcDefaultAssocDecl" (ppr decl)
-       ; (at_tvs, at_tys, at_rhs) <- tcSynFamInstDecl fam_tc decl
-       ; return (ATD at_tvs at_tys at_rhs loc) }
+       ; quads <- tcSynFamInstDecl fam_tc decl
+       ; return $ map (uncurry4 ATD) quads }
 -- We check for well-formedness and validity later, in checkValidClass
+    where uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+          uncurry4 f (a, b, c, d) = f a b c d
 
 -------------------------
-tcSynFamInstDecl :: TyCon -> FamInstDecl Name -> TcM ([TyVar], [Type], Type)
+tcSynFamInstDecl :: TyCon -> TyFamInstDecl Name -> TcM [([TyVar], [Type], Type, SrcSpan)]
 -- Placed here because type family instances appear as 
 -- default decls in class declarations 
-tcSynFamInstDecl fam_tc 
-    (FamInstDecl { fid_pats = pats, fid_defn = defn@(TySynonym { td_synRhs = hs_ty }) })
-  = do { checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
-       ; tcFamTyPats fam_tc pats (kcTyDefn defn) $ \tvs' pats' res_kind -> 
+tcSynFamInstDecl fam_tc (TyFamInstDecl { tfid_eqns = eqns })
+  -- we know the first equation matches the fam_tc because of the lookup logic
+  -- now, just check that all other names match the first
+  = do { let names = map (tfie_tycon . unLoc) eqns
+             first = head names
+       ; tcSynFamInstNames first names
+       ; checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; mapM (tcTyFamInstEqn fam_tc) eqns }
+
+-- Checks to make sure that all the names in an instance group are the same
+tcSynFamInstNames :: Located Name -> [Located Name] -> TcM ()
+tcSynFamInstNames (L _ first) names
+  = do { let badNames = filter ((/= first) . unLoc) names
+       ; mapM_ (failLocated (wrongNamesInInstGroup first)) badNames }
+  where 
+    failLocated :: (Name -> SDoc) -> Located Name -> TcM ()
+    failLocated msg_fun (L loc name)
+      = setSrcSpan loc $
+        failWithTc (msg_fun name)
+
+tcTyFamInstEqn :: TyCon -> LTyFamInstEqn Name -> TcM ([TyVar], [Type], Type, SrcSpan)
+tcTyFamInstEqn fam_tc 
+    (L loc (TyFamInstEqn { tfie_pats = pats, tfie_rhs = hs_ty }))
+  = setSrcSpan loc $
+    tcFamTyPats fam_tc pats (discardResult . (tcCheckLHsType hs_ty)) $
+       \tvs' pats' res_kind -> 
     do { rhs_ty <- tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; traceTc "tcSynFamInstDecl" (ppr fam_tc <+> (ppr tvs' $$ ppr pats' $$ ppr rhs_ty))
-       ; return (tvs', pats', rhs_ty) } }
+       ; traceTc "tcSynFamInstEqn" (ppr fam_tc <+> (ppr tvs' $$ ppr pats' $$ ppr rhs_ty))
+       ; return (tvs', pats', rhs_ty, loc) }
 
-tcSynFamInstDecl _ decl = pprPanic "tcSynFamInstDecl" (ppr decl)
-
-kcTyDefn :: HsTyDefn Name -> TcKind -> TcM ()
--- Used for 'data instance' and 'type instance' only
--- Ordinary 'data' and 'type' are handed by kcTyClDec and kcSynDecls resp
-kcTyDefn (TyData { td_ctxt = ctxt, td_cons = cons, td_kindSig = mb_kind }) res_k
+kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
+-- Used for 'data instance' only
+-- Ordinary 'data' is handled by kcTyClDec
+kcDataDefn (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
   = do	{ _ <- tcHsContext ctxt
 	; mapM_ (wrapLocM kcConDecl) cons
         ; kcResultKind mb_kind res_k }
-
-kcTyDefn (TySynonym { td_synRhs = rhs_ty }) res_k
-  = discardResult (tcCheckLHsType rhs_ty res_k)
 
 ------------------
 kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
@@ -836,11 +900,11 @@ tcFamTyPats fam_tc (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tva
                       ; tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds }
        ; let all_args = fam_arg_kinds ++ typats
 
-            -- Find free variables (after zonking)
-       ; tkvs <- zonkTyVarsAndFV (tyVarsOfTypes all_args)
-
-            -- Turn them into skolems, so that we don't subsequently 
+            -- Find free variables (after zonking) and turn
+            -- them into skolems, so that we don't subsequently 
             -- replace a meta kind var with AnyK
+            -- Very like kindGeneralize
+       ; tkvs <- zonkTyVarsAndFV (tyVarsOfTypes all_args)
        ; qtkvs <- zonkQuantifiedTyVars (varSetElems tkvs)
 
             -- Zonk the patterns etc into the Type world
@@ -848,7 +912,7 @@ tcFamTyPats fam_tc (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tva
        ; all_args'    <- zonkTcTypeToTypes ze all_args
        ; res_kind'    <- zonkTcTypeToType  ze res_kind
 
-       ; traceTc "tcFamPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; traceTc "tcFamTyPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
        ; tcExtendTyVarEnv qtkvs' $
          thing_inside qtkvs' all_args' res_kind' }
 \end{code}
@@ -1006,7 +1070,7 @@ tcConDecl new_or_data rep_tycon res_tmpl 	-- Data types
                 -- free kind variables of the type, for kindGeneralize to work on
 
              -- Generalise the kind variables (returning quantifed TcKindVars)
-             -- and quanify the type variables (substiting their kinds)
+             -- and quantify the type variables (substiting their kinds)
        ; kvs <- kindGeneralize (tyVarsOfType pretend_con_ty) (map getName tvs)
        ; tvs <- zonkQuantifiedTyVars tvs
 
@@ -1022,7 +1086,8 @@ tcConDecl new_or_data rep_tycon res_tmpl 	-- Data types
                 = rejigConRes res_tmpl qtkvs res_ty
 
        ; traceTc "tcConDecl 3" (ppr name)
-       ; buildDataCon (unLoc name) is_infix
+       ; fam_envs <- tcGetFamInstEnvs 
+       ; buildDataCon fam_envs (unLoc name) is_infix
     		      stricts field_lbls
     		      univ_tvs ex_tvs eq_preds ctxt arg_tys
 		      res_ty' rep_tycon
@@ -1169,16 +1234,15 @@ checkClassCycleErrs cls
   = unless (null cls_cycles) $ mapM_ recClsErr cls_cycles
   where cls_cycles = calcClassCycles cls
 
-checkValidTyCl :: TyClDecl Name -> TcM ()
--- We do the validity check over declarations, rather than TyThings
--- only so that we can add a nice context with tcAddDeclCtxt
-checkValidTyCl decl
-  = tcAddDeclCtxt decl $
-    do	{ traceTc "Validity of 1" (ppr decl)
+checkValidDecl :: SDoc -- the context for error checking
+               -> Located Name -> TcM ()
+checkValidDecl ctxt lname
+  = addErrCtxt ctxt $
+    do	{ traceTc "Validity of 1" (ppr lname)
         ; env <- getGblEnv
 	; traceTc "Validity of 1a" (ppr (tcg_type_env env))
-	; thing <- tcLookupLocatedGlobal (tcdLName decl)
-	; traceTc "Validity of 2" (ppr decl)
+	; thing <- tcLookupLocatedGlobal lname
+	; traceTc "Validity of 2" (ppr lname)
 	; traceTc "Validity of" (ppr thing)
 	; case thing of
 	    ATyCon tc -> do
@@ -1189,6 +1253,20 @@ checkValidTyCl decl
             _         -> panic "checkValidTyCl"
 	; traceTc "Done validity of" (ppr thing)	
 	}
+
+checkValidTyCl :: TyClDecl Name -> TcM ()
+checkValidTyCl decl
+  = do { checkValidDecl (tcMkDeclCtxt decl) (tyClDeclLName decl)
+       ; case decl of
+           ClassDecl { tcdATs = ats } ->
+             mapM_ (checkValidFamDecl . unLoc) ats
+           _ -> return () }
+
+checkValidFamDecl :: FamilyDecl Name -> TcM ()
+checkValidFamDecl (FamilyDecl { fdLName = lname, fdFlavour = flav })
+  = checkValidDecl (hsep [ptext (sLit "In the"), ppr flav,
+                          ptext (sLit "declaration for"), quotes (ppr lname)])
+                   lname
 
 -------------------------
 -- For data types declared with record syntax, we require
@@ -1322,7 +1400,7 @@ checkValidDataCon dflags existential_ok tc con
     ctxt = ConArgCtxt (dataConName con) 
     check_bang (HsBang want_unpack, rep_bang, n) 
       | want_unpack
-      , case rep_bang of { HsUnpack -> False; _ -> True }
+      , case rep_bang of { HsUnpack {} -> False; _ -> True }
       , not (gopt Opt_OmitInterfacePragmas dflags)  
            -- If not optimising, se don't unpack, so don't complain!
            -- See MkId.dataConArgRep, the (HsBang True) case
@@ -1418,7 +1496,7 @@ checkValidClass cls
 		-- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = do { mapM_ (\(ATD _tvs pats rhs _loc) -> checkValidFamInst pats rhs) defs
+      = do { mapM_ (\(ATD tvs pats rhs _loc) -> checkValidTyFamInst fam_tc tvs pats rhs) defs
            ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
              mapM_ (check_loc_at_def fam_tc) defs }
 
@@ -1683,13 +1761,25 @@ tcAddDefaultAssocDeclCtxt name thing_inside
      ctxt = hsep [ptext (sLit "In the type synonym instance default declaration for"),
                   quotes (ppr name)]
 
-tcAddFamInstCtxt :: FamInstDecl Name -> TcM a -> TcM a
-tcAddFamInstCtxt (FamInstDecl { fid_tycon = tc, fid_defn = defn }) thing_inside
+tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a
+tcAddFamInstCtxt flavour tycon thing_inside
   = addErrCtxt ctxt thing_inside
   where
-     ctxt = hsep [ptext (sLit "In the") <+> pprTyDefnFlavour defn 
-                  <+> ptext (sLit "instance declaration for"),
-                  quotes (ppr tc)]
+     ctxt = hsep [ptext (sLit "In the") <+> flavour 
+                  <+> ptext (sLit "declaration for"),
+                  quotes (ppr tycon)]
+
+tcAddTyFamInstCtxt :: TyFamInstDecl Name -> TcM a -> TcM a
+tcAddTyFamInstCtxt decl
+  | [_] <- tfid_eqns decl
+  = tcAddFamInstCtxt (ptext (sLit "type instance")) (tyFamInstDeclName decl)
+  | otherwise
+  = tcAddFamInstCtxt (ptext (sLit "type instance group")) (tyFamInstDeclName decl)
+
+tcAddDataFamInstCtxt :: DataFamInstDecl Name -> TcM a -> TcM a
+tcAddDataFamInstCtxt decl
+  = tcAddFamInstCtxt ((pprDataFamInstFlavour decl) <+> (ptext (sLit "instance")))
+                     (unLoc (dfid_tycon decl)) 
 
 resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
@@ -1831,4 +1921,11 @@ wrongKindOfFamily family
     kindOfFamily | isSynTyCon family = ptext (sLit "type synonym")
                  | isAlgTyCon family = ptext (sLit "data type")
                  | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
+
+wrongNamesInInstGroup :: Name -> Name -> SDoc
+wrongNamesInInstGroup first cur
+  = ptext (sLit "Mismatched family names in instance group.") $$
+    ptext (sLit "First name was") <+>
+    (ppr first) <> (ptext (sLit "; this one is")) <+> (ppr cur)
+
 \end{code}

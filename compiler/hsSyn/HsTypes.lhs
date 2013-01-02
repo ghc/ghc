@@ -45,6 +45,7 @@ import HsLit
 import NameSet( FreeVars )
 import Name( Name )
 import RdrName( RdrName )
+import DataCon( HsBang(..) )
 import Type
 import HsDoc
 import BasicTypes

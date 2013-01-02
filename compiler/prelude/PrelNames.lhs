@@ -585,7 +585,7 @@ unsafeIndex_RDR         = varQual_RDR gHC_ARR (fsLit "unsafeIndex")
 unsafeRangeSize_RDR     = varQual_RDR gHC_ARR (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
-    readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR :: RdrName
+    readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
 readList_RDR            = varQual_RDR gHC_READ (fsLit "readList")
 readListDefault_RDR     = varQual_RDR gHC_READ (fsLit "readListDefault")
 readListPrec_RDR        = varQual_RDR gHC_READ (fsLit "readListPrec")
@@ -594,6 +594,7 @@ readPrec_RDR            = varQual_RDR gHC_READ (fsLit "readPrec")
 parens_RDR              = varQual_RDR gHC_READ (fsLit "parens")
 choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
 lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
+expectP_RDR             = varQual_RDR gHC_READ (fsLit "expectP")
 
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
 punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
@@ -1215,6 +1216,7 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
+-- SingI: see Note [SingI and EvLit] in TcEvidence
 singIClassNameKey, typeNatLeqClassNameKey :: Unique
 singIClassNameKey       = mkPreludeClassUnique 42
 typeNatLeqClassNameKey  = mkPreludeClassUnique 43

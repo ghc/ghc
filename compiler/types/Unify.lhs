@@ -23,7 +23,9 @@ module Unify (
 
         -- Side-effect free unification
         tcUnifyTys, BindFlag(..),
-        niFixTvSubst, niSubstTvSet
+        niFixTvSubst, niSubstTvSet,
+
+        ApartResult(..), tcApartTys
 
    ) where
 
@@ -36,11 +38,7 @@ import Kind
 import Type
 import TyCon
 import TypeRep
-import Outputable
-import ErrUtils
 import Util
-import Maybes
-import FastString
 \end{code}
 
 
@@ -358,7 +356,71 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 %*                                                                      *
 %************************************************************************
 
+Note [Unification and apartness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The workhorse function behind unification actually is testing for apartness,
+not unification. Here, two types are apart if it is never possible to unify
+them or any types they are safely coercible to.(* see below) There are three
+possibilities here:
+
+ - two types might be NotApart, which means a substitution can be found between
+   them,
+
+   Example: (Either a Int) and (Either Bool b) are NotApart, with
+   [a |-> Bool, b |-> Int]
+
+ - they might be MaybeApart, which means that we're not sure, but a substitution
+   cannot be found
+
+   Example: Int and F a (for some type family F) are MaybeApart
+
+ - they might be SurelyApart, in which case we can guarantee that they never
+   unify
+
+   Example: (Either Int a) and (Either Bool b) are SurelyApart
+
+In the NotApart case, the apartness finding function also returns a
+substitution, which we can then use to unify the types. It is necessary for
+the unification algorithm to depend on the apartness algorithm, because
+apartness is finer-grained than unification.
+
+Note [Unifying with type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We wish to separate out the case where unification fails on a type family
+from other unification failure. What does "fail on a type family" look like?
+According to the TyConApp invariant, a type family application must always
+be in a TyConApp. This TyConApp may not be buried within the left-hand-side
+of an AppTy.
+
+Furthermore, we wish to proceed with unification if we are unifying
+(F a b) with (F Int Bool). Here, unification should succeed with
+[a |-> Int, b |-> Bool]. So, here is what we do:
+
+ - If we are unifying two TyConApps, check the heads for equality and
+   proceed iff they are equal.
+
+ - Otherwise, if either (or both) type is a TyConApp headed by a type family,
+   we know they cannot fully unify. But, they might unify later, depending
+   on the type family. So, we return "maybeApart".
+
+Note that we never want to unify, say, (a Int) with (F Int), because doing so
+leads to an unsaturated type family. So, we don't have to worry about any
+unification between type families and AppTys.
+
+But wait! There is one more possibility. What about nullary type families?
+If G is a nullary type family, we *do* want to unify (a) with (G). This is
+handled in uVar, which is triggered before we look at TyConApps. Ah. All is
+well again.
+
+Note [Apartness with skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we discover that two types unify if and only if a skolem variable is
+substituted, we can't properly unify the types. But, that skolem variable
+may later be instantiated with a unifyable type. So, we return maybeApart
+in these cases.
+
 \begin{code}
+-- See Note [Unification and apartness]
 tcUnifyTys :: (TyVar -> BindFlag)
 	   -> [Type] -> [Type]
 	   -> Maybe TvSubst	-- A regular one-shot (idempotent) substitution
@@ -366,7 +428,20 @@ tcUnifyTys :: (TyVar -> BindFlag)
 -- second call to tcUnifyTys in FunDeps.checkClsFD
 --
 tcUnifyTys bind_fn tys1 tys2
-  = maybeErrToMaybe $ initUM bind_fn $
+  | NotApart subst <- tcApartTys bind_fn tys1 tys2
+  = Just subst
+  | otherwise
+  = Nothing
+
+data ApartResult = NotApart TvSubst   -- the subst that unifies the types
+                 | MaybeApart
+                 | SurelyApart
+
+tcApartTys :: (TyVar -> BindFlag)
+           -> [Type] -> [Type]
+           -> ApartResult
+tcApartTys bind_fn tys1 tys2
+  = initUM bind_fn $
     do { subst <- unifyList emptyTvSubstEnv tys1 tys2
 
 	-- Find the fixed point of the resulting non-idempotent substitution
@@ -437,7 +512,14 @@ unify subst ty1 ty2 | Just ty1' <- tcView ty1 = unify subst ty1' ty2
 unify subst ty1 ty2 | Just ty2' <- tcView ty2 = unify subst ty1 ty2'
 
 unify subst (TyConApp tyc1 tys1) (TyConApp tyc2 tys2) 
-  | tyc1 == tyc2 = unify_tys subst tys1 tys2
+  | tyc1 == tyc2                                   = unify_tys subst tys1 tys2
+  | isSynFamilyTyCon tyc1 || isSynFamilyTyCon tyc2 = maybeApart
+
+-- See Note [Unifying with type families]
+unify _ (TyConApp tyc _) _
+  | isSynFamilyTyCon tyc = maybeApart
+unify _ _ (TyConApp tyc _)
+  | isSynFamilyTyCon tyc = maybeApart
 
 unify subst (FunTy ty1a ty1b) (FunTy ty2a ty2b) 
   = do	{ subst' <- unify subst ty1a ty2a
@@ -459,7 +541,7 @@ unify subst ty1 (AppTy ty2a ty2b)
 
 unify subst (LitTy x) (LitTy y) | x == y = return subst
 
-unify _ ty1 ty2 = failWith (misMatch ty1 ty2)
+unify _ _ _ = surelyApart
 	-- ForAlls??
 
 ------------------------------
@@ -473,17 +555,13 @@ unifyList subst orig_xs orig_ys
     go subst []     []     = return subst
     go subst (x:xs) (y:ys) = do { subst' <- unify subst x y
 				; go subst' xs ys }
-    go _ _ _ = failWith (lengthMisMatch orig_xs orig_ys)
+    go _ _ _ = surelyApart
 
 ---------------------------------
 uVar :: TvSubstEnv	-- An existing substitution to extend
      -> TyVar           -- Type variable to be unified
      -> Type            -- with this type
      -> UM TvSubstEnv
-
--- PRE-CONDITION: in the call (uVar swap r tv1 ty), we know that
---	if swap=False	(tv1~ty)
---	if swap=True	(ty~tv1)
 
 uVar subst tv1 ty
  = -- Check to see whether tv1 is refined by the substitution
@@ -529,13 +607,13 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
        ; b2 <- tvBindFlag tv2
        ; let ty1 = TyVarTy tv1
        ; case (b1, b2) of
-           (Skolem, Skolem) -> failWith (misMatch ty1 ty2)
+           (Skolem, Skolem) -> maybeApart  -- See Note [Apartness with skolems]
            (BindMe, _)      -> return (extendVarEnv subst' tv1 ty2)
            (_, BindMe)      -> return (extendVarEnv subst' tv2 ty1) }
 
 uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')
-  = failWith (occursCheck tv1 ty2)	-- Occurs check
+  = surelyApart                         -- Occurs check
   | otherwise
   = do { subst' <- unify subst k1 k2
        ; bindTv subst' tv1 ty2 }	-- Bind tyvar to the synonym if poss
@@ -547,7 +625,7 @@ bindTv :: TvSubstEnv -> TyVar -> Type -> UM TvSubstEnv
 bindTv subst tv ty	-- ty is not a type variable
   = do  { b <- tvBindFlag tv
 	; case b of
-	    Skolem -> failWith (misMatch (TyVarTy tv) ty)
+	    Skolem -> maybeApart  -- See Note [Apartness with skolems]
 	    BindMe -> return $ extendVarEnv subst tv ty
 	}
 \end{code}
@@ -574,53 +652,33 @@ data BindFlag
 %************************************************************************
 
 \begin{code}
+data UnifFailure = UFMaybeApart
+                 | UFSurelyApart
+
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
-		         -> MaybeErr MsgDoc a }
+		         -> Either UnifFailure a }
 
 instance Monad UM where
-  return a = UM (\_tvs -> Succeeded a)
-  fail s   = UM (\_tvs -> Failed (text s))
+  return a = UM (\_tvs -> Right a)
+  fail _   = UM (\_tvs -> Left UFSurelyApart) -- failed pattern match
   m >>= k  = UM (\tvs -> case unUM m tvs of
-			   Failed err -> Failed err
-			   Succeeded v  -> unUM (k v) tvs)
+			   Right v -> unUM (k v) tvs
+			   Left f  -> Left f)
 
-initUM :: (TyVar -> BindFlag) -> UM a -> MaybeErr MsgDoc a
-initUM badtvs um = unUM um badtvs
-
+initUM :: (TyVar -> BindFlag) -> UM TvSubst -> ApartResult
+initUM badtvs um
+  = case unUM um badtvs of
+      Right subst        -> NotApart subst
+      Left UFMaybeApart  -> MaybeApart
+      Left UFSurelyApart -> SurelyApart
+    
 tvBindFlag :: TyVar -> UM BindFlag
-tvBindFlag tv = UM (\tv_fn -> Succeeded (tv_fn tv))
+tvBindFlag tv = UM (\tv_fn -> Right (tv_fn tv))
 
-failWith :: MsgDoc -> UM a
-failWith msg = UM (\_tv_fn -> Failed msg)
+maybeApart :: UM a
+maybeApart = UM (\_tv_fn -> Left UFMaybeApart)
 
-maybeErrToMaybe :: MaybeErr fail succ -> Maybe succ
-maybeErrToMaybe (Succeeded a) = Just a
-maybeErrToMaybe (Failed _)    = Nothing
+surelyApart :: UM a
+surelyApart = UM (\_tv_fn -> Left UFSurelyApart)
 \end{code}
 
-
-%************************************************************************
-%*									*
-		Error reporting
-	We go to a lot more trouble to tidy the types
-	in TcUnify.  Maybe we'll end up having to do that
-	here too, but I'll leave it for now.
-%*									*
-%************************************************************************
-
-\begin{code}
-misMatch :: Type -> Type -> SDoc
-misMatch t1 t2
-  = ptext (sLit "Can't match types") <+> quotes (ppr t1) <+> 
-    ptext (sLit "and") <+> quotes (ppr t2)
-
-lengthMisMatch :: [Type] -> [Type] -> SDoc
-lengthMisMatch tys1 tys2
-  = sep [ptext (sLit "Can't match unequal length lists"), 
-	 nest 2 (ppr tys1), nest 2 (ppr tys2) ]
-
-occursCheck :: TyVar -> Type -> SDoc
-occursCheck tv ty
-  = hang (ptext (sLit "Can't construct the infinite type"))
-       2 (ppr tv <+> equals <+> ppr ty)
-\end{code}

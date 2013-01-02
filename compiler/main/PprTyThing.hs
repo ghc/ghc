@@ -29,7 +29,6 @@ import GHC ( TyThing(..) )
 import DataCon
 import Id
 import TyCon
-import BasicTypes
 import Coercion( pprCoAxiom )
 import HscTypes( tyThingParent_maybe )
 import TcType
@@ -219,7 +218,7 @@ pprDataConDecl pefas ss gadt_style dataCon
     user_ify :: HsBang -> HsBang
     user_ify bang | opt_PprStyle_Debug = bang
     user_ify HsStrict                  = HsBang False
-    user_ify HsUnpack                  = HsBang True
+    user_ify (HsUnpack {})             = HsBang True
     user_ify bang                      = bang
 
     maybe_show_label (lbl,bty)

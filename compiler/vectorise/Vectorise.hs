@@ -30,6 +30,7 @@ import BasicTypes           ( isStrongLoopBreaker )
 import Outputable
 import Util                 ( zipLazy )
 import MonadUtils
+import FamInstEnv           ( toBranchedFamInst )
 
 import Control.Monad
 import Data.Maybe
@@ -97,7 +98,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
                         -- and dfuns
                       , mg_binds        = Rec tc_binds : (binds_top ++ binds_imp)
                       , mg_fam_inst_env = fam_inst_env
-                      , mg_fam_insts    = fam_insts ++ new_fam_insts
+                      , mg_fam_insts    = fam_insts ++ (map toBranchedFamInst new_fam_insts)
                       }
       }
 

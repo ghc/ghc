@@ -19,8 +19,9 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 import HsSyn
 import TcBinds
-import TcTyClsDecls( tcAddImplicits, tcAddFamInstCtxt, tcSynFamInstDecl, 
-                     wrongKindOfFamily, tcFamTyPats, kcTyDefn, dataDeclChecks,
+import TcTyClsDecls( tcAddImplicits, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
+                     tcAddFamInstCtxt, tcSynFamInstDecl, 
+                     wrongKindOfFamily, tcFamTyPats, kcDataDefn, dataDeclChecks,
                      tcConDecls, checkValidTyCon, badATErr, wrongATArgErr )
 import TcClassDcl( tcClassDecl2, 
                    HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
@@ -43,6 +44,7 @@ import CoreSyn    ( DFunArg(..) )
 import Type
 import TcEvidence
 import TyCon
+import CoAxiom
 import DataCon
 import Class
 import Var
@@ -419,7 +421,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 , deriv_binds)
     }}
   where
-    typInstCheck ty = is_cls (iSpec ty) `elem` typeableClassNames
+    typInstCheck ty = is_cls_nm (iSpec ty) `elem` typeableClassNames
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
 
@@ -427,12 +429,12 @@ addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
-addFamInsts :: [FamInst] -> TcM a -> TcM a
+addFamInsts :: [FamInst Branched] -> TcM a -> TcM a
 -- Extend (a) the family instance envt
 --        (b) the type envt with stuff from data type decls
 addFamInsts fam_insts thing_inside
   = tcExtendLocalFamInstEnv fam_insts $ 
-    tcExtendGlobalEnv things $
+    tcExtendGlobalEnv things  $ 
     do { traceTc "addFamInsts" (pprFamInsts fam_insts)
        ; tcg_env <- tcAddImplicits things
        ; setGblEnv tcg_env thing_inside }
@@ -461,21 +463,35 @@ the brutal solution will do.
 
 \begin{code}
 tcLocalInstDecl :: LInstDecl Name
-                -> TcM ([InstInfo Name], [FamInst])
+                -> TcM ([InstInfo Name], [FamInst Branched])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
-tcLocalInstDecl (L loc (FamInstD { lid_inst = decl }))
+tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
   = setSrcSpan loc      $
-    tcAddFamInstCtxt decl  $
-    do { fam_inst <- tcFamInstDecl TopLevel decl
+    tcAddTyFamInstCtxt decl  $
+    do { fam_tc <- tcFamInstDeclCombined TopLevel (tyFamInstDeclLName decl)
+       ; fam_inst <- tcTyFamInstDecl fam_tc (L loc decl)
        ; return ([], [fam_inst]) }
 
-tcLocalInstDecl (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
-                                 , cid_sigs = uprags, cid_fam_insts = ats }))
-  = setSrcSpan loc                      $
-    addErrCtxt (instDeclCtxt1 poly_ty)  $
+tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
+  = setSrcSpan loc      $
+    tcAddDataFamInstCtxt decl  $
+    do { fam_tc <- tcFamInstDeclCombined TopLevel (dfid_tycon decl)
+       ; fam_inst <- tcDataFamInstDecl fam_tc decl
+       ; return ([], [toBranchedFamInst fam_inst]) }
+
+tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
+  = setSrcSpan loc $
+    do { (insts, fam_insts) <- tcClsInstDecl decl
+       ; return (insts, map toBranchedFamInst fam_insts) }
+
+tcClsInstDecl :: ClsInstDecl Name -> TcM ([InstInfo Name], [FamInst Unbranched])
+tcClsInstDecl (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
+                           , cid_sigs = uprags, cid_tyfam_insts = ats
+                           , cid_datafam_insts = adts })
+  = addErrCtxt (instDeclCtxt1 poly_ty)  $
 
     do  { is_boot <- tcIsHsBoot
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
@@ -487,17 +503,24 @@ tcLocalInstDecl (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
                            
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
-        ; fam_insts0 <- tcExtendTyVarEnv tyvars $
-                        mapAndRecoverM (tcAssocDecl clas mini_env) ats
+        ; tyfam_insts0 <- tcExtendTyVarEnv tyvars $
+                          mapAndRecoverM tcAssocTyDecl ats
+        ; datafam_insts <- tcExtendTyVarEnv tyvars $
+                           mapAndRecoverM tcAssocDataDecl adts
+
+        -- discard the [()]
+        ; _ <- mapAndRecoverM (tcAssocFamInst clas mini_env) (tyfam_insts0 ++ datafam_insts)
 
         -- Check for missing associated types and build them
         -- from their defaults (if available)
-        ; let defined_ats = mkNameSet $ map famInstDeclName ats
+        ; let defined_ats = mkNameSet $ map (tyFamInstDeclName . unLoc) ats
+              defined_adts = mkNameSet $ map (unLoc . dfid_tycon . unLoc) adts
 
-              mk_deflt_at_instances :: ClassATItem -> TcM [FamInst]
+              mk_deflt_at_instances :: ClassATItem -> TcM [FamInst Unbranched]
               mk_deflt_at_instances (fam_tc, defs)
                  -- User supplied instances ==> everything is OK
-                | tyConName fam_tc `elemNameSet` defined_ats 
+                | tyConName fam_tc `elemNameSet` defined_ats
+                   || tyConName fam_tc `elemNameSet` defined_adts
                 = return []
 
                  -- No defaults ==> generate a warning
@@ -517,9 +540,9 @@ tcLocalInstDecl (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
                            tvs'     = varSetElems tv_set'
                      ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
                      ; ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' ) 
-                       return (mkSynFamInst rep_tc_name tvs' fam_tc pat_tys' rhs') }
+                       return (mkSingleSynFamInst rep_tc_name tvs' fam_tc pat_tys' rhs') }
 
-        ; fam_insts1 <- mapM mk_deflt_at_instances (classATItems clas)
+        ; tyfam_insts1 <- mapM mk_deflt_at_instances (classATItems clas)
         
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
@@ -527,11 +550,14 @@ tcLocalInstDecl (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
                 -- Dfun location is that of instance *header*
 
         ; overlap_flag <- getOverlapFlag
+        ; (subst, tyvars') <- tcInstSkolTyVars tyvars
         ; let dfun  	= mkDictFunId dfun_name tyvars theta clas inst_tys
-              ispec 	= mkLocalInstance dfun overlap_flag
+              ispec 	= mkLocalInstance dfun overlap_flag tyvars' clas (substTys subst inst_tys)
+                            -- Be sure to freshen those type variables, 
+                            -- so they are sure not to appear in any lookup
               inst_info = InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False }
 
-        ; return ( [inst_info], fam_insts0 ++ concat fam_insts1) }
+        ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts) }
 \end{code}
 
 %************************************************************************
@@ -546,12 +572,11 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDecl :: TopLevelFlag -> FamInstDecl Name -> TcM FamInst
-tcFamInstDecl top_lvl decl
+tcFamInstDeclCombined :: TopLevelFlag -> Located Name -> TcM TyCon
+tcFamInstDeclCombined top_lvl fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
-       ; traceTc "tcFamInstDecl" (ppr decl)
-       ; let fam_tc_lname = fid_tycon decl
+       ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
        ; type_families <- xoptM Opt_TypeFamilies
        ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
@@ -563,50 +588,75 @@ tcFamInstDecl top_lvl decl
        ; when (isTopLevel top_lvl && isTyConAssoc fam_tc)
               (addErr $ assocInClassErr fam_tc_lname)
 
-         -- Now check the type/data instance itself
-         -- This is where type and data decls are treated separately
-       ; tcFamInstDecl1 fam_tc decl }
+       ; return fam_tc }
 
-tcFamInstDecl1 :: TyCon -> FamInstDecl Name -> TcM FamInst
-
+tcTyFamInstDecl :: TyCon -> LTyFamInstDecl Name -> TcM (FamInst Branched)
   -- "type instance"
-tcFamInstDecl1 fam_tc decl@(FamInstDecl { fid_tycon = fam_tc_name
-                                        , fid_defn = TySynonym {} })
+tcTyFamInstDecl fam_tc (L loc decl@(TyFamInstDecl { tfid_group = group }))
   = do { -- (0) Check it's an open type family
          checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; checkTc (isOpenSynFamilyTyCon fam_tc)
                  (notOpenFamily fam_tc)
 
-         -- (1) do the work of verifying the synonym
-       ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc decl
+         -- (1) do the work of verifying the synonym group
+       ; quads <- tcSynFamInstDecl fam_tc decl
 
-         -- (2) check the well-formedness of the instance
-       ; checkValidFamInst t_typats t_rhs
+         -- (2) create the branches
+       ; fam_inst_branches <- mapM check_valid_mk_branch quads
 
-         -- (3) construct representation tycon
-       ; rep_tc_name <- newFamInstAxiomName fam_tc_name t_typats
+         -- (3) construct coercion tycon
+       ; rep_tc_name <- newFamInstAxiomName loc
+                                            (tyFamInstDeclName decl)
+                                            (get_typats quads)
 
-       ; return (mkSynFamInst rep_tc_name t_tvs fam_tc t_typats t_rhs) }
+         -- (4) check to see if earlier equations dominate a later one
+       ; foldlM_ check_inaccessible_branches [] (map fst fam_inst_branches)
 
+         -- now, build the FamInstGroup
+       ; return $ mkSynFamInst rep_tc_name fam_tc group fam_inst_branches }
+
+    where 
+      check_valid_mk_branch :: ([TyVar], [Type], Type, SrcSpan)
+                            -> TcM (FamInstBranch, CoAxBranch)
+      check_valid_mk_branch (t_tvs, t_typats, t_rhs, loc)
+        = setSrcSpan loc $
+          do { -- check the well-formedness of the instance
+               checkValidTyFamInst fam_tc t_tvs t_typats t_rhs
+
+             ; return $ mkSynFamInstBranch loc t_tvs t_typats t_rhs }
+
+      check_inaccessible_branches :: [FamInstBranch]     -- previous
+                                  -> FamInstBranch       -- current
+                                  -> TcM [FamInstBranch] -- current : previous
+      check_inaccessible_branches prev_branches
+                                  cur_branch@(FamInstBranch { fib_lhs = tys })
+        = setSrcSpan (famInstBranchSpan cur_branch) $
+          do { when (tys `isDominatedBy` prev_branches) $
+                    addErrTc $ inaccessibleFamInstBranch fam_tc cur_branch
+             ; return $ cur_branch : prev_branches }
+
+      get_typats = map (\(_, tys, _, _) -> tys)
+
+tcDataFamInstDecl :: TyCon -> DataFamInstDecl Name -> TcM (FamInst Unbranched)
   -- "newtype instance" and "data instance"
-tcFamInstDecl1 fam_tc 
-    (FamInstDecl { fid_pats = pats
-                 , fid_tycon = fam_tc_name
-                 , fid_defn = defn@TyData { td_ND = new_or_data, td_cType = cType
-                                          , td_ctxt = ctxt, td_cons = cons } })
+tcDataFamInstDecl fam_tc 
+    (DataFamInstDecl { dfid_pats = pats
+                     , dfid_tycon = fam_tc_name
+                     , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                                                   , dd_ctxt = ctxt, dd_cons = cons } })
   = do { -- Check that the family declaration is for the right kind
          checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
-       ; tcFamTyPats fam_tc pats (kcTyDefn defn) $ 
+       ; tcFamTyPats fam_tc pats (kcDataDefn defn) $ 
            \tvs' pats' res_kind -> do
 
          -- Check that left-hand side contains no type family applications
          -- (vanilla synonyms are fine, though, and we checked for
          -- foralls earlier)
-       { mapM_ checkTyFamFreeness pats'
+       { checkValidFamPats fam_tc tvs' pats'
          
          -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
@@ -643,24 +693,23 @@ tcFamInstDecl1 fam_tc
 
 
 ----------------
-tcAssocDecl :: Class              -- ^ Class of associated type
-            -> VarEnv Type        -- ^ Instantiation of class TyVars
-            -> LFamInstDecl Name  -- ^ RHS
-            -> TcM FamInst
-tcAssocDecl clas mini_env (L loc decl)
-  = setSrcSpan loc      $
-    tcAddFamInstCtxt decl  $
-    do { fam_inst <- tcFamInstDecl NotTopLevel decl
-       ; let (fam_tc, at_tys) = famInstLHS fam_inst
+tcAssocFamInst :: Class              -- ^ Class of associated type
+               -> VarEnv Type        -- ^ Instantiation of class TyVars
+               -> FamInst Unbranched -- ^ RHS
+               -> TcM ()
+tcAssocFamInst clas mini_env fam_inst
+  = setSrcSpan (getSrcSpan fam_inst) $
+    tcAddFamInstCtxt (pprFamFlavor (fi_flavor fam_inst)) (fi_fam fam_inst) $
+    do { let branch = famInstSingleBranch fam_inst
+             fam_tc = famInstTyCon fam_inst
+             at_tys = famInstBranchLHS branch
 
        -- Check that the associated type comes from this class
        ; checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
        -- See Note [Checking consistent instantiation] in TcTyClsDecls
-       ; zipWithM_ check_arg (tyConTyVars fam_tc) at_tys
-
-       ; return fam_inst }
+       ; zipWithM_ check_arg (tyConTyVars fam_tc) at_tys }
   where
     check_arg fam_tc_tv at_ty
       | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
@@ -671,6 +720,23 @@ tcAssocDecl clas mini_env (L loc decl)
       | otherwise
       = return ()   -- Allow non-type-variable instantiation
                     -- See Note [Associated type instances]
+
+tcAssocTyDecl :: LTyFamInstDecl Name
+              -> TcM (FamInst Unbranched)
+tcAssocTyDecl ldecl@(L loc decl)
+  = setSrcSpan loc $
+    tcAddTyFamInstCtxt decl $
+    do { fam_tc <- tcFamInstDeclCombined NotTopLevel (tyFamInstDeclLName decl)
+       ; fam_inst <- tcTyFamInstDecl fam_tc ldecl
+       ; return $ toUnbranchedFamInst fam_inst }
+
+tcAssocDataDecl :: LDataFamInstDecl Name -- ^ RHS
+                -> TcM (FamInst Unbranched)
+tcAssocDataDecl (L loc decl)
+  = setSrcSpan loc $
+    tcAddDataFamInstCtxt decl $
+    do { fam_tc <- tcFamInstDeclCombined NotTopLevel (dfid_tycon decl)
+       ; tcDataFamInstDecl fam_tc decl }
 \end{code}
 
 
@@ -874,16 +940,24 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
          do { sig_ty <- tcHsSigType (FunSigCtxt sel_name) hs_ty
             ; inst_sigs <- xoptM Opt_InstanceSigs
             ; if inst_sigs then 
-                checkTc (sig_ty `eqType` local_meth_ty)
-                        (badInstSigErr sel_name local_meth_ty)
+                unless (sig_ty `eqType` local_meth_ty)
+                       (badInstSigErr sel_name local_meth_ty)
               else
                 addErrTc (misplacedInstSig sel_name hs_ty)
             ; return sig_ty }
 
-badInstSigErr :: Name -> Type -> SDoc
+badInstSigErr :: Name -> Type -> TcM ()
 badInstSigErr meth ty
-  = hang (ptext (sLit "Method signature does not match class; it should be"))
-       2 (pprPrefixName meth <+> dcolon <+> ppr ty)
+  = do { env0 <- tcInitTidyEnv
+       ; let tidy_ty = tidyType env0 ty
+                 -- Tidy the type using the ambient TidyEnv, 
+                 -- to avoid apparent name capture (Trac #7475)
+                 --    class C a where { op :: a -> b }
+                 --    instance C (a->b) where
+                 --       op :: forall x. x
+                 --       op = ...blah...
+       ; addErrTc (hang (ptext (sLit "Method signature does not match class; it should be"))
+                      2 (pprPrefixName meth <+> dcolon <+> ppr tidy_ty)) }
 
 misplacedInstSig :: Name -> LHsType Name -> SDoc
 misplacedInstSig name hs_ty
@@ -1449,6 +1523,11 @@ badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
+
+inaccessibleFamInstBranch :: TyCon -> FamInstBranch -> SDoc
+inaccessibleFamInstBranch tc fi
+  = ptext (sLit "Inaccessible family instance equation:") $$
+      (pprFamInstBranch tc fi)
 
 notOpenFamily :: TyCon -> SDoc
 notOpenFamily tc

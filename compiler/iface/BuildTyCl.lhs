@@ -24,7 +24,7 @@ module BuildTyCl (
 #include "HsVersions.h"
 
 import IfaceEnv
-
+import FamInstEnv( FamInstEnvs )
 import DataCon
 import Var
 import VarSet
@@ -134,7 +134,8 @@ mkNewTyConRhs tycon_name tycon con
 				
 
 ------------------------------------------------------
-buildDataCon :: Name -> Bool
+buildDataCon :: FamInstEnvs 
+            -> Name -> Bool
 	    -> [HsBang] 
 	    -> [Name]			-- Field labels
 	    -> [TyVar] -> [TyVar]	-- Univ and ext 
@@ -148,7 +149,7 @@ buildDataCon :: Name -> Bool
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
-buildDataCon src_name declared_infix arg_stricts field_lbls
+buildDataCon fam_envs src_name declared_infix arg_stricts field_lbls
 	     univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
@@ -166,7 +167,7 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 				     arg_tys res_ty rep_tycon
 				     stupid_ctxt dc_wrk dc_rep
                 dc_wrk = mkDataConWorkId work_name data_con
-                dc_rep = initUs_ us (mkDataConRep dflags wrap_name data_con)
+                dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name data_con)
 
 	; return data_con }
 
@@ -252,7 +253,8 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 	      arg_tys   = sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
                
-	; dict_con <- buildDataCon datacon_name
+	; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
+                                   datacon_name
 				   False 	-- Not declared infix
 				   (map (const HsNoBang) args)
 				   [{- No fields -}]

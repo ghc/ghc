@@ -27,7 +27,8 @@ import TcType
 import TcGenDeriv
 import DataCon
 import TyCon
-import FamInstEnv       ( FamInst, mkSynFamInst )
+import CoAxiom
+import FamInstEnv       ( FamInst, mkSingleSynFamInst )
 import Module           ( Module, moduleName, moduleNameString )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
@@ -70,7 +71,7 @@ For the generic representation we need to generate:
 
 \begin{code}
 gen_Generic_binds :: GenericKind -> TyCon -> MetaTyCons -> Module
-                 -> TcM (LHsBinds RdrName, FamInst)
+                 -> TcM (LHsBinds RdrName, FamInst Unbranched)
 gen_Generic_binds gk tc metaTyCons mod = do
   repTyInsts <- tc_mkRepFamInsts gk tc metaTyCons mod
   return (mkBindsRep gk tc, repTyInsts)
@@ -135,33 +136,32 @@ metaTyConsToDerivStuff tc metaDts =
       let
         safeOverlap = safeLanguageOn dflags
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
+        mk_inst clas tc dfun_name 
+          = mkLocalInstance (mkDictFunId dfun_name [] [] clas tys)
+                            (NoOverlap safeOverlap)
+                            [] clas tys
+          where
+            tys = [mkTyConTy tc]
         
         -- Datatype
         d_metaTycon = metaD metaDts
-        d_inst = mkLocalInstance d_dfun $ NoOverlap safeOverlap
-        d_binds = VanillaInst dBinds [] False
-        d_dfun  = mkDictFunId d_dfun_name (tyConTyVars tc) [] dClas 
-                    [ mkTyConTy d_metaTycon ]
+        d_inst   = mk_inst dClas d_metaTycon d_dfun_name
+        d_binds  = VanillaInst dBinds [] False
         d_mkInst = DerivInst (InstInfo { iSpec = d_inst, iBinds = d_binds })
         
         -- Constructor
         c_metaTycons = metaC metaDts
-        c_insts = [ mkLocalInstance (c_dfun c ds) $ NoOverlap safeOverlap
+        c_insts = [ mk_inst cClas c ds
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
         c_binds = [ VanillaInst c [] False | c <- cBinds ]
-        c_dfun c dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] cClas 
-                               [ mkTyConTy c ]
         c_mkInst = [ DerivInst (InstInfo { iSpec = is, iBinds = bs })
                    | (is,bs) <- myZip1 c_insts c_binds ]
         
         -- Selector
         s_metaTycons = metaS metaDts
-        s_insts = map (map (\(s,ds) -> mkLocalInstance (s_dfun s ds) $
-                                                  NoOverlap safeOverlap))
-                    (myZip2 s_metaTycons s_dfun_names)
+        s_insts = map (map (\(s,ds) -> mk_inst sClas s ds))
+                      (myZip2 s_metaTycons s_dfun_names)
         s_binds = [ [ VanillaInst s [] False | s <- ss ] | ss <- sBinds ]
-        s_dfun s dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] sClas
-                               [ mkTyConTy s ]
         s_mkInst = map (map (\(is,bs) -> DerivInst (InstInfo { iSpec  = is
                                                              , iBinds = bs})))
                        (myZip2 s_insts s_binds)
@@ -405,11 +405,11 @@ mkBindsRep gk tycon =
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts ::  GenericKind     -- Gen0 or Gen1
+tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
                -> TyCon           -- The type to generate representation for
                -> MetaTyCons      -- Metadata datatypes to refer to
                -> Module          -- Used as the location of the new RepTy
-               -> TcM FamInst     -- Generated representation0 coercion
+               -> TcM (FamInst Unbranched) -- Generated representation0 coercion
 tc_mkRepFamInsts gk tycon metaDts mod = 
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
@@ -448,7 +448,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                    in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
                         (nameSrcSpan (tyConName tycon))
 
-     ; return $ mkSynFamInst rep_name tyvars rep appT repTy
+     ; return $ mkSingleSynFamInst rep_name tyvars rep appT repTy
      }
 
 --------------------------------------------------------------------------------

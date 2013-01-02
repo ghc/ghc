@@ -16,7 +16,7 @@ Typechecking class declarations
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
                     HsSigFun, mkHsSigFun, lookupHsSig, emptyHsSigs,
-		    tcAddDeclCtxt, badMethodErr
+		    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
@@ -349,12 +349,13 @@ This makes the error messages right.
 %************************************************************************
 
 \begin{code}
+tcMkDeclCtxt :: TyClDecl Name -> SDoc
+tcMkDeclCtxt decl = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl, 
+                      ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
+
 tcAddDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
-  = addErrCtxt ctxt thing_inside
-  where
-     ctxt = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl, 
-		  ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
+  = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
 badMethodErr :: Outputable a => a -> Name -> SDoc
 badMethodErr clas op

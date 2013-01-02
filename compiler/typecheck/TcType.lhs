@@ -76,6 +76,7 @@ module TcType (
   -- Misc type manipulators
   deNoteType, occurCheckExpand, OccCheckResult(..),
   orphNamesOfType, orphNamesOfDFunHead, orphNamesOfCo,
+  orphNamesOfCoCon,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
 
@@ -173,6 +174,7 @@ import VarSet
 import Coercion
 import Type
 import TyCon
+import CoAxiom
 
 -- others:
 import DynFlags
@@ -648,8 +650,8 @@ tidyCo env@(_, subst) co
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
-    go (AxiomInstCo con cos) = let args = tidyCos env cos
-                               in  args `seqList` AxiomInstCo con args
+    go (AxiomInstCo con ind cos) = let args = tidyCos env cos
+                               in  args `seqList` AxiomInstCo con ind args
     go (UnsafeCo ty1 ty2)    = (UnsafeCo $! tidyType env ty1) $! tidyType env ty2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
@@ -1094,23 +1096,20 @@ tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
 
 -----------------------
-tcSplitDFunTy :: Type -> ([TyVar], Int, Class, [Type])
+tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 -- Split the type of a dictionary function
 -- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
 -- have non-Pred arguments, such as
 --     df :: forall m. (forall b. Eq b => Eq (m b)) -> C m
+-- 
+-- Also NB splitFunTys, not tcSplitFunTys; 
+-- the latter  specifically stops at PredTy arguments, 
+-- and we don't want to do that here
 tcSplitDFunTy ty 
-  = case tcSplitForAllTys ty   of { (tvs, rho)  ->
-    case split_dfun_args 0 rho of { (n_theta, tau) ->
-    case tcSplitDFunHead tau   of { (clas, tys) ->
-    (tvs, n_theta, clas, tys) }}}
-  where
-    -- Count the context of the dfun.  This can be a mix of
-    -- coercion and class constraints; or (in the general NDP case)
-    -- some other function argument
-    split_dfun_args n ty | Just ty' <- tcView ty = split_dfun_args n ty'
-    split_dfun_args n (FunTy _ ty)     = split_dfun_args (n+1) ty
-    split_dfun_args n ty               = (n, ty)
+  = case tcSplitForAllTys ty   of { (tvs, rho)   ->
+    case splitFunTys rho       of { (theta, tau) ->  
+    case tcSplitDFunHead tau   of { (clas, tys)  ->
+    (tvs, theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
@@ -1462,8 +1461,11 @@ orphNamesOfType (FunTy arg res)	    = orphNamesOfType arg `unionNameSets` orphNa
 orphNamesOfType (AppTy fun arg)	    = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
 orphNamesOfType (ForAllTy _ ty)	    = orphNamesOfType ty
 
+orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
+orphNamesOfThings f = foldr (unionNameSets . f) emptyNameSet
+
 orphNamesOfTypes :: [Type] -> NameSet
-orphNamesOfTypes tys = foldr (unionNameSets . orphNamesOfType) emptyNameSet tys
+orphNamesOfTypes = orphNamesOfThings orphNamesOfType
 
 orphNamesOfDFunHead :: Type -> NameSet
 -- Find the free type constructors and classes 
@@ -1482,7 +1484,7 @@ orphNamesOfCo (TyConAppCo tc cos)   = unitNameSet (getName tc) `unionNameSets` o
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ co)       = orphNamesOfCo co
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
-orphNamesOfCo (AxiomInstCo con cos) = orphNamesOfCoCon con `unionNameSets` orphNamesOfCos cos
+orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSets` orphNamesOfCos cos
 orphNamesOfCo (UnsafeCo ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
@@ -1491,11 +1493,18 @@ orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co ty)        = orphNamesOfCo co `unionNameSets` orphNamesOfType ty
 
 orphNamesOfCos :: [Coercion] -> NameSet
-orphNamesOfCos = foldr (unionNameSets . orphNamesOfCo) emptyNameSet
+orphNamesOfCos = orphNamesOfThings orphNamesOfCo
 
-orphNamesOfCoCon :: CoAxiom -> NameSet
-orphNamesOfCoCon (CoAxiom { co_ax_lhs = ty1, co_ax_rhs = ty2 })
-  = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2
+orphNamesOfCoCon :: CoAxiom br -> NameSet
+orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
+  = orphNamesOfTyCon tc `unionNameSets` orphNamesOfCoAxBranches branches
+
+orphNamesOfCoAxBranches :: BranchList CoAxBranch br -> NameSet
+orphNamesOfCoAxBranches = brListFoldr (unionNameSets . orphNamesOfCoAxBranch) emptyNameSet
+
+orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
+orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
+  = orphNamesOfTypes lhs `unionNameSets` orphNamesOfType rhs
 \end{code}
 
 

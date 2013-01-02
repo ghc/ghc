@@ -72,6 +72,7 @@ import RdrName
 import InstEnv
 import DataCon
 import TyCon
+import CoAxiom
 import TypeRep
 import Class
 import Name
@@ -87,7 +88,6 @@ import Encoding
 import FastString
 import ListSetOps
 import Util
-
 import Data.IORef
 import Data.List
 \end{code}
@@ -173,7 +173,7 @@ tcLookupTyCon name = do
         ATyCon tc -> return tc
         _         -> wrongThingErr "type constructor" (AGlobal thing) name
 
-tcLookupAxiom :: Name -> TcM CoAxiom
+tcLookupAxiom :: Name -> TcM (CoAxiom Branched)
 tcLookupAxiom name = do
     thing <- tcLookupGlobal name
     case thing of
@@ -700,7 +700,7 @@ pprInstInfoDetails info
 
 simpleInstInfoClsTy :: InstInfo a -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of
-                           (_, _, cls, [ty]) -> (cls, ty)
+                           (_, cls, [ty]) -> (cls, ty)
                            _ -> panic "simpleInstInfoClsTy"
 
 simpleInstInfoTy :: InstInfo a -> Type
@@ -731,17 +731,21 @@ Make a name for the representation tycon of a family instance.  It's an
 newGlobalBinder.
 
 \begin{code}
-newFamInstTyConName, newFamInstAxiomName :: Located Name -> [Type] -> TcM Name
-newFamInstTyConName = mk_fam_inst_name id
+newFamInstTyConName :: Located Name -> [Type] -> TcM Name
+newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
+
+newFamInstAxiomName :: SrcSpan -> Name -> [[Type]] -> TcM Name
 newFamInstAxiomName = mk_fam_inst_name mkInstTyCoOcc
 
-mk_fam_inst_name :: (OccName -> OccName) -> Located Name -> [Type] -> TcM Name
-mk_fam_inst_name adaptOcc (L loc tc_name) tys
+mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
+mk_fam_inst_name adaptOcc loc tc_name tyss
   = do  { mod   <- getModule
         ; let info_string = occNameString (getOccName tc_name) ++ 
-                            concatMap (occNameString.getDFunTyKey) tys
+                            intercalate "|" ty_strings
         ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
         ; newGlobalBinder mod (adaptOcc occ) loc }
+  where
+    ty_strings = map (concatMap (occNameString . getDFunTyKey)) tyss
 \end{code}
 
 Stable names used for foreign exports and annotations.

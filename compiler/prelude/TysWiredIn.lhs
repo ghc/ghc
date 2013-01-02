@@ -96,7 +96,7 @@ import TypeRep
 import RdrName
 import Name
 import BasicTypes       ( TupleSort(..), tupleSortBoxity,
-                          Arity, RecFlag(..), Boxity(..), HsBang(..) )
+                          Arity, RecFlag(..), Boxity(..) )
 import ForeignCall
 import Unique           ( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )

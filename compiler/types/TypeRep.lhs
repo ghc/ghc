@@ -64,6 +64,7 @@ import Name
 import BasicTypes
 import TyCon
 import Class
+import CoAxiom
 
 -- others
 import PrelNames
@@ -307,7 +308,7 @@ isKindVar v = isTKVar v && isSuperKind (varType v)
 %*									*
 %************************************************************************
 
-\begin{code}  
+\begin{code}
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
 -- tyVarsOfType returns only the free variables of a type
@@ -349,7 +350,7 @@ data TyThing
   = AnId     Id
   | ADataCon DataCon
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
-  | ACoAxiom CoAxiom
+  | ACoAxiom (CoAxiom Branched)
   deriving (Eq, Ord)
 
 instance Outputable TyThing where 

@@ -101,7 +101,7 @@ type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
   -- We can have more than one default per type; see
   -- Note [Associated type defaults] in TcTyClsDecls
 
--- Each associated type default template is a triple of:
+-- Each associated type default template is a quad of:
 data ATDefault = ATD { -- TyVars of the RHS and family arguments 
                        -- (including, but perhaps more than, the class TVs)
                        atDefaultTys     :: [TyVar],
