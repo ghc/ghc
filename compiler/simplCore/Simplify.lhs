@@ -1975,7 +1975,7 @@ simplAlts env scrut case_bndr alts cont'
           -- NB: it's possible that the returned in_alts is empty: this is handled
           -- by the caller (rebuildCase) in the missingAlt function
 
-        ; alts' <- mapM (simplAlt alt_env' (Just scrut) imposs_deflt_cons case_bndr' cont') in_alts
+        ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
         ; -- pprTrace "simplAlts" (ppr case_bndr $$ ppr alts_ty $$ ppr alts_ty' $$ ppr alts $$ ppr cont') $
           return (scrut', case_bndr', alts') }
 
