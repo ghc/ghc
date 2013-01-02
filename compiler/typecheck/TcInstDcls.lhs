@@ -616,26 +616,27 @@ tcTyFamInstDecl fam_tc (L loc decl@(TyFamInstDecl { tfid_group = group }))
          -- now, build the FamInstGroup
        ; return $ mkSynFamInst rep_tc_name fam_tc group fam_inst_branches }
 
-    where check_valid_mk_branch :: ([TyVar], [Type], Type, SrcSpan)
-                                -> TcM (FamInstBranch, CoAxBranch)
-          check_valid_mk_branch (t_tvs, t_typats, t_rhs, loc)
-            = setSrcSpan loc $
-              do { -- check the well-formedness of the instance
-                   checkValidFamInst t_typats t_rhs
+    where 
+      check_valid_mk_branch :: ([TyVar], [Type], Type, SrcSpan)
+                            -> TcM (FamInstBranch, CoAxBranch)
+      check_valid_mk_branch (t_tvs, t_typats, t_rhs, loc)
+        = setSrcSpan loc $
+          do { -- check the well-formedness of the instance
+               checkValidTyFamInst fam_tc t_tvs t_typats t_rhs
 
-                 ; return $ mkSynFamInstBranch loc t_tvs t_typats t_rhs }
+             ; return $ mkSynFamInstBranch loc t_tvs t_typats t_rhs }
 
-          check_inaccessible_branches :: [FamInstBranch]     -- previous
-                                      -> FamInstBranch       -- current
-                                      -> TcM [FamInstBranch] -- current : previous
-          check_inaccessible_branches prev_branches
-                                      cur_branch@(FamInstBranch { fib_lhs = tys })
-            = setSrcSpan (famInstBranchSpan cur_branch) $
-              do { when (tys `isDominatedBy` prev_branches) $
-                        addErrTc $ inaccessibleFamInstBranch fam_tc cur_branch
-                 ; return $ cur_branch : prev_branches }
+      check_inaccessible_branches :: [FamInstBranch]     -- previous
+                                  -> FamInstBranch       -- current
+                                  -> TcM [FamInstBranch] -- current : previous
+      check_inaccessible_branches prev_branches
+                                  cur_branch@(FamInstBranch { fib_lhs = tys })
+        = setSrcSpan (famInstBranchSpan cur_branch) $
+          do { when (tys `isDominatedBy` prev_branches) $
+                    addErrTc $ inaccessibleFamInstBranch fam_tc cur_branch
+             ; return $ cur_branch : prev_branches }
 
-          get_typats = map (\(_, tys, _, _) -> tys)
+      get_typats = map (\(_, tys, _, _) -> tys)
 
 tcDataFamInstDecl :: TyCon -> DataFamInstDecl Name -> TcM (FamInst Unbranched)
   -- "newtype instance" and "data instance"
@@ -655,7 +656,7 @@ tcDataFamInstDecl fam_tc
          -- Check that left-hand side contains no type family applications
          -- (vanilla synonyms are fine, though, and we checked for
          -- foralls earlier)
-       { mapM_ checkTyFamFreeness pats'
+       { checkValidFamPats fam_tc tvs' pats'
          
          -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)

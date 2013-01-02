@@ -811,21 +811,22 @@ tcSynFamInstNames :: Located Name -> [Located Name] -> TcM ()
 tcSynFamInstNames (L _ first) names
   = do { let badNames = filter ((/= first) . unLoc) names
        ; mapM_ (failLocated (wrongNamesInInstGroup first)) badNames }
-    where failLocated :: (Name -> SDoc) -> Located Name -> TcM ()
-          failLocated msg_fun (L loc name)
-            = setSrcSpan loc $
-              failWithTc (msg_fun name)
+  where 
+    failLocated :: (Name -> SDoc) -> Located Name -> TcM ()
+    failLocated msg_fun (L loc name)
+      = setSrcSpan loc $
+        failWithTc (msg_fun name)
 
 tcTyFamInstEqn :: TyCon -> LTyFamInstEqn Name -> TcM ([TyVar], [Type], Type, SrcSpan)
 tcTyFamInstEqn fam_tc 
     (L loc (TyFamInstEqn { tfie_pats = pats, tfie_rhs = hs_ty }))
   = setSrcSpan loc $
-    do { tcFamTyPats fam_tc pats (discardResult . (tcCheckLHsType hs_ty)) $
+    tcFamTyPats fam_tc pats (discardResult . (tcCheckLHsType hs_ty)) $
        \tvs' pats' res_kind -> 
     do { rhs_ty <- tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; traceTc "tcSynFamInstEqn" (ppr fam_tc <+> (ppr tvs' $$ ppr pats' $$ ppr rhs_ty))
-       ; return (tvs', pats', rhs_ty, loc) } }
+       ; return (tvs', pats', rhs_ty, loc) }
 
 kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
 -- Used for 'data instance' only
@@ -834,14 +835,6 @@ kcDataDefn (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind })
   = do	{ _ <- tcHsContext ctxt
 	; mapM_ (wrapLocM kcConDecl) cons
         ; kcResultKind mb_kind res_k }
-
-{- TODO remove
-kcTyRhs :: HsType Name -> 
--- Used for 'data instance' and 'type instance' only
--- Ordinary 'data' and 'type' are handed by kcTyClDec and kcSynDecls resp
-kcTyDefn (TySynonym { td_synRhs = rhs_ty }) res_k
-  = discardResult (tcCheckLHsType rhs_ty res_k)
--}
 
 ------------------
 kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
@@ -1503,7 +1496,7 @@ checkValidClass cls
 		-- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = do { mapM_ (\(ATD _tvs pats rhs _loc) -> checkValidFamInst pats rhs) defs
+      = do { mapM_ (\(ATD tvs pats rhs _loc) -> checkValidTyFamInst fam_tc tvs pats rhs) defs
            ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
              mapM_ (check_loc_at_def fam_tc) defs }
 
