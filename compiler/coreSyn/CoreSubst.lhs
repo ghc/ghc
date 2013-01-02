@@ -78,6 +78,7 @@ import Maybes
 import ErrUtils
 import DynFlags
 import BasicTypes ( isAlwaysActive )
+import ListSetOps
 import Util
 import Pair
 import Outputable
@@ -1195,7 +1196,7 @@ exprIsConApp_maybe id_unf expr
         , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
               mk_arg (DFunPolyArg e) = mkApps e args
-              mk_arg (DFunLamArg i)  = args !! i
+              mk_arg (DFunLamArg i)  = getNth args i
         = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
 
         -- Look through unfoldings, but only arity-zero one; 
@@ -1266,7 +1267,7 @@ dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
-                         ppr ex_args, ppr val_args]
+                         ppr ex_args, ppr val_args, ppr co, ppr _from_ty, ppr to_ty, ppr to_tc ]
     in
     ASSERT2( eqType _from_ty (mkTyConApp to_tc _dc_univ_args), dump_doc )
     ASSERT2( all isTypeArg ex_args, dump_doc )

@@ -68,6 +68,7 @@ import BasicTypes hiding ( TopLevel )
 import DynFlags
 import FastString
 import ErrUtils( MsgDoc )
+import ListSetOps( getNth )
 import Util
 import Control.Monad( when )
 import MonadUtils
@@ -754,7 +755,7 @@ dsEvTerm (EvTupleSel v n)
               (tc, tys) = splitTyConApp scrut_ty
     	      Just [dc] = tyConDataCons_maybe tc
     	      xs = mkTemplateLocals tys
-              the_x = xs !! n
+              the_x = getNth xs n
         ; ASSERT( isTupleTyCon tc )
           return $
           Case tm' (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }

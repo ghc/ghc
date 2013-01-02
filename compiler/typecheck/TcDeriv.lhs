@@ -754,7 +754,7 @@ mk_typeable_eqn orig tvs cls tycon tc_args mtheta
   | isNothing mtheta    -- deriving on a data type decl
   = do  { checkTc (cls `hasKey` typeableClassKey)
                   (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
-        ; real_cls <- tcLookupClass (typeableClassNames !! tyConArity tycon)
+        ; real_cls <- tcLookupClass (typeableClassNames `getNth` tyConArity tycon)
                       -- See Note [Getting base classes]
         ; mk_typeable_eqn orig tvs real_cls tycon [] (Just []) }
 

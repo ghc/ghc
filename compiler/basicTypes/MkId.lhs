@@ -330,7 +330,7 @@ mkDictSelId dflags no_unf name clas
     val_index      = assoc "MkId.mkDictSelId" sel_index_prs name
     sel_index_prs  = map idName (classAllSelIds clas) `zip` [0..]
 
-    the_arg_id     = arg_ids !! val_index
+    the_arg_id     = getNth arg_ids val_index
     pred       	   = mkClassPred clas (mkTyVarTys tyvars)
     dict_id    	   = mkTemplateLocal 1 pred
     arg_ids    	   = mkTemplateLocalsNum 2 arg_tys
@@ -352,7 +352,7 @@ dictSelRule :: Int -> Arity
 dictSelRule val_index n_ty_args _ _ id_unf args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
-  = Just (con_args !! val_index)
+  = Just (getNth con_args val_index)
   | otherwise
   = Nothing
 \end{code}

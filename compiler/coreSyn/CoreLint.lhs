@@ -877,8 +877,8 @@ lintCoercion the_co@(NthCo n co)
              , n < length tys_s
              -> return (ks, ts, tt)
              where
-               ts = tys_s !! n
-               tt = tys_t !! n
+               ts = getNth tys_s n
+               tt = getNth tys_t n
                ks = typeKind ts
 
            _ -> failWithL (hang (ptext (sLit "Bad getNth:"))

@@ -33,6 +33,7 @@ import SrcLoc
 import Outputable
 import FastString
 import TcType
+import ListSetOps( getNth )
 import Util
 \end{code}
 
@@ -869,11 +870,11 @@ mkMcUnzipM _ fmap_op ys elt_tys
        ; tup_xs   <- newSysLocalDs tup_ty
 
        ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
-                           [ Type tup_ty, Type (elt_tys !! i)
+                           [ Type tup_ty, Type (getNth elt_tys i)
                            , mk_sel i, Var ys]
 
              mk_sel n = Lam tup_xs $
-                        mkTupleSelector xs (xs !! n) tup_xs (Var tup_xs)
+                        mkTupleSelector xs (getNth xs n) tup_xs (Var tup_xs)
 
        ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
 \end{code}
