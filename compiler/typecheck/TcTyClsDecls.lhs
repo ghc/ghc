@@ -900,11 +900,11 @@ tcFamTyPats fam_tc (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tva
                       ; tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds }
        ; let all_args = fam_arg_kinds ++ typats
 
-            -- Find free variables (after zonking)
-       ; tkvs <- zonkTyVarsAndFV (tyVarsOfTypes all_args)
-
-            -- Turn them into skolems, so that we don't subsequently 
+            -- Find free variables (after zonking) and turn
+            -- them into skolems, so that we don't subsequently 
             -- replace a meta kind var with AnyK
+            -- Very like kindGeneralize
+       ; tkvs <- zonkTyVarsAndFV (tyVarsOfTypes all_args)
        ; qtkvs <- zonkQuantifiedTyVars (varSetElems tkvs)
 
             -- Zonk the patterns etc into the Type world
@@ -912,7 +912,7 @@ tcFamTyPats fam_tc (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tva
        ; all_args'    <- zonkTcTypeToTypes ze all_args
        ; res_kind'    <- zonkTcTypeToType  ze res_kind
 
-       ; traceTc "tcFamPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; traceTc "tcFamTyPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
        ; tcExtendTyVarEnv qtkvs' $
          thing_inside qtkvs' all_args' res_kind' }
 \end{code}
@@ -1070,7 +1070,7 @@ tcConDecl new_or_data rep_tycon res_tmpl 	-- Data types
                 -- free kind variables of the type, for kindGeneralize to work on
 
              -- Generalise the kind variables (returning quantifed TcKindVars)
-             -- and quanify the type variables (substiting their kinds)
+             -- and quantify the type variables (substiting their kinds)
        ; kvs <- kindGeneralize (tyVarsOfType pretend_con_ty) (map getName tvs)
        ; tvs <- zonkQuantifiedTyVars tvs
 

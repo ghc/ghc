@@ -542,21 +542,23 @@ zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
 -- A kind variable k may occur *after* a tyvar mentioning k in its kind
 zonkQuantifiedTyVars tyvars
   = do { let (kvs, tvs) = partition isKindVar tyvars
-       ; poly_kinds <- xoptM Opt_PolyKinds
-       ; if poly_kinds then
-             mapM zonkQuantifiedTyVar (kvs ++ tvs)
-           -- Because of the order, any kind variables
-           -- mentioned in the kinds of the type variables refer to
-           -- the now-quantified versions
-         else
+             (meta_kvs, skolem_kvs) = partition isMetaTyVar kvs
+
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
              -- may make zonkQuantifiedTyVars return a shorter list
              -- than it was passed, but that's ok
-             do { let (meta_kvs, skolem_kvs) = partition isMetaTyVar kvs
-                ; WARN ( not (null skolem_kvs), ppr skolem_kvs )
-                  mapM_ defaultKindVarToStar meta_kvs
-                ; mapM zonkQuantifiedTyVar (skolem_kvs ++ tvs) } }
+       ; poly_kinds <- xoptM Opt_PolyKinds
+       ; qkvs <- if poly_kinds 
+                 then return kvs
+                 else WARN ( not (null skolem_kvs), ppr skolem_kvs )
+                      do { mapM_ defaultKindVarToStar meta_kvs
+                         ; return skolem_kvs }  -- Should be empty
+
+       ; mapM zonkQuantifiedTyVar (qkvs ++ tvs) }
+           -- Because of the order, any kind variables
+           -- mentioned in the kinds of the type variables refer to
+           -- the now-quantified versions
 
 zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
