@@ -415,62 +415,65 @@ filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have t
              -- If callers need to preserve the invariant that there is always at least one branch
              -- in a "case" statement then they will need to manually add a dummy case branch that just
              -- calls "error" or similar.
-filterAlts us ty imposs_cons alts = (imposs_deflt_cons, refined_deflt, merged_alts)
+filterAlts us ty imposs_cons alts 
+  | Just (tycon, inst_tys) <- splitTyConApp_maybe ty
+  = filter_alts tycon inst_tys
+  | otherwise
+  = (imposs_cons, False, alts)
   where
     (alts_wo_default, maybe_deflt) = findDefault alts
     alt_cons = [con | (con,_,_) <- alts_wo_default]
-    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
-      -- "imposs_deflt_cons" are handled 
-      --   EITHER by the context, 
-      --   OR by a non-DEFAULT branch in this case expression.
 
-    trimmed_alts = filterOut impossible_alt alts_wo_default
-    merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
-      -- We need the mergeAlts in case the new default_alt 
-      -- has turned into a constructor alternative.
-      -- The merge keeps the inner DEFAULT at the front, if there is one
-      -- and interleaves the alternatives in the right order
+    filter_alts tycon inst_tys 
+      = (imposs_deflt_cons, refined_deflt, merged_alts)
+     where
+       trimmed_alts = filterOut (impossible_alt inst_tys) alts_wo_default
 
-    (refined_deflt, maybe_deflt') = case maybe_deflt of
-      Just deflt_rhs -> case mb_tc_app of
-        Just (tycon, inst_tys)
-          |     -- This branch handles the case where we are 
-                -- scrutinisng an algebraic data type
-            isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
-          , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
-                                        --      case x of { DEFAULT -> e }
-                                        -- and we don't want to fill in a default for them!
-          , Just all_cons <- tyConDataCons_maybe tycon
-          , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
-                impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
-          -> case filterOut impossible all_cons of
-               -- Eliminate the default alternative
-               -- altogether if it can't match:
-               []    -> (False, Nothing)
-               -- It matches exactly one constructor, so fill it in:
-               [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
-                 where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
-               _     -> (False, Just (DEFAULT, [], deflt_rhs))
+       imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+         -- "imposs_deflt_cons" are handled 
+         --   EITHER by the context, 
+         --   OR by a non-DEFAULT branch in this case expression.
 
-          | debugIsOn, isAlgTyCon tycon
-          , null (tyConDataCons tycon)
-          , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
-                -- Check for no data constructors
-                -- This can legitimately happen for abstract types and type families,
-                -- so don't report that
-          -> pprTrace "prepareDefault" (ppr tycon)
-             (False, Just (DEFAULT, [], deflt_rhs))
+       merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
+         -- We need the mergeAlts in case the new default_alt 
+         -- has turned into a constructor alternative.
+         -- The merge keeps the inner DEFAULT at the front, if there is one
+         -- and interleaves the alternatives in the right order
 
-        _ -> (False, Just (DEFAULT, [], deflt_rhs))
-      Nothing -> (False, Nothing)
-  
-    mb_tc_app = splitTyConApp_maybe ty
-    Just (_, inst_tys) = mb_tc_app
+       (refined_deflt, maybe_deflt') = case maybe_deflt of
+          Nothing -> (False, Nothing)
+          Just deflt_rhs 
+             | isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
+             , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
+                                           --      case x of { DEFAULT -> e }
+                                           -- and we don't want to fill in a default for them!
+             , Just all_cons <- tyConDataCons_maybe tycon
+             , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
+                   impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+             -> case filterOut impossible all_cons of
+                  -- Eliminate the default alternative
+                  -- altogether if it can't match:
+                  []    -> (False, Nothing)
+                  -- It matches exactly one constructor, so fill it in:
+                  [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
+                    where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
+                  _     -> (False, Just (DEFAULT, [], deflt_rhs))
 
-    impossible_alt :: (AltCon, a, b) -> Bool
-    impossible_alt (con, _, _) | con `elem` imposs_cons = True
-    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
-    impossible_alt _                   = False
+             | debugIsOn, isAlgTyCon tycon
+             , null (tyConDataCons tycon)
+             , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
+                   -- Check for no data constructors
+                   -- This can legitimately happen for abstract types and type families,
+                   -- so don't report that
+             -> pprTrace "prepareDefault" (ppr tycon)
+                (False, Just (DEFAULT, [], deflt_rhs))
+
+             | otherwise -> (False, Just (DEFAULT, [], deflt_rhs))
+
+    impossible_alt :: [Type] -> (AltCon, a, b) -> Bool
+    impossible_alt _ (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
+    impossible_alt _  _                         = False
 \end{code}
 
 Note [Unreachable code]
