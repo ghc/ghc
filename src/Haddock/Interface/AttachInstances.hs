@@ -60,7 +60,7 @@ attachToExportItem iface ifaceMap instIfaceMap export =
                 case mb_info of
                   Just (_, _, instances) ->
                     let insts = map (first synifyInstHead) $ sortImage (first instHead)
-                                [ (instanceHead i, getName i) | i <- instances ]
+                                [ (instanceSig i, getName i) | i <- instances ]
                     in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
                        | (inst, name) <- insts ]
                   Nothing -> []
