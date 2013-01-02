@@ -2,29 +2,22 @@
 -- | Utilities related to Monad and Applicative classes
 --   Mostly for backwards compatability.
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module MonadUtils
         ( Applicative(..)
         , (<$>)
-        
+
         , MonadFix(..)
         , MonadIO(..)
-	
+
         , liftIO1, liftIO2, liftIO3, liftIO4
 
-        , zipWith3M        
+        , zipWith3M
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M
         , mapAccumLM
         , mapSndM
         , concatMapM
         , mapMaybeM
-	, fmapMaybeM, fmapEitherM
+        , fmapMaybeM, fmapEitherM
         , anyM, allM
         , foldlM, foldlM_, foldrM
         , maybeMapM
@@ -92,7 +85,7 @@ zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 zipWith3M _ []     _      _      = return []
 zipWith3M _ _      []     _      = return []
 zipWith3M _ _      _      []     = return []
-zipWith3M f (x:xs) (y:ys) (z:zs) 
+zipWith3M f (x:xs) (y:ys) (z:zs)
   = do { r  <- f x y z
        ; rs <- zipWith3M f xs ys zs
        ; return $ r:rs
@@ -152,7 +145,7 @@ fmapEitherM _ fr (Right b) = fr b >>= (return . Right)
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 anyM _ []     = return False
 anyM f (x:xs) = do b <- f x
-                   if b then return True 
+                   if b then return True
                         else anyM f xs
 
 -- | Monad version of 'all', aborts the computation at the first @False@ value
