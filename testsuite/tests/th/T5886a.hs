@@ -11,4 +11,4 @@ class C α where
 
 bang ∷ DecsQ
 bang = return [InstanceD [] (AppT (ConT ''C) (ConT ''Int))
-                [TySynInstD ''AT [ConT ''Int] (ConT ''Int)]]
+                [TySynInstD ''AT [TySynEqn [ConT ''Int] (ConT ''Int)]]]

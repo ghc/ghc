@@ -1,5 +1,5 @@
 
 T3330b.hs:14:10:
     Conflicting family instance declarations:
-      type Res c a b -- Defined at T3330b.hs:14:10
-      type Res [c] a b -- Defined at T3330b.hs:18:10
+      Res c a b -- Defined at T3330b.hs:14:10
+      Res [c] a b -- Defined at T3330b.hs:18:10

@@ -1,0 +1,5 @@
+
+T7536.hs:8:15:
+    Family instance purports to bind type variable `a'
+      but the real LHS (expanding synonyms) is: TF Int = ...
+    In the type instance declaration for `TF'

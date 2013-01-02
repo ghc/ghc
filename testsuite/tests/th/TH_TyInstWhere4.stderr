@@ -1,0 +1,16 @@
+
+TH_TyInstWhere4.hs:12:4: Warning:
+    type family TH_TyInstWhere4.F a_0 b_1 :: * -> * -> GHC.Types.Bool
+type instance where
+    TH_TyInstWhere4.F a_2 a_2 = GHC.Types.True
+    TH_TyInstWhere4.F a_3 b_4 = GHC.Types.False
+
+TH_TyInstWhere4.hs:12:4: Warning:
+    type instance where
+    TH_TyInstWhere4.F a_0 a_0 = GHC.Types.True
+    TH_TyInstWhere4.F a_1 b_2 = GHC.Types.False
+
+TH_TyInstWhere4.hs:12:4: Warning:
+    type instance where
+    TH_TyInstWhere4.F a_0 a_0 = GHC.Types.True
+    TH_TyInstWhere4.F a_1 b_2 = GHC.Types.False

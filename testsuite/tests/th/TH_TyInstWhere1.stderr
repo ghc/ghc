@@ -1,0 +1,9 @@
+TH_TyInstWhere1.hs:1:1: Splicing declarations
+    [d| type instance where
+          F a a = True
+          F a b = False |]
+  ======>
+    TH_TyInstWhere1.hs:(7,3)-(9,24)
+    type instance where
+      F a a = True
+      F a b = False

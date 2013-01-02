@@ -1,8 +1,8 @@
 
-T5515.hs:9:3:
+T5515.hs:9:8:
     The RHS of an associated type declaration mentions type variable `a'
       All such variables must be bound on the LHS
 
-T5515.hs:15:3:
+T5515.hs:15:8:
     The RHS of an associated type declaration mentions type variable `a'
       All such variables must be bound on the LHS

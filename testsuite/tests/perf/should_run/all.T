@@ -51,7 +51,7 @@ else:
    sse2_opts = ''
 
 test('T4321',
-     [omit_ways(['ghci']), expect_broken(4321)],
+     omit_ways(['ghci']),
      compile_and_run, ['-O ' + sse2_opts])
 
 test('T3736',
@@ -266,3 +266,6 @@ test('Conversions',
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
+
+test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
+# For 7507, stack overflow is the bad case
