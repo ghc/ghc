@@ -333,7 +333,7 @@ addLocalFamInst (home_fie, my_fis) fam_inst
     famInstBranchSubst :: FamInstBranch -> [TyVar] -> TvSubst -> FamInstBranch
     famInstBranchSubst fib@(FamInstBranch { fib_lhs = lhs
                                           , fib_rhs = rhs }) new_tvs subst
-      = fib { fib_tvs = mkVarSet new_tvs
+      = fib { fib_tvs = new_tvs
             , fib_lhs = substTys subst lhs
             , fib_rhs = substTy subst rhs }
 

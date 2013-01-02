@@ -97,11 +97,15 @@ the FamInstBranch.
 Note [fi_group field]
 ~~~~~~~~~~~~~~~~~~~~~
 A FamInst stores whether or not it was declared with "type instance where"
-for two reasons: 1. for accurate pretty-printing; and 2. because confluent
-overlap is disallowed between branches declared in groups. Note that this
-"group-ness" is properly associated with the FamInst, which thinks about
-overlap, and not in the CoAxiom, which blindly assumes that it is part of
-a consistent axiom set.
+for two reasons: 
+  1. for accurate pretty-printing; and 
+  2. because confluent overlap is disallowed between branches 
+     declared in groups. 
+Note that this "group-ness" is properly associated with the FamInst,
+which thinks about overlap, and not in the CoAxiom, which blindly
+assumes that it is part of a consistent axiom set.
+
+A "group" with fi_group=True can have just one element, however.
 
 \begin{code}
 data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in CoAxiom.lhs
@@ -112,7 +116,8 @@ data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in C
                                              -- See Note [fi_group field]
 
             -- Everything below here is a redundant,
-            -- cached version of the two things above
+            -- cached version of the two things above,
+            -- except that the TyVars are freshened in the FamInstBranches
             , fi_branches :: BranchList FamInstBranch br
                                              -- Haskell-source-language view of 
                                              -- a CoAxBranch
@@ -125,7 +130,7 @@ data FamInstBranch
     { fib_loc    :: SrcSpan      -- location of this equation
                                  -- See Note [FamInst locations]
 
-    , fib_tvs    :: TyVarSet     -- bound type variables
+    , fib_tvs    :: [TyVar]      -- bound type variables
     , fib_lhs    :: [Type]       -- type patterns
     , fib_rhs    :: Type         -- RHS of family instance
     , fib_tcs    :: [Maybe Name] -- used for "rough matching" during typechecking
@@ -173,14 +178,6 @@ famInstBranchRoughMatch = fib_tcs
 
 famInstBranchSpan :: FamInstBranch -> SrcSpan
 famInstBranchSpan = fib_loc
-
--- returns True means the famInst will match all applications
--- returning False gives no information
-famInstMatchesAny :: FamInst br -> Bool
-famInstMatchesAny (FamInst { fi_branches = branches })
-  = brListAny (all isNothing . fib_tcs) branches
-  where brListAny :: (a -> Bool) -> BranchList a br -> Bool
-        brListAny f ls = brListFoldr (\branch rest -> rest || f branch) False ls
 
 -- Return the representation TyCons introduced by data family instances, if any
 famInstsRepTyCons :: [FamInst br] -> [TyCon]
@@ -272,7 +269,7 @@ mkSynFamInstBranch :: SrcSpan -- ^ where the branch equation appears
                    -> (FamInstBranch, CoAxBranch)
 mkSynFamInstBranch loc tvs lhs_tys rhs_ty
   = ( FamInstBranch { fib_loc    = loc
-                    , fib_tvs    = mkVarSet tvs
+                    , fib_tvs    = tvs
                     , fib_lhs    = lhs_tys
                     , fib_rhs    = rhs_ty
                     , fib_tcs    = mb_tcs }
@@ -323,7 +320,7 @@ mkSingleSynFamInst name tvs fam_tc inst_tys rep_ty
   where
     -- See note [FamInst Locations]
     branch = FamInstBranch { fib_loc    = getSrcSpan name
-                           , fib_tvs    = mkVarSet tvs
+                           , fib_tvs    = tvs
                            , fib_lhs    = inst_tys
                            , fib_rhs    = rep_ty
                            , fib_tcs    = roughMatchTcs inst_tys }
@@ -357,7 +354,7 @@ mkDataFamInst name tvs fam_tc inst_tys rep_tc
 
     branch = FamInstBranch { fib_loc    = getSrcSpan name
                                -- See Note [FamInst locations]
-                           , fib_tvs    = mkVarSet tvs
+                           , fib_tvs    = tvs
                            , fib_lhs    = inst_tys
                            , fib_rhs    = rhs
                            , fib_tcs    = roughMatchTcs inst_tys }
@@ -418,7 +415,7 @@ mkImportedFamInst fam group roughs axiom
                                     , cab_lhs = lhs
                                     , cab_rhs = rhs }) mb_tcs
        = FamInstBranch { fib_loc    = noSrcSpan
-                       , fib_tvs    = mkVarSet tvs
+                       , fib_tvs    = tvs
                        , fib_lhs    = lhs
                        , fib_rhs    = rhs
                        , fib_tcs    = mb_tcs }
@@ -470,14 +467,11 @@ type FamInstEnv = UniqFM FamilyInstEnv  -- Maps a family to its instances
 type FamInstEnvs = (FamInstEnv, FamInstEnv)
      -- External package inst-env, Home-package inst-env
 
-data FamilyInstEnv
+newtype FamilyInstEnv
   = FamIE [FamInst Branched] -- The instances for a particular family, in any order
-          Bool               -- True <=> there is an instance of form T a b c
-                             --      If *not* then the common case of looking up
-                             --      (T a b c) can fail immediately
 
 instance Outputable FamilyInstEnv where
-  ppr (FamIE fs b) = ptext (sLit "FamIE") <+> ppr b <+> vcat (map ppr fs)
+  ppr (FamIE fs) = ptext (sLit "FamIE") <+> vcat (map ppr fs)
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -490,35 +484,32 @@ emptyFamInstEnv :: FamInstEnv
 emptyFamInstEnv = emptyUFM
 
 famInstEnvElts :: FamInstEnv -> [FamInst Branched]
-famInstEnvElts fi = [elt | FamIE elts _ <- eltsUFM fi, elt <- elts]
+famInstEnvElts fi = [elt | FamIE elts <- eltsUFM fi, elt <- elts]
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst Branched]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
     get env = case lookupUFM env fam of
-                Just (FamIE insts _) -> insts
-                Nothing              -> []
+                Just (FamIE insts) -> insts
+                Nothing            -> []
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst br] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst br -> FamInstEnv
 extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUFM_C add inst_env cls_nm (FamIE [ins_item_br] ins_tyvar)
+  = addToUFM_C add inst_env cls_nm (FamIE [ins_item_br])
   where
     ins_item_br = toBranchedFamInst ins_item
-    add (FamIE items tyvar) _ = FamIE (ins_item_br:items)
-                                      (ins_tyvar || tyvar)
-    ins_tyvar = famInstMatchesAny ins_item
+    add (FamIE items) _ = FamIE (ins_item_br:items)
 
 deleteFromFamInstEnv :: FamInstEnv -> FamInst br -> FamInstEnv
 deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
  = adjustUFM adjust inst_env fam_nm
  where
    adjust :: FamilyInstEnv -> FamilyInstEnv
-   adjust (FamIE items tyvars)
-     = FamIE (filterOut (identicalFamInst fam_inst) items) tyvars
+   adjust (FamIE items) = FamIE (filterOut (identicalFamInst fam_inst) items)
 
 identicalFamInst :: FamInst br1 -> FamInst br2 -> Bool
 -- Same LHS, *and* the instance is defined in the same module
@@ -663,13 +654,14 @@ lookupFamInstEnv
 lookupFamInstEnv
   = lookup_fam_inst_env match True
   where
+    match :: MatchFun
     match seen (FamInstBranch { fib_tvs = tpl_tvs
                               , fib_lhs = tpl_tys })
           _ match_tys 
-      = ASSERT( tyVarsOfTypes match_tys `disjointVarSet` tpl_tvs )
+      = ASSERT( tyVarsOfTypes match_tys `disjointVarSet` tpl_tv_set )
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
-        case tcMatchTys tpl_tvs tpl_tys match_tys of
+        case tcMatchTys tpl_tv_set tpl_tys match_tys of
           -- success
           Just subst
             | checkConflict seen match_tys
@@ -681,7 +673,9 @@ lookupFamInstEnv
 
           -- failure; instance not relevant
           Nothing -> (Nothing, KeepSearching) 
-    
+      where
+        tpl_tv_set = mkVarSet tpl_tvs
+
     -- see Note [Instance checking within groups]
     checkConflict :: [FamInstBranch] -- the previous branches in the instance that matched
                   -> [Type]          -- the types in the tyfam application we are matching
@@ -711,9 +705,10 @@ lookupFamInstEnvConflicts envs grp tc
                           branch@(FamInstBranch { fib_lhs = tys, fib_rhs = rhs })
   = lookup_fam_inst_env my_unify False envs tc tys
   where
+    my_unify :: MatchFun
     my_unify _ (FamInstBranch { fib_tvs = tpl_tvs, fib_lhs = tpl_tys
                               , fib_rhs = tpl_rhs }) old_grp match_tys
-       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
+       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` mkVarSet tpl_tvs,
                   (pprFamInstBranch tc branch <+> ppr tys) $$
                   (ppr tpl_tvs <+> ppr tpl_tys) )
                 -- Unification will break badly if the variables overlap
@@ -806,69 +801,53 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> FamInstEnv
     -> TyCon -> [Type]        -- What we are looking for
     -> [FamInstMatch]
-lookup_fam_inst_env' match_fun one_sided ie fam tys
-  | not (isFamilyTyCon fam)
-  = []
-  | otherwise
-        -- Family type applications must be saturated
-  = ASSERT2( n_tys >= arity, ppr fam <+> ppr tys )
-    lookup ie
+lookup_fam_inst_env' match_fun _one_sided ie fam tys
+  | isFamilyTyCon fam
+  , Just (FamIE insts) <- lookupUFM ie fam
+  = ASSERT2( n_tys >= arity, ppr fam <+> ppr tys ) 
+    if arity < n_tys then    -- Family type applications must be saturated
+                             -- See Note [Over-saturated matches]
+        map wrap_extra_tys (find match_fun (take arity tys) insts)
+    else
+        find match_fun tys insts    -- The common case
+
+  | otherwise = []
   where
-    -- See Note [Over-saturated matches]
     arity = tyConArity fam
     n_tys = length tys
     extra_tys = drop arity tys
-    (match_tys, add_extra_tys)
-       | arity < n_tys = (take arity tys, \res_tys -> res_tys ++ extra_tys)
-       | otherwise     = (tys,            \res_tys -> res_tys)
-         -- The second case is the common one, hence functional representation
+    wrap_extra_tys fim@(FamInstMatch { fim_tys = match_tys })
+      = fim { fim_tys = match_tys ++ extra_tys }
 
-    --------------
+
+find :: MatchFun -> [Type] -> [FamInst Branched] -> [FamInstMatch]
+find _         _         [] = []
+find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_group = is_group }) : rest)
+  = case findBranch [] (fromBranchList branches) 0 of
+      (Just match, StopSearching) -> [match]
+      (Just match, KeepSearching) -> match : find match_fun match_tys rest
+      (Nothing,    StopSearching) -> []
+      (Nothing,    KeepSearching) -> find match_fun match_tys rest
+  where
     rough_tcs = roughMatchTcs match_tys
-    all_tvs   = all isNothing rough_tcs && one_sided
-
-    --------------
-    lookup env = case lookupUFM env fam of
-                   Nothing -> []        -- No instances for this class
-                   Just (FamIE insts has_tv_insts)
-                       -- Short cut for common case:
-                       --   The thing we are looking up is of form (C a
-                       --   b c), and the FamIE has no instances of
-                       --   that form, so don't bother to search
-                     | all_tvs && not has_tv_insts -> []
-                     | otherwise                   -> find insts
-
-    --------------
-    find :: [FamInst Branched] -> [FamInstMatch]
-    find [] = []
-    find (inst@(FamInst { fi_branches = branches }) : rest)
-      = case findBranch [] (fromBranchList branches) inst 0 of
-          (Just match, StopSearching) -> [match]
-          (Just match, KeepSearching) -> match : find rest
-          (Nothing,    StopSearching) -> []
-          (Nothing,    KeepSearching) -> find rest
-
     findBranch :: [FamInstBranch]  -- the branches that have already been checked
                -> [FamInstBranch]  -- still looking through these
-               -> FamInst Branched -- the instance we're looking through
                -> Int              -- the index of the next branch
                -> (Maybe FamInstMatch, ContSearch)
-    findBranch _ [] _ _ = (Nothing, KeepSearching)
-    findBranch seen (branch@(FamInstBranch { fib_tcs = mb_tcs }) : rest)
-                    inst@(FamInst { fi_axiom = axiom, fi_group = group }) ind
+    findBranch _ [] _ = (Nothing, KeepSearching)
+    findBranch seen (branch@(FamInstBranch { fib_tvs = tvs, fib_tcs = mb_tcs }) : rest) ind
       | instanceCantMatch rough_tcs mb_tcs
-      = findBranch seen rest inst (ind+1) -- branch won't unify later; ignore
+      = findBranch seen rest (ind+1) -- branch won't unify later; ignore
       | otherwise
-      = case match_fun seen branch group match_tys of
-          (Nothing, KeepSearching) -> findBranch (branch : seen) rest inst (ind+1)
+      = case match_fun seen branch is_group match_tys of
+          (Nothing, KeepSearching) -> findBranch (branch : seen) rest (ind+1)
           (Nothing, StopSearching) -> (Nothing, StopSearching)
           (Just subst, cont)       -> (Just match, cont)
-            where match = FamInstMatch { fim_instance = inst
-                                       , fim_index    = ind
-                                       , fim_tys      = tys }
-                  axBranch = coAxiomNthBranch axiom ind
-                  tys = add_extra_tys $
-                        substTyVars subst (coAxBranchTyVars axBranch)
+              where 
+                match = FamInstMatch { fim_instance = inst
+                                     , fim_index    = ind
+                                     , fim_tys      = substTyVars subst tvs }
+
 
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
@@ -881,7 +860,6 @@ lookup_fam_inst_env           -- The worker, local to this module
 lookup_fam_inst_env match_fun one_sided (pkg_ie, home_ie) fam tys = 
     lookup_fam_inst_env' match_fun one_sided home_ie fam tys ++
     lookup_fam_inst_env' match_fun one_sided pkg_ie  fam tys
-
 \end{code}
 
 Note [Over-saturated matches]
@@ -914,8 +892,7 @@ isDominatedBy lhs branches
   = or $ map match branches
     where
       match (FamInstBranch { fib_tvs = tvs, fib_lhs = tys })
-        = isJust $ tcMatchTys tvs tys lhs
-
+        = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
 \end{code}
 
 
