@@ -30,7 +30,6 @@ import Util
 import Maybes
 import TcMType
 import Type
-import VarSet (mkVarSet)
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
