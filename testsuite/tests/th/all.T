@@ -263,3 +263,7 @@ test('TH_TyInstWhere4', normal, compile, ['-v0'])
 test('T7445', extra_clean(['T7445a.hi', 'T7445a.o']),
 	      run_command,
 	      ['$MAKE -s --no-print-directory T7445'] )
+test('T7532',
+     extra_clean(['T7532a.hi', 'T7532a.o']),
+     multimod_compile,
+     ['T7532', '-v0'])
