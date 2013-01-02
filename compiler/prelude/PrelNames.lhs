@@ -1216,6 +1216,7 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
+-- SingI: see Note [SingI and EvLit] in TcEvidence
 singIClassNameKey, typeNatLeqClassNameKey :: Unique
 singIClassNameKey       = mkPreludeClassUnique 42
 typeNatLeqClassNameKey  = mkPreludeClassUnique 43

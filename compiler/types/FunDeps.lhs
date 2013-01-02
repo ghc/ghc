@@ -28,9 +28,7 @@ module FunDeps (
 import Name
 import Var
 import Class
-import Id( idType )
 import Type
-import TcType( tcSplitDFunTy )
 import Unify
 import InstEnv
 import VarSet
@@ -348,7 +346,7 @@ checkClsFD :: FunDep TyVar -> [TyVar] 	          -- One functional dependency fr
 	   -> [([TyVar], [FDEq])]
 
 checkClsFD fd clas_tvs 
-           (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst, is_dfun = dfun })
+           (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })
            extra_qtvs tys_actual rough_tcs_actual
 
 -- 'qtvs' are the quantified type variables, the ones which an be instantiated 
@@ -420,9 +418,8 @@ checkClsFD fd clas_tvs
                         -- eqType again, since we know for sure that /at least one/ 
                         -- equation in there is useful)
 
-                    (dfun_tvs, _, _, _) = tcSplitDFunTy (idType dfun)
 		    meta_tvs = [ setVarType tv (substTy subst (varType tv))
-                               | tv <- dfun_tvs, tv `notElemTvSubst` subst ]
+                               | tv <- qtvs, tv `notElemTvSubst` subst ]
 		        -- meta_tvs are the quantified type variables
 		        -- that have not been substituted out
 		        --	
@@ -440,7 +437,8 @@ checkClsFD fd clas_tvs
                         --              whose kind mentions that kind variable!
                         --          Trac #6015, #6068
   where
-    bind_fn tv | tv `elemVarSet` qtvs       = BindMe
+    qtv_set = mkVarSet qtvs
+    bind_fn tv | tv `elemVarSet` qtv_set    = BindMe
                | tv `elemVarSet` extra_qtvs = BindMe
 	       | otherwise	            = Skolem
 
@@ -539,7 +537,7 @@ checkFunDeps inst_envs ispec
   | null bad_fundeps = Nothing
   | otherwise	     = Just bad_fundeps
   where
-    (ins_tvs, _, clas, ins_tys) = instanceHead ispec
+    (ins_tvs, clas, ins_tys) = instanceHead ispec
     ins_tv_set   = mkVarSet ins_tvs
     cls_inst_env = classInstances inst_envs clas
     bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys

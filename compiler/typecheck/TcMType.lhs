@@ -52,9 +52,9 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   expectedKindInCtxt, 
-  checkValidTheta, 
+  checkValidTheta, checkValidFamPats,
   checkValidInstHead, checkValidInstance, validDerivPred,
-  checkInstTermination, checkValidFamInst, checkTyFamFreeness, 
+  checkInstTermination, checkValidTyFamInst, checkTyFamFreeness, 
   arityErr, 
   growThetaTyVars, quantifyPred,
 
@@ -1809,7 +1809,7 @@ predUndecErr pred msg = sep [msg,
 
 nomoreMsg :: [TcTyVar] -> SDoc
 nomoreMsg tvs 
-  = sep [ ptext (sLit "Variable") <+> plural tvs <+> quotes (pprWithCommas ppr tvs) 
+  = sep [ ptext (sLit "Variable") <> plural tvs <+> quotes (pprWithCommas ppr tvs) 
         , (if isSingleton tvs then ptext (sLit "occurs")
                                   else ptext (sLit "occur"))
           <+> ptext (sLit "more often than in the instance head") ]
@@ -1830,13 +1830,11 @@ undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidFamInst :: [Type] -> Type -> TcM ()
-checkValidFamInst typats rhs
-  = do { -- left-hand side contains no type family applications
-         -- (vanilla synonyms are fine, though)
-       ; mapM_ checkTyFamFreeness typats
+checkValidTyFamInst :: TyCon -> [TyVar] -> [Type] -> Type -> TcM ()
+checkValidTyFamInst fam_tc tvs typats rhs
+  = do { checkValidFamPats fam_tc tvs typats
 
-         -- the right-hand side is a tau type
+         -- The right-hand side is a tau type
        ; checkValidMonoType rhs
 
          -- we have a decidable instance unless otherwise permitted
@@ -1874,12 +1872,25 @@ checkFamInstRhs lhsTys famInsts
              -- excessive occurrences of *type* variables.
              -- e.g. type instance Demote {T k} a = T (Demote {k} (Any {k}))
 
+checkValidFamPats :: TyCon -> [TyVar] -> [Type] -> TcM ()
+-- Patterns in a 'type instance' or 'data instance' decl should
+-- a) contain no type family applications
+--    (vanilla synonyms are fine, though)
+-- b) properly bind all their free type variables
+--    e.g. we disallow (Trac #7536)
+--         type T a = Int
+--         type instance F (T a) = a
+checkValidFamPats fam_tc tvs ty_pats
+  = do { mapM_ checkTyFamFreeness ty_pats
+       ; let unbound_tvs = filterOut (`elemVarSet` exactTyVarsOfTypes ty_pats) tvs
+       ; checkTc (null unbound_tvs) (famPatErr fam_tc unbound_tvs ty_pats) }
+
 -- Ensure that no type family instances occur in a type.
 --
 checkTyFamFreeness :: Type -> TcM ()
 checkTyFamFreeness ty
   = checkTc (isTyFamFree ty) $
-      tyFamInstIllegalErr ty
+    tyFamInstIllegalErr ty
 
 -- Check that a type does not contain any type family applications.
 --
@@ -1899,6 +1910,13 @@ famInstUndecErr ty msg
   = sep [msg, 
          nest 2 (ptext (sLit "in the type family application:") <+> 
                  pprType ty)]
+
+famPatErr :: TyCon -> [TyVar] -> [Type] -> SDoc
+famPatErr fam_tc tvs pats
+  = hang (ptext (sLit "Family instance purports to bind type variable") <> plural tvs
+          <+> pprQuotedList tvs)
+       2 (hang (ptext (sLit "but the real LHS (expanding synonyms) is:"))
+             2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+> ptext (sLit "= ...")))
 
 nestedMsg, smallerAppMsg :: SDoc
 nestedMsg     = ptext (sLit "Nested type family application")
