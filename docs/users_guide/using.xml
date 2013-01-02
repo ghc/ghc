@@ -950,6 +950,7 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-overlapping-patterns</option>,
     <option>-fwarn-warnings-deprecations</option>,
     <option>-fwarn-deprecated-flags</option>,
+    <option>-fwarn-duplicate-constraints</option>,
     <option>-fwarn-duplicate-exports</option>,
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
@@ -1191,6 +1192,24 @@ foreign import "&amp;f" f :: FunPtr t
       <literal>where !(I# x) = ...</literal> instead. This will be an
       error, rather than a warning, in GHC 7.2.
       </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-duplicate-constraints</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-duplicate-constraints</option></primary></indexterm>
+          <indexterm><primary>duplicate constraints, warning</primary></indexterm>
+
+          <para>Have the compiler warn about duplicate constraints in a type signature. For
+          example
+          <programlisting>
+             f :: (Eq a, Show a, Eq a) => a -> a
+          </programlisting>
+          The warning will indicate the duplicated <literal>Eq a</literal> constraint.
+          </para>
+
+          <para>This option is on by default.</para>
         </listitem>
       </varlistentry>
 

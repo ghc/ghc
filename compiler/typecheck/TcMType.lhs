@@ -1266,10 +1266,11 @@ checkValidTheta ctxt theta
 check_valid_theta :: UserTypeCtxt -> [PredType] -> TcM ()
 check_valid_theta _ []
   = return ()
-check_valid_theta ctxt theta = do
-    dflags <- getDynFlags
-    warnTc (notNull dups) (dupPredWarn dups)
-    mapM_ (check_pred_ty dflags ctxt) theta
+check_valid_theta ctxt theta
+  = do { dflags <- getDynFlags
+       ; warnTc (wopt Opt_WarnDuplicateConstraints dflags &&
+                 notNull dups) (dupPredWarn dups)
+       ; mapM_ (check_pred_ty dflags ctxt) theta }
   where
     (_,dups) = removeDups cmpPred theta
 
