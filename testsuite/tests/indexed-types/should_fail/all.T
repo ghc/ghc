@@ -93,7 +93,4 @@ test('T7354a',
      extra_clean(['T7354b.o', 'T7354b.hi']),
      run_command,
      ['$MAKE -s --no-print-directory T7354a'])
-
-
-
-
+test('T7536', normal, compile_fail, [''])
