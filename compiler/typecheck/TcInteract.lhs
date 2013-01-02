@@ -1719,13 +1719,45 @@ data LookupInstResult
 
 matchClassInst :: InertSet -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
 
-matchClassInst _ clas [ _, ty ] _
+matchClassInst _ clas [ k, ty ] _
   | className clas == singIClassName
-  , Just n <- isNumLitTy ty = return $ GenInst [] $ EvLit $ EvNum n
+  , Just n <- isNumLitTy ty = makeDict (EvNum n)
 
   | className clas == singIClassName
-  , Just s <- isStrLitTy ty = return $ GenInst [] $ EvLit $ EvStr s
+  , Just s <- isStrLitTy ty = makeDict (EvStr s)
 
+  where
+  {- This adds a coercion that will convert the literal into a dictionary
+     of the appropriate type.  The coercion happens in 3 steps:
+
+     evLit    -> Sing_k_n   -- literal to representation of data family
+     Sing_k_n -> Sing k n   -- representation of data family to data family
+     Sing k n -> SingI k n   -- data family to class dictionary.
+  -}
+  makeDict evLit =
+    case unwrapNewTyCon_maybe (classTyCon clas) of
+      Just (_,dictRep, axDict)
+        | Just tcSing <- tyConAppTyCon_maybe dictRep ->
+           do mbInst <- matchFam tcSing [k,ty]
+              case mbInst of
+                Just FamInstMatch
+                  { fim_instance = FamInst { fi_axiom  = axDataFam
+                                           , fi_flavor = DataFamilyInst tcon
+                                           }
+                  , fim_index = ix, fim_tys = tys
+                  } | Just (_,_,axSing) <- unwrapNewTyCon_maybe tcon ->
+
+                  do let co1 = mkTcSymCo $ mkTcUnbranchedAxInstCo axSing tys
+                         co2 = mkTcSymCo $ mkTcAxInstCo axDataFam ix tys
+                         co3 = mkTcSymCo $ mkTcUnbranchedAxInstCo axDict [k,ty]
+                     return $ GenInst [] $ EvCast (EvLit evLit) $
+                        mkTcTransCo co1 $ mkTcTransCo co2 co3
+
+                _ -> unexpected
+
+      _ -> unexpected
+
+  unexpected = panicTcS (text "Unexpected evidence for SingI")
 
 matchClassInst inerts clas tys loc
    = do { dflags <- getDynFlags
