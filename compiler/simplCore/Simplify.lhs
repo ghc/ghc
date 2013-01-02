@@ -2069,16 +2069,22 @@ addAltUnfoldings env scrut case_bndr con_app
 
              -- See Note [Add unfolding for scrutinee]
              env2 = case scrut of
-           	      Just (Var v)           -> addBinderUnfolding env1 v con_app_unf
-           	      Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
+                      Just (Var v)           -> addBinderUnfolding env1 v con_app_unf
+                      Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
                                                 mkSimpleUnfolding dflags (Cast con_app (mkSymCo co))
-           	      _                      -> env1
+                      _                      -> env1
               
        ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
 
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
+  | debugIsOn, Just tmpl <- maybeUnfoldingTemplate unf
+  = WARN( not (eqType (idType bndr) (exprType tmpl)), 
+          ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl) ) 
+    modifyInScope env (bndr `setIdUnfolding` unf)
+
+  | otherwise
   = modifyInScope env (bndr `setIdUnfolding` unf)
 
 zapBndrOccInfo :: Bool -> Id -> Id
