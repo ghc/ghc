@@ -940,16 +940,24 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
          do { sig_ty <- tcHsSigType (FunSigCtxt sel_name) hs_ty
             ; inst_sigs <- xoptM Opt_InstanceSigs
             ; if inst_sigs then 
-                checkTc (sig_ty `eqType` local_meth_ty)
-                        (badInstSigErr sel_name local_meth_ty)
+                unless (sig_ty `eqType` local_meth_ty)
+                       (badInstSigErr sel_name local_meth_ty)
               else
                 addErrTc (misplacedInstSig sel_name hs_ty)
             ; return sig_ty }
 
-badInstSigErr :: Name -> Type -> SDoc
+badInstSigErr :: Name -> Type -> TcM ()
 badInstSigErr meth ty
-  = hang (ptext (sLit "Method signature does not match class; it should be"))
-       2 (pprPrefixName meth <+> dcolon <+> ppr ty)
+  = do { env0 <- tcInitTidyEnv
+       ; let tidy_ty = tidyType env0 ty
+                 -- Tidy the type using the ambient TidyEnv, 
+                 -- to avoid apparent name capture (Trac #7475)
+                 --    class C a where { op :: a -> b }
+                 --    instance C (a->b) where
+                 --       op :: forall x. x
+                 --       op = ...blah...
+       ; addErrTc (hang (ptext (sLit "Method signature does not match class; it should be"))
+                      2 (pprPrefixName meth <+> dcolon <+> ppr tidy_ty)) }
 
 misplacedInstSig :: Name -> LHsType Name -> SDoc
 misplacedInstSig name hs_ty
