@@ -113,6 +113,7 @@ libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off -Werror for transformers
+libraries/transformers_dist-boot_EXTRA_HC_OPTS += -Wwarn
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings

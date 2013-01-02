@@ -106,16 +106,13 @@ if [ $speed != "FAST" ]; then
     $make test_bindist TEST_PREP=YES
 
     #
-    # Install the transformers package into the bindist, because it is
-    # used by some tests.
-    # It isn't essential that we do this (the failing tests will
-    # be treated as expected failures), but we get a bit more test
-    # coverage, and also verify that we can install a package into the
+    # Install the xhtml package into the bindist.
+    # This verifies that we can install a package into the
     # bindist with Cabal.
     #
     bindistdir="bindisttest/install   dir"
 
-    $make validate_build_transformers BINDIST_PREFIX="$thisdir/$bindistdir"
+    $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
 fi
 
 fi # testsuite-only

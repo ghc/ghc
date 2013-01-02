@@ -24,36 +24,15 @@ module MonadUtils
         ) where
 
 -------------------------------------------------------------------------------
--- Detection of available libraries
--------------------------------------------------------------------------------
-
--- we don't depend on MTL for now
-#define HAVE_MTL 0
-
--------------------------------------------------------------------------------
 -- Imports
 -------------------------------------------------------------------------------
 
 import Maybes
 
 import Control.Applicative
-#if HAVE_MTL
-import Control.Monad.Trans
-#endif
 import Control.Monad
 import Control.Monad.Fix
-
--------------------------------------------------------------------------------
--- MTL
--------------------------------------------------------------------------------
-
-#if !HAVE_MTL
-
-class Monad m => MonadIO m where
-    liftIO :: IO a -> m a
-
-instance MonadIO IO where liftIO = id
-#endif
+import Control.Monad.IO.Class
 
 -------------------------------------------------------------------------------
 -- Lift combinators

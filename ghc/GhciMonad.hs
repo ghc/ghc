@@ -37,7 +37,6 @@ import SrcLoc
 import Module
 import ObjLink
 import Linker
-import qualified MonadUtils
 
 import Exception
 import Numeric
@@ -47,13 +46,13 @@ import Data.IORef
 import System.CPUTime
 import System.Environment
 import System.IO
-import Control.Monad as Monad
+import Control.Monad
 import GHC.Exts
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
-import Control.Monad.Trans.Class as Trans
-import Control.Monad.IO.Class as Trans
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -186,11 +185,8 @@ modifyGHCiState f = GHCi $ \r -> liftIO $ readIORef r >>= writeIORef r . f
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
 
-instance MonadUtils.MonadIO GHCi where
-  liftIO = liftGhc . MonadUtils.liftIO
-
-instance Trans.MonadIO Ghc where
-  liftIO = MonadUtils.liftIO
+instance MonadIO GHCi where
+  liftIO = liftGhc . liftIO
 
 instance HasDynFlags GHCi where
   getDynFlags = getSessionDynFlags
@@ -206,9 +202,6 @@ instance GhcMonad (InputT GHCi) where
   setSession = lift . setSession
   getSession = lift getSession
 
-instance MonadUtils.MonadIO (InputT GHCi) where
-  liftIO = Trans.liftIO
-
 instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
   gblock (GHCi m)   = GHCi $ \r -> gblock (m r)
@@ -219,9 +212,6 @@ instance ExceptionMonad GHCi where
                                 g_restore (GHCi m) = GHCi $ \s' -> io_restore (m s')
                              in
                                 unGHCi (f g_restore) s
-
-instance MonadIO GHCi where
-  liftIO = MonadUtils.liftIO
 
 instance Haskeline.MonadException Ghc where
   controlIO f = Ghc $ \s -> Haskeline.controlIO $ \(Haskeline.RunIO run) -> let
@@ -259,7 +249,7 @@ printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  MonadUtils.liftIO $ Outputable.printForUser dflags stdout unqual doc
+  liftIO $ Outputable.printForUser dflags stdout unqual doc
 
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
