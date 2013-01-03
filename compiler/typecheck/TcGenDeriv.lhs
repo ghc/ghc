@@ -1474,6 +1474,24 @@ This is pretty much the same as $fmap, only without the $(cofmap 'a 'a) case:
   $(cofmap 'a '(T b1 b2))  =  fmap $(cofmap 'a 'b2)   -- when a only occurs in the last parameter, b2
   $(cofmap 'a '(b -> c))   =  \x b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
 
+Note that the code produced by $(fmap _ _) is always a higher order function,
+with type `(a -> b) -> (g a -> g b)` for some g. When we need to do pattern
+matching on the type, this means create a lambda function (see the (,) case above).
+The resulting code for fmap can look a bit weird, for example:
+
+  data X a = X (a,Int)
+  -- generated instance
+  instance Functor X where
+      fmap f (X x) = (\y -> case y of (x1,x2) -> X (f x1, (\z -> z) x2)) x
+
+The optimizer should be able to simplify this code by simple inlining.
+
+An older version of the deriving code tried to avoid these applied
+lambda functions by producing a meta level function. But the function to
+be mapped, `f`, is a function on the code level, not on the meta level,
+so it was eta expanded to `\x -> [| f $x |]`. This resulted in too much eta expansion.
+It is better to produce too many lambdas than to eta expand, see ticket #7436.
+
 \begin{code}
 gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Functor_binds loc tycon
