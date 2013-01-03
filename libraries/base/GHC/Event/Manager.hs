@@ -353,7 +353,7 @@ closeFd mgr close fd = do
         return (newMap, fds)
   forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
 
--- | Does everything that closeFd does, except for updating the callback tables.
+-- | Close a file descriptor in a race-safe way. 
 -- It assumes the caller will update the callback tables and that the caller
 -- holds the callback table lock for the fd.
 closeFd_ :: EventManager -> IM.IntMap [FdData] -> Fd -> IO (IM.IntMap [FdData])
