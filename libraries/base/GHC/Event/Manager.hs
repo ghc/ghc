@@ -363,6 +363,7 @@ closeFd_ mgr oldMap fd = do
     (Just fds, !newMap) -> do
       let oldEvs = eventsOf fds
       I.modifyFd (emBackend mgr) fd oldEvs mempty
+      when (oldEvs /= mempty) $ wakeManager mgr
       forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
       return newMap
 ------------------------------------------------------------------------
