@@ -1447,28 +1447,10 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
 	
 	StgTVar *s;
 	s = e -> tvar;
-
-    // Careful! We might have a read entry here that we don't want
-    // to spam over the update entry in the enclosing TRec.  e.g. in
-    //
-    //   t <- newTVar 1
-    //   writeTVar t 2
-    //   ((readTVar t >> retry) `orElse` return ()) `orElse` return ()
-    //
-    // - the innermost txn first aborts, giving us a read-only entry
-    //   with e->expected_value == e->new_value == 1
-    // - the inner orElse commits into the outer orElse, which
-    //   lands us here.  If we unconditionally did
-    //   merge_update_into(), then we would overwrite the outer
-    //   TRec's update, so we must check whether the entry is an
-    //   update or not, and if not, just do merge_read_into.
-    //
-    if (entry_is_update(e)) {
+	if (entry_is_update(e)) {
 	  unlock_tvar(trec, s, e -> expected_value, FALSE);
-	  merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
-    } else {
-	  merge_read_into(cap, et, s, e -> expected_value);
-    }
+	}
+	merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
 	ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
       });
     } else {
