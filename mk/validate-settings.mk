@@ -39,12 +39,14 @@ GhcLibHcOpts    += -O -dcore-lint
 # We define DefaultFastGhcLibWays in this style so that the value is
 # correct even if the user alters DYNAMIC_BY_DEFAULT
 DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),dyn,v)
+DefaultProfGhcLibWays = $(if $(filter $(GhcProfiled),YES),p,)
 
 ifeq "$(ValidateSpeed)" "FAST"
 GhcLibWays     = $(DefaultFastGhcLibWays)
 else
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
 endif
+GhcLibWays     += $(DefaultProfGhcLibWays)
 SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
