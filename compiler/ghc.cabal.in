@@ -52,7 +52,8 @@ Library
                    array      >= 0.1 && < 0.5,
                    filepath   >= 1   && < 1.4,
                    Cabal,
-                   hpc
+                   hpc,
+                   transformers
 
     if flag(stage1) && impl(ghc < 7.5)
         Build-Depends: old-time   >= 1   && < 1.2
