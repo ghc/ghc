@@ -130,6 +130,14 @@ hashFd fd = fromIntegral fd `mod` callbackArraySize
 callbackTableVar :: EventManager -> Fd -> MVar (IM.IntMap [FdData])
 callbackTableVar mgr fd = emFds mgr ! hashFd fd
 {-# INLINE callbackTableVar #-}
+
+haveOneShot :: Bool
+{-# INLINE haveOneShot #-}
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+haveOneShot = True
+#else
+haveOneShot = False
+#endif
 ------------------------------------------------------------------------
 -- Creation
 
@@ -265,15 +273,13 @@ registerFd_ mgr@(EventManager{..}) cb fd evs = do
       reg  = FdKey fd u
       !fdd = FdData reg evs cb
   modifyMVar (callbackTableVar mgr fd) $ \oldMap ->
-#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
-    if emOneShot
+    if haveOneShot && emOneShot
     then case IM.insertWith (++) fd' [fdd] oldMap of
       (Nothing,   n) -> do I.modifyFdOnce emBackend fd evs
                            return (n, (reg, False))
       (Just prev, n) -> do I.modifyFdOnce emBackend fd (combineEvents evs prev)
                            return (n, (reg, False))
     else
-#endif
       let (!newMap, (oldEvs, newEvs)) =
             case IM.insertWith (++) fd' [fdd] oldMap of
               (Nothing,   n) -> (n, (mempty, evs))
@@ -330,12 +336,9 @@ unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
               (Just prev, newm) -> (newm, pairEvents prev newm fd')
         modify = oldEvs /= newEvs
     when modify $
-#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)    
-      if emOneShot && newEvs /= mempty
+      if haveOneShot && emOneShot && newEvs /= mempty
       then I.modifyFdOnce emBackend fd newEvs
-      else
-#endif        
-        I.modifyFd emBackend fd oldEvs newEvs
+      else I.modifyFd emBackend fd oldEvs newEvs
     return (newMap, modify)
 
 -- | Drop a previous file descriptor registration.
@@ -411,21 +414,18 @@ onFdEvent mgr fd evs =
       where
         -- nothing to rearm.
         aux [] _    []          =
-#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
-           return (curmap, cbs)
-#else
-          do I.modifyFd (emBackend mgr) fd (eventsOf cbs) mempty
-             return (curmap, cbs)
-#endif
+          if haveOneShot 
+          then return (curmap, cbs)
+          else do I.modifyFd (emBackend mgr) fd (eventsOf cbs) mempty
+                  return (curmap, cbs)
+
         -- reinsert and rearm; note that we already have the lock on the
         -- callback table for this fd, and we deleted above, so we know there
         -- is no entry in the table for this fd.
         aux [] fdds saved@(_:_) = do
-#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
-          I.modifyFdOnce (emBackend mgr) fd $ eventsOf saved
-#else
-          I.modifyFd (emBackend mgr) fd (eventsOf cbs) $ eventsOf saved
-#endif
+          if haveOneShot 
+            then I.modifyFdOnce (emBackend mgr) fd $ eventsOf saved
+            else I.modifyFd (emBackend mgr) fd (eventsOf cbs) $ eventsOf saved
           return (snd $ IM.insertWith (\_ _ -> saved) fd' saved curmap, fdds)
 
         -- continue, saving those callbacks that don't match the event
