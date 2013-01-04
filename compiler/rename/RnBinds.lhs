@@ -781,9 +781,11 @@ rnMatchGroup :: Outputable (body RdrName) => HsMatchContext Name
              -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
              -> MatchGroup RdrName (Located (body RdrName))
              -> RnM (MatchGroup Name (Located (body Name)), FreeVars)
-rnMatchGroup ctxt rnBody (MatchGroup ms _) 
-  = do { (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (MatchGroup new_ms placeHolderType, ms_fvs) }
+rnMatchGroup ctxt rnBody (MG { mg_alts = ms }) 
+  = do { empty_case_ok <- xoptM Opt_EmptyCase
+       ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
+       ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
+       ; return (mkMatchGroup new_ms, ms_fvs) }
 
 rnMatch :: Outputable (body RdrName) => HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
@@ -807,6 +809,16 @@ rnMatch' ctxt rnBody match@(Match pats maybe_rhs_sig grhss)
 	{ (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
 
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
+
+emptyCaseErr :: HsMatchContext Name -> SDoc
+emptyCaseErr ctxt = hang (ptext (sLit "Empty list of alterantives in") <+> pp_ctxt)
+                       2 (ptext (sLit "Use -XEmptyCase to allow this"))
+  where
+    pp_ctxt = case ctxt of
+                CaseAlt    -> ptext (sLit "case expression")
+                LambdaExpr -> ptext (sLit "\\case expression")
+                _ -> ptext (sLit "(unexpected)") <+> pprMatchContextNoun ctxt
+ 
 
 resSigErr :: Outputable body => HsMatchContext Name -> Match RdrName body -> HsType RdrName -> SDoc 
 resSigErr ctxt match ty

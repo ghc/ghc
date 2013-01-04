@@ -236,7 +236,7 @@ matchLiterals :: [Id]
 	      -> DsM MatchResult
 
 matchLiterals (var:vars) ty sub_groups
-  = ASSERT( all notNull sub_groups )
+  = ASSERT( notNull sub_groups && all notNull sub_groups )
     do	{	-- Deal with each group
 	; alts <- mapM match_group sub_groups
 
