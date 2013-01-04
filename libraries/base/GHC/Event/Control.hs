@@ -48,7 +48,7 @@ import System.Posix.Types (Fd)
 
 #if defined(HAVE_EVENTFD)
 import Foreign.C.Error (throwErrnoIfMinus1)
-import Foreign.C.Types (CULong(..))
+import Foreign.C.Types (CULLong(..))
 #else
 import Foreign.C.Error (eAGAIN, eWOULDBLOCK, getErrno, throwErrno)
 #endif
@@ -198,7 +198,7 @@ foreign import ccall unsafe "sys/eventfd.h eventfd"
    c_eventfd :: CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "sys/eventfd.h eventfd_write"
-   c_eventfd_write :: CInt -> CULong -> IO CInt
+   c_eventfd_write :: CInt -> CULLong -> IO CInt
 #endif
 
 -- Used to tell the RTS how it can send messages to the I/O manager.
