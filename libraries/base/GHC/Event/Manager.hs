@@ -362,18 +362,23 @@ closeFd mgr close fd = do
 
 -- | Close a file descriptor in a race-safe way. 
 -- It assumes the caller will update the callback tables and that the caller
--- holds the callback table lock for the fd.
-closeFd_ :: EventManager -> IM.IntMap [FdData] -> Fd -> IO (IM.IntMap [FdData])
+-- holds the callback table lock for the fd. It must hold this lock because
+-- this command executes a backend command on the fd.
+closeFd_ :: EventManager
+            -> IM.IntMap [FdData]
+            -> Fd
+            -> IO (IM.IntMap [FdData], IO ())
 closeFd_ mgr oldMap fd = do
   case IM.delete (fromIntegral fd) oldMap of
-    (Nothing,  _)       -> return oldMap
+    (Nothing,  _)       -> return (oldMap, return ())
     (Just fds, !newMap) -> do
       let oldEvs = eventsOf fds
       when (oldEvs /= mempty) $ do
         I.modifyFd (emBackend mgr) fd oldEvs mempty
         wakeManager mgr
-      forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
-      return newMap
+      let runCbs =
+            forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
+      return (newMap, runCbs)
 ------------------------------------------------------------------------
 -- Utilities
 

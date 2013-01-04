@@ -100,15 +100,16 @@ closeFdWith close fd = do
     return mgr
   mask_ $ do
     tables <- forM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
-    tables' <- zipWithM
-               (\mgr table -> M.closeFd_ mgr table fd)
-               mgrs
-               tables
+    tableAndCbApps <- zipWithM
+                      (\mgr table -> M.closeFd_ mgr table fd)
+                      mgrs
+                      tables
     close fd
-    zipWithM_
-      (\mgr table' -> putMVar (M.callbackTableVar mgr fd) table')
-      mgrs
-      tables'
+    zipWithM_ finish mgrs tableAndCbApps
+  where
+    finish mgr (table', cbApp) = do
+      putMVar (M.callbackTableVar mgr fd) table'
+      cbApp
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
