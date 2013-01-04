@@ -26,7 +26,7 @@ import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, isMarkedStrict )
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
-import Demand           ( isStrictDmd, StrictSig(..), dmdTypeDepth )
+import Demand           ( StrictSig(..), dmdTypeDepth )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold
 import CoreUtils
@@ -1666,11 +1666,9 @@ check that
         (a) 'e' is already evaluated (it may so if e is a variable)
             Specifically we check (exprIsHNF e)
 or
-        (b) the scrutinee is a variable and 'x' is used strictly
-or
-        (c) 'x' is not used at all and e is ok-for-speculation
+        (b) 'x' is not used at all and e is ok-for-speculation
 
-For the (c), consider
+For the (b), consider
    case (case a ># b of { True -> (p,q); False -> (q,p) }) of
      r -> blah
 The scrutinee is ok-for-speculation (it looks inside cases), but we do
@@ -1678,6 +1676,24 @@ not want to transform to
    let r = case a ># b of { True -> (p,q); False -> (q,p) }
    in blah
 because that builds an unnecessary thunk.
+
+We used also to do case elimination if
+        (c) the scrutinee is a variable and 'x' is used strictly
+But that changes
+    case x of { _ -> error "bad" }
+    --> error "bad"
+which is very puzzling if 'x' is later bound to (error "good").
+Where the order of evaluation is specified (via seq or case)
+we should respect it.  See also
+Note [Empty case alternatives] in CoreSyn.
+
+  For reference, the old code was an extra disjunct in elim_lifted
+       || (strict_case_bndr && scrut_is_var scrut)
+      strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
+      scrut_is_var (Cast s _) = scrut_is_var s
+      scrut_is_var (Var _)    = True
+      scrut_is_var _          = False
+
 
 Note [Case elimination: unlifted case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1791,7 +1807,6 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
    then elim_unlifted        -- Satisfy the let-binding invariant
    else elim_lifted
   = do  { -- pprTrace "case elim" (vcat [ppr case_bndr, ppr (exprIsHNF scrut),
-          --                            ppr strict_case_bndr, ppr (scrut_is_var scrut),
           --                            ppr ok_for_spec,
           --                            ppr scrut]) $
           tick (CaseElim case_bndr)
@@ -1801,10 +1816,6 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
   where
     elim_lifted   -- See Note [Case elimination: lifted case]
       = exprIsHNF scrut
-     || (strict_case_bndr && scrut_is_var scrut)
-              -- The case binder is going to be evaluated later,
-              -- and the scrutinee is a simple variable
-
      || (is_plain_seq && ok_for_spec)
               -- Note: not the same as exprIsHNF
 
@@ -1819,11 +1830,6 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
 
     ok_for_spec      = exprOkForSpeculation scrut
     is_plain_seq     = isDeadBinder case_bndr -- Evaluation *only* for effect
-    strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
-
-    scrut_is_var (Cast s _) = scrut_is_var s
-    scrut_is_var (Var _)    = True
-    scrut_is_var _          = False
 
 
 --------------------------------------------------
