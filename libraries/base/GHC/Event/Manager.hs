@@ -330,9 +330,12 @@ unregisterFd_ mgr@(EventManager{..}) (FdKey fd u) =
               (Just prev, newm) -> (newm, pairEvents prev newm fd')
         modify = oldEvs /= newEvs
     when modify $
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)    
       if emOneShot && newEvs /= mempty
       then I.modifyFdOnce emBackend fd newEvs
-      else I.modifyFd emBackend fd oldEvs newEvs
+      else
+#endif        
+        I.modifyFd emBackend fd oldEvs newEvs
     return (newMap, modify)
 
 -- | Drop a previous file descriptor registration.
