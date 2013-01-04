@@ -401,7 +401,9 @@ renameDeriv is_boot inst_infos bagBinds
                  , emptyValBindsOut, usesOnly (plusFVs fvs)) }
 
   | otherwise
-  = discardWarnings $    -- Discard warnings about unused bindings etc
+  = discardWarnings $         -- Discard warnings about unused bindings etc
+    setXOptM Opt_EmptyCase $  -- Derived decls (for empty types) can have 
+                              --    case x of {}
     do  {
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
