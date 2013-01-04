@@ -117,8 +117,6 @@ pty (NthCoercion n t) =
   sep [text "%nth", int n, paty t]
 pty (InstCoercion t1 t2) =
   sep [text "%inst", paty t1, paty t2]
-pty (AxiomCoercion tc i cos) = 
-  pqname tc <+> int i <+> sep (map paty cos)
 pty ty@(Tapp {}) = pappty ty []
 pty ty@(Tvar {}) = paty ty
 pty ty@(Tcon {}) = paty ty
