@@ -95,19 +95,19 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
 closeFdWith close fd = do
   eventManagerArray <- readIORef eventManager
   let (low, high) = boundsIOArray eventManagerArray
-  tableVars <- forM [low..high] $ \i -> do
+  mgrs <- forM [low..high] $ \i -> do
     Just (_,!mgr) <- readIOArray eventManagerArray i
-    return (mgr, M.callbackTableVar mgr fd)
+    return mgr
   mask_ $ do
-    tables <- forM tableVars (takeMVar.snd)
+    tables <- forM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
     tables' <- zipWithM
-               (\(mgr,tableVar) table -> M.closeFd_ mgr table fd)
-               tableVars
+               (\mgr table -> M.closeFd_ mgr table fd)
+               mgrs
                tables
     close fd
     zipWithM_
-      (\(mgr,tableVar) table' -> putMVar tableVar table')
-      tableVars
+      (\mgr table' -> putMVar (M.callbackTableVar mgr fd) table')
+      mgrs
       tables'
 
 threadWait :: Event -> Fd -> IO ()
