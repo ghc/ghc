@@ -114,7 +114,7 @@ closeFdWith close fd = do
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
-  mgr <- getSystemEventManager
+  mgr <- getSystemEventManager_
   reg <- registerFd mgr (\_ e -> putMVar m e) fd evt
   evt' <- takeMVar m `onException` unregisterFd_ mgr reg
   if evt' `eventIs` evtClose
@@ -125,7 +125,7 @@ threadWait evt fd = mask_ $ do
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do
   m <- newTVarIO Nothing
-  mgr <- getSystemEventManager
+  mgr <- getSystemEventManager_
   reg <- registerFd mgr (\_ e -> atomically (writeTVar m (Just e))) fd evt
   let waitAction =
         do mevt <- readTVar m
@@ -162,17 +162,24 @@ threadWaitWriteSTM = threadWaitSTM evtWrite
 {-# INLINE threadWaitWriteSTM #-}
 
 
--- | Retrieve the system event manager.
+-- | Retrieve the system event manager for the capability on which the
+-- calling thread is running.
 --
--- This function always returns 'Just' the system event manager when using the
--- threaded RTS and 'Nothing' otherwise.
-getSystemEventManager :: IO EventManager
+-- This function always returns 'Just' the current thread's event manager
+-- when using the threaded RTS and 'Nothing' otherwise.
+getSystemEventManager :: IO (Maybe EventManager)
 getSystemEventManager = do
   t <- myThreadId
   (cap, _) <- threadCapability t
   eventManagerArray <- readIORef eventManager
-  Just (_,mgr) <- readIOArray eventManagerArray cap
+  mmgr <- readIOArray eventManagerArray cap
+  return $ fmap snd mmgr
+
+getSystemEventManager_ :: IO EventManager
+getSystemEventManager_ = do
+  Just mgr <- getSystemEventManager
   return mgr
+{-# INLINE getSystemEventManager_ #-}
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
