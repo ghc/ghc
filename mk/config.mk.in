@@ -807,6 +807,8 @@ BUILD_DOCBOOK_HTML       = @BUILD_DOCBOOK_HTML@
 BUILD_DOCBOOK_PS         = @BUILD_DOCBOOK_PS@
 BUILD_DOCBOOK_PDF        = @BUILD_DOCBOOK_PDF@
 DBLATEX                  = @DblatexCmd@
+# filename.as.url=0 is needed with dblatex 0.3.4 (#7486)
+DBLATEX_OPTS             = -P 'filename.as.url=0'
 XSLTPROC                 = @XsltprocCmd@
 XMLLINT                  = @XmllintCmd@
 HAVE_DOCBOOK_XSL	 = @HAVE_DOCBOOK_XSL@
