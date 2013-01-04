@@ -25,6 +25,7 @@ import TysWiredIn
 import PrelNames
 import Module
 import Name
+import Util
 import SrcLoc
 import Outputable
 \end{code}
@@ -56,16 +57,15 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchCon
         -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty = do
-    match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
-    let
-        match_result1 = foldr1 combineMatchResults match_results
-        match_result2 = adjustMatchResultDs
+dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty 
+  = ASSERT( notNull grhss )
+    do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
+       ; let match_result1 = foldr1 combineMatchResults match_results
+             match_result2 = adjustMatchResultDs
                                  (\e -> dsLocalBinds binds e)
                                  match_result1
                 -- NB: nested dsLet inside matchResult
-    --
-    return match_result2
+       ; return match_result2 }
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id (LHsExpr Id) -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))

@@ -490,7 +490,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- constructor aguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code) 
-                <- matchWrapper RecUpd (MatchGroup alts in_out_ty)
+                <- matchWrapper RecUpd (MG { mg_alts = alts, mg_arg_tys = [in_ty], mg_res_ty = out_ty })
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
@@ -512,7 +512,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
         -- from instance type to family type
     tycon     = dataConTyCon (head cons_to_upd)
     in_ty     = mkTyConApp tycon in_inst_tys
-    in_out_ty = mkFunTy in_ty (mkFamilyTyConApp tycon out_inst_tys)
+    out_ty    = mkFamilyTyConApp tycon out_inst_tys
 
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec, 
@@ -761,8 +761,8 @@ dsDo stmts
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
-        mfix_arg     = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
-                                                 (mkFunTy tup_ty body_ty))
+        mfix_arg     = noLoc $ HsLam (MG { mg_alts = [mkSimpleMatch [mfix_pat] body]
+                                         , mg_arg_tys = [tup_ty], mg_res_ty = body_ty })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
         ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)

@@ -525,7 +525,7 @@ methodNamesCmd (HsCmdCase _ matches)
 
 ---------------------------------------------------
 methodNamesMatch :: MatchGroup Name (LHsCmd Name) -> FreeVars
-methodNamesMatch (MatchGroup ms _)
+methodNamesMatch (MG { mg_alts = ms })
   = plusFVs (map do_one ms)
  where 
     do_one (L _ (Match _ _ grhss)) = methodNamesGRHSs grhss

@@ -606,7 +606,7 @@ rnMethodBind :: Name
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
 rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
-				  , fun_matches = MatchGroup matches _ }))
+				  , fun_matches = MG { mg_alts = matches } }))
   = setSrcSpan loc $ do
     sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
     let plain_name = unLoc sel_name
@@ -614,7 +614,7 @@ rnMethodBind cls sig_fn
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                           mapFvRn (rnMatch (FunRhs plain_name is_infix) rnLExpr) matches
-    let new_group = MatchGroup new_matches placeHolderType
+    let new_group = mkMatchGroup new_matches
 
     when is_infix $ checkPrecMatch plain_name new_group
     return (unitBag (L loc (bind { fun_id      = sel_name 

@@ -498,10 +498,11 @@ zonkLTcSpecPrags env ps
 zonkMatchGroup :: ZonkEnv 
                -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))
                -> MatchGroup TcId (Located (body TcId)) -> TcM (MatchGroup Id (Located (body Id)))
-zonkMatchGroup env zBody (MatchGroup ms ty) 
+zonkMatchGroup env zBody (MG { mg_alts = ms, mg_arg_tys = arg_tys, mg_res_ty = res_ty }) 
   = do	{ ms' <- mapM (zonkMatch env zBody) ms
-	; ty' <- zonkTcTypeToType env ty
-	; return (MatchGroup ms' ty') }
+	; arg_tys' <- zonkTcTypeToTypes env arg_tys
+	; res_ty'  <- zonkTcTypeToType env res_ty
+	; return (MG { mg_alts = ms', mg_arg_tys = arg_tys', mg_res_ty = res_ty' }) }
 
 zonkMatch :: ZonkEnv 
           -> (ZonkEnv -> Located (body TcId) -> TcM (Located (body Id)))

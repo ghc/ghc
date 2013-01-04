@@ -109,7 +109,7 @@ tcMatchesCase :: (Outputable (body Name)) =>
 
 tcMatchesCase ctxt scrut_ty matches res_ty
   | isEmptyMatchGroup matches   -- Allow empty case expressions
-  = return (MatchGroup [] (mkFunTys [scrut_ty] res_ty)) 
+  = return (MG { mg_alts = [], mg_arg_tys = [scrut_ty], mg_res_ty = res_ty }) 
 
   | otherwise
   = tcMatches ctxt [scrut_ty] res_ty matches
@@ -180,10 +180,10 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcRhoType
                  -> TcM (Located (body TcId)) }
 
-tcMatches ctxt pat_tys rhs_ty (MatchGroup matches _)
+tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = matches })
   = ASSERT( not (null matches) )	-- Ensure that rhs_ty is filled in
     do	{ matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-	; return (MatchGroup matches' (mkFunTys pat_tys rhs_ty)) }
+	; return (MG { mg_alts = matches', mg_arg_tys = pat_tys, mg_res_ty = rhs_ty }) }
 
 -------------
 tcMatch :: (Outputable (body Name)) => TcMatchCtxt body
@@ -855,8 +855,11 @@ number of args are used in each equation.
 
 \begin{code}
 checkArgs :: Name -> MatchGroup Name body -> TcM ()
-checkArgs fun (MatchGroup (match1:matches) _)
-    | null bad_matches = return ()
+checkArgs _ (MG { mg_alts = [] })
+    = return ()
+checkArgs fun (MG { mg_alts = match1:matches })
+    | null bad_matches 
+    = return ()
     | otherwise
     = failWithTc (vcat [ptext (sLit "Equations for") <+> quotes (ppr fun) <+> 
 			  ptext (sLit "have different numbers of arguments"),
@@ -868,6 +871,5 @@ checkArgs fun (MatchGroup (match1:matches) _)
 
     args_in_match :: LMatch Name body -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
-checkArgs fun _ = pprPanic "TcPat.checkArgs" (ppr fun) -- Matches always non-empty
 \end{code}
 

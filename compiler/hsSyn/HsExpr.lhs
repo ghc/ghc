@@ -831,11 +831,12 @@ patterns in each equation.
 
 \begin{code}
 data MatchGroup id body
-  = MatchGroup
-        [LMatch id body] -- The alternatives
-        PostTcType       -- The type is the type of the entire group
-                         --      t1 -> ... -> tn -> tr
-                         -- where there are n patterns
+  = MG { mg_alts    :: [LMatch id body]  -- The alternatives
+       , mg_arg_tys :: [PostTcType]      -- Types of the arguments, t1..tn
+       , mg_res_ty  :: PostTcType  }     -- Type of the result, tr 
+     -- The type is the type of the entire group
+     --      t1 -> ... -> tn -> tr
+     -- where there are n patterns
   deriving (Data, Typeable)
 
 type LMatch id body = Located (Match id body)
@@ -849,17 +850,14 @@ data Match id body
   deriving (Data, Typeable)
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
-isEmptyMatchGroup (MatchGroup ms _) = null ms
+isEmptyMatchGroup (MG { mg_alts = ms }) = null ms
 
 matchGroupArity :: MatchGroup id body -> Arity
-matchGroupArity (MatchGroup [] _)
-  = panic "matchGroupArity"     -- Precondition: MatchGroup is non-empty
-matchGroupArity (MatchGroup (match:matches) _)
-  = ASSERT( all ((== n_pats) . length . hsLMatchPats) matches )
-    -- Assertion just checks that all the matches have the same number of pats
-    n_pats
-  where
-    n_pats = length (hsLMatchPats match)
+-- Precondition: MatchGroup is non-empty
+-- This is called before type checking, when mg_arg_tys is not set
+matchGroupArity (MG { mg_alts = alts })
+  | (alt1:_) <- alts = length (hsLMatchPats alt1)
+  | otherwise        = panic "matchGroupArity"
 
 hsLMatchPats :: LMatch id body -> [LPat id]
 hsLMatchPats (L _ (Match pats _ _)) = pats
@@ -884,7 +882,7 @@ We know the list must have at least one @Match@ in it.
 \begin{code}
 pprMatches :: (OutputableBndr idL, OutputableBndr idR, Outputable body)
            => HsMatchContext idL -> MatchGroup idR body -> SDoc
-pprMatches ctxt (MatchGroup matches _)
+pprMatches ctxt (MG { mg_alts = matches })
     = vcat (map (pprMatch ctxt) (map unLoc matches))
       -- Don't print the type; it's only a place-holder before typechecking
 

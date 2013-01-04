@@ -1305,8 +1305,8 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
                                                            && no_sig (unLoc v)
     restricted (AbsBinds {}) = panic "isRestrictedGroup/unrestricted AbsBinds"
 
-    restricted_match (MatchGroup (L _ (Match [] _ _) : _) _) = True
-    restricted_match _                                       = False
+    restricted_match (MG { mg_alts = L _ (Match [] _ _) : _ }) = True
+    restricted_match _                                         = False
         -- No args => like a pattern binding
         -- Some args => a function binding
 
