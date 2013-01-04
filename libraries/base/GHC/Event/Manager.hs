@@ -348,11 +348,15 @@ unregisterFd mgr reg = do
 closeFd :: EventManager -> (Fd -> IO ()) -> Fd -> IO ()
 closeFd mgr close fd = do
   fds <- modifyMVar (callbackTableVar mgr fd) $ \oldMap -> do
-    close fd
     case IM.delete (fromIntegral fd) oldMap of
-      (Nothing,  _)       -> return (oldMap, [])
+      (Nothing,  _)       -> do close fd
+                                return (oldMap, [])
       (Just fds, !newMap) -> do
-        when (eventsOf fds /= mempty) $ wakeManager mgr
+        let oldEvs = eventsOf fds
+        when (oldEvs /= mempty) $ do
+          I.modifyFd (emBackend mgr) fd oldEvs mempty
+          wakeManager mgr
+        close fd
         return (newMap, fds)
   forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
 
