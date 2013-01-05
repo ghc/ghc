@@ -14,9 +14,9 @@ module FamInstEnv (
         famInstBranchLHS, famInstBranches, famInstBranchSpan,
         toBranchedFamInst, toUnbranchedFamInst,
         famInstTyCon, famInstRepTyCon_maybe, dataFamInstRepTyCon, 
-        pprFamInst, pprFamInsts, pprFamInstBranch, pprFamInstBranches,
-        pprFamFlavor, pprFamInstBranchHdr,
-        mkSynFamInst, mkSynFamInstBranch, mkSingleSynFamInst,
+        pprFamInst, pprFamInsts, pprFamInstBranch,
+        pprFamFlavor, pprFamInstBranchHdr, pprCoAxBranch,
+        mkSynFamInst, mkSingleSynFamInst,
         mkDataFamInst, mkImportedFamInst, 
 
         FamInstEnv, FamInstEnvs,
@@ -107,8 +107,35 @@ assumes that it is part of a consistent axiom set.
 
 A "group" with fi_group=True can have just one element, however.
 
+Note [Why we need fib_rhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+It may at first seem unnecessary to store the right-hand side of an equation
+in a FamInstBranch. After all, FamInstBranches are used only for matching a
+family application; the underlying CoAxiom is used to perform the actual
+simplification.
+
+However, we do need to know the rhs field during conflict checking to support
+confluent overlap. When two unbranched instances have overlapping left-hand
+sides, we check if the right-hand sides are coincident in the region of overlap.
+This check requires fib_rhs. See lookupFamInstEnvConflicts.
+
+Note [Why we need fib_index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A FamInstBranch is always stored in a list of branches within a FamInst. So,
+why would we ever need it to store its own index? Because of printing,
+unfortunately.
+
+At various places, we need to print either a FamInstBranch or a CoAxBranch.
+These data structures store the same information, essentially, so they should
+print the same. We don't wish to duplicate code between them. Because a
+CoAxBranch is more fundamental, we choose to write the printing code for that.
+However, a FamInstBranch by itself has no reference to its attending CoAxBranch.
+The solution is for the FamInstBranch to carry its own index. Whenever we
+need to print a FamInstBranch, we happen to have its attending *CoAxiom*
+available. Knowing the index, we can then get the CoAxBranch and print. Hurrah.
+
 \begin{code}
-data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in CoAxiom.lhs
+data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in CoAxiom
   = FamInst { fi_axiom    :: CoAxiom br      -- The new coercion axiom introduced
                                              -- by this family instance
             , fi_flavor   :: FamFlavor
@@ -131,10 +158,16 @@ data FamInstBranch
                                  -- See Note [FamInst locations]
 
     , fib_tvs    :: [TyVar]      -- bound type variables
+                                 -- like ClsInsts, these variables are always
+                                 -- fresh. See Note [Template tyvars are fresh]
+                                 -- in InstEnv
     , fib_lhs    :: [Type]       -- type patterns
     , fib_rhs    :: Type         -- RHS of family instance
+                                 -- See Note [Why we need fib_rhs]
     , fib_tcs    :: [Maybe Name] -- used for "rough matching" during typechecking
                                  -- see Note [Rough-match field] in InstEnv
+    , fib_index  :: Int          -- the index of this branch (counting from 0)
+                                 -- See Note [Why we need fib_index]
     }
 
 data FamFlavor 
@@ -154,7 +187,9 @@ famInstTyCon = co_ax_tc . fi_axiom
 famInstNthBranch :: FamInst br -> Int -> FamInstBranch
 famInstNthBranch (FamInst { fi_branches = branches }) index
   = ASSERT( 0 <= index && index < (length $ fromBranchList branches) )
-    brListNth branches index
+    let branch = brListNth branches index in
+    ASSERT( fib_index branch == index )
+    branch
 
 famInstSingleBranch :: FamInst Unbranched -> FamInstBranch
 famInstSingleBranch (FamInst { fi_branches = FirstBranch branch }) = branch
@@ -197,6 +232,12 @@ dataFamInstRepTyCon fi
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+        Pretty printing
+%*                                                                      *
+%************************************************************************
+
 \begin{code}
 instance NamedThing (FamInst br) where
    getName = coAxiomName . fi_axiom
@@ -235,49 +276,61 @@ pprFamFlavor flavor
         | otherwise             -> ptext (sLit "WEIRD") <+> ppr tycon
 
 pprFamInstBranchHdr :: CoAxiom br -> FamInstBranch -> SDoc
-pprFamInstBranchHdr ax (FamInstBranch { fib_lhs = tys, fib_loc = loc })
+pprFamInstBranchHdr ax (FamInstBranch { fib_index = index })
+  = pprCoAxBranchHdr ax (coAxiomNthBranch ax index)
+
+pprFamInstBranch :: CoAxiom br -> FamInstBranch -> SDoc
+pprFamInstBranch ax (FamInstBranch { fib_index = index })
+  = pprCoAxBranch (coAxiomTyCon ax) (coAxiomNthBranch ax index)
+
+-- defined here to avoid bad dependencies
+pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranch fam_tc (CoAxBranch { cab_lhs = lhs
+                                 , cab_rhs = rhs })
+  = pprTypeApp fam_tc lhs <+> equals <+> (ppr rhs)
+
+pprCoAxBranchHdr :: CoAxiom br -> CoAxBranch -> SDoc
+pprCoAxBranchHdr (CoAxiom { co_ax_tc = fam_tc, co_ax_name = name })
+                 (CoAxBranch { cab_lhs = tys, cab_loc = loc })
   = hang (pprTypeApp fam_tc tys)
        2 (ptext (sLit "-- Defined") <+> ppr_loc)
     where
-        fam_tc = coAxiomTyCon ax
         ppr_loc
           | isGoodSrcSpan loc
           = ptext (sLit "at") <+> ppr (srcSpanStart loc)
     
           | otherwise
           = ptext (sLit "in") <+>
-              quotes (ppr (nameModule (coAxiomName ax)))
+              quotes (ppr (nameModule name))
 
-pprFamInstBranch :: TyCon -> FamInstBranch -> SDoc
-pprFamInstBranch fam_tc (FamInstBranch { fib_lhs = lhs
-                                       , fib_rhs = rhs })
-  = pprTypeApp fam_tc lhs <+> equals <+> (ppr rhs)
 
 pprFamInsts :: [FamInst br] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
 
-pprFamInstBranches :: TyCon -> [FamInstBranch] -> SDoc
-pprFamInstBranches tc branches = vcat (map (pprFamInstBranch tc) branches)
+mk_fam_inst_branch :: Int -> CoAxBranch -> FamInstBranch
+mk_fam_inst_branch index
+                   (CoAxBranch { cab_loc = loc
+                               , cab_tvs = tvs
+                               , cab_lhs = lhs
+                               , cab_rhs = rhs })
+  = FamInstBranch { fib_loc   = loc
+                  , fib_tvs   = tvs
+                  , fib_lhs   = lhs
+                  , fib_rhs   = rhs
+                  , fib_tcs   = roughMatchTcs lhs
+                  , fib_index = index }
 
--- | Create a branch of a @type@ family instance.
--- This branch must be incorporated into a full @FamInst@ with
--- @mkSynFamInst@ to be useful.
-mkSynFamInstBranch :: SrcSpan -- ^ where the branch equation appears
-                   -> [TyVar] -- ^ bound variables
-                   -> [Type]  -- ^ LHS type patterns
-                   -> Type    -- ^ RHS type
-                   -> (FamInstBranch, CoAxBranch)
-mkSynFamInstBranch loc tvs lhs_tys rhs_ty
-  = ( FamInstBranch { fib_loc    = loc
-                    , fib_tvs    = tvs
-                    , fib_lhs    = lhs_tys
-                    , fib_rhs    = rhs_ty
-                    , fib_tcs    = mb_tcs }
-    , CoAxBranch { cab_tvs = tvs
-                 , cab_lhs = lhs_tys
-                 , cab_rhs = rhs_ty })
-  where
-    mb_tcs = roughMatchTcs lhs_tys
+map_with_index :: (Int -> a -> b) -> [a] -> [b]
+map_with_index f elts
+  = go 0 elts
+  where go _ []     = []
+        go n (x:xs) = f n x : go (n+1) xs
+
+zipWith_index :: (Int -> a -> b -> c) -> [a] -> [b] -> [c]
+zipWith_index f as bs
+  = go 0 as bs
+  where go n (a:as) (b:bs) = f n a b : go (n+1) as bs
+        go _ _      _      = []
 
 -- | Create a coercion identifying a @type@ family instance.
 -- It has the form @Co tvs :: F ts ~ R@, where @Co@ is
@@ -286,13 +339,13 @@ mkSynFamInstBranch loc tvs lhs_tys rhs_ty
 mkSynFamInst :: Name            -- ^ Unique name for the coercion tycon
              -> TyCon           -- ^ Family tycon (@F@)
              -> Bool            -- ^ Was this declared as a branched group?
-             -> [(FamInstBranch, CoAxBranch)] -- ^ the branches of this FamInst
+             -> [CoAxBranch]    -- ^ the branches of the CoAxiom
              -> FamInst Branched
 mkSynFamInst name fam_tc group branches
   = ASSERT( length branches >= 1 )
     FamInst { fi_fam      = tyConName fam_tc
             , fi_flavor   = SynFamilyInst
-            , fi_branches = toBranchList $ fst $ unzip branches
+            , fi_branches = toBranchList (map_with_index mk_fam_inst_branch branches)
             , fi_group    = group
             , fi_axiom    = axiom }
   where
@@ -300,12 +353,13 @@ mkSynFamInst name fam_tc group branches
                     , co_ax_name     = name
                     , co_ax_tc       = fam_tc
                     , co_ax_implicit = False
-                    , co_ax_branches = toBranchList (snd $ unzip branches) }
+                    , co_ax_branches = toBranchList branches }
+
 
 -- | Create a coercion identifying a @type@ family instance, but with only
 -- one equation (branch).
 mkSingleSynFamInst :: Name        -- ^ Unique name for the coercion tycon
-                   -> [TyVar]     -- ^ Type parameters of the coercion (@tvs@)
+                   -> [TyVar]     -- ^ *Fresh* tyvars of the coercion (@tvs@)
                    -> TyCon       -- ^ Family tycon (@F@)
                    -> [Type]      -- ^ Type instance (@ts@)
                    -> Type        -- ^ right-hand side
@@ -319,17 +373,14 @@ mkSingleSynFamInst name tvs fam_tc inst_tys rep_ty
             , fi_axiom    = axiom }
   where
     -- See note [FamInst Locations]
-    branch = FamInstBranch { fib_loc    = getSrcSpan name
-                           , fib_tvs    = tvs
-                           , fib_lhs    = inst_tys
-                           , fib_rhs    = rep_ty
-                           , fib_tcs    = roughMatchTcs inst_tys }
+    branch = mk_fam_inst_branch 0 axBranch
     axiom = CoAxiom { co_ax_unique   = nameUnique name
                     , co_ax_name     = name
                     , co_ax_tc       = fam_tc
                     , co_ax_implicit = False
                     , co_ax_branches = FirstBranch axBranch }
-    axBranch = CoAxBranch { cab_tvs = tvs
+    axBranch = CoAxBranch { cab_loc = getSrcSpan name
+                          , cab_tvs = tvs
                           , cab_lhs = inst_tys
                           , cab_rhs = rep_ty }
     
@@ -338,7 +389,7 @@ mkSingleSynFamInst name tvs fam_tc inst_tys rep_ty
 -- where @Co@ is the coercion constructor built here, @F@ the family tycon
 -- and @R@ the (derived) representation tycon.
 mkDataFamInst :: Name         -- ^ Unique name for the coercion tycon
-              -> [TyVar]      -- ^ Type parameters of the coercion (@tvs@)
+              -> [TyVar]      -- ^ *Fresh* parameters of the coercion (@tvs@)
               -> TyCon        -- ^ Family tycon (@F@)
               -> [Type]       -- ^ Type instance (@ts@)
               -> TyCon        -- ^ Representation tycon (@R@)
@@ -352,20 +403,16 @@ mkDataFamInst name tvs fam_tc inst_tys rep_tc
   where
     rhs = mkTyConApp rep_tc (mkTyVarTys tvs)
 
-    branch = FamInstBranch { fib_loc    = getSrcSpan name
                                -- See Note [FamInst locations]
-                           , fib_tvs    = tvs
-                           , fib_lhs    = inst_tys
-                           , fib_rhs    = rhs
-                           , fib_tcs    = roughMatchTcs inst_tys }
-
+    branch = mk_fam_inst_branch 0 axBranch
     axiom = CoAxiom { co_ax_unique   = nameUnique name
                     , co_ax_name     = name
                     , co_ax_tc       = fam_tc
                     , co_ax_branches = FirstBranch axBranch
                     , co_ax_implicit = False }
 
-    axBranch = CoAxBranch { cab_tvs = tvs
+    axBranch = CoAxBranch { cab_loc = getSrcSpan name
+                          , cab_tvs = tvs
                           , cab_lhs = inst_tys
                           , cab_rhs = rhs }
 
@@ -409,16 +456,18 @@ mkImportedFamInst fam group roughs axiom
        = ASSERT( fam == tyConName (coAxiomTyCon axiom) )
          axiom
 
-     branches = toBranchList (zipWith mk_fam_inst_branch (fromBranchList axBranches) roughs)
+     branches = toBranchList (zipWith_index mk_imp_fam_inst_branch (fromBranchList axBranches) roughs)
 
-     mk_fam_inst_branch (CoAxBranch { cab_tvs = tvs
-                                    , cab_lhs = lhs
-                                    , cab_rhs = rhs }) mb_tcs
+     mk_imp_fam_inst_branch index
+                            (CoAxBranch { cab_tvs = tvs
+                                        , cab_lhs = lhs
+                                        , cab_rhs = rhs }) mb_tcs
        = FamInstBranch { fib_loc    = noSrcSpan
                        , fib_tvs    = tvs
                        , fib_lhs    = lhs
                        , fib_rhs    = rhs
-                       , fib_tcs    = mb_tcs }
+                       , fib_tcs    = mb_tcs
+                       , fib_index  = index }
 
          -- Derive the flavor for an imported FamInst rather disgustingly
          -- Maybe we should store it in the IfaceFamInst?
@@ -702,15 +751,13 @@ lookupFamInstEnvConflicts
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnvConflicts envs grp tc
-                          branch@(FamInstBranch { fib_lhs = tys, fib_rhs = rhs })
+                          (FamInstBranch { fib_lhs = tys, fib_rhs = rhs })
   = lookup_fam_inst_env my_unify False envs tc tys
   where
     my_unify :: MatchFun
     my_unify _ (FamInstBranch { fib_tvs = tpl_tvs, fib_lhs = tpl_tys
                               , fib_rhs = tpl_rhs }) old_grp match_tys
-       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` mkVarSet tpl_tvs,
-                  (pprFamInstBranch tc branch <+> ppr tys) $$
-                  (ppr tpl_tvs <+> ppr tpl_tys) )
+       = ASSERT( tyVarsOfTypes tys `disjointVarSet` mkVarSet tpl_tvs )
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
          case tcUnifyTys instanceBindFun tpl_tys match_tys of
@@ -823,7 +870,7 @@ lookup_fam_inst_env' match_fun _one_sided ie fam tys
 find :: MatchFun -> [Type] -> [FamInst Branched] -> [FamInstMatch]
 find _         _         [] = []
 find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_group = is_group }) : rest)
-  = case findBranch [] (fromBranchList branches) 0 of
+  = case findBranch [] (fromBranchList branches) of
       (Just match, StopSearching) -> [match]
       (Just match, KeepSearching) -> match : find match_fun match_tys rest
       (Nothing,    StopSearching) -> []
@@ -832,22 +879,20 @@ find match_fun match_tys (inst@(FamInst { fi_branches = branches, fi_group = is_
     rough_tcs = roughMatchTcs match_tys
     findBranch :: [FamInstBranch]  -- the branches that have already been checked
                -> [FamInstBranch]  -- still looking through these
-               -> Int              -- the index of the next branch
                -> (Maybe FamInstMatch, ContSearch)
-    findBranch _ [] _ = (Nothing, KeepSearching)
-    findBranch seen (branch@(FamInstBranch { fib_tvs = tvs, fib_tcs = mb_tcs }) : rest) ind
+    findBranch _ [] = (Nothing, KeepSearching)
+    findBranch seen (branch@(FamInstBranch { fib_tvs = tvs, fib_tcs = mb_tcs, fib_index = ind }) : rest)
       | instanceCantMatch rough_tcs mb_tcs
-      = findBranch seen rest (ind+1) -- branch won't unify later; ignore
+      = findBranch seen rest -- branch won't unify later; ignore
       | otherwise
       = case match_fun seen branch is_group match_tys of
-          (Nothing, KeepSearching) -> findBranch (branch : seen) rest (ind+1)
+          (Nothing, KeepSearching) -> findBranch (branch : seen) rest
           (Nothing, StopSearching) -> (Nothing, StopSearching)
           (Just subst, cont)       -> (Just match, cont)
               where 
                 match = FamInstMatch { fim_instance = inst
                                      , fim_index    = ind
                                      , fim_tys      = substTyVars subst tvs }
-
 
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
@@ -887,11 +932,12 @@ The "extra" type argument [Char] just stays on the end.
 --   False -> no information
 -- It is currently (Oct 2012) used only for generating errors for
 -- inaccessible branches. If these errors go unreported, no harm done.
-isDominatedBy :: [Type] -> [FamInstBranch] -> Bool
+-- This is defined here to avoid a dependency from CoAxiom to Unify
+isDominatedBy :: [Type] -> [CoAxBranch] -> Bool
 isDominatedBy lhs branches
   = or $ map match branches
     where
-      match (FamInstBranch { fib_tvs = tvs, fib_lhs = tys })
+      match (CoAxBranch { cab_tvs = tvs, cab_lhs = tys })
         = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
 \end{code}
 
