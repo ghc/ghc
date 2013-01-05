@@ -1457,6 +1457,12 @@ runPhase MergeStub input_fn dflags
          panic "runPhase(MergeStub): no stub"
        Just stub_o -> do
          liftIO $ joinObjectFiles dflags [input_fn, stub_o] output_fn
+         whenGeneratingDynamicToo dflags $ do
+           liftIO $ debugTraceMsg dflags 4
+                        (text "Merging stub again for -dynamic-too")
+           let dyn_input_fn  = replaceExtension input_fn  (dynObjectSuf dflags)
+               dyn_output_fn = replaceExtension output_fn (dynObjectSuf dflags)
+           liftIO $ joinObjectFiles dflags [dyn_input_fn, stub_o] dyn_output_fn
          return (StopLn, output_fn)
 
 -- warning suppression
