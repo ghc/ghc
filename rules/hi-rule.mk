@@ -62,11 +62,13 @@
 # documentation).  An empty command is enough to get GNU make to think
 # it has updated %.hi, but without actually spawning a shell to do so.
 
-define hi-rule # $1 = way
+define hi-rule # $1 = source directory, $2 = object directory, $3 = way
 
-%.$$($1_hisuf) : %.$$($1_osuf) ;
+$2/%.$$($3_hisuf) : $2/%.$$($3_osuf) $1/%.hs ;
+$2/%.$$($3_hisuf) : $2/%.$$($3_osuf) $1/%.lhs ;
 
-%.$$($1_way_)hi-boot : %.$$($1_way_)o-boot ;
+$2/%.$$($3_way_)hi-boot : $2/%.$$($3_way_)o-boot $1/%.hs ;
+$2/%.$$($3_way_)hi-boot : $2/%.$$($3_way_)o-boot $1/%.lhs ;
 
 endef
 
