@@ -1594,6 +1594,13 @@ initLinker( void )
 #   if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
     machoInitSymbolsWithoutUnderscore();
 #   endif
+    /* GCC defines a special symbol __dso_handle which is resolved to NULL if
+       referenced from a statically linked module. We need to mimic this, but
+       we cannot use NULL because we use it to mean nonexistent symbols. So we
+       use an arbitrary (hopefully unique) address here.
+    */
+    ghciInsertSymbolTable(WSTR("(GHCi special symbols)"),
+        symhash, "__dso_handle", (void *)0x12345687, HS_BOOL_FALSE, NULL);
 
 #   if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 #   if defined(RTLD_DEFAULT)
