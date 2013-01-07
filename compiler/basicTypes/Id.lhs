@@ -98,7 +98,7 @@ import IdInfo
 import BasicTypes
 
 -- Imported and re-exported
-import Var( Var, Id, DictId,
+import Var( Id, DictId,
             idInfo, idDetails, globaliseId, varType,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var

@@ -54,7 +54,7 @@ import Unify
 import HscTypes
 import Id
 import Name
-import Var      ( Var, EvVar, varType, setVarType )
+import Var      ( EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
