@@ -638,7 +638,7 @@
           </row>
           <row>
             <entry><option>-no-auto-link-packages</option></entry>
-            <entry>Don't automatically link in the haskell98 package.</entry>
+            <entry>Don't automatically link in the base and rts packages.</entry>
             <entry>dynamic</entry>
             <entry>-</entry>
           </row>
