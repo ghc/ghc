@@ -126,49 +126,47 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
     AC_CACHE_VAL(AC_CV_NAME,[
         AC_CV_NAME_supported=yes
         FP_COMPUTE_INT([HTYPE_IS_INTEGRAL],
-                       [(($1)((int)(($1)1.4))) == (($1)1.4)],
-                       [FPTOOLS_HTYPE_INCLUDES],[AC_CV_NAME_supported=no])
-        if test "$AC_CV_NAME_supported" = "yes"
+                       [($1)1.4],
+                       [FPTOOLS_HTYPE_INCLUDES],[HTYPE_IS_INTEGRAL=0])
+
+        if test "$HTYPE_IS_INTEGRAL" -eq 0
         then
-            if test "$HTYPE_IS_INTEGRAL" -eq 0
+            FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
+                           [FPTOOLS_HTYPE_INCLUDES],
+                           [AC_CV_NAME_supported=no])
+            FP_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
+                           [FPTOOLS_HTYPE_INCLUDES],
+                           [AC_CV_NAME_supported=no])
+            FP_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
+                           [FPTOOLS_HTYPE_INCLUDES],
+                           [AC_CV_NAME_supported=no])
+            if test "$HTYPE_IS_FLOAT" -eq 1
             then
-                FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
-                               [FPTOOLS_HTYPE_INCLUDES],
-                               [AC_CV_NAME_supported=no])
-                FP_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
-                               [FPTOOLS_HTYPE_INCLUDES],
-                               [AC_CV_NAME_supported=no])
-                FP_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
-                               [FPTOOLS_HTYPE_INCLUDES],
-                               [AC_CV_NAME_supported=no])
-                if test "$HTYPE_IS_FLOAT" -eq 1
-                then
-                    AC_CV_NAME=Float
-                elif test "$HTYPE_IS_DOUBLE" -eq 1
-                then
-                    AC_CV_NAME=Double
-                elif test "$HTYPE_IS_LDOUBLE" -eq 1
-                then
-                    AC_CV_NAME=LDouble
-                else
-                    AC_CV_NAME_supported=no
-                fi
+                AC_CV_NAME=Float
+            elif test "$HTYPE_IS_DOUBLE" -eq 1
+            then
+                AC_CV_NAME=Double
+            elif test "$HTYPE_IS_LDOUBLE" -eq 1
+            then
+                AC_CV_NAME=LDouble
             else
-                FP_COMPUTE_INT([HTYPE_IS_SIGNED],[(($1)(-1)) < (($1)0)],
-                               [FPTOOLS_HTYPE_INCLUDES],
-                               [AC_CV_NAME_supported=no])
-                FP_COMPUTE_INT([HTYPE_SIZE],[sizeof($1) * 8],
-                               [FPTOOLS_HTYPE_INCLUDES],
-                               [AC_CV_NAME_supported=no])
-                if test "$HTYPE_IS_SIGNED" -eq 0
-                then
-                    AC_CV_NAME="Word$HTYPE_SIZE"
-                else
-                    AC_CV_NAME="Int$HTYPE_SIZE"
-                fi
+                AC_CV_NAME_supported=no
+            fi
+        else
+            FP_COMPUTE_INT([HTYPE_IS_SIGNED],[(($1)(-1)) < (($1)0)],
+                           [FPTOOLS_HTYPE_INCLUDES],
+                           [AC_CV_NAME_supported=no])
+            FP_COMPUTE_INT([HTYPE_SIZE],[sizeof($1) * 8],
+                           [FPTOOLS_HTYPE_INCLUDES],
+                           [AC_CV_NAME_supported=no])
+            if test "$HTYPE_IS_SIGNED" -eq 0
+            then
+                AC_CV_NAME="Word$HTYPE_SIZE"
+            else
+                AC_CV_NAME="Int$HTYPE_SIZE"
             fi
         fi
-        ])
+    ])
     if test "$AC_CV_NAME_supported" = no
     then
         $2
