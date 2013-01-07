@@ -1362,25 +1362,41 @@ findImportUsage imports rdr_env rdrs
     import_usage = foldr (extendImportMap rdr_env) Map.empty rdrs
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
-      = (decl, nubAvails used_avails, unused_imps)
+      = (decl, nubAvails used_avails, nameSetToList unused_imps)
       where
         used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
                       -- srcSpanEnd: see Note [The ImportMap]
-        dont_report_as_unused = foldr add emptyNameSet used_avails
-        add (Avail n) s = s `addOneToNameSet` n
-        add (AvailTC n ns) s = s `addListToNameSet` (n:ns)
+        used_names   = availsToNameSet used_avails
+        used_parents = mkNameSet [n | AvailTC n _ <- used_avails]
+
+        unused_imps   -- Not trivial; see eg Trac #7454
+          = case imps of
+              Just (False, imp_ies) -> foldr (add_unused . unLoc) emptyNameSet imp_ies
+              _other -> emptyNameSet -- No explicit import list => no unused-name list
+
+        add_unused :: IE Name -> NameSet -> NameSet
+        add_unused (IEVar n)          acc = add_unused_name n acc
+        add_unused (IEThingAbs n)     acc = add_unused_name n acc
+        add_unused (IEThingAll n)     acc = add_unused_all  n acc
+        add_unused (IEThingWith p ns) acc = add_unused_with p ns acc
+        add_unused _                  acc = acc
+
+        add_unused_name n acc 
+          | n `elemNameSet` used_names = acc
+          | otherwise                  = acc `addOneToNameSet` n
+        add_unused_all n acc
+          | n `elemNameSet` used_names   = acc
+          | n `elemNameSet` used_parents = acc
+          | otherwise                    = acc `addOneToNameSet` n
+        add_unused_with p ns acc
+          | all (`elemNameSet` acc1) ns = add_unused_name p acc1
+          | otherwise = acc1
+          where
+            acc1 = foldr add_unused_name acc ns
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
-       -- Num is not itself mentioned.  Hence adding 'n' as
-       -- well to the list of of "don't report if unused" names
-
-        unused_imps = case imps of
-                        Just (False, imp_ies) -> nameSetToList unused_imps
-                          where
-                            imp_names = mkNameSet (concatMap (ieNames . unLoc) imp_ies)
-                            unused_imps = imp_names `minusNameSet` dont_report_as_unused
-
-                        _other -> []    -- No explicit import list => no unused-name list
+       -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+          
 
 extendImportMap :: GlobalRdrEnv -> RdrName -> ImportMap -> ImportMap
 -- For a used RdrName, find all the import decls that brought
