@@ -322,9 +322,10 @@ shutdownManagers =
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
-ioManagerCapabilitiesChanged :: Int -> IO ()
-ioManagerCapabilitiesChanged new_n_caps = do
+ioManagerCapabilitiesChanged :: IO ()
+ioManagerCapabilitiesChanged = do
   withMVar ioManagerLock $ \_ -> do
+    new_n_caps <- getNumCapabilities
     numEnabled <- readIORef numEnabledEventManagers
     writeIORef numEnabledEventManagers new_n_caps
     eventManagerArray <- readIORef eventManager

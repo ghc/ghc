@@ -79,7 +79,7 @@ ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
 ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
 #endif
 
-ioManagerCapabilitiesChanged :: Int -> IO ()
+ioManagerCapabilitiesChanged :: IO ()
 #ifndef mingw32_HOST_OS
 ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
 #else
