@@ -36,6 +36,7 @@ import CLabel
 import Outputable
 import Platform
 import FastBool
+import UniqSupply
 
 --------------------------------------------------------------------------------
 -- Size of a PPC memory address, in bytes.
@@ -80,11 +81,11 @@ allocMoreStack
   :: Platform
   -> Int
   -> NatCmmDecl statics PPC.Instr.Instr
-  -> NatCmmDecl statics PPC.Instr.Instr
+  -> UniqSM (NatCmmDecl statics PPC.Instr.Instr)
 
-allocMoreStack _ _ top@(CmmData _ _) = top
+allocMoreStack _ _ top@(CmmData _ _) = return top
 allocMoreStack platform amount (CmmProc info lbl live (ListGraph code)) =
-        CmmProc info lbl live (ListGraph (map insert_stack_insns code))
+        return (CmmProc info lbl live (ListGraph (map insert_stack_insns code)))
   where
     alloc   = mkStackAllocInstr platform amount
     dealloc = mkStackDeallocInstr platform amount

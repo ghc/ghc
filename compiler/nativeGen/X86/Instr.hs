@@ -36,6 +36,9 @@ import CLabel
 import DynFlags
 import UniqSet
 import Unique
+import UniqSupply
+
+import Control.Monad
 
 -- Size of an x86/x86_64 memory address, in bytes.
 --
@@ -622,7 +625,7 @@ x86_mkSpillInstr
     -> Instr
 
 x86_mkSpillInstr dflags reg delta slot
-  = let off     = spillSlotToOffset dflags slot - delta
+  = let off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
            RcInteger   -> MOV (archWordSize is32Bit)
@@ -642,7 +645,7 @@ x86_mkLoadInstr
     -> Instr
 
 x86_mkLoadInstr dflags reg delta slot
-  = let off     = spillSlotToOffset dflags slot - delta
+  = let off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordSize is32Bit)
@@ -653,20 +656,25 @@ x86_mkLoadInstr dflags reg delta slot
     where platform = targetPlatform dflags
           is32Bit = target32Bit platform
 
-spillSlotSize :: DynFlags -> Int
+spillSlotSize :: Platform -> Int
 spillSlotSize dflags = if is32Bit then 12 else 8
-    where is32Bit = target32Bit (targetPlatform dflags)
+    where is32Bit = target32Bit dflags
 
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize dflags) - 1
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize (targetPlatform dflags)) - 1
+--     = 0 -- useful for testing allocMoreStack
+
+-- number of bytes that the stack pointer should be aligned to
+stackAlign :: Int
+stackAlign = 16
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
-spillSlotToOffset :: DynFlags -> Int -> Int
-spillSlotToOffset dflags slot
-   = 64 + spillSlotSize dflags * slot
+spillSlotToOffset :: Platform -> Int -> Int
+spillSlotToOffset platform slot
+   = 64 + spillSlotSize platform * slot
 
 --------------------------------------------------------------------------------
 
@@ -772,6 +780,16 @@ i386_insert_ffrees blocks
    insertGFREEs (BasicBlock id insns)
      = BasicBlock id (insertBeforeNonlocalTransfers GFREE insns)
 
+insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
+insertBeforeNonlocalTransfers insert insns
+     = foldr p [] insns
+     where p insn r = case insn of
+                        CALL _ _    -> insert : insn : r
+                        JMP _ _     -> insert : insn : r
+                        JXX_GBL _ _ -> panic "insertBeforeNonlocalTransfers: cannot handle JXX_GBL"
+                        _           -> insn : r
+
+
 -- if you ever add a new FP insn to the fake x86 FP insn set,
 -- you must update this too
 is_G_instr :: Instr -> Bool
@@ -821,36 +839,74 @@ is_G_instr instr
 --   - rename the virtual regs, so that we re-use vreg names and hence
 --     stack slots for non-overlapping vregs.
 --
+-- Note that when a block is both a non-local entry point (with an
+-- info table) and a local branch target, we have to split it into
+-- two, like so:
+--
+--    <info table>
+--    L:
+--       <code>
+--
+-- becomes
+--
+--    <info table>
+--    L:
+--       subl $rsp, N
+--       jmp Lnew
+--    Lnew:
+--       <code>
+--
+-- and all branches pointing to L are retargetted to point to Lnew.
+-- Otherwise, we would repeat the $rsp adjustment for each branch to
+-- L.
+--
 allocMoreStack
   :: Platform
   -> Int
   -> NatCmmDecl statics X86.Instr.Instr
-  -> NatCmmDecl statics X86.Instr.Instr
+  -> UniqSM (NatCmmDecl statics X86.Instr.Instr)
 
-allocMoreStack _ _ top@(CmmData _ _) = top
-allocMoreStack platform amount (CmmProc info lbl live (ListGraph code)) =
-        CmmProc info lbl live (ListGraph (map insert_stack_insns code))
-  where
-    alloc   = mkStackAllocInstr platform amount
-    dealloc = mkStackDeallocInstr platform amount
+allocMoreStack _ _ top@(CmmData _ _) = return top
+allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
+    let
+        infos = mapKeys info
+        entries = case code of
+                    [] -> infos
+                    BasicBlock entry _ : _ -- first block is the entry point
+                       | entry `elem` infos -> infos
+                       | otherwise          -> entry : infos
 
-    is_entry_point id = id `mapMember` info
+    uniqs <- replicateM (length entries) getUniqueUs
 
-    insert_stack_insns (BasicBlock id insns)
-       | is_entry_point id  = BasicBlock id (alloc : block')
-       | otherwise          = BasicBlock id block'
-       where
-         block' = insertBeforeNonlocalTransfers dealloc insns
+    let
+      delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
+        where x = slots * spillSlotSize platform -- sp delta
 
+      alloc   = mkStackAllocInstr   platform delta
+      dealloc = mkStackDeallocInstr platform delta
+  
+      new_blockmap :: BlockEnv BlockId
+      new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
+  
+      insert_stack_insns (BasicBlock id insns)
+         | Just new_blockid <- mapLookup id new_blockmap
+         = [ BasicBlock id [alloc, JXX ALWAYS new_blockid]
+           , BasicBlock new_blockid block' ]
+         | otherwise
+         = [ BasicBlock id block' ]
+         where
+           block' = foldr insert_dealloc [] insns
 
-insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
-insertBeforeNonlocalTransfers insert insns
-     = foldr p [] insns
-     where p insn r = case insn of
-                        CALL _ _    -> insert : insn : r
-                        JMP _ _     -> insert : insn : r
-                        JXX_GBL _ _ -> panic "insertBeforeNonlocalTransfers: cannot handle JXX_GBL"
-                        _           -> insn : r
+      insert_dealloc insn r = case insn of
+         JMP _ _     -> dealloc : insn : r
+         JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
+         JXX cond b | Just new_dest <- mapLookup b new_blockmap
+             -> JXX cond new_dest : r
+         _ -> insn : r
+
+      new_code = concatMap insert_stack_insns code
+    -- in
+    return (CmmProc info lbl live (ListGraph new_code))
 
 
 data JumpDest = DestBlockId BlockId | DestImm Imm
