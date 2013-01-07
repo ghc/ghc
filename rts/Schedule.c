@@ -2070,9 +2070,7 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
     // Notify IO manager that the number of capabilities has changed.
     rts_evalIO(
        &cap,
-       rts_apply(cap, 
-		 &base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure,
-		 rts_mkInt(cap, enabled_capabilities)),
+       &base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure,
        NULL);
 
     rts_unlock(cap);
