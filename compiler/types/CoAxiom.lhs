@@ -16,14 +16,14 @@ module CoAxiom (
        brListLength, brListNth, brListMap, brListFoldr,
        brListZipWith,
 
-       CoAxiom(..), CoAxBranch(..),
+       CoAxiom(..), CoAxBranch(..), mkCoAxBranch,
 
        toBranchedAxiom, toUnbranchedAxiom,
        coAxiomName, coAxiomArity, coAxiomBranches,
        coAxiomTyCon, isImplicitCoAxiom,
        coAxiomNthBranch, coAxiomSingleBranch_maybe,
        coAxiomSingleBranch, coAxBranchTyVars, coAxBranchLHS,
-       coAxBranchRHS
+       coAxBranchRHS, coAxBranchSpan
        ) where 
 
 import {-# SOURCE #-} TypeRep ( Type )
@@ -35,17 +35,12 @@ import Var
 import Util
 import BasicTypes
 import Data.Typeable ( Typeable )
+import SrcLoc
 import qualified Data.Data as Data
 
 #include "HsVersions.h"
 
 \end{code}
-
-%************************************************************************
-%*                                                                      *
-                    Coercion axioms
-%*                                                                      *
-%************************************************************************
 
 Note [Coercion axiom branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -115,6 +110,13 @@ remain compilable with GHC 7.2.1. If you are revising this code and GHC no
 longer needs to remain compatible with GHC 7.2.x, then please update this
 code to use promoted types.
 
+
+%************************************************************************
+%*                                                                      *
+                    Branch lists
+%*                                                                      *
+%************************************************************************
+
 \begin{code}
 
 -- the phantom type labels
@@ -177,7 +179,15 @@ brListZipWith f (NextBranch a ta) (NextBranch b tb) = f a b : brListZipWith f ta
 
 instance Outputable a => Outputable (BranchList a br) where
   ppr = ppr . fromBranchList
+\end{code}
 
+%************************************************************************
+%*                                                                      *
+                    Coercion axioms
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 -- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
 
 -- If you edit this type, you may need to update the GHC formalism
@@ -197,7 +207,8 @@ data CoAxiom br
 
 data CoAxBranch
   = CoAxBranch
-    { cab_tvs      :: [TyVar]      -- bound type variables
+    { cab_loc      :: SrcSpan      -- location of the defining equation
+    , cab_tvs      :: [TyVar]      -- bound type variables
     , cab_lhs      :: [Type]       -- type patterns to match against
     , cab_rhs      :: Type         -- right-hand side of the equality
     }
@@ -248,8 +259,16 @@ coAxBranchLHS = cab_lhs
 coAxBranchRHS :: CoAxBranch -> Type
 coAxBranchRHS = cab_rhs
 
+coAxBranchSpan :: CoAxBranch -> SrcSpan
+coAxBranchSpan = cab_loc
+
 isImplicitCoAxiom :: CoAxiom br -> Bool
 isImplicitCoAxiom = co_ax_implicit
+
+-- The tyvars must be *fresh*. This CoAxBranch will be put into a
+-- FamInst. See Note [Template tyvars are fresh] in InstEnv
+mkCoAxBranch :: SrcSpan -> [TyVar] -> [Type] -> Type -> CoAxBranch
+mkCoAxBranch = CoAxBranch
 \end{code}
 
 Note [Implicit axioms]
@@ -290,3 +309,4 @@ instance Typeable br => Data.Data (CoAxiom br) where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "CoAxiom"
 \end{code}
+

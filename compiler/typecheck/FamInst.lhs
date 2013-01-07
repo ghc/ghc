@@ -11,7 +11,10 @@ The @FamInst@ type: family instance heads
 module FamInst ( 
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
 	tcLookupFamInst, tcLookupDataFamInst,
-        tcGetFamInstEnvs
+        tcGetFamInstEnvs,
+
+        freshenFamInstEqn, freshenFamInstEqnLoc,
+        mkFreshenedSynInst, mkFreshenedSynInstLoc
     ) where
 
 import HscTypes
@@ -22,6 +25,7 @@ import TcRnMonad
 import TyCon
 import CoAxiom
 import DynFlags
+import SrcLoc
 import Module
 import Outputable
 import UniqFM
@@ -30,6 +34,7 @@ import Util
 import Maybes
 import TcMType
 import Type
+import Name
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -264,32 +269,20 @@ addLocalFamInst (home_fie, my_fis) fam_inst
         -- my_fies is just the ones from this module
   = do { traceTc "addLocalFamInst" (ppr fam_inst)
 
-           -- We wish to extend the instance envt with completely
-           -- fresh template variables. Otherwise, there may be
-           -- problems when we try to unify the template variables
-           -- with type family applications.
-
-           -- See also addLocalInst in Inst.lhs
-       ; (axBranches', fiBranches')
-           <- zipWithAndUnzipM mk_skolem_tyvars (fromBranchList $ coAxiomBranches axiom)
-                                                (fromBranchList fiBranches)
-       ; let axiom' = axiom { co_ax_branches = toBranchList axBranches' }
-             fam_inst' = fam_inst { fi_axiom = axiom'
-                                  , fi_branches = toBranchList fiBranches' }
-
        ; isGHCi <- getIsGHCi
  
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
        ; let (home_fie', my_fis') 
-               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst'
-                             , filterOut (identicalFamInst fam_inst') my_fis)
+               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst
+                             , filterOut (identicalFamInst fam_inst) my_fis)
                | otherwise = (home_fie, my_fis)
 
            -- Load imported instances, so that we report
            -- overlaps correctly
        ; eps <- getEps
        ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
+             fam_inst'  = toBranchedFamInst fam_inst
              home_fie'' = extendFamInstEnv home_fie fam_inst'
 
            -- Check for conflicting instance decls
@@ -298,44 +291,6 @@ addLocalFamInst (home_fie, my_fis) fam_inst
             return (home_fie'', fam_inst' : my_fis')
          else 
             return (home_fie,   my_fis) }
-
-  where
-    axiom = famInstAxiom fam_inst
-    fiBranches = famInstBranches fam_inst
-
-    zipWithAndUnzipM :: Monad m
-                     => (a -> b -> m (c, d))
-                     -> [a]
-                     -> [b]
-                     -> m ([c], [d])
-    zipWithAndUnzipM f as bs
-      = do { cds <- zipWithM f as bs
-           ; return $ unzip cds }
-
-    mk_skolem_tyvars :: CoAxBranch -> FamInstBranch
-                     -> TcM (CoAxBranch, FamInstBranch)
-    mk_skolem_tyvars axb fib
-      = do { (subst, skol_tvs) <- tcInstSkolTyVars (coAxBranchTyVars axb)
-           ; let axb' = coAxBranchSubst axb skol_tvs subst
-                 fib' = famInstBranchSubst fib skol_tvs subst
-           ; return (axb', fib') }
-
-    -- substitute the tyvars for a new set of tyvars
-    coAxBranchSubst :: CoAxBranch -> [TyVar] -> TvSubst -> CoAxBranch
-    coAxBranchSubst (CoAxBranch { cab_lhs = lhs
-                                , cab_rhs = rhs }) new_tvs subst
-      = CoAxBranch { cab_tvs = new_tvs
-                   , cab_lhs = substTys subst lhs
-                   , cab_rhs = substTy subst rhs }
-
-    -- substitute the current set of tyvars for another
-    famInstBranchSubst :: FamInstBranch -> [TyVar] -> TvSubst -> FamInstBranch
-    famInstBranchSubst fib@(FamInstBranch { fib_lhs = lhs
-                                          , fib_rhs = rhs }) new_tvs subst
-      = fib { fib_tvs = new_tvs
-            , fib_lhs = substTys subst lhs
-            , fib_rhs = substTy subst rhs }
-
 
 \end{code}
 
@@ -368,7 +323,7 @@ conflictInstErr fam_inst branch conflictingMatch
                    [(fam_inst, branch),
                     (confInst, famInstNthBranch confInst confIndex)]
   | otherwise
-  = pprPanic "conflictInstErr" (pprFamInstBranch (famInstTyCon fam_inst) branch)
+  = pprPanic "conflictInstErr" (pprFamInstBranch (famInstAxiom fam_inst) branch)
 
 addFamInstsErr :: SDoc -> [(FamInst Branched, FamInstBranch)] -> TcRn ()
 addFamInstsErr herald insts
@@ -392,4 +347,54 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 tcGetFamInstEnvs 
   = do { eps <- getEps; env <- getGblEnv
        ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
+\end{code}
+
+%************************************************************************
+%*									*
+	Freshening type variables
+%*									*
+%************************************************************************
+
+\begin{code}
+
+-- All type variables in a FamInst/CoAxiom must be fresh. This function
+-- creates the fresh variables and applies the necessary substitution
+-- It is defined here to avoid a dependency from FamInstEnv on the monad
+-- code.
+freshenFamInstEqn :: [TyVar] -- original, possibly stale, tyvars
+                  -> [Type]  -- LHS patterns
+                  -> Type    -- RHS
+                  -> TcM ([TyVar], [Type], Type)
+freshenFamInstEqn tvs lhs rhs
+  = do { loc <- getSrcSpanM
+       ; freshenFamInstEqnLoc loc tvs lhs rhs }
+
+-- freshenFamInstEqn needs to be called outside the TcM monad:
+freshenFamInstEqnLoc :: SrcSpan
+                     -> [TyVar] -> [Type] -> Type
+                     -> TcRnIf gbl lcl ([TyVar], [Type], Type)
+freshenFamInstEqnLoc loc tvs lhs rhs
+  = do { (subst, tvs') <- tcInstSkolTyVarsLoc loc tvs
+       ; let lhs' = substTys subst lhs
+             rhs' = substTy  subst rhs
+       ; return (tvs', lhs', rhs') }
+
+-- Makes an unbranched synonym FamInst, with freshened tyvars
+mkFreshenedSynInst :: Name    -- Unique name for the coercion tycon
+                   -> [TyVar] -- possibly stale tyvars of the coercion
+                   -> TyCon   -- Family tycon
+                   -> [Type]  -- LHS patterns
+                   -> Type    -- RHS
+                   -> TcM (FamInst Unbranched)
+mkFreshenedSynInst name tvs fam_tc inst_tys rep_ty
+  = do { loc <- getSrcSpanM
+       ; mkFreshenedSynInstLoc loc name tvs fam_tc inst_tys rep_ty }
+
+mkFreshenedSynInstLoc :: SrcSpan
+                      -> Name -> [TyVar] -> TyCon -> [Type] -> Type
+                      -> TcRnIf gbl lcl (FamInst Unbranched)
+mkFreshenedSynInstLoc loc name tvs fam_tc inst_tys rep_ty
+  = do { (tvs', inst_tys', rep_ty') <- freshenFamInstEqnLoc loc tvs inst_tys rep_ty
+       ; return $ mkSingleSynFamInst name tvs' fam_tc inst_tys' rep_ty' }
+
 \end{code}

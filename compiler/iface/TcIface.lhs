@@ -559,7 +559,8 @@ tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = bra
           = bindIfaceTyVars tv_bndrs $ \ tvs -> do
             { tc_lhs <- mapM tcIfaceType lhs
             ; tc_rhs <- tcIfaceType rhs
-            ; let branch = CoAxBranch { cab_tvs = tvs
+            ; let branch = CoAxBranch { cab_loc = noSrcSpan
+                                      , cab_tvs = tvs
                                       , cab_lhs = tc_lhs
                                       , cab_rhs = tc_rhs }
             ; return branch }
