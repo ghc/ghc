@@ -34,7 +34,9 @@ module GHC.TypeLits
 
     -- * Destructing type-nat singletons.
   , isZero, IsZero(..)
-  , isEven, IsEven(..)
+
+-- Commented out; see definition below; SLPJ Jan 13
+--  , isEven, IsEven(..)
 
 
     -- * Matching on type-nats
@@ -51,7 +53,7 @@ import GHC.Base(String)
 import GHC.Read(Read(..))
 import GHC.Show(Show(..))
 import Unsafe.Coerce(unsafeCoerce)
-import Data.Bits(testBit,shiftR)
+-- import Data.Bits(testBit,shiftR)
 import Data.Maybe(Maybe(..))
 import Data.List((++))
 
@@ -193,9 +195,16 @@ instance Show (IsZero n) where
   show IsZero     = "0"
   show (IsSucc n) = "(" ++ show n ++ " + 1)"
 
+{- ----------------------------------------------------------------------------
+
+This IsEven code is commented out for now.  The trouble is that the 
+IsEven constructor has an ambiguous type, at least until (+) becomes
+suitably injective. 
+
 data IsEven :: Nat -> * where
   IsEvenZero :: IsEven 0
   IsEven     :: !(Sing (n+1)) -> IsEven (2 * n + 2)
+  IsEven     :: !(Sing (n)) -> IsEven (2 * n + 1)
   IsOdd      :: !(Sing n)     -> IsEven (2 * n + 1)
 
 isEven :: Sing n -> IsEven n
@@ -208,8 +217,7 @@ instance Show (IsEven n) where
   show (IsEven x) = "(2 * " ++ show x ++ ")"
   show (IsOdd  x) = "(2 * " ++ show x ++ " + 1)"
 
-
---------------------------------------------------------------------------------
+------------------------------------------------------------------------------ -}
 
 -- | Unary implemenation of natural numbers.
 -- Used both at the type and at the value level.
