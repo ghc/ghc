@@ -101,3 +101,4 @@ test('T5252Take2',
      extra_clean(['T5252Take2a.hi', 'T5252Take2a.o']),
      run_command, 
      ['$MAKE -s --no-print-directory T5252Take2'])
+test('T2431', normal, compile, ['-ddump-simpl -dsuppress-uniques'])

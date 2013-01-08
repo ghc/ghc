@@ -1,10 +1,10 @@
 
 SimpleFail11a.hs:6:15:
     Conflicting family instance declarations:
-      data instance C9 Int Int -- Defined at SimpleFail11a.hs:6:15
-      data instance C9 Int Int -- Defined at SimpleFail11a.hs:8:15
+      C9 Int Int -- Defined at SimpleFail11a.hs:6:15
+      C9 Int Int -- Defined at SimpleFail11a.hs:8:15
 
 SimpleFail11a.hs:11:15:
     Conflicting family instance declarations:
-      type instance D9 Int Int -- Defined at SimpleFail11a.hs:11:15
-      type instance D9 Int Int -- Defined at SimpleFail11a.hs:13:15
+      D9 Int Int -- Defined at SimpleFail11a.hs:11:15
+      D9 Int Int -- Defined at SimpleFail11a.hs:13:15

@@ -51,7 +51,7 @@ else:
    sse2_opts = ''
 
 test('T4321',
-     [omit_ways(['ghci']), expect_broken(4321)],
+     omit_ways(['ghci']),
      compile_and_run, ['-O ' + sse2_opts])
 
 test('T3736',
@@ -254,3 +254,27 @@ test('T7257',
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
+
+test('Conversions',
+     [if_wordsize(32,
+          stats_range_field('bytes allocated', 55316, 5)),
+                           # 2012-12-18: Guessed 64-bit value / 2
+      if_wordsize(64,
+          stats_range_field('bytes allocated', 110632, 5)),
+                           # 2012-12-18: 109608 (amd64/OS X)
+
+      only_ways(['normal'])
+     ],
+    compile_and_run, ['-O'])
+
+test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
+# For 7507, stack overflow is the bad case
+
+test('T7436',
+     [stats_num_field('max_bytes_used', 50000,
+                                         100000),
+                                     # expected value: 127,000 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])

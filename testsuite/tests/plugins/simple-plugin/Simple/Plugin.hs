@@ -70,7 +70,7 @@ changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in ca
                 Nothing -> return e
                 Just replacement -> do
                         putMsgS "Performing Replacement"
-                        return $ Lit (MachStr (fastStringToFastBytes (mkFastString replacement)))
+                        return $ Lit (MachStr (fastStringToByteString (mkFastString replacement)))
         App e1 e2 -> liftM2 App (go e1) (go e2)
         Lam b e -> liftM (Lam b) (go e)
         Let bind e -> liftM2 Let (changeBind anns mb_replacement bind) (go e)

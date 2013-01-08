@@ -1,0 +1,7 @@
+
+T7506.hs:6:1:
+    Unacceptable type in foreign declaration: Int -> IO ()
+    A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)
+    When checking declaration:
+      foreign import ccall safe "static stdio.h &putchar" c_putchar
+        :: Int -> IO ()

@@ -29,7 +29,7 @@ T4306:
 T4201:
 	$(RM) -f T4201.hi T4201.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4201.hs 
-	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi | grep 'Sym'
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi | grep -B2 'Sym'
 
 # This one looped as a result of bogus specialisation
 T4903:

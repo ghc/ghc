@@ -81,6 +81,9 @@ class TestConfig:
         # Do we have vanilla libraries?
         self.have_vanilla = False
 
+        # Do we have dynamic libraries?
+        self.have_dynamic = False
+
         # Do we have profiling support?
         self.have_profiling = False
 

@@ -354,6 +354,42 @@ def if_cygwin( f ):
     else:
         return normal
 
+def when_have_vanilla( f ):
+    if config.have_vanilla:
+        return f
+    else:
+        return normal
+
+def unless_have_vanilla( f ):
+    if config.have_vanilla:
+        return normal
+    else:
+        return f
+
+def when_have_dynamic( f ):
+    if config.have_dynamic:
+        return f
+    else:
+        return normal
+
+def unless_have_dynamic( f ):
+    if config.have_dynamic:
+        return normal
+    else:
+        return f
+
+def when_have_profiling( f ):
+    if config.have_profiling:
+        return f
+    else:
+        return normal
+
+def unless_have_profiling( f ):
+    if config.have_profiling:
+        return normal
+    else:
+        return f
+
 # ---
 
 def if_ghci_dynamic( f ):

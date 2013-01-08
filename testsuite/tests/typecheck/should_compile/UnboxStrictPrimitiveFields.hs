@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -funbox-strict-primitive-fields #-}
+{-# OPTIONS_GHC -funbox-small-strict-fields #-}
 module Test where
 
 import GHC.Exts

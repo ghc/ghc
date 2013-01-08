@@ -1,0 +1,5 @@
+
+Overlap4.hs:6:15:
+    Conflicting family instance declarations:
+      F Char Char -- Defined at Overlap4.hs:6:15
+      F a a -- Defined at Overlap4.hs:8:3

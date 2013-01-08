@@ -43,7 +43,7 @@ Derived instances:
   instance GHC.Base.Functor GenDerivOutput.List where
     GHC.Base.fmap f GenDerivOutput.Nil = GenDerivOutput.Nil
     GHC.Base.fmap f (GenDerivOutput.Cons a1 a2)
-      = GenDerivOutput.Cons (f a1) (GHC.Base.fmap (\ b1 -> f b1) a2)
+      = GenDerivOutput.Cons (f a1) (GHC.Base.fmap f a2)
   
   instance GHC.Generics.Generic (GenDerivOutput.Rose a) where
     GHC.Generics.from GenDerivOutput.Empty
