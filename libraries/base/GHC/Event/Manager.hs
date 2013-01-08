@@ -246,6 +246,14 @@ loop mgr@EventManager{..} = do
             Releasing -> putMVar emLock ()
             _         -> cleanup mgr
 
+-- | To make a step, we first do a non-blocking poll, in case
+-- there are already events ready to handle. This improves performance
+-- because we can make an unsafe foreign C call, thereby avoiding
+-- forcing the current Task to release the Capability and forcing a context switch.
+-- If the poll fails to find events, we yield, putting the poll loop thread at
+-- end of the Haskell run queue. When it comes back around, we do one more
+-- non-blocking poll, in case we get lucky and have ready events.
+-- If that also returns no events, then we do a blocking poll.
 step :: EventManager -> IO State
 step mgr@EventManager{..} = do
   waitForIO
