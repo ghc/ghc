@@ -41,7 +41,7 @@ import GHC.Char
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
-import GHC.Real( Integral, Rational, (%), fromIntegral,
+import GHC.Real( Rational, (%), fromIntegral,
                  toInteger, (^) )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
