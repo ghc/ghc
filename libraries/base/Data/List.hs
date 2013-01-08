@@ -509,7 +509,7 @@ mapAccumR f s (x:xs)    =  (s'', y:ys)
                                  (s', ys) = mapAccumR f s xs
 
 -- | The 'insert' function takes an element and a list and inserts the
--- element into the list at the last position where it is still less
+-- element into the list at the first position where it is less
 -- than or equal to the next element.  In particular, if the list
 -- is sorted before the call, the result will also be sorted.
 -- It is a special case of 'insertBy', which allows the programmer to

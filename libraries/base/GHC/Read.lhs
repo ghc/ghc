@@ -38,6 +38,7 @@ module GHC.Read
   , list
   , choose
   , readListDefault, readListPrecDefault
+  , readNumber
 
   -- Temporary
   , readParen

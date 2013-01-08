@@ -19,7 +19,7 @@ module Text.Read.Lex
   -- lexing types
   ( Lexeme(..)
 
-  , numberToInteger, numberToRational, numberToRangedRational
+  , numberToInteger, numberToFixed, numberToRational, numberToRangedRational
 
   -- lexer
   , lex, expect
@@ -81,6 +81,22 @@ numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
+
+numberToFixed :: Integer -> Number -> Maybe (Integer, Integer)
+numberToFixed _ (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart, 0)
+numberToFixed _ (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart, 0)
+numberToFixed p (MkDecimal iPart (Just fPart) Nothing)
+    = let i = val 10 0 iPart
+          f = val 10 0 (integerTake p (fPart ++ repeat 0))
+          -- Sigh, we really want genericTake, but that's above us in
+          -- the hierarchy, so we define our own version here (actually
+          -- specialised to Integer)
+          integerTake             :: Integer -> [a] -> [a]
+          integerTake n _ | n <= 0 = []
+          integerTake _ []        =  []
+          integerTake n (x:xs)    =  x : integerTake (n-1) xs
+      in Just (i, f)
+numberToFixed _ _ = Nothing
 
 -- This takes a floatRange, and if the Rational would be outside of
 -- the floatRange then it may return Nothing. Not that it will not
