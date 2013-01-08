@@ -6,7 +6,6 @@ tcfail080.hs:27:1:
       bound by the inferred type for `q': Collection c a => a -> Bool
       at tcfail080.hs:27:1-27
     The type variable `c0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     When checking that `q'
       has the inferred type `forall (c :: * -> *) a.
                              Collection c a =>

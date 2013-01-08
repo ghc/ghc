@@ -2,9 +2,6 @@
 tcfail043.hs:38:17:
     No instance for (Ord_ a0) arising from a use of `gt'
     The type variable `a0' is ambiguous
-    Possible cause: the monomorphism restriction applied to: `search'
-    Probable fix: give these definition(s) an explicit type signature
-                  or use -XNoMonomorphismRestriction
     Relevant bindings include
       search :: a0 -> [a0] -> Bool (bound at tcfail043.hs:37:1)
       a :: a0 (bound at tcfail043.hs:38:6)
@@ -27,9 +24,6 @@ tcfail043.hs:38:17:
 tcfail043.hs:40:25:
     No instance for (Eq_ a0) arising from a use of `eq'
     The type variable `a0' is ambiguous
-    Possible cause: the monomorphism restriction applied to: `search'
-    Probable fix: give these definition(s) an explicit type signature
-                  or use -XNoMonomorphismRestriction
     Relevant bindings include
       search :: a0 -> [a0] -> Bool (bound at tcfail043.hs:37:1)
       a :: a0 (bound at tcfail043.hs:38:6)

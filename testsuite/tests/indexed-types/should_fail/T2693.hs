@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes, TypeFamilies #-}
+-- Type of x is ambiguous
 
 module T2693 where
 

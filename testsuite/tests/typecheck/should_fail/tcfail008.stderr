@@ -2,9 +2,6 @@
 tcfail008.hs:3:5:
     No instance for (Num a0) arising from the literal `1'
     The type variable `a0' is ambiguous
-    Possible cause: the monomorphism restriction applied to: `o'
-    Probable fix: give these definition(s) an explicit type signature
-                  or use -XNoMonomorphismRestriction
     Relevant bindings include o :: [a0] (bound at tcfail008.hs:3:1)
     Note: there are several potential instances:
       instance Num Double -- Defined in `GHC.Float'

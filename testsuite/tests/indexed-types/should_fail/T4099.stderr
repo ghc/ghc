@@ -1,23 +1,23 @@
 
-T4099.hs:11:14:
+T4099.hs:11:30:
     Couldn't match expected type `T a0' with actual type `T b'
     NB: `T' is a type function, and may not be injective
     The type variable `a0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include
-      bar1 :: T b -> Int (bound at T4099.hs:11:1)
-      x :: T b (bound at T4099.hs:11:6)
-    In the first argument of `foo', namely `x'
-    In the expression: foo x
-    In an equation for `bar1': bar1 x = foo x
+      bar1 :: b -> T b -> Int (bound at T4099.hs:11:1)
+      a :: b (bound at T4099.hs:11:6)
+      x :: T b (bound at T4099.hs:11:8)
+    In the second argument of `foo', namely `x'
+    In the expression: foo (error "urk") x
+    In an equation for `bar1': bar1 a x = foo (error "urk") x
 
-T4099.hs:14:14:
+T4099.hs:14:30:
     Couldn't match expected type `T a1' with actual type `Maybe b'
     The type variable `a1' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include
-      bar2 :: Maybe b -> Int (bound at T4099.hs:14:1)
-      x :: Maybe b (bound at T4099.hs:14:6)
-    In the first argument of `foo', namely `x'
-    In the expression: foo x
-    In an equation for `bar2': bar2 x = foo x
+      bar2 :: b -> Maybe b -> Int (bound at T4099.hs:14:1)
+      a :: b (bound at T4099.hs:14:6)
+      x :: Maybe b (bound at T4099.hs:14:8)
+    In the second argument of `foo', namely `x'
+    In the expression: foo (error "urk") x
+    In an equation for `bar2': bar2 a x = foo (error "urk") x

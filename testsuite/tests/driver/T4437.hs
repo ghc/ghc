@@ -31,6 +31,7 @@ check title expected got
 
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = [
+                             "AlloAmbiguousTypes",
                              "RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",

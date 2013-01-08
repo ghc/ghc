@@ -1,5 +1,5 @@
 
-T5934.hs:10:7:
+T5934.hs:12:7:
     Cannot instantiate unification variable `a0'
     with a type involving foralls: (forall s. GenST s) -> Int
       Perhaps you want -XImpredicativeTypes

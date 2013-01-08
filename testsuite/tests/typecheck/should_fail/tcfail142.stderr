@@ -1,7 +1,10 @@
 
-tcfail142.hs:21:12:
-    No instance for (Bar a0 r0)
-      arising from a use of `bar'
-    In the first argument of `foo', namely `bar'
-    In the expression: foo bar
-    In an equation for `test': test = foo bar
+tcfail142.hs:18:8:
+    Could not deduce (Bar a0 r)
+      arising from the ambiguity check for `bar'
+    from the context (Bar a r)
+      bound by the type signature for bar :: Bar a r => r -> ()
+      at tcfail142.hs:18:8-25
+    The type variable `a0' is ambiguous
+    In the ambiguity check for: forall r a. Bar a r => r -> ()
+    In the type signature for `bar': bar :: Bar a r => r -> ()

@@ -1,5 +1,5 @@
 
-../../typecheck/should_run/Defer01.hs:11:40: Warning:
+..\..\typecheck\should_run\Defer01.hs:11:40: Warning:
     Couldn't match type `Char' with `[Char]'
     Expected type: String
       Actual type: Char
@@ -7,17 +7,17 @@
     In the second argument of `(>>)', namely putStr ','
     In the expression: putStr "Hello World" >> putStr ','
 
-../../typecheck/should_run/Defer01.hs:14:5: Warning:
+..\..\typecheck\should_run\Defer01.hs:14:5: Warning:
     Couldn't match expected type `Int' with actual type `Char'
     In the expression: 'p'
     In an equation for `a': a = 'p'
 
-../../typecheck/should_run/Defer01.hs:18:9: Warning:
+..\..\typecheck\should_run\Defer01.hs:18:9: Warning:
     No instance for (Eq B) arising from a use of `=='
     In the expression: x == x
     In an equation for `b': b x = x == x
 
-../../typecheck/should_run/Defer01.hs:25:4: Warning:
+..\..\typecheck\should_run\Defer01.hs:25:4: Warning:
     Couldn't match type `Int' with `Bool'
     Inaccessible code in
       a pattern with constructor
@@ -26,51 +26,50 @@
     In the pattern: C2 x
     In an equation for `c': c (C2 x) = True
 
-../../typecheck/should_run/Defer01.hs:28:5: Warning:
+..\..\typecheck\should_run\Defer01.hs:28:5: Warning:
     No instance for (Num (a -> a)) arising from the literal `1'
     In the expression: 1
     In an equation for `d': d = 1
 
-../../typecheck/should_run/Defer01.hs:31:5: Warning:
+..\..\typecheck\should_run\Defer01.hs:31:5: Warning:
     Couldn't match expected type `Char -> t' with actual type `Char'
     Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
+      f :: t (bound at ..\..\typecheck\should_run\Defer01.hs:31:1)
     The function `e' is applied to one argument,
     but its type `Char' has none
     In the expression: e 'q'
     In an equation for `f': f = e 'q'
 
-../../typecheck/should_run/Defer01.hs:34:8: Warning:
+..\..\typecheck\should_run\Defer01.hs:34:8: Warning:
     Couldn't match expected type `Char' with actual type `a'
       `a' is a rigid type variable bound by
           the type signature for h :: a -> (Char, Char)
-          at ../../typecheck/should_run/Defer01.hs:33:6
+          at ..\..\typecheck\should_run\Defer01.hs:33:6
     Relevant bindings include
       h :: a -> (Char, Char)
-        (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
+        (bound at ..\..\typecheck\should_run\Defer01.hs:34:1)
+      x :: a (bound at ..\..\typecheck\should_run\Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
     In an equation for `h': h x = (x, 'c')
 
-../../typecheck/should_run/Defer01.hs:39:17: Warning:
+..\..\typecheck\should_run\Defer01.hs:39:17: Warning:
     Couldn't match expected type `Bool' with actual type `T a'
     Relevant bindings include
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
-      a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a -> () (bound at ..\..\typecheck\should_run\Defer01.hs:39:1)
+      a :: a (bound at ..\..\typecheck\should_run\Defer01.hs:39:3)
     In the return type of a call of `K'
     In the first argument of `not', namely `(K a)'
     In the expression: (not (K a))
 
-../../typecheck/should_run/Defer01.hs:43:5: Warning:
+..\..\typecheck\should_run\Defer01.hs:43:5: Warning:
     No instance for (MyClass a1) arising from a use of `myOp'
     In the expression: myOp 23
     In an equation for `j': j = myOp 23
 
-../../typecheck/should_run/Defer01.hs:43:10: Warning:
+..\..\typecheck\should_run\Defer01.hs:43:10: Warning:
     No instance for (Num a1) arising from the literal `23'
     The type variable `a1' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
       instance Num Double -- Defined in `GHC.Float'
       instance Num Float -- Defined in `GHC.Float'
@@ -81,23 +80,30 @@
     In the expression: myOp 23
     In an equation for `j': j = myOp 23
 
-../../typecheck/should_run/Defer01.hs:45:6: Warning:
+..\..\typecheck\should_run\Defer01.hs:45:6: Warning:
+    Couldn't match type `Int' with `Bool'
+    Inaccessible code in
+      the type signature for k :: Int ~ Bool => Int -> Bool
+    In the ambiguity check for: Int ~ Bool => Int -> Bool
+    In the type signature for `k': k :: Int ~ Bool => Int -> Bool
+
+..\..\typecheck\should_run\Defer01.hs:45:6: Warning:
     Couldn't match type `Int' with `Bool'
     Inaccessible code in
       the type signature for k :: Int ~ Bool => Int -> Bool
 
-../../typecheck/should_run/Defer01.hs:46:7: Warning:
+..\..\typecheck\should_run\Defer01.hs:46:7: Warning:
     Couldn't match expected type `Bool' with actual type `Int'
     In the expression: x
     In an equation for `k': k x = x
 
-../../typecheck/should_run/Defer01.hs:49:5: Warning:
+..\..\typecheck\should_run\Defer01.hs:49:5: Warning:
     Couldn't match expected type `IO a0'
                 with actual type `Char -> IO ()'
     In the first argument of `(>>)', namely `putChar'
     In the expression: putChar >> putChar 'p'
     In an equation for `l': l = putChar >> putChar 'p'
-*** Exception: ../../typecheck/should_run/Defer01.hs:11:40:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:11:40:
     Couldn't match type `Char' with `[Char]'
     Expected type: String
       Actual type: Char
@@ -105,12 +111,12 @@
     In the second argument of `(>>)', namely putStr ','
     In the expression: putStr "Hello World" >> putStr ','
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:14:5:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:14:5:
     Couldn't match expected type `Int' with actual type `Char'
     In the expression: 'p'
     In an equation for `a': a = 'p'
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:18:9:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:18:9:
     No instance for (Eq B) arising from a use of `=='
     In the expression: x == x
     In an equation for `b': b x = x == x
@@ -123,43 +129,43 @@
     In the return type of a call of `C2'
     In the first argument of `c', namely `(C2 True)'
     In the first argument of `print', namely `(c (C2 True))'
-*** Exception: ../../typecheck/should_run/Defer01.hs:28:5:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:28:5:
     No instance for (Num (a -> a)) arising from the literal `1'
     In the expression: 1
     In an equation for `d': d = 1
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:31:5:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:31:5:
     Couldn't match expected type `Char -> t' with actual type `Char'
     Relevant bindings include
-      f :: t (bound at ../../typecheck/should_run/Defer01.hs:31:1)
+      f :: t (bound at ..\..\typecheck\should_run\Defer01.hs:31:1)
     The function `e' is applied to one argument,
     but its type `Char' has none
     In the expression: e 'q'
     In an equation for `f': f = e 'q'
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:34:8:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:34:8:
     Couldn't match expected type `Char' with actual type `a'
       `a' is a rigid type variable bound by
           the type signature for h :: a -> (Char, Char)
-          at ../../typecheck/should_run/Defer01.hs:33:6
+          at ..\..\typecheck\should_run\Defer01.hs:33:6
     Relevant bindings include
       h :: a -> (Char, Char)
-        (bound at ../../typecheck/should_run/Defer01.hs:34:1)
-      x :: a (bound at ../../typecheck/should_run/Defer01.hs:34:3)
+        (bound at ..\..\typecheck\should_run\Defer01.hs:34:1)
+      x :: a (bound at ..\..\typecheck\should_run\Defer01.hs:34:3)
     In the expression: x
     In the expression: (x, 'c')
     In an equation for `h': h x = (x, 'c')
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:39:17:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:39:17:
     Couldn't match expected type `Bool' with actual type `T a'
     Relevant bindings include
-      i :: a -> () (bound at ../../typecheck/should_run/Defer01.hs:39:1)
-      a :: a (bound at ../../typecheck/should_run/Defer01.hs:39:3)
+      i :: a -> () (bound at ..\..\typecheck\should_run\Defer01.hs:39:1)
+      a :: a (bound at ..\..\typecheck\should_run\Defer01.hs:39:3)
     In the return type of a call of `K'
     In the first argument of `not', namely `(K a)'
     In the expression: (not (K a))
 (deferred type error)
-*** Exception: ../../typecheck/should_run/Defer01.hs:43:5:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:43:5:
     No instance for (MyClass a1) arising from a use of `myOp'
     In the expression: myOp 23
     In an equation for `j': j = myOp 23
@@ -170,7 +176,7 @@
     In the first argument of `print', namely `(k 2)'
     In the expression: print (k 2)
     In an equation for `it': it = print (k 2)
-*** Exception: ../../typecheck/should_run/Defer01.hs:49:5:
+*** Exception: ..\..\typecheck\should_run\Defer01.hs:49:5:
     Couldn't match expected type `IO a0'
                 with actual type `Char -> IO ()'
     In the first argument of `(>>)', namely `putChar'

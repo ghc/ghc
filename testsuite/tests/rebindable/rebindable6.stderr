@@ -3,7 +3,6 @@ rebindable6.hs:106:17:
     No instance for (HasSeq (IO a -> t0 -> IO b))
       arising from a do statement
     The type variable `t0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
@@ -27,7 +26,6 @@ rebindable6.hs:107:17:
     No instance for (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t0))
       arising from a do statement
     The type variables `t0', `t1' are ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)
@@ -50,7 +48,6 @@ rebindable6.hs:108:17:
     No instance for (HasReturn (b -> t1))
       arising from a use of `return'
     The type variable `t1' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include
       test_do :: IO a -> IO (Maybe b) -> IO b
         (bound at rebindable6.hs:104:9)

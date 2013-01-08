@@ -5,7 +5,6 @@ T2544.hs:15:18:
       bound by the instance declaration at T2544.hs:13:10-37
     NB: `IxMap' is a type function, and may not be injective
     The type variable `i0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Expected type: IxMap l [Int]
       Actual type: IxMap i0 [Int]
     Relevant bindings include
@@ -20,7 +19,6 @@ T2544.hs:15:24:
       bound by the instance declaration at T2544.hs:13:10-37
     NB: `IxMap' is a type function, and may not be injective
     The type variable `i1' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Expected type: IxMap r [Int]
       Actual type: IxMap i1 [Int]
     Relevant bindings include

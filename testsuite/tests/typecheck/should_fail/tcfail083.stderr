@@ -9,7 +9,6 @@ tcfail083.hs:8:39:
 tcfail083.hs:8:53:
     No instance for (Show t0) arising from a use of `print'
     The type variable `t0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Relevant bindings include b :: t0 (bound at tcfail083.hs:8:45)
     Note: there are several potential instances:
       instance Show Bar -- Defined at tcfail083.hs:3:43

@@ -6,7 +6,6 @@ tc168.hs:17:1:
       bound by the inferred type for `g': C a1 (a, b) => a1 -> a
       at tc168.hs:17:1-16
     The type variable `b0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     When checking that `g'
       has the inferred type `forall a b a1. C a1 (a, b) => a1 -> a'
     Probable cause: the inferred type is ambiguous

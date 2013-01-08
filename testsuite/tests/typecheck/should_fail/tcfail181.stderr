@@ -6,7 +6,6 @@ tcfail181.hs:17:9:
                wog :: Monad m => t -> Something (m Bool) e
       at tcfail181.hs:17:1-30
     The type variable `m0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
       instance Monad ((->) r) -- Defined in `GHC.Base'
       instance Monad IO -- Defined in `GHC.Base'
@@ -14,4 +13,3 @@ tcfail181.hs:17:9:
     In the expression: foo
     In the expression: foo {bar = return True}
     In an equation for `wog': wog x = foo {bar = return True}
-

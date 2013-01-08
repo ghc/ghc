@@ -3,7 +3,6 @@ T5858.hs:11:7:
     No instance for (InferOverloaded ([a0], [a1]))
       arising from a use of `infer'
     The type variables `a0', `a1' are ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there is a potential instance available:
       instance t1 ~ String => InferOverloaded (t1, t1)
         -- Defined at T5858.hs:8:10

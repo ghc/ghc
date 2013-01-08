@@ -6,10 +6,6 @@ data T a where
   MkT :: a -> T a 
   MkT3 :: forall a. (a ~ Bool) => T a 
 
--- Occurs checks in givens
-foo :: forall a. (a ~ T a) => a -> a 
-foo x = x 
-
 -- Mismatches in givens 
 bloh :: T Int -> () 
 bloh x = case x of 

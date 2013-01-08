@@ -3,7 +3,6 @@ tcfail128.hs:18:16:
     No instance for (Data.Array.Base.MArray b0 FlatVector IO)
       arising from a use of `thaw'
     The type variable `b0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there is a potential instance available:
       instance Data.Array.Base.MArray GHC.IOArray.IOArray e IO
         -- Defined in `Data.Array.Base'

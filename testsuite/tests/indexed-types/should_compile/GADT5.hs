@@ -9,6 +9,6 @@ data T a where
 
 type family F a
 
-bar :: T (F a) -> ()
-bar T = ()
+bar :: a -> T (F a) -> ()
+bar x T = ()
 

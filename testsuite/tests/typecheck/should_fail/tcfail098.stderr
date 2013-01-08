@@ -1,0 +1,10 @@
+
+tcfail098.hs:12:10:
+    Could not deduce (Bar a0)
+      arising from the ambiguity check for an instance declaration
+    from the context (Bar a)
+      bound by an instance declaration: Bar a => Bar Bool
+      at tcfail098.hs:12:10-26
+    The type variable `a0' is ambiguous
+    In the ambiguity check for: forall a. Bar a => Bar Bool
+    In the instance declaration for `Bar Bool'
