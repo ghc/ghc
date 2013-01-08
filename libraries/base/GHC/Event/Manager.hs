@@ -118,7 +118,7 @@ data EventManager = EventManager
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
     , emOneShot      :: !Bool
-    , emLock         :: MVar ()
+    , emLock         :: {-# UNPACK #-} !(MVar ())
     }
 
 -- must be power of 2
