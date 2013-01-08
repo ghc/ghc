@@ -195,6 +195,7 @@ eventManager = unsafePerformIO $ do
 numEnabledEventManagers :: IORef Int
 numEnabledEventManagers = unsafePerformIO $ do
   newIORef 0
+{-# NOINLINE numEnabledEventManagers #-}
 
 foreign import ccall unsafe "getOrSetSystemEventThreadIOManagerThreadStore"
     getOrSetSystemEventThreadIOManagerThreadStore :: Ptr a -> IO (Ptr a)
