@@ -85,6 +85,7 @@ import DynFlags
 import Util
 import Outputable
 import FastString
+import SrcLoc
 import Bag
 
 import Control.Monad
