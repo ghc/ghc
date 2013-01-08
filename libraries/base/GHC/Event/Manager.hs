@@ -52,6 +52,7 @@ import Control.Concurrent.MVar (MVar, modifyMVar, newMVar, readMVar, putMVar,
                                 tryPutMVar, takeMVar)
 import Control.Exception (onException)
 import Control.Monad ((=<<), forM_, liftM, when, replicateM, void)
+import Data.Bits ((.&.))
 import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
@@ -63,7 +64,7 @@ import GHC.Conc.Signal (runHandlers)
 import GHC.Conc.Sync (yield)
 import GHC.List (filter)
 import GHC.Num (Num(..))
-import GHC.Real (fromIntegral, mod)
+import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
@@ -120,11 +121,12 @@ data EventManager = EventManager
     , emLock         :: MVar ()
     }
 
+-- must be power of 2
 callbackArraySize :: Int
 callbackArraySize = 32
 
 hashFd :: Fd -> Int
-hashFd fd = fromIntegral fd `mod` callbackArraySize
+hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
 {-# INLINE hashFd #-}
 
 callbackTableVar :: EventManager -> Fd -> MVar (IM.IntMap [FdData])
