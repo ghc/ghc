@@ -88,3 +88,6 @@ T7165:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O2 T7165a.hs -dcore-lint
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O2 T7165.hs -dcore-lint
 
+T5366:
+	$(RM) -f T5366.hi T5366.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ddump-simpl -dsuppress-uniques -c -O T5366.hs | grep 'Bar.*I#'
