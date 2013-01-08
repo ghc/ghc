@@ -10,12 +10,10 @@ module TcEvidence (
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpLams, mkWpLet, 
   idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
-  -- Evidence bindin
+  -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..), 
   EvBindMap(..), emptyEvBindMap, extendEvBinds, lookupEvBind, evBindMapBinds,
-
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
-
   EvTerm(..), mkEvCast, evVarsOfTerm, 
   EvLit(..), evTermCoercion,
 

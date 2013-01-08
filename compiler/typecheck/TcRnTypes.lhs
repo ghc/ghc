@@ -1523,7 +1523,7 @@ data CtOrigin
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
   | SectionOrigin
   | TupleOrigin                        -- (..,..)
-  | AmbigOrigin Name    -- f :: ty
+  | AmbigOrigin UserTypeCtxt    -- Will be FunSigCtxt, InstDeclCtxt, or SpecInstCtxt
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
@@ -1549,7 +1549,11 @@ pprO AppOrigin             = ptext (sLit "an application")
 pprO (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
 pprO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
 pprO RecordUpdOrigin       = ptext (sLit "a record update")
-pprO (AmbigOrigin name)    = ptext (sLit "the ambiguity check for") <+> quotes (ppr name)
+pprO (AmbigOrigin ctxt)    = ptext (sLit "the ambiguity check for") 
+                             <+> case ctxt of 
+                                    FunSigCtxt name -> quotes (ppr name)
+                                    InfSigCtxt name -> quotes (ppr name)
+                                    _               -> pprUserTypeCtxt ctxt
 pprO ExprSigOrigin         = ptext (sLit "an expression type signature")
 pprO PatSigOrigin          = ptext (sLit "a pattern type signature")
 pprO PatOrigin             = ptext (sLit "a pattern")

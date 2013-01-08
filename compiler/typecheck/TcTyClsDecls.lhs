@@ -32,6 +32,7 @@ import HscTypes
 import BuildTyCl
 import TcRnMonad
 import TcEnv
+import TcValidity
 import TcHsSyn
 import TcBinds( tcRecSelBinds )
 import TcTyDecls

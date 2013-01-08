@@ -31,6 +31,7 @@ import Var
 import Name
 import TcEnv
 import TcMType
+import TcValidity( arityErr )
 import TcType
 import TcUnify
 import TcHsType

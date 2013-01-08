@@ -601,7 +601,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
         
 
     prag_sigs = prag_fn poly_name
-    origin    = AmbigOrigin poly_name
+    origin    = AmbigOrigin sig_ctxt
     sig_ctxt  = InfSigCtxt poly_name
 \end{code}
 
@@ -1162,16 +1162,28 @@ For example:
 (Instantiation is only necessary because of type synonyms.  Otherwise,
 it's all cool; each signature has distinct type variables from the renamer.)
 
+Note [Fail eagerly on bad signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a type signaure is wrong, fail immediately:
+
+ * the type sigs may bind type variables, so proceeding without them
+   can lead to a cascade of errors
+
+ * the type signature might be ambiguous, in which case checking
+   the code against the signature will give a very similar error
+   to the ambiguity error.
+
+ToDo: this means we fall over if any type sig
+is wrong (eg at the top level of the module), 
+which is over-conservative
+
 \begin{code}
 tcTySigs :: [LSig Name] -> TcM ([TcId], TcSigFun)
 tcTySigs hs_sigs
-  = do { ty_sigs <- concat <$> checkNoErrs (mapAndRecoverM tcTySig hs_sigs)
-                -- No recovery from bad signatures, because the type sigs
-                -- may bind type variables, so proceeding without them
-                -- can lead to a cascade of errors
-                -- ToDo: this means we fall over immediately if any type sig
-                -- is wrong, which is over-conservative, see Trac bug #745
-       ; let env = mkNameEnv [(idName (sig_id sig), sig) | sig <- ty_sigs]
+  = checkNoErrs $   -- See Note [Fail eagerly on bad signatures]
+    do { ty_sigs_s<- mapAndRecoverM tcTySig hs_sigs
+       ; let ty_sigs = concat ty_sigs_s
+             env = mkNameEnv [(idName (sig_id sig), sig) | sig <- ty_sigs]
        ; return (map sig_id ty_sigs, lookupNameEnv env) }
 
 tcTySig :: LSig Name -> TcM [TcSigInfo]

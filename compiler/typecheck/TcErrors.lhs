@@ -285,7 +285,7 @@ mkUniReporter :: (ReportErrCtxt -> Ct -> TcM ErrMsg) -> Reporter
 mkUniReporter mk_err ctxt 
   = mapM_ $ \ct -> 
     do { err <- mk_err ctxt ct
-       ; maybeReportError ctxt err ct
+       ; maybeReportError ctxt err
        ; maybeAddDeferredBinding ctxt err ct }
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
@@ -297,23 +297,23 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 mkGroupReporter _ _ [] 
   = return ()
 mkGroupReporter mk_err ctxt (ct1 : rest)
-  = do { err <- mk_err ctxt cts
-       ; maybeReportError ctxt err ct1
-       ; mapM_ (maybeAddDeferredBinding ctxt err) (ct1:rest)
+  = do { err <- mk_err ctxt first_group
+       ; maybeReportError ctxt err
+       ; mapM_ (maybeAddDeferredBinding ctxt err) first_group
                -- Add deferred bindings for all
        ; mkGroupReporter mk_err ctxt others }
   where
    loc               = cc_loc ct1
-   cts               = ct1 : friends
+   first_group       = ct1 : friends
    (friends, others) = partition is_friend rest
    is_friend friend  = cc_loc friend `same_loc` loc
 
    same_loc :: CtLoc -> CtLoc -> Bool
    same_loc l1 l2 = ctLocSpan l1 == ctLocSpan l2
 
-maybeReportError :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
+maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
 -- Report the error and/or make a deferred binding for it
-maybeReportError ctxt err _ct
+maybeReportError ctxt err
   | cec_defer ctxt  -- We have -fdefer-type-errors
                     -- so warn about all, even if cec_suppress is on
   = reportWarning (makeIntoWarning err)
@@ -494,9 +494,8 @@ mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 ----------------
 mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkIPErr ctxt cts
-  = do { (ctxt, _, ambig_err) <- mkAmbigMsg ctxt cts
-       ; (ctxt, bind_msg) <- relevantBindings ctxt ct1
-       ; mkErrorMsg ctxt ct1 (msg $$ ambig_err $$ bind_msg) }
+  = do { (ctxt, bind_msg) <- relevantBindings ctxt ct1
+       ; mkErrorMsg ctxt ct1 (msg $$ bind_msg) }
   where
     (ct1:_) = cts
     orig    = ctLocOrigin (cc_loc ct1)
@@ -605,8 +604,8 @@ reportEqErr :: ReportErrCtxt -> SDoc
             -> Maybe SwapFlag   -- Nothing <=> not sure
             -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt extra1 ct oriented ty1 ty2
-  = do { (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
-       ; mkErrorMsg ctxt' ct (vcat [ misMatchOrCND ctxt' ct oriented ty1 ty2
+  = do { let extra2 = mkEqInfoMsg ct ty1 ty2
+       ; mkErrorMsg ctxt ct (vcat [ misMatchOrCND ctxt ct oriented ty1 ty2
                                    , extra2, extra1]) }
 
 mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> SDoc -> Ct 
@@ -629,8 +628,8 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   | OC_Occurs <- occ_check_expand
   = do { let occCheckMsg = hang (text "Occurs check: cannot construct the infinite type:")
                               2 (sep [ppr ty1, char '~', ppr ty2])
-       ; (ctxt', extra2) <- mkEqInfoMsg ctxt ct ty1 ty2
-       ; mkErrorMsg ctxt' ct (occCheckMsg $$ extra2 $$ extra) }
+             extra2 = mkEqInfoMsg ct ty1 ty2
+       ; mkErrorMsg ctxt ct (occCheckMsg $$ extra2 $$ extra) }
 
   | OC_Forall <- occ_check_expand
   = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
@@ -694,20 +693,22 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
     k2 	= typeKind ty2
     ty1 = mkTyVarTy tv1
 
-mkEqInfoMsg :: ReportErrCtxt -> Ct -> TcType -> TcType -> TcM (ReportErrCtxt, SDoc)
+mkEqInfoMsg :: Ct -> TcType -> TcType -> SDoc
 -- Report (a) ambiguity if either side is a type function application
 --            e.g. F a0 ~ Int    
 --        (b) warning about injectivity if both sides are the same
 --            type function application   F a ~ F b
 --            See Note [Non-injective type functions]
-mkEqInfoMsg ctxt ct ty1 ty2
-  = do { (ctxt', _, ambig_msg) <- if isJust mb_fun1 || isJust mb_fun2
-                                  then mkAmbigMsg ctxt [ct]
-                                  else return (ctxt, False, empty)
-       ; return (ctxt', tyfun_msg $$ ambig_msg) }
+mkEqInfoMsg ct ty1 ty2
+  = tyfun_msg $$ ambig_msg
   where
     mb_fun1 = isTyFun_maybe ty1
     mb_fun2 = isTyFun_maybe ty2
+
+    ambig_msg | isJust mb_fun1 || isJust mb_fun2 
+              = snd (mkAmbigMsg ct)
+              | otherwise = empty
+
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
               , tc1 == tc2 
@@ -891,7 +892,7 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 -- from an overlap (returning Left clas), otherwise return (Right pred)
 mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
   | null matches  -- No matches but perhaps several unifiers
-  = do { (ctxt, is_ambig, ambig_msg) <- mkAmbigMsg ctxt [ct]
+  = do { let (is_ambig, ambig_msg) = mkAmbigMsg ct
        ; (ctxt, binds_msg) <- relevantBindings ctxt ct
        ; traceTc "mk_dict_err" (ppr ct $$ ppr is_ambig $$ ambig_msg)
        ; return (ctxt, cannot_resolve_msg is_ambig binds_msg ambig_msg) }
@@ -912,18 +913,21 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
     cannot_resolve_msg has_ambig_tvs binds_msg ambig_msg
       = vcat [ addArising orig (no_inst_herald <+> pprParendType pred)
              , vcat (pp_givens givens)
-             , if (has_ambig_tvs && not (null unifiers && null givens))
-               then vcat [ ambig_msg, binds_msg, potential_msg ]
-               else empty
+             , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
+               (vcat [ ambig_msg, binds_msg, potential_msg ])
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
 
     potential_msg
-      | null unifiers = empty
-      | otherwise 
-      = hang (if isSingleton unifiers 
+      = ppWhen (not (null unifiers) && want_potential orig) $
+        hang (if isSingleton unifiers 
               then ptext (sLit "Note: there is a potential instance available:")
               else ptext (sLit "Note: there are several potential instances:"))
     	   2 (ppr_insts unifiers)
+
+    -- Report "potential instances" only when the constraint arises
+    -- directly from the user's use of an overloaded function
+    want_potential (AmbigOrigin {})   = False
+    want_potential _                  = True
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
@@ -960,15 +964,14 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
         vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
 				<+> pprType (mkClassPred clas tys))
 
-             ,  if not (null matching_givens) then 
+             ,  ppUnless (null matching_givens) $
                   sep [ptext (sLit "Matching givens (or their superclasses):") 
                       , nest 2 (vcat matching_givens)]
-                else empty
 
     	     ,	sep [ptext (sLit "Matching instances:"),
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
-             ,  if null matching_givens && isSingleton matches && null unifiers then
+             ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
                 -- Intuitively, some given matched the wanted in their
                 -- flattened or rewritten (from given equalities) form
                 -- but the matcher can't figure that out because the
@@ -977,18 +980,14 @@ mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell))
                 -- context. Accelerate Smart.hs showed this problem.
                   sep [ ptext (sLit "There exists a (perhaps superclass) match:") 
                       , nest 2 (vcat (pp_givens givens))]
-                else empty 
 
-	     ,	if not (isSingleton matches)
-    		then 	-- Two or more matches
-		     empty
-    		else 	-- One match
-		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
-	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys))),
-			      if null (matching_givens) then
-                                   vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
-			                  ptext (sLit "when compiling the other instance declarations")]
-                              else empty])]
+	     ,	ppWhen (isSingleton matches) $
+		parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
+	    		          quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys)))
+			     , ppWhen (null (matching_givens)) $
+                               vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances")
+			            , ptext (sLit "when compiling the other instance declarations")]
+                        ])]
         where
             ispecs = [ispec | (ispec, _) <- matches]
 
@@ -1091,59 +1090,25 @@ that match such things.  And flattening under a for-all is problematic
 anyway; consider C (forall a. F a)
 
 \begin{code}
-mkAmbigMsg :: ReportErrCtxt -> [Ct] 
-           -> TcM (ReportErrCtxt, Bool, SDoc)
-mkAmbigMsg ctxt cts
-  | isEmptyVarSet ambig_tv_set
-  = return (ctxt, False, empty)
-  | otherwise
-  = do { dflags <- getDynFlags
-       
-       ; prs <- mapSndM zonkTcType $ 
-                [ (id, idType id) | TcIdBndr id top_lvl <- ct1_bndrs
-                                  , isTopLevel top_lvl ]
-       ; let ambig_ids = [id | (id, zonked_ty) <- prs
-                             , tyVarsOfType zonked_ty `intersectsVarSet` ambig_tv_set]
-       ; return (ctxt, True, mk_msg dflags ambig_ids) }
+mkAmbigMsg :: Ct -> (Bool, SDoc)
+mkAmbigMsg ct
+  | isEmptyVarSet ambig_tv_set = (False, empty)
+  | otherwise                  = (True,  msg)
   where
-    ct1:_ = cts
-    ct1_bndrs = tcl_bndrs (ctLocEnv (cc_loc ct1))
- 
-    ambig_tv_set = foldr (unionVarSet . filterVarSet isAmbiguousTyVar . tyVarsOfCt) 
-                         emptyVarSet cts
+    ambig_tv_set = filterVarSet isAmbiguousTyVar (tyVarsOfCt ct)
     ambig_tvs = varSetElems ambig_tv_set
     
     is_or_are | isSingleton ambig_tvs = text "is"
               | otherwise             = text "are"
                  
-    mk_msg dflags ambig_ids
-      | any isRuntimeUnkSkol ambig_tvs  -- See Note [Runtime skolems]
-      =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
-                   <+> pprQuotedList ambig_tvs
-              , ptext (sLit "Use :print or :force to determine these types")]
-      | otherwise
-      = vcat [ text "The type variable" <> plural ambig_tvs
-	          <+> pprQuotedList ambig_tvs
-                  <+> is_or_are <+> text "ambiguous"
-             , mk_extra_msg dflags ambig_ids ]
-  
-    mk_extra_msg dflags ambig_ids
-      | null ambig_ids
-      = ptext (sLit "Possible fix: add a type signature that fixes these type variable(s)")
-			-- This happens in things like
-			--	f x = show (read "foo")
-			-- where monomorphism doesn't play any role
-      | otherwise 
-      = vcat [ hang (ptext (sLit "Possible cause: the monomorphism restriction applied to:"))
-	          2 (pprWithCommas (quotes . ppr) ambig_ids)
-             , ptext (sLit "Probable fix:") <+> vcat
-     	          [ ptext (sLit "give these definition(s) an explicit type signature")
-     	          , if xopt Opt_MonomorphismRestriction dflags
-                    then ptext (sLit "or use -XNoMonomorphismRestriction")
-                    else empty ]    -- Only suggest adding "-XNoMonomorphismRestriction"
-     			            -- if it is not already set!
-             ]
-
+    msg | any isRuntimeUnkSkol ambig_tvs  -- See Note [Runtime skolems]
+        =  vcat [ ptext (sLit "Cannot resolve unknown runtime type") <> plural ambig_tvs
+                     <+> pprQuotedList ambig_tvs
+                , ptext (sLit "Use :print or :force to determine these types")]
+        | otherwise
+        = vcat [ text "The type variable" <> plural ambig_tvs
+                    <+> pprQuotedList ambig_tvs
+                    <+> is_or_are <+> text "ambiguous" ]
 
 pprSkol :: SkolemInfo -> SrcLoc -> SDoc
 pprSkol UnkSkol   _ 

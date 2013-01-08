@@ -8,7 +8,7 @@
 
 module TcSimplify( 
        simplifyInfer, simplifyAmbiguityCheck,
-       simplifyDefault, simplifyDeriv, 
+       simplifyDefault, 
        simplifyRule, simplifyTop, simplifyInteractive,
        solveWantedsTcM
   ) where
@@ -30,7 +30,6 @@ import Unique
 import VarSet
 import VarEnv 
 import TcEvidence
-import TypeRep
 import Name
 import Bag
 import ListSetOps
@@ -176,135 +175,6 @@ simplifyDefault theta
        ; return () }
 \end{code}
 
-
-***********************************************************************************
-*                                                                                 * 
-*                            Deriving                                             *
-*                                                                                 *
-***********************************************************************************
-
-\begin{code}
-simplifyDeriv :: CtOrigin
-              -> PredType
-	      -> [TyVar]	
-	      -> ThetaType		-- Wanted
-	      -> TcM ThetaType	-- Needed
--- Given  instance (wanted) => C inst_ty 
--- Simplify 'wanted' as much as possibles
--- Fail if not possible
-simplifyDeriv orig pred tvs theta 
-  = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
-      	 	-- The constraint solving machinery 
-		-- expects *TcTyVars* not TyVars.  
-		-- We use *non-overlappable* (vanilla) skolems
-		-- See Note [Overlap and deriving]
-
-       ; let subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
-             skol_set   = mkVarSet tvs_skols
-	     doc = ptext (sLit "deriving") <+> parens (ppr pred)
-
-       ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
-
-       ; traceTc "simplifyDeriv" $ 
-         vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
-       ; (residual_wanted, _ev_binds1)
-             <- solveWantedsTcM (mkFlatWC wanted)
-                -- Post: residual_wanted are already zonked
-
-       ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
-                         -- See Note [Exotic derived instance contexts]
-             get_good :: Ct -> Either PredType Ct
-             get_good ct | validDerivPred skol_set p 
-                         , isWantedCt ct  = Left p 
-                         -- NB: residual_wanted may contain unsolved
-                         -- Derived and we stick them into the bad set
-                         -- so that reportUnsolved may decide what to do with them
-                         | otherwise = Right ct
-                         where p = ctPred ct
-
-       -- We never want to defer these errors because they are errors in the
-       -- compiler! Hence the `False` below
-       ; reportAllUnsolved (residual_wanted { wc_flat = bad })
-
-       ; let min_theta = mkMinimalBySCs (bagToList good)
-       ; return (substTheta subst_skol min_theta) }
-\end{code}
-
-Note [Overlap and deriving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider some overlapping instances:
-  data Show a => Show [a] where ..
-  data Show [Char] where ...
-
-Now a data type with deriving:
-  data T a = MkT [a] deriving( Show )
-
-We want to get the derived instance
-  instance Show [a] => Show (T a) where...
-and NOT
-  instance Show a => Show (T a) where...
-so that the (Show (T Char)) instance does the Right Thing
-
-It's very like the situation when we're inferring the type
-of a function
-   f x = show [x]
-and we want to infer
-   f :: Show [a] => a -> String
-
-BOTTOM LINE: use vanilla, non-overlappable skolems when inferring
-             the context for the derived instance. 
-	     Hence tcInstSkolTyVars not tcInstSuperSkolTyVars
-
-Note [Exotic derived instance contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a 'derived' instance declaration, we *infer* the context.  It's a
-bit unclear what rules we should apply for this; the Haskell report is
-silent.  Obviously, constraints like (Eq a) are fine, but what about
-	data T f a = MkT (f a) deriving( Eq )
-where we'd get an Eq (f a) constraint.  That's probably fine too.
-
-One could go further: consider
-	data T a b c = MkT (Foo a b c) deriving( Eq )
-	instance (C Int a, Eq b, Eq c) => Eq (Foo a b c)
-
-Notice that this instance (just) satisfies the Paterson termination 
-conditions.  Then we *could* derive an instance decl like this:
-
-	instance (C Int a, Eq b, Eq c) => Eq (T a b c) 
-even though there is no instance for (C Int a), because there just
-*might* be an instance for, say, (C Int Bool) at a site where we
-need the equality instance for T's.  
-
-However, this seems pretty exotic, and it's quite tricky to allow
-this, and yet give sensible error messages in the (much more common)
-case where we really want that instance decl for C.
-
-So for now we simply require that the derived instance context
-should have only type-variable constraints.
-
-Here is another example:
-	data Fix f = In (f (Fix f)) deriving( Eq )
-Here, if we are prepared to allow -XUndecidableInstances we
-could derive the instance
-	instance Eq (f (Fix f)) => Eq (Fix f)
-but this is so delicate that I don't think it should happen inside
-'deriving'. If you want this, write it yourself!
-
-NB: if you want to lift this condition, make sure you still meet the
-termination conditions!  If not, the deriving mechanism generates
-larger and larger constraints.  Example:
-  data Succ a = S a
-  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
-
-Note the lack of a Show instance for Succ.  First we'll generate
-  instance (Show (Succ a), Show a) => Show (Seq a)
-and then
-  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
-and so on.  Instead we want to complain of no instance for (Show (Succ a)).
-
-The bottom line
-~~~~~~~~~~~~~~~
-Allow constraints which consist only of type variables, with no repeats.
 
 *********************************************************************************
 *                                                                                 * 
@@ -1253,23 +1123,3 @@ dealing with the (Num a) context arising from f's definition;
 we try to unify a with Int (to default it), but find that it's
 already been unified with the rigid variable from g's type sig
 
-
-
-*********************************************************************************
-*                                                                               * 
-*                   Utility functions
-*                                                                               *
-*********************************************************************************
-
-\begin{code}
-newFlatWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
-newFlatWanteds orig theta
-  = do { loc <- getCtLoc orig
-       ; mapM (inst_to_wanted loc) theta }
-  where 
-    inst_to_wanted loc pty 
-          = do { v <- TcM.newWantedEvVar pty 
-               ; return $ mkNonCanonical loc $
-                 CtWanted { ctev_evar = v
-                          , ctev_pred = pty } }
-\end{code}

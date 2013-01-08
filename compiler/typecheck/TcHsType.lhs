@@ -50,6 +50,7 @@ import TcRnMonad
 import TcEvidence( HsWrapper )
 import TcEnv
 import TcMType
+import TcValidity
 import TcUnify
 import TcIface
 import TcType

@@ -468,6 +468,7 @@ data ExtensionFlag
    | Opt_ImplicitParams
    | Opt_ImplicitPrelude
    | Opt_ScopedTypeVariables
+   | Opt_AllowAmbiguousTypes
    | Opt_UnboxedTuples
    | Opt_BangPatterns
    | Opt_TypeFamilies
@@ -2585,6 +2586,7 @@ xFlags = [
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
+  ( "AllowAmbiguousTypes",              Opt_AllowAmbiguousTypes, nop),
 
   ( "PatternSignatures",                Opt_ScopedTypeVariables,
     deprecatedForExtension "ScopedTypeVariables" ),

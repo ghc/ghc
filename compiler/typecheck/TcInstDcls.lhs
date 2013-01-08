@@ -28,6 +28,7 @@ import TcClassDcl( tcClassDecl2,
                    findMethodBind, instantiateMethod, tcInstanceMethodBody )
 import TcPat      ( addInlinePrags )
 import TcRnMonad
+import TcValidity
 import TcMType
 import TcType
 import BuildTyCl
