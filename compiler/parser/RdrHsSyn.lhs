@@ -310,13 +310,13 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1,
-                               fun_matches = MatchGroup mtchs1 _ })) binds
+                               fun_matches = MG { mg_alts = mtchs1 } })) binds
   | has_args mtchs1
   = go is_infix1 mtchs1 loc1 binds []
   where
     go is_infix mtchs loc
        (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
-                                fun_matches = MatchGroup mtchs2 _ })) : binds) _
+                                fun_matches = MG { mg_alts = mtchs2 } })) : binds) _
         | f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs)
                         (combineSrcSpans loc loc2) binds []
     go is_infix mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls
@@ -886,9 +886,9 @@ checkCmdStmt _ stmt@(RecStmt { recS_stmts = stmts }) = do
 checkCmdStmt l stmt = cmdStmtFail l stmt
 
 checkCmdMatchGroup :: MatchGroup RdrName (LHsExpr RdrName) -> P (MatchGroup RdrName (LHsCmd RdrName))
-checkCmdMatchGroup (MatchGroup ms ty) = do
+checkCmdMatchGroup mg@(MG { mg_alts = ms }) = do
     ms' <- mapM (locMap $ const convert) ms
-    return $ MatchGroup ms' ty
+    return $ mg { mg_alts = ms' }
     where convert (Match pat mty grhss) = do
             grhss' <- checkCmdGRHSs grhss
             return $ Match pat mty grhss'

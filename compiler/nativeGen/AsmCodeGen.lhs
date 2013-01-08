@@ -147,7 +147,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     allocatableRegs           :: [RealReg],
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
-    ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr -> NatCmmDecl statics instr,
+    ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr -> UniqSM (NatCmmDecl statics instr),
     ncgMakeFarBranches        :: [NatBasicBlock instr] -> [NatBasicBlock instr]
     }
 
@@ -238,7 +238,7 @@ sparcNcgImpl dflags
 -- default to the panic below.  To support allocating extra stack on
 -- more platforms provide a definition of ncgAllocMoreStack.
 --
-noAllocMoreStack :: Int -> NatCmmDecl statics instr -> NatCmmDecl statics instr
+noAllocMoreStack :: Int -> NatCmmDecl statics instr -> UniqSM (NatCmmDecl statics instr)
 noAllocMoreStack amount _
   = panic $   "Register allocator: out of stack slots (need " ++ show amount ++ ")\n"
         ++  "   If you are trying to compile SHA1.hs from the crypto library then this\n"
@@ -518,9 +518,9 @@ cmmNativeGen dflags ncgImpl us cmm count
                                Linear.regAlloc dflags proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats )
-                         Just amount ->
-                           return ( ncgAllocMoreStack ncgImpl amount alloced
-                                  , ra_stats )
+                         Just amount -> do
+                           alloced' <- ncgAllocMoreStack ncgImpl amount alloced
+                           return (alloced', ra_stats )
 
                 let ((alloced, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc" #-}

@@ -20,6 +20,7 @@ import DataCon
 import TyCon
 import Type
 import FamInstEnv
+import TcMType
 import Name
 import Util
 import MonadUtils
@@ -43,11 +44,12 @@ buildDataFamInst :: Name -> TyCon -> TyCon -> AlgTyConRhs -> VM (FamInst Unbranc
 buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
-      ; let fam_inst = mkDataFamInst axiom_name tyvars fam_tc pat_tys rep_tc
+      ; (_, tyvars') <- liftDs $ tcInstSkolTyVarsLoc (getSrcSpan name') tyvars
+      ; let fam_inst = mkDataFamInst axiom_name tyvars' fam_tc pat_tys rep_tc
             ax       = famInstAxiom fam_inst
-            pat_tys  = [mkTyConApp vect_tc (mkTyVarTys tyvars)]
+            pat_tys  = [mkTyConApp vect_tc (mkTyVarTys tyvars')]
             rep_tc   = buildAlgTyCon name'
-                           tyvars
+                           tyvars'
                            Nothing
                            []          -- no stupid theta
                            rhs

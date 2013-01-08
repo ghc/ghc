@@ -1712,6 +1712,8 @@ guardquals1 :: { Located [LStmt RdrName (LHsExpr RdrName)] }
 altslist :: { Located [LMatch RdrName (LHsExpr RdrName)] }
         : '{'            alts '}'       { LL (reverse (unLoc $2)) }
         |     vocurly    alts  close    { L (getLoc $2) (reverse (unLoc $2)) }
+        | '{'                 '}'       { noLoc [] }
+        |     vocurly          close    { noLoc [] }
 
 alts    :: { Located [LMatch RdrName (LHsExpr RdrName)] }
         : alts1                         { L1 (unLoc $1) }

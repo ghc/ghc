@@ -196,6 +196,10 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/b
 else
 ifneq "$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -lffi 
+ifeq "$$(TargetOS_CPP)" "linux"
+LIBFFI_LIBS += -optl-Wl,-rpath -optl-Wl,'$$$$ORIGIN'
+endif
+
 else
 # flags will be taken care of in rts/libs.depend
 LIBFFI_LIBS =

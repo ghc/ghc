@@ -719,7 +719,7 @@ checkPrecMatch :: Name -> MatchGroup Name body -> RnM ()
   --   eg  a `op` b `C` c = ...
   -- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch op (MatchGroup ms _)	
+checkPrecMatch op (MG { mg_alts = ms })	
   = mapM_ check ms			 	
   where
     check (L _ (Match (L l1 p1 : L l2 p2 :_) _ _))

@@ -307,7 +307,7 @@ mkCoAlgCaseMatchResult dflags var ty match_alts
     match_results  = [match_result | (_,_,match_result) <- match_alts]
 
     fail_flag | exhaustive_case
-	      = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
+	      = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
 	      | otherwise
 	      = CanFail
 

@@ -417,15 +417,21 @@ sub scmall {
         }
         elsif ($command eq "remote") {
             my @scm_args;
+            my $rpath;
             $ignore_failure = 1;
+            if ($remotepath eq '-') {
+                $rpath = "$repo_base/$localpath";
+            } else {
+                $rpath = $path;
+            }
             if ($subcommand eq 'add') {
-                @scm_args = ("remote", "add", $branch_name, $path);
+                @scm_args = ("remote", "add", $branch_name, $rpath);
             } elsif ($subcommand eq 'rm') {
                 @scm_args = ("remote", "rm", $branch_name);
             } elsif ($subcommand eq 'set-branches') {
                 @scm_args = ("remote", "set-branches", $branch_name);
             } elsif ($subcommand eq 'set-url') {
-                @scm_args = ("remote", "set-url", $branch_name, $path);
+                @scm_args = ("remote", "set-url", $branch_name, $rpath);
             }
             scm ($localpath, $scm, @scm_args, @args);
         }

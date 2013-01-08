@@ -18,7 +18,7 @@ import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId )
 
 import HsSyn
 import TcMatches
--- import TcSimplify( solveWantedsTcM )
+import TcHsSyn( hsLPatType )
 import TcType
 import TcMType
 import TcBinds
@@ -192,7 +192,7 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
 -------------------------------------------
 -- 		Lambda
 
-tc_cmd env cmd@(HsCmdLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig grhss))] _))
+tc_cmd env cmd@(HsCmdLam (MG { mg_alts = [L mtch_loc (match@(Match pats _maybe_rhs_sig grhss))] }))
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match_ctxt match)	$
 
@@ -206,7 +206,10 @@ tc_cmd env cmd@(HsCmdLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_s
                              tc_grhss grhss res_ty
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
-	; return (HsCmdLam (MatchGroup [match'] res_ty))
+              arg_tys = map hsLPatType pats'
+	; return (HsCmdLam (MG { mg_alts = [match'], mg_arg_tys = arg_tys
+                               , mg_res_ty = res_ty }))
+              -- Or should we decompose res_ty?
 	}
 
   where

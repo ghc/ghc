@@ -42,7 +42,7 @@ module TcMType (
   -- Instantiation
   tcInstTyVars, tcInstSigTyVars, newSigTyVar,
   tcInstType, 
-  tcInstSkolTyVars, tcInstSuperSkolTyVars,
+  tcInstSkolTyVars, tcInstSkolTyVarsLoc, tcInstSuperSkolTyVars,
   tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX,
   tcInstSkolTyVar, tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
@@ -224,15 +224,15 @@ tcSuperSkolTyVar subst tv
     kind   = substTy subst (tyVarKind tv)
     new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
 
-tcInstSkolTyVar :: Bool -> TvSubst -> TyVar -> TcM (TvSubst, TcTyVar)
+tcInstSkolTyVar :: SrcSpan -> Bool -> TvSubst -> TyVar
+                -> TcRnIf gbl lcl (TvSubst, TcTyVar)
 -- Instantiate the tyvar, using 
 --      * the occ-name and kind of the supplied tyvar, 
 --      * the unique from the monad,
 --      * the location either from the tyvar (skol_info = SigSkol)
 --                     or from the monad (otherwise)
-tcInstSkolTyVar overlappable subst tyvar
+tcInstSkolTyVar loc overlappable subst tyvar
   = do  { uniq <- newUnique
-        ; loc  <- getSrcSpanM
         ; let new_name = mkInternalName uniq occ loc
               new_tv   = mkTcTyVar new_name kind (SkolemTv overlappable)
         ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
@@ -242,6 +242,10 @@ tcInstSkolTyVar overlappable subst tyvar
     kind     = substTy subst (tyVarKind tyvar)
 
 -- Wrappers
+-- we need to be able to do this from outside the TcM monad:
+tcInstSkolTyVarsLoc :: SrcSpan -> [TyVar] -> TcRnIf gbl lcl (TvSubst, [TcTyVar])
+tcInstSkolTyVarsLoc loc = mapAccumLM (tcInstSkolTyVar loc False) (mkTopTvSubst [])
+
 tcInstSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
 tcInstSkolTyVars = tcInstSkolTyVarsX (mkTopTvSubst [])
 
@@ -256,7 +260,9 @@ tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True  subst
 tcInstSkolTyVars' :: Bool -> TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
 -- Precondition: tyvars should be ordered (kind vars first)
 -- see Note [Kind substitution when instantiating]
-tcInstSkolTyVars' isSuperSkol = mapAccumLM (tcInstSkolTyVar isSuperSkol)
+tcInstSkolTyVars' isSuperSkol subst tvs
+  = do { loc <- getSrcSpanM
+       ; mapAccumLM (tcInstSkolTyVar loc isSuperSkol) subst tvs }
 
 tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants

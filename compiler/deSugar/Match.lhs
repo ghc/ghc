@@ -291,9 +291,8 @@ match [] ty eqns
 		      eqn_rhs eqn
 		    | eqn <- eqns ]
 
-match vars@(v:_) ty eqns
-  = ASSERT( not (null eqns ) )
-    do	{ dflags <- getDynFlags
+match vars@(v:_) ty eqns    -- Eqns *can* be empty
+  = do	{ dflags <- getDynFlags
       	; 	-- Tidy the first pattern, generating
 		-- auxiliary bindings if necessary
           (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
@@ -304,12 +303,17 @@ match vars@(v:_) ty eqns
          -- print the view patterns that are commoned up to help debug
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
-	; match_results <- mapM match_group grouped
-	; return (adjustMatchResult (foldr1 (.) aux_binds) $
+	; match_results <- match_groups grouped
+	; return (adjustMatchResult (foldr (.) id aux_binds) $
 		  foldr1 combineMatchResults match_results) }
   where
     dropGroup :: [(PatGroup,EquationInfo)] -> [EquationInfo]
     dropGroup = map snd
+
+    match_groups :: [[(PatGroup,EquationInfo)]] -> DsM [MatchResult]
+    -- Result list of [MatchResult] is always non-empty
+    match_groups [] = matchEmpty v ty
+    match_groups gs = mapM match_group gs
 
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group [] = panic "match_group"
@@ -338,6 +342,14 @@ match vars@(v:_) ty eqns
         in 
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
+
+matchEmpty :: Id -> Type -> DsM [MatchResult]
+-- See Note [Empty case expressions]
+matchEmpty var res_ty
+  = return [MatchResult CanFail mk_seq]
+  where
+    mk_seq fail = return $ mkWildCase (Var var) (idType var) res_ty 
+                                      [(DEFAULT, [], fail)]
 
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -393,6 +405,24 @@ getBangPat _                 = panic "getBangPat"
 getViewPat (ViewPat _ pat _) = unLoc pat
 getViewPat _                 = panic "getBangPat"
 \end{code}
+
+Note [Empty case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The list of EquationInfo can be empty, arising from
+    case x of {}   or    \case {}
+In that situation we desugar to
+    case x of { _ -> error "pattern match failure" }
+The *desugarer* isn't certain whether there really should be no
+alternatives, so it adds a default case, as it always does.  A later
+pass may remove it if it's inaccessible.  (See also Note [Empty case
+alternatives] in CoreSyn.)
+
+We do *not* deugar simply to
+   error "empty case" 
+or some such, because 'x' might be bound to (error "hello"), in which
+case we want to see that "hello" exception, not (error "empty case").
+See also Note [Case elimination: lifted case] in Simplify.
+
 
 %************************************************************************
 %*									*
@@ -693,17 +723,16 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 
 \begin{code}
-matchWrapper ctxt (MatchGroup matches match_ty)
-  = ASSERT( notNull matches )
-    do	{ eqns_info   <- mapM mk_eqn_info matches
-	; new_vars    <- selectMatchVars arg_pats
+matchWrapper ctxt (MG { mg_alts = matches
+                      , mg_arg_tys = arg_tys
+                      , mg_res_ty = rhs_ty })
+  = do	{ eqns_info   <- mapM mk_eqn_info matches
+	; new_vars    <- case matches of
+                           []    -> mapM newSysLocalDs arg_tys
+                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 	; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
 	; return (new_vars, result_expr) }
   where
-    arg_pats    = map unLoc (hsLMatchPats (head matches))
-    n_pats	= length arg_pats
-    (_, rhs_ty) = splitFunTysN n_pats match_ty
-
     mk_eqn_info (L _ (Match pats _ grhss))
       = do { let upats = map unLoc pats
 	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty

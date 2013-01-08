@@ -134,7 +134,8 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
     match_group :: [Id] -> [(ConArgPats, EquationInfo)] -> DsM MatchResult
     -- All members of the group have compatible ConArgPats
     match_group arg_vars arg_eqn_prs
-      = do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
+      = ASSERT( notNull arg_eqn_prs )
+        do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
     	   ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
     	   ; match_result <- match (group_arg_vars ++ vars) ty eqns'
     	   ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }

@@ -87,7 +87,7 @@ import Var
 import VarEnv
 import VarSet
 import Maybes   ( orElse )
-import Name	( Name, NamedThing(..), nameUnique )
+import Name	( Name, NamedThing(..), nameUnique, getSrcSpan )
 import OccName 	( parenSymOcc )
 import Util
 import BasicTypes
@@ -705,7 +705,8 @@ mkNewTypeCo name tycon tvs rhs_ty
             , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
             , co_ax_tc       = tycon
             , co_ax_branches = FirstBranch branch }
-  where branch = CoAxBranch { cab_tvs = tvs
+  where branch = CoAxBranch { cab_loc = getSrcSpan name
+                            , cab_tvs = tvs
                             , cab_lhs = mkTyVarTys tvs
                             , cab_rhs = rhs_ty }
 

@@ -33,7 +33,6 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
 
 import TcType
 import TcEvidence
-import Type
 import CoreSyn
 import CoreFVs
 import CoreUtils
@@ -382,7 +381,7 @@ dsCmd ids local_vars stack res_ty (HsCmdApp cmd arg) env_ids = do
 --		---> premap (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) c
 
 dsCmd ids local_vars stack res_ty
-        (HsCmdLam (MatchGroup [L _ (Match pats _ (GRHSs [L _ (GRHS [] body)] _ ))] _))
+        (HsCmdLam (MG { mg_alts = [L _ (Match pats _ (GRHSs [L _ (GRHS [] body)] _ ))] }))
         env_ids = do
     let
         pat_vars = mkVarSet (collectPatsBinders pats)
@@ -483,8 +482,9 @@ case bodies, containing the following fields:
    bodies with |||.
 
 \begin{code}
-dsCmd ids local_vars stack res_ty (HsCmdCase exp (MatchGroup matches match_ty))
-        env_ids = do
+dsCmd ids local_vars stack res_ty 
+      (HsCmdCase exp (MG { mg_alts = matches, mg_arg_tys = arg_tys }))
+      env_ids = do
     stack_ids <- mapM newSysLocalDs stack
 
     -- Extract and desugar the leaf commands in the case, building tuple
@@ -526,12 +526,11 @@ dsCmd ids local_vars stack res_ty (HsCmdCase exp (MatchGroup matches match_ty))
         (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
         in_ty = envStackType env_ids stack
 
-        pat_ty    = funArgTy match_ty
-        match_ty' = mkFunTy pat_ty sum_ty
+    core_body <- dsExpr (HsCase exp (MG { mg_alts = matches', mg_arg_tys = arg_tys
+                                        , mg_res_ty = sum_ty }))
         -- Note that we replace the HsCase result type by sum_ty,
         -- which is the type of matches'
-    
-    core_body <- dsExpr (HsCase exp (MatchGroup matches' match_ty'))
+
     core_matches <- matchEnvStack env_ids stack_ids core_body
     return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
             exprFreeIds core_body  `intersectVarSet` local_vars)

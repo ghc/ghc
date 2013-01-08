@@ -530,6 +530,7 @@ data ExtensionFlag
    | Opt_LambdaCase
    | Opt_MultiWayIf
    | Opt_TypeHoles
+   | Opt_EmptyCase
    deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
@@ -2610,7 +2611,8 @@ xFlags = [
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
   ( "PackageImports",                   Opt_PackageImports, nop ),
-  ( "TypeHoles",                        Opt_TypeHoles, nop )
+  ( "TypeHoles",                        Opt_TypeHoles, nop ),
+  ( "EmptyCase",                        Opt_EmptyCase, nop )
   ]
 
 defaultFlags :: Settings -> [GeneralFlag]

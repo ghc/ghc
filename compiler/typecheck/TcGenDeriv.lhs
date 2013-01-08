@@ -1454,11 +1454,11 @@ instance for T is:
       fmap f (T1 x1 x2) = T1 ($(fmap 'a 'b1) x1) ($(fmap 'a 'a) x2)
       fmap f (T2 x1)    = T2 ($(fmap 'a '(T a)) x1)
 
-  $(fmap 'a 'b)         x  =  x     -- when b does not contain a
-  $(fmap 'a 'a)         x  =  f x
-  $(fmap 'a '(b1,b2))   x  =  case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
-  $(fmap 'a '(T b1 b2)) x  =  fmap $(fmap 'a 'b2) x   -- when a only occurs in the last parameter, b2
-  $(fmap 'a '(b -> c))  x  =  \b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
+  $(fmap 'a 'b)          =  \x -> x     -- when b does not contain a
+  $(fmap 'a 'a)          =  f
+  $(fmap 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> ($(fmap 'a 'b1) x1, $(fmap 'a 'b2) x2)
+  $(fmap 'a '(T b1 b2))  =  fmap $(fmap 'a 'b2)   -- when a only occurs in the last parameter, b2
+  $(fmap 'a '(b -> c))   =  \x b -> $(fmap 'a' 'c) (x ($(cofmap 'a 'b) b))
 
 For functions, the type parameter 'a can occur in a contravariant position,
 which means we need to derive a function like:
@@ -1467,12 +1467,30 @@ which means we need to derive a function like:
 
 This is pretty much the same as $fmap, only without the $(cofmap 'a 'a) case:
 
-  $(cofmap 'a 'b)         x  =  x     -- when b does not contain a
-  $(cofmap 'a 'a)         x  =  error "type variable in contravariant position"
-  $(cofmap 'a '(b1,b2))   x  =  case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
-  $(cofmap 'a '[b])       x  =  map $(cofmap 'a 'b) x
-  $(cofmap 'a '(T b1 b2)) x  =  fmap $(cofmap 'a 'b2) x   -- when a only occurs in the last parameter, b2
-  $(cofmap 'a '(b -> c))  x  =  \b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+  $(cofmap 'a 'b)          =  \x -> x     -- when b does not contain a
+  $(cofmap 'a 'a)          =  error "type variable in contravariant position"
+  $(cofmap 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> ($(cofmap 'a 'b1) x1, $(cofmap 'a 'b2) x2)
+  $(cofmap 'a '[b])        =  map $(cofmap 'a 'b)
+  $(cofmap 'a '(T b1 b2))  =  fmap $(cofmap 'a 'b2)   -- when a only occurs in the last parameter, b2
+  $(cofmap 'a '(b -> c))   =  \x b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
+
+Note that the code produced by $(fmap _ _) is always a higher order function,
+with type `(a -> b) -> (g a -> g b)` for some g. When we need to do pattern
+matching on the type, this means create a lambda function (see the (,) case above).
+The resulting code for fmap can look a bit weird, for example:
+
+  data X a = X (a,Int)
+  -- generated instance
+  instance Functor X where
+      fmap f (X x) = (\y -> case y of (x1,x2) -> X (f x1, (\z -> z) x2)) x
+
+The optimizer should be able to simplify this code by simple inlining.
+
+An older version of the deriving code tried to avoid these applied
+lambda functions by producing a meta level function. But the function to
+be mapped, `f`, is a function on the code level, not on the meta level,
+so it was eta expanded to `\x -> [| f $x |]`. This resulted in too much eta expansion.
+It is better to produce too many lambdas than to eta expand, see ticket #7436.
 
 \begin{code}
 gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
@@ -1482,30 +1500,34 @@ gen_Functor_binds loc tycon
     data_cons = tyConDataCons tycon
     fmap_bind = L loc $ mkRdrFunBind (L loc fmap_RDR) eqns
 
-    fmap_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
+    fmap_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
-        parts = foldDataConArgs ft_fmap con
+        parts = sequence $ foldDataConArgs ft_fmap con
 
     eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat]
                                            (error_Expr "Void fmap")]
          | otherwise      = map fmap_eqn data_cons
 
-    ft_fmap :: FFoldType (LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName))
-    -- Tricky higher order type; I can't say I fully understand this code :-(
-    ft_fmap = FT { ft_triv = \x -> return x                    -- fmap f x = x
-                 , ft_var  = \x -> return (nlHsApp f_Expr x)   -- fmap f x = f x
-                 , ft_fun = \g h x -> mkSimpleLam (\b -> h =<< (nlHsApp x `fmap` g b))
-                                                               -- fmap f x = \b -> h (x (g b))
-                 , ft_tup = mkSimpleTupleCase match_for_con    -- fmap f x = case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
-                 , ft_ty_app = \_ g  x -> do gg <- mkSimpleLam g      -- fmap f x = fmap g x
-                                             return $ nlHsApps fmap_RDR [gg,x]
-                 , ft_forall = \_ g  x -> g x
+    ft_fmap :: FFoldType (State [RdrName] (LHsExpr RdrName))
+    ft_fmap = FT { ft_triv = mkSimpleLam $ \x -> return x    -- fmap f = \x -> x
+                 , ft_var  = return f_Expr                   -- fmap f = f
+                 , ft_fun  = \g h -> do                      -- fmap f = \x b -> h (x (g b))
+                                 gg <- g
+                                 hh <- h
+                                 mkSimpleLam2 $ \x b -> return $ nlHsApp hh (nlHsApp x (nlHsApp gg b)) 
+                 , ft_tup = \t gs -> do                      -- fmap f = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+                                 gg <- sequence gs
+                                 mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
+                 , ft_ty_app = \_ g -> nlHsApp fmap_Expr <$> g  -- fmap f = fmap g
+                 , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument"
                  , ft_co_var = panic "contravariant" }
 
+    -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
+    match_for_con :: [LPat RdrName] -> DataCon -> [LHsExpr RdrName]
+                  -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
     match_for_con = mkSimpleConMatch $
-        \con_name xsM -> do xs <- sequence xsM
-                            return (nlHsApps con_name xs)  -- Con (g1 v1) (g2 v2) ..
+        \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
 \end{code}
 
 Utility functions related to Functor deriving.
@@ -1574,7 +1596,8 @@ deepSubtypesContaining tv
   = functorLikeTraverse tv
         (FT { ft_triv = []
             , ft_var = []
-            , ft_fun = (++), ft_tup = \_ xs -> concat xs
+            , ft_fun = (++)
+            , ft_tup = \_ xs -> concat xs
             , ft_ty_app = (:)
             , ft_bad_app = panic "in other argument"
             , ft_co_var = panic "contravariant"
@@ -1608,19 +1631,22 @@ mkSimpleLam2 lam = do
     return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
-mkSimpleConMatch :: Monad m => (RdrName -> [a] -> m (LHsExpr RdrName)) -> [LPat RdrName]
-                 -> DataCon -> [LHsExpr RdrName -> a] -> m (LMatch RdrName (LHsExpr RdrName))
+mkSimpleConMatch :: Monad m => (RdrName -> [LHsExpr RdrName] -> m (LHsExpr RdrName))
+                 -> [LPat RdrName]
+                 -> DataCon
+                 -> [LHsExpr RdrName]
+                 -> m (LMatch RdrName (LHsExpr RdrName))
 mkSimpleConMatch fold extra_pats con insides = do
     let con_name = getRdrName con
     let vars_needed = takeList insides as_RDRs
     let pat = nlConVarPat con_name vars_needed
-    rhs <- fold con_name (zipWith ($) insides (map nlHsVar vars_needed))
+    rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
     return $ mkMatch (extra_pats ++ [pat]) rhs emptyLocalBinds
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
-mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [LHsExpr RdrName -> a]
-                  -> m (LMatch RdrName (LHsExpr RdrName)))
-                  -> TupleSort -> [LHsExpr RdrName -> a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
+mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [a]
+                                 -> m (LMatch RdrName (LHsExpr RdrName)))
+                  -> TupleSort -> [a] -> LHsExpr RdrName -> m (LHsExpr RdrName)
 mkSimpleTupleCase match_for_con sort insides x = do
     let con = tupleCon sort (length insides)
     match <- match_for_con [] con insides
@@ -1646,10 +1672,10 @@ Here the derived instance for the type T above is:
 
 The cases are:
 
-  $(foldr 'a 'b)         x z  =  z     -- when b does not contain a
-  $(foldr 'a 'a)         x z  =  f x z
-  $(foldr 'a '(b1,b2))   x z  =  case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
-  $(foldr 'a '(T b1 b2)) x z  =  foldr $(foldr 'a 'b2) x z  -- when a only occurs in the last parameter, b2
+  $(foldr 'a 'b)         =  \x z -> z     -- when b does not contain a
+  $(foldr 'a 'a)         =  f
+  $(foldr 'a '(b1,b2))   =  \x z -> case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
+  $(foldr 'a '(T b1 b2)) =  \x z -> foldr $(foldr 'a 'b2) z x  -- when a only occurs in the last parameter, b2
 
 Note that the arguments to the real foldr function are the wrong way around,
 since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
@@ -1657,28 +1683,51 @@ since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
 \begin{code}
 gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Foldable_binds loc tycon
-  = (unitBag foldr_bind, emptyBag)
+  = (listToBag [foldr_bind, foldMap_bind], emptyBag)
   where
     data_cons = tyConDataCons tycon
 
     foldr_bind = L loc $ mkRdrFunBind (L loc foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
-    foldr_eqn con = evalState (match_for_con z_Expr [f_Pat,z_Pat] con parts) bs_RDRs
+    foldr_eqn con = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
-        parts = foldDataConArgs ft_foldr con
+        parts = sequence $ foldDataConArgs ft_foldr con
 
-    ft_foldr :: FFoldType (LHsExpr RdrName -> LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName))
-    ft_foldr = FT { ft_triv = \_ z -> return z                        -- foldr f z x = z
-                  , ft_var  = \x z -> return (nlHsApps f_RDR [x,z])   -- foldr f z x = f x z
-                  , ft_tup = \b gs x z -> mkSimpleTupleCase (match_for_con z) b gs x
-                  , ft_ty_app = \_ g  x z -> do gg <- mkSimpleLam2 g   -- foldr f z x = foldr (\xx zz -> g xx zz) z x
-                                                return $ nlHsApps foldable_foldr_RDR [gg,z,x]
-                  , ft_forall = \_ g  x z -> g x z
-                  , ft_co_var = panic "covariant"
-                  , ft_fun = panic "function"
+    foldMap_bind = L loc $ mkRdrFunBind (L loc foldMap_RDR) (map foldMap_eqn data_cons)
+    foldMap_eqn con = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
+      where
+        parts = sequence $ foldDataConArgs ft_foldMap con
+
+    ft_foldr :: FFoldType (State [RdrName] (LHsExpr RdrName))
+    ft_foldr = FT { ft_triv    = mkSimpleLam2 $ \_ z -> return z       -- foldr f = \x z -> z
+                  , ft_var     = return f_Expr                         -- foldr f = f
+                  , ft_tup     = \t g -> do gg <- sequence g           -- foldr f = (\x z -> case x of ...)
+                                            mkSimpleLam2 $ \x z -> mkSimpleTupleCase (match_foldr z) t gg x
+                  , ft_ty_app  = \_ g -> do gg <- g                    -- foldr f = (\x z -> foldr g z x)
+                                            mkSimpleLam2 $ \x z -> return $ nlHsApps foldable_foldr_RDR [gg,z,x]
+                  , ft_forall  = \_ g -> g
+                  , ft_co_var  = panic "contravariant"
+                  , ft_fun     = panic "function"
                   , ft_bad_app = panic "in other argument" }
 
-    match_for_con z = mkSimpleConMatch (\_con_name -> foldrM ($) z) -- g1 v1 (g2 v2 (.. z))
+    match_foldr z = mkSimpleConMatch $ \_con_name xs -> return $ foldr nlHsApp z xs -- g1 v1 (g2 v2 (.. z))
+
+    ft_foldMap :: FFoldType (State [RdrName] (LHsExpr RdrName))
+    ft_foldMap = FT { ft_triv = mkSimpleLam $ \_ -> return mempty_Expr  -- foldMap f = \x -> mempty
+                    , ft_var  = return f_Expr                           -- foldMap f = f
+                    , ft_tup  = \t g -> do gg <- sequence g             -- foldMap f = \x -> case x of (..,)
+                                           mkSimpleLam $ mkSimpleTupleCase match_foldMap t gg
+                    , ft_ty_app = \_ g -> nlHsApp foldMap_Expr <$> g    -- foldMap f = foldMap g
+                    , ft_forall = \_ g -> g
+                    , ft_co_var = panic "contravariant"
+                    , ft_fun = panic "function"
+                    , ft_bad_app = panic "in other argument" }
+    
+    match_foldMap = mkSimpleConMatch $ \_con_name xs -> return $
+        case xs of
+            [] -> mempty_Expr
+            xs -> foldr1 (\x y -> nlHsApps mappend_RDR [x,y]) xs
+
 \end{code}
 
 
@@ -1694,10 +1743,10 @@ Again, Traversable is much like Functor and Foldable.
 
 The cases are:
 
-  $(traverse 'a 'b)         x  =  pure x     -- when b does not contain a
-  $(traverse 'a 'a)         x  =  f x
-  $(traverse 'a '(b1,b2))   x  =  case x of (x1,x2) -> (,) <$> $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
-  $(traverse 'a '(T b1 b2)) x  =  traverse $(traverse 'a 'b2) x  -- when a only occurs in the last parameter, b2
+  $(traverse 'a 'b)          =  pure     -- when b does not contain a
+  $(traverse 'a 'a)          =  f
+  $(traverse 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> (,) <$> $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
+  $(traverse 'a '(T b1 b2))  =  traverse $(traverse 'a 'b2)  -- when a only occurs in the last parameter, b2
 
 Note that the generated code is not as efficient as it could be. For instance:
 
@@ -1715,26 +1764,26 @@ gen_Traversable_binds loc tycon
 
     traverse_bind = L loc $ mkRdrFunBind (L loc traverse_RDR) eqns
     eqns = map traverse_eqn data_cons
-    traverse_eqn con = evalState (match_for_con [f_Pat] con parts) bs_RDRs
+    traverse_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
-        parts = foldDataConArgs ft_trav con
+        parts = sequence $ foldDataConArgs ft_trav con
 
 
-    ft_trav :: FFoldType (LHsExpr RdrName -> State [RdrName] (LHsExpr RdrName))
-    ft_trav = FT { ft_triv = \x -> return (nlHsApps pure_RDR [x])   -- traverse f x = pure x
-                 , ft_var = \x -> return (nlHsApps f_RDR [x])       -- travese f x = f x
-                 , ft_tup = mkSimpleTupleCase match_for_con         -- travese f x z = case x of (a1,a2,..) ->
-                                                                    --                   (,,) <$> g1 a1 <*> g2 a2 <*> ..
-                 , ft_ty_app = \_ g  x -> do gg <- mkSimpleLam g    -- travese f x = travese (\xx -> g xx) x
-                                             return $ nlHsApps traverse_RDR [gg,x]
-                 , ft_forall = \_ g  x -> g x
-                 , ft_co_var = panic "covariant"
-                 , ft_fun = panic "function"
+    ft_trav :: FFoldType (State [RdrName] (LHsExpr RdrName))
+    ft_trav = FT { ft_triv    = return pure_Expr                  -- traverse f = pure x
+                 , ft_var     = return f_Expr                     -- traverse f = f x
+                 , ft_tup     = \t gs -> do                       -- traverse f = \x -> case x of (a1,a2,..) ->
+                                    gg <- sequence gs             --                   (,,) <$> g1 a1 <*> g2 a2 <*> ..
+                                    mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
+                 , ft_ty_app  = \_ g -> nlHsApp traverse_Expr <$> g  -- traverse f = travese g
+                 , ft_forall  = \_ g -> g
+                 , ft_co_var  = panic "contravariant"
+                 , ft_fun     = panic "function"
                  , ft_bad_app = panic "in other argument" }
 
+    -- Con a1 a2 ... -> Con <$> g1 a1 <*> g2 a2 <*> ...
     match_for_con = mkSimpleConMatch $
-        \con_name xsM -> do xs <- sequence xsM
-                            return (mkApCon (nlHsVar con_name) xs)
+        \con_name xs -> return $ mkApCon (nlHsVar con_name) xs
 
     -- ((Con <$> x1) <*> x2) <*> ..
     mkApCon con []     = nlHsApps pure_RDR [con]
@@ -2040,7 +2089,7 @@ bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) ..
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 a_Expr, c_Expr, f_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
-    false_Expr, true_Expr :: LHsExpr RdrName
+    false_Expr, true_Expr, fmap_Expr, pure_Expr, mempty_Expr, foldMap_Expr, traverse_Expr :: LHsExpr RdrName
 a_Expr          = nlHsVar a_RDR
 -- b_Expr       = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
@@ -2051,6 +2100,11 @@ eqTag_Expr      = nlHsVar eqTag_RDR
 gtTag_Expr      = nlHsVar gtTag_RDR
 false_Expr      = nlHsVar false_RDR
 true_Expr       = nlHsVar true_RDR
+fmap_Expr       = nlHsVar fmap_RDR
+pure_Expr       = nlHsVar pure_RDR
+mempty_Expr     = nlHsVar mempty_RDR
+foldMap_Expr    = nlHsVar foldMap_RDR
+traverse_Expr   = nlHsVar traverse_RDR
 
 a_Pat, b_Pat, c_Pat, d_Pat, f_Pat, k_Pat, z_Pat :: LPat RdrName
 a_Pat           = nlVarPat a_RDR

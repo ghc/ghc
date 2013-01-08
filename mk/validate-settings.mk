@@ -39,12 +39,14 @@ GhcLibHcOpts    += -O -dcore-lint
 # We define DefaultFastGhcLibWays in this style so that the value is
 # correct even if the user alters DYNAMIC_BY_DEFAULT
 DefaultFastGhcLibWays = $(if $(filter $(DYNAMIC_BY_DEFAULT),YES),dyn,v)
+DefaultProfGhcLibWays = $(if $(filter $(GhcProfiled),YES),p,)
 
 ifeq "$(ValidateSpeed)" "FAST"
 GhcLibWays     = $(DefaultFastGhcLibWays)
 else
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
 endif
+GhcLibWays     += $(DefaultProfGhcLibWays)
 SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
@@ -113,6 +115,7 @@ libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # temporarily turn off -Werror for transformers
+libraries/transformers_dist-boot_EXTRA_HC_OPTS += -Wwarn
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings

@@ -917,8 +917,8 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 	-- HsOverlit can definitely occur
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam (MatchGroup [m] _)) = repLambda m
-repE (HsLamCase _ (MatchGroup ms _))
+repE (HsLam (MG { mg_alts = [m] })) = repLambda m
+repE (HsLamCase _ (MG { mg_alts = ms }))
                    = do { ms' <- mapM repMatchTup ms
                         ; repLamCase (nonEmptyCoreList ms') }
 repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
@@ -935,7 +935,7 @@ repE (NegApp x _)        = do
 repE (HsPar x)            = repLE x
 repE (SectionL x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase e (MatchGroup ms _))
+repE (HsCase e (MG { mg_alts = ms }))
                           = do { arg <- repLE e
                                ; ms2 <- mapM repMatchTup ms
                                ; repCaseE arg (nonEmptyCoreList ms2) }
@@ -1166,7 +1166,7 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match
 -- with an empty list of patterns
 rep_bind (L loc (FunBind { fun_id = fn,
-			   fun_matches = MatchGroup [L _ (Match [] _ (GRHSs guards wheres))] _ }))
+			   fun_matches = MG { mg_alts = [L _ (Match [] _ (GRHSs guards wheres))] } }))
  = do { (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
 	; fn'  <- lookupLBinder fn
@@ -1175,7 +1175,7 @@ rep_bind (L loc (FunBind { fun_id = fn,
 	; ans' <- wrapGenSyms ss ans
 	; return (loc, ans') }
 
-rep_bind (L loc (FunBind { fun_id = fn, fun_matches = MatchGroup ms _ }))
+rep_bind (L loc (FunBind { fun_id = fn, fun_matches = MG { mg_alts = ms } }))
  =   do { ms1 <- mapM repClauseTup ms
 	; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)

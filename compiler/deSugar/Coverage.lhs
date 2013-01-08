@@ -271,7 +271,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   -- See Note [inline sccs]
   if inline && gopt Opt_SccProfilingOn dflags then return (L pos funBind) else do
 
-  (fvs, (MatchGroup matches' ty)) <-
+  (fvs, mg@(MG { mg_alts = matches' })) <-
         getFreeVars $
         addPathEntry name $
         addTickMatchGroup False (fun_matches funBind)
@@ -293,7 +293,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
              else
                 return Nothing
 
-  return $ L pos $ funBind { fun_matches = MatchGroup matches' ty
+  return $ L pos $ funBind { fun_matches = mg { mg_alts = matches' }
                            , fun_tick = tick }
 
    where
@@ -586,10 +586,10 @@ addTickTupArg (Present e)  = do { e' <- addTickLHsExpr e; return (Present e') }
 addTickTupArg (Missing ty) = return (Missing ty)
 
 addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup Id (LHsExpr Id) -> TM (MatchGroup Id (LHsExpr Id))
-addTickMatchGroup is_lam (MatchGroup matches ty) = do
+addTickMatchGroup is_lam mg@(MG { mg_alts = matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
-  return $ MatchGroup matches' ty
+  return $ mg { mg_alts = matches' }
 
 addTickMatch :: Bool -> Bool -> Match Id (LHsExpr Id) -> TM (Match Id (LHsExpr Id))
 addTickMatch isOneOfMany isLambda (Match pats opSig gRHSs) =
@@ -799,9 +799,9 @@ addTickHsCmd (HsCmdArrForm e fix cmdtop) =
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
 
 addTickCmdMatchGroup :: MatchGroup Id (LHsCmd Id) -> TM (MatchGroup Id (LHsCmd Id))
-addTickCmdMatchGroup (MatchGroup matches ty) = do
+addTickCmdMatchGroup mg@(MG { mg_alts = matches }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
-  return $ MatchGroup matches' ty
+  return $ mg { mg_alts = matches' }
 
 addTickCmdMatch :: Match Id (LHsCmd Id) -> TM (Match Id (LHsCmd Id))
 addTickCmdMatch (Match pats opSig gRHSs) =
