@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 25, types: 22, coercions: 0}
+Result size of Tidy Core = {terms: 27, types: 24, coercions: 0}
 
 T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
 [GblId[DataConWrapper],
@@ -38,13 +38,19 @@ T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (@ a) (x [Occ=Once] :: [a]) ->
                  (T7360.fun3,
-                  case GHC.List.$wlen @ a x 0 of ww { __DEFAULT ->
+                  case x of wild { __DEFAULT ->
+                  case GHC.List.$wlen @ a wild 0 of ww { __DEFAULT ->
                   GHC.Types.I# ww
+                  }
                   })}]
 T7360.fun2 =
   \ (@ a) (x :: [a]) ->
     (T7360.fun3,
-     case GHC.List.$wlen @ a x 0 of ww { __DEFAULT -> GHC.Types.I# ww })
+     case x of wild { __DEFAULT ->
+     case GHC.List.$wlen @ a wild 0 of ww { __DEFAULT ->
+     GHC.Types.I# ww
+     }
+     })
 
 
 
