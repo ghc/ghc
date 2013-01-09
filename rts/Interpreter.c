@@ -788,9 +788,7 @@ run_BCO:
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
 #ifdef DEBUG
 	int bcoSize;
-    bcoSize = BCO_READ_NEXT_WORD;
-#else
-    BCO_NEXT_WORD;
+        bcoSize = bco->instrs->bytes / sizeof(StgWord16);
 #endif
 	IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
