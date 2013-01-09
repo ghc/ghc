@@ -322,8 +322,8 @@ conflictInstErr fam_inst branch conflictingMatch
   = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
                    [(fam_inst, branch),
                     (confInst, confIndex) ]
-  | otherwise
-  = pprPanic "conflictInstErr" (pprCoAxBranchHdr (famInstAxiom fam_inst) branch)
+  | otherwise -- no conflict on this branch; see Trac #7560
+  = return ()
 
 addFamInstsErr :: SDoc -> [(FamInst Branched, Int)] -> TcRn ()
 addFamInstsErr herald insts
