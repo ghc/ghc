@@ -311,32 +311,32 @@ checkForConflicts inst_envs fam_inst@(FamInst { fi_branches = branches
              no_conflicts = all null conflicts
        ; traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
        ; unless no_conflicts $
-	   zipWithM_ (conflictInstErr fam_inst) (fromBranchList branches) conflicts
+	   zipWithM_ (conflictInstErr fam_inst) (brListIndices branches) conflicts
        ; return no_conflicts }
     where fam_tc = famInstTyCon fam_inst
 
-conflictInstErr :: FamInst Branched -> FamInstBranch -> [FamInstMatch] -> TcRn ()
+conflictInstErr :: FamInst Branched -> BranchIndex -> [FamInstMatch] -> TcRn ()
 conflictInstErr fam_inst branch conflictingMatch
   | (FamInstMatch { fim_instance = confInst
                   , fim_index = confIndex }) : _ <- conflictingMatch
   = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
                    [(fam_inst, branch),
-                    (confInst, famInstNthBranch confInst confIndex)]
+                    (confInst, confIndex) ]
   | otherwise
-  = pprPanic "conflictInstErr" (pprFamInstBranch (famInstAxiom fam_inst) branch)
+  = pprPanic "conflictInstErr" (pprCoAxBranchHdr (famInstAxiom fam_inst) branch)
 
-addFamInstsErr :: SDoc -> [(FamInst Branched, FamInstBranch)] -> TcRn ()
+addFamInstsErr :: SDoc -> [(FamInst Branched, Int)] -> TcRn ()
 addFamInstsErr herald insts
-  = setSrcSpan srcSpan $
-    addErr (hang herald 2 $ vcat (zipWith pprFamInstBranchHdr
-                                          sortedAxioms sortedBranches))
+  = ASSERT( not (null insts) )
+    setSrcSpan srcSpan $ addErr $
+    hang herald
+       2 (vcat [ pprCoAxBranchHdr (famInstAxiom fi) index 
+               | (fi,index) <- sorted ])
  where
-   getSpan = famInstBranchSpan . snd
-   sorted = sortWith getSpan insts
-   srcSpan = getSpan $ head sorted
-
-   sortedAxioms = map (famInstAxiom . fst) sorted
-   sortedBranches = map snd sorted
+   getSpan   = getSrcLoc . famInstAxiom . fst
+   sorted    = sortWith getSpan insts
+   (fi1,ix1) = head sorted
+   srcSpan   = coAxBranchSpan (coAxiomNthBranch (famInstAxiom fi1) ix1)
    -- The sortWith just arranges that instances are dislayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users

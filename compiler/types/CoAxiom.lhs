@@ -10,11 +10,11 @@
 -- and newtypes
 
 module CoAxiom (
-       Branched, Unbranched, BranchList(..),
+       Branched, Unbranched, BranchIndex, BranchList(..),
        toBranchList, fromBranchList,
        toBranchedList, toUnbranchedList,
        brListLength, brListNth, brListMap, brListFoldr,
-       brListZipWith,
+       brListZipWith, brListIndices,
 
        CoAxiom(..), CoAxBranch(..), mkCoAxBranch,
 
@@ -118,6 +118,8 @@ code to use promoted types.
 %************************************************************************
 
 \begin{code}
+type BranchIndex = Int  -- The index of the branch in the list of branches
+                        -- Counting from zero
 
 -- the phantom type labels
 data Unbranched deriving Typeable
@@ -152,8 +154,16 @@ brListLength :: BranchList a br -> Int
 brListLength (FirstBranch _) = 1
 brListLength (NextBranch _ t) = 1 + brListLength t
 
+-- Indices
+brListIndices :: BranchList a br -> [BranchIndex]
+brListIndices bs = go 0 bs 
+ where
+   go :: BranchIndex -> BranchList a br -> [BranchIndex]
+   go n (NextBranch _ t) = n : go (n+1) t
+   go n (FirstBranch {}) = [n]
+
 -- lookup
-brListNth :: BranchList a br -> Int -> a
+brListNth :: BranchList a br -> BranchIndex -> a
 brListNth (FirstBranch b) 0 = b
 brListNth (NextBranch h _) 0 = h
 brListNth (NextBranch _ t) n = brListNth t (n-1)
@@ -207,10 +217,11 @@ data CoAxiom br
 
 data CoAxBranch
   = CoAxBranch
-    { cab_loc      :: SrcSpan      -- location of the defining equation
-    , cab_tvs      :: [TyVar]      -- bound type variables
-    , cab_lhs      :: [Type]       -- type patterns to match against
-    , cab_rhs      :: Type         -- right-hand side of the equality
+    { cab_loc      :: SrcSpan      -- Location of the defining equation
+                                   -- See Note [CoAxiom locations]
+    , cab_tvs      :: [TyVar]      -- Bound type variables
+    , cab_lhs      :: [Type]       -- Type patterns to match against
+    , cab_rhs      :: Type         -- Right-hand side of the equality
     }
   deriving Typeable
 
@@ -222,12 +233,11 @@ toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
 toUnbranchedAxiom (CoAxiom unique name tc branches implicit)
   = CoAxiom unique name tc (toUnbranchedList branches) implicit
 
-coAxiomNthBranch :: CoAxiom br -> Int -> CoAxBranch
-coAxiomNthBranch ax index
-  = ASSERT( 0 <= index && index < (length $ fromBranchList (co_ax_branches ax)) )
-    (fromBranchList $ co_ax_branches ax) !! index
+coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
+coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
+  = brListNth bs index
 
-coAxiomArity :: CoAxiom br -> Int -> Arity
+coAxiomArity :: CoAxiom br -> BranchIndex -> Arity
 coAxiomArity ax index
   = length $ cab_tvs $ coAxiomNthBranch ax index
 
@@ -270,6 +280,20 @@ isImplicitCoAxiom = co_ax_implicit
 mkCoAxBranch :: SrcSpan -> [TyVar] -> [Type] -> Type -> CoAxBranch
 mkCoAxBranch = CoAxBranch
 \end{code}
+
+Note [CoAxiom locations]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The source location of a CoAxiom is stored in two places in the
+datatype tree. 
+  * The first is in the location info buried in the Name of the
+    CoAxiom. This span includes all of the branches of a branched
+    CoAxiom.
+  * The second is in the cab_loc fields of the CoAxBranches.  
+
+In the case of a single branch, we can extract the source location of
+the branch from the name of the CoAxiom. In other cases, we need an
+explicit SrcSpan to correctly store the location of the equation
+giving rise to the FamInstBranch.
 
 Note [Implicit axioms]
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -27,7 +27,7 @@ module Coercion (
 
 	-- ** Constructing coercions
         mkReflCo, mkCoVarCo, 
-        mkAxInstCo, mkUnbranchedAxInstCo, mkAxInstRHS,
+        mkAxInstCo, mkUnbranchedAxInstCo, mkAxInstLHS, mkAxInstRHS,
         mkUnbranchedAxInstRHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkNthCo, mkLRCo,
@@ -580,19 +580,23 @@ mkUnbranchedAxInstCo :: CoAxiom Unbranched -> [Type] -> Coercion
 mkUnbranchedAxInstCo ax tys
   = mkAxInstCo ax 0 tys
 
-mkAxInstRHS :: CoAxiom br -> Int -> [Type] -> Type
+mkAxInstLHS, mkAxInstRHS :: CoAxiom br -> BranchIndex -> [Type] -> Type
 -- Instantiate the axiom with specified types,
 -- returning the instantiated RHS
 -- A companion to mkAxInstCo: 
 --    mkAxInstRhs ax index tys = snd (coercionKind (mkAxInstCo ax index tys))
-mkAxInstRHS ax index tys
+mkAxInstLHS ax index tys
+  | CoAxBranch { cab_tvs = tvs, cab_lhs = lhs } <- coAxiomNthBranch ax index
+  , (tys1, tys2) <- splitAtList tvs tys
   = ASSERT( tvs `equalLength` tys1 ) 
-    mkAppTys rhs' tys2
+    mkTyConApp (coAxiomTyCon ax) (substTysWith tvs tys1 lhs ++ tys2)
   where
-    branch       = coAxiomNthBranch ax index
-    tvs          = coAxBranchTyVars branch
-    (tys1, tys2) = splitAtList tvs tys
-    rhs'         = substTyWith tvs tys1 (coAxBranchRHS branch)
+
+mkAxInstRHS ax index tys
+  | CoAxBranch { cab_tvs = tvs, cab_rhs = rhs } <- coAxiomNthBranch ax index
+  , (tys1, tys2) <- splitAtList tvs tys
+  = ASSERT( tvs `equalLength` tys1 ) 
+    mkAppTys (substTyWith tvs tys1 rhs) tys2
 
 mkUnbranchedAxInstRHS :: CoAxiom Unbranched -> [Type] -> Type
 mkUnbranchedAxInstRHS ax = mkAxInstRHS ax 0
@@ -1157,11 +1161,13 @@ coercionKind co = go co
     go (ForAllCo tv co)     = mkForAllTy tv <$> go co
     go (CoVarCo cv)         = toPair $ coVarKind cv
     go (AxiomInstCo ax ind cos)
-      = let branch         = coAxiomNthBranch ax ind
-            tvs            = coAxBranchTyVars branch
-            Pair tys1 tys2 = sequenceA $ map go cos 
-        in  Pair (substTyWith tvs tys1 (coAxNthLHS ax ind))
-                 (substTyWith tvs tys2 (coAxBranchRHS branch))
+      | CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs } <- coAxiomNthBranch ax ind
+      , (cos1, cos2) <- splitAtList tvs cos
+      , Pair tys1 tys2 <- sequenceA (map go cos1)
+      = mkAppTys 
+        <$> Pair (substTyWith tvs tys1 (mkTyConApp (coAxiomTyCon ax) lhs))
+                 (substTyWith tvs tys2 rhs)
+        <*> sequenceA (map go cos2)
     go (UnsafeCo ty1 ty2)   = Pair ty1 ty2
     go (SymCo co)           = swap $ go co
     go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)
