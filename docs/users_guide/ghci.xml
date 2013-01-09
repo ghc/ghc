@@ -2808,11 +2808,22 @@ bar
 
       <varlistentry>
 	<term>
-          <literal>:show languages</literal>
-          <indexterm><primary><literal>:show languages</literal></primary></indexterm>
+          <literal>:show language</literal>
+          <indexterm><primary><literal>:show language</literal></primary></indexterm>
         </term>
 	<listitem>
-    <para>Show the currently active language flags.</para>
+    <para>Show the currently active language flags for source files.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:showi language</literal>
+          <indexterm><primary><literal>:showi language</literal></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Show the currently active language flags for
+          expressions typed at the prompt (see also <literal>:seti</literal>).</para>
 	</listitem>
       </varlistentry>
 
