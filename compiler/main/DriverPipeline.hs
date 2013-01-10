@@ -1962,12 +1962,20 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
+    let sse2 = isSse2Enabled dflags
+        sse4_2 = isSse4_2Enabled dflags
+        sse_defs =
+          [ "-D__SSE__=1" | sse2 || sse4_2 ] ++
+          [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
+          [ "-D__SSE4_2__=1" | sse4_2 ]
+
     cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option cc_opts
+                    ++ map SysTools.Option sse_defs
                     ++ [ SysTools.Option     "-x"
                        , SysTools.Option     "c"
                        , SysTools.Option     input_fn

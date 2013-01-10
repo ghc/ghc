@@ -118,6 +118,10 @@ module DynFlags (
         tAG_MASK,
         mAX_PTR_TAG,
         tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
+
+        -- * SSE
+        isSse2Enabled,
+        isSse4_2Enabled,
   ) where
 
 #include "HsVersions.h"
@@ -2153,6 +2157,11 @@ dynamic_flags = [
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "msse2"        (NoArg (setGeneralFlag Opt_SSE2))
   , Flag "msse4.2"      (NoArg (setGeneralFlag Opt_SSE4_2))
+    -- at some point we should probably have a single SSE flag that
+    -- contains the SSE version, instead of having a different flag
+    -- per version. That would make it easier to e.g. check if SSE2 is
+    -- enabled as you wouldn't have to check if either Opt_SSE2 or
+    -- Opt_SSE4_2 is set (as the latter implies the former).
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -3371,3 +3380,21 @@ makeDynFlagsConsistent dflags
           arch = platformArch platform
           os   = platformOS   platform
 
+-- -----------------------------------------------------------------------------
+-- SSE
+
+isSse2Enabled :: DynFlags -> Bool
+isSse2Enabled dflags = isSse4_2Enabled dflags || isSse2Enabled'
+  where
+    isSse2Enabled' = case platformArch (targetPlatform dflags) of
+        ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
+                      -- possible to make it optional, but we'd need to
+                      -- fix at least the foreign call code where the
+                      -- calling convention specifies the use of xmm regs,
+                      -- and possibly other places.
+                      True
+        ArchX86    -> gopt Opt_SSE2 dflags
+        _          -> False
+
+isSse4_2Enabled :: DynFlags -> Bool
+isSse4_2Enabled dflags = gopt Opt_SSE4_2 dflags
