@@ -503,70 +503,74 @@ runPipeline
   -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
 runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
              mb_basename output maybe_loc maybe_stub_o
-    = do r <- runPipeline' stop_phase hsc_env0 (input_fn, mb_phase)
-                           mb_basename output maybe_loc maybe_stub_o
-         let dflags = extractDynFlags hsc_env0
+
+    = do let
+             dflags0 = hsc_dflags hsc_env0
+
+             -- Decide where dump files should go based on the pipeline output
+             dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
+             hsc_env = hsc_env0 {hsc_dflags = dflags}
+
+             (input_basename, suffix) = splitExtension input_fn
+             suffix' = drop 1 suffix -- strip off the .
+             basename | Just b <- mb_basename = b
+                      | otherwise             = input_basename
+
+             env = PipeEnv{ stop_phase,
+                            src_basename = basename,
+                            src_suffix = suffix',
+                            output_spec = output }
+
+             -- If we were given a -x flag, then use that phase to start from
+             start_phase = fromMaybe (startPhase suffix') mb_phase
+
+         -- We want to catch cases of "you can't get there from here" before
+         -- we start the pipeline, because otherwise it will just run off the
+         -- end.
+         --
+         -- There is a partial ordering on phases, where A < B iff A occurs
+         -- before B in a normal compilation pipeline.
+
+         when (not (start_phase `happensBefore` stop_phase)) $
+               throwGhcException (UsageError
+                           ("cannot compile this file to desired target: "
+                              ++ input_fn))
+
+         r <- runPipeline' start_phase stop_phase hsc_env env input_fn
+                           output maybe_loc maybe_stub_o
+         let dflags = extractDynFlags hsc_env
          whenCannotGenerateDynamicToo dflags $ do
              let dflags' = doDynamicToo dflags
-             hsc_env1 <- newHscEnv dflags'
-             _ <- runPipeline' stop_phase hsc_env1 (input_fn, mb_phase)
-                               mb_basename output maybe_loc maybe_stub_o
+             hsc_env' <- newHscEnv dflags'
+             _ <- runPipeline' start_phase stop_phase hsc_env' env input_fn
+                               output maybe_loc maybe_stub_o
              return ()
          return r
 
 runPipeline'
-  :: Phase                      -- ^ When to stop
+  :: Phase                      -- ^ When to start
+  -> Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath,Maybe Phase)     -- ^ Input filename (and maybe -x suffix)
-  -> Maybe FilePath             -- ^ original basename (if different from ^^^)
+  -> PipeEnv
+  -> FilePath                   -- ^ Input filename
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> Maybe FilePath             -- ^ stub object, if we have one
-  -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
-runPipeline' stop_phase hsc_env0 (input_fn, mb_phase)
-             mb_basename output maybe_loc maybe_stub_o
+  -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
+runPipeline' start_phase stop_phase hsc_env env input_fn
+             output maybe_loc maybe_stub_o
   = do
-  let dflags0 = hsc_dflags hsc_env0
-      (input_basename, suffix) = splitExtension input_fn
-      suffix' = drop 1 suffix -- strip off the .
-      basename | Just b <- mb_basename = b
-               | otherwise             = input_basename
-
-      -- Decide where dump files should go based on the pipeline output
-      dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
-      hsc_env = hsc_env0 {hsc_dflags = dflags}
-
-        -- If we were given a -x flag, then use that phase to start from
-      start_phase = fromMaybe (startPhase suffix') mb_phase
-
-  -- We want to catch cases of "you can't get there from here" before
-  -- we start the pipeline, because otherwise it will just run off the
-  -- end.
-  --
-  -- There is a partial ordering on phases, where A < B iff A occurs
-  -- before B in a normal compilation pipeline.
-
-  when (not (start_phase `happensBefore` stop_phase)) $
-        throwGhcException (UsageError
-                    ("cannot compile this file to desired target: "
-                       ++ input_fn))
-
   -- this is a function which will be used to calculate output file names
   -- as we go along (we partially apply it to some of its inputs here)
-  let get_output_fn = getOutputFilename stop_phase output basename
+  let get_output_fn = getOutputFilename stop_phase output (src_basename env)
 
   -- Execute the pipeline...
-  let env   = PipeEnv{ stop_phase,
-                       src_basename = basename,
-                       src_suffix = suffix',
-                       output_spec = output }
-
-      state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
+  let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
 
   (state', output_fn) <- unP (pipeLoop start_phase input_fn) env state
 
   let PipeState{ hsc_env=hsc_env', maybe_loc } = state'
-      dflags' = hsc_dflags hsc_env'
+      dflags = hsc_dflags hsc_env'
 
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
@@ -575,14 +579,14 @@ runPipeline' stop_phase hsc_env0 (input_fn, mb_phase)
   -- further compilation stages can tell what the original filename was.
   case output of
     Temporary ->
-        return (dflags', output_fn)
-    _other -> 
-        do final_fn <- get_output_fn dflags' stop_phase maybe_loc
+        return (dflags, output_fn)
+    _ ->
+        do final_fn <- get_output_fn dflags stop_phase maybe_loc
            when (final_fn /= output_fn) $ do
               let msg = ("Copying `" ++ output_fn ++"' to `" ++ final_fn ++ "'")
                   line_prag = Just ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}\n")
               copyWithHeader dflags msg line_prag output_fn final_fn
-           return (dflags', final_fn)
+           return (dflags, final_fn)
 
 -- -----------------------------------------------------------------------------
 -- The pipeline uses a monad to carry around various bits of information
