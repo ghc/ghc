@@ -1,0 +1,5 @@
+
+T7562.hs:3:14: Warning:
+    UNPACK pragma lacks '!' on the first argument of `Pair2'
+    In the definition of data constructor `Pair2'
+    In the data declaration for `Pair2'
