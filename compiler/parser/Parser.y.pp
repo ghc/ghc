@@ -1030,9 +1030,13 @@ infixtype :: { LHsType RdrName }
         | btype tyvarop  type    { LL $ mkHsOpTy $1 $2 $3 }
 
 strict_mark :: { Located HsBang }
-        : '!'                           { L1 (HsBang False) }
-        | '{-# UNPACK' '#-}' '!'        { LL (HsBang True) }
-        | '{-# NOUNPACK' '#-}' '!'      { LL HsStrict }
+        : '!'                           { L1 (HsUserBang Nothing      True) }
+        | '{-# UNPACK' '#-}'            { LL (HsUserBang (Just True)  False) }
+        | '{-# NOUNPACK' '#-}'          { LL (HsUserBang (Just False) True) }
+        | '{-# UNPACK' '#-}' '!'        { LL (HsUserBang (Just True)  True) }
+        | '{-# NOUNPACK' '#-}' '!'      { LL (HsUserBang (Just False) True) }
+        -- Although UNPAACK with no '!' is illegal, we get a 
+        -- better error message if we parse it here
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }

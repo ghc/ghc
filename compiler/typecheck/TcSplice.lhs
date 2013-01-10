@@ -1487,11 +1487,12 @@ reifyFixity name
       conv_dir BasicTypes.InfixN = TH.InfixN
 
 reifyStrict :: DataCon.HsBang -> TH.Strict
-reifyStrict HsNoBang        = TH.NotStrict
-reifyStrict (HsBang False)  = TH.Unpacked
-reifyStrict (HsBang True)   = TH.Unpacked
-reifyStrict HsStrict        = TH.IsStrict
-reifyStrict (HsUnpack {})   = TH.Unpacked
+reifyStrict HsNoBang                      = TH.NotStrict
+reifyStrict (HsUserBang _ False)          = TH.NotStrict
+reifyStrict (HsUserBang (Just True) True) = TH.Unpacked
+reifyStrict (HsUserBang _     True)       = TH.IsStrict
+reifyStrict HsStrict                      = TH.IsStrict
+reifyStrict (HsUnpack {})                 = TH.Unpacked
 
 ------------------------------
 noTH :: LitString -> SDoc -> TcM a

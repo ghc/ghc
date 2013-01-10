@@ -217,8 +217,8 @@ pprDataConDecl pefas ss gadt_style dataCon
     -- See Note [Printing bangs on data constructors]
     user_ify :: HsBang -> HsBang
     user_ify bang | opt_PprStyle_Debug = bang
-    user_ify HsStrict                  = HsBang False
-    user_ify (HsUnpack {})             = HsBang True
+    user_ify HsStrict                  = HsUserBang Nothing     True
+    user_ify (HsUnpack {})             = HsUserBang (Just True) True
     user_ify bang                      = bang
 
     maybe_show_label (lbl,bty)

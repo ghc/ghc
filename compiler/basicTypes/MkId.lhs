@@ -593,7 +593,11 @@ dataConArgRep
 dataConArgRep _ _ arg_ty HsNoBang
   = (HsNoBang, [(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
-dataConArgRep dflags fam_envs arg_ty (HsBang user_unpack_prag) 
+dataConArgRep _ _ arg_ty (HsUserBang _ False)  -- No '!'
+  = (HsNoBang, [(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
+
+dataConArgRep dflags fam_envs arg_ty 
+    (HsUserBang unpk_prag True)  -- {-# UNPACK #-} !
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; 
           -- rather arbitrarily, we use -fomit-iface-pragmas
@@ -602,10 +606,11 @@ dataConArgRep dflags fam_envs arg_ty (HsBang user_unpack_prag)
         arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
   , isUnpackableType fam_envs arg_ty'
   , (rep_tys, wrappers) <- dataConArgUnpack arg_ty'
-  , user_unpack_prag
-    || gopt Opt_UnboxStrictFields dflags
-    || (gopt Opt_UnboxSmallStrictFields dflags 
-        && length rep_tys <= 1)  -- See Note [Unpack one-wide fields]
+  , case unpk_prag of
+      Nothing -> gopt Opt_UnboxStrictFields dflags
+              || (gopt Opt_UnboxSmallStrictFields dflags 
+                   && length rep_tys <= 1)  -- See Note [Unpack one-wide fields]
+      Just unpack_me -> unpack_me
   = case mb_co of
       Nothing          -> (HsUnpack Nothing,   rep_tys, wrappers)
       Just (co,rep_ty) -> (HsUnpack (Just co), rep_tys, wrapCo co rep_ty wrappers)
@@ -687,6 +692,10 @@ dataConArgUnpack arg_ty
 isUnpackableType :: FamInstEnvs -> Type -> Bool
 -- True if we can unpack the UNPACK fields of the constructor
 -- without involving the NameSet tycons
+-- See Note [Recursive unboxing]
+-- We look "deeply" inside rather than relying on the DataCons
+-- we encounter on the way, because otherwise we might well
+-- end up relying on ourselves!
 isUnpackableType fam_envs ty
   | Just (tc, _) <- splitTyConApp_maybe ty
   , Just con <- tyConSingleDataCon_maybe tc
@@ -695,7 +704,7 @@ isUnpackableType fam_envs ty
   | otherwise
   = False
   where
-    ok_arg tcs (ty, bang) = no_unpack bang || ok_ty tcs norm_ty
+    ok_arg tcs (ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
         where
           norm_ty = case topNormaliseType fam_envs ty of
                       Just (_, ty) -> ty
@@ -713,10 +722,12 @@ isUnpackableType fam_envs ty
 
     ok_con_args tcs con
        = all (ok_arg tcs) (dataConOrigArgTys con `zip` dataConStrictMarks con)
+         -- NB: dataConStrictMarks gives the *user* request; 
+         -- We'd get a black hole if we used dataConRepBangs
 
-    no_unpack (HsBang True)   = False
-    no_unpack (HsUnpack {})   = False
-    no_unpack _               = True
+    attempt_unpack (HsUnpack {})              = True
+    attempt_unpack (HsUserBang (Just unpk) _) = unpk
+    attempt_unpack _                          = False
 \end{code}
 
 Note [Unpack one-wide fields]

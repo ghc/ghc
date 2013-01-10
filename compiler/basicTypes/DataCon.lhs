@@ -442,15 +442,19 @@ data DataConRep
 -- HsBang describes what the *programmer* wrote
 -- This info is retained in the DataCon.dcStrictMarks field
 data HsBang 
-  = HsNoBang	       -- Lazy field
+  = HsUserBang   -- The user's source-code request
+       (Maybe Bool)       -- Just True    {-# UNPACK #-}
+                          -- Just False   {-# NOUNPACK #-}
+                          -- Nothing      no pragma
+       Bool               -- True <=> '!' specified
 
-  | HsBang Bool      -- Source-language '!' bang
-                     --  True <=> also an {-# UNPACK #-} pragma
+  | HsNoBang	          -- Lazy field
+                          -- HsUserBang Nothing False means the same as HsNoBang
 
   | HsUnpack              -- Definite commitment: this field is strict and unboxed
        (Maybe Coercion)   --    co :: arg-ty ~ product-ty
 
-  | HsStrict            -- Definite commitment: this field is strict but not unboxed
+  | HsStrict              -- Definite commitment: this field is strict but not unboxed
   deriving (Data.Data, Data.Typeable)
 
 -------------------------
@@ -489,7 +493,9 @@ Note [Bangs on data constructor arguments]
 Consider
   data T = MkT !Int {-# UNPACK #-} !Int Bool
 Its dcArgBangs field records the *users* specifications, in this case
-    [HsBang False, HsBang True, HsNoBang]
+    [ HsUserBang Nothing True
+    , HsUserBang (Just True) True
+    , HsNoBang]
 See the declaration of HsBang in BasicTypes
 
 The dcr_bangs field of the dcRep field records the *actual, decided*
@@ -538,12 +544,16 @@ instance Data.Data DataCon where
     dataTypeOf _ = mkNoRepType "DataCon"
 
 instance Outputable HsBang where
-    ppr HsNoBang             = empty
-    ppr (HsBang True)        = ptext (sLit "{-# UNPACK #-} !")
-    ppr (HsBang False)       = char '!'
-    ppr (HsUnpack Nothing)   = ptext (sLit "Unpk")
-    ppr (HsUnpack (Just co)) = ptext (sLit "Unpk") <> parens (ppr co)
-    ppr HsStrict             = ptext (sLit "SrictNotUnpacked")
+    ppr HsNoBang               = empty
+    ppr (HsUserBang prag bang) = pp_unpk prag <+> ppWhen bang (char '!')
+    ppr (HsUnpack Nothing)     = ptext (sLit "Unpk")
+    ppr (HsUnpack (Just co))   = ptext (sLit "Unpk") <> parens (ppr co)
+    ppr HsStrict               = ptext (sLit "SrictNotUnpacked")
+
+pp_unpk :: Maybe Bool -> SDoc
+pp_unpk Nothing      = empty
+pp_unpk (Just True)  = ptext (sLit "{-# UNPACK #-}")
+pp_unpk (Just False) = ptext (sLit "{-# NOUNPACK #-}")
 
 instance Outputable StrictnessMark where
   ppr MarkedStrict     = ptext (sLit "!")
@@ -551,16 +561,16 @@ instance Outputable StrictnessMark where
 
 
 eqHsBang :: HsBang -> HsBang -> Bool
-eqHsBang HsNoBang             HsNoBang             = True
 eqHsBang HsStrict             HsStrict             = True
-eqHsBang (HsBang b1)          (HsBang b2)          = b1 == b2
+eqHsBang (HsUserBang u1 b1)   (HsUserBang u2 b2)   = u1==u2 && b1==b2
 eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)   = True
 eqHsBang (HsUnpack (Just c1)) (HsUnpack (Just c2)) = eqType (coercionType c1) (coercionType c2)
 eqHsBang _ _ = False
 
 isBanged :: HsBang -> Bool
-isBanged HsNoBang = False
-isBanged _        = True
+isBanged HsNoBang                  = False
+isBanged (HsUserBang Nothing bang) = bang
+isBanged _                         = True
 
 isMarkedStrict :: StrictnessMark -> Bool
 isMarkedStrict NotMarkedStrict = False

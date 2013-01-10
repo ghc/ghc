@@ -1399,19 +1399,22 @@ checkValidDataCon dflags existential_ok tc con
     }
   where
     ctxt = ConArgCtxt (dataConName con) 
-    check_bang (HsBang want_unpack, rep_bang, n) 
+    check_bang (HsUserBang (Just want_unpack) has_bang, rep_bang, n)
+      | want_unpack, not has_bang
+      = addWarnTc (bad_bang n (ptext (sLit "UNPACK pragma lacks '!'")))
       | want_unpack
       , case rep_bang of { HsUnpack {} -> False; _ -> True }
       , not (gopt Opt_OmitInterfacePragmas dflags)  
            -- If not optimising, se don't unpack, so don't complain!
            -- See MkId.dataConArgRep, the (HsBang True) case
-      = addWarnTc (cant_unbox_msg n)
+      = addWarnTc (bad_bang n (ptext (sLit "Ignoring unusable UNPACK pragma")))
+
     check_bang _
       = return ()
 
-    cant_unbox_msg n = sep [ ptext (sLit "Ignoring unusable UNPACK pragma on the")
-                           , speakNth n <+> ptext (sLit "argument of") <+> quotes (ppr con)]
-
+    bad_bang n herald
+      = hang herald 2 (ptext (sLit "on the") <+> speakNth n 
+                       <+> ptext (sLit "argument of") <+> quotes (ppr con))
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
 -- Checks for the data constructor of a newtype

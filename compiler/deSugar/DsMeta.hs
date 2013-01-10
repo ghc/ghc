@@ -557,8 +557,8 @@ repBangTy ty= do
   rep2 strictTypeName [s, t]
   where
     (str, ty') = case ty of
-		   L _ (HsBangTy (HsBang True) ty) -> (unpackedName,  ty)
-		   L _ (HsBangTy _ ty)             -> (isStrictName,  ty)
+		   L _ (HsBangTy (HsUserBang (Just True) True) ty) -> (unpackedName,  ty)
+		   L _ (HsBangTy (HsUserBang _     True) ty)       -> (isStrictName,  ty)
 		   _                               -> (notStrictName, ty)
 
 -------------------------------------------------------

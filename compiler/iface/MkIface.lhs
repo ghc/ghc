@@ -1528,7 +1528,7 @@ toIfaceBang _    HsNoBang            = IfNoBang
 toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
 toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (coToIfaceType (tidyCo env co))
 toIfaceBang _   HsStrict             = IfStrict
-toIfaceBang _   (HsBang {})          = panic "toIfaceBang"
+toIfaceBang _   (HsUserBang {})      = panic "toIfaceBang"
 
 classToIfaceDecl :: TidyEnv -> Class -> IfaceDecl
 classToIfaceDecl env clas
