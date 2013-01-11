@@ -545,21 +545,13 @@ mode_flags =
                                             addFlag "-no-link" f))
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"            (PassFlag setGenerateC)
+  , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
-
-setGenerateC :: String -> EwM ModeM ()
-setGenerateC f = do -- TODO: We used to warn and ignore when
-                    -- unregisterised, but we no longer know whether
-                    -- we are unregisterised at this point. Should
-                    -- we check later on?
-                    setMode (stopBeforeMode HCc) f
-                    addFlag "-fvia-C" f
 
 setMode :: Mode -> String -> EwM ModeM ()
 setMode newMode newFlag = liftEwM $ do
