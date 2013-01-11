@@ -709,9 +709,9 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             prevailing_target = hscTarget (hsc_dflags hsc_env)
             local_target      = hscTarget dflags
 
-            -- If OPTIONS_GHC contains -fasm or -fvia-C, be careful that
+            -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
             -- we don't do anything dodgy: these should only work to change
-            -- from -fvia-C to -fasm and vice-versa, otherwise we could 
+            -- from -fllvm to -fasm and vice-versa, otherwise we could
             -- end up trying to link object code to byte code.
             target = if prevailing_target /= local_target
                         && (not (isObjectTarget prevailing_target)

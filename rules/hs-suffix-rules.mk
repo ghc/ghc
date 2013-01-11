@@ -34,5 +34,8 @@ $(call hi-rule,$1/$2/build/autogen,$1/$2/build,$3)
 endif
 endif
 
+$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
+  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3,$$(dir))))
+
 endef # hs-suffix-rules
 

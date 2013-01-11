@@ -233,6 +233,8 @@ include $(TOP)/mk/install.mk
 # portable as possible.
 BeConservative = NO
 
+ExtraMakefileSanityChecks = NO
+
 #
 # Building various ways?
 # (right now, empty if not).
