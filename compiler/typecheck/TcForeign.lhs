@@ -427,7 +427,7 @@ checkCOrAsmOrLlvm HscC    = Nothing
 checkCOrAsmOrLlvm HscAsm  = Nothing
 checkCOrAsmOrLlvm HscLlvm = Nothing
 checkCOrAsmOrLlvm _
-  = Just (text "requires via-C, llvm (-fllvm) or native code generation (-fvia-C)")
+  = Just (text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)")
 
 checkCOrAsmOrLlvmOrInterp :: HscTarget -> Maybe SDoc
 checkCOrAsmOrLlvmOrInterp HscC           = Nothing
@@ -435,7 +435,7 @@ checkCOrAsmOrLlvmOrInterp HscAsm         = Nothing
 checkCOrAsmOrLlvmOrInterp HscLlvm        = Nothing
 checkCOrAsmOrLlvmOrInterp HscInterpreted = Nothing
 checkCOrAsmOrLlvmOrInterp _
-  = Just (text "requires interpreted, C, Llvm or native code generation")
+  = Just (text "requires interpreted, unregisterised, llvm or native code generation")
 
 checkCOrAsmOrLlvmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
 checkCOrAsmOrLlvmOrDotNetOrInterp HscC           = Nothing
@@ -443,7 +443,7 @@ checkCOrAsmOrLlvmOrDotNetOrInterp HscAsm         = Nothing
 checkCOrAsmOrLlvmOrDotNetOrInterp HscLlvm        = Nothing
 checkCOrAsmOrLlvmOrDotNetOrInterp HscInterpreted = Nothing
 checkCOrAsmOrLlvmOrDotNetOrInterp _
-  = Just (text "requires interpreted, C, Llvm or native code generation")
+  = Just (text "requires interpreted, unregisterised, llvm or native code generation")
 
 checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
 checkCg check = do
