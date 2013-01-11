@@ -35,6 +35,7 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} DynFlags
 import Outputable
 import Platform
 import System.FilePath
@@ -131,33 +132,39 @@ eqPhase _           _          = False
 -- Partial ordering on phases: we want to know which phases will occur before
 -- which others.  This is used for sanity checking, to ensure that the
 -- pipeline will stop at some point (see DriverPipeline.runPipeline).
-happensBefore :: Phase -> Phase -> Bool
-StopLn `happensBefore` _ = False
-x      `happensBefore` y = after_x `eqPhase` y || after_x `happensBefore` y
-        where
-          after_x = nextPhase x
+happensBefore :: DynFlags -> Phase -> Phase -> Bool
+happensBefore dflags p1 p2 = p1 `happensBefore'` p2
+    where StopLn `happensBefore'` _ = False
+          x      `happensBefore'` y = after_x `eqPhase` y
+                                   || after_x `happensBefore'` y
+              where after_x = nextPhase dflags x
 
-nextPhase :: Phase -> Phase
--- A conservative approximation to the next phase, used in happensBefore
-nextPhase (Unlit sf) = Cpp  sf
-nextPhase (Cpp   sf) = HsPp sf
-nextPhase (HsPp  sf) = Hsc  sf
-nextPhase (Hsc   _)  = HCc
-nextPhase Splitter   = SplitAs
-nextPhase LlvmOpt    = LlvmLlc
-nextPhase LlvmLlc    = LlvmMangle
-nextPhase LlvmMangle = As
-nextPhase SplitAs    = MergeStub
-nextPhase As         = MergeStub
-nextPhase Ccpp       = As
-nextPhase Cc         = As
-nextPhase Cobjc      = As
-nextPhase Cobjcpp    = As
-nextPhase CmmCpp     = Cmm
-nextPhase Cmm        = HCc
-nextPhase HCc        = As
-nextPhase MergeStub  = StopLn
-nextPhase StopLn     = panic "nextPhase: nothing after StopLn"
+nextPhase :: DynFlags -> Phase -> Phase
+nextPhase dflags p
+    -- A conservative approximation to the next phase, used in happensBefore
+    = case p of
+      Unlit sf   -> Cpp  sf
+      Cpp   sf   -> HsPp sf
+      HsPp  sf   -> Hsc  sf
+      Hsc   _    -> maybeHCc
+      Splitter   -> SplitAs
+      LlvmOpt    -> LlvmLlc
+      LlvmLlc    -> LlvmMangle
+      LlvmMangle -> As
+      SplitAs    -> MergeStub
+      As         -> MergeStub
+      Ccpp       -> As
+      Cc         -> As
+      Cobjc      -> As
+      Cobjcpp    -> As
+      CmmCpp     -> Cmm
+      Cmm        -> maybeHCc
+      HCc        -> As
+      MergeStub  -> StopLn
+      StopLn     -> panic "nextPhase: nothing after StopLn"
+    where maybeHCc = if platformUnregisterised (targetPlatform dflags)
+                     then HCc
+                     else As
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.

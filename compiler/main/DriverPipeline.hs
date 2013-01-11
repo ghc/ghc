@@ -540,7 +540,8 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- There is a partial ordering on phases, where A < B iff A occurs
          -- before B in a normal compilation pipeline.
 
-         when (not (start_phase `happensBefore` stop_phase)) $
+         let happensBefore' = happensBefore dflags
+         when (not (start_phase `happensBefore'` stop_phase)) $
                throwGhcException (UsageError
                            ("cannot compile this file to desired target: "
                               ++ input_fn))
@@ -682,12 +683,13 @@ phaseOutputFilename next_phase = do
 pipeLoop :: Phase -> FilePath -> CompPipeline FilePath
 pipeLoop phase input_fn = do
   PipeEnv{stop_phase} <- getPipeEnv
-  PipeState{hsc_env}  <- getPipeState
+  dflags <- getDynFlags
+  let happensBefore' = happensBefore dflags
   case () of
    _ | phase `eqPhase` stop_phase            -- All done
      -> return input_fn
 
-     | not (phase `happensBefore` stop_phase)
+     | not (phase `happensBefore'` stop_phase)
         -- Something has gone wrong.  We'll try to cover all the cases when
         -- this could happen, so if we reach here it is a panic.
         -- eg. it might happen if the -C flag is used on a source file that
@@ -696,9 +698,8 @@ pipeLoop phase input_fn = do
            " but I wanted to stop at phase " ++ show stop_phase)
 
      | otherwise
-     -> do liftIO $ debugTraceMsg (hsc_dflags hsc_env) 4
+     -> do liftIO $ debugTraceMsg dflags 4
                                   (ptext (sLit "Running phase") <+> ppr phase)
-           dflags <- getDynFlags
            (next_phase, output_fn) <- runPhase phase input_fn dflags
            pipeLoop next_phase output_fn
 
