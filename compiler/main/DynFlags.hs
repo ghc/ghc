@@ -590,6 +590,7 @@ data DynFlags = DynFlags {
   dynHiSuf              :: String,
 
   outputFile            :: Maybe String,
+  dynOutputFile         :: Maybe String,
   outputHi              :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
@@ -1144,6 +1145,7 @@ doDynamicToo :: DynFlags -> DynFlags
 doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0
                            dflags2 = addWay' WayDyn dflags1
                            dflags3 = dflags2 {
+                                         outputFile = dynOutputFile dflags2,
                                          hiSuf = dynHiSuf dflags2,
                                          objectSuf = dynObjectSuf dflags2
                                      }
@@ -1222,6 +1224,7 @@ defaultDynFlags mySettings =
         pluginModNameOpts       = [],
 
         outputFile              = Nothing,
+        dynOutputFile           = Nothing,
         outputHi                = Nothing,
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
@@ -1594,7 +1597,7 @@ setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          addCmdlineFramework, addHaddockOpts, addGhciScript, 
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
-setOutputFile, setOutputHi, setDumpPrefixForce
+setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
 
 setObjectDir  f d = d{ objectDir  = Just f}
@@ -1614,6 +1617,7 @@ setDynHiSuf     f d = d{ dynHiSuf     = f}
 setHcSuf        f d = d{ hcSuf        = f}
 
 setOutputFile f d = d{ outputFile = f}
+setDynOutputFile f d = d{ dynOutputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
@@ -1796,11 +1800,31 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcException (CmdLineError ("combination not supported: "  ++
                               intercalate "/" (map wayDesc theWays)))
 
-  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+  -- TODO: This is an ugly hack. Do something better.
+  -- -fPIC affects the CMM code we generate, so if
+  -- we are in -dynamic-too mode we need -fPIC to be on during the
+  -- shared part of the compilation.
+  let doingDynamicToo = gopt Opt_BuildDynamicToo dflags3
+      platform = targetPlatform dflags3
+      dflags4 = if doingDynamicToo
+                then foldr setGeneralFlag' dflags3
+                           (wayGeneralFlags platform WayDyn)
+                else dflags3
 
-  liftIO $ setUnsafeGlobalDynFlags dflags4
+  {-
+  TODO: This test doesn't quite work: We don't want to give an error
+  when e.g. compiling a C file, only when compiling Haskell files.
+  when doingDynamicToo $
+      unless (isJust (outputFile dflags4) == isJust (dynOutputFile dflags4)) $
+          throwGhcException $ CmdLineError
+              "With -dynamic-too, must give -dyno iff giving -o"
+  -}
 
-  return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
+  let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
+
+  liftIO $ setUnsafeGlobalDynFlags dflags5
+
+  return (dflags5, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
@@ -1992,6 +2016,7 @@ dynamic_flags = [
         ------- Output Redirection ------------------------------------------
   , Flag "odir"              (hasArg setObjectDir)
   , Flag "o"                 (sepArg (setOutputFile . Just))
+  , Flag "dyno"              (sepArg (setDynOutputFile . Just))
   , Flag "ohi"               (hasArg (setOutputHi . Just ))
   , Flag "osuf"              (hasArg setObjectSuf)
   , Flag "dynosuf"           (hasArg setDynObjectSuf)

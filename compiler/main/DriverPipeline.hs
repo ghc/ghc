@@ -516,13 +516,22 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
              basename | Just b <- mb_basename = b
                       | otherwise             = input_basename
 
-             env = PipeEnv{ stop_phase,
+             -- If we were given a -x flag, then use that phase to start from
+             start_phase = fromMaybe (startPhase suffix') mb_phase
+
+             isHaskell (Unlit _) = True
+             isHaskell (Cpp   _) = True
+             isHaskell (HsPp  _) = True
+             isHaskell (Hsc   _) = True
+             isHaskell _         = False
+
+             isHaskellishFile = isHaskell start_phase
+
+             env = PipeEnv{ pe_isHaskellishFile = isHaskellishFile,
+                            stop_phase,
                             src_basename = basename,
                             src_suffix = suffix',
                             output_spec = output }
-
-             -- If we were given a -x flag, then use that phase to start from
-             start_phase = fromMaybe (startPhase suffix') mb_phase
 
          -- We want to catch cases of "you can't get there from here" before
          -- we start the pipeline, because otherwise it will just run off the
@@ -536,14 +545,26 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                            ("cannot compile this file to desired target: "
                               ++ input_fn))
 
+         debugTraceMsg dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase stop_phase hsc_env env input_fn
                            output maybe_loc maybe_stub_o
+
+         -- If we are compiling a Haskell module, and doing
+         -- -dynamic-too, but couldn't do the -dynamic-too fast
+         -- path, then rerun the pipeline for the dyn way
          let dflags = extractDynFlags hsc_env
-         whenCannotGenerateDynamicToo dflags $ do
+         when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
+             debugTraceMsg dflags 4
+                 (text "Running the pipeline again for -dynamic-too")
              let dflags' = doDynamicToo dflags
+                 -- TODO: This should use -dyno
+                 output' = case output of
+                           SpecificFile fn -> SpecificFile (replaceExtension fn (objectSuf dflags'))
+                           Persistent -> Persistent
+                           Temporary -> Temporary
              hsc_env' <- newHscEnv dflags'
              _ <- runPipeline' start_phase stop_phase hsc_env' env input_fn
-                               output maybe_loc maybe_stub_o
+                               output' maybe_loc maybe_stub_o
              return ()
          return r
 
@@ -593,6 +614,7 @@ runPipeline' start_phase stop_phase hsc_env env input_fn
 
 -- PipeEnv: invariant information passed down
 data PipeEnv = PipeEnv {
+       pe_isHaskellishFile :: Bool,
        stop_phase   :: Phase,       -- ^ Stop just before this phase
        src_basename :: String,      -- ^ basename of original input source
        src_suffix   :: String,      -- ^ its extension
