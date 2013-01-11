@@ -70,6 +70,6 @@ largeOffsetError :: (Integral a, Show a) => a -> b
 largeOffsetError i
   = panic ("ERROR: SPARC native-code generator cannot handle large offset ("
                 ++ show i ++ ");\nprobably because of large constant data structures;" ++
-                "\nworkaround: use -fvia-C on this module.\n")
+                "\nworkaround: use -fllvm on this module.\n")
 
 
