@@ -255,7 +255,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
       dflags <- getDynFlags
       check (xopt Opt_GHCForeignImportPrim dflags)
             (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
-      checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
+      checkCg checkCOrAsmOrLlvmOrInterp
       checkCTarget target
       check (playSafe safety)
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
@@ -264,7 +264,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
+      checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
       checkCTarget target
       dflags <- getDynFlags
@@ -283,7 +283,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
 checkCTarget (StaticTarget str _ _) = do
-    checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
+    checkCg checkCOrAsmOrLlvmOrInterp
     check (isCLabelString str) (badCName str)
 
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
@@ -435,14 +435,6 @@ checkCOrAsmOrLlvmOrInterp HscAsm         = Nothing
 checkCOrAsmOrLlvmOrInterp HscLlvm        = Nothing
 checkCOrAsmOrLlvmOrInterp HscInterpreted = Nothing
 checkCOrAsmOrLlvmOrInterp _
-  = Just (text "requires interpreted, unregisterised, llvm or native code generation")
-
-checkCOrAsmOrLlvmOrDotNetOrInterp :: HscTarget -> Maybe SDoc
-checkCOrAsmOrLlvmOrDotNetOrInterp HscC           = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscAsm         = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscLlvm        = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp HscInterpreted = Nothing
-checkCOrAsmOrLlvmOrDotNetOrInterp _
   = Just (text "requires interpreted, unregisterised, llvm or native code generation")
 
 checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
