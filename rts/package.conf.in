@@ -141,6 +141,7 @@ ld-options:
          , "-u", "base_GHCziTopHandler_runIO_closure"
          , "-u", "base_GHCziTopHandler_runNonIO_closure"
 	 , "-u", "base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         , "-u", "base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
 	 , "-u", "base_GHCziConcziSync_runSparks_closure"
 	 , "-u", "base_GHCziConcziSignal_runHandlers_closure"
 #endif
