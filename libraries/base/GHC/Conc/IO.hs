@@ -121,7 +121,7 @@ threadWaitReadSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
-      Sync.forkIO $ do
+      _ <- Sync.forkIO $ do
         threadWaitRead fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
@@ -140,7 +140,7 @@ threadWaitWriteSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
-      Sync.forkIO $ do
+      _ <- Sync.forkIO $ do
         threadWaitWrite fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
