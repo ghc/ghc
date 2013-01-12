@@ -295,7 +295,7 @@ f (Wibble x y)  # ugly, and proud of it
           <literal>Strictness: &lt;string&gt;</literal>.  The
           <literal>&lt;string&gt;</literal> gives the strictness of
           the function's arguments: see <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/Demand">
-          the GHC Commentary</ulink> for a description of the stricntess notation.
+          the GHC Commentary</ulink> for a description of the strictness notation.
           </para>
 
 	  <para>For an &ldquo;unpackable&rdquo;
