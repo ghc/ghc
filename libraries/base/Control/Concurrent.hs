@@ -466,7 +466,7 @@ threadWaitReadSTM fd
                                       case result of
                                         Nothing         -> retry
                                         Just (Right ()) -> return ()
-                                        Just (Left e)   -> throwSTM e
+                                        Just (Left e)   -> throwSTM (e :: IOException)
                   let killAction = return ()
                   return (waitAction, killAction)
   | otherwise = error "threadWaitReadSTM requires -threaded on Windows"
@@ -488,7 +488,7 @@ threadWaitWriteSTM fd
                                       case result of
                                         Nothing         -> retry
                                         Just (Right ()) -> return ()
-                                        Just (Left e)   -> throwSTM e
+                                        Just (Left e)   -> throwSTM (e :: IOException)
                   let killAction = return ()
                   return (waitAction, killAction)
   | otherwise = error "threadWaitWriteSTM requires -threaded on Windows"
