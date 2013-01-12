@@ -9,7 +9,7 @@
 #include <stdio.h>
 
 void
-OutOfHeapHook (W_ request_size, W_ heap_size) /* both sizes in bytes */
+OutOfHeapHook (lnat request_size, lnat heap_size) /* both sizes in bytes */
 {
   /*    fprintf(stderr, "Heap exhausted;\nwhile trying to allocate %lu bytes in a %lu-byte heap;\nuse `+RTS -H<size>' to increase the total heap size.\n", */
 
