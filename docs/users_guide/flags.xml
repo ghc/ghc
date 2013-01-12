@@ -460,8 +460,9 @@
         <tbody>
           <row>
             <entry><option>-fforce-recomp</option></entry>
-            <entry>Turn off recompilation checking; implied by any
-              <option>-ddump-X</option> option</entry>
+            <entry>Turn off recompilation checking. This is implied by any
+              <option>-ddump-X</option> option when compiling a single
+              file (i.e. when using <literal>-c</literal>).</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-force-recomp</option></entry>
           </row>
