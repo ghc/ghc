@@ -128,7 +128,7 @@ import GHC.Base
 import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
-import Control.Monad    ( when )
+import Control.Monad
 
 #ifdef mingw32_HOST_OS
 import Foreign.C
@@ -460,8 +460,8 @@ threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
 #ifdef mingw32_HOST_OS
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ forkIO $ do result <- try (waitFd fd 0)
-                                      atomically (writeTVar v $ Just result)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 0)
+                                             atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
                                         Nothing         -> retry
@@ -482,8 +482,8 @@ threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd 
 #ifdef mingw32_HOST_OS
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ forkIO $ do result <- try (waitFd fd 1)
-                                      atomically (writeTVar v $ Just result)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
+                                             atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
                                         Nothing         -> retry
