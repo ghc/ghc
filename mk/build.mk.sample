@@ -16,6 +16,9 @@
 # Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
 
+# Fast build with optimised libraries, no profiling, with LLVM:
+#BuildFlavour = quick-llvm
+
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
 # (including stage2) will run very slowly:
@@ -96,6 +99,22 @@ SRC_HC_OPTS        = -H64m -O0 -fasm
 GhcStage1HcOpts    = -O -fasm
 GhcStage2HcOpts    = -O0 -fasm
 GhcLibHcOpts       = -O -fasm
+SplitObjs          = NO
+HADDOCK_DOCS       = NO
+BUILD_DOCBOOK_HTML = NO
+BUILD_DOCBOOK_PS   = NO
+BUILD_DOCBOOK_PDF  = NO
+
+endif
+
+# -------- A Fast build with optimised libs using LLVM -----------------------
+
+ifeq "$(BuildFlavour)" "quick-llvm"
+
+SRC_HC_OPTS        = -H64m -O0 -fllvm
+GhcStage1HcOpts    = -O -fllvm
+GhcStage2HcOpts    = -O0 -fllvm
+GhcLibHcOpts       = -O -fllvm
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_DOCBOOK_HTML = NO
