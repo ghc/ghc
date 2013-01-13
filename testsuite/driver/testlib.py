@@ -517,6 +517,9 @@ def objc_src( opts ):
 def objcpp_src( opts ):
     opts.objcpp_src = 1;
 
+def cmm_src( opts ):
+    opts.cmm_src = 1;
+
 def outputdir( odir ):
     return lambda opts, d=odir: _outputdir(opts, d)
 
@@ -1205,7 +1208,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     # Required by GHC 7.3+, harmless for earlier versions:
     if (getTestOpts().c_src or
         getTestOpts().objc_src or
-        getTestOpts().objcpp_src):
+        getTestOpts().objcpp_src or
+        getTestOpts().cmm_src):
         extra_hc_opts += ' -no-hs-main '
 
     if getTestOpts().compile_cmd_prefix == '':
@@ -2111,6 +2115,8 @@ def add_suffix( name, suffix ):
 def add_hs_lhs_suffix(name):
     if getTestOpts().c_src:
         return add_suffix(name, 'c')
+    elif getTestOpts().cmm_src:
+        return add_suffix(name, 'cmm')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
     elif getTestOpts().objcpp_src:
