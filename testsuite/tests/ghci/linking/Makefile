@@ -117,3 +117,7 @@ ghcilink006 :
 	#
 	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF006) -package test
 
+.PHONY: T3333
+T3333:
+	"$(TEST_HC)" -c T3333.c -o T3333.o
+	echo "weak_test 10" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 T3333.hs T3333.o
