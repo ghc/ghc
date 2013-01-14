@@ -146,21 +146,22 @@ oclose preds fixed_tvs
             TuplePred ts      -> concatMap classesOfPredTy ts
             _                 -> []
 
--- An alternative implementation of `oclose`. Differences:
---  1. The empty set of variables is allowed to determine stuff,
---  2. We also use equality predicates as FDs.
---
--- I (Iavor) believe that this is the correct implementation of oclose.
--- For 1: the above argument about `t` being monomorphic seems incorrect.
---    The correct behavior is to quantify over `t`, even though we know that
---    it may be instantiated to at most one type.  The point is that we might
---    only find out what that type is later, at the call site to the function.
---    In general, we should be quantifying all variables that are (i) not in
---    mentioned in the environment, and (ii) not FD-determined by something in
---    the environment.
--- For 2: This is just a nicity, but it makes things a bit more general:
---    if we have an assumption `t1 ~ t2`, then we use the fact that if we know
---    `t1` we also know `t2` and the other way.
+-- XXX: Combine the two `oclose`s.
+
+{- An alternative implementation of `oclose` used in the "liberal" coverage
+condition. Differences:
+
+  1. The empty set of variables is allowed to determine stuff,
+  2. We also use equality predicates as FDs.
+
+  For 1:
+    This is needed because otherwise some valid instances are rejected.
+
+  For 2:
+    This is just a nicity, but it makes things a bit more general:
+    if we have an assumption `t1 ~ t2`, then we use the fact that if we know
+    `t1` we also know `t2` and the other way.
+-}
 
 oclose1 :: [PredType] -> TyVarSet -> TyVarSet
 oclose1 preds fixed_tvs
