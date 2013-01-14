@@ -118,6 +118,10 @@ module DynFlags (
         tAG_MASK,
         mAX_PTR_TAG,
         tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
+
+        -- * SSE
+        isSse2Enabled,
+        isSse4_2Enabled,
   ) where
 
 #include "HsVersions.h"
@@ -590,6 +594,7 @@ data DynFlags = DynFlags {
   dynHiSuf              :: String,
 
   outputFile            :: Maybe String,
+  dynOutputFile         :: Maybe String,
   outputHi              :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
@@ -1144,6 +1149,7 @@ doDynamicToo :: DynFlags -> DynFlags
 doDynamicToo dflags0 = let dflags1 = unSetGeneralFlag' Opt_Static dflags0
                            dflags2 = addWay' WayDyn dflags1
                            dflags3 = dflags2 {
+                                         outputFile = dynOutputFile dflags2,
                                          hiSuf = dynHiSuf dflags2,
                                          objectSuf = dynObjectSuf dflags2
                                      }
@@ -1222,6 +1228,7 @@ defaultDynFlags mySettings =
         pluginModNameOpts       = [],
 
         outputFile              = Nothing,
+        dynOutputFile           = Nothing,
         outputHi                = Nothing,
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
@@ -1594,7 +1601,7 @@ setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          addCmdlineFramework, addHaddockOpts, addGhciScript, 
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
-setOutputFile, setOutputHi, setDumpPrefixForce
+setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
 
 setObjectDir  f d = d{ objectDir  = Just f}
@@ -1614,6 +1621,7 @@ setDynHiSuf     f d = d{ dynHiSuf     = f}
 setHcSuf        f d = d{ hcSuf        = f}
 
 setOutputFile f d = d{ outputFile = f}
+setDynOutputFile f d = d{ dynOutputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
@@ -1796,11 +1804,31 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcException (CmdLineError ("combination not supported: "  ++
                               intercalate "/" (map wayDesc theWays)))
 
-  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+  -- TODO: This is an ugly hack. Do something better.
+  -- -fPIC affects the CMM code we generate, so if
+  -- we are in -dynamic-too mode we need -fPIC to be on during the
+  -- shared part of the compilation.
+  let doingDynamicToo = gopt Opt_BuildDynamicToo dflags3
+      platform = targetPlatform dflags3
+      dflags4 = if doingDynamicToo
+                then foldr setGeneralFlag' dflags3
+                           (wayGeneralFlags platform WayDyn)
+                else dflags3
 
-  liftIO $ setUnsafeGlobalDynFlags dflags4
+  {-
+  TODO: This test doesn't quite work: We don't want to give an error
+  when e.g. compiling a C file, only when compiling Haskell files.
+  when doingDynamicToo $
+      unless (isJust (outputFile dflags4) == isJust (dynOutputFile dflags4)) $
+          throwGhcException $ CmdLineError
+              "With -dynamic-too, must give -dyno iff giving -o"
+  -}
 
-  return (dflags4, leftover, consistency_warnings ++ sh_warns ++ warns)
+  let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
+
+  liftIO $ setUnsafeGlobalDynFlags dflags5
+
+  return (dflags5, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
@@ -1992,6 +2020,7 @@ dynamic_flags = [
         ------- Output Redirection ------------------------------------------
   , Flag "odir"              (hasArg setObjectDir)
   , Flag "o"                 (sepArg (setOutputFile . Just))
+  , Flag "dyno"              (sepArg (setDynOutputFile . Just))
   , Flag "ohi"               (hasArg (setOutputHi . Just ))
   , Flag "osuf"              (hasArg setObjectSuf)
   , Flag "dynosuf"           (hasArg setDynObjectSuf)
@@ -2153,6 +2182,11 @@ dynamic_flags = [
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "msse2"        (NoArg (setGeneralFlag Opt_SSE2))
   , Flag "msse4.2"      (NoArg (setGeneralFlag Opt_SSE4_2))
+    -- at some point we should probably have a single SSE flag that
+    -- contains the SSE version, instead of having a different flag
+    -- per version. That would make it easier to e.g. check if SSE2 is
+    -- enabled as you wouldn't have to check if either Opt_SSE2 or
+    -- Opt_SSE4_2 is set (as the latter implies the former).
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -3371,3 +3405,21 @@ makeDynFlagsConsistent dflags
           arch = platformArch platform
           os   = platformOS   platform
 
+-- -----------------------------------------------------------------------------
+-- SSE
+
+isSse2Enabled :: DynFlags -> Bool
+isSse2Enabled dflags = isSse4_2Enabled dflags || isSse2Enabled'
+  where
+    isSse2Enabled' = case platformArch (targetPlatform dflags) of
+        ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
+                      -- possible to make it optional, but we'd need to
+                      -- fix at least the foreign call code where the
+                      -- calling convention specifies the use of xmm regs,
+                      -- and possibly other places.
+                      True
+        ArchX86    -> gopt Opt_SSE2 dflags
+        _          -> False
+
+isSse4_2Enabled :: DynFlags -> Bool
+isSse4_2Enabled dflags = gopt Opt_SSE4_2 dflags

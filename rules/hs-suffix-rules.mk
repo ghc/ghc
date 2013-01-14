@@ -28,8 +28,14 @@ $1/$2/build/%.$$($3_hcsuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$($1_
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/autogen/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
+$(call hi-rule,$1/$2/build,$1/$2/build,$3)
+$(call hi-rule,$1/$2/build/autogen,$1/$2/build,$3)
+
 endif
 endif
+
+$$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
+  $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3,$$(dir))))
 
 endef # hs-suffix-rules
 

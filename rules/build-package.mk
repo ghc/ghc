@@ -43,8 +43,6 @@ $(call clean-target,$1,$2,$1/$2)
 
 distclean : clean_$1_$2_config
 
-maintainer-clean : distclean
-
 .PHONY: clean_$1_$2_config
 clean_$1_$2_config:
 	$$(call removeFiles,$1/config.log $1/config.status $(wildcard $1/include/Hs*Config.h))

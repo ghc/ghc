@@ -252,8 +252,8 @@ exposed-modules: Network.BSD,
           </indexterm></term>
         <listitem>
           <para>By default, GHC will automatically link in the
-            <literal>haskell98</literal> package. This flag disables that
-            behaviour.</para>
+            <literal>base</literal> and <literal>rts</literal> packages.
+            This flag disables that behaviour.</para>
         </listitem>
       </varlistentry>
 

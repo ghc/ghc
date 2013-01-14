@@ -229,10 +229,6 @@ ifneq "$(CLEANING)" "YES"
 include rules/hs-suffix-rules-srcdir.mk
 include rules/hs-suffix-rules.mk
 include rules/hi-rule.mk
-
-$(foreach way,$(ALL_WAYS),\
-  $(eval $(call hi-rule,$(way))))
-
 include rules/c-suffix-rules.mk
 include rules/cmm-suffix-rules.mk
 
