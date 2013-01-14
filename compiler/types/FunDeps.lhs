@@ -19,7 +19,7 @@ module FunDeps (
         FDEq (..),
  	Equation(..), pprEquation,
 	oclose, improveFromInstEnv, improveFromAnother,
-	checkInstCoverage, checkFunDeps,
+	checkInstCoverage, checkInstLiberalCoverage, checkFunDeps,
 	pprFundeps
     ) where
 
@@ -145,6 +145,52 @@ oclose preds fixed_tvs
             ClassPred cls tys -> [(cls, tys)]
             TuplePred ts      -> concatMap classesOfPredTy ts
             _                 -> []
+
+-- An alternative implementation of `oclose`. Differences:
+--  1. The empty set of variables is allowed to determine stuff,
+--  2. We also use equality predicates as FDs.
+--
+-- I (Iavor) believe that this is the correct implementation of oclose.
+-- For 1: the above argument about `t` being monomorphic seems incorrect.
+--    The correct behavior is to quantify over `t`, even though we know that
+--    it may be instantiated to at most one type.  The point is that we might
+--    only find out what that type is later, at the class site to the function.
+--    In genral, we should be quantifying all variables that are not mentioned
+--    in the environment + the variables that are determined by them.
+-- For 2: This is just a nicity, but it makes things a bit more general:
+--    if we have an assumption `t1 ~ t2`, then we use the fact that if we know
+--    `t1` we also know `t2` and the other way.
+
+oclose1 :: [PredType] -> TyVarSet -> TyVarSet
+oclose1 preds fixed_tvs
+  | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
+  | otherwise   = loop fixed_tvs
+  where
+    loop fixed_tvs
+      | new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
+      | otherwise                           = loop new_fixed_tvs
+      where new_fixed_tvs = foldl extend fixed_tvs tv_fds
+
+    extend fixed_tvs (ls,rs)
+        | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+        | otherwise                = fixed_tvs
+
+    tv_fds  :: [(TyVarSet,TyVarSet)]
+    tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
+              | (xs, ys) <- concatMap deterimned preds
+              ]
+
+    deterimned :: PredType -> [([Type],[Type])]
+    deterimned pred
+       = case classifyPredType pred of
+            ClassPred cls tys ->
+               do let (cls_tvs, cls_fds) = classTvsFds cls
+                  fd <- cls_fds
+                  return (instFD fd cls_tvs tys)
+            EqPred t1 t2      -> [([t1],[t2]), ([t2],[t1])]
+            TuplePred ts      -> concatMap deterimned ts
+            _                 -> []
+
 \end{code}
 
     
@@ -471,6 +517,23 @@ checkInstCoverage clas inst_taus
     fundep_ok fd  = tyVarsOfTypes rs `subVarSet` tyVarsOfTypes ls
 		 where
 		   (ls,rs) = instFD fd tyvars inst_taus
+
+checkInstLiberalCoverage :: Class -> [PredType] -> [Type] -> Bool
+-- Check that the Liberal Coverage Condition is obeyed in an instance decl
+-- For example, if we have:
+--    class C a b | a -> b
+--    instance theta => C t1 t2
+-- Then we require fv(t2) `subset` oclose(fv(t1), theta)
+-- This ensures the self-consistency of the instance, but
+-- it does not guarantee termination.
+-- See Note [Coverage Condition] below
+
+checkInstLiberalCoverage clas theta inst_taus
+  = all fundep_ok fds
+  where
+    (tyvars, fds) = classTvsFds clas
+    fundep_ok fd = tyVarsOfTypes rs `subVarSet` oclose1 theta (tyVarsOfTypes ls)
+                    where (ls,rs) = instFD fd tyvars inst_taus
 \end{code}
 
 Note [Coverage condition]

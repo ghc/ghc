@@ -827,7 +827,9 @@ checkValidInstance ctxt hs_type ty
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM Opt_UndecidableInstances
         ; if undecidable_ok 
-          then checkAmbiguity ctxt ty
+          then do checkAmbiguity ctxt ty
+                  checkTc (checkInstLiberalCoverage clas theta inst_tys)
+                          (instTypeErr clas inst_tys liberal_msg)
           else do { checkInstTermination inst_tys theta
                   ; checkTc (checkInstCoverage clas inst_tys)
                             (instTypeErr clas inst_tys msg) }
@@ -837,6 +839,10 @@ checkValidInstance ctxt hs_type ty
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
                          undecidableMsg])
 
+    liberal_msg = vcat
+      [ ptext $ sLit "Multiple uses of this instance may be inconsistent"
+      , ptext $ sLit "with the functional dependencies of the class."
+      ]
         -- The location of the "head" of the instance
     head_loc = case hs_type of
                  L _ (HsForAllTy _ _ _ (L loc _)) -> loc
