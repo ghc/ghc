@@ -154,9 +154,10 @@ oclose preds fixed_tvs
 -- For 1: the above argument about `t` being monomorphic seems incorrect.
 --    The correct behavior is to quantify over `t`, even though we know that
 --    it may be instantiated to at most one type.  The point is that we might
---    only find out what that type is later, at the class site to the function.
---    In genral, we should be quantifying all variables that are not mentioned
---    in the environment + the variables that are determined by them.
+--    only find out what that type is later, at the call site to the function.
+--    In general, we should be quantifying all variables that are (i) not in
+--    mentioned in the environment, and (ii) not FD-determined by something in
+--    the environment.
 -- For 2: This is just a nicity, but it makes things a bit more general:
 --    if we have an assumption `t1 ~ t2`, then we use the fact that if we know
 --    `t1` we also know `t2` and the other way.
