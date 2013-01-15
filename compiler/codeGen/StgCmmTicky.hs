@@ -410,6 +410,6 @@ showTypeCategory ty
 	  else if isPrimTyCon tycon {- array, we hope -}   then 'A'	-- Bogus
 	  else if isEnumerationTyCon tycon		   then 'E'
 	  else if isTupleTyCon tycon			   then 'T'
-	  else if isJust (tyConSingleDataCon_maybe tycon)       then 'S'
+	  else if isJust (tyConSingleDataCon_maybe tycon)  then 'S'
 	  else if utc == listTyConKey			   then 'L'
 	  else 'M' -- oh, well...
