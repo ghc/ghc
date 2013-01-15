@@ -5,7 +5,7 @@ module T5684 where
 class B a b | a -> b where
   op :: a -> b -> ()
   
-class A a
+class A a | -> a
 
 instance A b => B Bool b
 
