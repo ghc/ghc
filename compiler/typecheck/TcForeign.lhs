@@ -90,8 +90,7 @@ normaliseFfiType' env ty0 = go [] ty0
         = do { rdr_env <- getGlobalRdrEnv 
              ; case checkNewtypeFFI rdr_env rec_nts tc of
                  Nothing  -> children_only
-                 Just gre -> do { let nt_co = mkUnbranchedAxInstCo (newTyConCo tc) tys
-                                ; (co', ty', gres) <- go rec_nts' nt_rhs
+                 Just gre -> do { (co', ty', gres) <- go rec_nts' nt_rhs
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 
         | isFamilyTyCon tc              -- Expand open tycons
@@ -108,7 +107,9 @@ normaliseFfiType' env ty0 = go [] ty0
             = do xs <- mapM (go rec_nts) tys
                  let (cos, tys', gres) = unzip3 xs
                  return (mkTyConAppCo tc cos, mkTyConApp tc tys', unionManyBags gres)
+          nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
           nt_rhs = newTyConInstRhs tc tys
+
           rec_nts' | isRecursiveTyCon tc = tc:rec_nts
                    | otherwise           = rec_nts
 
