@@ -10,7 +10,9 @@ module FooModule where
 class Concrete a b | a -> b where
 	bar :: a -> String
 
-instance (Show a) => Concrete a b where
+class Wuggle b | -> b  -- To make the Concrete instance work
+
+instance (Show a, Wuggle b) => Concrete a b where
 	bar = error "urk"
 
 wib :: Concrete a b => a -> String
