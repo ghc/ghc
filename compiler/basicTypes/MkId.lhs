@@ -599,10 +599,10 @@ dataConArgRep _ _ arg_ty (HsUserBang _ False)  -- No '!'
 dataConArgRep dflags fam_envs arg_ty 
     (HsUserBang unpk_prag True)  -- {-# UNPACK #-} !
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
-          -- Don't unpack if we aren't optimising; 
-          -- rather arbitrarily, we use -fomit-iface-pragmas
-          -- as the indication
+          -- Don't unpack if we aren't optimising; rather arbitrarily, 
+          -- we use -fomit-iface-pragmas as the indication
   , let mb_co   = topNormaliseType fam_envs arg_ty
+                     -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
   , isUnpackableType fam_envs arg_ty'
   , (rep_tys, wrappers) <- dataConArgUnpack arg_ty'
@@ -670,7 +670,10 @@ dataConArgUnpack
 
 dataConArgUnpack arg_ty
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
-  , Just con <- tyConSingleDataCon_maybe tc
+  , Just con <- tyConSingleAlgDataCon_maybe tc
+      -- NB: check for an *algebraic* data type
+      -- A recursive newtype might mean that 
+      -- 'arg_ty' is a newtype
   , let rep_tys = dataConInstArgTys con tc_args
   = ASSERT( isVanillaDataCon con )
     ( rep_tys `zip` dataConRepStrictness con
@@ -698,7 +701,7 @@ isUnpackableType :: FamInstEnvs -> Type -> Bool
 -- end up relying on ourselves!
 isUnpackableType fam_envs ty
   | Just (tc, _) <- splitTyConApp_maybe ty
-  , Just con <- tyConSingleDataCon_maybe tc
+  , Just con <- tyConSingleAlgDataCon_maybe tc
   , isVanillaDataCon con
   = ok_con_args (unitNameSet (getName tc)) con
   | otherwise
@@ -713,7 +716,7 @@ isUnpackableType fam_envs ty
       | Just (tc, _) <- splitTyConApp_maybe ty
       , let tc_name = getName tc
       =  not (tc_name `elemNameSet` tcs)
-      && case tyConSingleDataCon_maybe tc of
+      && case tyConSingleAlgDataCon_maybe tc of
             Just con | isVanillaDataCon con
                     -> ok_con_args (tcs `addOneToNameSet` getName tc) con
             _ -> True

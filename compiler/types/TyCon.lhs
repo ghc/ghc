@@ -56,7 +56,8 @@ module TyCon(
         tyConUnique,
         tyConTyVars,
         tyConCType, tyConCType_maybe,
-        tyConDataCons, tyConDataCons_maybe, tyConSingleDataCon_maybe,
+        tyConDataCons, tyConDataCons_maybe, 
+        tyConSingleDataCon_maybe, tyConSingleAlgDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
@@ -1380,6 +1381,13 @@ tyConSingleDataCon_maybe (TupleTyCon {dataCon = c})                            =
 tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = [c] }}) = Just c
 tyConSingleDataCon_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = c }})     = Just c
 tyConSingleDataCon_maybe _                                                     = Nothing
+
+tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
+-- Returns (Just con) for single-constructor *algebraic* data types
+-- *not* newtypes
+tyConSingleAlgDataCon_maybe (TupleTyCon {dataCon = c})                            = Just c
+tyConSingleAlgDataCon_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = [c] }}) = Just c
+tyConSingleAlgDataCon_maybe _                                                     = Nothing
 \end{code}
 
 \begin{code}
