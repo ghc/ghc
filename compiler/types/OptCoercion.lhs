@@ -10,7 +10,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module OptCoercion ( optCoercion ) where 
+module OptCoercion ( optCoercion, checkAxInstCo ) where 
 
 #include "HsVersions.h"
 
@@ -28,6 +28,8 @@ import Pair
 import Maybes( allMaybes )
 import FastString
 import Util
+import Unify
+import InstEnv
 \end{code}
 
 %************************************************************************
@@ -288,21 +290,37 @@ opt_trans_rule is co1 co2
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
 
-  -- TrPushAxR/TrPushSymAxR
+  -- TrPushSymAxR
   | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
   , Just cos2 <- matchAxiom sym con ind co2
-  = fireTransRule "TrPushAxR" co1 co2 $
-    if sym 
-    then SymCo $ AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
-    else         AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , True <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
 
-  -- TrPushAxL/TrPushSymAxL
+  -- TrPushAxR
+  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , Just cos2 <- matchAxiom sym con ind co2
+  , False <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushAxR" co1 co2 newAxInst
+
+  -- TrPushSymAxL
   | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
   , Just cos1 <- matchAxiom (not sym) con ind co1
-  = fireTransRule "TrPushAxL" co1 co2 $
-    if sym 
-    then SymCo $ AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
-    else         AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , True <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
+
+  -- TrPushAxL  
+  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , Just cos1 <- matchAxiom (not sym) con ind co1
+  , False <- sym
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Nothing <- checkAxInstCo newAxInst
+  = fireTransRule "TrPushAxL" co1 co2 newAxInst
 
   -- TrPushAxSym/TrPushSymAx
   | Just (sym1, con1, ind1, cos1) <- co1_is_axiom_maybe
@@ -337,6 +355,54 @@ fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res
   = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
     Just res
+
+\end{code}
+
+Note [Conflict checking with AxiomInstCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following type family and axiom:
+
+type family Equal (a :: k) (b :: k) :: Bool
+type instance where
+  Equal a a = True
+  Equal a b = False
+--
+Equal :: forall k::BOX. k -> k -> Bool
+axEqual :: { forall k::BOX. forall a::k. Equal k a a ~ True
+           ; forall k::BOX. forall a::k. forall b::k. Equal k a b ~ False }
+
+We wish to disallow (axEqual[1] <*> <Int> <Int). (Recall that the index is 0-based,
+so this is the second branch of the axiom.) The problem is that, on the surface, it
+seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False) and that all is
+OK. But, all is not OK: we want to use the first branch of the axiom in this case,
+not the second. The problem is that the parameters of the first branch can unify with
+the supplied coercions, thus meaning that the first branch should be taken. See also
+Note [Instance checking within groups] in types/FamInstEnv.lhs.
+
+\begin{code}
+-- | Check to make sure that an AxInstCo is internally consistent.
+-- Returns the number of the conflicting branch, if it exists
+-- See Note [Conflict checking with AxiomInstCo]
+checkAxInstCo :: Coercion -> Maybe Int
+-- defined here to avoid dependencies in Coercion
+checkAxInstCo (AxiomInstCo ax ind cos)
+  = let branch = coAxiomNthBranch ax ind
+        tvs = coAxBranchTyVars branch
+        tys = map (pFst . coercionKind) cos 
+        subst = zipOpenTvSubst tvs tys
+        lhs' = Type.substTys subst (coAxBranchLHS branch) in
+    check_no_conflict lhs' (ind-1)
+  where
+    check_no_conflict :: [Type] -> Int -> Maybe Int
+    check_no_conflict _ (-1) = Nothing
+    check_no_conflict lhs' j
+      | SurelyApart <- tcApartTys instanceBindFun lhs' lhsj
+      = check_no_conflict lhs' (j-1)
+      | otherwise
+      = Just j
+      where
+        (CoAxBranch { cab_lhs = lhsj }) = coAxiomNthBranch ax j
+checkAxInstCo _ = Nothing
 
 -----------
 wrapSym :: Bool -> Coercion -> Coercion

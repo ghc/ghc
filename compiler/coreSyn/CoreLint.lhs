@@ -51,8 +51,7 @@ import PrelNames
 import Outputable
 import FastString
 import Util
-import Unify
-import InstEnv ( instanceBindFun )
+import OptCoercion ( checkAxInstCo )
 import Control.Monad
 import MonadUtils
 import Data.Maybe
@@ -412,31 +411,6 @@ instantiations between kind coercions and type coercions. We lint the
 kind coercions and produce the following substitution which is to be
 applied in the type variables:
   k_ag   ~~>   * -> *
-
-Note [Conflict checking with AxiomInstCo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following type family and axiom:
-
-type family Equal (a :: k) (b :: k) :: Bool
-type instance where
-  Equal a a = True
-  Equal a b = False
---
-Equal :: forall k::BOX. k -> k -> Bool
-axEqual :: { forall k::BOX. forall a::k. Equal k a a ~ True
-           ; forall k::BOX. forall a::k. forall b::k. Equal k a b ~ False }
-
-We wish to disallow (axEqual[1] <*> <Int> <Int). (Recall that the index is 0-based,
-so this is the second branch of the axiom.) The problem is that, on the surface, it
-seems that (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False) and that all is
-OK. But, all is not OK: we want to use the first branch of the axiom in this case,
-not the second. The problem is that the parameters of the first branch can unify with
-the supplied coercions, thus meaning that the first branch should be taken. See also
-Note [Instance checking within groups] in types/FamInstEnv.lhs.
-
-However, if the right-hand side of the previous branch coincides with the right-hand
-side of the selected branch, we wish to accept the AxiomInstCo. See also Note
-[Confluence checking within groups], also in types/FamInstEnv.lhs.
 
 %************************************************************************
 %*									*
@@ -951,24 +925,13 @@ lintCoercion co@(AxiomInstCo con ind cos)
                                       (ktvs `zip` cos)
        ; let lhs' = Type.substTys subst_l lhs
              rhs' = Type.substTy subst_r rhs
-       ; case check_no_conflict lhs' (ind - 1) of
+       ; case checkAxInstCo co of
            Just bad_index -> bad_ax $ ptext (sLit "inconsistent with") <+> (ppr bad_index)
            Nothing -> return ()
        ; return (typeKind rhs', mkTyConApp (coAxiomTyCon con) lhs', rhs') }
   where
     bad_ax what = addErrL (hang (ptext (sLit "Bad axiom application") <+> parens what)
                         2 (ppr co))
-
-      -- See Note [Conflict checking with AxiomInstCo]
-    check_no_conflict :: [Type] -> Int -> Maybe Int
-    check_no_conflict _ (-1) = Nothing
-    check_no_conflict lhs' j
-      | SurelyApart <- tcApartTys instanceBindFun lhs' lhsj
-      = check_no_conflict lhs' (j-1)
-      | otherwise
-      = Just j
-      where
-        (CoAxBranch { cab_lhs = lhsj }) = coAxiomNthBranch con j
 
     check_ki (subst_l, subst_r) (ktv, co)
       = do { (k, t1, t2) <- lintCoercion co
