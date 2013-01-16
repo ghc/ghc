@@ -20,7 +20,9 @@ data Existential (p :: KProxy k) =
 class HasSingleton a (kp :: KProxy k) | a -> kp where
   exists :: a -> Existential kp
 
-instance forall a (mp :: KProxy (Maybe ak)). HasSingleton (Maybe a) mp where
+class Floop a b | a -> b
+
+instance forall a (mp :: KProxy (Maybe ak)). Floop a mp => HasSingleton (Maybe a) mp where
   exists Nothing = Exists SNothing
 
 -- instance forall (a ::*) (mp :: KProxy (Maybe ak)). HasSingleton (Maybe ak) (Maybe a) mp where
