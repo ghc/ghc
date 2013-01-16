@@ -71,11 +71,12 @@ module Outputable (
     ) where
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
-                                  targetPlatform, pprUserLength, pprCols )
+                                  targetPlatform, pprUserLength, pprCols,
+                                  unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-}   Name( Name, nameModule )
+import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
-import StaticFlags
 import FastString
 import FastTypes
 import qualified Pretty

@@ -289,8 +289,7 @@ import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
 import DynFlags
-import StaticFlagParser
-import qualified StaticFlags
+import StaticFlags
 import SysTools
 import Annotations
 import Module
@@ -446,7 +445,7 @@ initGhcMonad mb_top_dir = do
   -- catch ^C
   liftIO $ installSignalHandlers
 
-  liftIO $ StaticFlags.initStaticOpts
+  liftIO $ initStaticOpts
 
   mySettings <- liftIO $ initSysTools mb_top_dir
   dflags <- liftIO $ initDynFlags (defaultDynFlags mySettings)

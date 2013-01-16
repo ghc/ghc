@@ -291,7 +291,6 @@ Library
         Packages
         PprTyThing
         StaticFlags
-        StaticFlagParser
         SysTools
         TidyPgm
         Ctype

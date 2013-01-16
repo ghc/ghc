@@ -119,6 +119,8 @@ module DynFlags (
         mAX_PTR_TAG,
         tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD,
 
+        unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
+
         -- * SSE
         isSse2Enabled,
         isSse4_2Enabled,
@@ -136,7 +138,6 @@ import Config
 import CmdLineParser
 import Constants
 import Panic
-import StaticFlags
 import Util
 import Maybes           ( orElse )
 import MonadUtils
@@ -149,9 +150,7 @@ import Foreign.C        ( CInt(..) )
 #endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
 
-#ifdef GHCI
 import System.IO.Unsafe ( unsafePerformIO )
-#endif
 import Data.IORef
 import Control.Monad
 
@@ -3406,6 +3405,23 @@ makeDynFlagsConsistent dflags
           platform = targetPlatform dflags
           arch = platformArch platform
           os   = platformOS   platform
+
+--------------------------------------------------------------------------
+-- Do not use unsafeGlobalDynFlags!
+--
+-- unsafeGlobalDynFlags is a hack, necessary because we need to be able
+-- to show SDocs when tracing, but we don't always have DynFlags
+-- available.
+--
+-- Do not use it if you can help it. You may get the wrong value!
+
+GLOBAL_VAR(v_unsafeGlobalDynFlags, panic "v_unsafeGlobalDynFlags: not initialised", DynFlags)
+
+unsafeGlobalDynFlags :: DynFlags
+unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
+
+setUnsafeGlobalDynFlags :: DynFlags -> IO ()
+setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 
 -- -----------------------------------------------------------------------------
 -- SSE
