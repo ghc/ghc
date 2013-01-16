@@ -4,5 +4,5 @@ module ShouldCompile where
 
 type family T a
 
-f :: T a -> Int
-f x = x `seq` 3
+f :: a -> T a -> Int
+f p x = x `seq` 3

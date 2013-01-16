@@ -269,3 +269,12 @@ test('Conversions',
 
 test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
+
+test('T7436',
+     [stats_num_field('max_bytes_used', 50000,
+                                         100000),
+                                     # expected value: 127,000 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])

@@ -1,21 +1,13 @@
 
-T1900.hs:11:12:
-    No instance for (Num ()) arising from a use of `+'
-    In the expression: (+ 1)
-    In an equation for `trans': trans = (+ 1)
-    In the instance declaration for `Bug Int'
-
-T1900.hs:14:16:
+T1900.hs:13:10:
     Could not deduce (Depend s0 ~ Depend s)
     from the context (Bug s)
       bound by the type signature for check :: Bug s => Depend s -> Bool
       at T1900.hs:13:10-36
     NB: `Depend' is a type function, and may not be injective
     The type variable `s0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    Relevant bindings include
-      check :: Depend s -> Bool (bound at T1900.hs:14:1)
-      d :: Depend s (bound at T1900.hs:14:7)
-    In the return type of a call of `trans'
-    In the second argument of `(==)', namely `trans d'
-    In the expression: d == trans d
+    Expected type: Depend s -> Bool
+      Actual type: Depend s0 -> Bool
+    In the ambiguity check for: forall s. Bug s => Depend s -> Bool
+    In the type signature for `check':
+      check :: Bug s => Depend s -> Bool

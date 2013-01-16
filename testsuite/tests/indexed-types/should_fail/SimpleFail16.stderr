@@ -2,9 +2,6 @@
 SimpleFail16.hs:10:12:
     Couldn't match expected type `p0 a0' with actual type `F ()'
     The type variables `p0', `a0' are ambiguous
-    Possible cause: the monomorphism restriction applied to: `bar'
-    Probable fix: give these definition(s) an explicit type signature
-                  or use -XNoMonomorphismRestriction
     Relevant bindings include
       bar :: p0 a0 (bound at SimpleFail16.hs:10:1)
     In the first argument of `foo', namely `(undefined :: F ())'

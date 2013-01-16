@@ -2,7 +2,6 @@
 annfail10.hs:9:1:
     No instance for (Data.Data.Data a0) arising from an annotation
     The type variable `a0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
       instance Data.Data.Data () -- Defined in `Data.Data'
       instance (Data.Data.Data a, Data.Data.Data b) =>
@@ -18,7 +17,6 @@ annfail10.hs:9:1:
 annfail10.hs:9:11:
     No instance for (Num a0) arising from the literal `1'
     The type variable `a0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
       instance Num Double -- Defined in `GHC.Float'
       instance Num Float -- Defined in `GHC.Float'

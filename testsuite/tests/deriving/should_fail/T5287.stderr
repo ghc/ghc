@@ -1,12 +1,10 @@
 
-T5287.hs:6:29:
-    No instance for (A e oops)
-      arising from the 'deriving' clause of a data type declaration
-    The type variable `oops' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    Note: there is a potential instance available:
-      instance A Int Bool -- Defined at T5287.hs:7:10
-    Possible fix:
-      use a standalone 'deriving instance' declaration,
-        so you can specify the instance context yourself
-    When deriving the instance for (Read (E e))
+T5287.hs:6:10:
+    Could not deduce (A a oops0)
+      arising from the ambiguity check for an instance declaration
+    from the context (A a oops)
+      bound by an instance declaration: A a oops => Read (D a)
+      at T5287.hs:6:10-31
+    The type variable `oops0' is ambiguous
+    In the ambiguity check for: forall a oops. A a oops => Read (D a)
+    In the instance declaration for `Read (D a)'

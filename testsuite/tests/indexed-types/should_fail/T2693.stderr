@@ -1,9 +1,8 @@
 
-T2693.hs:10:7:
+T2693.hs:11:7:
     Couldn't match expected type `TFn a' with actual type `TFn a0'
     NB: `TFn' is a type function, and may not be injective
     The type variable `a0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     When checking that `x' has the inferred type `forall a. TFn a'
     Probable cause: the inferred type is ambiguous
     In the expression:
@@ -15,28 +14,25 @@ T2693.hs:10:7:
                  let n = ...;
                  return () }
 
-T2693.hs:18:15:
+T2693.hs:19:15:
     Couldn't match expected type `(a2, b0)' with actual type `TFn a3'
     The type variables `a2', `b0', `a3' are ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    Relevant bindings include n :: a2 (bound at T2693.hs:18:7)
+    Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
     In the first argument of `fst', namely `x'
     In the first argument of `(+)', namely `fst x'
     In the expression: fst x + snd x
 
-T2693.hs:18:23:
+T2693.hs:19:23:
     Couldn't match expected type `(a4, a2)' with actual type `TFn a5'
     The type variables `a2', `a4', `a5' are ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    Relevant bindings include n :: a2 (bound at T2693.hs:18:7)
+    Relevant bindings include n :: a2 (bound at T2693.hs:19:7)
     In the first argument of `snd', namely `x'
     In the second argument of `(+)', namely `snd x'
     In the expression: fst x + snd x
 
-T2693.hs:28:20:
+T2693.hs:29:20:
     Couldn't match type `TFn a0' with `PVR a1'
     The type variables `a0', `a1' are ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Expected type: () -> Maybe (PVR a1)
       Actual type: () -> Maybe (TFn a0)
     In the first argument of `mapM', namely `g'

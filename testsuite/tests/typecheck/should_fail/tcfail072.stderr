@@ -6,7 +6,6 @@ tcfail072.hs:23:13:
                  g :: (Ord p, Ord q) => AB p q -> Bool
       at tcfail072.hs:22:6-38
     The type variable `q0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
       instance Integral a => Ord (GHC.Real.Ratio a)
         -- Defined in `GHC.Real'

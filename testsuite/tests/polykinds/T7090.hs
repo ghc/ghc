@@ -21,6 +21,8 @@ type family (a :: Nat) :==: (b :: Nat) :: Bool
 boolToProp :: (a :==: b) ~ True => Dict (a ~ b)
 boolToProp = undefined
 
-foo :: forall n. (Succ n :==: Plus n One) ~ True => ()
+data T (n :: Nat) = MkT
+
+foo :: forall n. (Succ n :==: Plus n One) ~ True => T n
 foo = case (boolToProp :: Dict (Succ n ~ Plus n One)) of
-           Dict -> ()
+           Dict -> MkT

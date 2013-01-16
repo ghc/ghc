@@ -1,6 +1,9 @@
 
 tcfail097.hs:5:6:
-    Ambiguous constraint `Eq a'
-      At least one of the forall'd type variables mentioned by the constraint
-      must be reachable from the type after the '=>'
+    Could not deduce (Eq a0) arising from the ambiguity check for `f'
+    from the context (Eq a)
+      bound by the type signature for f :: Eq a => Int -> Int
+      at tcfail097.hs:5:6-23
+    The type variable `a0' is ambiguous
+    In the ambiguity check for: forall a. Eq a => Int -> Int
     In the type signature for `f': f :: Eq a => Int -> Int

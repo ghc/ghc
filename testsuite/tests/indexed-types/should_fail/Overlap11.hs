@@ -7,8 +7,8 @@ type instance where
   F a a = Int
   F a b = b
 
-g :: F a Int
-g = (5 :: Int)
+g :: a -> F a Int
+g x = (5 :: Int)
 
 
 

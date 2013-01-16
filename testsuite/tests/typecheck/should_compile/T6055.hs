@@ -21,7 +21,7 @@ class Add' x y z | x y -> z
 instance Succ y z => Add' D1 y z
 
 
-class (Add' x y z) => Add x y z
+class (Add' x y z) => Add x y z | x y -> z
 instance (Add' D1 y z) => Add D1 y z
 
 

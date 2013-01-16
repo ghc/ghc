@@ -21,7 +21,6 @@ T4485.hs:47:15:
 T4485.hs:47:26:
     No instance for (XMLGen m0) arising from a use of `genElement'
     The type variable `m0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Note: there is a potential instance available:
       instance [overlap ok] XMLGen (IdentityT m)
         -- Defined at T4485.hs:36:10

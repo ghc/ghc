@@ -94,3 +94,5 @@ test('T7354a',
      run_command,
      ['$MAKE -s --no-print-directory T7354a'])
 test('T7536', normal, compile_fail, [''])
+
+test('T7560', normal, compile_fail, [''])

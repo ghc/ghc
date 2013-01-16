@@ -1,6 +1,8 @@
 
-Overlap11.hs:11:6:
+Overlap11.hs:11:8:
     Couldn't match expected type `F a Int' with actual type `Int'
-    Relevant bindings include g :: F a Int (bound at Overlap11.hs:11:1)
+    Relevant bindings include
+      g :: a -> F a Int (bound at Overlap11.hs:11:1)
+      x :: a (bound at Overlap11.hs:11:3)
     In the expression: (5 :: Int)
-    In an equation for `g': g = (5 :: Int)
+    In an equation for `g': g x = (5 :: Int)

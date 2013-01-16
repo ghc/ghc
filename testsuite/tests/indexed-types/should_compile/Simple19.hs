@@ -6,5 +6,5 @@ module ShouldCompile where
 
 type family Element c :: *
 
-f :: Element x
-f = undefined
+f :: x -> Element x
+f x = undefined

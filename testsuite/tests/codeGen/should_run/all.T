@@ -100,4 +100,7 @@ test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
                 req_profiling,
                 extra_hc_opts('-fprof-auto'),
                 extra_run_opts('+RTS -xc') ], compile_and_run, [''])
-test('Word2Float', normal, compile_and_run, [''])
+test('Word2Float32', unless_wordsize(32, skip), compile_and_run, [''])
+test('Word2Float64', unless_wordsize(64, skip), compile_and_run, [''])
+
+test('T7361', normal, compile_and_run, [''])

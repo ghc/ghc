@@ -342,6 +342,24 @@ def if_wordsize( ws, f ):
     else:
         return normal
 
+def unless_wordsize( ws, f ):
+    if config.wordsize == str(ws):
+        return normal
+    else:
+        return f
+
+def if_unregisterised( f ):
+    if config.unregisterised:
+        return f
+    else:
+        return normal
+
+def unless_unregisterised( f ):
+    if config.unregisterised:
+        return normal
+    else:
+        return f
+
 def if_msys( f ):
     if config.msys:
         return f
