@@ -6,6 +6,7 @@ import Panic
 #endif
 import Reg
 
+#include "ghcautoconf.h"
 #include "stg/MachRegs.h"
 
 #if MACHREGS_i386 || MACHREGS_x86_64
