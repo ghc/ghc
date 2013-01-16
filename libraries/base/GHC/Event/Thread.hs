@@ -27,7 +27,6 @@ import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_, registerTimeout)
-import GHC.Event.Clock (initializeTimer)
 import qualified GHC.Event.Manager as M
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
@@ -167,7 +166,6 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
   | not threaded = return ()
   | otherwise = do
-      initializeTimer
       startIOManagerThread
 
 startIOManagerThread :: IO ()
