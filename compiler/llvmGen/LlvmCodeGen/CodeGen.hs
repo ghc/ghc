@@ -40,7 +40,7 @@ type LlvmStatements = OrdList LlvmStatement
 --
 genLlvmProc :: LlvmEnv -> RawCmmDecl -> UniqSM (LlvmEnv, [LlvmCmmDecl])
 genLlvmProc env (CmmProc infos lbl live graph) = do
-    let blocks = toBlockListEntryFirst graph
+    let blocks = toBlockListEntryFirstFalseFallthrough graph
     (env', lmblocks, lmdata) <- basicBlocksCodeGen env live blocks ([], [])
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)

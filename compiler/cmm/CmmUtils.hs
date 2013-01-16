@@ -52,7 +52,8 @@ module CmmUtils(
         modifyGraph,
 
         ofBlockMap, toBlockMap, insertBlock,
-        ofBlockList, toBlockList, bodyToBlockList, toBlockListEntryFirst,
+        ofBlockList, toBlockList, bodyToBlockList,
+        toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
 
         analFwd, analBwd, analRewFwd, analRewBwd,
@@ -447,6 +448,34 @@ toBlockListEntryFirst g
     entry_id = g_entry g
     Just entry_block = mapLookup entry_id m
     others = filter ((/= entry_id) . entryLabel) (mapElems m)
+
+-- | Like 'toBlockListEntryFirst', but we strive to ensure that we order blocks
+-- so that the false case of a conditional jumps to the next block in the output
+-- list of blocks. This matches the way OldCmm blocks were output since in
+-- OldCmm the false case was a fallthrough, whereas in Cmm conditional branches
+-- have both true and false successors. Block ordering can make a big difference
+-- in performance in the LLVM backend. Note that we rely crucially on the order
+-- of successors returned for CmmCondBranch by the NonLocal instance for CmmNode
+-- defind in cmm/CmmNode.hs. -GBM
+toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
+toBlockListEntryFirstFalseFallthrough g
+  | mapNull m  = []
+  | otherwise  = dfs setEmpty [entry_block]
+  where
+    m = toBlockMap g
+    entry_id = g_entry g
+    Just entry_block = mapLookup entry_id m
+
+    dfs :: LabelSet -> [CmmBlock] -> [CmmBlock]
+    dfs _ [] = []
+    dfs visited (block:bs)
+      | id `setMember` visited = dfs visited bs
+      | otherwise              = block : dfs (setInsert id visited) bs'
+      where id = entryLabel block
+            bs' = foldr add_id bs (successors block)
+            add_id id bs = case mapLookup id m of
+                              Just b  -> b : bs
+                              Nothing -> bs
 
 ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
 ofBlockList entry blocks = CmmGraph { g_entry = entry
