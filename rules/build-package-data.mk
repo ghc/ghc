@@ -70,6 +70,12 @@ ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
 endif
 
+ifeq "$$(CrossCompiling)" "YES"
+$1_$2_CONFIGURE_OPTS += --configure-option=--host=$(TARGETPLATFORM)
+# We use different platform name conventions than autoconf expects,
+# but let's hope it doesn't cause problems.
+endif
+
 ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
