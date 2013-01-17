@@ -68,6 +68,8 @@ llvmCodeGen dflags h us cmms
         ver <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
         -- cache llvm version for later use
         writeIORef (llvmVersion dflags) ver
+        debugTraceMsg dflags 2
+            (text "Using LLVM version:" <+> text (show ver))
         let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
         when (ver < minSupportLlvmVersion && doWarn) $
             errorMsg dflags (text "You are using an old version of LLVM that"
