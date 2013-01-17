@@ -171,8 +171,8 @@ tidyLetBndr rec_tidy_env env (id,rhs)
     idinfo   = idInfo id
     new_info = idInfo new_id
 		`setArityInfo`		exprArity rhs
-		`setStrictnessInfo`	strictnessInfo idinfo
-		`setDemandInfo`		demandInfo idinfo
+                `setStrictnessInfo`	strictnessInfo idinfo
+                `setDemandInfo`	        demandInfo idinfo
 		`setInlinePragInfo`	inlinePragInfo idinfo
 		`setUnfoldingInfo`	new_unf
 

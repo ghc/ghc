@@ -359,8 +359,12 @@ Here y is demanded.  If we float it outside the lazy 'x=..' then
 we'd have to zap its demand info, and it may never be restored.
 
 So at a 'let' we leave the binding right where the are unless
-the binding will escape a value lambda.  That's what the 
-partitionByMajorLevel does in the floatExpr (Let ...) case.
+the binding will escape a value lambda, e.g.  
+
+(\x -> let y = fac 100 in y)
+
+That's what the partitionByMajorLevel does in the floatExpr (Let ...)
+case.
 
 Notice, though, that we must take care to drop any bindings
 from the body of the let that depend on the staying-put bindings.

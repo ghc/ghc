@@ -38,15 +38,15 @@ module Id (
         recordSelectorFieldLabel,
 
         -- ** Modifying an Id
-        setIdName, setIdUnique, Id.setIdType,
-        setIdExported, setIdNotExported,
-        globaliseId, localiseId,
+        setIdName, setIdUnique, Id.setIdType, 
+        setIdExported, setIdNotExported, 
+        globaliseId, localiseId, 
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
-
+        zapIdStrictness,
 
         -- ** Predicates on Ids
-        isImplicitId, isDeadBinder,
+        isImplicitId, isDeadBinder, 
         isStrictId,
         isExportedId, isLocalId, isGlobalId,
         isRecordSelector, isNaughtyRecordSelector,
@@ -69,9 +69,7 @@ module Id (
         setOneShotLambda, clearOneShotLambda,
 
         -- ** Reading 'IdInfo' fields
-        idArity,
-        idDemandInfo, idDemandInfo_maybe,
-        idStrictness, idStrictness_maybe,
+        idArity, 
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo,
@@ -82,11 +80,16 @@ module Id (
         setIdUnfoldingLazily,
         setIdUnfolding,
         setIdArity,
-        setIdDemandInfo,
-        setIdStrictness, zapIdStrictness,
+
         setIdSpecialisation,
         setIdCafInfo,
         setIdOccInfo, zapIdOccInfo,
+
+        setIdDemandInfo, 
+        setIdStrictness, 
+
+        idDemandInfo, 
+        idStrictness,
 
     ) where
 
@@ -127,12 +130,14 @@ infixl  1 `setIdUnfoldingLazily`,
           `setIdUnfolding`,
           `setIdArity`,
           `setIdOccInfo`,
-          `setIdDemandInfo`,
-          `setIdStrictness`,
+
           `setIdSpecialisation`,
           `setInlinePragma`,
           `setInlineActivation`,
-          `idCafInfo`
+          `idCafInfo`,
+
+          `setIdDemandInfo`,
+          `setIdStrictness`
 \end{code}
 
 %************************************************************************
@@ -464,17 +469,14 @@ idRepArity x = typeRepArity (idArity x) (idType x)
 isBottomingId :: Id -> Bool
 isBottomingId id = isBottomingSig (idStrictness id)
 
-idStrictness_maybe :: Id -> Maybe StrictSig
 idStrictness :: Id -> StrictSig
-
-idStrictness_maybe id = strictnessInfo (idInfo id)
-idStrictness       id = idStrictness_maybe id `orElse` topSig
+idStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictSig -> Id
-setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` Just sig) id
+setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
 
 zapIdStrictness :: Id -> Id
-zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` Nothing) id
+zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` topSig) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (e.g., an
@@ -485,8 +487,9 @@ zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` Nothing) id
 isStrictId :: Id -> Bool
 isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
-           (isStrictDmd (idDemandInfo id)) ||
-           (isStrictType (idType id))
+           (isStrictType (idType id)) ||
+           -- Take the best of both strictnesses - old and new               
+           (isStrictDmd (idDemandInfo id))
 
         ---------------------------------
         -- UNFOLDING
@@ -508,14 +511,11 @@ setIdUnfoldingLazily id unfolding = modifyIdInfo (`setUnfoldingInfoLazily` unfol
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
-idDemandInfo_maybe :: Id -> Maybe Demand
 idDemandInfo       :: Id -> Demand
-
-idDemandInfo_maybe id = demandInfo (idInfo id)
-idDemandInfo       id = demandInfo (idInfo id) `orElse` topDmd
+idDemandInfo       id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
-setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` Just dmd) id
+setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
 
         ---------------------------------
         -- SPECIALISATION
@@ -654,11 +654,11 @@ zapInfo zapper id = maybeModifyIdInfo (zapper (idInfo id)) id
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo = zapInfo zapLamInfo
 
+zapFragileIdInfo :: Id -> Id
+zapFragileIdInfo = zapInfo zapFragileInfo 
+
 zapDemandIdInfo :: Id -> Id
 zapDemandIdInfo = zapInfo zapDemandInfo
-
-zapFragileIdInfo :: Id -> Id
-zapFragileIdInfo = zapInfo zapFragileInfo
 \end{code}
 
 Note [transferPolyIdInfo]
@@ -725,11 +725,12 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_inline_prag = inlinePragInfo old_info
     old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
-    old_strictness  = strictnessInfo old_info
-    new_strictness  = fmap (increaseStrictSigArity arity_increase) old_strictness
 
-    transfer new_info = new_info `setStrictnessInfo` new_strictness
-                                 `setArityInfo` new_arity
+    old_strictness  = strictnessInfo old_info
+    new_strictness  = increaseStrictSigArity arity_increase old_strictness
+
+    transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` old_occ_info
+                                 `setStrictnessInfo` new_strictness
 \end{code}

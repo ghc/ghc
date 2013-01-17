@@ -1695,7 +1695,7 @@ toIfaceIdDetails other                          = pprTrace "toIfaceIdDetails" (p
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
-  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
+  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo,
                     inline_hsinfo,  unfold_hsinfo] of
        []    -> NoInfo
        infos -> HasInfo infos
@@ -1715,9 +1715,9 @@ toIfaceIdInfo id_info
 
     ------------  Strictness  --------------
         -- No point in explicitly exporting TopSig
-    strict_hsinfo = case strictnessInfo id_info of
-                        Just sig | not (isTopSig sig) -> Just (HsStrictness sig)
-                        _other                        -> Nothing
+    sig_info = strictnessInfo id_info
+    strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
+                  | otherwise               = Nothing
 
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info) 

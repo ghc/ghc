@@ -336,8 +336,7 @@ Into this one:
 %************************************************************************
 
 \begin{code}
-cpeBind :: TopLevelFlag
-        -> CorePrepEnv -> CoreBind
+cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
         -> UniqSM (CorePrepEnv, Floats)
 cpeBind top_lvl env (NonRec bndr rhs)
   = do { (_, bndr1) <- cpCloneBndr env bndr
@@ -472,8 +471,8 @@ cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
 cpeRhsE env (Lit (LitInteger i _))
     = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env) i)
-cpeRhsE _env expr@(Lit {})       = return (emptyFloats, expr)
-cpeRhsE env expr@(Var {})        = cpeApp env expr
+cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
+cpeRhsE env expr@(Var {})  = cpeApp env expr
 
 cpeRhsE env (Var f `App` _ `App` arg)
   | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
@@ -642,12 +641,13 @@ cpeApp env expr
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
            ; let
               (ss1, ss_rest)   = case ss of
-                                   (ss1:ss_rest) -> (ss1,     ss_rest)
-                                   []            -> (lazyDmd, [])
+                                   (ss1:ss_rest)             -> (ss1,     ss_rest)
+                                   []                        -> (topDmd, [])
               (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                  splitFunTy_maybe fun_ty
+              is_strict = isStrictDmd ss1
 
-           ; (fs, arg') <- cpeArg env (isStrictDmd ss1) arg arg_ty
+           ; (fs, arg') <- cpeArg env is_strict arg arg_ty
            ; return (App fun' arg', hd, res_ty, fs `appendFloats` floats, ss_rest) }
 
     collect_args (Var v) depth
@@ -656,10 +656,10 @@ cpeApp env expr
            ; return (Var v2, (Var v2, depth), idType v2, emptyFloats, stricts) }
         where
           stricts = case idStrictness v of
-                        StrictSig (DmdType _ demands _)
-                            | listLengthCmp demands depth /= GT -> demands
+                            StrictSig (DmdType _ demands _)
+                              | listLengthCmp demands depth /= GT -> demands
                                     -- length demands <= depth
-                            | otherwise                         -> []
+                              | otherwise                         -> []
                 -- If depth < length demands, then we have too few args to
                 -- satisfy strictness  info so we have to  ignore all the
                 -- strictness info, e.g. + (error "urk")
@@ -689,8 +689,8 @@ cpeApp env expr
 -- ---------------------------------------------------------------------------
 
 -- This is where we arrange that a non-trivial argument is let-bound
-cpeArg :: CorePrepEnv -> RhsDemand -> CoreArg -> Type
-       -> UniqSM (Floats, CpeTriv)
+cpeArg :: CorePrepEnv -> RhsDemand 
+       -> CoreArg -> Type -> UniqSM (Floats, CpeTriv)
 cpeArg env is_strict arg arg_ty
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1

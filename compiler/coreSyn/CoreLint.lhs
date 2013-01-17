@@ -223,16 +223,15 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
       -- Check whether arity and demand type are consistent (only if demand analysis
       -- already happened)
-       ; checkL (case maybeDmdTy of
-                  Just (StrictSig dmd_ty) -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs
-                  Nothing -> True)
+       ; checkL (case dmdTy of
+                  StrictSig dmd_ty -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs)
            (mkArityMsg binder) }
 	  
 	-- We should check the unfolding, if any, but this is tricky because
  	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
    where
     binder_ty                  = idType binder
-    maybeDmdTy                 = idStrictness_maybe binder
+    dmdTy                      = idStrictness binder
     bndr_vars                  = varSetElems (idFreeVars binder)
 
     -- If you edit this function, you may need to update the GHC formalism

@@ -77,7 +77,7 @@ import Var
 import VarSet
 import VarEnv
 import Literal		( litIsTrivial )
-import Demand		( StrictSig, increaseStrictSigArity )
+import Demand           ( StrictSig, increaseStrictSigArity )
 import Name		( getOccName, mkSystemVarName )
 import OccName		( occNameString )
 import Type		( isUnLiftedType, Type, mkPiTypes )
@@ -563,8 +563,8 @@ Doesn't change any other allocation at all.
 \begin{code}
 annotateBotStr :: Id -> Maybe (Arity, StrictSig) -> Id
 annotateBotStr id Nothing            = id
-annotateBotStr id (Just (arity,sig)) = id `setIdArity` arity
-				          `setIdStrictness` sig
+annotateBotStr id (Just (arity, sig)) = id `setIdArity` arity
+     		                              `setIdStrictness` sig
 
 notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
@@ -820,7 +820,8 @@ lvlLamBndrs lvl bndrs
 \begin{code}
   -- Destination level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
-destLevel :: LevelEnv -> VarSet -> Bool -> Maybe (Arity, StrictSig) -> Level
+destLevel :: LevelEnv -> VarSet -> Bool -> 
+             Maybe (Arity, StrictSig) -> Level
 destLevel env fvs is_function mb_bot
   | Just {} <- mb_bot = tOP_LEVEL	-- Send bottoming bindings to the top 
 					-- regardless; see Note [Bottoming floats]
@@ -1079,9 +1080,10 @@ newLvlVar vars body_ty mb_bot
     arity = count isId vars
     info = case mb_bot of
 		Nothing               -> vanillaIdInfo
-		Just (bot_arity, sig) -> vanillaIdInfo 
-					   `setArityInfo`      (arity + bot_arity)
-					   `setStrictnessInfo` Just (increaseStrictSigArity arity sig)
+		Just (bot_arity, sig) -> 
+                     vanillaIdInfo 
+		    `setArityInfo`      (arity + bot_arity)
+		    `setStrictnessInfo` (increaseStrictSigArity arity sig)
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.
@@ -1114,7 +1116,9 @@ cloneVar :: LevelEnv -> Var -> Level -> LvlM (LevelEnv, Var)
 cloneVar env v dest_lvl -- Works for Ids, TyVars and CoVars
   = do { u <- getUniqueM
        ; let (subst', v1) = cloneBndr (le_subst env) u v
-      	     v2     	  = if isId v1 then zapDemandIdInfo v1 else v1
+      	     v2     	  = if isId v1 
+                            then zapDemandIdInfo v1  
+                            else v1
       	     env'	  = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
        ; return (env', v2) }
 
@@ -1127,7 +1131,8 @@ cloneRecVars env vs dest_lvl -- Works for CoVars too (since cloneRecIdBndrs does
     us <- getUniqueSupplyM
     let
       (subst', vs1) = cloneRecIdBndrs (le_subst env) us vs
-      vs2	    = map zapDemandIdInfo vs1  -- Note [Zapping the demand info]
+      -- Note [Zapping the demand info]
+      vs2	    = map zapDemandIdInfo vs1  
       env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
     return (env', vs2)
 \end{code}

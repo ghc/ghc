@@ -30,13 +30,11 @@ import TysWiredIn
 import IfaceEnv
 import HscTypes
 import BasicTypes
-import Demand
 import Annotations
 import IfaceSyn
 import Module
 import Name
 import Avail
-import VarEnv
 import DynFlags
 import UniqFM
 import UniqSupply
@@ -389,7 +387,6 @@ data BinSymbolTable = BinSymbolTable {
                                 -- indexed by Name
   }
 
-
 putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
 putFastString dict bh fs = allocateFastString dict fs >>= put_ bh
 
@@ -426,12 +423,6 @@ data BinDictionary = BinDictionary {
 {-! for Boxity derive: Binary !-}
 {-! for StrictnessMark derive: Binary !-}
 {-! for Activation derive: Binary !-}
-
--- Demand
-{-! for Demand derive: Binary !-}
-{-! for Demands derive: Binary !-}
-{-! for DmdResult derive: Binary !-}
-{-! for StrictSig derive: Binary !-}
 
 -- Class
 {-! for DefMeth derive: Binary !-}
@@ -818,87 +809,6 @@ instance Binary Fixity where
           ab <- get bh
           return (Fixity aa ab)
 
--------------------------------------------------------------------------
---              Types from: Demand
--------------------------------------------------------------------------
-
-instance Binary DmdType where
-        -- Ignore DmdEnv when spitting out the DmdType
-  put bh (DmdType _ ds dr) = do p <- put bh ds; put_ bh dr; return (castBin p)
-  get bh = do ds <- get bh; dr <- get bh; return (DmdType emptyVarEnv ds dr)
-
-instance Binary Demand where
-    put_ bh Top = do
-            putByte bh 0
-    put_ bh Abs = do
-            putByte bh 1
-    put_ bh (Call aa) = do
-            putByte bh 2
-            put_ bh aa
-    put_ bh (Eval ab) = do
-            putByte bh 3
-            put_ bh ab
-    put_ bh (Defer ac) = do
-            putByte bh 4
-            put_ bh ac
-    put_ bh (Box ad) = do
-            putByte bh 5
-            put_ bh ad
-    put_ bh Bot = do
-            putByte bh 6
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do return Top
-              1 -> do return Abs
-              2 -> do aa <- get bh
-                      return (Call aa)
-              3 -> do ab <- get bh
-                      return (Eval ab)
-              4 -> do ac <- get bh
-                      return (Defer ac)
-              5 -> do ad <- get bh
-                      return (Box ad)
-              _ -> do return Bot
-
-instance Binary Demands where
-    put_ bh (Poly aa) = do
-            putByte bh 0
-            put_ bh aa
-    put_ bh (Prod ab) = do
-            putByte bh 1
-            put_ bh ab
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do aa <- get bh
-                      return (Poly aa)
-              _ -> do ab <- get bh
-                      return (Prod ab)
-
-instance Binary DmdResult where
-    put_ bh TopRes = do
-            putByte bh 0
-    put_ bh RetCPR = do
-            putByte bh 1
-    put_ bh BotRes = do
-            putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do return TopRes
-              1 -> do return RetCPR     -- Really use RetCPR even if -fcpr-off
-                                        -- The wrapper was generated for CPR in 
-                                        -- the imported module!
-              _ -> do return BotRes
-
-instance Binary StrictSig where
-    put_ bh (StrictSig aa) = do
-            put_ bh aa
-    get bh = do
-          aa <- get bh
-          return (StrictSig aa)
-
 
 -------------------------------------------------------------------------
 --              Types from: CostCentre
@@ -1219,11 +1129,11 @@ instance Binary IfaceIdInfo where
             _ -> lazyGet bh >>= (return . HasInfo)     -- NB lazyGet
 
 instance Binary IfaceInfoItem where
-    put_ bh (HsArity aa)      = putByte bh 0 >> put_ bh aa
-    put_ bh (HsStrictness ab) = putByte bh 1 >> put_ bh ab
-    put_ bh (HsUnfold lb ad)  = putByte bh 2 >> put_ bh lb >> put_ bh ad
-    put_ bh (HsInline ad)     = putByte bh 3 >> put_ bh ad
-    put_ bh HsNoCafRefs       = putByte bh 4
+    put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
+    put_ bh (HsStrictness ab)     = putByte bh 1 >> put_ bh ab
+    put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
+    put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
+    put_ bh HsNoCafRefs           = putByte bh 4
     get bh = do
         h <- getByte bh
         case h of

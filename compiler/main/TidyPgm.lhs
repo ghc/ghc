@@ -29,7 +29,7 @@ import Id
 import IdInfo
 import InstEnv
 import FamInstEnv
-import Demand
+import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -663,7 +663,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
     show_unfold    = show_unfolding (unfoldingInfo idinfo)
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
+    bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1069,27 +1069,25 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- when we are doing -fexpose-all-unfoldings
 
     --------- Strictness ------------
-    final_sig | Just sig <- strictnessInfo idinfo
-              = WARN( _bottom_hidden sig, ppr name ) Just sig
-              | Just (_, sig) <- mb_bot_str = Just sig
-              | otherwise                   = Nothing
-
-    -- If the cheap-and-cheerful bottom analyser can see that
-    -- the RHS is bottom, it should jolly well be exposed
-    _bottom_hidden id_sig = case mb_bot_str of
-                               Nothing         -> False
-                               Just (arity, _) -> not (appIsBottom id_sig arity)
-
     mb_bot_str = exprBotStrictness_maybe orig_rhs
+
+    sig = strictnessInfo idinfo
+    final_sig | not $ isTopSig sig 
+                 = WARN( _bottom_hidden sig , ppr name ) sig 
+                 -- try a cheap-and-cheerful bottom analyser
+                 | Just (_, nsig) <- mb_bot_str = nsig
+                 | otherwise                    = sig
+
+    _bottom_hidden id_sig = case mb_bot_str of
+                                  Nothing         -> False
+                                  Just (arity, _) -> not (appIsBottom id_sig arity)
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
     unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
                 | otherwise   = noUnfolding
     unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = case final_sig of
-                Just sig -> isBottomingSig sig
-                Nothing  -> False
+    is_bot = isBottomingSig final_sig
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that
