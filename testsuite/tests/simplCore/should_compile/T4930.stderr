@@ -3,7 +3,7 @@
 Result size of Tidy Core = {terms: 20, types: 10, coercions: 0}
 
 lvl :: [GHC.Types.Char]
-[GblId]
+[GblId, Str=DmdType]
 lvl = GHC.CString.unpackCString# "Too small"#
 
 T4930.foo1 :: GHC.Types.Int
@@ -13,7 +13,7 @@ T4930.foo1 = GHC.Err.error @ GHC.Types.Int lvl
 T4930.foo :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
- Str=DmdType U(L)m,
+ Str=DmdType <S,U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

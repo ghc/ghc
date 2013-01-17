@@ -4,7 +4,7 @@ Result size of Tidy Core = {terms: 19, types: 10, coercions: 0}
 
 Rec {
 T3717.$wfoo [Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,U>]
 T3717.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
     case ww of ds {
@@ -17,7 +17,7 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType U(L)m,
+ Str=DmdType <S(S),U(U)>m,
  Unf=Unf{Src=Worker=T3717.$wfoo, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
