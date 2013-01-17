@@ -322,8 +322,6 @@ data GeneralFlag
    | Opt_EmitExternalCore
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
-   | Opt_SSE2
-   | Opt_SSE4_2
    | Opt_IgnoreDotGhci
    | Opt_GhciSandbox
    | Opt_GhciHistory
@@ -711,7 +709,10 @@ data DynFlags = DynFlags {
 
   llvmVersion           :: IORef Int,
 
-  nextWrapperNum        :: IORef Int
+  nextWrapperNum        :: IORef Int,
+
+  -- | Machine dependant flags (-m<blah> stuff)
+  sseVersion            :: Maybe (Int, Int)  -- (major, minor)
  }
 
 class HasDynFlags m where
@@ -1305,7 +1306,8 @@ defaultDynFlags mySettings =
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion",
         interactivePrint = Nothing,
-        nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum"
+        nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
+        sseVersion = Nothing
       }
 
 defaultWays :: Settings -> [Way]
@@ -2181,13 +2183,7 @@ dynamic_flags = [
   , Flag "monly-2-regs" (NoArg (addWarn "The -monly-2-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
-  , Flag "msse2"        (NoArg (setGeneralFlag Opt_SSE2))
-  , Flag "msse4.2"      (NoArg (setGeneralFlag Opt_SSE4_2))
-    -- at some point we should probably have a single SSE flag that
-    -- contains the SSE version, instead of having a different flag
-    -- per version. That would make it easier to e.g. check if SSE2 is
-    -- enabled as you wouldn't have to check if either Opt_SSE2 or
-    -- Opt_SSE4_2 is set (as the latter implies the former).
+  , Flag "msse"         (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -2944,6 +2940,9 @@ optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
               -> OptKind (CmdLineP DynFlags)
 optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
+versionSuffix :: (Int -> Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+versionSuffix fn = VersionSuffix (\maj min -> upd (fn maj min))
+
 setDumpFlag :: DumpFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
@@ -3412,17 +3411,15 @@ makeDynFlagsConsistent dflags
 -- SSE
 
 isSse2Enabled :: DynFlags -> Bool
-isSse2Enabled dflags = isSse4_2Enabled dflags || isSse2Enabled'
-  where
-    isSse2Enabled' = case platformArch (targetPlatform dflags) of
-        ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
-                      -- possible to make it optional, but we'd need to
-                      -- fix at least the foreign call code where the
-                      -- calling convention specifies the use of xmm regs,
-                      -- and possibly other places.
-                      True
-        ArchX86    -> gopt Opt_SSE2 dflags
-        _          -> False
+isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
+    ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
+                  -- possible to make it optional, but we'd need to
+                  -- fix at least the foreign call code where the
+                  -- calling convention specifies the use of xmm regs,
+                  -- and possibly other places.
+                  True
+    ArchX86    -> sseVersion dflags >= Just (2,0)
+    _          -> False
 
 isSse4_2Enabled :: DynFlags -> Bool
-isSse4_2Enabled dflags = gopt Opt_SSE4_2 dflags
+isSse4_2Enabled dflags = sseVersion dflags >= Just (4,2)
