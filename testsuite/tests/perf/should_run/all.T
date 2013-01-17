@@ -227,9 +227,10 @@ test('T5536',
                                              1250000000)),
                            # expected value: 1246287228 (i386/Linux)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 2480000000,
-                                             2510000000)),
-                           # expected value: 2492589480 (amd64/Linux)
+          stats_range_field('bytes allocated', 892399040, 5),
+                           # expected value: 2,492,589,480 (amd64/Linux)
+                           # 17/1/13:          892,399,040 (x86_64/Linux)
+                           #                   (new demand analyser)
      extra_clean(['T5536.data']),
      ignore_output,
      only_ways(['normal'])

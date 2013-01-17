@@ -39,7 +39,7 @@ test('T1969',
                         # 2012-10-08:     303930948 (x86/Linux, new codegen)
                         # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 658786936, 1)),
+          compiler_stats_range_field('bytes allocated', 658786936, 5)),
                         # 17/11/2009:     434,845,560 (amd64/Linux)
                         # 08/12/2009:     459,776,680 (amd64/Linux)
                         # 17/05/2010:     519,377,728 (amd64/Linux)
@@ -56,7 +56,10 @@ test('T1969',
                         #                 (^ -fPIC turned off again)
                         # 12/11/2012:     658,786,936 (amd64/Linux)
                         #                 ( UNKNOWN REASON )
+                        # 17/1/13:        667,160,192 (x86_64/Linux)
+                        #                 (new demand analyser)
       only_ways(['normal']),
+
       extra_hc_opts('-dcore-lint -static')
           # Leave -dcore-lint on for this one test, so that we have something
           # that will catch a regression in -dcore-lint performance.
@@ -201,9 +204,13 @@ test('T5030',
           compiler_stats_range_field('bytes allocated', 259547660, 10)),
                      # previous:    196457520
                      # 2012-10-08:  259547660 (x86/Linux, new codegen)
-      # expected value: 346750856 (amd64/Linux):
+
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 530000000, 10)),
+          compiler_stats_range_field('bytes allocated', 602993184, 10)),
+            # Previously 530000000 (+/- 10%)
+            # 17/1/13:       602,993,184  (x86_64/Linux)
+            #                (new demand analyser)
+   
        only_ways(['normal'])
       ],
      compile,
