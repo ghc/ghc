@@ -18,4 +18,7 @@
 HsInt genSymZh(void);
 HsInt resetGenSymZh(void);
 
+/* Alternate to raise(3) for threaded rts, for BSD-based OSes */
+int genericRaise(int sig);
+
 #endif /* RTS_UTILS_H */

@@ -160,7 +160,7 @@ SLOW)
         BINDIST="BINDIST=YES"
         ;;
 NORMAL)
-        MAKE_TEST_TARGET=test
+        MAKE_TEST_TARGET=fulltest
         BINDIST="BINDIST=YES"
         ;;
 FAST)
