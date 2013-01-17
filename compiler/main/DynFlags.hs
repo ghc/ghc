@@ -3410,6 +3410,10 @@ makeDynFlagsConsistent dflags
 -- -----------------------------------------------------------------------------
 -- SSE
 
+-- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
+-- check if SSE is enabled, we might have x86-64 imply the -msse2
+-- flag.
+
 isSse2Enabled :: DynFlags -> Bool
 isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be

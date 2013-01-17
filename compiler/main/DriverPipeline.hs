@@ -1436,7 +1436,8 @@ runPhase LlvmLlc input_fn dflags
                 ++ map SysTools.Option lc_opts
                 ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts
-                ++ map SysTools.Option abiOpts)
+                ++ map SysTools.Option abiOpts
+                ++ map SysTools.Option sseOpts)
 
     return (next_phase, output_fn)
   where
@@ -1461,6 +1462,10 @@ runPhase LlvmLlc input_fn dflags
                     ArchARM ARMv7 _ HARD -> ["-float-abi=hard"]
                     ArchARM ARMv7 _ _    -> []
                     _                    -> []
+
+        sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
+                | isSse2Enabled dflags   = ["-mattr=+sse2"]
+                | otherwise              = []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
