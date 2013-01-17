@@ -210,7 +210,6 @@ AC_CANONICAL_TARGET
 # Testing ARM ABI
 # required for code generation (LLVM options)
 ARM_ABI=SOFT
-echo HOST: $host
 
 case $host in
      arm*-*-linux-gnueabihf)
@@ -451,12 +450,9 @@ AC_SUBST([SplitObjsBroken])
 
 dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
-BuildingCrossCompiler=NO
-PortingCompiler=NO
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$host" != "$target" ; then
-    BuildingCrossCompiler=YES
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
@@ -464,25 +460,17 @@ if test "$host" != "$target" ; then
                           #   If you meant to cross compile, use `--host'.
 fi
 if test "$build" != "$host" ; then
-    CrossCompiling=YES
-    PortingCompiler=YES
-fi
-# Note: cross_compiling is set to 'yes' in both 'port' and 'toolchain' cases
-if ! test "$host" = "$target" -o "$host" = "$build" ; then
    AC_MSG_ERROR([
 You've selected:
 
-  build:  $build   (the architecture we're building on)
-  host:   $host    (the architecture the compiler we're building will execute on)
-  target: $target  (the architecture the compiler we're building will produce code for)
+  BUILD:  $build   (the architecture we're building on)
+  HOST:   $host    (the architecture the compiler we're building will execute on)
+  TARGET: $target  (the architecture the compiler we're building will produce code for)
 
-host must equal build or target. The two allowed cases are:
-
-  --host=<arch> --target=<arch>   to _port_ GHC to run on a foreign architecture
-                                  and produce code for that architecture
-  --target=<arch>                 to build a cross compiler _toolchain_ that runs
-                                  locally but produces code for a foreign
-                                  architecture
+BUILD must equal HOST; that is, we do not support building GHC itself
+with a cross-compiler.  To cross-compile GHC itself, set TARGET: stage
+1 will be a cross-compiler, and stage 2 will be the cross-compiled
+GHC.
 ])
 fi
 if test "$CrossCompiling" = "YES"
@@ -492,9 +480,7 @@ else
   CrossCompilePrefix=""
 fi
 TargetPlatformFull="${target}"
-AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
-AC_SUBST(PortingCompiler)        # 'port' case
-AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
 AC_ARG_WITH([alien],
@@ -1019,8 +1005,7 @@ fi
 echo ["\
    Using GCC                 : $WhatGccIsCalled
       which is version       : $GccVersion
-   Building a cross compiler : $BuildingCrossCompiler
-   Porting to foreign arch   : $PortingCompiler
+   Building a cross compiler : $CrossCompiling
    Alien script              : $AlienScript
 
    ld       : $LdCmd

@@ -582,32 +582,37 @@ endif
 TargetPlatformFull    = @TargetPlatformFull@
 GccLT34         = @GccLT34@
 GccLT46         = @GccLT46@
+
 CC              = $(WhatGccIsCalled)
 CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
 CC_STAGE2       = $(CC)
 CC_STAGE3       = $(CC)
+
 AS              = $(WhatGccIsCalled)
 AS_STAGE0       = @CC_STAGE0@
 AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
 
+# We don't have an LD_STAGE0.  CC_STAGE0 is determined by asking "ghc
+# --info", and it doesn't report an LD.
+LD_STAGE0       = error-no-ld-stage0
+LD_STAGE1       = $(LD)
+LD_STAGE2       = $(LD)
+LD_STAGE3       = $(LD)
+
 # Cross-compiling options
 #
-# The 'toolchain' case: Cross-compiler to run locally:
-BuildingCrossCompiler = @BuildingCrossCompiler@
-# The 'port' case: Porting to a foreign architecture:
-PortingCompiler       = @PortingCompiler@
-# BuildingCrossCompiler OR PortingCompiler
 CrossCompiling        = @CrossCompiling@
 
-# Install stage 2 by default, or stage 1 in the cross compiler case. Can be changed to 3
-ifeq "$(BuildingCrossCompiler)" "YES"
-INSTALL_GHC_STAGE=1
-else
-INSTALL_GHC_STAGE=2
-endif
+# Change this to YES if you're building a cross-compiler and don't
+# want to build stage 2.
+Stage1Only = NO
+
+# Install stage 2 by default, or stage 1 in the cross compiler
+# case. Can be changed to 3
+INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC

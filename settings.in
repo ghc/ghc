@@ -1,6 +1,7 @@
 [("GCC extra via C opts", "@GccExtraViaCOpts@"),
  ("C compiler command", "@SettingsCCompilerCommand@"),
  ("C compiler flags", "@SettingsCCompilerFlags@"),
+ ("ld command", "@SettingsLdCommand@"),
  ("ld flags", "@SettingsLdFlags@"),
  ("ld supports compact unwind", "@LdHasNoCompactUnwind@"),
  ("ld supports build-id", "@LdHasBuildId@"),

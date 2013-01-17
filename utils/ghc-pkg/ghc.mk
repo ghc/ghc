@@ -85,7 +85,7 @@ $(eval $(call clean-target,utils/ghc-pkg,dist,utils/ghc-pkg/dist))
 # Cross-compile case: Install our dist version
 # Normal case: Build ghc-pkg with stage 1
 
-ifeq "$(BuildingCrossCompiler)" "YES"
+ifeq "$(Stage1Only)" "YES"
 GHC_PKG_DISTDIR=dist
 else
 GHC_PKG_DISTDIR=dist-install
@@ -104,7 +104,7 @@ ifeq "$(BootingFromHc)" "YES"
 utils/ghc-pkg_dist-install_OTHER_OBJS += $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
 endif
 
-ifeq "$(BuildingCrossCompiler)" "YES"
+ifeq "$(Stage1Only)" "YES"
 $(eval $(call shell-wrapper,utils/ghc-pkg,dist))
 else
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
