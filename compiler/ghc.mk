@@ -130,63 +130,12 @@ endif
 
 PLATFORM_H = ghc_boot_platform.h
 
-ifeq "$(BuildingCrossCompiler)" "YES"
-compiler/stage1/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
-	cp $< $@
-else
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __PLATFORM_H__"                           >> $@
 	@echo "#define __PLATFORM_H__"                           >> $@
 	@echo                                                    >> $@
-	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\"" >> $@
-	@echo "#define HostPlatform_NAME   \"$(BUILDPLATFORM)\"" >> $@
-	@echo "#define TargetPlatform_NAME \"$(HOSTPLATFORM)\""  >> $@
-	@echo                                                    >> $@
-	@echo "#define $(BuildPlatform_CPP)_BUILD 1"             >> $@
-	@echo "#define $(BuildPlatform_CPP)_HOST 1"              >> $@
-	@echo "#define $(HostPlatform_CPP)_TARGET 1"             >> $@
-	@echo                                                    >> $@
-	@echo "#define $(BuildArch_CPP)_BUILD_ARCH 1"            >> $@
-	@echo "#define $(BuildArch_CPP)_HOST_ARCH 1"             >> $@
-	@echo "#define $(HostArch_CPP)_TARGET_ARCH 1"            >> $@
-	@echo "#define BUILD_ARCH \"$(BuildArch_CPP)\""          >> $@
-	@echo "#define HOST_ARCH \"$(BuildArch_CPP)\""           >> $@
-	@echo "#define TARGET_ARCH \"$(HostArch_CPP)\""          >> $@
-	@echo                                                    >> $@
-	@echo "#define $(BuildOS_CPP)_BUILD_OS 1"                >> $@
-	@echo "#define $(BuildOS_CPP)_HOST_OS 1"                 >> $@
-	@echo "#define $(HostOS_CPP)_TARGET_OS 1"                >> $@
-	@echo "#define BUILD_OS \"$(BuildOS_CPP)\""              >> $@
-	@echo "#define HOST_OS \"$(BuildOS_CPP)\""               >> $@
-	@echo "#define TARGET_OS \"$(HostOS_CPP)\""              >> $@
-ifeq "$(HostOS_CPP)" "irix"
-	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS"                  >> $@
-	@echo "#define $(IRIX_MAJOR)_TARGET_OS 1"                >> $@
-	@echo "#endif"                                           >> $@
-endif
-	@echo                                                    >> $@
-	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 1"        >> $@
-	@echo "#define $(BuildVendor_CPP)_HOST_VENDOR 1"         >> $@
-	@echo "#define $(HostVendor_CPP)_TARGET_VENDOR 1"        >> $@
-	@echo "#define BUILD_VENDOR \"$(BuildVendor_CPP)\""      >> $@
-	@echo "#define HOST_VENDOR \"$(BuildVendor_CPP)\""       >> $@
-	@echo "#define TARGET_VENDOR \"$(HostVendor_CPP)\""      >> $@
-	@echo                                                    >> $@
-	@echo "#endif /* __PLATFORM_H__ */"                      >> $@
-	@echo "Done."
-endif
-
-# For stage2 and above, the BUILD platform is the HOST of stage1, and
-# the HOST platform is the TARGET of stage1.  The TARGET remains the same
-# (stage1 is the cross-compiler, not stage2).
-compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo "Creating $@..."
-	@echo "#ifndef __PLATFORM_H__"                            >> $@
-	@echo "#define __PLATFORM_H__"                            >> $@
-	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
 	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\""   >> $@
 	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
@@ -198,14 +147,14 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "#define $(BuildArch_CPP)_BUILD_ARCH 1"             >> $@
 	@echo "#define $(HostArch_CPP)_HOST_ARCH 1"               >> $@
 	@echo "#define $(TargetArch_CPP)_TARGET_ARCH 1"           >> $@
-	@echo "#define BUILD_ARCH \"$(HostArch_CPP)\""            >> $@
+	@echo "#define BUILD_ARCH \"$(BuildArch_CPP)\""           >> $@
 	@echo "#define HOST_ARCH \"$(HostArch_CPP)\""             >> $@
 	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\""         >> $@
 	@echo                                                     >> $@
-	@echo "#define $(HostOS_CPP)_BUILD_OS 1"                  >> $@
+	@echo "#define $(BuildOS_CPP)_BUILD_OS 1"                 >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS 1"                   >> $@
 	@echo "#define $(TargetOS_CPP)_TARGET_OS 1"               >> $@
-	@echo "#define BUILD_OS \"$(HostOS_CPP)\""                >> $@
+	@echo "#define BUILD_OS \"$(BuildOS_CPP)\""               >> $@
 	@echo "#define HOST_OS \"$(HostOS_CPP)\""                 >> $@
 	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
 ifeq "$(TargetOS_CPP)" "irix"
@@ -219,6 +168,52 @@ endif
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1"      >> $@
 	@echo "#define BUILD_VENDOR \"$(BuildVendor_CPP)\""       >> $@
 	@echo "#define HOST_VENDOR \"$(HostVendor_CPP)\""         >> $@
+	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\""     >> $@
+	@echo                                                     >> $@
+	@echo "#endif /* __PLATFORM_H__ */"                       >> $@
+	@echo "Done."
+
+# For stage2 and above, the BUILD platform is the HOST of stage1, and
+# the HOST platform is the TARGET of stage1.  The TARGET remains the same
+# (stage1 is the cross-compiler, not stage2).
+compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
+	$(call removeFiles,$@)
+	@echo "Creating $@..."
+	@echo "#ifndef __PLATFORM_H__"                            >> $@
+	@echo "#define __PLATFORM_H__"                            >> $@
+	@echo                                                     >> $@
+	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
+	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
+	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
+	@echo                                                     >> $@
+	@echo "#define $(HostPlatform_CPP)_BUILD 1"               >> $@
+	@echo "#define $(TargetPlatform_CPP)_HOST 1"              >> $@
+	@echo "#define $(TargetPlatform_CPP)_TARGET 1"            >> $@
+	@echo                                                     >> $@
+	@echo "#define $(HostArch_CPP)_BUILD_ARCH 1"              >> $@
+	@echo "#define $(TargetArch_CPP)_HOST_ARCH 1"             >> $@
+	@echo "#define $(TargetArch_CPP)_TARGET_ARCH 1"           >> $@
+	@echo "#define BUILD_ARCH \"$(HostArch_CPP)\""            >> $@
+	@echo "#define HOST_ARCH \"$(TargetArch_CPP)\""           >> $@
+	@echo "#define TARGET_ARCH \"$(TargetArch_CPP)\""         >> $@
+	@echo                                                     >> $@
+	@echo "#define $(HostOS_CPP)_BUILD_OS 1"                  >> $@
+	@echo "#define $(TargetOS_CPP)_HOST_OS 1"                 >> $@
+	@echo "#define $(TargetOS_CPP)_TARGET_OS 1"               >> $@
+	@echo "#define BUILD_OS \"$(HostOS_CPP)\""                >> $@
+	@echo "#define HOST_OS \"$(TargetOS_CPP)\""               >> $@
+	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
+ifeq "$(TargetOS_CPP)" "irix"
+	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS"                   >> $@
+	@echo "#define $(IRIX_MAJOR)_TARGET_OS 1"                 >> $@
+	@echo "#endif"                                            >> $@
+endif
+	@echo                                                     >> $@
+	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 1"          >> $@
+	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR 1"         >> $@
+	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1"      >> $@
+	@echo "#define BUILD_VENDOR \"$(HostVendor_CPP)\""        >> $@
+	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\""       >> $@
 	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\""     >> $@
 	@echo                                                     >> $@
 	@echo "#endif /* __PLATFORM_H__ */"                       >> $@

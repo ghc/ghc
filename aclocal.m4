@@ -61,18 +61,25 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
 
     if test "$target_alias" = ""
     then
-        if test "$bootstrap_target" != ""
+        if test "$host_alias" != ""
         then
-            target=$bootstrap_target
-            echo "Target platform inferred as: $target"
+            GHC_CONVERT_CPU([$host_cpu], [TargetArch])
+            GHC_CONVERT_VENDOR([$host_vendor], [TargetVendor])
+            GHC_CONVERT_OS([$host_os], [TargetOS])
         else
-            echo "Can't work out target platform"
-            exit 1
+            if test "$bootstrap_target" != ""
+            then
+                target=$bootstrap_target
+                echo "Target platform inferred as: $target"
+            else
+                echo "Can't work out target platform"
+                exit 1
+            fi
+    
+            TargetArch=`echo "$target" | sed 's/-.*//'`
+            TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
+            TargetOS=`echo "$target" | sed 's/.*-//'`
         fi
-
-        TargetArch=`echo "$target" | sed 's/-.*//'`
-        TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
-        TargetOS=`echo "$target" | sed 's/.*-//'`
     else
         GHC_CONVERT_CPU([$target_cpu], [TargetArch])
         GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
@@ -377,6 +384,7 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
         SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
@@ -384,6 +392,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
@@ -406,6 +415,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCCompilerFlags)
+    AC_SUBST(SettingsLdCommand)
     AC_SUBST(SettingsLdFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsPerlCommand)

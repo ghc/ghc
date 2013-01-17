@@ -81,7 +81,12 @@ $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
 $1_$2_CONFIGURE_OPTS += --with-gcc="$$(CC_STAGE$3)"
-$1_$2_CONFIGURE_OPTS += --with-ld="$$(LD)"
+
+ifneq "$3" "0"
+# There is no LD_STAGE0, Cabal will figure it out
+$1_$2_CONFIGURE_OPTS += --with-ld="$$(LD_STAGE$3)"
+endif
+
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-cc="$$(CC_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ar="$$(AR_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ranlib="$$(RANLIB)"
