@@ -204,6 +204,10 @@ extern nat n_gc_threads;
 
 extern gc_thread **gc_threads;
 
+#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR)
+extern ThreadLocalKey gctKey;
+#endif
+
 #include "EndPrivate.h"
 
 #endif // SM_GCTHREAD_H

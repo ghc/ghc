@@ -52,7 +52,7 @@ extern __thread gc_thread* gct;
 // with a C compiler that uses an LLVM back end (clang or llvm-gcc) then we
 // use pthread_getspecific() to handle the thread local storage for gct.
 #define gct ((gc_thread *)(pthread_getspecific(gctKey)))
-#define DECLARE_GCT /* nothing */
+#define DECLARE_GCT ThreadLocalKey gctKey;
 
 #elif defined(sparc_HOST_ARCH)
 // On SPARC we can't pin gct to a register. Names like %l1 are just offsets
