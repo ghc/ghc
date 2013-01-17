@@ -1,6 +1,8 @@
 {-# LANGUAGE ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
 
 -- From trac #1947
+-- Should fail with heap exhaustion
+-- See notes below with "Infinite loop here".
 
 module Main(main) where
 
@@ -244,9 +246,20 @@ f20 v1 v2 =
                        prelude_error
                          (skipCAF realWorld# (str_ "Prelude.read: ambiguous parse"))
 
+-- Infinite loop here.  It was originally:
+-- f34 v1 v2 v3 =
+--    let v336 = f34 v1 v2 v3
+--    in v336
+--
+-- But that now (correctly) just makes a non-allocating infinite loop
+-- instead of (incorrectly) eta-reducing to f34 = f34.
+-- So I've changed to an infinite, allocating loop, which makes
+-- the heap get exhausted.
 f34 v1 v2 v3 =
-    let v336 = f34 v1 v2 v3
+  if abs v2 < 1000 then 
+    let v336 = f34 (v1+1) (-v2) v3
     in v336
+  else if v2 == 2000 then 0 else v1
 
 f38 v1 v2 =
     case v1 of
