@@ -227,6 +227,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/Flags.h"
 #include "rts/Adjustor.h"
 #include "rts/FileLock.h"
+#include "rts/GetTime.h"
 #include "rts/Globals.h"
 #include "rts/IOManager.h"
 #include "rts/Linker.h"
