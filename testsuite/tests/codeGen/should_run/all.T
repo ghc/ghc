@@ -104,3 +104,5 @@ test('Word2Float32', unless_wordsize(32, skip), compile_and_run, [''])
 test('Word2Float64', unless_wordsize(64, skip), compile_and_run, [''])
 
 test('T7361', normal, compile_and_run, [''])
+test('T7600', normal, compile_and_run, [''])
+
