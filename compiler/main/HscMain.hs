@@ -1614,6 +1614,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
                      ptext (sLit "parse error in import declaration")
 
 -- | Typecheck an expression (but don't run it)
+-- Returns its most general type
 hscTcExpr :: HscEnv
           -> String -- ^ The expression
           -> IO Type
@@ -1628,6 +1629,7 @@ hscTcExpr hsc_env0 expr = runInteractiveHsc hsc_env0 $ do
                 (text "not an expression:" <+> quotes (text expr))
 
 -- | Find the kind of a type
+-- Currently this does *not* generalise the kinds of the type
 hscKcType
   :: HscEnv
   -> Bool            -- ^ Normalise the type

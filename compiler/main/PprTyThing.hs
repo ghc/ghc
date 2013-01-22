@@ -33,6 +33,7 @@ import Coercion( pprCoAxiom )
 import HscTypes( tyThingParent_maybe )
 import TcType
 import Name
+import VarEnv( emptyTidyEnv )
 import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
@@ -161,8 +162,12 @@ pprTypeForUser print_foralls ty
   | print_foralls = ppr tidy_ty
   | otherwise     = ppr (mkPhiTy ctxt ty')
   where
-    tidy_ty     = tidyTopType ty
     (_, ctxt, ty') = tcSplitSigmaTy tidy_ty
+    (_, tidy_ty)   = tidyOpenType emptyTidyEnv ty
+     -- Often the types/kinds we print in ghci are fully generalised
+     -- and have no free variables, but it turns out that we sometimes
+     -- print un-generalised kinds (eg when doing :k T), so it's
+     -- better to use tidyOpenType here
 
 pprTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
 pprTyCon pefas ss tyCon

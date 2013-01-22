@@ -1529,6 +1529,7 @@ tcRnExpr :: HscEnv
          -> InteractiveContext
          -> LHsExpr RdrName
          -> IO (Messages, Maybe Type)
+-- Type checks the expression and returns its most general type
 tcRnExpr hsc_env ictxt rdr_expr
   = initTcPrintErrors hsc_env iNTERACTIVE $
     setInteractiveContext hsc_env ictxt $ do {
