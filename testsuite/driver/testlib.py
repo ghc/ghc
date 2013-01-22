@@ -645,6 +645,8 @@ def test (name, setup, func, args):
     global allTestNames
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
+    if not re.match('^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', name):
+        framework_fail(name, 'bad_name', 'This test has an invalid name')
     myTestOpts = copy.copy(thisdir_testopts)
 
     if type(setup) is types.ListType:
