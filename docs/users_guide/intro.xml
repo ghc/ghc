@@ -130,17 +130,15 @@
       </varlistentry>
 
       <varlistentry>
-	<term>glasgow-haskell-bugs:</term>
+	<term>ghc-devs:</term>
 	<listitem>
-	  <para>This list is for reporting and discussing GHC bugs.
-	    However, please see <xref linkend="bug-reporting" /> before
-	    posting here.</para>
+	  <para>The hardcore GHC developers hang out here.</para>
 
 	  <variablelist>
 	    <varlistentry>
 	      <term>list email address:</term>
 	      <listitem>
-		<para><email>glasgow-haskell-bugs@haskell.org</email></para>
+		<para><email>ghc-devs@haskell.org</email></para>
 	      </listitem>
 	    </varlistentry>
 
@@ -148,14 +146,14 @@
 	      <term>subscribe at:</term>
 	      <listitem>
 		<para><ulink
-	      url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs"><literal>http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs</literal></ulink>.</para>
+	      url="http://www.haskell.org/mailman/listinfo/ghc-devs"><literal>http://www.haskell.org/mailman/listinfo/ghc-devs</literal></ulink>.</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
 	      <term>admin email address:</term>
 	      <listitem>
-		<para><email>glasgow-haskell-bugs-admin@haskell.org</email></para>
+		<para><email>ghc-devs-admin@haskell.org</email></para>
 	      </listitem>
 	    </varlistentry>
 
@@ -163,50 +161,7 @@
 	      <term>list archives:</term>
 	      <listitem>
 		<para><ulink
-                         url="http://www.haskell.org/pipermail/glasgow-haskell-bugs/"><literal>http://www.haskell.org/pipermail/glasgow-haskell-bugs/</literal></ulink></para>
-	      </listitem>
-	    </varlistentry>
-	  </variablelist>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>cvs-ghc:</term>
-	<listitem>
-	  <para>The hardcore GHC developers hang out here.  This list
-	  also gets commit message from the GHC darcs repository.  There are
-	  other lists for other darcs
-	  repositories (most notably <literal>cvs-libraries</literal>).
-	  </para>
-
-	  <variablelist>
-	    <varlistentry>
-	      <term>list email address:</term>
-	      <listitem>
-		<para><email>cvs-ghc@haskell.org</email></para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>subscribe at:</term>
-	      <listitem>
-		<para><ulink
-	      url="http://www.haskell.org/mailman/listinfo/cvs-ghc"><literal>http://www.haskell.org/mailman/listinfo/cvs-ghc</literal></ulink>.</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>admin email address:</term>
-	      <listitem>
-		<para><email>cvs-ghc-admin@haskell.org</email></para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>list archives:</term>
-	      <listitem>
-		<para><ulink
-          url="http://www.haskell.org/pipermail/cvs-ghc/"><literal>http://www.haskell.org/pipermail/cvs-ghc/</literal></ulink></para>
+          url="http://www.haskell.org/pipermail/ghc-devs/"><literal>http://www.haskell.org/pipermail/ghc-devs/</literal></ulink></para>
 	      </listitem>
 	    </varlistentry>
 	  </variablelist>
