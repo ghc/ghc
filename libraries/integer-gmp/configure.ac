@@ -1,8 +1,5 @@
 AC_INIT([Haskell integer (GMP)], [0.1], [libraries@haskell.org], [integer])
 
-# Safety check: Ensure that we are in the correct source directory.
-AC_CONFIG_SRCDIR([cbits/mkGmpDerivedConstants.c])
-
 AC_CANONICAL_TARGET
 
 AC_ARG_WITH([cc],
@@ -66,7 +63,30 @@ AC_SUBST(GMP_FRAMEWORK)
 AC_SUBST(HaveLibGmp)
 AC_SUBST(HaveFrameworkGMP)
 
-AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk])
+dnl GMP_INT_TO_CONST(int_expr, var_name)
+AC_DEFUN([GMP_INT_TO_VAR],
+[
+    AC_MSG_CHECKING([for $1 size])
+    AC_COMPUTE_INT([$2], [$1],[[#include <stdio.h>
+#include <stddef.h>
+#include "gmp.h"
+
+#define FIELD_OFFSET(s_type, field) offsetof(s_type, field)
+#define FIELD_SIZE_BITS(s_type, field) (unsigned long)sizeof (__typeof__(((((s_type*)0)->field)))) * 8
+]], AC_MSG_ERROR([Failed to compute size of $1]))
+    AC_MSG_RESULT($$2)
+    AC_SUBST($2)
+])
+
+GMP_INT_TO_VAR([[sizeof (MP_INT)]], [SIZEOF_MP_INT])
+GMP_INT_TO_VAR([[FIELD_OFFSET(MP_INT,_mp_alloc)]],    [OFFSET_MP_INT__mp_alloc])
+GMP_INT_TO_VAR([[FIELD_SIZE_BITS(MP_INT,_mp_alloc)]], [REP_MP_INT__mp_alloc])
+GMP_INT_TO_VAR([[FIELD_OFFSET(MP_INT,_mp_size)]],     [OFFSET_MP_INT__mp_size])
+GMP_INT_TO_VAR([[FIELD_SIZE_BITS(MP_INT,_mp_size)]],  [REP_MP_INT__mp_size])
+GMP_INT_TO_VAR([[FIELD_OFFSET(MP_INT,_mp_d)]],        [OFFSET_MP_INT__mp_d])
+GMP_INT_TO_VAR([[FIELD_SIZE_BITS(MP_INT,_mp_d)]],     [REP_MP_INT__mp_d])
+
+AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk cbits/GmpDerivedConstants.h])
 
 dnl--------------------------------------------------------------------
 dnl * Generate the header cbits/GmpDerivedConstants.h

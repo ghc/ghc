@@ -8,4 +8,3 @@ ghc.mk
 gmp/config.mk
 integer-gmp.buildinfo
 cbits/GmpDerivedConstants.h
-cbits/mkGmpDerivedConstants

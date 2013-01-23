@@ -46,12 +46,6 @@ endif
 libraries/integer-gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
 libraries/integer-gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
-libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/cbits/mkGmpDerivedConstants.c
-	"$(CC_STAGE1)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) $(libraries/integer-gmp_CC_OPTS) $< -o $@
-
-libraries/integer-gmp/cbits/GmpDerivedConstants.h: libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext)
-	$< > $@
-
 # Compile GMP only if we don't have it already
 #
 # We use GMP's own configuration stuff, because it's all rather hairy
@@ -85,8 +79,6 @@ $(foreach w,$(GhcLibWays),$(eval $(call GmpDerivedConstants-dependencies,$w)))
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 $(libraries/integer-gmp_dist-install_depfile_c_asm): libraries/integer-gmp/gmp/gmp.h
-
-libraries/integer-gmp/cbits/mkGmpDerivedConstants$(exeext): libraries/integer-gmp/gmp/gmp.h
 
 libraries/integer-gmp_CC_OPTS += -I$(TOP)/libraries/integer-gmp/gmp
 
