@@ -1232,18 +1232,18 @@ runPhase As input_fn dflags
         let whichAsProg | hscTarget dflags == HscLlvm &&
                           platformOS (targetPlatform dflags) == OSDarwin
                         = do
+                            -- be careful what options we call clang with
+                            -- see #5903 and #7617 for bugs caused by this.
                             llvmVer <- liftIO $ figureLlvmVersion dflags
                             return $ case llvmVer of
-                                Just n | n >= 30 ->
-                                    (SysTools.runClang, getOpts dflags opt_c)
+                                Just n | n >= 30 -> SysTools.runClang
+                                _                -> SysTools.runAs
 
-                                _ -> (SysTools.runAs, getOpts dflags opt_a)
+                        | otherwise = return SysTools.runAs
 
-                        | otherwise
-                        = return (SysTools.runAs, getOpts dflags opt_a)
-
-        (as_prog, as_opts) <- whichAsProg
-        let cmdline_include_paths = includePaths dflags
+        as_prog <- whichAsProg
+        let as_opts = getOpts dflags opt_a
+            cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
         output_fn <- phaseOutputFilename next_phase
