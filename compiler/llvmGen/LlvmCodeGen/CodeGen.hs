@@ -706,7 +706,7 @@ genCondBranch :: LlvmEnv -> CmmExpr -> BlockId -> BlockId -> UniqSM StmtData
 genCondBranch env cond idT idF = do
     let labelT = blockIdToLlvm idT
     let labelF = blockIdToLlvm idF
-    -- See Note [Literals and branch conditions]
+    -- See Note [Literals and branch conditions].
     (env', vc, stmts, top) <- exprToVarOpt env i1Option cond
     if getVarType vc == i1
         then do
@@ -798,31 +798,30 @@ type ExprData = (LlvmEnv, LlvmVar, LlvmStatements, [LlvmCmmDecl])
 
 -- | Values which can be passed to 'exprToVar' to configure its
 -- behaviour in certain circumstances.
-data EOption = EOption {
-        -- | The expected LlvmType for the returned variable.
-        --
-        -- Currently just used for determining if a comparison should return
-        -- a boolean (i1) or a int (i32/i64).
-        eoExpectedType :: Maybe LlvmType
-  }
+--
+-- Currently just used for determining if a comparison should return
+-- a boolean (i1) or a word. See Note [Literals and branch conditions].
+newtype EOption = EOption { i1Expected :: Bool }
+-- XXX: EOption is an ugly and inefficient solution to this problem.
 
+-- | i1 type expected (condition scrutinee).
 i1Option :: EOption
-i1Option = EOption (Just i1)
+i1Option = EOption True
 
-wordOption :: DynFlags -> EOption
-wordOption dflags = EOption (Just (llvmWord dflags))
-
+-- | Word type expected (usual).
+wordOption :: EOption
+wordOption = EOption False
 
 -- | Convert a CmmExpr to a list of LlvmStatements with the result of the
 -- expression being stored in the returned LlvmVar.
 exprToVar :: LlvmEnv -> CmmExpr -> UniqSM ExprData
-exprToVar env = exprToVarOpt env (wordOption (getDflags env))
+exprToVar env = exprToVarOpt env wordOption
 
 exprToVarOpt :: LlvmEnv -> EOption -> CmmExpr -> UniqSM ExprData
 exprToVarOpt env opt e = case e of
 
     CmmLit lit
-        -> genLit opt env lit -- See Note [Literals and branch conditions]
+        -> genLit opt env lit
 
     CmmLoad e' ty
         -> genLoad env e' ty
@@ -1072,26 +1071,16 @@ genMachOp_slow env opt op [x, y] = case op of
 
         -- | Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
-        -- if expected
+        -- if expected. See Note [Literals and branch conditions].
         genBinComp opt cmp = do
-            ed@(env', v1, stmts, top) <- binLlvmOp (\_ -> i1) $ Compare cmp
-
+            ed@(env', v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp)
             if getVarType v1 == i1
-                then
-                    case eoExpectedType opt of
-                         Nothing ->
-                             return ed
-
-                         Just t | t == i1 ->
-                                    return ed
-
-                                | isInt t -> do
-                                    (v2, s1) <- doExpr t $ Cast LM_Zext v1 t
-                                    return (env', v2, stmts `snocOL` s1, top)
-
-                                | otherwise ->
-                                    panic $ "genBinComp: Can't case i1 compare"
-                                        ++ "res to non int type " ++ show (t)
+                then case i1Expected opt of
+                    True  -> return ed
+                    False -> do
+                        let w_ = llvmWord dflags
+                        (v2, s1) <- doExpr w_ $ Cast LM_Zext v1 w_
+                        return (env', v2, stmts `snocOL` s1, top)
                 else
                     panic $ "genBinComp: Compare returned type other then i1! "
                         ++ (show $ getVarType v1)
@@ -1259,9 +1248,14 @@ allocReg _ = panic $ "allocReg: Global reg encountered! Global registers should"
 
 -- | Generate code for a literal
 genLit :: EOption -> LlvmEnv -> CmmLit -> UniqSM ExprData
-genLit (EOption opt) env (CmmInt i w)
-  -- See Note [Literals and branch conditions]
-  = let width = fromMaybe (LMInt $ widthInBits w) opt
+genLit opt env (CmmInt i w)
+  -- See Note [Literals and branch conditions].
+  = let width | i1Expected opt = i1
+              | otherwise      = LMInt (widthInBits w)
+        -- comm  = Comment [ fsLit $ "EOption: " ++ show opt
+        --                 , fsLit $ "Width  : " ++ show w
+        --                 , fsLit $ "Width' : " ++ show (widthInBits w)
+        --                 ]
     in return (env, mkIntLit width i, nilOL, [])
 
 genLit _ env (CmmFloat r w)
