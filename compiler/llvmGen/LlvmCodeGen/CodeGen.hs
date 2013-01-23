@@ -32,7 +32,6 @@ import Unique
 import Util
 
 import Data.List  ( partition )
-import Data.Maybe ( fromMaybe )
 
 type LlvmStatements = OrdList LlvmStatement
 
