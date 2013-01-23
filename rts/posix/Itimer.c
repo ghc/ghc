@@ -73,6 +73,24 @@
  * etc.).
  */
 
+#if defined(solaris2_HOST_OS)
+/* USE_TIMER_CREATE is usually disabled for Solaris. In fact it is
+   supported well on this OS, but requires additional privilege. When
+   user does not have it, then the testing configure program fails
+   which results in USE_TIMER_CREATE not defined.
+   On the other hand when we cross-compile, then we optimistically
+   assume usage of timer_create function. The problem is that if we
+   cross compile for example from i386-solaris2 to x86_64-solaris2,
+   then the build fails with error like this:
+
+ghc-stage2: timer_create: Not owner
+
+   which happens on first ghc-stage2 invocation. So to support
+   cross-compilation to Solaris we manually undefine USE_TIMER_CREATE
+   here */
+#undef USE_TIMER_CREATE
+#endif /* solaris2_HOST_OS */
+
 #if defined(USE_TIMER_CREATE)
 #  define ITIMER_SIGNAL SIGVTALRM
 #elif defined(HAVE_SETITIMER)
