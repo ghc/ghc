@@ -26,6 +26,8 @@ types that
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
+        ConTag, fIRST_TAG,
+
 	Arity, RepArity,
 	
 	Alignment,
@@ -109,6 +111,21 @@ type Arity = Int
 --  \x -> fib x                has representation arity 1
 --  \(# x, y #) -> fib (x + y) has representation arity 2
 type RepArity = Int
+\end{code}
+
+%************************************************************************
+%*									*
+              Constructor tags
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Type of the tags associated with each constructor possibility
+type ConTag = Int
+
+fIRST_TAG :: ConTag
+-- ^ Tags are allocated from here for real constructors
+fIRST_TAG =  1
 \end{code}
 
 %************************************************************************

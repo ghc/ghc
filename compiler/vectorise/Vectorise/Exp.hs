@@ -661,11 +661,11 @@ unVectDict ty e
        ; return $ mkCoreConApps dataCon (map Type tys ++ scOps)
        }
   where
-    (tycon, tys, dataCon, methTys) = splitProductType "unVectDict: original type" ty
-    cls                            = case tyConClass_maybe tycon of
-                                       Just cls -> cls
-                                       Nothing  -> panic "Vectorise.Exp.unVectDict: no class"
-    selIds                         = classAllSelIds cls
+    (tycon, tys) = splitTyConApp ty
+    Just dataCon = isDataProductTyCon_maybe tycon
+    Just cls     = tyConClass_maybe tycon
+    methTys      = dataConInstArgTys dataCon tys
+    selIds       = classAllSelIds cls
 
 -- Vectorise an 'n'-ary lambda abstraction by building a set of 'n' explicit closures.
 --

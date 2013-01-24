@@ -1303,12 +1303,12 @@ mkKindErrMsg tyvar arg_ty
 
 mkArityMsg :: Id -> MsgDoc
 mkArityMsg binder
-  = vcat [hsep [ptext (sLit "Demand type has "),
-                     ppr (dmdTypeDepth dmd_ty),
-                     ptext (sLit " arguments, rhs has "),
-                     ppr (idArity binder),
-                     ptext (sLit "arguments, "),
-		     ppr binder],
+  = vcat [hsep [ptext (sLit "Demand type has"),
+               	ppr (dmdTypeDepth dmd_ty),
+               	ptext (sLit "arguments, rhs has"),
+               	ppr (idArity binder),
+               	ptext (sLit "arguments,"),
+	       	ppr binder],
 	      hsep [ptext (sLit "Binder's strictness signature:"), ppr dmd_ty]
 
          ]

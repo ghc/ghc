@@ -1435,7 +1435,7 @@ calcSpecStrictness fn qvars pats
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
     go_one env d   (Var v) = extendVarEnv_C bothDmd env v d
     go_one env d e 
-           | Just ds <- splitProdDmd_maybe d
+           | Just ds <- splitProdDmd_maybe d  -- NB: d does not have to be strict
            , (Var _, args) <- collectArgs e = go env ds args
     go_one env _         _ = env
 \end{code}

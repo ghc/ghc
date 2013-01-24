@@ -2037,7 +2037,7 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
               con_app :: OutExpr
-              con_app   = mkConApp con (map Type inst_tys' ++ varsToCoreExprs vs')
+              con_app   = mkConApp2 con inst_tys' vs'
 
         ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
         ; rhs' <- simplExprC env'' rhs cont'
@@ -2384,8 +2384,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                           where
                                  -- See Note [Case binders and join points]
                              unf = mkInlineUnfolding Nothing rhs
-                             rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
-                                                ++ varsToCoreExprs bndrs')
+                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
                       LitAlt {} -> WARN( True, ptext (sLit "mkDupableAlt")
                                                 <+> ppr case_bndr <+> ppr con )

@@ -41,7 +41,8 @@ module TyCon(
         isPromotedDataCon_maybe, isPromotedTyCon_maybe,
 
         isInjectiveTyCon,
-        isDataTyCon, isProductTyCon, isEnumerationTyCon,
+        isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
+        isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
@@ -1058,14 +1059,8 @@ unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs,
 unwrapNewTyCon_maybe _     = Nothing
 
 isProductTyCon :: TyCon -> Bool
--- | A /product/ 'TyCon' must both:
---
--- 1. Have /one/ constructor
---
--- 2. /Not/ be existential
---
--- However other than this there are few restrictions: they may be @data@ or @newtype@
--- 'TyCon's of any boxity and may even be recursive.
+-- True of datatypes or newtypes that have
+--   one, vanilla, data constructor
 isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     DataTyCon{ data_cons = [data_con] }
                                                 -> isVanillaDataCon data_con
@@ -1073,6 +1068,18 @@ isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     _           -> False
 isProductTyCon (TupleTyCon {})  = True
 isProductTyCon _                = False
+
+
+isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
+-- True of datatypes (not newtypes) with 
+--   one, vanilla, data constructor
+isDataProductTyCon_maybe (AlgTyCon { algTcRhs = DataTyCon { data_cons = cons } })
+  | [con] <- cons         -- Singleton
+  , isVanillaDataCon con  -- Vanilla
+  = Just con
+isDataProductTyCon_maybe (TupleTyCon { dataCon = con })
+  = Just con
+isDataProductTyCon_maybe _ = Nothing
 
 -- | Is this a 'TyCon' representing a type synonym (@type@)?
 isSynTyCon :: TyCon -> Bool

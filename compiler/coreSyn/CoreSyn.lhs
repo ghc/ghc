@@ -31,7 +31,7 @@ module CoreSyn (
 	mkFloatLit, mkFloatLitFloat,
 	mkDoubleLit, mkDoubleLitDouble,
 	
-	mkConApp, mkTyBind, mkCoBind,
+	mkConApp, mkConApp2, mkTyBind, mkCoBind,
 	varToCoreExpr, varsToCoreExprs,
 
         isId, cmpAltCon, cmpAlt, ltAlt,
@@ -1132,6 +1132,11 @@ mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
 mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
+
+mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
+mkConApp2 con tys arg_ids = Var (dataConWorkId con) 
+                            `mkApps` map Type tys
+                            `mkApps` map varToCoreExpr arg_ids
 
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
