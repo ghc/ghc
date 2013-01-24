@@ -1,6 +1,3 @@
-h0
-h1
-h2
 
 T7594.hs:25:11:
     Couldn't match type `b' with `IO ()'
