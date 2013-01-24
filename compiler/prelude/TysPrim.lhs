@@ -241,7 +241,7 @@ funTyCon = mkFunTyCon funTyConName $
         -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
 	-- But if we do that we get kind errors when saying
 	--	instance Control.Arrow (->)
-	-- becuase the expected kind is (*->*->*).  The trouble is that the
+	-- because the expected kind is (*->*->*).  The trouble is that the
 	-- expected/actual stuff in the unifier does not go contra-variant, whereas
 	-- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
@@ -653,7 +653,7 @@ The type constructor Any of kind forall k. k -> k has these properties:
   * It is a *closed* type family, with no instances.  This means that
     if   ty :: '(k1, k2)  we add a given coercion
              g :: ty ~ (Fst ty, Snd ty)
-    If Any was a *data* type, then we'd get inconsistency becuase 'ty'
+    If Any was a *data* type, then we'd get inconsistency because 'ty'
     could be (Any '(k1,k2)) and then we'd have an equality with Any on
     one side and '(,) on the other
 

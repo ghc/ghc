@@ -679,7 +679,7 @@ We *do* transfer the arity from from the in_id of a let binding to the
 out_id.  This is important, so that the arity of an Id is visible in
 its own RHS.  For example:
         f = \x. ....g (\y. f y)....
-We can eta-reduce the arg to g, becuase f is a value.  But that
+We can eta-reduce the arg to g, because f is a value.  But that
 needs to be visible.
 
 This interacts with the 'state hack' too:

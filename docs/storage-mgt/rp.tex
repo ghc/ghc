@@ -793,7 +793,7 @@ live static closure to a correct null value before its destruction.
 This is done by invoking the function 
 @resetStaticObjectForRetainerProfiling()@.
 
-\textbf{To do:} In the current implemenation, if a static closure has no child
+\textbf{To do:} In the current implementation, if a static closure has no child
 (e.g., @CONSTR_NOCAF_STATIC@, @THUNK_STATIC@ with an empty SRT, and
 @FUN_STATIC@ with an empty SRT), we do not compute its retainer set (because
 there is no need to do). This slight optimization allows us to render 

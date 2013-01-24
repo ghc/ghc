@@ -262,7 +262,7 @@ data TcGblEnv
           -- ^ @True@ <=> Template Haskell syntax used.
           --
           -- We need this so that we can generate a dependency on the
-          -- Template Haskell package, becuase the desugarer is going
+          -- Template Haskell package, because the desugarer is going
           -- to emit loads of references to TH symbols.  The reference
           -- is implicit rather than explicit, so we have to zap a
           -- mutable variable.

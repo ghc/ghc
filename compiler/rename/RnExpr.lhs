@@ -1056,7 +1056,7 @@ rn_rec_stmt _ all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
   return [(duDefs du_binds, allUses du_binds, 
 	   emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
--- no RecStmt case becuase they get flattened above when doing the LHSes
+-- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ stmt@(L _ (RecStmt {})) _
   = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 

@@ -626,7 +626,7 @@ specImport :: DynFlags
 specImport dflags done rb fn calls_for_fn
   | fn `elemVarSet` done
   = return ([], [])     -- No warning.  This actually happens all the time
-                        -- when specialising a recursive function, becuase
+                        -- when specialising a recursive function, because
                         -- the RHS of the specialised function contains a recursive
                         -- call to the original function
 

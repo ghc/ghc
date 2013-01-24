@@ -1200,7 +1200,7 @@ then overwrite the Eq t constraint with a superclass selection!
 
 At first I had a gross hack, whereby I simply did not add superclass constraints
 in addWanted, though I did for addGiven and addIrred.  This was sub-optimal,
-becuase it lost legitimate superclass sharing, and it still didn't do the job:
+because it lost legitimate superclass sharing, and it still didn't do the job:
 I found a very obscure program (now tcrun021) in which improvement meant the
 simplifier got two bites a the cherry... so something seemed to be an Stop
 first time, but reducible next time.

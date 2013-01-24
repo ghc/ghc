@@ -1167,7 +1167,7 @@ isTupleTyCon :: TyCon -> Bool
 -- ^ Does this 'TyCon' represent a tuple?
 --
 -- NB: when compiling @Data.Tuple@, the tycons won't reply @True@ to
--- 'isTupleTyCon', becuase they are built as 'AlgTyCons'.  However they
+-- 'isTupleTyCon', because they are built as 'AlgTyCons'.  However they
 -- get spat into the interface file as tuple tycons, so I don't think
 -- it matters.
 isTupleTyCon (TupleTyCon {}) = True

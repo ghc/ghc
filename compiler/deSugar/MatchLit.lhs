@@ -113,7 +113,7 @@ dsOverLit' dflags (OverLit { ol_val = val, ol_rebindable = rebindable
 Note [Literal short cut]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 The type checker tries to do this short-cutting as early as possible, but 
-becuase of unification etc, more information is available to the desugarer.
+because of unification etc, more information is available to the desugarer.
 And where it's possible to generate the correct literal right away, it's
 much better do do so.
 

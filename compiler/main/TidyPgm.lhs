@@ -476,7 +476,7 @@ Note [Don't attempt to trim data types]
 For some time GHC tried to avoid exporting the data constructors
 of a data type if it wasn't strictly necessary to do so; see Trac #835.
 But "strictly necessary" accumulated a longer and longer list 
-of execeptions, and finally I gave up the battle:
+of exceptions, and finally I gave up the battle:
 
     commit 9a20e540754fc2af74c2e7392f2786a81d8d5f11
     Author: Simon Peyton Jones <simonpj@microsoft.com>
@@ -525,7 +525,7 @@ Id still makes sense.]
 
 At one time I tried injecting the implicit bindings *early*, at the
 beginning of SimplCore.  But that gave rise to real difficulty,
-becuase GlobalIds are supposed to have *fixed* IdInfo, but the
+because GlobalIds are supposed to have *fixed* IdInfo, but the
 simplifier and other core-to-core passes mess with IdInfo all the
 time.  The straw that broke the camels back was when a class selector
 got the wrong arity -- ie the simplifier gave it arity 2, whereas

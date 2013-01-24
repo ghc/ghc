@@ -749,7 +749,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       * so we can either:
         - do y first, put its result in a fresh tmp, then copy it to %ecx later
         - do y second and put its result into %ecx.  x gets placed in a fresh
-          tmp.  This is likely to be better, becuase the reg alloc can
+          tmp.  This is likely to be better, because the reg alloc can
           eliminate this reg->reg move here (it won't eliminate the other one,
           because the move is into the fixed %ecx).
     -}

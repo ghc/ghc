@@ -891,7 +891,7 @@ Here the 'proc (y,z)' binding scopes over the arrow tails but not the
 arrow body (e.g 'term').  As things stand (bogusly) all the
 constraints from the proc body are gathered together, so constraints
 from 'term' will be seen by the tcPat for (y,z).  But we must *not*
-bind constraints from 'term' here, becuase the desugarer will not make
+bind constraints from 'term' here, because the desugarer will not make
 these bindings scope over 'term'.
 
 The Right Thing is not to confuse these constraints together. But for
@@ -923,7 +923,7 @@ generate the translated term
 	f = \x' :: (forall a. a->a).  let x = x' Int in x 3
 
 From a type-system point of view, this is perfectly fine, but it's *very* seldom useful.
-And it requires a significant amount of code to implement, becuase we need to decorate
+And it requires a significant amount of code to implement, because we need to decorate
 the translated pattern with coercion functions (generated from the subsumption check 
 by tcSub).  
 
