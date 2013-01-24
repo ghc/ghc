@@ -242,7 +242,7 @@ ppr_case_pat (DataAlt dc) args
     tc = dataConTyCon dc
 
 ppr_case_pat con args
-  = ppr con <+> sep (map ppr_bndr args)
+  = ppr con <+> (fsep (map ppr_bndr args))
   where
     ppr_bndr = pprBndr CaseBind
 
