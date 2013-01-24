@@ -371,17 +371,29 @@ mkWWstr dflags (arg : args) = do
 Note [Unpacking arguments with product and polymorphic demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The argument is unpacked in a case if it has a product type and has a
-strict and used demand put on it. I.e., arguments, with demands such
+strict *and* used demand put on it. I.e., arguments, with demands such
 as the following ones:
 
-<S,U(U, L)>
-<S(L,S),U>
+   <S,U(U, L)>
+   <S(L,S),U>
 
-will be unpacked. Moreover, for arguments whose demand is <S,U> or
-<S,H>, we take an advantage of the polymorphic nature of S and U and
-replicate the enclosed demand correspondingly (see definition of
-replicateDmd).
+will be unpacked, but
 
+   <S,U> or <B,U>
+
+will not, because the pieces aren't used. This is quite important otherwise
+we end up unpacking massive tuples passed to the bottoming function. Example:
+
+ 	f :: ((Int,Int) -> String) -> (Int,Int) -> a
+ 	f g pr = error (g pr)
+
+ 	main = print (f fst (1, error "no"))
+
+Does 'main' print "error 1" or "error no"?  We don't really want 'f'
+to unbox its second argument.  This actually happened in GHC's onwn
+source code, in Packages.applyPackageFlag, which ended up un-boxing
+the enormous DynFlags tuple, and being strict in the
+as-yet-un-filled-in pkgState fiels.
 
 \begin{code}
 ----------------------
@@ -421,10 +433,9 @@ mkWWstr_one dflags arg
 		-- But the Evald flag is pretty weird, and I worry that it might disappear
 		-- during simplification, so for now I've just nuked this whole case
 
-  	-- Unpack case, 
-        -- see note [Unpacking arguments with product and polymorphic demands]
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
+      -- See Note [Unpacking arguments with product and polymorphic demands]
   , Just (data_con, inst_tys, inst_con_arg_tys, co) 
              <- deepSplitProductType_maybe (idType arg)
   =  do { (uniq1:uniqs) <- getUniquesM
