@@ -1,5 +1,5 @@
 %
-o% (c) The AQUA Project, Glasgow University, 1993-1998
+% (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[SimplMonad]{The simplifier Monad}
 
@@ -399,7 +399,7 @@ doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff})
   =  not (isNilOL fs) && want_to_float && can_float
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs 
-     		     -- See Note [Float when cheap or expandable]
+                     -- See Note [Float when cheap or expandable]
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
