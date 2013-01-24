@@ -8,6 +8,6 @@ drvfail016:
 
 .PHONY: T1133A
 T1133A:
-	$(TEST_HC) $(TEST_HC_OPTS) -c T1133A.hs-boot
-	-$(TEST_HC) $(TEST_HC_OPTS) -c T1133A.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T1133A.hs-boot
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T1133A.hs
 
