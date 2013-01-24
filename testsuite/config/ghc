@@ -80,7 +80,7 @@ if (ghc_with_llvm == 1):
 config.in_tree_compiler = in_tree_compiler
 config.clean_only       = clean_only
 
-config.way_flags = {
+config.way_flags = lambda name : {
     'normal'       : [],
     'g1'           : [],
     'optasm'       : ['-O', '-fasm'],
@@ -97,7 +97,7 @@ config.way_flags = {
     'threaded1_ls' : ['-threaded', '-debug'],
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
     'threaded2_hT' : ['-O', '-threaded'],
-    'hpc'          : ['-O', '-fhpc' ],
+    'hpc'          : ['-O', '-fhpc', '-hpcdir', '.hpc.' + name ],
     'prof_hc_hb'   : ['-O', '-prof', '-static', '-auto-all'],
     'prof_hb'      : ['-O', '-prof', '-static', '-auto-all'],
     'prof_hd'      : ['-O', '-prof', '-static', '-auto-all'],
@@ -153,15 +153,15 @@ config.way_rts_flags = {
 
 prof_ways = map (lambda x: x[0], \
                  filter(lambda x: '-prof' in x[1], \
-                        config.way_flags.items()))
+                        config.way_flags('dummy_name').items()))
 
 threaded_ways = map (lambda x: x[0], \
                  filter(lambda x: '-threaded' in x[1] or 'ghci' == x[0], \
-                        config.way_flags.items()))
+                        config.way_flags('dummy_name').items()))
 
 opt_ways = map (lambda x: x[0], \
                  filter(lambda x: '-O' in x[1], \
-                        config.way_flags.items()))
+                        config.way_flags('dummy_name').items()))
 
 def get_compiler_info():
 # This should really not go through the shell

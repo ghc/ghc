@@ -1229,7 +1229,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
           + config.compiler + "' " \
           + join(comp_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + opts.extra_hc_opts + ' ' \
           + '>' + errname + ' 2>&1'
@@ -1415,7 +1415,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     cmd = "'" + config.compiler + "' " \
           + join(flags,' ') + ' ' \
           + srcname + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
@@ -1511,7 +1511,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(flags,' ') + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
           + to_do \
@@ -1536,7 +1536,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         deplist2 = string.replace(deplist,'.lhs,', '.hcr');
         to_compile = string.replace(deplist2,'.hs,', '.hcr');
 
-    flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
+    flags = join(filter(lambda f: f != '-fext-core',config.way_flags(name)[way]),' ')
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
 
