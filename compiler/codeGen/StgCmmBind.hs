@@ -32,6 +32,7 @@ import MkGraph
 import CoreSyn          ( AltCon(..) )
 import SMRep
 import Cmm
+import CmmInfo
 import CmmUtils
 import CLabel
 import StgSyn

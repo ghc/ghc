@@ -9,7 +9,31 @@ module CmmInfo (
   mkEmptyContInfoTable,
   cmmToRawCmm,
   mkInfoTable,
-  srtEscape
+  srtEscape,
+
+  -- info table accessors
+  closureInfoPtr,
+  entryCode,
+  getConstrTag,
+  cmmGetClosureType,
+  infoTable,
+  infoTableConstrTag,
+  infoTableSrtBitmap,
+  infoTableClosureType,
+  infoTablePtrs,
+  infoTableNonPtrs,
+  funInfoTable,
+
+  -- info table sizes and offsets
+  stdInfoTableSizeW,
+  fixedInfoTableSizeW,
+  profInfoTableSizeW,
+  maxStdInfoTableSizeW,
+  maxRetInfoTableSizeW,
+  stdInfoTableSizeB,
+  stdSrtBitmapOffset,
+  stdClosureTypeOffset,
+  stdPtrsOffset, stdNonPtrsOffset,
 ) where
 
 #include "HsVersions.h"
@@ -388,3 +412,132 @@ newStringLit bytes
 -- | Value of the srt field of an info table when using an StgLargeSRT
 srtEscape :: DynFlags -> StgHalfWord
 srtEscape dflags = toStgHalfWord dflags (-1)
+
+-------------------------------------------------------------------------
+--
+--	Accessing fields of an info table
+--
+-------------------------------------------------------------------------
+
+closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes a closure pointer and returns the info table pointer
+closureInfoPtr dflags e = CmmLoad e (bWord dflags)
+
+entryCode :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes an info pointer (the first word of a closure)
+-- and returns its entry code
+entryCode dflags e
+ | tablesNextToCode dflags = e
+ | otherwise               = CmmLoad e (bWord dflags)
+
+getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes a closure pointer, and return the *zero-indexed*
+-- constructor tag obtained from the info table
+-- This lives in the SRT field of the info table
+-- (constructors don't need SRTs).
+getConstrTag dflags closure_ptr
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableConstrTag dflags info_table]
+  where
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
+
+cmmGetClosureType :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes a closure pointer, and return the closure type
+-- obtained from the info table
+cmmGetClosureType dflags closure_ptr
+  = CmmMachOp (MO_UU_Conv (halfWordWidth dflags) (wordWidth dflags)) [infoTableClosureType dflags info_table]
+  where
+    info_table = infoTable dflags (closureInfoPtr dflags closure_ptr)
+
+infoTable :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes an info pointer (the first word of a closure)
+-- and returns a pointer to the first word of the standard-form
+-- info table, excluding the entry-code word (if present)
+infoTable dflags info_ptr
+  | tablesNextToCode dflags = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags)
+  | otherwise               = cmmOffsetW dflags info_ptr 1 -- Past the entry code pointer
+
+infoTableConstrTag :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes an info table pointer (from infoTable) and returns the constr tag
+-- field of the info table (same as the srt_bitmap field)
+infoTableConstrTag = infoTableSrtBitmap
+
+infoTableSrtBitmap :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes an info table pointer (from infoTable) and returns the srt_bitmap
+-- field of the info table
+infoTableSrtBitmap dflags info_tbl
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdSrtBitmapOffset dflags)) (bHalfWord dflags)
+
+infoTableClosureType :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes an info table pointer (from infoTable) and returns the closure type
+-- field of the info table.
+infoTableClosureType dflags info_tbl
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdClosureTypeOffset dflags)) (bHalfWord dflags)
+
+infoTablePtrs :: DynFlags -> CmmExpr -> CmmExpr
+infoTablePtrs dflags info_tbl
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdPtrsOffset dflags)) (bHalfWord dflags)
+
+infoTableNonPtrs :: DynFlags -> CmmExpr -> CmmExpr
+infoTableNonPtrs dflags info_tbl
+  = CmmLoad (cmmOffsetB dflags info_tbl (stdNonPtrsOffset dflags)) (bHalfWord dflags)
+
+funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
+-- Takes the info pointer of a function,
+-- and returns a pointer to the first word of the StgFunInfoExtra struct
+-- in the info table.
+funInfoTable dflags info_ptr
+  | tablesNextToCode dflags
+  = cmmOffsetB dflags info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
+  | otherwise
+  = cmmOffsetW dflags info_ptr (1 + stdInfoTableSizeW dflags)
+				-- Past the entry code pointer
+
+-----------------------------------------------------------------------------
+--
+--      Info table sizes & offsets
+--
+-----------------------------------------------------------------------------
+	
+stdInfoTableSizeW :: DynFlags -> WordOff
+-- The size of a standard info table varies with profiling/ticky etc,
+-- so we can't get it from Constants
+-- It must vary in sync with mkStdInfoTable
+stdInfoTableSizeW dflags
+  = fixedInfoTableSizeW
+  + if gopt Opt_SccProfilingOn dflags
+       then profInfoTableSizeW
+       else 0
+
+fixedInfoTableSizeW :: WordOff
+fixedInfoTableSizeW = 2 -- layout, type
+
+profInfoTableSizeW :: WordOff
+profInfoTableSizeW = 2
+
+maxStdInfoTableSizeW :: WordOff
+maxStdInfoTableSizeW =
+  1 {- entry, when !tablesNextToCode -}
+  + fixedInfoTableSizeW
+  + profInfoTableSizeW
+
+maxRetInfoTableSizeW :: WordOff
+maxRetInfoTableSizeW =
+  maxStdInfoTableSizeW
+  + 1 {- srt label -}
+
+stdInfoTableSizeB  :: DynFlags -> ByteOff
+stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
+
+stdSrtBitmapOffset :: DynFlags -> ByteOff
+-- Byte offset of the SRT bitmap half-word which is 
+-- in the *higher-addressed* part of the type_lit
+stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE dflags
+
+stdClosureTypeOffset :: DynFlags -> ByteOff
+-- Byte offset of the closure type half-word 
+stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
+
+stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
+stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
+

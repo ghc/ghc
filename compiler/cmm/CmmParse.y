@@ -186,6 +186,7 @@ import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
 import MkGraph
 import Cmm
 import CmmUtils
+import CmmInfo
 import BlockId
 import CmmLex
 import CLabel

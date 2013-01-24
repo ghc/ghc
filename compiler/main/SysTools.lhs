@@ -527,12 +527,19 @@ runClang :: DynFlags -> [Option] -> IO ()
 runClang dflags args = do
   -- we simply assume its available on the PATH
   let clang = "clang"
+      -- be careful what options we call clang with
+      -- see #5903 and #7617 for bugs caused by this.
+      (_,args0) = pgm_a dflags
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
   Exception.catch (do
-        runSomething dflags "Clang (Assembler)" clang args
+        runSomethingFiltered dflags id "Clang (Assembler)" clang args1 mb_env
     )
     (\(err :: SomeException) -> do
-        errorMsg dflags $ text $ "Error running clang! you need clang installed"
-                              ++ " to use the LLVM backend"
+        errorMsg dflags $
+            text ("Error running clang! you need clang installed to use the" ++
+                "LLVM backend") $+$
+            text "(or GHC tried to execute clang incorrectly)"
         throw err
     )
 

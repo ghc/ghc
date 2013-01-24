@@ -4088,6 +4088,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
 #  define ELF_64BIT
+#  define ELF_TARGET_AMD64 /* Used inside <elf.h> on Solaris 11 */
 #elif defined(powerpc64_HOST_ARCH)
 #  define ELF_64BIT
 #endif

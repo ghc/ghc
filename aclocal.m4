@@ -245,6 +245,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         osf3)
             test -z "[$]2" || eval "[$]2=OSOsf3"
             ;;
+        nto-qnx)
+            test -z "[$]2" || eval "[$]2=OSQNXNTO"
+            ;;
         dragonfly|osf1|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
@@ -1829,6 +1832,9 @@ case "$1" in
             #      i686-gentoo-freebsd8
             #      i686-gentoo-freebsd8.2
     $2="freebsd"
+    ;;
+  nto-qnx*)
+    $2="nto-qnx"
     ;;
   *)
     echo "Unknown OS $1"
