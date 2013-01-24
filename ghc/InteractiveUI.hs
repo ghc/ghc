@@ -1420,7 +1420,9 @@ kindOfType norm str
   = handleSourceError GHC.printException
   $ do
        (ty, kind) <- GHC.typeKind norm str
-       printForUser $ vcat [ text str <+> dcolon <+> ppr kind
+       dflags <- getDynFlags
+       let pefas = gopt Opt_PrintExplicitForalls dflags
+       printForUser $ vcat [ text str <+> dcolon <+> pprTypeForUser pefas kind
                            , ppWhen norm $ equals <+> ppr ty ]
 
 

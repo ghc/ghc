@@ -972,6 +972,7 @@ parseName str = withSession $ \hsc_env -> do
 -- Getting the type of an expression
 
 -- | Get the type of an expression
+-- Returns its most general type
 exprType :: GhcMonad m => String -> m Type
 exprType expr = withSession $ \hsc_env -> do
    ty <- liftIO $ hscTcExpr hsc_env expr

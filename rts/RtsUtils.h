@@ -43,9 +43,6 @@ void heapCheckFail( void );
 
 void printRtsInfo(void);
 
-/* Alternate to raise(3) for threaded rts, for OpenBSD */
-int genericRaise(int sig);
-
 void checkFPUStack(void);
 
 #include "EndPrivate.h"

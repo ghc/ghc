@@ -1232,18 +1232,18 @@ runPhase As input_fn dflags
         let whichAsProg | hscTarget dflags == HscLlvm &&
                           platformOS (targetPlatform dflags) == OSDarwin
                         = do
+                            -- be careful what options we call clang with
+                            -- see #5903 and #7617 for bugs caused by this.
                             llvmVer <- liftIO $ figureLlvmVersion dflags
                             return $ case llvmVer of
-                                Just n | n >= 30 ->
-                                    (SysTools.runClang, getOpts dflags opt_c)
+                                Just n | n >= 30 -> SysTools.runClang
+                                _                -> SysTools.runAs
 
-                                _ -> (SysTools.runAs, getOpts dflags opt_a)
+                        | otherwise = return SysTools.runAs
 
-                        | otherwise
-                        = return (SysTools.runAs, getOpts dflags opt_a)
-
-        (as_prog, as_opts) <- whichAsProg
-        let cmdline_include_paths = includePaths dflags
+        as_prog <- whichAsProg
+        let as_opts = getOpts dflags opt_a
+            cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
         output_fn <- phaseOutputFilename next_phase
@@ -1436,7 +1436,8 @@ runPhase LlvmLlc input_fn dflags
                 ++ map SysTools.Option lc_opts
                 ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts
-                ++ map SysTools.Option abiOpts)
+                ++ map SysTools.Option abiOpts
+                ++ map SysTools.Option sseOpts)
 
     return (next_phase, output_fn)
   where
@@ -1461,6 +1462,10 @@ runPhase LlvmLlc input_fn dflags
                     ArchARM ARMv7 _ HARD -> ["-float-abi=hard"]
                     ArchARM ARMv7 _ _    -> []
                     _                    -> []
+
+        sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
+                | isSse2Enabled dflags   = ["-mattr=+sse2"]
+                | otherwise              = []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
@@ -1814,7 +1819,7 @@ linkBinary dflags o_files dep_packages = do
             let os = platformOS (targetPlatform dflags)
             in if os == OSOsf3 then ["-lpthread", "-lexc"]
                else if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD,
-                                  OSNetBSD, OSHaiku]
+                                  OSNetBSD, OSHaiku, OSQNXNTO]
                then []
                else ["-lpthread"]
          | otherwise               = []

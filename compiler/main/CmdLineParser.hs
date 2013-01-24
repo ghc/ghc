@@ -53,6 +53,8 @@ data OptKind m                             -- Suppose the flag is -f
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
     | PrefixPred    (String -> Bool) (String -> EwM m ())
     | AnySuffixPred (String -> Bool) (String -> EwM m ())
+    | VersionSuffix (Int -> Int -> EwM m ())
+      -- -f or -f=maj.min; pass major and minor version to fn
 
 
 --------------------------------------------------------
@@ -196,6 +198,13 @@ processOneArg opt_kind rest arg args
         AnySuffix f       -> Right (f dash_arg, args)
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
+        VersionSuffix f | [maj_s, min_s] <- split '.' rest_no_eq,
+                          Just maj <- parseInt maj_s,
+                          Just min <- parseInt min_s -> Right (f maj min, args)
+                        | [maj_s] <- split '.' rest_no_eq,
+                          Just maj <- parseInt maj_s -> Right (f maj 0, args)
+                        | otherwise -> Left ("malformed version argument in " ++ dash_arg)
+
 
 findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg =
@@ -222,6 +231,7 @@ arg_ok (OptPrefix       _)  _    _   = True
 arg_ok (PassFlag        _)  rest _   = null rest
 arg_ok (AnySuffix       _)  _    _   = True
 arg_ok (AnySuffixPred p _)  _    arg = p arg
+arg_ok (VersionSuffix   _)  _    _   = True
 
 -- | Parse an Int
 --

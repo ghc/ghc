@@ -1230,7 +1230,6 @@ sdist_%:
 
 CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
-CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
 # These are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:

@@ -144,10 +144,13 @@ data Coercion
 
   -- These are special
   | CoVarCo CoVar
-  | AxiomInstCo (CoAxiom Branched) Int [Coercion]
-     -- The coercion arguments always *precisely* saturate arity of CoAxiom.
-     -- See [Coercion axioms applied to coercions]
+  | AxiomInstCo (CoAxiom Branched) BranchIndex [Coercion]
      -- See also [CoAxiom index]
+     -- The coercion arguments always *precisely* saturate 
+     -- arity of (that branch of) the CoAxiom.  If there are
+     -- any left over, we use AppCo.  See 
+     -- See [Coercion axioms applied to coercions]
+
   | UnsafeCo Type Type
   | SymCo Coercion
   | TransCo Coercion Coercion
@@ -1194,12 +1197,11 @@ coercionKind co = go co
     go (CoVarCo cv)         = toPair $ coVarKind cv
     go (AxiomInstCo ax ind cos)
       | CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs } <- coAxiomNthBranch ax ind
-      , (cos1, cos2) <- splitAtList tvs cos
-      , Pair tys1 tys2 <- sequenceA (map go cos1)
-      = mkAppTys 
-        <$> Pair (substTyWith tvs tys1 (mkTyConApp (coAxiomTyCon ax) lhs))
-                 (substTyWith tvs tys2 rhs)
-        <*> sequenceA (map go cos2)
+      , Pair tys1 tys2 <- sequenceA (map go cos)
+      = ASSERT( cos `equalLength` tvs )  -- Invariant of AxiomInstCo: cos should 
+                                         -- exactly saturate the axiom branch
+        Pair (substTyWith tvs tys1 (mkTyConApp (coAxiomTyCon ax) lhs))
+             (substTyWith tvs tys2 rhs)
     go (UnsafeCo ty1 ty2)   = Pair ty1 ty2
     go (SymCo co)           = swap $ go co
     go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)

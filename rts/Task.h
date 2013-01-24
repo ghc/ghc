@@ -238,12 +238,6 @@ extern __thread Task *my_task;
 #else
 extern ThreadLocalKey currentTaskKey;
 #endif
-// LLVM-based compilers do not upport the __thread attribute, so we need
-// to store the gct variable as a pthread local storage. We declare the
-// key here to keep thread local storage initialization in the same place.
-#if defined(llvm_CC_FLAVOR)
-extern ThreadLocalKey gctKey;
-#endif
 #else
 extern Task *my_task;
 #endif

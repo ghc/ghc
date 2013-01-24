@@ -100,9 +100,10 @@ type LevelledExpr = TaggedExpr FloatSpec
 type LevelledBind = TaggedBind FloatSpec
 type LevelledBndr = TaggedBndr FloatSpec
 
-data Level = Level Int	-- Level number of enclosing lambdas
-	  	   Int	-- Number of big-lambda and/or case expressions between
-			-- here and the nearest enclosing lambda
+data Level = Level Int	-- Major level: number of enclosing value lambdas
+	  	   Int	-- Minor level: number of big-lambda and/or case 
+                        -- expressions between here and the nearest 
+                        -- enclosing value lambda
 
 data FloatSpec 
   = FloatMe Level	-- Float to just inside the binding 

@@ -4397,6 +4397,12 @@ The constraint <literal>C Int [Int]</literal> matches instances (A),
 most-specific match, the program is rejected.
 </para>
 <para>
+An instance declaration is <emphasis>more specific</emphasis> than another iff 
+the head of former is a substitution instance of the latter. For example
+(D) is "more specific" than (C) because you can get from (C) to (D) by 
+substituting <literal>a:=Int</literal>.
+</para>
+<para>
 However, GHC is conservative about committing to an overlapping instance.  For example:
 <programlisting>
   f :: [b] -> [b]

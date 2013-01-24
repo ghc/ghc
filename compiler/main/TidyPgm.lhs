@@ -420,6 +420,8 @@ tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
 --          the externally-accessible ones
 -- This truncates the type environment to include only the
 -- exported Ids and things needed from them, which saves space
+--
+-- See Note [Don't attempt to trim data types]
 
 tidyTypeEnv omit_prags type_env
  = let
@@ -469,6 +471,33 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
 
+Note [Don't attempt to trim data types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For some time GHC tried to avoid exporting the data constructors
+of a data type if it wasn't strictly necessary to do so; see Trac #835.
+But "strictly necessary" accumulated a longer and longer list 
+of execeptions, and finally I gave up the battle:
+
+    commit 9a20e540754fc2af74c2e7392f2786a81d8d5f11
+    Author: Simon Peyton Jones <simonpj@microsoft.com>
+    Date:   Thu Dec 6 16:03:16 2012 +0000
+
+    Stop attempting to "trim" data types in interface files
+    
+    Without -O, we previously tried to make interface files smaller
+    by not including the data constructors of data types.  But
+    there are a lot of exceptions, notably when Template Haskell is
+    involved or, more recently, DataKinds.
+    
+    However Trac #7445 shows that even without TemplateHaskell, using
+    the Data class and invoking Language.Haskell.TH.Quote.dataToExpQ
+    is enough to require us to expose the data constructors.
+    
+    So I've given up on this "optimisation" -- it's probably not
+    important anyway.  Now I'm simply not attempting to trim off
+    the data constructors.  The gain in simplicity is worth the
+    modest cost in interface file growth, which is limited to the
+    bits reqd to describe those data constructors.
 
 %************************************************************************
 %*                                                                      *

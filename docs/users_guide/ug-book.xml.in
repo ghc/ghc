@@ -3,7 +3,7 @@
 <title>@ProjectName@ User's Guide, Version @ProjectVersion@</title>
 <author><othername>The GHC Team</othername></author>
 <address>
-<email>glasgow-haskell-&lcub;bugs,users&rcub;-request@haskell.org</email>
+<email>glasgow-haskell-users-request@haskell.org</email>
 </address>
 </bookinfo>
 
