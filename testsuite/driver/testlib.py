@@ -762,6 +762,11 @@ def test_common_work (name, opts, func, args):
                     pass
 
             try:
+                shutil.rmtree(in_testdir('.hpc.' + name))
+            except:
+                pass
+
+            try:
                 cleanCmd = getTestOpts().clean_cmd
                 if cleanCmd != None:
                     result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
