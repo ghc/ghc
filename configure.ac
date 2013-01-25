@@ -211,11 +211,11 @@ AC_CANONICAL_TARGET
 # required for code generation (LLVM options)
 ARM_ABI=SOFT
 
-case $host in
-     arm*-*-linux-gnueabihf)
+case $target in
+     arm*-*-linux-gnueabihf | arm*-linux-gnueabihf)
      ARM_ABI=HARD
      ;;
-     arm*-*-linux-gnueabi)
+     arm*-*-linux-gnueabi | arm*-linux-gnueabi)
      ARM_ABI=SOFTFP
      ;;
 esac
