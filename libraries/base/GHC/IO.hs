@@ -191,7 +191,7 @@ unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 --                             case writeIORef v r s of (# s1, _ #) ->
 --                             (# s1, r #)
 -- The strictness analyser will find that the binding for r is strict,
--- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
+-- (because of uPIO's strictness sig), and so it'll evaluate it before 
 -- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
 -- get a deadlock!  
 --

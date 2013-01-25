@@ -41,12 +41,12 @@ local_id x = x   -- See Note [Mega-hack for coerce]
 {- Note [Meta-hack for coerce]
 
 If we just say
-  unsafeCoerce x = unsafeCoercs# x
+  unsafeCoerce x = unsafeCoerce# x
 then the simple-optimiser that the desugarer runs will eta-reduce to
   unsafeCoerce :: forall (a:*) (b:*). a -> b
   unsafeCoercs = unsafeCoerce#
 And that, sadly, is ill-typed because unsafeCoercs# has OpenKind type variables
-And rightly so, becuase we shouldn't be calling unsafeCoerce# in a higher
+And rightly so, because we shouldn't be calling unsafeCoerce# in a higher
 order way; it has a compulsory unfolding 
    unsafeCoerce# a b x = x |> UnsafeCo a b
 and we really rely on it being inlined pronto. But the simple-optimiser doesn't.
