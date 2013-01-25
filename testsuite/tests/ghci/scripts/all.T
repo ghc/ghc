@@ -12,7 +12,7 @@ test('ghci007', combined_output, ghci_script, ['ghci007.script'])
 test('ghci008', combined_output, ghci_script, ['ghci008.script'])
 test('ghci009', combined_output, ghci_script, ['ghci009.script'])
 
-# Skip this test: deadlock can't be detected now, because we wait for
+# Skip this test: deadlock cannot be detected now, because we wait for
 # signals to arrive if there are signal handlers installed, and GHCi
 # has a ^C handler installed.
 test('ghci010', skip, ghci_script, ['ghci010.script'])
