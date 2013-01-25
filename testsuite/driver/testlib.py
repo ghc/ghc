@@ -887,6 +887,8 @@ def do_test(name, way, func, args):
                         t.expected_failures[name] = [way]
         else:
             framework_fail(name, way, 'bad result ' + passFail)
+    except KeyboardInterrupt:
+        raise
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
