@@ -1019,56 +1019,6 @@ buildAlgTyCon tc_name ktvs cType stupid_theta rhs
 
 
 %************************************************************************
-%*									*
-\subsection{Splitting products}
-%*									*
-%************************************************************************
-
-\begin{code}
--- | Extract the type constructor, type argument, data constructor and it's
--- /representation/ argument types from a type if it is a product type.
---
--- Precisely, we return @Just@ for any type that is all of:
---
---  * Concrete (i.e. constructors visible)
---
---  * Single-constructor
---
---  * Not existentially quantified
---
--- Whether the type is a @data@ type or a @newtype@
-splitProductType_maybe
-	:: Type 			-- ^ A product type, perhaps
-	-> Maybe (TyCon, 		-- The type constructor
-		  [Type],		-- Type args of the tycon
-		  DataCon,		-- The data constructor
-		  [Type])		-- Its /representation/ arg types
-
-	-- Rejecing existentials is conservative.  Maybe some things
-	-- could be made to work with them, but I'm not going to sweat
-	-- it through till someone finds it's important.
-
-splitProductType_maybe ty
-  = case splitTyConApp_maybe ty of
-	Just (tycon,ty_args)
-	   | isProductTyCon tycon  	-- Includes check for non-existential,
-					-- and for constructors visible
-	   -> Just (tycon, ty_args, data_con, dataConInstArgTys data_con ty_args)
-	   where
-	      data_con = ASSERT( not (null (tyConDataCons tycon)) ) 
-			 head (tyConDataCons tycon)
-	_other -> Nothing
-
--- | As 'splitProductType_maybe', but panics if the 'Type' is not a product type
-splitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
-splitProductType str ty
-  = case splitProductType_maybe ty of
-	Just stuff -> stuff
-	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
-\end{code}
-
-
-%************************************************************************
 %*                                                                      *
         Promoting of data types to the kind level
 %*                                                                      *
