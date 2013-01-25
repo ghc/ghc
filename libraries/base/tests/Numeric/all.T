@@ -15,4 +15,7 @@ test('num009', [ skip_if_fast
                # We also get another set of results for 1e02 with GHCi, so
                # I'm skipping that way altogether.
              compile_and_run, [''])
-test('num010', normal, compile_and_run, [''])
+test('num010',
+     if_platform('i386-apple-darwin', expect_broken_for(7043, 'ghci')),
+     compile_and_run,
+     [''])

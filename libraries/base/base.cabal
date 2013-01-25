@@ -225,6 +225,7 @@ Library {
         cbits/inputReady.c
         cbits/primFloat.c
         cbits/md5.c
+        cbits/sysconf.c
     include-dirs: include
     includes:    HsBase.h
     install-includes:    HsBase.h HsBaseConfig.h EventConfig.h WCsubst.h consUtils.h Typeable.h
