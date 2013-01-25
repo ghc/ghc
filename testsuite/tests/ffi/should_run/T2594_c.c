@@ -1,5 +1,5 @@
 
-#include "2594_c.h"
+#include "T2594_c.h"
 
 void call8 (funtype8 fun)  { fun(-1); }
 void call16(funtype16 fun) { fun(-1); }

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "5594_stub.h"
+#include "T5594_stub.h"
 
 #include "HsFFI.h"
 

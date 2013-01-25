@@ -1,7 +1,7 @@
 #include "HsFFI.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "5402_stub.h"
+#include "T5402_stub.h"
 
 int main (int argc, char *argv[])
 {
