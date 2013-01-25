@@ -715,7 +715,9 @@ tcDataFamInstDecl mb_clsinfo fam_tc
                     fam_inst = mkDataFamInst axiom_name tvs'' fam_tc pats'' rep_tc
                     parent   = FamInstTyCon (famInstAxiom fam_inst) fam_tc pats''
                     rep_tc   = buildAlgTyCon rep_tc_name tvs'' cType stupid_theta tc_rhs 
-                                             Recursive h98_syntax parent
+                                             Recursive 
+                                             False      -- No promotable to the kind level
+                                             h98_syntax parent
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive

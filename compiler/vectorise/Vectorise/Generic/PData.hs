@@ -54,6 +54,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
                            []          -- no stupid theta
                            rhs
                            rec_flag    -- FIXME: is this ok?
+                           False       -- Not promotable
                            False       -- not GADT syntax
                            (FamInstTyCon ax fam_tc pat_tys)
       ; return fam_inst }

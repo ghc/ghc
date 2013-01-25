@@ -29,7 +29,6 @@ import DataCon
 import Var
 import VarSet
 import BasicTypes
-import ForeignCall
 import Name
 import MkId
 import Class
@@ -56,21 +55,6 @@ buildSynTyCon tc_name tvs rhs rhs_kind parent
   = return (mkSynTyCon tc_name kind tvs rhs parent)
   where kind = mkPiKinds tvs rhs_kind
 
-------------------------------------------------------
-buildAlgTyCon :: Name 
-              -> [TyVar]               -- ^ Kind variables and type variables
-	      -> Maybe CType
-	      -> ThetaType	       -- ^ Stupid theta
-	      -> AlgTyConRhs
-	      -> RecFlag
-	      -> Bool		       -- ^ True <=> was declared in GADT syntax
-              -> TyConParent
-	      -> TyCon
-
-buildAlgTyCon tc_name ktvs cType stupid_theta rhs is_rec gadt_syn parent
-  = mkAlgTyCon tc_name kind ktvs cType stupid_theta rhs parent is_rec gadt_syn
-  where 
-    kind = mkPiKinds ktvs liftedTypeKind
 
 ------------------------------------------------------
 distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs

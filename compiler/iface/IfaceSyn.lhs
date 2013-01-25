@@ -82,6 +82,7 @@ data IfaceDecl
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
                 ifRec        :: RecFlag,        -- Recursive or not?
+                ifPromotable :: Bool,           -- Promotable to kind level?
                 ifGadtSyntax :: Bool,           -- True <=> declared using
                                                 -- GADT syntax
                 ifAxiom      :: Maybe IfExtName -- The axiom, for a newtype, 
@@ -511,11 +512,16 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
 pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
                          ifCtxt = context,
                          ifTyVars = tyvars, ifCons = condecls,
-                         ifRec = isrec, ifAxiom = mbAxiom})
+                         ifRec = isrec, ifPromotable = is_prom,
+                         ifAxiom = mbAxiom})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprCType cType, pprRec isrec, pp_condecls tycon condecls,
-                pprAxiom mbAxiom])
+       4 (vcat [ pprCType cType
+               , pprRec isrec <> comma <+> pp_prom 
+               , pp_condecls tycon condecls
+               , pprAxiom mbAxiom])
   where
+    pp_prom | is_prom   = ptext (sLit "Promotable")
+            | otherwise = ptext (sLit "Not promotable")
     pp_nd = case condecls of
                 IfAbstractTyCon dis -> ptext (sLit "abstract") <> parens (ppr dis)
                 IfDataFamTyCon     -> ptext (sLit "data family")
