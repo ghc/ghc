@@ -27,7 +27,7 @@ import System.Environment
 -- Used by test2:
 -- import System.Posix.IO
 
-fp = "2122-test"
+fp = "T2122-test"
 
 main :: IO ()
 main = do
