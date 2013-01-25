@@ -511,8 +511,8 @@ tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind
        ; return (mkNumLitTy n) }
 
 tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind 
-  = do { checkExpectedKind hs_ty typeStringKind exp_kind
-       ; checkWiredInTyCon typeStringKindCon
+  = do { checkExpectedKind hs_ty typeSymbolKind exp_kind
+       ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }
 
 ---------------------------
