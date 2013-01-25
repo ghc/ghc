@@ -239,7 +239,7 @@ instance Show (a :~: b) where
 {- | Check if two type-natural singletons of potentially different types
 are indeed the same, by comparing their runtime representations.
 
-WARNING: in combination with `unsafeSingNat` this may lead to unsoudness:
+WARNING: in combination with `unsafeSingNat` this may lead to unsoundness:
 
 > eqSingNat (sing :: Sing 1) (unsafeSingNat 1 :: Sing 2)
 > == Just (Refl :: 1 :~: 2)
@@ -253,7 +253,7 @@ eqSingNat x y
 
 {- | Check if two symbol singletons of potentially different types
 are indeed the same, by comparing their runtime representations.
-WARNING: in combination with `unsafeSingSymbol` this may lead to unsoudness
+WARNING: in combination with `unsafeSingSymbol` this may lead to unsoundness
 (see `eqSingNat` for an example).
 -}
 
