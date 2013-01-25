@@ -1,17 +1,17 @@
 
-T2334.hs:9:26:
+T2334A.hs:9:26:
     The constructor of a newtype must have exactly one field
       but `F' has two
     In the definition of data constructor `F'
     In the newtype instance declaration for `F'
 
-T2334.hs:10:27:
+T2334A.hs:10:27:
     The constructor of a newtype must have exactly one field
       but `H' has none
     In the definition of data constructor `H'
     In the newtype instance declaration for `F'
 
-T2334.hs:12:15:
+T2334A.hs:12:15:
     Conflicting family instance declarations:
-      F Bool -- Defined at T2334.hs:12:15
-      F Bool -- Defined at T2334.hs:13:15
+      F Bool -- Defined at T2334A.hs:12:15
+      F Bool -- Defined at T2334A.hs:13:15

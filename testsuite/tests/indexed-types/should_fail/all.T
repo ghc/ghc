@@ -41,7 +41,7 @@ test('Over',
 
 test('SkolemOccursLoop', expect_fail, compile_fail, [''])
 
-test('T2334', normal, compile_fail, [''])
+test('T2334A', normal, compile_fail, [''])
 test('T1900', normal, compile_fail, [''])
 test('T2157', normal, compile_fail, [''])
 test('T2203a', normal, compile_fail, [''])
