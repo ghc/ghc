@@ -66,9 +66,21 @@ IN_TREE_COMPILER = NO
 # passed in by the user, but
 #     which ghc          == /usr/bin/ghc
 #     which /usr/bin/ghc == /usr/bin/ghc
-# so we can just always 'which' it. We need to use 'override' in order
-# to override a value given on the commandline.
+# so on unix-like platforms we can just always 'which' it.
+# However, on cygwin, we can't just use which:
+#     $ which c:/ghc/ghc-7.4.1/bin/ghc.exe
+#     which: no ghc.exe in (./c:/ghc/ghc-7.4.1/bin)
+# so we start off by using realpath, and if that succeeds then we use
+# that value. Otherwise we fall back on 'which'.
+#
+# Note also that we need to use 'override' in order to override a
+# value given on the commandline.
+TEST_HC_REALPATH := $(realpath $(TEST_HC))
+ifeq "$(TEST_HC_REALPATH)" ""
 override TEST_HC := $(shell which '$(TEST_HC)')
+else
+override TEST_HC := $(TEST_HC_REALPATH)
+endif
 endif
 
 # We can't use $(dir ...) here as TEST_HC might be in a path
