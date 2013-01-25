@@ -35,12 +35,7 @@ test('arith015', normal, compile_and_run, [''])
 test('numrun009', normal, compile_and_run, [''])
 test('numrun010', normal, compile_and_run, [''])
 test('numrun011', normal, compile_and_run, [''])
-test('numrun012',
-        if_os('mingw32',expect_fail_for('ghci')),
-        # on Windows, GHCi says that "logBase 2 (2^31)" is "31.0", but
-        # other platforms (and compiled on Windows) reports 31.000000000000004
-        # I have no idea where the discrepancy comes from.  --SDM
-        compile_and_run, [''])
+test('numrun012', normal, compile_and_run, [''])
 test('numrun013', normal, compile_and_run, [''])
 test('numrun014', normal, compile_and_run, [''])
 test('arith016', compose(normal,only_compiler_types(['ghc'])), compile_and_run, [''])
