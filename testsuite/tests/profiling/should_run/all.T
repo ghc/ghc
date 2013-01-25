@@ -9,7 +9,7 @@ test('heapprof001',
                extra_run_opts('7')]),
      compile_and_run, [''])
 
-test('2592',
+test('T2592',
      [only_ways(['profasm']), req_profiling,
       extra_run_opts('+RTS -M1m -RTS'), exit_code(251)],
      compile_and_run, [''])
@@ -43,7 +43,7 @@ test('scc004', [req_profiling,
      compile_and_run,
      [''])
 
-test('5314',
+test('T5314',
      [ only_ways(prof_ways),
        extra_ways(extra_prof_ways),
        req_profiling ],
