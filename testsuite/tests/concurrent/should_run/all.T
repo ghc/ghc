@@ -22,20 +22,20 @@ test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 # vector code must get inlined to become non-allocating
-test('367', composes([reqlib('vector'), timeout_multiplier(0.001)]), compile_and_run, ['-O2 -fno-omit-yields'])
-test('367_letnoescape', composes([timeout_multiplier(0.001)]), compile_and_run, ['-fno-omit-yields'])
+test('T367', composes([reqlib('vector'), timeout_multiplier(0.001)]), compile_and_run, ['-O2 -fno-omit-yields'])
+test('T367_letnoescape', composes([timeout_multiplier(0.001)]), compile_and_run, ['-fno-omit-yields'])
 
-test('1980', normal, compile_and_run, [''])
-test('2910', normal, compile_and_run, [''])
-test('2910a', normal, compile_and_run, [''])
-test('3279', normal, compile_and_run, [''])
+test('T1980', normal, compile_and_run, [''])
+test('T2910', normal, compile_and_run, [''])
+test('T2910a', normal, compile_and_run, [''])
+test('T3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
-test('3429', extra_run_opts('+RTS -C0.001 -RTS'), compile_and_run, [''])
+test('T3429', extra_run_opts('+RTS -C0.001 -RTS'), compile_and_run, [''])
 
 # without -O, goes into an infinite loop
 # GHCi does not detect the infinite loop.  We should really fix this.
-test('4030', omit_ways('ghci'), compile_and_run, ['-O'])
+test('T4030', omit_ways('ghci'), compile_and_run, ['-O'])
 
 # each of these runs for about a second
 test('throwto001', [reqlib('random'), extra_run_opts('1000 2000')],
@@ -50,29 +50,29 @@ test('async001', normal, compile_and_run, [''])
 
 test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
 
-test('4262', [ skip, # skip for now, it doesn't give reliable results
-               only_ways(['threaded1']),
-               unless_os('linux',skip),
-               if_compiler_lt('ghc', '7.1', expect_fail) ],
-             compile_and_run, [''])
+test('T4262', [ skip, # skip for now, it doesn't give reliable results
+                only_ways(['threaded1']),
+                unless_os('linux',skip),
+                if_compiler_lt('ghc', '7.1', expect_fail) ],
+              compile_and_run, [''])
 
-test('4813', normal, compile_and_run, [''])
-test('4811', normal, compile_and_run, [''])
+test('T4813', normal, compile_and_run, [''])
+test('T4811', normal, compile_and_run, [''])
 
 test('allowinterrupt001', normal, compile_and_run, [''])
 
 # try hard to provoke the error by running the test 100 times
-test('5558',
+test('T5558',
      [ only_ways(['threaded2']),
        cmd_wrapper(
          lambda c: "for i in %s; do %s || break; done"  %
            (" ".join(str(i) for i in range(1,101)), c)) ],
      compile_and_run, [''])
 
-test('5421', normal, compile_and_run, [''])
-test('5611', normal, compile_and_run, [''])
-test('5238', normal, compile_and_run, [''])
-test('5866', exit_code(1), compile_and_run, [''])
+test('T5421', normal, compile_and_run, [''])
+test('T5611', normal, compile_and_run, [''])
+test('T5238', normal, compile_and_run, [''])
+test('T5866', exit_code(1), compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
