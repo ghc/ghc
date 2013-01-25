@@ -181,32 +181,28 @@ from testlib import *
 
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
-# if windows or darwin:
-pkginfo = getStdout([config.ghc_pkg, 'dump'])
-topdir = config.libdir
-for line in pkginfo.split('\n'):
-    if line.startswith('library-dirs:'):
-        path = line.rstrip()
-        path = re.sub('^library-dirs: ', '', path)
-        path = re.sub('\\$topdir', topdir, path)
-        if path.startswith('"'):
-            path = re.sub('^"(.*)"$', '\\1', path)
-            path = re.sub('\\\\(.)', '\\1', path)
-        if windows:
-            if config.cygwin:
-                # On cygwin we can't put "c:\foo" in $PATH, as : is a
-                # field separator. So convert to /cygdrive/c/foo instead.
-                # Other pythons use ; as the separator, so no problem.
-                path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
-                path = re.sub('\\\\', '/', path)
-            os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
-        elif darwin:
-            # darwin
-            os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
-        else:
-            # unix
-            os.environ['LD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("LD_LIBRARY_PATH", "")])
-
+if windows or darwin:
+    pkginfo = getStdout([config.ghc_pkg, 'dump'])
+    topdir = config.libdir
+    for line in pkginfo.split('\n'):
+        if line.startswith('library-dirs:'):
+            path = line.rstrip()
+            path = re.sub('^library-dirs: ', '', path)
+            path = re.sub('\\$topdir', topdir, path)
+            if path.startswith('"'):
+                path = re.sub('^"(.*)"$', '\\1', path)
+                path = re.sub('\\\\(.)', '\\1', path)
+            if windows:
+                if config.cygwin:
+                    # On cygwin we can't put "c:\foo" in $PATH, as : is a
+                    # field separator. So convert to /cygdrive/c/foo instead.
+                    # Other pythons use ; as the separator, so no problem.
+                    path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
+                    path = re.sub('\\\\', '/', path)
+                os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
+            else:
+                # darwin
+                os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
 
 global testopts_local
 testopts_local.x = TestOptions()
