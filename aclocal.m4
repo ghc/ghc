@@ -251,6 +251,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         dragonfly|osf1|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
+        linux-android)
+            test -z "[$]2" || eval "[$]2=OSAndroid"
+            ;;
         *)
             echo "Unknown OS '[$]1'"
             exit 1
@@ -1821,6 +1824,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
 case "$1" in
+  linux-android*)
+    $2="linux-android"
+    ;;
   linux-*|linux)
     $2="linux"
     ;;

@@ -106,7 +106,10 @@ genGenericMetaTyCons tc mod =
         
         mkTyCon name = ASSERT( isExternalName name )
                        buildAlgTyCon name [] Nothing [] distinctAbstractTyConRhs
-                                          NonRecursive False NoParentTyCon
+                                          NonRecursive 
+                                          False          -- Not promotable
+                                          False          -- Not GADT syntax
+                                          NoParentTyCon
 
       let metaDTyCon  = mkTyCon d_name
           metaCTyCons = map mkTyCon c_names

@@ -1141,7 +1141,7 @@ tryEtaExpand env bndr rhs
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
       , let new_arity = findArity dflags bndr rhs old_arity
       , new_arity > manifest_arity      -- And the curent manifest arity isn't enough
-                                        -- See Note [Eta expansion to manifes arity]
+                                        -- See Note [Eta expansion to manifest arity]
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise

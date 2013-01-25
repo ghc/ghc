@@ -338,8 +338,11 @@ PKGS_THAT_ARE_DPH := \
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-PKGS_THAT_BUILD_WITH_STAGE2 := \
-    $(PKGS_THAT_ARE_DPH) old-time haskell98 haskell2010
+PKGS_THAT_BUILD_WITH_STAGE2 := $(PKGS_THAT_ARE_DPH)
+ifeq "$(CrossCompiling)" "NO"
+# We cannot use the stage 2 compiler, it runs on $(TARGETPLATFORM)
+PKGS_THAT_BUILD_WITH_STAGE2 +=  old-time haskell98 haskell2010
+endif
 
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
@@ -397,9 +400,7 @@ endef
 define addPackage # args: $1 = package, $2 = condition
 ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
-ifneq "$(Stage1Only)" "YES"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
-endif
 else
 $(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
 endif
@@ -640,13 +641,11 @@ else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 
-ifeq "$(Stage1Only)-$(phase)" "YES-final"
-MAYBE_COMPILER=
+ifeq "$(CrossCompiling)-$(phase)" "YES-final"
 MAYBE_GHCTAGS=
 MAYBE_HPC=
 MAYBE_RUNGHC=
 else
-MAYBE_COMPILER=compiler
 MAYBE_GHCTAGS=utils/ghctags
 MAYBE_HPC=utils/hpc
 MAYBE_RUNGHC=utils/runghc
@@ -655,7 +654,7 @@ endif
 BUILD_DIRS += \
    utils/haddock \
    utils/haddock/doc \
-   $(MAYBE_COMPILER) \
+   compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
    utils/deriveConstants \
@@ -668,7 +667,7 @@ BUILD_DIRS += \
    ghc
 
 ifneq "$(BINDIST)" "YES"
-ifneq "$(Stage1Only)-$(phase)" "YES-final"
+ifneq "$(CrossCompiling)-$(phase)" "YES-final"
 BUILD_DIRS += \
    utils/mkUserGuidePart
 endif

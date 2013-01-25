@@ -565,32 +565,32 @@ TyCons or Classes of this recursive group.  Earlier, finished groups,
 live in the global env only.
 
 \begin{code}
-tcTyClDecl :: (Name -> RecFlag) -> LTyClDecl Name -> TcM [TyThing]
-tcTyClDecl calc_isrec (L loc decl)
+tcTyClDecl :: RecTyInfo -> LTyClDecl Name -> TcM [TyThing]
+tcTyClDecl rec_info (L loc decl)
   = setSrcSpan loc $ tcAddDeclCtxt decl $
     traceTc "tcTyAndCl-x" (ppr decl) >>
-    tcTyClDecl1 NoParentTyCon calc_isrec decl
+    tcTyClDecl1 NoParentTyCon rec_info decl
 
   -- "type family" declarations
-tcTyClDecl1 :: TyConParent -> (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
-tcTyClDecl1 parent _calc_isrec (FamDecl { tcdFam = fd })
+tcTyClDecl1 :: TyConParent -> RecTyInfo -> TyClDecl Name -> TcM [TyThing]
+tcTyClDecl1 parent _rec_info (FamDecl { tcdFam = fd })
   = tcFamDecl1 parent fd
 
   -- "type" synonym declaration
-tcTyClDecl1 _parent _calc_isrec
+tcTyClDecl1 _parent _rec_info
             (SynDecl { tcdLName = L _ tc_name, tcdTyVars = tvs, tcdRhs = rhs })
   = ASSERT( isNoParent _parent )
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> 
     tcTySynRhs tc_name tvs' kind rhs
 
   -- "data/newtype" declaration
-tcTyClDecl1 _parent calc_isrec
+tcTyClDecl1 _parent rec_info
             (DataDecl { tcdLName = L _ tc_name, tcdTyVars = tvs, tcdDataDefn = defn })
   = ASSERT( isNoParent _parent )
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> 
-    tcDataDefn calc_isrec tc_name tvs' kind defn
+    tcDataDefn rec_info tc_name tvs' kind defn
 
-tcTyClDecl1 _parent calc_isrec
+tcTyClDecl1 _parent rec_info
             (ClassDecl { tcdLName = L _ class_name, tcdTyVars = tvs
             , tcdCtxt = ctxt, tcdMeths = meths
 	    , tcdFDs = fundeps, tcdSigs = sigs
@@ -603,7 +603,7 @@ tcTyClDecl1 _parent calc_isrec
 			-- hold of the name of the class TyCon, which we
 			-- need to look up its recursiveness
 		    tycon_name = tyConName (classTyCon clas)
-		    tc_isrec = calc_isrec tycon_name
+		    tc_isrec = rti_is_rec rec_info tycon_name
 
                ; ctxt' <- tcHsContext ctxt
                ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'  
@@ -667,7 +667,10 @@ tcFamDecl1 parent
   ; extra_tvs <- tcDataKindSig kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
         tycon = buildAlgTyCon tc_name final_tvs Nothing []
-                              DataFamilyTyCon Recursive True parent
+                              DataFamilyTyCon Recursive 
+                              False   -- Not promotable to the kind level
+                              True    -- GADT syntax
+                              parent
   ; return [ATyCon tycon] }
 
 tcTySynRhs :: Name   
@@ -682,17 +685,16 @@ tcTySynRhs tc_name tvs kind hs_ty
                                 kind NoParentTyCon
        ; return [ATyCon tycon] }
 
-tcDataDefn :: (Name -> RecFlag) -> Name
+tcDataDefn :: RecTyInfo -> Name
            -> [TyVar] -> Kind
            -> HsDataDefn Name -> TcM [TyThing]
   -- NB: not used for newtype/data instances (whether associated or not)
-tcDataDefn calc_isrec tc_name tvs kind
+tcDataDefn rec_info tc_name tvs kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
                      , dd_cons = cons })
   = do { extra_tvs <- tcDataKindSig kind
-       ; let is_rec     = calc_isrec tc_name
-             final_tvs  = tvs ++ extra_tvs
+       ; let final_tvs  = tvs ++ extra_tvs
        ; stupid_theta <- tcHsContext ctxt
        ; kind_signatures <- xoptM Opt_KindSignatures
        ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
@@ -718,7 +720,9 @@ tcDataDefn calc_isrec tc_name tvs kind
              	   NewType  -> ASSERT( not (null data_cons) )
                                     mkNewTyConRhs tc_name tycon (head data_cons)
              ; return (buildAlgTyCon tc_name final_tvs cType stupid_theta tc_rhs
-                                     is_rec (not h98_syntax) NoParentTyCon) }
+                                     (rti_is_rec rec_info tc_name)
+                                     (rti_promotable rec_info)
+                                     (not h98_syntax) NoParentTyCon) }
        ; return [ATyCon tycon] }
 \end{code}
 

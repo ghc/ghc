@@ -437,7 +437,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
                           ifTyVars = tv_bndrs, 
                           ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
                           ifCons = rdr_cons, 
-                          ifRec = is_rec, 
+                          ifRec = is_rec, ifPromotable = is_prom, 
                           ifAxiom = mb_axiom_name })
   = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
     { tc_name <- lookupIfaceTop occ_name
@@ -446,7 +446,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
             ; parent' <- tc_parent tyvars mb_axiom_name
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
             ; return (buildAlgTyCon tc_name tyvars cType stupid_theta 
-                                    cons is_rec gadt_syn parent') }
+                                    cons is_rec is_prom gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
   where
@@ -1393,8 +1393,10 @@ tcIfaceKindCon (IfaceTc name)
        ; case thing of    -- A "type constructor" here is a promoted type constructor
                           --           c.f. Trac #5881
            ATyCon tc 
-             | isSuperKind (tyConKind tc) -> return tc   -- Mainly just '*' or 'AnyK'
-             | otherwise                  -> return (promoteTyCon tc)
+             | isSuperKind (tyConKind tc) 
+             -> return tc   -- Mainly just '*' or 'AnyK'
+             | Just prom_tc <- promotableTyCon_maybe tc
+             -> return prom_tc
 
            _ -> pprPanic "tcIfaceKindCon" (ppr name $$ ppr thing) }
 
