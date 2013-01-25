@@ -366,7 +366,7 @@ showLitChar '\t'           s =  showString "\\t" s
 showLitChar '\v'           s =  showString "\\v" s
 showLitChar '\SO'          s =  protectEsc (== 'H') (showString "\\SO") s
 showLitChar c              s =  showString ('\\' : asciiTab!!ord c) s
-        -- I've done manual eta-expansion here, becuase otherwise it's
+        -- I've done manual eta-expansion here, because otherwise it's
         -- impossible to stop (asciiTab!!ord) getting floated out as an MFE
 
 showLitString :: String -> ShowS

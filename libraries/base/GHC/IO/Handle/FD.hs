@@ -275,7 +275,7 @@ fdToHandle fdint = do
               --  on Windows we're guessing this is not a socket (XXX)
             False{-is_nonblock-}
               -- file descriptors that we get from external sources are
-              -- not put into non-blocking mode, becuase that would affect
+              -- not put into non-blocking mode, because that would affect
               -- other users of the file descriptor
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
    mkHandleFromFD fd fd_type fd_str iomode False{-non-block-} 
