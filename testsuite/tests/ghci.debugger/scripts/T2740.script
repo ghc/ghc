@@ -1,5 +1,5 @@
 :seti -XMonomorphismRestriction
-:l 2740.hs
+:l T2740.hs
 :step f 1 2 3
 :step
 :print x

@@ -1,6 +1,6 @@
-Stopped at 2740.hs:(3,1)-(4,25)
+Stopped at T2740.hs:(3,1)-(4,25)
 _result :: a = _
-Stopped at 2740.hs:3:11-13
+Stopped at T2740.hs:3:11-13
 _result :: Bool = _
 x :: Integer = 1
 y :: Integer = 2
