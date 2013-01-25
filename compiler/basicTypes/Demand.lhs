@@ -20,7 +20,7 @@ module Demand (
 
         DmdEnv, emptyDmdEnv,
 
-        DmdResult, CPRResult, PureResult, 
+        DmdResult, CPRResult,
         isBotRes, isTopRes, resTypeArgDmd, 
         topRes, botRes, cprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig, 
@@ -504,24 +504,6 @@ isProdDmd _                     = False
 %************************************************************************
 
 \begin{code}
-
-------------------------------------------------------------------------
--- Pure demand result                                             
-------------------------------------------------------------------------
-
-data PureResult = TopRes        -- Nothing known, assumed to be just lazy
-                | BotRes        -- Diverges or errors
-               deriving( Eq, Show )
-
-lubPR :: PureResult -> PureResult -> PureResult
-lubPR BotRes pr = pr
-lubPR TopRes _  = TopRes
-
-bothPR :: PureResult -> PureResult -> PureResult
-bothPR BotRes _  = BotRes
-bothPR TopRes pr = pr
-
-
 ------------------------------------------------------------------------
 -- Constructed Product Result                                             
 ------------------------------------------------------------------------
@@ -546,67 +528,59 @@ bothCPR :: CPRResult -> CPRResult -> CPRResult
 -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
 bothCPR r _ = r
 
+instance Outputable DmdResult where
+  ppr RetProd    = char 'm' 
+  ppr (RetSum n) = char 'm' <> int n  
+  ppr BotCPR     = char 'b'   
+  ppr NoCPR      = empty   -- Keep these distinct from Demand letters
 
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
-
-data DmdResult = DR { res :: PureResult, cpr :: CPRResult }
-     deriving ( Eq )
+type DmdResult = CPRResult
 
 lubDmdResult :: DmdResult -> DmdResult -> DmdResult
-lubDmdResult (DR pr1 cpr1) (DR pr2 cpr2) = DR (pr1 `lubPR` pr2) (cpr1 `lubCPR` cpr2)
+lubDmdResult = lubCPR
 
 bothDmdResult :: DmdResult -> DmdResult -> DmdResult
-bothDmdResult (DR pr1 cpr1) (DR pr2 cpr2) = DR (pr1 `bothPR` pr2) (cpr1 `bothCPR` cpr2)
-
--- Pretty-printing
-instance Outputable DmdResult where
-  ppr (DR {res=TopRes, cpr=RetProd})  = char 'm' 
-  ppr (DR {res=TopRes, cpr=RetSum n}) = char 'm' <> int n  
-  ppr (DR {res=BotRes})               = char 'b'   
-  ppr _ = empty   -- Keep these distinct from Demand letters
-
-mkDmdResult :: PureResult -> CPRResult -> DmdResult
--- mkDmdResult BotRes (RetCPR _) = botRes   -- SLPJ: commenting out; unnecessary?
-mkDmdResult x y = DR {res=x, cpr=y}
+bothDmdResult = bothCPR
 
 seqDmdResult :: DmdResult -> ()
-seqDmdResult (DR {res=x, cpr=y}) = x `seq` y `seq` ()
+seqDmdResult r = r `seq` ()
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
 topRes, botRes :: DmdResult
-topRes = mkDmdResult TopRes NoCPR
-botRes = mkDmdResult BotRes BotCPR
+topRes = NoCPR
+botRes = BotCPR
 
 cprSumRes :: ConTag -> DmdResult
 cprSumRes tag | opt_CprOff = topRes
-              | otherwise  = mkDmdResult TopRes (RetSum tag)
+              | otherwise  = RetSum tag
 cprProdRes :: DmdResult
 cprProdRes | opt_CprOff = topRes
-           | otherwise  = mkDmdResult TopRes RetProd
+           | otherwise  = RetProd
 
 
 isTopRes :: DmdResult -> Bool
-isTopRes (DR {res=TopRes, cpr=NoCPR})  = True
-isTopRes _                  = False
+isTopRes NoCPR  = True
+isTopRes _      = False
 
 isBotRes :: DmdResult -> Bool
-isBotRes (DR {res=BotRes})      = True
-isBotRes _                  = False
+isBotRes BotCPR = True
+isBotRes _      = False
 
 returnsCPR :: DmdResult -> Bool
 returnsCPR dr = isJust (returnsCPR_maybe dr)
 
 returnsCPRProd :: DmdResult -> Bool
-returnsCPRProd (DR {res=TopRes, cpr=RetProd}) = True
-returnsCPRProd _                              = False
+returnsCPRProd RetProd = True
+returnsCPRProd _       = False
 
 returnsCPR_maybe :: DmdResult -> Maybe ConTag
-returnsCPR_maybe (DR {res=TopRes, cpr=RetSum t}) = Just t
-returnsCPR_maybe (DR {res=TopRes, cpr=RetProd})  = Just fIRST_TAG
-returnsCPR_maybe _                               = Nothing
+returnsCPR_maybe (RetSum t) = Just t
+returnsCPR_maybe (RetProd)  = Just fIRST_TAG
+returnsCPR_maybe _          = Nothing
 
 resTypeArgDmd :: DmdResult -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1086,16 +1060,6 @@ instance Binary JointDmd where
               y <- get bh
               return $ mkJointDmd x y
 
-instance Binary PureResult where
-    put_ bh BotRes       = do putByte bh 0
-    put_ bh TopRes       = do putByte bh 1
-
-    get  bh = do
-            h <- getByte bh
-            case h of 
-              0 -> return BotRes
-              _ -> return TopRes
-
 instance Binary StrictSig where
     put_ bh (StrictSig aa) = do
             put_ bh aa
@@ -1126,11 +1090,4 @@ instance Binary CPRResult where
               1 -> return RetProd
               2 -> return NoCPR
               _ -> return BotCPR
-
-instance Binary DmdResult where
-    put_ bh (DR {res=x, cpr=y}) = do put_ bh x; put_ bh y
-    get  bh = do 
-              x <- get bh
-              y <- get bh
-              return $ mkDmdResult x y
 \end{code}
