@@ -11,7 +11,7 @@ TYPE CONSTRUCTORS
   ListColl :: * -> *
   data ListColl a
       No C type associated
-      RecFlag NonRecursive
+      RecFlag NonRecursive, Promotable
       = L :: forall a. [a] -> ListColl a Stricts: _
       FamilyInstance: none
 COERCION AXIOMS
