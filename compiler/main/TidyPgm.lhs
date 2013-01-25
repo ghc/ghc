@@ -29,7 +29,7 @@ import Id
 import IdInfo
 import InstEnv
 import FamInstEnv
-import Demand
+import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -420,6 +420,8 @@ tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
 --          the externally-accessible ones
 -- This truncates the type environment to include only the
 -- exported Ids and things needed from them, which saves space
+--
+-- See Note [Don't attempt to trim data types]
 
 tidyTypeEnv omit_prags type_env
  = let
@@ -469,6 +471,33 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
 
+Note [Don't attempt to trim data types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For some time GHC tried to avoid exporting the data constructors
+of a data type if it wasn't strictly necessary to do so; see Trac #835.
+But "strictly necessary" accumulated a longer and longer list 
+of execeptions, and finally I gave up the battle:
+
+    commit 9a20e540754fc2af74c2e7392f2786a81d8d5f11
+    Author: Simon Peyton Jones <simonpj@microsoft.com>
+    Date:   Thu Dec 6 16:03:16 2012 +0000
+
+    Stop attempting to "trim" data types in interface files
+    
+    Without -O, we previously tried to make interface files smaller
+    by not including the data constructors of data types.  But
+    there are a lot of exceptions, notably when Template Haskell is
+    involved or, more recently, DataKinds.
+    
+    However Trac #7445 shows that even without TemplateHaskell, using
+    the Data class and invoking Language.Haskell.TH.Quote.dataToExpQ
+    is enough to require us to expose the data constructors.
+    
+    So I've given up on this "optimisation" -- it's probably not
+    important anyway.  Now I'm simply not attempting to trim off
+    the data constructors.  The gain in simplicity is worth the
+    modest cost in interface file growth, which is limited to the
+    bits reqd to describe those data constructors.
 
 %************************************************************************
 %*                                                                      *
@@ -663,7 +692,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
     show_unfold    = show_unfolding (unfoldingInfo idinfo)
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
+    bottoming_fn   = isBottomingSig (strictnessInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1069,27 +1098,25 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- when we are doing -fexpose-all-unfoldings
 
     --------- Strictness ------------
-    final_sig | Just sig <- strictnessInfo idinfo
-              = WARN( _bottom_hidden sig, ppr name ) Just sig
-              | Just (_, sig) <- mb_bot_str = Just sig
-              | otherwise                   = Nothing
-
-    -- If the cheap-and-cheerful bottom analyser can see that
-    -- the RHS is bottom, it should jolly well be exposed
-    _bottom_hidden id_sig = case mb_bot_str of
-                               Nothing         -> False
-                               Just (arity, _) -> not (appIsBottom id_sig arity)
-
     mb_bot_str = exprBotStrictness_maybe orig_rhs
+
+    sig = strictnessInfo idinfo
+    final_sig | not $ isTopSig sig 
+                 = WARN( _bottom_hidden sig , ppr name ) sig 
+                 -- try a cheap-and-cheerful bottom analyser
+                 | Just (_, nsig) <- mb_bot_str = nsig
+                 | otherwise                    = sig
+
+    _bottom_hidden id_sig = case mb_bot_str of
+                                  Nothing         -> False
+                                  Just (arity, _) -> not (appIsBottom id_sig arity)
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
     unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
                 | otherwise   = noUnfolding
     unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = case final_sig of
-                Just sig -> isBottomingSig sig
-                Nothing  -> False
+    is_bot = isBottomingSig final_sig
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that

@@ -70,11 +70,23 @@ ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
 endif
 
+ifeq "$$(CrossCompiling)" "YES"
+$1_$2_CONFIGURE_OPTS += --configure-option=--host=$(TARGETPLATFORM)
+# We use different platform name conventions than autoconf expects,
+# but let's hope it doesn't cause problems.
+endif
+
 ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
 $1_$2_CONFIGURE_OPTS += --with-gcc="$$(CC_STAGE$3)"
+
+ifneq "$3" "0"
+# There is no LD_STAGE0, Cabal will figure it out
+$1_$2_CONFIGURE_OPTS += --with-ld="$$(LD_STAGE$3)"
+endif
+
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-cc="$$(CC_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ar="$$(AR_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ranlib="$$(RANLIB)"

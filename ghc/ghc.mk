@@ -99,7 +99,7 @@ ifneq "$(filter-out 2,$(stage))" ""
 ghc_stage2_NOT_NEEDED = YES
 endif
 # When cross-compiling, the stage 1 compiler is our release compiler, so omit stage 2
-ifeq "$(BuildingCrossCompiler)" "YES"
+ifeq "$(Stage1Only)" "YES"
 ghc_stage2_NOT_NEEDED = YES
 endif
 # stage 3 has to be requested explicitly with stage=3

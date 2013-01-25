@@ -229,6 +229,10 @@ void storageAddCapabilities (nat from, nat to)
         }
     }
 
+#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR)
+    newThreadLocalKey(&gctKey);
+#endif
+
     initGcThreads(from, to);
 }
 
@@ -249,6 +253,9 @@ freeStorage (rtsBool free_heap)
     closeMutex(&sm_mutex);
 #endif
     stgFree(nurseries);
+#if defined(THREADED_RTS) && defined(llvm_CC_FLAVOR)
+    freeThreadLocalKey(&gctKey);
+#endif
     freeGcThreads();
 }
 

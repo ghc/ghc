@@ -7,7 +7,8 @@
 -- for details
 
 module TcSimplify( 
-       simplifyInfer, simplifyAmbiguityCheck,
+       simplifyInfer, quantifyPred,
+       simplifyAmbiguityCheck,
        simplifyDefault, 
        simplifyRule, simplifyTop, simplifyInteractive,
        solveWantedsTcM
@@ -23,6 +24,7 @@ import TcType
 import TcSMonad as TcS
 import TcInteract 
 import Inst
+import FunDeps  ( growThetaTyVars )
 import Type     ( classifyPredType, PredTree(..), getClassPredTys_maybe )
 import Class    ( Class )
 import Var
@@ -342,7 +344,38 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
+
+quantifyPred :: TyVarSet           -- Quantifying over these
+	     -> PredType -> Bool   -- True <=> quantify over this wanted
+quantifyPred qtvs pred
+  | isIPPred pred = True  -- Note [Inheriting implicit parameters]
+  | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
 \end{code}
+
+Note [Inheriting implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+
+	f x = (x::Int) + ?y
+
+where f is *not* a top-level binding.
+From the RHS of f we'll get the constraint (?y::Int).
+There are two types we might infer for f:
+
+	f :: Int -> Int
+
+(so we get ?y from the context of f's definition), or
+
+	f :: (?y::Int) => Int -> Int
+
+At first you might think the first was better, becuase then
+?y behaves like a free variable of the definition, rather than
+having to be passed at each call site.  But of course, the WHOLE
+IDEA is that ?y should be passed at each call site (that's what
+dynamic binding means) so we'd better infer the second.
+
+BOTTOM LINE: when *inferring types* you *must* quantify 
+over implicit parameters. See the predicate isFreeWhenInferring.
 
 Note [Quantification with errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

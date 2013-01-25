@@ -918,7 +918,7 @@ topNormaliseType env ty
         | isNewTyCon tc         -- Expand newtypes
         = if tc `elem` rec_nts  -- See Note [Expanding newtypes] in Type.lhs
           then Nothing
-          else let nt_co = mkUnbranchedAxInstCo (newTyConCo tc) tys
+          else let 
                in add_co nt_co rec_nts' nt_rhs
 
         | isFamilyTyCon tc              -- Expand open tycons
@@ -930,7 +930,8 @@ topNormaliseType env ty
         , not (isReflCo co)
         = add_co co rec_nts ty
         where
-          nt_rhs = newTyConInstRhs tc tys
+          nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
+          nt_rhs = newTyConInstRhs      tc              tys
           rec_nts' | isRecursiveTyCon tc = tc:rec_nts
                    | otherwise           = rec_nts
 

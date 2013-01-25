@@ -29,6 +29,7 @@ import BasicTypes
 import MkGraph
 import StgSyn
 import Cmm
+import CmmInfo
 import Type     ( Type, tyConAppTyCon )
 import TyCon
 import CLabel

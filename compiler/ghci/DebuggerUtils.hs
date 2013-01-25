@@ -2,7 +2,7 @@ module DebuggerUtils (
        dataConInfoPtrToName,
   ) where
 
-import StgCmmLayout ( stdInfoTableSizeB )
+import CmmInfo ( stdInfoTableSizeB )
 import ByteCodeItbls
 import DynFlags
 import FastString

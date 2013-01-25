@@ -43,7 +43,7 @@ import LiberateCase     ( liberateCase )
 import SAT              ( doStaticArgs )
 import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
-import DmdAnal          ( dmdAnalPgm )
+import DmdAnal       ( dmdAnalProgram )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
 import FastString
@@ -190,6 +190,13 @@ getCoreToDo dflags
                           -- Don't do case-of-case transformations.
                           -- This makes full laziness work better
 
+    -- New demand analyser
+    demand_analyser = (CoreDoPasses ([
+                           CoreDoStrictness,
+                           CoreDoWorkerWrapper,
+                           simpl_phase 0 ["post-worker-wrapper"] max_iter
+                           ]))
+
     core_todo =
      if opt_level == 0 then
        [ vectorisation
@@ -256,11 +263,7 @@ getCoreToDo dflags
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
 
-        runWhen strictness (CoreDoPasses [
-                CoreDoStrictness,
-                CoreDoWorkerWrapper,
-                simpl_phase 0 ["post-worker-wrapper"] max_iter
-                ]),
+        runWhen strictness demand_analyser,
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
@@ -387,8 +390,8 @@ doCorePass _      (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
 doCorePass _      CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
                                               doPassU doStaticArgs
 
-doCorePass _      CoreDoStrictness          = {-# SCC "Stranal" #-}
-                                              doPassDM dmdAnalPgm
+doCorePass _      CoreDoStrictness          = {-# SCC "NewStranal" #-}
+                                              doPassDM dmdAnalProgram
 
 doCorePass dflags CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
                                               doPassU (wwTopBinds dflags)
@@ -896,7 +899,7 @@ transferIdInfo exported_id local_id
   = modifyIdInfo transfer exported_id
   where
     local_info = idInfo local_id
-    transfer exp_info = exp_info `setStrictnessInfo` strictnessInfo local_info
+    transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info
                                  `setUnfoldingInfo`     unfoldingInfo local_info
                                  `setInlinePragInfo`    inlinePragInfo local_info
                                  `setSpecInfo`          addSpecInfo (specInfo exp_info) new_info

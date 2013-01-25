@@ -579,6 +579,13 @@ removeFromRunQueue (Capability *cap, StgTSO *tso)
     IF_DEBUG(sanity, checkRunQueue(cap));
 }
 
+void
+promoteInRunQueue (Capability *cap, StgTSO *tso)
+{
+    removeFromRunQueue(cap, tso);
+    pushOnRunQueue(cap, tso);
+}
+
 /* ----------------------------------------------------------------------------
  * Setting up the scheduler loop
  * ------------------------------------------------------------------------- */
@@ -635,8 +642,8 @@ shouldYieldCapability (Capability *cap, Task *task, rtsBool didGcLast)
     return ((pending_sync && !didGcLast) ||
             cap->returning_tasks_hd != NULL ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
-                                     ? cap->run_queue_hd->bound != NULL
-                                     : cap->run_queue_hd->bound != task->incall)));
+                                     ? peekRunQueue(cap)->bound != NULL
+                                     : peekRunQueue(cap)->bound != task->incall)));
 }
 
 // This is the single place where a Task goes to sleep.  There are
@@ -700,10 +707,10 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     // Check whether we have more threads on our run queue, or sparks
     // in our pool, that we could hand to another Capability.
-    if (cap->run_queue_hd == END_TSO_QUEUE) {
+    if (emptyRunQueue(cap)) {
         if (sparkPoolSizeCap(cap) < 2) return;
     } else {
-        if (cap->run_queue_hd->_link == END_TSO_QUEUE &&
+        if (singletonRunQueue(cap) &&
             sparkPoolSizeCap(cap) < 1) return;
     }
 
@@ -743,7 +750,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 	debugTrace(DEBUG_sched, 
 		   "cap %d: %s and %d free capabilities, sharing...", 
 		   cap->no, 
-		   (!emptyRunQueue(cap) && cap->run_queue_hd->_link != END_TSO_QUEUE)?
+		   (!emptyRunQueue(cap) && !singletonRunQueue(cap))?
 		   "excess threads on run queue":"sparks to share (>=2)",
 		   n_free_caps);
 
@@ -1860,8 +1867,7 @@ forkProcess(HsStablePtr *entry
             // cleaned up later, but some of them may correspond to
             // bound threads for which the corresponding Task does not
             // exist.
-            cap->run_queue_hd = END_TSO_QUEUE;
-            cap->run_queue_tl = END_TSO_QUEUE;
+            truncateRunQueue(cap);
 
             // Any suspended C-calling Tasks are no more, their OS threads
             // don't exist now:

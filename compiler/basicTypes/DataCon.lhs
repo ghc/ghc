@@ -563,6 +563,7 @@ instance Outputable StrictnessMark where
 
 
 eqHsBang :: HsBang -> HsBang -> Bool
+eqHsBang HsNoBang             HsNoBang             = True
 eqHsBang HsStrict             HsStrict             = True
 eqHsBang (HsUserBang u1 b1)   (HsUserBang u2 b2)   = u1==u2 && b1==b2
 eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)   = True

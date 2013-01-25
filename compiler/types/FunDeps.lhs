@@ -18,9 +18,9 @@ It's better to read it as: "if we know these, then we're going to know these"
 module FunDeps (
         FDEq (..),
  	Equation(..), pprEquation,
-	oclose, improveFromInstEnv, improveFromAnother,
+	improveFromInstEnv, improveFromAnother,
 	checkInstCoverage, checkInstLiberalCoverage, checkFunDeps,
-	pprFundeps
+	growThetaTyVars, pprFundeps
     ) where
 
 #include "HsVersions.h"
@@ -51,8 +51,8 @@ import Data.Maybe	( isJust )
   oclose(vs,C)	The result of extending the set of tyvars vs
 		using the functional dependencies from C
 
-  grow(vs,C)	The result of extend the set of tyvars vs
-		using all conceivable links from C.
+  growThetaTyVars(C,vs)	 The result of extend the set of tyvars vs
+                         using all conceivable links from C.
 
 		E.g. vs = {a}, C = {H [a] b, K (b,Int) c, Eq e}
 		Then grow(vs,C) = {a,b,c}
@@ -61,11 +61,11 @@ import Data.Maybe	( isJust )
 		That is, simplfication can only shrink the result of grow.
 
 Notice that
-   oclose is conservative 	v `elem` oclose(vs,C)
-          one way:     		 => v is definitely fixed by vs
+   oclose is conservative 		 v `elem` oclose(vs,C)
+          one way:     			  => v is definitely fixed by vs
 
-   grow is conservative		if v might be fixed by vs 
-          the other way:	=> v `elem` grow(vs,C)
+   growThetaTyVars is conservative	 if v might be fixed by vs 
+          the other way:	         => v `elem` grow(vs,C)
 
 ----------------------------------------------------------
 (oclose preds tvs) closes the set of type variables tvs, 
@@ -76,94 +76,16 @@ then
 	oclose [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
 because if we know x and y then that fixes z.
 
-oclose is used (only) when generalising a type T; see extensive
-notes in TcSimplify.
+We also use equality predicates in the predicates; if we have an
+assumption `t1 ~ t2`, then we use the fact that if we know `t1` we
+also know `t2` and the other way.
+  eg    oclose [C (x,y) z, a ~ x] {a,y} = {a,y,z,x}
 
-Note [Important subtlety in oclose]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (oclose (C Int t) {}), where class C a b | a->b
-Then, since a->b, 't' is fully determined by Int, and the
-uniform thing is to return {t}.
-
-However, consider
-	class D a b c | b->c
-	f x = e	  -- 'e' generates constraint (D s Int t)
-		  -- \x.e has type s->s
-Then, if (oclose (D s Int t) {}) = {t}, we'll make the function
-monomorphic in 't', thus
-	f :: forall s. D s Int t => s -> s
-
-But if this function is never called, 't' will never be instantiated;
-the functional dependencies that fix 't' may well be instance decls in
-some importing module.  But the top-level defaulting of unconstrained
-type variables will fix t=GHC.Prim.Any, and that's simply a bug.
-
-Conclusion: oclose only returns a type variable as "fixed" if it 
-depends on at least one type variable in the input fixed_tvs.
-
-Remember, it's always sound for oclose to return a smaller set.
-An interesting example is tcfail093, where we get this inferred type:
-    class C a b | a->b
-    dup :: forall h. (Call (IO Int) h) => () -> Int -> h
-This is perhaps a bit silly, because 'h' is fixed by the (IO Int);
-previously GHC rejected this saying 'no instance for Call (IO Int) h'.
-But it's right on the borderline. If there was an extra, otherwise
-uninvolved type variable, like 's' in the type of 'f' above, then
-we must accept the function.  So, for now anyway, we accept 'dup' too.
+oclose is used (only) when checking functional dependencies
 
 \begin{code}
 oclose :: [PredType] -> TyVarSet -> TyVarSet
 oclose preds fixed_tvs
-  | null tv_fds 	    = fixed_tvs	   -- Fast escape hatch for common case
-  | isEmptyVarSet fixed_tvs = emptyVarSet  -- Note [Important subtlety in oclose]
-  | otherwise 		    = loop fixed_tvs
-  where
-    loop fixed_tvs
-	| new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
-	| otherwise		  	      = loop new_fixed_tvs
-	where
-	  new_fixed_tvs = foldl extend fixed_tvs tv_fds
-
-    extend fixed_tvs (ls,rs) 
-	| not (isEmptyVarSet ls)	-- Note [Important subtlety in oclose]
-	, ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
-	| otherwise		   = fixed_tvs
-
-    tv_fds  :: [(TyVarSet,TyVarSet)]
-	-- In our example, tv_fds will be [ ({x,y}, {z}), ({x,p},{q}) ]
-	-- Meaning "knowing x,y fixes z, knowing x,p fixes q"
-    tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-	      | (cls, tys) <- concatMap classesOfPredTy preds,  -- Ignore implicit params
-		let (cls_tvs, cls_fds) = classTvsFds cls,
-		fd <- cls_fds,
-		let (xs,ys) = instFD fd cls_tvs tys
-	      ]
-     
-    classesOfPredTy :: PredType -> [(Class, [Type])]
-    classesOfPredTy pred
-       = case classifyPredType pred of
-            ClassPred cls tys -> [(cls, tys)]
-            TuplePred ts      -> concatMap classesOfPredTy ts
-            _                 -> []
-
--- An alternative implementation of `oclose`. Differences:
---  1. The empty set of variables is allowed to determine stuff,
---  2. We also use equality predicates as FDs.
---
--- I (Iavor) believe that this is the correct implementation of oclose.
--- For 1: the above argument about `t` being monomorphic seems incorrect.
---    The correct behavior is to quantify over `t`, even though we know that
---    it may be instantiated to at most one type.  The point is that we might
---    only find out what that type is later, at the call site to the function.
---    In general, we should be quantifying all variables that are (i) not in
---    mentioned in the environment, and (ii) not FD-determined by something in
---    the environment.
--- For 2: This is just a nicity, but it makes things a bit more general:
---    if we have an assumption `t1 ~ t2`, then we use the fact that if we know
---    `t1` we also know `t2` and the other way.
-
-oclose1 :: [PredType] -> TyVarSet -> TyVarSet
-oclose1 preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
   | otherwise   = loop fixed_tvs
   where
@@ -178,20 +100,49 @@ oclose1 preds fixed_tvs
 
     tv_fds  :: [(TyVarSet,TyVarSet)]
     tv_fds  = [ (tyVarsOfTypes xs, tyVarsOfTypes ys)
-              | (xs, ys) <- concatMap deterimned preds
+              | (xs, ys) <- concatMap determined preds
               ]
 
-    deterimned :: PredType -> [([Type],[Type])]
-    deterimned pred
+    determined :: PredType -> [([Type],[Type])]
+    determined pred
        = case classifyPredType pred of
             ClassPred cls tys ->
                do let (cls_tvs, cls_fds) = classTvsFds cls
                   fd <- cls_fds
                   return (instFD fd cls_tvs tys)
             EqPred t1 t2      -> [([t1],[t2]), ([t2],[t1])]
-            TuplePred ts      -> concatMap deterimned ts
+            TuplePred ts      -> concatMap determined ts
             _                 -> []
 
+\end{code}
+
+Note [Growing the tau-tvs using constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(growThetaTyVars insts tvs) is the result of extending the set 
+    of tyvars tvs using all conceivable links from pred
+
+E.g. tvs = {a}, preds = {H [a] b, K (b,Int) c, Eq e}
+Then growThetaTyVars preds tvs = {a,b,c}
+
+\begin{code}
+growThetaTyVars :: ThetaType -> TyVarSet -> TyVarSet
+-- See Note [Growing the tau-tvs using constraints]
+growThetaTyVars theta tvs
+  | null theta = tvs
+  | otherwise  = fixVarSet mk_next tvs
+  where
+    mk_next tvs = foldr grow_one tvs theta
+    grow_one pred tvs = growPredTyVars pred tvs `unionVarSet` tvs
+
+growPredTyVars :: PredType
+               -> TyVarSet	-- The set to extend
+	       -> TyVarSet	-- TyVars of the predicate if it intersects the set, 
+growPredTyVars pred tvs 
+   | isIPPred pred                   = pred_tvs   -- Always quantify over implicit parameers
+   | pred_tvs `intersectsVarSet` tvs = pred_tvs
+   | otherwise                       = emptyVarSet
+  where
+    pred_tvs = tyVarsOfType pred
 \end{code}
 
     
@@ -533,7 +484,7 @@ checkInstLiberalCoverage clas theta inst_taus
   = all fundep_ok fds
   where
     (tyvars, fds) = classTvsFds clas
-    fundep_ok fd = tyVarsOfTypes rs `subVarSet` oclose1 theta (tyVarsOfTypes ls)
+    fundep_ok fd = tyVarsOfTypes rs `subVarSet` oclose theta (tyVarsOfTypes ls)
                     where (ls,rs) = instFD fd tyvars inst_taus
 \end{code}
 

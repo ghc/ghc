@@ -11,7 +11,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs ) where
+module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs, deepSplitProductType_maybe ) where
 
 #include "HsVersions.h"
 
@@ -23,7 +23,7 @@ import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon
-import Demand		( Demand(..), DmdResult(..), Demands(..) ) 
+import Demand        
 import MkCore		( mkRuntimeErrorApp, aBSENT_ERROR_ID )
 import MkId		( realWorldPrimId, voidArgId
                         , wrapNewTypeBody, unwrapNewTypeBody )
@@ -36,7 +36,7 @@ import Literal		( absentLiteralOf )
 import TyCon
 import UniqSupply
 import Unique
-import Util		( zipWithEqual )
+import Util
 import Outputable
 import DynFlags
 import FastString
@@ -133,13 +133,14 @@ mkWwBodies :: DynFlags
 
 mkWwBodies dflags fun_ty demands res_info one_shots
   = do	{ let arg_info = demands `zip` (one_shots ++ repeat False)
+              all_one_shots = all snd arg_info
 	; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
 	; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr dflags wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
 	; (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
 
-	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args cpr_res_ty
+	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args all_one_shots cpr_res_ty
 	; return ([idDemandInfo v | v <- work_call_args, isId v],
                   wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
                   mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
@@ -184,16 +185,39 @@ We use the state-token type which generates no code.
 
 \begin{code}
 mkWorkerArgs :: [Var]
+             -> Bool    -- Whether all arguments are one-shot
 	     -> Type	-- Type of body
 	     -> ([Var],	-- Lambda bound args
 		 [Var])	-- Args at call site
-mkWorkerArgs args res_ty
+mkWorkerArgs args all_one_shot res_ty
     | any isId args || not (isUnLiftedType res_ty)
     = (args, args)
     | otherwise	
-    = (args ++ [voidArgId], args ++ [realWorldPrimId])
+    = (args ++ [newArg], args ++ [realWorldPrimId])
+    where
+      -- see Note [All One-Shot Arguments of a Worker]
+      newArg = if all_one_shot 
+               then setOneShotLambda voidArgId
+               else voidArgId     
 \end{code}
 
+Note [All One-Shot Arguments of a Worker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes, derived joint-points are just lambda-lifted thunks, whose
+only argument is of the unit type and is never used. This might
+interfere with the absence analysis, basing on which results these
+never-used arguments are eliminated in the worker. The additional
+argument `all_one_shot` of `mkWorkerArgs` is to prevent this.
+
+An example for this phenomenon is a `treejoin` program from the
+`nofib` suite, which features the following joint points:
+
+$j_s1l1 =
+  \ _ ->
+     case GHC.Prim.<=# 56320 y_aOy of _ {
+        GHC.Types.False -> $j_s1kP GHC.Prim.realWorld#;
+        GHC.Types.True ->  ... }
 
 %************************************************************************
 %*									*
@@ -342,6 +366,24 @@ mkWWstr dflags (arg : args) = do
     (args2, wrap_fn2, work_fn2) <- mkWWstr dflags args
     return (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
+\end{code}
+
+Note [Unpacking arguments with product and polymorphic demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The argument is unpacked in a case if it has a product type and has a
+strict and used demand put on it. I.e., arguments, with demands such
+as the following ones:
+
+<S,U(U, L)>
+<S(L,S),U>
+
+will be unpacked. Moreover, for arguments whose demand is <S,U> or
+<S,H>, we take an advantage of the polymorphic nature of S and U and
+replicate the enclosed demand correspondingly (see definition of
+replicateDmd).
+
+
+\begin{code}
 ----------------------
 -- mkWWstr_one wrap_arg = (work_args, wrap_fn, work_fn)
 --   *  wrap_fn assumes wrap_arg is in scope,
@@ -353,39 +395,19 @@ mkWWstr_one dflags arg
   | isTyVar arg
   = return ([arg],  nop_fn, nop_fn)
 
-  | otherwise
-  = case idDemandInfo arg of
-
-	-- Absent case.  We can't always handle absence for arbitrary
-        -- unlifted types, so we need to choose just the cases we can
-	-- (that's what mk_absent_let does)
-      Abs | Just work_fn <- mk_absent_let dflags arg
-          -> return ([], nop_fn, work_fn)
-
-	-- Unpack case
-      Eval (Prod cs)
-	| Just (_arg_tycon, _tycon_arg_tys, data_con, inst_con_arg_tys) 
-		<- deepSplitProductType_maybe (idType arg)
-	-> do uniqs <- getUniquesM
-	      let
-	        unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
-	        unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	        unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
-	        rebox_fn       = Let (NonRec arg con_app) 
-	        con_app        = mkProductBox unpk_args (idType arg)
-	      (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
-	      return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) 
-	  		   -- Don't pass the arg, rebox instead
-
-	-- `seq` demand; evaluate in wrapper in the hope
-	-- of dropping seqs in the worker
-      Eval (Poly Abs)
-	-> let
-		arg_w_unf = arg `setIdUnfolding` evaldUnfolding
-		-- Tell the worker arg that it's sure to be evaluated
-		-- so that internal seqs can be dropped
-	   in
-	   return ([arg_w_unf], mk_seq_case arg, nop_fn)
+  | isAbsDmd dmd
+  , Just work_fn <- mk_absent_let dflags arg
+     -- Absent case.  We can't always handle absence for arbitrary
+     -- unlifted types, so we need to choose just the cases we can
+     --- (that's what mk_absent_let does)
+  = return ([], nop_fn, work_fn)
+      
+  | isSeqDmd dmd  -- `seq` demand; evaluate in wrapper in the hope
+                  -- of dropping seqs in the worker
+  = let arg_w_unf = arg `setIdUnfolding` evaldUnfolding
+	  -- Tell the worker arg that it's sure to be evaluated
+          -- so that internal seqs can be dropped
+    in return ([arg_w_unf], mk_seq_case arg, nop_fn)
 	  	-- Pass the arg, anyway, even if it is in theory discarded
 		-- Consider
 		--	f x y = x `seq` y
@@ -398,11 +420,28 @@ mkWWstr_one dflags arg
 		-- we end up evaluating the absent thunk.
 		-- But the Evald flag is pretty weird, and I worry that it might disappear
 		-- during simplification, so for now I've just nuked this whole case
+
+  	-- Unpack case, 
+        -- see note [Unpacking arguments with product and polymorphic demands]
+  | isStrictDmd dmd
+  , Just (_arg_tycon, _tycon_arg_tys, data_con, inst_con_arg_tys) 
+             <- deepSplitProductType_maybe (idType arg)
+  =  do { uniqs <- getUniquesM
+	; let   cs             = splitProdDmd (length inst_con_arg_tys) dmd
+	        unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
+	        unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
+	        unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
+	        rebox_fn       = Let (NonRec arg con_app) 
+	        con_app        = mkProductBox unpk_args (idType arg)
+	 ; (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
+	 ; return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
+	  		   -- Don't pass the arg, rebox instead
 			
-	-- Other cases
-      _other_demand -> return ([arg], nop_fn, nop_fn)
+  | otherwise	-- Other cases
+  = return ([arg], nop_fn, nop_fn)
 
   where
+    dmd = idDemandInfo arg
 	-- If the wrapper argument is a one-shot lambda, then
 	-- so should (all) the corresponding worker arguments be
 	-- This bites when we do w/w on a case join point
@@ -415,8 +454,6 @@ mkWWstr_one dflags arg
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 \end{code}
-
-
 
 \begin{code}
 mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
@@ -496,7 +533,10 @@ mkWWcpr :: Type                              -- function body type
                    CoreExpr -> CoreExpr,	     -- New worker
 		   Type)			-- Type of worker's body 
 
-mkWWcpr body_ty RetCPR
+mkWWcpr body_ty res
+    | not (returnsCPR res) -- No CPR info
+    = return (id, id, body_ty)
+
     | not (isClosedAlgType body_ty)
     = WARN( True, 
             text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
@@ -536,9 +576,6 @@ mkWWcpr body_ty RetCPR
       (_arg_tycon, _tycon_arg_tys, data_con, con_arg_tys) = deepSplitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
-
-mkWWcpr body_ty _other		-- No CPR info
-    = return (id, id, body_ty)
 
 -- If the original function looked like
 --	f = \ x -> _scc_ "foo" E

@@ -231,11 +231,11 @@ data IfaceIdInfo
 --      and so gives a new version.
 
 data IfaceInfoItem
-  = HsArity      Arity
-  | HsStrictness StrictSig
-  | HsInline     InlinePragma
-  | HsUnfold     Bool             -- True <=> isStrongLoopBreaker is true
-                 IfaceUnfolding   -- See Note [Expose recursive functions]
+  = HsArity         Arity
+  | HsStrictness    StrictSig
+  | HsInline        InlinePragma
+  | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
+                    IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
 
 -- NB: Specialisations and rules come in separately and are
@@ -756,13 +756,13 @@ instance Outputable IfaceIdInfo where
                      <+> ptext (sLit "-}")
 
 instance Outputable IfaceInfoItem where
-  ppr (HsUnfold lb unf)  = ptext (sLit "Unfolding")
-                           <> ppWhen lb (ptext (sLit "(loop-breaker)"))
-                           <> colon <+> ppr unf
-  ppr (HsInline prag)    = ptext (sLit "Inline:") <+> ppr prag
-  ppr (HsArity arity)    = ptext (sLit "Arity:") <+> int arity
+  ppr (HsUnfold lb unf)     = ptext (sLit "Unfolding")
+                              <> ppWhen lb (ptext (sLit "(loop-breaker)"))
+                              <> colon <+> ppr unf
+  ppr (HsInline prag)       = ptext (sLit "Inline:") <+> ppr prag
+  ppr (HsArity arity)       = ptext (sLit "Arity:") <+> int arity
   ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
-  ppr HsNoCafRefs        = ptext (sLit "HasNoCafRefs")
+  ppr HsNoCafRefs           = ptext (sLit "HasNoCafRefs")
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = ptext (sLit "<compulsory>") <+> parens (ppr e)

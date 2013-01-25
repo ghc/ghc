@@ -42,7 +42,6 @@ import DynFlags         ( DynFlags(..) )
 import StaticFlags      ( opt_PprStyle_Debug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand
-import DmdAnal          ( both )
 import Serialized       ( deserializeWithData )
 import Util
 import Pair
@@ -1386,22 +1385,24 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               -- changes (#4012).
               rule_name  = mkFastString ("SC:" ++ occNameString fn_occ ++ show rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
---      ; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $
+--      ; pprTrace "{spec_one" (ppr (sc_count env) <+> ppr fn <+> ppr pats <+> text "-->" <+> ppr spec_name) $ 
 --        return ()
 
         -- Specialise the body
         ; (spec_usg, spec_body) <- scExpr spec_env body
 
---      ; pprTrace "done spec_one}" (ppr fn) $
+--      ; pprTrace "done spec_one}" (ppr fn) $ 
 --        return ()
 
                 -- And build the results
-        ; let spec_id = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty)
-                             `setIdStrictness` spec_str         -- See Note [Transfer strictness]
+        ; let spec_id = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty) 
+                             -- See Note [Transfer strictness]
+                             `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args
               spec_str   = calcSpecStrictness fn spec_lam_args pats
-              (spec_lam_args, spec_call_args) = mkWorkerArgs qvars body_ty
-                -- Usual w/w hack to avoid generating
+                -- Conditionally use result of new worker-wrapper transform
+              (spec_lam_args, spec_call_args) = mkWorkerArgs qvars False body_ty
+                -- Usual w/w hack to avoid generating 
                 -- a spec_rhs of unlifted type and no args
 
               spec_rhs   = mkLams spec_lam_args spec_body
@@ -1418,24 +1419,25 @@ calcSpecStrictness :: Id                     -- The original function
                    -> StrictSig              -- Strictness of specialised thing
 -- See Note [Transfer strictness]
 calcSpecStrictness fn qvars pats
-  = StrictSig (mkTopDmdType spec_dmds TopRes)
+  = StrictSig (mkTopDmdType spec_dmds topRes)
   where
-    spec_dmds = [ lookupVarEnv dmd_env qv `orElse` lazyDmd | qv <- qvars, isId qv ]
+    spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     StrictSig (DmdType _ dmds _) = idStrictness fn
 
     dmd_env = go emptyVarEnv dmds pats
 
+    go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
     go env ds (Type {} : pats) = go env ds pats
     go env ds (Coercion {} : pats) = go env ds pats
     go env (d:ds) (pat : pats) = go (go_one env d pat) ds pats
     go env _      _            = env
 
-    go_one env d   (Var v) = extendVarEnv_C both env v d
-    go_one env (Box d)   e = go_one env d e
-    go_one env (Eval (Prod ds)) e
-           | (Var _, args) <- collectArgs e = go env ds args
+    go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
+    go_one env d   (Var v) = extendVarEnv_C bothDmd env v d
+    go_one env d e 
+           | Just ds <- splitProdDmd_maybe d
+           , (Var _, args) <- collectArgs e = go env ds args
     go_one env _         _ = env
-
 \end{code}
 
 Note [Specialise original body]

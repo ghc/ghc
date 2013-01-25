@@ -15,6 +15,19 @@
 #include "Rts.h"
 #include "HsFFI.h"
 
+#include "GC.h"
+#include "GCThread.h"
+#include "GCTDecl.h"            // NB. before RtsSignals.h which
+                                // clobbers REG_R1 on arm/Linux
+#include "Compact.h"
+#include "Evac.h"
+#include "Scav.h"
+#include "GCUtils.h"
+#include "MarkStack.h"
+#include "MarkWeak.h"
+#include "Sparks.h"
+#include "Sweep.h"
+
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "Apply.h"
@@ -37,18 +50,6 @@
 #include "RaiseAsync.h"
 #include "Papi.h"
 #include "Stable.h"
-
-#include "GC.h"
-#include "GCThread.h"
-#include "GCTDecl.h"
-#include "Compact.h"
-#include "Evac.h"
-#include "Scav.h"
-#include "GCUtils.h"
-#include "MarkStack.h"
-#include "MarkWeak.h"
-#include "Sparks.h"
-#include "Sweep.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>

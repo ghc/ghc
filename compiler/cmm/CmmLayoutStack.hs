@@ -5,9 +5,9 @@ module CmmLayoutStack (
 
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
 import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
-import StgCmmLayout     ( entryCode ) -- XXX layering violation
 
 import Cmm
+import CmmInfo
 import BlockId
 import CLabel
 import CmmUtils
