@@ -15,7 +15,7 @@ clean:
 
 # bug #437
 
-437: clean
+T437: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP)  --make -main-is Test.main Test.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP)  --make -main-is Test2.main Test2.hs
 	./Test

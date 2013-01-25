@@ -17,7 +17,7 @@ clean:
 	rm -f p1/A.hs
 	rm -f $(LOCAL_PKGCONF)
 
-1372:
+T1372:
 	$(MAKE) clean
 	$(MAKE) prep
 # This should recompile Main.hs, because A in package p1 has changed

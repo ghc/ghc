@@ -1,4 +1,0 @@
-
-2499.hs:1:12: unknown flag in  {-# OPTIONS_GHC #-} pragma: -package
-
-2499.hs:1:12: unknown flag in  {-# OPTIONS_GHC #-} pragma: blargh

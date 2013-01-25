@@ -1,4 +1,4 @@
-{-# OPTIONS -F -pgmF ./3674_pre #-}
+{-# OPTIONS -F -pgmF ./T3674_pre #-}
 
 module Test3674 where
 

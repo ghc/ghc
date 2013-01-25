@@ -411,7 +411,7 @@ test200:
 
 # -----------------------------------------------------------------------------
 
-2566::
+T2566::
 	if "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -c foo2566.bar; then false else true; fi
 
 .PHONY: mode001
@@ -439,10 +439,10 @@ shared001:
 
 # -----------------------------------------------------------------------------
 
-3674:
-	$(RM) 3674*.o 3674*.hi 3674_pre
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make 3674_pre.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make 3674.hs
+T3674:
+	$(RM) T3674*.o T3674*.hi T3674_pre
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make T3674_pre.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make T3674.hs
 
 .PHONY: rtsopts001
 rtsopts001:
