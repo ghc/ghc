@@ -7,7 +7,7 @@ test('arith001', normal, compile_and_run, [''])
 test('arith002', normal, compile_and_run, [''])
 test('arith003', normal, compile_and_run, [''])
 test('arith004', normal, compile_and_run, [''])
-test('arith005', normal, compile_and_run, [''])
+test('arith005', if_platform('i386-apple-darwin', expect_broken_for(7043, 'ghci')), compile_and_run, [''])
 test('arith006', normal, compile_and_run, [''])
 test('arith007', normal, compile_and_run, [''])
 

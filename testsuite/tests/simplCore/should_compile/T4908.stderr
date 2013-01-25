@@ -6,7 +6,7 @@ Rec {
 T4908.f_$s$wf [Occ=LoopBreaker]
   :: GHC.Prim.Int#
      -> GHC.Types.Int -> GHC.Prim.Int# -> GHC.Types.Bool
-[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType LLL]
+[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType <S,U><L,U><L,U>]
 T4908.f_$s$wf =
   \ (sc :: GHC.Prim.Int#)
     (sc1 :: GHC.Types.Int)
@@ -27,7 +27,7 @@ T4908.$wf
 [GblId,
  Arity=2,
  Caf=NoCafRefs,
- Str=DmdType LL,
+ Str=DmdType <S,U><L,U(UU(U))>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [30 20] 101 20}]
@@ -52,7 +52,7 @@ T4908.f [InlPrag=INLINE[0]]
 [GblId,
  Arity=2,
  Caf=NoCafRefs,
- Str=DmdType U(L)L,
+ Str=DmdType <S(S),U(U)><L,U(UU(U))>,
  Unf=Unf{Src=Worker=T4908.$wf, TopLvl=True, Arity=2, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

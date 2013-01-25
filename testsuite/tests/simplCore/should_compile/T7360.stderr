@@ -6,7 +6,7 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType S,
+ Str=DmdType <S,U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
@@ -17,7 +17,7 @@ T7360.$WFoo3 =
     case dt of dt { __DEFAULT -> T7360.Foo3 dt }
 
 T7360.fun1 [InlPrag=NOINLINE] :: T7360.Foo -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType S]
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,U>]
 T7360.fun1 =
   \ (x :: T7360.Foo) -> case x of _ { __DEFAULT -> GHC.Tuple.() }
 
@@ -32,7 +32,7 @@ T7360.fun3 = T7360.fun1 T7360.Foo1
 T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
 [GblId,
  Arity=1,
- Str=DmdType Lm,
+ Str=DmdType <L,U>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)

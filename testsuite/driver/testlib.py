@@ -517,6 +517,9 @@ def objc_src( opts ):
 def objcpp_src( opts ):
     opts.objcpp_src = 1;
 
+def cmm_src( opts ):
+    opts.cmm_src = 1;
+
 def outputdir( odir ):
     return lambda opts, d=odir: _outputdir(opts, d)
 
@@ -642,6 +645,8 @@ def test (name, setup, func, args):
     global allTestNames
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
+    if not re.match('^[a-zA-Z0-9][a-zA-Z0-9._-]*$', name):
+        framework_fail(name, 'bad_name', 'This test has an invalid name')
     myTestOpts = copy.copy(thisdir_testopts)
 
     if type(setup) is types.ListType:
@@ -755,6 +760,11 @@ def test_common_work (name, opts, func, args):
                     shutil.rmtree(odir)
                 except:
                     pass
+
+            try:
+                shutil.rmtree(in_testdir('.hpc.' + name))
+            except:
+                pass
 
             try:
                 cleanCmd = getTestOpts().clean_cmd
@@ -877,6 +887,8 @@ def do_test(name, way, func, args):
                         t.expected_failures[name] = [way]
         else:
             framework_fail(name, way, 'bad result ' + passFail)
+    except KeyboardInterrupt:
+        raise
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
@@ -916,7 +928,7 @@ def skiptest (name, way):
 
 def framework_fail( name, way, reason ):
     full_name = name + '(' + way + ')'
-    print '*** framework failure for', full_name, reason, ':'
+    print '*** framework failure for', full_name, reason
     t.n_framework_failures = t.n_framework_failures + 1
     if name in t.framework_failures:
         t.framework_failures[name].append(way)
@@ -1205,7 +1217,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     # Required by GHC 7.3+, harmless for earlier versions:
     if (getTestOpts().c_src or
         getTestOpts().objc_src or
-        getTestOpts().objcpp_src):
+        getTestOpts().objcpp_src or
+        getTestOpts().cmm_src):
         extra_hc_opts += ' -no-hs-main '
 
     if getTestOpts().compile_cmd_prefix == '':
@@ -1223,7 +1236,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
           + config.compiler + "' " \
           + join(comp_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + opts.extra_hc_opts + ' ' \
           + '>' + errname + ' 2>&1'
@@ -1409,7 +1422,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     cmd = "'" + config.compiler + "' " \
           + join(flags,' ') + ' ' \
           + srcname + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
@@ -1505,7 +1518,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(flags,' ') + ' ' \
-          + join(config.way_flags[way],' ') + ' ' \
+          + join(config.way_flags(name)[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
           + to_do \
@@ -1530,7 +1543,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         deplist2 = string.replace(deplist,'.lhs,', '.hcr');
         to_compile = string.replace(deplist2,'.hs,', '.hcr');
 
-    flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
+    flags = join(filter(lambda f: f != '-fext-core',config.way_flags(name)[way]),' ')
     if getTestOpts().outputdir != None:
         flags.extend(["-outputdir", getTestOpts().outputdir])
 
@@ -2111,6 +2124,8 @@ def add_suffix( name, suffix ):
 def add_hs_lhs_suffix(name):
     if getTestOpts().c_src:
         return add_suffix(name, 'c')
+    elif getTestOpts().cmm_src:
+        return add_suffix(name, 'cmm')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
     elif getTestOpts().objcpp_src:

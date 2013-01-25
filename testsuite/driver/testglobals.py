@@ -237,6 +237,9 @@ class TestOptions:
        self.objc_src   = 0
        self.objcpp_src = 0
 
+       # Does this test use a .cmm file?
+       self.cmm_src    = 0
+
        # Should we put .hi/.o files in a subdirectory?
        self.outputdir = None
 

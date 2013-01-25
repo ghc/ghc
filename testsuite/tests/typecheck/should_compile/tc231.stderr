@@ -8,14 +8,14 @@ TYPE CONSTRUCTORS
   Q :: * -> * -> * -> *
   data Q s a chain
       No C type associated
-      RecFlag NonRecursive
+      RecFlag NonRecursive, Promotable
       = Node :: forall s a chain. s -> a -> chain -> Q s a chain
             Stricts: _ _ _
       FamilyInstance: none
   Z :: * -> *
   data Z a
       No C type associated
-      RecFlag NonRecursive
+      RecFlag NonRecursive, Promotable
       = Z :: forall a. a -> Z a Stricts: _
       FamilyInstance: none
   Zork :: * -> * -> * -> Constraint

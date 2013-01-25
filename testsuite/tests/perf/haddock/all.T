@@ -21,10 +21,11 @@ test('haddock.base',
           stats_range_field('max_bytes_used', 45574928, 1))
                                 # 2012-08-14: 45574928 (x86/OSX)
      ,if_wordsize(64,
-          stats_range_field('bytes allocated', 5902601224, 2))
+          stats_range_field('bytes allocated', 6064874536, 2))
                                  # 2012-08-14: 5920822352 (amd64/Linux)
                                  # 2012-09-20: 5829972376 (amd64/Linux)
                                  # 2012-10-08: 5902601224 (amd64/Linux)
+                                 # 2013-01-17: 6064874536 (x86_64/Linux)
      ,if_wordsize(32,
           stats_range_field('bytes allocated', 2955470952, 1))
                                  # 2012-08-14: 3046487920 (x86/OSX)

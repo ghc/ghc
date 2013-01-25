@@ -36,4 +36,7 @@ test('T5287', normal, compile_fail, [''])
 test('T5478', normal, compile_fail, [''])
 test('T5686', normal, compile_fail, [''])
 test('T5922', normal, compile_fail, [''])
-
+test('T1133A',
+     extra_clean(['T1133A.o-boot', 'T1133A.hi-boot']),
+     run_command,
+     ['$MAKE --no-print-directory -s T1133A'])

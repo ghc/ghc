@@ -1,1 +1,1 @@
-rght [Dmd=Just S] :: EvalTest.AList a
+rght [Dmd=<S,U>] :: EvalTest.AList a

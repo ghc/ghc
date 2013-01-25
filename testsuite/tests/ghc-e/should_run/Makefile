@@ -27,3 +27,6 @@ ghc-e005:
 3890:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" 3890.hs | cat
 
+T7299:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "Control.Concurrent.threadDelay (1000 * 1000)"
+
