@@ -24,7 +24,7 @@ hsc2hs004:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
 	./$@
 
-.PHONY: 3837
-3837:
+.PHONY: T3837
+T3837:
 	LANG=C '$(HSC2HS)' $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c $@.hs
