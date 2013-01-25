@@ -360,7 +360,8 @@ bindHsTyVars :: HsDocContext
              -> (LHsTyVarBndrs Name -> RnM (b, FreeVars))
              -> RnM (b, FreeVars)
 -- (a) Bring kind variables into scope 
---     both (i) passed in (kv_bndrs) and (ii) mentioned in the kinds of tv_bndrs
+--     both (i)  passed in (kv_bndrs) 
+--     and  (ii) mentioned in the kinds of tv_bndrs
 -- (b) Bring type variables into scope
 bindHsTyVars doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { rdr_env <- getLocalRdrEnv
