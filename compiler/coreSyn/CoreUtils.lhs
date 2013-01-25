@@ -1712,8 +1712,14 @@ tryEtaReduce bndrs body
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
-       | isLocalId fun && isStrongLoopBreaker (idOccInfo fun) = 0
-       | otherwise = idArity fun
+       | isLocalId fun
+       , isStrongLoopBreaker (idOccInfo fun) = 0
+       | arity > 0                           = arity
+       | isEvaldUnfolding (idUnfolding fun)  = 1  
+            -- See Note [Eta reduction of an eval'd function]
+       | otherwise                           = 0
+       where
+         arity = idArity fun
 
     ---------------
     ok_lam v = isTyVar v || isEvVar v
@@ -1736,6 +1742,20 @@ tryEtaReduce bndrs body
        -- so we can have a simple-minded pattern match here
     ok_arg _ _ _ = Nothing
 \end{code}
+
+Note [Eta reduction of an eval'd function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell is is not true that    f = \x. f x
+because f might be bottom, and 'seq' can distinguish them.
+
+But it *is* true that   f = f `seq` \x. f x 
+and we'd like to simplify the latter to the former.  This amounts
+to the rule that 
+  * when there is just *one* value argument,
+  * f is not bottom
+we can eta-reduce    \x. f x  ===>  f
+
+This turned up in Trac #7542.  
 
 
 %************************************************************************

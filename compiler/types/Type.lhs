@@ -154,7 +154,7 @@ import VarSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeStringKind )
+import {-# SOURCE #-} TysWiredIn ( eqTyCon, typeNatKind, typeSymbolKind )
 import PrelNames ( eqTyConKey, ipClassNameKey, 
                    constraintKindTyConKey, liftedTypeKindTyConKey )
 import CoAxiom
@@ -1620,7 +1620,7 @@ typeLiteralKind :: TyLit -> Kind
 typeLiteralKind l =
   case l of
     NumTyLit _ -> typeNatKind
-    StrTyLit _ -> typeStringKind
+    StrTyLit _ -> typeSymbolKind
 \end{code}
 
 Kind inference

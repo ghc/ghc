@@ -6,6 +6,6 @@ import {-# SOURCE #-} TypeRep    (Type)
 
 
 eqTyCon :: TyCon
-typeNatKind, typeStringKind :: Type
+typeNatKind, typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
 \end{code}

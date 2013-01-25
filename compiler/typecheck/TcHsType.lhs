@@ -511,8 +511,8 @@ tc_hs_type hs_ty@(HsTyLit (HsNumTy n)) exp_kind
        ; return (mkNumLitTy n) }
 
 tc_hs_type hs_ty@(HsTyLit (HsStrTy s)) exp_kind 
-  = do { checkExpectedKind hs_ty typeStringKind exp_kind
-       ; checkWiredInTyCon typeStringKindCon
+  = do { checkExpectedKind hs_ty typeSymbolKind exp_kind
+       ; checkWiredInTyCon typeSymbolKindCon
        ; return (mkStrLitTy s) }
 
 ---------------------------
@@ -626,8 +626,9 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
              -> do { data_kinds <- xoptM Opt_DataKinds
                    ; unless data_kinds $ promotionErr name NoDataKinds
                    ; inst_tycon (mkTyConApp tc) (tyConKind tc) }
-             | otherwise -> failWithTc (quotes (ppr dc) <+> ptext (sLit "of type")
-                            <+> quotes (ppr (dataConUserType dc)) <+> ptext (sLit "is not promotable"))
+             | otherwise -> failWithTc (ptext (sLit "Data constructor") <+> quotes (ppr dc)
+                                        <+> ptext (sLit "comes from an un-promotable type") 
+                                        <+> quotes (ppr (dataConTyCon dc)))
 
            APromotionErr err -> promotionErr name err
 
@@ -1485,9 +1486,9 @@ tc_kind_var_app name arg_kis
   	   AGlobal (ATyCon tc)
   	     -> do { data_kinds <- xoptM Opt_DataKinds
   	           ; unless data_kinds $ addErr (dataKindsErr name)
-  	     	   ; case isPromotableTyCon tc of
-  	     	       Just n | n == length arg_kis ->
-  	     	         return (mkTyConApp (promoteTyCon tc) arg_kis)
+  	     	   ; case promotableTyCon_maybe tc of
+  	     	       Just prom_tc | arg_kis `lengthIs` tyConArity prom_tc
+  	     	               -> return (mkTyConApp prom_tc arg_kis)
   	     	       Just _  -> tycon_err tc "is not fully applied"
   	     	       Nothing -> tycon_err tc "is not promotable" }
 

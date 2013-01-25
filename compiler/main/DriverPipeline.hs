@@ -1752,7 +1752,16 @@ linkBinary dflags o_files dep_packages = do
                   rpath = if gopt Opt_RPath dflags
                           then ["-Wl,-rpath",      "-Wl," ++ libpath]
                           else []
-              in ["-L" ++ l, "-Wl,-rpath-link", "-Wl," ++ l] ++ rpath
+                  -- Solaris 11's linker does not support -rpath-link option. It silently
+                  -- ignores it and then complains about next option which is -l<some
+                  -- dir> as being a directory and not expected object file, E.g
+                  -- ld: elf error: file
+                  -- /tmp/ghc-src/libraries/base/dist-install/build:
+                  -- elf_begin: I/O error: region read: Is a directory
+                  rpathlink = if (platformOS platform) == OSSolaris2
+                              then []
+                              else ["-Wl,-rpath-link", "-Wl," ++ l]
+              in ["-L" ++ l] ++ rpathlink ++ rpath
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
