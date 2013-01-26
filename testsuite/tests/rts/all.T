@@ -112,8 +112,7 @@ test('exec_signals', [
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('T4850', extra_clean(['T4850.o','T4850.hi','T4850']),
-             run_command, ['$MAKE -s --no-print-directory T4850'])
+test('T4850', normal, run_command, ['$MAKE -s --no-print-directory T4850'])
 
 def config_T5250(opts):
     if not (config.arch in ['i386','x86_64']):
