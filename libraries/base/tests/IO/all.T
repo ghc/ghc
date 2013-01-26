@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 def expect_fail_if_windows(opts):
-   f = if_platform('i386-unknown-mingw32', expect_fail);
+   f = if_os('mingw32', expect_fail);
    return f(opts);
 
 test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
