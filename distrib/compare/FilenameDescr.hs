@@ -18,11 +18,11 @@ data FilenameDescrBit = VersionOf String
                       | Ways
     deriving (Show, Eq, Ord)
 
-normalise :: FilenameDescr -> FilenameDescr
-normalise [] = []
-normalise [x] = [x]
-normalise (FP x1 : FP x2 : xs) = normalise (FP (x1 ++ x2) : xs)
-normalise (x : xs) = x : normalise xs
+normaliseDescr :: FilenameDescr -> FilenameDescr
+normaliseDescr [] = []
+normaliseDescr [x] = [x]
+normaliseDescr (FP x1 : FP x2 : xs) = normaliseDescr (FP (x1 ++ x2) : xs)
+normaliseDescr (x : xs) = x : normaliseDescr xs
 
 -- Sanity check that the FilenameDescr matches the filename in the tar line
 checkContent :: BuildInfo -> (FilenameDescr, TarLine) -> Errors
