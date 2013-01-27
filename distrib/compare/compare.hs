@@ -62,7 +62,8 @@ doDirectory ignoreSizeChanges p1 p2
           extraFile d fp = do putBreak
                               putStrLn ("Extra file in " ++ show d
                                      ++ ": " ++ show fp)
-          doFiles [] [] = return ()
+          doFiles [] [] = do putBreak
+                             putStrLn "Done."
           doFiles ((_, fp) : xs) [] = do extraFile p1 fp
                                          doFiles xs []
           doFiles [] ((_, fp) : ys) = do extraFile p2 fp
