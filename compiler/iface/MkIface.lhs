@@ -63,6 +63,7 @@ import FlagChecker
 import Id
 import IdInfo
 import Demand
+import Coercion( tidyCo )
 import Annotations
 import CoreSyn
 import CoreFVs

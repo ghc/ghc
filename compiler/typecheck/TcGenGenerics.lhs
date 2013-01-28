@@ -28,6 +28,7 @@ import TcGenDeriv
 import DataCon
 import TyCon
 import CoAxiom
+import Coercion         ( mkSingleCoAxiom )
 import FamInstEnv       ( FamInst, FamFlavor(..) )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString )

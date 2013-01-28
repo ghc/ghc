@@ -42,7 +42,6 @@ import FamInstEnv
 import TcAnnotations
 import TcBinds
 import HeaderInfo       ( mkPrelImports )
-import TcType   ( tidyTopType )
 import TcDefaults
 import TcEnv
 import TcRules

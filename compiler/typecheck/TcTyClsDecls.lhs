@@ -43,6 +43,7 @@ import TcMType
 import TcType
 import TysWiredIn( unitTy )
 import FamInst
+import Coercion( mkCoAxBranch )
 import Type
 import Kind
 import Class

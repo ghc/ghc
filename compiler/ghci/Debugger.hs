@@ -22,7 +22,8 @@ import Name
 import Var hiding ( varName )
 import VarSet
 import UniqSupply
-import TcType
+import Type
+import Kind
 import GHC
 import Outputable
 import PprTyThing
@@ -207,7 +208,7 @@ pprTypeAndContents id = do
   dflags  <- GHC.getSessionDynFlags
   let pefas     = gopt Opt_PrintExplicitForalls dflags
       pcontents = gopt Opt_PrintBindContents dflags
-      pprdId    = (pprTyThing pefas . AnId) id
+      pprdId    = (PprTyThing.pprTyThing pefas . AnId) id
   if pcontents 
     then do
       let depthBound = 100

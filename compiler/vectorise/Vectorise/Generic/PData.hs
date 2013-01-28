@@ -14,6 +14,7 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
+import Coercion( mkSingleCoAxiom )
 import BasicTypes
 import BuildTyCl
 import DataCon

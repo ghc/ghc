@@ -8,8 +8,6 @@ FamInstEnv: Type checked family instance declarations
 module FamInstEnv (
         Branched, Unbranched,
 
-        pprCoAxBranch, pprCoAxBranchHdr, 
-
         FamInst(..), FamFlavor(..), FamInstBranch(..), 
 
         famInstAxiom, famInstBranchRoughMatch,
@@ -52,7 +50,6 @@ import Outputable
 import Maybes
 import Util
 import FastString
-import SrcLoc
 \end{code}
 
 
@@ -240,27 +237,6 @@ pprFamFlavor flavor
         | isNewTyCon      tycon -> ptext (sLit "newtype")
         | isAbstractTyCon tycon -> ptext (sLit "data")
         | otherwise             -> ptext (sLit "WEIRD") <+> ppr tycon
-
--- defined here to avoid bad dependencies
-pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-pprCoAxBranch fam_tc (CoAxBranch { cab_lhs = lhs
-                                 , cab_rhs = rhs })
-  = pprTypeApp fam_tc lhs <+> equals <+> (ppr rhs)
-
-pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
-pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
-  | CoAxBranch { cab_lhs = tys, cab_loc = loc } <- coAxiomNthBranch ax index
-  = hang (pprTypeApp fam_tc tys)
-       2 (ptext (sLit "-- Defined") <+> ppr_loc loc)
-  where
-        ppr_loc loc
-          | isGoodSrcSpan loc
-          = ptext (sLit "at") <+> ppr (srcSpanStart loc)
-    
-          | otherwise
-          = ptext (sLit "in") <+>
-              quotes (ppr (nameModule name))
-
 
 pprFamInsts :: [FamInst br] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)

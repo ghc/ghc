@@ -90,17 +90,6 @@ module TcType (
   -- * Finding "exact" (non-dead) type variables
   exactTyVarsOfType, exactTyVarsOfTypes,
 
-  -- * Tidying type related things up for printing
-  tidyType,      tidyTypes,
-  tidyOpenType,  tidyOpenTypes,
-  tidyOpenKind,
-  tidyTyVarBndr, tidyTyVarBndrs, tidyFreeTyVars,
-  tidyOpenTyVar, tidyOpenTyVars,
-  tidyTyVarOcc,
-  tidyTopType,
-  tidyKind, 
-  tidyCo, tidyCos,
-
   ---------------------------------
   -- Foreign import and export
   isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
@@ -192,7 +181,6 @@ import ListSetOps
 import Outputable
 import FastString
 
-import Data.List( mapAccumL )
 import Data.IORef
 \end{code}
 
@@ -519,149 +507,6 @@ pprUserTypeCtxt SigmaCtxt         = ptext (sLit "the context of a polymorphic ty
 pprUserTypeCtxt (DataTyCtxt tc)   = ptext (sLit "the context of the data type declaration for") <+> quotes (ppr tc)
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{TidyType}
-%*									*
-%************************************************************************
-
-Tidying is here becuase it has a special case for FlatSkol
-
-\begin{code}
--- | This tidies up a type for printing in an error message, or in
--- an interface file.
--- 
--- It doesn't change the uniques at all, just the print names.
-tidyTyVarBndrs :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
-tidyTyVarBndrs env tvs = mapAccumL tidyTyVarBndr env tvs
-
-tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
-tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
-  = case tidyOccName occ_env occ1 of
-      (tidy', occ') -> ((tidy', subst'), tyvar')
-	where
-          subst' = extendVarEnv subst tyvar tyvar'
-          tyvar' = setTyVarKind (setTyVarName tyvar name') kind'
-          name'  = tidyNameOcc name occ'
-          kind'  = tidyKind tidy_env (tyVarKind tyvar)
-  where
-    name = tyVarName tyvar
-    occ  = getOccName name
-    -- System Names are for unification variables;
-    -- when we tidy them we give them a trailing "0" (or 1 etc)
-    -- so that they don't take precedence for the un-modified name
-    occ1 | isSystemName name = mkTyVarOcc (occNameString occ ++ "0")
-         | otherwise         = occ
-
-
----------------
-tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
--- ^ Add the free 'TyVar's to the env in tidy form,
--- so that we can tidy the type they are free in
-tidyFreeTyVars (full_occ_env, var_env) tyvars 
-  = fst (tidyOpenTyVars (full_occ_env, var_env) (varSetElems tyvars))
-
-        ---------------
-tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
-tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
-
----------------
-tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
--- ^ Treat a new 'TyVar' as a binder, and give it a fresh tidy name
--- using the environment if one has not already been allocated. See
--- also 'tidyTyVarBndr'
-tidyOpenTyVar env@(_, subst) tyvar
-  = case lookupVarEnv subst tyvar of
-	Just tyvar' -> (env, tyvar')		-- Already substituted
-	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
-
----------------
-tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar
-tidyTyVarOcc (_, subst) tv
-  = case lookupVarEnv subst tv of
-	Nothing  -> tv
-	Just tv' -> tv'
-
----------------
-tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = map (tidyType env) tys
-
----------------
-tidyType :: TidyEnv -> Type -> Type
-tidyType _   (LitTy n)            = LitTy n
-tidyType env (TyVarTy tv)	  = TyVarTy (tidyTyVarOcc env tv)
-tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
- 		                    in args `seqList` TyConApp tycon args
-tidyType env (AppTy fun arg)	  = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (FunTy fun arg)	  = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
-			          where
-			            (envp, tvp) = tidyTyVarBndr env tv
-
----------------
--- | Grabs the free type variables, tidies them
--- and then uses 'tidyType' to work over the type itself
-tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty
-  = (env', tidyType (trimmed_occ_env, var_env) ty)
-  where
-    (env'@(_, var_env), tvs') = tidyOpenTyVars env (varSetElems (tyVarsOfType ty))
-    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
-      -- The idea here was that we restrict the new TidyEnv to the 
-      -- _free_ vars of the type, so that we don't gratuitously rename
-      -- the _bound_ variables of the type.
-
----------------
-tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
-tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
-
----------------
--- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
-tidyTopType :: Type -> Type
-tidyTopType ty = tidyType emptyTidyEnv ty
-
----------------
-tidyOpenKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
-tidyOpenKind = tidyOpenType
-
-tidyKind :: TidyEnv -> Kind -> Kind
-tidyKind = tidyType
-\end{code}
-
-%************************************************************************
-%*									*
-                            Tidying coercions
-%*									*
-%************************************************************************
-
-\begin{code}
-tidyCo :: TidyEnv -> Coercion -> Coercion
-tidyCo env@(_, subst) co
-  = go co
-  where
-    go (Refl ty)             = Refl (tidyType env ty)
-    go (TyConAppCo tc cos)   = let args = map go cos
-                               in args `seqList` TyConAppCo tc args
-    go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
-    go (ForAllCo tv co)      = ForAllCo tvp $! (tidyCo envp co)
-                               where
-                                 (envp, tvp) = tidyTyVarBndr env tv
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
-    go (AxiomInstCo con ind cos) = let args = tidyCos env cos
-                               in  args `seqList` AxiomInstCo con ind args
-    go (UnsafeCo ty1 ty2)    = (UnsafeCo $! tidyType env ty1) $! tidyType env ty2
-    go (SymCo co)            = SymCo $! go co
-    go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
-    go (NthCo d co)          = NthCo d $! go co
-    go (LRCo lr co)          = LRCo lr $! go co
-    go (InstCo co ty)        = (InstCo $! go co) $! tidyType env ty
-
-tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = map (tidyCo env)
-\end{code}
 
 %************************************************************************
 %*                  *

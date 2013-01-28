@@ -24,7 +24,8 @@ import CoreSyn
 import CoreArity
 import Id
 import IdInfo
-import TcType( tidyType, tidyCo, tidyTyVarBndr )
+import Type( tidyType, tidyTyVarBndr )
+import Coercion( tidyCo )
 import Var
 import VarEnv
 import UniqFM
