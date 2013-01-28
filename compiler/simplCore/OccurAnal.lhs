@@ -710,7 +710,7 @@ occAnalRec :: SCC (Node Details)
 occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}, _, _))
            (body_uds, binds)
   | not (bndr `usedIn` body_uds)
-  = (body_uds, binds)
+  = (body_uds, binds)           -- See Note [Dead code]
 
   | otherwise                   -- It's mentioned in the body
   = (body_uds' +++ rhs_uds,
@@ -722,7 +722,7 @@ occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}, _,
         -- See Note [Loop breaking]
 occAnalRec (CyclicSCC nodes) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
-  = (body_uds, binds)                           -- Dead code
+  = (body_uds, binds)                   -- See Note [Dead code]
 
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
