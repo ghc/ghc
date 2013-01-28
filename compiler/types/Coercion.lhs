@@ -564,9 +564,11 @@ pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
        2 (vcat (map (pprCoAxBranch tc) $ fromBranchList branches))
 
 pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-pprCoAxBranch fam_tc (CoAxBranch { cab_lhs = lhs
+pprCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
+                                 , cab_lhs = lhs
                                  , cab_rhs = rhs })
-  = pprTypeApp fam_tc lhs <+> equals <+> (ppr rhs)
+  = hang (ifPprDebug (pprForAll tvs))
+       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
 
 pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
 pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
