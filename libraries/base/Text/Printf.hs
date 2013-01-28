@@ -6,7 +6,7 @@
 -- Module      :  Text.Printf
 -- Copyright   :  (c) Lennart Augustsson, 2004-2008
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  lennart@augustsson.net
 -- Stability   :  provisional
 -- Portability :  portable
@@ -44,7 +44,7 @@ import System.IO
 -- >    0      pad with zeroes rather than spaces
 --
 -- followed optionally by a field width:
--- 
+--
 -- >    num    field width
 -- >    *      as num, but taken from argument list
 --
@@ -110,13 +110,13 @@ instance (IsChar c) => PrintfType [c] where
 
 instance PrintfType (IO a) where
     spr fmts args = do
-	putStr (uprintf fmts (reverse args))
-	return (error "PrintfType (IO a): result should not be used.")
+        putStr (uprintf fmts (reverse args))
+        return (error "PrintfType (IO a): result should not be used.")
 
 instance HPrintfType (IO a) where
     hspr hdl fmts args = do
-	hPutStr hdl (uprintf fmts (reverse args))
-	return (error "HPrintfType (IO a): result should not be used.")
+        hPutStr hdl (uprintf fmts (reverse args))
+        return (error "HPrintfType (IO a): result should not be used.")
 
 instance (PrintfArg a, PrintfType r) => PrintfType (a -> r) where
     spr fmts args = \ a -> spr fmts (toUPrintf a : args)
@@ -203,37 +203,37 @@ uprintf (c:cs)   us       = c:uprintf cs us
 
 fmt :: String -> [UPrintf] -> String
 fmt cs us =
-	let (width, prec, ladj, zero, plus, cs', us') = getSpecs False False False cs us
-	    adjust (pre, str) = 
-		let lstr = length str
-		    lpre = length pre
-		    fill = if lstr+lpre < width then take (width-(lstr+lpre)) (repeat (if zero then '0' else ' ')) else ""
-		in  if ladj then pre ++ str ++ fill else if zero then pre ++ fill ++ str else fill ++ pre ++ str
+        let (width, prec, ladj, zero, plus, cs', us') = getSpecs False False False cs us
+            adjust (pre, str) =
+                let lstr = length str
+                    lpre = length pre
+                    fill = if lstr+lpre < width then take (width-(lstr+lpre)) (repeat (if zero then '0' else ' ')) else ""
+                in  if ladj then pre ++ str ++ fill else if zero then pre ++ fill ++ str else fill ++ pre ++ str
             adjust' ("", str) | plus = adjust ("+", str)
             adjust' ps = adjust ps
         in
-	case cs' of
-	[]     -> fmterr
-	c:cs'' ->
-	    case us' of
-	    []     -> argerr
-	    u:us'' ->
-		(case c of
-		'c' -> adjust  ("", [toEnum (toint u)])
-		'd' -> adjust' (fmti prec u)
-		'i' -> adjust' (fmti prec u)
-		'x' -> adjust  ("", fmtu 16 prec u)
-		'X' -> adjust  ("", map toUpper $ fmtu 16 prec u)
-		'o' -> adjust  ("", fmtu 8  prec u)
-		'u' -> adjust  ("", fmtu 10 prec u)
-		'e' -> adjust' (dfmt' c prec u)
-		'E' -> adjust' (dfmt' c prec u)
-		'f' -> adjust' (dfmt' c prec u)
-		'g' -> adjust' (dfmt' c prec u)
-		'G' -> adjust' (dfmt' c prec u)
-		's' -> adjust  ("", tostr prec u)
-		_   -> perror ("bad formatting char " ++ [c])
-		 ) ++ uprintf cs'' us''
+        case cs' of
+        []     -> fmterr
+        c:cs'' ->
+            case us' of
+            []     -> argerr
+            u:us'' ->
+                (case c of
+                'c' -> adjust  ("", [toEnum (toint u)])
+                'd' -> adjust' (fmti prec u)
+                'i' -> adjust' (fmti prec u)
+                'x' -> adjust  ("", fmtu 16 prec u)
+                'X' -> adjust  ("", map toUpper $ fmtu 16 prec u)
+                'o' -> adjust  ("", fmtu 8  prec u)
+                'u' -> adjust  ("", fmtu 10 prec u)
+                'e' -> adjust' (dfmt' c prec u)
+                'E' -> adjust' (dfmt' c prec u)
+                'f' -> adjust' (dfmt' c prec u)
+                'g' -> adjust' (dfmt' c prec u)
+                'G' -> adjust' (dfmt' c prec u)
+                's' -> adjust  ("", tostr prec u)
+                _   -> perror ("bad formatting char " ++ [c])
+                 ) ++ uprintf cs'' us''
 
 fmti :: Int -> UPrintf -> (String, String)
 fmti prec (UInteger _ i) = if i < 0 then ("-", integral_prec prec (show (-i))) else ("", integral_prec prec (show i))
@@ -251,19 +251,19 @@ integral_prec prec integral = (replicate (prec - (length integral)) '0') ++ inte
 toint :: UPrintf -> Int
 toint (UInteger _ i) = fromInteger i
 toint (UChar c)      = fromEnum c
-toint _		     = baderr
+toint _              = baderr
 
 tostr :: Int -> UPrintf -> String
 tostr n (UString s) = if n >= 0 then take n s else s
-tostr _ _		  = baderr
+tostr _ _                 = baderr
 
 itosb :: Integer -> Integer -> String
-itosb b n = 
-	if n < b then 
-	    [intToDigit $ fromInteger n]
-	else
-	    let (q, r) = quotRem n b in
-	    itosb b q ++ [intToDigit $ fromInteger r]
+itosb b n =
+        if n < b then
+            [intToDigit $ fromInteger n]
+        else
+            let (q, r) = quotRem n b in
+            itosb b q ++ [intToDigit $ fromInteger r]
 
 stoi :: Int -> String -> (Int, String)
 stoi a (c:cs) | isDigit c = stoi (a*10 + digitToInt c) cs
@@ -274,27 +274,27 @@ getSpecs _ z s ('-':cs) us = getSpecs True z s cs us
 getSpecs l z _ ('+':cs) us = getSpecs l z True cs us
 getSpecs l _ s ('0':cs) us = getSpecs l True s cs us
 getSpecs l z s ('*':cs) us =
-	let (us', n) = getStar us
-	    ((p, cs''), us'') =
-		    case cs of
+        let (us', n) = getStar us
+            ((p, cs''), us'') =
+                    case cs of
                     '.':'*':r -> let (us''', p') = getStar us'
-		    	      	 in  ((p', r), us''')
-		    '.':r     -> (stoi 0 r, us')
-		    _         -> ((-1, cs), us')
-	in  (abs n, p, if n < 0 then not l else l, z, s, cs'', us'')
+                                 in  ((p', r), us''')
+                    '.':r     -> (stoi 0 r, us')
+                    _         -> ((-1, cs), us')
+        in  (abs n, p, if n < 0 then not l else l, z, s, cs'', us'')
 getSpecs l z s ('.':cs) us =
-	let ((p, cs'), us') = 
-	        case cs of
-		'*':cs'' -> let (us'', p') = getStar us in ((p', cs''), us'')
+        let ((p, cs'), us') =
+                case cs of
+                '*':cs'' -> let (us'', p') = getStar us in ((p', cs''), us'')
                 _ ->        (stoi 0 cs, us)
-	in  (0, p, l, z, s, cs', us')
+        in  (0, p, l, z, s, cs', us')
 getSpecs l z s cs@(c:_) us | isDigit c =
-	let (n, cs') = stoi 0 cs
-	    ((p, cs''), us') = case cs' of
-	    	 	       '.':'*':r -> let (us'', p') = getStar us in ((p', r), us'')
-		               '.':r -> (stoi 0 r, us)
-			       _     -> ((-1, cs'), us)
-	in  (n, p, l, z, s, cs'', us')
+        let (n, cs') = stoi 0 cs
+            ((p, cs''), us') = case cs' of
+                               '.':'*':r -> let (us'', p') = getStar us in ((p', r), us'')
+                               '.':r -> (stoi 0 r, us)
+                               _     -> ((-1, cs'), us)
+        in  (n, p, l, z, s, cs'', us')
 getSpecs l z s cs       us = (0, -1, l, z, s, cs, us)
 
 getStar :: [UPrintf] -> ([UPrintf], Int)
@@ -311,7 +311,7 @@ dfmt' _ _ _           = baderr
 
 dfmt :: (RealFloat a) => Char -> Int -> a -> (String, String)
 dfmt c p d =
-	case (if isUpper c then map toUpper else id) $
+        case (if isUpper c then map toUpper else id) $
              (case toLower c of
                   'e' -> showEFloat
                   'f' -> showFFloat
@@ -319,8 +319,8 @@ dfmt c p d =
                   _   -> error "Printf.dfmt: impossible"
              )
                (if p < 0 then Nothing else Just p) d "" of
-	'-':cs -> ("-", cs)
-	cs     -> ("" , cs)
+        '-':cs -> ("-", cs)
+        cs     -> ("" , cs)
 
 perror :: String -> a
 perror s = error ("Printf.printf: "++s)
@@ -328,4 +328,3 @@ fmterr, argerr, baderr :: a
 fmterr = perror "formatting string ended prematurely"
 argerr = perror "argument list ended prematurely"
 baderr = perror "bad argument"
-
