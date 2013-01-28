@@ -281,7 +281,7 @@ getSpecs l z s ('*':cs) us =
 		    	      	 in  ((p', r), us''')
 		    '.':r     -> (stoi 0 r, us')
 		    _         -> ((-1, cs), us')
-	in  (n, p, l, z, s, cs'', us'')
+	in  (abs n, p, if n < 0 then not l else l, z, s, cs'', us'')
 getSpecs l z s ('.':cs) us =
 	let ((p, cs'), us') = 
 	        case cs of
