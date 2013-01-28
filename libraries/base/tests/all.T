@@ -122,3 +122,5 @@ test('T7034', normal, compile_and_run, [''])
 
 test('qsem001', normal, compile_and_run, [''])
 test('qsemn001', normal, compile_and_run, [''])
+
+test('T7457', normal, compile_and_run, [''])
