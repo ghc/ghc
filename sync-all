@@ -335,7 +335,7 @@ sub scmall {
         }
 
         my $darcs_repo_present = 1 if -d "$localpath/_darcs";
-        my $git_repo_present = 1 if -d "$localpath/.git" || ($bare_flag && -d "$localpath");
+        my $git_repo_present = 1 if -e "$localpath/.git" || ($bare_flag && -d "$localpath");
         if ($darcs_repo_present) {
             if ($git_repo_present) {
                 die "Found both _darcs and .git in $localpath";

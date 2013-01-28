@@ -5,7 +5,7 @@ import Data.Function
 import Data.List
 import System.Exit
 import System.IO
-import Text.Regex.Posix
+import Text.Regex.PCRE
 
 die :: Errors -> IO a
 die errs = do mapM_ (hPutStrLn stderr) errs

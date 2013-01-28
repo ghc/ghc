@@ -1438,7 +1438,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    // definitely doesn't point into a young generation.
 	    // Clean objects don't need to be scavenged.  Some clean
 	    // objects (MUT_VAR_CLEAN) are not kept on the mutable
-	    // list at all; others, such as TSO
+	    // list at all; others, such as MUT_ARR_PTRS
 	    // are always on the mutable list.
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {

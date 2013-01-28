@@ -1,6 +1,7 @@
 
 module FilenameDescr where
 
+import Data.Char
 import Data.Either
 import Data.List
 
@@ -18,11 +19,11 @@ data FilenameDescrBit = VersionOf String
                       | Ways
     deriving (Show, Eq, Ord)
 
-normalise :: FilenameDescr -> FilenameDescr
-normalise [] = []
-normalise [x] = [x]
-normalise (FP x1 : FP x2 : xs) = normalise (FP (x1 ++ x2) : xs)
-normalise (x : xs) = x : normalise xs
+normaliseDescr :: FilenameDescr -> FilenameDescr
+normaliseDescr [] = []
+normaliseDescr [x] = [x]
+normaliseDescr (FP x1 : FP x2 : xs) = normaliseDescr (FP (x1 ++ x2) : xs)
+normaliseDescr (x : xs) = x : normaliseDescr xs
 
 -- Sanity check that the FilenameDescr matches the filename in the tar line
 checkContent :: BuildInfo -> (FilenameDescr, TarLine) -> Errors
@@ -32,7 +33,11 @@ checkContent buildInfo (fd, tl)
       Right fn' ->
           if fn' == fn
           then []
-          else ["checkContent: Can't happen: filename mismatch: " ++ show fn]
+          else if all isAscii fn
+               then ["checkContent: Can't happen: filename mismatch: "
+                  ++ show fn]
+               else [] -- Ugly kludge; don't worry too much if filepaths
+                       -- containing non-ASCII chars have gone wrong
       Left errs ->
           errs
 
