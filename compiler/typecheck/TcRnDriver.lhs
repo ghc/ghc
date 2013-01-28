@@ -77,6 +77,7 @@ import Outputable
 import DataCon
 import Type
 import Class
+import CoAxiom  ( CoAxBranch(..) )
 import TcType   ( orphNamesOfDFunHead )
 import Inst     ( tcGetInstEnvs )
 import Data.List ( sortBy )
@@ -748,7 +749,8 @@ checkBootTyCon tc1 tc2
            eqListBy eqATDef def_ats1 def_ats2
 
        -- Ignore the location of the defaults
-       eqATDef (ATD tvs1 ty_pats1 ty1 _loc1) (ATD tvs2 ty_pats2 ty2 _loc2)
+       eqATDef (CoAxBranch { cab_tvs = tvs1, cab_lhs =  ty_pats1, cab_rhs = ty1 })
+               (CoAxBranch { cab_tvs = tvs2, cab_lhs =  ty_pats2, cab_rhs = ty2 })
          | Just env <- eqTyVarBndrs emptyRnEnv2 tvs1 tvs2
          = eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
            eqTypeX env ty1 ty2

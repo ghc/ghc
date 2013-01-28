@@ -16,7 +16,7 @@ The @Class@ datatype
 module Class (
 	Class,
         ClassOpItem, DefMeth (..),
-        ClassATItem, ATDefault (..),
+        ClassATItem,
 	defMethSpecOfDefMeth,
 
 	FunDep,	pprFundeps, pprFunDep,
@@ -31,15 +31,14 @@ module Class (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )
-import {-# SOURCE #-} TypeRep	( Type, PredType )
-
+import {-# SOURCE #-} TypeRep	( PredType )
+import CoAxiom
 import Var
 import Name
 import BasicTypes
 import Unique
 import Util
 import Outputable
-import SrcLoc
 import FastString
 
 import Data.Typeable (Typeable)
@@ -97,20 +96,9 @@ data DefMeth = NoDefMeth 		-- No default method
              deriving Eq
 
 type ClassATItem = (TyCon,           -- See Note [Associated type tyvar names]
-                    [ATDefault])     -- Default associated types from these templates 
+                    [CoAxBranch])    -- Default associated types from these templates 
   -- We can have more than one default per type; see
   -- Note [Associated type defaults] in TcTyClsDecls
-
--- Each associated type default template is a quad of:
-data ATDefault = ATD { -- TyVars of the RHS and family arguments 
-                       -- (including, but perhaps more than, the class TVs)
-                       atDefaultTys     :: [TyVar],
-                       -- The instantiated family arguments
-                       atDefaultPats    :: [Type],
-                       -- The RHS of the synonym
-                       atDefaultRhs     :: Type,
-                       -- The source location of the synonym
-                       atDefaultSrcSpan :: SrcSpan }
 
 -- | Convert a `DefMethSpec` to a `DefMeth`, which discards the name field in
 --   the `DefMeth` constructor of the `DefMeth`.

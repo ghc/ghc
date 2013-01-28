@@ -593,7 +593,6 @@ mkAxInstLHS ax index tys
   , (tys1, tys2) <- splitAtList tvs tys
   = ASSERT( tvs `equalLength` tys1 ) 
     mkTyConApp (coAxiomTyCon ax) (substTysWith tvs tys1 lhs ++ tys2)
-  where
 
 mkAxInstRHS ax index tys
   | CoAxBranch { cab_tvs = tvs, cab_rhs = rhs } <- coAxiomNthBranch ax index

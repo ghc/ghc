@@ -531,14 +531,15 @@ tcClsInstDecl (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                  --            instance C [x]
                  -- Then we want to generate the decl:   type F [x] b = ()
                 | otherwise 
-                = forM defs $ \(ATD _tvs pat_tys rhs _loc) ->
+                = forM defs $ \(CoAxBranch { cab_lhs = pat_tys, cab_rhs = rhs }) ->
                   do { let pat_tys' = substTys mini_subst pat_tys
                            rhs'     = substTy  mini_subst rhs
                            tv_set'  = tyVarsOfTypes pat_tys'
                            tvs'     = varSetElems tv_set'
                      ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
+                     ; let axiom = mkSingleCoAxiom rep_tc_name tvs' fam_tc pat_tys' rhs'
                      ; ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' ) 
-                       mkFreshenedSynInst rep_tc_name tvs' fam_tc pat_tys' rhs' }
+                       newFamInst SynFamilyInst False {- group -} axiom }
 
         ; tyfam_insts1 <- mapM mk_deflt_at_instances (classATItems clas)
         
@@ -622,38 +623,29 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
                  (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
-       ; quads <- tcSynFamInstDecl fam_tc decl
+       ; co_ax_branches <- tcSynFamInstDecl fam_tc decl
 
-         -- (2) create the branches
-       ; co_ax_branches <- mapM check_valid_mk_branch quads
-
-         -- (3) construct coercion tycon
-       ; rep_tc_name <- newFamInstAxiomName loc
-                                            (tyFamInstDeclName decl)
-                                            (get_typats quads)
-
-         -- (4) check to see if earlier equations dominate a later one
+         -- (2) check for validity and inaccessibility
+       ; mapM_   check_valid_mk_branch co_ax_branches
        ; foldlM_ check_inaccessible_branches [] co_ax_branches
 
-         -- now, build the FamInst
-       ; return $ mkSynFamInst rep_tc_name fam_tc group co_ax_branches }
-
+         -- (3) construct coercion axiom
+       ; rep_tc_name <- newFamInstAxiomName loc
+                                            (tyFamInstDeclName decl)
+                                            (map cab_lhs co_ax_branches)
+       ; let axiom = mkBranchedCoAxiom rep_tc_name fam_tc co_ax_branches
+       ; newFamInst SynFamilyInst group axiom }
     where 
-      check_valid_mk_branch :: ([TyVar], [Type], Type, SrcSpan)
-                            -> TcM CoAxBranch
-      check_valid_mk_branch (t_tvs, t_typats, t_rhs, loc)
+      check_valid_mk_branch :: CoAxBranch -> TcM ()
+      check_valid_mk_branch (CoAxBranch { cab_tvs = t_tvs, cab_lhs = t_typats
+                                        , cab_rhs = t_rhs, cab_loc = loc })
         = setSrcSpan loc $
           do { -- check the well-formedness of the instance
                checkValidTyFamInst fam_tc t_tvs t_typats t_rhs
 
                -- check that type patterns match the class instance head
-             ; tcAssocFamInst mb_clsinfo loc (ptext (sLit "type")) fam_tc t_typats
+             ; tcAssocFamInst mb_clsinfo loc (ptext (sLit "type")) fam_tc t_typats }
 
-               -- make fresh tyvars for axiom
-             ; (t_tvs', t_typats', t_rhs')
-                 <- freshenFamInstEqn t_tvs t_typats t_rhs
-
-             ; return $ mkCoAxBranch loc t_tvs' t_typats' t_rhs' }
 
       check_inaccessible_branches :: [CoAxBranch]     -- previous
                                   -> CoAxBranch       -- current
@@ -664,8 +656,6 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
           do { when (tys `isDominatedBy` prev_branches) $
                     addErrTc $ inaccessibleCoAxBranch fam_tc cur_branch
              ; return $ cur_branch : prev_branches }
-
-      get_typats = map (\(_, tys, _, _) -> tys)
 
 tcDataFamInstDecl :: Maybe (Class, VarEnv Type)
                   -> TyCon -> LDataFamInstDecl Name -> TcM (FamInst Unbranched)
@@ -710,11 +700,10 @@ tcDataFamInstDecl mb_clsinfo fam_tc
                      NewType  -> ASSERT( not (null data_cons) )
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
               -- freshen tyvars
-              ; (subst, tvs'') <- tcInstSkolTyVars tvs'
-              ; let pats''   = substTys subst pats'
-                    fam_inst = mkDataFamInst axiom_name tvs'' fam_tc pats'' rep_tc
-                    parent   = FamInstTyCon (famInstAxiom fam_inst) fam_tc pats''
-                    rep_tc   = buildAlgTyCon rep_tc_name tvs'' cType stupid_theta tc_rhs 
+              ; let axiom    = mkSingleCoAxiom axiom_name tvs' fam_tc pats' 
+                                               (mkTyConApp rep_tc (mkTyVarTys tvs'))
+                    parent   = FamInstTyCon axiom fam_tc pats'
+                    rep_tc   = buildAlgTyCon rep_tc_name tvs' cType stupid_theta tc_rhs 
                                              Recursive 
                                              False      -- No promotable to the kind level
                                              h98_syntax parent
@@ -723,6 +712,7 @@ tcDataFamInstDecl mb_clsinfo fam_tc
                  -- further instance might not introduce a new recursive
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
+              ; fam_inst <- newFamInst (DataFamilyInst rep_tc) False axiom
               ; return (rep_tc, fam_inst) }
 
          -- Remember to check validity; no recursion to worry about here

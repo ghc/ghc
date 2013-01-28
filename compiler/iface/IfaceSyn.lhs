@@ -14,7 +14,7 @@
 module IfaceSyn (
         module IfaceType,
 
-        IfaceDecl(..), IfaceClassOp(..), IfaceAT(..), IfaceATDefault(..),
+        IfaceDecl(..), IfaceClassOp(..), IfaceAT(..), 
         IfaceConDecl(..), IfaceConDecls(..),
         IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
@@ -118,15 +118,13 @@ data IfaceClassOp = IfaceClassOp OccName DefMethSpec IfaceType
         -- Just False => ordinary polymorphic default method
         -- Just True  => generic default method
 
-data IfaceAT = IfaceAT IfaceDecl [IfaceATDefault]
+data IfaceAT = IfaceAT IfaceDecl [IfaceAxBranch]
         -- Nothing => no default associated type instance
         -- Just ds => default associated type instance from these templates
 
-data IfaceATDefault = IfaceATD [IfaceTvBndr] [IfaceType] IfaceType
-        -- Each associated type default template is a triple of:
-        --   1. TyVars of the RHS and family arguments (including the class TVs)
-        --   3. The instantiated family arguments
-        --   2. The RHS of the synonym
+instance Outputable IfaceAxBranch where
+   ppr (IfaceAxBranch { ifaxbTyVars = tvs, ifaxbLHS = pat_tys, ifaxbRHS = ty }) 
+      = ppr tvs <+> hsep (map ppr pat_tys) <+> char '=' <+> ppr ty
 
 -- this is just like CoAxBranch
 data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars :: [IfaceTvBndr]
@@ -538,11 +536,10 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 
 pprIfaceDecl (IfaceAxiom {ifName = name, ifTyCon = tycon, ifAxBranches = branches })
   = hang (ptext (sLit "axiom") <+> ppr name <> colon)
-       2 (vcat $ map (pprIfaceAxBranch tycon) branches)
-
-pprIfaceAxBranch :: IfaceTyCon -> IfaceAxBranch -> SDoc
-pprIfaceAxBranch tc (IfaceAxBranch { ifaxbTyVars = tyvars, ifaxbLHS = lhs, ifaxbRHS = rhs })
-  = pprIfaceTvBndrs tyvars <> dot <+> ppr (IfaceTyConApp tc lhs) <+> text "~#" <+> ppr rhs
+       2 (vcat $ map ppr_branch branches)
+  where
+     ppr_branch (IfaceAxBranch { ifaxbTyVars = tyvars, ifaxbLHS = lhs, ifaxbRHS = rhs })
+        = pprIfaceTvBndrs tyvars <> dot <+> ppr (IfaceTyConApp tycon lhs) <+> text "~#" <+> ppr rhs
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing = ptext (sLit "No C type associated")
@@ -560,9 +557,6 @@ instance Outputable IfaceClassOp where
 
 instance Outputable IfaceAT where
    ppr (IfaceAT d defs) = hang (ppr d) 2 (vcat (map ppr defs))
-
-instance Outputable IfaceATDefault where
-   ppr (IfaceATD tvs pat_tys ty) = ppr tvs <+> hsep (map ppr pat_tys) <+> char '=' <+> ppr ty
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars
@@ -837,12 +831,7 @@ freeNamesIfContext = fnList freeNamesIfType
 freeNamesIfAT :: IfaceAT -> NameSet
 freeNamesIfAT (IfaceAT decl defs)
   = freeNamesIfDecl decl &&&
-    fnList fn_at_def defs
-  where
-    fn_at_def (IfaceATD tvs pat_tys ty)
-      = freeNamesIfTvBndrs tvs &&&
-        fnList freeNamesIfType pat_tys &&&
-        freeNamesIfType ty
+    fnList freeNamesIfAxBranch defs
 
 freeNamesIfClsSig :: IfaceClassOp -> NameSet
 freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty

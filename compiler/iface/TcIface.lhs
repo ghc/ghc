@@ -525,13 +525,8 @@ tc_iface_decl _parent ignore_prags
 
    tc_at cls (IfaceAT tc_decl defs_decls)
      = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
-          defs <- mapM tc_iface_at_def defs_decls
+          defs <- mapM tc_ax_branch defs_decls
           return (tc, defs)
-
-   tc_iface_at_def (IfaceATD tvs pat_tys ty) =
-       bindIfaceTyVars_AT tvs $
-         \tvs' -> liftM2 (\pats tys -> ATD tvs' pats tys noSrcSpan)
-                           (mapM tcIfaceType pat_tys) (tcIfaceType ty)
 
    mk_op_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 
@@ -547,23 +542,23 @@ tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 tc_iface_decl _ _ (IfaceAxiom {ifName = ax_occ, ifTyCon = tc, ifAxBranches = branches})
   = do { tc_name     <- lookupIfaceTop ax_occ
        ; tc_tycon    <- tcIfaceTyCon tc
-       ; tc_branches <- mapM tc_branch branches
+       ; tc_branches <- mapM tc_ax_branch branches
        ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
                              , co_ax_branches = toBranchList tc_branches
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
-  where tc_branch :: IfaceAxBranch -> IfL CoAxBranch
-        tc_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs })
-          = bindIfaceTyVars tv_bndrs $ \ tvs -> do
-            { tc_lhs <- mapM tcIfaceType lhs
-            ; tc_rhs <- tcIfaceType rhs
-            ; let branch = CoAxBranch { cab_loc = noSrcSpan
-                                      , cab_tvs = tvs
-                                      , cab_lhs = tc_lhs
-                                      , cab_rhs = tc_rhs }
-            ; return branch }
+
+tc_ax_branch :: IfaceAxBranch -> IfL CoAxBranch
+tc_ax_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs, ifaxbLHS = lhs, ifaxbRHS = rhs })
+  = bindIfaceTyVars tv_bndrs $ \ tvs -> do  -- Variables will all be fresh
+    { tc_lhs <- mapM tcIfaceType lhs
+    ; tc_rhs <- tcIfaceType rhs
+    ; return (CoAxBranch { cab_loc = noSrcSpan
+                         , cab_tvs = tvs
+                         , cab_lhs = tc_lhs
+                         , cab_rhs = tc_rhs } ) }
 
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons

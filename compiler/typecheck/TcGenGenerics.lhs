@@ -28,7 +28,7 @@ import TcGenDeriv
 import DataCon
 import TyCon
 import CoAxiom
-import FamInstEnv       ( FamInst )
+import FamInstEnv       ( FamInst, FamFlavor(..) )
 import FamInst
 import Module           ( Module, moduleName, moduleNameString )
 import IfaceEnv         ( newGlobalBinder )
@@ -419,7 +419,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
   do { -- `rep` = GHC.Generics.Rep or GHC.Generics.Rep1 (type family)
-       rep <- case gk of
+       fam_tc <- case gk of
          Gen0 -> tcLookupTyCon repTyConName
          Gen1 -> tcLookupTyCon rep1TyConName
 
@@ -432,6 +432,7 @@ tc_mkRepFamInsts gk tycon metaDts mod =
 
            tyvar_args = mkTyVarTys tyvars
 
+           appT :: [Type]
            appT = case tyConFamInst_maybe tycon of
                      -- `appT` = D Int a b (data families case)
                      Just (famtycon, apps) ->
@@ -452,8 +453,8 @@ tc_mkRepFamInsts gk tycon metaDts mod =
                    in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
                         (nameSrcSpan (tyConName tycon))
 
-     ; mkFreshenedSynInst rep_name tyvars rep appT repTy
-     }
+     ; let axiom = mkSingleCoAxiom rep_name tyvars fam_tc appT repTy
+     ; newFamInst SynFamilyInst False axiom  }
 
 --------------------------------------------------------------------------------
 -- Type representation
