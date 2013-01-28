@@ -218,7 +218,8 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 	
         BlockedOnMVar          the MVAR             the MVAR's queue
 
-	BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
+        BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
+        BlockedOnSTM           STM_AWOKEN           run queue
 	
         BlockedOnMsgThrowTo    MessageThrowTo *     TSO->blocked_exception
 
@@ -252,5 +253,6 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
+#define STM_AWOKEN     ((StgTSO *)(void*)&stg_STM_AWOKEN_closure)
 
 #endif /* RTS_STORAGE_TSO_H */

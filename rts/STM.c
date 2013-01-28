@@ -380,13 +380,19 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
 
     // Unblocking a TSO from BlockedOnSTM is done under the TSO lock,
     // to avoid multiple CPUs unblocking the same TSO, and also to
-    // synchronise with throwTo().
+    // synchronise with throwTo(). The first time the TSO is unblocked
+    // we mark this fact by setting block_info.closure == STM_AWOKEN.
+    // This way we can avoid sending further wakeup messages in the
+    // future.
     lockTSO(tso);
-    if (tso -> why_blocked == BlockedOnSTM) {
-	TRACE("unpark_tso on tso=%p", tso);
-        tryWakeupThread(cap,tso);
+    if (tso->why_blocked == BlockedOnSTM && tso->block_info.closure == STM_AWOKEN) {
+      TRACE("unpark_tso already woken up tso=%p", tso);
+    } else if (tso -> why_blocked == BlockedOnSTM) {
+      TRACE("unpark_tso on tso=%p", tso);
+      tso->block_info.closure = STM_AWOKEN;
+      tryWakeupThread(cap,tso);
     } else {
-	TRACE("spurious unpark_tso on tso=%p", tso);
+      TRACE("spurious unpark_tso on tso=%p", tso);
     }
     unlockTSO(tso);
 }
