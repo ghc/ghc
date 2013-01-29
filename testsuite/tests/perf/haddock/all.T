@@ -2,21 +2,23 @@
 test('haddock.base',
      [unless_in_tree_compiler(skip)
      ,if_wordsize(64,
-          stats_range_field('peak_megabytes_allocated', 249, 10))
+          stats_range_field('peak_megabytes_allocated', 274, 10))
                                         # 2012-08-14: 240 (amd64/Linux)
                                         # 2012-09-18: 237 (amd64/Linux)
                                         # 2012-11-12: 249 (amd64/Linux)
+                                        # 2013-01-29: 274 (amd64/Linux)
      ,if_wordsize(32,
           stats_num_field('peak_megabytes_allocated', 110,
                                                       115))
                                         # 2012-08-14: 144 (x86/OSX)
                                         # 2012-10-30: 113 (x86/Windows)
      ,if_wordsize(64,
-          stats_range_field('max_bytes_used', 87265136, 10))
+          stats_range_field('max_bytes_used', 96022312, 10))
                                 # 2012-08-14: 87374568 (amd64/Linux)
                                 # 2012-08-21: 86428216 (amd64/Linux)
                                 # 2012-09-20: 84794136 (amd64/Linux)
                                 # 2012-11-12: 87265136 (amd64/Linux)
+                                # 2013-01-29: 96022312 (amd64/Linux)
      ,if_wordsize(32,
           stats_range_field('max_bytes_used', 45574928, 1))
                                 # 2012-08-14: 45574928 (x86/OSX)
