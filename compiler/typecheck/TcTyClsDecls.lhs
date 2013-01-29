@@ -956,42 +956,6 @@ type variables (a,b), but also over the implicitly mentioned kind varaibles
 none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.
 
-Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow this:
-  class C a where
-    type T x a
-  instance C Int where
-    type T (S y) Int = y
-    type T Z     Int = Char
-
-Note that 
-  a) The variable 'x' is not bound by the class decl
-  b) 'x' is instantiated to a non-type-variable in the instance
-  c) There are several type instance decls for T in the instance
-
-All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, becuase it's an *associated* type.
-
-Note [Checking consistent instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  class C a b where
-    type T a x b
-
-  instance C [p] Int
-    type T [p] y Int = (p,y,y)  -- Induces the family instance TyCon
-                                --    type TR p y = (p,y,y)
-
-So we 
-  * Form the mini-envt from the class type variables a,b
-    to the instance decl types [p],Int:   [a->[p], b->Int]
-
-  * Look at the tyvars a,x,b of the type family constructor T
-    (it shares tyvars with the class C)
-
-  * Apply the mini-evnt to them, and check that the result is
-    consistent with the instance types [p] y Int
-
 
 %************************************************************************
 %*                                                                      *
@@ -1449,7 +1413,6 @@ checkValidClass cls
 	; mapM_ (check_op constrained_class_methods) op_stuff
 
         -- Check the associated type defaults are well-formed and instantiated
-        -- See Note [Checking consistent instantiation]
         ; mapM_ check_at_defs at_stuff	}
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
