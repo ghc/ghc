@@ -358,10 +358,13 @@ pprExpr e = case e of
     CmmRegOff reg 0 -> pprCastReg reg
 
     CmmRegOff reg i
-        | i >  0    -> pprRegOff (char '+') i
-        | otherwise -> pprRegOff (char '-') (-i)
+        | i < 0 && negate_ok -> pprRegOff (char '-') (-i)
+        | otherwise          -> pprRegOff (char '+') i
       where
         pprRegOff op i' = pprCastReg reg <> op <> int i'
+        negate_ok = negate (fromIntegral i :: Integer) <
+                    fromIntegral (maxBound::Int)
+                     -- overflow is undefined; see #7620
 
     CmmMachOp mop args -> pprMachOpApp mop args
 

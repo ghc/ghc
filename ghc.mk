@@ -400,7 +400,9 @@ endef
 define addPackage # args: $1 = package, $2 = condition
 ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
+ifneq "$(CrossCompiling)" "YES"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
+endif
 else
 $(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
 endif
