@@ -37,7 +37,6 @@ import DriverPhases     ( Phase(..), isSourceFilename, anyHsc,
                           startPhase, isHaskellSrcFilename )
 import BasicTypes       ( failed )
 import StaticFlags
-import StaticFlagParser
 import DynFlags
 import ErrUtils
 import FastString

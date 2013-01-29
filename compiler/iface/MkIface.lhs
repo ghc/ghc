@@ -63,6 +63,7 @@ import FlagChecker
 import Id
 import IdInfo
 import Demand
+import Coercion( tidyCo )
 import Annotations
 import CoreSyn
 import CoreFVs
@@ -1444,18 +1445,18 @@ coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
 coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches })
  = IfaceAxiom { ifName       = name
               , ifTyCon      = toIfaceTyCon tycon
-              , ifAxBranches = brListMap coAxBranchToIfaceBranch branches }
+              , ifAxBranches = brListMap (coAxBranchToIfaceBranch emptyTidyEnv) branches }
  where
    name = getOccName ax
 
 
-coAxBranchToIfaceBranch :: CoAxBranch -> IfaceAxBranch
-coAxBranchToIfaceBranch (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
+coAxBranchToIfaceBranch :: TidyEnv -> CoAxBranch -> IfaceAxBranch
+coAxBranchToIfaceBranch env0 (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
   = IfaceAxBranch { ifaxbTyVars = toIfaceTvBndrs tv_bndrs
-                  , ifaxbLHS    = map (tidyToIfaceType env) lhs
-                  , ifaxbRHS    = tidyToIfaceType env rhs }
+                  , ifaxbLHS    = map (tidyToIfaceType env1) lhs
+                  , ifaxbRHS    = tidyToIfaceType env1 rhs }
   where
-    (env, tv_bndrs) = tidyTyVarBndrs emptyTidyEnv tvs
+    (env1, tv_bndrs) = tidyTyVarBndrs env0 tvs
 
 -----------------
 tyConToIfaceDecl :: TidyEnv -> TyCon -> IfaceDecl
@@ -1549,14 +1550,7 @@ classToIfaceDecl env clas
     
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (tc, defs)
-      = IfaceAT (tyConToIfaceDecl env1 tc) (map to_if_at_def defs)
-      where
-        to_if_at_def (ATD tvs pat_tys ty _loc)
-          = IfaceATD (toIfaceTvBndrs tvs') 
-                     (map (tidyToIfaceType env2) pat_tys) 
-                     (tidyToIfaceType env2 ty)
-          where
-            (env2, tvs') = tidyTyClTyVarBndrs env1 tvs
+      = IfaceAT (tyConToIfaceDecl env1 tc) (map (coAxBranchToIfaceBranch env1) defs)
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT(sel_tyvars == clas_tyvars)

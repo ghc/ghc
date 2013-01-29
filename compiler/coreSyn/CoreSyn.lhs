@@ -1324,8 +1324,9 @@ isRuntimeVar = isId
 isRuntimeArg :: CoreExpr -> Bool
 isRuntimeArg = isValArg
 
--- | Returns @False@ iff the expression is a 'Type' or 'Coercion'
--- expression at its top level
+-- | Returns @True@ for value arguments, false for type args
+-- NB: coercions are value arguments (zero width, to be sure,
+-- like State#, but still value args).
 isValArg :: Expr b -> Bool
 isValArg e = not (isTypeArg e)
 

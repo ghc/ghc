@@ -43,9 +43,11 @@ import TcMType
 import TcType
 import TysWiredIn( unitTy )
 import FamInst
+import Coercion( mkCoAxBranch )
 import Type
 import Kind
 import Class
+import CoAxiom( CoAxBranch(..) )
 import TyCon
 import DataCon
 import Id
@@ -779,19 +781,16 @@ tcClassATs class_name parent ats at_defs
 -------------------------
 tcDefaultAssocDecl :: TyCon                -- ^ Family TyCon
                    -> LTyFamInstDecl Name  -- ^ RHS
-                   -> TcM [ATDefault]      -- ^ Type checked RHS and free TyVars
+                   -> TcM [CoAxBranch]     -- ^ Type checked RHS and free TyVars
 tcDefaultAssocDecl fam_tc (L loc decl)
   = setSrcSpan loc $
     tcAddTyFamInstCtxt decl $
     do { traceTc "tcDefaultAssocDecl" (ppr decl)
-       ; quads <- tcSynFamInstDecl fam_tc decl
-       ; return $ map (uncurry4 ATD) quads }
--- We check for well-formedness and validity later, in checkValidClass
-    where uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-          uncurry4 f (a, b, c, d) = f a b c d
+       ; tcSynFamInstDecl fam_tc decl }
+    -- We check for well-formedness and validity later, in checkValidClass
 
 -------------------------
-tcSynFamInstDecl :: TyCon -> TyFamInstDecl Name -> TcM [([TyVar], [Type], Type, SrcSpan)]
+tcSynFamInstDecl :: TyCon -> TyFamInstDecl Name -> TcM [CoAxBranch]
 -- Placed here because type family instances appear as 
 -- default decls in class declarations 
 tcSynFamInstDecl fam_tc (TyFamInstDecl { tfid_eqns = eqns })
@@ -814,7 +813,7 @@ tcSynFamInstNames (L _ first) names
       = setSrcSpan loc $
         failWithTc (msg_fun name)
 
-tcTyFamInstEqn :: TyCon -> LTyFamInstEqn Name -> TcM ([TyVar], [Type], Type, SrcSpan)
+tcTyFamInstEqn :: TyCon -> LTyFamInstEqn Name -> TcM CoAxBranch
 tcTyFamInstEqn fam_tc 
     (L loc (TyFamInstEqn { tfie_pats = pats, tfie_rhs = hs_ty }))
   = setSrcSpan loc $
@@ -823,7 +822,7 @@ tcTyFamInstEqn fam_tc
     do { rhs_ty <- tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; traceTc "tcSynFamInstEqn" (ppr fam_tc <+> (ppr tvs' $$ ppr pats' $$ ppr rhs_ty))
-       ; return (tvs', pats', rhs_ty, loc) }
+       ; return (mkCoAxBranch tvs' pats' rhs_ty loc) }
 
 kcDataDefn :: HsDataDefn Name -> TcKind -> TcM ()
 -- Used for 'data instance' only
@@ -1496,7 +1495,8 @@ checkValidClass cls
 		-- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = do { mapM_ (\(ATD tvs pats rhs _loc) -> checkValidTyFamInst fam_tc tvs pats rhs) defs
+      = do { mapM_ (\(CoAxBranch { cab_tvs = tvs, cab_lhs = pats, cab_rhs = rhs })
+                    -> checkValidTyFamInst fam_tc tvs pats rhs) defs
            ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
              mapM_ (check_loc_at_def fam_tc) defs }
 
@@ -1511,7 +1511,7 @@ checkValidClass cls
     --  the (C Int Bool)  header
     -- This is not to do with soundness; it's just checking that the
     -- type instance arg is the sam
-    check_loc_at_def fam_tc (ATD _tvs pats _rhs loc)
+    check_loc_at_def fam_tc (CoAxBranch { cab_lhs = pats, cab_loc = loc })
       -- Set the location for each of the default declarations
       = setSrcSpan loc $ zipWithM_ check_arg (tyConTyVars fam_tc) pats
 

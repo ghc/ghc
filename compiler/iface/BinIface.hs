@@ -1426,13 +1426,6 @@ instance Binary IfaceAT where
         defs <- get bh
         return (IfaceAT dec defs)
 
-instance Binary IfaceATDefault where
-    put_ bh (IfaceATD tvs pat_tys ty) = do
-        put_ bh tvs
-        put_ bh pat_tys
-        put_ bh ty
-    get bh = liftM3 IfaceATD (get bh) (get bh) (get bh)
-
 instance Binary IfaceClassOp where
     put_ bh (IfaceClassOp n def ty) = do 
         put_ bh (occNameFS n)

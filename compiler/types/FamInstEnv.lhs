@@ -17,9 +17,7 @@ module FamInstEnv (
         famInstTyCon, famInstRepTyCon_maybe, dataFamInstRepTyCon, 
         pprFamInst, pprFamInsts, 
         pprFamFlavor, 
-        pprCoAxBranch, pprCoAxBranchHdr, 
-        mkSynFamInst, mkSingleSynFamInst,
-        mkDataFamInst, mkImportedFamInst, 
+        mkImportedFamInst, 
 
         FamInstEnv, FamInstEnvs,
         emptyFamInstEnvs, emptyFamInstEnv, famInstEnvElts, familyInstances,
@@ -52,13 +50,12 @@ import Outputable
 import Maybes
 import Util
 import FastString
-import SrcLoc
 \end{code}
 
 
 %************************************************************************
 %*                                                                      *
-\subsection{Type checked family instance heads}
+           Type checked family instance heads
 %*                                                                      *
 %************************************************************************
 
@@ -130,8 +127,8 @@ data FamInst br -- See Note [FamInsts and CoAxioms], Note [Branched axioms] in C
 
 data FamInstBranch
   = FamInstBranch
-    { fib_tvs    :: [TyVar]      -- bound type variables
-                                 -- like ClsInsts, these variables are always
+    { fib_tvs    :: [TyVar]      -- Bound type variables
+                                 -- Like ClsInsts, these variables are always
                                  -- fresh. See Note [Template tyvars are fresh]
                                  -- in InstEnv
     , fib_lhs    :: [Type]       -- type patterns
@@ -241,123 +238,8 @@ pprFamFlavor flavor
         | isAbstractTyCon tycon -> ptext (sLit "data")
         | otherwise             -> ptext (sLit "WEIRD") <+> ppr tycon
 
--- defined here to avoid bad dependencies
-pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-pprCoAxBranch fam_tc (CoAxBranch { cab_lhs = lhs
-                                 , cab_rhs = rhs })
-  = pprTypeApp fam_tc lhs <+> equals <+> (ppr rhs)
-
-pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
-pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
-  | CoAxBranch { cab_lhs = tys, cab_loc = loc } <- coAxiomNthBranch ax index
-  = hang (pprTypeApp fam_tc tys)
-       2 (ptext (sLit "-- Defined") <+> ppr_loc loc)
-  where
-        ppr_loc loc
-          | isGoodSrcSpan loc
-          = ptext (sLit "at") <+> ppr (srcSpanStart loc)
-    
-          | otherwise
-          = ptext (sLit "in") <+>
-              quotes (ppr (nameModule name))
-
-
 pprFamInsts :: [FamInst br] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
-
-mk_fam_inst_branch :: CoAxBranch -> FamInstBranch
-mk_fam_inst_branch (CoAxBranch { cab_tvs = tvs
-                               , cab_lhs = lhs
-                               , cab_rhs = rhs })
-  = FamInstBranch { fib_tvs   = tvs
-                  , fib_lhs   = lhs
-                  , fib_rhs   = rhs
-                  , fib_tcs   = roughMatchTcs lhs }
-
--- | Create a coercion identifying a @type@ family instance.
--- It has the form @Co tvs :: F ts ~ R@, where @Co@ is
--- the coercion constructor built here, @F@ the family tycon and @R@ the
--- right-hand side of the type family instance.
-mkSynFamInst :: Name            -- ^ Unique name for the coercion tycon
-             -> TyCon           -- ^ Family tycon (@F@)
-             -> Bool            -- ^ Was this declared as a branched group?
-             -> [CoAxBranch]    -- ^ the branches of the CoAxiom
-             -> FamInst Branched
-mkSynFamInst name fam_tc group branches
-  = ASSERT( length branches >= 1 )
-    FamInst { fi_fam      = tyConName fam_tc
-            , fi_flavor   = SynFamilyInst
-            , fi_branches = toBranchList (map mk_fam_inst_branch branches)
-            , fi_group    = group
-            , fi_axiom    = axiom }
-  where
-    axiom = CoAxiom { co_ax_unique   = nameUnique name
-                    , co_ax_name     = name
-                    , co_ax_tc       = fam_tc
-                    , co_ax_implicit = False
-                    , co_ax_branches = toBranchList branches }
-
-
--- | Create a coercion identifying a @type@ family instance, but with only
--- one equation (branch).
-mkSingleSynFamInst :: Name        -- ^ Unique name for the coercion tycon
-                   -> [TyVar]     -- ^ *Fresh* tyvars of the coercion (@tvs@)
-                   -> TyCon       -- ^ Family tycon (@F@)
-                   -> [Type]      -- ^ Type instance (@ts@)
-                   -> Type        -- ^ right-hand side
-                   -> FamInst Unbranched
--- See note [Branched axioms] in CoAxiom.lhs
-mkSingleSynFamInst name tvs fam_tc inst_tys rep_ty
-  = FamInst { fi_fam      = tyConName fam_tc
-            , fi_flavor   = SynFamilyInst
-            , fi_branches = FirstBranch branch
-            , fi_group    = False
-            , fi_axiom    = axiom }
-  where
-    -- See note [FamInst Locations]
-    branch = mk_fam_inst_branch axBranch
-    axiom = CoAxiom { co_ax_unique   = nameUnique name
-                    , co_ax_name     = name
-                    , co_ax_tc       = fam_tc
-                    , co_ax_implicit = False
-                    , co_ax_branches = FirstBranch axBranch }
-    axBranch = CoAxBranch { cab_loc = getSrcSpan name
-                          , cab_tvs = tvs
-                          , cab_lhs = inst_tys
-                          , cab_rhs = rep_ty }
-    
--- | Create a coercion identifying a @data@ or @newtype@ representation type
--- and its family instance.  It has the form @Co tvs :: F ts ~ R tvs@,
--- where @Co@ is the coercion constructor built here, @F@ the family tycon
--- and @R@ the (derived) representation tycon.
-mkDataFamInst :: Name         -- ^ Unique name for the coercion tycon
-              -> [TyVar]      -- ^ *Fresh* parameters of the coercion (@tvs@)
-              -> TyCon        -- ^ Family tycon (@F@)
-              -> [Type]       -- ^ Type instance (@ts@)
-              -> TyCon        -- ^ Representation tycon (@R@)
-              -> FamInst Unbranched
-mkDataFamInst name tvs fam_tc inst_tys rep_tc
-  = FamInst { fi_fam      = tyConName fam_tc
-            , fi_flavor   = DataFamilyInst rep_tc
-            , fi_group    = False
-            , fi_branches = FirstBranch branch
-            , fi_axiom    = axiom }
-  where
-    rhs = mkTyConApp rep_tc (mkTyVarTys tvs)
-
-                               -- See Note [FamInst locations]
-    branch = mk_fam_inst_branch axBranch
-    axiom = CoAxiom { co_ax_unique   = nameUnique name
-                    , co_ax_name     = name
-                    , co_ax_tc       = fam_tc
-                    , co_ax_branches = FirstBranch axBranch
-                    , co_ax_implicit = False }
-
-    axBranch = CoAxBranch { cab_loc = getSrcSpan name
-                          , cab_tvs = tvs
-                          , cab_lhs = inst_tys
-                          , cab_rhs = rhs }
-
 \end{code}
 
 Note [Lazy axiom match]

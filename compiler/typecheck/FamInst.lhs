@@ -1,6 +1,7 @@
 The @FamInst@ type: family instance heads
 
 \begin{code}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -12,20 +13,19 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
 	tcLookupFamInst, tcLookupDataFamInst,
         tcGetFamInstEnvs,
-
-        freshenFamInstEqn, freshenFamInstEqnLoc,
-        mkFreshenedSynInst, mkFreshenedSynInstLoc
+        newFamInst
     ) where
 
 import HscTypes
 import FamInstEnv
+import InstEnv( roughMatchTcs )
+import Coercion( pprCoAxBranchHdr )
 import LoadIface
 import TypeRep
 import TcRnMonad
 import TyCon
 import CoAxiom
 import DynFlags
-import SrcLoc
 import Module
 import Outputable
 import UniqFM
@@ -33,13 +33,54 @@ import FastString
 import Util
 import Maybes
 import TcMType
-import Type
+import TcType
 import Name
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 
 #include "HsVersions.h"
+\end{code}
+
+%************************************************************************
+%*									*
+                 Making a FamInst
+%*									*
+%************************************************************************
+
+\begin{code}
+-- All type variables in a FamInst must be fresh. This function
+-- creates the fresh variables and applies the necessary substitution
+-- It is defined here to avoid a dependency from FamInstEnv on the monad
+-- code.
+newFamInst :: FamFlavor -> Bool -> CoAxiom br -> TcRnIf gbl lcl(FamInst br)
+-- Freshen the type variables of the FamInst branches
+-- Called from the vectoriser monad too, hence the rather general type
+newFamInst flavor is_group axiom@(CoAxiom { co_ax_tc       = fam_tc
+                                          , co_ax_branches = ax_branches })
+  = do { fam_branches <- go ax_branches
+       ; return (FamInst { fi_fam      = tyConName fam_tc
+                         , fi_flavor   = flavor
+                         , fi_branches = fam_branches
+                         , fi_group    = is_group
+                         , fi_axiom    = axiom }) }
+  where
+    go :: BranchList CoAxBranch br -> TcRnIf gbl lcl (BranchList FamInstBranch br)
+    go (FirstBranch br) = do { br' <- go_branch br
+                             ; return (FirstBranch br') }
+    go (NextBranch br brs) = do { br' <- go_branch br
+                                ; brs' <- go brs
+                                ;return (NextBranch br' brs') }
+    go_branch :: CoAxBranch -> TcRnIf gbl lcl FamInstBranch 
+    go_branch (CoAxBranch { cab_tvs = tvs1
+                          , cab_lhs = lhs
+                          , cab_loc = loc
+                          , cab_rhs = rhs })
+       = do { (subst, tvs2) <- tcInstSkolTyVarsLoc loc tvs1
+            ; return (FamInstBranch { fib_tvs   = tvs2
+                                    , fib_lhs   = substTys subst lhs
+                                    , fib_rhs   = substTy  subst rhs
+                                    , fib_tcs   = roughMatchTcs lhs }) }
 \end{code}
 
 
@@ -347,54 +388,4 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 tcGetFamInstEnvs 
   = do { eps <- getEps; env <- getGblEnv
        ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
-\end{code}
-
-%************************************************************************
-%*									*
-	Freshening type variables
-%*									*
-%************************************************************************
-
-\begin{code}
-
--- All type variables in a FamInst/CoAxiom must be fresh. This function
--- creates the fresh variables and applies the necessary substitution
--- It is defined here to avoid a dependency from FamInstEnv on the monad
--- code.
-freshenFamInstEqn :: [TyVar] -- original, possibly stale, tyvars
-                  -> [Type]  -- LHS patterns
-                  -> Type    -- RHS
-                  -> TcM ([TyVar], [Type], Type)
-freshenFamInstEqn tvs lhs rhs
-  = do { loc <- getSrcSpanM
-       ; freshenFamInstEqnLoc loc tvs lhs rhs }
-
--- freshenFamInstEqn needs to be called outside the TcM monad:
-freshenFamInstEqnLoc :: SrcSpan
-                     -> [TyVar] -> [Type] -> Type
-                     -> TcRnIf gbl lcl ([TyVar], [Type], Type)
-freshenFamInstEqnLoc loc tvs lhs rhs
-  = do { (subst, tvs') <- tcInstSkolTyVarsLoc loc tvs
-       ; let lhs' = substTys subst lhs
-             rhs' = substTy  subst rhs
-       ; return (tvs', lhs', rhs') }
-
--- Makes an unbranched synonym FamInst, with freshened tyvars
-mkFreshenedSynInst :: Name    -- Unique name for the coercion tycon
-                   -> [TyVar] -- possibly stale tyvars of the coercion
-                   -> TyCon   -- Family tycon
-                   -> [Type]  -- LHS patterns
-                   -> Type    -- RHS
-                   -> TcM (FamInst Unbranched)
-mkFreshenedSynInst name tvs fam_tc inst_tys rep_ty
-  = do { loc <- getSrcSpanM
-       ; mkFreshenedSynInstLoc loc name tvs fam_tc inst_tys rep_ty }
-
-mkFreshenedSynInstLoc :: SrcSpan
-                      -> Name -> [TyVar] -> TyCon -> [Type] -> Type
-                      -> TcRnIf gbl lcl (FamInst Unbranched)
-mkFreshenedSynInstLoc loc name tvs fam_tc inst_tys rep_ty
-  = do { (tvs', inst_tys', rep_ty') <- freshenFamInstEqnLoc loc tvs inst_tys rep_ty
-       ; return $ mkSingleSynFamInst name tvs' fam_tc inst_tys' rep_ty' }
-
 \end{code}

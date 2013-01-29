@@ -1454,14 +1454,17 @@ runPhase LlvmLlc input_fn dflags
                                       else if (elem VFPv3D16 ext)
                                            then ["-mattr=+v7,+vfp3,+d16"]
                                            else []
+                   ArchARM ARMv6 ext _ -> if (elem VFPv2 ext)
+                                          then ["-mattr=+v6,+vfp2"]
+                                          else ["-mattr=+v6"]
                    _                 -> []
         -- On Ubuntu/Debian with ARM hard float ABI, LLVM's llc still
         -- compiles into soft-float ABI. We need to explicitly set abi
         -- to hard
         abiOpts = case platformArch (targetPlatform dflags) of
-                    ArchARM ARMv7 _ HARD -> ["-float-abi=hard"]
-                    ArchARM ARMv7 _ _    -> []
-                    _                    -> []
+                    ArchARM _ _ HARD -> ["-float-abi=hard"]
+                    ArchARM _ _ _    -> []
+                    _                -> []
 
         sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
                 | isSse2Enabled dflags   = ["-mattr=+sse2"]
