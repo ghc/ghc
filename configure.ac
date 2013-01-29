@@ -207,19 +207,6 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-# Testing ARM ABI
-# required for code generation (LLVM options)
-ARM_ABI=SOFT
-
-case $target in
-     arm*-*-linux-gnueabihf | arm*-linux-gnueabihf)
-     ARM_ABI=HARD
-     ;;
-     arm*-*-linux-gnueabi | arm*-linux-gnueabi)
-     ARM_ABI=SOFTFP
-     ;;
-esac
-
 FPTOOLS_SET_PLATFORM_VARS
 
 # Verify that the installed (bootstrap) GHC is capable of generating
