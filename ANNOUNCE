@@ -1,26 +1,16 @@
 
    =============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 7.6.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.6.2
    =============================================================
 
-The GHC Team is pleased to announce a new major release of GHC, 7.6.1.
+The GHC Team is pleased to announce a new major release of GHC, 7.6.2.
 
-Here are some of the highlights of the 7.6 branch since 7.4:
-
-  * Polymorphic kinds and data promotion are now fully implemented and
-    supported features.
-
-  * Windows 64bit is now a supported platform.
-
-  * It is now possible to defer type errors until runtime using the
-    -fdefer-type-errors flag.
-
-  * The RTS now supports changing the number of capabilities at runtime
-    with Control.Concurrent.setNumCapabilities.
+This release fixes a number of bugs relative to 7.6.1, so we recommend
+upgrading.
 
 Full release notes are here:
 
-  http://www.haskell.org/ghc/docs/7.6.1/html/users_guide/release-7-6-1.html
+  http://www.haskell.org/ghc/docs/7.6.2/html/users_guide/release-7-6-2.html
 
 How to get it
 ~~~~~~~~~~~~~
