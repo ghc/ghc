@@ -430,7 +430,7 @@ compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
 compileFile hsc_env stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $
-        throwGhcException (CmdLineError ("does not exist: " ++ src))
+        throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
 
    let
         dflags = hsc_dflags hsc_env
@@ -542,7 +542,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
          let happensBefore' = happensBefore dflags
          when (not (start_phase `happensBefore'` stop_phase)) $
-               throwGhcException (UsageError
+               throwGhcExceptionIO (UsageError
                            ("cannot compile this file to desired target: "
                               ++ input_fn))
 
@@ -1895,8 +1895,8 @@ linkBinary dflags o_files dep_packages = do
 
     -- parallel only: move binary to another dir -- HWL
     success <- runPhase_MoveBinary dflags output_fn
-    if success then return ()
-               else throwGhcException (InstallationError ("cannot move binary"))
+    unless success $
+        throwGhcExceptionIO (InstallationError ("cannot move binary"))
 
 
 exeFileName :: DynFlags -> FilePath
