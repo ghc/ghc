@@ -1,0 +1,6 @@
+
+T7609.hs:7:16:
+    Expecting one more argument to `Maybe'
+    The second argument of a tuple should have kind `*',
+      but `Maybe' has kind `* -> *'
+    In the type signature for `f': f :: (a `X` a, Maybe)
