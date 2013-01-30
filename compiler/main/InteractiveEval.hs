@@ -71,6 +71,7 @@ import Outputable
 import FastString
 import MonadUtils
 
+import System.Mem.Weak
 import System.Directory
 import Data.Dynamic
 import Data.Either
@@ -415,9 +416,19 @@ sandboxIO dflags statusMVar thing =
 --  * clients of the GHC API can terminate a runStmt in progress
 --    without knowing the ThreadId of the sandbox thread (#1381)
 --
+-- NB. use a weak pointer to the thread, so that the thread can still
+-- be considered deadlocked by the RTS and sent a BlockedIndefinitely
+-- exception.  A symptom of getting this wrong is that conc033(ghci)
+-- will hang.
+--
 redirectInterrupts :: ThreadId -> IO a -> IO a
 redirectInterrupts target wait
-  = wait `catch` \e -> do throwTo target (e :: SomeException); wait
+  = do wtid <- mkWeakThreadId target
+       wait `catch` \e -> do
+          m <- deRefWeak wtid
+          case m of
+            Nothing -> wait
+            Just target -> do throwTo target (e :: SomeException); wait
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.

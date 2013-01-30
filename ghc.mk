@@ -400,7 +400,9 @@ endef
 define addPackage # args: $1 = package, $2 = condition
 ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
+ifneq "$(CrossCompiling)" "YES"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
+endif
 else
 $(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
 endif
@@ -724,7 +726,7 @@ $(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
 libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
-	cd libraries && sh gen_contents_index --inplace
+	cd libraries && sh gen_contents_index --intree
 ifeq "$(phase)" "final"
 $(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
 endif

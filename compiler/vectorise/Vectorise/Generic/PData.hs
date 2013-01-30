@@ -14,11 +14,13 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
+import Coercion( mkSingleCoAxiom )
 import BasicTypes
 import BuildTyCl
 import DataCon
 import TyCon
 import Type
+import FamInst
 import FamInstEnv
 import TcMType
 import Name
@@ -45,9 +47,10 @@ buildDataFamInst name' fam_tc vect_tc rhs
  = do { axiom_name <- mkDerivedName mkInstTyCoOcc name'
 
       ; (_, tyvars') <- liftDs $ tcInstSkolTyVarsLoc (getSrcSpan name') tyvars
-      ; let fam_inst = mkDataFamInst axiom_name tyvars' fam_tc pat_tys rep_tc
-            ax       = famInstAxiom fam_inst
-            pat_tys  = [mkTyConApp vect_tc (mkTyVarTys tyvars')]
+      ; let ax       = mkSingleCoAxiom axiom_name tyvars' fam_tc pat_tys rep_ty
+            tys'     = mkTyVarTys tyvars'
+            rep_ty   = mkTyConApp rep_tc tys'
+            pat_tys  = [mkTyConApp vect_tc tys']
             rep_tc   = buildAlgTyCon name'
                            tyvars'
                            Nothing
@@ -57,7 +60,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
                            False       -- Not promotable
                            False       -- not GADT syntax
                            (FamInstTyCon ax fam_tc pat_tys)
-      ; return fam_inst }
+      ; liftDs $ newFamInst (DataFamilyInst rep_tc) False ax }
  where
     tyvars    = tyConTyVars vect_tc
     rec_flag  = boolToRecFlag (isRecursiveTyCon vect_tc)

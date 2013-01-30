@@ -136,6 +136,16 @@ module Type (
         pprTvBndr, pprTvBndrs, pprForAll, pprSigmaType,
 	pprEqPred, pprTheta, pprThetaArrowTy, pprClassPred, 
         pprKind, pprParendKind, pprSourceTyCon,
+
+        -- * Tidying type related things up for printing
+        tidyType,      tidyTypes,
+        tidyOpenType,  tidyOpenTypes,
+        tidyOpenKind,
+        tidyTyVarBndr, tidyTyVarBndrs, tidyFreeTyVars,
+        tidyOpenTyVar, tidyOpenTyVars,
+        tidyTyVarOcc,
+        tidyTopType,
+        tidyKind, 
     ) where
 
 #include "HsVersions.h"

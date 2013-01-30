@@ -7,28 +7,41 @@ die () {
     exit 1
 }
 
-[ "$#" -eq 2 ] || die "Bad args. Usage: $0 <Linux bindist> <Windows bindist>"
+NO_CLEAN=0
+if [ "$1" = "--no-clean" ]
+then
+    NO_CLEAN=1
+    shift
+fi
+[ "$#" -eq 2 ] || die "Bad args. Usage: $0 [--no-clean] <Linux bindist> <Windows bindist>"
 
 LINUX_BINDIST=`realpath "$1"`
 WINDOWS_BINDIST=`realpath "$2"`
 
 mkdir docs
 cd docs
+INST=`pwd`/inst
 tar -jxf "$LINUX_BINDIST"
 mv ghc* linux
+cd linux
+./configure --prefix="$INST"
+make install
+cd ..
+[ "$NO_CLEAN" -eq 0 ] && rm -r linux
 tar -jxf "$WINDOWS_BINDIST"
 mv ghc* windows
-cd linux
-./configure --prefix=`pwd`/inst
-make install
 cd inst/share/doc/ghc/html/libraries
-mv ../../../../../../../windows/doc/html/libraries/Win32-* .
+mv ../../../../../../windows/doc/html/libraries/Win32-* .
 sh gen_contents_index
 cd ..
 for i in haddock libraries users_guide
 do
-    tar -jcf ../../../../../../$i.html.tar.bz2 $i
+    tar -jcf ../../../../../$i.html.tar.bz2 $i
 done
+mv index.html ../../../../..
 cd ..
-mv *.pdf *.ps ../../../../..
+mv *.pdf *.ps ../../../..
+cd ../../../..
+[ "$NO_CLEAN" -eq 0 ] && rm -r inst
+[ "$NO_CLEAN" -eq 0 ] && rm -r windows
 

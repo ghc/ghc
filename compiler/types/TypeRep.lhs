@@ -47,6 +47,16 @@ module TypeRep (
         -- Free variables
         tyVarsOfType, tyVarsOfTypes,
 
+        -- * Tidying type related things up for printing
+        tidyType,      tidyTypes,
+        tidyOpenType,  tidyOpenTypes,
+        tidyOpenKind,
+        tidyTyVarBndr, tidyTyVarBndrs, tidyFreeTyVars,
+        tidyOpenTyVar, tidyOpenTyVars,
+        tidyTyVarOcc,
+        tidyTopType,
+        tidyKind, 
+
         -- Substitutions
         TvSubst(..), TvSubstEnv
     ) where
@@ -75,6 +85,7 @@ import StaticFlags( opt_PprStyle_Debug )
 import Util
 
 -- libraries
+import Data.List( mapAccumL )
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
@@ -730,3 +741,111 @@ pprArrowChain p (arg:args) = maybeParen p FunPrec $
                              sep [arg, sep (map (arrow <+>) args)]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{TidyType}
+%*									*
+%************************************************************************
+
+Tidying is here becuase it has a special case for FlatSkol
+
+\begin{code}
+-- | This tidies up a type for printing in an error message, or in
+-- an interface file.
+-- 
+-- It doesn't change the uniques at all, just the print names.
+tidyTyVarBndrs :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
+tidyTyVarBndrs env tvs = mapAccumL tidyTyVarBndr env tvs
+
+tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
+  = case tidyOccName occ_env occ1 of
+      (tidy', occ') -> ((tidy', subst'), tyvar')
+	where
+          subst' = extendVarEnv subst tyvar tyvar'
+          tyvar' = setTyVarKind (setTyVarName tyvar name') kind'
+          name'  = tidyNameOcc name occ'
+          kind'  = tidyKind tidy_env (tyVarKind tyvar)
+  where
+    name = tyVarName tyvar
+    occ  = getOccName name
+    -- System Names are for unification variables;
+    -- when we tidy them we give them a trailing "0" (or 1 etc)
+    -- so that they don't take precedence for the un-modified name
+    occ1 | isSystemName name = mkTyVarOcc (occNameString occ ++ "0")
+         | otherwise         = occ
+
+
+---------------
+tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
+-- ^ Add the free 'TyVar's to the env in tidy form,
+-- so that we can tidy the type they are free in
+tidyFreeTyVars (full_occ_env, var_env) tyvars 
+  = fst (tidyOpenTyVars (full_occ_env, var_env) (varSetElems tyvars))
+
+        ---------------
+tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
+tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
+
+---------------
+tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+-- ^ Treat a new 'TyVar' as a binder, and give it a fresh tidy name
+-- using the environment if one has not already been allocated. See
+-- also 'tidyTyVarBndr'
+tidyOpenTyVar env@(_, subst) tyvar
+  = case lookupVarEnv subst tyvar of
+	Just tyvar' -> (env, tyvar')		-- Already substituted
+	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
+
+---------------
+tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar
+tidyTyVarOcc (_, subst) tv
+  = case lookupVarEnv subst tv of
+	Nothing  -> tv
+	Just tv' -> tv'
+
+---------------
+tidyTypes :: TidyEnv -> [Type] -> [Type]
+tidyTypes env tys = map (tidyType env) tys
+
+---------------
+tidyType :: TidyEnv -> Type -> Type
+tidyType _   (LitTy n)            = LitTy n
+tidyType env (TyVarTy tv)	  = TyVarTy (tidyTyVarOcc env tv)
+tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
+ 		                    in args `seqList` TyConApp tycon args
+tidyType env (AppTy fun arg)	  = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (FunTy fun arg)	  = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
+			          where
+			            (envp, tvp) = tidyTyVarBndr env tv
+
+---------------
+-- | Grabs the free type variables, tidies them
+-- and then uses 'tidyType' to work over the type itself
+tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
+tidyOpenType env ty
+  = (env', tidyType (trimmed_occ_env, var_env) ty)
+  where
+    (env'@(_, var_env), tvs') = tidyOpenTyVars env (varSetElems (tyVarsOfType ty))
+    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
+      -- The idea here was that we restrict the new TidyEnv to the 
+      -- _free_ vars of the type, so that we don't gratuitously rename
+      -- the _bound_ variables of the type.
+
+---------------
+tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
+tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
+
+---------------
+-- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
+tidyTopType :: Type -> Type
+tidyTopType ty = tidyType emptyTidyEnv ty
+
+---------------
+tidyOpenKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
+tidyOpenKind = tidyOpenType
+
+tidyKind :: TidyEnv -> Kind -> Kind
+tidyKind = tidyType
+\end{code}

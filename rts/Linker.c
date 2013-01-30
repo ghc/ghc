@@ -5523,14 +5523,18 @@ ocVerifyImage_MachO(ObjectCode * oc)
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header->magic != MH_MAGIC_64) {
-        errorBelch("%s: Bad magic. Expected: %08x, got: %08x.\n",
-                   oc->fileName, MH_MAGIC_64, header->magic);
+        errorBelch("Could not load image %s: bad magic!\n"
+                   "  Expected %08x (64bit), got %08x%s\n",
+                   oc->fileName, MH_MAGIC_64, header->magic,
+                   header->magic == MH_MAGIC ? " (32bit)." : ".");
         return 0;
     }
 #else
     if(header->magic != MH_MAGIC) {
-        errorBelch("%s: Bad magic. Expected: %08x, got: %08x.\n",
-                   oc->fileName, MH_MAGIC, header->magic);
+        errorBelch("Could not load image %s: bad magic!\n"
+                   "  Expected %08x (32bit), got %08x%s\n",
+                   oc->fileName, MH_MAGIC, header->magic,
+                   header->magic == MH_MAGIC_64 ? " (64bit)." : ".");
         return 0;
     }
 #endif

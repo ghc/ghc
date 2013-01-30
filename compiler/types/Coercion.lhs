@@ -15,6 +15,9 @@
 -- more on System FC and how coercions fit into it.
 --
 module Coercion (
+        -- * CoAxioms
+        mkCoAxBranch, mkBranchedCoAxiom, mkSingleCoAxiom,
+
         -- * Main data type
         Coercion(..), Var, CoVar,
         LeftOrRight(..), pickLR,
@@ -70,7 +73,11 @@ module Coercion (
         seqCo,
         
         -- * Pretty-printing
-        pprCo, pprParendCo, pprCoAxiom, 
+        pprCo, pprParendCo, 
+        pprCoAxiom, pprCoAxBranch, pprCoAxBranchHdr, 
+
+        -- * Tidying
+        tidyCo, tidyCos,
 
         -- * Other
         applyCo
@@ -88,7 +95,7 @@ import Var
 import VarEnv
 import VarSet
 import Maybes   ( orElse )
-import Name	( Name, NamedThing(..), nameUnique, getSrcSpan )
+import Name	( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
 import NameSet
 import OccName 	( parenSymOcc )
 import Util
@@ -96,6 +103,7 @@ import BasicTypes
 import Outputable
 import Unique
 import Pair
+import SrcLoc
 import PrelNames	( funTyConKey, eqPrimTyConKey )
 import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
@@ -104,6 +112,58 @@ import FastString
 
 import qualified Data.Data as Data hiding ( TyCon )
 \end{code}
+
+
+%************************************************************************
+%*                                                                      *
+           Constructing axioms
+    These functions are here because tidyType etc 
+    are not available in CoAxiom
+%*                                                                      *
+%************************************************************************
+
+Note [Tidy axioms when we build them]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We print out axioms and don't want to print stuff like
+    F k k a b = ...
+Instead we must tidy those kind variables.  See Trac #7524.
+
+
+\begin{code}
+mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
+             -> [Type]  -- LHS patterns
+             -> Type    -- RHS
+             -> SrcSpan
+             -> CoAxBranch
+mkCoAxBranch tvs lhs rhs loc
+  = CoAxBranch { cab_tvs = tvs1
+               , cab_lhs = tidyTypes env lhs
+               , cab_rhs = tidyType  env rhs
+               , cab_loc = loc }
+  where
+    (env, tvs1) = tidyTyVarBndrs emptyTidyEnv tvs
+    -- See Note [Tidy axioms when we build them]
+  
+
+mkBranchedCoAxiom :: Name -> TyCon -> [CoAxBranch] -> CoAxiom Branched
+mkBranchedCoAxiom ax_name fam_tc branches
+  = CoAxiom { co_ax_unique   = nameUnique ax_name
+            , co_ax_name     = ax_name
+            , co_ax_tc       = fam_tc
+            , co_ax_implicit = False
+            , co_ax_branches = toBranchList branches }
+
+mkSingleCoAxiom :: Name -> [TyVar] -> TyCon -> [Type] -> Type -> CoAxiom Unbranched
+mkSingleCoAxiom ax_name tvs fam_tc lhs_tys rhs_ty
+  = CoAxiom { co_ax_unique   = nameUnique ax_name
+            , co_ax_name     = ax_name
+            , co_ax_tc       = fam_tc
+            , co_ax_implicit = False
+            , co_ax_branches = FirstBranch branch }
+  where
+    branch = mkCoAxBranch tvs lhs_tys rhs_ty (getSrcSpan ax_name)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -390,6 +450,40 @@ coercionSize (InstCo co ty)      = 1 + coercionSize co + typeSize ty
 
 %************************************************************************
 %*									*
+                            Tidying coercions
+%*									*
+%************************************************************************
+
+\begin{code}
+tidyCo :: TidyEnv -> Coercion -> Coercion
+tidyCo env@(_, subst) co
+  = go co
+  where
+    go (Refl ty)             = Refl (tidyType env ty)
+    go (TyConAppCo tc cos)   = let args = map go cos
+                               in args `seqList` TyConAppCo tc args
+    go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
+    go (ForAllCo tv co)      = ForAllCo tvp $! (tidyCo envp co)
+                               where
+                                 (envp, tvp) = tidyTyVarBndr env tv
+    go (CoVarCo cv)          = case lookupVarEnv subst cv of
+                                 Nothing  -> CoVarCo cv
+                                 Just cv' -> CoVarCo cv'
+    go (AxiomInstCo con ind cos) = let args = tidyCos env cos
+                               in  args `seqList` AxiomInstCo con ind args
+    go (UnsafeCo ty1 ty2)    = (UnsafeCo $! tidyType env ty1) $! tidyType env ty2
+    go (SymCo co)            = SymCo $! go co
+    go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
+    go (NthCo d co)          = NthCo d $! go co
+    go (LRCo lr co)          = LRCo lr $! go co
+    go (InstCo co ty)        = (InstCo $! go co) $! tidyType env ty
+
+tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
+tidyCos env = map (tidyCo env)
+\end{code}
+
+%************************************************************************
+%*									*
                    Pretty-printing coercions
 %*                                                                      *
 %************************************************************************
@@ -472,10 +566,25 @@ pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
        2 (vcat (map (pprCoAxBranch tc) $ fromBranchList branches))
 
 pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-pprCoAxBranch tc (CoAxBranch { cab_tvs = tvs, cab_lhs = lhs, cab_rhs = rhs })
-  = ptext (sLit "forall") <+> pprTvBndrs tvs <> dot <+> 
-      pprEqPred (Pair (mkTyConApp tc lhs) rhs)
+pprCoAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
+                                 , cab_lhs = lhs
+                                 , cab_rhs = rhs })
+  = hang (ifPprDebug (pprForAll tvs))
+       2 (hang (pprTypeApp fam_tc lhs) 2 (equals <+> (ppr rhs)))
 
+pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
+pprCoAxBranchHdr ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = name }) index
+  | CoAxBranch { cab_lhs = tys, cab_loc = loc } <- coAxiomNthBranch ax index
+  = hang (pprTypeApp fam_tc tys)
+       2 (ptext (sLit "-- Defined") <+> ppr_loc loc)
+  where
+        ppr_loc loc
+          | isGoodSrcSpan loc
+          = ptext (sLit "at") <+> ppr (srcSpanStart loc)
+    
+          | otherwise
+          = ptext (sLit "in") <+>
+              quotes (ppr (nameModule name))
 \end{code}
 
 %************************************************************************
@@ -595,7 +704,6 @@ mkAxInstLHS ax index tys
   , (tys1, tys2) <- splitAtList tvs tys
   = ASSERT( tvs `equalLength` tys1 ) 
     mkTyConApp (coAxiomTyCon ax) (substTysWith tvs tys1 lhs ++ tys2)
-  where
 
 mkAxInstRHS ax index tys
   | CoAxBranch { cab_tvs = tvs, cab_rhs = rhs } <- coAxiomNthBranch ax index

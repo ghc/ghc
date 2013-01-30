@@ -31,6 +31,7 @@ import Id
 import TyCon
 import Coercion( pprCoAxiom )
 import HscTypes( tyThingParent_maybe )
+import Type( tidyTopType, tidyOpenType )
 import TcType
 import Name
 import VarEnv( emptyTidyEnv )

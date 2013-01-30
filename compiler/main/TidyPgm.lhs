@@ -29,6 +29,7 @@ import Id
 import IdInfo
 import InstEnv
 import FamInstEnv
+import Type             ( tidyTopType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
@@ -39,7 +40,6 @@ import PrelNames
 import IfaceEnv
 import TcEnv
 import TcRnMonad
-import TcType
 import DataCon
 import TyCon
 import Class

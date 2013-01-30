@@ -16,7 +16,7 @@ module CoAxiom (
        brListLength, brListNth, brListMap, brListFoldr,
        brListZipWith, brListIndices,
 
-       CoAxiom(..), CoAxBranch(..), mkCoAxBranch,
+       CoAxiom(..), CoAxBranch(..), 
 
        toBranchedAxiom, toUnbranchedAxiom,
        coAxiomName, coAxiomArity, coAxiomBranches,
@@ -219,7 +219,8 @@ data CoAxBranch
   = CoAxBranch
     { cab_loc      :: SrcSpan      -- Location of the defining equation
                                    -- See Note [CoAxiom locations]
-    , cab_tvs      :: [TyVar]      -- Bound type variables
+    , cab_tvs      :: [TyVar]      -- Bound type variables; not necessarily fresh
+                                   -- See Note [CoAxBranch type variables]
     , cab_lhs      :: [Type]       -- Type patterns to match against
     , cab_rhs      :: Type         -- Right-hand side of the equality
     }
@@ -275,11 +276,29 @@ coAxBranchSpan = cab_loc
 isImplicitCoAxiom :: CoAxiom br -> Bool
 isImplicitCoAxiom = co_ax_implicit
 
--- The tyvars must be *fresh*. This CoAxBranch will be put into a
--- FamInst. See Note [Template tyvars are fresh] in InstEnv
-mkCoAxBranch :: SrcSpan -> [TyVar] -> [Type] -> Type -> CoAxBranch
-mkCoAxBranch = CoAxBranch
 \end{code}
+
+Note [CoAxBranch type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the case of a CoAxBranch of an associated type-family instance, 
+we use the *same* type variables (where possible) as the
+enclosing class or instance.  Consider
+   class C a b where
+     type F x b 
+     type F [y] b = ...     -- Second param must be b
+
+   instance C Int [z] where
+     type F Int [z] = ...   -- Second param must be [z]
+
+In the CoAxBranch in the instance decl (F Int [z]) we use the
+same 'z', so that it's easy to check that that type is the same
+as that in the instance header.  
+
+Similarly in the CoAxBranch for the default decl for F in the
+class decl, we use the same 'b' to make the same check easy.
+
+So, unlike FamInsts, there is no expectation that the cab_tvs
+are fresh wrt each other, or any other CoAxBranch.
 
 Note [CoAxiom locations]
 ~~~~~~~~~~~~~~~~~~~~~~~~
