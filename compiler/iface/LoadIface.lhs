@@ -172,7 +172,7 @@ loadInterfaceWithException doc mod_name where_from
   = do  { mb_iface <- loadInterface doc mod_name where_from
         ; dflags <- getDynFlags
         ; case mb_iface of 
-            Failed err      -> throwGhcException (ProgramError (showSDoc dflags err))
+            Failed err      -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
             Succeeded iface -> return iface }
 
 ------------------

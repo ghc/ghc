@@ -353,7 +353,7 @@ findTopDir Nothing
          maybe_exec_dir <- getBaseDir
          case maybe_exec_dir of
              -- "Just" on Windows, "Nothing" on unix
-             Nothing  -> throwGhcException (InstallationError "missing -B<dir> option")
+             Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
              Just dir -> return dir
 \end{code}
 
@@ -837,14 +837,14 @@ handleProc pgm phase_name proc = do
         -- the case of a missing program there will otherwise be no output
         -- at all.
        | n == 127  -> does_not_exist
-       | otherwise -> throwGhcException (PhaseFailed phase_name rc)
+       | otherwise -> throwGhcExceptionIO (PhaseFailed phase_name rc)
   where
     handler err =
        if IO.isDoesNotExistError err
           then does_not_exist
           else IO.ioError err
 
-    does_not_exist = throwGhcException (InstallationError ("could not execute: " ++ pgm))
+    does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
 
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
@@ -976,7 +976,7 @@ traceCmd dflags phase_name cmd_line action
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
-                              ; throwGhcException (PhaseFailed phase_name (ExitFailure 1)) }
+                              ; throwGhcExceptionIO (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
 %************************************************************************

@@ -829,7 +829,7 @@ oldMD5 dflags bh = do
   let cmd = "md5sum " ++ tmp ++ " >" ++ tmp2
   r <- system cmd
   case r of
-    ExitFailure _ -> throwGhcException (PhaseFailed cmd r)
+    ExitFailure _ -> throwGhcExceptionIO (PhaseFailed cmd r)
     ExitSuccess -> do
         hash_str <- readFile tmp2
         return $! readHexFingerprint hash_str
