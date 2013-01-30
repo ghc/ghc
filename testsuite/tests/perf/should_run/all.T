@@ -3,7 +3,7 @@
 # fortunately the values here are mostly independent of the wordsize,
 # because the test allocates an unboxed array of doubles.
 
-test('3586',
+test('T3586',
      [stats_num_field('peak_megabytes_allocated', 17,
                                                   18),
                                      # expected value: 17 (amd64/Linux)
@@ -120,7 +120,9 @@ test('T5113',
           stats_num_field('bytes allocated', 8000000,
                                              9000000)),
       only_ways(['normal']),
-      expect_broken(7046)
+      normal
+      # WAS: expect_broken(7046)
+      # but it started working again around 01/2013, see #7046
       ],
      compile_and_run,
      ['-O'])

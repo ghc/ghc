@@ -645,7 +645,7 @@ def test (name, setup, func, args):
     global allTestNames
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
-    if not re.match('^[a-zA-Z0-9][a-zA-Z0-9._-]*$', name):
+    if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         framework_fail(name, 'bad_name', 'This test has an invalid name')
     myTestOpts = copy.copy(thisdir_testopts)
 
@@ -887,6 +887,8 @@ def do_test(name, way, func, args):
                         t.expected_failures[name] = [way]
         else:
             framework_fail(name, way, 'bad result ' + passFail)
+    except KeyboardInterrupt:
+        raise
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()

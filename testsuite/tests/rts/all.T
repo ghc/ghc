@@ -42,12 +42,12 @@ test('outofmem', if_os('darwin', skip),
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
-test('2047', compose(ignore_output, extra_run_opts('+RTS -c -RTS')),
-             compile_and_run, ['-package containers'])
+test('T2047', compose(ignore_output, extra_run_opts('+RTS -c -RTS')),
+              compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
 # Skip GHCi due to #2786
-test('2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
+test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
@@ -55,7 +55,7 @@ test('testwsdeque', [unless_in_tree_compiler(skip),
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, ['-I../../../rts'])
 
-test('3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
+test('T3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
 
 test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
@@ -68,9 +68,9 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
 
 test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
 
-test('3424', # it's slow:
-             [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
-             compile_and_run, [''])
+test('T3424', # it's slow:
+              [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
+              compile_and_run, [''])
 
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
@@ -112,28 +112,27 @@ test('exec_signals', [
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('4850', extra_clean(['4850.o','4850.hi','4850']),
-             run_command, ['$MAKE -s --no-print-directory 4850'])
+test('T4850', normal, run_command, ['$MAKE -s --no-print-directory T4850'])
 
-def config_5250(opts):
+def config_T5250(opts):
     if not (config.arch in ['i386','x86_64']):
         opts.skip = 1;
 
-test('5250', [ config_5250,
-               # stack ptr is not 16-byte aligned on 32-bit Windows
-               if_platform('i386-unknown-mingw32', expect_fail),
-               if_platform('i386-unknown-linux',
-                           expect_broken_for(4211,['llvm'])),
-               extra_clean(['spalign.o']),
-               omit_ways(['ghci']) ],
-             compile_and_run, ['spalign.c'])
+test('T5250', [ config_T5250,
+                # stack ptr is not 16-byte aligned on 32-bit Windows
+                if_platform('i386-unknown-mingw32', expect_fail),
+                if_platform('i386-unknown-linux',
+                            expect_broken_for(4211,['llvm'])),
+                extra_clean(['spalign.o']),
+                omit_ways(['ghci']) ],
+              compile_and_run, ['spalign.c'])
 
 test('T5423',
      extra_clean(['T5423_cmm.o']),
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
-test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
+test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  extra_clean(['T6006_c.o']),
@@ -148,7 +147,7 @@ test('T7037',
      run_command,
      ['$MAKE -s --no-print-directory T7037'])
 
-test('7087', exit_code(1), compile_and_run, [''])
+test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', normal, compile_and_run, [''])
 
 test('T7040', [ extra_clean(['T7040_c.o']), omit_ways(['ghci']) ],

@@ -110,20 +110,20 @@ ghcpkg06 :
 	if $(LOCAL_GHC_PKG06) register testdup.pkg; then false else true; fi
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
 
-PKGCONF1750=local1750.package.conf
-LOCAL_GHC_PKG1750 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF1750)
+PKGCONFT1750=localT1750.package.conf
+LOCAL_GHC_PKGT1750 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFT1750)
 
-1750:
-	rm -rf $(PKGCONF1750) 1750.hs 1750.o 1750.hi 1750.out
-	$(LOCAL_GHC_PKG1750) init $(PKGCONF1750)
-	$(LOCAL_GHC_PKG1750) register --force 1750A.pkg >1750.out 2>&1
-	$(LOCAL_GHC_PKG1750) register --force 1750B.pkg >1750.out 2>&1
-	GHC_PACKAGE_PATH=$(PKGCONF1750) '$(GHC_PKG)' --no-user-package-db list
+T1750:
+	rm -rf $(PKGCONFT1750) T1750.hs T1750.o T1750.hi T1750.out
+	$(LOCAL_GHC_PKGT1750) init $(PKGCONFT1750)
+	$(LOCAL_GHC_PKGT1750) register --force T1750A.pkg >T1750.out 2>&1
+	$(LOCAL_GHC_PKGT1750) register --force T1750B.pkg >T1750.out 2>&1
+	GHC_PACKAGE_PATH=$(PKGCONFT1750) '$(GHC_PKG)' --no-user-package-db list
 # GHC_PACKAGE_PATH trick is to make this work with 6.8.2 which doesn't have
 # the patch "Change the command-line semantics for query commands" to
 # ghc-pkg
-	echo "main = return ()" >1750.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF1750) -package 1750A 1750.hs || true
+	echo "main = return ()" >T1750.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFT1750) -package T1750A T1750.hs || true
 
 PKGCONFSHADOW1=localshadow1.package.conf
 PKGCONFSHADOW2=localshadow2.package.conf

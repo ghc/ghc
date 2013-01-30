@@ -12,7 +12,7 @@ test('ghci007', combined_output, ghci_script, ['ghci007.script'])
 test('ghci008', combined_output, ghci_script, ['ghci008.script'])
 test('ghci009', combined_output, ghci_script, ['ghci009.script'])
 
-# Skip this test: deadlock can't be detected now, because we wait for
+# Skip this test: deadlock cannot be detected now, because we wait for
 # signals to arrive if there are signal handlers installed, and GHCi
 # has a ^C handler installed.
 test('ghci010', skip, ghci_script, ['ghci010.script'])
@@ -84,19 +84,19 @@ test('ghci056',
 
 test('ghci057', normal, ghci_script, ['ghci057.script'])
 
-test('2452', normal, ghci_script, ['2452.script'])
+test('T2452', normal, ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 
-test('1914',
+test('T1914',
      extra_clean(['T1914A.hs', 'T1914B.hs']),
      ghci_script,
-     ['1914.script'])
+     ['T1914.script'])
 
-test('2976', normal, ghci_script, ['2976.script'])
-test('2816', normal, ghci_script, ['2816.script'])
+test('T2976', normal, ghci_script, ['T2976.script'])
+test('T2816', normal, ghci_script, ['T2816.script'])
 test('T789', normal, ghci_script, ['T789.script'])
 test('T3263', normal, ghci_script, ['T3263.script'])
-test('4051', normal, ghci_script, ['4051.script'])
+test('T4051', normal, ghci_script, ['T4051.script'])
 test('T4087', normal, ghci_script, ['T4087.script'])
 test('T4015', normal, ghci_script, ['T4015.script'])
 test('T4127', normal, ghci_script, ['T4127.script'])

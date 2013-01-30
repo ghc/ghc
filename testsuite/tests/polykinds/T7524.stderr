@@ -1,0 +1,5 @@
+
+T7524.hs:5:15:
+    Conflicting family instance declarations:
+      F k k a a -- Defined at T7524.hs:5:15
+      F k k1 a b -- Defined at T7524.hs:6:15

@@ -31,11 +31,11 @@ exec_signals-prep:
 	$(CC) -o exec_signals_child exec_signals_child.c
 	$(CC) -o exec_signals_prepare exec_signals_prepare.c
 
-.PHONY: 4850
-4850:
-	$(RM) 4850.o 4850.hi 4850$(exeext)
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make 4850
-	./4850 +RTS -s 2>&1 | grep TASKS | sed 's/^ *TASKS: *\([0-9]*\).*$$/\1/'
+.PHONY: T4850
+T4850:
+	$(RM) T4850.o T4850.hi T4850$(exeext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make T4850
+	./T4850 +RTS -s 2>&1 | grep TASKS | sed 's/^ *TASKS: *\([0-9]*\).*$$/\1/'
 
 .PHONY: T5423
 T5423:

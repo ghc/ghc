@@ -24,6 +24,6 @@ TYPE CONSTRUCTORS
       huh :: forall chain. Q s a chain -> ST s ()
 COERCION AXIOMS
   axiom ShouldCompile.NTCo:Zork ::
-    forall s a b. Zork s a b ~# (forall chain. Q s a chain -> ST s ())
+    Zork s a b = forall chain. Q s a chain -> ST s ()
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]
