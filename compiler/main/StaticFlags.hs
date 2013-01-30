@@ -89,10 +89,10 @@ parseStaticFlagsFull :: [Flag IO] -> [Located String]
                      -> IO ([Located String], [Located String])
 parseStaticFlagsFull flagsAvailable args = do
   ready <- readIORef v_opt_C_ready
-  when ready $ throwGhcException (ProgramError "Too late for parseStaticFlags: call it before newSession")
+  when ready $ throwGhcExceptionIO (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
   (leftover, errs, warns) <- processArgs flagsAvailable args
-  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
+  when (not (null errs)) $ throwGhcExceptionIO $ errorsToGhcException errs
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
