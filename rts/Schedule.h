@@ -122,7 +122,7 @@ void resurrectThreads (StgTSO *);
 
 #if !IN_STG_CODE
 
-/* END_TSO_QUEUE and friends now defined in includes/StgMiscClosures.h */
+/* END_TSO_QUEUE and friends now defined in includes/stg/MiscClosures.h */
 
 /* Add a thread to the end of the run queue.
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.

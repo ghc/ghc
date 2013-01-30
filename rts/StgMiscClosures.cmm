@@ -547,6 +547,18 @@ INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","E
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
 /* ----------------------------------------------------------------------------
+   STM_AWOKEN
+
+   This is a static nullary constructor (like []) that we use to mark a
+   thread waiting on an STM wakeup
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF_STATIC,"STM_AWOKEN","STM_AWOKEN")
+{ foreign "C" barf("STM_AWOKEN object entered!") never returns; }
+
+CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
+
+/* ----------------------------------------------------------------------------
    Arrays
 
    These come in two basic flavours: arrays of data (StgArrWords) and arrays of
