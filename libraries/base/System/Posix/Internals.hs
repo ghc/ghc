@@ -488,7 +488,8 @@ foreign import ccall unsafe "HsBase.h fork"
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt
 
-foreign import ccall unsafe "HsBase.h mkfifo"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h pipe"
@@ -503,10 +504,12 @@ foreign import capi unsafe "signal.h sigaddset"
 foreign import capi unsafe "signal.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "HsBase.h tcgetattr"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "HsBase.h tcsetattr"
+-- capi is required at least on Android
+foreign import capi unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
 foreign import capi unsafe "HsBase.h utime"
