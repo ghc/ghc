@@ -7,7 +7,7 @@
 module RnEnv (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupTopBndrRn,
-        lookupLocatedOccRn, lookupOccRn,
+        lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,

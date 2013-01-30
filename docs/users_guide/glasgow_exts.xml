@@ -7082,10 +7082,18 @@ the term you're about to write.
 </para>
 
 <para>
-This extension allows special placeholders, written as "<literal>_</literal>", to be used as an expression.
-During compilation these holes will generate an error message describing what type is expected there.
-The error includes helpful information about the origin of type variables and a list of local bindings
+This extension allows special placeholders, written with a leading underscore (e.g. "<literal>_</literal>", 
+"<literal>_foo</literal>", "<literal>_bar</literal>"), to be used as an expression.
+During compilation these holes will generate an error message describing what type is expected there,
+information about the origin of any free type variables, and a list of local bindings
 that might help fill the hole with actual code.
+</para>
+
+<para>
+Holes work together well with <link linkend="defer-type-errors">deferring type errors to runtime</link>:
+with <literal>-fdefer-type-errors</literal>, the error from a hole is also deferred, effctively making the hole
+typecheck just like <literal>undefined</literal>, but with the added benefit that it will show its warning message
+if it gets evaluated. This way, other parts of the code can still be executed and tested.
 </para>
 
 <para>
@@ -7097,7 +7105,7 @@ f x = _
 will fail with the following error:
 <programlisting>
 hole.hs:2:7:
-    Found hole `_' with type a
+    Found hole `_' with type: a
     Where: `a' is a rigid type variable bound by
                the type signature for f :: a -> a at hole.hs:1:6
     Relevant bindings include
@@ -7112,38 +7120,56 @@ hole.hs:2:7:
 Multiple type holes can be used to find common type variables between expressions. For example:
 <programlisting>
 sum :: [Int] -> Int
-sum x = foldr _ _ _
+sum xx = foldr _f _z xs
 </programlisting>
 Shows:
 <programlisting>
 holes.hs:2:15:
-    Found hole `_' with type a0 -> Int -> Int
-    Where: `a0' is an ambiguous type variable
+    Found hole `_f' with type: Int-> Int -> Int
     In the first argument of `foldr', namely `_'
-    In the expression: foldr _ _ _
-    In an equation for `sum': sum x = foldr _ _ _
+    In the expression: foldr _a _b _c
+    In an equation for `sum': sum x = foldr _a _b _c
 
 holes.hs:2:17:
-    Found hole `_' with type Int
+    Found hole `_z' with type: Int
     In the second argument of `foldr', namely `_'
-    In the expression: foldr _ _ _
-    In an equation for `sum': sum x = foldr _ _ _
-
-holes.hs:2:19:
-    Found hole `_' with type [a0]
-    Where: `a0' is an ambiguous type variable
-    In the third argument of `foldr', namely `_'
-    In the expression: foldr _ _ _
-    In an equation for `sum': sum x = foldr _ _ _
+    In the expression: foldr _a _b _c
+    In an equation for `sum': sum x = foldr _a _b _c
 </programlisting>
 </para>
 
 <para>
-Holes work together well with <link linkend="defer-type-errors">deferring type errors to runtime</link>:
-with <literal>-fdefer-type-errors</literal>, the error from a hole is also deferred, effctively making the hole
-typecheck just like <literal>undefined</literal>, but with the added benefit that it will show its warning message
-if it gets evaluated. This way, other parts of the code can still be executed and tested.
+Unbound identifiers with the same name are never unified, even within the same function, but always printed individually.
+For example:
+<programlisting>
+cons = _x : _x
+</programlisting>
+results in the following errors:
+<programlisting>
+unbound.hs:1:8:
+    Found hole '_x' with type: a
+    Where: `a' is a rigid type variable bound by
+               the inferred type of cons :: [a] at unbound.hs:1:1
+    Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
+    In the first argument of `(:)', namely `_x'
+    In the expression: _x : _x
+    In an equation for `cons': cons = _x : _x
+
+unbound.hs:1:13:
+    Found hole '_x' with type: [a]
+    Arising from: an undeclared identifier `_x' at unbound.hs:1:13-14
+    Where: `a' is a rigid type variable bound by
+               the inferred type of cons :: [a] at unbound.hs:1:1
+    Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
+    In the second argument of `(:)', namely `_x'
+    In the expression: _x : _x
+    In an equation for `cons': cons = _x : _x
+Failed, modules loaded: none.
+</programlisting>
+This ensures that an unbound identifier is never reported with a too polymorphic type, like
+<literal>forall a. a</literal>, when used multiple times for types that can not be unified.
 </para>
+
 </sect2>
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
