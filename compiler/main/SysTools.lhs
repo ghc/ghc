@@ -540,7 +540,7 @@ runClang dflags args = do
             text ("Error running clang! you need clang installed to use the" ++
                 "LLVM backend") $+$
             text "(or GHC tried to execute clang incorrectly)"
-        throw err
+        throwIO err
     )
 
 -- | Figure out which version of LLVM we are running this session
