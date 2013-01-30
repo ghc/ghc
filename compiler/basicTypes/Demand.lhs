@@ -695,10 +695,10 @@ However we *don't* want to do this when the argument is not actually
 taken apart in the function at all.  Otherwise we risk decomposing a
 masssive tuple which is barely used.  Example:
 
-	f :: ((Int,Int) -> String) -> (Int,Int) -> a
-	f g pr = error (g pr)
+        f :: ((Int,Int) -> String) -> (Int,Int) -> a
+        f g pr = error (g pr)
 
-	main = print (f fst (1, error "no"))
+        main = print (f fst (1, error "no"))
           
 Here, f does not take 'pr' apart, and it's stupid to do so.
 Imagine that it had millions of fields. This actually happened
