@@ -1795,16 +1795,17 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args') dflags0
-  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
+  when (not (null errs)) $ liftIO $
+      throwGhcExceptionIO $ errorsToGhcException errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
       dflags3 = updateWays dflags2
       theWays = ways dflags3
 
-  unless (allowed_combination theWays) $
-      throwGhcException (CmdLineError ("combination not supported: "  ++
-                              intercalate "/" (map wayDesc theWays)))
+  unless (allowed_combination theWays) $ liftIO $
+      throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
+                               intercalate "/" (map wayDesc theWays)))
 
   -- TODO: This is an ugly hack. Do something better.
   -- -fPIC affects the CMM code we generate, so if
@@ -1822,7 +1823,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   when e.g. compiling a C file, only when compiling Haskell files.
   when doingDynamicToo $
       unless (isJust (outputFile dflags4) == isJust (dynOutputFile dflags4)) $
-          throwGhcException $ CmdLineError
+          liftIO $ throwGhcExceptionIO $ CmdLineError
               "With -dynamic-too, must give -dyno iff giving -o"
   -}
 
