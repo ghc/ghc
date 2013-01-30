@@ -58,10 +58,10 @@ T4908.f [InlPrag=INLINE[0]]
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int)
                  (w1 [Occ=Once] :: (GHC.Types.Int, GHC.Types.Int)) ->
-                 case w of _ { GHC.Types.I# ww [Occ=Once] -> T4908.$wf ww w1 }}]
+                 case w of _ { GHC.Types.I# ww1 [Occ=Once] -> T4908.$wf ww1 w1 }}]
 T4908.f =
   \ (w :: GHC.Types.Int) (w1 :: (GHC.Types.Int, GHC.Types.Int)) ->
-    case w of _ { GHC.Types.I# ww -> T4908.$wf ww w1 }
+    case w of _ { GHC.Types.I# ww1 -> T4908.$wf ww1 w1 }
 
 
 ------ Local rules for imported ids --------

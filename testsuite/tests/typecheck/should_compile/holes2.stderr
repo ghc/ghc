@@ -1,5 +1,5 @@
 
-holes2.hs:7:5: Warning:
+holes2.hs:5:5: Warning:
     No instance for (Show a0) arising from a use of `show'
     The type variable `a0' is ambiguous
     Note: there are several potential instances:
@@ -11,8 +11,8 @@ holes2.hs:7:5: Warning:
     In the expression: show _
     In an equation for `f': f = show _
 
-holes2.hs:7:10: Warning:
-    Found hole `_' with type a0
+holes2.hs:5:10: Warning:
+    Found hole `_' with type: a0
     Where: `a0' is an ambiguous type variable
     In the first argument of `show', namely `_'
     In the expression: show _

@@ -6,7 +6,7 @@ T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,U>,
+ Str=DmdType <S,U>m3,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=False,boring_ok=False)
