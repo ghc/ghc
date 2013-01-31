@@ -206,7 +206,7 @@ type IfaceAnnTarget = AnnTarget OccName
 
 -- We only serialise the IdDetails of top-level Ids, and even then
 -- we only need a very limited selection.  Notably, none of the
--- implicit ones are needed here, becuase they are not put it
+-- implicit ones are needed here, because they are not put it
 -- interface files
 
 data IfaceIdDetails

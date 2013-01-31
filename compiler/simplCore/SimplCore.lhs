@@ -857,7 +857,7 @@ makeIndEnv binds
 shortMeOut :: IndEnv -> Id -> Id -> Bool
 shortMeOut ind_env exported_id local_id
 -- The if-then-else stuff is just so I can get a pprTrace to see
--- how often I don't get shorting out becuase of IdInfo stuff
+-- how often I don't get shorting out because of IdInfo stuff
   = if isExportedId exported_id &&              -- Only if this is exported
 
        isLocalId local_id &&                    -- Only if this one is defined in this

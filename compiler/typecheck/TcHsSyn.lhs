@@ -123,7 +123,7 @@ hsLitType (HsFloatPrim _)  = floatPrimTy
 hsLitType (HsDoublePrim _) = doublePrimTy
 \end{code}
 
-Overloaded literals. Here mainly becuase it uses isIntTy etc
+Overloaded literals. Here mainly because it uses isIntTy etc
 
 \begin{code}
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr TcId)

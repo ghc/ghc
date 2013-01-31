@@ -291,7 +291,7 @@ mkDictSelId dflags no_unf name clas
 	                                else mkImplicitUnfolding dflags rhs)
 		   -- In module where class op is defined, we must add
 		   -- the unfolding, even though it'll never be inlined
-		   -- becuase we use that to generate a top-level binding
+		   -- because we use that to generate a top-level binding
 		   -- for the ClassOp
 
     info | new_tycon = base_info `setInlinePragInfo` alwaysInlinePragma

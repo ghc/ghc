@@ -436,7 +436,7 @@ substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
 
 \begin{code}
 -- | De-shadowing the program is sometimes a useful pre-pass. It can be done simply
--- by running over the bindings with an empty substitution, becuase substitution
+-- by running over the bindings with an empty substitution, because substitution
 -- returns a result that has no-shadowing guaranteed.
 --
 -- (Actually, within a single /type/ there might still be shadowing, because 
@@ -868,7 +868,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- We also inline bindings that bind a Eq# box: see
 -- See Note [Optimise coercion boxes agressively].
 --
--- The result is NOT guaranteed occurence-analysed, becuase
+-- The result is NOT guaranteed occurence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
 

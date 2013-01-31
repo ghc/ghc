@@ -371,7 +371,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 		Right (final_bndrs, fn_id, args) -> do
 	
 	{ let is_local = isLocalId fn_id
-		-- NB: isLocalId is False of implicit Ids.  This is good becuase
+		-- NB: isLocalId is False of implicit Ids.  This is good because
 		-- we don't want to attach rules to the bindings of implicit Ids, 
 		-- because they don't show up in the bindings until just before code gen
 	      fn_name   = idName fn_id

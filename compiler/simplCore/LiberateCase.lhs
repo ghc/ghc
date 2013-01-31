@@ -277,7 +277,7 @@ We get the following levels
 Then 'x' is being scrutinised at a deeper level than its binding, so
 it's added to lc_sruts:  [(x,1)]  
 
-We do *not* want to specialise the call to 'f', becuase 'x' is not free 
+We do *not* want to specialise the call to 'f', because 'x' is not free 
 in 'f'.  So here the bind-level of 'x' (=1) is not <= the bind-level of 'f' (=0).
 
 We *do* want to specialise the call to 'g', because 'x' is free in g.

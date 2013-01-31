@@ -20,6 +20,21 @@
  */
 
 /*
+ * Undefine these as a precaution: some of them were found to be
+ * defined by system headers on ARM/Linux.
+ */
+#undef REG_R1
+#undef REG_R2
+#undef REG_R3
+#undef REG_R4
+#undef REG_R5
+#undef REG_R6
+#undef REG_R7
+#undef REG_R8
+#undef REG_R9
+#undef REG_R10
+
+/*
  * Defining MACHREGS_NO_REGS to 1 causes no global registers to be used.
  * MACHREGS_NO_REGS is typically controlled by NO_REGS, which is
  * typically defined by GHC, via a command-line option passed to gcc,

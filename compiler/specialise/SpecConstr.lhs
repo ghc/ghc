@@ -587,7 +587,7 @@ We get two specialisations:
 
 But perhaps the first one isn't good.  After all, we know that tpl_B2 is
 a T (I# x) really, because T is strict and Int has one constructor.  (We can't
-unbox the strict fields, becuase T is polymorphic!)
+unbox the strict fields, because T is polymorphic!)
 
 %************************************************************************
 %*                                                                      *
@@ -867,7 +867,7 @@ specialiations.  Consider
 
 If we specialise $j1 then in each specialisation (as well as the original)
 we can specialise $j2, and similarly $j3.  Even if we make just *one*
-specialisation of each, becuase we also have the original we'll get 2^n
+specialisation of each, because we also have the original we'll get 2^n
 copies of $j3, which is not good.
 
 So when recursively specialising we divide the sc_count by the number of

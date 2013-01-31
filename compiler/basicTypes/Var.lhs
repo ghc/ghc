@@ -352,7 +352,7 @@ idDetails (Id { id_details = details }) = details
 idDetails other 	       	        = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
--- Ids, becuase Id.lhs uses 'mkGlobalId' etc with different types
+-- Ids, because Id.lhs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
   = mk_id name ty GlobalId details info

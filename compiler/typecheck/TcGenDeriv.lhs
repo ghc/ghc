@@ -500,7 +500,7 @@ unliftedCompare :: PrimOp -> PrimOp
 -- Return (if a < b then lt else if a == b then eq else gt)
 unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
   = nlHsIf (genOpApp a_expr (primOpRdrName lt_op) b_expr) lt $
-                        -- Test (<) first, not (==), becuase the latter
+                        -- Test (<) first, not (==), because the latter
                         -- is true less often, so putting it first would
                         -- mean more tests (dynamically)
         nlHsIf (genOpApp a_expr (primOpRdrName eq_op) b_expr) eq gt
@@ -690,7 +690,7 @@ instance ... Ix (Foo ...) where
         map tag2con_Foo (enumFromTo (I# a#) (I# b#))
         }}
 
-    -- Generate code for unsafeIndex, becuase using index leads
+    -- Generate code for unsafeIndex, because using index leads
     -- to lots of redundant range tests
     unsafeIndex c@(a, b) d
       = case (con2tag_Foo d -# con2tag_Foo a) of

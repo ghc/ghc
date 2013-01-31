@@ -8,7 +8,7 @@
 module Main(main) where
 
 #include "../../includes/ghcconfig.h"
-#include "../../includes/stg/RtsMachRegs.h"
+#include "../../includes/stg/HaskellMachRegs.h"
 #include "../../includes/rts/Constants.h"
 
 -- Needed for TAG_BITS

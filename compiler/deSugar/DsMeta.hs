@@ -8,7 +8,7 @@
 -- CoreExpr's of the "smart constructors" of the Meta.Exp datatype.
 --
 -- It also defines a bunch of knownKeyNames, in the same way as is done
--- in prelude/PrelNames.  It's much more convenient to do it here, becuase
+-- in prelude/PrelNames.  It's much more convenient to do it here, because
 -- otherwise we have to recompile PrelNames whenever we add a Name, which is
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
@@ -351,7 +351,7 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
             -- appear in the resulting data structure
 	    --
 	    -- But we do NOT bring the binders of 'binds' into scope
-	    -- becuase they are properly regarded as occurrences
+	    -- because they are properly regarded as occurrences
 	    -- For example, the method names should be bound to
 	    -- the selector Ids, not to fresh names (Trac #5410)
 	    --
@@ -1876,7 +1876,7 @@ mk_string s = return $ HsString s
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})
   = do { lit <- mk_lit val; repLiteral lit }
-	-- The type Rational will be in the environment, becuase
+	-- The type Rational will be in the environment, because
 	-- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used
 

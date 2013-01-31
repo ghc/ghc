@@ -686,7 +686,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = reportEqErr ctxt extra ct oriented (mkTyVarTy tv1) ty2
         -- This *can* happen (Trac #6123, and test T2627b)
         -- Consider an ambiguous top-level constraint (a ~ F a)
-        -- Not an occurs check, becuase F is a type function.
+        -- Not an occurs check, because F is a type function.
   where         
     occ_check_expand = occurCheckExpand dflags tv1 ty2
     k1 	= tyVarKind tv1
@@ -866,7 +866,7 @@ mkDictErr ctxt cts
 
        -- Report definite no-instance errors, 
        -- or (iff there are none) overlap errors
-       -- But we report only one of them (hence 'head') becuase they all
+       -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
        ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
