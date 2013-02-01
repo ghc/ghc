@@ -560,17 +560,20 @@ checkPat loc e args     -- OK to let this happen even if bang-patterns
   | Just (e', args') <- splitBang e
   = do  { args'' <- checkPatterns args'
         ; checkPat loc e' (args'' ++ args) }
-checkPat loc (L _ (HsApp f x)) args
-  = do { x <- checkLPat x; checkPat loc f (x:args) }
+checkPat loc (L _ (HsApp f e)) args
+  = do p <- checkLPat e
+       checkPat loc f (p : args)
 checkPat loc (L _ e) []
-  = do { pState <- getPState
-       ; p <- checkAPat (dflags pState) loc e
-       ; return (L loc p) }
+  = do p <- checkAPat loc e
+       return (L loc p)
 checkPat loc e _
   = patFail loc (unLoc e)
 
-checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
-checkAPat dynflags loc e0 = case e0 of
+checkAPat :: SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
+checkAPat loc e0 = do
+ pState <- getPState
+ let dynflags = dflags pState
+ case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
    HsLit l  -> return (LitPat l)
