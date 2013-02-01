@@ -267,3 +267,4 @@ test('T7532',
      extra_clean(['T7532a.hi', 'T7532a.o']),
      multimod_compile,
      ['T7532', '-v0'])
+test('T2222', normal, compile, ['-v0'])
