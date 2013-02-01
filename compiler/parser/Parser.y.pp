@@ -1789,12 +1789,12 @@ maybe_stmt :: { Maybe (LStmt RdrName (LHsExpr RdrName)) }
         | {- nothing -}                 { Nothing }
 
 stmt  :: { LStmt RdrName (LHsExpr RdrName) }
-        : qual                              { $1 }
+        : qual                          { $1 }
         | 'rec' stmtlist                { LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName (LHsExpr RdrName) }
     : pat '<-' exp                      { LL $ mkBindStmt $1 $3 }
-    | exp                                   { L1 $ mkBodyStmt $1 }
+    | exp                               { L1 $ mkBodyStmt $1 }
     | 'let' binds                       { LL $ LetStmt (unLoc $2) }
 
 -----------------------------------------------------------------------------
