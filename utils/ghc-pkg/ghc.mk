@@ -61,7 +61,6 @@ utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
 	       -iutils/ghc-pkg \
-	       -XCPP -XExistentialQuantification -XDeriveDataTypeable \
 	       -iutils/ghc-pkg/dist/build \
 	       -ilibraries/Cabal/Cabal \
 	       -ilibraries/filepath \
