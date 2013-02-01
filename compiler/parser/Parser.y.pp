@@ -1358,14 +1358,14 @@ decl    :: { Located (OrdList (LHsDecl RdrName)) }
         : sigdecl               { $1 }
 
         | '!' aexp rhs          {% do { let { e = LL (SectionR (LL (HsVar bang_RDR)) $2) };
-                                        pat <- checkPattern e;
+                                        pat <- checkPattern empty e;
                                         return $ LL $ unitOL $ LL $ ValD $
                                                PatBind pat (unLoc $3)
                                                        placeHolderType placeHolderNames (Nothing,[]) } }
                                 -- Turn it all into an expression so that
                                 -- checkPattern can check that bangs are enabled
 
-        | infixexp opt_sig rhs  {% do { r <- checkValDef $1 $2 $3;
+        | infixexp opt_sig rhs  {% do { r <- checkValDef empty $1 $2 $3;
                                         let { l = comb2 $1 $> };
                                         return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | docdecl               { LL $ unitOL $1 }
@@ -1465,7 +1465,7 @@ exp10 :: { LHsExpr RdrName }
                                                                       else HsPar $2 } }
 
         | 'proc' aexp '->' exp  
-                        {% checkPattern $2 >>= \ p -> 
+                        {% checkPattern empty $2 >>= \ p -> 
                             checkCommand $4 >>= \ cmd ->
                             return (LL $ HsProc p (LL $ HsCmdTop cmd [] 
                                                     placeHolderType undefined)) }
@@ -1548,7 +1548,7 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }                       
         | '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }                       
-        | '[p|' infixexp '|]'   {% checkPattern $2 >>= \p ->
+        | '[p|' infixexp '|]'   {% checkPattern empty $2 >>= \p ->
                                         return (LL $ HsBracket (PatBr p)) }
         | '[d|' cvtopbody '|]'  { LL $ HsBracket (DecBrL $2) }
         | quasiquote            { L1 (HsQuasiQuoteE (unLoc $1)) }
@@ -1750,12 +1750,16 @@ gdpat   :: { LGRHS RdrName (LHsExpr RdrName) }
 -- Bangs inside are parsed as infix operator applications, so that
 -- we parse them right when bang-patterns are off
 pat     :: { LPat RdrName }
-pat     :  exp                  {% checkPattern $1 }
-        | '!' aexp              {% checkPattern (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
+pat     :  exp                  {% checkPattern empty $1 }
+        | '!' aexp              {% checkPattern empty (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
+
+bindpat :: { LPat RdrName }
+bindpat :  exp                  {% checkPattern (text "Possibly caused by a missing 'do'?") $1 }
+        | '!' aexp              {% checkPattern (text "Possibly caused by a missing 'do'?") (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
 
 apat   :: { LPat RdrName }      
-apat    : aexp                  {% checkPattern $1 }
-        | '!' aexp              {% checkPattern (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
+apat    : aexp                  {% checkPattern empty $1 }
+        | '!' aexp              {% checkPattern empty (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
 
 apats  :: { [LPat RdrName] }
         : apat apats            { $1 : $2 }
@@ -1793,7 +1797,7 @@ stmt  :: { LStmt RdrName (LHsExpr RdrName) }
         | 'rec' stmtlist                { LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName (LHsExpr RdrName) }
-    : pat '<-' exp                      { LL $ mkBindStmt $1 $3 }
+    : bindpat '<-' exp                  { LL $ mkBindStmt $1 $3 }
     | exp                               { L1 $ mkBodyStmt $1 }
     | 'let' binds                       { LL $ LetStmt (unLoc $2) }
 
