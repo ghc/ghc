@@ -120,9 +120,7 @@ test('T5113',
           stats_num_field('bytes allocated', 8000000,
                                              9000000)),
       only_ways(['normal']),
-      normal
-      # WAS: expect_broken(7046)
-      # but it started working again around 01/2013, see #7046
+      expect_broken(7046)
       ],
      compile_and_run,
      ['-O'])
