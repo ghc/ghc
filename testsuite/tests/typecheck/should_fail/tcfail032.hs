@@ -6,7 +6,7 @@
 
 It *is* an error, because x does not have the polytype 
 	forall a. Eq a => a -> Int
-becuase it is monomorphic, but the error message isn't very illuminating.
+because it is monomorphic, but the error message isn't very illuminating.
 -}
 
 module ShouldFail where

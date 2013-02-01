@@ -1,4 +1,4 @@
--- This program broke GHC 6.3, becuase dataToTag was called with
+-- This program broke GHC 6.3, because dataToTag was called with
 -- an unevaluated argument
 
 module Main where
