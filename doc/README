@@ -8,6 +8,7 @@ process the documentation on your system, and a Makefile to actually
 do the processing (so, on Windows, you'll need Cygwin or MSys in
 addition to the DocBook XML tools).  To build the HTML documentation:
 
+   $ autoconf
    $ ./configure
    $ make html
 

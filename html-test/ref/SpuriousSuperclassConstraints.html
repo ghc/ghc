@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >SpuriousSuperclassConstraints</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_SpuriousSuperclassConstraints.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href=""
+	  >Contents</a
+	  ></li
+	><li
+	><a href=""
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>SpuriousSuperclassConstraints</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >What is tested here:
+</p
+	  ><p
+	  >Due to a change in GHC 7.6.1 we had a bug that superclass contraints were
+ included in the instances list.  Edward K. repported it here:
+</p
+	  ><p
+	  ><a href=""
+	    >http://www.haskell.org/pipermail/haskell-cafe/2012-September/103600.html</a
+	    >
+</p
+	  ><p
+	  >And here is the corresponding theard on glasgow-haskell-users:
+</p
+	  ><p
+	  ><a href=""
+	    >http://www.haskell.org/pipermail/glasgow-haskell-users/2012-September/022914.html</a
+	    >
+</p
+	  ><p
+	  >It has been fixed in:
+</p
+	  ><pre
+	  > 6ccf78e15a525282fef61bc4f58a279aa9c21771
+ Fix spurious superclass constraints bug.
+</pre
+	  ></div
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a name="t:SomeType" class="def"
+	    >SomeType</a
+	    > f a </p
+	  ><div class="subs instances"
+	  ><p id="control.i:SomeType" class="caption collapser" onclick="toggleSection('i:SomeType')"
+	    >Instances</p
+	    ><div id="section.i:SomeType" class="show"
+	    ><table
+	      ><tr
+		><td class="src"
+		  ><a href=""
+		    >Functor</a
+		    > (<a href=""
+		    >SomeType</a
+		    > f)</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><a href=""
+		    >Applicative</a
+		    > f =&gt; <a href=""
+		    >Applicative</a
+		    > (<a href=""
+		    >SomeType</a
+		    > f)</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		></table
+	      ></div
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.13.2</p
+      ></div
+    ></body
+  ></html
+>

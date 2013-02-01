@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections, BangPatterns #-}
+{-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Create
@@ -40,7 +41,7 @@ import Name
 import Bag
 import RdrName
 import TcRnTypes
-import FastString (unpackFS)
+import FastString (unpackFS, concatFS)
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -89,8 +90,11 @@ createInterface tm flags modMap instIfaceMap = do
 
   liftErrMsg $ warnAboutFilteredDecls dflags mdl decls
 
-  let warningMap = mkWarningMap warnings gre exportedNames
-  exportItems <- mkExportItems modMap mdl warningMap gre exportedNames decls maps exports
+  warningMap <- liftErrMsg $ mkWarningMap dflags warnings gre exportedNames
+
+  let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
+
+  exportItems <- mkExportItems modMap mdl allWarnings gre exportedNames decls maps exports
                    instances instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames exportItems opts
@@ -111,26 +115,29 @@ createInterface tm flags modMap instIfaceMap = do
   let !aliases =
         mkAliasMap dflags $ tm_renamed_source tm
 
+  modWarn <- liftErrMsg $ moduleWarning dflags gre warnings
+
   return $! Interface {
-    ifaceMod             = mdl,
-    ifaceOrigFilename    = msHsFilePath ms,
-    ifaceInfo            = info,
-    ifaceDoc             = Documentation mbDoc (moduleWarning warnings),
-    ifaceRnDoc           = Documentation Nothing Nothing,
-    ifaceOptions         = opts,
-    ifaceDocMap          = docMap,
-    ifaceArgMap          = argMap,
-    ifaceRnDocMap        = M.empty,
-    ifaceRnArgMap        = M.empty,
-    ifaceExportItems     = prunedExportItems,
-    ifaceRnExportItems   = [],
-    ifaceExports         = exportedNames,
-    ifaceVisibleExports  = visibleNames,
-    ifaceDeclMap         = declMap,
-    ifaceSubMap          = subMap,
-    ifaceModuleAliases   = aliases,
-    ifaceInstances       = instances,
-    ifaceHaddockCoverage = coverage
+    ifaceMod             = mdl
+  , ifaceOrigFilename    = msHsFilePath ms
+  , ifaceInfo            = info
+  , ifaceDoc             = Documentation mbDoc modWarn
+  , ifaceRnDoc           = Documentation Nothing Nothing
+  , ifaceOptions         = opts
+  , ifaceDocMap          = docMap
+  , ifaceArgMap          = argMap
+  , ifaceRnDocMap        = M.empty
+  , ifaceRnArgMap        = M.empty
+  , ifaceExportItems     = prunedExportItems
+  , ifaceRnExportItems   = []
+  , ifaceExports         = exportedNames
+  , ifaceVisibleExports  = visibleNames
+  , ifaceDeclMap         = declMap
+  , ifaceSubMap          = subMap
+  , ifaceModuleAliases   = aliases
+  , ifaceInstances       = instances
+  , ifaceHaddockCoverage = coverage
+  , ifaceWarningMap      = warningMap
   }
 
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
@@ -166,31 +173,35 @@ lookupModuleDyn dflags Nothing mdlName =
 -- Warnings
 -------------------------------------------------------------------------------
 
-type WarningMap = DocMap Name
-
-mkWarningMap :: Warnings -> GlobalRdrEnv -> [Name] -> WarningMap
-mkWarningMap NoWarnings  _ _ = M.empty
-mkWarningMap (WarnAll _) _ _ = M.empty
-mkWarningMap (WarnSome ws) gre exps = M.fromList
-      [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
-      , let n = gre_name elt, n `elem` exps ]
-
-
-moduleWarning :: Warnings -> Maybe (Doc id)
-moduleWarning ws =
-  case ws of
-    NoWarnings -> Nothing
-    WarnSome _ -> Nothing
-    WarnAll w  -> Just $! warnToDoc w
-
-
-warnToDoc :: WarningTxt -> Doc id
-warnToDoc w = case w of
-  (DeprecatedTxt msg) -> format "Deprecated: " msg
-  (WarningTxt    msg) -> format "Warning: "    msg
+mkWarningMap :: DynFlags -> Warnings -> GlobalRdrEnv -> [Name] -> ErrMsgM WarningMap
+mkWarningMap dflags warnings gre exps = case warnings of
+  NoWarnings  -> return M.empty
+  WarnAll _   -> return M.empty
+  WarnSome ws -> do
+    let ws' = [ (n, w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
+              , let n = gre_name elt, n `elem` exps ]
+    M.fromList <$> mapM parse ws'
   where
-    format x xs = let !str = force $ concat (x : map unpackFS xs)
-                  in DocWarning $ DocParagraph $ DocString str
+    parse (n, w) = (,) n <$> parseWarning dflags gre w
+
+
+moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> ErrMsgM (Maybe (Doc Name))
+moduleWarning dflags gre ws =
+  case ws of
+    NoWarnings -> return Nothing
+    WarnSome _ -> return Nothing
+    WarnAll w  -> Just <$> parseWarning dflags gre w
+
+parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Doc Name)
+parseWarning dflags gre w = do
+  r <- case w of
+    (DeprecatedTxt msg) -> format "Deprecated: " (concatFS msg)
+    (WarningTxt    msg) -> format "Warning: "    (concatFS msg)
+  r `deepseq` return r
+  where
+    format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
+      .   fromMaybe (DocString . unpackFS $ xs)
+      <$> processDocString dflags gre (HsDocString xs)
 
 
 -------------------------------------------------------------------------------
@@ -703,6 +714,7 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap) decls =
         f (L l (SigD (GenericSig names t))) xs = foldr (\n acc -> L l (SigD (GenericSig [n] t)) : acc) xs names
         f x xs = x : xs
 
+    mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
     mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
       mbDoc <- liftErrMsg $ processDocString dflags gre docStr
       return $ fmap (ExportGroup lev "") mbDoc
@@ -777,7 +789,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
   data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
 
 
--- | Keep exprt items with docs.
+-- | Keep export items with docs.
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems = filter hasDoc
   where

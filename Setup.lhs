@@ -1,5 +1,3 @@
-#! /usr/bin/runhaskell
-\begin{code}
-import Distribution.Simple
-main = defaultMain
-\end{code}
+#!/usr/bin/env runhaskell
+> import Distribution.Simple
+> main = defaultMain

@@ -1,0 +1,298 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >CrossPackageDocs</title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html");};
+//]]>
+</script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href=""
+	  >Contents</a
+	  ></li
+	><li
+	><a href=""
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      >&nbsp;</p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>CrossPackageDocs</p
+	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><a href=""
+	    >map</a
+	    > ::  (a -&gt; b) -&gt; [a] -&gt; [b]</li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >class</span
+	    >  <a href=""
+	    >IsString</a
+	    > a  <span class="keyword"
+	    >where</span
+	    ><ul class="subs"
+	    ><li
+	      ><a href=""
+		>fromString</a
+		> :: <a href=""
+		>String</a
+		> -&gt; a</li
+	      ></ul
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >runInteractiveProcess</a
+	    > :: <a href=""
+	    >FilePath</a
+	    > -&gt; [<a href=""
+	    >String</a
+	    >] -&gt; <a href=""
+	    >Maybe</a
+	    > <a href=""
+	    >FilePath</a
+	    > -&gt; <a href=""
+	    >Maybe</a
+	    > [(<a href=""
+	    >String</a
+	    >, <a href=""
+	    >String</a
+	    >)] -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >ProcessHandle</a
+	    >)</li
+	  ></ul
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a name="v:map" class="def"
+	    >map</a
+	    > ::  (a -&gt; b) -&gt; [a] -&gt; [b]</p
+	  ><div class="doc"
+	  ><p
+	    ><code
+	      ><a href=""
+		>map</a
+		></code
+	      > <code
+	      >f xs</code
+	      > is the list obtained by applying <code
+	      >f</code
+	      > to each element
+ of <code
+	      >xs</code
+	      >, i.e.,
+</p
+	    ><pre
+	    > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
+ map f [x1, x2, ...] == [f x1, f x2, ...]
+</pre
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    >  <a name="t:IsString" class="def"
+	    >IsString</a
+	    > a  <span class="keyword"
+	    >where</span
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Class for string-like datastructures; used by the overloaded string
+   extension (-foverloaded-strings in GHC).
+</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a name="v:fromString" class="def"
+	      >fromString</a
+	      > :: <a href=""
+	      >String</a
+	      > -&gt; a</p
+	    ></div
+	  ><div class="subs instances"
+	  ><p id="control.i:IsString" class="caption collapser" onclick="toggleSection('i:IsString')"
+	    >Instances</p
+	    ><div id="section.i:IsString" class="show"
+	    ><table
+	      ><tr
+		><td class="src"
+		  ><a href=""
+		    >IsString</a
+		    > [<a href=""
+		    >Char</a
+		    >]</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		></table
+	      ></div
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:runInteractiveProcess" class="def"
+	    >runInteractiveProcess</a
+	    ></p
+	  ><div class="subs arguments"
+	  ><p class="caption"
+	    >Arguments</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		>:: <a href=""
+		  >FilePath</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Filename of the executable (see <code
+		    ><a href=""
+		      >proc</a
+		      ></code
+		    > for details)
+</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; [<a href=""
+		  >String</a
+		  >]</td
+		><td class="doc"
+		><p
+		  >Arguments to pass to the executable
+</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; <a href=""
+		  >Maybe</a
+		  > <a href=""
+		  >FilePath</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Optional path to the working directory
+</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; <a href=""
+		  >Maybe</a
+		  > [(<a href=""
+		  >String</a
+		  >, <a href=""
+		  >String</a
+		  >)]</td
+		><td class="doc"
+		><p
+		  >Optional environment (otherwise inherit)
+</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; <a href=""
+		  >IO</a
+		  > (<a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >ProcessHandle</a
+		  >)</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="doc"
+	  ><p
+	    >Runs a raw command, and returns <code
+	      ><a href=""
+		>Handle</a
+		></code
+	      >s that may be used to communicate
+     with the process via its <code
+	      >stdin</code
+	      >, <code
+	      >stdout</code
+	      > and <code
+	      >stderr</code
+	      > respectively.
+</p
+	    ><p
+	    >For example, to start a process and feed a string to its stdin:
+</p
+	    ><pre
+	    >   (inp,out,err,pid) &lt;- runInteractiveProcess &quot;...&quot;
+   forkIO (hPutStr inp str)
+</pre
+	    ><p
+	    >The <code
+	      ><a href=""
+		>Handle</a
+		></code
+	      >s are initially in binary mode; if you need them to be
+    in text mode then use <code
+	      ><a href=""
+		>hSetBinaryMode</a
+		></code
+	      >.
+</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ><p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.13.2</p
+      ></div
+    ></body
+  ></html
+>

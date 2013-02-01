@@ -1,28 +1,20 @@
 --------------------------------------------
--- Haddock 2.9.3
+-- Haddock 2.13.1
 --------------------------------------------
 
-A new version of Haddock, the Haskell documentation tool, is out!
-
-This is the version that comes with GHC 7.2.1 (although that executable claims
-it is version 2.9.2!)
-
-Apologies to people who have sent in patches that haven't made it into this
-release, they will go into the next one.
+A new versions of Haddock has been uploaded to Hackage.
 
 --------------------------------------------
--- Changes in version 2.9.3
+-- Changes in version 2.13.1
 --------------------------------------------
 
-Changes in version 2.9.3
+ * Hide instances that are "internal" to a module
 
-  * Build with GHC 7.2.1
+ * Add support for properties in documentation
 
-  * Support blank lines in results of examples
+ * Fix a bug with spurious superclass constraints
 
-  * A type signatures for multiple names generates one signature in the output
-
-  * Minor bug fixes
+ * Fix and extend the Haddock API
 
 --------------------------------------------
 -- Links
@@ -32,7 +24,7 @@ Homepage:
  http://www.haskell.org/haddock
 
 Hackage page:
- http://hackage.haskell.org/package/haddock-2.9.0
+ http://hackage.haskell.org/package/haddock
 
 Bugtracker and wiki:
  http://trac.haskell.org/haddock
@@ -41,7 +33,7 @@ Mailing list:
  haddock@projects.haskell.org
 
 Code repository:
- http://code.haskell.org/haddock
+ http://darcs.haskell.org/haddock.git
 
 --------------------------------------------
 -- Contributors
@@ -49,13 +41,10 @@ Code repository:
 
 The following people contributed patches to this release:
 
-Max Bolingbroke
-Ian Lynagh
-Simon Hengel
-Jose Pedro Magalhaes
-Simon Peyton Jones
-Michal Terepeta
+Kazu Yamamoto
+Roman Cheplyaka
 David Waern
+Simon Hengel
 
 --------------------------------------------
 -- Get Involved
@@ -64,7 +53,7 @@ David Waern
 We would be very happy to get more contributors. To get involved, start by
 grabbing the code:
 
- http://code.haskell.org/haddock
+ http://darcs.haskell.org/haddock.git
 
 Then take a look at the bug and feature tracker for things to work on:
 

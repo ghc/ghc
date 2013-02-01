@@ -43,6 +43,7 @@ import Haddock.Utils
 import Control.Monad
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Distribution.Verbosity
 import System.Directory
 import System.FilePath
@@ -72,8 +73,12 @@ processModules verbosity modules flags extIfaces = do
                                    , iface <- ifInstalledIfaces ext ]
   interfaces <- createIfaces0 verbosity modules flags instIfaceMap
 
+  let exportedNames =
+        Set.unions $ map (Set.fromList . ifaceExports) $
+        filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
+      mods = Set.fromList $ map ifaceMod interfaces
   out verbosity verbose "Attaching instances..."
-  interfaces' <- attachInstances interfaces instIfaceMap
+  interfaces' <- attachInstances (exportedNames, mods) interfaces instIfaceMap
 
   out verbosity verbose "Building cross-linking environment..."
   -- Combine the link envs of the external packages into one

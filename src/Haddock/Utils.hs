@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Utils
@@ -426,9 +427,10 @@ markup m (DocUnorderedList ds)       = markupUnorderedList m (map (markup m) ds)
 markup m (DocOrderedList ds)         = markupOrderedList m (map (markup m) ds)
 markup m (DocDefList ds)             = markupDefList m (map (markupPair m) ds)
 markup m (DocCodeBlock d)            = markupCodeBlock m (markup m d)
-markup m (DocURL url)                = markupURL m url
+markup m (DocHyperlink l)            = markupHyperlink m l
 markup m (DocAName ref)              = markupAName m ref
 markup m (DocPic img)                = markupPic m img
+markup m (DocProperty p)             = markupProperty m p
 markup m (DocExamples e)             = markupExample m e
 
 
@@ -453,9 +455,10 @@ idMarkup = Markup {
   markupOrderedList          = DocOrderedList,
   markupDefList              = DocDefList,
   markupCodeBlock            = DocCodeBlock,
-  markupURL                  = DocURL,
+  markupHyperlink            = DocHyperlink,
   markupAName                = DocAName,
   markupPic                  = DocPic,
+  markupProperty             = DocProperty,
   markupExample              = DocExamples
   }
 

@@ -1,5 +1,5 @@
-{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Types
@@ -22,6 +22,7 @@ module Haddock.Types (
 
 import Control.Exception
 import Control.Arrow
+import Control.DeepSeq
 import Data.Typeable
 import Data.Map (Map)
 import Data.Maybe
@@ -113,7 +114,12 @@ data Interface = Interface
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
   , ifaceHaddockCoverage :: !(Int, Int)
+
+    -- | Warnings for things defined in this module.
+  , ifaceWarningMap :: !WarningMap
   }
+
+type WarningMap = DocMap Name
 
 
 -- | A subset of the fields of 'Interface' that we store in the interface
@@ -303,9 +309,10 @@ data Doc id
   | DocOrderedList [Doc id]
   | DocDefList [(Doc id, Doc id)]
   | DocCodeBlock (Doc id)
-  | DocURL String
+  | DocHyperlink Hyperlink
   | DocPic String
   | DocAName String
+  | DocProperty String
   | DocExamples [Example]
   deriving (Functor)
 
@@ -315,10 +322,52 @@ instance Monoid (Doc id) where
   mappend = DocAppend
 
 
+instance NFData a => NFData (Doc a) where
+  rnf doc = case doc of
+    DocEmpty                  -> ()
+    DocAppend a b             -> a `deepseq` b `deepseq` ()
+    DocString a               -> a `deepseq` ()
+    DocParagraph a            -> a `deepseq` ()
+    DocIdentifier a           -> a `deepseq` ()
+    DocIdentifierUnchecked a  -> a `deepseq` ()
+    DocModule a               -> a `deepseq` ()
+    DocWarning a              -> a `deepseq` ()
+    DocEmphasis a             -> a `deepseq` ()
+    DocMonospaced a           -> a `deepseq` ()
+    DocUnorderedList a        -> a `deepseq` ()
+    DocOrderedList a          -> a `deepseq` ()
+    DocDefList a              -> a `deepseq` ()
+    DocCodeBlock a            -> a `deepseq` ()
+    DocHyperlink a            -> a `deepseq` ()
+    DocPic a                  -> a `deepseq` ()
+    DocAName a                -> a `deepseq` ()
+    DocProperty a             -> a `deepseq` ()
+    DocExamples a             -> a `deepseq` ()
+
+
+instance NFData Name
+instance NFData OccName
+instance NFData ModuleName
+
+
+data Hyperlink = Hyperlink
+  { hyperlinkUrl   :: String
+  , hyperlinkLabel :: Maybe String
+  } deriving (Eq, Show)
+
+
+instance NFData Hyperlink where
+  rnf (Hyperlink a b) = a `deepseq` b `deepseq` ()
+
+
 data Example = Example
   { exampleExpression :: String
   , exampleResult     :: [String]
   } deriving (Eq, Show)
+
+
+instance NFData Example where
+  rnf (Example a b) = a `deepseq` b `deepseq` ()
 
 
 exampleToString :: Example -> String
@@ -341,9 +390,10 @@ data DocMarkup id a = Markup
   , markupOrderedList          :: [a] -> a
   , markupDefList              :: [(a,a)] -> a
   , markupCodeBlock            :: a -> a
-  , markupURL                  :: String -> a
+  , markupHyperlink            :: Hyperlink -> a
   , markupAName                :: String -> a
   , markupPic                  :: String -> a
+  , markupProperty             :: String -> a
   , markupExample              :: [Example] -> a
   }
 

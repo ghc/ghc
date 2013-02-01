@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.ParseModuleHeader

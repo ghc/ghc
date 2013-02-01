@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.11.0
+version:              2.13.2
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -26,57 +26,97 @@ extra-source-files:
   doc/docbook-xml.mk
   doc/fptools.css
   doc/haddock.xml
-  examples/A.hs
-  examples/B.hs
-  examples/Bug1.hs
-  examples/Bug2.hs
-  examples/Bug3.hs
-  examples/Bug4.hs
-  examples/Bug6.hs
-  examples/Bug7.hs
-  examples/Bug8.hs
-  examples/Bug9.hs
-  examples/Hash.hs
-  examples/Hidden.hs
-  examples/Makefile
-  examples/NoLayout.hs
-  examples/Test.hs
-  examples/Visible.hs
-  examples/hide-bug/A.hs
-  examples/hide-bug/B.hs
-  examples/hide-bug/C.hs
-  examples/hide-bug/D.hs
   haddock.spec
   haskell.vim
   src/haddock.sh
--- The test files shouldn't have to go here, but the source files for
--- the test-suite stanzas don't get picked up by `cabal sdist`.
-  tests/html-tests/runtests.hs
+  html-test/src/*.hs
+  html-test/ref/*.html
 
-data-files:
-  html/frames.html
-  html/haddock-util.js
-  html/Classic.theme/haskell_icon.gif
-  html/Classic.theme/minus.gif
-  html/Classic.theme/plus.gif
-  html/Classic.theme/xhaddock.css
-  html/Ocean.std-theme/hslogo-16.png
-  html/Ocean.std-theme/minus.gif
-  html/Ocean.std-theme/ocean.css
-  html/Ocean.std-theme/plus.gif
-  html/Ocean.std-theme/synopsis.png
-  latex/haddock.sty
+data-dir:   resources
+data-files: html/frames.html
+            html/haddock-util.js
+            html/Classic.theme/haskell_icon.gif
+            html/Classic.theme/minus.gif
+            html/Classic.theme/plus.gif
+            html/Classic.theme/xhaddock.css
+            html/Ocean.std-theme/hslogo-16.png
+            html/Ocean.std-theme/minus.gif
+            html/Ocean.std-theme/ocean.css
+            html/Ocean.std-theme/plus.gif
+            html/Ocean.std-theme/synopsis.png
+            latex/haddock.sty
 
 flag in-ghc-tree
   description: Are we in a GHC tree?
   default: False
   manual: True
 
-flag test
+-- Using this disables -O2, and hence allows to use --disable-optimization,
+-- which is about twice as fast.  This should probably be the default, but we
+-- need some benchmarks first..
+flag dev
   default: False
   manual: True
 
 executable haddock
+  default-language:     Haskell2010
+  main-is:              Main.hs
+  hs-source-dirs:       driver
+  if flag(dev)
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
+  else
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
+  if !flag(in-ghc-tree)
+    build-tools: alex >= 2.3, happy >= 1.18
+  build-depends:
+    base >= 4.3 && < 4.8
+  if flag(in-ghc-tree)
+    hs-source-dirs: src
+    cpp-options: -DIN_GHC_TREE
+    build-depends:
+      filepath,
+      directory,
+      containers,
+      deepseq,
+      array,
+      xhtml >= 3000.2 && < 3000.3,
+      Cabal >= 1.10,
+      ghc >= 7.4 && < 7.8
+    other-modules:
+      Documentation.Haddock
+      Haddock
+      Haddock.Interface
+      Haddock.Interface.Rename
+      Haddock.Interface.Create
+      Haddock.Interface.AttachInstances
+      Haddock.Interface.LexParseRn
+      Haddock.Interface.ParseModuleHeader
+      Haddock.Lex
+      Haddock.Parse
+      Haddock.Utils
+      Haddock.Backends.Xhtml
+      Haddock.Backends.Xhtml.Decl
+      Haddock.Backends.Xhtml.DocMarkup
+      Haddock.Backends.Xhtml.Layout
+      Haddock.Backends.Xhtml.Names
+      Haddock.Backends.Xhtml.Themes
+      Haddock.Backends.Xhtml.Types
+      Haddock.Backends.Xhtml.Utils
+      Haddock.Backends.LaTeX
+      Haddock.Backends.HaddockDB
+      Haddock.Backends.Hoogle
+      Haddock.ModuleTree
+      Haddock.Types
+      Haddock.Doc
+      Haddock.Version
+      Haddock.InterfaceFile
+      Haddock.Options
+      Haddock.GhcUtils
+      Haddock.Convert
+  else
+    build-depends:  haddock
+
+library
   default-language:     Haskell2010
   -- In a GHC tree - in particular, in a source tarball - we don't
   -- require alex or happy
@@ -86,7 +126,6 @@ executable haddock
     base >= 4.3 && < 4.8,
     filepath,
     directory,
-    pretty,
     containers,
     deepseq,
     array,
@@ -99,82 +138,17 @@ executable haddock
   else
     build-depends: ghc-paths
 
-  if flag(test)
-    cpp-options: -DTEST
-    build-depends: QuickCheck >= 2.1 && < 3
-
-  main-is:              Main.hs
   hs-source-dirs:       src
-  default-extensions:   CPP, DeriveDataTypeable,
-                        ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
-
-  other-modules:
-    Haddock.Interface
-    Haddock.Interface.Rename
-    Haddock.Interface.Create
-    Haddock.Interface.AttachInstances
-    Haddock.Interface.LexParseRn
-    Haddock.Interface.ParseModuleHeader
-    Haddock.Lex
-    Haddock.Parse
-    Haddock.Utils
-    Haddock.Backends.Xhtml
-    Haddock.Backends.Xhtml.Decl
-    Haddock.Backends.Xhtml.DocMarkup
-    Haddock.Backends.Xhtml.Layout
-    Haddock.Backends.Xhtml.Names
-    Haddock.Backends.Xhtml.Themes
-    Haddock.Backends.Xhtml.Types
-    Haddock.Backends.Xhtml.Utils
-    Haddock.Backends.LaTeX
-    Haddock.Backends.HaddockDB
-    Haddock.Backends.Hoogle
-    Haddock.ModuleTree
-    Haddock.Types
-    Haddock.Doc
-    Haddock.Version
-    Haddock.InterfaceFile        
-    Haddock.Options
-    Haddock.GhcUtils
-    Haddock.Convert
-   
-library
-  default-language:     Haskell2010
-  -- In a GHC tree - in particular, in a source tarball - we don't
-  -- require alex or happy
-  if !flag(in-ghc-tree)
-    build-tools: alex >= 2.3, happy >= 1.18
-  build-depends:
-    base >= 4.3 && < 4.8,
-    filepath,
-    directory,
-    pretty,
-    containers,
-    array,
-    xhtml >= 3000.2 && < 3000.3,
-    Cabal >= 1.10,
-    ghc >= 7.4 && < 7.8
-
-  if flag(in-ghc-tree)
-    cpp-options: -DIN_GHC_TREE
+  if flag(dev)
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs
   else
-    build-depends: ghc-paths
-
-  if flag(test)
-    cpp-options: -DTEST
-    build-depends: QuickCheck >= 2.1 && < 3
-
-  hs-source-dirs:       src
-  default-extensions:   CPP, DeriveDataTypeable,
-                        ScopedTypeVariables, MagicHash
-  ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
+    ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   exposed-modules:
     Documentation.Haddock
 
   other-modules:
-    Main
+    Haddock
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
@@ -204,16 +178,49 @@ library
     Haddock.GhcUtils
     Haddock.Convert
     Paths_haddock
-  
+
   if flag(in-ghc-tree)
     buildable: False
 
-test-suite html-tests
+test-suite html-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
-  main-is:          runtests.hs
-  hs-source-dirs:   tests/html-tests
+  main-is:          run.lhs
+  hs-source-dirs:   html-test
   build-depends:    base, directory, process, filepath, Cabal
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Spec.hs
+  hs-source-dirs:
+      test
+    , test/nanospec
+    , src
+
+  other-modules:
+      Test.Hspec
+      Haddock.ParseSpec
+
+  build-depends:
+      base
+    , ghc
+    , containers
+    , deepseq
+    , array
+
+  -- NOTE: As of this writing, Cabal does not properly handle alex/happy for
+  -- test suites.  We work around this by adding dist/build to hs-source-dirs,
+  -- so that the the generated lexer/parser from the library is used.  In
+  -- addition we depend on 'haddock', so that the library is compiled before
+  -- the test suite.
+  --
+  -- The corresponding cabal ticket is here:
+  -- https://github.com/haskell/cabal/issues/943
+  hs-source-dirs:
+      dist/build
+  build-depends:
+      haddock
 
 source-repository head
   type:     git

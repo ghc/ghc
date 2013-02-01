@@ -25,6 +25,7 @@ import Haddock.Types
 import Haddock.Utils
 
 import Text.XHtml hiding ( name, title, p, quote )
+import Data.Maybe (fromMaybe)
 
 import GHC
 
@@ -46,9 +47,10 @@ parHtmlMarkup qual ppId = Markup {
   markupOrderedList          = ordList,
   markupDefList              = defList,
   markupCodeBlock            = pre,
-  markupURL                  = \url -> anchor ! [href url] << url,
+  markupHyperlink            = \(Hyperlink url mLabel) -> anchor ! [href url] << fromMaybe url mLabel,
   markupAName                = \aname -> namedAnchor aname << "",
   markupPic                  = \path -> image ! [src path],
+  markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml
   }
   where

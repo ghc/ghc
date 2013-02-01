@@ -7,10 +7,10 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Haddock.Parse where
+module Haddock.Parse (parseString, parseParas) where
 
 import Haddock.Lex
-import Haddock.Types (Doc(..), Example(Example))
+import Haddock.Types (Doc(..), Example(Example), Hyperlink(..))
 import Haddock.Doc
 import HsSyn
 import RdrName
@@ -35,6 +35,7 @@ import Data.List  (stripPrefix)
 	'-'	{ (TokBullet,_) }
 	'(n)'	{ (TokNumber,_) }
 	'>..'	{ (TokBirdTrack $$,_) }
+	PROP	{ (TokProperty $$,_) }
 	PROMPT	{ (TokExamplePrompt $$,_) }
 	RESULT	{ (TokExampleResult $$,_) }
 	EXP	{ (TokExampleExpression $$,_) }
@@ -73,11 +74,15 @@ defpara :: { (Doc RdrName, Doc RdrName) }
 para    :: { Doc RdrName }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
+	| property		{ $1 }
 	| examples		{ DocExamples $1 }
 
 codepara :: { Doc RdrName }
 	: '>..' codepara	{ docAppend (DocString $1) $2 }
 	| '>..'			{ DocString $1 }
+
+property :: { Doc RdrName }
+	: PROP			{ makeProperty $1 }
 
 examples :: { [Example] }
 	: example examples	{ $1 : $2 }
@@ -107,7 +112,7 @@ seq1	:: { Doc RdrName }
 elem1	:: { Doc RdrName }
 	: STRING		{ DocString $1 }
 	| '/../'                { DocEmphasis (DocString $1) }
-	| URL			{ DocURL $1 }
+	| URL			{ DocHyperlink (makeHyperlink $1) }
 	| PIC                   { DocPic $1 }
 	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }
@@ -120,6 +125,22 @@ strings  :: { String }
 {
 happyError :: [LToken] -> Maybe a
 happyError toks = Nothing
+
+-- | Create a `Hyperlink` from given string.
+--
+-- A hyperlink consists of a URL and an optional label.  The label is separated
+-- from the url by one or more whitespace characters.
+makeHyperlink :: String -> Hyperlink
+makeHyperlink input = case break isSpace $ strip input of
+  (url, "")    -> Hyperlink url Nothing
+  (url, label) -> Hyperlink url (Just . dropWhile isSpace $ label)
+
+makeProperty :: String -> Doc RdrName
+makeProperty s = case strip s of
+  'p':'r':'o':'p':'>':xs ->
+	DocProperty (dropWhile isSpace xs)
+  xs ->
+	error $ "makeProperty: invalid input " ++ show xs
 
 -- | Create an 'Example', stripping superfluous characters as appropriate
 makeExample :: String -> String -> [String] -> Example

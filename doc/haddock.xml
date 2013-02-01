@@ -21,7 +21,7 @@
       <holder>Simon Marlow, David Waern</holder>
     </copyright>
     <abstract>
-      <para>This document describes Haddock version 2.11.0, a Haskell
+      <para>This document describes Haddock version 2.13.2, a Haskell
       documentation tool.</para>
     </abstract>
   </bookinfo>
@@ -1658,7 +1658,7 @@ module A where
 	by zero or more result lines:</para>
 
 <programlisting>
--- | Two examples are given bellow:
+-- | Two examples are given below:
 --
 -- &gt;&gt;&gt; fib 10
 -- 55
@@ -1672,6 +1672,18 @@ module A where
 	generated documenation.</para>
       </section>
 
+      <section>
+	<title>Properties</title>
+        <para>
+          Haddock provides markup for properties:
+<programlisting>
+-- | Addition is commutative:
+--
+-- prop> a + b = b + a
+</programlisting>
+          This allows third-party applications to extract and verify them.
+        </para>
+      </section>
 
       <section>
 	<title>Hyperlinked Identifiers</title>
@@ -1830,6 +1842,13 @@ module A where
 	<literal>&lt;...&gt;</literal>.  If the output format supports
 	it, the URL will be turned into a hyperlink when
 	rendered.</para>
+
+        The URL can be followed by an optional label:
+<programlisting>
+&lt;http://example.com label&gt;
+</programlisting>
+        The label is then used as a descriptive text for the hyperlink, if the
+        output format supports it.
       </section>
 
       <section>

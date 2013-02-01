@@ -82,42 +82,41 @@ renameInterface dflags renamingEnv warnings iface =
 --------------------------------------------------------------------------------
 
 
-newtype GenRnM n a =
-  RnM { unRn :: (n -> (Bool, DocName))  -- name lookup function
-             -> (a,[n])
+newtype RnM a =
+  RnM { unRn :: (Name -> (Bool, DocName))  -- name lookup function
+             -> (a,[Name])
       }
 
-type RnM a = GenRnM Name a
-
-instance Monad (GenRnM n) where
+instance Monad RnM where
   (>>=) = thenRn
   return = returnRn
 
-instance Functor (GenRnM n) where
+instance Functor RnM where
   fmap f x = do a <- x; return (f a)
 
-instance Applicative (GenRnM n) where
+instance Applicative RnM where
   pure = return
   (<*>) = ap
 
-returnRn :: a -> GenRnM n a
+returnRn :: a -> RnM a
 returnRn a   = RnM (const (a,[]))
-thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
+thenRn :: RnM a -> (a -> RnM b) -> RnM b
 m `thenRn` k = RnM (\lkp -> case unRn m lkp of
   (a,out1) -> case unRn (k a) lkp of
     (b,out2) -> (b,out1++out2))
 
 getLookupRn :: RnM (Name -> (Bool, DocName))
 getLookupRn = RnM (\lkp -> (lkp,[]))
+
 outRn :: Name -> RnM ()
 outRn name = RnM (const ((),[name]))
 
-lookupRn :: (DocName -> a) -> Name -> RnM a
-lookupRn and_then name = do
+lookupRn :: Name -> RnM DocName
+lookupRn name = do
   lkp <- getLookupRn
   case lkp name of
-    (False,maps_to) -> do outRn name; return (and_then maps_to)
-    (True, maps_to) -> return (and_then maps_to)
+    (False,maps_to) -> do outRn name; return maps_to
+    (True, maps_to) -> return maps_to
 
 
 runRnFM :: LinkEnv -> RnM a -> (a,[Name])
@@ -134,7 +133,7 @@ runRnFM env rn = unRn rn lkp
 
 
 rename :: Name -> RnM DocName
-rename = lookupRn id
+rename = lookupRn
 
 
 renameL :: Located Name -> RnM (Located DocName)
@@ -199,9 +198,10 @@ renameDoc d = case d of
   DocCodeBlock doc -> do
     doc' <- renameDoc doc
     return (DocCodeBlock doc')
-  DocURL str -> return (DocURL str)
+  DocHyperlink l -> return (DocHyperlink l)
   DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
+  DocProperty p -> return (DocProperty p)
   DocExamples e -> return (DocExamples e)
 
 
@@ -270,8 +270,16 @@ renameType t = case t of
 
   HsTyLit x -> return (HsTyLit x)
 
-  _ -> error "renameType"
+  HsWrapTy a b            -> HsWrapTy a <$> renameType b
+  HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
+  HsCoreTy a              -> pure (HsCoreTy a)
+  HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
+  HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
+  HsQuasiQuoteTy a        -> HsQuasiQuoteTy <$> renameHsQuasiQuote a
+  HsSpliceTy _ _ _        -> error "renameType: HsSpliceTy"
 
+renameHsQuasiQuote :: HsQuasiQuote Name -> RnM (HsQuasiQuote DocName)
+renameHsQuasiQuote (HsQuasiQuote a b c) = HsQuasiQuote <$> rename a <*> pure b <*> pure c
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
 renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
@@ -402,21 +410,24 @@ renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
       return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
                    , con_details = details', con_res = restype', con_doc = mbldoc' })
   where
-    renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
+    renameDetails (RecCon fields) = return . RecCon =<< mapM renameConDeclFieldField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
     renameDetails (InfixCon a b) = do
       a' <- renameLType a
       b' <- renameLType b
       return (InfixCon a' b')
 
-    renameField (ConDeclField name t doc) = do
-      name' <- renameL name
-      t'   <- renameLType t
-      doc' <- mapM renameLDocHsSyn doc
-      return (ConDeclField name' t' doc')
-
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
+
+
+renameConDeclFieldField :: ConDeclField Name -> RnM (ConDeclField DocName)
+renameConDeclFieldField (ConDeclField name t doc) = do
+  name' <- renameL name
+  t'   <- renameLType t
+  doc' <- mapM renameLDocHsSyn doc
+  return (ConDeclField name' t' doc')
+
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
@@ -498,8 +509,8 @@ renameExportItem item = case item of
       return (inst', idoc')
     return (ExportDecl decl' doc' subs' instances')
   ExportNoDecl x subs -> do
-    x'    <- lookupRn id x
-    subs' <- mapM (lookupRn id) subs
+    x'    <- lookupRn x
+    subs' <- mapM lookupRn subs
     return (ExportNoDecl x' subs')
   ExportDoc doc -> do
     doc' <- renameDoc doc

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE BangPatterns #-}
   -----------------------------------------------------------------------------
 -- |
@@ -117,9 +118,10 @@ rename dflags gre = rn
       DocCodeBlock doc -> DocCodeBlock (rn doc)
       DocIdentifierUnchecked x -> DocIdentifierUnchecked x
       DocModule str -> DocModule str
-      DocURL str -> DocURL str
+      DocHyperlink l -> DocHyperlink l
       DocPic str -> DocPic str
       DocAName str -> DocAName str
+      DocProperty p -> DocProperty p
       DocExamples e -> DocExamples e
       DocEmpty -> DocEmpty
       DocString str -> DocString str

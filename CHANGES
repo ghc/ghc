@@ -1,3 +1,30 @@
+Changes in version 2.13.2
+
+ * Handle HsExplicitListTy in renameer (#213)
+
+ * Allow haddock markup in deprecation messages
+
+ * Export more types from Documentation.Haddock
+
+ * Include everything that is required to run the test suite with the cabal
+   package (#230)
+
+Changes in version 2.13.1
+
+ * Hide instances that are "internal" to a module
+
+ * Add support for properties in documentation
+
+ * Fix a bug with spurious superclass constraints
+
+ * Fix and extend the Haddock API
+
+Changes in version 2.12.0
+
+ * Labeled URLs (e.g <http://example.net/ some label>)
+
+ * Improved memory usage (new dependency: deepseq)
+
 Changes in version 2.11.0
 
  * Show deprecation messages for identifiers
@@ -8,7 +35,7 @@ Changes in version 2.11.0
 
  * Fix reporting of modules safe haskell mode
 
- * Fix a case where we were generating invalid xhtml 
+ * Fix a case where we were generating invalid xhtml
 
  * Improved --qual option (no crashes, proper error messages)
 

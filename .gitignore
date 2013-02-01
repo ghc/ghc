@@ -1,6 +1,9 @@
 /dist/
+/html-test/out/
+
 /doc/haddock
-/tests/html-tests/output/
-/tests/html-tests/tests/doc-index.html.ref
-/tests/html-tests/tests/index-frames.html.ref
-/tests/html-tests/tests/index.html.ref
+/doc/autom4te.cache/
+/doc/config.log
+/doc/config.mk
+/doc/config.status
+/doc/configure
