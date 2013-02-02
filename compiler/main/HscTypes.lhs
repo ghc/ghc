@@ -884,7 +884,7 @@ data CgGuts
         cg_binds     :: CoreProgram,
                 -- ^ The tidied main bindings, including
                 -- previously-implicit bindings for record and class
-                -- selectors, and data construtor wrappers.  But *not*
+                -- selectors, and data constructor wrappers.  But *not*
                 -- data constructor workers; reason: we we regard them
                 -- as part of the code-gen of tycons
 

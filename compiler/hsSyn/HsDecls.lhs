@@ -634,7 +634,7 @@ pprTyClDeclFlavour (ForeignType {}) = ptext (sLit "foreign type")
 data HsDataDefn name   -- The payload of a data type defn
                        -- Used *both* for vanilla data declarations,
                        --       *and* for data family instances
-  = -- | Declares a data type or newtype, giving its construcors
+  = -- | Declares a data type or newtype, giving its constructors
     -- @
     --  data/newtype T a = <constrs>
     --  data/newtype instance T [a] = <constrs>
