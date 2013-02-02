@@ -470,12 +470,6 @@ TargetPlatformFull="${target}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-AC_ARG_WITH([alien],
-[AC_HELP_STRING([--with-alien=ARG],
-  [Supply script for running target binaries locally when cross-compiling])],
-  [AlienScript="$withval"],
-  [AlienScript=""])
-AC_SUBST(AlienScript)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
@@ -993,7 +987,6 @@ echo ["\
    Using GCC                 : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-   Alien script              : $AlienScript
 
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)
