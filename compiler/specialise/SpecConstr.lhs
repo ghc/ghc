@@ -95,7 +95,7 @@ Now the simplifier will apply the specialisation in the rhs of drop', giving
                       []     -> []
                       (y:ys) -> case n# of
                                   0 -> []
-                                  _ -> drop (n# -# 1#) xs
+                                  _ -> drop' (n# -# 1#) xs
 
 Much better!
 
@@ -109,12 +109,12 @@ In Core, by the time we've w/wd (f is strict in i) we get
 
         f i# n = case i# ># 0 of
                    False -> I# i#
-                   True  -> case n of n' { I# n# ->
+                   True  -> case n of { I# n# ->
                             case i# ># n# of
                                 False -> I# i#
-                                True  -> f (i# *# 2#) n'
+                                True  -> f (i# *# 2#) n
 
-At the call to f, we see that the argument, n is know to be (I# n#),
+At the call to f, we see that the argument, n is known to be (I# n#),
 and n is evaluated elsewhere in the body of f, so we can play the same
 trick as above.
 
@@ -354,7 +354,7 @@ Consider
 
 The recursive call ends up looking like
         go (T (I# ...) `cast` g)
-So we want to spot the construtor application inside the cast.
+So we want to spot the constructor application inside the cast.
 That's why we have the Cast case in argToPat
 
 Note [Local recursive groups]
@@ -389,8 +389,8 @@ ones, such as
       letrec foo x y = ....foo...
       in map foo xs
 then we will end up calling the un-specialised function, so then we *should*
-use the calls in the un-specialised RHS as seeds.  We call these "boring
-call patterns, and callsToPats reports if it finds any of these.
+use the calls in the un-specialised RHS as seeds.  We call these
+"boring call patterns", and callsToPats reports if it finds any of these.
 
 
 Note [Do not specialise diverging functions]
@@ -463,8 +463,8 @@ be join points and hence should be fully specialised) but reset for nested
 recursive bindings.
 
 What alternatives did I consider? Annotating the loop itself doesn't
-work because (a) it is local and (b) it will be w/w'ed and I having
-w/w propagating annotation somehow doesn't seem like a good idea. The
+work because (a) it is local and (b) it will be w/w'ed and having
+w/w propagating annotations somehow doesn't seem like a good idea. The
 types of the loop arguments really seem to be the most persistent
 thing.
 
@@ -492,7 +492,7 @@ also considered *wrapping* arguments in SPEC, thus
                         case state of (x,y) -> ... loop (SPEC (x',y')) ...
                         S2 -> error ...
 The idea is that a SPEC argument says "specialise this argument
-regardless of whether the function case-analyses it.  But this
+regardless of whether the function case-analyses it".  But this
 doesn't work well:
   * SPEC must still be a sum type, else the strictness analyser
     eliminates it
@@ -500,8 +500,8 @@ doesn't work well:
 This loss of strictness in turn screws up specialisation, because
 we may end up with calls like
    loop (SPEC (case z of (p,q) -> (q,p)))
-Without the SPEC, if 'loop' was strict, the case would move out
-and we'd see loop applied to a pair. But if 'loop' isn' strict
+Without the SPEC, if 'loop' were strict, the case would move out
+and we'd see loop applied to a pair. But if 'loop' isn't strict
 this doesn't look like a specialisable call.
 
 Note [NoSpecConstr]
@@ -796,9 +796,9 @@ ignoreType    :: ScEnv -> Type   -> Bool
 ignoreDataCon  :: ScEnv -> DataCon -> Bool
 forceSpecBndr :: ScEnv -> Var    -> Bool
 #ifndef GHCI
-ignoreType    _ _ = False
+ignoreType    _ _  = False
 ignoreDataCon  _ _ = False
-forceSpecBndr _ _ = False
+forceSpecBndr _ _  = False
 
 #else /* GHCI */
 
@@ -966,8 +966,8 @@ combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
 setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
 -- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
 -- is a variable, and an interesting variable
-setScrutOcc env usg (Cast e _) occ   = setScrutOcc env usg e occ
-setScrutOcc env usg (Tick _ e) occ = setScrutOcc env usg e occ
+setScrutOcc env usg (Cast e _) occ      = setScrutOcc env usg e occ
+setScrutOcc env usg (Tick _ e) occ      = setScrutOcc env usg e occ
 setScrutOcc env usg (Var v)    occ
   | Just RecArg <- lookupHowBound env v = usg { scu_occs = extendVarEnv (scu_occs usg) v occ }
   | otherwise                           = usg
@@ -992,21 +992,21 @@ scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
 scExpr env e = scExpr' env e
 
 
-scExpr' env (Var v)     = case scSubstId env v of
+scExpr' env (Var v)      = case scSubstId env v of
                             Var v' -> return (mkVarUsage env v' [], Var v')
                             e'     -> scExpr (zapScSubst env) e'
 
-scExpr' env (Type t)    = return (nullUsage, Type (scSubstTy env t))
+scExpr' env (Type t)     = return (nullUsage, Type (scSubstTy env t))
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
-scExpr' _   e@(Lit {})  = return (nullUsage, e)
-scExpr' env (Tick t e)  = do (usg,e') <- scExpr env e
-                             return (usg, Tick t e')
-scExpr' env (Cast e co) = do (usg, e') <- scExpr env e
-                             return (usg, Cast e' (scSubstCo env co))
-scExpr' env e@(App _ _) = scApp env (collectArgs e)
-scExpr' env (Lam b e)   = do let (env', b') = extendBndr env b
-                             (usg, e') <- scExpr env' e
-                             return (usg, Lam b' e')
+scExpr' _   e@(Lit {})   = return (nullUsage, e)
+scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
+                              return (usg, Tick t e')
+scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
+                              return (usg, Cast e' (scSubstCo env co))
+scExpr' env e@(App _ _)  = scApp env (collectArgs e)
+scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
+                              (usg, e') <- scExpr env' e
+                              return (usg, Lam b' e')
 
 scExpr' env (Case scrut b ty alts)
   = do  { (scrut_usg, scrut') <- scExpr env scrut
@@ -1016,10 +1016,10 @@ scExpr' env (Case scrut b ty alts)
         }
   where
     sc_con_app con args scrut'  -- Known constructor; simplify
-        = do { let (_, bs, rhs) = findAlt con alts
+     = do { let (_, bs, rhs) = findAlt con alts
                                   `orElse` (DEFAULT, [], mkImpossibleExpr ty)
-                   alt_env'  = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
-             ; scExpr alt_env' rhs }
+                alt_env'     = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
+          ; scExpr alt_env' rhs }
 
     sc_vanilla scrut_usg scrut' -- Normal case
      = do { let (alt_env,b') = extendBndrWith RecArg env b
@@ -1038,14 +1038,14 @@ scExpr' env (Case scrut b ty alts)
                     Case scrut' b' (scSubstTy env ty) alts') }
 
     sc_alt env scrut' b' (con,bs,rhs)
-      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
-                 (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
-           ; (usg, rhs') <- scExpr env2 rhs
-           ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
-                 scrut_occ = case con of
-                                DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
-                                _          -> ScrutOcc emptyUFM
-           ; return (usg', b_occ `combineOcc` scrut_occ, (con, bs2, rhs')) }
+     = do { let (env1, bs1) = extendBndrsWith RecArg env bs
+                (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
+          ; (usg, rhs') <- scExpr env2 rhs
+          ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
+                scrut_occ = case con of
+                               DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
+                               _          -> ScrutOcc emptyUFM
+          ; return (usg', b_occ `combineOcc` scrut_occ, (con, bs2, rhs')) }
 
 scExpr' env (Let (NonRec bndr rhs) body)
   | isTyVar bndr        -- Type-lets may be created by doBeta
@@ -1053,12 +1053,12 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
   | otherwise
   = do  { let (body_env, bndr') = extendBndr env bndr
-        ; (rhs_usg, rhs_info) <- scRecRhs env (bndr',rhs)
+        ; (rhs_usg, rhs_info)  <- scRecRhs env (bndr',rhs)
 
-        ; let body_env2 = extendHowBound body_env [bndr'] RecFun
+        ; let body_env2         = extendHowBound body_env [bndr'] RecFun
                                    -- Note [Local let bindings]
-              RI _ rhs' _ _ _ = rhs_info
-              body_env3 = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
+              RI _ rhs' _ _ _   = rhs_info
+              body_env3         = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
 
         ; (body_usg, body') <- scExpr body_env3 body
 
@@ -1077,10 +1077,10 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
 -- A *local* recursive group: see Note [Local recursive groups]
 scExpr' env (Let (Rec prs) body)
-  = do  { let (bndrs,rhss) = unzip prs
+  = do  { let (bndrs,rhss)      = unzip prs
               (rhs_env1,bndrs') = extendRecBndrs env bndrs
-              rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
-              force_spec = any (forceSpecBndr env) bndrs'
+              rhs_env2          = extendHowBound rhs_env1 bndrs' RecFun
+              force_spec        = any (forceSpecBndr env) bndrs'
                 -- Note [Forcing specialisation]
 
         ; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
@@ -1179,7 +1179,7 @@ scTopBind env (Rec prs)
         ; return (rhs_env, Rec (bndrs' `zip` rhss')) }
   | otherwise   -- Do specialisation
   = do  { let (rhs_env1,bndrs') = extendRecBndrs env bndrs
-              rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
+              rhs_env2          = extendHowBound rhs_env1 bndrs' RecFun
 
         ; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
         ; let rhs_usg = combineUsages rhs_usgs
@@ -1192,22 +1192,22 @@ scTopBind env (Rec prs)
                   Rec (concat (zipWith specInfoBinds rhs_infos specs))) }
   where
     (bndrs,rhss) = unzip prs
-    force_spec = any (forceSpecBndr env) bndrs
+    force_spec   = any (forceSpecBndr env) bndrs
       -- Note [Forcing specialisation]
 
 scTopBind env (NonRec bndr rhs)
   = do  { (_, rhs') <- scExpr env rhs
         ; let (env1, bndr') = extendBndr env bndr
-              env2 = extendValEnv env1 bndr' (isValue (sc_vals env) rhs')
+              env2          = extendValEnv env1 bndr' (isValue (sc_vals env) rhs')
         ; return (env2, NonRec bndr' rhs') }
 
 ----------------------
 scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (ScUsage, RhsInfo)
 scRecRhs env (bndr,rhs)
-  = do  { let (arg_bndrs,body) = collectBinders rhs
+  = do  { let (arg_bndrs,body)       = collectBinders rhs
               (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
-        ; (body_usg, body') <- scExpr body_env body
-        ; let (rhs_usg, arg_occs) = lookupOccs body_usg arg_bndrs'
+        ; (body_usg, body')         <- scExpr body_env body
+        ; let (rhs_usg, arg_occs)    = lookupOccs body_usg arg_bndrs'
         ; return (rhs_usg, RI bndr (mkLams arg_bndrs' body')
                                    arg_bndrs body arg_occs) }
                 -- The arg_occs says how the visible,
@@ -1373,8 +1373,8 @@ spec_one :: ScEnv
 
 spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
   = do  { spec_uniq <- getUniqueUs
-        ; let spec_env = extendScSubstList (extendScInScope env qvars)
-                                           (arg_bndrs `zip` pats)
+        ; let spec_env   = extendScSubstList (extendScInScope env qvars)
+                                             (arg_bndrs `zip` pats)
               fn_name    = idName fn
               fn_loc     = nameSrcSpan fn_name
               fn_occ     = nameOccName fn_name
@@ -1395,7 +1395,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 --        return ()
 
                 -- And build the results
-        ; let spec_id = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty) 
+        ; let spec_id    = mkLocalId spec_name (mkPiTypes spec_lam_args body_ty) 
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args
@@ -1427,10 +1427,10 @@ calcSpecStrictness fn qvars pats
     dmd_env = go emptyVarEnv dmds pats
 
     go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
-    go env ds (Type {} : pats) = go env ds pats
+    go env ds (Type {} : pats)     = go env ds pats
     go env ds (Coercion {} : pats) = go env ds pats
-    go env (d:ds) (pat : pats) = go (go_one env d pat) ds pats
-    go env _      _            = env
+    go env (d:ds) (pat : pats)     = go (go_one env d pat) ds pats
+    go env _      _                = env
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
     go_one env d   (Var v) = extendVarEnv_C bothDmd env v d
@@ -1475,7 +1475,7 @@ the specialised one.  Suppose, for example
   f has strictness     SS
         and a RULE     f (a:as) b = f_spec a as b
 
-Now we want f_spec to have strictess  LLS, otherwise we'll use call-by-need
+Now we want f_spec to have strictness  LLS, otherwise we'll use call-by-need
 when calling f_spec instead of call-by-value.  And that can result in
 unbounded worsening in space (cf the classic foldl vs foldl')
 
@@ -1535,22 +1535,22 @@ callToPats env bndr_occs (con_env, args)
   | length args < length bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
-  = do  { let in_scope = substInScope (sc_subst env)
+  = do  { let in_scope      = substInScope (sc_subst env)
         ; (interesting, pats) <- argsToPats env in_scope con_env args bndr_occs
-        ; let pat_fvs = varSetElems (exprsFreeVars pats)
+        ; let pat_fvs       = varSetElems (exprsFreeVars pats)
               in_scope_vars = getInScopeVars in_scope
-              qvars   = filterOut (`elemVarSet` in_scope_vars) pat_fvs
+              qvars         = filterOut (`elemVarSet` in_scope_vars) pat_fvs
                 -- Quantify over variables that are not in sccpe
                 -- at the call site
                 -- See Note [Free type variables of the qvar types]
                 -- See Note [Shadowing] at the top
 
-              (tvs, ids) = partition isTyVar qvars
-              qvars'     = tvs ++ map sanitise ids
+              (tvs, ids)    = partition isTyVar qvars
+              qvars'        = tvs ++ map sanitise ids
                 -- Put the type variables first; the type of a term
                 -- variable may mention a type variable
 
-              sanitise id = id `setIdType` expandTypeSynonyms (idType id)
+              sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
                 -- See Note [Free type variables of the qvar types]
 
         ; -- pprTrace "callToPats"  (ppr args $$ ppr prs $$ ppr bndr_occs) $
@@ -1619,7 +1619,7 @@ argToPat env in_scope val_env (Cast arg co) arg_occ
         { -- Make a wild-card pattern for the coercion
           uniq <- getUniqueUs
         ; let co_name = mkSysTvName uniq (fsLit "sg")
-              co_var = mkCoVar co_name (mkCoercionType ty1 ty2)
+              co_var  = mkCoVar co_name (mkCoercionType ty1 ty2)
         ; return (interesting, Cast arg' (mkCoVarCo co_var)) } }
   where
     Pair ty1 ty2 = coercionKind co
@@ -1632,9 +1632,9 @@ argToPat in_scope val_env arg arg_occ
   | is_value_lam arg
   = return (True, arg)
   where
-    is_value_lam (Lam v e)      -- Spot a value lambda, even if
-        | isId v = True         -- it is inside a type lambda
-        | otherwise = is_value_lam e
+    is_value_lam (Lam v e)         -- Spot a value lambda, even if
+        | isId v       = True      -- it is inside a type lambda
+        | otherwise    = is_value_lam e
     is_value_lam other = False
 -}
 
@@ -1675,7 +1675,7 @@ argToPat env in_scope val_env (Var v) arg_occ
 
 --      I'm really not sure what this comment means
 --      And by not wild-carding we tend to get forall'd
---      variables that are in soope, which in turn can
+--      variables that are in scope, which in turn can
 --      expose the weakness in let-matching
 --      See Note [Matching lets] in Rules
 
