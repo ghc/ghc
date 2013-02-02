@@ -1871,6 +1871,15 @@ def rawSystem(cmd_and_args):
     else:
         return os.spawnv(os.P_WAIT, cmd_and_args[0], cmd_and_args)
 
+# Note that this doesn't handle the timeout itself; it is just used for
+# commands that have timeout handling built-in.
+def rawSystemWithTimeout(cmd_and_args):
+    r = rawSystem(cmd_and_args)
+    if r == 98:
+        # The python timeout program uses 98 to signal that ^C was pressed
+        stopNow()
+    return r
+
 # cmd is a complex command in Bourne-shell syntax
 # e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
 # Hence it must ultimately be run by a Bourne shell
@@ -1890,7 +1899,7 @@ def runCmd( cmd ):
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
-        r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
+        r = rawSystemWithTimeout([config.timeout_prog, str(config.timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
@@ -1906,13 +1915,14 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
     if config.timeout_prog != '':
         if config.check_files_written:
             fn = name + ".strace"
-            r = rawSystem(["strace", "-o", fn, "-fF", "-e", "creat,open,chdir,clone,vfork",
-                           config.timeout_prog, str(timeout),
-                           cmd])
+            r = rawSystemWithTimeout(
+                    ["strace", "-o", fn, "-fF",
+                               "-e", "creat,open,chdir,clone,vfork",
+                     config.timeout_prog, str(timeout), cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
-            r = rawSystem([config.timeout_prog, str(timeout), cmd])
+            r = rawSystemWithTimeout([config.timeout_prog, str(timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
