@@ -1286,7 +1286,7 @@ type Kind = Type
 Haskell has a rich concrete syntax for types, including
   t1 -> t2, (t1,t2), [t], and so on
 In TH we represent all of this using AppT, with a distinguished
-type construtor at the head.  So,
+type constructor at the head.  So,
   Type              TH representation
   -----------------------------------------------
   t1 -> t2          ArrowT `AppT` t2 `AppT` t2

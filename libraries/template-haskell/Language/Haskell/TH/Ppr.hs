@@ -52,7 +52,7 @@ instance Ppr Info where
     ppr (PrimTyConI name arity is_unlifted) 
       = text "Primitive"
 	<+> (if is_unlifted then text "unlifted" else empty)
-	<+> text "type construtor" <+> quotes (ppr name)
+	<+> text "type constructor" <+> quotes (ppr name)
 	<+> parens (text "arity" <+> int arity)
     ppr (ClassOpI v ty cls fix) 
       = text "Class op from" <+> ppr cls <> colon <+>
