@@ -268,3 +268,4 @@ test('T7532',
      multimod_compile,
      ['T7532', '-v0'])
 test('T2222', normal, compile, ['-v0'])
+test('T1849', normal, ghci_script, ['T1849.script'])
