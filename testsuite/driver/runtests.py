@@ -261,6 +261,8 @@ for file in t_files:
 if config.use_threads:
     t.running_threads=0
 for oneTest in parallelTests:
+    if stopping():
+        break
     oneTest()
 if config.use_threads:
     t.thread_pool.acquire()
@@ -269,6 +271,8 @@ if config.use_threads:
     t.thread_pool.release()
 config.use_threads = False
 for oneTest in aloneTests:
+    if stopping():
+        break
     oneTest()
         
 summary(t, sys.stdout)

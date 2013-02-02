@@ -32,6 +32,14 @@ if config.use_threads:
     import threading
     import thread
 
+global wantToStop
+wantToStop = False
+def stopNow():
+    global wantToStop
+    wantToStop = True
+def stopping():
+    return wantToStop
+
 # Options valid for all the tests in the current "directory".  After
 # each test, we reset the options to these.  To change the options for
 # multiple tests, the function setTestOpts() below can be used to alter
@@ -726,6 +734,8 @@ def test_common_work (name, opts, func, args):
         if not config.clean_only:
             # Run the required tests...
             for way in do_ways:
+                if stopping():
+                    break
                 do_test (name, way, func, args)
 
             for way in all_ways:
@@ -888,7 +898,7 @@ def do_test(name, way, func, args):
         else:
             framework_fail(name, way, 'bad result ' + passFail)
     except KeyboardInterrupt:
-        raise
+        stopNow()
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
@@ -2248,6 +2258,9 @@ def summary(t, file):
 
     if config.check_files_written:
         checkForFilesWrittenProblems(file)
+
+    if stopping():
+        file.write('WARNING: Testsuite run was terminated early\n')
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()
