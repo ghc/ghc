@@ -79,7 +79,7 @@ testsuite                       testsuite   testsuite.git                       
 nofib                           nofib       nofib.git                           git
 libraries/parallel              extra       packages/parallel.git               git
 libraries/stm                   extra       packages/stm.git                    git
-libraries/random                dph         packages/random.git                 git
+libraries/random                dph         -                                   git
 libraries/primitive             dph         -                                   git
 libraries/vector                dph         -                                   git
 libraries/dph                   dph         packages/dph.git                    git

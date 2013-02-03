@@ -62,7 +62,6 @@ _darcs/
 /libraries/old-time/
 /libraries/parallel/
 /libraries/process/
-/libraries/random/
 /libraries/stm/
 /libraries/template-haskell/
 /libraries/unix/
