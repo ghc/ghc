@@ -17,6 +17,7 @@ OBJSUFFIX = .o
 # -fforce-recomp makes lots of driver tests trivially pass, so we
 # filter it out from $(TEST_HC_OPTS).
 TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
+TEST_HC_OPTS_NO_RECOMP_NO_RTSOPTS = $(filter-out -rtsopts,$(TEST_HC_OPTS_NO_RECOMP))
 
 # -----------------------------------------------------------------------------
 # One-shot compilations, non-hierarchical modules
@@ -435,7 +436,7 @@ mode001:
 # Test for building DLLs with ghc -shared, see #2745
 shared001:
 	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -v0 -shared Shared001.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP_NO_RTSOPTS) -v0 -shared Shared001.hs
 
 # -----------------------------------------------------------------------------
 
