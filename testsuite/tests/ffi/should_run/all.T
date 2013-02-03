@@ -13,7 +13,7 @@ test('fed001', compose(only_compiler_types(['ghc']),
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi002', [ omit_ways(['ghci']),
                  extra_clean(['ffi002_c.o']),
-                 compile_cmd_prefix('$MAKE ffi002_setup && ') ],
+                 pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
                  # The ffi002_setup hack is to ensure that we generate
                  # ffi002_stub.h before compiling ffi002_c.c, which
                  # needs it.
@@ -109,7 +109,7 @@ test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
 
 test('ffi018_ghci', [ only_ways(['ghci']),
-                      cmd_prefix('$MAKE ffi018_ghci_setup && '),
+                      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup'),
                       extra_clean(['ffi018_ghci_c.o']) ],
                     compile_and_run, ['ffi018_ghci_c.o'])
 
@@ -122,7 +122,7 @@ test('T1288', [ omit_ways(['ghci']),
                 extra_clean(['T1288_c.o']) ],
               compile_and_run, ['T1288_c.c'])
 test('T1288_ghci', [ only_ways(['ghci']),
-                     cmd_prefix('$MAKE --no-print-directory T1288_ghci_setup && '),
+                     pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup'),
                      extra_clean(['T1288_ghci_c.o']) ],
                    compile_and_run, ['T1288_ghci_c.o'])
 
@@ -130,7 +130,7 @@ test('T2276', [ omit_ways(['ghci']),
                 extra_clean(['T2276_c.o']) ],
               compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
-                     cmd_prefix('$MAKE --no-print-directory T2276_ghci_setup && '),
+                     pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup'),
                      extra_clean(['T2276_ghci_c.o']) ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
@@ -177,12 +177,12 @@ test('T5402', [ omit_ways(['ghci']),
                   # The T5402_setup hack is to ensure that we generate
                   # T5402_stub.h before compiling T5402_main.c, which
                   # needs it.
-                compile_cmd_prefix('$MAKE --no-print-directory T5402_setup && ') ],
+                pre_cmd('$MAKE -s --no-print-directory T5402_setup') ],
               compile_and_run, ["-no-hs-main T5402_main.c"])
 
 test('T5594', [ omit_ways(['ghci']),
                 extra_clean(['T5594_c.o']),
-                compile_cmd_prefix('$MAKE --no-print-directory T5594_setup && ') ],
+                pre_cmd('$MAKE -s --no-print-directory T5594_setup') ],
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
                 # needs it.

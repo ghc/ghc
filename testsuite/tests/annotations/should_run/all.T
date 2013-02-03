@@ -10,7 +10,7 @@ test('annrun01',
      [extra_clean(['Annrun01_Help.hi', 'Annrun01_Help.o',
                     'annrun01.hi', 'annrun01.o',
                     'Config.hs', 'Config.hi', 'Config.o']),
-      pre_cmd('$MAKE -s config'),
+      pre_cmd('$MAKE -s --no-print-directory config'),
       omit_ways(['profasm','profthreaded', 'dyn'])],
       multimod_compile_and_run,
       ['annrun01', '-package ghc']

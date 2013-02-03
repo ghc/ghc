@@ -76,7 +76,7 @@ test('ghci055', combined_output, ghci_script, ['ghci055.script'])
 
 test('ghci056',
      [
-       cmd_prefix('$MAKE --no-print-directory ghci056_setup && '),
+       pre_cmd('$MAKE -s --no-print-directory ghci056_setup'),
        extra_run_opts('ghci056_c.o'),
        extra_clean('ghci056_c.o')
      ],
