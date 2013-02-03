@@ -30,6 +30,7 @@ import SrcLoc
 import DynFlags
 import FastString
 
+import qualified Data.Bits
 import Data.Char
 import Data.Word (Word8)
 import Numeric
@@ -149,46 +150,64 @@ tokenPos t = let AlexPn _ line col = snd t in (line, col)
 -- Unicode/UTF-8 support in Alex 3.x, and Unicode documentation will
 -- probably get mangled.
 
+-- | Encode a Haskell String to a list of Word8 values, in UTF8 format.
+utf8Encode :: Char -> [Word8]
+utf8Encode = map fromIntegral . go . ord
+ where
+  go oc
+   | oc <= 0x7f       = [oc]
+
+   | oc <= 0x7ff      = [ 0xc0 + (oc `Data.Bits.shiftR` 6)
+                        , 0x80 + oc Data.Bits..&. 0x3f
+                        ]
+
+   | oc <= 0xffff     = [ 0xe0 + (oc `Data.Bits.shiftR` 12)
+                        , 0x80 + ((oc `Data.Bits.shiftR` 6) Data.Bits..&. 0x3f)
+                        , 0x80 + oc Data.Bits..&. 0x3f
+                        ]
+   | otherwise        = [ 0xf0 + (oc `Data.Bits.shiftR` 18)
+                        , 0x80 + ((oc `Data.Bits.shiftR` 12) Data.Bits..&. 0x3f)
+                        , 0x80 + ((oc `Data.Bits.shiftR` 6) Data.Bits..&. 0x3f)
+                        , 0x80 + oc Data.Bits..&. 0x3f
+                        ]
+
+type Byte = Word8
+
 type AlexInput = (AlexPosn,     -- current position,
                   Char,         -- previous char
+                  [Byte],       -- pending bytes on current char
                   String)       -- current input string
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (p,c,s) = c
+alexInputPrevChar (p,c,bs,s) = c
 
-alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
-alexGetByte (p,c,[]) = Nothing
-alexGetByte (p,_,(c:s))  = let p' = alexMove p c
-                              in p' `seq`  Just (fromIntegral (ord c), (p', c, s))
+alexGetByte :: AlexInput -> Maybe (Byte,AlexInput)
+alexGetByte (p,c,(b:bs),s) = Just (b,(p,c,bs,s))
+alexGetByte (p,c,[],[]) = Nothing
+alexGetByte (p,_,[],(c:s))  = let p' = alexMove p c
+                                  (b:bs) = utf8Encode c
+                              in p' `seq`  Just (b, (p', c, bs, s))
 
--- for compat with Alex 2.x:
-alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar i = case alexGetByte i of
-                  Nothing     -> Nothing
-                  Just (b,i') -> Just (chr (fromIntegral b), i')
+data AlexPosn = AlexPn !Int !Int !Int
+        deriving (Eq,Show)
 
 alexMove :: AlexPosn -> Char -> AlexPosn
 alexMove (AlexPn a l c) '\t' = AlexPn (a+1)  l     (((c+7) `div` 8)*8+1)
 alexMove (AlexPn a l c) '\n' = AlexPn (a+1) (l+1)   1
 alexMove (AlexPn a l c) _    = AlexPn (a+1)  l     (c+1)
 
-data AlexPosn = AlexPn !Int !Int !Int
-        deriving (Eq,Show)
-
 type StartCode = Int
 type Action = AlexPosn -> String -> StartCode -> (StartCode -> [LToken]) -> DynFlags -> [LToken]
 
 tokenise :: DynFlags -> String -> (Int, Int) -> [LToken]
-tokenise dflags str (line, col) = let toks = go (posn, '\n', eofHack str) para in {-trace (show toks)-} toks
-  where
-    posn = AlexPn 0 line col
-
-    go inp@(pos, _, str) sc =
-	  case alexScan inp sc of
-		AlexEOF -> []
-		AlexError _ -> []
-		AlexSkip  inp' _       -> go inp' sc
-		AlexToken inp'@(pos',_,_) len act -> act pos (take len str) sc (\sc -> go inp' sc) dflags
+tokenise dflags str (line, col) = go (posn,'\n',[],eofHack str) para
+  where posn = AlexPn 0 line col
+        go inp@(pos,_,_,str) sc =
+          case alexScan inp sc of
+                AlexEOF -> []
+                AlexError _ -> []
+                AlexSkip  inp' len     -> go inp' sc
+                AlexToken inp' len act -> act pos (take len str) sc (\sc -> go inp' sc) dflags
 
 -- NB. we add a final \n to the string, (see comment in the beginning of line
 -- production above).

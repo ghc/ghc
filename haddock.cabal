@@ -67,7 +67,7 @@ executable haddock
   else
     ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
   if !flag(in-ghc-tree)
-    build-tools: alex >= 2.3, happy >= 1.18
+    build-tools: alex >= 3, happy >= 1.18
   build-depends:
     base >= 4.3 && < 4.8
   if flag(in-ghc-tree)
@@ -121,7 +121,7 @@ library
   -- In a GHC tree - in particular, in a source tarball - we don't
   -- require alex or happy
   if !flag(in-ghc-tree)
-    build-tools: alex >= 2.3, happy >= 1.18
+    build-tools: alex >= 3, happy >= 1.18
   build-depends:
     base >= 4.3 && < 4.8,
     filepath,
