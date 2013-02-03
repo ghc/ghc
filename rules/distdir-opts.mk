@@ -96,7 +96,7 @@ $1_$2_ALL_HSC2HS_OPTS = \
 
 $1_$2_ALL_ALEX_OPTS = \
  $$(CONF_ALEX_OPTS) \
- $$(SRC_ALEX_OPTS)
+ $$(SRC_ALEX_OPTS) \
  $$($1_ALEX_OPTS) \
  $$($1_$2_ALEX_OPTS) \
  $$(EXTRA_ALEX_OPTS)

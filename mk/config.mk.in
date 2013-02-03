@@ -733,14 +733,13 @@ ALEX			= @AlexCmd@
 ALEX_VERSION		= @AlexVersion@		
 Alex3			= @Alex3@
 #
-# Options to pass to Happy when we're going to compile the output with GHC
+# Options to pass to Alex when we're going to compile the output with GHC
 #
+SRC_ALEX_OPTS = -g
 ifeq "$(Alex3)" "YES"
-# We aren't using the Unicode support in Alex 3.0 yet, in fact we do our own
+# The compiler isn't using the Unicode support in Alex 3.0 yet, in fact we do our own
 # Unicode handling, so diable Alex's.
-SRC_ALEX_OPTS		= -g --latin1
-else
-SRC_ALEX_OPTS		= -g
+compiler_ALEX_OPTS = --latin1
 endif
 
 # Should we build haddock docs?

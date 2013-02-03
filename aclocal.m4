@@ -863,7 +863,7 @@ AC_SUBST(HappyVersion)
 
 dnl
 dnl Check for Alex and version.  If we're building GHC, then we need
-dnl at least Alex version 2.0.1.
+dnl at least Alex version 2.1.1.
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
@@ -879,12 +879,17 @@ else
 fi;
 changequote([, ])dnl
 ])
+FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
+  [Alex3=YES],[Alex3=NO])
 if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
       [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]
-    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
-      [Alex3=YES],[Alex3=NO])
+fi
+if test ! -f utils/haddock/src/Haddock/Lex.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.0],
+      [AC_MSG_ERROR([Alex version 3.0 or later is required to compile Haddock.])])[]
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)

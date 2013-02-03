@@ -150,7 +150,7 @@ $1_$2_$3_GHC_CC_OPTS = \
 
 $1_$2_$3_ALL_AS_OPTS = \
  $$(CONF_AS_OPTS) \
- $$(SRC_AS_OPTS)
+ $$(SRC_AS_OPTS) \
  $$(WAY_$3_AS_OPTS) \
  $$($1_AS_OPTS) \
  $$($1_$2_AS_OPTS) \
