@@ -315,7 +315,6 @@ stderr = stdFD 2
 
 close :: FD -> IO ()
 close fd =
-  (flip finally) (release fd) $
   do let closer realFd =
            throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
 #ifdef mingw32_HOST_OS
@@ -324,6 +323,12 @@ close fd =
            else
 #endif
              c_close (fromIntegral realFd)
+
+     -- release the lock *first*, because otherwise if we're preempted
+     -- after closing but before releasing, the FD may have been reused.
+     -- (#7646)
+     release fd
+
      closeFdWith closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()
