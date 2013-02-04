@@ -162,7 +162,7 @@ encapsulateScalars :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
 encapsulateScalars ce@(_, AnnType _ty)
   = return ce
 encapsulateScalars ce@((_, VISimple), AnnVar _v)
-      -- NB: diverts from the paper: encapsulate variables with scalar type (includes functions)
+      -- NB: diverts from the paper: encapsulate scalar variables (including functions)
   = liftSimpleAndCase ce
 encapsulateScalars ce@(_, AnnVar _v)
   = return ce
@@ -265,6 +265,10 @@ liftSimpleAndCase aexpr@((fvs, _vi), AnnCase expr bndr t alts)
 liftSimpleAndCase aexpr = liftSimple aexpr
 
 liftSimple :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
+liftSimple ((fvs, vi), AnnVar v)
+  | v `elemVarSet` fvs                -- special case to avoid producing: (\v -> v) v
+  && not (isToplevel v)               --   NB: if 'v' not free or is toplevel, we must get the 'VIEncaps'
+  = return $ ((fvs, vi), AnnVar v)
 liftSimple aexpr@((fvs_orig, VISimple), expr) 
   = do 
     { let liftedExpr = mkAnnApps (mkAnnLams (reverse vars) fvs expr) vars
@@ -277,13 +281,6 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
     vars = varSetElems fvs
     fvs  = filterVarSet (not . isToplevel) fvs_orig -- only include 'Id's that are not toplevel
     
-    isToplevel v | isId v    = case realIdUnfolding v of
-                                 NoUnfolding                     -> False
-                                 OtherCon      {}                -> True
-                                 DFunUnfolding {}                -> True 
-                                 CoreUnfolding {uf_is_top = top} -> top 
-                 | otherwise = False
-
     mkAnnLams :: [Var] -> VarSet -> AnnExpr' Var (VarSet, VectAvoidInfo) -> CoreExprWithVectInfo
     mkAnnLams []     fvs expr = ASSERT(isEmptyVarSet fvs)
                                 ((emptyVarSet, VIEncaps), expr)
@@ -299,6 +296,13 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
 liftSimple aexpr
   = pprPanic "Vectorise.Exp.liftSimple: not simple" $ ppr (deAnnotate aexpr)
 
+isToplevel :: Var -> Bool
+isToplevel v | isId v    = case realIdUnfolding v of
+                             NoUnfolding                     -> False
+                             OtherCon      {}                -> True
+                             DFunUnfolding {}                -> True 
+                             CoreUnfolding {uf_is_top = top} -> top 
+             | otherwise = False
 
 -- |Vectorise an expression.
 --
