@@ -161,7 +161,7 @@ vectAnnPolyExpr loop_breaker expr
 encapsulateScalars :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
 encapsulateScalars ce@(_, AnnType _ty)
   = return ce
-encapsulateScalars ce@((_, VISimple), AnnVar v)
+encapsulateScalars ce@((_, VISimple), AnnVar _v)
       -- NB: diverts from the paper: encapsulate variables with scalar type (includes functions)
   = liftSimpleAndCase ce
 encapsulateScalars ce@(_, AnnVar _v)
@@ -175,14 +175,20 @@ encapsulateScalars ((fvs, vi), AnnTick tck expr)
     }
 encapsulateScalars ce@((fvs, vi), AnnLam bndr expr) 
   = do 
-    { varsS <- allScalarVarTypeSet fvs 
-    ; case (vi, varsS) of
+    { varsS  <- allScalarVarTypeSet fvs 
+        -- NB: diverts from the paper: we need to check the scalarness of bound variables as well,
+        --     as 'vectScalarFun' will handle them just the same as those introduced for the 'fvs'
+        --     by encapsulation.
+    ; bndrsS <- allScalarVarType bndrs
+    ; case (vi, varsS && bndrsS) of
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encExpr <- encapsulateScalars expr
                             ; return ((fvs, vi), AnnLam bndr encExpr)
                             }
     }
+  where
+    (bndrs, _) = collectAnnBndrs ce
 encapsulateScalars ce@((fvs, vi), AnnApp ce1 ce2)
   = do
     { varsS <- allScalarVarTypeSet fvs
