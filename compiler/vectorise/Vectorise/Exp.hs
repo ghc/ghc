@@ -159,10 +159,10 @@ vectAnnPolyExpr loop_breaker expr
 --   every expression that is not constant and contains at least one operation.
 --  
 encapsulateScalars :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
-encapsulateScalars ce@(_, AnnType _ty) 
+encapsulateScalars ce@(_, AnnType _ty)
   = return ce
 encapsulateScalars ce@((_, VISimple), AnnVar v)
-  | isFunTy . varType $ v       -- NB: diverts from the paper: encapsulate scalar function types
+      -- NB: diverts from the paper: encapsulate variables with scalar type (includes functions)
   = liftSimpleAndCase ce
 encapsulateScalars ce@(_, AnnVar _v)
   = return ce
@@ -302,6 +302,10 @@ vectExpr aexpr
     -- encapsulated expression of functional type => try to vectorise as a scalar subcomputation
   | (isFunTy . annExprType $ aexpr) && isVIEncaps aexpr
   = vectFnExpr True False aexpr
+    -- encapsulated constant => vectorise as a scalar constant
+  | isVIEncaps aexpr
+  = traceVt "vectExpr (encapsulated constant):" (ppr . deAnnotate $ aexpr) >> 
+    vectConst (deAnnotate aexpr)
 
 vectExpr (_, AnnVar v)
   = vectVar v
@@ -310,7 +314,8 @@ vectExpr (_, AnnLit lit)
   = vectConst $ Lit lit
 
 vectExpr aexpr@(_, AnnLam _ _)
-  = traceVt "vectExpr [AnnLam]:" (ppr . deAnnotate $ aexpr) >> vectFnExpr True False aexpr
+  = traceVt "vectExpr [AnnLam]:" (ppr . deAnnotate $ aexpr) >> 
+    vectFnExpr True False aexpr
 
   -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
   --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint

@@ -555,15 +555,18 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          , let tidy_var   = lookup_var var
                                tidy_var_v = lookup_var var_v
                          , isExportedId tidy_var
-                         , isExportedId tidy_var_v
+                         , isExternalId tidy_var_v
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
-    tidy_parallelVars = mkVarSet [ lookup_var var
+    tidy_parallelVars = mkVarSet [ tidy_var
                                  | var <- varSetElems parallelVars
-                                 , isGlobalId var || isExportedId var]
+                                 , let tidy_var = lookup_var var
+                                 , isExternalId tidy_var]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
+    
+    isExternalId = isExternalName . idName
 \end{code}
 
 
@@ -732,6 +735,9 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 | omit_prags = ([], False)
                 | otherwise  = addExternal expose_all refined_id
 
+                -- add vectorised version if any exists
+          new_ids' = new_ids ++ maybeToList (fmap snd $ lookupVarEnv vect_vars idocc)
+          
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
@@ -742,7 +748,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
-      search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
+      search (zip new_ids' (repeat referrer') ++ rest) unfold_env' occ_env'
 
   tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
                 -> IO (UnfoldEnv, TidyOccEnv)

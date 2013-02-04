@@ -30,8 +30,6 @@ import NameSet
 import Name
 import NameEnv
 import FastString
-import TysPrim
---import TysWiredIn
 
 
 import Data.Maybe
@@ -201,8 +199,9 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     { vectInfoVar            = mk_env ids      (global_vars     env)
     , vectInfoTyCon          = mk_env tyCons   (global_tycons   env)
     , vectInfoDataCon        = mk_env dataCons (global_datacons env)
-    , vectInfoParallelVars   = global_parallel_vars   env `minusVarSet`  vectInfoParallelVars   info
-    , vectInfoParallelTyCons = global_parallel_tycons env `minusNameSet` vectInfoParallelTyCons info
+    , vectInfoParallelVars   = (global_parallel_vars   env `minusVarSet`  vectInfoParallelVars   info)
+                               `intersectVarSet` (mkVarSet ids)
+    , vectInfoParallelTyCons =  global_parallel_tycons env `minusNameSet` vectInfoParallelTyCons info
     }
   where
     vectIds         = [id    | Vect     id    _   <- vectDecls] ++

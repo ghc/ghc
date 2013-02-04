@@ -50,6 +50,7 @@ import FastString
 import SrcLoc
 import Util
 
+import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
@@ -604,14 +605,23 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       , sz == sz     -- Force it
       = do {
                 -- Occurrence analysis
-           let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
+           let {   -- Note [Vectorisation declarations and occurences]
+                   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
                    -- that the right-hand sides of vectorisation declarations are taken into
-                   -- account during occurence analysis.
-                 maybeVects   = case sm_phase mode of
-                                  InitialPhase -> mg_vect_decls guts
-                                  _            -> []
+                   -- account during occurrence analysis. After the 'InitialPhase', we need to ensure
+                   -- that the binders representing variable vectorisation declarations are kept alive.
+                   -- (In contrast to automatically vectorised variables, their unvectorised versions
+                   -- don't depend on them.)
+                 vectVars = mkVarSet $ 
+                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
+                                        | Vect bndr _ <- mg_vect_decls guts]
+              ;  (maybeVects, maybeVectVars) 
+                   = case sm_phase mode of
+                       InitialPhase -> (mg_vect_decls guts, vectVars)
+                       _            -> ([], vectVars)
                ; tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_rule rules maybeVects binds
+                     occurAnalysePgm this_mod active_rule rules maybeVects maybeVectVars binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);

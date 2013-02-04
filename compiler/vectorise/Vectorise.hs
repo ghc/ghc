@@ -65,7 +65,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
  = do { dumpOptVt Opt_D_dump_vt_trace "Before vectorisation" $ 
           pprCoreBindings binds
  
-          -- Pick out all 'VECTORISE [SCALAR]   type' and 'VECTORISE class' pragmas
+          -- Pick out all 'VECTORISE [SCALAR] type' and 'VECTORISE class' pragmas
       ; let ty_vect_decls  = [vd | vd@(VectType _ _ _) <- vect_decls]
             cls_vect_decls = [vd | vd@(VectClass _)    <- vect_decls]
       
