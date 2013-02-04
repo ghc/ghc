@@ -11,8 +11,11 @@ import CoreSyn
 import TyCon
 import Type
 import TypeRep
+import NameSet
 import FastString
 import Outputable
+
+import Control.Applicative
 
 
 -- |Convert a vectorised expression such that it computes the non-vectorised equivalent of its
@@ -90,10 +93,11 @@ identityConv (ForAllTy {}) = noV $ text "identityConv: quantified type changes u
 identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
   = do 
-    { tc' <- lookupTyCon tc
-    ; case tc' of 
-        Nothing -> return ()
-        Just _  -> noV idErr
+    { isParallel <- (tyConName tc `elemNameSet`) <$> globalParallelTyCons
+    ; parray     <- builtin parrayTyCon
+    ; if isParallel && not (tc == parray)
+      then noV idErr
+      else return ()
     }
   where
     idErr = text "identityConvTyCon: type constructor contains parallel arrays" <+> ppr tc
