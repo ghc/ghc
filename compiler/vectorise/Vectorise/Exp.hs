@@ -267,7 +267,7 @@ liftSimpleAndCase aexpr = liftSimple aexpr
 liftSimple :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
 liftSimple aexpr@((fvs_orig, VISimple), expr) 
   = do 
-    { let liftedExpr = mkAnnApps (mkAnnLams vars fvs expr) vars
+    { let liftedExpr = mkAnnApps (mkAnnLams (reverse vars) fvs expr) vars
 
     ; traceVt "encapsulate:" $ ppr (deAnnotate aexpr) $$ text "==>" $$ ppr (deAnnotate liftedExpr)
 
