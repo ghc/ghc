@@ -1625,7 +1625,7 @@ def check_stderr_ok( name ):
          return normalise_errmsg(str)
 
    return compare_outputs('stderr', \
-                          two_normalisers(norm, getTestOpts().extra_normaliser), \
+                          two_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
