@@ -199,8 +199,8 @@ IOWorkerProc(PVOID param)
 		     * 
 		     * Note: Sleep() is in milliseconds, not micros.
 		     */
-		    Sleep((work->workData.delayData.msecs + 999) / 1000);
-		    len = work->workData.delayData.msecs;
+		    Sleep((work->workData.delayData.usecs + 999) / 1000);
+		    len = work->workData.delayData.usecs;
 		    complData = NULL;
 		    fd = 0;
 		    errCode = 0;
@@ -409,7 +409,7 @@ AddIORequest ( int   fd,
  * the request queue.
  */
 BOOL
-AddDelayRequest ( unsigned int   msecs,
+AddDelayRequest ( unsigned int   usecs,
 		  CompletionProc onCompletion)
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
@@ -418,7 +418,7 @@ AddDelayRequest ( unsigned int   msecs,
   
     /* Fill in the blanks */
     wItem->workKind     = WORKER_DELAY;
-    wItem->workData.delayData.msecs = msecs;
+    wItem->workData.delayData.usecs = usecs;
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
     wItem->link         = NULL;
