@@ -219,7 +219,7 @@ instance Show (IsEven n) where
 
 ------------------------------------------------------------------------------ -}
 
--- | Unary implemenation of natural numbers.
+-- | Unary implementation of natural numbers.
 -- Used both at the type and at the value level.
 data Nat1 = Zero | Succ Nat1
 
