@@ -79,7 +79,10 @@ emptyLocalEnv = LocalEnv
 --
 data GlobalEnv 
         = GlobalEnv
-        { global_vars                 :: VarEnv Var
+        { global_vect_avoid           :: Bool
+          -- ^'True' implies to avoid vectorisation as far as possible.
+
+        , global_vars                 :: VarEnv Var
           -- ^Mapping from global variables to their vectorised versions — aka the /vectorisation
           -- map/.
 
@@ -136,10 +139,11 @@ data GlobalEnv
 -- to the global table, so that we can query scalarness during vectorisation, and especially, when
 -- vectorising the scalar entities' definitions themselves.
 --
-initGlobalEnv :: VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
-initGlobalEnv info vectDecls instEnvs famInstEnvs
+initGlobalEnv :: Bool -> VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
+initGlobalEnv vectAvoid info vectDecls instEnvs famInstEnvs
   = GlobalEnv 
-  { global_vars                 = mapVarEnv snd $ vectInfoVar info
+  { global_vect_avoid           = vectAvoid
+  , global_vars                 = mapVarEnv snd $ vectInfoVar info
   , global_vect_decls           = mkVarEnv vects
   , global_parallel_vars        = vectInfoParallelVars info
   , global_parallel_tycons      = vectInfoParallelTyCons info

@@ -92,7 +92,8 @@ initV hsc_env guts info thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . setPAFunsEnv        builtin_pas
                         . setPRFunsEnv        builtin_prs
-                        $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
+                        $ initGlobalEnv (dopt Opt_VectorisationAvoidance dflags) 
+                                        info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
            ; r <- runVM thing_inside builtins genv emptyLocalEnv

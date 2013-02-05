@@ -5,6 +5,9 @@ module Vectorise.Monad.Global (
   setGEnv,
   updGEnv,
   
+  -- * Configuration
+  isVectAvoidanceAggressive,
+  
   -- * Vars
   defGlobalVar, undefGlobalVar,
   
@@ -64,6 +67,16 @@ setGEnv genv  = VM $ \_ _ lenv -> return (Yes genv lenv ())
 --
 updGEnv :: (GlobalEnv -> GlobalEnv) -> VM ()
 updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
+
+
+-- Configuration --------------------------------------------------------------
+
+-- |Should we avoid as much vectorisation as possible?
+--
+-- Set by '-f[no]-vectorisation-avoidance'
+--
+isVectAvoidanceAggressive :: VM Bool
+isVectAvoidanceAggressive = readGEnv global_vect_avoid
 
 
 -- Vars -----------------------------------------------------------------------

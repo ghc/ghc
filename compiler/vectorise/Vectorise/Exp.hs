@@ -157,7 +157,12 @@ vectAnnPolyExpr loop_breaker expr
 -- * All free variables and the result type must be /simple/ types.
 -- * The expression is sufficiently complex (to warrant special treatment).  For now, that is
 --   every expression that is not constant and contains at least one operation.
---  
+--
+--
+-- The user has an option to choose between aggressive and minimal vectorisation avoidance. With
+-- minimal vectorisation avoidance, we only encapsulate individual scalar operations. With
+-- aggressive vectorisation avoidance, we encapsulate subexpression that are as big as possible.
+--
 encapsulateScalars :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
 encapsulateScalars ce@(_, AnnType _ty)
   = return ce
@@ -175,12 +180,13 @@ encapsulateScalars ((fvs, vi), AnnTick tck expr)
     }
 encapsulateScalars ce@((fvs, vi), AnnLam bndr expr) 
   = do 
-    { varsS  <- allScalarVarTypeSet fvs 
+    { vectAvoid <- isVectAvoidanceAggressive
+    ; varsS     <- allScalarVarTypeSet fvs 
         -- NB: diverts from the paper: we need to check the scalarness of bound variables as well,
         --     as 'vectScalarFun' will handle them just the same as those introduced for the 'fvs'
         --     by encapsulation.
-    ; bndrsS <- allScalarVarType bndrs
-    ; case (vi, varsS && bndrsS) of
+    ; bndrsS    <- allScalarVarType bndrs
+    ; case (vi, vectAvoid && varsS && bndrsS) of
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encExpr <- encapsulateScalars expr
@@ -191,8 +197,9 @@ encapsulateScalars ce@((fvs, vi), AnnLam bndr expr)
     (bndrs, _) = collectAnnBndrs ce
 encapsulateScalars ce@((fvs, vi), AnnApp ce1 ce2)
   = do
-    { varsS <- allScalarVarTypeSet fvs
-    ; case (vi, varsS) of
+    { vectAvoid <- isVectAvoidanceAggressive
+    ; varsS     <- allScalarVarTypeSet fvs
+    ; case (vi, (vectAvoid || isSimpleApplication ce) && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encCe1 <- encapsulateScalars ce1
@@ -200,10 +207,26 @@ encapsulateScalars ce@((fvs, vi), AnnApp ce1 ce2)
                             ; return ((fvs, vi), AnnApp encCe1 encCe2)
                             }
     }
+  where
+    isSimpleApplication :: CoreExprWithVectInfo -> Bool
+    isSimpleApplication (_, AnnTick _ ce)                 = isSimpleApplication ce
+    isSimpleApplication (_, AnnCast ce _)                 = isSimpleApplication ce
+    isSimpleApplication ce                  | isSimple ce = True
+    isSimpleApplication (_, AnnApp ce1 ce2)               = isSimple ce1 && isSimpleApplication ce2
+    isSimpleApplication _                                 = False
+    --
+    isSimple :: CoreExprWithVectInfo -> Bool
+    isSimple (_, AnnType {})   = True
+    isSimple (_, AnnVar  {})   = True
+    isSimple (_, AnnLit  {})   = True
+    isSimple (_, AnnTick _ ce) = isSimple ce
+    isSimple (_, AnnCast ce _) = isSimple ce
+    isSimple _                 = False
 encapsulateScalars ce@((fvs, vi), AnnCase scrut bndr ty alts) 
   = do 
-    { varsS <- allScalarVarTypeSet fvs 
-    ; case (vi, varsS) of
+    { vectAvoid <- isVectAvoidanceAggressive
+    ; varsS     <- allScalarVarTypeSet fvs 
+    ; case (vi, vectAvoid && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encScrut <- encapsulateScalars scrut
@@ -215,8 +238,9 @@ encapsulateScalars ce@((fvs, vi), AnnCase scrut bndr ty alts)
     encAlt (con, bndrs, expr) = (con, bndrs,) <$> encapsulateScalars expr
 encapsulateScalars ce@((fvs, vi), AnnLet (AnnNonRec bndr expr1) expr2) 
   = do 
-    { varsS <- allScalarVarTypeSet fvs 
-    ; case (vi, varsS) of
+    { vectAvoid <- isVectAvoidanceAggressive
+    ; varsS     <- allScalarVarTypeSet fvs 
+    ; case (vi, vectAvoid && varsS) of
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encExpr1 <- encapsulateScalars expr1
@@ -226,8 +250,9 @@ encapsulateScalars ce@((fvs, vi), AnnLet (AnnNonRec bndr expr1) expr2)
     }
 encapsulateScalars ce@((fvs, vi), AnnLet (AnnRec binds) expr) 
   = do 
-    { varsS <- allScalarVarTypeSet fvs 
-    ; case (vi, varsS) of 
+    { vectAvoid <- isVectAvoidanceAggressive
+    ; varsS     <- allScalarVarTypeSet fvs 
+    ; case (vi, vectAvoid && varsS) of 
         (VISimple, True) -> liftSimpleAndCase ce
         _                -> do 
                             { encBinds <- mapM encBind binds
