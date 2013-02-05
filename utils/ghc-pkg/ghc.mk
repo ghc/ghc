@@ -81,36 +81,44 @@ utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 $(eval $(call clean-target,utils/ghc-pkg,dist,utils/ghc-pkg/dist))
 
 # -----------------------------------------------------------------------------
-# Cross-compile case: Install our dist version
-# Normal case: Build ghc-pkg with stage 1
+# Cross-compile case: install our dist version
 
 ifeq "$(Stage1Only)" "YES"
-GHC_PKG_DISTDIR=dist
-else
-GHC_PKG_DISTDIR=dist-install
+
+utils/ghc-pkg_dist_INSTALL = YES
+utils/ghc-pkg_dist_SHELL_WRAPPER = YES
+utils/ghc-pkg_dist_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
+utils/ghc-pkg_dist_WANT_INSTALLED_WRAPPER = YES
+
+INSTALL_LIBEXECS += utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)
+
+$(eval $(call shell-wrapper,utils/ghc-pkg,dist))
+
 endif
 
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_USES_CABAL = YES
+# -----------------------------------------------------------------------------
+# Normal case: Build ghc-pkg with stage 1 and install it
+
+ifneq "$(Stage1Only)" "YES"
+
+utils/ghc-pkg_dist-install_USES_CABAL = YES
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_PROG = ghc-pkg
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_SHELL_WRAPPER = YES
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL = YES
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
-utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_INPLACE = NO
+utils/ghc-pkg_dist-install_PROG = ghc-pkg
+utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
+utils/ghc-pkg_dist-install_INSTALL = YES
+utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
+utils/ghc-pkg_dist-install_INSTALL_INPLACE = NO
 
-ifeq "$(BootingFromHc)" "YES"
-utils/ghc-pkg_dist-install_OTHER_OBJS += $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
-endif
-
-ifeq "$(Stage1Only)" "YES"
-$(eval $(call shell-wrapper,utils/ghc-pkg,dist))
-else
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
-endif
 
 utils/ghc-pkg/dist-install/package-data.mk: \
     utils/ghc-pkg/dist-install/build/Version.hs
+
+endif
+
+# -----------------------------------------------------------------------------
+# Link ghc-pkg to ghc-pkg-$(ProjectVersion) when installing
 
 ifeq "$(Windows)" "NO"
 install: install_utils/ghc-pkg_link
@@ -121,4 +129,3 @@ install_utils/ghc-pkg_link:
 	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg")
 	$(LN_S) $(CrossCompilePrefix)ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg"
 endif
-
