@@ -155,6 +155,7 @@ endif
 include rules/prof.mk
 include rules/trace.mk
 include rules/library-path.mk
+include rules/add-dependency.mk
 include rules/make-command.mk
 include rules/pretty_commands.mk
 

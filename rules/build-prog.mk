@@ -246,4 +246,12 @@ endif
 
 $(call dependencies,$1,$2,$3)
 
+# The Main module of a program implicitly depends on GHC.TopHandler
+# so we need to add a dependency for that. As we don't know which
+# module contains Main, we just make all modules in the program
+# depend on it.
+ifneq "$3" "0"
+$$(foreach o,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS),$$(eval $$(call add-dependency,$$o,libraries/base/dist-install/build/GHC/TopHandler.$$($$($1_$2_PROGRAM_WAY)_osuf))))
+endif
+
 endef
