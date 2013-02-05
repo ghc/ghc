@@ -762,25 +762,25 @@ tcIfaceAnnTarget (ModuleTarget mod) = do
 --
 tcIfaceVectInfo :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
 tcIfaceVectInfo mod typeEnv (IfaceVectInfo 
-                             { ifaceVectInfoVar          = vars
-                             , ifaceVectInfoTyCon        = tycons
-                             , ifaceVectInfoTyConReuse   = tyconsReuse
-                             , ifaceVectInfoScalarVars   = scalarVars
-                             , ifaceVectInfoScalarTyCons = scalarTyCons
+                             { ifaceVectInfoVar            = vars
+                             , ifaceVectInfoTyCon          = tycons
+                             , ifaceVectInfoTyConReuse     = tyconsReuse
+                             , ifaceVectInfoParallelVars   = parallelVars
+                             , ifaceVectInfoParallelTyCons = parallelTyCons
                              })
-  = do { let scalarTyConsSet = mkNameSet scalarTyCons
-       ; vVars       <- mapM vectVarMapping                  vars
+  = do { let parallelTyConsSet = mkNameSet parallelTyCons
+       ; vVars         <- mapM vectVarMapping                  vars
        ; let varsSet = mkVarSet (map fst vVars)
-       ; tyConRes1   <- mapM (vectTyConVectMapping varsSet)  tycons
-       ; tyConRes2   <- mapM (vectTyConReuseMapping varsSet) tyconsReuse
-       ; vScalarVars <- mapM vectVar                         scalarVars
+       ; tyConRes1     <- mapM (vectTyConVectMapping varsSet)  tycons
+       ; tyConRes2     <- mapM (vectTyConReuseMapping varsSet) tyconsReuse
+       ; vParallelVars <- mapM vectVar                         parallelVars
        ; let (vTyCons, vDataCons, vScSels) = unzip3 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
-                  { vectInfoVar          = mkVarEnv  vVars `extendVarEnvList` concat vScSels
-                  , vectInfoTyCon        = mkNameEnv vTyCons
-                  , vectInfoDataCon      = mkNameEnv (concat vDataCons)
-                  , vectInfoScalarVars   = mkVarSet  vScalarVars
-                  , vectInfoScalarTyCons = scalarTyConsSet
+                  { vectInfoVar            = mkVarEnv  vVars `extendVarEnvList` concat vScSels
+                  , vectInfoTyCon          = mkNameEnv vTyCons
+                  , vectInfoDataCon        = mkNameEnv (concat vDataCons)
+                  , vectInfoParallelVars   = mkVarSet  vParallelVars
+                  , vectInfoParallelTyCons = parallelTyConsSet
                   }
        }
   where

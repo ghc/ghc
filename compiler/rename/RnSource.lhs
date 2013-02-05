@@ -764,19 +764,15 @@ badRuleLhsErr name lhs bad_e
 
 \begin{code}
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
-rnHsVectDecl (HsVect var Nothing)
-  = do { var' <- lookupLocatedOccRn var
-       ; return (HsVect var' Nothing, unitFV (unLoc var'))
-       }
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect var (Just rhs@(L _ (HsVar _))))
+rnHsVectDecl (HsVect var rhs@(L _ (HsVar _)))
   = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
-       ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
+       ; return (HsVect var' rhs', fv_rhs `addOneFV` unLoc var')
        }
-rnHsVectDecl (HsVect _var (Just _rhs))
-  = failWith $ vcat
+rnHsVectDecl (HsVect _var _rhs)
+  = failWith $ vcat 
                [ ptext (sLit "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma")
                , ptext (sLit "must be an identifier")
                ]

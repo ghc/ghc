@@ -1993,11 +1993,11 @@ on just the OccName easily in a Core pass.
 --
 data VectInfo
   = VectInfo
-    { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
-    , vectInfoTyCon        :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
-    , vectInfoDataCon      :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
-    , vectInfoScalarVars   :: VarSet                      -- ^ set of purely scalar variables
-    , vectInfoScalarTyCons :: NameSet                     -- ^ set of scalar type constructors
+    { vectInfoVar            :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
+    , vectInfoTyCon          :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
+    , vectInfoDataCon        :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
+    , vectInfoParallelVars   :: VarSet                      -- ^ set of parallel variables
+    , vectInfoParallelTyCons :: NameSet                     -- ^ set of parallel type constructors
     }
 
 -- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated
@@ -2011,18 +2011,18 @@ data VectInfo
 --
 data IfaceVectInfo
   = IfaceVectInfo
-    { ifaceVectInfoVar          :: [Name]  -- ^ All variables in here have a vectorised variant
-    , ifaceVectInfoTyCon        :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
-                                           -- the name of the vectorised variant and those of its
-                                           -- data constructors are determined by
-                                           -- 'OccName.mkVectTyConOcc' and
-                                           -- 'OccName.mkVectDataConOcc'; the names of the
-                                           -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoTyConReuse   :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
-                                           -- coincides with the unconverted form; the name of the
-                                           -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoScalarVars   :: [Name]  -- iface version of 'vectInfoScalarVar'
-    , ifaceVectInfoScalarTyCons :: [Name]  -- iface version of 'vectInfoScalarTyCon'
+    { ifaceVectInfoVar            :: [Name]  -- ^ All variables in here have a vectorised variant
+    , ifaceVectInfoTyCon          :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
+                                             -- the name of the vectorised variant and those of its
+                                             -- data constructors are determined by
+                                             -- 'OccName.mkVectTyConOcc' and
+                                             -- 'OccName.mkVectDataConOcc'; the names of the
+                                             -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoTyConReuse     :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
+                                             -- coincides with the unconverted form; the name of the
+                                             -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoParallelVars   :: [Name]  -- iface version of 'vectInfoParallelVar'
+    , ifaceVectInfoParallelTyCons :: [Name]  -- iface version of 'vectInfoParallelTyCon'
     }
 
 noVectInfo :: VectInfo
@@ -2031,11 +2031,11 @@ noVectInfo
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 =
-  VectInfo (vectInfoVar          vi1 `plusVarEnv`    vectInfoVar          vi2)
-           (vectInfoTyCon        vi1 `plusNameEnv`   vectInfoTyCon        vi2)
-           (vectInfoDataCon      vi1 `plusNameEnv`   vectInfoDataCon      vi2)
-           (vectInfoScalarVars   vi1 `unionVarSet`   vectInfoScalarVars   vi2)
-           (vectInfoScalarTyCons vi1 `unionNameSets` vectInfoScalarTyCons vi2)
+  VectInfo (vectInfoVar            vi1 `plusVarEnv`    vectInfoVar            vi2)
+           (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
+           (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
+           (vectInfoParallelVars   vi1 `unionVarSet`   vectInfoParallelVars   vi2)
+           (vectInfoParallelTyCons vi1 `unionNameSets` vectInfoParallelTyCons vi2)
 
 concatVectInfo :: [VectInfo] -> VectInfo
 concatVectInfo = foldr plusVectInfo noVectInfo
@@ -2049,11 +2049,11 @@ isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
 
 instance Outputable VectInfo where
   ppr info = vcat
-             [ ptext (sLit "variables     :") <+> ppr (vectInfoVar          info)
-             , ptext (sLit "tycons        :") <+> ppr (vectInfoTyCon        info)
-             , ptext (sLit "datacons      :") <+> ppr (vectInfoDataCon      info)
-             , ptext (sLit "scalar vars   :") <+> ppr (vectInfoScalarVars   info)
-             , ptext (sLit "scalar tycons :") <+> ppr (vectInfoScalarTyCons info)
+             [ ptext (sLit "variables       :") <+> ppr (vectInfoVar            info)
+             , ptext (sLit "tycons          :") <+> ppr (vectInfoTyCon          info)
+             , ptext (sLit "datacons        :") <+> ppr (vectInfoDataCon        info)
+             , ptext (sLit "parallel vars   :") <+> ppr (vectInfoParallelVars   info)
+             , ptext (sLit "parallel tycons :") <+> ppr (vectInfoParallelTyCons info)
              ]
 \end{code}
 

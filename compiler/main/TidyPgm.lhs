@@ -447,10 +447,10 @@ trimThing other_thing
 \begin{code}
 tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
 tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
-                                         , vectInfoScalarVars   = scalarVars
+                                         , vectInfoParallelVars = parallelVars
                                          })
   = info { vectInfoVar          = tidy_vars
-         , vectInfoScalarVars   = tidy_scalarVars
+         , vectInfoParallelVars = tidy_parallelVars
          }
   where
       -- we only export mappings whose domain and co-domain is exported (otherwise, the iface is
@@ -460,15 +460,18 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          , let tidy_var   = lookup_var var
                                tidy_var_v = lookup_var var_v
                          , isExportedId tidy_var
-                         , isExportedId tidy_var_v
+                         , isExternalId tidy_var_v
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
-    tidy_scalarVars = mkVarSet [ lookup_var var
-                               | var <- varSetElems scalarVars
-                               , isGlobalId var || isExportedId var]
+    tidy_parallelVars = mkVarSet [ tidy_var
+                                 | var <- varSetElems parallelVars
+                                 , let tidy_var = lookup_var var
+                                 , isExternalId tidy_var]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
+    
+    isExternalId = isExternalName . idName
 \end{code}
 
 Note [Don't attempt to trim data types]
@@ -664,6 +667,9 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 | omit_prags = ([], False)
                 | otherwise  = addExternal expose_all refined_id
 
+                -- add vectorised version if any exists
+          new_ids' = new_ids ++ maybeToList (fmap snd $ lookupVarEnv vect_vars idocc)
+          
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
@@ -674,7 +680,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
-      search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
+      search (zip new_ids' (repeat referrer') ++ rest) unfold_env' occ_env'
 
   tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
                 -> IO (UnfoldEnv, TidyOccEnv)
