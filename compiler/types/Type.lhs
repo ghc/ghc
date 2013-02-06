@@ -49,7 +49,7 @@ module Type (
         coAxNthLHS,
 	
 	-- (Newtypes)
-	newTyConInstRhs, carefullySplitNewType_maybe,
+	newTyConInstRhs, 
 	
 	-- Pred types
         mkFamilyTyConApp,
@@ -667,8 +667,13 @@ repType ty
 	= go rec_nts ty
 
     go rec_nts (TyConApp tc tys)	-- Expand newtypes
-      | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
-      = go rec_nts' ty'
+      | isNewTyCon tc
+      , tys `lengthAtLeast` tyConArity tc
+      , let tc_name = tyConName tc
+            rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
+	             | otherwise	   = rec_nts
+      , not (tc_name `elemNameSet` rec_nts)  -- See Note [Expanding newtypes]
+      = go rec_nts' (newTyConInstRhs tc tys)
 
       | isUnboxedTupleTyCon tc
       = if null tys
@@ -676,21 +681,6 @@ repType ty
          else UbxTupleRep (concatMap (flattenRepType . go rec_nts) tys)
 
     go _ ty = UnaryRep ty
-
-carefullySplitNewType_maybe :: NameSet -> TyCon -> [Type] -> Maybe (NameSet,Type)
--- Return the representation of a newtype, unless 
--- we've seen it already: see Note [Expanding newtypes]
--- Assumes the newtype is saturated
-carefullySplitNewType_maybe rec_nts tc tys
-  | isNewTyCon tc
-  , tys `lengthAtLeast` tyConArity tc
-  , not (tc_name `elemNameSet` rec_nts) = Just (rec_nts', newTyConInstRhs tc tys)
-  | otherwise	   	                = Nothing
-  where
-    tc_name = tyConName tc
-    rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
-	     | otherwise	   = rec_nts
-
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.

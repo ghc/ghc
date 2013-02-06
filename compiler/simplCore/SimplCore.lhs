@@ -50,6 +50,7 @@ import FastString
 import SrcLoc
 import Util
 
+import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
@@ -334,7 +335,8 @@ loadPlugin hsc_env mod_name
              dflags = hsc_dflags hsc_env
        ; mb_name <- lookupRdrNameInModule hsc_env mod_name plugin_rdr_name
        ; case mb_name of {
-            Nothing -> throwGhcException (CmdLineError $ showSDoc dflags $ hsep
+            Nothing ->
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
                           [ ptext (sLit "The module"), ppr mod_name
                           , ptext (sLit "did not export the plugin name")
                           , ppr plugin_rdr_name ]) ;
@@ -343,7 +345,8 @@ loadPlugin hsc_env mod_name
      do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case mb_plugin of
-            Nothing -> throwGhcException (CmdLineError $ showSDoc dflags $ hsep
+            Nothing ->
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
                           [ ptext (sLit "The value"), ppr name
                           , ptext (sLit "did not have the type")
                           , ppr pluginTyConName, ptext (sLit "as required")])
@@ -607,14 +610,23 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       , sz == sz     -- Force it
       = do {
                 -- Occurrence analysis
-           let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
+           let {   -- Note [Vectorisation declarations and occurences]
+                   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
                    -- that the right-hand sides of vectorisation declarations are taken into
-                   -- account during occurence analysis.
-                 maybeVects   = case sm_phase mode of
-                                  InitialPhase -> mg_vect_decls guts
-                                  _            -> []
+                   -- account during occurrence analysis. After the 'InitialPhase', we need to ensure
+                   -- that the binders representing variable vectorisation declarations are kept alive.
+                   -- (In contrast to automatically vectorised variables, their unvectorised versions
+                   -- don't depend on them.)
+                 vectVars = mkVarSet $ 
+                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
+                                        | Vect bndr _ <- mg_vect_decls guts]
+              ;  (maybeVects, maybeVectVars) 
+                   = case sm_phase mode of
+                       InitialPhase -> (mg_vect_decls guts, vectVars)
+                       _            -> ([], vectVars)
                ; tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_rule rules maybeVects binds
+                     occurAnalysePgm this_mod active_rule rules maybeVects maybeVectVars binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);
@@ -855,7 +867,7 @@ makeIndEnv binds
 shortMeOut :: IndEnv -> Id -> Id -> Bool
 shortMeOut ind_env exported_id local_id
 -- The if-then-else stuff is just so I can get a pprTrace to see
--- how often I don't get shorting out becuase of IdInfo stuff
+-- how often I don't get shorting out because of IdInfo stuff
   = if isExportedId exported_id &&              -- Only if this is exported
 
        isLocalId local_id &&                    -- Only if this one is defined in this

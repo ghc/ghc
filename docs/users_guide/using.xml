@@ -2278,9 +2278,15 @@ last (x : xs) = last' x xs
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>Data Parallel Haskell.
-            </para>
-            TODO: Document optimisation
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> optimisation transformation. This
+            optimisation transforms the nested data parallelism code of programs
+            using DPH into flat data parallelism. Flat data parallel programs
+            should have better load balancing, enable SIMD parallelism and
+            friendlier cache behaviour.</para>
           </listitem>
         </varlistentry>
 
@@ -2290,9 +2296,19 @@ last (x : xs) = last' x xs
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>Data Parallel Haskell.
-            </para>
-            TODO: Document optimisation
+            <para>Part of <link linkend="dph">Data Parallel Haskell
+            (DPH)</link>.</para>
+
+            <para><emphasis>Off by default.</emphasis> Enable the
+            <emphasis>vectorisation</emphasis> avoidance optimisation. This
+            optimisation only works when used in combination with the
+            <option>-fvectorise</option> transformation.</para>
+
+            <para>While vectorisation of code using DPH is often a big win, it
+            can also produce worse results for some kinds of code. This
+            optimisation modifies the vectorisation transformation to try to
+            determine if a function would be better of unvectorised and if
+            so, do just that.</para>
           </listitem>
         </varlistentry>
 

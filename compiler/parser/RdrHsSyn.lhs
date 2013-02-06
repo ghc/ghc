@@ -542,35 +542,39 @@ checkContext (L l orig_t)
 -- We parse patterns as expressions and check for valid patterns below,
 -- converting the expression into a pattern at the same time.
 
-checkPattern :: LHsExpr RdrName -> P (LPat RdrName)
-checkPattern e = checkLPat e
+checkPattern :: SDoc -> LHsExpr RdrName -> P (LPat RdrName)
+checkPattern msg e = checkLPat msg e
 
-checkPatterns :: [LHsExpr RdrName] -> P [LPat RdrName]
-checkPatterns es = mapM checkPattern es
+checkPatterns :: SDoc -> [LHsExpr RdrName] -> P [LPat RdrName]
+checkPatterns msg es = mapM (checkPattern msg) es
 
-checkLPat :: LHsExpr RdrName -> P (LPat RdrName)
-checkLPat e@(L l _) = checkPat l e []
+checkLPat :: SDoc -> LHsExpr RdrName -> P (LPat RdrName)
+checkLPat msg e@(L l _) = checkPat msg l e []
 
-checkPat :: SrcSpan -> LHsExpr RdrName -> [LPat RdrName] -> P (LPat RdrName)
-checkPat loc (L l (HsVar c)) args
+checkPat :: SDoc -> SrcSpan -> LHsExpr RdrName -> [LPat RdrName]
+         -> P (LPat RdrName)
+checkPat _ loc (L l (HsVar c)) args
   | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
-checkPat loc e args     -- OK to let this happen even if bang-patterns
+checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
   | Just (e', args') <- splitBang e
-  = do  { args'' <- checkPatterns args'
-        ; checkPat loc e' (args'' ++ args) }
-checkPat loc (L _ (HsApp f x)) args
-  = do { x <- checkLPat x; checkPat loc f (x:args) }
-checkPat loc (L _ e) []
-  = do { pState <- getPState
-       ; p <- checkAPat (dflags pState) loc e
-       ; return (L loc p) }
-checkPat loc e _
-  = patFail loc (unLoc e)
+  = do  { args'' <- checkPatterns msg args'
+        ; checkPat msg loc e' (args'' ++ args) }
+checkPat msg loc (L _ (HsApp f e)) args
+  = do p <- checkLPat msg e
+       checkPat msg loc f (p : args)
+checkPat msg loc (L _ e) []
+  = do p <- checkAPat msg loc e
+       return (L loc p)
+checkPat msg loc e _
+  = patFail msg loc (unLoc e)
 
-checkAPat :: DynFlags -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
-checkAPat dynflags loc e0 = case e0 of
+checkAPat :: SDoc -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
+checkAPat msg loc e0 = do
+ pState <- getPState
+ let dynflags = dflags pState
+ case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
    HsLit l  -> return (LitPat l)
@@ -585,14 +589,14 @@ checkAPat dynflags loc e0 = case e0 of
    SectionR (L _ (HsVar bang)) e        -- (! x)
         | bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
-              ; if bang_on then checkLPat e >>= (return . BangPat)
+              ; if bang_on then checkLPat msg e >>= (return . BangPat)
                 else parseErrorSDoc loc (text "Illegal bang-pattern (use -XBangPatterns):" $$ ppr e0) }
 
-   ELazyPat e         -> checkLPat e >>= (return . LazyPat)
-   EAsPat n e         -> checkLPat e >>= (return . AsPat n)
+   ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
+   EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
    -- view pattern is well-formed if the pattern is
-   EViewPat expr patE -> checkLPat patE >>= (return . (\p -> ViewPat expr p placeHolderType))
-   ExprWithTySig e t  -> do e <- checkLPat e
+   EViewPat expr patE -> checkLPat msg patE >>= (return . (\p -> ViewPat expr p placeHolderType))
+   ExprWithTySig e t  -> do e <- checkLPat msg e
                             -- Pattern signatures are parsed as sigtypes,
                             -- but they aren't explicit forall points.  Hence
                             -- we have to remove the implicit forall here.
@@ -607,29 +611,29 @@ checkAPat dynflags loc e0 = case e0 of
                       | xopt Opt_NPlusKPatterns dynflags && (plus == plus_RDR)
                       -> return (mkNPlusKPat (L nloc n) lit)
 
-   OpApp l op _fix r  -> do l <- checkLPat l
-                            r <- checkLPat r
+   OpApp l op _fix r  -> do l <- checkLPat msg l
+                            r <- checkLPat msg r
                             case op of
                                L cl (HsVar c) | isDataOcc (rdrNameOcc c)
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
-                               _ -> patFail loc e0
+                               _ -> patFail msg loc e0
 
-   HsPar e            -> checkLPat e >>= (return . ParPat)
-   ExplicitList _ es  -> do ps <- mapM checkLPat es
+   HsPar e            -> checkLPat msg e >>= (return . ParPat)
+   ExplicitList _ es  -> do ps <- mapM (checkLPat msg) es
                             return (ListPat ps placeHolderType)
-   ExplicitPArr _ es  -> do ps <- mapM checkLPat es
+   ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
                             return (PArrPat ps placeHolderType)
 
    ExplicitTuple es b
-     | all tupArgPresent es  -> do ps <- mapM checkLPat [e | Present e <- es]
+     | all tupArgPresent es  -> do ps <- mapM (checkLPat msg) [e | Present e <- es]
                                    return (TuplePat ps b placeHolderType)
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    RecordCon c _ (HsRecFields fs dd)
-                      -> do fs <- mapM checkPatField fs
+                      -> do fs <- mapM (checkPatField msg) fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
-   _                  -> patFail loc e0
+   _                  -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
@@ -641,42 +645,46 @@ plus_RDR = mkUnqual varName (fsLit "+") -- Hack
 bang_RDR = mkUnqual varName (fsLit "!") -- Hack
 pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
-checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
-checkPatField fld = do  { p <- checkLPat (hsRecFieldArg fld)
-                        ; return (fld { hsRecFieldArg = p }) }
+checkPatField :: SDoc -> HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
+checkPatField msg fld = do p <- checkLPat msg (hsRecFieldArg fld)
+                           return (fld { hsRecFieldArg = p })
 
-patFail :: SrcSpan -> HsExpr RdrName -> P a
-patFail loc e = parseErrorSDoc loc (text "Parse error in pattern:" <+> ppr e)
+patFail :: SDoc -> SrcSpan -> HsExpr RdrName -> P a
+patFail msg loc e = parseErrorSDoc loc err
+    where err = text "Parse error in pattern:" <+> ppr e
+             $$ msg
 
 
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-checkValDef :: LHsExpr RdrName
+checkValDef :: SDoc
+            -> LHsExpr RdrName
             -> Maybe (LHsType RdrName)
             -> Located (GRHSs RdrName (LHsExpr RdrName))
             -> P (HsBind RdrName)
 
-checkValDef lhs (Just sig) grhss
+checkValDef msg lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = checkPatBind (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
+  = checkPatBind msg (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
 
-checkValDef lhs opt_sig grhss
+checkValDef msg lhs opt_sig grhss
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats) -> checkFunBind (getLoc lhs)
+            Just (fun, is_infix, pats) -> checkFunBind msg (getLoc lhs)
                                                 fun is_infix pats opt_sig grhss
-            Nothing -> checkPatBind lhs grhss }
+            Nothing -> checkPatBind msg lhs grhss }
 
-checkFunBind :: SrcSpan
+checkFunBind :: SDoc
+             -> SrcSpan
              -> Located RdrName
              -> Bool
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
              -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
-checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
-  = do  ps <- checkPatterns pats
+checkFunBind msg lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+  = do  ps <- checkPatterns msg pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         return (makeFunBind fun is_infix [L match_span (Match ps opt_sig grhss)])
         -- The span of the match covers the entire equation.
@@ -688,11 +696,12 @@ makeFunBind fn is_infix ms
   = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup ms,
               fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames, fun_tick = Nothing }
 
-checkPatBind :: LHsExpr RdrName
+checkPatBind :: SDoc
+             -> LHsExpr RdrName
              -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P (HsBind RdrName)
-checkPatBind lhs (L _ grhss)
-  = do  { lhs <- checkPattern lhs
+checkPatBind msg lhs (L _ grhss)
+  = do  { lhs <- checkPattern msg lhs
         ; return (PatBind lhs grhss placeHolderType placeHolderNames
                     (Nothing,[])) }
 

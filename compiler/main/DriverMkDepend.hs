@@ -64,8 +64,8 @@ doMkDependHS srcs = do
                  }
     _ <- GHC.setSessionDynFlags dflags
 
-    when (null (depSuffixes dflags)) $
-        throwGhcException (ProgramError "You must specify at least one -dep-suffix")
+    when (null (depSuffixes dflags)) $ liftIO $
+        throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
 
     files <- liftIO $ beginMkDependHS dflags
 
@@ -193,7 +193,7 @@ processDeps :: DynFlags
 
 processDeps dflags _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwGhcException (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
+    throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags

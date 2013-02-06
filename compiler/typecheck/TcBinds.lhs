@@ -785,17 +785,12 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 --   during type checking.  Instead, constrain the rhs of a vectorisation declaration to be a single
 --   identifier (this is checked in 'rnHsVectDecl').  Fix this by enabling the use of 'vectType'
 --   from the vectoriser here.
-tcVect (HsVect name Nothing)
-  = addErrCtxt (vectCtxt name) $
-    do { var <- wrapLocM tcLookupId name
-       ; return $ HsVect var Nothing
-       }
-tcVect (HsVect name (Just rhs))
+tcVect (HsVect name rhs)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
        ; let L rhs_loc (HsVar rhs_var_name) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect var (Just $ L rhs_loc (HsVar rhs_id))
+       ; return $ HsVect var (L rhs_loc (HsVar rhs_id))
        }
 
 {- OLD CODE:

@@ -44,8 +44,8 @@ prepForeignCall dflags cconv arg_types result_type
     let res_ty = primRepToFFIType dflags result_type
     r <- ffi_prep_cif cif abi (fromIntegral n_args) res_ty arg_arr
     if (r /= fFI_OK)
-       then throwGhcException (InstallationError
-                                   ("prepForeignCallFailed: " ++ show r))
+       then throwGhcExceptionIO (InstallationError
+                                     ("prepForeignCallFailed: " ++ show r))
        else return cif
 
 convToABI :: CCallConv -> C_ffi_abi

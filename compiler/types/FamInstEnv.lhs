@@ -45,6 +45,7 @@ import CoAxiom
 import VarSet
 import VarEnv
 import Name
+import NameSet
 import UniqFM
 import Outputable
 import Maybes
@@ -790,32 +791,26 @@ topNormaliseType :: FamInstEnvs
 -- Its a bit like Type.repType, but handles type families too
 
 topNormaliseType env ty
-  = go [] ty
+  = go emptyNameSet ty
   where
-    go :: [TyCon] -> Type -> Maybe (Coercion, Type)
-    go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
+    go :: NameSet -> Type -> Maybe (Coercion, Type)
+    go rec_nts ty 
+        | Just ty' <- coreView ty     -- Expand synonyms
         = go rec_nts ty'
 
-    go rec_nts (TyConApp tc tys)
-        | isNewTyCon tc         -- Expand newtypes
-        = if tc `elem` rec_nts  -- See Note [Expanding newtypes] in Type.lhs
-          then Nothing
-          else let 
-               in add_co nt_co rec_nts' nt_rhs
+        | Just (rec_nts', nt_co, nt_rhs) <- topNormaliseNewTypeX rec_nts ty
+        = add_co nt_co rec_nts' nt_rhs
 
+    go rec_nts (TyConApp tc tys) 
         | isFamilyTyCon tc              -- Expand open tycons
         , (co, ty) <- normaliseTcApp env tc tys
                 -- Note that normaliseType fully normalises 'tys',
+                -- wrt type functions but *not* newtypes
                 -- It has do to so to be sure that nested calls like
                 --    F (G Int)
                 -- are correctly top-normalised
         , not (isReflCo co)
         = add_co co rec_nts ty
-        where
-          nt_co  = mkUnbranchedAxInstCo (newTyConCo tc) tys
-          nt_rhs = newTyConInstRhs      tc              tys
-          rec_nts' | isRecursiveTyCon tc = tc:rec_nts
-                   | otherwise           = rec_nts
 
     go _ _ = Nothing
 
@@ -844,7 +839,7 @@ normaliseTcApp env tc tys
     (fix_coi, nty)
 
   | otherwise   -- No unique matching family instance exists;
-                -- we do not do anything
+                -- we do not do anything (including for newtypes)
   = (tycon_coi, TyConApp tc ntys)
 
   where
@@ -860,6 +855,7 @@ normaliseType :: FamInstEnvs            -- environment with family instances
                                         -- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- Returns with Refl if nothing happens
+-- Does nothing to newtypes
 
 normaliseType env ty
   | Just ty' <- coreView ty = normaliseType env ty'

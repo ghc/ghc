@@ -502,20 +502,27 @@ gen_latex_doc (Info defaults entries)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
-   = "{-# LANGUAGE NoImplicitPrelude, UnboxedTuples #-}\n"
+   = "{-# LANGUAGE CPP, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ "import GHC.Types (Bool)\n"
      ++ "import GHC.Tuple ()\n"
-     ++ "import GHC.Prim (" ++ types ++ ")\n"
-     ++ unlines (concatMap f specs)
+     ++ "import GHC.Prim (" ++ concat (intersperse ", " othertycons) ++ ")\n"
+     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
+     ++ "import GHC.Prim (" ++ concat (intersperse ", " vectycons) ++ ")\n"
+     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
+     ++ unlines (concatMap f otherspecs)
+     ++ "#if defined (__GLASGOW_HASKELL_LLVM__)\n"
+     ++ unlines (concatMap f vecspecs)
+     ++ "#endif /* defined (__GLASGOW_HASKELL_LLVM__) */\n"
      where
         specs = filter (not.dodgy) (filter is_primop entries)
+        (vecspecs, otherspecs) = partition is_llvm_only specs
         tycons = foldr union [] $ map (tyconsIn . ty) specs
-        tycons' = filter (`notElem` ["()", "Bool"]) tycons
-        types = concat $ intersperse ", " tycons'
+        (vectycons, othertycons) =
+            (partition llvmOnlyTyCon . filter (`notElem` ["()", "Bool"])) tycons
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
                      lhs = src_name ++ " " ++ unwords args
@@ -535,6 +542,20 @@ gen_wrappers (Info _ entries)
               "par#", "parGlobal#", "parLocal#", "parAt#", 
               "parAtAbs#", "parAtRel#", "parAtForNow#" 
              ]
+
+        is_llvm_only :: Entry -> Bool
+        is_llvm_only entry =
+            case lookup_attrib "llvm_only" (opts entry) of
+              Just (OptionTrue _) -> True
+              _                   -> False
+
+        llvmOnlyTyCon :: TyCon -> Bool
+        llvmOnlyTyCon "Int32#"    = True
+        llvmOnlyTyCon "FloatX4#"  = True
+        llvmOnlyTyCon "DoubleX2#" = True
+        llvmOnlyTyCon "Int32X4#"  = True
+        llvmOnlyTyCon "Int64X2#"  = True
+        llvmOnlyTyCon _           = False
 
 gen_primop_list :: Info -> String
 gen_primop_list (Info _ entries)
@@ -653,6 +674,10 @@ ppType (TyApp "Word64#"     []) = "word64PrimTy"
 ppType (TyApp "Addr#"       []) = "addrPrimTy"
 ppType (TyApp "Float#"      []) = "floatPrimTy"
 ppType (TyApp "Double#"     []) = "doublePrimTy"
+ppType (TyApp "FloatX4#"    []) = "floatX4PrimTy"
+ppType (TyApp "DoubleX2#"   []) = "doubleX2PrimTy"
+ppType (TyApp "Int32X4#"    []) = "int32X4PrimTy"
+ppType (TyApp "Int64X2#"    []) = "int64X2PrimTy"
 ppType (TyApp "ByteArray#"  []) = "byteArrayPrimTy"
 ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"

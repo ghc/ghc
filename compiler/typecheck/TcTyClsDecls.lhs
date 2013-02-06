@@ -1236,7 +1236,7 @@ checkValidFamDecl (FamilyDecl { fdLName = lname, fdFlavour = flav })
 -- module alpha conversion of the quantified type variables
 -- of the constructor.
 --
--- Note that we allow existentials to match becuase the
+-- Note that we allow existentials to match because the
 -- fields can never meet. E.g
 --	data T where
 --	  T1 { f1 :: b, f2 :: a, f3 ::Int } :: T
@@ -1530,7 +1530,7 @@ Consider this (Trac #4169):
 
 When we typecheck 'ast' we have done the first pass over the class decl
 (in tcTyClDecls), but we have not yet typechecked the default-method
-declarations (becuase they can mention value declarations).  So we 
+declarations (because they can mention value declarations).  So we 
 must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 

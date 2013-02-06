@@ -194,6 +194,7 @@ pprLit lit = sdocWithDynFlags $ \dflags ->
                space <> dcolon <+> ppr rep ]
 
     CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
+    CmmVec lits        -> char '<' <> commafy (map pprLit lits) <> char '>'
     CmmLabel clbl      -> ppr clbl
     CmmLabelOff clbl i -> ppr clbl <> ppr_offset i
     CmmLabelDiffOff clbl1 clbl2 i -> ppr clbl1 <> char '-'
@@ -254,6 +255,7 @@ pprGlobalReg gr
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
+        XmmReg     n   -> ptext (sLit "XMM") <> int n
         Sp             -> ptext (sLit "Sp")
         SpLim          -> ptext (sLit "SpLim")
         Hp             -> ptext (sLit "Hp")

@@ -95,9 +95,10 @@
 #error Unknown long size
 #endif
 
-#define F_ float32
-#define D_ float64
-#define L_ bits64
+#define F_   float32
+#define D_   float64
+#define L_   bits64
+#define V16_ bits128
 
 #define SIZEOF_StgDouble 8
 #define SIZEOF_StgWord64 8
@@ -744,6 +745,7 @@
 
 #define NO_TREC                   stg_NO_TREC_closure
 #define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
+#define STM_AWOKEN                stg_STM_AWOKEN_closure
 #define END_INVARIANT_CHECK_QUEUE stg_END_INVARIANT_CHECK_QUEUE_closure
 
 #define recordMutableCap(p, gen)                                        \

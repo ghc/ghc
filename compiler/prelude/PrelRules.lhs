@@ -31,7 +31,7 @@ import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
-import DataCon     ( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
+import DataCon     ( dataConTag, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type

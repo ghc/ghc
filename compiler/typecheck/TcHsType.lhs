@@ -961,7 +961,7 @@ and *not* at the inner forall:
   f2 :: (forall k. forall (a:k). T k a -> Int) -> Int  -- NO!
 Reason: same as for HM inference on value level declarations,
 we want to infer the most general type.  The f2 type signature
-would be *less applicable* than f1, becuase it requires a more
+would be *less applicable* than f1, because it requires a more
 polymorphic argument.
 
 Note [Kinds of quantified type variables]

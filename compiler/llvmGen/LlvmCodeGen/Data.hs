@@ -171,6 +171,14 @@ genStaticLit (CmmInt i w)
 genStaticLit (CmmFloat r w)
     = Right $ LMStaticLit (LMFloatLit (fromRational r) (widthToLlvmFloat w))
 
+genStaticLit (CmmVec ls)
+    = Right $ LMStaticLit (LMVectorLit (map toLlvmLit ls))
+  where
+    toLlvmLit :: CmmLit -> LlvmLit
+    toLlvmLit lit = case genStaticLit lit of
+                   Right (LMStaticLit llvmLit) -> llvmLit
+                   _ -> panic "genStaticLit"
+
 -- Leave unresolved, will fix later
 genStaticLit c@(CmmLabel        _    ) = Left $ c
 genStaticLit c@(CmmLabelOff     _   _) = Left $ c

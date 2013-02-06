@@ -1,7 +1,7 @@
 
 module CmmType
     ( CmmType   -- Abstract
-    , b8, b16, b32, b64, f32, f64, bWord, bHalfWord, gcWord
+    , b8, b16, b32, b64, b128, f32, f64, bWord, bHalfWord, gcWord
     , cInt, cLong
     , cmmBits, cmmFloat
     , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
@@ -17,6 +17,13 @@ module CmmType
     , rEP_StgEntCounter_allocs
 
     , ForeignHint(..)
+
+    , Length
+    , vec, vec2, vec4, vec8, vec16
+    , vec2f64, vec2b64, vec4f32, vec4b32, vec8b16, vec16b8
+    , cmmVec
+    , vecLength, vecElemType
+    , isVecType
    )
 where
 
@@ -42,10 +49,11 @@ import Data.Int
 data CmmType    -- The important one!
   = CmmType CmmCat Width
 
-data CmmCat     -- "Category" (not exported)
-   = GcPtrCat   -- GC pointer
-   | BitsCat    -- Non-pointer
-   | FloatCat   -- Float
+data CmmCat                -- "Category" (not exported)
+   = GcPtrCat              -- GC pointer
+   | BitsCat               -- Non-pointer
+   | FloatCat              -- Float
+   | VecCat Length CmmCat  -- Vector
    deriving( Eq )
         -- See Note [Signed vs unsigned] at the end
 
@@ -53,9 +61,10 @@ instance Outputable CmmType where
   ppr (CmmType cat wid) = ppr cat <> ppr (widthInBits wid)
 
 instance Outputable CmmCat where
-  ppr FloatCat  = ptext $ sLit("F")
-  ppr GcPtrCat  = ptext $ sLit("P")
-  ppr BitsCat   = ptext $ sLit("I")
+  ppr FloatCat       = ptext $ sLit("F")
+  ppr GcPtrCat       = ptext $ sLit("P")
+  ppr BitsCat        = ptext $ sLit("I")
+  ppr (VecCat n cat) = ppr cat <> text "x" <> ppr n <> text "V"
 
 -- Why is CmmType stratified?  For native code generation,
 -- most of the time you just want to know what sort of register
@@ -77,10 +86,15 @@ cmmEqType_ignoring_ptrhood :: CmmType -> CmmType -> Bool
 cmmEqType_ignoring_ptrhood (CmmType c1 w1) (CmmType c2 w2)
    = c1 `weak_eq` c2 && w1==w2
    where
-      FloatCat `weak_eq` FloatCat = True
-      FloatCat `weak_eq` _other   = False
-      _other   `weak_eq` FloatCat = False
-      _word1   `weak_eq` _word2   = True        -- Ignores GcPtr
+     weak_eq :: CmmCat -> CmmCat -> Bool
+     FloatCat         `weak_eq` FloatCat         = True
+     FloatCat         `weak_eq` _other           = False
+     _other           `weak_eq` FloatCat         = False
+     (VecCat l1 cat1) `weak_eq` (VecCat l2 cat2) = l1 == l2
+                                                   && cat1 `weak_eq` cat2
+     (VecCat {})      `weak_eq` _other           = False
+     _other           `weak_eq` (VecCat {})      = False
+     _word1           `weak_eq` _word2           = True        -- Ignores GcPtr
 
 --- Simple operations on CmmType -----
 typeWidth :: CmmType -> Width
@@ -92,11 +106,12 @@ cmmFloat = CmmType FloatCat
 
 -------- Common CmmTypes ------------
 -- Floats and words of specific widths
-b8, b16, b32, b64, f32, f64 :: CmmType
+b8, b16, b32, b64, b128, f32, f64 :: CmmType
 b8     = cmmBits W8
 b16    = cmmBits W16
 b32    = cmmBits W32
 b64    = cmmBits W64
+b128   = cmmBits W128
 f32    = cmmFloat W32
 f64    = cmmFloat W64
 
@@ -243,6 +258,51 @@ narrowS W16 x = fromIntegral (fromIntegral x :: Int16)
 narrowS W32 x = fromIntegral (fromIntegral x :: Int32)
 narrowS W64 x = fromIntegral (fromIntegral x :: Int64)
 narrowS _ _ = panic "narrowTo"
+
+-----------------------------------------------------------------------------
+--              SIMD
+-----------------------------------------------------------------------------
+
+type Length = Int
+
+vec :: Length -> CmmType -> CmmType
+vec l (CmmType cat w) = CmmType (VecCat l cat) vecw
+  where
+    vecw :: Width
+    vecw = widthFromBytes (l*widthInBytes w)
+
+vec2, vec4, vec8, vec16 :: CmmType -> CmmType
+vec2  = vec 2
+vec4  = vec 4
+vec8  = vec 8
+vec16 = vec 16
+
+vec2f64, vec2b64, vec4f32, vec4b32, vec8b16, vec16b8 :: CmmType
+vec2f64 = vec 2 f64
+vec2b64 = vec 2 b64
+vec4f32 = vec 4 f32
+vec4b32 = vec 4 b32
+vec8b16 = vec 8 b16
+vec16b8 = vec 16 b8
+
+cmmVec :: Int -> CmmType -> CmmType
+cmmVec n (CmmType cat w) =
+    CmmType (VecCat n cat) (widthFromBytes (n*widthInBytes w))
+
+vecLength :: CmmType -> Length
+vecLength (CmmType (VecCat l _) _) = l
+vecLength _                        = panic "vecLength: not a vector"
+
+vecElemType :: CmmType -> CmmType
+vecElemType (CmmType (VecCat l cat) w) = CmmType cat scalw
+  where
+    scalw :: Width
+    scalw = widthFromBytes (widthInBytes w `div` l)
+vecElemType _ = panic "vecElemType: not a vector"
+
+isVecType :: CmmType -> Bool
+isVecType (CmmType (VecCat {}) _) = True
+isVecType _                       = False
 
 -------------------------------------------------------------------------
 -- Hints

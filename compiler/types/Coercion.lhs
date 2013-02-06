@@ -39,9 +39,10 @@ module Coercion (
         mkNewTypeCo, 
 
         -- ** Decomposition
-        splitNewTypeRepCo_maybe, instNewTyCon_maybe, decomposeCo,
-        getCoVar_maybe,
+        splitNewTypeRepCo_maybe, instNewTyCon_maybe, 
+        topNormaliseNewType, topNormaliseNewTypeX,
 
+        decomposeCo, getCoVar_maybe,
         splitTyConAppCo_maybe,
         splitAppCo_maybe,
         splitForAllCo_maybe,
@@ -95,6 +96,7 @@ import VarEnv
 import VarSet
 import Maybes   ( orElse )
 import Name	( Name, NamedThing(..), nameUnique, nameModule, getSrcSpan )
+import NameSet
 import OccName 	( parenSymOcc )
 import Util
 import BasicTypes
@@ -855,34 +857,64 @@ instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, Coercion)
 -- ^ If @co :: T ts ~ rep_ty@ then:
 --
 -- > instNewTyCon_maybe T ts = Just (rep_ty, co)
+-- Checks for a newtype, and for being saturated
 instNewTyCon_maybe tc tys
-  | Just (tvs, ty, co_tc) <- unwrapNewTyCon_maybe tc
-  = ASSERT( tys `lengthIs` tyConArity tc )
-    Just (substTyWith tvs tys ty, mkUnbranchedAxInstCo co_tc tys)
+  | Just (tvs, ty, co_tc) <- unwrapNewTyCon_maybe tc  -- Check for newtype
+  , tys `lengthIs` tyConArity tc                      -- Check saturated
+  = Just (substTyWith tvs tys ty, mkUnbranchedAxInstCo co_tc tys)
   | otherwise
   = Nothing
 
--- this is here to avoid module loops
 splitNewTypeRepCo_maybe :: Type -> Maybe (Type, Coercion)  
 -- ^ Sometimes we want to look through a @newtype@ and get its associated coercion.
 -- This function only strips *one layer* of @newtype@ off, so the caller will usually call
--- itself recursively. Furthermore, this function should only be applied to types of kind @*@,
--- hence the newtype is always saturated. If @co : ty ~ ty'@ then:
+-- itself recursively. If
 --
 -- > splitNewTypeRepCo_maybe ty = Just (ty', co)
 --
--- The function returns @Nothing@ for non-@newtypes@ or fully-transparent @newtype@s.
+-- then  @co : ty ~ ty'@.  The function returns @Nothing@ for non-@newtypes@, 
+-- or unsaturated applications
 splitNewTypeRepCo_maybe ty 
-  | Just ty' <- coreView ty = splitNewTypeRepCo_maybe ty'
+  | Just ty' <- coreView ty 
+  = splitNewTypeRepCo_maybe ty'
 splitNewTypeRepCo_maybe (TyConApp tc tys)
-  | Just (ty', co) <- instNewTyCon_maybe tc tys
-  = case co of
-	Refl _ -> panic "splitNewTypeRepCo_maybe"
-			-- This case handled by coreView
-	_      -> Just (ty', co)
+  = instNewTyCon_maybe tc tys
 splitNewTypeRepCo_maybe _
   = Nothing
 
+topNormaliseNewType :: Type -> Maybe (Type, Coercion)
+topNormaliseNewType ty
+  = case topNormaliseNewTypeX emptyNameSet ty of
+      Just (_, co, ty) -> Just (ty, co)
+      Nothing          -> Nothing
+
+topNormaliseNewTypeX :: NameSet -> Type -> Maybe (NameSet, Coercion, Type)
+topNormaliseNewTypeX rec_nts ty
+  | Just ty' <- coreView ty         -- Expand predicates and synonyms
+  = topNormaliseNewTypeX rec_nts ty'
+
+topNormaliseNewTypeX rec_nts (TyConApp tc tys)
+  | Just (rep_ty, co) <- instNewTyCon_maybe tc tys
+  , not (tc_name `elemNameSet` rec_nts)  -- See Note [Expanding newtypes] in Type
+  = case topNormaliseNewTypeX rec_nts' rep_ty of
+       Nothing                       -> Just (rec_nts', co,                 rep_ty)
+       Just (rec_nts', co', rep_ty') -> Just (rec_nts', co `mkTransCo` co', rep_ty')
+  where
+    tc_name = tyConName tc
+    rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
+             | otherwise	   = rec_nts
+
+topNormaliseNewTypeX _ _ = Nothing
+\end{code}
+
+
+%************************************************************************
+%*									*
+                   Equality of coercions
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 -- | Determines syntactic equality of coercions
 coreEqCoercion :: Coercion -> Coercion -> Bool
 coreEqCoercion co1 co2 = coreEqCoercion2 rn_env co1 co2

@@ -129,7 +129,7 @@ data IdDetails
 				--  b) when desugaring a RecordCon we can get 
 				--     from the Id back to the data con]
 
-  | ClassOpId Class 		-- ^ The 'Id' is an superclass selector or class operation of a class
+  | ClassOpId Class 		-- ^ The 'Id' is a superclass selector or class operation of a class
 
   | PrimOpId PrimOp		-- ^ The 'Id' is for a primitive operator
   | FCallId ForeignCall		-- ^ The 'Id' is for a foreign call

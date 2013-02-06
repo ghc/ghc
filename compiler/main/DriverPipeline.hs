@@ -430,7 +430,7 @@ compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
 compileFile hsc_env stop_phase (src, mb_phase) = do
    exists <- doesFileExist src
    when (not exists) $
-        throwGhcException (CmdLineError ("does not exist: " ++ src))
+        throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
 
    let
         dflags = hsc_dflags hsc_env
@@ -542,7 +542,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
          let happensBefore' = happensBefore dflags
          when (not (start_phase `happensBefore'` stop_phase)) $
-               throwGhcException (UsageError
+               throwGhcExceptionIO (UsageError
                            ("cannot compile this file to desired target: "
                               ++ input_fn))
 
@@ -1895,8 +1895,8 @@ linkBinary dflags o_files dep_packages = do
 
     -- parallel only: move binary to another dir -- HWL
     success <- runPhase_MoveBinary dflags output_fn
-    if success then return ()
-               else throwGhcException (InstallationError ("cannot move binary"))
+    unless success $
+        throwGhcExceptionIO (InstallationError ("cannot move binary"))
 
 
 exeFileName :: DynFlags -> FilePath
@@ -2013,10 +2013,13 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
           [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
           [ "-D__SSE4_2__=1" | sse4_2 ]
 
+    backend_defs <- getBackendDefs dflags
+
     cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs
+                    ++ map SysTools.Option backend_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option cc_opts
                     ++ map SysTools.Option sse_defs
@@ -2034,6 +2037,14 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
                        , SysTools.Option     "-o"
                        , SysTools.FileOption "" output_fn
                        ])
+
+getBackendDefs :: DynFlags -> IO [String]
+getBackendDefs dflags | hscTarget dflags == HscLlvm = do
+    llvmVer <- figureLlvmVersion dflags
+    return [ "-D__GLASGOW_HASKELL_LLVM__="++show llvmVer ]
+
+getBackendDefs _ =
+    return []
 
 hsSourceCppOpts :: [String]
 -- Default CPP defines in Haskell source

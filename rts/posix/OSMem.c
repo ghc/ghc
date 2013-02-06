@@ -99,7 +99,7 @@ my_mmap (void *addr, W_ size)
     
     kern_return_t err = 0;
     ret = addr;
-    if(addr)	// try to allocate at adress
+    if(addr)	// try to allocate at address
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
     if(!addr || err)	// try to allocate anywhere
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);

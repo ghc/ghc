@@ -905,7 +905,7 @@ What does M export?  AvailTC F [FInt]
 The former is strictly right because F isn't defined in this module.
 But then you can never do an explicit import of M, thus
     import M( F( FInt ) )
-becuase F isn't exported by M.  Nor can you import FInt alone from here
+because F isn't exported by M.  Nor can you import FInt alone from here
     import M( FInt )
 because we don't have syntax to support that.  (It looks like an import of 
 the type FInt.)
@@ -1334,7 +1334,7 @@ each import declaration, what stuff brought into scope by that
 declaration is actually used in the module.
 
 The SrcLoc is the location of the END of a particular 'import'
-declaration.  Why *END*?  Becuase we don't want to get confused
+declaration.  Why *END*?  Because we don't want to get confused
 by the implicit Prelude import. Consider (Trac #7476) the module
     import Foo( foo )
     main = print foo

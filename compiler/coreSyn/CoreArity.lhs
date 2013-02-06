@@ -202,7 +202,7 @@ slightly more complicated, does) turn into
 
    blah = op (\eta. ($dfList dCInt |> sym co) eta)
 
-and now it is *much* harder for the op/$dfList rule to fire, becuase
+and now it is *much* harder for the op/$dfList rule to fire, because
 exprIsConApp_maybe won't hold of the argument to op.  I considered
 trying to *make* it hold, but it's tricky and I gave up.
 

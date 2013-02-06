@@ -103,6 +103,31 @@ data MachOp
   | MO_SS_Conv Width Width      -- Signed int -> Signed int
   | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
   | MO_FF_Conv Width Width      -- Float -> Float
+
+  -- Vector element insertion and extraction operations
+  | MO_V_Insert  Length Width   -- Insert scalar into vector
+  | MO_V_Extract Length Width   -- Extract scalar from vector
+  
+  -- Integer vector operations
+  | MO_V_Add Length Width  
+  | MO_V_Sub Length Width  
+  | MO_V_Mul Length Width
+
+  -- Signed vector multiply/divide
+  | MO_VS_Quot Length Width
+  | MO_VS_Rem  Length Width
+  | MO_VS_Neg  Length Width
+
+  -- Floting point vector element insertion and extraction operations
+  | MO_VF_Insert  Length Width   -- Insert scalar into vector
+  | MO_VF_Extract Length Width   -- Extract scalar from vector
+
+  -- Floating point vector operations
+  | MO_VF_Add  Length Width  
+  | MO_VF_Sub  Length Width  
+  | MO_VF_Neg  Length Width             -- unary -
+  | MO_VF_Mul  Length Width
+  | MO_VF_Quot Length Width
   deriving (Eq, Show)
 
 pprMachOp :: MachOp -> SDoc
@@ -338,6 +363,26 @@ machOpResultType dflags mop tys =
     MO_FS_Conv _ to     -> cmmBits to
     MO_SF_Conv _ to     -> cmmFloat to
     MO_FF_Conv _ to     -> cmmFloat to
+
+    MO_V_Insert  l w    -> cmmVec l (cmmBits w)
+    MO_V_Extract _ w    -> cmmBits w
+
+    MO_V_Add l w        -> cmmVec l (cmmBits w)
+    MO_V_Sub l w        -> cmmVec l (cmmBits w)
+    MO_V_Mul l w        -> cmmVec l (cmmBits w)
+
+    MO_VS_Quot l w      -> cmmVec l (cmmBits w)
+    MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
+
+    MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
+    MO_VF_Extract _ w   -> cmmFloat w
+
+    MO_VF_Add  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Sub  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
   where
     (ty1:_) = tys
 
@@ -405,6 +450,26 @@ machOpArgReps dflags op =
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]
 
+    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth dflags]
+    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth dflags]
+
+    MO_V_Add _ r        -> [r,r]
+    MO_V_Sub _ r        -> [r,r]
+    MO_V_Mul _ r        -> [r,r]
+
+    MO_VS_Quot _ r      -> [r,r]
+    MO_VS_Rem  _ r      -> [r,r]
+    MO_VS_Neg  _ r      -> [r]
+
+    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
+    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+
+    MO_VF_Add  _ r      -> [r,r]
+    MO_VF_Sub  _ r      -> [r,r]
+    MO_VF_Mul  _ r      -> [r,r]
+    MO_VF_Quot _ r      -> [r,r]
+    MO_VF_Neg  _ r      -> [r]
+
 -----------------------------------------------------------------------------
 -- CallishMachOp
 -----------------------------------------------------------------------------
@@ -451,6 +516,10 @@ data CallishMachOp
 
   | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)
+
+  -- Prefetch
+  | MO_Prefetch_Data -- Prefetch hint. May change program performance but not
+                     -- program behavior.
 
   -- Note that these three MachOps all take 1 extra parameter than the
   -- standard C lib versions. The extra (last) parameter contains

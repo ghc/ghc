@@ -119,6 +119,7 @@ hash_block block =
         hash_lit :: CmmLit -> Word32
         hash_lit (CmmInt i _) = fromInteger i
         hash_lit (CmmFloat r _) = truncate r
+        hash_lit (CmmVec ls) = hash_list hash_lit ls
         hash_lit (CmmLabel _) = 119 -- ugh
         hash_lit (CmmLabelOff _ i) = cvt $ 199 + i
         hash_lit (CmmLabelDiffOff _ _ i) = cvt $ 299 + i

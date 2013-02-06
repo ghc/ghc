@@ -21,6 +21,7 @@ import HsBinds
 import TcEvidence
 import CoreSyn
 import Var
+import RdrName
 import Name
 import BasicTypes
 import DataCon
@@ -309,7 +310,7 @@ data HsExpr id
 
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
-  |  HsHole
+  |  HsUnboundVar RdrName
   deriving (Data, Typeable)
 
 -- HsTupArg is used for tuple sections
@@ -575,8 +576,8 @@ ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> ptext (sLit "|)"))
-ppr_expr HsHole
-  = ptext $ sLit "_"
+ppr_expr (HsUnboundVar nm)
+  = ppr nm
 
 \end{code}
 
@@ -612,7 +613,7 @@ hsExprNeedsParens (PArrSeq {})        = False
 hsExprNeedsParens (HsLit {})          = False
 hsExprNeedsParens (HsOverLit {})      = False
 hsExprNeedsParens (HsVar {})          = False
-hsExprNeedsParens (HsHole {})         = False
+hsExprNeedsParens (HsUnboundVar {})   = False
 hsExprNeedsParens (HsIPVar {})        = False
 hsExprNeedsParens (ExplicitTuple {})  = False
 hsExprNeedsParens (ExplicitList {})   = False
@@ -631,7 +632,7 @@ isAtomicHsExpr (HsVar {})     = True
 isAtomicHsExpr (HsLit {})     = True
 isAtomicHsExpr (HsOverLit {}) = True
 isAtomicHsExpr (HsIPVar {})   = True
-isAtomicHsExpr (HsHole {})    = True
+isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr _              = False

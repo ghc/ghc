@@ -662,8 +662,8 @@ It's true that this *is* a more specialised type, but the rule
 we get is something like this:
 	f_spec d = f
 	RULE: f = f_spec d
-Note that the rule is bogus, becuase it mentions a 'd' that is
-not bound on the LHS!  But it's a silly specialisation anyway, becuase
+Note that the rule is bogus, because it mentions a 'd' that is
+not bound on the LHS!  But it's a silly specialisation anyway, because
 the constraint is unused.  We could bind 'd' to (error "unused")
 but it seems better to reject the program because it's almost certainly
 a mistake.  That's what the isDeadBinder call detects.

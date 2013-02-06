@@ -207,19 +207,6 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-# Testing ARM ABI
-# required for code generation (LLVM options)
-ARM_ABI=SOFT
-
-case $target in
-     arm*-*-linux-gnueabihf | arm*-linux-gnueabihf)
-     ARM_ABI=HARD
-     ;;
-     arm*-*-linux-gnueabi | arm*-linux-gnueabi)
-     ARM_ABI=SOFTFP
-     ;;
-esac
-
 FPTOOLS_SET_PLATFORM_VARS
 
 # Verify that the installed (bootstrap) GHC is capable of generating
@@ -483,12 +470,6 @@ TargetPlatformFull="${target}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-AC_ARG_WITH([alien],
-[AC_HELP_STRING([--with-alien=ARG],
-  [Supply script for running target binaries locally when cross-compiling])],
-  [AlienScript="$withval"],
-  [AlienScript=""])
-AC_SUBST(AlienScript)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
@@ -1006,7 +987,6 @@ echo ["\
    Using GCC                 : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-   Alien script              : $AlienScript
 
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)

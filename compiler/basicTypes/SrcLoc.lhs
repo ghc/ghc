@@ -257,7 +257,7 @@ data RealSrcSpan
           srcSpanLine     :: {-# UNPACK #-} !Int,
           srcSpanCol      :: {-# UNPACK #-} !Int
         }
-  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
+  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, because we
                                 -- derive Show for Token
 
 data SrcSpan =
@@ -265,7 +265,7 @@ data SrcSpan =
   | UnhelpfulSpan !FastString   -- Just a general indication
                                 -- also used to indicate an empty span
 
-  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
+  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, because we
                                 -- derive Show for Token
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty

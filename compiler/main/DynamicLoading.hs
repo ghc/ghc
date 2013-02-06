@@ -35,7 +35,7 @@ import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
 import Module           ( Module, ModuleName )
-import Panic            ( GhcException(..), throwGhcException )
+import Panic
 import FastString
 import ErrUtils
 import Outputable
@@ -165,5 +165,5 @@ throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
 throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags
 
 throwCmdLineError :: String -> IO a
-throwCmdLineError = throwGhcException . CmdLineError
+throwCmdLineError = throwGhcExceptionIO . CmdLineError
 #endif

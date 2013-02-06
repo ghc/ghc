@@ -107,7 +107,6 @@ module CLabel (
 import IdInfo
 import BasicTypes
 import Packages
-import DataCon
 import Module
 import Name
 import Unique

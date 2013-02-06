@@ -109,7 +109,7 @@ namely:
 
 This is not (currently) where deep skolemisation occurs;
 matchExpectedFunTys does not skolmise nested foralls in the 
-expected type, becuase it expects that to have been done already
+expected type, because it expects that to have been done already
 
 
 \begin{code}

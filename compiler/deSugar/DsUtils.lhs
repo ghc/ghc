@@ -291,7 +291,7 @@ mkCoAlgCaseMatchResult dflags var ty match_alts
   = MatchResult fail_flag mk_case
   where
     tycon = dataConTyCon con1
-	-- [Interesting: becuase of GADTs, we can't rely on the type of 
+	-- [Interesting: because of GADTs, we can't rely on the type of 
 	--  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
 	-- Stuff for newtype

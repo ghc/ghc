@@ -42,7 +42,8 @@ module TyCon(
         promotableTyCon_maybe, promoteTyCon,
 
         isInjectiveTyCon,
-        isDataTyCon, isProductTyCon, isEnumerationTyCon,
+        isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
+        isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
@@ -78,9 +79,9 @@ module TyCon(
         pprPromotionQuote,
 
         -- * Primitive representations of Types
-        PrimRep(..),
+        PrimRep(..), PrimElemRep(..),
         tyConPrimRep,
-        primRepSizeW
+        primRepSizeW, primElemRepSizeB
 ) where
 
 #include "HsVersions.h"
@@ -783,22 +784,52 @@ data PrimRep
   | AddrRep             -- ^ A pointer, but /not/ to a Haskell value (use 'PtrRep')
   | FloatRep
   | DoubleRep
+  | VecRep Int PrimElemRep  -- ^ A vector
   deriving( Eq, Show )
+
+data PrimElemRep
+  = Int8ElemRep
+  | Int16ElemRep
+  | Int32ElemRep
+  | Int64ElemRep
+  | Word8ElemRep
+  | Word16ElemRep
+  | Word32ElemRep
+  | Word64ElemRep
+  | FloatElemRep
+  | DoubleElemRep
+   deriving( Eq, Show )
 
 instance Outputable PrimRep where
   ppr r = text (show r)
 
+instance Outputable PrimElemRep where
+  ppr r = text (show r)
+
 -- | Find the size of a 'PrimRep', in words
 primRepSizeW :: DynFlags -> PrimRep -> Int
-primRepSizeW _      IntRep   = 1
-primRepSizeW _      WordRep  = 1
-primRepSizeW dflags Int64Rep = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW dflags Word64Rep= wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW _      FloatRep = 1    -- NB. might not take a full word
-primRepSizeW dflags DoubleRep= dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-primRepSizeW _      AddrRep  = 1
-primRepSizeW _      PtrRep   = 1
-primRepSizeW _      VoidRep  = 0
+primRepSizeW _      IntRep           = 1
+primRepSizeW _      WordRep          = 1
+primRepSizeW dflags Int64Rep         = wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
+primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
+primRepSizeW _      AddrRep          = 1
+primRepSizeW _      PtrRep           = 1
+primRepSizeW _      VoidRep          = 0
+primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
+
+primElemRepSizeB :: PrimElemRep -> Int
+primElemRepSizeB Int8ElemRep   = 1
+primElemRepSizeB Int16ElemRep  = 2
+primElemRepSizeB Int32ElemRep  = 4
+primElemRepSizeB Int64ElemRep  = 8
+primElemRepSizeB Word8ElemRep  = 1
+primElemRepSizeB Word16ElemRep = 2
+primElemRepSizeB Word32ElemRep = 4
+primElemRepSizeB Word64ElemRep = 8
+primElemRepSizeB FloatElemRep  = 4
+primElemRepSizeB DoubleElemRep = 8
 \end{code}
 
 %************************************************************************
@@ -1068,14 +1099,8 @@ unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs,
 unwrapNewTyCon_maybe _     = Nothing
 
 isProductTyCon :: TyCon -> Bool
--- | A /product/ 'TyCon' must both:
---
--- 1. Have /one/ constructor
---
--- 2. /Not/ be existential
---
--- However other than this there are few restrictions: they may be @data@ or @newtype@
--- 'TyCon's of any boxity and may even be recursive.
+-- True of datatypes or newtypes that have
+--   one, vanilla, data constructor
 isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     DataTyCon{ data_cons = [data_con] }
                                                 -> isVanillaDataCon data_con
@@ -1083,6 +1108,18 @@ isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
                                     _           -> False
 isProductTyCon (TupleTyCon {})  = True
 isProductTyCon _                = False
+
+
+isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
+-- True of datatypes (not newtypes) with 
+--   one, vanilla, data constructor
+isDataProductTyCon_maybe (AlgTyCon { algTcRhs = DataTyCon { data_cons = cons } })
+  | [con] <- cons         -- Singleton
+  , isVanillaDataCon con  -- Vanilla
+  = Just con
+isDataProductTyCon_maybe (TupleTyCon { dataCon = con })
+  = Just con
+isDataProductTyCon_maybe _ = Nothing
 
 -- | Is this a 'TyCon' representing a type synonym (@type@)?
 isSynTyCon :: TyCon -> Bool
@@ -1160,7 +1197,7 @@ isTupleTyCon :: TyCon -> Bool
 -- ^ Does this 'TyCon' represent a tuple?
 --
 -- NB: when compiling @Data.Tuple@, the tycons won't reply @True@ to
--- 'isTupleTyCon', becuase they are built as 'AlgTyCons'.  However they
+-- 'isTupleTyCon', because they are built as 'AlgTyCons'.  However they
 -- get spat into the interface file as tuple tycons, so I don't think
 -- it matters.
 isTupleTyCon (TupleTyCon {}) = True

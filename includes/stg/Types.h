@@ -83,6 +83,8 @@ typedef unsigned long long int StgWord64;
 #error cannot find a way to define StgInt64
 #endif
 
+typedef struct { StgWord64 h; StgWord64 l; } StgWord128;
+
 /*
  * Define the standard word size we'll use on this machine: make it
  * big enough to hold a pointer.

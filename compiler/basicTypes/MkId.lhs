@@ -291,7 +291,7 @@ mkDictSelId dflags no_unf name clas
 	                                else mkImplicitUnfolding dflags rhs)
 		   -- In module where class op is defined, we must add
 		   -- the unfolding, even though it'll never be inlined
-		   -- becuase we use that to generate a top-level binding
+		   -- because we use that to generate a top-level binding
 		   -- for the ClassOp
 
     info | new_tycon = base_info `setInlinePragInfo` alwaysInlinePragma
@@ -425,16 +425,17 @@ mkDataConWorkId wkr_name data_con
 
 dataConCPR :: DataCon -> DmdResult
 dataConCPR con
-  | isProductTyCon tycon
-  , isDataTyCon tycon
+  | isDataTyCon tycon     -- Real data types only; that is, 
+                          -- not unboxed tuples or newtypes
+  , isVanillaDataCon con  -- No existentials 
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
-  = cprRes
+  = if is_prod then cprProdRes 
+               else cprSumRes (dataConTag con)
   | otherwise
   = topRes
-        -- RetCPR is only true for products that are real data types;
-        -- that is, not unboxed tuples or [non-recursive] newtypes
   where
+    is_prod = isProductTyCon tycon
     tycon = dataConTyCon con
     wkr_arity = dataConRepArity con
 

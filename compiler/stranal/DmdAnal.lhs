@@ -221,14 +221,14 @@ dmdAnal dflags env dmd (Lam var body)
 dmdAnal dflags env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
-  , isProductTyCon tycon
+  , isProductTyCon tycon 
   , not (isRecursiveTyCon tycon)
   = let
 	env_alt	              = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
 	(alt_ty, alt')	      = dmdAnalAlt dflags env_alt dmd alt
 	(alt_ty1, case_bndr') = annotateBndr alt_ty case_bndr
 	(_, bndrs', _)	      = alt'
-	case_bndr_sig	      = cprSig
+	case_bndr_sig	      = cprProdSig
 		-- Inside the alternative, the case binder has the CPR property.
 		-- Meaning that a case on it will successfully cancel.
 		-- Example:
@@ -621,9 +621,11 @@ mkSigTy top_lvl rec_flag env id rhs (DmdType fv dmds res)
     strict_fv = filterUFM isStrictDmd         fv
 
     ignore_cpr_info = not (exprIsHNF rhs || thunk_cpr_ok)
-    res' = if returnsCPR res && ignore_cpr_info 
-	   then topRes
-           else res 
+    res' | returnsCPR res
+         , not (isTopLevel top_lvl || returnsCPRProd res) 
+                -- See Note [CPR for sum types ]
+           || ignore_cpr_info                             = topRes
+	 | otherwise                                      = res
 
     -- Is it okay or not to assign CPR 
     -- (not okay in the first pass)
@@ -636,6 +638,32 @@ mkSigTy top_lvl rec_flag env id rhs (DmdType fv dmds res)
 	| isStrictDmd (idDemandInfo id) = True
 	| otherwise 		        = False	
 \end{code}
+
+Note [CPR for sum types]
+~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we do not do CPR for let-bindings that
+   * non-top level
+   * bind a sum type
+Reason: I found that in some benchmarks we were losing let-no-escapes,
+which messed it all up.  Example
+   let j = \x. ....
+   in case y of
+        True  -> j False
+        False -> j True
+If we w/w this we get
+   let j' = \x. ....
+   in case y of
+        True -> case j False of { (# a #) -> Just a }
+        True -> case j True of { (# a #) -> Just a }
+Notice that j' is not a let-no-escape any more.
+
+However this means in turn that the *enclosing* function
+may be CPR'd (via the returned Justs).  But in the case of
+sums, there may be Nothing alterantives; and that messes
+up the sum-type CPR.
+
+Conclusion: only do this for products.  It's still not
+guaranteed OK for products, but sums definitely lose sometimes.
 
 Note [CPR for thunks]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -867,13 +895,11 @@ nonVirgin sigs = AE { ae_sigs = sigs, ae_virgin = False }
 extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
 -- Extend the AnalEnv when we meet a lambda binder
 extendSigsWithLam env id
-  | ae_virgin env   -- See Note [Optimistic CPR in the "virgin" case]
-  = extendAnalEnv NotTopLevel env id cprSig
-
-  | isStrictDmd dmd_info  -- Might be bottom, first time round
-  , Just {} <- deepSplitProductType_maybe $ idType id
-  = extendAnalEnv NotTopLevel env id cprSig
+  | isStrictDmd dmd_info || ae_virgin env  
+       -- See Note [Optimistic CPR in the "virgin" case]
        -- See Note [Initial CPR for strict binders]
+  , Just {} <- deepSplitProductType_maybe $ idType id
+  = extendAnalEnv NotTopLevel env id cprProdSig 
 
   | otherwise = env
   where
@@ -882,7 +908,6 @@ extendSigsWithLam env id
 
 Note [Initial CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 CPR is initialized for a lambda binder in an optimistic manner, i.e,
 if the binder is used strictly and at least some of its components as
 a product are used, which is checked by the value of the absence

@@ -436,7 +436,7 @@ substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
 
 \begin{code}
 -- | De-shadowing the program is sometimes a useful pre-pass. It can be done simply
--- by running over the bindings with an empty substitution, becuase substitution
+-- by running over the bindings with an empty substitution, because substitution
 -- returns a result that has no-shadowing guaranteed.
 --
 -- (Actually, within a single /type/ there might still be shadowing, because 
@@ -750,12 +750,11 @@ substVects subst = map (substVect subst)
 
 ------------------
 substVect :: Subst -> CoreVect -> CoreVect
-substVect _subst (Vect   v Nothing)    = Vect v Nothing
-substVect subst  (Vect   v (Just rhs)) = Vect v (Just (simpleOptExprWith subst rhs))
-substVect _subst vd@(NoVect _)         = vd
-substVect _subst vd@(VectType _ _ _)   = vd
-substVect _subst vd@(VectClass _)      = vd
-substVect _subst vd@(VectInst _)       = vd
+substVect subst  (Vect v rhs)        = Vect v (simpleOptExprWith subst rhs)
+substVect _subst vd@(NoVect _)       = vd
+substVect _subst vd@(VectType _ _ _) = vd
+substVect _subst vd@(VectClass _)    = vd
+substVect _subst vd@(VectInst _)     = vd
 
 ------------------
 substVarSet :: Subst -> VarSet -> VarSet
@@ -868,7 +867,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- We also inline bindings that bind a Eq# box: see
 -- See Note [Optimise coercion boxes agressively].
 --
--- The result is NOT guaranteed occurence-analysed, becuase
+-- The result is NOT guaranteed occurence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
 
@@ -901,7 +900,7 @@ simpleOptPgm dflags this_mod binds rules vects
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
     occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
-                                       rules vects binds
+                                       rules vects emptyVarEnv binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        
     do_one (subst, binds') bind 

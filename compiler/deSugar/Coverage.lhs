@@ -576,7 +576,7 @@ addTickHsExpr (HsWrap w e) =
                 (addTickHsExpr e)       -- explicitly no tick on inside
 
 addTickHsExpr e@(HsType _) = return e
-addTickHsExpr HsHole = panic "addTickHsExpr.HsHole"
+addTickHsExpr (HsUnboundVar {}) = panic "addTickHsExpr.HsUnboundVar"
 
 -- Others dhould never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
