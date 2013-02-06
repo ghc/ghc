@@ -896,7 +896,7 @@ checkTauTvUpdate dflags tv ty
 
     defer_me :: TcType -> Bool
     -- Checks for (a) occurrence of tv
-    --            (b) type family applicatios
+    --            (b) type family applications
     -- See Note [Conservative unification check]
     defer_me (LitTy {})        = False
     defer_me (TyVarTy tv')     = tv == tv'
