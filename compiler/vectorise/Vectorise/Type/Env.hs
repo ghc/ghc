@@ -317,8 +317,6 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
                 , fam_insts, binds)
        }
   where
-    fst3 (a, _, _) = a
-    
     addParallelTyConAndCons tycon
       = do
         { addGlobalParallelTyCon tycon

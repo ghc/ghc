@@ -49,9 +49,6 @@ import MonadUtils
 import Control.Monad
 import Data.Maybe
 import Data.List
-import TcRnMonad (goptM)
-import DynFlags
-import Util
 
 
 -- Main entry point to vectorise expressions -----------------------------------
