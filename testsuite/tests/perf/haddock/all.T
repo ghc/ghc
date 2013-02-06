@@ -8,8 +8,7 @@ test('haddock.base',
                                         # 2012-11-12: 249 (amd64/Linux)
                                         # 2013-01-29: 274 (amd64/Linux)
      ,if_wordsize(32,
-          stats_num_field('peak_megabytes_allocated', 110,
-                                                      115))
+          stats_range_field('peak_megabytes_allocated', 113, 1))
                                         # 2012-08-14: 144 (x86/OSX)
                                         # 2012-10-30: 113 (x86/Windows)
      ,if_wordsize(64,
@@ -45,8 +44,7 @@ test('haddock.Cabal',
                              # 2012-09-20: 227 (amd64/Linux)
                              # 2012-10-08: 217 (amd64/Linux)
      ,if_wordsize(32,
-          stats_num_field('peak_megabytes_allocated', 80,
-                                                      85))
+          stats_range_field('peak_megabytes_allocated', 83, 1))
                                         # 2012-08-14: 116 (x86/OSX)
                                         # 2012-10-30: 83 (x86/Windows)
      ,if_wordsize(64,
@@ -81,8 +79,7 @@ test('haddock.compiler',
                                         # 2012-09-20: 1228 (amd64/Linux)
                                         # 2012-10-08: 1240 (amd64/Linux)
      ,if_wordsize(32,
-          stats_num_field('peak_megabytes_allocated', 600,
-                                                      610))
+          stats_range_field('peak_megabytes_allocated', 606, 1))
                                         # 2012-08-14: 631 (x86/OSX)
                                         # 2012-10-30: 606 (x86/Windows)
      ,if_wordsize(64,

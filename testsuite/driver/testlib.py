@@ -15,7 +15,7 @@ import traceback
 import copy
 import glob
 import types
-import math
+from math import ceil, trunc
 
 have_subprocess = False
 try:
@@ -257,24 +257,6 @@ def extra_clean( files ):
 
 def _extra_clean( opts, v ):
     opts.clean_files = v
-
-# -----
-
-def stats_num_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _stats_num_field(opts, f, x, y);
-
-def _stats_num_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.stats_num_fields = opts.stats_num_fields.copy()
-    opts.stats_num_fields[f] = (x, y)
-
-def compiler_stats_num_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _compiler_stats_num_field(opts, f, x, y);
-
-def _compiler_stats_num_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.compiler_stats_num_fields = opts.compiler_stats_num_fields.copy()
-    opts.compiler_stats_num_fields[f] = (x, y)
 
 # -----
 
@@ -1121,15 +1103,14 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return checkStats(stats_file, opts.stats_range_fields
-                                , opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, range_fields, num_fields):
+def checkStats(stats_file, range_fields):
     result = passed()
-    if len(num_fields) + len(range_fields) > 0:
+    if len(range_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
@@ -1141,8 +1122,8 @@ def checkStats(stats_file, range_fields, num_fields):
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
-            min = expected * ((100 - float(dev))/100);
-            max = expected * ((100 + float(dev))/100);
+            min = trunc(           expected * ((100 - float(dev))/100));
+            max = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
 
             if val < min:
                 print field, val, 'is more than ' + repr(dev) + '%'
@@ -1152,23 +1133,6 @@ def checkStats(stats_file, range_fields, num_fields):
                 result = failBecause('stat too good')
             if val > max:
                 print field, val, 'is more than ' + repr(dev) + '% greater than the expected value,', expected, max
-                result = failBecause('stat not good enough')
-
-        # ToDo: remove all uses of this, and delete it
-        for (field, (min, max)) in num_fields.items():
-            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
-            if m == None:
-                print 'Failed to find field: ', field
-                result = failBecause('no such stats field')
-            val = int(m.group(1))
-
-            if val < min:
-                print field, val, 'is less than minimum allowed', min
-                print 'If this is because you have improved GHC, please'
-                print 'update the test so that GHC doesn\'t regress again'
-                result = failBecause('stat too good')
-            if val > max:
-                print field, val, 'is more than maximum allowed', max
                 result = failBecause('stat not good enough')
 
     return result
@@ -1221,7 +1185,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if len(opts.compiler_stats_num_fields) + len(opts.compiler_stats_range_fields) > 0:
+    if len(opts.compiler_stats_range_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     # Required by GHC 7.3+, harmless for earlier versions:
@@ -1260,8 +1224,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields
-                                       , opts.compiler_stats_num_fields)
+    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1307,7 +1270,7 @@ def simple_run( name, way, prog, args ):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if len(opts.stats_num_fields) + len(opts.stats_range_fields) > 0:
+    if len(opts.stats_range_fields) > 0:
         args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if opts.no_stdin:
@@ -1361,8 +1324,7 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_range_fields
-                                , opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
     if (way == ''):
@@ -1910,7 +1872,7 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
-    timeout = int(math.ceil(config.timeout * timeout_multiplier))
+    timeout = int(ceil(config.timeout * timeout_multiplier))
 
     if config.timeout_prog != '':
         if config.check_files_written:

@@ -7,21 +7,18 @@ setTestOpts(no_lint)
 
 test('T1969',
      [if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 13,
-                                                               19)),
+          compiler_stats_range_field('peak_megabytes_allocated', 18, 1)),
                              # expected value: 14 (x86/Windows 17/05/10)
                              #                 15 (x86/OS X)
                              #                 19 (x86/OS X)
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 22,
-                                                               28)),
+          compiler_stats_range_field('peak_megabytes_allocated', 25, 1)),
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 34 (amd64/Linux)
                                              # 2012-09-20      23 (amd64/Linux)
                                              # 2012-10-03      25 (amd64/Linux if .hi exists)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 4000000,
-                                                     7000000)),
+          compiler_stats_range_field('max_bytes_used', 6149572, 5)),
                              # expected value: 6707308 (x86/OS X)
                              #                 5717704 (x86/Windows 17/05/10)
                              #                 6149572 (x86/Linux, 31/12/09)
@@ -81,10 +78,9 @@ else:
 
 test('T3294',
      [if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 12000000,
-                                                     20000000)),
+          compiler_stats_range_field('max_bytes_used', 17725476, 5)),
                                    # expected value: 17725476 (x86/OS X)
-				   #                 14593500 (Windows)
+                                   #                 14593500 (Windows)
       if_wordsize(64,
           compiler_stats_range_field('max_bytes_used', 44894544, 15)),
                                    # prev:           25753192 (amd64/Linux)
@@ -122,7 +118,7 @@ test('T4801',
 
       # expected value: 58 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
-          compiler_stats_num_field('peak_megabytes_allocated', 56, 60)),
+          compiler_stats_range_field('peak_megabytes_allocated', 58, 1)),
       # expected value: 228286660 (x86/OS X)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 185669232, 10)),
@@ -135,14 +131,12 @@ test('T4801',
 
       # expected value: 510938976 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
-          compiler_stats_num_field('bytes allocated', 490000000,
-                                                      530000000)),
+          compiler_stats_range_field('bytes allocated', 510938976, 5)),
 
       if_wordsize(32,
+          compiler_stats_range_field('max_bytes_used', 9651948, 5)),
       #                    expected value: x86/OS X:  9651948
-          compiler_stats_num_field('max_bytes_used',  8000000,
-                                                     12000000)),
-      # expected value: 10290952 (windows)
+      #                    expected value:           10290952 (windows)
       if_wordsize(64,
           compiler_stats_range_field('max_bytes_used', 21657520, 15)),
                 # prev:       20486256 (amd64/OS X)
@@ -151,8 +145,7 @@ test('T4801',
                 # 19/10/2012: 18619912 (-fPIC turned off)
                 # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
       if_platform('x86_64-apple-darwin',
-          compiler_stats_num_field('max_bytes_used', 20000000,
-                                                     23000000)),
+          compiler_stats_range_field('max_bytes_used', 21657520, 5)),
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
@@ -163,11 +156,11 @@ test('T3064',
      [# expect_broken( 3064 ),
       # expected value: 14 (x86/Linux 28-06-2012):
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 14, 30)),
+          compiler_stats_range_field('peak_megabytes_allocated', 14, 1)),
 
-      # expected value: 18 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),
+          compiler_stats_range_field('peak_megabytes_allocated', 24, 1)),
+                                    # expected value: 18 (amd64/Linux):
 
       # expected value: 56380288 (x86/Linux) (28/6/2011)
       #                 111189536 (x86/Windows) (30/10/12)
@@ -177,8 +170,7 @@ test('T3064',
 
       # expected value: 73259544 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 200000000,
-                                                      280000000)),
+          compiler_stats_range_field('bytes allocated', 240000000, 5)),
 
       # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
@@ -186,8 +178,7 @@ test('T3064',
 
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 8000000,
-                                                     14000000)),
+          compiler_stats_range_field('max_bytes_used', 11000000, 5)),
        only_ways(['normal'])
       ],
      compile,
@@ -221,8 +212,7 @@ test('T5631',
           compiler_stats_range_field('bytes allocated', 392904228, 10)),
       # expected value: 774,595,008 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 600000000,
-                                                      900000000)),
+          compiler_stats_range_field('bytes allocated', 774595008, 5)),
        only_ways(['normal'])
       ],
      compile,
@@ -234,8 +224,7 @@ test('parsing001',
           compiler_stats_range_field('bytes allocated', 274000576, 10)),
       # expected value: 587079016 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 540000000,
-                                                      620000000)),
+          compiler_stats_range_field('bytes allocated', 587079016, 5)),
        only_ways(['normal']),
       ],
      compile_fail, [''])

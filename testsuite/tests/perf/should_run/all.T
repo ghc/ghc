@@ -4,11 +4,9 @@
 # because the test allocates an unboxed array of doubles.
 
 test('T3586',
-     [stats_num_field('peak_megabytes_allocated', 17,
-                                                  18),
+     [stats_range_field('peak_megabytes_allocated', 17, 1),
                                      # expected value: 17 (amd64/Linux)
-      stats_num_field('bytes allocated', 16000000,
-                                         17000000),
+      stats_range_field('bytes allocated', 16835544, 5),
                                      # expected value: 16835544 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -16,8 +14,7 @@ test('T3586',
      ['-O'])
 
 test('T4830',
-     [stats_num_field('bytes allocated', 60000,
-                                         200000),
+     [stats_range_field('bytes allocated', 127000, 5),
                                      # expected value: 127,000 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -30,11 +27,9 @@ test('T3245', normal, compile_and_run, ['-O'])
 # a bug in hGetBufNonBlocking in 6.13 that triggered this.
 #
 test('lazy-bs-alloc',
-     [stats_num_field('peak_megabytes_allocated', 1,
-                                                  3),
+     [stats_range_field('peak_megabytes_allocated', 2, 1),
                                      # expected value: 2 (amd64/Linux)
-      stats_num_field('bytes allocated', 400000,
-                                         600000),
+      stats_range_field('bytes allocated', 489776, 5),
                                      # expected value: 489776 (amd64/Linux)
       only_ways(['normal']),
       extra_run_opts('../../numeric/should_run/arith011.stdout'),
@@ -60,16 +55,13 @@ test('T3736',
      ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
-      stats_num_field('peak_megabytes_allocated', 1,
-                                                  1),
+      stats_range_field('peak_megabytes_allocated', 1, 0),
                                      # expected value: 1 (amd64/Linux)
-      # expected value: 45648 (x86/Linux):
       if_wordsize(32,
-          stats_num_field('bytes allocated', 40000,
-                                             50000)),
+          stats_range_field('bytes allocated', 45648, 5)),
+                                     # expected value: 45648 (x86/Linux):
       if_wordsize(64,
-          stats_num_field('bytes allocated', 40000,
-                                             60000)),
+          stats_range_field('bytes allocated', 49400, 5)),
                                      # expected value: 49400 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -77,17 +69,14 @@ test('T3738',
      ['-O'])
 
 test('MethSharing',
-     [stats_num_field('peak_megabytes_allocated', 1,
-                                                  1),
+     [stats_range_field('peak_megabytes_allocated', 1, 0),
                                      # expected value: 1 (amd64/Linux)
       # expected value: 2685858140 (x86/OS X):
       if_wordsize(32,
-          stats_num_field('bytes allocated', 300000000,
-                                             400000000)),
+          stats_range_field('bytes allocated', 360940756, 5)),
                                   # expected: 360940756 (x86/Linux)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 600000000,
-                                             700000000)),
+          stats_range_field('bytes allocated', 640067672, 5)),
                                   # expected: 640067672 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -114,11 +103,9 @@ test('T149',
 test('T5113',
      [
       if_wordsize(32,
-          stats_num_field('bytes allocated', 3000000,
-                                             5000000)),
+          stats_range_field('bytes allocated', 4000000, 5)),
       if_wordsize(64,
-          stats_num_field('bytes allocated', 8000000,
-                                             9000000)),
+          stats_range_field('bytes allocated', 8000000, 5)),
       only_ways(['normal']),
       expect_broken(7046)
       ],
@@ -128,11 +115,9 @@ test('T5113',
 
 test('T4978',
      [if_wordsize(32,
-          stats_num_field('bytes allocated',  9000000,
-                                             11000000)),
+          stats_range_field('bytes allocated', 10000000, 5)),
       if_wordsize(64,
-          stats_num_field('bytes allocated',  9000000,
-                                             11000000)),
+          stats_range_field('bytes allocated', 10137680, 5)),
                                      # expected value: 10137680 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -141,12 +126,10 @@ test('T4978',
 
 test('T5205',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 40000,
-                                             50000)),
+          stats_range_field('bytes allocated', 47088, 5)),
                            # expected value: 47088 (x86/Darwin)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 40000,
-                                             60000)),
+          stats_range_field('bytes allocated', 51320, 5)),
                            # expected value: 51320 (amd64/Linux)
       only_ways(['normal', 'optasm'])
       ],
@@ -155,12 +138,10 @@ test('T5205',
 
 test('T5549',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 3000000000,
-                                             8000000000)),
+          stats_range_field('bytes allocated', 3362958676, 5)),
                            # expected value: 3362958676 (Windows)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 5000000000,
-                                             8000000000)),
+          stats_range_field('bytes allocated', 6725846120, 5)),
                            # expected value: 6,725,846,120 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -169,12 +150,10 @@ test('T5549',
 
 test('T4474a',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 1600000000,
-                                             2000000000)),
+          stats_range_field('bytes allocated', 1879095912, 5)),
                            # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
+          stats_range_field('bytes allocated', 3766493912, 5)),
                            # expected value: 3766493912 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -182,12 +161,10 @@ test('T4474a',
      ['-O'])
 test('T4474b',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 1600000000,
-                                             2000000000)),
+          stats_range_field('bytes allocated', 1879095912, 5)),
                            # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
+          stats_range_field('bytes allocated', 3766493912, 5)),
                            # expected value: 3766493912 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -195,12 +172,10 @@ test('T4474b',
      ['-O'])
 test('T4474c',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 1600000000,
-                                             2000000000)),
+          stats_range_field('bytes allocated', 1879095912, 5)),
                            # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
+          stats_range_field('bytes allocated', 3766493912, 5)),
                            # expected value: 3766493912 (amd64/Linux)
       only_ways(['normal'])
       ],
@@ -209,12 +184,10 @@ test('T4474c',
 
 test('T5237',
      [if_wordsize(32,
-          stats_num_field('bytes allocated',  70000,
-                                              90000)),
+          stats_range_field('bytes allocated',  78328, 5)),
                            # expected value: 78328 (i386/Linux)
       if_wordsize(64,
-          stats_num_field('bytes allocated',  90000,
-                                             130000)),
+          stats_range_field('bytes allocated',  110888, 5)),
                            # expected value: 110888 (amd64/Linux)
      only_ways(['normal'])
      ],
@@ -223,8 +196,7 @@ test('T5237',
 
 test('T5536',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 1150000000,
-                                             1250000000)),
+          stats_range_field('bytes allocated', 1246287228, 5)),
                            # expected value: 1246287228 (i386/Linux)
       if_wordsize(64,
           stats_range_field('bytes allocated', 892399040, 5)),
@@ -272,8 +244,7 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',
-     [stats_num_field('max_bytes_used', 50000,
-                                         100000),
+     [stats_range_field('max_bytes_used', 70000, 5),
                                      # expected value: 127,000 (amd64/Linux)
       only_ways(['normal'])
       ],
