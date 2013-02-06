@@ -32,6 +32,7 @@ import MonadUtils (liftIO)
 import Name
 import PrelNames
 import TcRnDriver (tcRnGetInfo)
+import TcType (tcSplitSigmaTy)
 import TyCon
 import TypeRep
 import TysPrim( funTyCon )
@@ -64,13 +65,13 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
               expItemInstances =
                 case mb_info of
                   Just (_, _, instances) ->
+{-
                     let insts = map (first synifyInstHead) $ sortImage (first instHead)
                                 [ (instanceSig i, getName i) | i <- instances ]
-{- FIXME
+-}
                     let insts = map (first synifyInstHead) $ sortImage (first instHead) $
                                 filter (\((_,_,cls,tys),_) -> not $ isInstanceHidden expInfo cls tys)
                                 [ (instanceHead' i, getName i) | i <- instances ]
--}
                     in [ (inst, lookupInstDoc name iface ifaceMap instIfaceMap)
                        | (inst, name) <- insts ]
                   Nothing -> []
@@ -100,14 +101,12 @@ lookupInstDoc name iface ifaceMap instIfaceMap =
 
 
 -- | Like GHC's 'instanceHead' but drops "silent" arguments.
-{- FIXME
 instanceHead' :: ClsInst -> ([TyVar], ThetaType, Class, [Type])
 instanceHead' ispec = (tvs, dropSilentArgs dfun theta, cls, tys)
   where
     dfun = is_dfun ispec
-    (tvs, theta, cls, tys) = instanceHead ispec
--}
-
+    (tvs, cls, tys) = instanceHead ispec
+    (_, theta, _) = tcSplitSigmaTy . idType . is_dfun $ ispec
 
 -- | Drop "silent" arguments. See GHC Note [Silent superclass
 -- arguments].
