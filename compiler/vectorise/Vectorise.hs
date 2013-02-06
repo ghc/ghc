@@ -13,27 +13,23 @@ import Vectorise.Type.Type
 import Vectorise.Convert
 import Vectorise.Utils.Hoisting
 import Vectorise.Exp
-import Vectorise.Vect
 import Vectorise.Env
 import Vectorise.Monad
 
 import HscTypes hiding      ( MonadThings(..) )
 import CoreUnfold           ( mkInlineUnfolding )
-import CoreFVs
 import PprCore
 import CoreSyn
 import CoreMonad            ( CoreM, getHscEnv )
 import Type
 import Id
 import DynFlags
-import BasicTypes           ( isStrongLoopBreaker )
 import Outputable
 import Util                 ( zipLazy )
 import MonadUtils
 import FamInstEnv           ( toBranchedFamInst )
 
 import Control.Monad
-import Data.Maybe
 
 
 -- |Vectorise a single module.
@@ -70,7 +66,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
  = do { dumpOptVt Opt_D_dump_vt_trace "Before vectorisation" $ 
           pprCoreBindings binds
  
-          -- Pick out all 'VECTORISE type' and 'VECTORISE class' pragmas
+          -- Pick out all 'VECTORISE [SCALAR] type' and 'VECTORISE class' pragmas
       ; let ty_vect_decls  = [vd | vd@(VectType _ _ _) <- vect_decls]
             cls_vect_decls = [vd | vd@(VectClass _)    <- vect_decls]
       
@@ -88,8 +84,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
 
           -- Vectorise all the top level bindings and VECTORISE declarations on imported identifiers
           -- NB: Need to vectorise the imported bindings first (local bindings may depend on them).
-      ; let impBinds = [imp_id | Vect     imp_id _ <- vect_decls, isGlobalId imp_id] ++
-                       [imp_id | VectInst imp_id   <- vect_decls, isGlobalId imp_id]
+      ; let impBinds = [(imp_id, expr) | Vect imp_id expr <- vect_decls, isGlobalId imp_id]
       ; binds_imp <- mapM vectImpBind impBinds
       ; binds_top <- mapM vectTopBind binds
 
@@ -102,7 +97,8 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
                       }
       }
 
--- Try to vectorise a top-level binding.  If it doesn't vectorise then return it unharmed.
+-- Try to vectorise a top-level binding.  If it doesn't vectorise, or if it is entirely scalar, then
+-- omit vectorisation of that binding.
 --
 -- For example, for the binding 
 --
@@ -126,129 +122,176 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
 --    lfoo = ...
 -- @ 
 --
--- @vfoo@ is the "vectorised", or scalar, version that does the same as the original
--- function foo, but takes an explicit environment.
+-- @vfoo@ is the "vectorised", or scalar, version that does the same as the original function foo,
+-- but takes an explicit environment.
 --
 -- @lfoo@ is the "lifted" version that works on arrays.
 --
--- @v_foo@ combines both of these into a `Closure` that also contains the
--- environment.
+-- @v_foo@ combines both of these into a `Closure` that also contains the environment.
 --
--- The original binding @foo@ is rewritten to call the vectorised version
--- present in the closure.
+-- The original binding @foo@ is rewritten to call the vectorised version present in the closure.
 --
 -- Vectorisation may be surpressed by annotating a binding with a 'NOVECTORISE' pragma.  If this
 -- pragma is used in a group of mutually recursive bindings, either all or no binding must have
--- the pragma.  If only some bindings are annotated, a fatal error is being raised.
+-- the pragma.  If only some bindings are annotated, a fatal error is being raised. (In the case of
+-- scalar bindings, we only omit vectorisation if all bindings in a group are scalar.)
+--
 -- FIXME: Once we support partial vectorisation, we may be able to vectorise parts of a group, or
 --   we may emit a warning and refrain from vectorising the entire group.
 --
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
-  = unlessNoVectDecl $
-      do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it
-             -- to the vectorisation map.
-         ; (inline, isScalar, expr') <- vectTopRhs [] var expr
-         ; var' <- vectTopBinder var inline expr'
-         ; when isScalar $ 
-             addGlobalScalarVar var
- 
-             -- We replace the original top-level binding by a value projected from the vectorised
-             -- closure and add any newly created hoisted top-level bindings.
-         ; cexpr <- tryConvert var var' expr
-         ; hs <- takeHoisted
-         ; return . Rec $ (var, cexpr) : (var', expr') : hs
-         }
-     `orElseErrV`
-     do { emitVt "  Could NOT vectorise top-level binding" $ ppr var
-        ; return b
+  = do
+    { traceVt "= Vectorise non-recursive top-level variable" (ppr var)
+    
+    ; (hasNoVect, vectDecl) <- lookupVectDecl var
+    ; if hasNoVect
+      then do
+      {   -- 'NOVECTORISE' pragma => leave this binding as it is
+      ; traceVt "NOVECTORISE" $ ppr var
+      ; return b
+      }
+      else do 
+    { vectRhs <- case vectDecl of
+        Just (_, expr') ->
+            -- 'VECTORISE' pragma => just use the provided vectorised rhs
+          do
+          { traceVt "VECTORISE" $ ppr var
+          ; addGlobalParallelVar var
+          ; return $ Just (False, inlineMe, expr')
+          }
+        Nothing         ->
+            -- no pragma => standard vectorisation of rhs
+          do
+          { traceVt "[Vanilla]" $ ppr var <+> char '=' <+> ppr expr
+          ; vectTopExpr var expr
+          }
+    ; hs <- takeHoisted -- make sure we clean those out (even if we skip)
+    ; case vectRhs of 
+      { Nothing ->
+          -- scalar binding => leave this binding as it is
+          do 
+          { traceVt "scalar binding [skip]" $ ppr var
+          ; return b
+          }
+      ; Just (parBind, inline, expr') -> do 
+    {
+       -- vanilla case => create an appropriate top-level binding & add it to the vectorisation map
+    ; when parBind $ 
+        addGlobalParallelVar var
+    ; var' <- vectTopBinder var inline expr'
+
+        -- We replace the original top-level binding by a value projected from the vectorised
+        -- closure and add any newly created hoisted top-level bindings.
+    ; cexpr <- tryConvert var var' expr
+    ; return . Rec $ (var, cexpr) : (var', expr') : hs
+    } } } }
+    `orElseErrV`
+    do 
+    { emitVt "  Could NOT vectorise top-level binding" $ ppr var
+    ; return b
+    }
+vectTopBind b@(Rec binds)
+  = do
+    { traceVt "= Vectorise recursive top-level variables" $ ppr vars
+    
+    ; vectDecls <- mapM lookupVectDecl vars
+    ; let hasNoVects = map fst vectDecls
+    ; if and hasNoVects 
+      then do
+      {   -- 'NOVECTORISE' pragmas => leave this entire binding group as it is
+      ; traceVt "NOVECTORISE" $ ppr vars
+      ; return b
+      }
+      else do 
+    { if or hasNoVects
+      then do
+        {   -- Inconsistent 'NOVECTORISE' pragmas => bail out
+        ; dflags <- getDynFlags
+        ; cantVectorise dflags noVectoriseErr (ppr b)
         }
-  where
-    unlessNoVectDecl vectorise
-      = do { hasNoVectDecl <- noVectDecl var
-           ; when hasNoVectDecl $
-               traceVt "NOVECTORISE" $ ppr var
-           ; if hasNoVectDecl then return b else vectorise
-           }
-vectTopBind b@(Rec bs)
-  = unlessSomeNoVectDecl $
-      do { (vars', _, exprs', hs) <- fixV $ 
-             \ ~(_, inlines, rhss, _) ->
-               do {   -- Vectorise the right-hand sides, create an appropriate top-level bindings
-                      -- and add them to the vectorisation map.
-                  ; vars' <- sequence [vectTopBinder var inline rhs
-                                      | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
-                  ; (inlines, areScalars, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
-                  ; hs <- takeHoisted
-                  ; if and areScalars
-                    then      -- (1) Entire recursive group is scalar
-                              --      => add all variables to the global set of scalars
-                         do { mapM_ addGlobalScalarVar vars
-                            ; return (vars', inlines, exprs', hs)
-                            }
-                    else      -- (2) At least one binding is not scalar
-                              --     => vectorise again with empty set of local scalars
-                         do { (inlines, _, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
-                            ; hs <- takeHoisted
-                            ; return (vars', inlines, exprs', hs)
-                            }
-                  }
-                       
-             -- Replace the original top-level bindings by a values projected from the vectorised
-             -- closures and add any newly created hoisted top-level bindings to the group.
-         ; cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
-         ; return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
-         }
-     `orElseErrV`
-       return b    
-  where
-    (vars, exprs) = unzip bs
+      else do 
+    { traceVt "[Vanilla]" $ vcat [ppr var <+> char '=' <+> ppr expr | (var, expr) <- binds]
+    
+       -- For all bindings *with* a pragma, just use the pragma-supplied vectorised expression
+    ; newBindsWPragma  <- concat <$>
+                          sequence [ vectTopBindAndConvert bind inlineMe expr'
+                                   | (bind, (_, Just (_, expr'))) <- zip binds vectDecls]
 
-    unlessSomeNoVectDecl vectorise
-      = do { hasNoVectDecls <- mapM noVectDecl vars
-           ; when (and hasNoVectDecls) $
-               traceVt "NOVECTORISE" $ ppr vars
-           ; if and hasNoVectDecls 
-             then return b                              -- all bindings have 'NOVECTORISE'
-             else if or hasNoVectDecls 
-             then do dflags <- getDynFlags
-                     cantVectorise dflags noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
-             else vectorise                             -- no binding has a 'NOVECTORISE' decl
-           }
+        -- Standard vectorisation of all rhses that are *without* a pragma.
+        -- NB: The reason for 'fixV' is rather subtle: 'vectTopBindAndConvert' adds entries for
+        --     the bound variables in the recursive group to the vectorisation map, which in turn
+        --     are needed by 'vectPolyExprs' (unless it returns 'Nothing').
+    ; let bindsWOPragma = [bind | (bind, (_, Nothing)) <- zip binds vectDecls]
+    ; (newBinds, _) <- fixV $
+        \ ~(_, exprs') ->
+          do
+          {   -- Create appropriate top-level bindings, enter them into the vectorisation map, and
+              -- vectorise the right-hand sides
+          ; newBindsWOPragma <- concat <$>
+                                sequence [vectTopBindAndConvert bind inline expr 
+                                         | (bind, ~(inline, expr)) <- zipLazy bindsWOPragma exprs']
+                                         -- irrefutable pattern and 'zipLazy' to tie the knot;
+                                         -- hence, can't use 'zipWithM'
+          ; vectRhses <- vectTopExprs bindsWOPragma
+          ; hs <- takeHoisted -- make sure we clean those out (even if we skip)
+
+          ; case vectRhses of
+              Nothing ->
+                -- scalar bindings => skip all bindings except those with pragmas and retract the
+                --   entries into the vectorisation map for the scalar bindings
+                do 
+                { traceVt "scalar bindings [skip]" $ ppr vars
+                ; mapM_ (undefGlobalVar . fst) bindsWOPragma
+                ; return (bindsWOPragma ++ newBindsWPragma, exprs')
+                }
+              Just (parBind, exprs') -> 
+                -- vanilla case => record parallel variables and return the final bindings
+                do
+                { when parBind $ 
+                    mapM_ addGlobalParallelVar vars
+                ; return (newBindsWOPragma ++ newBindsWPragma ++ hs, exprs')                  
+                }
+          }
+    ; return $ Rec newBinds
+    } } }
+    `orElseErrV`
+    do 
+    { emitVt "  Could NOT vectorise top-level bindings" $ ppr vars
+    ; return b
+    }
+  where
+    vars = map fst binds
     noVectoriseErr = "NOVECTORISE must be used on all or no bindings of a recursive group"
+    
+    -- Replace the original top-level bindings by a values projected from the vectorised
+    -- closures and add any newly created hoisted top-level bindings to the group.
+    vectTopBindAndConvert (var, expr) inline expr'
+      = do
+        { var'  <- vectTopBinder var inline expr'
+        ; cexpr <- tryConvert var var' expr
+        ; return [(var, cexpr), (var', expr')]
+        }
 
--- Add a vectorised binding to an imported top-level variable that has a VECTORISE [SCALAR] pragma
+-- Add a vectorised binding to an imported top-level variable that has a VECTORISE pragma
 -- in this module.
 --
--- RESTIRCTION: Currently, we cannot use the pragma vor mutually recursive definitions.
+-- RESTIRCTION: Currently, we cannot use the pragma for mutually recursive definitions.
 --
-vectImpBind :: Id -> VM CoreBind
-vectImpBind var
-  = do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it
-           -- to the vectorisation map.  For the non-lifted version, we refer to the original
-           -- definition — i.e., 'Var var'.
-           -- NB: To support recursive definitions, we tie a lazy knot.
-       ; (var', _, expr') <- fixV $
-           \ ~(_, inline, rhs) ->
-             do { var' <- vectTopBinder var inline rhs
-                ; (inline, isScalar, expr') <- vectTopRhs [] var (Var var)
+vectImpBind :: (Id, CoreExpr) -> VM CoreBind
+vectImpBind (var, expr)
+  = do 
+    { traceVt "= Add vectorised binding to imported variable" (ppr var)
 
-                ; when isScalar $ 
-                    addGlobalScalarVar var
-                ; return (var', inline, expr')
-                }
-
-           -- We add any newly created hoisted top-level bindings.
-       ; hs <- takeHoisted
-       ; return . Rec $ (var', expr') : hs
-       }
-
--- | Make the vectorised version of this top level binder, and add the mapping
---   between it and the original to the state. For some binder @foo@ the vectorised
---   version is @$v_foo@
+    ; var' <- vectTopBinder var inlineMe expr
+    ; return $ NonRec var' expr
+    }
+ 
+-- |Make the vectorised version of this top level binder, and add the mapping between it and the
+-- original to the state. For some binder @foo@ the vectorised version is @$v_foo@
 --
---   NOTE: 'vectTopBinder' *MUST* be lazy in inline and expr because of how it is
---   used inside of 'fixV' in 'vectTopBind'.
+-- NOTE: 'vectTopBinder' *MUST* be lazy in inline and expr because of how it is used inside of
+--       'fixV' in 'vectTopBind'.
 --
 vectTopBinder :: Var      -- ^ Name of the binding.
               -> Inline   -- ^ Whether it should be inlined, used to annotate it.
@@ -258,20 +301,20 @@ vectTopBinder var inline expr
  = do {   -- Vectorise the type attached to the var.
       ; vty  <- vectType (idType var)
       
-          -- If there is a vectorisation declartion for this binding, make sure that its type
-          -- matches
-      ; vectDecl <- lookupVectDecl var
+          -- If there is a vectorisation declartion for this binding, make sure its type matches
+      ; (_, vectDecl) <- lookupVectDecl var
       ; case vectDecl of
           Nothing             -> return ()
           Just (vdty, _) 
             | eqType vty vdty -> return ()
             | otherwise       -> 
-              do dflags <- getDynFlags
-                 cantVectorise dflags ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
-                   (text "Expected type" <+> ppr vty)
-                   $$
-                   (text "Inferred type" <+> ppr vdty)
-
+              do 
+              { dflags <- getDynFlags
+              ; cantVectorise dflags ("Type mismatch in vectorisation pragma for " ++ showPpr dflags var) $
+                  (text "Expected type" <+> ppr vty)
+                  $$
+                  (text "Inferred type" <+> ppr vdty)
+              }
           -- Make the vectorised version of binding's name, and set the unfolding used for inlining
       ; var' <- liftM (`setIdUnfoldingLazily` unfolding) 
                 $  mkVectId var vty
@@ -298,113 +341,17 @@ vectTopBinder var inline expr
                      `setInlinePragma` dfunInlinePragma
  -}
 
--- | Vectorise the RHS of a top-level binding, in an empty local environment.
+-- |Project out the vectorised version of a binding from some closure, or return the original body
+-- if that doesn't work.
 --
--- We need to distinguish four cases:
---
--- (1) We have a (non-scalar) vectorisation declaration for the variable (which explicitly provides
---     vectorised code implemented by the user)
---     => no automatic vectorisation & instead use the user-supplied code
--- 
--- (2) We have a scalar vectorisation declaration for a variable that is no dfun
---     => generate vectorised code that uses a scalar 'map'/'zipWith' to lift the computation
--- 
--- (3) We have a scalar vectorisation declaration for a variable that *is* a dfun
---     => generate vectorised code according to the the "Note [Scalar dfuns]" below
--- 
--- (4) There is no vectorisation declaration for the variable
---     => perform automatic vectorisation of the RHS (the definition may or may not be a dfun;
---        vectorisation proceeds differently depending on which it is)
---
--- Note [Scalar dfuns]
--- ~~~~~~~~~~~~~~~~~~~
---
--- Here is the translation scheme for scalar dfuns — assume the instance declaration:
---
---   instance Num Int where
---     (+) = primAdd
---   {-# VECTORISE SCALAR instance Num Int #-}
---
--- It desugars to
---
---   $dNumInt :: Num Int
---   $dNumInt = D:Num primAdd
---
--- We vectorise it to
---
---   $v$dNumInt :: V:Num Int
---   $v$dNumInt = D:V:Num (closure2 ((+) $dNumInt) (scalar_zipWith ((+) $dNumInt))))
---
--- while adding the following entry to the vectorisation map: '$dNumInt' --> '$v$dNumInt'.
---
--- See "Note [Vectorising classes]" in 'Vectorise.Type.Env' for the definition of 'V:Num'.
---
--- NB: The outlined vectorisation scheme does not require the right-hand side of the original dfun.
---     In fact, we definitely want to refer to the dfn variable instead of the right-hand side to 
---     ensure that the dictionary selection rules fire.
---
-vectTopRhs :: [Var]           -- ^ Names of all functions in the rec block
-           -> Var             -- ^ Name of the binding.
-           -> CoreExpr        -- ^ Body of the binding.
-           -> VM ( Inline     -- (1) inline specification for the binding
-                 , Bool       -- (2) whether the right-hand side is a scalar computation
-                 , CoreExpr)  -- (3) the vectorised right-hand side
-vectTopRhs recFs var expr
-  = closedV
-  $ do { globalScalar <- isGlobalScalarVar var
-       ; vectDecl     <- lookupVectDecl var
-       ; dflags       <- getDynFlags
-       ; let isDFun = isDFunId var
-
-       ; traceVt ("vectTopRhs of " ++ showPpr dflags var ++ info globalScalar isDFun vectDecl ++ ":") $
-           ppr expr
-
-       ; rhs globalScalar isDFun vectDecl
-       }
-  where
-    rhs _globalScalar _isDFun (Just (_, expr'))               -- Case (1)
-      = return (inlineMe, False, expr')
-    rhs True          False   Nothing                         -- Case (2)
-      = do { expr' <- vectScalarFun expr
-           ; return (inlineMe, True, vectorised expr')
-           }
-    rhs True          True    Nothing                         -- Case (3)
-      = do { expr' <- vectScalarDFun var
-           ; return (DontInline, True, expr')
-           }
-    rhs False         False   Nothing                         -- Case (4) — not a dfun
-      = do { let exprFvs = freeVars expr
-           ; (inline, isScalar, vexpr) 
-               <- inBind var $
-                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs exprFvs Nothing
-           ; return (inline, isScalar, vectorised vexpr)
-           }
-    rhs False         True    Nothing                         -- Case (4) — is a dfun
-      = do { expr' <- vectDictExpr expr
-           ; return  (DontInline, True, expr')
-           }
-
-    info True  False _                          = " [VECTORISE SCALAR]"
-    info True  True  _                          = " [VECTORISE SCALAR instance]"
-    info False _     vectDecl | isJust vectDecl = " [VECTORISE]"
-                              | otherwise       = " (no pragma)"
-
--- |Project out the vectorised version of a binding from some closure,
--- or return the original body if that doesn't work or the binding is scalar. 
---
-tryConvert :: Var       -- ^ Name of the original binding (eg @foo@)
-           -> Var       -- ^ Name of vectorised version of binding (eg @$vfoo@)
-           -> CoreExpr  -- ^ The original body of the binding.
+tryConvert :: Var       -- ^Name of the original binding (eg @foo@)
+           -> Var       -- ^Name of vectorised version of binding (eg @$vfoo@)
+           -> CoreExpr  -- ^The original body of the binding.
            -> VM CoreExpr
 tryConvert var vect_var rhs
-  = do { globalScalar <- isGlobalScalarVar var
-       ; if globalScalar
-         then
-           return rhs
-         else
-           fromVect (idType var) (Var vect_var) 
-           `orElseErrV` 
-           do { emitVt "  Could NOT call vectorised from original version" $ ppr var
-              ; return rhs
-              }
-       }
+  = fromVect (idType var) (Var vect_var) 
+    `orElseErrV` 
+    do 
+    { emitVt "  Could NOT call vectorised from original version" $ ppr var
+    ; return rhs
+    }
