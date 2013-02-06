@@ -512,9 +512,8 @@ ppr_co p (AppCo co1 co2)       = maybeParen p TyConPrec $
 ppr_co p co@(ForAllCo {})      = ppr_forall_co p co
 ppr_co _ (CoVarCo cv)          = parenSymOcc (getOccName cv) (ppr cv)
 ppr_co p (AxiomInstCo con index cos)
-  = angleBrackets (pprPrefixApp p 
-                    (ppr (getName con) <> brackets (ppr index))
-                    (map (ppr_co TyConPrec) cos))
+  = pprPrefixApp p (ppr (getName con) <> brackets (ppr index))
+                   (map (ppr_co TyConPrec) cos)
 
 ppr_co p co@(TransCo {}) = maybeParen p FunPrec $
                            case trans_co_list co [] of
