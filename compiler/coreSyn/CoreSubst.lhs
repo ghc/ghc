@@ -750,12 +750,11 @@ substVects subst = map (substVect subst)
 
 ------------------
 substVect :: Subst -> CoreVect -> CoreVect
-substVect _subst (Vect   v Nothing)    = Vect v Nothing
-substVect subst  (Vect   v (Just rhs)) = Vect v (Just (simpleOptExprWith subst rhs))
-substVect _subst vd@(NoVect _)         = vd
-substVect _subst vd@(VectType _ _ _)   = vd
-substVect _subst vd@(VectClass _)      = vd
-substVect _subst vd@(VectInst _)       = vd
+substVect subst  (Vect v rhs)        = Vect v (simpleOptExprWith subst rhs)
+substVect _subst vd@(NoVect _)       = vd
+substVect _subst vd@(VectType _ _ _) = vd
+substVect _subst vd@(VectClass _)    = vd
+substVect _subst vd@(VectInst _)     = vd
 
 ------------------
 substVarSet :: Subst -> VarSet -> VarSet
@@ -901,7 +900,7 @@ simpleOptPgm dflags this_mod binds rules vects
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
     occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
-                                       rules vects binds
+                                       rules vects emptyVarEnv binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        
     do_one (subst, binds') bind 

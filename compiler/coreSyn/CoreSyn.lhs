@@ -629,11 +629,11 @@ Representation of desugared vectorisation declarations that are fed to the vecto
 'ModGuts').
 
 \begin{code}
-data CoreVect = Vect      Id   (Maybe CoreExpr)
+data CoreVect = Vect      Id   CoreExpr
               | NoVect    Id
               | VectType  Bool TyCon (Maybe TyCon)
               | VectClass TyCon                     -- class tycon
-              | VectInst  Id                        -- instance dfun (always SCALAR)
+              | VectInst  Id                        -- instance dfun (always SCALAR)  !!!FIXME: should be superfluous now
 \end{code}
 
 

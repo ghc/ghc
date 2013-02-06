@@ -592,8 +592,7 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# DEPRECATED' deprecations '#-}'   { $2 }
         | '{-# WARNING' warnings '#-}'          { $2 }
         | '{-# RULES' rules '#-}'               { $2 }
-        | '{-# VECTORISE_SCALAR' qvar '#-}'     { unitOL $ LL $ VectD (HsVect       $2 Nothing) }
-        | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect       $2 (Just $4)) }
+        | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect       $2 $4) }
         | '{-# NOVECTORISE' qvar '#-}'          { unitOL $ LL $ VectD (HsNoVect     $2) }
         | '{-# VECTORISE' 'type' gtycon '#-}'     
                                                 { unitOL $ LL $ 
@@ -608,8 +607,6 @@ topdecl :: { OrdList (LHsDecl RdrName) }
                                                 { unitOL $ LL $ 
                                                     VectD (HsVectTypeIn True $3 (Just $5)) }
         | '{-# VECTORISE' 'class' gtycon '#-}'  { unitOL $ LL $ VectD (HsVectClassIn $3) }
-        | '{-# VECTORISE_SCALAR' 'instance' type '#-}'     
-                                                { unitOL $ LL $ VectD (HsVectInstIn $3) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 

@@ -430,7 +430,7 @@ the rule is precisly to optimise them:
 dsVect :: LVectDecl Id -> DsM CoreVect
 dsVect (L loc (HsVect (L _ v) rhs))
   = putSrcSpanDs loc $ 
-    do { rhs' <- fmapMaybeM dsLExpr rhs
+    do { rhs' <- dsLExpr rhs
        ; return $ Vect v rhs'
        }
 dsVect (L _loc (HsNoVect (L _ v)))

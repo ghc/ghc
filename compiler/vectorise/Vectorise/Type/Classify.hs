@@ -13,10 +13,12 @@
 -- types.  As '([::])' is being vectorised, any type constructor whose definition involves
 -- '([::])', either directly or indirectly, will be vectorised.
 
-module Vectorise.Type.Classify (
-  classifyTyCons
-) where
+module Vectorise.Type.Classify 
+  ( classifyTyCons
+  ) 
+where
 
+import NameSet
 import UniqSet
 import UniqFM
 import DataCon
@@ -29,33 +31,50 @@ import Digraph
 
 -- |From a list of type constructors, extract those that can be vectorised, returning them in two
 -- sets, where the first result list /must be/ vectorised and the second result list /need not be/
--- vectorised.  The third result list are those type constructors that we cannot convert (either
+-- vectorised. The third result list are those type constructors that we cannot convert (either
 -- because they use language extensions or because they dependent on type constructors for which
 -- no vectorised version is available).
-
+--
+-- NB: In order to be able to vectorise a type constructor, we require members of the depending set
+--     (i.e., those type constructors that the current one depends on) to be vectorised only if they
+--     are also parallel (i.e., appear in the second argument to the function).
+--
 -- The first argument determines the /conversion status/ of external type constructors as follows:
 --
 -- * tycons which have converted versions are mapped to 'True'
 -- * tycons which are not changed by vectorisation are mapped to 'False'
--- * tycons which can't be converted are not elements of the map
+-- * tycons which haven't been converted (because they can't or weren't vectorised) are not
+--   elements of the map
 --
-classifyTyCons :: UniqFM Bool                     -- ^type constructor conversion status
-               -> [TyCon]                         -- ^type constructors that need to be classified
-               -> ([TyCon], [TyCon], [TyCon])     -- ^tycons to be converted & not to be converted
-classifyTyCons convStatus tcs = classify [] [] [] convStatus (tyConGroups tcs)
+classifyTyCons :: UniqFM Bool                  -- ^type constructor vectorisation status
+               -> NameSet                      -- ^tycons involving parallel arrays
+               -> [TyCon]                      -- ^type constructors that need to be classified
+               -> ( [TyCon]                    -- to be converted
+                  , [TyCon]                    -- need not be converted (but could be)
+                  , [TyCon]                    -- involve parallel arrays (whether converted or not)
+                  , [TyCon]                    -- can't be converted
+                  )
+classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyCons (tyConGroups tcs)
   where
-    classify conv keep ignored _  [] = (conv, keep, ignored)
-    classify conv keep ignored cs ((tcs, ds) : rs)
+    classify conv keep par novect _  _   []               = (conv, keep, par, novect)
+    classify conv keep par novect cs pts ((tcs, ds) : rs)
       | can_convert && must_convert
-      = classify (tcs ++ conv) keep ignored (cs `addListToUFM` [(tc, True) | tc <- tcs]) rs
+      = classify (tcs ++ conv) keep (par ++ tcs_par) novect (cs `addListToUFM` [(tc, True)  | tc <- tcs]) pts' rs
       | can_convert
-      = classify conv (tcs ++ keep) ignored (cs `addListToUFM` [(tc, False) | tc <- tcs]) rs
+      = classify conv (tcs ++ keep) (par ++ tcs_par) novect (cs `addListToUFM` [(tc, False) | tc <- tcs]) pts' rs
       | otherwise
-      = classify conv keep (tcs ++ ignored) cs rs
+      = classify conv keep (par ++ tcs_par) (tcs ++ novect) cs pts' rs
       where
         refs = ds `delListFromUniqSet` tcs
+        
+          -- the tycons that directly or indirectly depend on parallel arrays
+        tcs_par | any ((`elemNameSet` parTyCons) . tyConName) . eltsUFM $ refs = tcs
+                | otherwise                                                    = []
 
-        can_convert  = (isNullUFM (refs `minusUFM` cs) && all convertable tcs)
+        pts' = pts `addListToNameSet` map tyConName tcs_par
+
+        can_convert  = (isNullUFM (filterUniqSet ((`elemNameSet` pts) . tyConName) (refs `minusUFM` cs)) 
+                        && all convertable tcs)
                        || isShowClass tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
                        && (not . isShowClass $ tcs)

@@ -54,10 +54,10 @@ Here's the externally-callable interface:
 
 \begin{code}
 occurAnalysePgm :: Module       -- Used only in debug output
-                -> (Activation -> Bool)
-                -> [CoreRule] -> [CoreVect]
+                -> (Activation -> Bool) 
+                -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_rule imp_rules vects binds
+occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
   | isEmptyVarEnv final_usage
   = binds'
   | otherwise   -- See Note [Glomming]
@@ -67,9 +67,13 @@ occurAnalysePgm this_mod active_rule imp_rules vects binds
   where
     (final_usage, binds') = go (initOccEnv active_rule) binds
 
-    initial_uds = addIdOccs emptyDetails
-                            (rulesFreeVars imp_rules `unionVarSet` vectsFreeVars vects)
-    -- The RULES and VECTORISE declarations keep things alive!
+    initial_uds = addIdOccs emptyDetails 
+                            (rulesFreeVars imp_rules `unionVarSet` 
+                             vectsFreeVars vects `unionVarSet`
+                             vectVars)
+    -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
+    -- we only get them *until* the vectoriser runs. Afterwards, these dependencies are
+    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurences].)
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rules_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv

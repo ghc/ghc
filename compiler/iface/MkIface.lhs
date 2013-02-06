@@ -374,17 +374,17 @@ mkIface_ hsc_env maybe_old_fingerprint
 
      ifFamInstTcName = ifFamInstFam
 
-     flattenVectInfo (VectInfo { vectInfoVar          = vVar
-                               , vectInfoTyCon        = vTyCon
-                               , vectInfoScalarVars   = vScalarVars
-                               , vectInfoScalarTyCons = vScalarTyCons
+     flattenVectInfo (VectInfo { vectInfoVar            = vVar
+                               , vectInfoTyCon          = vTyCon
+                               , vectInfoParallelVars     = vParallelVars
+                               , vectInfoParallelTyCons = vParallelTyCons
                                }) = 
        IfaceVectInfo
-       { ifaceVectInfoVar          = [Var.varName v | (v, _  ) <- varEnvElts  vVar]
-       , ifaceVectInfoTyCon        = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
-       , ifaceVectInfoTyConReuse   = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
-       , ifaceVectInfoScalarVars   = [Var.varName v | v <- varSetElems vScalarVars]
-       , ifaceVectInfoScalarTyCons = nameSetToList vScalarTyCons
+       { ifaceVectInfoVar            = [Var.varName v | (v, _  ) <- varEnvElts  vVar]
+       , ifaceVectInfoTyCon          = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
+       , ifaceVectInfoTyConReuse     = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
+       , ifaceVectInfoParallelVars   = [Var.varName v | v <- varSetElems vParallelVars]
+       , ifaceVectInfoParallelTyCons = nameSetToList vParallelTyCons
        } 
 
 -----------------------------
