@@ -92,7 +92,7 @@ initV hsc_env guts info thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . setPAFunsEnv        builtin_pas
                         . setPRFunsEnv        builtin_prs
-                        $ initGlobalEnv (dopt Opt_VectorisationAvoidance dflags) 
+                        $ initGlobalEnv (gopt Opt_VectorisationAvoidance dflags) 
                                         info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
