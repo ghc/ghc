@@ -1122,19 +1122,32 @@ def checkStats(stats_file, range_fields):
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
-            min = trunc(           expected * ((100 - float(dev))/100));
-            max = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
+            lowerBound = trunc(           expected * ((100 - float(dev))/100));
+            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
 
-            if val < min:
-                print field, val, 'is more than ' + repr(dev) + '%'
-                print 'less than the exepected value', expected
-                print 'If this is because you have improved GHC, please'
-                print 'update the test so that GHC doesn\'t regress again'
+            if val < lowerBound:
+                print field, 'value is too low:'
+                print '(If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again)'
                 result = failBecause('stat too good')
-            if val > max:
-                print field, val, 'is more than ' + repr(dev) + '% greater than the expected value,', expected, max
+            if val > upperBound:
+                print field, 'value is too high:'
                 result = failBecause('stat not good enough')
 
+            if val < lowerBound or val > upperBound:
+                valStr = str(val)
+                valLen = len(valStr)
+                expectedStr = str(expected)
+                expectedLen = len(expectedStr)
+                length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
+                def display(descr, val, extra):
+                    valStr = str(val)
+                    print descr, (' ' * (length - len(valStr))) + valStr, extra
+                display('    Expected    ' + field + ':', expected, '+/-' + str(dev) + '%')
+                display('    Lower bound ' + field + ':', lowerBound, '')
+                display('    Upper bound ' + field + ':', upperBound, '')
+                display('    Actual      ' + field + ':', val, '')
+                
     return result
 
 # -----------------------------------------------------------------------------
