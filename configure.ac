@@ -502,13 +502,13 @@ esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc], [llc])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
