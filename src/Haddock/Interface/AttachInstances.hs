@@ -106,7 +106,7 @@ instanceHead' ispec = (tvs, dropSilentArgs dfun theta, cls, tys)
   where
     dfun = is_dfun ispec
     (tvs, cls, tys) = instanceHead ispec
-    (_, theta, _) = tcSplitSigmaTy . idType . is_dfun $ ispec
+    (_, theta, _) = tcSplitSigmaTy (idType dfun)
 
 -- | Drop "silent" arguments. See GHC Note [Silent superclass
 -- arguments].
