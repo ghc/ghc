@@ -264,16 +264,12 @@ def stats_range_field( field, expected, dev ):
     return lambda opts, f=field, x=expected, y=dev: _stats_range_field(opts, f, x, y);
 
 def _stats_range_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.stats_range_fields = opts.stats_range_fields.copy()
     opts.stats_range_fields[f] = (x, y)
 
 def compiler_stats_range_field( field, expected, dev ):
     return lambda opts, f=field, x=expected, y=dev: _compiler_stats_range_field(opts, f, x, y);
 
 def _compiler_stats_range_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.compiler_stats_range_fields = opts.compiler_stats_range_fields.copy()
     opts.compiler_stats_range_fields[f] = (x, y)
 
 # -----
@@ -637,7 +633,9 @@ def test (name, setup, func, args):
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         framework_fail(name, 'bad_name', 'This test has an invalid name')
-    myTestOpts = copy.copy(thisdir_testopts)
+    # We need a deepcopy so that dictionarys, such as the stats_range_fields
+    # dictionary, get copied too.
+    myTestOpts = copy.deepcopy(thisdir_testopts)
 
     if type(setup) is types.ListType:
        setup = composes(setup)
