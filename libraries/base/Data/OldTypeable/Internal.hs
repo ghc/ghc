@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-typeable-instances #-}
-{-# LANGUAGE Unsafe    #-}
+{-# LANGUAGE Unsafe #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,37 +17,49 @@
            , OverlappingInstances
            , ScopedTypeVariables
            , FlexibleInstances
-           , MagicHash
-           , KindSignatures
-           , PolyKinds #-}
+           , MagicHash #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 #endif
 
-module Data.Typeable.Internal (
-    Proxy (..),
+module Data.OldTypeable.Internal {-# DEPRECATED "Use Data.Typeable.Internal instead" #-} (
     TypeRep(..),
-    Fingerprint(..),
-    typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
     TyCon(..),
     mkTyCon,
     mkTyCon3,
     mkTyConApp,
     mkAppTy,
     typeRepTyCon,
+    typeOfDefault,
+    typeOf1Default,
+    typeOf2Default,
+    typeOf3Default,
+    typeOf4Default,
+    typeOf5Default,
+    typeOf6Default,
     Typeable(..),
+    Typeable1(..),
+    Typeable2(..),
+    Typeable3(..),
+    Typeable4(..),
+    Typeable5(..),
+    Typeable6(..),
+    Typeable7(..),
     mkFunTy,
     splitTyConApp,
     funResultTy,
     typeRepArgs,
     showsTypeRep,
     tyConString,
+#if defined(__GLASGOW_HASKELL__)
     listTc, funTc
+#endif
   ) where
 
 import GHC.Base
 import GHC.Word
 import GHC.Show
+import GHC.Err          (undefined)
 import Data.Maybe
 import Data.List
 import GHC.Num
@@ -188,50 +199,221 @@ tyConString = tyConName
 --
 -------------------------------------------------------------
 
+{- Note [Memoising typeOf]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+IMPORTANT: we don't want to recalculate the type-rep once per
+call to the dummy argument.  This is what went wrong in Trac #3245
+So we help GHC by manually keeping the 'rep' *outside* the value 
+lambda, thus
+    
+    typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
+    typeOfDefault = \_ -> rep
+      where
+        rep = typeOf1 (undefined :: t a) `mkAppTy` 
+              typeOf  (undefined :: a)
+
+Notice the crucial use of scoped type variables here!
+-}
+
 -- | The class 'Typeable' allows a concrete representation of a type to
 -- be calculated.
 class Typeable a where
-  typeRep :: proxy a -> TypeRep
+  typeOf :: a -> TypeRep
   -- ^ Takes a value of type @a@ and returns a concrete representation
-  -- of that type.
+  -- of that type.  The /value/ of the argument should be ignored by
+  -- any instance of 'Typeable', so that it is safe to pass 'undefined' as
+  -- the argument.
 
--- | A concrete, poly-kinded proxy type
-data Proxy t = Proxy
+-- | Variant for unary type constructors
+class Typeable1 t where
+  typeOf1 :: t a -> TypeRep
 
--- Keeping backwards-compatibility
-typeOf :: forall a. Typeable a => a -> TypeRep
-typeOf _ = typeRep (Proxy :: Proxy a)
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable' instance from any 'Typeable1' instance.
+typeOfDefault :: forall t a. (Typeable1 t, Typeable a) => t a -> TypeRep
+typeOfDefault = \_ -> rep
+ where
+   rep = typeOf1 (undefined :: t a) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable' instance from any 'Typeable1' instance.
+typeOfDefault :: (Typeable1 t, Typeable a) => t a -> TypeRep
+typeOfDefault x = typeOf1 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a -> a
+   argType = undefined
+#endif
 
-typeOf1 :: forall t (a :: *). Typeable t => t a -> TypeRep
-typeOf1 _ = typeRep (Proxy :: Proxy t)
+-- | Variant for binary type constructors
+class Typeable2 t where
+  typeOf2 :: t a b -> TypeRep
 
-typeOf2 :: forall t (a :: *) (b :: *). Typeable t => t a b -> TypeRep
-typeOf2 _ = typeRep (Proxy :: Proxy t)
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
+typeOf1Default :: forall t a b. (Typeable2 t, Typeable a) => t a b -> TypeRep
+typeOf1Default = \_ -> rep 
+ where
+   rep = typeOf2 (undefined :: t a b) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
+typeOf1Default :: (Typeable2 t, Typeable a) => t a b -> TypeRep
+typeOf1Default x = typeOf2 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b -> a
+   argType = undefined
+#endif
 
-typeOf3 :: forall t (a :: *) (b :: *) (c :: *). Typeable t
-        => t a b c -> TypeRep
-typeOf3 _ = typeRep (Proxy :: Proxy t)
+-- | Variant for 3-ary type constructors
+class Typeable3 t where
+  typeOf3 :: t a b c -> TypeRep
 
-typeOf4 :: forall t (a :: *) (b :: *) (c :: *) (d :: *). Typeable t
-        => t a b c d -> TypeRep
-typeOf4 _ = typeRep (Proxy :: Proxy t)
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable2' instance from any 'Typeable3' instance.
+typeOf2Default :: forall t a b c. (Typeable3 t, Typeable a) => t a b c -> TypeRep
+typeOf2Default = \_ -> rep 
+ where
+   rep = typeOf3 (undefined :: t a b c) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable2' instance from any 'Typeable3' instance.
+typeOf2Default :: (Typeable3 t, Typeable a) => t a b c -> TypeRep
+typeOf2Default x = typeOf3 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b c -> a
+   argType = undefined
+#endif
 
-typeOf5 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *). Typeable t
-        => t a b c d e -> TypeRep
-typeOf5 _ = typeRep (Proxy :: Proxy t)
+-- | Variant for 4-ary type constructors
+class Typeable4 t where
+  typeOf4 :: t a b c d -> TypeRep
 
-typeOf6 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *) (f :: *).
-                Typeable t => t a b c d e f -> TypeRep
-typeOf6 _ = typeRep (Proxy :: Proxy t)
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable3' instance from any 'Typeable4' instance.
+typeOf3Default :: forall t a b c d. (Typeable4 t, Typeable a) => t a b c d -> TypeRep
+typeOf3Default = \_ -> rep
+ where
+   rep = typeOf4 (undefined :: t a b c d) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable3' instance from any 'Typeable4' instance.
+typeOf3Default :: (Typeable4 t, Typeable a) => t a b c d -> TypeRep
+typeOf3Default x = typeOf4 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b c d -> a
+   argType = undefined
+#endif
+   
+-- | Variant for 5-ary type constructors
+class Typeable5 t where
+  typeOf5 :: t a b c d e -> TypeRep
 
-typeOf7 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *) (f :: *)
-                (g :: *). Typeable t => t a b c d e f g -> TypeRep
-typeOf7 _ = typeRep (Proxy :: Proxy t)
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable4' instance from any 'Typeable5' instance.
+typeOf4Default :: forall t a b c d e. (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
+typeOf4Default = \_ -> rep 
+ where
+   rep = typeOf5 (undefined :: t a b c d e) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable4' instance from any 'Typeable5' instance.
+typeOf4Default :: (Typeable5 t, Typeable a) => t a b c d e -> TypeRep
+typeOf4Default x = typeOf5 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b c d e -> a
+   argType = undefined
+#endif
 
--- | Kind-polymorphic Typeable instance for type application
-instance (Typeable s, Typeable a) => Typeable (s a) where
-  typeRep _ = typeRep (Proxy :: Proxy s) `mkAppTy` typeRep (Proxy :: Proxy a)
+-- | Variant for 6-ary type constructors
+class Typeable6 t where
+  typeOf6 :: t a b c d e f -> TypeRep
 
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable5' instance from any 'Typeable6' instance.
+typeOf5Default :: forall t a b c d e f. (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
+typeOf5Default = \_ -> rep
+ where
+   rep = typeOf6 (undefined :: t a b c d e f) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable5' instance from any 'Typeable6' instance.
+typeOf5Default :: (Typeable6 t, Typeable a) => t a b c d e f -> TypeRep
+typeOf5Default x = typeOf6 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b c d e f -> a
+   argType = undefined
+#endif
+
+-- | Variant for 7-ary type constructors
+class Typeable7 t where
+  typeOf7 :: t a b c d e f g -> TypeRep
+
+#ifdef __GLASGOW_HASKELL__
+-- | For defining a 'Typeable6' instance from any 'Typeable7' instance.
+typeOf6Default :: forall t a b c d e f g. (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
+typeOf6Default = \_ -> rep
+ where
+   rep = typeOf7 (undefined :: t a b c d e f g) `mkAppTy` 
+         typeOf  (undefined :: a)
+   -- Note [Memoising typeOf]
+#else
+-- | For defining a 'Typeable6' instance from any 'Typeable7' instance.
+typeOf6Default :: (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
+typeOf6Default x = typeOf7 x `mkAppTy` typeOf (argType x)
+ where
+   argType :: t a b c d e f g -> a
+   argType = undefined
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+-- Given a @Typeable@/n/ instance for an /n/-ary type constructor,
+-- define the instances for partial applications.
+-- Programmers using non-GHC implementations must do this manually
+-- for each type constructor.
+-- (The INSTANCE_TYPEABLE/n/ macros in Typeable.h include this.)
+
+-- | One Typeable instance for all Typeable1 instances
+instance (Typeable1 s, Typeable a)
+       => Typeable (s a) where
+  typeOf = typeOfDefault
+
+-- | One Typeable1 instance for all Typeable2 instances
+instance (Typeable2 s, Typeable a)
+       => Typeable1 (s a) where
+  typeOf1 = typeOf1Default
+
+-- | One Typeable2 instance for all Typeable3 instances
+instance (Typeable3 s, Typeable a)
+       => Typeable2 (s a) where
+  typeOf2 = typeOf2Default
+
+-- | One Typeable3 instance for all Typeable4 instances
+instance (Typeable4 s, Typeable a)
+       => Typeable3 (s a) where
+  typeOf3 = typeOf3Default
+
+-- | One Typeable4 instance for all Typeable5 instances
+instance (Typeable5 s, Typeable a)
+       => Typeable4 (s a) where
+  typeOf4 = typeOf4Default
+
+-- | One Typeable5 instance for all Typeable6 instances
+instance (Typeable6 s, Typeable a)
+       => Typeable5 (s a) where
+  typeOf5 = typeOf5Default
+
+-- | One Typeable6 instance for all Typeable7 instances
+instance (Typeable7 s, Typeable a)
+       => Typeable6 (s a) where
+  typeOf6 = typeOf6Default
+
+#endif /* __GLASGOW_HASKELL__ */
 
 ----------------- Showing TypeReps --------------------
 
@@ -274,11 +456,13 @@ showTuple args = showChar '('
                                $ map (showsPrec 10) args)
                . showChar ')'
 
+#if defined(__GLASGOW_HASKELL__)
 listTc :: TyCon
 listTc = typeRepTyCon (typeOf [()])
 
 funTc :: TyCon
 funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
+#endif
 
 -------------------------------------------------------------
 --
@@ -286,7 +470,7 @@ funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
 --
 -------------------------------------------------------------
 
-#include "Typeable.h"
+#include "OldTypeable.h"
 
 INSTANCE_TYPEABLE0((),unitTc,"()")
 INSTANCE_TYPEABLE1([],listTc,"[]")
@@ -300,7 +484,7 @@ libraries/base/Data/Typeable.hs:589:1:
       The last argument of the instance must be a data or newtype application
     In the stand-alone deriving instance for `Typeable2 (->)'
 -}
-instance Typeable (->) where { typeRep _ = mkTyConApp funTc [] }
+instance Typeable2 (->) where { typeOf2 _ = mkTyConApp funTc [] }
 #else
 INSTANCE_TYPEABLE2((->),funTc,"->")
 #endif
@@ -384,6 +568,6 @@ libraries/base/Data/Typeable.hs:674:1:
 -}
 realWorldTc :: TyCon; \
 realWorldTc = mkTyCon3 "ghc-prim" "GHC.Types" "RealWorld"; \
-instance Typeable RealWorld where { typeRep _ = mkTyConApp realWorldTc [] }
+instance Typeable RealWorld where { typeOf _ = mkTyConApp realWorldTc [] }
 
 #endif

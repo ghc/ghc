@@ -269,7 +269,7 @@ class Typeable a => Data a where
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
   -- for non-unary type constructors.
-  dataCast1 :: Typeable1 t
+  dataCast1 :: Typeable t
             => (forall d. Data d => c (t d))
             -> Maybe (c a)
   dataCast1 _ = Nothing
@@ -280,7 +280,7 @@ class Typeable a => Data a where
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
   -- for non-binary type constructors.
-  dataCast2 :: Typeable2 t
+  dataCast2 :: Typeable t
             => (forall d e. (Data d, Data e) => c (t d e))
             -> Maybe (c a)
   dataCast2 _ = Nothing
