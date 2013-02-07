@@ -49,10 +49,7 @@ import System.Posix.Internals (c_close)
 import System.Posix.Types (Fd(..))
 import qualified GHC.Event.Array as A
 
-#if defined(HAVE_KEVENT64)
-import Data.Int (Int64)
-import Data.Word (Word64)
-#elif defined(netbsd_HOST_OS)
+#if defined(netbsd_HOST_OS)
 import Data.Int (Int64)
 #endif
 
@@ -134,48 +131,6 @@ newtype KQueueFd = KQueueFd {
       fromKQueueFd :: CInt
     } deriving (Eq, Show)
 
-#if defined(HAVE_KEVENT64)
-data Event = KEvent64 {
-      ident  :: {-# UNPACK #-} !Word64
-    , filter :: {-# UNPACK #-} !Filter
-    , flags  :: {-# UNPACK #-} !Flag
-    , fflags :: {-# UNPACK #-} !FFlag
-    , data_  :: {-# UNPACK #-} !Int64
-    , udata  :: {-# UNPACK #-} !Word64
-    , ext0   :: {-# UNPACK #-} !Word64
-    , ext1   :: {-# UNPACK #-} !Word64
-    } deriving Show
-
-event :: Fd -> Filter -> Flag -> FFlag -> Event
-event fd filt flag fflag = KEvent64 (fromIntegral fd) filt flag fflag 0 0 0 0
-
-instance Storable Event where
-    sizeOf _ = #size struct kevent64_s
-    alignment _ = alignment (undefined :: CInt)
-
-    peek ptr = do
-        ident'  <- #{peek struct kevent64_s, ident} ptr
-        filter' <- #{peek struct kevent64_s, filter} ptr
-        flags'  <- #{peek struct kevent64_s, flags} ptr
-        fflags' <- #{peek struct kevent64_s, fflags} ptr
-        data'   <- #{peek struct kevent64_s, data} ptr
-        udata'  <- #{peek struct kevent64_s, udata} ptr
-        ext0'   <- #{peek struct kevent64_s, ext[0]} ptr
-        ext1'   <- #{peek struct kevent64_s, ext[1]} ptr
-        let !ev = KEvent64 ident' (Filter filter') (Flag flags') fflags' data'
-                           udata' ext0' ext1'
-        return ev
-
-    poke ptr ev = do
-        #{poke struct kevent64_s, ident} ptr (ident ev)
-        #{poke struct kevent64_s, filter} ptr (filter ev)
-        #{poke struct kevent64_s, flags} ptr (flags ev)
-        #{poke struct kevent64_s, fflags} ptr (fflags ev)
-        #{poke struct kevent64_s, data} ptr (data_ ev)
-        #{poke struct kevent64_s, udata} ptr (udata ev)
-        #{poke struct kevent64_s, ext[0]} ptr (ext0 ev)
-        #{poke struct kevent64_s, ext[1]} ptr (ext1 ev)
-#else
 data Event = KEvent {
       ident  :: {-# UNPACK #-} !CUIntPtr
     , filter :: {-# UNPACK #-} !Filter
@@ -214,7 +169,6 @@ instance Storable Event where
         #{poke struct kevent, fflags} ptr (fflags ev)
         #{poke struct kevent, data} ptr (data_ ev)
         #{poke struct kevent, udata} ptr (udata ev)
-#endif
 
 newtype FFlag = FFlag Word32
     deriving (Eq, Show, Storable)
@@ -289,15 +243,9 @@ kevent :: Bool -> KQueueFd -> Ptr Event -> Int -> Ptr Event -> Int -> Ptr TimeSp
        -> IO Int
 kevent safe k chs chlen evs evlen ts
     = fmap fromIntegral $ E.throwErrnoIfMinus1NoRetry "kevent" $
-#if defined(HAVE_KEVENT64)
-      if safe
-      then c_kevent64 k chs (fromIntegral chlen) evs (fromIntegral evlen) 0 ts
-      else c_kevent64_unsafe k chs (fromIntegral chlen) evs (fromIntegral evlen) 0 ts
-#else
       if safe 
       then c_kevent k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
       else c_kevent_unsafe k chs (fromIntegral chlen) evs (fromIntegral evlen) ts
-#endif
 
 withEvent :: Event -> (Ptr Event -> IO a) -> IO a
 withEvent ev f = alloca $ \ptr -> poke ptr ev >> f ptr
@@ -326,15 +274,7 @@ toEvent (Filter f)
 foreign import ccall unsafe "kqueue"
     c_kqueue :: IO CInt
 
-#if defined(HAVE_KEVENT64)
-foreign import ccall safe "kevent64"
-    c_kevent64 :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
-               -> Ptr TimeSpec -> IO CInt
-
-foreign import ccall unsafe "kevent64"
-    c_kevent64_unsafe :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt -> CUInt
-                      -> Ptr TimeSpec -> IO CInt               
-#elif defined(HAVE_KEVENT)
+#if defined(HAVE_KEVENT)
 foreign import capi safe "sys/event.h kevent"
     c_kevent :: KQueueFd -> Ptr Event -> CInt -> Ptr Event -> CInt
              -> Ptr TimeSpec -> IO CInt
