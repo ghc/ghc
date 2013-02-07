@@ -1141,8 +1141,7 @@ def checkStats(stats_file, range_fields):
                 expectedLen = len(expectedStr)
                 length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
                 def display(descr, val, extra):
-                    valStr = str(val)
-                    print descr, (' ' * (length - len(valStr))) + valStr, extra
+                    print descr, string.rjust(str(val), length), extra
                 display('    Expected    ' + field + ':', expected, '+/-' + str(dev) + '%')
                 display('    Lower bound ' + field + ':', lowerBound, '')
                 display('    Upper bound ' + field + ':', upperBound, '')
