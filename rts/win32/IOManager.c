@@ -199,7 +199,17 @@ IOWorkerProc(PVOID param)
 		    /* Approximate implementation of threadDelay;
 		     * 
 		     * Note: Sleep() is in milliseconds, not micros.
-		     */
+                     *
+                     * MSDN says of Sleep:
+                     *   If dwMilliseconds is greater than one tick
+                     *   but less than two, the wait can be anywhere
+                     *   between one and two ticks, and so on.
+                     *
+                     * so we need to add (milliseconds-per-tick - 1)
+                     * to the amount of time we sleep for.
+                     *
+                     * test ThreadDelay001 fails if we get this wrong.
+                     */
 		    Sleep(((work->workData.delayData.usecs + 999) / 1000) + iom->sleepResolution - 1);
 		    len = work->workData.delayData.usecs;
 		    complData = NULL;
