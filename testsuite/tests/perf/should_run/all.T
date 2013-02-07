@@ -59,12 +59,11 @@ test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
       stats_range_field('peak_megabytes_allocated', 1, 0),
                                      # expected value: 1 (amd64/Linux)
-      when(wordsize(32),
-          stats_range_field('bytes allocated', 45648, 5)),
-                                     # expected value: 45648 (x86/Linux):
-      when(wordsize(64),
-          stats_range_field('bytes allocated', 49400, 5)),
-                                     # expected value: 49400 (amd64/Linux)
+      stats_num_field('bytes allocated',
+                      [(wordsize(32), 45648, 5),
+                    # expected value: 45648 (x86/Linux)
+                       (wordsize(64), 49400, 5)]),
+                    # expected value: 49400 (amd64/Linux)
       only_ways(['normal'])
       ],
      compile_and_run,

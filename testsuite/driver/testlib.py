@@ -251,17 +251,39 @@ def _extra_clean( name, opts, v ):
 
 # -----
 
-def stats_range_field( field, expected, dev ):
-    return lambda name, opts, f=field, x=expected, y=dev: _stats_range_field(name, opts, f, x, y);
+def stats_num_field( field, expecteds ):
+    return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e);
 
-def _stats_range_field( name, opts, f, x, y ):
-    opts.stats_range_fields[f] = (x, y)
+def _stats_num_field( name, opts, field, expecteds ):
+    if field in opts.stats_range_fields:
+        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
+
+    for (b, expected, dev) in expecteds:
+        if b:
+            opts.stats_range_fields[field] = (expected, dev)
+            return
+
+    framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+
+def stats_range_field( field, expected, dev ):
+    return stats_num_field( field, [(True, expected, dev)] )
+
+def compiler_stats_num_field( field, expecteds ):
+    return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e);
+
+def _compiler_stats_num_field( name, opts, field, expecteds ):
+    if field in opts.compiler_stats_range_fields:
+        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
+
+    for (b, expected, dev) in expecteds:
+        if b:
+            opts.compiler_stats_range_fields[field] = (expected, dev)
+            return
+
+    framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
 def compiler_stats_range_field( field, expected, dev ):
-    return lambda name, opts, f=field, x=expected, y=dev: _compiler_stats_range_field(name, opts, f, x, y);
-
-def _compiler_stats_range_field( name, opts, f, x, y ):
-    opts.compiler_stats_range_fields[f] = (x, y)
+    return compiler_stats_num_field( field, [(True, expected, dev)] )
 
 # -----
 
