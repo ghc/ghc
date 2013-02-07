@@ -34,7 +34,6 @@ import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Internal (eventIs, evtClose)
 import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_)
-import qualified GHC.Event.IntMap as IM
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.Num ((-), (+))
