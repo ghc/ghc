@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE CPP, KindSignatures #-}
 module HsExpr where
 
 import SrcLoc     ( Located )
@@ -8,22 +8,29 @@ import {-# SOURCE #-} HsPat  ( LPat )
 
 import Data.Data
 
--- IA0_NOTE: We need kind annotations because of kind polymorphism
 data HsExpr (i :: *)
 data HsCmd  (i :: *)
 data HsSplice (i :: *)
 data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 
+#if __GLASGOW_HASKELL__ > 706
+instance Typeable HsSplice
+instance Typeable HsExpr
+instance Typeable MatchGroup
+instance Typeable GRHSs
+#else
 instance Typeable1 HsSplice
-instance Data i => Data (HsSplice i)
 instance Typeable1 HsExpr
-instance Data i => Data (HsExpr i)
 instance Typeable1 HsCmd
-instance Data i => Data (HsCmd i)
 instance Typeable2 MatchGroup
-instance (Data i, Data body) => Data (MatchGroup i body)
 instance Typeable2 GRHSs
+#endif
+
+instance Data i => Data (HsSplice i)
+instance Data i => Data (HsExpr i)
+instance Data i => Data (HsCmd i)
+instance (Data i, Data body) => Data (MatchGroup i body)
 instance (Data i, Data body) => Data (GRHSs i body)
 
 instance OutputableBndr id => Outputable (HsExpr id)

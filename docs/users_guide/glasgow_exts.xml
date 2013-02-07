@@ -3379,19 +3379,19 @@ GHC extends this list with several more classes that may be automatically derive
 <literal>Typeable</literal>, and <literal>Data</literal>, defined in the library
 modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively.
 </para>
-<para>An instance of <literal>Typeable</literal> can only be derived if the
-data type has seven or fewer type parameters, all of kind <literal>*</literal>.
-The reason for this is that the <literal>Typeable</literal> class is derived using the scheme
-described in
-<ulink url="http://research.microsoft.com/%7Esimonpj/papers/hmap/gmap2.ps">
-Scrap More Boilerplate: Reflection, Zips, and Generalised Casts
-</ulink>.
-(Section 7.4 of the paper describes the multiple <literal>Typeable</literal> classes that
-are used, and only <literal>Typeable1</literal> up to
-<literal>Typeable7</literal> are provided in the library.)
-In other cases, there is nothing to stop the programmer writing a <literal>TypeableX</literal>
-class, whose kind suits that of the data type constructor, and
-then writing the data type instance by hand.
+<para>Since GHC 7.8.1, <literal>Typeable</literal> is kind-polymorphic (see
+<xref linkend="kind-polymorphism"/>) and can be derived for any datatype and
+type class. Instances for datatypes can be derived by attaching a 
+<literal>deriving Typeable</literal> clause to the datatype declaration, or by
+using standalone deriving (see <xref linkend="stand-alone-deriving"/>).
+Instances for type classes can only be derived using standalone deriving.
+Additionally, <option>-XAutoDeriveTypeable</option> will trigger the generation
+of derived <literal>Typeable</literal> instances for every datatype and type
+class declaration in the module it is used.
+</para>
+<para>
+Also since GHC 7.8.1, handwritten (ie. not derived) instances of
+<literal>Typeable</literal> are forbidden, and will be ignored with a warning.
 </para>
 </listitem>
 

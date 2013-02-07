@@ -956,8 +956,9 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-missing-methods</option>,
     <option>-fwarn-lazy-unlifted-bindings</option>,
     <option>-fwarn-wrong-do-bind</option>,
-    <option>-fwarn-unsupported-calling-conventions</option>, and
-    <option>-fwarn-dodgy-foreign-imports</option>.  The following
+    <option>-fwarn-unsupported-calling-conventions</option>,
+    <option>-fwarn-dodgy-foreign-imports</option>, and
+    <option>-fwarn-typeable-instances</option>.  The following
     flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
     </para>
@@ -1678,6 +1679,19 @@ f "2"    = 2
             <programlisting>
                do { popInt 10 ; return 10 }
             </programlisting>
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-typeable-instances</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-typeable-instances</option></primary></indexterm>
+          <indexterm><primary>typeable instances, warning</primary></indexterm>
+
+          <para>Report handwritten (ie. not derived) instances of the
+          <literal>Typeable</literal> class. These are ignore by the compiler;
+          only derived instances of <literal>Typeable</literal> are allowed.
           </para>
         </listitem>
       </varlistentry>
