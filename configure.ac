@@ -15,6 +15,11 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.7], [glasgow-haskell-bugs@haskell.org], [ghc])
 
+# Using autoconf v2.59 started to give nonsense like this
+#  #define SIZEOF_CHAR 0
+# recently. Exclude that version.
+AC_PREREQ([2.60])
+
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
 
