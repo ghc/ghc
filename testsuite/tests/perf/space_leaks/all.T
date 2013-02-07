@@ -5,11 +5,11 @@ test('space_leak_001',
      #           4 (x86/OS X)
      #           5 (x86/Linux)
      [stats_range_field('peak_megabytes_allocated', 4, 1),
-      stats_range_field('max_bytes_used', 481456, 1),
-                      # expected value: 440224 (amd64/Linux)
-                      #                 417016 (x86/OS X)
-                      #                 415672 (x86/Windows)
-                      #                 481456 (unreg amd64/Linux)
+      stats_range_field('max_bytes_used', 440000, 10),
+                        # expected value: 440224 (amd64/Linux)
+                        #                 417016 (x86/OS X)
+                        #                 415672 (x86/Windows)
+                        #                 481456 (unreg amd64/Linux)
       stats_range_field('bytes allocated', 9079316016, 1),
                            # expected value: 9079316016 (amd64/Linux)
                            #                 9331570416 (x86/Linux)

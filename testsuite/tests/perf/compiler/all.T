@@ -159,8 +159,9 @@ test('T3064',
           compiler_stats_range_field('peak_megabytes_allocated', 14, 1)),
 
       if_wordsize(64,
-          compiler_stats_range_field('peak_megabytes_allocated', 24, 1)),
-                                    # expected value: 18 (amd64/Linux):
+          compiler_stats_range_field('peak_megabytes_allocated', 26, 1)),
+                                     # (amd64/Linux):            18
+                                     # (amd64/Linux) 2012-02-07: 26
 
       # expected value: 56380288 (x86/Linux) (28/6/2011)
       #                 111189536 (x86/Windows) (30/10/12)
@@ -168,17 +169,19 @@ test('T3064',
           compiler_stats_range_field('bytes allocated', 111189536, 10)),
 
 
-      # expected value: 73259544 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 240000000, 5)),
+          compiler_stats_range_field('bytes allocated', 224798696, 5)),
+                          # (amd64/Linux) (28/06/2011):  73259544
+                          # (amd64/Linux) (07/02/2013): 224798696
 
       # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
           compiler_stats_range_field('max_bytes_used', 5511604, 20)),
 
-      # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 11000000, 5)),
+          compiler_stats_range_field('max_bytes_used',  9819288, 5)),
+                 # (amd64/Linux, intree) (28/06/2011):  4032024
+                 # (amd64/Linux, intree) (07/02/2013):  9819288
        only_ways(['normal'])
       ],
      compile,

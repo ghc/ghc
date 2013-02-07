@@ -14,8 +14,9 @@ test('T3586',
      ['-O'])
 
 test('T4830',
-     [stats_range_field('bytes allocated', 127000, 5),
-                                     # expected value: 127,000 (amd64/Linux)
+     [stats_range_field('bytes allocated',  99264, 1),
+               # (amd64/Linux):            127000
+               # (amd64/Linux) 2013-02-07:  99264
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -29,8 +30,9 @@ test('T3245', normal, compile_and_run, ['-O'])
 test('lazy-bs-alloc',
      [stats_range_field('peak_megabytes_allocated', 2, 1),
                                      # expected value: 2 (amd64/Linux)
-      stats_range_field('bytes allocated', 489776, 5),
-                                     # expected value: 489776 (amd64/Linux)
+      stats_range_field('bytes allocated', 429744, 1),
+              # (amd64/Linux):             489776
+              # (amd64/Linux) 2013-02-07:  429744
       only_ways(['normal']),
       extra_run_opts('../../numeric/should_run/arith011.stdout'),
       ignore_output
@@ -244,8 +246,9 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',
-     [stats_range_field('max_bytes_used', 70000, 5),
-                                     # expected value: 127,000 (amd64/Linux)
+     [stats_range_field('max_bytes_used', 60360, 1),
+           # (amd64/Linux):              127000
+           # (amd64/Linux) 2013-02-07:    60360
       only_ways(['normal'])
       ],
      compile_and_run,
