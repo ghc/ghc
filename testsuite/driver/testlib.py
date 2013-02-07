@@ -2211,6 +2211,7 @@ def findTFiles_(path):
 def summary(t, file):
 
     file.write('\n')
+    printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
     file.write('OVERALL SUMMARY for test run started at ' \
                + t.start_time + '\n'\
                + string.rjust(`t.total_tests`, 8) \
@@ -2246,6 +2247,18 @@ def summary(t, file):
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
+
+def printUnexpectedTests(file, testInfoss):
+    unexpected = []
+    for testInfos in testInfoss:
+        directories = testInfos.keys()
+        for directory in directories:
+            tests = testInfos[directory].keys()
+            unexpected += tests
+    if unexpected != []:
+        file.write('Unexpected results from:\n')
+        file.write('TEST="' + ' '.join(unexpected) + '"\n')
+        file.write('\n')
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()
