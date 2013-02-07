@@ -1,6 +1,6 @@
 # Args to vtc are: extra compile flags
 
-def f( opts ):
+def f( name, opts ):
   opts.extra_hc_opts = '-fno-warn-incomplete-patterns'
 
 setTestOpts(f)

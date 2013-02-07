@@ -4,7 +4,7 @@
 #	expected process return value, if not zero
 
 # Only compile with optimisation
-def f( opts ):
+def f( name, opts ):
   opts.only_ways = ['optasm']
 
 setTestOpts(f)

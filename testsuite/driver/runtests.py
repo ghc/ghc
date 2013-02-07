@@ -207,9 +207,6 @@ if windows or darwin:
 global testopts_local
 testopts_local.x = TestOptions()
 
-global thisdir_testopts
-thisdir_testopts = getThisDirTestOpts()
-
 if config.use_threads:
     t.lock = threading.Lock()
     t.thread_pool = threading.Condition(t.lock)

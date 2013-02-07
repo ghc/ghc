@@ -1,6 +1,6 @@
 # Tests for LLVM code generator
 
-def f( opts ):
+def f( name, opts ):
   opts.only_ways = ['optllvm', 'llvm', 'debugllvm']
 
 setTestOpts(f)

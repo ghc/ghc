@@ -77,7 +77,7 @@ test('T5866', exit_code(1), compile_and_run, [''])
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
-def f( opts ):
+def f( name, opts ):
   if config.fast:
   	opts.skip = 1
 

@@ -4,7 +4,7 @@
 # has been dropped.
 
 # Just do the normal way, SafeHaskell is all in the frontend
-def f( opts ):
+def f( name, opts ):
   opts.only_ways = ['normal']
 
 setTestOpts(f)

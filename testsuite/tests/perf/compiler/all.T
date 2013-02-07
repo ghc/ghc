@@ -1,4 +1,4 @@
-def no_lint(opts):
+def no_lint(name, opts):
    opts.compiler_always_flags = \
        filter(lambda opt: opt != '-dcore-lint' and opt != '-dcmm-lint', opts.compiler_always_flags)
 

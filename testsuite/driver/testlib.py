@@ -40,16 +40,6 @@ def stopNow():
 def stopping():
     return wantToStop
 
-# Options valid for all the tests in the current "directory".  After
-# each test, we reset the options to these.  To change the options for
-# multiple tests, the function setTestOpts() below can be used to alter
-# these options.
-global thisdir_testopts
-thisdir_testopts = TestOptions()
-
-def getThisDirTestOpts():
-    return thisdir_testopts
-
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
 
@@ -71,7 +61,8 @@ def setLocalTestOpts(opts):
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
 def setTestOpts( f ):
-    f( thisdir_testopts );
+    global thisdir_settings
+    thisdir_settings = compose(thisdir_settings, f)
 
 # -----------------------------------------------------------------------------
 # Canned setup functions for common cases.  eg. for a test you might say
@@ -84,23 +75,23 @@ def setTestOpts( f ):
 #
 # to expect failure for this test.
 
-def normal( opts ):
+def normal( name, opts ):
     return;
 
-def skip( opts ):
+def skip( name, opts ):
     opts.skip = 1
 
-def expect_fail( opts ):
+def expect_fail( name, opts ):
     opts.expect = 'fail';
 
 def reqlib( lib ):
-    return lambda opts, l=lib: _reqlib (opts, l )
+    return lambda name, opts, l=lib: _reqlib (name, opts, l )
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
 have_lib = {}
 
-def _reqlib( opts, lib ):
+def _reqlib( name, opts, lib ):
     if have_lib.has_key(lib):
         got_it = have_lib[lib]
     else:
@@ -123,164 +114,164 @@ def _reqlib( opts, lib ):
     if not got_it:
         opts.expect = 'missing-lib'
 
-def req_profiling( opts ):
+def req_profiling( name, opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
-def req_shared_libs( opts ):
+def req_shared_libs( name, opts ):
     if not config.have_shared_libs:
         opts.expect = 'fail'
 
-def req_interp( opts ):
+def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
-def req_smp( opts ):
+def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
 def expect_broken( bug ):
-    return lambda opts, b=bug: _expect_broken (opts, b )
+    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
-def _expect_broken( opts, bug ):
+def _expect_broken( name, opts, bug ):
     opts.expect = 'fail';
 
-def ignore_output( opts ):
+def ignore_output( name, opts ):
     opts.ignore_output = 1
 
-def no_stdin( opts ):
+def no_stdin( name, opts ):
     opts.no_stdin = 1
 
-def combined_output( opts ):
+def combined_output( name, opts ):
     opts.combined_output = True
 
 # -----
 
 def expect_fail_for( ways ):
-    return lambda opts, w=ways: _expect_fail_for( opts, w )
+    return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
-def _expect_fail_for( opts, ways ):
+def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
 def expect_broken_for( bug, ways ):
-    return lambda opts, b=bug, w=ways: _expect_broken_for( opts, b, w )
+    return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
-def _expect_broken_for( opts, bug, ways ):
+def _expect_broken_for( name, opts, bug, ways ):
     opts.expect_fail_for = ways
 
 # -----
 
 def omit_ways( ways ):
-    return lambda opts, w=ways: _omit_ways( opts, w )
+    return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
-def _omit_ways( opts, ways ):
+def _omit_ways( name, opts, ways ):
     opts.omit_ways = ways
 
 # -----
 
 def only_ways( ways ):
-    return lambda opts, w=ways: _only_ways( opts, w )
+    return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
-def _only_ways( opts, ways ):
+def _only_ways( name, opts, ways ):
     opts.only_ways = ways
 
 # -----
 
 def extra_ways( ways ):
-    return lambda opts, w=ways: _extra_ways( opts, w )
+    return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
-def _extra_ways( opts, ways ):
+def _extra_ways( name, opts, ways ):
     opts.extra_ways = ways
 
 # -----
 
 def omit_compiler_types( compiler_types ):
-   return lambda opts, c=compiler_types: _omit_compiler_types(opts, c)
+   return lambda name, opts, c=compiler_types: _omit_compiler_types(name, opts, c)
 
-def _omit_compiler_types( opts, compiler_types ):
+def _omit_compiler_types( name, opts, compiler_types ):
     if config.compiler_type in compiler_types:
         opts.skip = 1
 
 # -----
 
 def only_compiler_types( compiler_types ):
-   return lambda opts, c=compiler_types: _only_compiler_types(opts, c)
+   return lambda name, opts, c=compiler_types: _only_compiler_types(name, opts, c)
 
-def _only_compiler_types( opts, compiler_types ):
+def _only_compiler_types( name, opts, compiler_types ):
     if config.compiler_type not in compiler_types:
         opts.skip = 1
 
 # -----
 
 def set_stdin( file ):
-   return lambda opts, f=file: _set_stdin(opts, f);
+   return lambda name, opts, f=file: _set_stdin(name, opts, f);
 
-def _set_stdin( opts, f ):
+def _set_stdin( name, opts, f ):
    opts.stdin = f
 
 # -----
 
 def exit_code( val ):
-    return lambda opts, v=val: _exit_code(opts, v);
+    return lambda name, opts, v=val: _exit_code(name, opts, v);
 
-def _exit_code( opts, v ):
+def _exit_code( name, opts, v ):
     opts.exit_code = v
 
 # -----
 
 def timeout_multiplier( val ):
-    return lambda opts, v=val: _timeout_multiplier(opts, v)
+    return lambda name, opts, v=val: _timeout_multiplier(name, opts, v)
 
-def _timeout_multiplier( opts, v ):
+def _timeout_multiplier( name, opts, v ):
     opts.timeout_multiplier = v
 
 # -----
 
 def extra_run_opts( val ):
-    return lambda opts, v=val: _extra_run_opts(opts, v);
+    return lambda name, opts, v=val: _extra_run_opts(name, opts, v);
 
-def _extra_run_opts( opts, v ):
+def _extra_run_opts( name, opts, v ):
     opts.extra_run_opts = v
 
 # -----
 
 def extra_hc_opts( val ):
-    return lambda opts, v=val: _extra_hc_opts(opts, v);
+    return lambda name, opts, v=val: _extra_hc_opts(name, opts, v);
 
-def _extra_hc_opts( opts, v ):
+def _extra_hc_opts( name, opts, v ):
     opts.extra_hc_opts = v
 
 # -----
 
 def extra_clean( files ):
-    return lambda opts, v=files: _extra_clean(opts, v);
+    return lambda name, opts, v=files: _extra_clean(name, opts, v);
 
-def _extra_clean( opts, v ):
+def _extra_clean( name, opts, v ):
     opts.clean_files = v
 
 # -----
 
 def stats_range_field( field, expected, dev ):
-    return lambda opts, f=field, x=expected, y=dev: _stats_range_field(opts, f, x, y);
+    return lambda name, opts, f=field, x=expected, y=dev: _stats_range_field(name, opts, f, x, y);
 
-def _stats_range_field( opts, f, x, y ):
+def _stats_range_field( name, opts, f, x, y ):
     opts.stats_range_fields[f] = (x, y)
 
 def compiler_stats_range_field( field, expected, dev ):
-    return lambda opts, f=field, x=expected, y=dev: _compiler_stats_range_field(opts, f, x, y);
+    return lambda name, opts, f=field, x=expected, y=dev: _compiler_stats_range_field(name, opts, f, x, y);
 
-def _compiler_stats_range_field( opts, f, x, y ):
+def _compiler_stats_range_field( name, opts, f, x, y ):
     opts.compiler_stats_range_fields[f] = (x, y)
 
 # -----
 
-def skip_if_no_ghci(opts):
+def skip_if_no_ghci(name, opts):
     if not ('ghci' in config.run_ways):
         opts.skip = 1
 
 # ----
 
-def skip_if_fast(opts):
+def skip_if_fast(name, opts):
     if config.fast:
         opts.skip = 1
 
@@ -487,89 +478,89 @@ def unless_tag( tag, f ):
         return normal
 
 # ---
-def high_memory_usage(opts):
+def high_memory_usage(name, opts):
     opts.alone = True
 
 # ---
-def literate( opts ):
+def literate( name, opts ):
     opts.literate = 1;
 
-def c_src( opts ):
+def c_src( name, opts ):
     opts.c_src = 1;
 
-def objc_src( opts ):
+def objc_src( name, opts ):
     opts.objc_src = 1;
 
-def objcpp_src( opts ):
+def objcpp_src( name, opts ):
     opts.objcpp_src = 1;
 
-def cmm_src( opts ):
+def cmm_src( name, opts ):
     opts.cmm_src = 1;
 
 def outputdir( odir ):
-    return lambda opts, d=odir: _outputdir(opts, d)
+    return lambda name, opts, d=odir: _outputdir(name, opts, d)
 
-def _outputdir( opts, odir ):
+def _outputdir( name, opts, odir ):
     opts.outputdir = odir;
 
 # ----
 
 def pre_cmd( cmd ):
-    return lambda opts, c=cmd: _pre_cmd(opts, cmd)
+    return lambda name, opts, c=cmd: _pre_cmd(name, opts, cmd)
 
-def _pre_cmd( opts, cmd ):
+def _pre_cmd( name, opts, cmd ):
     opts.pre_cmd = cmd
 
 # ----
 
 def clean_cmd( cmd ):
-    return lambda opts, c=cmd: _clean_cmd(opts, cmd)
+    return lambda name, opts, c=cmd: _clean_cmd(name, opts, cmd)
 
-def _clean_cmd( opts, cmd ):
+def _clean_cmd( name, opts, cmd ):
     opts.clean_cmd = cmd
 
 # ----
 
 def cmd_prefix( prefix ):
-    return lambda opts, p=prefix: _cmd_prefix(opts, prefix)
+    return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
-def _cmd_prefix( opts, prefix ):
+def _cmd_prefix( name, opts, prefix ):
     opts.cmd_wrapper = lambda cmd, p=prefix: p + ' ' + cmd;
 
 # ----
 
 def cmd_wrapper( fun ):
-    return lambda opts, f=fun: _cmd_wrapper(opts, fun)
+    return lambda name, opts, f=fun: _cmd_wrapper(name, opts, fun)
 
-def _cmd_wrapper( opts, fun ):
+def _cmd_wrapper( name, opts, fun ):
     opts.cmd_wrapper = fun
 
 # ----
 
 def compile_cmd_prefix( prefix ):
-    return lambda opts, p=prefix: _compile_cmd_prefix(opts, prefix)
+    return lambda name, opts, p=prefix: _compile_cmd_prefix(name, opts, prefix)
 
-def _compile_cmd_prefix( opts, prefix ):
+def _compile_cmd_prefix( name, opts, prefix ):
     opts.compile_cmd_prefix = prefix
 
 # ----
 
-def normalise_slashes( opts ):
+def normalise_slashes( name, opts ):
     opts.extra_normaliser = normalise_slashes_
 
-def normalise_exe( opts ):
+def normalise_exe( name, opts ):
     opts.extra_normaliser = normalise_exe_
 
 def normalise_fun( fun ):
-    return lambda opts, f=fun: _normalise_fun(opts, f)
+    return lambda name, opts, f=fun: _normalise_fun(name, opts, f)
 
-def _normalise_fun( opts, f ):
+def _normalise_fun( name, opts, f ):
     opts.extra_normaliser = f
 
 def normalise_errmsg_fun( fun ):
-    return lambda opts, f=fun: _normalise_errmsg_fun(opts, f)
+    return lambda name, opts, f=fun: _normalise_errmsg_fun(name, opts, f)
 
-def _normalise_errmsg_fun( opts, f ):
+def _normalise_errmsg_fun( name, opts, f ):
     opts.extra_errmsg_normaliser = f
 
 def two_normalisers(f, g):
@@ -582,21 +573,23 @@ def composes( fs ):
     return reduce(lambda f, g: compose(f, g), fs)
 
 def compose( f, g ):
-    return lambda opts, f=f, g=g: _compose(opts,f,g)
+    return lambda name, opts, f=f, g=g: _compose(name, opts, f, g)
 
-def _compose( opts, f, g ):
-    f(opts)
-    g(opts)
+def _compose( name, opts, f, g ):
+    f(name, opts)
+    g(name, opts)
 
 # -----------------------------------------------------------------------------
 # The current directory of tests
 
 def newTestDir( dir ):
-    global thisdir_testopts
+    global thisdir_settings
     # reset the options for this test directory
-    thisdir_testopts = copy.copy(default_testopts)
-    thisdir_testopts.testdir = dir
-    thisdir_testopts.compiler_always_flags = config.compiler_always_flags
+    thisdir_settings = lambda name, opts, dir=dir: _newTestDir( name, opts, dir )
+
+def _newTestDir( name, opts, dir ):
+    opts.testdir = dir
+    opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
 # Actually doing tests
@@ -629,18 +622,22 @@ def test (name, setup, func, args):
     global aloneTests
     global parallelTests
     global allTestNames
+    global thisdir_settings
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         framework_fail(name, 'bad_name', 'This test has an invalid name')
-    # We need a deepcopy so that dictionarys, such as the stats_range_fields
-    # dictionary, get copied too.
-    myTestOpts = copy.deepcopy(thisdir_testopts)
+
+    # Make a deep copy of the default_testopts, as we need our own copy
+    # of any dictionaries etc inside it. Otherwise, if one test modifies
+    # them, all tests will see the modified version!
+    myTestOpts = copy.deepcopy(default_testopts)
 
     if type(setup) is types.ListType:
        setup = composes(setup)
 
-    setup(myTestOpts)
+    setup = compose(thisdir_settings, setup)
+    setup(name, myTestOpts)
 
     thisTest = lambda : runTest(myTestOpts, name, func, args)
     if myTestOpts.alone:

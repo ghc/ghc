@@ -3,7 +3,7 @@
 # to run it !if_compiler_profiled
 test('T4255', unless_compiler_profiled(skip), compile_fail, ['-v0'])
 
-def f(opts):
+def f(name, opts):
   opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
   if (ghc_with_interpreter == 0):
 	opts.skip = 1
