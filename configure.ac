@@ -15,11 +15,6 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.7], [glasgow-haskell-bugs@haskell.org], [ghc])
 
-# Using autoconf v2.59 started to give nonsense like this
-#  #define SIZEOF_CHAR 0
-# recently. Exclude that version.
-AC_PREREQ([2.60])
-
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
 
@@ -54,10 +49,13 @@ AC_SUBST([release], [1])
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
 
-dnl * We require autoconf version 2.52
+dnl * We require autoconf version 2.60
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-AC_PREREQ([2.52])
+dnl Using autoconf 2.59 started to give nonsense like this
+dnl  #define SIZEOF_CHAR 0
+dnl recently.
+AC_PREREQ([2.60])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
