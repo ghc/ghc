@@ -260,16 +260,16 @@ def _extra_clean( opts, v ):
 
 # -----
 
-def stats_range_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _stats_range_field(opts, f, x, y);
+def stats_range_field( field, expected, dev ):
+    return lambda opts, f=field, x=expected, y=dev: _stats_range_field(opts, f, x, y);
 
 def _stats_range_field( opts, f, x, y ):
     # copy the dictionary, as the config gets shared between all tests
     opts.stats_range_fields = opts.stats_range_fields.copy()
     opts.stats_range_fields[f] = (x, y)
 
-def compiler_stats_range_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _compiler_stats_range_field(opts, f, x, y);
+def compiler_stats_range_field( field, expected, dev ):
+    return lambda opts, f=field, x=expected, y=dev: _compiler_stats_range_field(opts, f, x, y);
 
 def _compiler_stats_range_field( opts, f, x, y ):
     # copy the dictionary, as the config gets shared between all tests
