@@ -57,8 +57,8 @@ test('T3736',
      ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
-      stats_range_field('peak_megabytes_allocated', 1, 0),
-                                     # expected value: 1 (amd64/Linux)
+      stats_num_field('peak_megabytes_allocated', (1, 0)),
+                                 # expected value: 1 (amd64/Linux)
       stats_num_field('bytes allocated',
                       [(wordsize(32), 45648, 5),
                     # expected value: 45648 (x86/Linux)

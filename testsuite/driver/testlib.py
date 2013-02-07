@@ -258,12 +258,16 @@ def _stats_num_field( name, opts, field, expecteds ):
     if field in opts.stats_range_fields:
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-    for (b, expected, dev) in expecteds:
-        if b:
-            opts.stats_range_fields[field] = (expected, dev)
-            return
+    if type(expecteds) is types.ListType:
+        for (b, expected, dev) in expecteds:
+            if b:
+                opts.stats_range_fields[field] = (expected, dev)
+                return
+        framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
-    framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+    else:
+        (expected, dev) = expecteds
+        opts.stats_range_fields[field] = (expected, dev)
 
 def stats_range_field( field, expected, dev ):
     return stats_num_field( field, [(True, expected, dev)] )
