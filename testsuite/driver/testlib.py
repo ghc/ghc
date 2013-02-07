@@ -290,6 +290,15 @@ def skip_if_fast(opts):
 
 # -----
 
+def when(b, f):
+    if b:
+        return f
+    else:
+        return normal
+
+def unless(b, f):
+    return when(not b, f)
+
 def if_platform( plat, f ):
     if config.platform == plat:
         return f
@@ -326,17 +335,8 @@ def unless_arch( arch, f ):
     else:
         return f
 
-def if_wordsize( ws, f ):
-    if config.wordsize == str(ws):
-        return f
-    else:
-        return normal
-
-def unless_wordsize( ws, f ):
-    if config.wordsize == str(ws):
-        return normal
-    else:
-        return f
+def wordsize( ws ):
+    return config.wordsize == str(ws)
 
 def if_unregisterised( f ):
     if config.unregisterised:
