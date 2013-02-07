@@ -3,7 +3,7 @@
 -- See Trac #1825
 
 module ShouldFail where
-import Data.Typeable
+import Data.OldTypeable
 
 data T1 a = T1 a deriving( Typeable1 )
 

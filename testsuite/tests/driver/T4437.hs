@@ -37,7 +37,8 @@ expectedGhcOnlyExtensions = [
                              "AlternativeLayoutRuleTransitional",
                              "ExplicitNamespaces",
                              "TypeHoles",
-                             "EmptyCase" ]
+                             "EmptyCase",
+                             "AutoDeriveTypeable"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

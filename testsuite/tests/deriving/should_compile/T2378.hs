@@ -7,4 +7,4 @@ import Data.Data
 
 newtype T f = MkT Int
 
-deriving instance Typeable1 T
+deriving instance Typeable T

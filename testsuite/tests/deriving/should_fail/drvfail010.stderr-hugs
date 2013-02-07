@@ -1,1 +1,0 @@
-ERROR "drvfail010.hs":6 - Cannot derive instances of class "Typeable"
