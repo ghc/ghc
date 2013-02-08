@@ -269,9 +269,6 @@ def _stats_num_field( name, opts, field, expecteds ):
         (expected, dev) = expecteds
         opts.stats_range_fields[field] = (expected, dev)
 
-def stats_range_field( field, expected, dev ):
-    return stats_num_field( field, [(True, expected, dev)] )
-
 def compiler_stats_num_field( field, expecteds ):
     return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e);
 
@@ -285,9 +282,6 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
             return
 
     framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
-
-def compiler_stats_range_field( field, expected, dev ):
-    return compiler_stats_num_field( field, [(True, expected, dev)] )
 
 # -----
 
