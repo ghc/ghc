@@ -117,7 +117,7 @@ test('T4801',
                    # 12/11/2012: 49 (amd64/Linux) (REASON UNKNOWN!)
 
       # expected value: 58 (amd64/OS X):
-      if_platform('x86_64-apple-darwin',
+      when(platform('x86_64-apple-darwin'),
           compiler_stats_range_field('peak_megabytes_allocated', 58, 1)),
       # expected value: 228286660 (x86/OS X)
       when(wordsize(32),
@@ -130,7 +130,7 @@ test('T4801',
                    # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
 
       # expected value: 510938976 (amd64/OS X):
-      if_platform('x86_64-apple-darwin',
+      when(platform('x86_64-apple-darwin'),
           compiler_stats_range_field('bytes allocated', 510938976, 5)),
 
       when(wordsize(32),
@@ -144,7 +144,7 @@ test('T4801',
                 # 19/10/2012: 26882576 (-fPIC turned on)
                 # 19/10/2012: 18619912 (-fPIC turned off)
                 # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
-      if_platform('x86_64-apple-darwin',
+      when(platform('x86_64-apple-darwin'),
           compiler_stats_range_field('max_bytes_used', 21657520, 5)),
        only_ways(['normal']),
        extra_hc_opts('-static')

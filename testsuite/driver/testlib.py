@@ -312,17 +312,8 @@ def when(b, f):
 def unless(b, f):
     return when(not b, f)
 
-def if_platform( plat, f ):
-    if config.platform == plat:
-        return f
-    else:
-        return normal
-
-def unless_platform( plat, f ):
-    if config.platform != plat:
-        return f
-    else:
-        return normal
+def platform( plat ):
+    return config.platform == plat
 
 def if_os( os, f ):
     if config.os == os:

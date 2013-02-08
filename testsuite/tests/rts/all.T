@@ -9,7 +9,7 @@ test('testblockalloc', compose(c_src,
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
      composes([
-             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
+             when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
              # LLVM Optimiser considers dereference of a null pointer
              # undefined and marks the code as unreachable which means
              # that later optimisations remove it altogether.
@@ -21,13 +21,13 @@ test('derefnull',
              # the right exit code we're OK.
              if_os('linux', ignore_output),
              # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
-             if_platform('i386-apple-darwin', exit_code(138)),
-             if_platform('powerpc-apple-darwin', exit_code(138)),
+             when(platform('i386-apple-darwin'), exit_code(138)),
+             when(platform('powerpc-apple-darwin'), exit_code(138)),
              if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
      composes([
-             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
+             when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
              # SIGFPE on Linux
              exit_code(136),
              # Apparently the output can be different on different
@@ -121,8 +121,8 @@ def config_T5250(name, opts):
 
 test('T5250', [ config_T5250,
                 # stack ptr is not 16-byte aligned on 32-bit Windows
-                if_platform('i386-unknown-mingw32', expect_fail),
-                if_platform('i386-unknown-linux',
+                when(platform('i386-unknown-mingw32'), expect_fail),
+                when(platform('i386-unknown-linux'),
                             expect_broken_for(4211,['llvm'])),
                 extra_clean(['spalign.o']),
                 omit_ways(['ghci']) ],
