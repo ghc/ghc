@@ -316,6 +316,15 @@ registerFd mgr cb fd evs = do
   return r
 {-# INLINE registerFd #-}
 
+{-
+    Building GHC with parallel IO manager on Mac freezes when
+    compiling the dph libraries in the phase 2. As workaround, we
+    don't use oneshot and we wake up an IO manager on Mac every time
+    when we register an event.
+
+    For more information, please read:
+        http://hackage.haskell.org/trac/ghc/ticket/7651
+-}
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
 #if defined(darwin_HOST_OS)
