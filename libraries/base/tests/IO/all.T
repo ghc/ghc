@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-def expect_fail_if_windows(opts):
+def expect_fail_if_windows(name, opts):
    f = if_os('mingw32', expect_fail);
-   return f(opts);
+   return f(normal, opts);
 
 test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
 	compile_and_run, [''])
