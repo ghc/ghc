@@ -1,5 +1,5 @@
 # Just do the opt way...
-def f( opts ):
+def f( name, opts ):
   opts.only_ways = ['optasm']
 
 setTestOpts(f)

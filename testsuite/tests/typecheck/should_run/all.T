@@ -16,7 +16,7 @@ test('Defer01', normal, compile_and_run, [''])
 # -----------------------------------------------------------------------------
 # Skip everything else if fast is on
 
-def f(opts):
+def f(name, opts):
   if config.fast:
 	opts.skip = 1
 setTestOpts(f)

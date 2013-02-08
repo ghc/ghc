@@ -4,7 +4,7 @@
 --	     (Monad GHC.Prim.Any1, Monad m) =>
 --	     t -> Something (m Bool) e
 --
--- The stupid 'GHC.Prim.Any1' arose becuase of type ambiguity
+-- The stupid 'GHC.Prim.Any1' arose because of type ambiguity
 -- which should be reported, and wasn't.
 
 module ShouldFail where

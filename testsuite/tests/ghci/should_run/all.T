@@ -2,7 +2,7 @@
 setTestOpts(if_compiler_profiled(skip))
 
 # We only want to run these tests with GHCi
-def just_ghci( opts ):
+def just_ghci( name, opts ):
   opts.only_ways = ['ghci']
 
 test('ghcirun001', just_ghci, compile_and_run, [''])

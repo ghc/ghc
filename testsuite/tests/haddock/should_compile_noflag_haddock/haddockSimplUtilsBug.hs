@@ -4,7 +4,7 @@ postInlineUnconditionally
   = case Just "Hey" of
 	-- The point of examining occ_info here is that for *non-values* 
 	-- that occur outside a lambda, the call-site inliner won't have
-	-- a chance (becuase it doesn't know that the thing
+	-- a chance (because it doesn't know that the thing
 	-- only occurs once).   The pre-inliner won't have gotten
 	-- it either, if the thing occurs in more than one branch
 	-- So the main target is things like

@@ -3,7 +3,7 @@
 # to run it !if_compiler_profiled
 test('T4255', unless_compiler_profiled(skip), compile_fail, ['-v0'])
 
-def f(opts):
+def f(name, opts):
   opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
   if (ghc_with_interpreter == 0):
 	opts.skip = 1
@@ -267,3 +267,5 @@ test('T7532',
      extra_clean(['T7532a.hi', 'T7532a.o']),
      multimod_compile,
      ['T7532', '-v0'])
+test('T2222', normal, compile, ['-v0'])
+test('T1849', normal, ghci_script, ['T1849.script'])

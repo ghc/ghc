@@ -4,15 +4,13 @@ test('space_leak_001',
      # Now it's: 3 (amd64/Linux)
      #           4 (x86/OS X)
      #           5 (x86/Linux)
-     [stats_num_field('peak_megabytes_allocated', 3, 5),
-      stats_num_field('max_bytes_used', 400000,
-                                        500000),
-                      # expected value: 440224 (amd64/Linux)
-                      #                 417016 (x86/OS X)
-                      #                 415672 (x86/Windows)
-                      #                 481456 (unreg amd64/Linux)
-      stats_num_field('bytes allocated', 9050000000,
-                                         9100000000),
+     [stats_range_field('peak_megabytes_allocated', 4, 1),
+      stats_range_field('max_bytes_used', 440000, 10),
+                        # expected value: 440224 (amd64/Linux)
+                        #                 417016 (x86/OS X)
+                        #                 415672 (x86/Windows)
+                        #                 481456 (unreg amd64/Linux)
+      stats_range_field('bytes allocated', 9079316016, 1),
                            # expected value: 9079316016 (amd64/Linux)
                            #                 9331570416 (x86/Linux)
                            #                 9329073952 (x86/OS X)
@@ -25,7 +23,7 @@ test('space_leak_001',
 test('T4334',
      # Test for a space leak in Data.List.lines (fixed with #4334)
      [extra_run_opts('1000000 2 t'),
-      stats_num_field('peak_megabytes_allocated', 1, 3),
+      stats_range_field('peak_megabytes_allocated', 2, 0),
       # prof ways don't work well with +RTS -V0
       omit_ways(['profasm','profthreaded'])
       ],
@@ -34,7 +32,7 @@ test('T4334',
 test('T2762',
      [# peak_megabytes_allocated is 2 with 7.0.2.
       # Was 57 with 6.12.3.
-      stats_num_field('peak_megabytes_allocated', 1, 3),
+      stats_range_field('peak_megabytes_allocated', 2, 0),
       only_ways(['normal']),
       extra_clean(['T2762A.hi', 'T2762A.o'])],
      compile_and_run, ['-O'])

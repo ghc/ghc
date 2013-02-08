@@ -85,9 +85,9 @@ test('T2615',
        if_os('darwin', skip),
        # Solaris' linker does not support GNUish linker scripts
        if_os('solaris2', skip),
-       cmd_prefix('$MAKE T2615-prep && ' +
-                  # Add current directory to dlopen search path
-                  'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
+       pre_cmd('$MAKE -s --no-print-directory T2615-prep'),
+       # Add current directory to dlopen search path
+       cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
        extra_clean(['libfoo_T2615.so', 'libfoo_T2615.o'])],
      compile_and_run,
      ['-package ghc'])
@@ -106,7 +106,8 @@ test('T4059',
 # Test for #4274
 test('exec_signals', [
      if_os('mingw32', skip),
-     cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
+     pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
+     cmd_prefix('./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])
     ], compile_and_run, [''])
 
@@ -114,7 +115,7 @@ test('return_mem_to_os', normal, compile_and_run, [''])
 
 test('T4850', normal, run_command, ['$MAKE -s --no-print-directory T4850'])
 
-def config_T5250(opts):
+def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
         opts.skip = 1;
 
@@ -136,7 +137,7 @@ test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  extra_clean(['T6006_c.o']),
-                 compile_cmd_prefix('$MAKE T6006_setup && ') ],
+                 pre_cmd('$MAKE -s --no-print-directory T6006_setup') ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which
                  # needs it.
@@ -154,10 +155,12 @@ test('T7040', [ extra_clean(['T7040_c.o']), omit_ways(['ghci']) ],
      compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci', [ only_ways(['ghci']),
-                      cmd_prefix('$MAKE T7040_ghci_setup && '),
+                      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup'),
                       extra_clean(['T7040_ghci_c.o']) ],
                     compile_and_run, ['T7040_ghci_c.o'])
 
 test('T7227', [ extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS'),
                 extra_clean(['T7227.stat']) ]
             , compile_and_run, [''] )
+
+test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )

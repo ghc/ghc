@@ -10,7 +10,7 @@ data Hidden = forall t . Hidden (ExpGADT t) (ExpGADT t)
 hval = Hidden (ExpInt 0) (ExpInt 1)
 
 -- With the type sig this is ok, but without it maybe
--- should be rejected becuase the result type is wobbly
+-- should be rejected because the result type is wobbly
 --    weird1 :: ExpGADT Int
 --
 -- And indeed it is rejected by GHC 7.8 because OutsideIn

@@ -1,4 +1,4 @@
-def f(opts):
+def f(name, opts):
   if (ghc_with_interpreter == 0):
 	opts.skip = 1
 

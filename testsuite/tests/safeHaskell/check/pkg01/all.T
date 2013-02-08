@@ -1,5 +1,5 @@
 # Just do the normal way, SafeHaskell is all in the frontend
-def f( opts ):
+def f( name, opts ):
   opts.only_ways = ['normal']
 
 def normaliseArrayPackage(str):
@@ -7,6 +7,9 @@ def normaliseArrayPackage(str):
 
 def normaliseBytestringPackage(str):
     return re.sub('bytestring-[0-9]+(\.[0-9]+)*', 'bytestring-<VERSION>', str)
+
+def ignoreLdOutput(str):
+    return re.sub('Creating library file: pdb.safePkg01/dist.build.libHSsafePkg01-1.0-ghc[0-9.]*.dll.a\n', '', str)
 
 setTestOpts(f)
 
@@ -31,6 +34,7 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 # and can be changed correctly
 test('safePkg01',
      [clean_cmd('$MAKE -s --no-print-directory cleanPackageDatabase.safePkg01'),
+      normalise_errmsg_fun(ignoreLdOutput),
       normalise_fun(two_normalisers(normaliseArrayPackage,
                                     normaliseBytestringPackage))],
      run_command, 

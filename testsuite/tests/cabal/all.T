@@ -16,7 +16,7 @@ test('ghcpkg02',
 test('ghcpkg03',
      [extra_clean(['local03.package.conf',
                    'local03.package.conf.old']),
-      normalise_fun(normaliseDynlibNames)],
+      normalise_errmsg_fun(normaliseDynlibNames)],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
 test('ghcpkg04',
@@ -36,8 +36,8 @@ test('ghcpkg05',
                     'local05a.package.conf.old',
                     'local05b.package.conf',
                     'local05b.package.conf.old']),
-       normalise_fun(two_normalisers(normalise_haddock_junk,
-                                     normaliseDynlibNames))
+       normalise_errmsg_fun(two_normalisers(normalise_haddock_junk,
+                                            normaliseDynlibNames))
        ],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg05'])

@@ -20,7 +20,7 @@ test    ('dph-nbody-copy-opt'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fno-liberate-case -package dph-lifted-copy -package dph-prim-par'])
+          , '-Odph -fno-vectorisation-avoidance -fno-liberate-case -package dph-lifted-copy -package dph-prim-par'])
 
 
 test    ('dph-nbody-vseg-fast' 
@@ -40,4 +40,4 @@ test    ('dph-nbody-copy-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O0 -package dph-lifted-copy -package dph-prim-par'])
+          , '-O0 -fno-vectorisation-avoidance -package dph-lifted-copy -package dph-prim-par'])

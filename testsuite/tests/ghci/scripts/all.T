@@ -76,7 +76,7 @@ test('ghci055', combined_output, ghci_script, ['ghci055.script'])
 
 test('ghci056',
      [
-       cmd_prefix('$MAKE --no-print-directory ghci056_setup && '),
+       pre_cmd('$MAKE -s --no-print-directory ghci056_setup'),
        extra_run_opts('ghci056_c.o'),
        extra_clean('ghci056_c.o')
      ],
@@ -128,7 +128,13 @@ test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
 test('T6007', normal, ghci_script, ['T6007.script'])
 test('T6091', normal, ghci_script, ['T6091.script'])
-test('T6106', extra_clean(['T6106.hs']), ghci_script, ['T6106.script'])
+test('T6106',
+     [extra_clean(['T6106.hs',
+                   'T6106_preproc.hi', 'T6106_preproc.o',
+                   'T6106_preproc', 'T6106_preproc.exe']),
+      pre_cmd('$MAKE -s --no-print-directory T6106_prep')],
+     ghci_script,
+     ['T6106.script'])
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
 test('ghci058',

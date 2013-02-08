@@ -207,9 +207,6 @@ if windows or darwin:
 global testopts_local
 testopts_local.x = TestOptions()
 
-global thisdir_testopts
-thisdir_testopts = getThisDirTestOpts()
-
 if config.use_threads:
     t.lock = threading.Lock()
     t.thread_pool = threading.Condition(t.lock)
@@ -261,6 +258,8 @@ for file in t_files:
 if config.use_threads:
     t.running_threads=0
 for oneTest in parallelTests:
+    if stopping():
+        break
     oneTest()
 if config.use_threads:
     t.thread_pool.acquire()
@@ -269,6 +268,8 @@ if config.use_threads:
     t.thread_pool.release()
 config.use_threads = False
 for oneTest in aloneTests:
+    if stopping():
+        break
     oneTest()
         
 summary(t, sys.stdout)
