@@ -333,7 +333,7 @@ ioManagerCapabilitiesChanged = do
     let old_n_caps = high + 1
     if new_n_caps > old_n_caps
       then do new_eventManagerArray <- newIOArray (0, new_n_caps - 1) Nothing
-                                       
+
               -- copy the existing values into the new array:
               forM_ [0..high] $ \i -> do
                 Just (tid,mgr) <- readIOArray eventManagerArray i
@@ -348,7 +348,7 @@ ioManagerCapabilitiesChanged = do
 
               -- update the event manager array reference:
               writeIORef eventManager new_eventManagerArray
-      else when (new_n_caps > numEnabled) $ 
+      else when (new_n_caps > numEnabled) $
             forM_ [numEnabled..new_n_caps-1] $ \i -> do
               Just (_,mgr) <- readIOArray eventManagerArray i
               tid <- restartPollLoop mgr i
