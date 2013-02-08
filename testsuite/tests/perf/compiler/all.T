@@ -6,55 +6,52 @@ setTestOpts(no_lint)
 
 
 test('T1969',
-     [when(wordsize(32),
-          compiler_stats_range_field('peak_megabytes_allocated', 18, 1)),
-                             # expected value: 14 (x86/Windows 17/05/10)
-                             #                 15 (x86/OS X)
-                             #                 19 (x86/OS X)
-      when(wordsize(64),
-          compiler_stats_range_field('peak_megabytes_allocated', 25, 1)),
-                                             # expected value: 28 (amd64/Linux)
-                                             # expected value: 34 (amd64/Linux)
-                                             # 2012-09-20      23 (amd64/Linux)
-                                             # 2012-10-03      25 (amd64/Linux if .hi exists)
-      when(wordsize(32),
-          compiler_stats_range_field('max_bytes_used', 6149572, 5)),
-                             # expected value: 6707308 (x86/OS X)
-                             #                 5717704 (x86/Windows 17/05/10)
-                             #                 6149572 (x86/Linux, 31/12/09)
-      when(wordsize(64),
-          compiler_stats_range_field('max_bytes_used', 9000000, 20)),
-                                  # looks like the peak is around 10M, but we're
-                                  # unlikely to GC exactly on the peak.
-                                  # varies quite a lot with CLEANUP and BINDIST,
-                                  # hence 10% range.
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 303930948, 5)),
-                        # expected value: 215582916 (x86/Windows)
-                        #                 221667908 (x86/OS X)
-                        #                 274932264 (x86/Linux)
-                        # 2012-10-08:     303930948 (x86/Linux, new codegen)
-                        # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 658786936, 5)),
-                        # 17/11/2009:     434,845,560 (amd64/Linux)
-                        # 08/12/2009:     459,776,680 (amd64/Linux)
-                        # 17/05/2010:     519,377,728 (amd64/Linux)
-                        # 05/08/2011:     561,382,568 (amd64/OS X)
-                        # 16/07/2012:     589,168,872 (amd64/Linux)
-                        # 20/07/2012:     595,936,240 (amd64/Linux)
-                        # 23/08/2012:     606,230,880 (amd64/Linux)
-                        # 29/08/2012:     633,334,184 (amd64/Linux)
-                        #                 (^ new codegen)
-                        # 18/09/2012:     641,959,976 (amd64/Linux)
-                        # 19/10/2012:     661,832,592 (amd64/Linux)
-                        #                 (^ -fPIC turned on)
-                        # 23/10/2012:     642,594,312 (amd64/Linux)
-                        #                 (^ -fPIC turned off again)
-                        # 12/11/2012:     658,786,936 (amd64/Linux)
-                        #                 ( UNKNOWN REASON )
-                        # 17/1/13:        667,160,192 (x86_64/Linux)
-                        #                 (new demand analyser)
+     [compiler_stats_num_field('peak_megabytes_allocated',
+          [(wordsize(32), 18, 1),
+        # expected value: 14 (x86/Windows 17/05/10)
+        #                 15 (x86/OS X)
+        #                 19 (x86/OS X)
+           (wordsize(64), 25, 1)]),
+        # expected value: 28 (amd64/Linux)
+        # expected value: 34 (amd64/Linux)
+        # 2012-09-20      23 (amd64/Linux)
+        # 2012-10-03      25 (amd64/Linux if .hi exists)
+      compiler_stats_num_field('max_bytes_used',
+          [(wordsize(32), 6149572, 5),
+        # expected value: 6707308 (x86/OS X)
+        #                 5717704 (x86/Windows 17/05/10)
+        #                 6149572 (x86/Linux, 31/12/09)
+           (wordsize(64), 9000000, 20)]),
+               # looks like the peak is around 10M, but we're
+               # unlikely to GC exactly on the peak.
+               # varies quite a lot with CLEANUP and BINDIST,
+               # hence 10% range.
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 303930948, 5),
+        # expected value: 215582916 (x86/Windows)
+        #                 221667908 (x86/OS X)
+        #                 274932264 (x86/Linux)
+        # 2012-10-08:     303930948 (x86/Linux, new codegen)
+        # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
+           (wordsize(64), 658786936, 5)]),
+        # 17/11/2009:     434845560 (amd64/Linux)
+        # 08/12/2009:     459776680 (amd64/Linux)
+        # 17/05/2010:     519377728 (amd64/Linux)
+        # 05/08/2011:     561382568 (amd64/OS X)
+        # 16/07/2012:     589168872 (amd64/Linux)
+        # 20/07/2012:     595936240 (amd64/Linux)
+        # 23/08/2012:     606230880 (amd64/Linux)
+        # 29/08/2012:     633334184 (amd64/Linux)
+        #                 (^ new codegen)
+        # 18/09/2012:     641959976 (amd64/Linux)
+        # 19/10/2012:     661832592 (amd64/Linux)
+        #                 (^ -fPIC turned on)
+        # 23/10/2012:     642594312 (amd64/Linux)
+        #                 (^ -fPIC turned off again)
+        # 12/11/2012:     658786936 (amd64/Linux)
+        #                 ( UNKNOWN REASON )
+        # 17/1/13:        667160192 (x86_64/Linux)
+        #                 (new demand analyser)
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -77,28 +74,27 @@ else:
    conf_3294 = skip
 
 test('T3294',
-     [when(wordsize(32),
-          compiler_stats_range_field('max_bytes_used', 17725476, 5)),
-                                   # expected value: 17725476 (x86/OS X)
-                                   #                 14593500 (Windows)
-      when(wordsize(64),
-          compiler_stats_range_field('max_bytes_used', 44894544, 15)),
-                                   # prev:           25753192 (amd64/Linux)
-                                   # 29/08/2012:     37724352 (amd64/Linux)
-                                   #  (increase due to new codegen, see #7198)
-                                   # 13/13/2012:     44894544 (amd64/Linux)
-                                   #  (reason for increase unknown)
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 1373514844, 5)),
-                                   # previous:     815479800  (x86/Linux)
-                                   # (^ increase due to new codegen, see #7198)
-                                   # 2012-10-08:   1373514844 (x86/Linux)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 2717327208, 5)),
-                                   # old:        1,357,587,088 (amd64/Linux)
-                                   # 29/08/2012: 2,961,778,696 (amd64/Linux)
-                                   # (^ increase due to new codegen, see #7198)
-                                   # 18/09/2012: 2,717,327,208 (amd64/Linux)
+     [
+      compiler_stats_num_field('max_bytes_used',
+          [(wordsize(32), 17725476, 5),
+        # expected value: 17725476 (x86/OS X)
+        #                 14593500 (Windows)
+           (wordsize(64), 44894544, 15)]),
+        # prev:           25753192 (amd64/Linux)
+        # 29/08/2012:     37724352 (amd64/Linux)
+        #  (increase due to new codegen, see #7198)
+        # 13/13/2012:     44894544 (amd64/Linux)
+        #  (reason for increase unknown)
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 1373514844, 5),
+           # previous:     815479800  (x86/Linux)
+           # (^ increase due to new codegen, see #7198)
+           # 2012-10-08:  1373514844 (x86/Linux)
+           (wordsize(64), 2717327208, 5)]),
+            # old:        1357587088 (amd64/Linux)
+            # 29/08/2012: 2961778696 (amd64/Linux)
+            # (^ increase due to new codegen, see #7198)
+            # 18/09/2012: 2717327208 (amd64/Linux)
       conf_3294
       ],
      compile,
@@ -107,45 +103,40 @@ test('T3294',
 test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
-      when(wordsize(32),
-          compiler_stats_range_field('peak_megabytes_allocated', 30, 20)),
+      compiler_stats_num_field('peak_megabytes_allocated',
+          [(platform('x86_64-apple-darwin'), 58, 1),
+                           # expected value: 58 (amd64/OS X)
+           (wordsize(32), 30, 20),
+           (wordsize(64), 49, 20)]),
+            # prev:       50 (amd64/Linux)
+            # 19/10/2012: 64 (amd64/Linux)
+            #                (REASON UNKNOWN!)
+            # 12/11/2012: 49 (amd64/Linux)
+            #                (REASON UNKNOWN!)
 
-      when(wordsize(64),
-          compiler_stats_range_field('peak_megabytes_allocated', 49, 20)),
-                   # prev:       50 (amd64/Linux)
-                   # 19/10/2012: 64 (amd64/Linux) (REASON UNKNOWN!)
-                   # 12/11/2012: 49 (amd64/Linux) (REASON UNKNOWN!)
+      compiler_stats_num_field('bytes allocated',
+          [(platform('x86_64-apple-darwin'), 510938976, 5),
+                           # expected value: 510938976 (amd64/OS X):
 
-      # expected value: 58 (amd64/OS X):
-      if_platform('x86_64-apple-darwin',
-          compiler_stats_range_field('peak_megabytes_allocated', 58, 1)),
-      # expected value: 228286660 (x86/OS X)
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 185669232, 10)),
+           (wordsize(32), 185669232, 10),
+        # expected value: 228286660 (x86/OS X)
 
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 392409984, 10)),
-                   # prev:       360243576 (amd64/Linux)
-                   # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
-                   # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
+           (wordsize(64), 392409984, 10)]),
+            # prev:       360243576 (amd64/Linux)
+            # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
+            # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
 
-      # expected value: 510938976 (amd64/OS X):
-      if_platform('x86_64-apple-darwin',
-          compiler_stats_range_field('bytes allocated', 510938976, 5)),
-
-      when(wordsize(32),
-          compiler_stats_range_field('max_bytes_used', 9651948, 5)),
+      compiler_stats_num_field('max_bytes_used',
+          [(platform('x86_64-apple-darwin'), 21657520, 5),
+           (wordsize(32), 9651948, 5),
       #                    expected value: x86/OS X:  9651948
       #                    expected value:           10290952 (windows)
-      when(wordsize(64),
-          compiler_stats_range_field('max_bytes_used', 21657520, 15)),
+           (wordsize(64), 21657520, 15)]),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
                 # 19/10/2012: 26882576 (-fPIC turned on)
                 # 19/10/2012: 18619912 (-fPIC turned off)
                 # 24/12/2012: 21657520 (perhaps gc sampling time wibbles?)
-      if_platform('x86_64-apple-darwin',
-          compiler_stats_range_field('max_bytes_used', 21657520, 5)),
        only_ways(['normal']),
        extra_hc_opts('-static')
       ],
@@ -154,34 +145,27 @@ test('T4801',
 
 test('T3064',
      [# expect_broken( 3064 ),
-      # expected value: 14 (x86/Linux 28-06-2012):
-      when(wordsize(32),
-          compiler_stats_range_field('peak_megabytes_allocated', 14, 1)),
+      compiler_stats_num_field('peak_megabytes_allocated',
+          [(wordsize(32), 14, 1),
+        # expected value: 14 (x86/Linux 28-06-2012):
+           (wordsize(64), 26, 1)]),
+            # (amd64/Linux):            18
+            # (amd64/Linux) 2012-02-07: 26
 
-      when(wordsize(64),
-          compiler_stats_range_field('peak_megabytes_allocated', 26, 1)),
-                                     # (amd64/Linux):            18
-                                     # (amd64/Linux) 2012-02-07: 26
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 111189536, 10),
+         # expected value: 56380288 (x86/Linux) (28/6/2011)
+         #                111189536 (x86/Windows) (30/10/12)
+           (wordsize(64), 224798696, 5)]),
+            # (amd64/Linux) (28/06/2011):  73259544
+            # (amd64/Linux) (07/02/2013): 224798696
 
-      # expected value: 56380288 (x86/Linux) (28/6/2011)
-      #                 111189536 (x86/Windows) (30/10/12)
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 111189536, 10)),
-
-
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 224798696, 5)),
-                          # (amd64/Linux) (28/06/2011):  73259544
-                          # (amd64/Linux) (07/02/2013): 224798696
-
-      # expected value: 2247016 (x86/Linux) (28/6/2011):
-      when(wordsize(32),
-          compiler_stats_range_field('max_bytes_used', 5511604, 20)),
-
-      when(wordsize(64),
-          compiler_stats_range_field('max_bytes_used',  9819288, 5)),
-                 # (amd64/Linux, intree) (28/06/2011):  4032024
-                 # (amd64/Linux, intree) (07/02/2013):  9819288
+      compiler_stats_num_field('max_bytes_used',
+          [(wordsize(32), 5511604, 20),
+        # expected value: 2247016 (x86/Linux) (28/6/2011):
+           (wordsize(64), 9819288, 5)]),
+            # (amd64/Linux, intree) (28/06/2011):  4032024
+            # (amd64/Linux, intree) (07/02/2013):  9819288
        only_ways(['normal'])
       ],
      compile,
@@ -193,17 +177,14 @@ test('T4007',
      ['$MAKE -s --no-print-directory T4007'])
 
 test('T5030',
-     [
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 259547660, 10)),
-                     # previous:    196457520
-                     # 2012-10-08:  259547660 (x86/Linux, new codegen)
-
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 602993184, 10)),
-            # Previously 530000000 (+/- 10%)
-            # 17/1/13:       602,993,184  (x86_64/Linux)
-            #                (new demand analyser)
+     [compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 259547660, 10),
+           # previous:    196457520
+           # 2012-10-08:  259547660 (x86/Linux, new codegen)
+           (wordsize(64), 602993184, 10)]),
+             # Previously 530000000 (+/- 10%)
+             # 17/1/13:   602993184  (x86_64/Linux)
+             #            (new demand analyser)
    
        only_ways(['normal'])
       ],
@@ -211,23 +192,21 @@ test('T5030',
      ['-fcontext-stack=300'])
 
 test('T5631',
-     [when(wordsize(32), # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 392904228, 10)),
-      # expected value: 774,595,008 (amd64/Linux):
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 774595008, 5)),
+     [compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 392904228, 10),
+        # expected value: 392904228 (x86/Linux)
+           (wordsize(64), 774595008, 5)]),
+        # expected value: 774595008 (amd64/Linux):
        only_ways(['normal'])
       ],
      compile,
      [''])
 
 test('parsing001',
-     [# expected value: ?
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 274000576, 10)),
-      # expected value: 587079016 (amd64/Linux):
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 587079016, 5)),
+     [compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 274000576, 10),
+           (wordsize(64), 587079016, 5)]),
+        # expected value: 587079016 (amd64/Linux)
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -236,82 +215,76 @@ test('parsing001',
 test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 226907420, 10)),
-                           # 2012-10-08: 226907420 (x86/Linux)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 640324528, 10)),
-                           # prev:       349,263,216 (amd64/Linux)
-                           # 07/08/2012: 384,479,856 (amd64/Linux)
-                           # 29/08/2012: 436,927,840 (amd64/Linux)
-                           # 12/11/2012: 640,324,528 (amd64/Linux)
-                           #   (OldCmm removed: not sure why this got worse, the
-                           #    other perf tests remained about the same)
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 226907420, 10),
+            # 2012-10-08: 226907420 (x86/Linux)
+           (wordsize(64), 640324528, 10)]),
+            # prev:       349263216 (amd64/Linux)
+            # 07/08/2012: 384479856 (amd64/Linux)
+            # 29/08/2012: 436927840 (amd64/Linux)
+            # 12/11/2012: 640324528 (amd64/Linux)
+            #   (OldCmm removed: not sure why this got worse, the
+            #    other perf tests remained about the same)
       extra_hc_opts('-static')
       ],
       compile,[''])
 
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
-      # sample from x86/Linux
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 344416344, 10)),
-                                         # prev:       300000000
-                                         # 2012-10-08: 344416344
-                                         #  (increase due to new codegen)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 713385808, 10))
-                                         # prev:       585,521,080
-                                         # 29/08/2012: 713,385,808
-                                         #  (increase due to new codegen)
+       compiler_stats_num_field('bytes allocated',
+           [(wordsize(32), 344416344, 10),
+             # prev:       300000000
+             # 2012-10-08: 344416344 x86/Linux
+             #  (increase due to new codegen)
+            (wordsize(64), 713385808, 10)])
+             # prev:       585521080
+             # 29/08/2012: 713385808
+             #  (increase due to new codegen)
       ],
       compile,[''])
 
 test('T5321FD',
      [ only_ways(['normal']),  # no optimisation for this one
-      when(wordsize(32),
-          compiler_stats_range_field('bytes allocated', 240302920, 10)),
-                                         # prev:       213380256
-                                         # 2012-10-08: 240302920 (x86/Linux)
-                                         #  (increase due to new codegen)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 492905640, 10))
-                                         # prev:       418,306,336
-                                         # 29/08/2012: 492,905,640
-                                         #  (increase due to new codegen)
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 240302920, 10),
+            # prev:       213380256
+            # 2012-10-08: 240302920 (x86/Linux)
+            #  (increase due to new codegen)
+           (wordsize(64), 492905640, 10)])
+            # prev:       418306336
+            # 29/08/2012: 492905640
+            #  (increase due to new codegen)
       ],
       compile,[''])
 
 test('T5642',
      [ only_ways(['normal']),
-      when(wordsize(32), # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated',  650000000, 10)),
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 1300000000, 10))
+       compiler_stats_num_field('bytes allocated',
+           [(wordsize(32), 650000000, 10),
+                     # sample from x86/Linux
+            (wordsize(64), 1300000000, 10)])
       ],
       compile,['-O'])
 
 test('T5837',
      [ only_ways(['normal']),
-      when(wordsize(32), # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 40000000, 10)),
-
-      # sample: 3926235424 (amd64/Linux, 15/2/2012)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 81879216, 10))
-	  				   # 2012-10-02 81879216
-                                           # 2012-09-20 87254264 amd64/Linux
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 40000000, 10),
+          # sample from x86/Linux
+           (wordsize(64), 81879216, 10)])
+              # sample: 3926235424 (amd64/Linux, 15/2/2012)
+             # 2012-10-02 81879216
+             # 2012-09-20 87254264 amd64/Linux
       ],
       compile_fail,['-fcontext-stack=50'])
 
 test('T6048',
      [ only_ways(['optasm']),
-      when(wordsize(32), # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 48887164, 10)),
-                                           # prev:       38000000
-                                           # 2012-10-08: 48887164 (x86/Linux)
-      when(wordsize(64),
-          compiler_stats_range_field('bytes allocated', 97247032, 10))
-                                           # 18/09/2012 97247032 amd64/Linux
+      compiler_stats_num_field('bytes allocated',
+          [(wordsize(32), 48887164, 10),
+            # prev:       38000000 (x86/Linux)
+            # 2012-10-08: 48887164 (x86/Linux)
+           (wordsize(64), 97247032, 10)])
+             # 18/09/2012 97247032 amd64/Linux
       ],
       compile,[''])

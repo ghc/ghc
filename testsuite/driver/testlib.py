@@ -269,9 +269,6 @@ def _stats_num_field( name, opts, field, expecteds ):
         (expected, dev) = expecteds
         opts.stats_range_fields[field] = (expected, dev)
 
-def stats_range_field( field, expected, dev ):
-    return stats_num_field( field, [(True, expected, dev)] )
-
 def compiler_stats_num_field( field, expecteds ):
     return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e);
 
@@ -285,9 +282,6 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
             return
 
     framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
-
-def compiler_stats_range_field( field, expected, dev ):
-    return compiler_stats_num_field( field, [(True, expected, dev)] )
 
 # -----
 
@@ -312,17 +306,8 @@ def when(b, f):
 def unless(b, f):
     return when(not b, f)
 
-def if_platform( plat, f ):
-    if config.platform == plat:
-        return f
-    else:
-        return normal
-
-def unless_platform( plat, f ):
-    if config.platform != plat:
-        return f
-    else:
-        return normal
+def platform( plat ):
+    return config.platform == plat
 
 def if_os( os, f ):
     if config.os == os:
