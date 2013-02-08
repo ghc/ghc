@@ -571,7 +571,6 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
 WhatGccIsCalled       = @WhatGccIsCalled@
 GccVersion            = @GccVersion@
-AlienScript           = @AlienScript@
 ifeq "$(phase)" "0"
 CrossCompilePrefix    =
 else

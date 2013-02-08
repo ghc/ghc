@@ -21,15 +21,12 @@ FP_GMP
 bootstrap_target=@TargetPlatform@
 FPTOOLS_SET_PLATFORM_VARS
 
-BuildingCrossCompiler=NO
-PortingCompiler=NO
+# ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO
 CrossCompilePrefix=""
 TargetPlatformFull="${target}"
 
-AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
-AC_SUBST(PortingCompiler)        # 'port' case
-AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
 

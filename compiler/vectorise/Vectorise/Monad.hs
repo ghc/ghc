@@ -14,8 +14,8 @@ module Vectorise.Monad (
   -- * Variables
   lookupVar,
   lookupVar_maybe,
-  addGlobalScalarVar, 
-  addGlobalScalarTyCon, 
+  addGlobalParallelVar, 
+  addGlobalParallelTyCon, 
 ) where
 
 import Vectorise.Monad.Base
@@ -92,7 +92,8 @@ initV hsc_env guts info thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . setPAFunsEnv        builtin_pas
                         . setPRFunsEnv        builtin_prs
-                        $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
+                        $ initGlobalEnv (gopt Opt_VectorisationAvoidance dflags) 
+                                        info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
            ; r <- runVM thing_inside builtins genv emptyLocalEnv
@@ -172,22 +173,22 @@ dumpVar dflags var
   = cantVectorise dflags "Variable not vectorised:" (ppr var)
 
 
--- Global scalars --------------------------------------------------------------
+-- Global parallel entities ----------------------------------------------------
 
--- |Mark the given variable as scalar — i.e., executing the associated code does not involve any
+-- |Mark the given variable as parallel — i.e., executing the associated code might involve
 -- parallel array computations.
 --
-addGlobalScalarVar :: Var -> VM ()
-addGlobalScalarVar var
-  = do { traceVt "addGlobalScalarVar" (ppr var)
-       ; updGEnv $ \env -> env{global_scalar_vars = extendVarSet (global_scalar_vars env) var}
+addGlobalParallelVar :: Var -> VM ()
+addGlobalParallelVar var
+  = do { traceVt "addGlobalParallelVar" (ppr var)
+       ; updGEnv $ \env -> env{global_parallel_vars = extendVarSet (global_parallel_vars env) var}
        }
 
--- |Mark the given type constructor as scalar — i.e., its values cannot embed parallel arrays.
+-- |Mark the given type constructor as parallel — i.e., its values might embed parallel arrays.
 --
-addGlobalScalarTyCon :: TyCon -> VM ()
-addGlobalScalarTyCon tycon
-  = do { traceVt "addGlobalScalarTyCon" (ppr tycon)
+addGlobalParallelTyCon :: TyCon -> VM ()
+addGlobalParallelTyCon tycon
+  = do { traceVt "addGlobalParallelTyCon" (ppr tycon)
        ; updGEnv $ \env -> 
-           env{global_scalar_tycons = addOneToNameSet (global_scalar_tycons env) (tyConName tycon)}
+           env{global_parallel_tycons = addOneToNameSet (global_parallel_tycons env) (tyConName tycon)}
        }

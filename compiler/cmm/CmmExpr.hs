@@ -33,6 +33,7 @@ import BlockId
 import CLabel
 import DynFlags
 import Unique
+import Outputable (panic)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -101,6 +102,7 @@ data CmmLit
         -- it will be used as a signed or unsigned value (the CmmType doesn't
         -- distinguish between signed & unsigned).
   | CmmFloat  Rational Width
+  | CmmVec [CmmLit]                     -- Vector literal
   | CmmLabel    CLabel                  -- Address of label
   | CmmLabelOff CLabel Int              -- Address of label + byte offset
 
@@ -133,6 +135,11 @@ cmmExprType dflags (CmmStackSlot _ _)  = bWord dflags -- an address
 cmmLitType :: DynFlags -> CmmLit -> CmmType
 cmmLitType _      (CmmInt _ width)     = cmmBits  width
 cmmLitType _      (CmmFloat _ width)   = cmmFloat width
+cmmLitType _      (CmmVec [])          = panic "cmmLitType: CmmVec []"
+cmmLitType cflags (CmmVec (l:ls))      = let ty = cmmLitType cflags l
+                                         in if all (`cmmEqType` ty) (map (cmmLitType cflags) ls)
+                                            then cmmVec (1+length ls) ty
+                                            else panic "cmmLitType: CmmVec"
 cmmLitType dflags (CmmLabel lbl)       = cmmLabelType dflags lbl
 cmmLitType dflags (CmmLabelOff lbl _)  = cmmLabelType dflags lbl
 cmmLitType dflags (CmmLabelDiffOff {}) = bWord dflags
@@ -329,6 +336,9 @@ data GlobalReg
   | LongReg             -- long int registers (64-bit, really)
         {-# UNPACK #-} !Int     -- its number
 
+  | XmmReg                      -- 128-bit SIMD vector register 
+        {-# UNPACK #-} !Int     -- its number
+
   -- STG registers
   | Sp                  -- Stack ptr; points to last occupied stack location.
   | SpLim               -- Stack limit
@@ -364,6 +374,7 @@ instance Eq GlobalReg where
    FloatReg i == FloatReg j = i==j
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
+   XmmReg i == XmmReg j = i==j
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -385,6 +396,7 @@ instance Ord GlobalReg where
    compare (FloatReg i)  (FloatReg  j) = compare i j
    compare (DoubleReg i) (DoubleReg j) = compare i j
    compare (LongReg i)   (LongReg   j) = compare i j
+   compare (XmmReg i)    (XmmReg    j) = compare i j
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -406,6 +418,8 @@ instance Ord GlobalReg where
    compare _ (DoubleReg _)    = GT
    compare (LongReg _) _      = LT
    compare _ (LongReg _)      = GT
+   compare (XmmReg _) _       = LT
+   compare _ (XmmReg _)       = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -448,6 +462,8 @@ globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
 globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
+globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
+
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
                                             -- dynamically allocated closures
@@ -458,4 +474,5 @@ isArgReg (VanillaReg {}) = True
 isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
 isArgReg (LongReg {})    = True
+isArgReg (XmmReg {})     = True
 isArgReg _               = False

@@ -499,7 +499,8 @@ resume canLogSpan step
        resume = ic_resume ic
 
    case resume of
-     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
+     [] -> liftIO $
+           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
@@ -557,16 +558,17 @@ moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
 moveHist fn = do
   hsc_env <- getSession
   case ic_resume (hsc_IC hsc_env) of
-     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
+     [] -> liftIO $
+           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         let ix = resumeHistoryIx r
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix > length history) $
-           throwGhcException (ProgramError "no more logged breakpoints")
-        when (new_ix < 0) $
-           throwGhcException (ProgramError "already at the beginning of the history")
+        when (new_ix > length history) $ liftIO $
+           throwGhcExceptionIO (ProgramError "no more logged breakpoints")
+        when (new_ix < 0) $ liftIO $
+           throwGhcExceptionIO (ProgramError "already at the beginning of the history")
 
         let
           update_ic apStack mb_info = do
@@ -848,7 +850,8 @@ setContext imports
        ; let dflags = hsc_dflags hsc_env
        ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
        ; case all_env_err of
-           Left (mod, err) -> throwGhcException (formatError dflags mod err)
+           Left (mod, err) ->
+               liftIO $ throwGhcExceptionIO (formatError dflags mod err)
            Right all_env -> do {
        ; let old_ic        = hsc_IC hsc_env
              final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env

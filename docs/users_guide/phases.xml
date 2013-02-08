@@ -387,6 +387,21 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant>
+          <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Only defined when <option>-fllvm</option> is specified. When GHC
+          is using version
+          <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>
+          of LLVM, the value of
+          <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;LLVM&lowbar;&lowbar;</constant>
+          is the integer <replaceable>xy</replaceable>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant>
           <indexterm><primary><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
         </term>

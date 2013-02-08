@@ -331,7 +331,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 not_lam (Lam _ _) = False
                 not_lam _         = True
                         -- Do not do the "abstract tyyvar" thing if there's
-                        -- a lambda inside, becuase it defeats eta-reduction
+                        -- a lambda inside, because it defeats eta-reduction
                         --    f = /\a. \x. g a x
                         -- should eta-reduce
 
@@ -781,7 +781,7 @@ on to the old unfolding (which is part of the id).
 Note [Arity decrease]
 ~~~~~~~~~~~~~~~~~~~~~
 Generally speaking the arity of a binding should not decrease.  But it *can*
-legitimately happen becuase of RULES.  Eg
+legitimately happen because of RULES.  Eg
         f = g Int
 where g has arity 2, will have arity 2.  But if there's a rewrite rule
         g Int --> h
@@ -2347,7 +2347,7 @@ mkDupableCont env (Select _ case_bndr alts se cont)
         ; (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
                 -- NB: We call prepareCaseCont here.  If there is only one
                 -- alternative, then dup_cont may be big, but that's ok
-                -- becuase we push it into the single alternative, and then
+                -- because we push it into the single alternative, and then
                 -- use mkDupableAlt to turn that simplified alternative into
                 -- a join point if it's too big to duplicate.
                 -- And this is important: see Note [Fusing case continuations]

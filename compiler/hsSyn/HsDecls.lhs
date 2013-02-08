@@ -634,7 +634,7 @@ pprTyClDeclFlavour (ForeignType {}) = ptext (sLit "foreign type")
 data HsDataDefn name   -- The payload of a data type defn
                        -- Used *both* for vanilla data declarations,
                        --       *and* for data family instances
-  = -- | Declares a data type or newtype, giving its construcors
+  = -- | Declares a data type or newtype, giving its constructors
     -- @
     --  data/newtype T a = <constrs>
     --  data/newtype instance T [a] = <constrs>
@@ -1210,7 +1210,7 @@ type LVectDecl name = Located (VectDecl name)
 data VectDecl name
   = HsVect
       (Located name)
-      (Maybe (LHsExpr name))    -- 'Nothing' => SCALAR declaration
+      (LHsExpr name)
   | HsNoVect
       (Located name)
   | HsVectTypeIn                -- pre type-checking
@@ -1225,9 +1225,9 @@ data VectDecl name
       (Located name)
   | HsVectClassOut              -- post type-checking
       Class
-  | HsVectInstIn                -- pre type-checking (always SCALAR)
+  | HsVectInstIn                -- pre type-checking (always SCALAR)  !!!FIXME: should be superfluous now
       (LHsType name)
-  | HsVectInstOut               -- post type-checking (always SCALAR)
+  | HsVectInstOut               -- post type-checking (always SCALAR) !!!FIXME: should be superfluous now
       ClsInst
   deriving (Data, Typeable)
 
@@ -1247,9 +1247,7 @@ lvectInstDecl (L _ (HsVectInstOut _)) = True
 lvectInstDecl _                       = False
 
 instance OutputableBndr name => Outputable (VectDecl name) where
-  ppr (HsVect v Nothing)
-    = sep [text "{-# VECTORISE SCALAR" <+> ppr v <+> text "#-}" ]
-  ppr (HsVect v (Just rhs))
+  ppr (HsVect v rhs)
     = sep [text "{-# VECTORISE" <+> ppr v,
            nest 4 $ 
              pprExpr (unLoc rhs) <+> text "#-}" ]

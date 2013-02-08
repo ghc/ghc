@@ -172,7 +172,7 @@ getHValue hsc_env name = do
   pls <- modifyPLS $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [nameModule name]
-             if (failed ok) then throwGhcException (ProgramError "")
+             if (failed ok) then throwGhcExceptionIO (ProgramError "")
                             else return (pls', pls')
             else
              return (pls, pls)
@@ -321,7 +321,7 @@ reallyInitDynLinker dflags =
         ; ok <- resolveObjs
 
         ; if succeeded ok then maybePutStrLn dflags "done"
-          else throwGhcException (ProgramError "linking extra libraries/objects failed")
+          else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
         ; return pls
         }}
@@ -403,7 +403,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
        = do maybePutStr dflags "failed.\n"
-            throwGhcException $
+            throwGhcExceptionIO $
               CmdLineError (
                     "user specified .o/.so/.DLL could not be loaded ("
                     ++ sys_errmsg ++ ")\nWhilst trying to load:  "
@@ -455,7 +455,7 @@ linkExpr hsc_env span root_ul_bco
      -- Link the packages and modules required
    ; (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
    ; if failed ok then
-        throwGhcException (ProgramError "")
+        throwGhcExceptionIO (ProgramError "")
      else do {
 
      -- Link the expression itself
@@ -480,7 +480,7 @@ linkExpr hsc_env span root_ul_bco
         -- by default, so we can safely ignore them here.
 
 dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
-dieWith dflags span msg = throwGhcException (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
+dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
@@ -566,7 +566,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           mb_iface <- initIfaceCheck hsc_env $
                         loadInterface msg mod (ImportByUser False)
           iface <- case mb_iface of
-                    Maybes.Failed err      -> throwGhcException (ProgramError (showSDoc dflags err))
+                    Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
                     Maybes.Succeeded iface -> return iface
 
           when (mi_boot iface) $ link_boot_mod_error mod
@@ -594,7 +594,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
 
     link_boot_mod_error mod =
-        throwGhcException (ProgramError (showSDoc dflags (
+        throwGhcExceptionIO (ProgramError (showSDoc dflags (
             text "module" <+> ppr mod <+>
             text "cannot be linked; it is only available as a boot module")))
 
@@ -677,7 +677,7 @@ linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
     -- Link the packages and modules required
     (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
     if failed ok
-      then throwGhcException (ProgramError "")
+      then throwGhcExceptionIO (ProgramError "")
       else do
 
     -- Link the expression itself
@@ -717,7 +717,7 @@ linkModule hsc_env mod = do
   initDynLinker (hsc_dflags hsc_env)
   modifyPLS_ $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
-    if (failed ok) then throwGhcException (ProgramError "could not link module")
+    if (failed ok) then throwGhcExceptionIO (ProgramError "could not link module")
       else return pls'
 \end{code}
 
@@ -1084,7 +1084,7 @@ linkPackages' dflags new_pks pls = do
              ; return (new_pkg : pkgs') }
 
         | otherwise
-        = throwGhcException (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
+        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ packageIdString new_pkg))
 
 
 linkPackage :: DynFlags -> PackageConfig -> IO ()
@@ -1140,7 +1140,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
         if succeeded ok then maybePutStrLn dflags "done."
-              else throwGhcException (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
+              else throwGhcExceptionIO (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
 
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
@@ -1151,7 +1151,7 @@ load_dyn :: FilePath -> IO ()
 load_dyn dll = do r <- loadDLL dll
                   case r of
                     Nothing  -> return ()
-                    Just err -> throwGhcException (CmdLineError ("can't load .so/.DLL for: "
+                    Just err -> throwGhcExceptionIO (CmdLineError ("can't load .so/.DLL for: "
                                                               ++ dll ++ " (" ++ err ++ ")" ))
 
 loadFrameworks :: Platform -> InstalledPackageInfo_ ModuleName -> IO ()
@@ -1166,7 +1166,7 @@ loadFrameworks platform pkg
     load fw = do  r <- loadFramework fw_dirs fw
                   case r of
                     Nothing  -> return ()
-                    Just err -> throwGhcException (CmdLineError ("can't load framework: "
+                    Just err -> throwGhcExceptionIO (CmdLineError ("can't load framework: "
                                                         ++ fw ++ " (" ++ err ++ ")" ))
 
 -- Try to find an object file for a given library in the given paths.

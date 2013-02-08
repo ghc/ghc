@@ -79,9 +79,9 @@ module TyCon(
         pprPromotionQuote,
 
         -- * Primitive representations of Types
-        PrimRep(..),
+        PrimRep(..), PrimElemRep(..),
         tyConPrimRep,
-        primRepSizeW
+        primRepSizeW, primElemRepSizeB
 ) where
 
 #include "HsVersions.h"
@@ -784,22 +784,52 @@ data PrimRep
   | AddrRep             -- ^ A pointer, but /not/ to a Haskell value (use 'PtrRep')
   | FloatRep
   | DoubleRep
+  | VecRep Int PrimElemRep  -- ^ A vector
   deriving( Eq, Show )
+
+data PrimElemRep
+  = Int8ElemRep
+  | Int16ElemRep
+  | Int32ElemRep
+  | Int64ElemRep
+  | Word8ElemRep
+  | Word16ElemRep
+  | Word32ElemRep
+  | Word64ElemRep
+  | FloatElemRep
+  | DoubleElemRep
+   deriving( Eq, Show )
 
 instance Outputable PrimRep where
   ppr r = text (show r)
 
+instance Outputable PrimElemRep where
+  ppr r = text (show r)
+
 -- | Find the size of a 'PrimRep', in words
 primRepSizeW :: DynFlags -> PrimRep -> Int
-primRepSizeW _      IntRep   = 1
-primRepSizeW _      WordRep  = 1
-primRepSizeW dflags Int64Rep = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW dflags Word64Rep= wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW _      FloatRep = 1    -- NB. might not take a full word
-primRepSizeW dflags DoubleRep= dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-primRepSizeW _      AddrRep  = 1
-primRepSizeW _      PtrRep   = 1
-primRepSizeW _      VoidRep  = 0
+primRepSizeW _      IntRep           = 1
+primRepSizeW _      WordRep          = 1
+primRepSizeW dflags Int64Rep         = wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
+primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
+primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
+primRepSizeW _      AddrRep          = 1
+primRepSizeW _      PtrRep           = 1
+primRepSizeW _      VoidRep          = 0
+primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
+
+primElemRepSizeB :: PrimElemRep -> Int
+primElemRepSizeB Int8ElemRep   = 1
+primElemRepSizeB Int16ElemRep  = 2
+primElemRepSizeB Int32ElemRep  = 4
+primElemRepSizeB Int64ElemRep  = 8
+primElemRepSizeB Word8ElemRep  = 1
+primElemRepSizeB Word16ElemRep = 2
+primElemRepSizeB Word32ElemRep = 4
+primElemRepSizeB Word64ElemRep = 8
+primElemRepSizeB FloatElemRep  = 4
+primElemRepSizeB DoubleElemRep = 8
 \end{code}
 
 %************************************************************************
@@ -1167,7 +1197,7 @@ isTupleTyCon :: TyCon -> Bool
 -- ^ Does this 'TyCon' represent a tuple?
 --
 -- NB: when compiling @Data.Tuple@, the tycons won't reply @True@ to
--- 'isTupleTyCon', becuase they are built as 'AlgTyCons'.  However they
+-- 'isTupleTyCon', because they are built as 'AlgTyCons'.  However they
 -- get spat into the interface file as tuple tycons, so I don't think
 -- it matters.
 isTupleTyCon (TupleTyCon {}) = True

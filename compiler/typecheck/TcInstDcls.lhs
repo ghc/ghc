@@ -737,7 +737,7 @@ Note that
   c) There are several type instance decls for T in the instance
 
 All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, becuase it's an *associated* type.
+for (T ty Int) elsewhere, because it's an *associated* type.
 
 Note [Checking consistent instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -824,7 +824,7 @@ checkConsistentFamInst (Just (clas, mini_env)) flav fam_tc at_tvs at_tys
       = case tcMatchTyX at_tv_set subst at_ty inst_ty of
            Just subst | all_distinct subst -> return subst
            _ -> failWithTc $ wrongATArgErr at_ty inst_ty
-                -- No need to instantiate here, becuase the axiom
+                -- No need to instantiate here, because the axiom
                 -- uses the same type variables as the assocated class
       | otherwise
       = return subst   -- Allow non-type-variable instantiation
@@ -1014,7 +1014,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
   = do  { let sel_occ = nameOccName sel_name
         ; meth_name <- newName (mkClassOpAuxOcc sel_occ)
         ; local_meth_name <- newName sel_occ
-                  -- Base the local_meth_name on the selector name, becuase
+                  -- Base the local_meth_name on the selector name, because
                   -- type errors from tcInstanceMethodBody come from here
 
         ; local_meth_sig <- case lookupHsSig sig_fn sel_name of

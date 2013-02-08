@@ -536,7 +536,7 @@ handle the *non-updated* fields.  Consider:
 
 The result type should be (T a b' c)
 not (T a b c),   because 'b' *is not* mentioned in a non-updated field
-not (T a b' c'), becuase 'c' *is*     mentioned in a non-updated field
+not (T a b' c'), because 'c' *is*     mentioned in a non-updated field
 NB that it's not good enough to look at just one constructor; we must
 look at them all; cf Trac #3219
 

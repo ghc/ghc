@@ -507,8 +507,7 @@ instance Outputable id => Outputable (Tickish id) where
 
 \begin{code}
 instance Outputable CoreVect where
-  ppr (Vect     var Nothing)         = ptext (sLit "VECTORISE SCALAR") <+> ppr var
-  ppr (Vect     var (Just e))        = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
+  ppr (Vect     var e)               = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
                                          4 (pprCoreExpr e)
   ppr (NoVect   var)                 = ptext (sLit "NOVECTORISE") <+> ppr var
   ppr (VectType False var Nothing)   = ptext (sLit "VECTORISE type") <+> ppr var

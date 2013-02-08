@@ -144,7 +144,7 @@ lintCoreBindings binds
     -- allow this at top level:
     --    M.n{r3}  = ...
     --    M.n{r29} = ...
-    -- becuase they both get the same linker symbol
+    -- because they both get the same linker symbol
     ext_dups = snd (removeDups ord_ext (map Var.varName binders))
     ord_ext n1 n2 | Just m1 <- nameModule_maybe n1
                   , Just m2 <- nameModule_maybe n2

@@ -32,6 +32,7 @@ typedef struct IOManagerState {
     /* fields for keeping track of active WorkItems */
     CritSection      active_work_lock;
     WorkItem*        active_work_items;
+    UINT             sleepResolution;
 } IOManagerState;
 
 /* ToDo: wrap up this state via a IOManager handle instead? */
@@ -198,9 +199,19 @@ IOWorkerProc(PVOID param)
 		    /* Approximate implementation of threadDelay;
 		     * 
 		     * Note: Sleep() is in milliseconds, not micros.
-		     */
-		    Sleep((work->workData.delayData.msecs + 999) / 1000);
-		    len = work->workData.delayData.msecs;
+                     *
+                     * MSDN says of Sleep:
+                     *   If dwMilliseconds is greater than one tick
+                     *   but less than two, the wait can be anywhere
+                     *   between one and two ticks, and so on.
+                     *
+                     * so we need to add (milliseconds-per-tick - 1)
+                     * to the amount of time we sleep for.
+                     *
+                     * test ThreadDelay001 fails if we get this wrong.
+                     */
+		    Sleep(((work->workData.delayData.usecs + 999) / 1000) + iom->sleepResolution - 1);
+		    len = work->workData.delayData.usecs;
 		    complData = NULL;
 		    fd = 0;
 		    errCode = 0;
@@ -266,6 +277,19 @@ StartIOManager(void)
 {
     HANDLE hExit;
     WorkQueue* wq;
+    UINT sleepResolution;
+    TIMECAPS timecaps;
+    MMRESULT mmresult;
+
+    mmresult = timeGetDevCaps(&timecaps, sizeof(timecaps));
+    if (mmresult != MMSYSERR_NOERROR) {
+        return FALSE;
+    }
+    sleepResolution = timecaps.wPeriodMin;
+    mmresult = timeBeginPeriod(sleepResolution);
+    if (mmresult != MMSYSERR_NOERROR) {
+        return FALSE;
+    }
 
     wq = NewWorkQueue();
     if ( !wq ) return FALSE;  
@@ -284,7 +308,7 @@ StartIOManager(void)
 	free(ioMan);
 	return FALSE;
     }
-  
+
     ioMan->hExitEvent = hExit;
     InitializeCriticalSection(&ioMan->manLock);
     ioMan->workQueue   = wq;
@@ -294,6 +318,7 @@ StartIOManager(void)
     ioMan->requestID   = 1;
     InitializeCriticalSection(&ioMan->active_work_lock);
     ioMan->active_work_items = NULL;
+    ioMan->sleepResolution = sleepResolution;
  
     return TRUE;
 }
@@ -409,7 +434,7 @@ AddIORequest ( int   fd,
  * the request queue.
  */
 BOOL
-AddDelayRequest ( unsigned int   msecs,
+AddDelayRequest ( unsigned int   usecs,
 		  CompletionProc onCompletion)
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
@@ -418,7 +443,7 @@ AddDelayRequest ( unsigned int   msecs,
   
     /* Fill in the blanks */
     wItem->workKind     = WORKER_DELAY;
-    wItem->workData.delayData.msecs = msecs;
+    wItem->workData.delayData.usecs = usecs;
     wItem->onCompletion = onCompletion;
     wItem->requestID    = reqID;
     wItem->link         = NULL;
@@ -455,6 +480,7 @@ AddProcRequest ( void* proc,
 void ShutdownIOManager ( rtsBool wait_threads )
 {
     int num;
+    MMRESULT mmresult;
 
     SetEvent(ioMan->hExitEvent);
   
@@ -472,6 +498,12 @@ void ShutdownIOManager ( rtsBool wait_threads )
         CloseHandle(ioMan->hExitEvent);
         DeleteCriticalSection(&ioMan->active_work_lock);
         DeleteCriticalSection(&ioMan->manLock);
+
+        mmresult = timeEndPeriod(ioMan->sleepResolution);
+        if (mmresult != MMSYSERR_NOERROR) {
+            barf("timeEndPeriod failed");
+        }
+
         free(ioMan);
         ioMan = NULL;
     }

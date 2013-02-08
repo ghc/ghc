@@ -379,10 +379,12 @@ AC_DEFUN([GET_ARM_ISA],
                         )],
                         [changequote(, )dnl
                          ARM_ISA_EXT="[VFPv2]"
-                         changequote([, ])dnl],
+                         changequote([, ])dnl
+                        ],
                         [changequote(, )dnl
                          ARM_ISA_EXT="[]"
-                         changequote([, ])dnl]
+                         changequote([, ])dnl
+                        ]
                 )],
                 [changequote(, )dnl
                  ARM_ISA=ARMv7
@@ -390,6 +392,33 @@ AC_DEFUN([GET_ARM_ISA],
                  changequote([, ])dnl
                 ])
         ])
+
+        AC_COMPILE_IFELSE(
+               [AC_LANG_PROGRAM(
+                       [],
+                       [#if defined(__SOFTFP__)
+                            return 0;
+                       #else
+                            not softfp
+                       #endif]
+               )],
+               [changequote(, )dnl
+                ARM_ABI="SOFT"
+                changequote([, ])dnl
+               ],
+               [AC_COMPILE_IFELSE(
+                    [AC_LANG_PROGRAM(
+                       [],
+                       [#if defined(__ARM_PCS_VFP)
+                            return 0;
+                       #else
+                            no hard float ABI
+                       #endif]
+                    )],
+                    [ARM_ABI="HARD"],
+                    [ARM_ABI="SOFTFP"]
+               )]
+        )
 ])
 
 
@@ -573,7 +602,11 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 
 # FP_ARG_WITH_PATH_GNU_PROG
 # --------------------
-# XXX
+# Find the specified command on the path or allow a user to set it manually
+# with a --with-<command> option. An error will be thrown if the command isn't
+# found.
+#
+# This is ignored on the mingw32 platform.
 #
 # $1 = the variable to set
 # $2 = the with option name
@@ -612,10 +645,14 @@ AC_ARG_WITH($2,
 
 # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 # --------------------
-# XXX
+# Same as FP_ARG_WITH_PATH_GNU_PROG but no error will be thrown if the command
+# isn't found.
+#
+# This is ignored on the mingw32 platform.
 #
 # $1 = the variable to set
-# $2 = the command to look for
+# $2 = the with option name
+# $3 = the command to look for
 #
 AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
 [
@@ -633,7 +670,7 @@ AC_ARG_WITH($2,
 [
     if test "$HostOS" != "mingw32"
     then
-        AC_PATH_PROG([$1], [$2])
+        AC_PATH_PROG([$1], [$3])
     fi
 ]
 )

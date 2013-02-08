@@ -37,3 +37,6 @@
 [submodule "libraries/time"]
 	path = libraries/time
 	url = http://darcs.haskell.org/libraries/time.git/
+[submodule "libraries/random"]
+	path = libraries/random
+	url = http://darcs.haskell.org/libraries/random.git/

@@ -497,13 +497,13 @@ etaTyConAppCo_maybe tc co
 
 Note [Eta for AppCo]
 ~~~~~~~~~~~~~~~~~~~~
-Supopse we have 
+Suppose we have 
    g :: s1 t1 ~ s2 t2
 
 Then we can't necessarily make
    left  g :: s1 ~ s2
    right g :: t1 ~ t2
-becuase it's poossible that
+because it's possible that
    s1 :: * -> *         t1 :: *
    s2 :: (*->*) -> *    t2 :: * -> *
 and in that case (left g) does not have the same

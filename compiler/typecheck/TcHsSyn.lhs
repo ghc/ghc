@@ -123,7 +123,7 @@ hsLitType (HsFloatPrim _)  = floatPrimTy
 hsLitType (HsDoublePrim _) = doublePrimTy
 \end{code}
 
-Overloaded literals. Here mainly becuase it uses isIntTy etc
+Overloaded literals. Here mainly because it uses isIntTy etc
 
 \begin{code}
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr TcId)
@@ -1141,7 +1141,7 @@ zonkVects env = mappM (wrapLocM (zonkVect env))
 zonkVect :: ZonkEnv -> VectDecl TcId -> TcM (VectDecl Id)
 zonkVect env (HsVect v e)
   = do { v' <- wrapLocM (zonkIdBndr env) v
-       ; e' <- fmapMaybeM (zonkLExpr env) e
+       ; e' <- zonkLExpr env e
        ; return $ HsVect v' e'
        }
 zonkVect env (HsNoVect v)

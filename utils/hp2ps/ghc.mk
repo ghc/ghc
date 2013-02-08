@@ -16,7 +16,7 @@ utils/hp2ps_dist_C_SRCS          = AreaBelow.c Curves.c Error.c Main.c \
                                    Axes.c Dimensions.c Key.c PsFile.c Shade.c \
                                    Utilities.c
 utils/hp2ps_dist_EXTRA_LIBRARIES = m
-utils/hp2ps_dist_PROG            = hp2ps$(exeext)
+utils/hp2ps_dist_PROG            = $(CrossCompilePrefix)hp2ps$(exeext)
 utils/hp2ps_dist_INSTALL         = YES
 utils/hp2ps_dist_INSTALL_INPLACE = YES
 

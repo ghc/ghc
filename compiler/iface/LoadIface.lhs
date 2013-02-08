@@ -172,7 +172,7 @@ loadInterfaceWithException doc mod_name where_from
   = do  { mb_iface <- loadInterface doc mod_name where_from
         ; dflags <- getDynFlags
         ; case mb_iface of 
-            Failed err      -> throwGhcException (ProgramError (showSDoc dflags err))
+            Failed err      -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
             Succeeded iface -> return iface }
 
 ------------------
@@ -790,18 +790,18 @@ pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
                     pprFix (occ,fix) = ppr fix <+> ppr occ 
 
 pprVectInfo :: IfaceVectInfo -> SDoc
-pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
-                           , ifaceVectInfoTyCon        = tycons
-                           , ifaceVectInfoTyConReuse   = tyconsReuse
-                           , ifaceVectInfoScalarVars   = scalarVars
-                           , ifaceVectInfoScalarTyCons = scalarTyCons
+pprVectInfo (IfaceVectInfo { ifaceVectInfoVar            = vars
+                           , ifaceVectInfoTyCon          = tycons
+                           , ifaceVectInfoTyConReuse     = tyconsReuse
+                           , ifaceVectInfoParallelVars   = parallelVars
+                           , ifaceVectInfoParallelTyCons = parallelTyCons
                            }) = 
   vcat 
   [ ptext (sLit "vectorised variables:") <+> hsep (map ppr vars)
   , ptext (sLit "vectorised tycons:") <+> hsep (map ppr tycons)
   , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
-  , ptext (sLit "scalar variables:") <+> hsep (map ppr scalarVars)
-  , ptext (sLit "scalar tycons:") <+> hsep (map ppr scalarTyCons)
+  , ptext (sLit "parallel variables:") <+> hsep (map ppr parallelVars)
+  , ptext (sLit "parallel tycons:") <+> hsep (map ppr parallelTyCons)
   ]
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc

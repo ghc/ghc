@@ -7,6 +7,7 @@ module Exception
     where
 
 import Control.Exception
+import Control.Monad.IO.Class
 
 catchIO :: IO a -> (IOException -> IO a) -> IO a
 catchIO = Control.Exception.catch
@@ -27,7 +28,7 @@ tryIO = try
 -- implementations of 'gbracket' and 'gfinally' use 'gblock' and 'gunblock'
 -- thus rarely require overriding.
 --
-class Monad m => ExceptionMonad m where
+class MonadIO m => ExceptionMonad m where
 
   -- | Generalised version of 'Control.Exception.catch', allowing an arbitrary
   -- exception handling monad instead of just 'IO'.
@@ -92,5 +93,5 @@ ghandle = flip gcatch
 gonException :: (ExceptionMonad m) => m a -> m b -> m a
 gonException ioA cleanup = ioA `gcatch` \e ->
                              do _ <- cleanup
-                                throw (e :: SomeException)
+                                liftIO $ throwIO (e :: SomeException)
 

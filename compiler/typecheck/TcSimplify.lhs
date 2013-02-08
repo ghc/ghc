@@ -368,7 +368,7 @@ There are two types we might infer for f:
 
 	f :: (?y::Int) => Int -> Int
 
-At first you might think the first was better, becuase then
+At first you might think the first was better, because then
 ?y behaves like a free variable of the definition, rather than
 having to be passed at each call site.  But of course, the WHOLE
 IDEA is that ?y should be passed at each call site (that's what

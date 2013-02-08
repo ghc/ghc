@@ -174,7 +174,7 @@ mkJumpToAddr a
 
 #elif powerpc_TARGET_ARCH
 -- We'll use r12, for no particular reason.
--- 0xDEADBEEF stands for the adress:
+-- 0xDEADBEEF stands for the address:
 -- 3D80DEAD lis r12,0xDEAD
 -- 618CBEEF ori r12,r12,0xBEEF
 -- 7D8903A6 mtctr r12

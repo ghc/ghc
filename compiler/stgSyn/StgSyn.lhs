@@ -118,9 +118,9 @@ isDllConApp dflags con args
 
     this_pkg = thisPackage dflags
 
--- True of machine adddresses; these are the things that don't
+-- True of machine addresses; these are the things that don't
 -- work across DLLs. The key point here is that VoidRep comes
--- out False, so that a top level nullary GADT construtor is
+-- out False, so that a top level nullary GADT constructor is
 -- False for isDllConApp
 --    data T a where
 --      T1 :: T Int

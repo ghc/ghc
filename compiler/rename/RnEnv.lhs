@@ -440,7 +440,7 @@ Thus:
     instance C S where
       data G S = Y1 | Y2
 Even though there are two G's in scope (M.G and Blib.G), the occurence
-of 'G' in the 'instance C S' decl is unambiguous, becuase C has only
+of 'G' in the 'instance C S' decl is unambiguous, because C has only
 one associated type called G. This is exactly what happens for methods,
 and it is only consistent to do the same thing for types. That's the
 role of the function lookupTcdName; the (Maybe Name) give the class of

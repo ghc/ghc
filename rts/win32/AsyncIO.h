@@ -14,7 +14,7 @@ addIORequest(int   fd,
 	     int   isSock,
 	     int   len,
 	     char* buf);
-extern unsigned int addDelayRequest(int   msecs);
+extern unsigned int addDelayRequest(int   usecs);
 extern unsigned int addDoProcRequest(void* proc, void* param);
 extern int  startupAsyncIO(void);
 extern void shutdownAsyncIO(rtsBool wait_threads);
