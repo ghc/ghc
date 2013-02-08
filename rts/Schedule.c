@@ -2772,6 +2772,7 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
     }
       
     case UNDERFLOW_FRAME:
+        tso->stackobj->sp = p;
         threadStackUnderflow(cap,tso);
         p = tso->stackobj->sp;
         continue;

@@ -49,10 +49,13 @@ AC_SUBST([release], [1])
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
 
-dnl * We require autoconf version 2.52
+dnl * We require autoconf version 2.60
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-AC_PREREQ([2.52])
+dnl Using autoconf 2.59 started to give nonsense like this
+dnl  #define SIZEOF_CHAR 0
+dnl recently.
+AC_PREREQ([2.60])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
@@ -502,13 +505,13 @@ esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc], [llc])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 

@@ -588,7 +588,7 @@ dePArrComp (LetStmt ds : qs) pa cea = do
                                    [Type ty'cea, Type errTy, proj, cea])
 --
 -- The parser guarantees that parallel comprehensions can only appear as
--- singeltons qualifier lists, which we already special case in the caller.
+-- singleton qualifier lists, which we already special case in the caller.
 -- So, encountering one here is a bug.
 --
 dePArrComp (ParStmt {} : _) _ _ =

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-8-1">
+  <title>Release notes for version 7.8.1</title>
+
+  <para>
+    The significant changes to the various parts of the compiler are
+    listed in the following sections. There have also been numerous bug
+    fixes and performance improvements over the 7.6 branch.
+  </para>
+
+  <sect2>
+    <title>Highlights</title>
+
+    <para>
+        The highlights, since the 7.6 branch, are:
+    </para>
+
+    <itemizedlist>
+      <listitem>
+          <para>
+              TODO: Format these nicely and expand:
+              - type holes
+              - rebindable list syntax
+              - major changes to the type inference engine
+              - type level naturals
+              - overlapping type families
+              - new codegen
+          </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
+
