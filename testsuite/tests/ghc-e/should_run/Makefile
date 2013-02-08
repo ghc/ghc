@@ -18,14 +18,14 @@ ghc-e004:
 ghc-e005:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -main-is foo ghc-e005.hs -e ":set prog ghc-e005-prog" -e ":main [\"the\",\"args\"]"; echo $$?
 
-2228:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" 2228.hs
+T2228:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2228.hs
 
-2636:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" 2636.hs; if [ "$?" != 0 ]; then true; else false; fi
+T2636:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2636.hs; if [ "$?" != 0 ]; then true; else false; fi
 
-3890:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" 3890.hs | cat
+T3890:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T3890.hs | cat
 
 T7299:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "Control.Concurrent.threadDelay (1000 * 1000)"

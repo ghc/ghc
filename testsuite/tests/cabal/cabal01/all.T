@@ -20,7 +20,10 @@ if default_testopts.cleanup != '':
 else:
    cleanup = ''
 
+def ignoreLdOutput(str):
+    return re.sub('Creating library file: dist.build.libHStest-1.0-ghc[0-9.]*.dll.a\n', '', str)
+
 test('cabal01',
-     normal,
+     normalise_errmsg_fun(ignoreLdOutput),
      run_command, 
      ['$MAKE -s --no-print-directory cabal01 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])

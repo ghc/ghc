@@ -1,15 +1,13 @@
 {-# LANGUAGE TypeHoles #-}
 
-module Main where
-
-main = return ()
+module Holes3 where
 
 f = _
 
 g :: Int -> Char
-g x = _
+g x = _gr
 
-h = _ ++ "a"
+h = _aa ++ "a"
 
 z :: [a] -> [a]
-z y = const y _
+z y = const y _x

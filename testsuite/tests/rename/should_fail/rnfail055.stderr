@@ -24,12 +24,12 @@ RnFail055.hs-boot:12:6:
     Type constructor `T1' has conflicting definitions in the module and its hs-boot file
     Main module: data T1 a b
                      No C type associated
-                     RecFlag Recursive
+                     RecFlag Recursive, Promotable
                      = T1 :: forall a b. [b] -> [a] -> T1 a b Stricts: _ _
                      FamilyInstance: none
     Boot file:   data T1 a b
                      No C type associated
-                     RecFlag NonRecursive
+                     RecFlag NonRecursive, Promotable
                      = T1 :: forall a b. [a] -> [b] -> T1 a b Stricts: _ _
                      FamilyInstance: none
 
@@ -37,12 +37,12 @@ RnFail055.hs-boot:14:16:
     Type constructor `T2' has conflicting definitions in the module and its hs-boot file
     Main module: data Eq b => T2 a b
                      No C type associated
-                     RecFlag Recursive
+                     RecFlag Recursive, Promotable
                      = T2 :: forall a b. a -> T2 a b Stricts: _
                      FamilyInstance: none
     Boot file:   data Eq a => T2 a b
                      No C type associated
-                     RecFlag NonRecursive
+                     RecFlag NonRecursive, Promotable
                      = T2 :: forall a b. a -> T2 a b Stricts: _
                      FamilyInstance: none
 
@@ -56,12 +56,12 @@ RnFail055.hs-boot:21:6:
     Type constructor `T5' has conflicting definitions in the module and its hs-boot file
     Main module: data T5 a
                      No C type associated
-                     RecFlag Recursive
+                     RecFlag Recursive, Promotable
                      = T5 :: forall a. a -> T5 a Stricts: _ Fields: field5
                      FamilyInstance: none
     Boot file:   data T5 a
                      No C type associated
-                     RecFlag NonRecursive
+                     RecFlag NonRecursive, Promotable
                      = T5 :: forall a. a -> T5 a Stricts: _
                      FamilyInstance: none
 
@@ -69,12 +69,12 @@ RnFail055.hs-boot:23:6:
     Type constructor `T6' has conflicting definitions in the module and its hs-boot file
     Main module: data T6
                      No C type associated
-                     RecFlag Recursive
+                     RecFlag Recursive, Not promotable
                      = T6 :: Int -> T6 Stricts: _
                      FamilyInstance: none
     Boot file:   data T6
                      No C type associated
-                     RecFlag NonRecursive
+                     RecFlag NonRecursive, Not promotable
                      = T6 :: Int -> T6 HasWrapper Stricts: !
                      FamilyInstance: none
 
@@ -82,12 +82,12 @@ RnFail055.hs-boot:25:6:
     Type constructor `T7' has conflicting definitions in the module and its hs-boot file
     Main module: data T7 a
                      No C type associated
-                     RecFlag Recursive
+                     RecFlag Recursive, Promotable
                      = T7 :: forall a a1. a1 -> T7 a Stricts: _
                      FamilyInstance: none
     Boot file:   data T7 a
                      No C type associated
-                     RecFlag NonRecursive
+                     RecFlag NonRecursive, Promotable
                      = T7 :: forall a b. a -> T7 a Stricts: _
                      FamilyInstance: none
 

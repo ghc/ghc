@@ -1,5 +1,0 @@
-WARNING: there are broken packages.  Run 'ghc-pkg check' for more details.
-<command line>: cannot satisfy -package 1750A: 
-    1750A-1-XXX is unusable due to missing or recursive dependencies:
-      1750B-1-XXX
-    (use -v for more information)

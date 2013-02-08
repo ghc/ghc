@@ -214,17 +214,6 @@ class TestOptions:
        self.compiler_stats_range_fields = {}
        self.stats_range_fields = {}
 
-       # TODO: deprecate this in favour of compiler_stats_range_fields
-       #
-       # which -t numeric fields do we want to look at, and what bounds must
-       # they fall within?
-       # Elements of these lists should be things like
-       # ('bytes allocated',
-       #   9300000000,
-       #   9400000000)
-       self.compiler_stats_num_fields = {}
-       self.stats_num_fields = {}
-
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
        self.alone = False

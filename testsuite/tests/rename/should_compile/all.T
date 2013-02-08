@@ -113,7 +113,7 @@ test('rn067',
 test('T1972', normal, compile, [''])
 test('T2205', normal, compile, [''])
 
-test('2334', normal, compile, [''])
+test('T2334', normal, compile, [''])
 test('T2506', normal, compile, [''])
 test('T2914', normal, compile, [''])
 test('T3221', normal, compile, [''])
@@ -202,3 +202,5 @@ test('dodgy',
      ['dodgy', '-v0'])
 test('T7167', normal, compile, [''])
 test('T7336', normal, compile, ['-Wall'])
+
+test('T2435', normal, multimod_compile, ['T2435','-v0'])

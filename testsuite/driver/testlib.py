@@ -15,7 +15,7 @@ import traceback
 import copy
 import glob
 import types
-import math
+from math import ceil, trunc
 
 have_subprocess = False
 try:
@@ -32,15 +32,13 @@ if config.use_threads:
     import threading
     import thread
 
-# Options valid for all the tests in the current "directory".  After
-# each test, we reset the options to these.  To change the options for
-# multiple tests, the function setTestOpts() below can be used to alter
-# these options.
-global thisdir_testopts
-thisdir_testopts = TestOptions()
-
-def getThisDirTestOpts():
-    return thisdir_testopts
+global wantToStop
+wantToStop = False
+def stopNow():
+    global wantToStop
+    wantToStop = True
+def stopping():
+    return wantToStop
 
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
@@ -63,7 +61,8 @@ def setLocalTestOpts(opts):
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
 def setTestOpts( f ):
-    f( thisdir_testopts );
+    global thisdir_settings
+    thisdir_settings = compose(thisdir_settings, f)
 
 # -----------------------------------------------------------------------------
 # Canned setup functions for common cases.  eg. for a test you might say
@@ -76,23 +75,23 @@ def setTestOpts( f ):
 #
 # to expect failure for this test.
 
-def normal( opts ):
+def normal( name, opts ):
     return;
 
-def skip( opts ):
+def skip( name, opts ):
     opts.skip = 1
 
-def expect_fail( opts ):
+def expect_fail( name, opts ):
     opts.expect = 'fail';
 
 def reqlib( lib ):
-    return lambda opts, l=lib: _reqlib (opts, l )
+    return lambda name, opts, l=lib: _reqlib (name, opts, l )
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
 have_lib = {}
 
-def _reqlib( opts, lib ):
+def _reqlib( name, opts, lib ):
     if have_lib.has_key(lib):
         got_it = have_lib[lib]
     else:
@@ -115,202 +114,200 @@ def _reqlib( opts, lib ):
     if not got_it:
         opts.expect = 'missing-lib'
 
-def req_profiling( opts ):
+def req_profiling( name, opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
-def req_shared_libs( opts ):
+def req_shared_libs( name, opts ):
     if not config.have_shared_libs:
         opts.expect = 'fail'
 
-def req_interp( opts ):
+def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
-def req_smp( opts ):
+def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
 def expect_broken( bug ):
-    return lambda opts, b=bug: _expect_broken (opts, b )
+    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
-def _expect_broken( opts, bug ):
+def _expect_broken( name, opts, bug ):
     opts.expect = 'fail';
 
-def ignore_output( opts ):
+def ignore_output( name, opts ):
     opts.ignore_output = 1
 
-def no_stdin( opts ):
+def no_stdin( name, opts ):
     opts.no_stdin = 1
 
-def combined_output( opts ):
+def combined_output( name, opts ):
     opts.combined_output = True
 
 # -----
 
 def expect_fail_for( ways ):
-    return lambda opts, w=ways: _expect_fail_for( opts, w )
+    return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
-def _expect_fail_for( opts, ways ):
+def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
 def expect_broken_for( bug, ways ):
-    return lambda opts, b=bug, w=ways: _expect_broken_for( opts, b, w )
+    return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
-def _expect_broken_for( opts, bug, ways ):
+def _expect_broken_for( name, opts, bug, ways ):
     opts.expect_fail_for = ways
 
 # -----
 
 def omit_ways( ways ):
-    return lambda opts, w=ways: _omit_ways( opts, w )
+    return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
-def _omit_ways( opts, ways ):
+def _omit_ways( name, opts, ways ):
     opts.omit_ways = ways
 
 # -----
 
 def only_ways( ways ):
-    return lambda opts, w=ways: _only_ways( opts, w )
+    return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
-def _only_ways( opts, ways ):
+def _only_ways( name, opts, ways ):
     opts.only_ways = ways
 
 # -----
 
 def extra_ways( ways ):
-    return lambda opts, w=ways: _extra_ways( opts, w )
+    return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
-def _extra_ways( opts, ways ):
+def _extra_ways( name, opts, ways ):
     opts.extra_ways = ways
 
 # -----
 
 def omit_compiler_types( compiler_types ):
-   return lambda opts, c=compiler_types: _omit_compiler_types(opts, c)
+   return lambda name, opts, c=compiler_types: _omit_compiler_types(name, opts, c)
 
-def _omit_compiler_types( opts, compiler_types ):
+def _omit_compiler_types( name, opts, compiler_types ):
     if config.compiler_type in compiler_types:
         opts.skip = 1
 
 # -----
 
 def only_compiler_types( compiler_types ):
-   return lambda opts, c=compiler_types: _only_compiler_types(opts, c)
+   return lambda name, opts, c=compiler_types: _only_compiler_types(name, opts, c)
 
-def _only_compiler_types( opts, compiler_types ):
+def _only_compiler_types( name, opts, compiler_types ):
     if config.compiler_type not in compiler_types:
         opts.skip = 1
 
 # -----
 
 def set_stdin( file ):
-   return lambda opts, f=file: _set_stdin(opts, f);
+   return lambda name, opts, f=file: _set_stdin(name, opts, f);
 
-def _set_stdin( opts, f ):
+def _set_stdin( name, opts, f ):
    opts.stdin = f
 
 # -----
 
 def exit_code( val ):
-    return lambda opts, v=val: _exit_code(opts, v);
+    return lambda name, opts, v=val: _exit_code(name, opts, v);
 
-def _exit_code( opts, v ):
+def _exit_code( name, opts, v ):
     opts.exit_code = v
 
 # -----
 
 def timeout_multiplier( val ):
-    return lambda opts, v=val: _timeout_multiplier(opts, v)
+    return lambda name, opts, v=val: _timeout_multiplier(name, opts, v)
 
-def _timeout_multiplier( opts, v ):
+def _timeout_multiplier( name, opts, v ):
     opts.timeout_multiplier = v
 
 # -----
 
 def extra_run_opts( val ):
-    return lambda opts, v=val: _extra_run_opts(opts, v);
+    return lambda name, opts, v=val: _extra_run_opts(name, opts, v);
 
-def _extra_run_opts( opts, v ):
+def _extra_run_opts( name, opts, v ):
     opts.extra_run_opts = v
 
 # -----
 
 def extra_hc_opts( val ):
-    return lambda opts, v=val: _extra_hc_opts(opts, v);
+    return lambda name, opts, v=val: _extra_hc_opts(name, opts, v);
 
-def _extra_hc_opts( opts, v ):
+def _extra_hc_opts( name, opts, v ):
     opts.extra_hc_opts = v
 
 # -----
 
 def extra_clean( files ):
-    return lambda opts, v=files: _extra_clean(opts, v);
+    return lambda name, opts, v=files: _extra_clean(name, opts, v);
 
-def _extra_clean( opts, v ):
+def _extra_clean( name, opts, v ):
     opts.clean_files = v
 
 # -----
 
-def stats_num_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _stats_num_field(opts, f, x, y);
+def stats_num_field( field, expecteds ):
+    return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e);
 
-def _stats_num_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.stats_num_fields = opts.stats_num_fields.copy()
-    opts.stats_num_fields[f] = (x, y)
+def _stats_num_field( name, opts, field, expecteds ):
+    if field in opts.stats_range_fields:
+        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-def compiler_stats_num_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _compiler_stats_num_field(opts, f, x, y);
+    if type(expecteds) is types.ListType:
+        for (b, expected, dev) in expecteds:
+            if b:
+                opts.stats_range_fields[field] = (expected, dev)
+                return
+        framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
-def _compiler_stats_num_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.compiler_stats_num_fields = opts.compiler_stats_num_fields.copy()
-    opts.compiler_stats_num_fields[f] = (x, y)
+    else:
+        (expected, dev) = expecteds
+        opts.stats_range_fields[field] = (expected, dev)
 
-# -----
+def compiler_stats_num_field( field, expecteds ):
+    return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e);
 
-def stats_range_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _stats_range_field(opts, f, x, y);
+def _compiler_stats_num_field( name, opts, field, expecteds ):
+    if field in opts.compiler_stats_range_fields:
+        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-def _stats_range_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.stats_range_fields = opts.stats_range_fields.copy()
-    opts.stats_range_fields[f] = (x, y)
+    for (b, expected, dev) in expecteds:
+        if b:
+            opts.compiler_stats_range_fields[field] = (expected, dev)
+            return
 
-def compiler_stats_range_field( field, min, max ):
-    return lambda opts, f=field, x=min, y=max: _compiler_stats_range_field(opts, f, x, y);
-
-def _compiler_stats_range_field( opts, f, x, y ):
-    # copy the dictionary, as the config gets shared between all tests
-    opts.compiler_stats_range_fields = opts.compiler_stats_range_fields.copy()
-    opts.compiler_stats_range_fields[f] = (x, y)
+    framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
 # -----
 
-def skip_if_no_ghci(opts):
+def skip_if_no_ghci(name, opts):
     if not ('ghci' in config.run_ways):
         opts.skip = 1
 
 # ----
 
-def skip_if_fast(opts):
+def skip_if_fast(name, opts):
     if config.fast:
         opts.skip = 1
 
 # -----
 
-def if_platform( plat, f ):
-    if config.platform == plat:
+def when(b, f):
+    if b:
         return f
     else:
         return normal
 
-def unless_platform( plat, f ):
-    if config.platform != plat:
-        return f
-    else:
-        return normal
+def unless(b, f):
+    return when(not b, f)
+
+def platform( plat ):
+    return config.platform == plat
 
 def if_os( os, f ):
     if config.os == os:
@@ -336,17 +333,8 @@ def unless_arch( arch, f ):
     else:
         return f
 
-def if_wordsize( ws, f ):
-    if config.wordsize == str(ws):
-        return f
-    else:
-        return normal
-
-def unless_wordsize( ws, f ):
-    if config.wordsize == str(ws):
-        return normal
-    else:
-        return f
+def wordsize( ws ):
+    return config.wordsize == str(ws)
 
 def if_unregisterised( f ):
     if config.unregisterised:
@@ -501,89 +489,89 @@ def unless_tag( tag, f ):
         return normal
 
 # ---
-def high_memory_usage(opts):
+def high_memory_usage(name, opts):
     opts.alone = True
 
 # ---
-def literate( opts ):
+def literate( name, opts ):
     opts.literate = 1;
 
-def c_src( opts ):
+def c_src( name, opts ):
     opts.c_src = 1;
 
-def objc_src( opts ):
+def objc_src( name, opts ):
     opts.objc_src = 1;
 
-def objcpp_src( opts ):
+def objcpp_src( name, opts ):
     opts.objcpp_src = 1;
 
-def cmm_src( opts ):
+def cmm_src( name, opts ):
     opts.cmm_src = 1;
 
 def outputdir( odir ):
-    return lambda opts, d=odir: _outputdir(opts, d)
+    return lambda name, opts, d=odir: _outputdir(name, opts, d)
 
-def _outputdir( opts, odir ):
+def _outputdir( name, opts, odir ):
     opts.outputdir = odir;
 
 # ----
 
 def pre_cmd( cmd ):
-    return lambda opts, c=cmd: _pre_cmd(opts, cmd)
+    return lambda name, opts, c=cmd: _pre_cmd(name, opts, cmd)
 
-def _pre_cmd( opts, cmd ):
+def _pre_cmd( name, opts, cmd ):
     opts.pre_cmd = cmd
 
 # ----
 
 def clean_cmd( cmd ):
-    return lambda opts, c=cmd: _clean_cmd(opts, cmd)
+    return lambda name, opts, c=cmd: _clean_cmd(name, opts, cmd)
 
-def _clean_cmd( opts, cmd ):
+def _clean_cmd( name, opts, cmd ):
     opts.clean_cmd = cmd
 
 # ----
 
 def cmd_prefix( prefix ):
-    return lambda opts, p=prefix: _cmd_prefix(opts, prefix)
+    return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
-def _cmd_prefix( opts, prefix ):
+def _cmd_prefix( name, opts, prefix ):
     opts.cmd_wrapper = lambda cmd, p=prefix: p + ' ' + cmd;
 
 # ----
 
 def cmd_wrapper( fun ):
-    return lambda opts, f=fun: _cmd_wrapper(opts, fun)
+    return lambda name, opts, f=fun: _cmd_wrapper(name, opts, fun)
 
-def _cmd_wrapper( opts, fun ):
+def _cmd_wrapper( name, opts, fun ):
     opts.cmd_wrapper = fun
 
 # ----
 
 def compile_cmd_prefix( prefix ):
-    return lambda opts, p=prefix: _compile_cmd_prefix(opts, prefix)
+    return lambda name, opts, p=prefix: _compile_cmd_prefix(name, opts, prefix)
 
-def _compile_cmd_prefix( opts, prefix ):
+def _compile_cmd_prefix( name, opts, prefix ):
     opts.compile_cmd_prefix = prefix
 
 # ----
 
-def normalise_slashes( opts ):
+def normalise_slashes( name, opts ):
     opts.extra_normaliser = normalise_slashes_
 
-def normalise_exe( opts ):
+def normalise_exe( name, opts ):
     opts.extra_normaliser = normalise_exe_
 
 def normalise_fun( fun ):
-    return lambda opts, f=fun: _normalise_fun(opts, f)
+    return lambda name, opts, f=fun: _normalise_fun(name, opts, f)
 
-def _normalise_fun( opts, f ):
+def _normalise_fun( name, opts, f ):
     opts.extra_normaliser = f
 
 def normalise_errmsg_fun( fun ):
-    return lambda opts, f=fun: _normalise_errmsg_fun(opts, f)
+    return lambda name, opts, f=fun: _normalise_errmsg_fun(name, opts, f)
 
-def _normalise_errmsg_fun( opts, f ):
+def _normalise_errmsg_fun( name, opts, f ):
     opts.extra_errmsg_normaliser = f
 
 def two_normalisers(f, g):
@@ -596,21 +584,23 @@ def composes( fs ):
     return reduce(lambda f, g: compose(f, g), fs)
 
 def compose( f, g ):
-    return lambda opts, f=f, g=g: _compose(opts,f,g)
+    return lambda name, opts, f=f, g=g: _compose(name, opts, f, g)
 
-def _compose( opts, f, g ):
-    f(opts)
-    g(opts)
+def _compose( name, opts, f, g ):
+    f(name, opts)
+    g(name, opts)
 
 # -----------------------------------------------------------------------------
 # The current directory of tests
 
 def newTestDir( dir ):
-    global thisdir_testopts
+    global thisdir_settings
     # reset the options for this test directory
-    thisdir_testopts = copy.copy(default_testopts)
-    thisdir_testopts.testdir = dir
-    thisdir_testopts.compiler_always_flags = config.compiler_always_flags
+    thisdir_settings = lambda name, opts, dir=dir: _newTestDir( name, opts, dir )
+
+def _newTestDir( name, opts, dir ):
+    opts.testdir = dir
+    opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
 # Actually doing tests
@@ -643,16 +633,22 @@ def test (name, setup, func, args):
     global aloneTests
     global parallelTests
     global allTestNames
+    global thisdir_settings
     if name in allTestNames:
         framework_fail(name, 'duplicate', 'There are multiple tests with this name')
-    if not re.match('^[a-zA-Z0-9][a-zA-Z0-9._-]*$', name):
+    if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         framework_fail(name, 'bad_name', 'This test has an invalid name')
-    myTestOpts = copy.copy(thisdir_testopts)
+
+    # Make a deep copy of the default_testopts, as we need our own copy
+    # of any dictionaries etc inside it. Otherwise, if one test modifies
+    # them, all tests will see the modified version!
+    myTestOpts = copy.deepcopy(default_testopts)
 
     if type(setup) is types.ListType:
        setup = composes(setup)
 
-    setup(myTestOpts)
+    setup = compose(thisdir_settings, setup)
+    setup(name, myTestOpts)
 
     thisTest = lambda : runTest(myTestOpts, name, func, args)
     if myTestOpts.alone:
@@ -726,6 +722,8 @@ def test_common_work (name, opts, func, args):
         if not config.clean_only:
             # Run the required tests...
             for way in do_ways:
+                if stopping():
+                    break
                 do_test (name, way, func, args)
 
             for way in all_ways:
@@ -888,7 +886,7 @@ def do_test(name, way, func, args):
         else:
             framework_fail(name, way, 'bad result ' + passFail)
     except KeyboardInterrupt:
-        raise
+        stopNow()
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
@@ -1111,15 +1109,14 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return checkStats(stats_file, opts.stats_range_fields
-                                , opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, range_fields, num_fields):
+def checkStats(stats_file, range_fields):
     result = passed()
-    if len(num_fields) + len(range_fields) > 0:
+    if len(range_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
@@ -1131,36 +1128,31 @@ def checkStats(stats_file, range_fields, num_fields):
                 result = failBecause('no such stats field')
             val = int(m.group(1))
 
-            min = expected * ((100 - float(dev))/100);
-            max = expected * ((100 + float(dev))/100);
+            lowerBound = trunc(           expected * ((100 - float(dev))/100));
+            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)));
 
-            if val < min:
-                print field, val, 'is more than ' + repr(dev) + '%'
-                print 'less than the exepected value', expected
-                print 'If this is because you have improved GHC, please'
-                print 'update the test so that GHC doesn\'t regress again'
+            if val < lowerBound:
+                print field, 'value is too low:'
+                print '(If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again)'
                 result = failBecause('stat too good')
-            if val > max:
-                print field, val, 'is more than ' + repr(dev) + '% greater than the expected value,', expected, max
+            if val > upperBound:
+                print field, 'value is too high:'
                 result = failBecause('stat not good enough')
 
-        # ToDo: remove all uses of this, and delete it
-        for (field, (min, max)) in num_fields.items():
-            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
-            if m == None:
-                print 'Failed to find field: ', field
-                result = failBecause('no such stats field')
-            val = int(m.group(1))
-
-            if val < min:
-                print field, val, 'is less than minimum allowed', min
-                print 'If this is because you have improved GHC, please'
-                print 'update the test so that GHC doesn\'t regress again'
-                result = failBecause('stat too good')
-            if val > max:
-                print field, val, 'is more than maximum allowed', max
-                result = failBecause('stat not good enough')
-
+            if val < lowerBound or val > upperBound:
+                valStr = str(val)
+                valLen = len(valStr)
+                expectedStr = str(expected)
+                expectedLen = len(expectedStr)
+                length = max(map (lambda x : len(str(x)), [expected, lowerBound, upperBound, val]))
+                def display(descr, val, extra):
+                    print descr, string.rjust(str(val), length), extra
+                display('    Expected    ' + field + ':', expected, '+/-' + str(dev) + '%')
+                display('    Lower bound ' + field + ':', lowerBound, '')
+                display('    Upper bound ' + field + ':', upperBound, '')
+                display('    Actual      ' + field + ':', val, '')
+                
     return result
 
 # -----------------------------------------------------------------------------
@@ -1211,7 +1203,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if len(opts.compiler_stats_num_fields) + len(opts.compiler_stats_range_fields) > 0:
+    if len(opts.compiler_stats_range_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     # Required by GHC 7.3+, harmless for earlier versions:
@@ -1250,8 +1242,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields
-                                       , opts.compiler_stats_num_fields)
+    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1297,7 +1288,7 @@ def simple_run( name, way, prog, args ):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if len(opts.stats_num_fields) + len(opts.stats_range_fields) > 0:
+    if len(opts.stats_range_fields) > 0:
         args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if opts.no_stdin:
@@ -1351,8 +1342,7 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_range_fields
-                                , opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
     if (way == ''):
@@ -1615,7 +1605,7 @@ def check_stderr_ok( name ):
          return normalise_errmsg(str)
 
    return compare_outputs('stderr', \
-                          two_normalisers(norm, getTestOpts().extra_normaliser), \
+                          two_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
@@ -1861,6 +1851,15 @@ def rawSystem(cmd_and_args):
     else:
         return os.spawnv(os.P_WAIT, cmd_and_args[0], cmd_and_args)
 
+# Note that this doesn't handle the timeout itself; it is just used for
+# commands that have timeout handling built-in.
+def rawSystemWithTimeout(cmd_and_args):
+    r = rawSystem(cmd_and_args)
+    if r == 98:
+        # The python timeout program uses 98 to signal that ^C was pressed
+        stopNow()
+    return r
+
 # cmd is a complex command in Bourne-shell syntax
 # e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
 # Hence it must ultimately be run by a Bourne shell
@@ -1880,7 +1879,7 @@ def runCmd( cmd ):
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
-        r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
+        r = rawSystemWithTimeout([config.timeout_prog, str(config.timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
@@ -1891,18 +1890,19 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
     if config.os == 'mingw32':
         # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
-    timeout = int(math.ceil(config.timeout * timeout_multiplier))
+    timeout = int(ceil(config.timeout * timeout_multiplier))
 
     if config.timeout_prog != '':
         if config.check_files_written:
             fn = name + ".strace"
-            r = rawSystem(["strace", "-o", fn, "-fF", "-e", "creat,open,chdir,clone,vfork",
-                           config.timeout_prog, str(timeout),
-                           cmd])
+            r = rawSystemWithTimeout(
+                    ["strace", "-o", fn, "-fF",
+                               "-e", "creat,open,chdir,clone,vfork",
+                     config.timeout_prog, str(timeout), cmd])
             addTestFilesWritten(name, fn)
             rm_no_fail(fn)
         else:
-            r = rawSystem([config.timeout_prog, str(timeout), cmd])
+            r = rawSystemWithTimeout([config.timeout_prog, str(timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
@@ -2216,6 +2216,7 @@ def findTFiles_(path):
 def summary(t, file):
 
     file.write('\n')
+    printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
     file.write('OVERALL SUMMARY for test run started at ' \
                + t.start_time + '\n'\
                + string.rjust(`t.total_tests`, 8) \
@@ -2248,6 +2249,21 @@ def summary(t, file):
 
     if config.check_files_written:
         checkForFilesWrittenProblems(file)
+
+    if stopping():
+        file.write('WARNING: Testsuite run was terminated early\n')
+
+def printUnexpectedTests(file, testInfoss):
+    unexpected = []
+    for testInfos in testInfoss:
+        directories = testInfos.keys()
+        for directory in directories:
+            tests = testInfos[directory].keys()
+            unexpected += tests
+    if unexpected != []:
+        file.write('Unexpected results from:\n')
+        file.write('TEST="' + ' '.join(unexpected) + '"\n')
+        file.write('\n')
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()

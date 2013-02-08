@@ -76,3 +76,4 @@ test('ParserNoLambdaCase', if_compiler_lt('ghc', '7.5', skip), compile_fail, [''
 test('ParserNoMultiWayIf', if_compiler_lt('ghc', '7.5', skip), compile_fail, [''])
 
 test('T5425', normal, compile_fail, [''])
+test('T984', normal, compile_fail, [''])

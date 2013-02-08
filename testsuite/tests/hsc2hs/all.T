@@ -20,8 +20,8 @@ test('hsc2hs004',
      ['$MAKE -s --no-print-directory hsc2hs004'])
 
 
-test('3837',
-     [extra_clean(['3837.hs', '3837_hsc_make.c'])],
+test('T3837',
+     [extra_clean(['T3837.hs', 'T3837_hsc_make.c'])],
      run_command,
-     ['$MAKE -s --no-print-directory 3837'])
+     ['$MAKE -s --no-print-directory T3837'])
 

@@ -16,7 +16,7 @@ test('utf8_022', normal, compile_fail, [''])
 
 test('utf8_024', normal, compile_and_run, [''])
 
-test('1744', normal, compile_and_run, [''])
-test('1103', normal, compile, [''])
-test('2302', only_ways(['normal']), compile_fail, [''])
-test('4373', normal, compile, [''])
+test('T1744', normal, compile_and_run, [''])
+test('T1103', normal, compile, [''])
+test('T2302', only_ways(['normal']), compile_fail, [''])
+test('T4373', normal, compile, [''])

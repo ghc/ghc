@@ -5,20 +5,20 @@ include $(TOP)/mk/test.mk
 ffi018_ghci_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ffi018_ghci_c.c
 
-1288_ghci_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c 1288_ghci_c.c
+T1288_ghci_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T1288_ghci_c.c
 
-2276_ghci_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c 2276_ghci_c.c
+T2276_ghci_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T2276_ghci_c.c
 
 ffi002_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ffi002.hs
 
-5402_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c 5402.hs
+T5402_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5402.hs
 
-5594_setup :
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c 5594.hs
+T5594_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5594.hs
 
 .PHONY: Capi_Ctype_001
 Capi_Ctype_001:

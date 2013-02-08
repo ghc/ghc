@@ -9,7 +9,7 @@ test('testblockalloc', compose(c_src,
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
      composes([
-             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
+             when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
              # LLVM Optimiser considers dereference of a null pointer
              # undefined and marks the code as unreachable which means
              # that later optimisations remove it altogether.
@@ -21,13 +21,13 @@ test('derefnull',
              # the right exit code we're OK.
              if_os('linux', ignore_output),
              # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
-             if_platform('i386-apple-darwin', exit_code(138)),
-             if_platform('powerpc-apple-darwin', exit_code(138)),
+             when(platform('i386-apple-darwin'), exit_code(138)),
+             when(platform('powerpc-apple-darwin'), exit_code(138)),
              if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
      composes([
-             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
+             when(platform('x86_64-unknown-mingw32'), expect_broken(6079)),
              # SIGFPE on Linux
              exit_code(136),
              # Apparently the output can be different on different
@@ -42,12 +42,12 @@ test('outofmem', if_os('darwin', skip),
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
-test('2047', compose(ignore_output, extra_run_opts('+RTS -c -RTS')),
-             compile_and_run, ['-package containers'])
+test('T2047', compose(ignore_output, extra_run_opts('+RTS -c -RTS')),
+              compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
 # Skip GHCi due to #2786
-test('2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
+test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
@@ -55,7 +55,7 @@ test('testwsdeque', [unless_in_tree_compiler(skip),
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, ['-I../../../rts'])
 
-test('3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
+test('T3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
 
 test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
@@ -68,9 +68,9 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
 
 test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
 
-test('3424', # it's slow:
-             [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
-             compile_and_run, [''])
+test('T3424', # it's slow:
+              [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
+              compile_and_run, [''])
 
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
@@ -85,9 +85,9 @@ test('T2615',
        if_os('darwin', skip),
        # Solaris' linker does not support GNUish linker scripts
        if_os('solaris2', skip),
-       cmd_prefix('$MAKE T2615-prep && ' +
-                  # Add current directory to dlopen search path
-                  'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
+       pre_cmd('$MAKE -s --no-print-directory T2615-prep'),
+       # Add current directory to dlopen search path
+       cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
        extra_clean(['libfoo_T2615.so', 'libfoo_T2615.o'])],
      compile_and_run,
      ['-package ghc'])
@@ -106,38 +106,38 @@ test('T4059',
 # Test for #4274
 test('exec_signals', [
      if_os('mingw32', skip),
-     cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
+     pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
+     cmd_prefix('./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])
     ], compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('4850', extra_clean(['4850.o','4850.hi','4850']),
-             run_command, ['$MAKE -s --no-print-directory 4850'])
+test('T4850', normal, run_command, ['$MAKE -s --no-print-directory T4850'])
 
-def config_5250(opts):
+def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
         opts.skip = 1;
 
-test('5250', [ config_5250,
-               # stack ptr is not 16-byte aligned on 32-bit Windows
-               if_platform('i386-unknown-mingw32', expect_fail),
-               if_platform('i386-unknown-linux',
-                           expect_broken_for(4211,['llvm'])),
-               extra_clean(['spalign.o']),
-               omit_ways(['ghci']) ],
-             compile_and_run, ['spalign.c'])
+test('T5250', [ config_T5250,
+                # stack ptr is not 16-byte aligned on 32-bit Windows
+                when(platform('i386-unknown-mingw32'), expect_fail),
+                when(platform('i386-unknown-linux'),
+                            expect_broken_for(4211,['llvm'])),
+                extra_clean(['spalign.o']),
+                omit_ways(['ghci']) ],
+              compile_and_run, ['spalign.c'])
 
 test('T5423',
      extra_clean(['T5423_cmm.o']),
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
-test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
+test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  extra_clean(['T6006_c.o']),
-                 compile_cmd_prefix('$MAKE T6006_setup && ') ],
+                 pre_cmd('$MAKE -s --no-print-directory T6006_setup') ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which
                  # needs it.
@@ -148,17 +148,19 @@ test('T7037',
      run_command,
      ['$MAKE -s --no-print-directory T7037'])
 
-test('7087', exit_code(1), compile_and_run, [''])
+test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', normal, compile_and_run, [''])
 
 test('T7040', [ extra_clean(['T7040_c.o']), omit_ways(['ghci']) ],
      compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci', [ only_ways(['ghci']),
-                      cmd_prefix('$MAKE T7040_ghci_setup && '),
+                      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup'),
                       extra_clean(['T7040_ghci_c.o']) ],
                     compile_and_run, ['T7040_ghci_c.o'])
 
 test('T7227', [ extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS'),
                 extra_clean(['T7227.stat']) ]
             , compile_and_run, [''] )
+
+test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )

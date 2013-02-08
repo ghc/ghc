@@ -1,7 +1,7 @@
 
 # this one causes the compiler to run out of heap in the simplifier
 
-def set_opts( opts ):
+def set_opts( name, opts ):
   opts.expect = 'fail'
 
 test('okeefe_neural',

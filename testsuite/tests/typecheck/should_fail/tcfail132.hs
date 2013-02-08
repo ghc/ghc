@@ -4,7 +4,7 @@
 --    Kind error: Expecting kind `k_a1JA -> k_a1JE -> k_a1JI -> *',
 --	          but `DUnit t' has kind `k_a1JA -> k_a1JE -> *'
 --
--- as we couldn't tidy kinds, becuase they didn't have OccNames.
+-- as we couldn't tidy kinds, because they didn't have OccNames.
 -- This test recalls the bad error message.
 
 module ShouldFail where

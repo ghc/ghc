@@ -31,11 +31,11 @@ exec_signals-prep:
 	$(CC) -o exec_signals_child exec_signals_child.c
 	$(CC) -o exec_signals_prepare exec_signals_prepare.c
 
-.PHONY: 4850
-4850:
-	$(RM) 4850.o 4850.hi 4850$(exeext)
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make 4850
-	./4850 +RTS -s 2>&1 | grep TASKS | sed 's/^ *TASKS: *\([0-9]*\).*$$/\1/'
+.PHONY: T4850
+T4850:
+	$(RM) T4850.o T4850.hi T4850$(exeext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make T4850
+	./T4850 +RTS -s 2>&1 | grep TASKS | sed 's/^ *TASKS: *\([0-9]*\).*$$/\1/'
 
 .PHONY: T5423
 T5423:
@@ -48,11 +48,16 @@ T5423:
 T6006_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+T7037_CONST = const
+else
+T7037_CONST =
+endif
 .PHONY: T7037
 T7037:
 	$(RM) 7037.o 7037.hi 7037$(exeext)
 	"$(TEST_HC)" $(TEST_HC_OPTS) T7037.hs -v0
-	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
+	"$(TEST_HC)" -optc-DT7037_CONST=$(T7037_CONST) $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
 	./T7037_main
 
 T7040_ghci_setup :

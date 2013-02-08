@@ -4,5 +4,5 @@
 test('prof001', compose(only_ways(['normal']), req_profiling), compile_and_run, ['-prof -caf-all'])
 test('prof002', compose(only_ways(['normal']), req_profiling), compile_and_run, ['-prof -caf-all'])
 
-test('2410', compose(only_ways(['normal']), req_profiling), compile, ['-O2 -prof -caf-all'])
+test('T2410', compose(only_ways(['normal']), req_profiling), compile, ['-O2 -prof -caf-all'])
 
