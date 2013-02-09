@@ -758,10 +758,11 @@ The "extra" type argument [Char] just stays on the end.
 -- It is currently (Oct 2012) used only for generating errors for
 -- inaccessible branches. If these errors go unreported, no harm done.
 -- This is defined here to avoid a dependency from CoAxiom to Unify
-isDominatedBy :: [Type] -> [CoAxBranch] -> Bool
-isDominatedBy lhs branches
+isDominatedBy :: CoAxBranch -> [CoAxBranch] -> Bool
+isDominatedBy branch branches
   = or $ map match branches
     where
+      lhs = coAxBranchLHS branch
       match (CoAxBranch { cab_tvs = tvs, cab_lhs = tys })
         = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
 \end{code}

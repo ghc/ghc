@@ -21,8 +21,8 @@ module TcTyClsDecls (
 	-- data/type family instance declarations
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcSynFamInstDecl, tcFamTyPats, 
-        tcAddFamInstCtxt, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
-        wrongKindOfFamily, badATErr, wrongATArgErr
+        tcAddTyFamInstCtxt, tcAddDataFamInstCtxt, tcAddFamInstCtxt,
+        wrongKindOfFamily,
     ) where
 
 #include "HsVersions.h"
@@ -54,6 +54,7 @@ import Id
 import MkCore		( rEC_SEL_ERROR_ID )
 import IdInfo
 import Var
+import VarEnv
 import VarSet
 import Module
 import Name
@@ -1467,36 +1468,10 @@ checkValidClass cls
 		-- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = do { mapM_ (\(CoAxBranch { cab_tvs = tvs, cab_lhs = pats, cab_rhs = rhs })
-                    -> checkValidTyFamInst fam_tc tvs pats rhs) defs
-           ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
-             mapM_ (check_loc_at_def fam_tc) defs }
+      = tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
+        mapM_ (checkValidTyFamInst mb_clsinfo fam_tc) defs
 
-    -- Check that the index of the type instance is the same as on
-    -- its parent class.  Eg
-    --    class C a b where
-    --       type F b x a ::*
-    --    instnace C Int Bool where
-    --       type F Bool Char Int = Int
-    --       type F Bool Bool Int = Bool
-    --  Here the first and third args should match
-    --  the (C Int Bool)  header
-    -- This is not to do with soundness; it's just checking that the
-    -- type instance arg is the sam
-    check_loc_at_def fam_tc (CoAxBranch { cab_lhs = pats, cab_loc = loc })
-      -- Set the location for each of the default declarations
-      = setSrcSpan loc $ zipWithM_ check_arg (tyConTyVars fam_tc) pats
-
-    -- We only want to check this on the *class* TyVars,
-    -- not the *family* TyVars (there may be more of these)
-    -- Nor do we want to check kind vars, for which we don't enforce
-    -- the "same name as parent" rule as we do for type variables
-    -- c.f. Trac #7073
-    check_arg fam_tc_tv at_ty
-      = checkTc (   isKindVar fam_tc_tv
-                 || not (fam_tc_tv `elem` tyvars)
-                 || mkTyVarTy fam_tc_tv `eqType` at_ty) 
-          (wrongATArgErr at_ty (mkTyVarTy fam_tc_tv))
+    mb_clsinfo = Just (cls, mkVarEnv [ (tv, mkTyVarTy tv) | tv <- tyvars ])
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies
@@ -1733,14 +1708,6 @@ tcAddDefaultAssocDeclCtxt name thing_inside
      ctxt = hsep [ptext (sLit "In the type synonym instance default declaration for"),
                   quotes (ppr name)]
 
-tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a
-tcAddFamInstCtxt flavour tycon thing_inside
-  = addErrCtxt ctxt thing_inside
-  where
-     ctxt = hsep [ptext (sLit "In the") <+> flavour 
-                  <+> ptext (sLit "declaration for"),
-                  quotes (ppr tycon)]
-
 tcAddTyFamInstCtxt :: TyFamInstDecl Name -> TcM a -> TcM a
 tcAddTyFamInstCtxt decl
   | [_] <- tfid_eqns decl
@@ -1752,6 +1719,14 @@ tcAddDataFamInstCtxt :: DataFamInstDecl Name -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl
   = tcAddFamInstCtxt ((pprDataFamInstFlavour decl) <+> (ptext (sLit "instance")))
                      (unLoc (dfid_tycon decl)) 
+
+tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a
+tcAddFamInstCtxt flavour tycon thing_inside
+  = addErrCtxt ctxt thing_inside
+  where
+     ctxt = hsep [ptext (sLit "In the") <+> flavour 
+                  <+> ptext (sLit "declaration for"),
+                  quotes (ppr tycon)]
 
 resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
@@ -1817,11 +1792,6 @@ badGadtKindCon data_con
           <+> ptext (sLit "cannot be GADT-like in its *kind* arguments"))
        2 (ppr data_con <+> dcolon <+> ppr (dataConUserType data_con))
 
-badATErr :: Name -> Name -> SDoc
-badATErr clas op
-  = hsep [ptext (sLit "Class"), quotes (ppr clas), 
-          ptext (sLit "does not have an associated type"), quotes (ppr op)]
-
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
   = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
@@ -1872,13 +1842,6 @@ emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext (sLit "has no constructors"),
 	 nest 2 $ ptext (sLit "(-XEmptyDataDecls permits this)")]
-
-wrongATArgErr :: Type -> Type -> SDoc
-wrongATArgErr ty instTy =
-  sep [ ptext (sLit "Type indexes must match class instance head")
-      , ptext (sLit "Found") <+> quotes (ppr ty)
-        <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
-      ]
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity

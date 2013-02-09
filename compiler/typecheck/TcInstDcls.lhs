@@ -20,9 +20,9 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 import HsSyn
 import TcBinds
 import TcTyClsDecls( tcAddImplicits, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
-                     tcAddFamInstCtxt, tcSynFamInstDecl, 
+                     tcSynFamInstDecl, 
                      wrongKindOfFamily, tcFamTyPats, kcDataDefn, dataDeclChecks,
-                     tcConDecls, checkValidTyCon, badATErr, wrongATArgErr )
+                     tcConDecls, checkValidTyCon, tcAddFamInstCtxt )
 import TcClassDcl( tcClassDecl2, 
                    HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
                    findMethodBind, instantiateMethod, tcInstanceMethodBody )
@@ -41,7 +41,6 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import Unify      ( tcMatchTyX )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import CoreSyn    ( DFunArg(..) )
 import Type
@@ -640,19 +639,15 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
       check_valid_branch :: [CoAxBranch]     -- previous
                          -> CoAxBranch       -- current
                          -> TcM [CoAxBranch] -- current : previous
-      check_valid_branch prev_branches
-          cur_branch@(CoAxBranch { cab_tvs = t_tvs, cab_lhs = t_typats
-                                 , cab_rhs = t_rhs, cab_loc = loc })
-        = setSrcSpan loc $
+      check_valid_branch prev_branches cur_branch
+        = tcAddFamInstCtxt (ptext (sLit "type")) (tyConName fam_tc) $
           do { -- Check the well-formedness of the instance
-               checkValidTyFamInst fam_tc t_tvs t_typats t_rhs
-
-               -- Check that type patterns match the class instance head
-             ; checkConsistentFamInst mb_clsinfo (ptext (sLit "type")) fam_tc t_tvs t_typats
+               checkValidTyFamInst mb_clsinfo fam_tc cur_branch
 
                -- Check whether the branch is dominated by earlier
                -- ones and hence is inaccessible
-             ; when (t_typats `isDominatedBy` prev_branches) $
+             ; when (cur_branch `isDominatedBy` prev_branches) $
+               setSrcSpan (coAxBranchSpan cur_branch) $
                addErrTc $ inaccessibleCoAxBranch fam_tc cur_branch
 
              ; return $ cur_branch : prev_branches }
@@ -667,6 +662,7 @@ tcDataFamInstDecl mb_clsinfo fam_tc
              , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                                            , dd_ctxt = ctxt, dd_cons = cons } }))
   = setSrcSpan loc $
+    tcAddFamInstCtxt (ppr new_or_data) (tyConName fam_tc) $
     do { -- Check that the family declaration is for the right kind
          checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
@@ -680,7 +676,7 @@ tcDataFamInstDecl mb_clsinfo fam_tc
          --  foralls earlier)
          checkValidFamPats fam_tc tvs' pats'
          -- Check that type patterns match class instance head, if any
-       ; checkConsistentFamInst mb_clsinfo (ppr new_or_data) fam_tc tvs' pats'
+       ; checkConsistentFamInst mb_clsinfo fam_tc tvs' pats'
          
          -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
@@ -719,129 +715,6 @@ tcDataFamInstDecl mb_clsinfo fam_tc
          -- Remember to check validity; no recursion to worry about here
        ; checkValidTyCon rep_tc
        ; return fam_inst } }
-\end{code}
-
-
-Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow this:
-  class C a where
-    type T x a
-  instance C Int where
-    type T (S y) Int = y
-    type T Z     Int = Char
-
-Note that 
-  a) The variable 'x' is not bound by the class decl
-  b) 'x' is instantiated to a non-type-variable in the instance
-  c) There are several type instance decls for T in the instance
-
-All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, becuase it's an *associated* type.
-
-Note [Checking consistent instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  class C a b where
-    type T a x b
-
-  instance C [p] Int
-    type T [p] y Int = (p,y,y)  -- Induces the family instance TyCon
-                                --    type TR p y = (p,y,y)
-
-So we 
-  * Form the mini-envt from the class type variables a,b
-    to the instance decl types [p],Int:   [a->[p], b->Int]
-
-  * Look at the tyvars a,x,b of the type family constructor T
-    (it shares tyvars with the class C)
-
-  * Apply the mini-evnt to them, and check that the result is
-    consistent with the instance types [p] y Int
-
-We do *not* assume (at this point) the the bound variables of 
-the assoicated type instance decl are the same as for the parent
-instance decl. So, for example,
-
-  instance C [p] Int
-    type T [q] y Int = ...
-
-would work equally well. Reason: making the *kind* variables line
-up is much harder. Example (Trac #7282):
-  class Foo (xs :: [k]) where
-     type Bar xs :: *
-
-   instance Foo '[] where
-     type Bar '[] = Int
-Here the instance decl really looks like
-   instance Foo k ('[] k) where
-     type Bar k ('[] k) = Int
-but the k's are not scoped, and hence won't match Uniques.
-
-So instead we just match structure, with tcMatchTyX, and check
-that distinct type variales match 1-1 with distinct type variables.
-
-HOWEVER, we *still* make the instance type variables scope over the
-type instances, to pick up non-obvious kinds.  Eg
-   class Foo (a :: k) where
-      type F a
-   instance Foo (b :: k -> k) where
-      type F b = Int
-Here the instance is kind-indexed and really looks like
-      type F (k->k) (b::k->k) = Int
-But if the 'b' didn't scope, we would make F's instance too
-poly-kinded.
-
-\begin{code}
-checkConsistentFamInst 
-               :: Maybe ( Class
-                        , VarEnv Type )  -- ^ Class of associated type
-                                         -- and instantiation of class TyVars
-               -> SDoc               -- ^ "flavor" of the instance
-               -> TyCon              -- ^ Family tycon
-               -> [TyVar]            -- ^ Type variables of the family instance
-               -> [Type]             -- ^ Type patterns from instance
-               -> TcM ()
--- See Note [Checking consistent instantiation]
-
-checkConsistentFamInst Nothing _ _ _ _ = return ()
-checkConsistentFamInst (Just (clas, mini_env)) flav fam_tc at_tvs at_tys
-  = tcAddFamInstCtxt flav (tyConName fam_tc) $
-    do { -- Check that the associated type indeed comes from this class
-         checkTc (Just clas == tyConAssoc_maybe fam_tc)
-                 (badATErr (className clas) (tyConName fam_tc))
-
-         -- See Note [Checking consistent instantiation] in TcTyClsDecls
-         -- Check right to left, so that we spot type variable
-         -- inconsistencies before (more confusing) kind variables
-       ; discardResult $ foldrM check_arg emptyTvSubst $
-                         tyConTyVars fam_tc `zip` at_tys }
-  where
-    at_tv_set = mkVarSet at_tvs
-
-    check_arg :: (TyVar, Type) -> TvSubst -> TcM TvSubst
-    check_arg (fam_tc_tv, at_ty) subst
-      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
-      = case tcMatchTyX at_tv_set subst at_ty inst_ty of
-           Just subst | all_distinct subst -> return subst
-           _ -> failWithTc $ wrongATArgErr at_ty inst_ty
-                -- No need to instantiate here, becuase the axiom
-                -- uses the same type variables as the assocated class
-      | otherwise
-      = return subst   -- Allow non-type-variable instantiation
-                       -- See Note [Associated type instances]
-
-    all_distinct :: TvSubst -> Bool
-    -- True if all the variables mapped the substitution 
-    -- map to *distinct* type *variables*
-    all_distinct subst = go [] at_tvs
-       where
-         go _   []       = True
-         go acc (tv:tvs) = case lookupTyVar subst tv of
-                             Nothing -> go acc tvs
-                             Just ty | Just tv' <- tcGetTyVar_maybe ty
-                                     , tv' `notElem` acc
-                                     -> go (tv' : acc) tvs
-                             _other -> False
 \end{code}
 
 
