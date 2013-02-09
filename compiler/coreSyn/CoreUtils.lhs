@@ -525,7 +525,7 @@ There used to be a gruesome test for (hasNoBinding v) in the
 Var case:
         exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
 The idea here is that a constructor worker, like \$wJust, is
-really short for (\x -> \$wJust x), becuase \$wJust has no binding.
+really short for (\x -> \$wJust x), because \$wJust has no binding.
 So it should be treated like a lambda.  Ditto unsaturated primops.
 But now constructor workers are not "have-no-binding" Ids.  And
 completely un-applied primops and foreign-call Ids are sufficiently

@@ -472,19 +472,19 @@ mkIrredErr ctxt cts
 
 ----------------
 mkHoleError :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkHoleError ctxt ct@(CHoleCan {})
+mkHoleError ctxt ct@(CHoleCan { cc_occ = occ })
   = do { let tyvars = varSetElems (tyVarsOfCt ct)
              tyvars_msg = map loc_msg tyvars
-             msg = (text "Found hole" <+> quotes (text "_") 
-                    <+> text "with type") <+> pprType (ctEvPred (cc_ev ct))
-                   $$ (if null tyvars_msg then empty else text "Where:" <+> vcat tyvars_msg)
+             msg = vcat [ hang (ptext (sLit "Found hole") <+> quotes (ppr occ))
+                             2 (ptext (sLit "with type:") <+> pprType (ctEvPred (cc_ev ct)))
+                        , ppUnless (null tyvars_msg) (ptext (sLit "Where:") <+> vcat tyvars_msg) ]
        ; (ctxt, binds_doc) <- relevantBindings ctxt ct
        ; mkErrorMsg ctxt ct (msg $$ binds_doc) }
   where
     loc_msg tv 
        = case tcTyVarDetails tv of
           SkolemTv {} -> quotes (ppr tv) <+> skol_msg
-          MetaTv {}   -> quotes (ppr tv) <+> text "is an ambiguous type variable"
+          MetaTv {}   -> quotes (ppr tv) <+> ptext (sLit "is an ambiguous type variable")
           det -> pprTcTyVarDetails det
        where 
           skol_msg = pprSkol (getSkolemInfo (cec_encl ctxt) tv) (getSrcLoc tv)
@@ -686,7 +686,7 @@ mkTyVarEqErr dflags ctxt extra ct oriented tv1 ty2
   = reportEqErr ctxt extra ct oriented (mkTyVarTy tv1) ty2
         -- This *can* happen (Trac #6123, and test T2627b)
         -- Consider an ambiguous top-level constraint (a ~ F a)
-        -- Not an occurs check, becuase F is a type function.
+        -- Not an occurs check, because F is a type function.
   where         
     occ_check_expand = occurCheckExpand dflags tv1 ty2
     k1 	= tyVarKind tv1
@@ -866,7 +866,7 @@ mkDictErr ctxt cts
 
        -- Report definite no-instance errors, 
        -- or (iff there are none) overlap errors
-       -- But we report only one of them (hence 'head') becuase they all
+       -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
        ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))

@@ -144,7 +144,7 @@ lintCoreBindings binds
     -- allow this at top level:
     --    M.n{r3}  = ...
     --    M.n{r29} = ...
-    -- becuase they both get the same linker symbol
+    -- because they both get the same linker symbol
     ext_dups = snd (removeDups ord_ext (map Var.varName binders))
     ord_ext n1 n2 | Just m1 <- nameModule_maybe n1
                   , Just m2 <- nameModule_maybe n2
@@ -1303,12 +1303,12 @@ mkKindErrMsg tyvar arg_ty
 
 mkArityMsg :: Id -> MsgDoc
 mkArityMsg binder
-  = vcat [hsep [ptext (sLit "Demand type has "),
-                     ppr (dmdTypeDepth dmd_ty),
-                     ptext (sLit " arguments, rhs has "),
-                     ppr (idArity binder),
-                     ptext (sLit "arguments, "),
-		     ppr binder],
+  = vcat [hsep [ptext (sLit "Demand type has"),
+               	ppr (dmdTypeDepth dmd_ty),
+               	ptext (sLit "arguments, rhs has"),
+               	ppr (idArity binder),
+               	ptext (sLit "arguments,"),
+	       	ppr binder],
 	      hsep [ptext (sLit "Binder's strictness signature:"), ppr dmd_ty]
 
          ]

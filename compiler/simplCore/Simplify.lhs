@@ -331,7 +331,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 not_lam (Lam _ _) = False
                 not_lam _         = True
                         -- Do not do the "abstract tyyvar" thing if there's
-                        -- a lambda inside, becuase it defeats eta-reduction
+                        -- a lambda inside, because it defeats eta-reduction
                         --    f = /\a. \x. g a x
                         -- should eta-reduce
 
@@ -781,7 +781,7 @@ on to the old unfolding (which is part of the id).
 Note [Arity decrease]
 ~~~~~~~~~~~~~~~~~~~~~
 Generally speaking the arity of a binding should not decrease.  But it *can*
-legitimately happen becuase of RULES.  Eg
+legitimately happen because of RULES.  Eg
         f = g Int
 where g has arity 2, will have arity 2.  But if there's a rewrite rule
         g Int --> h
@@ -2057,7 +2057,7 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
               con_app :: OutExpr
-              con_app   = mkConApp con (map Type inst_tys' ++ varsToCoreExprs vs')
+              con_app   = mkConApp2 con inst_tys' vs'
 
         ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
         ; rhs' <- simplExprC env'' rhs cont'
@@ -2347,7 +2347,7 @@ mkDupableCont env (Select _ case_bndr alts se cont)
         ; (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
                 -- NB: We call prepareCaseCont here.  If there is only one
                 -- alternative, then dup_cont may be big, but that's ok
-                -- becuase we push it into the single alternative, and then
+                -- because we push it into the single alternative, and then
                 -- use mkDupableAlt to turn that simplified alternative into
                 -- a join point if it's too big to duplicate.
                 -- And this is important: see Note [Fusing case continuations]
@@ -2404,8 +2404,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                           where
                                  -- See Note [Case binders and join points]
                              unf = mkInlineUnfolding Nothing rhs
-                             rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
-                                                ++ varsToCoreExprs bndrs')
+                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
                       LitAlt {} -> WARN( True, ptext (sLit "mkDupableAlt")
                                                 <+> ppr case_bndr <+> ppr con )

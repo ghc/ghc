@@ -458,7 +458,7 @@ type ClsInstLookupResult
 
 Note [DFunInstType: instantiating types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A successful match is an ClsInst, together with the types at which
+A successful match is a ClsInst, together with the types at which
         the dfun_id in the ClsInst should be instantiated
 The instantiating types are (Either TyVar Type)s because the dfun
 might have some tyvars that *only* appear in arguments

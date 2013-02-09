@@ -599,49 +599,40 @@ tcTyClDecl1 _parent rec_info
 	    , tcdFDs = fundeps, tcdSigs = sigs
             , tcdATs = ats, tcdATDefs = at_defs })
   = ASSERT( isNoParent _parent )
-    do 
-  { (tvs', ctxt', fds', sig_stuff, gen_dm_env)
-       <- tcTyClTyVars class_name tvs $ \ tvs' kind -> do
-          { MASSERT( isConstraintKind kind )
-
-          ; ctxt' <- tcHsContext ctxt
-          ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'  
-                  -- Squeeze out any kind unification variables
-          ; fds'  <- mapM (addLocM tc_fundep) fundeps
-          ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
-          ; env <- getLclTypeEnv
-          ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tvs' $$ ppr fds' $$  ppr env)
-          ; return (tvs', ctxt', fds', sig_stuff, gen_dm_env) }
-
-
-
-  ; clas <- fixM $ \ clas -> do
-	    { let 	-- This little knot is just so we can get
+    do { (clas, tvs', gen_dm_env) <- fixM $ \ ~(clas,_,_) ->
+	    tcTyClTyVars class_name tvs $ \ tvs' kind ->
+            do { MASSERT( isConstraintKind kind )
+               ; let 	-- This little knot is just so we can get
 			-- hold of the name of the class TyCon, which we
 			-- need to look up its recursiveness
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = rti_is_rec rec_info tycon_name
 
-            ; at_stuff <- tcClassATs class_name (AssocFamilyTyCon clas) ats at_defs
+               ; ctxt' <- tcHsContext ctxt
+               ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'  
+                       -- Squeeze out any kind unification variables
+               ; fds'  <- mapM (addLocM tc_fundep) fundeps
+               ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
+               ; at_stuff <- tcClassATs class_name (AssocFamilyTyCon clas) ats at_defs
+               ; clas <- buildClass False {- Must include unfoldings for selectors -}
+	                    class_name tvs' ctxt' fds' at_stuff
+	       		    sig_stuff tc_isrec 
+               ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tvs' $$ ppr fds')
+               ; return (clas, tvs', gen_dm_env) }
 
-            ; buildClass False {- Must include unfoldings for selectors -}
-			 class_name tvs' ctxt' fds' at_stuff
-			 sig_stuff tc_isrec }
+       ; let { gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
+                            | (sel_id, GenDefMeth gen_dm_name) <- classOpItems clas
+                     	    , let gen_dm_tau = expectJust "tcTyClDecl1" $
+                     	                       lookupNameEnv gen_dm_env (idName sel_id)
+		     	    , let gen_dm_ty = mkSigmaTy tvs' 
+                     	                              [mkClassPred clas (mkTyVarTys tvs')] 
+                     	                              gen_dm_tau
+                     	    ]
+             ; class_ats = map ATyCon (classATs clas) }
 
-  ; let gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
-                     | (sel_id, GenDefMeth gen_dm_name) <- classOpItems clas
-                     , let gen_dm_tau = expectJust "tcTyClDecl1" $
-                                        lookupNameEnv gen_dm_env (idName sel_id)
-		     , let gen_dm_ty = mkSigmaTy tvs' 
-                                                 [mkClassPred clas (mkTyVarTys tvs')] 
-                                                 gen_dm_tau
-                     ]
-        class_ats = map ATyCon (classATs clas)
-
-  ; return (ATyCon (classTyCon clas) : gen_dm_ids ++ class_ats )
-      -- NB: Order is important due to the call to `mkGlobalThings' when
-      --     tying the the type and class declaration type checking knot.
-  }
+       ; return (ATyCon (classTyCon clas) : gen_dm_ids ++ class_ats ) }
+         -- NB: Order is important due to the call to `mkGlobalThings' when
+         --     tying the the type and class declaration type checking knot.
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tc_fd_tyvar tvs1 ;
 				; tvs2' <- mapM tc_fd_tyvar tvs2 ;
@@ -1246,7 +1237,7 @@ checkValidFamDecl (FamilyDecl { fdLName = lname, fdFlavour = flav })
 -- module alpha conversion of the quantified type variables
 -- of the constructor.
 --
--- Note that we allow existentials to match becuase the
+-- Note that we allow existentials to match because the
 -- fields can never meet. E.g
 --	data T where
 --	  T1 { f1 :: b, f2 :: a, f3 ::Int } :: T
@@ -1514,7 +1505,7 @@ Consider this (Trac #4169):
 
 When we typecheck 'ast' we have done the first pass over the class decl
 (in tcTyClDecls), but we have not yet typechecked the default-method
-declarations (becuase they can mention value declarations).  So we 
+declarations (because they can mention value declarations).  So we 
 must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 

@@ -182,7 +182,7 @@ INLINE_HEADER Time fsecondsToTime (double t)
    Include everything STG-ish
    -------------------------------------------------------------------------- */
 
-/* System headers: stdlib.h is eeded so that we can use NULL.  It must
+/* System headers: stdlib.h is needed so that we can use NULL.  It must
  * come after MachRegs.h, because stdlib.h might define some inline
  * functions which may only be defined after register variables have
  * been declared.

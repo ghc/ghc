@@ -42,9 +42,6 @@ module DataCon (
 	isVanillaDataCon, classDataCon, dataConCannotMatch,
         isBanged, isMarkedStrict, eqHsBang,
 
-        -- * Splitting product types
-	splitProductType_maybe, splitProductType, 
-
         -- ** Promotion related functions
         promoteKind, promoteDataCon, promoteDataCon_maybe
     ) where
@@ -463,13 +460,6 @@ data HsBang
 -- StrictnessMark is internal only, used to indicate strictness 
 -- of the DataCon *worker* fields
 data StrictnessMark = MarkedStrict | NotMarkedStrict	
-
--- | Type of the tags associated with each constructor possibility
-type ConTag = Int
-
-fIRST_TAG :: ConTag
--- ^ Tags are allocated from here for real constructors
-fIRST_TAG =  1
 \end{code}
 
 Note [Data con representation]
@@ -1025,56 +1015,6 @@ buildAlgTyCon tc_name ktvs cType stupid_theta rhs
     mb_promoted_tc
       | is_promotable = Just (mkPromotedTyCon tc (promoteKind kind))
       | otherwise     = Nothing
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Splitting products}
-%*									*
-%************************************************************************
-
-\begin{code}
--- | Extract the type constructor, type argument, data constructor and it's
--- /representation/ argument types from a type if it is a product type.
---
--- Precisely, we return @Just@ for any type that is all of:
---
---  * Concrete (i.e. constructors visible)
---
---  * Single-constructor
---
---  * Not existentially quantified
---
--- Whether the type is a @data@ type or a @newtype@
-splitProductType_maybe
-	:: Type 			-- ^ A product type, perhaps
-	-> Maybe (TyCon, 		-- The type constructor
-		  [Type],		-- Type args of the tycon
-		  DataCon,		-- The data constructor
-		  [Type])		-- Its /representation/ arg types
-
-	-- Rejecing existentials is conservative.  Maybe some things
-	-- could be made to work with them, but I'm not going to sweat
-	-- it through till someone finds it's important.
-
-splitProductType_maybe ty
-  = case splitTyConApp_maybe ty of
-	Just (tycon,ty_args)
-	   | isProductTyCon tycon  	-- Includes check for non-existential,
-					-- and for constructors visible
-	   -> Just (tycon, ty_args, data_con, dataConInstArgTys data_con ty_args)
-	   where
-	      data_con = ASSERT( not (null (tyConDataCons tycon)) ) 
-			 head (tyConDataCons tycon)
-	_other -> Nothing
-
--- | As 'splitProductType_maybe', but panics if the 'Type' is not a product type
-splitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
-splitProductType str ty
-  = case splitProductType_maybe ty of
-	Just stuff -> stuff
-	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
 \end{code}
 
 

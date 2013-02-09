@@ -2,20 +2,18 @@
 
 set -e
 
-USAGE="Usage: $0 [--inplace] [--verbose] [--help]"
-INPLACE=
+USAGE="Usage: $0 [--intree] [--verbose] [--help]"
+INTREE=
 VERBOSE=
 
 HADDOCK_ARGS=
 
-[ -d dist-haddock ] || mkdir dist-haddock
-cd dist-haddock
-
 while [ "$#" -ne "0" ]
 do
     case "$1" in
-    --inplace)
-        INPLACE=yes
+    --intree)
+        # We're in a GHC build tree
+        INTREE=yes
         ;;
     --verbose)
         VERBOSE=yes
@@ -29,9 +27,13 @@ do
     shift
 done
 
-if [ -n "$INPLACE" ]
+if [ -n "$INTREE" ]
 then
+    [ -d dist-haddock ] || mkdir dist-haddock
+    cd dist-haddock
+
     HADDOCK=../../inplace/bin/haddock
+    HADDOCK_ARGS="-p ../prologue.txt"
     for REPO in `grep '^libraries/[^ ]*  *- ' ../../packages | sed -e 's#libraries/##' -e 's/ .*//'`
     do
         if [ -f "../$REPO/ghc-packages" ]
@@ -58,9 +60,10 @@ then
         done
     done
 else
-    HADDOCK=../../../../../../bin/haddock
+    HADDOCK=../../../../../bin/haddock
     # We don't want the GHC API to swamp the index
-    HADDOCK_FILES=`ls -1 ../*/*.haddock | grep -v '/ghc\.haddock' | sort`
+    HADDOCK_FILES=`ls -1 */*.haddock | grep -v '/ghc\.haddock' | sort`
+    HADDOCK_ARGS="-p prologue.txt"
     for HADDOCK_FILE in $HADDOCK_FILES
     do
         NAME_VERSION=`echo "$HADDOCK_FILE" | sed 's#/.*##'`
@@ -76,7 +79,6 @@ then
 fi
 $HADDOCK --gen-index --gen-contents -o . \
          -t "Haskell Hierarchical Libraries" \
-         -p "../prologue.txt" \
          $HADDOCK_ARGS
 
 # Unhandled Windows help stuff?:

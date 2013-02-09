@@ -118,15 +118,15 @@ addIORequest(int   fd,
 }
 
 unsigned int
-addDelayRequest(int msecs)
+addDelayRequest(int usecs)
 {
     EnterCriticalSection(&queue_lock);
     issued_reqs++;
     LeaveCriticalSection(&queue_lock);
 #if 0
-    fprintf(stderr, "addDelayReq: %d\n", msecs); fflush(stderr);
+    fprintf(stderr, "addDelayReq: %d\n", usecs); fflush(stderr);
 #endif
-    return AddDelayRequest(msecs,onIOComplete);
+    return AddDelayRequest(usecs,onIOComplete);
 }
 
 unsigned int

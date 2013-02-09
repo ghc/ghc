@@ -17,7 +17,7 @@ module Vectorise.Utils (
   combinePD, liftPD,
 
   -- * Scalars
-  zipScalars, scalarClosure,
+  isScalar, zipScalars, scalarClosure,
 
   -- * Naming
   newLocalVar
@@ -137,20 +137,29 @@ liftPD x
 
 -- Scalars --------------------------------------------------------------------
 
+isScalar :: Type -> VM Bool
+isScalar ty
+  = do
+    { scalar <- builtin scalarClass
+    ; existsInst scalar [ty]
+    }
+
 zipScalars :: [Type] -> Type -> VM CoreExpr
 zipScalars arg_tys res_ty
-  = do
-      scalar <- builtin scalarClass
-      (dfuns, _) <- mapAndUnzipM (\ty -> lookupInst scalar [ty]) ty_args
-      zipf <- builtin (scalarZip $ length arg_tys)
-      return $ Var zipf `mkTyApps` ty_args `mkApps` map Var dfuns
+  = do 
+    { scalar <- builtin scalarClass
+    ; (dfuns, _) <- mapAndUnzipM (\ty -> lookupInst scalar [ty]) ty_args
+    ; zipf <- builtin (scalarZip $ length arg_tys)
+    ; return $ Var zipf `mkTyApps` ty_args `mkApps` map Var dfuns
+    }
     where
       ty_args = arg_tys ++ [res_ty]
 
 scalarClosure :: [Type] -> Type -> CoreExpr -> CoreExpr -> VM CoreExpr
 scalarClosure arg_tys res_ty scalar_fun array_fun
   = do
-      ctr <- builtin (closureCtrFun $ length arg_tys)
-      pas <- mapM paDictOfType (init arg_tys)
-      return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
+    { ctr <- builtin (closureCtrFun $ length arg_tys)
+    ; pas <- mapM paDictOfType (init arg_tys)
+    ; return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
                        `mkApps`   (pas ++ [scalar_fun, array_fun])
+    }

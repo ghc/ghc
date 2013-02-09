@@ -886,7 +886,7 @@ tcScopedKindVars kv_ns thing_inside
   = tcExtendTyVarEnv (map mkKindSigVar kv_ns) thing_inside
 
 tcHsTyVarBndrs :: LHsTyVarBndrs Name 
-	       -> ([TyVar] -> TcM r)
+	       -> ([TcTyVar] -> TcM r)
 	       -> TcM r
 -- Bind the type variables to skolems, each with a meta-kind variable kind
 tcHsTyVarBndrs (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
@@ -895,7 +895,7 @@ tcHsTyVarBndrs (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
        ; traceTc "tcHsTyVarBndrs" (ppr hs_tvs $$ ppr tvs)
        ; tcExtendTyVarEnv tvs (thing_inside tvs) }
 
-tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TyVar
+tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TcTyVar
 -- Return a type variable 
 -- initialised with a kind variable.
 -- Typically the Kind inside the KindedTyVar will be a tyvar with a mutable kind 
@@ -907,7 +907,7 @@ tcHsTyVarBndr :: LHsTyVarBndr Name -> TcM TyVar
 --   instance C (a,b) where
 --     type F (a,b) c = ...
 -- Here a,b will be in scope when processing the associated type instance for F.
--- See Note [Associated type tyvar names] in TyCon
+-- See Note [Associated type tyvar names] in Class
 tcHsTyVarBndr (L _ hs_tv)
   = do { let name = hsTyVarName hs_tv
        ; mb_tv <- tcLookupLcl_maybe name
@@ -915,7 +915,7 @@ tcHsTyVarBndr (L _ hs_tv)
            Just (ATyVar _ tv) -> return tv ;
            _ -> do
        { kind <- case hs_tv of
-                   UserTyVar {} -> newMetaKindVar
+                   UserTyVar {}       -> newMetaKindVar
                    KindedTyVar _ kind -> tcLHsKind kind
        ; return (mkTcTyVar name kind (SkolemTv False)) } } }
 
@@ -961,7 +961,7 @@ and *not* at the inner forall:
   f2 :: (forall k. forall (a:k). T k a -> Int) -> Int  -- NO!
 Reason: same as for HM inference on value level declarations,
 we want to infer the most general type.  The f2 type signature
-would be *less applicable* than f1, becuase it requires a more
+would be *less applicable* than f1, because it requires a more
 polymorphic argument.
 
 Note [Kinds of quantified type variables]

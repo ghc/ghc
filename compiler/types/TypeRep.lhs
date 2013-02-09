@@ -747,7 +747,7 @@ pprArrowChain p (arg:args) = maybeParen p FunPrec $
 %*									*
 %************************************************************************
 
-Tidying is here becuase it has a special case for FlatSkol
+Tidying is here because it has a special case for FlatSkol
 
 \begin{code}
 -- | This tidies up a type for printing in an error message, or in

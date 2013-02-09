@@ -108,8 +108,14 @@ finishHsVar name
 		; return (e, unitFV name) } }
 
 rnExpr (HsVar v)
-  = do name <- lookupOccRn v
-       finishHsVar name
+  = do { opt_TypeHoles <- xoptM Opt_TypeHoles
+       ; if opt_TypeHoles && startsWithUnderscore (rdrNameOcc v)
+         then do { mb_name <- lookupOccRn_maybe v
+                 ; case mb_name of
+                     Nothing -> return (HsUnboundVar v, emptyFVs)
+                     Just n  -> finishHsVar n }
+         else do { name <- lookupOccRn v
+                 ; finishHsVar name } }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
@@ -300,9 +306,6 @@ rnExpr (ArithSeq _ seq)
 rnExpr (PArrSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
     return (PArrSeq noPostTcExpr new_seq, fvs)
-
-rnExpr HsHole
-  = return (HsHole, emptyFVs)
 \end{code}
 
 These three are pattern syntax appearing in expressions.
@@ -312,7 +315,7 @@ We return a (bogus) EWildPat in each case.
 \begin{code}
 rnExpr e@EWildPat      = do { holes <- xoptM Opt_TypeHoles
                             ; if holes
-                                then return (HsHole, emptyFVs)
+                                then return (hsHoleExpr, emptyFVs)
                                 else patSynErr e
                             }
 rnExpr e@(EAsPat {})   = patSynErr e
@@ -340,13 +343,16 @@ rnExpr e@(HsArrForm {}) = arrowFail e
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 	-- HsWrap
 
+hsHoleExpr :: HsExpr Name
+hsHoleExpr = HsUnboundVar (mkRdrUnqual (mkVarOcc "_"))
+
 arrowFail :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 arrowFail e
   = do { addErr (vcat [ ptext (sLit "Arrow command found where an expression was expected:")
                       , nest 2 (ppr e) ])
          -- Return a place-holder hole, so that we can carry on
          -- to report other errors
-       ; return (HsHole, emptyFVs) }
+       ; return (hsHoleExpr, emptyFVs) }
 
 ----------------------
 -- See Note [Parsing sections] in Parser.y.pp
@@ -1050,7 +1056,7 @@ rn_rec_stmt _ all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do
   return [(duDefs du_binds, allUses du_binds, 
 	   emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
--- no RecStmt case becuase they get flattened above when doing the LHSes
+-- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ stmt@(L _ (RecStmt {})) _
   = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 

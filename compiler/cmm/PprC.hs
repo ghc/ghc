@@ -358,10 +358,13 @@ pprExpr e = case e of
     CmmRegOff reg 0 -> pprCastReg reg
 
     CmmRegOff reg i
-        | i >  0    -> pprRegOff (char '+') i
-        | otherwise -> pprRegOff (char '-') (-i)
+        | i < 0 && negate_ok -> pprRegOff (char '-') (-i)
+        | otherwise          -> pprRegOff (char '+') i
       where
         pprRegOff op i' = pprCastReg reg <> op <> int i'
+        negate_ok = negate (fromIntegral i :: Integer) <
+                    fromIntegral (maxBound::Int)
+                     -- overflow is undefined; see #7620
 
     CmmMachOp mop args -> pprMachOpApp mop args
 
@@ -463,6 +466,8 @@ pprLit lit = case lit of
                   | otherwise             = text (show d)
                 -- these constants come from <math.h>
                 -- see #1861
+
+    CmmVec {} -> panic "PprC printing vector literal"
 
     CmmBlock bid       -> mkW_ <> pprCLabelAddr (infoTblLbl bid)
     CmmHighStackMark   -> panic "PprC printing high stack mark"
@@ -621,6 +626,71 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_U_MulMayOflo"
                                       ++ " should have been handled earlier!")
 
+        MO_V_Insert {}    -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_V_Insert")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Insert"
+                                      ++ " should have been handled earlier!")
+        MO_V_Extract {}   -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_V_Extract")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Extract"
+                                      ++ " should have been handled earlier!")
+
+        MO_V_Add {}       -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_V_Add")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Add"
+                                      ++ " should have been handled earlier!")
+        MO_V_Sub {}       -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_V_Sub")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Sub"
+                                      ++ " should have been handled earlier!")
+        MO_V_Mul {}       -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_V_Mul")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Mul"
+                                      ++ " should have been handled earlier!")
+
+        MO_VS_Quot {}     -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VS_Quot")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Quot"
+                                      ++ " should have been handled earlier!")
+        MO_VS_Rem {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VS_Rem")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Rem"
+                                      ++ " should have been handled earlier!")
+        MO_VS_Neg {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VS_Neg")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
+                                      ++ " should have been handled earlier!")
+
+        MO_VF_Insert {}   -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Insert")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"
+                                      ++ " should have been handled earlier!")
+        MO_VF_Extract {}  -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Extract")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Extract"
+                                      ++ " should have been handled earlier!")
+
+        MO_VF_Add {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Add")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Add"
+                                      ++ " should have been handled earlier!")
+        MO_VF_Sub {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Sub")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Sub"
+                                      ++ " should have been handled earlier!")
+        MO_VF_Neg {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Neg")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Neg"
+                                      ++ " should have been handled earlier!")
+        MO_VF_Mul {}      -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Mul")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Mul"
+                                      ++ " should have been handled earlier!")
+        MO_VF_Quot {}     -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_VF_Quot")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
+                                      ++ " should have been handled earlier!")
+
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True
 signedOp (MO_S_Rem  _)    = True
@@ -689,6 +759,7 @@ pprCallishMachOp_for_C mop
         MO_Add2       {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
+        MO_Prefetch_Data -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 

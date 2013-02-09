@@ -717,7 +717,6 @@ tcDataFamInstDecl mb_clsinfo fam_tc
        ; return fam_inst } }
 \end{code}
 
-
 %************************************************************************
 %*                                                                      *
       Type-checking instance declarations, pass 2
@@ -887,7 +886,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
   = do  { let sel_occ = nameOccName sel_name
         ; meth_name <- newName (mkClassOpAuxOcc sel_occ)
         ; local_meth_name <- newName sel_occ
-                  -- Base the local_meth_name on the selector name, becuase
+                  -- Base the local_meth_name on the selector name, because
                   -- type errors from tcInstanceMethodBody come from here
 
         ; local_meth_sig <- case lookupHsSig sig_fn sel_name of

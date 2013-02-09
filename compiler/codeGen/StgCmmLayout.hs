@@ -46,7 +46,7 @@ import CLabel
 import StgSyn
 import Id
 import Name
-import TyCon		( PrimRep(..) )
+import TyCon		( PrimRep(..), primElemRepSizeB )
 import BasicTypes	( RepArity )
 import DynFlags
 import Module
@@ -317,6 +317,7 @@ slowCallPattern (N: _)		      = (fsLit "stg_ap_n", 1)
 slowCallPattern (F: _)		      = (fsLit "stg_ap_f", 1)
 slowCallPattern (D: _)		      = (fsLit "stg_ap_d", 1)
 slowCallPattern (L: _)		      = (fsLit "stg_ap_l", 1)
+slowCallPattern (V16: _)	      = (fsLit "stg_ap_v16", 1)
 slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 
 
@@ -333,36 +334,42 @@ data ArgRep = P   -- GC Ptr
             | V   -- Void
             | F   -- Float
             | D   -- Double
+            | V16 -- 16-byte (128-bit) vectors of Float/Double/Int8/Word32/etc.
 instance Outputable ArgRep where
-  ppr P = text "P"
-  ppr N = text "N"
-  ppr L = text "L"
-  ppr V = text "V"
-  ppr F = text "F"
-  ppr D = text "D"
+  ppr P   = text "P"
+  ppr N   = text "N"
+  ppr L   = text "L"
+  ppr V   = text "V"
+  ppr F   = text "F"
+  ppr D   = text "D"
+  ppr V16 = text "V16"
 
 toArgRep :: PrimRep -> ArgRep
-toArgRep VoidRep   = V
-toArgRep PtrRep    = P
-toArgRep IntRep    = N
-toArgRep WordRep   = N
-toArgRep AddrRep   = N
-toArgRep Int64Rep  = L
-toArgRep Word64Rep = L
-toArgRep FloatRep  = F
-toArgRep DoubleRep = D
+toArgRep VoidRep           = V
+toArgRep PtrRep            = P
+toArgRep IntRep            = N
+toArgRep WordRep           = N
+toArgRep AddrRep           = N
+toArgRep Int64Rep          = L
+toArgRep Word64Rep         = L
+toArgRep FloatRep          = F
+toArgRep DoubleRep         = D
+toArgRep (VecRep len elem)
+    | len*primElemRepSizeB elem == 16 = V16
+    | otherwise                       = error "toArgRep: bad vector primrep"
 
 isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
 
 argRepSizeW :: DynFlags -> ArgRep -> WordOff                -- Size in words
-argRepSizeW _      N = 1
-argRepSizeW _      P = 1
-argRepSizeW _      F = 1
-argRepSizeW dflags L = wORD64_SIZE        `quot` wORD_SIZE dflags
-argRepSizeW dflags D = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-argRepSizeW _      V = 0
+argRepSizeW _      N   = 1
+argRepSizeW _      P   = 1
+argRepSizeW _      F   = 1
+argRepSizeW dflags L   = wORD64_SIZE        `quot` wORD_SIZE dflags
+argRepSizeW dflags D   = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
+argRepSizeW _      V   = 0
+argRepSizeW dflags V16 = 16                 `quot` wORD_SIZE dflags
 
 idArgRep :: Id -> ArgRep
 idArgRep = toArgRep . idPrimRep
@@ -456,12 +463,13 @@ argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
 stdPattern :: [ArgRep] -> Maybe Int
 stdPattern reps
   = case reps of
-	[]  -> Just ARG_NONE	-- just void args, probably
-	[N] -> Just ARG_N
-	[P] -> Just ARG_P
-	[F] -> Just ARG_F
-	[D] -> Just ARG_D
-	[L] -> Just ARG_L
+	[]    -> Just ARG_NONE	-- just void args, probably
+	[N]   -> Just ARG_N
+	[P]   -> Just ARG_P
+	[F]   -> Just ARG_F
+	[D]   -> Just ARG_D
+	[L]   -> Just ARG_L
+	[V16] -> Just ARG_V16
 
 	[N,N] -> Just ARG_NN
 	[N,P] -> Just ARG_NP

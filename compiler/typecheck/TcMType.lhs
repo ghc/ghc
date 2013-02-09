@@ -547,9 +547,12 @@ defaultKindVarToStar kv
 
 zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
 -- A kind variable k may occur *after* a tyvar mentioning k in its kind
+-- Can be given a mixture of TcTyVars and TyVars, in the case of
+-- associated type declarations
 zonkQuantifiedTyVars tyvars
   = do { let (kvs, tvs) = partition isKindVar tyvars
-             (meta_kvs, skolem_kvs) = partition isMetaTyVar kvs
+             (meta_kvs, skolem_kvs) 
+                  = partition (\kv -> isTcTyVar kv && isMetaTyVar kv) kvs
 
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
@@ -562,10 +565,16 @@ zonkQuantifiedTyVars tyvars
                       do { mapM_ defaultKindVarToStar meta_kvs
                          ; return skolem_kvs }  -- Should be empty
 
-       ; mapM zonkQuantifiedTyVar (qkvs ++ tvs) }
+       ; mapM zonk_quant (qkvs ++ tvs) }
            -- Because of the order, any kind variables
            -- mentioned in the kinds of the type variables refer to
            -- the now-quantified versions
+  where
+    zonk_quant tkv
+      | isTcTyVar tkv = zonkQuantifiedTyVar tkv
+      | otherwise     = return tkv
+      -- For associated types, we have the class variables 
+      -- in scope, and they are TyVars not TcTyVars
 
 zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables

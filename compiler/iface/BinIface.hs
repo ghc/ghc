@@ -96,7 +96,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
         errorOnMismatch what wanted got =
             -- This will be caught by readIface which will emit an error
             -- msg containing the iface module name.
-            when (wanted /= got) $ throwGhcException $ ProgramError
+            when (wanted /= got) $ throwGhcExceptionIO $ ProgramError
                          (what ++ " (wanted " ++ show wanted
                                ++ ", got "    ++ show got ++ ")")
     bh <- Binary.readBinMem hi_path

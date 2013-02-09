@@ -16,26 +16,26 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs, deepSplitProductType_maybe ) w
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, mkCast )
 import Id		( Id, idType, mkSysLocal, idDemandInfo, setIdDemandInfo,
 			  isOneShotLambda, setOneShotLambda, setIdUnfolding,
-                          setIdInfo, setIdType
+                          setIdInfo
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon
 import Demand        
 import MkCore		( mkRuntimeErrorApp, aBSENT_ERROR_ID )
-import MkId		( realWorldPrimId, voidArgId
-                        , wrapNewTypeBody, unwrapNewTypeBody )
+import MkId		( realWorldPrimId, voidArgId )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type
-import Coercion         ( mkSymCo, instNewTyCon_maybe, splitNewTypeRepCo_maybe )
+import Coercion hiding  ( substTy, substTyVarBndr )
 import BasicTypes	( TupleSort(..) )
 import Literal		( absentLiteralOf )
 import TyCon
 import UniqSupply
 import Unique
+import Maybes
 import Util
 import Outputable
 import DynFlags
@@ -371,17 +371,29 @@ mkWWstr dflags (arg : args) = do
 Note [Unpacking arguments with product and polymorphic demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The argument is unpacked in a case if it has a product type and has a
-strict and used demand put on it. I.e., arguments, with demands such
+strict *and* used demand put on it. I.e., arguments, with demands such
 as the following ones:
 
-<S,U(U, L)>
-<S(L,S),U>
+   <S,U(U, L)>
+   <S(L,S),U>
 
-will be unpacked. Moreover, for arguments whose demand is <S,U> or
-<S,H>, we take an advantage of the polymorphic nature of S and U and
-replicate the enclosed demand correspondingly (see definition of
-replicateDmd).
+will be unpacked, but
 
+   <S,U> or <B,U>
+
+will not, because the pieces aren't used. This is quite important otherwise
+we end up unpacking massive tuples passed to the bottoming function. Example:
+
+ 	f :: ((Int,Int) -> String) -> (Int,Int) -> a
+ 	f g pr = error (g pr)
+
+ 	main = print (f fst (1, error "no"))
+
+Does 'main' print "error 1" or "error no"?  We don't really want 'f'
+to unbox its second argument.  This actually happened in GHC's onwn
+source code, in Packages.applyPackageFlag, which ended up un-boxing
+the enormous DynFlags tuple, and being strict in the
+as-yet-un-filled-in pkgState fiels.
 
 \begin{code}
 ----------------------
@@ -421,18 +433,18 @@ mkWWstr_one dflags arg
 		-- But the Evald flag is pretty weird, and I worry that it might disappear
 		-- during simplification, so for now I've just nuked this whole case
 
-  	-- Unpack case, 
-        -- see note [Unpacking arguments with product and polymorphic demands]
   | isStrictDmd dmd
-  , Just (_arg_tycon, _tycon_arg_tys, data_con, inst_con_arg_tys) 
+  , Just cs <- splitProdDmd_maybe dmd
+      -- See Note [Unpacking arguments with product and polymorphic demands]
+  , Just (data_con, inst_tys, inst_con_arg_tys, co) 
              <- deepSplitProductType_maybe (idType arg)
-  =  do { uniqs <- getUniquesM
-	; let   cs             = splitProdDmd (length inst_con_arg_tys) dmd
-	        unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
+  =  do { (uniq1:uniqs) <- getUniquesM
+	; let   unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
 	        unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	        unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
+	        unbox_fn       = mkUnpackCase (Var arg `mkCast` co) uniq1
+                                              data_con unpk_args
 	        rebox_fn       = Let (NonRec arg con_app) 
-	        con_app        = mkProductBox unpk_args (idType arg)
+	        con_app        = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
 	 ; (worker_args, wrap_fn, work_fn) <- mkWWstr dflags unpk_args_w_ds
 	 ; return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
 	  		   -- Don't pass the arg, rebox instead
@@ -456,57 +468,25 @@ nop_fn body = body
 \end{code}
 
 \begin{code}
-mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
--- (mkUnpackCase x e args Con body)
---      returns
--- case (e `cast` ...) of bndr { Con args -> body }
--- 
--- the type of the bndr passed in is irrelevent
-mkUnpackCase bndr arg unpk_args boxing_con body
-  = Case cast_arg (setIdType bndr bndr_ty) (exprType body) [(DataAlt boxing_con, unpk_args, body)]
-  where
-  (cast_arg, bndr_ty) = go (idType bndr) arg
-  go ty arg 
-    | (tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
-    , isNewTyCon tycon && not (isRecursiveTyCon tycon)
-    = go (newTyConInstRhs tycon tycon_args) 
-         (unwrapNewTypeBody tycon tycon_args arg)
-    | otherwise = (arg, ty)
-
-mkProductBox :: [Id] -> Type -> CoreExpr
-mkProductBox arg_ids ty 
-  = result_expr
-  where 
-    (tycon, tycon_args, pack_con, _con_arg_tys) = splitProductType "mkProductBox" ty
-
-    result_expr
-      | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
-      = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
-      | otherwise = mkConApp pack_con (map Type tycon_args ++ varsToCoreExprs arg_ids)
-
-    wrap expr = wrapNewTypeBody tycon tycon_args expr
-
--- | As 'splitProductType_maybe', but in turn instantiates the 'TyCon' returned
--- and hence recursively tries to unpack it as far as it able to
-deepSplitProductType_maybe :: Type -> Maybe (TyCon, [Type], DataCon, [Type])
+deepSplitProductType_maybe :: Type -> Maybe (DataCon, [Type], [Type], Coercion)
+-- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
+-- then  dc @ tys (args::arg_tys)  |> co :: ty
 deepSplitProductType_maybe ty
-  = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
-       ; let {result 
-             | Just (ty', _co) <- instNewTyCon_maybe tycon tycon_args
-	     , not (isRecursiveTyCon tycon)
-             = deepSplitProductType_maybe ty'	-- Ignore the coercion?
-             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive
-					   -- newtypes nor through families
-             | otherwise = Just res}
-       ; result
-       }
+  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo ty)
+  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
+  , Just con <- isDataProductTyCon_maybe tc
+  = Just (con, tc_args, dataConInstArgTys con tc_args, co)
+deepSplitProductType_maybe _ = Nothing
 
--- | As 'deepSplitProductType_maybe', but panics if the 'Type' is not a product type
-deepSplitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
-deepSplitProductType str ty 
-  = case deepSplitProductType_maybe ty of
-      Just stuff -> stuff
-      Nothing -> pprPanic (str ++ ": not a product") (pprType ty)
+deepSplitCprType_maybe :: ConTag -> Type -> Maybe (DataCon, [Type], [Type], Coercion)
+deepSplitCprType_maybe con_tag ty
+  | let (ty1, co) = topNormaliseNewType ty `orElse` (ty, mkReflCo ty)
+  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
+  , isDataTyCon tc
+  , let cons = tyConDataCons tc
+        con = ASSERT( cons `lengthAtLeast` con_tag ) cons !! (con_tag - fIRST_TAG)
+  = Just (con, tc_args, dataConInstArgTys con tc_args, co)
+deepSplitCprType_maybe _ _ = Nothing
 \end{code}
 
 
@@ -534,71 +514,78 @@ mkWWcpr :: Type                              -- function body type
 		   Type)			-- Type of worker's body 
 
 mkWWcpr body_ty res
-    | not (returnsCPR res) -- No CPR info
-    = return (id, id, body_ty)
+  = case returnsCPR_maybe res of
+       Nothing      -> return (id, id, body_ty)  -- No CPR info
+       Just con_tag | Just stuff <- deepSplitCprType_maybe con_tag body_ty
+                    -> mkWWcpr_help stuff
+                    |  otherwise
+                    -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
+                       return (id, id, body_ty)
+          
+mkWWcpr_help :: (DataCon, [Type], [Type], Coercion)
+             -> UniqSM (CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
-    | not (isClosedAlgType body_ty)
-    = WARN( True, 
-            text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-      return (id, id, body_ty)
-
-    | n_con_args == 1 && isUnLiftedType con_arg_ty1 = do
+mkWWcpr_help (data_con, inst_tys, arg_tys, co)
+  | [arg_ty1] <- arg_tys
+  , isUnLiftedType arg_ty1
 	-- Special case when there is a single result of unlifted type
 	--
 	-- Wrapper:	case (..call worker..) of x -> C x
 	-- Worker:	case (   ..body..    ) of C x -> x
-      (work_uniq : arg_uniq : _) <- getUniquesM
-      let
-	work_wild = mk_ww_local work_uniq body_ty
-	arg	  = mk_ww_local arg_uniq  con_arg_ty1
-	con_app   = mkProductBox [arg] body_ty
+  = do { (work_uniq : arg_uniq : _) <- getUniquesM
+       ; let arg       = mk_ww_local arg_uniq  arg_ty1
+	     con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` co
 
-      return (\ wkr_call -> Case wkr_call (arg) (exprType con_app) [(DEFAULT, [], con_app)],
-		\ body     -> workerCase (work_wild) body [arg] data_con (Var arg),
-		con_arg_ty1)
+       ; return ( \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
+                , \ body     -> mkUnpackCase body work_uniq data_con [arg] (Var arg)
+                , arg_ty1 ) }
 
-    | otherwise = do	-- The general case
+  | otherwise 	-- The general case
 	-- Wrapper: case (..call worker..) of (# a, b #) -> C a b
 	-- Worker:  case (   ...body...  ) of C a b -> (# a, b #)     
-      uniqs <- getUniquesM
-      let
-        (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
-	arg_vars		       = varsToCoreExprs args
-	ubx_tup_con		       = tupleCon UnboxedTuple n_con_args
-	ubx_tup_ty		       = exprType ubx_tup_app
-	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
-        con_app			       = mkProductBox args body_ty
+  = do { (work_uniq : uniqs) <- getUniquesM
+       ; let (wrap_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : arg_tys)
+	     ubx_tup_con  = tupleCon UnboxedTuple (length arg_tys)
+	     ubx_tup_ty	  = exprType ubx_tup_app
+	     ubx_tup_app  = mkConApp2 ubx_tup_con arg_tys args
+             con_app	  = mkConApp2 data_con inst_tys args `mkCast` co
 
-      return (\ wkr_call -> Case wkr_call (wrap_wild) (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
-		\ body     -> workerCase (work_wild) body args data_con ubx_tup_app,
-		ubx_tup_ty)
-    where
-      (_arg_tycon, _tycon_arg_tys, data_con, con_arg_tys) = deepSplitProductType "mkWWcpr" body_ty
-      n_con_args  = length con_arg_tys
-      con_arg_ty1 = head con_arg_tys
+       ; return ( \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)]
+		, \ body     -> mkUnpackCase body work_uniq data_con args ubx_tup_app
+		, ubx_tup_ty ) }
 
--- If the original function looked like
---	f = \ x -> _scc_ "foo" E
---
--- then we want the CPR'd worker to look like
---	\ x -> _scc_ "foo" (case E of I# x -> x)
--- and definitely not
---	\ x -> case (_scc_ "foo" E) of I# x -> x)
---
--- This transform doesn't move work or allocation
--- from one cost centre to another.
---
--- Later [SDM]: presumably this is because we want the simplifier to
--- eliminate the case, and the scc would get in the way?  I'm ok with
--- including the case itself in the cost centre, since it is morally
--- part of the function (post transformation) anyway.
+mkUnpackCase ::  CoreExpr -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
+-- (mkUnpackCase e bndr Con args body)
+--      returns
+-- case e of bndr { Con args -> body }
+-- 
+-- the type of the bndr passed in is irrelevent
 
-workerCase :: Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
-workerCase bndr (Tick tickish e) args con body
-   = Tick tickish (mkUnpackCase bndr e args con body)
-workerCase bndr e args con body
-   = mkUnpackCase bndr e args con body
+mkUnpackCase (Tick tickish e) uniq con args body   -- See Note [Profiling and unpacking]
+  = Tick tickish (mkUnpackCase e uniq con args body)
+mkUnpackCase scrut uniq boxing_con unpk_args body
+  = Case scrut 
+         (mk_ww_local uniq (exprType scrut)) (exprType body) 
+         [(DataAlt boxing_con, unpk_args, body)]
 \end{code}
+
+Note [Profiling and unpacking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the original function looked like
+	f = \ x -> _scc_ "foo" E
+
+then we want the CPR'd worker to look like
+	\ x -> _scc_ "foo" (case E of I# x -> x)
+and definitely not
+	\ x -> case (_scc_ "foo" E) of I# x -> x)
+
+This transform doesn't move work or allocation
+from one cost centre to another.
+
+Later [SDM]: presumably this is because we want the simplifier to
+eliminate the case, and the scc would get in the way?  I'm ok with
+including the case itself in the cost centre, since it is morally
+part of the function (post transformation) anyway.
 
 
 %************************************************************************

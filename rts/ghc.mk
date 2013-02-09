@@ -131,13 +131,13 @@ define build-rts-way # args: $1 = way
 
 ifneq "$$(BINDIST)" "YES"
 
+rts_dist_$1_HC_OPTS := $$(GhcRtsHcOpts)
+rts_dist_$1_CC_OPTS := $$(GhcRtsCcOpts)
+
 # The per-way CC_OPTS
 ifneq "$$(findstring debug, $1)" ""
-rts_dist_$1_HC_OPTS = -O0
-rts_dist_$1_CC_OPTS = -g -O0
-else
-rts_dist_$1_HC_OPTS = $$(GhcRtsHcOpts)
-rts_dist_$1_CC_OPTS = $$(GhcRtsCcOpts)
+rts_dist_$1_HC_OPTS += -O0
+rts_dist_$1_CC_OPTS += -g -O0
 endif
 
 ifneq "$$(findstring dyn, $1)" ""

@@ -71,6 +71,7 @@ import Outputable
 import FastString
 import MonadUtils
 
+import System.Mem.Weak
 import System.Directory
 import Data.Dynamic
 import Data.Either
@@ -415,9 +416,19 @@ sandboxIO dflags statusMVar thing =
 --  * clients of the GHC API can terminate a runStmt in progress
 --    without knowing the ThreadId of the sandbox thread (#1381)
 --
+-- NB. use a weak pointer to the thread, so that the thread can still
+-- be considered deadlocked by the RTS and sent a BlockedIndefinitely
+-- exception.  A symptom of getting this wrong is that conc033(ghci)
+-- will hang.
+--
 redirectInterrupts :: ThreadId -> IO a -> IO a
 redirectInterrupts target wait
-  = wait `catch` \e -> do throwTo target (e :: SomeException); wait
+  = do wtid <- mkWeakThreadId target
+       wait `catch` \e -> do
+          m <- deRefWeak wtid
+          case m of
+            Nothing -> wait
+            Just target -> do throwTo target (e :: SomeException); wait
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -488,7 +499,8 @@ resume canLogSpan step
        resume = ic_resume ic
 
    case resume of
-     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
+     [] -> liftIO $
+           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
@@ -546,16 +558,17 @@ moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
 moveHist fn = do
   hsc_env <- getSession
   case ic_resume (hsc_IC hsc_env) of
-     [] -> throwGhcException (ProgramError "not stopped at a breakpoint")
+     [] -> liftIO $
+           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
      (r:rs) -> do
         let ix = resumeHistoryIx r
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix > length history) $
-           throwGhcException (ProgramError "no more logged breakpoints")
-        when (new_ix < 0) $
-           throwGhcException (ProgramError "already at the beginning of the history")
+        when (new_ix > length history) $ liftIO $
+           throwGhcExceptionIO (ProgramError "no more logged breakpoints")
+        when (new_ix < 0) $ liftIO $
+           throwGhcExceptionIO (ProgramError "already at the beginning of the history")
 
         let
           update_ic apStack mb_info = do
@@ -837,7 +850,8 @@ setContext imports
        ; let dflags = hsc_dflags hsc_env
        ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
        ; case all_env_err of
-           Left (mod, err) -> throwGhcException (formatError dflags mod err)
+           Left (mod, err) ->
+               liftIO $ throwGhcExceptionIO (formatError dflags mod err)
            Right all_env -> do {
        ; let old_ic        = hsc_IC hsc_env
              final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env

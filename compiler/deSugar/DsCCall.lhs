@@ -19,6 +19,7 @@ module DsCCall
 	, unboxArg
 	, boxResult
 	, resultWrapper
+        , splitDataProductType_maybe
 	) where
 
 #include "HsVersions.h"
@@ -191,7 +192,7 @@ unboxArg arg
        pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
     arg_ty					= exprType arg
-    maybe_product_type 			   	= splitProductType_maybe arg_ty
+    maybe_product_type 			   	= splitDataProductType_maybe arg_ty
     is_product_type			   	= maybeToBool maybe_product_type
     Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
     data_con_arity				= dataConSourceArity data_con
@@ -357,7 +358,7 @@ resultWrapper result_ty
 
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
-  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty,
+  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitDataProductType_maybe result_ty,
     dataConSourceArity data_con == 1
   = do dflags <- getDynFlags
        let
@@ -391,3 +392,43 @@ maybeNarrow dflags tycon
 	 && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId Narrow32WordOp)) e
   | otherwise			  = id
 \end{code}
+
+%************************************************************************
+%*									*
+\subsection{Splitting products}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | Extract the type constructor, type argument, data constructor and it's
+-- /representation/ argument types from a type if it is a product type.
+--
+-- Precisely, we return @Just@ for any type that is all of:
+--
+--  * Concrete (i.e. constructors visible)
+--
+--  * Single-constructor
+--
+--  * Not existentially quantified
+--
+-- Whether the type is a @data@ type or a @newtype@
+splitDataProductType_maybe
+	:: Type 			-- ^ A product type, perhaps
+	-> Maybe (TyCon, 		-- The type constructor
+		  [Type],		-- Type args of the tycon
+		  DataCon,		-- The data constructor
+		  [Type])		-- Its /representation/ arg types
+
+	-- Rejecing existentials is conservative.  Maybe some things
+	-- could be made to work with them, but I'm not going to sweat
+	-- it through till someone finds it's important.
+
+splitDataProductType_maybe ty
+  | Just (tycon, ty_args) <- splitTyConApp_maybe ty
+  , Just con <- isDataProductTyCon_maybe tycon
+  = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
+  | otherwise
+  = Nothing
+\end{code}
+
+

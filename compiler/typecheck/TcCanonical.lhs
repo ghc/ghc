@@ -23,6 +23,7 @@ import TyCon
 import TypeRep
 import Var
 import VarEnv
+import OccName( OccName )
 import Outputable
 import Control.Monad    ( when )
 import TysWiredIn ( eqTyCon )
@@ -192,8 +193,8 @@ canonicalize (CFunEqCan { cc_loc = d
 canonicalize (CIrredEvCan { cc_ev = ev
                           , cc_loc = d })
   = canIrred d ev
-canonicalize (CHoleCan { cc_ev = ev, cc_loc = d })
-  = canHole d ev
+canonicalize (CHoleCan { cc_ev = ev, cc_loc = d, cc_occ = occ })
+  = canHole d ev occ
 
 canEvNC :: CtLoc -> CtEvidence -> TcS StopOrContinue
 -- Called only for non-canonical EvVars 
@@ -401,13 +402,13 @@ canIrred d ev
              Just new_ev -> canEvNC d new_ev  -- Re-classify and try again
              Nothing     -> return Stop } }   -- Found a cached copy
 
-canHole :: CtLoc -> CtEvidence -> TcS StopOrContinue
-canHole d ev 
+canHole :: CtLoc -> CtEvidence -> OccName -> TcS StopOrContinue
+canHole d ev occ
   = do { let ty = ctEvPred ev
        ; (xi,co) <- flatten d FMFullFlatten (ctEvFlavour ev) ty -- co :: xi ~ ty
        ; mb <- rewriteCtFlavor ev xi co 
        ; case mb of
-             Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_loc = d})
+             Just new_ev -> emitInsoluble (CHoleCan { cc_ev = new_ev, cc_loc = d, cc_occ = occ })
              Nothing     -> return ()   -- Found a cached copy; won't happen
        ; return Stop } 
 \end{code}

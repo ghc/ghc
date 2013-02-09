@@ -1289,7 +1289,7 @@ The Ids bound by previous Stmts in GHCi are currently
      generator will consider the occurrences to be free rather than
      global.
 
- (b) They retain their Internal names becuase we don't have a suitable
+ (b) They retain their Internal names because we don't have a suitable
      Module to name them with. We could revisit this choice.
 
  (c) Their types are tidied. This is important, because :info may ask

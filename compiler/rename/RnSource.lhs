@@ -578,15 +578,10 @@ Renaming of the associated types in instances.
 \begin{code}
 -- rename associated type family decl in class
 rnATDecls :: Name      -- Class
-          -> LHsTyVarBndrs Name
           -> [LFamilyDecl RdrName] 
           -> RnM ([LFamilyDecl Name], FreeVars)
-rnATDecls cls hs_tvs at_decls
-  = rnList (rnFamDecl (Just (cls, tv_ns))) at_decls
-  where
-    tv_ns = hsLTyVarNames hs_tvs
-    -- Type variable binders (but NOT kind variables)
-    -- See Note [Renaming associated types] in RnTypes
+rnATDecls cls at_decls
+  = rnList (rnFamDecl (Just cls)) at_decls
 
 rnATInstDecls :: (Maybe (Name, [Name]) ->    -- The function that renames
                   decl RdrName ->            -- an instance. rnTyFamInstDecl
@@ -769,19 +764,15 @@ badRuleLhsErr name lhs bad_e
 
 \begin{code}
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
-rnHsVectDecl (HsVect var Nothing)
-  = do { var' <- lookupLocatedOccRn var
-       ; return (HsVect var' Nothing, unitFV (unLoc var'))
-       }
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect var (Just rhs@(L _ (HsVar _))))
+rnHsVectDecl (HsVect var rhs@(L _ (HsVar _)))
   = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
-       ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
+       ; return (HsVect var' rhs', fv_rhs `addOneFV` unLoc var')
        }
-rnHsVectDecl (HsVect _var (Just _rhs))
-  = failWith $ vcat
+rnHsVectDecl (HsVect _var _rhs)
+  = failWith $ vcat 
                [ ptext (sLit "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma")
                , ptext (sLit "must be an identifier")
                ]
@@ -950,7 +941,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = lcls,
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds (docOfHsDocContext cls_doc) fds
                          -- The fundeps have no free variables
-             ; (ats',     fv_ats)     <- rnATDecls cls' tyvars' ats
+             ; (ats',     fv_ats)     <- rnATDecls cls' ats
              ; (at_defs', fv_at_defs) <- rnATInstDecls rnTyFamInstDecl cls' tyvars' at_defs
              ; (sigs', sig_fvs) <- renameSigs (ClsDeclCtxt cls') sigs
              ; let fvs = cxt_fvs     `plusFV`
@@ -1045,8 +1036,8 @@ badGadtStupidTheta _
   = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
           ptext (sLit "(You can put a context on each contructor, though.)")]
 
-rnFamDecl :: Maybe (Name, [Name])
-                    -- Just (cls,tvs) => this FamilyDecl is nested 
+rnFamDecl :: Maybe Name
+                    -- Just cls => this FamilyDecl is nested 
                     --             inside an *class decl* for cls
                     --             used for associated types
           -> FamilyDecl RdrName
@@ -1062,7 +1053,6 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
   where 
      fmly_doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars kind
-
 \end{code}
 
 Note [Stupid theta]

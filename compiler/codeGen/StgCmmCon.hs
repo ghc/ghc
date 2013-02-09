@@ -129,7 +129,7 @@ buildDynCon' :: DynFlags
 
 {- We used to pass a boolean indicating whether all the
 args were of size zero, so we could use a static
-construtor; but I concluded that it just isn't worth it.
+constructor; but I concluded that it just isn't worth it.
 Now I/O uses unboxed tuples there just aren't any constructors
 with all size-zero args.
 

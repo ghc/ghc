@@ -49,10 +49,13 @@ AC_SUBST([release], [1])
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
 
-dnl * We require autoconf version 2.52
+dnl * We require autoconf version 2.60
 dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-AC_PREREQ([2.52])
+dnl Using autoconf 2.59 started to give nonsense like this
+dnl  #define SIZEOF_CHAR 0
+dnl recently.
+AC_PREREQ([2.60])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
@@ -206,19 +209,6 @@ fi
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
-
-# Testing ARM ABI
-# required for code generation (LLVM options)
-ARM_ABI=SOFT
-
-case $target in
-     arm*-*-linux-gnueabihf | arm*-linux-gnueabihf)
-     ARM_ABI=HARD
-     ;;
-     arm*-*-linux-gnueabi | arm*-linux-gnueabi)
-     ARM_ABI=SOFTFP
-     ;;
-esac
 
 FPTOOLS_SET_PLATFORM_VARS
 
@@ -483,12 +473,6 @@ TargetPlatformFull="${target}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-AC_ARG_WITH([alien],
-[AC_HELP_STRING([--with-alien=ARG],
-  [Supply script for running target binaries locally when cross-compiling])],
-  [AlienScript="$withval"],
-  [AlienScript=""])
-AC_SUBST(AlienScript)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
@@ -521,13 +505,13 @@ esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc], [llc])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt])
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
@@ -1006,7 +990,6 @@ echo ["\
    Using GCC                 : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
-   Alien script              : $AlienScript
 
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)

@@ -42,6 +42,6 @@
 
 #endif
 
-#include "stg/MachRegs.h"
+#include "MachRegs.h"
 
 #endif /* HASKELLMACHREGS_H */
