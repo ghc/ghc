@@ -10,11 +10,12 @@ foreign import ccall "wrapper" mkF :: Fun -> IO (FunPtr Fun)
 
 foreign import ccall "dynamic" callF :: FunPtr Fun -> Fun
 
--- This test should create 4 OS threads only:
+-- This test should create 5 OS threads only:
 --   one for main
 --   worker 1 for the IO manager
---   worker 2 to run the first forkIO
---   worker 3 created when worker 2 makes its foreign call
+--   worker 1 for the timeout manager
+--   worker 3 to run the first forkIO
+--   worker 4 created when worker 2 makes its foreign call
 
 -- Due to #4850, an extra worker was being created because worker 2 was
 -- lost after returning from its foreign call.
