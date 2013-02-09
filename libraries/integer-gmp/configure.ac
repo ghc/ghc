@@ -33,6 +33,12 @@ AC_ARG_WITH([gmp-framework-preferred],
     [GMP_PREFER_FRAMEWORK=YES],
     [GMP_PREFER_FRAMEWORK=NO])
 
+AC_ARG_WITH([intree-gmp],
+  [AC_HELP_STRING([--with-intree-gmp],
+    [force using the in-tree GMP])],
+    [GMP_FORCE_INTREE=YES],
+    [GMP_FORCE_INTREE=NO])
+
 dnl--------------------------------------------------------------------
 dnl * Detect gmp
 dnl--------------------------------------------------------------------
@@ -42,13 +48,16 @@ GMP_LIBS=
 HaveFrameworkGMP=NO
 GMP_FRAMEWORK=
 
-if test "$GMP_PREFER_FRAMEWORK" = "YES"
+if test "$GMP_FORCE_INTREE" != "YES"
 then
-    LOOK_FOR_GMP_FRAMEWORK
-    LOOK_FOR_GMP_LIB
-else
-    LOOK_FOR_GMP_LIB
-    LOOK_FOR_GMP_FRAMEWORK
+    if test "$GMP_PREFER_FRAMEWORK" = "YES"
+    then
+        LOOK_FOR_GMP_FRAMEWORK
+        LOOK_FOR_GMP_LIB
+    else
+        LOOK_FOR_GMP_LIB
+        LOOK_FOR_GMP_FRAMEWORK
+    fi
 fi
 if test "$HaveFrameworkGMP" = "YES" || test "$HaveLibGmp" = "YES"
 then
