@@ -126,7 +126,7 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
     AC_CACHE_VAL(AC_CV_NAME,[
         AC_CV_NAME_supported=yes
         FP_COMPUTE_INT([HTYPE_IS_INTEGRAL],
-                       [($1)1.4],
+                       [($1)0.2 - ($1)0.4 < 0 ? 0 : 1],
                        [FPTOOLS_HTYPE_INCLUDES],[HTYPE_IS_INTEGRAL=0])
 
         if test "$HTYPE_IS_INTEGRAL" -eq 0
