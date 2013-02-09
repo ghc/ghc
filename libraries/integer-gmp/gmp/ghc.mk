@@ -36,17 +36,17 @@ endif
 ifeq "$(Windows)" "YES"
 # Apparently building on Windows fails when there is a system gmp
 # available, so we never try to use the system gmp on Windows
-libraries/integer-gmp_dist-install_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
+libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
+endif
+
+ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
+libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
 
 ifeq "$(phase)" "final"
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
-endif
-
-ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
-libraries/integer-gmp_CC_OPTS += --with-gmp-framework-preferred
 endif
 
 libraries/integer-gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
