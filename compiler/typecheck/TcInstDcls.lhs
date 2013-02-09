@@ -22,7 +22,7 @@ import TcBinds
 import TcTyClsDecls( tcAddImplicits, tcAddTyFamInstCtxt, tcAddDataFamInstCtxt,
                      tcSynFamInstDecl, 
                      wrongKindOfFamily, tcFamTyPats, kcDataDefn, dataDeclChecks,
-                     tcConDecls, checkValidTyCon, tcAddFamInstCtxt )
+                     tcConDecls, checkValidTyCon )
 import TcClassDcl( tcClassDecl2, 
                    HsSigFun, lookupHsSig, mkHsSigFun, emptyHsSigs,
                    findMethodBind, instantiateMethod, tcInstanceMethodBody )
@@ -71,7 +71,7 @@ import SrcLoc
 import Util
 
 import Control.Monad
-import Maybes     ( orElse )
+import Maybes     ( orElse, isNothing )
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
@@ -471,30 +471,23 @@ tcLocalInstDecl :: LInstDecl Name
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
-  = setSrcSpan loc      $
-    tcAddTyFamInstCtxt decl  $
-    do { fam_tc <- tcFamInstDeclCombined TopLevel (tyFamInstDeclLName decl)
-       ; fam_inst <- tcTyFamInstDecl Nothing fam_tc (L loc decl)
+  = do { fam_inst <- tcTyFamInstDecl Nothing (L loc decl)
        ; return ([], [fam_inst]) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
-  = setSrcSpan loc      $
-    tcAddDataFamInstCtxt decl  $
-    do { fam_tc <- tcFamInstDeclCombined TopLevel (dfid_tycon decl)
-       ; fam_inst <- tcDataFamInstDecl Nothing fam_tc (L loc decl)
+  = do { fam_inst <- tcDataFamInstDecl Nothing (L loc decl)
        ; return ([], [toBranchedFamInst fam_inst]) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
-  = setSrcSpan loc $
-    do { (insts, fam_insts) <- tcClsInstDecl decl
+  = do { (insts, fam_insts) <- tcClsInstDecl (L loc decl)
        ; return (insts, map toBranchedFamInst fam_insts) }
 
-tcClsInstDecl :: ClsInstDecl Name -> TcM ([InstInfo Name], [FamInst Unbranched])
-tcClsInstDecl (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
-                           , cid_sigs = uprags, cid_tyfam_insts = ats
-                           , cid_datafam_insts = adts })
-  = addErrCtxt (instDeclCtxt1 poly_ty)  $
-
+tcClsInstDecl :: LClsInstDecl Name -> TcM ([InstInfo Name], [FamInst Unbranched])
+tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
+                                  , cid_sigs = uprags, cid_tyfam_insts = ats
+                                  , cid_datafam_insts = adts }))
+  = setSrcSpan loc                      $
+    addErrCtxt (instDeclCtxt1 poly_ty)  $
     do  { is_boot <- tcIsHsBoot
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
                   badBootDeclErr
@@ -502,13 +495,14 @@ tcClsInstDecl (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; (tyvars, theta, clas, inst_tys) <- tcHsInstHead InstDeclCtxt poly_ty
         ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
               mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+              mb_info    = Just (clas, mini_env)
                            
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
         ; tyfam_insts0 <- tcExtendTyVarEnv tyvars $
                           mapAndRecoverM (tcAssocTyDecl clas mini_env) ats
         ; datafam_insts <- tcExtendTyVarEnv tyvars $
-                           mapAndRecoverM (tcAssocDataDecl clas mini_env) adts
+                           mapAndRecoverM (tcDataFamInstDecl mb_info) adts
 
         -- Check for missing associated types and build them
         -- from their defaults (if available)
@@ -564,23 +558,9 @@ tcAssocTyDecl :: Class                   -- Class of associated type
               -> VarEnv Type             -- Instantiation of class TyVars
               -> LTyFamInstDecl Name     
               -> TcM (FamInst Unbranched)
-tcAssocTyDecl clas mini_env ldecl@(L loc decl)
-  = setSrcSpan loc $
-    tcAddTyFamInstCtxt decl $
-    do { fam_tc <- tcFamInstDeclCombined NotTopLevel (tyFamInstDeclLName decl)
-       ; fam_inst <- tcTyFamInstDecl (Just (clas, mini_env)) fam_tc ldecl
+tcAssocTyDecl clas mini_env ldecl
+  = do { fam_inst <- tcTyFamInstDecl (Just (clas, mini_env)) ldecl
        ; return $ toUnbranchedFamInst fam_inst }
-
---------------
-tcAssocDataDecl :: Class                 -- ^ Class of associated type
-                -> VarEnv Type           -- ^ Instantiation of class TyVars
-                -> LDataFamInstDecl Name -- ^ RHS
-                -> TcM (FamInst Unbranched)
-tcAssocDataDecl clas mini_env ldecl@(L loc decl)
-  = setSrcSpan loc $
-    tcAddDataFamInstCtxt decl $
-    do { fam_tc <- tcFamInstDeclCombined NotTopLevel (dfid_tycon decl)
-       ; tcDataFamInstDecl (Just (clas, mini_env)) fam_tc ldecl }
 \end{code}
 
 %************************************************************************
@@ -595,8 +575,9 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDeclCombined :: TopLevelFlag -> Located Name -> TcM TyCon
-tcFamInstDeclCombined top_lvl fam_tc_lname
+tcFamInstDeclCombined :: Maybe (Class, VarEnv Type) -- the class & mini_env if applicable
+                      -> Located Name -> TcM TyCon
+tcFamInstDeclCombined mb_clsinfo fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
@@ -608,17 +589,25 @@ tcFamInstDeclCombined top_lvl fam_tc_lname
        -- Look up the family TyCon and check for validity including
        -- check that toplevel type instances are not for associated types.
        ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
-       ; when (isTopLevel top_lvl && isTyConAssoc fam_tc)
+       ; when (isNothing mb_clsinfo &&   -- Not in a class decl
+               isTyConAssoc fam_tc)      -- but an associated type
               (addErr $ assocInClassErr fam_tc_lname)
 
        ; return fam_tc }
 
 tcTyFamInstDecl :: Maybe (Class, VarEnv Type) -- the class & mini_env if applicable
-                -> TyCon -> LTyFamInstDecl Name -> TcM (FamInst Branched)
+                -> LTyFamInstDecl Name -> TcM (FamInst Branched)
   -- "type instance"
-tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = group }))
-  = do { -- (0) Check it's an open type family
-         checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_group = group
+                                                      , tfid_eqns = eqns }))
+  = setSrcSpan loc           $
+    tcAddTyFamInstCtxt decl  $
+    do { let (eqn1:_) = eqns
+             fam_lname = tfie_tycon (unLoc eqn1)
+       ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
+
+         -- (0) Check it's an open type family
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; checkTc (isOpenSynFamilyTyCon fam_tc)
                  (notOpenFamily fam_tc)
@@ -627,7 +616,7 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
        ; co_ax_branches <- tcSynFamInstDecl fam_tc decl
 
          -- (2) check for validity and inaccessibility
-       ; foldlM_ check_valid_branch [] co_ax_branches
+       ; foldlM_ (check_valid_branch fam_tc) [] co_ax_branches
 
          -- (3) construct coercion axiom
        ; rep_tc_name <- newFamInstAxiomName loc
@@ -636,12 +625,12 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
        ; let axiom = mkBranchedCoAxiom rep_tc_name fam_tc co_ax_branches
        ; newFamInst SynFamilyInst group axiom }
     where 
-      check_valid_branch :: [CoAxBranch]     -- previous
+      check_valid_branch :: TyCon
+                         -> [CoAxBranch]     -- previous
                          -> CoAxBranch       -- current
                          -> TcM [CoAxBranch] -- current : previous
-      check_valid_branch prev_branches cur_branch
-        = tcAddFamInstCtxt (ptext (sLit "type")) (tyConName fam_tc) $
-          do { -- Check the well-formedness of the instance
+      check_valid_branch fam_tc prev_branches cur_branch
+        = do { -- Check the well-formedness of the instance
                checkValidTyFamInst mb_clsinfo fam_tc cur_branch
 
                -- Check whether the branch is dominated by earlier
@@ -653,18 +642,20 @@ tcTyFamInstDecl mb_clsinfo fam_tc (L loc decl@(TyFamInstDecl { tfid_group = grou
              ; return $ cur_branch : prev_branches }
 
 tcDataFamInstDecl :: Maybe (Class, VarEnv Type)
-                  -> TyCon -> LDataFamInstDecl Name -> TcM (FamInst Unbranched)
+                  -> LDataFamInstDecl Name -> TcM (FamInst Unbranched)
   -- "newtype instance" and "data instance"
-tcDataFamInstDecl mb_clsinfo fam_tc 
-    (L loc (DataFamInstDecl
-             { dfid_pats = pats
-             , dfid_tycon = fam_tc_name
-             , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                                           , dd_ctxt = ctxt, dd_cons = cons } }))
-  = setSrcSpan loc $
-    tcAddFamInstCtxt (ppr new_or_data) (tyConName fam_tc) $
-    do { -- Check that the family declaration is for the right kind
-         checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+tcDataFamInstDecl mb_clsinfo 
+    (L loc decl@(DataFamInstDecl
+       { dfid_pats = pats
+       , dfid_tycon = fam_tc_name
+       , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                                     , dd_ctxt = ctxt, dd_cons = cons } }))
+  = setSrcSpan loc             $
+    tcAddDataFamInstCtxt decl  $
+    do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_tc_name
+
+         -- Check that the family declaration is for the right kind
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns

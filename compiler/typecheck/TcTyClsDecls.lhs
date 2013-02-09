@@ -21,7 +21,7 @@ module TcTyClsDecls (
 	-- data/type family instance declarations
         kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcSynFamInstDecl, tcFamTyPats, 
-        tcAddTyFamInstCtxt, tcAddDataFamInstCtxt, tcAddFamInstCtxt,
+        tcAddTyFamInstCtxt, tcAddDataFamInstCtxt, 
         wrongKindOfFamily,
     ) where
 
@@ -1708,7 +1708,7 @@ tcAddTyFamInstCtxt decl
 
 tcAddDataFamInstCtxt :: DataFamInstDecl Name -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl
-  = tcAddFamInstCtxt ((pprDataFamInstFlavour decl) <+> (ptext (sLit "instance")))
+  = tcAddFamInstCtxt (pprDataFamInstFlavour decl <+> ptext (sLit "instance"))
                      (unLoc (dfid_tycon decl)) 
 
 tcAddFamInstCtxt :: SDoc -> Name -> TcM a -> TcM a

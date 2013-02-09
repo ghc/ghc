@@ -842,6 +842,7 @@ type LTyFamInstDecl name = Located (TyFamInstDecl name)
 data TyFamInstDecl name 
   = TyFamInstDecl
        { tfid_eqns  :: [LTyFamInstEqn name] -- ^ list of (possibly-overlapping) eqns 
+                                            -- Always non-empty
        , tfid_group :: Bool                 -- Was this declared with the "where" syntax?
        , tfid_fvs   :: NameSet }            -- The group is type-checked as one,
                                             --   so one NameSet will do
