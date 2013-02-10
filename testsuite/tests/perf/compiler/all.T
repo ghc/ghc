@@ -31,9 +31,10 @@ test('T1969',
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
       compiler_stats_num_field('bytes allocated',
-          [(platform('i386-unknown-mingw32'), 303930948, 1),
+          [(platform('i386-unknown-mingw32'), 310633884, 1),
                                  #            215582916 (x86/Windows)
                                  # 2012-10-29 298921816 (x86/Windows)
+                                 # 2013-02-10 310633884 (x86/Windows)
            (wordsize(32), 322937684, 1),
              #            221667908 (x86/OS X)
              #            274932264 (x86/Linux)
