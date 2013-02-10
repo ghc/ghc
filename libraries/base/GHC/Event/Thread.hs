@@ -276,11 +276,7 @@ startIOManagerThread eventManagerArray i = do
           -- See #4449
           M.cleanup em
           create
-        _other         -> do
-          -- Another thread is currently servicing the manager loop.
-          -- Tell it to exit and start a new thread to work on the loop.
-          M.release em
-          create
+        _other         -> return ()
 
 startTimerManagerThread :: IO ()
 startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
