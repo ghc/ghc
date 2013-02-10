@@ -893,7 +893,7 @@ AC_SUBST(Alex3)
 AC_DEFUN([FP_PROG_LD_FLAG],
 [
 AC_CACHE_CHECK([whether ld understands $1], [fp_cv_$2],
-[echo 'foo() {}' > conftest.c
+[echo 'int foo() { return 0; }' > conftest.c
 ${CC-cc} -c conftest.c
 if ${LdCmd} -r $1 -o conftest2.o conftest.o > /dev/null 2>&1; then
    fp_cv_$2=$1
@@ -934,7 +934,7 @@ FP_PROG_LD_FLAG([--reduce-memory-overheads],[LdReduceMemoryOverheads])
 AC_DEFUN([FP_PROG_LD_BUILD_ID],
 [
 AC_CACHE_CHECK([whether ld understands --build-id], [fp_cv_ld_build_id],
-[echo 'foo() {}' > conftest.c
+[echo 'int foo() { return 0; }' > conftest.c
 ${CC-cc} -c conftest.c
 if ${LdCmd} -r --build-id=none -o conftest2.o conftest.o > /dev/null 2>&1; then
    fp_cv_ld_build_id=yes
@@ -975,7 +975,7 @@ AC_SUBST([LdIsGNULd], [`echo $fp_cv_gnu_ld | sed 'y/yesno/YESNO/'`])
 AC_DEFUN([FP_PROG_LD_NO_COMPACT_UNWIND],
 [
 AC_CACHE_CHECK([whether ld understands -no_compact_unwind], [fp_cv_ld_no_compact_unwind],
-[echo 'foo() {}' > conftest.c
+[echo 'int foo() { return 0; }' > conftest.c
 ${CC-cc} -c conftest.c
 if ${LdCmd} -r -no_compact_unwind -o conftest2.o conftest.o > /dev/null 2>&1; then
    fp_cv_ld_no_compact_unwind=yes
