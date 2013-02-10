@@ -46,10 +46,6 @@ NO_INCLUDE_PKGDATA = NO
 # Should we build latex docs?
 LATEX_DOCS = NO
 
-# Is the global compiler clang, llvm, or something neither?
-CC_CLANG_BACKEND = @CC_CLANG_BACKEND@
-CC_LLVM_BACKEND  = @CC_LLVM_BACKEND@
-
 # Mac OS X deployment target (to cross-compile for older OS versions)
 #
 MACOSX_DEPLOYMENT_VERSION = @MACOSX_DEPLOYMENT_VERSION@
