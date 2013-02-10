@@ -7,51 +7,57 @@ setTestOpts(no_lint)
 
 test('T1969',
      [compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(32), 18, 1),
-        # expected value: 14 (x86/Windows 17/05/10)
-        #                 15 (x86/OS X)
-        #                 19 (x86/OS X)
+          [(wordsize(32), 14, 1),
+             # 2010-05-17 14 (x86/Windows)
+             #            15 (x86/OS X)
+             #            19 (x86/OS X)
+             # 2013-02-10 13 (x86/Windows)
+             # 2013-02-10 14 (x86/OSX)
            (wordsize(64), 25, 1)]),
-        # expected value: 28 (amd64/Linux)
-        # expected value: 34 (amd64/Linux)
-        # 2012-09-20      23 (amd64/Linux)
-        # 2012-10-03      25 (amd64/Linux if .hi exists)
+             #            28 (amd64/Linux)
+             #            34 (amd64/Linux)
+             # 2012-09-20 23 (amd64/Linux)
+             # 2012-10-03 25 (amd64/Linux if .hi exists)
       compiler_stats_num_field('max_bytes_used',
-          [(wordsize(32), 6149572, 5),
-        # expected value: 6707308 (x86/OS X)
-        #                 5717704 (x86/Windows 17/05/10)
-        #                 6149572 (x86/Linux, 31/12/09)
+          [(platform('i386-unknown-mingw32'), 5159748, 1),
+                                 # 2010-05-17 5717704 (x86/Windows)
+                                 # 2013-02-10 5159748 (x86/Windows)
+           (wordsize(32), 6149572, 1),
+             #            6707308 (x86/OS X)
+             # 2009-12-31 6149572 (x86/Linux)
            (wordsize(64), 9000000, 20)]),
                # looks like the peak is around 10M, but we're
                # unlikely to GC exactly on the peak.
                # varies quite a lot with CLEANUP and BINDIST,
                # hence 10% range.
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 303930948, 5),
-        # expected value: 215582916 (x86/Windows)
-        #                 221667908 (x86/OS X)
-        #                 274932264 (x86/Linux)
-        # 2012-10-08:     303930948 (x86/Linux, new codegen)
-        # 2012-10-29:     298921816 (x86/Windows; increased range to 5%
+          [(platform('i386-unknown-mingw32'), 303930948, 1),
+                                 #            215582916 (x86/Windows)
+                                 # 2012-10-29 298921816 (x86/Windows)
+           (wordsize(32), 322937684, 1),
+             #            221667908 (x86/OS X)
+             #            274932264 (x86/Linux)
+             # 2012-10-08 303930948 (x86/Linux, new codegen)
+             # 2013-02-10 322937684 (x86/OSX)
            (wordsize(64), 658786936, 5)]),
-        # 17/11/2009:     434845560 (amd64/Linux)
-        # 08/12/2009:     459776680 (amd64/Linux)
-        # 17/05/2010:     519377728 (amd64/Linux)
-        # 05/08/2011:     561382568 (amd64/OS X)
-        # 16/07/2012:     589168872 (amd64/Linux)
-        # 20/07/2012:     595936240 (amd64/Linux)
-        # 23/08/2012:     606230880 (amd64/Linux)
-        # 29/08/2012:     633334184 (amd64/Linux)
-        #                 (^ new codegen)
-        # 18/09/2012:     641959976 (amd64/Linux)
-        # 19/10/2012:     661832592 (amd64/Linux)
-        #                 (^ -fPIC turned on)
-        # 23/10/2012:     642594312 (amd64/Linux)
-        #                 (^ -fPIC turned off again)
-        # 12/11/2012:     658786936 (amd64/Linux)
-        #                 ( UNKNOWN REASON )
-        # 17/1/13:        667160192 (x86_64/Linux)
-        #                 (new demand analyser)
+             # 17/11/2009 434845560 (amd64/Linux)
+             # 08/12/2009 459776680 (amd64/Linux)
+             # 17/05/2010 519377728 (amd64/Linux)
+             # 05/08/2011 561382568 (amd64/OS X)
+             # 16/07/2012 589168872 (amd64/Linux)
+             # 20/07/2012 595936240 (amd64/Linux)
+             # 23/08/2012 606230880 (amd64/Linux)
+             # 29/08/2012 633334184 (amd64/Linux)
+             #            (^ new codegen)
+             # 18/09/2012 641959976 (amd64/Linux)
+             # 19/10/2012 661832592 (amd64/Linux)
+             #            (^ -fPIC turned on)
+             # 23/10/2012 642594312 (amd64/Linux)
+             #            (^ -fPIC turned off again)
+             # 12/11/2012 658786936 (amd64/Linux)
+             #            (^ UNKNOWN REASON )
+             # 17/1/13:   667160192 (x86_64/Linux)
+             #            (^ new demand analyser)
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static')
@@ -76,9 +82,11 @@ else:
 test('T3294',
      [
       compiler_stats_num_field('max_bytes_used',
-          [(wordsize(32), 17725476, 5),
-        # expected value: 17725476 (x86/OS X)
-        #                 14593500 (Windows)
+          [(wordsize(32), 20712280, 1),
+             #            17725476 (x86/OS X)
+             #            14593500 (Windows)
+             # 2013-02-10 20651576 (x86/Windows)
+             # 2013-02-10 20772984 (x86/OSX)
            (wordsize(64), 44894544, 15)]),
         # prev:           25753192 (amd64/Linux)
         # 29/08/2012:     37724352 (amd64/Linux)
@@ -110,9 +118,9 @@ test('T4801',
            (wordsize(64), 49, 20)]),
             # prev:       50 (amd64/Linux)
             # 19/10/2012: 64 (amd64/Linux)
-            #                (REASON UNKNOWN!)
+            #                (^ REASON UNKNOWN!)
             # 12/11/2012: 49 (amd64/Linux)
-            #                (REASON UNKNOWN!)
+            #                (^ REASON UNKNOWN!)
 
       compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 510938976, 5),
@@ -128,9 +136,11 @@ test('T4801',
 
       compiler_stats_num_field('max_bytes_used',
           [(platform('x86_64-apple-darwin'), 21657520, 5),
-           (wordsize(32), 9651948, 5),
-      #                    expected value: x86/OS X:  9651948
-      #                    expected value:           10290952 (windows)
+           (wordsize(32), 11139444, 1),
+             #             9651948 (x86/OSX)
+             #            10290952 (windows)
+             # 2013-02-10 11071060 (x86/Windows)
+             # 2013-02-10 11207828 (x86/OSX)
            (wordsize(64), 21657520, 15)]),
                 # prev:       20486256 (amd64/OS X)
                 # 30/08/2012: 17305600--20391920 (varies a lot)
@@ -216,8 +226,10 @@ test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
       # expected value: 175,569,928 (x86/Linux)
       compiler_stats_num_field('bytes allocated',
-          [(wordsize(32), 226907420, 10),
+          [(wordsize(32), 333833658, 2),
             # 2012-10-08: 226907420 (x86/Linux)
+            # 2013-02-10: 329202116 (x86/Windows)
+            # 2013-02-10: 338465200 (x86/OSX)
            (wordsize(64), 640324528, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
