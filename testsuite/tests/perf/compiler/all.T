@@ -19,9 +19,10 @@ test('T1969',
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
       compiler_stats_num_field('max_bytes_used',
-          [(platform('i386-unknown-mingw32'), 5159748, 1),
+          [(platform('i386-unknown-mingw32'), 5094914, 2),
                                  # 2010-05-17 5717704 (x86/Windows)
                                  # 2013-02-10 5159748 (x86/Windows)
+                                 # 2013-02-10 5030080 (x86/Windows)
            (wordsize(32), 6149572, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
