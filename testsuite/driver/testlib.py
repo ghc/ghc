@@ -2217,25 +2217,27 @@ def summary(t, file):
 
     file.write('\n')
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
-    file.write('OVERALL SUMMARY for test run started at ' \
-               + t.start_time + '\n'\
-               + string.rjust(`t.total_tests`, 8) \
-               + ' total tests, which gave rise to\n' \
-               + string.rjust(`t.total_test_cases`, 8) \
-               + ' test cases, of which\n' \
-               + string.rjust(`t.n_framework_failures`, 8) \
-               + ' caused framework failures\n' \
+    file.write('OVERALL SUMMARY for test run started at '
+               + t.start_time + '\n'
+               + string.rjust(`t.total_tests`, 8)
+               + ' total tests, which gave rise to\n'
+               + string.rjust(`t.total_test_cases`, 8)
+               + ' test cases, of which\n'
                + string.rjust(`t.n_tests_skipped`, 8)
-               + ' were skipped\n\n' \
-               + string.rjust(`t.n_expected_passes`, 8)
-               + ' expected passes\n' \
+               + ' were skipped\n'
+               + '\n'
                + string.rjust(`t.n_missing_libs`, 8)
-               + ' had missing libraries\n' \
-               + string.rjust(`t.n_expected_failures`, 8) \
-               + ' expected failures\n' \
-               + string.rjust(`t.n_unexpected_passes`, 8) \
+               + ' had missing libraries\n'
+               + string.rjust(`t.n_expected_passes`, 8)
+               + ' expected passes\n'
+               + string.rjust(`t.n_expected_failures`, 8)
+               + ' expected failures\n'
+               + '\n'
+               + string.rjust(`t.n_framework_failures`, 8)
+               + ' caused framework failures\n'
+               + string.rjust(`t.n_unexpected_passes`, 8)
                + ' unexpected passes\n'
-               + string.rjust(`t.n_unexpected_failures`, 8) \
+               + string.rjust(`t.n_unexpected_failures`, 8)
                + ' unexpected failures\n'
                + '\n')
 
