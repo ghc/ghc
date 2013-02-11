@@ -1,0 +1,31 @@
+
+GenericTemplate.hs:219:14: Warning:
+    Pattern bindings containing unlifted types should use an outermost bang pattern:
+      sts1@((HappyCons (st1@(action)) (_)))
+        = happyDrop k (HappyCons (st) (sts))
+    In an equation for `happyMonadReduce':
+        happyMonadReduce k nt fn j tk st sts stk
+          = happyThen1
+              (fn stk tk)
+              (\ r -> happyGoto nt j tk st1 sts1 (r `HappyStk` drop_stk))
+          where
+              sts1@((HappyCons (st1@(action)) (_)))
+                = happyDrop k (HappyCons (st) (sts))
+              drop_stk = happyDropStk k stk
+
+GenericTemplate.hs:226:14: Warning:
+    Pattern bindings containing unlifted types should use an outermost bang pattern:
+      sts1@((HappyCons (st1@(action)) (_)))
+        = happyDrop k (HappyCons (st) (sts))
+    In an equation for `happyMonad2Reduce':
+        happyMonad2Reduce k nt fn j tk st sts stk
+          = happyThen1
+              (fn stk tk)
+              (\ r -> happyNewToken new_state sts1 (r `HappyStk` drop_stk))
+          where
+              sts1@((HappyCons (st1@(action)) (_)))
+                = happyDrop k (HappyCons (st) (sts))
+              drop_stk = happyDropStk k stk
+              off = indexShortOffAddr happyGotoOffsets st1
+              off_i = (off +# nt)
+              ....
