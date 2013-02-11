@@ -12,7 +12,7 @@ test('T2589',      just_ghci, compile_and_run, [''])
 test('T2881',      just_ghci, compile_and_run, [''])
 
 test('T3171',
-     [if_os('mingw32',skip),
+     [when(opsys('mingw32'),skip),
       req_interp,
       combined_output],
      run_command,

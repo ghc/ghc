@@ -19,11 +19,11 @@ test('derefnull',
              # Apparently the output can be different on different
              # Linux setups, so just ignore it. As long as we get
              # the right exit code we're OK.
-             if_os('linux', ignore_output),
+             when(opsys('linux'), ignore_output),
              # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
              when(platform('i386-apple-darwin'), exit_code(138)),
              when(platform('powerpc-apple-darwin'), exit_code(138)),
-             if_os('mingw32', exit_code(1))]),
+             when(opsys('mingw32'), exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
      composes([
@@ -33,11 +33,11 @@ test('divbyzero',
              # Apparently the output can be different on different
              # Linux setups, so just ignore it. As long as we get
              # the right exit code we're OK.
-             if_os('linux', ignore_output),
-             if_os('mingw32', exit_code(1))]),
+             when(opsys('linux'), ignore_output),
+             when(opsys('mingw32'), exit_code(1))]),
      compile_and_run, [''])
 
-test('outofmem', if_os('darwin', skip), 
+test('outofmem', when(opsys('darwin'), skip), 
                  run_command, ['$MAKE -s --no-print-directory outofmem'])
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
@@ -80,11 +80,11 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
-     [ if_os('mingw32', skip),
+     [ when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
-       if_os('darwin', skip),
+       when(opsys('darwin'), skip),
        # Solaris' linker does not support GNUish linker scripts
-       if_os('solaris2', skip),
+       when(opsys('solaris2'), skip),
        pre_cmd('$MAKE -s --no-print-directory T2615-prep'),
        # Add current directory to dlopen search path
        cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
@@ -105,7 +105,7 @@ test('T4059',
 
 # Test for #4274
 test('exec_signals', [
-     if_os('mingw32', skip),
+     when(opsys('mingw32'), skip),
      pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
      cmd_prefix('./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])

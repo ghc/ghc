@@ -52,7 +52,7 @@ test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T4262', [ skip, # skip for now, it doesn't give reliable results
                 only_ways(['threaded1']),
-                unless_os('linux',skip),
+                unless(opsys('linux'),skip),
                 if_compiler_lt('ghc', '7.1', expect_fail) ],
               compile_and_run, [''])
 
@@ -171,7 +171,7 @@ test('conc036', skip, compile_and_run, [''])
 
 # Interrupting foreign calls only makes sense if we are threaded
 test('foreignInterruptible', [skip_if_fast,
-                              if_os('mingw32',expect_fail),
+                              when(opsys('mingw32'),expect_fail),
                               # I don't think we support interrupting Sleep()
                               # on Windows.  --SDM
                               only_threaded_ways,

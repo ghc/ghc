@@ -313,17 +313,8 @@ def unless(b, f):
 def platform( plat ):
     return config.platform == plat
 
-def if_os( os, f ):
-    if config.os == os:
-        return f
-    else:
-        return normal
-
-def unless_os( os, f ):
-    if config.os == os:
-        return normal
-    else:
-        return f
+def opsys( os ):
+    return config.os == os
 
 def if_arch( arch, f ):
     if config.arch == arch:
