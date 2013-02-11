@@ -293,12 +293,6 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
 
 # -----
 
-def skip_if_no_ghci(name, opts):
-    if not ('ghci' in config.run_ways):
-        opts.skip = 1
-
-# ----
-
 def when(b, f):
     # When list_brokens is on, we want to see all expect_broken calls,
     # so we always do f
@@ -312,6 +306,9 @@ def unless(b, f):
 
 def fast():
     return config.fast
+
+def doing_ghci():
+    return 'ghci' in config.run_ways
 
 def platform( plat ):
     return config.platform == plat

@@ -44,7 +44,7 @@ test('rnfail040',
 test('rnfail041', normal, compile_fail, [''])
 test('rnfail042', normal, compile_fail, [''])
 
-test('rnfail043', skip_if_no_ghci, compile_fail, ['-v0'])
+test('rnfail043', unless(doing_ghci, skip), compile_fail, ['-v0'])
 test('rnfail044', normal, compile_fail, [''])
 test('rnfail045', normal, compile_fail, [''])
 test('rnfail046', normal, compile_fail, [''])
