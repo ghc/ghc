@@ -37,8 +37,7 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 test('ghci024',
-     [when(fast(), skip),
-      when(platform("powerpc-apple-darwin"), expect_broken(1845))],
+     when(fast(), skip),
      run_command,
      ['$MAKE -s --no-print-directory ghci024'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
