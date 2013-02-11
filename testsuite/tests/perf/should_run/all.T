@@ -112,8 +112,7 @@ test('T5113',
      [stats_num_field('bytes allocated',
                       [(wordsize(32), 4000000, 5),
                        (wordsize(64), 8000000, 5)]),
-      only_ways(['normal']),
-      expect_broken(7046)
+      only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
