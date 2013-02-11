@@ -6,7 +6,7 @@ def f(name, opts):
 setTestOpts(f)
 setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal','ghci']))
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 
 test('TH_spliceViewPat',
      extra_clean(['Main.o', 'Main.hi', 'A.o', 'A.hi']),

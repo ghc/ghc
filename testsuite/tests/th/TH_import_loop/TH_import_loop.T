@@ -1,5 +1,5 @@
 
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 
 test('TH_import_loop',
      [extra_clean(['ModuleA.o-boot', 'ModuleA.hi-boot',

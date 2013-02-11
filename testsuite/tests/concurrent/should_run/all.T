@@ -53,7 +53,7 @@ test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
 test('T4262', [ skip, # skip for now, it doesn't give reliable results
                 only_ways(['threaded1']),
                 unless(opsys('linux'),skip),
-                if_compiler_lt('ghc', '7.1', expect_fail) ],
+                when(compiler_lt('ghc', '7.1'), expect_fail) ],
               compile_and_run, [''])
 
 test('T4813', normal, compile_and_run, [''])

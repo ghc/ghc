@@ -1,6 +1,6 @@
 
 test('haddock.base',
-     [unless_in_tree_compiler(skip)
+     [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
           [(wordsize(64), 274, 10)
             # 2012-08-14: 240 (amd64/Linux)
@@ -41,7 +41,7 @@ test('haddock.base',
      ['../../../../libraries/base/dist-install/doc/html/base/base.haddock.t'])
 
 test('haddock.Cabal',
-     [unless_in_tree_compiler(skip)
+     [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
           [(wordsize(64), 217, 10)
             # 2012-08-14: 202 (amd64/Linux)
@@ -80,7 +80,7 @@ test('haddock.Cabal',
      ['../../../../libraries/Cabal/Cabal/dist-install/doc/html/Cabal/Cabal.haddock.t'])
 
 test('haddock.compiler',
-     [unless_in_tree_compiler(skip)
+     [unless(in_tree_compiler(), skip)
      ,stats_num_field('peak_megabytes_allocated',
           [(wordsize(64), 1240, 10)
             # 2012-08-14: 1203 (amd64/Linux)

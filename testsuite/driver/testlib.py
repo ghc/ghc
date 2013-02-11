@@ -348,75 +348,36 @@ def have_profiling( ):
 
 # ---
 
-def if_ghci_dynamic( f ):
-    if config.ghc_dynamic_by_default:
-        return f
-    else:
-        return normal
+def ghci_dynamic( ):
+    return config.ghc_dynamic_by_default
 
-def if_in_tree_compiler( f ):
-    if config.in_tree_compiler:
-        return f
-    else:
-        return normal
+def in_tree_compiler( ):
+    return config.in_tree_compiler
 
-def unless_in_tree_compiler( f ):
-    if config.in_tree_compiler:
-        return normal
-    else:
-        return f
+def compiler_type( compiler ):
+    return config.compiler_type == compiler
 
-def if_compiler_type( compiler, f ):
-    if config.compiler_type == compiler:
-        return f
-    else:
-        return normal
+def compiler_profiled( ):
+    return config.compiler_profiled
 
-def if_compiler_profiled( f ):
-    if config.compiler_profiled:
-        return f
-    else:
-        return normal
+def compiler_lt( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_lt(config.compiler_version, version)
 
-def unless_compiler_profiled( f ):
-    if config.compiler_profiled:
-        return normal
-    else:
-        return f
+def compiler_le( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_le(config.compiler_version, version)
 
-def if_compiler_lt( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        return f
-    else:
-        return normal
+def compiler_gt( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_gt(config.compiler_version, version)
 
-def if_compiler_le( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_le(config.compiler_version, version):
-        return f
-    else:
-        return normal
+def compiler_ge( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_ge(config.compiler_version, version)
 
-def if_compiler_gt( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_gt(config.compiler_version, version):
-        return f
-    else:
-        return normal
-
-def if_compiler_ge( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_ge(config.compiler_version, version):
-        return f
-    else:
-        return normal
-
-def if_compiler_debugged( f ):
-    if config.compiler_debugged:
-        return f
-    else:
-        return normal
+def compiler_debugged( ):
+    return config.compiler_debugged
 
 def namebase( nb ):
    return lambda opts, nb=nb: _namebase(opts, nb)

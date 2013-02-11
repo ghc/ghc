@@ -102,10 +102,10 @@ test('gadt25', normal, compile, [''])
 test('T3651', normal, compile_fail, [''])
 test('T3638', normal, compile, [''])
 
-test('gadtSyntax001', if_compiler_lt('ghc', '7.1', expect_fail), compile, [''])
-test('gadtSyntaxFail001', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
-test('gadtSyntaxFail002', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
-test('gadtSyntaxFail003', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
+test('gadtSyntax001', when(compiler_lt('ghc', '7.1'), expect_fail), compile, [''])
+test('gadtSyntaxFail001', when(compiler_lt('ghc', '7.1'), expect_fail), compile_fail, [''])
+test('gadtSyntaxFail002', when(compiler_lt('ghc', '7.1'), expect_fail), compile_fail, [''])
+test('gadtSyntaxFail003', when(compiler_lt('ghc', '7.1'), expect_fail), compile_fail, [''])
 test('T3169', normal, compile_fail, [''])
 test('T5424',
      extra_clean(['T5424a.hi', 'T5424a.o']),

@@ -1,5 +1,5 @@
 test('ghcilink001',
-     [if_ghci_dynamic(expect_fail), # dynamic ghci can't load '.a's
+     [when(ghci_dynamic(), expect_fail), # dynamic ghci can't load '.a's
       skip_if_no_ghci,
       extra_clean(['dir001/*','dir001'])],
      run_command,
@@ -21,7 +21,7 @@ test('ghcilink003',
      ['$MAKE -s --no-print-directory ghcilink003'])
 
 test('ghcilink004',
-     [if_ghci_dynamic(expect_fail), # dynamic ghci can't load '.a's
+     [when(ghci_dynamic(), expect_fail), # dynamic ghci can't load '.a's
       skip_if_no_ghci,
       extra_clean(['dir004/*','dir004'])],
      run_command,

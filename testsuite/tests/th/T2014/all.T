@@ -1,4 +1,4 @@
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 
 test('T2014',
      [req_interp,

@@ -1,5 +1,5 @@
 
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 
 # We only want to run these tests with GHCi
 def just_ghci( name, opts ):

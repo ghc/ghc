@@ -251,7 +251,7 @@ test('mod150', normal, compile_fail, [''])
 test('mod151', normal, compile_fail, [''])
 test('mod152', normal, compile_fail, [''])
 test('mod153', normal, compile_fail, [''])
-test('mod154', if_compiler_type('hugs', expect_fail), compile, [''])
+test('mod154', when(compiler_type('hugs'), expect_fail), compile, [''])
 test('mod155', normal, compile_fail, [''])
 test('mod156', normal, compile, [''])
 test('mod157', 

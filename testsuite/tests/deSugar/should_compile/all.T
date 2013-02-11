@@ -76,7 +76,7 @@ test('GadtOverlap', normal, compile, ['-Wall'])
 test('T2395', normal, compile, [''])
 test('T4371', normal, compile, [''])
 test('T4439', normal, compile, [''])
-test('T4488', if_compiler_lt('ghc', '7.1', expect_fail), compile, [''])
+test('T4488', when(compiler_lt('ghc', '7.1'), expect_fail), compile, [''])
 test('T4870',
      [only_ways(['optasm']),
       only_compiler_types(['ghc']),

@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test('arrowfail001',
-     if_compiler_debugged(expect_broken(5267)),
+     when(compiler_debugged(), expect_broken(5267)),
      compile_fail,
      [''])
  # arrowfail001 gets an ASSERT error in the stage1 compiler
