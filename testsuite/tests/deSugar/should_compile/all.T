@@ -64,7 +64,6 @@ test('ds057', normal, compile, [''])
 test('ds058', normal, compile, ['-W'])
 test('ds059', normal, compile, ['-W'])
 test('ds060', expect_broken(322), compile, [''])
-test('ds061', expect_broken(851), compile, [''])
 test('ds062', normal, compile, [''])
 test('ds063', normal, compile, [''])
 
