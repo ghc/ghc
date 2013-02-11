@@ -7,8 +7,8 @@ test('dynamicToo001',
                    'A001.dyn_hi', 'B001.dyn_hi', 'C001.dyn_hi',
                    's001', 'd001']),
       when(opsys('mingw32'), expect_broken(7665)),
-      unless_have_vanilla(skip),
-      unless_have_dynamic(skip)],
+      unless(have_vanilla(), skip),
+      unless(have_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory dynamicToo001'])
 
