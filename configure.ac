@@ -986,14 +986,18 @@ echo ["\
 "]
 fi
 
-if test "$CC_CLANG_BACKEND" = "1"; then
-CNAME="clang "
+if test "x$CC_LLVM_BACKEND" = "x1"; then
+    if test "x$CC_CLANG_BACKEND" = "x1"; then
+        CompilerName="clang        "
+    else
+        CompilerName="llvm-gcc     "
+    fi
 else
-CNAME="gcc   "
+    CompilerName="gcc          "
 fi
 
 echo ["\
-   Using $CNAME              : $WhatGccIsCalled
+   Using $CompilerName       : $WhatGccIsCalled
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
 
