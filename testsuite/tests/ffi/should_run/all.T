@@ -32,7 +32,7 @@ test('ffi004', skip, compile_and_run, [''])
 # use of 80-bit internal precision when using the native code generator.
 #
 test('ffi005', [ omit_ways(prof_ways), 
-                 if_arch('i386', skip),
+                 when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3) ],
                compile_and_run, [''])

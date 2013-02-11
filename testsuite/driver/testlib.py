@@ -322,17 +322,8 @@ def platform( plat ):
 def opsys( os ):
     return config.os == os
 
-def if_arch( arch, f ):
-    if config.arch == arch:
-        return f
-    else:
-        return normal
-
-def unless_arch( arch, f ):
-    if config.arch == arch:
-        return normal
-    else:
-        return f
+def arch( arch ):
+    return config.arch == arch
 
 def wordsize( ws ):
     return config.wordsize == str(ws)

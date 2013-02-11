@@ -15,8 +15,8 @@ test('T3286', extra_clean(['T3286b.o','T3286b.hi']),
 test('T3579', normal, compile, [''])
 test('T2578', normal, run_command, ['$MAKE -s --no-print-directory T2578'])
 # skip llvm on i386 as we don't support fPIC
-test('jmp_tbl', if_arch('i386', omit_ways(['llvm', 'optllvm'])), compile, ['-fPIC -O'])
+test('jmp_tbl', when(arch('i386'), omit_ways(['llvm', 'optllvm'])), compile, ['-fPIC -O'])
 test('massive_array',
-     [ if_arch('i386', omit_ways(['llvm', 'optllvm'])) ],
+     [ when(arch('i386'), omit_ways(['llvm', 'optllvm'])) ],
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
