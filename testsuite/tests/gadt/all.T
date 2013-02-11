@@ -6,10 +6,10 @@ setTestOpts(only_compiler_types(['ghc']))
 # In fast mode, we omit all the compile_and_run tests except a couple
 
 test('gadt1', normal, compile, [''])
-test('gadt2', skip_if_fast, compile_and_run, [''])
+test('gadt2', when(fast(), skip), compile_and_run, [''])
 test('gadt3', normal, compile, [''])
-test('gadt4', skip_if_fast, compile_and_run, [''])
-test('gadt5', skip_if_fast, compile_and_run, [''])
+test('gadt4', when(fast(), skip), compile_and_run, [''])
+test('gadt5', when(fast(), skip), compile_and_run, [''])
 test('gadt6', normal, compile, [''])
 test('gadt7', normal, compile_fail, [''])
 test('gadt8', normal, compile, [''])
@@ -40,7 +40,7 @@ test('gadt23',
 test('gadt24', normal, compile, [''])
 
 test('red-black', normal, compile, [''])
-test('type-rep', skip_if_fast, compile_and_run, [''])
+test('type-rep', when(fast(), skip), compile_and_run, [''])
 test('equal', normal, compile, [''])
 test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
@@ -50,13 +50,13 @@ test('lazypatok', expect_fail, compile, [''])
 test('tc', normal, compile_and_run, [''])
 test('arrow', normal, compile, [''])
 test('tdpe', normal, compile, [''])
-test('Nilsson', skip_if_fast, compile, [''])
+test('Nilsson', when(fast(), skip), compile, [''])
 
 if config.fast:
     test('records', normal, compile, [''])
 else:
     test('records', normal, compile_and_run, [''])
-test('ubx-records', skip_if_fast, compile_and_run, [''])
+test('ubx-records', when(fast(), skip), compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
 
 test('doaitse', normal, compile, [''])

@@ -1,7 +1,7 @@
 # Exhausts Hugs's heap (CAF leak)
 
 test('barton-mangler-bug',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Basic.hi',             'Basic.o',
                    'Expected.hi',          'Expected.o',
                    'Main.hi',              'Main.o',

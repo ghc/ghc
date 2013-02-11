@@ -29,7 +29,7 @@ test('simpl-T1370', normal, compile, [''])
 test('T2520', normal, compile, [''])
 
 
-test('spec001', skip_if_fast, compile, [''])
+test('spec001', when(fast(), skip), compile, [''])
 test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
@@ -44,7 +44,7 @@ test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
-test('T3016', skip_if_fast, compile, [''])
+test('T3016', when(fast(), skip), compile, [''])
 
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 

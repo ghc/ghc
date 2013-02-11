@@ -127,7 +127,7 @@ if config.platform == 'i386-unknown-mingw32':
 else:
    conc023_ways = normal
 
-test('conc023', composes([skip_if_fast,
+test('conc023', composes([when(fast(), skip),
                           only_compiler_types(['ghc']),
                           reqlib('random'),
                           conc023_ways]), compile_and_run, [''])
@@ -170,7 +170,7 @@ test('conc036', skip, compile_and_run, [''])
 
 
 # Interrupting foreign calls only makes sense if we are threaded
-test('foreignInterruptible', [skip_if_fast,
+test('foreignInterruptible', [when(fast(), skip),
                               when(opsys('mingw32'),expect_fail),
                               # I don't think we support interrupting Sleep()
                               # on Windows.  --SDM

@@ -1,6 +1,6 @@
 # exhausts Hugs's heap (CAF leak)
 test('andre_monad',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Main.hi', 'Main.o']),
       omit_compiler_types(['hugs'])],
      multimod_compile_and_run,

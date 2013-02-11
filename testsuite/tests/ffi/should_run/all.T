@@ -67,7 +67,7 @@ if config.platform.startswith('i386-'):
    else:
         maybe_skip = only_ways(['ghci'])
 
-test('ffi009', [skip_if_fast, expect_fail_for(['extcore','optextcore']),
+test('ffi009', [when(fast(), skip), expect_fail_for(['extcore','optextcore']),
                 reqlib('random'),
                 maybe_skip] ,compile_and_run, [opts])
 

@@ -69,7 +69,7 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
 test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
 
 test('T3424', # it's slow:
-              [ skip_if_fast, only_ways(['normal','threaded1','ghci']) ],
+              [ when(fast(), skip), only_ways(['normal','threaded1','ghci']) ],
               compile_and_run, [''])
 
 # Test for out-of-range heap size

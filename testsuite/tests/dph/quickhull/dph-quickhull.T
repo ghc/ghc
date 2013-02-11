@@ -2,7 +2,7 @@
 test    ('dph-quickhull-copy-opt' 
         , [ high_memory_usage
           , outputdir('copy-opt')
-          , skip_if_fast
+          , when(fast(), skip)
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -14,7 +14,7 @@ test    ('dph-quickhull-copy-opt'
 test    ('dph-quickhull-vseg-opt' 
         , [ high_memory_usage
           , outputdir('vseg-opt')
-          , skip_if_fast
+          , when(fast(), skip)
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 

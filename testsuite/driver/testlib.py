@@ -299,12 +299,6 @@ def skip_if_no_ghci(name, opts):
 
 # ----
 
-def skip_if_fast(name, opts):
-    if config.fast:
-        opts.skip = 1
-
-# -----
-
 def when(b, f):
     # When list_brokens is on, we want to see all expect_broken calls,
     # so we always do f
@@ -315,6 +309,9 @@ def when(b, f):
 
 def unless(b, f):
     return when(not b, f)
+
+def fast():
+    return config.fast
 
 def platform( plat ):
     return config.platform == plat
