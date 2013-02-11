@@ -256,8 +256,14 @@ for file in t_files:
 
 if config.list_broken:
     global brokens
+    print ''
     print 'Broken tests:'
     print (' '.join(map (lambda (b, n) : '#' + str(b) + '(' + n + ')', brokens)))
+    print ''
+
+    if t.n_framework_failures != 0:
+        print 'WARNING:', str(t.n_framework_failures), 'framework failures!'
+        print ''
 else:
     # Now run all the tests
     if config.use_threads:
