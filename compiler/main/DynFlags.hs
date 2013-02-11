@@ -11,6 +11,9 @@
 --
 -------------------------------------------------------------------------------
 
+{-# OPTIONS -fno-cse #-}
+-- -fno-cse is needed for GLOBAL_VAR's to behave properly
+
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
@@ -129,6 +132,7 @@ module DynFlags (
 #include "HsVersions.h"
 
 import Platform
+import PlatformConstants
 import Module
 import PackageConfig
 import {-# SOURCE #-} PrelNames ( mAIN )
@@ -3330,7 +3334,6 @@ compilerInfo dflags
        ("Global Package DB",           systemPackageConfig dflags)
       ]
 
-#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs"
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
