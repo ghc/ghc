@@ -14,9 +14,13 @@ test('T3586',
      ['-O'])
 
 test('T4830',
-     [stats_num_field('bytes allocated', (99264, 1)),
-             # (amd64/Linux):            127000
-             # (amd64/Linux) 2013-02-07:  99264
+     [stats_num_field('bytes allocated',
+          [(wordsize(64), 99264, 1),
+           #             127000 (amd64/Linux)
+           # 2013-02-07:  99264 (amd64/Linux)
+           (wordsize(32), 70646, 2)]),
+           # 2013-02-10:  69744 (x86/Windows)
+           # 2013-02-10:  71548 (x86/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -30,9 +34,13 @@ test('T3245', normal, compile_and_run, ['-O'])
 test('lazy-bs-alloc',
      [stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
-      stats_num_field('bytes allocated', (429744, 1)),
-             # (amd64/Linux):             489776
-             # (amd64/Linux) 2013-02-07:  429744
+      stats_num_field('bytes allocated',
+          [(wordsize(64), 429744, 1),
+            #             489776 (amd64/Linux)
+            # 2013-02-07: 429744 (amd64/Linux)
+           (wordsize(32), 417738, 1)]),
+            # 2013-02-10: 421296 (x86/Windows)
+            # 2013-02-10: 414180 (x86/OSX)
       only_ways(['normal']),
       extra_run_opts('../../numeric/should_run/arith011.stdout'),
       ignore_output
@@ -186,8 +194,10 @@ test('T5237',
 
 test('T5536',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 1246287228, 5),
-                    # expected value: 1246287228 (i386/Linux)
+                      [(wordsize(32), 446260520, 1),
+                                   # 1246287228 (i386/Linux)
+                                    # 446328556 (i386/Windows)
+                                    # 446192484 (i386/OSX)
                        (wordsize(64), 892399040, 5)]),
                    # expected value: 2492589480 (amd64/Linux)
                    # 17/1/13:         892399040 (x86_64/Linux)
@@ -217,8 +227,10 @@ test('T7257',
 
 test('Conversions',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 55316, 5),
-                        # 2012-12-18: Guessed 64-bit value / 2
+                      [(wordsize(32), 78374, 2),
+                        # 2012-12-18: 55316 Guessed 64-bit value / 2
+                        # 2013-02-10: 77472 (x86/OSX)
+                        # 2013-02-10: 79276 (x86/Windows)
                        (wordsize(64), 110632, 5)]),
                         # 2012-12-18: 109608 (amd64/OS X)
 
@@ -230,9 +242,13 @@ test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',
-     [stats_num_field('max_bytes_used', (60360, 1)),
-          # (amd64/Linux):              127000
-          # (amd64/Linux) 2013-02-07:    60360
+     [stats_num_field('max_bytes_used',
+          [(wordsize(64), 60360, 1),
+           #             127000 (amd64/Linux)
+           # 2013-02-07:  60360 (amd64/Linux)
+           (wordsize(32), 58434, 1)]),
+            # 2013-02-10: 58032 (x86/Windows)
+            # 2013-02-10: 58836 (x86/OSX)
       only_ways(['normal'])
       ],
      compile_and_run,
