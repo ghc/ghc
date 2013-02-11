@@ -130,14 +130,6 @@ def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
-def expect_broken( bug ):
-    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
-
-def _expect_broken( name, opts, bug ):
-    global brokens
-    brokens.append((bug, name))
-    opts.expect = 'fail';
-
 def ignore_output( name, opts ):
     opts.ignore_output = 1
 
@@ -155,10 +147,20 @@ def expect_fail_for( ways ):
 def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
+def expect_broken( bug ):
+    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
+
+def _expect_broken( name, opts, bug ):
+    global brokens
+    brokens.append((bug, name))
+    opts.expect = 'fail';
+
 def expect_broken_for( bug, ways ):
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
+    global brokens
+    brokens.append((bug, name))
     opts.expect_fail_for = ways
 
 # -----
