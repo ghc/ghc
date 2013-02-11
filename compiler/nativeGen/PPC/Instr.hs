@@ -41,6 +41,9 @@ import FastBool
 import UniqFM (listToUFM, lookupUFM)
 import UniqSupply
 
+import Control.Monad (replicateM)
+import Data.Maybe (fromMaybe)
+
 --------------------------------------------------------------------------------
 -- Size of a PPC memory address, in bytes.
 --
@@ -80,6 +83,9 @@ ppc_mkStackDeallocInstr platform amount
                  ADD sp sp (RIImm (ImmInt amount))
       arch -> panic $ "ppc_mkStackDeallocInstr " ++ show arch
 
+--
+-- See note [extra spill slots] in X86/Instr.hs
+--
 allocMoreStack
   :: Platform
   -> Int
@@ -87,32 +93,61 @@ allocMoreStack
   -> UniqSM (NatCmmDecl statics PPC.Instr.Instr)
 
 allocMoreStack _ _ top@(CmmData _ _) = return top
-allocMoreStack platform amount (CmmProc info lbl live (ListGraph code)) =
-        return (CmmProc info lbl live (ListGraph (map insert_stack_insns code)))
-  where
-    alloc   = mkStackAllocInstr platform amount
-    dealloc = mkStackDeallocInstr platform amount
+allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
+    let
+        infos   = mapKeys info
+        entries = case code of
+                    [] -> infos
+                    BasicBlock entry _ : _ -- first block is the entry point
+                        | entry `elem` infos -> infos
+                        | otherwise          -> entry : infos
 
-    is_entry_point id = id `mapMember` info
+    uniqs <- replicateM (length entries) getUniqueUs
 
-    insert_stack_insns (BasicBlock id insns)
-       | is_entry_point id  = BasicBlock id (alloc : block')
-       | otherwise          = BasicBlock id block'
-       where
-         block' = insertBeforeNonlocalTransfers dealloc insns
+    let
+        delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
+            where x = slots * spillSlotSize -- sp delta
 
-insertBeforeNonlocalTransfers :: Instr -> [Instr] -> [Instr]
-insertBeforeNonlocalTransfers insert insns
-     = foldr p [] insns
-     where p insn r = case insn of
-                        BCC    _ _  -> insert : insn : r
-                        BCCFAR _ _  -> insert : insn : r
-                        JMP    _    -> insert : insn : r
-                        MTCTR  _    -> insert : insn : r
-                        BCTR   _ _  -> insert : insn : r
-                        BL     _ _  -> insert : insn : r
-                        BCTRL  _    -> insert : insn : r
-                        _           -> insn : r
+        alloc   = mkStackAllocInstr   platform delta
+        dealloc = mkStackDeallocInstr platform delta
+
+        new_blockmap :: BlockEnv BlockId
+        new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
+
+        insert_stack_insns (BasicBlock id insns)
+            | Just new_blockid <- mapLookup id new_blockmap
+                = [ BasicBlock id [alloc, BCC ALWAYS new_blockid]
+                  , BasicBlock new_blockid block'
+                  ]
+            | otherwise
+                = [ BasicBlock id block' ]
+            where
+              block' = foldr insert_dealloc [] insns
+
+        insert_dealloc insn r
+            -- BCTR might or might not be a non-local jump. For
+            -- "labeled-goto" we use JMP, and for "computed-goto" we
+            -- use MTCTR followed by BCTR. See 'PPC.CodeGen.genJump'.
+            = case insn of
+                JMP _           -> dealloc : insn : r
+                BCTR [] Nothing -> dealloc : insn : r
+                BCTR ids label  -> BCTR (map (fmap retarget) ids) label : r
+                BCCFAR cond b   -> BCCFAR cond (retarget b) : r
+                BCC    cond b   -> BCC    cond (retarget b) : r
+                _               -> insn : r
+            -- BL and BCTRL are call-like instructions rather than
+            -- jumps, and are used only for C calls.
+
+        retarget :: BlockId -> BlockId
+        retarget b
+            = fromMaybe b (mapLookup b new_blockmap)
+
+        new_code
+            = concatMap insert_stack_insns code
+
+    -- in
+    return (CmmProc info lbl live (ListGraph new_code))
+
 
 -- -----------------------------------------------------------------------------
 -- Machine's assembly language
@@ -412,7 +447,7 @@ ppc_mkSpillInstr
 
 ppc_mkSpillInstr dflags reg delta slot
   = let platform = targetPlatform dflags
-        off      = spillSlotToOffset dflags slot
+        off      = spillSlotToOffset slot
     in
     let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
@@ -430,7 +465,7 @@ ppc_mkLoadInstr
 
 ppc_mkLoadInstr dflags reg delta slot
   = let platform = targetPlatform dflags
-        off     = spillSlotToOffset dflags slot
+        off     = spillSlotToOffset slot
     in
     let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
@@ -439,20 +474,31 @@ ppc_mkLoadInstr dflags reg delta slot
     in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
-spillSlotSize :: DynFlags -> Int
-spillSlotSize dflags = if is32Bit then 12 else 8
-    where is32Bit = target32Bit (targetPlatform dflags)
+-- | The maximum number of bytes required to spill a register. PPC32
+-- has 32-bit GPRs and 64-bit FPRs, while PPC64 has 64-bit GPRs and
+-- 64-bit FPRs. So the maximum is 8 regardless of platforms unlike
+-- x86. Note that AltiVec's vector registers are 128-bit wide so we
+-- must not use this to spill them.
+spillSlotSize :: Int
+spillSlotSize = 8
 
+-- | The number of spill slots available without allocating more.
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize dflags) - 1
+    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize) - 1
+--     = 0 -- useful for testing allocMoreStack
 
--- convert a spill slot number to a *byte* offset, with no sign:
--- decide on a per arch basis whether you are spilling above or below
--- the C stack pointer.
-spillSlotToOffset :: DynFlags -> Int -> Int
-spillSlotToOffset dflags slot
-   = 64 + spillSlotSize dflags * slot
+-- | The number of bytes that the stack pointer should be aligned
+-- to. This is 16 both on PPC32 and PPC64 at least for Darwin, but I'm
+-- not sure this is correct for other OSes.
+stackAlign :: Int
+stackAlign = 16
+
+-- | Convert a spill slot number to a *byte* offset, with no sign.
+spillSlotToOffset :: Int -> Int
+spillSlotToOffset slot
+   = 64 + spillSlotSize * slot
+
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
