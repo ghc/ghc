@@ -73,19 +73,19 @@ test('openFile002',  exit_code(1), compile_and_run, [''])
 test('openFile003',  extra_clean(['openFile003Dir']), compile_and_run, [''])
 test('openFile004',  extra_clean(['openFile004.out']), compile_and_run, [''])
 test('openFile005',
-     [if_compiler_type('hugs', expect_fail),
+     [when(compiler_type('hugs'), expect_fail),
       extra_clean(['openFile005.out1', 'openFile005.out2'])],
      compile_and_run, [''])
 test('openFile006', extra_clean(['openFile006.out']), compile_and_run, [''])
 test('openFile007',
-     [if_compiler_type('hugs', expect_fail),
+     [when(compiler_type('hugs'), expect_fail),
       extra_clean(['openFile007.out'])],
      compile_and_run, [''])
 test('openFile008', cmd_prefix('ulimit -n 1024; '), compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001',
-     [if_compiler_type('hugs', expect_fail),
+     [when(compiler_type('hugs'), expect_fail),
       extra_clean(['readFile001.out'])],
      compile_and_run, [''])
 test('readwrite001',
@@ -103,7 +103,7 @@ test('readwrite002',
 test('readwrite003', extra_clean(['readwrite003.txt']), compile_and_run, [''])
 
 test('hGetBuf001', compose(only_compiler_types(['ghc']),
-		   compose(skip_if_fast,
+		   compose(when(fast(), skip),
 		     expect_fail_if_windows)), compile_and_run, ['-package unix'])
 
 test('hDuplicateTo001', extra_clean(['tmp']), compile_and_run, [''])

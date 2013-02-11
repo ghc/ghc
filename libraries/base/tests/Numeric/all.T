@@ -6,7 +6,7 @@ test('num005', normal, compile_and_run, [''])
 test('num006', normal, compile_and_run, [''])
 test('num007', normal, compile_and_run, [''])
 test('num008', normal, compile_and_run, [''])
-test('num009', [ skip_if_fast
+test('num009', [ when(fast(), skip)
                , when(platform('i386-apple-darwin'), expect_broken(2370))
                , when(opsys('mingw32'), omit_ways(['ghci'])) ],
                # We get different results at 1e20 on x86/Windows, so there is
