@@ -76,7 +76,7 @@ test('dynbrk007', normal, ghci_script, ['dynbrk007.script'])
 test('dynbrk008', normal, ghci_script, ['dynbrk008.script'])
 test('dynbrk009', normal, ghci_script, ['dynbrk009.script'])
 
-test('result001', expect_broken(1531), ghci_script, ['result001.script'])
+test('result001', normal, ghci_script, ['result001.script'])
 
 test('listCommand001', combined_output, ghci_script, ['listCommand001.script'])
 test('listCommand002', normal, ghci_script, ['listCommand002.script'])
