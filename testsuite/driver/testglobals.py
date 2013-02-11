@@ -48,6 +48,8 @@ class TestConfig:
         # run the "fast" version of the test suite
         self.fast = 0
 
+        self.list_broken = False
+
         # Compiler type (ghc, hugs, nhc, etc.)
         self.compiler_type = ''
 
@@ -262,4 +264,8 @@ class TestOptions:
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()
+
+# (bug, name) of tests marked broken
+global brokens
+brokens = []
 

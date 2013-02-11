@@ -134,6 +134,8 @@ def expect_broken( bug ):
     return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
 def _expect_broken( name, opts, bug ):
+    global brokens
+    brokens.append((bug, name))
     opts.expect = 'fail';
 
 def ignore_output( name, opts ):
@@ -298,7 +300,9 @@ def skip_if_fast(name, opts):
 # -----
 
 def when(b, f):
-    if b:
+    # When list_brokens is on, we want to see all expect_broken calls,
+    # so we always do f
+    if b or config.list_broken:
         return f
     else:
         return normal
