@@ -328,29 +328,14 @@ def arch( arch ):
 def wordsize( ws ):
     return config.wordsize == str(ws)
 
-def if_unregisterised( f ):
-    if config.unregisterised:
-        return f
-    else:
-        return normal
+def unregisterised( ):
+    return config.unregisterised
 
-def unless_unregisterised( f ):
-    if config.unregisterised:
-        return normal
-    else:
-        return f
+def msys( ):
+    return config.msys
 
-def if_msys( f ):
-    if config.msys:
-        return f
-    else:
-        return normal
-
-def if_cygwin( f ):
-    if config.cygwin:
-        return f
-    else:
-        return normal
+def cygwin( ):
+    return config.cygwin
 
 def when_have_vanilla( f ):
     if config.have_vanilla:

@@ -362,6 +362,6 @@ test('T7060',
      run_command,
      ['$MAKE -s --no-print-directory T7060'])
 test('T7130', normal, compile_fail, ['-fflul-laziness'])
-test('T7563', if_unregisterised(skip), run_command,
+test('T7563', when(unregisterised(), skip), run_command,
      ['$MAKE -s --no-print-directory T7563'])
 
