@@ -258,7 +258,7 @@ if config.list_broken:
     global brokens
     print ''
     print 'Broken tests:'
-    print (' '.join(map (lambda (b, n) : '#' + str(b) + '(' + n + ')', brokens)))
+    print (' '.join(map (lambda (b, d, n) : '#' + str(b) + '(' + d + '/' + n + ')', brokens)))
     print ''
 
     if t.n_framework_failures != 0:

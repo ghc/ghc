@@ -265,7 +265,7 @@ class TestOptions:
 global default_testopts
 default_testopts = TestOptions()
 
-# (bug, name) of tests marked broken
+# (bug, directory, name) of tests marked broken
 global brokens
 brokens = []
 

@@ -151,19 +151,19 @@ def expect_broken( bug ):
     return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
 def _expect_broken( name, opts, bug ):
-    record_broken(name, bug)
+    record_broken(name, opts, bug)
     opts.expect = 'fail';
 
 def expect_broken_for( bug, ways ):
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
-    record_broken(name, bug)
+    record_broken(name, opts, bug)
     opts.expect_fail_for = ways
 
-def record_broken(name, bug):
+def record_broken(name, opts, bug):
     global brokens
-    me = (bug, name)
+    me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
 
