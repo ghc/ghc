@@ -387,17 +387,8 @@ def _namebase( opts, nb ):
 
 # ---
 
-def if_tag( tag, f ):
-    if tag in config.compiler_tags:
-        return f
-    else:
-        return normal
-
-def unless_tag( tag, f ):
-    if not (tag in config.compiler_tags):
-        return f
-    else:
-        return normal
+def tag( t ):
+    return t in config.compiler_tags
 
 # ---
 def high_memory_usage(name, opts):
