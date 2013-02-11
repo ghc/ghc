@@ -1641,6 +1641,12 @@ variables?
    We have to take care to put any new interesting dictionary 
    bindings in the set.
 
+We accidentally lost accurate tracking of local variables for a long
+time, because cloned variables don't have unfoldings. But makes a 
+massive difference in a few cases, eg Trac #5113. For nofib as a 
+whole it's only a small win: 2.2% improvement in allocation for ansi,
+1.2% for bspt, but mostly 0.0!  Average 0.1% increase in binary size.
+
 
 \begin{code}
 interestingDict :: SpecEnv -> CoreExpr -> Bool
