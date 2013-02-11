@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 def expect_fail_if_windows(name, opts):
-   f = if_os('mingw32', expect_fail);
+   f = when(opsys('mingw32'), expect_fail);
    return f(normal, opts);
 
 test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
@@ -119,7 +119,7 @@ test('concio002', reqlib('process'), compile_and_run, [''])
 
 test('T2122', extra_clean(['T2122-test']), compile_and_run, [''])
 test('T3307',
-     [if_msys(expect_broken(5599)),
+     [when(msys(), expect_broken(5599)),
       extra_clean(['chinese-file-小说', 'chinese-name'])],
      run_command,
      ['$MAKE -s --no-print-directory T3307-test'])
@@ -144,7 +144,7 @@ test('encoding001',
 test('encoding002', normal, compile_and_run, [''])
 
 test('environment001',
-     [if_msys(expect_broken(5599)),
+     [when(msys(), expect_broken(5599)),
       extra_clean(['environment001'])],
      run_command,
      ['$MAKE -s --no-print-directory environment001-test'])
