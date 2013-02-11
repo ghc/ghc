@@ -39,6 +39,7 @@ import Unique
 import UniqSupply
 
 import Control.Monad
+import Data.Maybe       (fromMaybe)
 
 -- Size of an x86/x86_64 memory address, in bytes.
 --
@@ -900,9 +901,8 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
       insert_dealloc insn r = case insn of
          JMP _ _     -> dealloc : insn : r
          JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
-         JXX cond b | Just new_dest <- mapLookup b new_blockmap
-             -> JXX cond new_dest : r
-         _ -> insn : r
+         _other      -> x86_patchJumpInstr insn retarget : r
+           where retarget b = fromMaybe b (mapLookup b new_blockmap)
 
       new_code = concatMap insert_stack_insns code
     -- in
