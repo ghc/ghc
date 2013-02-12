@@ -524,9 +524,7 @@ cvtl e = wrapL (cvt e)
     cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
-    cvt (LamCaseE ms)
-      | null ms        = failWith (ptext (sLit "Lambda-case expression with no alternatives"))
-      | otherwise      = do { ms' <- mapM cvtMatch ms
+    cvt (LamCaseE ms)  = do { ms' <- mapM cvtMatch ms
                             ; return $ HsLamCase placeHolderType
                                                  (mkMatchGroup ms')
                             }
@@ -543,9 +541,7 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
                             ; e' <- cvtl e; return $ HsLet ds' e' }
-    cvt (CaseE e ms)
-       | null ms       = failWith (ptext (sLit "Case expression with no alternatives"))
-       | otherwise     = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
+    cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
                             ; return $ HsCase e' (mkMatchGroup ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
