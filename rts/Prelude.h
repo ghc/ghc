@@ -45,6 +45,7 @@ PRELUDE_CLOSURE(base_ControlziExceptionziBase_nestedAtomically_closure);
 
 PRELUDE_CLOSURE(base_GHCziConcziSync_runSparks_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
+PRELUDE_CLOSURE(base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure);
 PRELUDE_CLOSURE(base_GHCziConcziSignal_runHandlers_closure);
 
 PRELUDE_CLOSURE(base_GHCziTopHandler_flushStdHandles_closure);

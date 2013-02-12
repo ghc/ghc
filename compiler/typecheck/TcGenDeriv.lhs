@@ -24,7 +24,7 @@ module TcGenDeriv (
         gen_Read_binds,
         gen_Show_binds,
         gen_Data_binds,
-        gen_Typeable_binds,
+        gen_old_Typeable_binds, gen_Typeable_binds,
         gen_Functor_binds,
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
@@ -1178,7 +1178,67 @@ getPrecedence get_fixity nm
 
 %************************************************************************
 %*                                                                      *
-\subsection{Typeable}
+\subsection{Typeable (old)}
+%*                                                                      *
+%************************************************************************
+
+From the data type
+
+        data T a b = ....
+
+we generate
+
+        instance Typeable2 T where
+                typeOf2 _ = mkTyConApp (mkTyCon <hash-high> <hash-low>
+                                                <pkg> <module> "T") []
+
+We are passed the Typeable2 class as well as T
+
+\begin{code}
+gen_old_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
+gen_old_Typeable_binds dflags loc tycon
+  = unitBag $
+        mk_easy_FunBind loc
+                (old_mk_typeOf_RDR tycon)   -- Name of appropriate type0f function
+                [nlWildPat]
+                (nlHsApps oldMkTyConApp_RDR [tycon_rep, nlList []])
+  where
+    tycon_name = tyConName tycon
+    modl       = nameModule tycon_name
+    pkg        = modulePackageId modl
+
+    modl_fs    = moduleNameFS (moduleName modl)
+    pkg_fs     = packageIdFS pkg
+    name_fs    = occNameFS (nameOccName tycon_name)
+
+    tycon_rep = nlHsApps oldMkTyCon_RDR
+                    (map nlHsLit [int64 high,
+                                  int64 low,
+                                  HsString pkg_fs,
+                                  HsString modl_fs,
+                                  HsString name_fs])
+
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
+    Fingerprint high low = fingerprintString hashThis
+
+    int64
+      | wORD_SIZE dflags == 4 = HsWord64Prim . fromIntegral
+      | otherwise             = HsWordPrim . fromIntegral
+
+
+old_mk_typeOf_RDR :: TyCon -> RdrName
+-- Use the arity of the TyCon to make the right typeOfn function
+old_mk_typeOf_RDR tycon = varQual_RDR oLDTYPEABLE_INTERNAL (mkFastString ("typeOf" ++ suffix))
+                where
+                  arity = tyConArity tycon
+                  suffix | arity == 0 = ""
+                         | otherwise  = show arity
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Typeable (new)}
 %*                                                                      *
 %************************************************************************
 
@@ -1197,11 +1257,8 @@ We are passed the Typeable2 class as well as T
 \begin{code}
 gen_Typeable_binds :: DynFlags -> SrcSpan -> TyCon -> LHsBinds RdrName
 gen_Typeable_binds dflags loc tycon
-  = unitBag $
-        mk_easy_FunBind loc
-                (mk_typeOf_RDR tycon)   -- Name of appropriate type0f function
-                [nlWildPat]
-                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
+  = unitBag $ mk_easy_FunBind loc typeRep_RDR [nlWildPat]
+              (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
   where
     tycon_name = tyConName tycon
     modl       = nameModule tycon_name
@@ -1224,15 +1281,6 @@ gen_Typeable_binds dflags loc tycon
     int64
       | wORD_SIZE dflags == 4 = HsWord64Prim . fromIntegral
       | otherwise             = HsWordPrim . fromIntegral
-
-
-mk_typeOf_RDR :: TyCon -> RdrName
--- Use the arity of the TyCon to make the right typeOfn function
-mk_typeOf_RDR tycon = varQual_RDR tYPEABLE_INTERNAL (mkFastString ("typeOf" ++ suffix))
-                where
-                  arity = tyConArity tycon
-                  suffix | arity == 0 = ""
-                         | otherwise  = show arity
 \end{code}
 
 

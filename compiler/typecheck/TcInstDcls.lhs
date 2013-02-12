@@ -55,13 +55,14 @@ import VarSet     ( mkVarSet, subVarSet, varSetElems )
 import Pair
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr )
-import PrelNames  ( typeableClassNames )
+import PrelNames  ( tYPEABLE_INTERNAL, typeableClassName, oldTypeableClassNames )
 
 import Bag
 import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
+import HscTypes ( isHsBoot )
 import Id
 import MkId
 import Name
@@ -381,13 +382,17 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             -- round)
 
             -- Do class and family instance declarations
+       ; env <- getGblEnv
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
        ; let (local_infos_s, fam_insts_s) = unzip stuff
-             local_infos = concat local_infos_s
-             fam_insts   = concat fam_insts_s
-       ; addClsInsts local_infos $
-         addFamInsts fam_insts   $ 
+             fam_insts    = concat fam_insts_s
+             local_infos' = concat local_infos_s
+             -- Handwritten instances of the poly-kinded Typeable class are
+             -- forbidden, so we handle those separately
+             (typeable_instances, local_infos) = splitTypeable env local_infos'
 
+       ; addClsInsts local_infos $
+         addFamInsts fam_insts   $
     do {    -- Compute instances from "deriving" clauses;
             -- This stuff computes a context for the derived instance
             -- decl, so it needs to know about all the instances possible
@@ -405,11 +410,14 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                          ; return (gbl_env, emptyBag, emptyValBindsOut) }
                  else tcDeriving tycl_decls inst_decls deriv_decls
 
+       -- Remove any handwritten instance of poly-kinded Typeable and warn
+       ; dflags <- getDynFlags
+       ; when (wopt Opt_WarnTypeableInstances dflags) $
+              mapM_ (addWarnTc . instMsg) typeable_instances
 
        -- Check that if the module is compiled with -XSafe, there are no
-       -- hand written instances of Typeable as then unsafe casts could be
+       -- hand written instances of old Typeable as then unsafe casts could be
        -- performed. Derived instances are OK.
-       ; dflags <- getDynFlags
        ; when (safeLanguageOn dflags) $
              mapM_ (\x -> when (typInstCheck x)
                                (addErrAt (getSrcSpan $ iSpec x) typInstErr))
@@ -423,9 +431,26 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 , deriv_binds)
     }}
   where
-    typInstCheck ty = is_cls_nm (iSpec ty) `elem` typeableClassNames
+    -- Separate the Typeable instances from the rest
+    splitTypeable _   []     = ([],[])
+    splitTypeable env (i:is) =
+      let (typeableInsts, otherInsts) = splitTypeable env is
+      in if -- We will filter out instances of Typeable
+            (typeableClassName == is_cls_nm (iSpec i))
+            -- but not those that come from Data.Typeable.Internal
+            && tcg_mod env /= tYPEABLE_INTERNAL
+            -- nor those from an .hs-boot file (deriving can't be used there)
+            && not (isHsBoot (tcg_src env))
+         then (i:typeableInsts, otherInsts)
+         else (typeableInsts, i:otherInsts)
+
+    typInstCheck ty = is_cls_nm (iSpec ty) `elem` oldTypeableClassNames
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
+
+    instMsg i = hang (ptext (sLit $ "Typeable instances can only be derived; ignoring "
+                                 ++ "the following instance:"))
+                     2 (pprInstance (iSpec i))
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside

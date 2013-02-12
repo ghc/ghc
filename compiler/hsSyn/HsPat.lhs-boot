@@ -1,15 +1,19 @@
 \begin{code}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE CPP, KindSignatures #-}
 
 module HsPat where
 import SrcLoc( Located )
 
 import Data.Data
 
--- IA0_NOTE: We need kind annotation because of kind polymorphism.
 data Pat (i :: *)
 type LPat i = Located (Pat i)
 
+#if __GLASGOW_HASKELL__ > 706
+instance Typeable Pat
+#else
 instance Typeable1 Pat
+#endif
+
 instance Data i => Data (Pat i)
 \end{code}

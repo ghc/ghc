@@ -1061,6 +1061,12 @@
             <entry><option>-XNoDeriveDataTypeable</option></entry>
           </row>
           <row>
+            <entry><option>-XAutoDeriveTypeable</option></entry>
+            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoAutoDeriveTypeable</option></entry>
+          </row>
+          <row>
             <entry><option>-XDeriveGeneric</option></entry>
             <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
             <entry>dynamic</entry>
@@ -1445,6 +1451,14 @@
             <entry>warn about uses of functions &amp; types that have warnings or deprecated pragmas</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-warn-warnings-deprecations</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-fwarn-typeable-instances</option></entry>
+            <entry>warn if there are any handwritten <literal>Typeable</literal>
+                   instances (see <xref linkend="deriving-typeable"/>)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-typeable-instances</option></entry>
           </row>
 
         </tbody>
