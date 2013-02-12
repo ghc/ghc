@@ -1,4 +1,4 @@
-esc = unless_tag('esc', skip)
+esc = unless(tag('esc'), skip)
 
 test('TestList', esc, compile, ['-fesc'])
 test('TestImport', esc, compile, ['-fesc'])

@@ -1,6 +1,6 @@
 
 test('fast2haskell',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Main.hi',         'Main.o',
                    'Fast2haskell.hi', 'Fast2haskell.o'])],
      multimod_compile_and_run,

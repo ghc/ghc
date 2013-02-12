@@ -5,7 +5,7 @@
 
 module T2433 where
 
- import Data.Typeable(Typeable1)
+ import Data.Typeable(Typeable)
  import T2433_Help( T )
 
- deriving instance Typeable1 T
+ deriving instance Typeable T

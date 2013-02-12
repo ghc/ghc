@@ -175,6 +175,12 @@ endif
 RUNTEST_OPTS +=  \
 	$(EXTRA_RUNTEST_OPTS)
 
+ifeq "$(list_broken)" "YES"
+set_list_broken = -e config.list_broken=True
+else
+set_list_broken = 
+endif
+
 ifeq "$(fast)" "YES"
 setfast = -e config.fast=1
 else
@@ -209,6 +215,7 @@ test: $(TIMEOUT_PROGRAM)
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \
 		$(patsubst %, --skipway=%, $(SKIPWAY)) \
+		$(set_list_broken) \
 		$(setfast) \
 		$(setaccept)
 
@@ -219,4 +226,7 @@ accept:
 
 fast:
 	$(MAKE) fast=YES
+
+list_broken:
+	$(MAKE) list_broken=YES
 

@@ -1,7 +1,7 @@
 
 test    ('dph-primespj-copy-opt' 
         , [ outputdir('opt')
-          , skip_if_fast
+          , when(fast(), skip)
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 

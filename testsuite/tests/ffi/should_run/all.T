@@ -32,7 +32,7 @@ test('ffi004', skip, compile_and_run, [''])
 # use of 80-bit internal precision when using the native code generator.
 #
 test('ffi005', [ omit_ways(prof_ways), 
-                 if_arch('i386', skip),
+                 when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3) ],
                compile_and_run, [''])
@@ -67,7 +67,7 @@ if config.platform.startswith('i386-'):
    else:
         maybe_skip = only_ways(['ghci'])
 
-test('ffi009', [skip_if_fast, expect_fail_for(['extcore','optextcore']),
+test('ffi009', [when(fast(), skip), expect_fail_for(['extcore','optextcore']),
                 reqlib('random'),
                 maybe_skip] ,compile_and_run, [opts])
 

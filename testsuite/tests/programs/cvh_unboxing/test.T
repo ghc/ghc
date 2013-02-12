@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test('cvh_unboxing',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Append.hi', 'Append.o',
                    'Main.hi',   'Main.o',
                    'Types.hi',  'Types.o'])],

@@ -1,6 +1,6 @@
 # coding=utf8
 
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
@@ -37,8 +37,7 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 test('ghci024',
-     [skip_if_fast,
-      when(platform("powerpc-apple-darwin"), expect_broken(1845))],
+     when(fast(), skip),
      run_command,
      ['$MAKE -s --no-print-directory ghci024'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])

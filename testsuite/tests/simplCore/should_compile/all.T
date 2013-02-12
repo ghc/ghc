@@ -29,7 +29,7 @@ test('simpl-T1370', normal, compile, [''])
 test('T2520', normal, compile, [''])
 
 
-test('spec001', skip_if_fast, compile, [''])
+test('spec001', when(fast(), skip), compile, [''])
 test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
@@ -44,7 +44,7 @@ test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
-test('T3016', skip_if_fast, compile, [''])
+test('T3016', when(fast(), skip), compile, [''])
 
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
@@ -64,7 +64,7 @@ test('T4908', only_ways(['optasm']),
               compile,
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
-test('T4930', [if_compiler_lt('ghc', '7.1', expect_fail),
+test('T4930', [when(compiler_lt('ghc', '7.1'), expect_fail),
                only_ways(['optasm'])],
               compile,
               ['-O -ddump-simpl -dsuppress-uniques'])
@@ -109,7 +109,7 @@ test('T4918',
      ['$MAKE -s --no-print-directory T4918'])
 
 test('T4945',
-     if_compiler_lt('ghc', '7.1', expect_fail),
+     when(compiler_lt('ghc', '7.1'), expect_fail),
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 

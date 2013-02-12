@@ -1,6 +1,6 @@
-setTestOpts(if_compiler_profiled(skip))
+setTestOpts(when(compiler_profiled(), skip))
 # These tests are very slow due to their use of package GHC
-setTestOpts(skip_if_fast)
+setTestOpts(when(fast(), skip))
 
 # Annotations, like Template Haskell, require runtime evaluation.  In
 # order for this to work with profiling, we would have to build the

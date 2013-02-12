@@ -130,12 +130,6 @@ def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
-def expect_broken( bug ):
-    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
-
-def _expect_broken( name, opts, bug ):
-    opts.expect = 'fail';
-
 def ignore_output( name, opts ):
     opts.ignore_output = 1
 
@@ -153,11 +147,25 @@ def expect_fail_for( ways ):
 def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
+def expect_broken( bug ):
+    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
+
+def _expect_broken( name, opts, bug ):
+    record_broken(name, opts, bug)
+    opts.expect = 'fail';
+
 def expect_broken_for( bug, ways ):
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
+    record_broken(name, opts, bug)
     opts.expect_fail_for = ways
+
+def record_broken(name, opts, bug):
+    global brokens
+    me = (bug, opts.testdir, name)
+    if not me in brokens:
+        brokens.append(me)
 
 # -----
 
@@ -285,20 +293,10 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
 
 # -----
 
-def skip_if_no_ghci(name, opts):
-    if not ('ghci' in config.run_ways):
-        opts.skip = 1
-
-# ----
-
-def skip_if_fast(name, opts):
-    if config.fast:
-        opts.skip = 1
-
-# -----
-
 def when(b, f):
-    if b:
+    # When list_brokens is on, we want to see all expect_broken calls,
+    # so we always do f
+    if b or config.list_broken:
         return f
     else:
         return normal
@@ -306,167 +304,74 @@ def when(b, f):
 def unless(b, f):
     return when(not b, f)
 
+def fast():
+    return config.fast
+
+def doing_ghci():
+    return 'ghci' in config.run_ways
+
 def platform( plat ):
     return config.platform == plat
 
-def if_os( os, f ):
-    if config.os == os:
-        return f
-    else:
-        return normal
+def opsys( os ):
+    return config.os == os
 
-def unless_os( os, f ):
-    if config.os == os:
-        return normal
-    else:
-        return f
-
-def if_arch( arch, f ):
-    if config.arch == arch:
-        return f
-    else:
-        return normal
-
-def unless_arch( arch, f ):
-    if config.arch == arch:
-        return normal
-    else:
-        return f
+def arch( arch ):
+    return config.arch == arch
 
 def wordsize( ws ):
     return config.wordsize == str(ws)
 
-def if_unregisterised( f ):
-    if config.unregisterised:
-        return f
-    else:
-        return normal
+def unregisterised( ):
+    return config.unregisterised
 
-def unless_unregisterised( f ):
-    if config.unregisterised:
-        return normal
-    else:
-        return f
+def msys( ):
+    return config.msys
 
-def if_msys( f ):
-    if config.msys:
-        return f
-    else:
-        return normal
+def cygwin( ):
+    return config.cygwin
 
-def if_cygwin( f ):
-    if config.cygwin:
-        return f
-    else:
-        return normal
+def have_vanilla( ):
+    return config.have_vanilla
 
-def when_have_vanilla( f ):
-    if config.have_vanilla:
-        return f
-    else:
-        return normal
+def have_dynamic( ):
+    return config.have_dynamic
 
-def unless_have_vanilla( f ):
-    if config.have_vanilla:
-        return normal
-    else:
-        return f
-
-def when_have_dynamic( f ):
-    if config.have_dynamic:
-        return f
-    else:
-        return normal
-
-def unless_have_dynamic( f ):
-    if config.have_dynamic:
-        return normal
-    else:
-        return f
-
-def when_have_profiling( f ):
-    if config.have_profiling:
-        return f
-    else:
-        return normal
-
-def unless_have_profiling( f ):
-    if config.have_profiling:
-        return normal
-    else:
-        return f
+def have_profiling( ):
+    return config.have_profiling
 
 # ---
 
-def if_ghci_dynamic( f ):
-    if config.ghc_dynamic_by_default:
-        return f
-    else:
-        return normal
+def ghci_dynamic( ):
+    return config.ghc_dynamic_by_default
 
-def if_in_tree_compiler( f ):
-    if config.in_tree_compiler:
-        return f
-    else:
-        return normal
+def in_tree_compiler( ):
+    return config.in_tree_compiler
 
-def unless_in_tree_compiler( f ):
-    if config.in_tree_compiler:
-        return normal
-    else:
-        return f
+def compiler_type( compiler ):
+    return config.compiler_type == compiler
 
-def if_compiler_type( compiler, f ):
-    if config.compiler_type == compiler:
-        return f
-    else:
-        return normal
+def compiler_profiled( ):
+    return config.compiler_profiled
 
-def if_compiler_profiled( f ):
-    if config.compiler_profiled:
-        return f
-    else:
-        return normal
+def compiler_lt( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_lt(config.compiler_version, version)
 
-def unless_compiler_profiled( f ):
-    if config.compiler_profiled:
-        return normal
-    else:
-        return f
+def compiler_le( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_le(config.compiler_version, version)
 
-def if_compiler_lt( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        return f
-    else:
-        return normal
+def compiler_gt( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_gt(config.compiler_version, version)
 
-def if_compiler_le( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_le(config.compiler_version, version):
-        return f
-    else:
-        return normal
+def compiler_ge( compiler, version ):
+    return config.compiler_type == compiler and \
+           version_ge(config.compiler_version, version)
 
-def if_compiler_gt( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_gt(config.compiler_version, version):
-        return f
-    else:
-        return normal
-
-def if_compiler_ge( compiler, version, f ):
-    if config.compiler_type == compiler and \
-       version_ge(config.compiler_version, version):
-        return f
-    else:
-        return normal
-
-def if_compiler_debugged( f ):
-    if config.compiler_debugged:
-        return f
-    else:
-        return normal
+def compiler_debugged( ):
+    return config.compiler_debugged
 
 def namebase( nb ):
    return lambda opts, nb=nb: _namebase(opts, nb)
@@ -476,17 +381,8 @@ def _namebase( opts, nb ):
 
 # ---
 
-def if_tag( tag, f ):
-    if tag in config.compiler_tags:
-        return f
-    else:
-        return normal
-
-def unless_tag( tag, f ):
-    if not (tag in config.compiler_tags):
-        return f
-    else:
-        return normal
+def tag( t ):
+    return t in config.compiler_tags
 
 # ---
 def high_memory_usage(name, opts):
@@ -2217,25 +2113,27 @@ def summary(t, file):
 
     file.write('\n')
     printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures])
-    file.write('OVERALL SUMMARY for test run started at ' \
-               + t.start_time + '\n'\
-               + string.rjust(`t.total_tests`, 8) \
-               + ' total tests, which gave rise to\n' \
-               + string.rjust(`t.total_test_cases`, 8) \
-               + ' test cases, of which\n' \
-               + string.rjust(`t.n_framework_failures`, 8) \
-               + ' caused framework failures\n' \
+    file.write('OVERALL SUMMARY for test run started at '
+               + t.start_time + '\n'
+               + string.rjust(`t.total_tests`, 8)
+               + ' total tests, which gave rise to\n'
+               + string.rjust(`t.total_test_cases`, 8)
+               + ' test cases, of which\n'
                + string.rjust(`t.n_tests_skipped`, 8)
-               + ' were skipped\n\n' \
-               + string.rjust(`t.n_expected_passes`, 8)
-               + ' expected passes\n' \
+               + ' were skipped\n'
+               + '\n'
                + string.rjust(`t.n_missing_libs`, 8)
-               + ' had missing libraries\n' \
-               + string.rjust(`t.n_expected_failures`, 8) \
-               + ' expected failures\n' \
-               + string.rjust(`t.n_unexpected_passes`, 8) \
+               + ' had missing libraries\n'
+               + string.rjust(`t.n_expected_passes`, 8)
+               + ' expected passes\n'
+               + string.rjust(`t.n_expected_failures`, 8)
+               + ' expected failures\n'
+               + '\n'
+               + string.rjust(`t.n_framework_failures`, 8)
+               + ' caused framework failures\n'
+               + string.rjust(`t.n_unexpected_passes`, 8)
                + ' unexpected passes\n'
-               + string.rjust(`t.n_unexpected_failures`, 8) \
+               + string.rjust(`t.n_unexpected_failures`, 8)
                + ' unexpected failures\n'
                + '\n')
 

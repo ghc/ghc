@@ -1,6 +1,6 @@
 
 test('10queens',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Main.hi', 'Main.o'])],
      multimod_compile_and_run,
      ['Main', ''])

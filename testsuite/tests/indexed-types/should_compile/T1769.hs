@@ -5,7 +5,7 @@ module T1769 where
 import Data.Typeable
 
 data family T a
-deriving instance Typeable1 T
+deriving instance Typeable T
 -- deriving instance Functor T
 
 data instance T [b] = T1 | T2 b 

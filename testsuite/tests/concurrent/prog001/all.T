@@ -13,7 +13,7 @@
 # right now. --SDM 1/4/2010
 
 test('concprog001',
-     [skip_if_fast,
+     [when(fast(), skip),
       only_ways(['threaded2']),
       extra_clean(['Arithmetic.hi', 'Arithmetic.o',
                    'Converter.hi',  'Converter.o',

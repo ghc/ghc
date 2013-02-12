@@ -1,1 +1,4 @@
-test('apirecomp001', skip_if_fast, run_command, ['$MAKE -s --no-print-directory apirecomp001'])
+test('apirecomp001',
+     when(fast(), skip),
+     run_command,
+     ['$MAKE -s --no-print-directory apirecomp001'])

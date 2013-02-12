@@ -3,7 +3,7 @@
 -- | Here we used typeable to produce an illegal value
 module Main where
 
-import Data.Typeable
+import Data.OldTypeable
 
 import BadImport02_A
 

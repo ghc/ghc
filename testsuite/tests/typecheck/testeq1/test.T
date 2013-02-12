@@ -1,6 +1,6 @@
 
 test('typecheck.testeq1',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Main.hi', 'Main.o',
                    'TypeCast.hi', 'TypeCast.o',
                    'FakePrelude.hi', 'FakePrelude.o',
