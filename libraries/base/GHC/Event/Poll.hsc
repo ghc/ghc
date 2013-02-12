@@ -55,13 +55,16 @@ data Poll = Poll {
     }
 
 new :: IO E.Backend
-new = E.backend poll modifyFd (\_ -> return ()) `liftM`
+new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) `liftM`
       liftM2 Poll (newMVar =<< A.empty) A.empty
 
 modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO ()
 modifyFd p fd oevt nevt =
   withMVar (pollChanges p) $ \ary ->
     A.snoc ary $ PollFd fd (fromEvent nevt) (fromEvent oevt)
+
+modifyFdOnce :: Poll -> Fd -> E.Event -> IO ()
+modifyFdOnce = error "modifyFdOnce not supported in Poll backend"
 
 reworkFd :: Poll -> PollFd -> IO ()
 reworkFd p (PollFd fd npevt opevt) = do
@@ -77,15 +80,20 @@ reworkFd p (PollFd fd npevt opevt) = do
           | otherwise  -> A.removeAt ary i
 
 poll :: Poll
-     -> E.Timeout
+     -> Maybe E.Timeout
      -> (Fd -> E.Event -> IO ())
-     -> IO ()
-poll p tout f = do
+     -> IO Int
+poll p mtout f = do
   let a = pollFd p
   mods <- swapMVar (pollChanges p) =<< A.empty
   A.forM_ mods (reworkFd p)
-  n <- A.useAsPtr a $ \ptr len -> E.throwErrnoIfMinus1NoRetry "c_poll" $
-         c_poll ptr (fromIntegral len) (fromIntegral (fromTimeout tout))
+  n <- A.useAsPtr a $ \ptr len ->
+    E.throwErrnoIfMinus1NoRetry "c_poll" $
+    case mtout of
+      Just tout ->
+        c_poll ptr (fromIntegral len) (fromIntegral (fromTimeout tout))
+      Nothing   ->
+        c_poll_unsafe ptr (fromIntegral len) 0
   unless (n == 0) $ do
     A.loop a 0 $ \i e -> do
       let r = pfdRevents e
@@ -94,6 +102,7 @@ poll p tout f = do
                 let i' = i + 1
                 return (i', i' == n)
         else return (i, True)
+  return (fromIntegral n)
 
 fromTimeout :: E.Timeout -> Int
 fromTimeout E.Forever     = -1
@@ -160,4 +169,6 @@ instance Storable PollFd where
 foreign import ccall safe "poll.h poll"
     c_poll :: Ptr PollFd -> CULong -> CInt -> IO CInt
 
+foreign import ccall unsafe "poll.h poll"
+    c_poll_unsafe :: Ptr PollFd -> CULong -> CInt -> IO CInt
 #endif /* defined(HAVE_POLL_H) */

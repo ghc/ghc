@@ -32,6 +32,7 @@
 -- #not-home
 module GHC.Conc.IO
         ( ensureIOManagerIsRunning
+        , ioManagerCapabilitiesChanged
 
         -- * Waiting
         , threadDelay
@@ -76,6 +77,13 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
 #else
 ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
+#endif
+
+ioManagerCapabilitiesChanged :: IO ()
+#ifndef mingw32_HOST_OS
+ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
+#else
+ioManagerCapabilitiesChanged = return ()
 #endif
 
 -- | Block the current thread until data is available to read on the

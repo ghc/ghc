@@ -13,15 +13,9 @@ module GHC.Event
       EventManager
 
       -- * Creation
-    , new
     , getSystemEventManager
-
-      -- * Running
-    , loop
-
-    -- ** Stepwise running
-    , step
-    , shutdown
+    , new
+    , getSystemTimerManager
 
       -- * Registering interest in I/O events
     , Event
@@ -44,5 +38,7 @@ module GHC.Event
     ) where
 
 import GHC.Event.Manager
-import GHC.Event.Thread (getSystemEventManager)
+import GHC.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
+                               updateTimeout, unregisterTimeout)
+import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
 
