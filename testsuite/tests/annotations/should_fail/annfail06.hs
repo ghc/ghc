@@ -7,7 +7,7 @@ import Data.Data
 import Data.Typeable
 
 instance Typeable InstancesInWrongModule where
-    typeOf _ = undefined
+    typeRep _ = undefined
 
 instance Data InstancesInWrongModule where
     gfoldl = undefined

@@ -10,7 +10,7 @@
 # occasionally, but at least the test is here for posterity.
 
 test('concprog003',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean([
            'BackList2.hi', 'BackList2.o',
            'ImmList.hi', 'ImmList.o',

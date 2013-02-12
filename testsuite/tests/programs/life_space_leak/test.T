@@ -1,8 +1,8 @@
 # exhausts Hugs's heap (CAF leak)
 test('life_space_leak',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['Main.hi', 'Main.o']),
-      if_compiler_type('hugs', expect_fail)],
+      when(compiler_type('hugs'), expect_fail)],
      multimod_compile_and_run,
      ['Main', ''])
 

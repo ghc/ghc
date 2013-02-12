@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test('base01',
-     [if_compiler_lt('ghc', '7.1', expect_fail),
+     [when(compiler_lt('ghc', '7.1'), expect_fail),
       normalise_slashes,
       clean_cmd('$MAKE -s clean')],
      run_command,

@@ -1,0 +1,13 @@
+
+drv021.hs:9:1: Warning:
+    Module `Data.OldTypeable' is deprecated: Use Data.Typeable instead
+
+drv021.hs:14:19: Warning:
+    In the use of type constructor or class `Typeable1'
+    (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
+    Deprecated: "Use Data.Typeable.Internal instead"
+
+drv021.hs:15:19: Warning:
+    In the use of type constructor or class `Typeable2'
+    (imported from Data.OldTypeable, but defined in Data.OldTypeable.Internal):
+    Deprecated: "Use Data.Typeable.Internal instead"

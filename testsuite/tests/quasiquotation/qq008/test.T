@@ -1,5 +1,5 @@
 test('qq008',
-     [skip_if_fast,
+     [when(fast(), skip),
       extra_clean(['QQ.hi', 'QQ.o', 'Test.hi', 'Test.o']),
       # We'd need to jump through some hoops to run this test the
       # profiling ways, due to the TH use, so for now we just

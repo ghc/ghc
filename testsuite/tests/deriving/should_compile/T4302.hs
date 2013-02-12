@@ -11,7 +11,7 @@ data Test a
 
 deriving instance Eq (Test a) 
 deriving instance Ord (Test a) 
-deriving instance Typeable1 Test
+deriving instance Typeable Test
 deriving instance Data a => Data (Test a) 
 deriving instance Functor Test 
 deriving instance Foldable Test 

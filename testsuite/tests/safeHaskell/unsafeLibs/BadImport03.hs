@@ -5,7 +5,7 @@
 -- Now using SAFE though so will fail
 module Main where
 
-import Data.Typeable
+import Data.OldTypeable
 
 import BadImport03_A
 

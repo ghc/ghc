@@ -1,5 +1,5 @@
 test('qq005',
-     [skip_if_fast,
+     [when(fast(), skip),
       reqlib('parsec'),
       only_compiler_types(['ghc']),
       # We'd need to jump through some hoops to run this test the

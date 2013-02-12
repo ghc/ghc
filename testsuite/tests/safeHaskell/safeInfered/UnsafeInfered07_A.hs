@@ -1,7 +1,7 @@
 -- | Unsafe as hand crafts a typeable instance
 module UnsafeInfered07_A where
 
-import Data.Typeable
+import Data.OldTypeable
 
 data G = G Int
 

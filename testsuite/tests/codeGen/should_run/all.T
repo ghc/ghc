@@ -87,7 +87,7 @@ test('T5149', omit_ways(['ghci']), multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
 test('T5129', normal, compile_and_run, [''])
 test('T5626', exit_code(1), compile_and_run, [''])
-test('T5747', if_arch('i386', extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
+test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
 test('T5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
 
