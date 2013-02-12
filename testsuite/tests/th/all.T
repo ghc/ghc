@@ -269,3 +269,4 @@ test('T7532',
      ['T7532', '-v0'])
 test('T2222', normal, compile, ['-v0'])
 test('T1849', normal, ghci_script, ['T1849.script'])
+test('T7681', normal, compile, ['-v0'])
