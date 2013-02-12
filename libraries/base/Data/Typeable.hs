@@ -38,6 +38,9 @@
 
 module Data.Typeable
   (
+        -- * A proxy type
+        Proxy (..),
+
         -- * The Typeable class
         Typeable( typeRep ),
 
