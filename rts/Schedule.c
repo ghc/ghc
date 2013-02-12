@@ -2067,6 +2067,12 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
         stgFree(old_capabilities);
     }
 
+    // Notify IO manager that the number of capabilities has changed.
+    rts_evalIO(
+       &cap,
+       &base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure,
+       NULL);
+
     rts_unlock(cap);
 
 #endif // THREADED_RTS
