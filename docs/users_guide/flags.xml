@@ -1062,7 +1062,7 @@
           </row>
           <row>
             <entry><option>-XAutoDeriveTypeable</option></entry>
-            <entry>Automatically derive Typeable instances for every datatype and type class declaration.</entry>
+            <entry>Automatically <link linkend="auto-derive-typeable">derive Typeable instances for every datatype and type class declaration</link>.</entry>
             <entry>dynamic</entry>
             <entry><option>-XNoAutoDeriveTypeable</option></entry>
           </row>
