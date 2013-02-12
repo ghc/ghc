@@ -160,9 +160,10 @@ test('T3064',
       compiler_stats_num_field('peak_megabytes_allocated',
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
-           (wordsize(64), 26, 1)]),
+           (wordsize(64), 23, 1)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
+            # (amd64/Linux) 2013-02-12: 23
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 111189536, 10),
@@ -175,11 +176,9 @@ test('T3064',
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 8945328, 5)]),
+           (wordsize(64), 9819288, 5)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
-            # (amd64/Linux, intree) (10/02/2013):  8945328 
-            #   apparently courtesy of the b5c18c (Trac #5113)
        only_ways(['normal'])
       ],
      compile,
