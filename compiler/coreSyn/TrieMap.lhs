@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
-   TypeMap, foldTypeMap, lookupTypeMap_mod,
+   TypeMap, foldTypeMap, -- lookupTypeMap_mod,
    CoercionMap, 
    MaybeMap, 
    ListMap,
@@ -31,8 +31,6 @@ import Var
 import UniqFM
 import Unique( Unique )
 import FastString(FastString)
-
-import Unify ( niFixTvSubst )
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -631,40 +629,6 @@ lkT env ty m
     go (LitTy l)         = tm_tylit  >.> lkTyLit l
     go (ForAllTy tv ty)  = tm_forall >.> lkT (extendCME env tv) ty >=> lkBndr env tv
 
-
-lkT_mod :: CmEnv  
-        -> TyVarEnv Type -- TvSubstEnv 
-        -> Type
-        -> TypeMap b -> Maybe b 
-lkT_mod env s ty m
-  | EmptyTM <- m = Nothing
-  | Just ty' <- coreView ty
-  = lkT_mod env s ty' m
-  | [] <- candidates 
-  = go env s ty m
-  | otherwise
-  = Just $ snd (head candidates) -- Yikes!
-  where
-     -- Hopefully intersects is much smaller than traversing the whole vm_fvar
-    intersects = eltsUFM $
-                 intersectUFM_C (,) s (vm_fvar $ tm_var m)
-    candidates = [ (u,ct) | (u,ct) <- intersects
-                          , Type.substTy (niFixTvSubst s) u `eqType` ty ]
-                  
-    go env _s (TyVarTy v)      = tm_var    >.> lkVar env v
-    go env s (AppTy t1 t2)     = tm_app    >.> lkT_mod env s t1 >=> lkT_mod env s t2
-    go env s (FunTy t1 t2)     = tm_fun    >.> lkT_mod env s t1 >=> lkT_mod env s t2
-    go env s (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT_mod env s) tys
-    go _env _s (LitTy l)       = tm_tylit  >.> lkTyLit l
-    go _env _s (ForAllTy _tv _ty) = const Nothing
-    
-    {- DV TODO: Add proper lookup for ForAll -}
-
-lookupTypeMap_mod :: TyVarEnv a -- A substitution to be applied to the /keys/ of type map 
-                  -> (a -> Type)
-                  -> Type 
-                  -> TypeMap b -> Maybe b
-lookupTypeMap_mod s f = lkT_mod emptyCME (mapVarEnv f s)
 
 -----------------
 xtT :: CmEnv -> Type -> XT a -> TypeMap a -> TypeMap a

@@ -920,7 +920,8 @@ repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
 repE (HsLam (MG { mg_alts = [m] })) = repLambda m
 repE (HsLamCase _ (MG { mg_alts = ms }))
                    = do { ms' <- mapM repMatchTup ms
-                        ; repLamCase (nonEmptyCoreList ms') }
+                        ; core_ms <- coreList matchQTyConName ms'
+                        ; repLamCase core_ms }
 repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
 
 repE (OpApp e1 op _ e2) =
@@ -938,7 +939,8 @@ repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
 repE (HsCase e (MG { mg_alts = ms }))
                           = do { arg <- repLE e
                                ; ms2 <- mapM repMatchTup ms
-                               ; repCaseE arg (nonEmptyCoreList ms2) }
+                               ; core_ms2 <- coreList matchQTyConName ms2
+                               ; repCaseE arg core_ms2 }
 repE (HsIf _ x y z)         = do
 			      a <- repLE x
 			      b <- repLE y
