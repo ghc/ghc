@@ -10,7 +10,8 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstHead, checkValidInstance, validDerivPred,
   checkInstTermination, checkValidTyFamInst, checkTyFamFreeness, 
-  arityErr 
+  checkConsistentFamInst,
+  arityErr, badATErr
   ) where
 
 #include "HsVersions.h"
@@ -22,7 +23,9 @@ import TypeRep
 import TcType
 import TcMType
 import Type
+import Unify( tcMatchTyX )
 import Kind
+import CoAxiom
 import Class
 import TyCon
 
@@ -31,6 +34,7 @@ import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import FunDeps
 import Name
+import VarEnv
 import VarSet
 import ErrUtils
 import PrelNames
@@ -906,6 +910,140 @@ undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 \end{code}
 
 
+
+Note [Associated type instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow this:
+  class C a where
+    type T x a
+  instance C Int where
+    type T (S y) Int = y
+    type T Z     Int = Char
+
+Note that 
+  a) The variable 'x' is not bound by the class decl
+  b) 'x' is instantiated to a non-type-variable in the instance
+  c) There are several type instance decls for T in the instance
+
+All this is fine.  Of course, you can't give any *more* instances
+for (T ty Int) elsewhere, becuase it's an *associated* type.
+
+Note [Checking consistent instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  class C a b where
+    type T a x b
+
+  instance C [p] Int
+    type T [p] y Int = (p,y,y)  -- Induces the family instance TyCon
+                                --    type TR p y = (p,y,y)
+
+So we 
+  * Form the mini-envt from the class type variables a,b
+    to the instance decl types [p],Int:   [a->[p], b->Int]
+
+  * Look at the tyvars a,x,b of the type family constructor T
+    (it shares tyvars with the class C)
+
+  * Apply the mini-evnt to them, and check that the result is
+    consistent with the instance types [p] y Int
+
+We do *not* assume (at this point) the the bound variables of 
+the assoicated type instance decl are the same as for the parent
+instance decl. So, for example,
+
+  instance C [p] Int
+    type T [q] y Int = ...
+
+would work equally well. Reason: making the *kind* variables line
+up is much harder. Example (Trac #7282):
+  class Foo (xs :: [k]) where
+     type Bar xs :: *
+
+   instance Foo '[] where
+     type Bar '[] = Int
+Here the instance decl really looks like
+   instance Foo k ('[] k) where
+     type Bar k ('[] k) = Int
+but the k's are not scoped, and hence won't match Uniques.
+
+So instead we just match structure, with tcMatchTyX, and check
+that distinct type variales match 1-1 with distinct type variables.
+
+HOWEVER, we *still* make the instance type variables scope over the
+type instances, to pick up non-obvious kinds.  Eg
+   class Foo (a :: k) where
+      type F a
+   instance Foo (b :: k -> k) where
+      type F b = Int
+Here the instance is kind-indexed and really looks like
+      type F (k->k) (b::k->k) = Int
+But if the 'b' didn't scope, we would make F's instance too
+poly-kinded.
+
+\begin{code}
+checkConsistentFamInst 
+               :: Maybe ( Class
+                        , VarEnv Type )  -- ^ Class of associated type
+                                         -- and instantiation of class TyVars
+               -> TyCon              -- ^ Family tycon
+               -> [TyVar]            -- ^ Type variables of the family instance
+               -> [Type]             -- ^ Type patterns from instance
+               -> TcM ()
+-- See Note [Checking consistent instantiation]
+
+checkConsistentFamInst Nothing _ _ _ = return ()
+checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
+  = do { -- Check that the associated type indeed comes from this class
+         checkTc (Just clas == tyConAssoc_maybe fam_tc)
+                 (badATErr (className clas) (tyConName fam_tc))
+
+         -- See Note [Checking consistent instantiation] in TcTyClsDecls
+         -- Check right to left, so that we spot type variable
+         -- inconsistencies before (more confusing) kind variables
+       ; discardResult $ foldrM check_arg emptyTvSubst $
+                         tyConTyVars fam_tc `zip` at_tys }
+  where
+    at_tv_set = mkVarSet at_tvs
+
+    check_arg :: (TyVar, Type) -> TvSubst -> TcM TvSubst
+    check_arg (fam_tc_tv, at_ty) subst
+      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
+      = case tcMatchTyX at_tv_set subst at_ty inst_ty of
+           Just subst | all_distinct subst -> return subst
+           _ -> failWithTc $ wrongATArgErr at_ty inst_ty
+                -- No need to instantiate here, becuase the axiom
+                -- uses the same type variables as the assocated class
+      | otherwise
+      = return subst   -- Allow non-type-variable instantiation
+                       -- See Note [Associated type instances]
+
+    all_distinct :: TvSubst -> Bool
+    -- True if all the variables mapped the substitution 
+    -- map to *distinct* type *variables*
+    all_distinct subst = go [] at_tvs
+       where
+         go _   []       = True
+         go acc (tv:tvs) = case lookupTyVar subst tv of
+                             Nothing -> go acc tvs
+                             Just ty | Just tv' <- tcGetTyVar_maybe ty
+                                     , tv' `notElem` acc
+                                     -> go (tv' : acc) tvs
+                             _other -> False
+
+badATErr :: Name -> Name -> SDoc
+badATErr clas op
+  = hsep [ptext (sLit "Class"), quotes (ppr clas), 
+          ptext (sLit "does not have an associated type"), quotes (ppr op)]
+
+wrongATArgErr :: Type -> Type -> SDoc
+wrongATArgErr ty instTy =
+  sep [ ptext (sLit "Type indexes must match class instance head")
+      , ptext (sLit "Found") <+> quotes (ppr ty)
+        <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
+      ]
+\end{code}
+
+
 %************************************************************************
 %*                                                                      *
         Checking type instance well-formedness and termination
@@ -916,18 +1054,24 @@ undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidTyFamInst :: TyCon -> [TyVar] -> [Type] -> Type -> TcM ()
-checkValidTyFamInst fam_tc tvs typats rhs
-  = do { checkValidFamPats fam_tc tvs typats
+checkValidTyFamInst :: Maybe ( Class, VarEnv Type )
+                    -> TyCon -> CoAxBranch -> TcM ()
+checkValidTyFamInst mb_clsinfo fam_tc 
+                    (CoAxBranch { cab_tvs = tvs, cab_lhs = typats
+                                , cab_rhs = rhs, cab_loc = loc })
+  = setSrcSpan loc $ 
+    do { checkValidFamPats fam_tc tvs typats
 
          -- The right-hand side is a tau type
        ; checkValidMonoType rhs
 
-         -- we have a decidable instance unless otherwise permitted
+         -- We have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM Opt_UndecidableInstances
        ; unless undecidable_ok $
            mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs))
-       }
+
+         -- Check that type patterns match the class instance head
+       ; checkConsistentFamInst mb_clsinfo fam_tc tvs typats }
 
 -- Make sure that each type family application is 
 --   (1) strictly smaller than the lhs,
