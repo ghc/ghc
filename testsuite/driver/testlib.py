@@ -304,11 +304,14 @@ def when(b, f):
 def unless(b, f):
     return when(not b, f)
 
-def fast():
-    return config.fast
-
 def doing_ghci():
     return 'ghci' in config.run_ways
+
+def ghci_dynamic( ):
+    return config.ghc_dynamic_by_default
+
+def fast():
+    return config.fast
 
 def platform( plat ):
     return config.platform == plat
@@ -321,9 +324,6 @@ def arch( arch ):
 
 def wordsize( ws ):
     return config.wordsize == str(ws)
-
-def unregisterised( ):
-    return config.unregisterised
 
 def msys( ):
     return config.msys
@@ -340,19 +340,11 @@ def have_dynamic( ):
 def have_profiling( ):
     return config.have_profiling
 
-# ---
-
-def ghci_dynamic( ):
-    return config.ghc_dynamic_by_default
-
 def in_tree_compiler( ):
     return config.in_tree_compiler
 
 def compiler_type( compiler ):
     return config.compiler_type == compiler
-
-def compiler_profiled( ):
-    return config.compiler_profiled
 
 def compiler_lt( compiler, version ):
     return config.compiler_type == compiler and \
@@ -370,8 +362,19 @@ def compiler_ge( compiler, version ):
     return config.compiler_type == compiler and \
            version_ge(config.compiler_version, version)
 
+def unregisterised( ):
+    return config.unregisterised
+
+def compiler_profiled( ):
+    return config.compiler_profiled
+
 def compiler_debugged( ):
     return config.compiler_debugged
+
+def tag( t ):
+    return t in config.compiler_tags
+
+# ---
 
 def namebase( nb ):
    return lambda opts, nb=nb: _namebase(opts, nb)
@@ -381,10 +384,6 @@ def _namebase( opts, nb ):
 
 # ---
 
-def tag( t ):
-    return t in config.compiler_tags
-
-# ---
 def high_memory_usage(name, opts):
     opts.alone = True
 
