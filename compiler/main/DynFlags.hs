@@ -128,9 +128,11 @@ module DynFlags (
 
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
-        -- * SSE
+        -- * SSE and AVX
         isSse2Enabled,
         isSse4_2Enabled,
+        isAvxEnabled,
+        isAvx2Enabled,
 
         -- * Linker information
         LinkerInfo(..),
@@ -770,6 +772,8 @@ data DynFlags = DynFlags {
 
   -- | Machine dependant flags (-m<blah> stuff)
   sseVersion            :: Maybe (Int, Int),  -- (major, minor)
+  avx                   :: Bool,
+  avx2                  :: Bool,
 
   -- | Run-time linker information (what options we need, etc.)
   rtldFlags             :: IORef (Maybe LinkerInfo)
@@ -1401,6 +1405,8 @@ defaultDynFlags mySettings =
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
+        avx = False,
+        avx2 = False,
         rtldFlags = panic "defaultDynFlags: no rtldFlags"
       }
 
@@ -2305,6 +2311,8 @@ dynamic_flags = [
   , Flag "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "msse"         (versionSuffix (\maj min d -> d{ sseVersion = Just (maj, min) }))
+  , Flag "mavx"         (noArg (\d -> d{ avx = True }))
+  , Flag "mavx2"        (noArg (\d -> d{ avx2 = True }))
 
      ------ Warning opts -------------------------------------------------
   , Flag "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
@@ -3585,7 +3593,7 @@ setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 
 -- -----------------------------------------------------------------------------
--- SSE
+-- SSE and AVX
 
 -- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
@@ -3604,6 +3612,12 @@ isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just (4,2)
+
+isAvxEnabled :: DynFlags -> Bool
+isAvxEnabled dflags = avx dflags || avx2 dflags
+
+isAvx2Enabled :: DynFlags -> Bool
+isAvx2Enabled dflags = avx2 dflags
 
 -- -----------------------------------------------------------------------------
 -- Linker information

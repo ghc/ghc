@@ -1380,7 +1380,8 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
                 ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts
                 ++ map SysTools.Option abiOpts
-                ++ map SysTools.Option sseOpts)
+                ++ map SysTools.Option sseOpts
+                ++ map SysTools.Option avxOpts)
 
     return (RealPhase next_phase, output_fn)
   where
@@ -1411,6 +1412,10 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
         sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
                 | isSse2Enabled dflags   = ["-mattr=+sse2"]
+                | otherwise              = []
+
+        avxOpts | isAvx2Enabled dflags   = ["-mattr=+avx2"]
+                | isAvxEnabled dflags    = ["-mattr=+avx"]
                 | otherwise              = []
 
 -----------------------------------------------------------------------------
@@ -2022,6 +2027,10 @@ doCpp dflags raw input_fn output_fn = do
           [ "-D__SSE2__=1" | sse2 || sse4_2 ] ++
           [ "-D__SSE4_2__=1" | sse4_2 ]
 
+    let avx_defs =
+          [ "-D__AVX__=1"  | isAvxEnabled  dflags ] ++
+          [ "-D__AVX2__=1" | isAvx2Enabled dflags ]
+
     backend_defs <- getBackendDefs dflags
 
     cpp_prog       (   map SysTools.Option verbFlags
@@ -2031,6 +2040,7 @@ doCpp dflags raw input_fn output_fn = do
                     ++ map SysTools.Option backend_defs
                     ++ map SysTools.Option hscpp_opts
                     ++ map SysTools.Option sse_defs
+                    ++ map SysTools.Option avx_defs
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash
         -- operator, which we tend to abuse. Clang in particular is not very happy
