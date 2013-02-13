@@ -507,6 +507,7 @@ tidy1 :: Id 			-- The Id being scrutinised
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
 tidy1 _ (WildPat ty)      = return (idDsWrapper, WildPat ty)
+tidy1 v (BangPat (L l p)) = tidy_bang_pat v l p
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
@@ -565,24 +566,37 @@ tidy1 _ (LitPat lit)
 tidy1 _ (NPat lit mb_neg eq)
   = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq)
 
--- BangPatterns: Pattern matching is already strict in constructors,
--- tuples etc, so the last case strips off the bang for thoses patterns.
-tidy1 v (BangPat (L _ (LazyPat p)))       = tidy1 v (BangPat p)
-tidy1 v (BangPat (L _ (ParPat p)))        = tidy1 v (BangPat p)
-tidy1 _ p@(BangPat (L _(VarPat _)))       = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (WildPat _)))     = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (CoPat _ _ _)))   = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (SigPatIn _ _)))  = return (idDsWrapper, p)
-tidy1 _ p@(BangPat (L _ (SigPatOut _ _))) = return (idDsWrapper, p)
-tidy1 v (BangPat (L _ (AsPat (L _ var) pat)))
-  = do	{ (wrap, pat') <- tidy1 v (BangPat pat)
-        ; return (wrapBind var v . wrap, pat') }
-tidy1 v (BangPat (L _ p))                   = tidy1 v p
-
 -- Everything else goes through unchanged...
 
 tidy1 _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
+
+--------------------
+tidy_bang_pat :: Id -> SrcSpan -> Pat Id -> DsM (DsWrapper, Pat Id)
+-- BangPatterns: Pattern matching is already strict in constructors,
+-- tuples etc, so the last case strips off the bang for those patterns.
+
+-- Discard bang around strict pattern
+tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
+tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(ConPatOut {}) = tidy1 v p
+tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
+
+-- Discard lazy/par/sig under a bang
+tidy_bang_pat v _ (LazyPat (L l p))     = tidy_bang_pat v l p
+tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
+
+-- Push the bang-pattern inwards, in the hope that
+-- it may disappear next time 
+tidy_bang_pat v l (AsPat v' p)  = tidy1 v (AsPat v' (L l (BangPat p)))
+tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat (L l p)) t)
+
+-- Default case, leave the bang there:
+-- VarPat, WildPat, ViewPat, NPat, NPlusKPat
+tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
+  -- NB: SigPatIn, ConPatIn should not happen
 \end{code}
 
 \noindent
