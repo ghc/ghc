@@ -1456,7 +1456,11 @@ exprStats (Cast e co)     = coStats co `plusCS` exprStats e
 exprStats (Tick _ e)      = exprStats e
 
 altStats :: CoreAlt -> CoreStats
-altStats (_, bs, r) = sumCS bndrStats bs `plusCS` exprStats r
+altStats (_, bs, r) = altBndrStats bs `plusCS` exprStats r
+
+altBndrStats :: [Var] -> CoreStats
+-- Charge one for the alternative, not for each binder
+altBndrStats vs = oneTM `plusCS` sumCS (tyStats . varType) vs
 
 tyStats :: Type -> CoreStats
 tyStats ty = zeroCS { cs_ty = typeSize ty }
