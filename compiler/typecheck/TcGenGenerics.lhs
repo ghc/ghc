@@ -628,8 +628,10 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
         mkBag l = foldr1 unionBags 
                     [ unitBag (L loc (mkFunBind (L loc name) matches)) 
                         | (name, matches) <- l ]
-        dtBinds       = mkBag [ (datatypeName_RDR, dtName_matches)
-                              , (moduleName_RDR, moduleName_matches)]
+        dtBinds       = mkBag ( [ (datatypeName_RDR, dtName_matches)
+                                , (moduleName_RDR, moduleName_matches)]
+                              ++ ifElseEmpty (isNewTyCon tycon)
+                                [ (isNewtypeName_RDR, isNewtype_matches) ] )
 
         allConBinds   = map conBinds datacons
         conBinds c    = mkBag ( [ (conName_RDR, conName_matches c)]
@@ -663,6 +665,7 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
                            $ tyConName_user
         moduleName_matches = mkStringLHS . moduleNameString . moduleName 
                            . nameModule . tyConName $ tycon
+        isNewtype_matches  = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
 
         conName_matches     c = mkStringLHS . occNameString . nameOccName
                               . dataConName $ c
