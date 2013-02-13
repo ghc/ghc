@@ -131,6 +131,9 @@ class Datatype d where
   datatypeName :: t d (f :: * -> *) a -> [Char]
   -- | The fully-qualified name of the module where the type is declared
   moduleName   :: t d (f :: * -> *) a -> [Char]
+  -- | Marks if the datatype is actually a newtype
+  isNewtype    :: t d (f :: * -> *) a -> Bool
+  isNewtype _ = False
 
 
 -- | Class for datatypes that represent records
