@@ -175,32 +175,32 @@ instance FiniteBits Int8 where
 
 {-# RULES
 "properFraction/Float->(Int8,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y :: Float) }
 "truncate/Float->Int8"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int8) (truncate x)
+    truncate = (fromIntegral :: Int -> Int8) . (truncate :: Float -> Int)
 "floor/Float->Int8"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int8) (floor x)
+    floor    = (fromIntegral :: Int -> Int8) . (floor :: Float -> Int)
 "ceiling/Float->Int8"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int8) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int8) . (ceiling :: Float -> Int)
 "round/Float->Int8"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int8) (round x)
+    round    = (fromIntegral :: Int -> Int8) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Int8,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int8) n, y :: Double) }
 "truncate/Double->Int8"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int8) (truncate x)
+    truncate = (fromIntegral :: Int -> Int8) . (truncate :: Double -> Int)
 "floor/Double->Int8"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int8) (floor x)
+    floor    = (fromIntegral :: Int -> Int8) . (floor :: Double -> Int)
 "ceiling/Double->Int8"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int8) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int8) . (ceiling :: Double -> Int)
 "round/Double->Int8"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int8) (round x)
+    round    = (fromIntegral :: Int -> Int8) . (round  :: Double -> Int)
   #-}
 
 ------------------------------------------------------------------------
@@ -336,32 +336,32 @@ instance FiniteBits Int16 where
 
 {-# RULES
 "properFraction/Float->(Int16,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y :: Float) }
 "truncate/Float->Int16"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int16) (truncate x)
+    truncate = (fromIntegral :: Int -> Int16) . (truncate :: Float -> Int)
 "floor/Float->Int16"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int16) (floor x)
+    floor    = (fromIntegral :: Int -> Int16) . (floor :: Float -> Int)
 "ceiling/Float->Int16"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int16) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int16) . (ceiling :: Float -> Int)
 "round/Float->Int16"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int16) (round x)
+    round    = (fromIntegral :: Int -> Int16) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Int16,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int16) n, y :: Double) }
 "truncate/Double->Int16"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int16) (truncate x)
+    truncate = (fromIntegral :: Int -> Int16) . (truncate :: Double -> Int)
 "floor/Double->Int16"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int16) (floor x)
+    floor    = (fromIntegral :: Int -> Int16) . (floor :: Double -> Int)
 "ceiling/Double->Int16"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int16) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int16) . (ceiling :: Double -> Int)
 "round/Double->Int16"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int16) (round x)
+    round    = (fromIntegral :: Int -> Int16) . (round  :: Double -> Int)
   #-}
 
 ------------------------------------------------------------------------
@@ -503,32 +503,32 @@ instance FiniteBits Int32 where
 
 {-# RULES
 "properFraction/Float->(Int32,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y :: Float) }
 "truncate/Float->Int32"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int32) (truncate x)
+    truncate = (fromIntegral :: Int -> Int32) . (truncate :: Float -> Int)
 "floor/Float->Int32"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int32) (floor x)
+    floor    = (fromIntegral :: Int -> Int32) . (floor :: Float -> Int)
 "ceiling/Float->Int32"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int32) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int32) . (ceiling :: Float -> Int)
 "round/Float->Int32"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int32) (round x)
+    round    = (fromIntegral :: Int -> Int32) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Int32,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int32) n, y :: Double) }
 "truncate/Double->Int32"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int32) (truncate x)
+    truncate = (fromIntegral :: Int -> Int32) . (truncate :: Double -> Int)
 "floor/Double->Int32"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int32) (floor x)
+    floor    = (fromIntegral :: Int -> Int32) . (floor :: Double -> Int)
 "ceiling/Double->Int32"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int32) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int32) . (ceiling :: Double -> Int)
 "round/Double->Int32"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int32) (round x)
+    round    = (fromIntegral :: Int -> Int32) . (round  :: Double -> Int)
   #-}
 
 instance Real Int32 where
@@ -835,32 +835,32 @@ instance Bits Int64 where
 
 {-# RULES
 "properFraction/Float->(Int64,Float)"
-    forall x. properFraction (x :: Float) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y :: Float) }
 "truncate/Float->Int64"
-    forall x. truncate (x :: Float) = (fromIntegral :: Int -> Int64) (truncate x)
+    truncate = (fromIntegral :: Int -> Int64) . (truncate :: Float -> Int)
 "floor/Float->Int64"
-    forall x. floor    (x :: Float) = (fromIntegral :: Int -> Int64) (floor x)
+    floor    = (fromIntegral :: Int -> Int64) . (floor :: Float -> Int)
 "ceiling/Float->Int64"
-    forall x. ceiling  (x :: Float) = (fromIntegral :: Int -> Int64) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int64) . (ceiling :: Float -> Int)
 "round/Float->Int64"
-    forall x. round    (x :: Float) = (fromIntegral :: Int -> Int64) (round x)
+    round    = (fromIntegral :: Int -> Int64) . (round  :: Float -> Int)
   #-}
 
 {-# RULES
 "properFraction/Double->(Int64,Double)"
-    forall x. properFraction (x :: Double) =
+    properFraction = \x ->
                       case properFraction x of {
-                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y) }
+                        (n, y) -> ((fromIntegral :: Int -> Int64) n, y :: Double) }
 "truncate/Double->Int64"
-    forall x. truncate (x :: Double) = (fromIntegral :: Int -> Int64) (truncate x)
+    truncate = (fromIntegral :: Int -> Int64) . (truncate :: Double -> Int)
 "floor/Double->Int64"
-    forall x. floor    (x :: Double) = (fromIntegral :: Int -> Int64) (floor x)
+    floor    = (fromIntegral :: Int -> Int64) . (floor :: Double -> Int)
 "ceiling/Double->Int64"
-    forall x. ceiling  (x :: Double) = (fromIntegral :: Int -> Int64) (ceiling x)
+    ceiling  = (fromIntegral :: Int -> Int64) . (ceiling :: Double -> Int)
 "round/Double->Int64"
-    forall x. round    (x :: Double) = (fromIntegral :: Int -> Int64) (round x)
+    round    = (fromIntegral :: Int -> Int64) . (round  :: Double -> Int)
   #-}
 
 uncheckedIShiftL64# :: Int# -> Int# -> Int#
