@@ -13,7 +13,6 @@ import Data.Typeable
 class Sat a where
     dict :: a
 
-data Proxy (a :: * -> *)
 
 class ( Sat (ctx a)) => Data ctx a where
     gunfold :: Proxy ctx
