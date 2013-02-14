@@ -1981,9 +1981,9 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-    if test "$1" == ""; then
+    if test "$$1" == ""; then
         GOOD_PATH=`echo $PATH | tr ':,;' '   '`
-        $1=`${FindCmd} ${GOOD_PATH} -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
+        $1=`${FindCmd} ${GOOD_PATH} -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' -or -type l -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
     fi
 ])
 
