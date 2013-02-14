@@ -22,8 +22,8 @@ test('conc072', only_ways(['threaded2']), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 # vector code must get inlined to become non-allocating
-test('T367', composes([reqlib('vector'), timeout_multiplier(0.001)]), compile_and_run, ['-O2 -fno-omit-yields'])
-test('T367_letnoescape', composes([timeout_multiplier(0.001)]), compile_and_run, ['-fno-omit-yields'])
+test('T367', [reqlib('vector'), timeout_multiplier(0.001)], compile_and_run, ['-O2 -fno-omit-yields'])
+test('T367_letnoescape', [timeout_multiplier(0.001)], compile_and_run, ['-fno-omit-yields'])
 
 test('T1980', normal, compile_and_run, [''])
 test('T2910', normal, compile_and_run, [''])
@@ -89,11 +89,11 @@ test('conc002', normal, compile_and_run, [''])
 # Omit GHCi way - it blows up to 0.5G.  Something to do with the threaded RTS?
 test('conc004', omit_ways(['ghci']), compile_and_run, [''])
 
-test('conc007', compose(only_compiler_types(['ghc']),
-			extra_run_opts('+RTS -H128M -RTS')),
+test('conc007', [only_compiler_types(['ghc']),
+                 extra_run_opts('+RTS -H128M -RTS')],
 		compile_and_run, [''])
 test('conc008', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc009', compose(only_compiler_types(['ghc']), exit_code(1)),
+test('conc009', [only_compiler_types(['ghc']), exit_code(1)],
 		compile_and_run, [''])
 test('conc010', only_compiler_types(['ghc']), compile_and_run, [''])
 
@@ -110,8 +110,8 @@ test('conc016', [ omit_ways(['threaded2']), # see comment in conc016.hs
 test('conc017', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc017a', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc018', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc019', compose(only_compiler_types(['ghc']),
-			extra_run_opts('+RTS -K16m -RTS')),
+test('conc019', [only_compiler_types(['ghc']),
+                 extra_run_opts('+RTS -K16m -RTS')],
 		compile_and_run, [''])
 test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc021', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
@@ -127,18 +127,18 @@ if config.platform == 'i386-unknown-mingw32':
 else:
    conc023_ways = normal
 
-test('conc023', composes([when(fast(), skip),
-                          only_compiler_types(['ghc']),
-                          reqlib('random'),
-                          conc023_ways]), compile_and_run, [''])
+test('conc023', [when(fast(), skip),
+                 only_compiler_types(['ghc']),
+                 reqlib('random'),
+                 conc023_ways], compile_and_run, [''])
 
 test('conc024', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
 test('conc026', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc028', normal, compile_and_run, [''])
 test('conc029', normal, compile_and_run, [''])
-test('conc030', compose(only_compiler_types(['ghc']),
-			extra_run_opts('+RTS -K4M -RTS')),
+test('conc030',
+     [only_compiler_types(['ghc']), extra_run_opts('+RTS -K4M -RTS')],
 		compile_and_run, [''])
 
 test('conc031', normal, compile_and_run, [''])
@@ -147,9 +147,9 @@ test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc033', normal, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-test('conc034', compose(only_compiler_types(['ghc']),
-			compose(omit_ways(['ghci']), 
-			extra_run_opts('+RTS -C0 -RTS'))),
+test('conc034', [only_compiler_types(['ghc']),
+                 omit_ways(['ghci']), 
+                 extra_run_opts('+RTS -C0 -RTS')],
 		compile_and_run, [''])
 
 test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
@@ -187,9 +187,8 @@ test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc039', omit_ways(['ghci','threaded1','threaded2','profthreaded']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
-test('conc040', compose(only_compiler_types(['ghc']),
-			compose(exit_code(1),
-			omit_ways(['ghci']))),
+test('conc040',
+     [only_compiler_types(['ghc']), exit_code(1), omit_ways(['ghci'])],
 		compile_and_run, [''])
 
 # STM-related tests.

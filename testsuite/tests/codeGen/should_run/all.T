@@ -24,8 +24,9 @@ test('cgrun020', normal, compile_and_run, [''])
 test('cgrun021', normal, compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
-test('cgrun025', compose(reqlib('regex-compat'), compose(extra_run_opts('cg025.hs'),exit_code(1))),
-                      compile_and_run, ['-package regex-compat'])
+test('cgrun025',
+     [reqlib('regex-compat'), extra_run_opts('cg025.hs'), exit_code(1)],
+     compile_and_run, ['-package regex-compat'])
 test('cgrun026', only_compiler_types(['ghc']), compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])
 test('cgrun028', normal, compile_and_run, [''])
@@ -48,7 +49,8 @@ test('cgrun048', normal, compile_and_run, [''])
 test('cgrun049', normal, compile_and_run, ['-funbox-strict-fields'])
 test('cgrun050', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype declaration with no constructors
-test('cgrun051', (compose (expect_fail_for(['extcore','optextcore']),exit_code(1))), compile_and_run, [''])
+test('cgrun051', [expect_fail_for(['extcore','optextcore']), exit_code(1)],
+     compile_and_run, [''])
 test('cgrun052', only_ways(['optasm']), compile_and_run, ['-funbox-strict-fields'])
 test('cgrun053', normal, compile_and_run, [''])
 test('cgrun054', normal, compile_and_run, [''])

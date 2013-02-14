@@ -5,8 +5,8 @@
 #	expected process return value, if not zero
 
 # Doesn't work with External Core due to __labels
-test('fed001', compose(only_compiler_types(['ghc']),
-			expect_fail_for(['extcore','optextcore'])),
+test('fed001', [only_compiler_types(['ghc']),
+                expect_fail_for(['extcore','optextcore'])],
 		compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
@@ -48,13 +48,14 @@ test('ffi006', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 # Sometimes we end up with the wrong exit code, or get an extra
 # 'interrupted' message from the GHCi thread shutting down.
 
-test('ffi007', compose( omit_ways(['ghci']),
-		        expect_fail_for(['extcore','optextcore']) ), 
+test('ffi007',
+     [omit_ways(['ghci']), expect_fail_for(['extcore','optextcore'])], 
 	       compile_and_run, [''])
 
-test('ffi008', compose(expect_fail_for(['extcore','optextcore']), 
-		       compose(exit_code(1),
-			       omit_ways(['ghci']))), 
+test('ffi008',
+     [expect_fail_for(['extcore','optextcore']),
+      exit_code(1),
+      omit_ways(['ghci'])],
 	       compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
@@ -145,7 +146,7 @@ test('fptr01', [ omit_ways(['ghci']), extra_clean(['fptr01_c.o']) ],
                compile_and_run, ['fptr01_c.c'])
 test('fptr02', normal, compile_and_run, [''])
 
-test('fptrfail01', [ compose(omit_ways(['ghci']), exit_code(1)),
+test('fptrfail01', [ omit_ways(['ghci']), exit_code(1),
                      extra_clean(['fptrfail01_c.o']) ],
                    compile_and_run, ['fptrfail01_c.c'])
 

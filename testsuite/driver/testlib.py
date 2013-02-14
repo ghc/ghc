@@ -62,7 +62,7 @@ def setLocalTestOpts(opts):
 # for the following tests.
 def setTestOpts( f ):
     global thisdir_settings
-    thisdir_settings = compose(thisdir_settings, f)
+    thisdir_settings = [thisdir_settings, f]
 
 # -----------------------------------------------------------------------------
 # Canned setup functions for common cases.  eg. for a test you might say
@@ -475,15 +475,16 @@ def two_normalisers(f, g):
 # ----
 # Function for composing two opt-fns together
 
-def composes( fs ):
-    return reduce(lambda f, g: compose(f, g), fs)
+def executeSetups(fs, name, opts):
+    if type(fs) is types.ListType:
+        # If we have a list of setups, then execute each one
+        map (lambda f : executeSetups(f, name, opts), fs)
+    else:
+        # fs is a single function, so just apply it
+        fs(name, opts)
 
 def compose( f, g ):
-    return lambda name, opts, f=f, g=g: _compose(name, opts, f, g)
-
-def _compose( name, opts, f, g ):
-    f(name, opts)
-    g(name, opts)
+    return [f, g]
 
 # -----------------------------------------------------------------------------
 # The current directory of tests
@@ -539,11 +540,7 @@ def test (name, setup, func, args):
     # them, all tests will see the modified version!
     myTestOpts = copy.deepcopy(default_testopts)
 
-    if type(setup) is types.ListType:
-       setup = composes(setup)
-
-    setup = compose(thisdir_settings, setup)
-    setup(name, myTestOpts)
+    executeSetups([thisdir_settings, setup], name, myTestOpts)
 
     thisTest = lambda : runTest(myTestOpts, name, func, args)
     if myTestOpts.alone:
