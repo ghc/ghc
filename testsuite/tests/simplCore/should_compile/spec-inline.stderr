@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 140, types: 55, coercions: 0}
+Result size of Tidy Core = {terms: 156, types: 55, coercions: 0}
 
 Roman.foo3 :: GHC.Types.Int
 [GblId, Str=DmdType b]

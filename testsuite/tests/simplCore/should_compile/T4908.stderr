@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 47, types: 38, coercions: 0}
+Result size of Tidy Core = {terms: 54, types: 38, coercions: 0}
 
 Rec {
 T4908.f_$s$wf [Occ=LoopBreaker]

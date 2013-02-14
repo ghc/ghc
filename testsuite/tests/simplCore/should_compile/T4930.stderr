@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 20, types: 10, coercions: 0}
+Result size of Tidy Core = {terms: 22, types: 10, coercions: 0}
 
 lvl :: [GHC.Types.Char]
 [GblId, Str=DmdType]

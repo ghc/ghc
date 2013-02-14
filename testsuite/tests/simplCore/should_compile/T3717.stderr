@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 19, types: 10, coercions: 0}
+Result size of Tidy Core = {terms: 22, types: 10, coercions: 0}
 
 Rec {
 T3717.$wfoo [Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#

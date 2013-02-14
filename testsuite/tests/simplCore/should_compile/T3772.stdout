@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 23, types: 10, coercions: 0}
+Result size of Tidy Core = {terms: 27, types: 10, coercions: 0}
 
 Rec {
 xs :: GHC.Prim.Int# -> ()
