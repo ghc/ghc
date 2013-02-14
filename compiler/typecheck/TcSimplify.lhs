@@ -266,6 +266,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                             meta_tvs   = filter isMetaTyVar (varSetElems (tyVarsOfCts quant_cand)) 
                       ; ((flats, _insols), _extra_binds) <- runTcS $ 
                         do { mapM_ (promoteAndDefaultTyVar untch gbl_tvs) meta_tvs
+                                 -- See Note [Promote _and_ default when inferring]
                            ; _implics <- solveInteract quant_cand
                            ; getInertUnsolved }
                       ; return (map ctPred $ filter isWantedCt (bagToList flats)) }
@@ -910,6 +911,7 @@ have an instance (C ((x:*) -> Int)).  The instance doesn't match -- but it
 should!  If we don't solve the constraint, we'll stupidly quantify over 
 (C (a->Int)) and, worse, in doing so zonkQuantifiedTyVar will quantify over
 (b:*) instead of (a:OpenKind), which can lead to disaster; see Trac #7332.
+Trac #7641 is a simpler example.
 
 Note [Float Equalities out of Implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
