@@ -1002,14 +1002,16 @@ echo ["\
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
 
-   llc      : $LlcCmd
-   opt      : $OptCmd
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)
    Alex     : $AlexCmd ($AlexVersion)
    Perl     : $PerlCmd
    dblatex  : $DblatexCmd
-   xsltproc : $XsltprocCmd"]
+   xsltproc : $XsltprocCmd
+
+   Using LLVM tools
+      llc   : $LlcCmd
+      opt   : $OptCmd"]
 
 if test "$HSCOLOUR" = ""; then
 echo ["
