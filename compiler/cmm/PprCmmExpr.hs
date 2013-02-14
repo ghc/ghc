@@ -256,6 +256,7 @@ pprGlobalReg gr
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
         XmmReg     n   -> ptext (sLit "XMM") <> int n
+        YmmReg     n   -> ptext (sLit "YMM") <> int n
         Sp             -> ptext (sLit "Sp")
         SpLim          -> ptext (sLit "SpLim")
         Hp             -> ptext (sLit "Hp")

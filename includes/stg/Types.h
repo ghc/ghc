@@ -85,6 +85,8 @@ typedef unsigned long long int StgWord64;
 
 typedef struct { StgWord64 h; StgWord64 l; } StgWord128;
 
+typedef struct { StgWord128 h; StgWord128 l; } StgWord256;
+
 /*
  * Define the standard word size we'll use on this machine: make it
  * big enough to hold a pointer.

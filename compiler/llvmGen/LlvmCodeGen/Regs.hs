@@ -62,6 +62,12 @@ lmGlobalReg dflags suf reg
         XmmReg 4       -> xmmGlobal $ "XMM4" ++ suf
         XmmReg 5       -> xmmGlobal $ "XMM5" ++ suf
         XmmReg 6       -> xmmGlobal $ "XMM6" ++ suf
+        YmmReg 1       -> ymmGlobal $ "YMM1" ++ suf
+        YmmReg 2       -> ymmGlobal $ "YMM2" ++ suf
+        YmmReg 3       -> ymmGlobal $ "YMM3" ++ suf
+        YmmReg 4       -> ymmGlobal $ "YMM4" ++ suf
+        YmmReg 5       -> ymmGlobal $ "YMM5" ++ suf
+        YmmReg 6       -> ymmGlobal $ "YMM6" ++ suf
         _other         -> panic $ "LlvmCodeGen.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
         -- LongReg, HpLim, CCSS, CurrentTSO, CurrentNusery, HpAlloc
@@ -72,6 +78,7 @@ lmGlobalReg dflags suf reg
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
         xmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 4 (LMInt 32))
+        ymmGlobal    name = LMNLocalVar (fsLit name) (LMVector 8 (LMInt 32))
 
 -- | A list of STG Registers that should always be considered alive
 alwaysLive :: [GlobalReg]

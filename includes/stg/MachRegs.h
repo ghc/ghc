@@ -108,11 +108,17 @@
 #define REG_XMM3    xmm2
 #define REG_XMM4    xmm3
 
+#define REG_YMM1    ymm0
+#define REG_YMM2    ymm1
+#define REG_YMM3    ymm2
+#define REG_YMM4    ymm3
+
 #define MAX_REAL_VANILLA_REG 1  /* always, since it defines the entry conv */
 #define MAX_REAL_FLOAT_REG   0
 #define MAX_REAL_DOUBLE_REG  0
 #define MAX_REAL_LONG_REG    0
 #define MAX_REAL_XMM_REG     4
+#define MAX_REAL_YMM_REG     4
 
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
@@ -179,6 +185,13 @@
 #define REG_XMM5    xmm5
 #define REG_XMM6    xmm6
 
+#define REG_YMM1    ymm1
+#define REG_YMM2    ymm2
+#define REG_YMM3    ymm3
+#define REG_YMM4    ymm4
+#define REG_YMM5    ymm5
+#define REG_YMM6    ymm6
+
 #if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
 #define CALLER_SAVES_R4
@@ -213,11 +226,21 @@
 #define CALLER_SAVES_XMM6
 #endif
 
+#define CALLER_SAVES_YMM1
+#define CALLER_SAVES_YMM2
+#define CALLER_SAVES_YMM3
+#define CALLER_SAVES_YMM4
+#define CALLER_SAVES_YMM5
+#if !defined(mingw32_HOST_OS)
+#define CALLER_SAVES_YMM6
+#endif
+
 #define MAX_REAL_VANILLA_REG 6
 #define MAX_REAL_FLOAT_REG   6
 #define MAX_REAL_DOUBLE_REG  6
 #define MAX_REAL_LONG_REG    0
 #define MAX_REAL_XMM_REG     6
+#define MAX_REAL_YMM_REG     6
 
 /* -----------------------------------------------------------------------------
    The PowerPC register mapping

@@ -343,6 +343,9 @@ data GlobalReg
   | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
+  | YmmReg                      -- 256-bit SIMD vector register 
+        {-# UNPACK #-} !Int     -- its number
+
   -- STG registers
   | Sp                  -- Stack ptr; points to last occupied stack location.
   | SpLim               -- Stack limit
@@ -379,6 +382,7 @@ instance Eq GlobalReg where
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
    XmmReg i == XmmReg j = i==j
+   YmmReg i == YmmReg j = i==j
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -401,6 +405,7 @@ instance Ord GlobalReg where
    compare (DoubleReg i) (DoubleReg j) = compare i j
    compare (LongReg i)   (LongReg   j) = compare i j
    compare (XmmReg i)    (XmmReg    j) = compare i j
+   compare (YmmReg i)    (YmmReg    j) = compare i j
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -424,6 +429,8 @@ instance Ord GlobalReg where
    compare _ (LongReg _)      = GT
    compare (XmmReg _) _       = LT
    compare _ (XmmReg _)       = GT
+   compare (YmmReg _) _       = LT
+   compare _ (YmmReg _)       = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -467,6 +474,7 @@ globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
 globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
+globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
 
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
@@ -479,4 +487,5 @@ isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
 isArgReg (LongReg {})    = True
 isArgReg (XmmReg {})     = True
+isArgReg (YmmReg {})     = True
 isArgReg _               = False
