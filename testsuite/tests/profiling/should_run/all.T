@@ -3,10 +3,10 @@
 extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_hr']
 
 test('heapprof001',
-     composes([only_ways(prof_ways),
-               extra_ways(extra_prof_ways),
-               req_profiling,
-               extra_run_opts('7')]),
+     [only_ways(prof_ways),
+      extra_ways(extra_prof_ways),
+      req_profiling,
+      extra_run_opts('7')],
      compile_and_run, [''])
 
 test('T2592',

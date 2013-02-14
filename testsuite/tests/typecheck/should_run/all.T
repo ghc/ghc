@@ -38,7 +38,8 @@ test('tcrun020', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors
 test('tcrun021', expect_fail_for(['extcore','optextcore']),
      compile_and_run, ['-package containers'])
-test('tcrun022', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, ['-O'])
+test('tcrun022', [omit_ways(['ghci']),only_compiler_types(['ghc'])],
+     compile_and_run, ['-O'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
 test('tcrun025', extra_clean(['TcRun025_B.hi', 'TcRun025_B.o']),
@@ -70,11 +71,16 @@ test('tcrun043', normal, compile_and_run, [''])
 test('tcrun044', normal, compile_and_run, [''])
 test('tcrun045', normal, compile_and_run, [''])
 test('tcrun046', normal, compile_and_run, [''])
-test('tcrun047', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
-test('tcrun048', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
-test('tcrun049', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
-test('tcrun050', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
-test('tcrun051', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
+test('tcrun047', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
+test('tcrun048', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
+test('tcrun049', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
+test('tcrun050', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
+test('tcrun051', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])
@@ -92,8 +98,10 @@ test('T4809', reqlib('mtl'), compile_and_run, [''])
 test('T2722', normal, compile_and_run, [''])
 test('mc17', normal, compile_and_run, [''])
 test('T5759', normal, compile_and_run, [''])
-test('T5573a', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
-test('T5573b', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, [''])
+test('T5573a', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
+test('T5573b', [omit_ways(['ghci']), only_compiler_types(['ghc'])],
+     compile_and_run, [''])
 test('T7023', normal, compile_and_run, [''])
 test('T7126', normal, compile_and_run, [''])
 test('T6117', normal, compile_and_run, [''])
