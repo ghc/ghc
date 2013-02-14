@@ -1,9 +1,9 @@
 
 <interactive>:6:1:
-    No instance for (Show a) arising from a use of `print'
-    Cannot resolve unknown runtime type `a'
+    No instance for (Show t1) arising from a use of `print'
+    Cannot resolve unknown runtime type `t1'
     Use :print or :force to determine these types
-    Relevant bindings include it :: a (bound at <interactive>:6:1)
+    Relevant bindings include it :: t1 (bound at <interactive>:6:1)
     Note: there are several potential instances:
       instance Show Double -- Defined in `GHC.Float'
       instance Show Float -- Defined in `GHC.Float'
@@ -13,10 +13,10 @@
     In a stmt of an interactive GHCi command: print it
 
 <interactive>:8:1:
-    No instance for (Show a) arising from a use of `print'
-    Cannot resolve unknown runtime type `a'
+    No instance for (Show t1) arising from a use of `print'
+    Cannot resolve unknown runtime type `t1'
     Use :print or :force to determine these types
-    Relevant bindings include it :: a (bound at <interactive>:8:1)
+    Relevant bindings include it :: t1 (bound at <interactive>:8:1)
     Note: there are several potential instances:
       instance Show Double -- Defined in `GHC.Float'
       instance Show Float -- Defined in `GHC.Float'

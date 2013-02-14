@@ -1,6 +1,6 @@
 
 T2534.hs:3:19:
-    Couldn't match expected type `a -> a -> b' with actual type `[a0]'
+    Couldn't match expected type `a -> a -> b' with actual type `[t0]'
     Relevant bindings include
       foo :: a -> a -> b (bound at T2534.hs:3:1)
     In the second argument of `foldr', namely `[]'

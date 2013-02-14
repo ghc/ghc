@@ -37,6 +37,7 @@ expectedGhcOnlyExtensions = [
                              "AlternativeLayoutRuleTransitional",
                              "ExplicitNamespaces",
                              "TypeHoles",
+                             "OverloadedLists",
                              "EmptyCase",
                              "AutoDeriveTypeable"]
 

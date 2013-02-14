@@ -1,15 +1,15 @@
 Stopped at ../Test3.hs:(1,1)-(2,31)
-_result :: [a] = _
+_result :: [t1] = _
 Stopped at ../Test3.hs:2:18-31
-_result :: [a] = _
-f :: Integer -> a = _
+_result :: [t1] = _
+f :: Integer -> t1 = _
 x :: Integer = 1
 xs :: [Integer] = [2,3]
 xs :: [Integer] = [2,3]
 x :: Integer = 1
-f :: Integer -> a = _
-_result :: [a] = _
-y = (_t1::a)
+f :: Integer -> t1 = _
+_result :: [t1] = _
+y = (_t1::t1)
 y = 2
 xs :: [Integer] = [2,3]
 x :: Integer = 1

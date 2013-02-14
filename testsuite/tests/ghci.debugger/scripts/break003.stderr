@@ -1,4 +1,4 @@
 
 <interactive>:5:1:
-    No instance for (Show (t -> a)) arising from a use of `print'
+    No instance for (Show (t -> t1)) arising from a use of `print'
     In a stmt of an interactive GHCi command: print it

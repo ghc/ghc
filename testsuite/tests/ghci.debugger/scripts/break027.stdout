@@ -1,6 +1,6 @@
 Breakpoint 0 activated at ../QSort.hs:(4,1)-(6,55)
 Stopped at ../QSort.hs:(4,1)-(6,55)
-_result :: [a] = _
+_result :: [t] = _
 Stopped at ../QSort.hs:5:16-51
 _result :: [Integer] = _
 a :: Integer = 3
