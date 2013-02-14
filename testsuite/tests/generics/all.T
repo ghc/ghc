@@ -9,6 +9,7 @@ test('GenCannotDoRep0', normal, compile_fail, [''])
 test('GenCannotDoRep1', normal, compile_fail, [''])
 test('GenCannotDoRep2', normal, compile_fail, [''])
 test('T5884',           normal, compile, [''])
+test('GenNewtype',      normal, compile_and_run, [''])
 
 test('GenCanDoRep1_0',    normal, compile, [''])
 test('GenDerivOutput1_0',  normal, compile, ['-dsuppress-uniques'])

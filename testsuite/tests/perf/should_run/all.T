@@ -49,6 +49,17 @@ test('lazy-bs-alloc',
      compile_and_run,
      ['-O'])
 
+test('T876',
+     [stats_num_field('bytes allocated',
+          [(wordsize(64), 1263712 , 5),
+              # 2013-02-14: 1263712 (x86_64/Linux)
+           (wordsize(32), 663712, 5)]),
+      only_ways(['normal']),
+      extra_run_opts('10000')
+      ],
+     compile_and_run,
+     ['-O'])
+
 # Get reproducible floating-point results on x86
 if config.arch == 'i386':
    sse2_opts = '-msse2'

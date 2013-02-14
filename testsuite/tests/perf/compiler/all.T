@@ -13,11 +13,12 @@ test('T1969',
              #            19 (x86/OS X)
              # 2013-02-10 13 (x86/Windows)
              # 2013-02-10 14 (x86/OSX)
-           (wordsize(64), 25, 1)]),
+           (wordsize(64), 23, 10)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
              # 2012-10-03 25 (amd64/Linux if .hi exists)
+             # 2013-02-13 23, but unstable so increased to 10% range
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5094914, 2),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -160,9 +161,11 @@ test('T3064',
       compiler_stats_num_field('peak_megabytes_allocated',
           [(wordsize(32), 14, 1),
         # expected value: 14 (x86/Linux 28-06-2012):
-           (wordsize(64), 26, 1)]),
+           (wordsize(64), 26, 10)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
+            # (amd64/Linux) 2013-02-12: 23
+            # (amd64/Linux) 2013-02-13: back to 26; increased range to 10%
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 111189536, 10),
@@ -175,11 +178,9 @@ test('T3064',
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 8945328, 5)]),
+           (wordsize(64), 9819288, 5)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
-            # (amd64/Linux, intree) (10/02/2013):  8945328 
-            #   apparently courtesy of the b5c18c (Trac #5113)
        only_ways(['normal'])
       ],
      compile,

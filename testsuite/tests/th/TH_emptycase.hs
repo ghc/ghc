@@ -1,6 +1,6 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, EmptyCase #-}
 -- Trac #2431: empty case expression
---             currently rejected
+--             now accepted
 
 module Main where
 
