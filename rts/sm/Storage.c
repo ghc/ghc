@@ -240,8 +240,8 @@ void storageAddCapabilities (nat from, nat to)
 void
 exitStorage (void)
 {
-    W_ allocated = updateNurseriesStats();
-    stat_exit(allocated);
+    updateNurseriesStats();
+    stat_exit();
 }
 
 void
@@ -508,22 +508,18 @@ allocNurseries (nat from, nat to)
     assignNurseriesToCapabilities(from, to);
 }
       
-W_
+void
 clearNursery (Capability *cap)
 {
     bdescr *bd;
-    W_ allocated = 0;
 
     for (bd = nurseries[cap->no].blocks; bd; bd = bd->link) {
-        allocated            += (W_)(bd->free - bd->start);
         cap->total_allocated += (W_)(bd->free - bd->start);
         bd->free = bd->start;
         ASSERT(bd->gen_no == 0);
         ASSERT(bd->gen == g0);
         IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
     }
-
-    return allocated;
 }
 
 void
@@ -771,6 +767,7 @@ allocatePinned (Capability *cap, W_ n)
         // g0->large_objects.
         if (bd != NULL) {
             dbl_link_onto(bd, &cap->pinned_object_blocks);
+            // add it to the allocation stats when the block is full
             cap->total_allocated += bd->free - bd->start;
         }
 
@@ -927,32 +924,19 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  * updateNurseriesStats()
  *
  * Update the per-cap total_allocated numbers with an approximation of
- * the amount of memory used in each cap's nursery. Also return the
- * total across all caps.
- * 
+ * the amount of memory used in each cap's nursery.
+ *
  * Since this update is also performed by clearNurseries() then we only
  * need this function for the final stats when the RTS is shutting down.
  * -------------------------------------------------------------------------- */
 
-W_
-updateNurseriesStats (void)
+void updateNurseriesStats (void)
 {
-    W_ allocated = 0;
     nat i;
 
     for (i = 0; i < n_capabilities; i++) {
-        int cap_allocated = countOccupied(nurseries[i].blocks);
-        capabilities[i].total_allocated += cap_allocated;
-        allocated                       += cap_allocated;
+        capabilities[i].total_allocated += countOccupied(nurseries[i].blocks);
     }
-
-    return allocated;
-}
-
-W_
-countLargeAllocated (void)
-{
-    return g0->n_new_large_words;
 }
 
 W_ countOccupied (bdescr *bd)

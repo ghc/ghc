@@ -1772,7 +1772,7 @@ computeRetainerSet( void )
 	retainRoot(NULL, (StgClosure **)&weak);
 
     // Consider roots from the stable ptr table.
-    markStablePtrTable(retainRoot, NULL);
+    markStableTables(retainRoot, NULL);
 
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when

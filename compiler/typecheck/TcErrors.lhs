@@ -89,7 +89,7 @@ to compile, and it will run fine unless we evaluate `a`. This is what
 
 It does this by keeping track of which errors correspond to which coercion
 in TcErrors. TcErrors.reportTidyWanteds does not print the errors
-and does not fail if -fwarn-type-errors is on, so that we can continue
+and does not fail if -fdefer-type-errors is on, so that we can continue
 compilation. The errors are turned into warnings in `reportUnsolved`.
 
 Note [Suppressing error messages]

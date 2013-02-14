@@ -82,7 +82,7 @@ void dirty_TVAR(Capability *cap, StgTVar *p);
 extern nursery *nurseries;
 
 void     resetNurseries       ( void );
-W_       clearNursery         ( Capability *cap );
+void     clearNursery         ( Capability *cap );
 void     resizeNurseries      ( W_ blocks );
 void     resizeNurseriesFixed ( W_ blocks );
 W_       countNurseryBlocks   ( void );
@@ -91,7 +91,7 @@ W_       countNurseryBlocks   ( void );
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-W_    updateNurseriesStats (void);
+void  updateNurseriesStats (void);
 W_    countLargeAllocated  (void);
 W_    countOccupied        (bdescr *bd);
 W_    calcNeeded           (rtsBool force_major, W_ *blocks_needed);

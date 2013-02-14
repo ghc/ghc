@@ -29,7 +29,7 @@ void      stat_endInit(void);
 
 void      stat_startGC(Capability *cap, struct gc_thread_ *_gct);
 void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct,
-                       W_ alloc, W_ live, W_ copied, W_ slop, nat gen,
+                       W_ live, W_ copied, W_ slop, nat gen,
                        nat n_gc_threads, W_ par_max_copied, W_ par_tot_copied);
 
 void stat_gcWorkerThreadStart (struct gc_thread_ *_gct);
@@ -52,7 +52,7 @@ void      stat_endHeapCensus(void);
 void      stat_startExit(void);
 void      stat_endExit(void);
 
-void      stat_exit(int alloc);
+void      stat_exit(void);
 void      stat_workerStop(void);
 
 void      initStats0(void);

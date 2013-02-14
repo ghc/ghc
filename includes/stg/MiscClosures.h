@@ -472,7 +472,7 @@ extern StgWord RTS_VAR(atomic_modify_mutvar_mutex);
 extern StgWord RTS_VAR(RtsFlags); // bogus type
 
 // Stable.c
-extern StgWord RTS_VAR(stable_ptr_table);
+extern StgWord RTS_VAR(stable_name_table);
 
 // Profiling.c
 extern unsigned int RTS_VAR(era);

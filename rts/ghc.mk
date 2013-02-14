@@ -137,7 +137,7 @@ rts_dist_$1_CC_OPTS := $$(GhcRtsCcOpts)
 # The per-way CC_OPTS
 ifneq "$$(findstring debug, $1)" ""
 rts_dist_$1_HC_OPTS += -O0
-rts_dist_$1_CC_OPTS += -g -O0
+rts_dist_$1_CC_OPTS += -fno-omit-frame-pointer -g -O0
 endif
 
 ifneq "$$(findstring dyn, $1)" ""

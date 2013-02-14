@@ -370,8 +370,8 @@ LAX_DEPENDENCIES = NO
 # optimisation both for C code (-optc-O2) and .cmm code (-O2).  For
 # the debugging RTS flavour, rts/ghc.mk overrides these to turn off
 # optimisation.
-GhcRtsHcOpts=-optc-O2 -O2
-GhcRtsCcOpts=-fomit-frame-pointer
+GhcRtsHcOpts=-O2
+GhcRtsCcOpts=-O2 -fomit-frame-pointer
 
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO

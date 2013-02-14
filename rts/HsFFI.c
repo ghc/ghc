@@ -27,12 +27,30 @@ hs_perform_gc(void)
     performMajorGC();
 }
 
+void hs_lock_stable_tables (void)
+{
+    stableLock();
+}
+
+void hs_unlock_stable_tables (void)
+{
+    stableUnlock();
+}
+
 void
 hs_free_stable_ptr(HsStablePtr sp)
 {
     /* The cast is for clarity only, both HsStablePtr and StgStablePtr are
        typedefs for void*. */
     freeStablePtr((StgStablePtr)sp);
+}
+
+void
+hs_free_stable_ptr_unsafe(HsStablePtr sp)
+{
+    /* The cast is for clarity only, both HsStablePtr and StgStablePtr are
+       typedefs for void*. */
+    freeStablePtrUnsafe((StgStablePtr)sp);
 }
 
 void
