@@ -60,3 +60,5 @@ test('T7014',
      ['$MAKE -s --no-print-directory T7014'])
 
 test('T7233', normal, compile_and_run, [''])
+
+test('T7689', normal, compile_and_run, [''])
