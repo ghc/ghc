@@ -93,6 +93,14 @@ isAlive(StgClosure *p)
       p = ((StgInd *)q)->indirectee;
       continue;
 
+    case BLACKHOLE:
+        p = ((StgInd*)q)->indirectee;
+        if (GET_CLOSURE_TAG(p) != 0) {
+            continue;
+        } else {
+            return NULL;
+        }
+
     default:
       // dead. 
       return NULL;

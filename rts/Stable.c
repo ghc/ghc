@@ -278,28 +278,36 @@ freeStablePtr(StgStablePtr sp)
 
 /*
  * get at the real stuff...remove indirections.
- * It untags pointers before dereferencing and
- * retags the real stuff with its tag (if there
- * is any) when returning.
- *
- * ToDo: move to a better home.
  */
-static
-StgClosure*
-removeIndirections(StgClosure* p)
+static StgClosure*
+removeIndirections (StgClosure* p)
 {
-  StgWord tag = GET_CLOSURE_TAG(p);
-  StgClosure* q = UNTAG_CLOSURE(p);
+    StgClosure* q;
 
-  while (get_itbl(q)->type == IND ||
-         get_itbl(q)->type == IND_STATIC ||
-         get_itbl(q)->type == IND_PERM) {
-      q = ((StgInd *)q)->indirectee;
-      tag = GET_CLOSURE_TAG(q);
-      q = UNTAG_CLOSURE(q);
-  }
+    while (1)
+    {
+        q = UNTAG_CLOSURE(p);
 
-  return TAG_CLOSURE(tag,q);
+        switch (get_itbl(q)->type) {
+        case IND:
+        case IND_STATIC:
+        case IND_PERM:
+            p = ((StgInd *)q)->indirectee;
+            continue;
+
+        case BLACKHOLE:
+            p = ((StgInd *)q)->indirectee;
+            if (GET_CLOSURE_TAG(p) != 0) {
+                continue;
+            } else {
+                break;
+            }
+
+        default:
+            break;
+        }
+        return p;
+    }
 }
 
 StgWord

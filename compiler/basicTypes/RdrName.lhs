@@ -277,7 +277,11 @@ instance OutputableBndr RdrName where
 	| otherwise		 = ppr n
 
     pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-    pprPrefixOcc rdr = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+    pprPrefixOcc rdr 
+      | Just name <- isExact_maybe rdr = pprPrefixName name
+             -- pprPrefixName has some special cases, so
+             -- we delegate to them rather than reproduce them
+      | otherwise = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
 
 instance Eq RdrName where
     (Exact n1) 	  == (Exact n2)    = n1==n2
