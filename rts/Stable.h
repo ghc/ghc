@@ -21,17 +21,28 @@
 
 void    freeStablePtr         ( StgStablePtr sp );
 
-void    initStablePtrTable    ( void );
-void    exitStablePtrTable    ( void );
+/* Use the "Unsafe" one after manually locking with stableLock/stableUnlock */
+void    freeStablePtrUnsafe   ( StgStablePtr sp );
+
+void    initStableTables      ( void );
+void    exitStableTables      ( void );
 StgWord lookupStableName      ( StgPtr p );
 
-void    markStablePtrTable    ( evac_fn evac, void *user );
-void    threadStablePtrTable  ( evac_fn evac, void *user );
-void    gcStablePtrTable      ( void );
-void    updateStablePtrTable  ( rtsBool full );
+/* Call given function on every stable ptr. markStableTables depends
+ * on the function updating its pointers in case the object is
+ * moved. */
+/* TODO: This also remembers old stable name addresses, which isn't
+ * necessary in some contexts markStableTables is called from.
+ * Consider splitting it.
+ */
+void    markStableTables      ( evac_fn evac, void *user );
 
-void    stablePtrPreGC        ( void );
-void    stablePtrPostGC       ( void );
+void    threadStableTables    ( evac_fn evac, void *user );
+void    gcStableTables        ( void );
+void    updateStableTables    ( rtsBool full );
+
+void    stableLock            ( void );
+void    stableUnlock          ( void );
 
 #ifdef THREADED_RTS
 // needed by Schedule.c:forkProcess()

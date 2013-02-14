@@ -1,3 +1,4 @@
+/* -*- tab-width: 8 -*- */
 /* -----------------------------------------------------------------------------
  *
  * (c) The GHC Team, 1998-2012
@@ -1513,22 +1514,21 @@ stg_makeStableNamezh ( P_ obj )
 {
     W_ index, sn_obj;
 
-    ALLOC_PRIM_P (SIZEOF_StgStableName, stg_makeStableNamezh, obj);
-  
     (index) = ccall lookupStableName(obj "ptr");
 
     /* Is there already a StableName for this heap object?
-     *  stable_ptr_table is a pointer to an array of snEntry structs.
+     *  stable_name_table is a pointer to an array of snEntry structs.
      */
-    if ( snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) == NULL ) {
-	sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
-	SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
-	StgStableName_sn(sn_obj) = index;
-	snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) = sn_obj;
+    if ( snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) == NULL ) {
+        ALLOC_PRIM (SIZEOF_StgStableName);
+        sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
+        SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
+        StgStableName_sn(sn_obj) = index;
+        snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
-	sn_obj = snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry);
+        sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
     }
-    
+
     return (sn_obj);
 }
 
@@ -1543,7 +1543,7 @@ stg_makeStablePtrzh ( P_ obj )
 stg_deRefStablePtrzh ( P_ sp )
 {
     W_ r;
-    r = snEntry_addr(W_[stable_ptr_table] + sp*SIZEOF_snEntry);
+    r = spEntry_addr(W_[stable_ptr_table] + sp*SIZEOF_spEntry);
     return (r);
 }
 

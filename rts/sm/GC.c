@@ -220,7 +220,7 @@ GarbageCollect (nat collect_gen,
   stat_startGC(cap, gct);
 
   // lock the StablePtr table
-  stablePtrPreGC();
+  stableLock();
 
 #ifdef DEBUG
   mutlist_MUTVARS = 0;
@@ -390,7 +390,7 @@ GarbageCollect (nat collect_gen,
   initWeakForGC();
 
   // Mark the stable pointer table.
-  markStablePtrTable(mark_root, gct);
+  markStableTables(mark_root, gct);
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -420,7 +420,7 @@ GarbageCollect (nat collect_gen,
   shutdown_gc_threads(gct->thread_index);
 
   // Now see which stable names are still alive.
-  gcStablePtrTable();
+  gcStableTables();
 
 #ifdef THREADED_RTS
   if (n_gc_threads == 1) {
@@ -698,15 +698,15 @@ GarbageCollect (nat collect_gen,
   }
 
   // Update the stable pointer hash table.
-  updateStablePtrTable(major_gc);
+  updateStableTables(major_gc);
 
   // unlock the StablePtr table.  Must be before scheduleFinalizers(),
   // because a finalizer may call hs_free_fun_ptr() or
   // hs_free_stable_ptr(), both of which access the StablePtr table.
-  stablePtrPostGC();
+  stableUnlock();
 
   // Start any pending finalizers.  Must be after
-  // updateStablePtrTable() and stablePtrPostGC() (see #4221).
+  // updateStableTables() and stableUnlock() (see #4221).
   RELEASE_SM_LOCK;
   scheduleFinalizers(cap, old_weak_ptr_list);
   ACQUIRE_SM_LOCK;
