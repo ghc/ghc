@@ -164,3 +164,7 @@ test('T7227', [ extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS'),
             , compile_and_run, [''] )
 
 test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )
+
+test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
+# hpc should fail this, because it tags every variable occurrence with
+# a different tick.  It's probably a bug if it works, hence expect_fail.
