@@ -181,7 +181,7 @@ tcHsSigTypeNC ctxt (L loc hs_ty)
           -- The kind is checked by checkValidType, and isn't necessarily
           -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
-          -- Generalise here: see Note [ generalisation]
+          -- Generalise here: see Note [Kind generalisation]
         ; ty <- tcCheckHsTypeAndGen hs_ty kind
 
           -- Zonk to expose kind information to checkValidType

@@ -970,7 +970,7 @@ repE e@(HsDo ctxt sts _)
   | otherwise
   = notHandled "mdo, monad comprehension and [: :]" (ppr e)
 
-repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
+repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed)
   | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
@@ -987,7 +987,7 @@ repE (RecordUpd e flds _ _ _)
         repRecUpd x fs }
 
 repE (ExprWithTySig e ty) = do { e1 <- repLE e; t1 <- repLTy ty; repSigExp e1 t1 }
-repE (ArithSeq _ aseq) =
+repE (ArithSeq _ _ aseq) =
   case aseq of
     From e              -> do { ds1 <- repLE e; repFrom ds1 }
     FromThen e1 e2      -> do
@@ -1259,7 +1259,8 @@ repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
 repP (ParPat p)        = repLP p
-repP (ListPat ps _)    = do { qs <- repLPs ps; repPlist qs }
+repP (ListPat ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
+repP (ListPat ps ty1 (Just (_,e))) = do { p <- repP (ListPat ps ty1 Nothing); e' <- repE e; repPview e' p}
 repP (TuplePat ps boxed _)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }

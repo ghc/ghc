@@ -97,7 +97,8 @@ hsPatType (LazyPat pat)               = hsLPatType pat
 hsPatType (LitPat lit)                = hsLitType lit
 hsPatType (AsPat var _)               = idType (unLoc var)
 hsPatType (ViewPat _ _ ty)            = ty
-hsPatType (ListPat _ ty)              = mkListTy ty
+hsPatType (ListPat _ ty Nothing)      = mkListTy ty
+hsPatType (ListPat _ _ (Just (ty,_))) = ty
 hsPatType (PArrPat _ ty)              = mkPArrTy ty
 hsPatType (TuplePat _ _ ty)           = ty
 hsPatType (ConPatOut { pat_ty = ty }) = ty
@@ -647,10 +648,14 @@ zonkExpr env (HsDo do_or_lc stmts ty)
     zonkTcTypeToType env ty             `thenM` \ new_ty   ->
     returnM (HsDo do_or_lc new_stmts new_ty)
 
-zonkExpr env (ExplicitList ty exprs)
+zonkExpr env (ExplicitList ty wit exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
+    zonkWit env wit             `thenM` \ new_wit ->
     zonkLExprs env exprs	`thenM` \ new_exprs ->
-    returnM (ExplicitList new_ty new_exprs)
+    returnM (ExplicitList new_ty new_wit new_exprs)
+   where zonkWit _ Nothing = returnM Nothing
+         zonkWit env (Just fln) = zonkExpr env fln `thenM` \ new_fln ->
+                                  returnM (Just new_fln)
 
 zonkExpr env (ExplicitPArr ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
@@ -675,10 +680,14 @@ zonkExpr env (ExprWithTySigOut e ty)
 
 zonkExpr _ (ExprWithTySig _ _) = panic "zonkExpr env:ExprWithTySig"
 
-zonkExpr env (ArithSeq expr info)
+zonkExpr env (ArithSeq expr wit info)
   = zonkExpr env expr		`thenM` \ new_expr ->
+    zonkWit env wit             `thenM` \ new_wit  ->
     zonkArithSeq env info	`thenM` \ new_info ->
-    returnM (ArithSeq new_expr new_info)
+    returnM (ArithSeq new_expr new_wit new_info)
+   where zonkWit _ Nothing = returnM Nothing
+         zonkWit env (Just fln) = zonkExpr env fln `thenM` \ new_fln ->
+                                  returnM (Just new_fln)
 
 zonkExpr env (PArrSeq expr info)
   = zonkExpr env expr		`thenM` \ new_expr ->
@@ -987,10 +996,17 @@ zonk_pat env (ViewPat expr pat ty)
  	; ty' <- zonkTcTypeToType env ty
 	; return (env', ViewPat expr' pat' ty') }
 
-zonk_pat env (ListPat pats ty)
+zonk_pat env (ListPat pats ty Nothing)
   = do	{ ty' <- zonkTcTypeToType env ty
 	; (env', pats') <- zonkPats env pats
-	; return (env', ListPat pats' ty') }
+	; return (env', ListPat pats' ty' Nothing) }
+                                         
+zonk_pat env (ListPat pats ty (Just (ty2,wit)))
+  = do	{ wit' <- zonkExpr env wit
+        ; ty2' <- zonkTcTypeToType env ty2
+        ; ty' <- zonkTcTypeToType env ty
+	; (env', pats') <- zonkPats env pats
+	; return (env', ListPat pats' ty' (Just (ty2',wit'))) }
 
 zonk_pat env (PArrPat pats ty)
   = do	{ ty' <- zonkTcTypeToType env ty

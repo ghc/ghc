@@ -344,7 +344,7 @@ nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
 nlHsPar e		= noLoc (HsPar e)
 nlHsIf cond true false	= noLoc (mkHsIf cond true false)
 nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
-nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
+nlList exprs		= noLoc (ExplicitList placeHolderType Nothing exprs)
 
 nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
 nlHsTyVar :: name                         -> LHsType name
@@ -566,7 +566,7 @@ collect_lpat (L _ pat) bndrs
     go (ViewPat _ pat _)          = collect_lpat pat bndrs
     go (ParPat  pat)     	  = collect_lpat pat bndrs
 				  
-    go (ListPat pats _)    	  = foldr collect_lpat bndrs pats
+    go (ListPat pats _ _)         = foldr collect_lpat bndrs pats
     go (PArrPat pats _)    	  = foldr collect_lpat bndrs pats
     go (TuplePat pats _ _)  	  = foldr collect_lpat bndrs pats
 				  
@@ -751,7 +751,7 @@ lPatImplicits = hs_lpat
     hs_pat (AsPat _ pat)       = hs_lpat pat
     hs_pat (ViewPat _ pat _)   = hs_lpat pat
     hs_pat (ParPat  pat)       = hs_lpat pat
-    hs_pat (ListPat pats _)    = hs_lpats pats
+    hs_pat (ListPat pats _ _)  = hs_lpats pats
     hs_pat (PArrPat pats _)    = hs_lpats pats
     hs_pat (TuplePat pats _ _) = hs_lpats pats
 

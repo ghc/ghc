@@ -179,8 +179,9 @@ data HsExpr id
                 [ExprLStmt id]       -- "do":one or more stmts
                 PostTcType           -- Type of the whole expression
 
-  | ExplicitList                -- syntactic list
-                PostTcType      -- Gives type of components of list
+  | ExplicitList                        -- syntactic list
+                PostTcType              -- Gives type of components of list
+                (Maybe (SyntaxExpr id)) -- For OverloadedLists, the fromListN witness
                 [LHsExpr id]
 
   | ExplicitPArr                -- syntactic parallel array: [:e1, ..., en:]
@@ -215,8 +216,9 @@ data HsExpr id
                 (LHsType Name)          -- Retain the signature for
                                         -- round-tripping purposes
 
-  | ArithSeq                            -- arithmetic sequence
+  | ArithSeq                            -- Arithmetic sequence
                 PostTcExpr
+                (Maybe (SyntaxExpr id))   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo id)
 
   | PArrSeq                             -- arith. sequence for parallel array
@@ -500,7 +502,7 @@ ppr_expr (HsLet binds expr)
 
 ppr_expr (HsDo do_or_list_comp stmts _) = pprDo do_or_list_comp stmts
 
-ppr_expr (ExplicitList _ exprs)
+ppr_expr (ExplicitList _ _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (ExplicitPArr _ exprs)
@@ -519,7 +521,7 @@ ppr_expr (ExprWithTySigOut expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 
-ppr_expr (ArithSeq _ info) = brackets (ppr info)
+ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 ppr_expr (PArrSeq  _ info) = paBrackets (ppr info)
 
 ppr_expr EWildPat       = char '_'

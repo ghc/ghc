@@ -4656,6 +4656,163 @@ to work since it gets translated into an equality comparison.
 </para>
 </sect2>
 
+<sect2 id="overloaded-lists">
+<title>Overloaded lists</title>
+
+<para> GHC supports <emphasis>overloading of the list notation</emphasis>.
+Before turning our attention to the overloading, let us recap the notation for
+constructing lists. In Haskell, the list notation can be be used in the
+following seven ways:
+
+<programlisting>
+[]          -- Empty list 
+[x]         -- x : []
+[x,y,z]     -- x : y : z : []
+[x .. ]     -- enumFrom x
+[x,y ..]    -- enumFromThen x y
+[x .. y]    -- enumFromTo x y
+[x,y .. z]  -- enumFromThenTo x y z
+</programlisting>
+
+When the <option>OverloadedLists</option> extension is turned on, the
+aforementioned seven notations are desugared as follows: </para>
+
+<programlisting>
+[]          -- fromListN 0 []
+[x]         -- fromListN 1 (x : [])
+[x,y,z]     -- fromListN 3 (x : y : z : [])
+[x .. ]     -- fromList (enumFrom x)
+[x,y ..]    -- fromList (enumFromThen x y)
+[x .. y]    -- fromList (enumFromTo x y)
+[x,y .. z]  -- fromList (enumFromThenTo x y z)
+</programlisting>
+
+<para> This extension allows programmers to use the list notation for
+construction of structures like: <literal>Set</literal>,
+<literal>Map</literal>, <literal>IntMap</literal>, <literal>Vector</literal>,
+<literal>Text</literal> and <literal>Array</literal>. The following code
+listing gives a few examples:</para>
+
+<programlisting>
+['0' .. '9']             :: Set Char
+[1 .. 10]                :: Vector Int
+[("default",0), (k1,v1)] :: Map String Int
+['a' .. 'z']             :: Text
+</programlisting>
+<para>
+List patterns are also overloaded. When the <option>OverloadedLists</option> 
+extension is turned on, these definitions are desugared as follows
+<programlisting>
+f [] = ...          -- f (toList -> []) = ...
+g [x,y,z] = ...     -- g (toList -> [x,y,z]) = ...
+</programlisting>
+(Here we are using view-pattern syntax for the translation, see <xref linkend="view-patterns"/>.)
+</para>
+<para> During the typechecking and desugaring phases, GHC uses whatever is in
+scope with the names of <literal>toList</literal>, <literal>fromList</literal> and
+<literal>fromListN</literal>. That is, these functions are rebindable;
+c.f. <xref linkend="rebindable-syntax"/> </para>
+
+<para>That said, the <literal>GHC.Exts</literal> module exports the
+<literal>IsList</literal> class that can be used to overload
+these functions for different
+structures. The type class is defined as follows:</para>
+
+<programlisting>
+class IsList l where
+  type Item l
+
+  fromList :: [Item l] -> l
+  toList   :: l -> [Item l]
+
+  fromListN :: Int -> [Item l] -> l
+  fromListN _ = fromList
+</programlisting>
+
+<para>The <literal>FromList</literal> class and its methods are intended to be
+used in conjunction with the <option>OverloadedLists</option> extension. 
+<itemizedlist>
+<listitem> <para> The type function
+<literal>Item</literal> returns the type of items of the
+structure <literal>l</literal>.
+</para></listitem>
+<listitem><para> 
+The function <literal>fromList</literal> 
+constructs the structure <literal>l</literal> from the given list of
+<literal>Item l</literal>. 
+</para></listitem>
+<listitem><para> 
+The function <literal>fromListN</literal> takes the
+input list's length as a hint. Its behaviour should be equivalent to
+<literal>fromList</literal>. The hint can be used for more efficient
+construction of the structure <literal>l</literal> compared to
+<literal>fromList</literal>. If the given hint is not equal to the input
+list's length the behaviour of <literal>fromListN</literal> is not
+specified.
+</para></listitem>
+<listitem><para> 
+The function <literal>toList</literal> should be 
+the inverse of <literal>fromList</literal>.
+</para></listitem>
+</itemizedlist>
+</para>
+<para>In the following, we give several example instances of the
+<literal>FromList</literal> type class:</para>
+
+<programlisting>
+instance FromList [a] where
+  type Item [a] = a
+  fromList = id
+  toList = id
+
+instance (Ord a) => FromList (Set a) where
+  type Item (Set a) = a
+  fromList = Set.fromList
+  toList = Set.toList
+
+instance (Ord k) => FromList (Map k v) where
+  type Item (Map k v) = (k,v)
+  fromList = Map.fromList 
+  toList = Map.toList
+
+instance FromList (IntMap v) where
+  type Item (IntMap v) = (Int,v)
+  fromList = IntMap.fromList 
+  toList = IntMap.toList
+
+instance FromList Text where
+  type Item Text = Char
+  fromList = Text.pack
+  toList = Text.unpack
+
+instance FromList (Vector a) where
+  type Item (Vector a) = a
+  fromList  = Vector.fromList
+  fromListN = Vector.fromListN
+  toList = Vector.toList
+</programlisting>
+
+<para>Currently, the <literal>IsList</literal> class is not accompanied with
+defaulting rules. Although feasible, not much thought has gone into how to
+specify the meaning of the default declarations like:</para>
+
+<programlisting>
+default ([a])
+</programlisting>
+
+<para>The current implementation of the <option>OverloadedLists</option>
+extension can be improved by handling the lists that are only populated with
+literals in a special way. More specifically, the compiler could allocate such
+lists statically using a compact representation and allow
+<literal>IsList</literal> instances to take advantage of the compact
+representation. Equipped with this capability the
+<option>OverloadedLists</option> extension will be in a good position to
+subsume the <option>OverloadedStrings</option> extension (currently, as a
+special case, string literals benefit from statically allocated compact
+representation).</para>
+
+</sect2>
+
 </sect1>
 
 <sect1 id="type-families">

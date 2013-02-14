@@ -61,6 +61,8 @@ import SrcLoc
 import FastString
 import Literal		( inCharRange )
 import Control.Monad	( when )
+import TysWiredIn       ( nilDataCon )
+import DataCon          ( dataConName )
 \end{code}
 
 
@@ -375,11 +377,20 @@ rnPatAndThen mk p@(ViewPat expr pat ty)
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
-  = rnConPatAndThen mk con stuff
+   -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
+  = case unLoc con == nameRdrName (dataConName nilDataCon) of
+      True    -> do { ol_flag <- liftCps $ xoptM Opt_OverloadedLists
+                    ; if ol_flag then rnPatAndThen mk (ListPat [] placeHolderType Nothing)
+                                 else rnConPatAndThen mk con stuff} 
+      False   -> rnConPatAndThen mk con stuff
 
-rnPatAndThen mk (ListPat pats _)
-  = do { pats' <- rnLPatsAndThen mk pats
-       ; return (ListPat pats' placeHolderType) }
+rnPatAndThen mk (ListPat pats _ _)
+  = do { opt_OverloadedLists <- liftCps $ xoptM Opt_OverloadedLists
+       ; pats' <- rnLPatsAndThen mk pats
+       ; case opt_OverloadedLists of
+          True -> do   { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
+                       ; return (ListPat pats' placeHolderType (Just (placeHolderType, to_list_name)))}
+          False -> return (ListPat pats' placeHolderType Nothing) }
 
 rnPatAndThen mk (PArrPat pats _)
   = do { pats' <- rnLPatsAndThen mk pats

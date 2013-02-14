@@ -17,7 +17,7 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
-import {-#SOURCE#-} DsExpr (dsLExpr)
+import {-#SOURCE#-} DsExpr (dsLExpr, dsExpr)
 
 import DynFlags
 import HsSyn		
@@ -53,7 +53,7 @@ import qualified Data.Map as Map
 \end{code}
 
 This function is a wrapper of @match@, it must be called from all the parts where 
-it was called match, but only substitutes the firs call, ....
+it was called match, but only substitutes the first call, ....
 if the associated flags are declared, warnings will be issued.
 It can not be called matchWrapper because this name already exists :-(
 
@@ -327,12 +327,13 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
             PgBang     -> matchBangs      vars ty (dropGroup eqns)
             PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
             PgView _ _ -> matchView       vars ty (dropGroup eqns)
-
+            PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
+            
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
 
     -- print some stuff to see what's getting grouped
-    -- use -dppr-debug to see the resolution of overloaded lits
+    -- use -dppr-debug to see the resolution of overloaded literals
     debug eqns = 
         let gs = map (\group -> foldr (\ (p,_) -> \acc -> 
                                            case p of PgView e _ -> e:acc 
@@ -391,19 +392,33 @@ matchView (var:vars) ty (eqns@(eqn1:_))
 	; return (mkViewMatchResult var' viewExpr' var match_result) }
 matchView _ _ _ = panic "matchView"
 
+matchOverloadedList :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
+-- Since overloaded list patterns are treated as view patterns, 
+-- the code is roughly the same as for matchView
+  = do { let ListPat _ elt_ty (Just (_,e)) = firstPat eqn1 
+       ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
+       ; match_result <- match (var':vars) ty $ 
+                            map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
+       ; e' <- dsExpr e
+       ; return (mkViewMatchResult var' e' var match_result) }
+matchOverloadedList _ _ _ = panic "matchOverloadedList"
+
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat Id -> Pat Id) -> EquationInfo -> EquationInfo
 decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 	= eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat :: Pat Id -> Pat Id
+getCoPat, getBangPat, getViewPat, getOLPat :: Pat Id -> Pat Id
 getCoPat (CoPat _ pat _)     = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat pat  )   = unLoc pat
 getBangPat _                 = panic "getBangPat"
 getViewPat (ViewPat _ pat _) = unLoc pat
-getViewPat _                 = panic "getBangPat"
+getViewPat _                 = panic "getViewPat"
+getOLPat (ListPat pats ty (Just _)) = ListPat pats ty Nothing
+getOLPat _                   = panic "getOLPat"
 \end{code}
 
 Note [Empty case alternatives]
@@ -536,7 +551,7 @@ tidy1 v (LazyPat pat)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
 	; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ (ListPat pats ty)
+tidy1 _ (ListPat pats ty Nothing)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
@@ -831,7 +846,8 @@ data PatGroup
   | PgView (LHsExpr Id) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
-
+  | PgOverloadedList
+  
 groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- If the result is of form [g1, g2, g3], 
 -- (a) all the (pg,eq) pairs in g1 have the same pg
@@ -885,7 +901,7 @@ sameGroup (PgCo	t1)  (PgCo t2)  = t1 `eqType` t2
 	-- always have the same type, so this boils down to saying that
 	-- the two coercions are identical.
 sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2) 
-       -- ViewPats are in the same gorup iff the expressions
+       -- ViewPats are in the same group iff the expressions
        -- are "equal"---conservatively, we use syntactic equality
 sameGroup _          _          = False
 
@@ -1002,6 +1018,7 @@ patGroup _      (NPat olit mb_neg _)         = PgN   (hsOverLitKey olit (isJust 
 patGroup _      (NPlusKPat _ olit _ _)       = PgNpK (hsOverLitKey olit False)
 patGroup _      (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _      (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
+patGroup _      (ListPat _ _ (Just _))       = PgOverloadedList
 patGroup _      pat = pprPanic "patGroup" (ppr pat)
 \end{code}
 

@@ -48,7 +48,7 @@ module TysWiredIn (
 	wordTyCon, wordDataCon, wordTyConName, wordTy,
 
         -- * List
-	listTyCon, nilDataCon, consDataCon, consDataConName,
+	listTyCon, nilDataCon, nilDataConName, consDataCon, consDataConName,
 	listTyCon_RDR, consDataCon_RDR, listTyConName,
 	mkListTy, mkPromotedListTy,
 

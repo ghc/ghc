@@ -30,6 +30,7 @@ import Id
 import Var
 import Name
 import TcEnv
+--import TcExpr
 import TcMType
 import TcValidity( arityErr )
 import TcType
@@ -451,11 +452,20 @@ tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
 
 ------------------------
 -- Lists, tuples, arrays
-tc_pat penv (ListPat pats _) pat_ty thing_inside
-  = do	{ (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy pat_ty
+tc_pat penv (ListPat pats _ Nothing) pat_ty thing_inside
+  = do	{ (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy pat_ty      
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 				     pats penv thing_inside
- 	; return (mkHsWrapPat coi (ListPat pats' elt_ty) pat_ty, res) 
+ 	; return (mkHsWrapPat coi (ListPat pats' elt_ty Nothing) pat_ty, res) 
+        }
+
+tc_pat penv (ListPat pats _ (Just (_,e))) pat_ty thing_inside
+  = do	{ list_pat_ty <- newFlexiTyVarTy liftedTypeKind
+        ; e' <- tcSyntaxOp ListOrigin e (mkFunTy pat_ty list_pat_ty)
+        ; (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy list_pat_ty
+        ; (pats', res) <- tcMultiple (\p -> tc_lpat p elt_ty)
+				     pats penv thing_inside
+ 	; return (mkHsWrapPat coi (ListPat pats' elt_ty (Just (pat_ty,e'))) list_pat_ty, res) 
         }
 
 tc_pat penv (PArrPat pats _) pat_ty thing_inside

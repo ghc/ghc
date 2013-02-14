@@ -67,8 +67,12 @@ data Pat id
   | BangPat     (LPat id)               -- Bang pattern
 
         ------------ Lists, tuples, arrays ---------------
-  | ListPat     [LPat id]               -- Syntactic list
-                PostTcType              -- The type of the elements
+  | ListPat     [LPat id]                            -- Syntactic list
+                PostTcType                           -- The type of the elements
+                (Maybe (PostTcType, SyntaxExpr id))  -- For rebindable syntax
+                   -- For OverloadedLists a Just (ty,fn) gives
+                   -- overall type of the pattern, and the toList
+                   -- function to convert the scrutinee to a list value
 
   | TuplePat    [LPat id]               -- Tuple
                 Boxity                  -- UnitPat is TuplePat []
@@ -245,7 +249,7 @@ pprPat (BangPat pat)      = char '!' <> pprParendLPat pat
 pprPat (AsPat name pat)   = hcat [ppr name, char '@', pprParendLPat pat]
 pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)         = parens (ppr pat)
-pprPat (ListPat pats _)     = brackets (interpp'SP pats)
+pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = paBrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens (boxityNormalTupleSort bx) (interpp'SP pats)
 
@@ -401,7 +405,7 @@ isIrrefutableHsPat pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
-    go1 (ListPat {})        = False
+    go1 (ListPat {}) = False
     go1 (PArrPat {})        = False     -- ?
 
     go1 (ConPatIn {})       = False     -- Conservative

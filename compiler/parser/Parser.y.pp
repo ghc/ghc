@@ -1617,12 +1617,12 @@ tup_tail :: { [HsTupArg RdrName] }
 -- avoiding another shift/reduce-conflict.
 
 list :: { LHsExpr RdrName }
-        : texp                  { L1 $ ExplicitList placeHolderType [$1] }
-        | lexps                 { L1 $ ExplicitList placeHolderType (reverse (unLoc $1)) }
-        | texp '..'             { LL $ ArithSeq noPostTcExpr (From $1) }
-        | texp ',' exp '..'     { LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
-        | texp '..' exp         { LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
-        | texp ',' exp '..' exp { LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
+        : texp                  { L1 $ ExplicitList placeHolderType Nothing [$1] }
+        | lexps                 { L1 $ ExplicitList placeHolderType Nothing (reverse (unLoc $1)) }
+        | texp '..'             { LL $ ArithSeq noPostTcExpr Nothing (From $1) }
+        | texp ',' exp '..'     { LL $ ArithSeq noPostTcExpr Nothing (FromThen $1 $3) }
+        | texp '..' exp         { LL $ ArithSeq noPostTcExpr Nothing (FromTo $1 $3) }
+        | texp ',' exp '..' exp { LL $ ArithSeq noPostTcExpr Nothing (FromThenTo $1 $3 $5) }
         | texp '|' flattenedpquals      
              {% checkMonadComp >>= \ ctxt ->
                 return (sL (comb2 $1 $>) $ 

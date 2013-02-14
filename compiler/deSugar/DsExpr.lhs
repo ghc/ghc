@@ -350,8 +350,8 @@ dsExpr (HsMultiIf res_ty alts)
 \underline{\bf Various data construction things}
 %              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-dsExpr (ExplicitList elt_ty xs) 
-  = dsExplicitList elt_ty xs
+dsExpr (ExplicitList elt_ty wit xs) 
+  = dsExplicitList elt_ty wit xs
 
 -- We desugar [:x1, ..., xn:] as
 --   singletonP x1 +:+ ... +:+ singletonP xn
@@ -368,17 +368,13 @@ dsExpr (ExplicitPArr ty xs) = do
     unary  fn x   = mkApps (Var fn) [Type ty, x]
     binary fn x y = mkApps (Var fn) [Type ty, x, y]
 
-dsExpr (ArithSeq expr (From from))
-  = App <$> dsExpr expr <*> dsLExpr from
-
-dsExpr (ArithSeq expr (FromTo from to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
-
-dsExpr (ArithSeq expr (FromThen from thn))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
-
-dsExpr (ArithSeq expr (FromThenTo from thn to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
+dsExpr (ArithSeq expr witness seq)
+  = case witness of
+     Nothing -> dsArithSeq expr seq
+     Just fl -> do { 
+       ; fl' <- dsExpr fl
+       ; newArithSeq <- dsArithSeq expr seq
+       ; return (App fl' newArithSeq)}
 
 dsExpr (PArrSeq expr (FromTo from to))
   = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
@@ -673,9 +669,9 @@ makes all list literals be generated via the simple route.
 
 
 \begin{code}
-dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
+dsExplicitList :: PostTcType -> Maybe (SyntaxExpr Id) -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
-dsExplicitList elt_ty xs
+dsExplicitList elt_ty Nothing xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
@@ -700,9 +696,25 @@ dsExplicitList elt_ty xs
            ; folded_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) suffix'
            ; return (foldr (App . App (Var c)) folded_suffix prefix) }
 
+dsExplicitList elt_ty (Just fln) xs
+  = do { fln' <- dsExpr fln
+       ; list <- dsExplicitList elt_ty Nothing xs
+       ; dflags <- getDynFlags
+       ; return (App (App fln' (mkIntExprInt dflags (length xs))) list) }
+       
 spanTail :: (a -> Bool) -> [a] -> ([a], [a])
 spanTail f xs = (reverse rejected, reverse satisfying)
     where (satisfying, rejected) = span f $ reverse xs
+    
+dsArithSeq :: PostTcExpr -> (ArithSeqInfo Id) -> DsM CoreExpr
+dsArithSeq expr (From from)
+  = App <$> dsExpr expr <*> dsLExpr from
+dsArithSeq expr (FromTo from to)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
+dsArithSeq expr (FromThen from thn)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
+dsArithSeq expr (FromThenTo from thn to)
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
 \end{code}
 
 Desugar 'do' and 'mdo' expressions (NOT list comprehensions, they're

@@ -809,6 +809,13 @@
             <entry><option>-XNoOverloadedStrings</option></entry>
           </row>
           <row>
+            <entry><option>-XOverloadedLists</option></entry>
+            <entry>Enable <link linkend="overloaded-lists">overloaded lists</link>.
+            </entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoOverloadedLists</option></entry>
+          </row>
+          <row>
             <entry><option>-XGADTs</option></entry>
             <entry>Enable <link linkend="gadt">generalised algebraic data types</link>.
             </entry>

@@ -260,7 +260,9 @@ pprDeeper d = SDoc $ \ctx -> case ctx of
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 -- Truncate a list that list that is longer than the current depth
-pprDeeperList f ds = SDoc work
+pprDeeperList f ds 
+  | null ds   = f []
+  | otherwise = SDoc work
  where
   work ctx@SDC{sdocStyle=PprUser q (PartWay n)}
    | n==0      = Pretty.text "..."

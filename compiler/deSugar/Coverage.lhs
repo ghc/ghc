@@ -519,10 +519,14 @@ addTickHsExpr (HsDo cxt stmts srcloc)
         forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
-addTickHsExpr (ExplicitList ty es) =
-        liftM2 ExplicitList
+addTickHsExpr (ExplicitList ty wit es) =
+        liftM3 ExplicitList
                 (return ty)
-                (mapM (addTickLHsExpr) es)
+                (addTickWit wit)
+                (mapM (addTickLHsExpr) es) 
+             where addTickWit Nothing = return Nothing
+                   addTickWit (Just fln) = do fln' <- addTickHsExpr fln
+                                              return (Just fln')
 addTickHsExpr (ExplicitPArr ty es) =
         liftM2 ExplicitPArr
                 (return ty)
@@ -543,10 +547,14 @@ addTickHsExpr (ExprWithTySigOut e ty) =
                 (addTickLHsExprNever e) -- No need to tick the inner expression
                                     -- for expressions with signatures
                 (return ty)
-addTickHsExpr (ArithSeq  ty arith_seq) =
-        liftM2 ArithSeq
+addTickHsExpr (ArithSeq  ty wit arith_seq) =
+        liftM3 ArithSeq
                 (return ty)
+                (addTickWit wit)
                 (addTickArithSeqInfo arith_seq)
+             where addTickWit Nothing = return Nothing
+                   addTickWit (Just fl) = do fl' <- addTickHsExpr fl
+                                             return (Just fl')
 addTickHsExpr (HsTickPragma _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0

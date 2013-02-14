@@ -141,8 +141,9 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ (LitPat lit)           = LitPat (untidy_lit lit)
     untidy' _ p@(ConPatIn _ (PrefixCon [])) = p
     untidy' b (ConPatIn name ps)     = pars b (L loc (ConPatIn name (untidy_con ps)))
-    untidy' _ (ListPat pats ty)      = ListPat (map untidy_no_pars pats) ty
+    untidy' _ (ListPat pats ty Nothing)     = ListPat (map untidy_no_pars pats) ty Nothing   
     untidy' _ (TuplePat pats box ty) = TuplePat (map untidy_no_pars pats) box ty
+    untidy' _ (ListPat _ _ (Just _)) = panic "Check.untidy: Overloaded ListPat"    
     untidy' _ (PArrPat _ _)          = panic "Check.untidy: Shouldn't get a parallel array here!"
     untidy' _ (SigPatIn _ _)         = panic "Check.untidy: SigPat"
     untidy' _ (LazyPat {})           = panic "Check.untidy: LazyPat"
@@ -568,15 +569,15 @@ is_nil (ConPatIn con (PrefixCon [])) = unLoc con == getName nilDataCon
 is_nil _                             = False
 
 is_list :: Pat Name -> Bool
-is_list (ListPat _ _) = True
+is_list (ListPat _ _ Nothing) = True
 is_list _             = False
 
 return_list :: DataCon -> Pat Name -> Bool
 return_list id q = id == consDataCon && (is_nil q || is_list q)
 
 make_list :: LPat Name -> Pat Name -> Pat Name
-make_list p q | is_nil q    = ListPat [p] placeHolderType
-make_list p (ListPat ps ty) = ListPat (p:ps) ty
+make_list p q | is_nil q    = ListPat [p] placeHolderType Nothing
+make_list p (ListPat ps ty Nothing) = ListPat (p:ps) ty Nothing
 make_list _ _               = panic "Check.make_list: Invalid argument"
 
 make_con :: Pat Id -> ExhaustivePat -> ExhaustivePat
@@ -647,7 +648,8 @@ might_fail_pat (ViewPat _ p _)               = not (isIrrefutableHsPat p)
 might_fail_pat (ParPat p)                    = might_fail_lpat p
 might_fail_pat (AsPat _ p)                   = might_fail_lpat p
 might_fail_pat (SigPatOut p _ )              = might_fail_lpat p
-might_fail_pat (ListPat ps _)                = any might_fail_lpat ps
+might_fail_pat (ListPat ps _ Nothing)        = any might_fail_lpat ps
+might_fail_pat (ListPat _ _ (Just _))      = True
 might_fail_pat (TuplePat ps _ _)             = any might_fail_lpat ps
 might_fail_pat (PArrPat ps _)                = any might_fail_lpat ps
 might_fail_pat (BangPat p)                   = might_fail_lpat p
@@ -682,11 +684,12 @@ tidy_pat (CoPat _ pat _)  = tidy_pat pat
 -- guard says "this equation might fall through".
 tidy_pat (NPlusKPat id _ _ _) = WildPat (idType (unLoc id))
 tidy_pat (ViewPat _ _ ty)     = WildPat ty
+tidy_pat (ListPat _ _ (Just (ty,_))) = WildPat ty
 
 tidy_pat pat@(ConPatOut { pat_con = L _ id, pat_args = ps })
   = pat { pat_args = tidy_con id ps }
 
-tidy_pat (ListPat ps ty)
+tidy_pat (ListPat ps ty Nothing)
   = unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
                                   (mkNilPat list_ty)
                                   (map tidy_lpat ps)

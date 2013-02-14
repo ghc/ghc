@@ -227,13 +227,19 @@ basicKnownKeyNames
         -- Stable pointers
         newStablePtrName,
 
-    -- GHC Extensions
+        -- GHC Extensions
         groupWithName,
 
         -- Strings and lists
         unpackCStringName,
         unpackCStringFoldrName, unpackCStringUtf8Name,
-
+        
+        -- Overloaded lists
+        isListClassName,
+        fromListName,
+        fromListNName,
+        toListName,
+        
         -- List operations
         concatName, filterName, mapName,
         zipName, foldrName, buildName, augmentName, appendName,
@@ -569,6 +575,11 @@ plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
 
 fromString_RDR :: RdrName
 fromString_RDR          = nameRdrName fromStringName
+
+fromList_RDR, fromListN_RDR, toList_RDR :: RdrName
+fromList_RDR = nameRdrName fromListName
+fromListN_RDR = nameRdrName fromListNName
+toList_RDR = nameRdrName toListName
 
 compose_RDR :: RdrName
 compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
@@ -1001,6 +1012,13 @@ concatName, filterName, zipName :: Name
 concatName        = varQual gHC_LIST (fsLit "concat") concatIdKey
 filterName        = varQual gHC_LIST (fsLit "filter") filterIdKey
 zipName           = varQual gHC_LIST (fsLit "zip") zipIdKey
+
+-- Overloaded lists
+isListClassName, fromListName, fromListNName, toListName :: Name
+isListClassName = clsQual gHC_EXTS (fsLit "IsList") isListClassKey
+fromListName = methName gHC_EXTS (fsLit "fromList") fromListClassOpKey
+fromListNName = methName gHC_EXTS (fsLit "fromListN") fromListNClassOpKey
+toListName = methName gHC_EXTS (fsLit "toList") toListClassOpKey
 
 -- Class Show
 showClassName :: Name
@@ -1743,6 +1761,12 @@ mzipIdKey       = mkPreludeMiscIdUnique 196
 ghciStepIoMClassOpKey :: Unique
 ghciStepIoMClassOpKey = mkPreludeMiscIdUnique 197
 
+-- Overloaded lists
+isListClassKey, fromListClassOpKey, fromListNClassOpKey, toListClassOpKey :: Unique
+isListClassKey = mkPreludeMiscIdUnique 198
+fromListClassOpKey = mkPreludeMiscIdUnique 199
+fromListNClassOpKey = mkPreludeMiscIdUnique 500
+toListClassOpKey = mkPreludeMiscIdUnique 501
 
 ---------------- Template Haskell -------------------
 --      USES IdUniques 200-499
