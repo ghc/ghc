@@ -156,7 +156,7 @@ static StgWord dec_running          (void);
 static void wakeup_gc_threads       (nat me);
 static void shutdown_gc_threads     (nat me);
 static void collect_gct_blocks      (void);
-static StgWord collect_pinned_object_blocks (void);
+static void collect_pinned_object_blocks (void);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -186,7 +186,7 @@ GarbageCollect (nat collect_gen,
 {
   bdescr *bd;
   generation *gen;
-  StgWord live_blocks, live_words, allocated, par_max_copied, par_tot_copied;
+  StgWord live_blocks, live_words, par_max_copied, par_tot_copied;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -242,11 +242,6 @@ GarbageCollect (nat collect_gen,
       capabilities[n].r.rCCCS = CCS_GC;
   }
 #endif
-
-  /* Approximate how much we allocated.  
-   * Todo: only when generating stats? 
-   */
-  allocated = countLargeAllocated(); /* don't count the nursery yet */
 
   /* Figure out which generation to collect
    */
@@ -304,7 +299,7 @@ GarbageCollect (nat collect_gen,
 
   // gather blocks allocated using allocatePinned() from each capability
   // and put them on the g0->large_object list.
-  allocated += collect_pinned_object_blocks();
+  collect_pinned_object_blocks();
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
@@ -419,7 +414,7 @@ GarbageCollect (nat collect_gen,
   }
 
   if (!DEBUG_IS_ON && n_gc_threads != 1) {
-      gct->allocated = clearNursery(cap);
+      clearNursery(cap);
   }
 
   shutdown_gc_threads(gct->thread_index);
@@ -659,17 +654,14 @@ GarbageCollect (nat collect_gen,
   // Reset the nursery: make the blocks empty
   if (DEBUG_IS_ON || n_gc_threads == 1) {
       for (n = 0; n < n_capabilities; n++) {
-          allocated += clearNursery(&capabilities[n]);
+          clearNursery(&capabilities[n]);
       }
   } else {
       // When doing parallel GC, clearNursery() is called by the
-      // worker threads, and the value returned is stored in
-      // gct->allocated.
+      // worker threads
       for (n = 0; n < n_capabilities; n++) {
           if (gc_threads[n]->idle) {
-              allocated += clearNursery(&capabilities[n]);
-          } else {
-              allocated += gc_threads[n]->allocated;
+              clearNursery(&capabilities[n]);
           }
       }
   }
@@ -781,7 +773,7 @@ GarbageCollect (nat collect_gen,
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(cap, gct, allocated, live_words, copied,
+  stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
              N, n_gc_threads, par_max_copied, par_tot_copied);
 
@@ -1094,7 +1086,7 @@ gcWorkerThread (Capability *cap)
     scavenge_until_all_done();
     
     if (!DEBUG_IS_ON) {
-        gct->allocated = clearNursery(cap);
+        clearNursery(cap);
     }
 
 #ifdef THREADED_RTS
@@ -1439,17 +1431,15 @@ collect_gct_blocks (void)
    purposes.
    -------------------------------------------------------------------------- */
 
-static StgWord
+static void
 collect_pinned_object_blocks (void)
 {
     nat n;
     bdescr *bd, *prev;
-    StgWord allocated = 0;
 
     for (n = 0; n < n_capabilities; n++) {
         prev = NULL;
         for (bd = capabilities[n].pinned_object_blocks; bd != NULL; bd = bd->link) {
-            allocated += bd->free - bd->start;
             prev = bd;
         }
         if (prev != NULL) {
@@ -1461,8 +1451,6 @@ collect_pinned_object_blocks (void)
             capabilities[n].pinned_object_blocks = 0;
         }
     }
-
-    return allocated;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1480,7 +1468,6 @@ init_gc_thread (gc_thread *t)
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;
-    t->allocated = 0;
     t->copied = 0;
     t->scanned = 0;
     t->any_work = 0;

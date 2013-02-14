@@ -176,7 +176,6 @@ typedef struct gc_thread_ {
     // -------------------
     // stats
 
-    W_ allocated;          // result of clearNursery()
     W_ copied;
     W_ scanned;
     W_ any_work;
