@@ -1,0 +1,7 @@
+
+overloadedlistsfail05.hs:3:29:
+    Couldn't match expected type `Char' with actual type `Int'
+    In the expression: (10 :: Int)
+    In the first argument of `length', namely `['a' .. (10 :: Int)]'
+    In the first argument of `print', namely
+      `(length ['a' .. (10 :: Int)])'
