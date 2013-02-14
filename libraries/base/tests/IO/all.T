@@ -4,7 +4,7 @@ def expect_fail_if_windows(name, opts):
    f = when(opsys('mingw32'), expect_fail);
    return f(normal, opts);
 
-test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
+test('IOError001', [omit_ways(['ghci']), set_stdin('IOError001.hs')],
 	compile_and_run, [''])
 
 test('IOError002',      normal, compile_and_run, [''])
@@ -22,7 +22,7 @@ test('hFlush001',
      compile_and_run, [''])
 
 test('hGetBuffering001', 
-	compose(omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')), 
+	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')], 
 	compile_and_run, [''])
 
 test('hGetChar001', normal, compile_and_run, [''])
@@ -52,8 +52,8 @@ test('hSeek004', extra_clean(['hSeek004.out']), compile_and_run, ['-cpp'])
 
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
-test('hSetBuffering003', compose(omit_ways(['ghci']), 
-				 set_stdin('hSetBuffering003.hs')), 
+test('hSetBuffering003',
+    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')], 
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
@@ -102,9 +102,11 @@ test('readwrite002',
 
 test('readwrite003', extra_clean(['readwrite003.txt']), compile_and_run, [''])
 
-test('hGetBuf001', compose(only_compiler_types(['ghc']),
-		   compose(when(fast(), skip),
-		     expect_fail_if_windows)), compile_and_run, ['-package unix'])
+test('hGetBuf001',
+     [only_compiler_types(['ghc']),
+      when(fast(), skip),
+      expect_fail_if_windows],
+     compile_and_run, ['-package unix'])
 
 test('hDuplicateTo001', extra_clean(['tmp']), compile_and_run, [''])
 
