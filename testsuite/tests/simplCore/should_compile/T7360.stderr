@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 27, types: 24, coercions: 0}
+Result size of Tidy Core = {terms: 36, types: 28, coercions: 0}
 
 T7360.$WFoo3 [InlPrag=INLINE] :: GHC.Types.Int -> T7360.Foo
 [GblId[DataConWrapper],
@@ -21,13 +21,22 @@ T7360.fun1 [InlPrag=NOINLINE] :: T7360.Foo -> ()
 T7360.fun1 =
   \ (x :: T7360.Foo) -> case x of _ { __DEFAULT -> GHC.Tuple.() }
 
-T7360.fun3 :: ()
+T7360.fun4 :: ()
 [GblId,
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=False,
          ConLike=False, WorkFree=False, Expandable=False,
          Guidance=IF_ARGS [] 20 0}]
-T7360.fun3 = T7360.fun1 T7360.Foo1
+T7360.fun4 = T7360.fun1 T7360.Foo1
+
+T7360.fun3 :: GHC.Types.Int
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
+         ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 20}]
+T7360.fun3 = GHC.Types.I# 0
 
 T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
 [GblId,
@@ -36,20 +45,24 @@ T7360.fun2 :: forall a. [a] -> ((), GHC.Types.Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
          ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) (x [Occ=Once] :: [a]) ->
-                 (T7360.fun3,
-                  case x of wild { __DEFAULT ->
-                  case GHC.List.$wlen @ a wild 0 of ww { __DEFAULT ->
-                  GHC.Types.I# ww
-                  }
+         Tmpl= \ (@ a) (x [Occ=Once!] :: [a]) ->
+                 (T7360.fun4,
+                  case x of wild {
+                    [] -> T7360.fun3;
+                    : _ _ ->
+                      case GHC.List.$wlenAcc @ a wild 0 of ww { __DEFAULT ->
+                      GHC.Types.I# ww
+                      }
                   })}]
 T7360.fun2 =
   \ (@ a) (x :: [a]) ->
-    (T7360.fun3,
-     case x of wild { __DEFAULT ->
-     case GHC.List.$wlen @ a wild 0 of ww { __DEFAULT ->
-     GHC.Types.I# ww
-     }
+    (T7360.fun4,
+     case x of wild {
+       [] -> T7360.fun3;
+       : ds ds1 ->
+         case GHC.List.$wlenAcc @ a wild 0 of ww { __DEFAULT ->
+         GHC.Types.I# ww
+         }
      })
 
 
