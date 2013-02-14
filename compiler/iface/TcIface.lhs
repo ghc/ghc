@@ -9,7 +9,10 @@ Type checking of type signatures in interface files
 module TcIface ( 
         tcImportDecl, importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-        tcIfaceVectInfo, tcIfaceAnnotations, tcIfaceGlobal, tcExtCoreBindings
+        tcIfaceVectInfo, tcIfaceAnnotations, 
+        tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
+        tcIfaceGlobal, 
+        tcExtCoreBindings
  ) where
 
 #include "HsVersions.h"

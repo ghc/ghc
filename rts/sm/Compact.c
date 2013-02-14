@@ -964,7 +964,7 @@ compact(StgClosure *static_objects)
     thread_static(static_objects /* ToDo: ok? */);
 
     // the stable pointer table
-    threadStablePtrTable((evac_fn)thread_root, NULL);
+    threadStableTables((evac_fn)thread_root, NULL);
 
     // the CAF list (used by GHCi)
     markCAFs((evac_fn)thread_root, NULL);

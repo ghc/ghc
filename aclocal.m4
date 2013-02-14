@@ -1219,6 +1219,26 @@ AC_SUBST([FindCmd])[]dnl
 ])# FP_PROG_FIND
 
 
+# FP_PROG_SORT
+# ------------
+# Find a Unix-like sort
+AC_DEFUN([FP_PROG_SORT],
+[AC_PATH_PROG([fp_prog_sort], [sort])
+echo conwip > conftest.txt
+$fp_prog_sort -f conftest.txt > conftest.out 2>&1
+if grep 'conwip' conftest.out > /dev/null 2>&1 ; then
+  # The goods
+  SortCmd="$fp_prog_sort"
+else
+  # Summink else..pick next one.
+  AC_MSG_WARN([$fp_prog_sort looks like a non-*nix sort, ignoring it])
+  FP_CHECK_PROG([SortCmd], [sort], [], [], [$fp_prog_sort])
+fi
+rm -f conftest.txt conftest.out
+AC_SUBST([SortCmd])[]dnl
+])# FP_PROG_SORT
+
+
 dnl
 dnl FPTOOLS_NOCACHE_CHECK prints a message, then sets the
 dnl values of the second argument to the result of running
@@ -1478,21 +1498,11 @@ if test "$RELEASE" = "NO"; then
         fi
         PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
         AC_MSG_RESULT(inferred $PACKAGE_VERSION)
-    elif test -d _darcs; then
-        # TODO: Remove this branch after conversion to Git
-        changequote(, )dnl
-        ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | ${SortCmd} -n | tail -1`
-        if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
-        changequote([, ])dnl
-                AC_MSG_ERROR([failed to detect version date: check that darcs is in your path])
-        fi
-        PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
-        AC_MSG_RESULT(inferred $PACKAGE_VERSION)
     elif test -f VERSION; then
         PACKAGE_VERSION=`cat VERSION`
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     else
-        AC_MSG_WARN([cannot determine snapshot version: no .git or _darcs directory and no VERSION file])
+        AC_MSG_WARN([cannot determine snapshot version: no .git directory and no VERSION file])
     fi
 fi
 
@@ -1866,7 +1876,7 @@ case "$1" in
 # converts vendor from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_VENDOR],[
   case "$1" in
-  pc|gentoo) # like i686-pc-linux-gnu and i686-gentoo-freebsd8
+  pc|gentoo|w64) # like i686-pc-linux-gnu, i686-gentoo-freebsd8, x86_64-w64-mingw32
     $2="unknown"
     ;;
   softfloat) # like armv5tel-softfloat-linux-gnueabi
@@ -1957,6 +1967,23 @@ AC_DEFUN([XCODE_VERSION],[
             AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
             AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
         fi
+    fi
+])
+
+# FIND_LLVM_PROG()
+# --------------------------------
+# Find where the llvm tools are. We have a special function to handle when they
+# are installed with a version suffix (e.g., llc-3.1).
+#
+# $1 = the variable to set
+# $2 = the with option name
+# $3 = the command to look for
+#
+AC_DEFUN([FIND_LLVM_PROG],[
+    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
+    if test "$1" == ""; then
+        GOOD_PATH=`echo $PATH | tr ':,;' '   '`
+        $1=`${FindCmd} ${GOOD_PATH} -type f -perm +111 -maxdepth 1 -regex '.*/$3-[[0-9]]\.[[0-9]]' | ${SortCmd} -n | tail -1`
     fi
 ])
 

@@ -77,7 +77,7 @@ typedef struct generation_ {
     memcount       n_large_blocks;      // no. of blocks used by large objs
     memcount       n_large_words;       // no. of words used by large objs
     memcount       n_new_large_words;   // words of new large objects
-                                        // (for allocation stats)
+                                        // (for doYouWantToGC())
 
     memcount       max_blocks;          // max blocks
 

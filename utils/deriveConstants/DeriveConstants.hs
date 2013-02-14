@@ -536,6 +536,9 @@ wanteds = concat
           ,structField C "snEntry" "sn_obj"
           ,structField C "snEntry" "addr"
 
+          ,structSize  C "spEntry"
+          ,structField C "spEntry" "addr"
+
            -- Note that this conditional part only affects the C headers.
            -- That's important, as it means we get the same PlatformConstants
            -- type on all platforms.

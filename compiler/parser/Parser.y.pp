@@ -2104,7 +2104,7 @@ modid   :: { Located ModuleName }
                                      (unpackFS mod ++ '.':unpackFS c))
                                 }
 
-commas :: { Int }
+commas :: { Int }   -- One or more commas
         : commas ','                    { $1 + 1 }
         | ','                           { 1 }
 

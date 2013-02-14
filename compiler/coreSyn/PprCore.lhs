@@ -157,17 +157,13 @@ ppr_expr add_par expr@(App {})
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PprCaseAsLet dflags
-    then add_par $
-         sep [sep    [ ptext (sLit "let")
-                             <+> char '{'
-                             <+> ppr_case_pat con args
-                             <+> ptext (sLit "~")
-                             <+> ppr_bndr var
-                     , ptext (sLit "<-")
-                             <+> ppr_expr id expr
-                     , char '}'
-                             <+> ptext (sLit "in")
-                     ]
+    then add_par $  -- See Note [Print case as let]
+         sep [ sep [ ptext (sLit "let! {") 
+                     <+> ppr_case_pat con args
+                     <+> ptext (sLit "~")
+                     <+> ppr_bndr var
+                   , ptext (sLit "<-") <+> ppr_expr id expr
+                     <+> ptext (sLit "} in") ]
              , pprCoreExpr rhs
              ]
     else add_par $
@@ -258,6 +254,17 @@ pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
 pprArg expr          = pprParendExpr expr
 \end{code}
 
+Note [Print case as let]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Single-branch case expressions are very common:
+   case x of y { I# x' -> 
+   case p of q { I# p' -> ... } }
+These are, in effect, just strict let's, with pattern matching.
+With -dppr-case-as-let we print them as such:
+   let! { I# x' ~ y <- x } in
+   let! { I# p' ~ q <- p } in ...
+
+ 
 Other printing bits-and-bobs used with the general @pprCoreBinding@
 and @pprCoreExpr@ functions.
 

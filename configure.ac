@@ -39,6 +39,7 @@ dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
+FP_PROG_SORT
 
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
@@ -505,13 +506,13 @@ esac
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc], [llc])
+FIND_LLVM_PROG([LLC], [llc], [llc])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt], [opt])
+FIND_LLVM_PROG([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
@@ -1006,7 +1007,11 @@ echo ["\
    Alex     : $AlexCmd ($AlexVersion)
    Perl     : $PerlCmd
    dblatex  : $DblatexCmd
-   xsltproc : $XsltprocCmd"]
+   xsltproc : $XsltprocCmd
+
+   Using LLVM tools
+      llc   : $LlcCmd
+      opt   : $OptCmd"]
 
 if test "$HSCOLOUR" = ""; then
 echo ["

@@ -25,7 +25,6 @@ module TcRnDriver (
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif
 
-import TypeRep
 import DynFlags
 import StaticFlags
 import HsSyn
@@ -1514,7 +1513,7 @@ isGHCiMonad hsc_env ictxt ty
                 let name = gre_name n
                 ghciClass <- tcLookupClass ghciIoClassName 
                 userTyCon <- tcLookupTyCon name
-                let userTy = TyConApp userTyCon []
+                let userTy = mkTyConApp userTyCon []
                 _ <- tcLookupInstance ghciClass [userTy]
                 return name
 

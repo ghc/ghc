@@ -205,7 +205,10 @@ check' :: [(EqnNo, EquationInfo)]
         -> ([ExhaustivePat],    -- Pattern scheme that might not be matched at all
             EqnSet)             -- Eqns that are used (others are overlapped)
 
-check' [] = ([([],[])],emptyUniqSet)
+check' [] = ([],emptyUniqSet)
+  -- Was    ([([],[])], emptyUniqSet)
+  -- But that (a) seems weird, and (b) triggered Trac #7669 
+  -- So now I'm just doing the simple obvious thing
 
 check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult can_fail _ }) : rs)
    | first_eqn_all_vars && case can_fail of { CantFail -> True; CanFail -> False }
