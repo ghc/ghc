@@ -289,6 +289,7 @@ import Data.Maybe
         'bits32'        { L _ (CmmT_bits32) }
         'bits64'        { L _ (CmmT_bits64) }
         'bits128'       { L _ (CmmT_bits128) }
+        'bits256'       { L _ (CmmT_bits256) }
         'float32'       { L _ (CmmT_float32) }
         'float64'       { L _ (CmmT_float64) }
         'gcptr'         { L _ (CmmT_gcptr) }
@@ -777,6 +778,7 @@ typenot8 :: { CmmType }
         | 'bits32'              { b32 }
         | 'bits64'              { b64 }
         | 'bits128'             { b128 }
+        | 'bits256'             { b256 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do dflags <- getDynFlags; return $ gcWord dflags }
