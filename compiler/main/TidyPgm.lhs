@@ -459,18 +459,21 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          | (var, var_v) <- varEnvElts vars
                          , let tidy_var   = lookup_var var
                                tidy_var_v = lookup_var var_v
-                         , isExportedId tidy_var
-                         , isExternalId tidy_var_v
+                         , isExternalId tidy_var   && isExportedId tidy_var
+                         , isExternalId tidy_var_v && isExportedId tidy_var_v
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
     tidy_parallelVars = mkVarSet [ tidy_var
                                  | var <- varSetElems parallelVars
                                  , let tidy_var = lookup_var var
-                                 , isExternalId tidy_var]
+                                 , isExternalId tidy_var && isExportedId tidy_var
+                                 ]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
     
+    -- We need to make sure that all names getting into the iface version of 'VectInfo' are
+    -- external; otherwise, 'MkIface' will bomb out.
     isExternalId = isExternalName . idName
 \end{code}
 

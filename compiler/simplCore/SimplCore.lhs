@@ -621,6 +621,12 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                  vectVars = mkVarSet $ 
                               catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
                                         | Vect bndr _ <- mg_vect_decls guts]
+                              ++
+                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr 
+                                        | bndr <- bindersOfBinds binds]
+                                        -- FIXME: This second comprehensions is only needed as long as we
+                                        --        have vectorised bindings where we get "Could NOT call
+                                        --        vectorised from original version".
               ;  (maybeVects, maybeVectVars) 
                    = case sm_phase mode of
                        InitialPhase -> (mg_vect_decls guts, vectVars)
