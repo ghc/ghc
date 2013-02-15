@@ -1,0 +1,4 @@
+:l T7688
+:k Proxy
+# I'm expecting to see a kind-polymorphic answer,
+# even though -XPolyKinds is not set in GHCi
