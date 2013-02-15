@@ -371,6 +371,42 @@ sub scmall {
             $ignore_failure = 1;
             scm ($localpath, $scm, "commit", @args);
         }
+        elsif ($command eq "check_submodules") {
+            # If we have a submodule then check whether it is up-to-date
+            if ($remotepath eq "-") {
+                my %remote_heads;
+
+                message "== Checking sub-module $localpath";
+
+                chdir($localpath);
+
+                open my $lsremote, '-|', 'git', 'ls-remote', '--heads', '-q'
+                    or die "Executing ls-remote failed: $!";
+                while (<$lsremote>) {
+                    if (/^([0-9a-f]{40})\s*refs\/heads\//) {
+                        $remote_heads{$1} = 1;
+                    }
+                    else {
+                        die "Bad output from ls-remote: $_";
+                    }
+                }
+                close($lsremote);
+
+                open my $revparse, '-|', 'git', 'rev-parse', '--verify', 'HEAD'
+                    or die "Executing rev-parse failed: $!";
+                my $myhead;
+                $myhead = <$revparse>;
+                    # or die "Failed to read from rev-parse: $!";
+                chomp $myhead;
+                close($revparse);
+
+                if (not defined($remote_heads{$myhead})) {
+                    die "Sub module $localpath needs to be pushed; see http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream";
+                }
+                
+                chdir($initial_working_directory);
+            }
+        }
         elsif ($command eq "push") {
             # We don't automatically push to the submodules. If you want
             # to push to them then you need to use a special command, as
@@ -781,6 +817,10 @@ sub main {
         }
         elsif ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
             $command = "status";
+        }
+
+        if ($command eq "push") {
+            scmall ("check_submodules", @_);
         }
 
         scmall ($command, @_);
