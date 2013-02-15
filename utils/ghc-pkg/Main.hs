@@ -21,7 +21,7 @@ import Distribution.Text
 import Distribution.Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Cmd       ( rawSystem )
+import System.Process
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
@@ -61,7 +61,6 @@ import System.Posix hiding (fdToHandle)
 #endif
 
 #if defined(GLOB)
-import System.Process(runInteractiveCommand)
 import qualified System.Info(os)
 #endif
 

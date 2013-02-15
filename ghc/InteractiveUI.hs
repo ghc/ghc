@@ -81,7 +81,6 @@ import Exception hiding (catch)
 import Foreign.C
 import Foreign.Safe
 
-import System.Cmd
 import System.Directory
 import System.Environment
 import System.Exit ( exitWith, ExitCode(..) )
@@ -89,6 +88,7 @@ import System.FilePath
 import System.IO
 import System.IO.Error
 import System.IO.Unsafe ( unsafePerformIO )
+import System.Process
 import Text.Printf
 
 #ifndef mingw32_HOST_OS
