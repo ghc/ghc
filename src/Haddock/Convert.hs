@@ -118,7 +118,7 @@ synifyTyCon tc
                          let mk_hs_tv realKind fakeTyVar 
                                 = noLoc $ KindedTyVar (getName fakeTyVar) 
                                                       (synifyKindSig realKind)
-                         in HsQTvs { hsq_kvs = []   -- No kind polymorhism
+                         in HsQTvs { hsq_kvs = []   -- No kind polymorphism
                                    , hsq_tvs = zipWith mk_hs_tv (fst (splitKindFunTys (tyConKind tc)))
                                                                 alphaTyVars --a, b, c... which are unfortunately all kind *
                                    }
