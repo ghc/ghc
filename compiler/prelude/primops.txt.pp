@@ -217,6 +217,17 @@ primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    {Rounds towards zero.}
    with can_fail = True
 
+primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+   with commutable = True
+
+primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
 	 {Add with carry.  First member of result is (wrapped) sum; 

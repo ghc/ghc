@@ -100,6 +100,15 @@ primOpRules nm IntRemOp    = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intO
                                                     retLit zeroi
                                                , equalArgs >> retLit zeroi
                                                , equalArgs >> retLit zeroi ]
+primOpRules nm AndIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
+                                               , idempotent
+                                               , zeroElem zeroi ]
+primOpRules nm OrIOp       = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
+                                               , idempotent
+                                               , identityDynFlags zeroi ]
+primOpRules nm XorIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
+                                               , identityDynFlags zeroi
+                                               , equalArgs >> retLit zeroi ]
 primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
                                                , inversePrimOp IntNegOp ]
 primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftL)
