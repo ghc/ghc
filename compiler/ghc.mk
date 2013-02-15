@@ -24,6 +24,11 @@ compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
 compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
 
+# This package doesn't pass the Cabal checks because include-dirs
+# points outside the source directory. This isn't a real problem, so
+# we just skip the check.
+compiler_NO_CHECK = YES
+
 ifneq "$(BINDIST)" "YES"
 compiler/stage1/package-data.mk : compiler/stage1/build/Config.hs
 compiler/stage2/package-data.mk : compiler/stage2/build/Config.hs

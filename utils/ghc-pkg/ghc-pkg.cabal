@@ -11,7 +11,7 @@ Description:
 	XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.2
+cabal-version: >=1.4
 
 Executable ghc-pkg
     Main-Is: Main.hs

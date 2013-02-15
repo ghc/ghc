@@ -137,14 +137,6 @@ ifneq "$$($1_$2_GROUP)" ""
 all_$$($1_$2_GROUP): all_$1_$2
 endif
 
-ifneq "$$(CHECKED_$1)" "YES"
-CHECKED_$1 = YES
-check_packages: check_$1
-.PHONY: check_$1
-check_$1: $$(GHC_CABAL_INPLACE)
-	CROSS_COMPILE="$(CrossCompilePrefix)" $$(GHC_CABAL_INPLACE) check $1
-endif
-
 ifneq "$3" "0"
 $(call haddock,$1,$2)
 endif

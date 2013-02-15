@@ -566,23 +566,6 @@ libraries/dph/dph-lifted-copy_dist-install_EXCLUDED_WAYS := dyn
 libraries/dph/dph-lifted-vseg_dist-install_EXCLUDED_WAYS := dyn
 endif
 
-# ----------------------------------------------
-# Checking packages with 'cabal check'
-
-ifeq "$(phase)" "final"
-ifeq "$(CHECK_PACKAGES)" "YES"
-all: check_packages
-endif
-endif
-
-# These packages don't pass the Cabal checks because hs-source-dirs
-# points outside the source directory. This isn't a real problem in
-# these cases, so we just skip checking them.
-# NB. these must come before we include the ghc.mk files below, because
-# they disable the relevant rules.
-# In compiler's case, include-dirs points outside of the source tree
-CHECKED_compiler = YES
-
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
