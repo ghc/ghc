@@ -97,9 +97,7 @@ module System.IO (
 
     hSeek,
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
-#if !defined(__NHC__)
     hTell,
-#endif
 
     -- ** Handle properties
 
@@ -109,12 +107,10 @@ module System.IO (
 
     -- ** Terminal operations (not portable: GHC\/Hugs only)
 
-#if !defined(__NHC__)
     hIsTerminalDevice,
 
     hSetEcho,
     hGetEcho,
-#endif
 
     -- ** Showing handle state (not portable: GHC only)
 
@@ -162,7 +158,7 @@ module System.IO (
     hSetBinaryMode,
     hPutBuf,
     hGetBuf,
-#if !defined(__NHC__) && !defined(__HUGS__)
+#if !defined(__HUGS__)
     hGetBufSome,
     hPutBufNonBlocking,
     hGetBufNonBlocking,
@@ -175,7 +171,7 @@ module System.IO (
     openTempFileWithDefaultPermissions,
     openBinaryTempFileWithDefaultPermissions,
 
-#if !defined(__NHC__) && !defined(__HUGS__)
+#if !defined(__HUGS__)
     -- * Unicode encoding\/decoding
 
     -- | A text-mode 'Handle' has an associated 'TextEncoding', which
@@ -207,7 +203,7 @@ module System.IO (
     mkTextEncoding,
 #endif
 
-#if !defined(__NHC__) && !defined(__HUGS__)
+#if !defined(__HUGS__)
     -- * Newline conversion
     
     -- | In Haskell, a newline is always represented by the character
@@ -236,7 +232,6 @@ module System.IO (
 
 import Control.Exception.Base
 
-#ifndef __NHC__
 import Data.Bits
 import Data.List
 import Data.Maybe
@@ -247,7 +242,6 @@ import Foreign.C.String
 import Foreign.C.Types
 import System.Posix.Internals
 import System.Posix.Types
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -270,47 +264,6 @@ import Hugs.IO
 import Hugs.IOExts
 import Hugs.IORef
 import System.IO.Unsafe ( unsafeInterleaveIO )
-#endif
-
-#ifdef __NHC__
-import IO
-  ( Handle ()
-  , HandlePosn ()
-  , IOMode (ReadMode,WriteMode,AppendMode,ReadWriteMode)
-  , BufferMode (NoBuffering,LineBuffering,BlockBuffering)
-  , SeekMode (AbsoluteSeek,RelativeSeek,SeekFromEnd)
-  , stdin, stdout, stderr
-  , openFile                  -- :: FilePath -> IOMode -> IO Handle
-  , hClose                    -- :: Handle -> IO ()
-  , hFileSize                 -- :: Handle -> IO Integer
-  , hIsEOF                    -- :: Handle -> IO Bool
-  , isEOF                     -- :: IO Bool
-  , hSetBuffering             -- :: Handle -> BufferMode -> IO ()
-  , hGetBuffering             -- :: Handle -> IO BufferMode
-  , hFlush                    -- :: Handle -> IO ()
-  , hGetPosn                  -- :: Handle -> IO HandlePosn
-  , hSetPosn                  -- :: HandlePosn -> IO ()
-  , hSeek                     -- :: Handle -> SeekMode -> Integer -> IO ()
-  , hWaitForInput             -- :: Handle -> Int -> IO Bool
-  , hGetChar                  -- :: Handle -> IO Char
-  , hGetLine                  -- :: Handle -> IO [Char]
-  , hLookAhead                -- :: Handle -> IO Char
-  , hGetContents              -- :: Handle -> IO [Char]
-  , hPutChar                  -- :: Handle -> Char -> IO ()
-  , hPutStr                   -- :: Handle -> [Char] -> IO ()
-  , hPutStrLn                 -- :: Handle -> [Char] -> IO ()
-  , hPrint                    -- :: Handle -> [Char] -> IO ()
-  , hReady                    -- :: Handle -> [Char] -> IO ()
-  , hIsOpen, hIsClosed        -- :: Handle -> IO Bool
-  , hIsReadable, hIsWritable  -- :: Handle -> IO Bool
-  , hIsSeekable               -- :: Handle -> IO Bool
-  , bracket
-
-  , IO ()
-  , FilePath                  -- :: String
-  )
-import NHC.IOExtras (fixIO, hPutBuf, hGetBuf)
-import NHC.FFI (Ptr)
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -426,7 +379,6 @@ localeEncoding :: TextEncoding
 localeEncoding = initLocaleEncoding
 #endif  /* __GLASGOW_HASKELL__ */
 
-#ifndef __NHC__
 -- | Computation 'hReady' @hdl@ indicates whether at least one item is
 -- available for input from handle @hdl@.
 -- 
@@ -449,7 +401,6 @@ hReady h        =  hWaitForInput h 0
 
 hPrint          :: Show a => Handle -> a -> IO ()
 hPrint hdl      =  hPutStrLn hdl . show
-#endif /* !__NHC__ */
 
 -- | @'withFile' name mode act@ opens a file using 'openFile' and passes
 -- the resulting handle to the computation @act@.  The handle will be
@@ -493,14 +444,6 @@ fixIO k = do
 --
 -- See also System.IO.Unsafe.unsafeFixIO.
 --
-#endif
-
-#if defined(__NHC__)
--- Assume a unix platform, where text and binary I/O are identical.
-openBinaryFile = openFile
-hSetBinaryMode _ _ = return ()
-
-type CMode = Int
 #endif
 
 -- | The function creates a temporary file in ReadWrite mode.
@@ -566,13 +509,7 @@ openTempFile' loc tmp_dir template binary mode = do
          -- beginning with '.' as the second component.
          _                      -> error "bug in System.IO.openTempFile"
 
-#ifndef __NHC__
-#endif
-
-#if defined(__NHC__)
-    findTempName x = do h <- openFile filepath ReadWriteMode
-                        return (filepath, h)
-#elif defined(__GLASGOW_HASKELL__)
+#if defined(__GLASGOW_HASKELL__)
     findTempName x = do
       r <- openNewFile filepath binary mode
       case r of
@@ -661,17 +598,11 @@ pathSeparator = '\\'
 pathSeparator = '/'
 #endif
 
-#ifndef __NHC__
 -- XXX Copied from GHC.Handle
 std_flags, output_flags, rw_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 rw_flags     = output_flags .|. o_RDWR
-#endif
-
-#ifdef __NHC__
-foreign import ccall "getpid" c_getpid :: IO Int
-#endif
 
 -- $locking
 -- Implementations should enforce as far as possible, at least locally to the

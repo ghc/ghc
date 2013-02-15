@@ -52,9 +52,6 @@ module Control.Exception (
         NonTermination(..),
         NestedAtomically(..),
 #endif
-#ifdef __NHC__
-        System.ExitCode(), -- instance Exception
-#endif
 
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
@@ -111,14 +108,12 @@ module Control.Exception (
         -- asynchronous exceptions during a critical region.
 
         mask,
-#ifndef __NHC__
         mask_,
         uninterruptibleMask,
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
         allowInterrupt,
-#endif
 
         -- ** (deprecated) Asynchronous exception control
 
@@ -157,10 +152,6 @@ import GHC.IO (unsafeUnmask)
 import Data.Maybe
 #else
 import Prelude hiding (catch)
-#endif
-
-#ifdef __NHC__
-import System (ExitCode())
 #endif
 
 -- | You need this when using 'catches'.

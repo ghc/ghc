@@ -119,15 +119,6 @@ import Hugs.IOArray
 import Hugs.ConcBase    ( MVar )
 #endif
 
-#ifdef __NHC__
-import NHC.IOExtras (IOArray,IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
-import IO (Handle)
-import Ratio (Ratio)
-        -- For the Typeable instance
-import NHC.FFI  ( Ptr,FunPtr,StablePtr,ForeignPtr )
-import Array    ( Array )
-#endif
-
 #include "OldTypeable.h"
 
 {-# DEPRECATED typeRepKey "TypeRep itself is now an instance of Ord" #-}

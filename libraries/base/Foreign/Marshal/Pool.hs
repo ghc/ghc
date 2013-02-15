@@ -56,11 +56,7 @@ import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
 #else
 import Data.IORef            ( IORef, newIORef, readIORef, writeIORef )
-#if defined(__NHC__)
-import IO                    ( bracket )
-#else
 import Control.Exception.Base ( bracket )
-#endif
 #endif
 
 import Control.Monad         ( liftM )

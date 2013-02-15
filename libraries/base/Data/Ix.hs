@@ -72,7 +72,3 @@ import GHC.Arr
 import Hugs.Prelude( Ix(..) )
 #endif
 
-#ifdef __NHC__
-import Ix (Ix(..))
-#endif
-

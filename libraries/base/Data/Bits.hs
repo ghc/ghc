@@ -331,17 +331,7 @@ instance Bits Int where
     bit                    = primBitInt
     testBit                = primTestInt
     bitSize _              = SIZEOF_HSINT*8
-#elif defined(__NHC__)
-    (.&.)                  = nhc_primIntAnd
-    (.|.)                  = nhc_primIntOr
-    xor                    = nhc_primIntXor
-    complement             = nhc_primIntCompl
-    shiftL                 = nhc_primIntLsh
-    shiftR                 = nhc_primIntRsh
-    bit                    = bitDefault
-    testBit                = testBitDefault
-    bitSize _              = 32
-#endif /* __NHC__ */
+#endif
 
     x `rotate`  i
         | i<0 && x<0       = let left = i+bitSize x in
@@ -357,15 +347,6 @@ instance Bits Int where
 
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
-
-#ifdef __NHC__
-foreign import ccall nhc_primIntAnd :: Int -> Int -> Int
-foreign import ccall nhc_primIntOr  :: Int -> Int -> Int
-foreign import ccall nhc_primIntXor :: Int -> Int -> Int
-foreign import ccall nhc_primIntLsh :: Int -> Int -> Int
-foreign import ccall nhc_primIntRsh :: Int -> Int -> Int
-foreign import ccall nhc_primIntCompl :: Int -> Int
-#endif /* __NHC__ */
 
 #if defined(__GLASGOW_HASKELL__)
 instance Bits Word where

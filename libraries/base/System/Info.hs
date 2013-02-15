@@ -45,12 +45,7 @@ compilerName :: String
 
 compilerVersionRaw :: Int
 
-#if defined(__NHC__)
-#include "OSInfo.hs"
-compilerName = "nhc98"
-compilerVersionRaw = __NHC__
-
-#elif defined(__GLASGOW_HASKELL__)
+#if defined(__GLASGOW_HASKELL__)
 #include "ghcplatform.h"
 os = HOST_OS
 arch = HOST_ARCH

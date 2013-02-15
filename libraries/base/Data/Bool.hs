@@ -29,14 +29,3 @@ module Data.Bool (
 import GHC.Base
 #endif
 
-#ifdef __NHC__
-import Prelude
-import Prelude
-  ( Bool(..)
-  , (&&)
-  , (||)
-  , not
-  , otherwise
-  )
-#endif
-

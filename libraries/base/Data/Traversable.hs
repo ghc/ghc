@@ -61,8 +61,6 @@ import Data.Monoid (Monoid)
 import GHC.Arr
 #elif defined(__HUGS__)
 import Hugs.Array
-#elif defined(__NHC__)
-import Array
 #endif
 
 -- | Functors representing data structures that can be traversed from

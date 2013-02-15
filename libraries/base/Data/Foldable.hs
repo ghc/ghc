@@ -68,10 +68,6 @@ import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid
 
-#ifdef __NHC__
-import Control.Arrow (ArrowZero(..)) -- work around nhc98 typechecker problem
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
 #endif
@@ -80,8 +76,6 @@ import GHC.Exts (build)
 import GHC.Arr
 #elif defined(__HUGS__)
 import Hugs.Array
-#elif defined(__NHC__)
-import Array
 #endif
 
 -- | Data structures that can be folded.

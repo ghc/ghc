@@ -33,7 +33,3 @@ import Hugs.IOExts
 foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()
 #endif
 
-#ifdef __NHC__
-import NHC.IOExtras (performGC)
-#endif
-

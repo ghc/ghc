@@ -51,16 +51,6 @@ import GHC.Weak
 #endif
 #endif /* __GLASGOW_HASKELL__ */
 
-#ifdef __NHC__
-import NHC.IOExtras
-    ( IORef
-    , newIORef
-    , readIORef
-    , writeIORef
-    , excludeFinalisers
-    )
-#endif
-
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
 -- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
 -- to run when 'IORef' is garbage-collected
@@ -120,13 +110,6 @@ atomicModifyIORef = plainModifyIORef    -- Hugs has no preemption
   where plainModifyIORef r f = do
                 a <- readIORef r
                 case f a of (a',b) -> writeIORef r a' >> return b
-#elif defined(__NHC__)
-atomicModifyIORef r f =
-  excludeFinalisers $ do
-    a <- readIORef r
-    let (a',b) = f a
-    writeIORef r a'
-    return b
 #endif
 
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored

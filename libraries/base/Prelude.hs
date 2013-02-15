@@ -37,13 +37,6 @@ module Prelude (
     -- *** Tuples
     fst, snd, curry, uncurry,
 
-#if defined(__NHC__)
-    []((:), []),        -- Not legal Haskell 98;
-                        -- ... available through built-in syntax
-    module Data.Tuple,  -- Includes tuple types
-    ()(..),             -- Not legal Haskell 98
-    (->),               -- ... available through built-in syntax
-#endif
 #ifdef __HUGS__
     (:),                -- Not legal Haskell 98
 #endif

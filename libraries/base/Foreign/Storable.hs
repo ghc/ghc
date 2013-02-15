@@ -34,11 +34,6 @@ module Foreign.Storable
         ) where
 
 
-#ifdef __NHC__
-import NHC.FFI (Storable(..),Ptr,FunPtr,StablePtr
-               ,Int8,Int16,Int32,Int64,Word8,Word16,Word32,Word64)
-#else
-
 import Control.Monad            ( liftM )
 
 #include "MachDeps.h"
@@ -204,10 +199,8 @@ STORABLE(Char,SIZEOF_HSCHAR,ALIGNMENT_HSCHAR,
 STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
          readIntOffPtr,writeIntOffPtr)
 
-#ifndef __NHC__
 STORABLE(Word,SIZEOF_HSWORD,ALIGNMENT_HSWORD,
          readWordOffPtr,writeWordOffPtr)
-#endif
 
 STORABLE((Ptr a),SIZEOF_HSPTR,ALIGNMENT_HSPTR,
          readPtrOffPtr,writePtrOffPtr)
@@ -247,8 +240,6 @@ STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
 
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
          readInt64OffPtr,writeInt64OffPtr)
-
-#endif
 
 -- XXX: here to avoid orphan instance in GHC.Fingerprint
 #ifdef __GLASGOW_HASKELL__

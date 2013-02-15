@@ -88,9 +88,7 @@ module Foreign.C.Error (
 -- this is were we get the CONST_XXX definitions from that configure
 -- calculated for us
 --
-#ifndef __NHC__
 #include "HsBaseConfig.h"
-#endif
 
 import Foreign.Ptr
 import Foreign.C.Types
@@ -154,9 +152,6 @@ eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN,
 -- configure 
 --
 eOK             = Errno 0
-#ifdef __NHC__
-#include "Errno.hs"
-#else
 e2BIG           = Errno (CONST_E2BIG)
 eACCES          = Errno (CONST_EACCES)
 eADDRINUSE      = Errno (CONST_EADDRINUSE)
@@ -255,7 +250,6 @@ eTXTBSY         = Errno (CONST_ETXTBSY)
 eUSERS          = Errno (CONST_EUSERS)
 eWOULDBLOCK     = Errno (CONST_EWOULDBLOCK)
 eXDEV           = Errno (CONST_EXDEV)
-#endif
 
 -- | Yield 'True' if the given 'Errno' value is valid on the system.
 -- This implies that the 'Eq' instance of 'Errno' is also system dependent
@@ -278,25 +272,16 @@ getErrno :: IO Errno
 -- We must call a C function to get the value of errno in general.  On
 -- threaded systems, errno is hidden behind a C macro so that each OS
 -- thread gets its own copy.
-#ifdef __NHC__
-getErrno = do e <- peek _errno; return (Errno e)
-foreign import ccall unsafe "errno.h &errno" _errno :: Ptr CInt
-#else
 getErrno = do e <- get_errno; return (Errno e)
 foreign import ccall unsafe "HsBase.h __hscore_get_errno" get_errno :: IO CInt
-#endif
 
 -- | Reset the current thread\'s @errno@ value to 'eOK'.
 --
 resetErrno :: IO ()
 
 -- Again, setting errno has to be done via a C function.
-#ifdef __NHC__
-resetErrno = poke _errno 0
-#else
 resetErrno = set_errno 0
 foreign import ccall unsafe "HsBase.h __hscore_set_errno" set_errno :: CInt -> IO ()
-#endif
 
 -- throw current "errno" value
 -- ---------------------------

@@ -38,17 +38,6 @@ import GHC.Stable
 import Hugs.StablePtr
 #endif
 
-#ifdef __NHC__
-import NHC.FFI
-  ( StablePtr
-  , newStablePtr
-  , deRefStablePtr
-  , freeStablePtr
-  , castStablePtrToPtr
-  , castPtrToStablePtr
-  )
-#endif
-
 -- $cinterface
 --
 -- The following definition is available to C programs inter-operating with

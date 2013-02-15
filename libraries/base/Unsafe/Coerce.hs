@@ -63,10 +63,6 @@ unsafeCoerce x = local_id (unsafeCoerce# x)
   -- give usafeCoerce the same (dangerous) type as unsafeCoerce#
 #endif
 
-#if defined(__NHC__)
-import NonStdUnsafeCoerce (unsafeCoerce)
-#endif
-
 #if defined(__HUGS__)
 import Hugs.IOExts (unsafeCoerce)
 #endif
