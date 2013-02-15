@@ -4660,7 +4660,7 @@ to work since it gets translated into an equality comparison.
 <title>Overloaded lists</title>
 
 <para> GHC supports <emphasis>overloading of the list notation</emphasis>.
-Before turning our attention to the overloading, let us recap the notation for
+Let us recap the notation for
 constructing lists. In Haskell, the list notation can be be used in the
 following seven ways:
 
@@ -4708,15 +4708,16 @@ g [x,y,z] = ...     -- g (toList -> [x,y,z]) = ...
 </programlisting>
 (Here we are using view-pattern syntax for the translation, see <xref linkend="view-patterns"/>.)
 </para>
-<para> During the typechecking and desugaring phases, GHC uses whatever is in
-scope with the names of <literal>toList</literal>, <literal>fromList</literal> and
-<literal>fromListN</literal>. That is, these functions are rebindable;
-c.f. <xref linkend="rebindable-syntax"/> </para>
 
-<para>That said, the <literal>GHC.Exts</literal> module exports the
-<literal>IsList</literal> class that can be used to overload
-these functions for different
-structures. The type class is defined as follows:</para>
+<sect3>
+<title>The <literal>IsList</literal> class</title>
+
+<para>In the above desugarings, the functions <literal>toList</literal>,
+<literal>fromList</literal> and <literal>fromListN</literal> are all
+methods of 
+the <literal>IsList</literal> class, which is itself exported from
+the <literal>GHC.Exts</literal> module.
+The type class is defined as follows:</para>
 
 <programlisting>
 class IsList l where
@@ -4756,9 +4757,10 @@ the inverse of <literal>fromList</literal>.
 </para></listitem>
 </itemizedlist>
 </para>
-<para>In the following, we give several example instances of the
-<literal>FromList</literal> type class:</para>
-
+<para>It is perfectly fine to declare new instances
+of <literal>IsList</literal>, so that list notation becomes
+useful for completely new data types.
+Here are several example instances:
 <programlisting>
 instance FromList [a] where
   type Item [a] = a
@@ -4791,6 +4793,25 @@ instance FromList (Vector a) where
   fromListN = Vector.fromListN
   toList = Vector.toList
 </programlisting>
+</para>
+</sect3>
+
+<sect3>
+<title>Rebindable syntax</title>
+
+<para> When desugaring list notation with <option>-XOverloadedLists</option>
+GHC uses the <literal>fromList</literal> (etc) methods from module <literal>GHC.Exts</literal>.
+You do not need to import <literal>GHC.Exts</literal> for this to happen.
+</para>
+<para> However if you use <option>-XRebindableSyntax</option>, then 
+GHC instead uses whatever is in
+scope with the names of <literal>toList</literal>, <literal>fromList</literal> and
+<literal>fromListN</literal>. That is, these functions are rebindable;
+c.f. <xref linkend="rebindable-syntax"/>. </para>
+</sect3>
+
+<sect3>
+<title>Defaulting</title>
 
 <para>Currently, the <literal>IsList</literal> class is not accompanied with
 defaulting rules. Although feasible, not much thought has gone into how to
@@ -4799,6 +4820,11 @@ specify the meaning of the default declarations like:</para>
 <programlisting>
 default ([a])
 </programlisting>
+</sect3>
+
+<sect3>
+<title>Speculation about the future</title>
+
 
 <para>The current implementation of the <option>OverloadedLists</option>
 extension can be improved by handling the lists that are only populated with
@@ -4810,7 +4836,7 @@ representation. Equipped with this capability the
 subsume the <option>OverloadedStrings</option> extension (currently, as a
 special case, string literals benefit from statically allocated compact
 representation).</para>
-
+</sect3>
 </sect2>
 
 </sect1>
