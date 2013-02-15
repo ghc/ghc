@@ -1,0 +1,6 @@
+[1 of 1] Compiling ExportList       ( ExportList.hs, ExportList.o )
+Warning: vectorisation failure: identityConvTyCon: type constructor contains parallel arrays [::]
+  Could NOT call vectorised from original version ExportList.solveV
+Warning: vectorisation failure: identityConvTyCon: type constructor contains parallel arrays NodeV
+  Could NOT call vectorised from original version
+  ExportList.solvePA
