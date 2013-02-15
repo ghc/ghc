@@ -412,7 +412,7 @@ localSigWarnId sig_ns id
   | idName id `elemNameSet` sig_ns = return ()
   | otherwise                      = warnMissingSig msg id
   where
-    msg = ptext (sLit "Polymophic local binding with no type signature:")
+    msg = ptext (sLit "Polymorphic local binding with no type signature:")
 
 warnMissingSig :: SDoc -> Id -> TcM ()
 warnMissingSig msg id
