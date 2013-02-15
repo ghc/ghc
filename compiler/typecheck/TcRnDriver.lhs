@@ -1601,7 +1601,7 @@ kind-generalise the type.  This gives the right default behaviour at
 the GHCi prompt, where if you say ":k T", and T has a polymorphic
 kind, you'd like to see that polymorphism. Of course.  If T isn't
 kind-polymorphic you won't get anything unexpected, but the apparent
-*loss* of polymorphism, for types that you konw are polymorphic, is
+*loss* of polymorphism, for types that you know are polymorphic, is
 quite surprising.  See Trac #7688 for a discussion.
 
 

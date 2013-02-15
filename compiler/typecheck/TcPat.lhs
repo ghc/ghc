@@ -283,7 +283,7 @@ mkLocalBinder name ty
 Note [Polymorphism and pattern bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When is_mono holds we are not generalising
-But the signature can still be polymoprhic!
+But the signature can still be polymorphic!
      data T = MkT (forall a. a->a)
      x :: forall a. a->a
      MkT x = <rhs>
