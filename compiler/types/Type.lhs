@@ -419,14 +419,18 @@ splitAppTys ty = split ty ty []
 mkNumLitTy :: Integer -> Type
 mkNumLitTy n = LitTy (NumTyLit n)
 
+-- | Is this a numeric literal. We also look through type synonyms.
 isNumLitTy :: Type -> Maybe Integer
+isNumLitTy ty | Just ty1 <- tcView ty = isNumLitTy ty1
 isNumLitTy (LitTy (NumTyLit n)) = Just n
 isNumLitTy _                    = Nothing
 
 mkStrLitTy :: FastString -> Type
 mkStrLitTy s = LitTy (StrTyLit s)
 
+-- | Is this a symbol literal. We also look through type synonyms.
 isStrLitTy :: Type -> Maybe FastString
+isStrLitTy ty | Just ty1 <- tcView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
 
