@@ -1575,26 +1575,41 @@ tcRnType :: HscEnv
          -> IO (Messages, Maybe (Type, Kind))
 tcRnType hsc_env ictxt normalise rdr_type
   = initTcPrintErrors hsc_env iNTERACTIVE $
-    setInteractiveContext hsc_env ictxt $ do {
-
-    (rn_type, _fvs) <- rnLHsType GHCiCtx rdr_type ;
-    failIfErrsM ;
+    setInteractiveContext hsc_env ictxt $ 
+    setXOptM Opt_PolyKinds $   -- See Note [Kind-generalise in tcRnType]
+    do { (rn_type, _fvs) <- rnLHsType GHCiCtx rdr_type
+       ; failIfErrsM
 
         -- Now kind-check the type
         -- It can have any rank or kind
-    ty <- tcHsSigType GhciCtxt rn_type ;
+       ; ty <- tcHsSigType GhciCtxt rn_type ;
 
-    ty' <- if normalise
-           then do { fam_envs <- tcGetFamInstEnvs
-                   ; return (snd (normaliseType fam_envs ty)) }
-                   -- normaliseType returns a coercion
-                   -- which we discard
-           else return ty ;
+       ; ty' <- if normalise
+                then do { fam_envs <- tcGetFamInstEnvs
+                        ; return (snd (normaliseType fam_envs ty)) }
+                        -- normaliseType returns a coercion
+                        -- which we discard
+                else return ty ;
 
-    return (ty', typeKind ty)
-    }
-
+       ; return (ty', typeKind ty) }
 \end{code}
+
+Note [Kind-generalise in tcRnType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We switch on PolyKinds when kind-checking a user type, so that we will
+kind-generalise the type.  This gives the right default behaviour at
+the GHCi prompt, where if you say ":k T", and T has a polymorphic
+kind, you'd like to see that polymorphism. Of course.  If T isn't
+kind-polymorphic you won't get anything unexpected, but the apparent
+*loss* of polymorphism, for types that you konw are polymorphic, is
+quite surprising.  See Trac #7688 for a discussion.
+
+
+%************************************************************************
+%*                                                                      *
+                 tcRnDeclsi
+%*                                                                      *
+%************************************************************************
 
 tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 
