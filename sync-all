@@ -372,7 +372,13 @@ sub scmall {
             scm ($localpath, $scm, "commit", @args);
         }
         elsif ($command eq "push") {
-            scm ($localpath, $scm, "push", @args);
+            # We don't automatically push to the submodules. If you want
+            # to push to them then you need to use a special command, as
+            # described on
+            # http://hackage.haskell.org/trac/ghc/wiki/Repositories/Upstream
+            if ($remotepath ne "-") {
+                scm ($localpath, $scm, "push", @args);
+            }
         }
         elsif ($command eq "pull") {
             my $realcmd;
