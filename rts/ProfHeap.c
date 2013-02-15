@@ -364,6 +364,9 @@ printSample(rtsBool beginSample, StgDouble sampleValue)
     fprintf(hp_file, "%s %" FMT_Word64 ".%02" FMT_Word64 "\n",
             (beginSample ? "BEGIN_SAMPLE" : "END_SAMPLE"),
             (StgWord64)integralPart, (StgWord64)(fractionalPart * 100));
+    if (!beginSample) {
+        fflush(hp_file);
+    }
 }
 
 /* --------------------------------------------------------------------------
