@@ -23,7 +23,6 @@ import Control.Exception.Base
 
 import Control.Monad
 import Control.Monad.Fix
-import Control.Monad.Instances
 import Control.Monad.Zip
 
 import Data.Bits
