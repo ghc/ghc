@@ -13,8 +13,6 @@
 # -----------------------------------------------------------------------------
 # Bootstrapping ghc-pkg
 
-utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
-
 utils/ghc-pkg/dist/build/Version.hs \
 utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
@@ -43,7 +41,7 @@ $(eval $(call shell-wrapper,utils/ghc-pkg,dist))
 endif
 
 utils/ghc-pkg_dist_USES_CABAL = YES
-utils/ghc-pkg_dist_PROG = ghc-pkg
+utils/ghc-pkg_dist_PROG = ghc-pkg$(exeext)
 utils/ghc-pkg_dist_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist_INSTALL_INPLACE = YES
 
