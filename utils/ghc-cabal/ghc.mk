@@ -30,7 +30,7 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs $(T
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
-               -DBOOTSTRAPPING \
+	       -DBOOTSTRAPPING \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
 	       -ilibraries/Cabal/Cabal \
