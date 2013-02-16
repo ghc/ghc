@@ -6,6 +6,7 @@ import Data.ByteString.Internal (inlinePerformIO)
 import qualified Data.ByteString.Internal as S
 import Data.Monoid
 import Foreign
+import System.IO.Unsafe
 
 newtype Builder = Builder {
         runBuilder :: (Buffer -> [S.ByteString]) -> Buffer -> [S.ByteString]
