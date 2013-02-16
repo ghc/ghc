@@ -10,6 +10,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
+{-# LANGUAGE CPP #-}
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
@@ -33,7 +34,9 @@ import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
+#if !MIN_VERSION_base(4,7,0)
 import Control.Monad.Instances ( ) -- for Functor Either a
+#endif
 import Data.Char             ( toUpper )
 import Data.List             ( sortBy, groupBy, intercalate )
 import Data.Maybe
