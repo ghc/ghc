@@ -15,6 +15,7 @@
 -- 'Functor' and 'Monad' instances for @(->) r@ and
 -- 'Functor' instances for @(,) a@ and @'Either' a@.
 
-module Control.Monad.Instances (Functor(..),Monad(..)) where
--- module DEPRECATED -- deprecated in 7.6
+module Control.Monad.Instances {-# DEPRECATED "This module now contains no instances and will be removed in the future" #-} -- deprecated in 7.8
+    (Functor(..),Monad(..)) where
+
 import Prelude
