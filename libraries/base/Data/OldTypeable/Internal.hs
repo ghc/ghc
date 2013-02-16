@@ -22,7 +22,7 @@
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
 #endif
 
-module Data.OldTypeable.Internal {-# DEPRECATED "Use Data.Typeable.Internal instead" #-} (
+module Data.OldTypeable.Internal {-# DEPRECATED "Use Data.Typeable.Internal instead" #-} ( -- deprecated in 7.8
     TypeRep(..),
     TyCon(..),
     mkTyCon,
@@ -189,7 +189,7 @@ typeRepArgs :: TypeRep -> [TypeRep]
 typeRepArgs (TypeRep _ _ args) = args
 
 -- | Observe string encoding of a type representation
-{-# DEPRECATED tyConString "renamed to tyConName; tyConModule and tyConPackage are also available." #-}
+{-# DEPRECATED tyConString "renamed to tyConName; tyConModule and tyConPackage are also available." #-} -- deprecated in 7.4
 tyConString :: TyCon   -> String
 tyConString = tyConName
 

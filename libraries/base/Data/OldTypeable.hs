@@ -30,7 +30,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.OldTypeable {-# DEPRECATED "Use Data.Typeable instead" #-}
+module Data.OldTypeable {-# DEPRECATED "Use Data.Typeable instead" #-} -- deprecated in 7.8
   (
 
         -- * The Typeable class
@@ -121,7 +121,7 @@ import Hugs.ConcBase    ( MVar )
 
 #include "OldTypeable.h"
 
-{-# DEPRECATED typeRepKey "TypeRep itself is now an instance of Ord" #-}
+{-# DEPRECATED typeRepKey "TypeRep itself is now an instance of Ord" #-} -- deprecated in 7.2
 -- | (DEPRECATED) Returns a unique key associated with a 'TypeRep'.
 -- This function is deprecated because 'TypeRep' itself is now an
 -- instance of 'Ord', so mappings can be made directly with 'TypeRep'
@@ -146,7 +146,7 @@ newtype TypeRepKey = TypeRepKey Fingerprint
 
 ----------------- Construction ---------------------
 
-{-# DEPRECATED mkTyCon "either derive Typeable, or use mkTyCon3 instead" #-}
+{-# DEPRECATED mkTyCon "either derive Typeable, or use mkTyCon3 instead" #-} -- deprecated in 7.2
 -- | Backwards-compatible API
 mkTyCon :: String       -- ^ unique string
         -> TyCon        -- ^ A unique 'TyCon' object

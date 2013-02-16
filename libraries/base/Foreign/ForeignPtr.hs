@@ -57,7 +57,7 @@ import Foreign.ForeignPtr.Safe
 import Foreign.Ptr ( Ptr )
 import qualified Foreign.ForeignPtr.Unsafe as U
 
-{-# DEPRECATED unsafeForeignPtrToPtr "Use Foreign.ForeignPtr.Unsafe.unsafeForeignPtrToPtr instead; This function will be removed in the next release" #-}
+{-# DEPRECATED unsafeForeignPtrToPtr "Use Foreign.ForeignPtr.Unsafe.unsafeForeignPtrToPtr instead; This function will be removed in the next release" #-} -- deprecated in 7.2
 {-# INLINE unsafeForeignPtrToPtr #-}
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 unsafeForeignPtrToPtr = U.unsafeForeignPtrToPtr

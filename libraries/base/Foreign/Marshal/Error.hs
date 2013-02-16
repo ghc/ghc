@@ -81,4 +81,4 @@ throwIfNull  = throwIf (== nullPtr) . const
 --
 void     :: IO a -> IO ()
 void act  = act >> return ()
-{-# DEPRECATED void "use Control.Monad.void instead" #-}
+{-# DEPRECATED void "use Control.Monad.void instead" #-} -- deprecated in 7.6

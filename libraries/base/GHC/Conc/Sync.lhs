@@ -45,7 +45,7 @@ module GHC.Conc.Sync
         , forkIOUnmasked
         , forkIOWithUnmask
         , forkOn
-        , forkOnIO    -- DEPRECATED
+        , forkOnIO    -- DEPRECATED -- deprecated in 7.2
         , forkOnIOUnmasked
         , forkOnWithUnmask
         , numCapabilities
@@ -208,7 +208,7 @@ forkIO action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
-{-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-}
+{-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-} -- deprecated in 7.2
 -- | This function is deprecated; use 'forkIOWithUnmask' instead
 forkIOUnmasked :: IO () -> IO ThreadId
 forkIOUnmasked io = forkIO (unsafeUnmask io)
@@ -258,12 +258,12 @@ forkOn (I# cpu) action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
-{-# DEPRECATED forkOnIO "renamed to forkOn" #-}
+{-# DEPRECATED forkOnIO "renamed to forkOn" #-} -- deprecated in 7.2
 -- | This function is deprecated; use 'forkOn' instead
 forkOnIO :: Int -> IO () -> IO ThreadId
 forkOnIO = forkOn
 
-{-# DEPRECATED forkOnIOUnmasked "use forkOnWithUnmask instead" #-}
+{-# DEPRECATED forkOnIOUnmasked "use forkOnWithUnmask instead" #-} -- deprecated in 7.2
 -- | This function is deprecated; use 'forkOnWIthUnmask' instead
 forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
 forkOnIOUnmasked cpu io = forkOn cpu (unsafeUnmask io)

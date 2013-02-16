@@ -50,9 +50,7 @@ results in undefined behaviour.
 It is expected that this operation will be
 replaced in a future revision of Haskell.
 -}
-{-# DEPRECATED unsafeLocalState
-               "Please import from Foreign.Marshall.Unsafe instead; This will be removed in the next release"
- #-}
+{-# DEPRECATED unsafeLocalState "Please import from Foreign.Marshall.Unsafe instead; This will be removed in the next release" #-} -- deprecated in 7.2
 unsafeLocalState :: IO a -> a
 unsafeLocalState = unsafePerformIO
 

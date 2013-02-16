@@ -69,7 +69,7 @@ infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
 
-{-# DEPRECATED bitSize "Use bitSizeMaybe or finiteBitSize instead" #-}
+{-# DEPRECATED bitSize "Use bitSizeMaybe or finiteBitSize instead" #-} -- deprecated in 7.8
 
 {-| 
 The 'Bits' class defines bitwise operations over integral types.

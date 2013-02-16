@@ -37,9 +37,7 @@ module Control.Monad.ST.Lazy (
 import Control.Monad.ST.Lazy.Safe
 import qualified Control.Monad.ST.Lazy.Unsafe as U
 
-{-# DEPRECATED unsafeInterleaveST, unsafeIOToST
-              "Please import from Control.Monad.ST.Lazy.Unsafe instead; This will be removed in the next release"
- #-}
+{-# DEPRECATED unsafeInterleaveST, unsafeIOToST "Please import from Control.Monad.ST.Lazy.Unsafe instead; This will be removed in the next release" #-} -- deprecated in 7.2
 
 {-# INLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a

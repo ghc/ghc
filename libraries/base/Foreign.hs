@@ -47,7 +47,7 @@ import Foreign.Marshal
 import GHC.IO (IO)
 import qualified GHC.IO (unsafePerformIO)
 
-{-# DEPRECATED unsafePerformIO "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release" #-}
+{-# DEPRECATED unsafePerformIO "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release" #-} -- deprecated in 7.2
 
 {-# INLINE unsafePerformIO #-}
 unsafePerformIO :: IO a -> a

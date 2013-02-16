@@ -16,5 +16,5 @@
 -- 'Functor' instances for @(,) a@ and @'Either' a@.
 
 module Control.Monad.Instances (Functor(..),Monad(..)) where
-
+-- module DEPRECATED -- deprecated in 7.6
 import Prelude
