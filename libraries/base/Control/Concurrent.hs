@@ -107,9 +107,6 @@ module Control.Concurrent (
 
         -- $preemption
 
-        -- * Deprecated functions
-        forkIOUnmasked
-
     ) where
 
 import Prelude
