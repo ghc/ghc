@@ -3,7 +3,7 @@ import Control.Concurrent
 import Text.Printf
 
 -- Test combinations of nesting mask/uninterruptibleMask with
--- forkIO/forkIOUnmask
+-- forkIO/forkIOWithUnmask
 
 main = do
   m <- newEmptyMVar
@@ -17,9 +17,11 @@ main = do
                                       print (e::SomeException)
                                       throwIO e
   killThread t2
-  t3 <- mask_ $ forkIOUnmasked $ do stat 3 Unmasked; putMVar m ()
+  t3 <- mask_ $ forkIOWithUnmask $ \unmask ->
+            unmask $ do stat 3 Unmasked; putMVar m ()
   takeMVar m
-  t4 <- uninterruptibleMask_ $ forkIOUnmasked $ do stat 4 Unmasked; putMVar m ()
+  t4 <- uninterruptibleMask_ $ forkIOWithUnmask $ \unmask ->
+            unmask $ do stat 4 Unmasked; putMVar m ()
   takeMVar m
 
 stat :: Int -> MaskingState -> IO ()
