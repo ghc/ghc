@@ -1,4 +1,0 @@
-
-BadImport09.hs:5:1:
-    Foreign.Marshal: Can't be safely imported!
-    The module itself isn't safe.

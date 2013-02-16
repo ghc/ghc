@@ -31,12 +31,10 @@ test('BadImport03',
      extra_clean(['BadImport03_A.o', 'BadImport03_A.hi']),
      multimod_compile_fail,
      ['BadImport03', ''])
-test('BadImport04', normal, compile_fail, [''])
 test('BadImport05', normal, compile_fail, [''])
 test('BadImport06', normal, compile_fail, [''])
 test('BadImport07', normal, compile_fail, [''])
 test('BadImport08', normal, compile_fail, [''])
-test('BadImport09', normal, compile_fail, [''])
 
 # check safe modules are marked safe
 test('GoodImport01', normal, compile, [''])
