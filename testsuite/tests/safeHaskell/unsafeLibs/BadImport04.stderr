@@ -1,3 +1,3 @@
 
 BadImport04.hs:5:1:
-    Foreign: Can't be safely imported! The module itself isn't safe.
+    System.IO.Unsafe: Can't be safely imported! The module itself isn't safe.

@@ -1,8 +1,8 @@
 {-# LANGUAGE Safe #-}
--- | Import unsafe module Foreign to make sure it fails
+-- | Import unsafe module System.IO.Unsafe to make sure it fails
 module Main where
 
-import Foreign (unsafePerformIO)
+import System.IO.Unsafe (unsafePerformIO)
 
 f :: Int
 f = unsafePerformIO $ putStrLn "What kind of swallow?" >> return 2
