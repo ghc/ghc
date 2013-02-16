@@ -355,7 +355,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl transformers
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl transformers terminfo
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -464,7 +464,7 @@ $(eval $(call extra-packages))
 # parallelism, but we don't know the dependencies until we've
 # generated the package-data.mk files.
 define fixed_pkg_dep
-libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
+libraries/$1/$2/package-data.mk : $$(fixed_pkg_prev)
 fixed_pkg_prev:=libraries/$1/$2/package-data.mk
 endef
 
@@ -738,8 +738,8 @@ $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
 # lost).
 fixed_pkg_prev=
 $(foreach pkg,$(PACKAGES_STAGE0),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
-
-compiler/stage1/package-data.mk : $(fixed_pkg_prev)
+utils/ghc-pkg/dist/package-data.mk: $(fixed_pkg_prev)
+compiler/stage1/package-data.mk:    $(fixed_pkg_prev)
 endif
 
 ifneq "$(BINDIST)" "YES"
@@ -1333,6 +1333,8 @@ endif
 # Numbered phase targets
 
 .PHONY: phase_0_builds
+phase_0_builds: $(utils/ghc-pkg_dist_depfile_haskell)
+phase_0_builds: $(utils/ghc-pkg_dist_depfile_c_asm)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
 phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)

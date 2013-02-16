@@ -186,13 +186,13 @@ ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) : \
-    $$(foreach dep,$$($1_$2_DEP_NAMES),\
-        $$(if $$(filter ghc,$$(dep)),\
+    $$(foreach dep,$$($1_$2_DEPS),\
+        $$(if $$(filter ghc%,$$(dep)),\
             $(if $(filter 0,$3),$$(compiler_stage1_PROGRAM_DEP_LIB),\
             $(if $(filter 1,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
             $(if $(filter 2,$3),$$(compiler_stage2_PROGRAM_DEP_LIB),\
             $$(error Bad build stage)))),\
-        $$$$(libraries/$$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
+        $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB)))
 
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_C_OBJS) $$($1_$2_$$($1_$2_PROGRAM_WAY)_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.

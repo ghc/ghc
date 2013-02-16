@@ -123,6 +123,7 @@ $$(foreach way,$$($1_$2_WAYS),$$(eval \
 # If dyn libs are not being built then $$($1_$2_dyn_LIB) will just
 # expand to the empty string, and be ignored.
 $1_$2_PROGRAM_DEP_LIB = $$($1_$2_v_LIB) $$($1_$2_dyn_LIB)
+$$($1_PACKAGE)-$$($1_$2_VERSION)_$2_PROGRAM_DEP_LIB = $$($1_$2_PROGRAM_DEP_LIB)
 
 # C and S files are possibly built the "dyn" way.
 ifeq "$$(BuildSharedLibs)" "YES"
