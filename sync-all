@@ -162,6 +162,28 @@ sub gitNewWorkdir {
     }
 }
 
+sub configure_repository {
+    my $localpath = shift;
+    my $scm = shift;
+
+    if ($scm eq "git") {
+        &scm($localpath, $scm, "config", "--local", "core.ignorecase", "true");
+
+        open my $git_autocrlf, '-|', 'git', '--git-dir', $localpath,
+                                            'config', '--get', 'core.autocrlf'
+            or die "Executing git config failed: $!";
+        my $autocrlf = <$git_autocrlf>;
+        $autocrlf = "" unless defined($autocrlf);
+        chomp $autocrlf;
+        close($git_autocrlf);
+        if ($autocrlf eq "true") {
+            &scm($localpath, $scm,
+                 "config", "--local", "core.autocrlf", "false");
+            &scm($localpath, $scm, "reset", "--hard");
+        }
+    }
+}
+
 sub scm {
     my $dir = shift;
     my $scm = shift;
@@ -309,9 +331,7 @@ sub scmall {
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
                     if $localpath ne ".";
-                if ($scm eq "git") {
-                    scm ($localpath, $scm, "config", "core.ignorecase", "true");
-                }
+                &configure_repository($localpath, $scm);
                 next;
             }
 
@@ -329,7 +349,7 @@ sub scmall {
                 my @argsWithBare = @args;
                 push @argsWithBare, $bare_flag if $bare_flag;
                 scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
-                scm ($localpath, $scm, "config", "core.ignorecase", "true");
+                &configure_repository($localpath, $scm);
             }
             next;
         }
