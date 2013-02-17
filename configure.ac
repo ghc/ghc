@@ -129,25 +129,28 @@ if test "$WithGhc" != ""; then
 fi
 
 dnl ** Must have GHC to build GHC
-  if test "$WithGhc" = ""; then
-     AC_MSG_ERROR([GHC is required.])
-  fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
+if test "$WithGhc" = ""
+then
+    AC_MSG_ERROR([GHC is required.])
+fi
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
     [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
 
-  if test `expr $GhcMinVersion % 2` = "1"; then
-     if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
+if test `expr $GhcMinVersion % 2` = "1"
+then
+    if test "$EnableBootstrapWithDevelSnaphost" = "NO"
+    then
         AC_MSG_ERROR([
      $WithGhc is a development snapshot of GHC, version $GhcVersion.
      Bootstrapping using this version of GHC is not supported, and may not
      work.  Use --enable-bootstrap-with-devel-snapshot to try it anyway,
      or --with-ghc to specify a different GHC to use.])
-     fi
-  fi
+    fi
+fi
 
-  GHC_PACKAGE_DB_FLAG=package-db
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
-  AC_SUBST(GHC_PACKAGE_DB_FLAG)
+GHC_PACKAGE_DB_FLAG=package-db
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
+AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -197,13 +200,13 @@ FPTOOLS_SET_PLATFORM_VARS
 
 # Verify that the installed (bootstrap) GHC is capable of generating
 # code for the requested build platform.
-    if test "$BuildPlatform" != "$bootstrap_target"
-    then
-        echo "This GHC (${WithGhc}) does not generate code for the build platform"
-        echo "   GHC target platform    : $bootstrap_target"
-        echo "   Desired build platform : $BuildPlatform"
-        exit 1
-    fi
+if test "$BuildPlatform" != "$bootstrap_target"
+then
+    echo "This GHC (${WithGhc}) does not generate code for the build platform"
+    echo "   GHC target platform    : $bootstrap_target"
+    echo "   Desired build platform : $BuildPlatform"
+    exit 1
+fi
 
 # Testing if we shall enable shared libs support on Solaris.
 # Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
