@@ -1190,16 +1190,6 @@ publish-sdist :
 	$(call try10Times,$(PublishCp) $(SRC_DIST_TESTSUITE_TARBALL) $(PublishLocation)/dist)
 endif
 
-ifeq "$(BootingFromHc)" "YES"
-# In a normal build we use GHC to compile C files (see
-# rules/c-suffix-rules.mk), which passes a number of its own options
-# to the C compiler.  So when bootstrapping we have to provide these
-# flags explicitly to C compilations.
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
-SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-endif
-
 # -----------------------------------------------------------------------------
 # sdisting libraries
 

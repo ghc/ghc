@@ -161,11 +161,6 @@ $(GHC_STAGE2) : | $(TOUCHY)
 $(GHC_STAGE3) : | $(TOUCHY)
 endif
 
-ifeq "$(BootingFromHc)" "YES"
-$(GHC_STAGE2) : $(ALL_STAGE1_LIBS)
-ghc_stage2_OTHER_OBJS += $(compiler_stage2_v_LIB) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
-endif
-
 endif
 
 INSTALL_LIBS += settings

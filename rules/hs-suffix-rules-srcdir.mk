@@ -18,8 +18,6 @@ define hs-suffix-rules-srcdir
 
 ifneq "$$(BINDIST)" "YES"
 
-ifneq "$$(BootingFromHc)" "YES"
-
 $1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
 	$$(call cmd,HAPPY) $$($1_$2_$3_ALL_HAPPY_OPTS) $$< -o $$@
 
@@ -54,8 +52,6 @@ $1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$
 
 $(call hi-rule,$1/$4,$1/$2/build,$3)
 
-endif
-
 # XXX: for some reason these get used in preference to the direct
 # .hs->.o rule, I don't know why --SDM
 
@@ -88,12 +84,10 @@ $1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$($1_$2_H
 $1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.lhs-boot $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
-ifneq "$$(BootingFromHc)" "YES"
 # stubs are automatically generated and compiled by GHC
 
 $1/$2/build/%_stub.$$($3_osuf): $1/$2/build/%.$$($3_osuf)
 	@:
-endif
 
 endif
 

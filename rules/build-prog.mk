@@ -160,9 +160,6 @@ $(call c-objs,$1,$2,$$($1_$2_PROGRAM_WAY))
 $(call hs-objs,$1,$2,$$($1_$2_PROGRAM_WAY))
 
 $1_$2_LINK_WITH_GCC = NO
-ifeq "$$(BootingFromHc)" "YES"
-$1_$2_LINK_WITH_GCC = YES
-endif
 
 ifeq "$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS)" ""
 # We don't want to link the GHC RTS into C-only programs. There's no

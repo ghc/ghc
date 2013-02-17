@@ -19,8 +19,7 @@ define c-suffix-rules
 
 ifneq "$$(BINDIST)" "YES"
 
-# UseGhcForCc is only relevant when not booting from HC files.
-ifeq "$4 $$(BootingFromHc)" "YES NO"
+ifeq "$4" "YES"
 
 $1/$2/build/%.$$($3_osuf) : $1/%.c $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_GHC_CC_OPTS) -c $$< -o $$@

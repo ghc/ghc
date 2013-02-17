@@ -5,12 +5,8 @@ ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
 SUBDIRS = mkdirhier hp2ps parallel unlit
 else
-ifeq "$(BootingFromHc)" "YES"
-SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode unlit
-else
 SUBDIRS = mkdependC mkdirhier runstdtest hp2ps \
 	  parallel unlit genprimopcode genapply
-endif
 #ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ## lndir doesn't build on Windows
 #SUBDIRS += lndir
@@ -44,10 +40,8 @@ endif
 include $(TOP)/mk/target.mk
 
 # genprimopcode is needed to boot in ghc/compiler...
-ifneq "$(BootingFromHc)" "YES"
 boot ::
 	$(MAKE) -C genprimopcode
-endif
 
 ############################################
 
