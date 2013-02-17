@@ -94,22 +94,6 @@ dnl ** Tell the make system which OS we are using
 dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
 AC_SUBST(OSTYPE)
 
-dnl ** Booting from .hc files?
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(hc-boot,
-[AC_HELP_STRING([--enable-hc-boot],
-[Boot the Glasgow Haskell Compiler from intermediate .hc files.
- (This option is mostly of interest to porters.) [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-        BootingFromHc=YES
-  else
-        BootingFromHc=NO
-  fi
-],
-[BootingFromHc=NO]
-)
-AC_SUBST(BootingFromHc)
-
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
@@ -144,10 +128,9 @@ if test "$WithGhc" != ""; then
   fi
 fi
 
-dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO"; then
+dnl ** Must have GHC to build GHC
   if test "$WithGhc" = ""; then
-     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+     AC_MSG_ERROR([GHC is required.])
   fi
   FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.4],
     [AC_MSG_ERROR([GHC version 7.4 or later is required to compile GHC.])])dnl
@@ -165,7 +148,6 @@ if test "$BootingFromHc" = "NO"; then
   GHC_PACKAGE_DB_FLAG=package-db
   FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.5],GHC_PACKAGE_DB_FLAG=package-conf)
   AC_SUBST(GHC_PACKAGE_DB_FLAG)
-fi;
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -215,8 +197,6 @@ FPTOOLS_SET_PLATFORM_VARS
 
 # Verify that the installed (bootstrap) GHC is capable of generating
 # code for the requested build platform.
-if test "$BootingFromHc" = "NO"
-then
     if test "$BuildPlatform" != "$bootstrap_target"
     then
         echo "This GHC (${WithGhc}) does not generate code for the build platform"
@@ -224,7 +204,6 @@ then
         echo "   Desired build platform : $BuildPlatform"
         exit 1
     fi
-fi
 
 # Testing if we shall enable shared libs support on Solaris.
 # Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
@@ -685,16 +664,10 @@ dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
 dnl ** check for installed happy binary + version
-dnl    (don't do it if we're booting from .hc files though.)
-if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
-fi;
 
 dnl ** check for installed alex binary + version
-dnl    (don't do it if we're booting from .hc files though.)
-if test "$BootingFromHc" = "NO"; then
 FPTOOLS_ALEX
-fi;
 
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
@@ -976,16 +949,10 @@ Configure completed successfully.
    Target platform       : $TargetPlatform
 "]
 
-if test "$BootingFromHc" = "YES"; then
-echo ["\
-   Bootstrapping from HC files.
-"]
-else
 echo ["\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
 "]
-fi
 
 if test "x$CC_LLVM_BACKEND" = "x1"; then
     if test "x$CC_CLANG_BACKEND" = "x1"; then
