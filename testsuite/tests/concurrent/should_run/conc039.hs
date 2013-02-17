@@ -1,6 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 
 import Foreign
+import System.IO.Unsafe
 import System.Mem
 import Control.Concurrent
 
