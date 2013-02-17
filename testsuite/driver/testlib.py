@@ -483,9 +483,6 @@ def executeSetups(fs, name, opts):
         # fs is a single function, so just apply it
         fs(name, opts)
 
-def compose( f, g ):
-    return [f, g]
-
 # -----------------------------------------------------------------------------
 # The current directory of tests
 
