@@ -1902,31 +1902,31 @@ case "$1-$2" in
     $3="ios"
     ;;
   *)
-  case "$1" in
-  linux-android*)
-    $3="linux-android"
-    ;;
-  linux-*|linux)
-    $3="linux"
-    ;;
-  # As far as I'm aware, none of these have relevant variants
-  freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
-    $3="$1"
-    ;;
-  freebsd*) # like i686-gentoo-freebsd7
-            #      i686-gentoo-freebsd8
-            #      i686-gentoo-freebsd8.2
-    $3="freebsd"
-    ;;
-  nto-qnx*)
-    $3="nto-qnx"
-    ;;
-  *)
-    echo "Unknown OS $1"
-    exit 1
-    ;;
-  esac
-  ;;
+    case "$1" in
+      linux-android*)
+        $3="linux-android"
+        ;;
+      linux-*|linux)
+        $3="linux"
+        ;;
+      # As far as I'm aware, none of these have relevant variants
+      freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+        $3="$1"
+        ;;
+      freebsd*) # like i686-gentoo-freebsd7
+                #      i686-gentoo-freebsd8
+                #      i686-gentoo-freebsd8.2
+        $3="freebsd"
+        ;;
+      nto-qnx*)
+        $3="nto-qnx"
+        ;;
+      *)
+        echo "Unknown OS $1"
+        exit 1
+        ;;
+      esac
+      ;;
   esac
 ])
 
