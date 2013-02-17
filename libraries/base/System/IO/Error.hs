@@ -112,7 +112,6 @@ tryIOError f   =  catch (do r <- f
                             return (Right r))
                         (return . Left)
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 -- -----------------------------------------------------------------------------
 -- Constructing an IOError
 
@@ -131,7 +130,6 @@ mkIOError t location maybe_hdl maybe_filename =
                         ioe_handle = maybe_hdl, 
                         ioe_filename = maybe_filename
                         }
-#endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
 -- -----------------------------------------------------------------------------
 -- IOErrorType
@@ -273,7 +271,6 @@ isUserErrorType _ = False
 -- -----------------------------------------------------------------------------
 -- Miscellaneous
 
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 ioeGetErrorType       :: IOError -> IOErrorType
 ioeGetErrorString     :: IOError -> String
 ioeGetLocation        :: IOError -> String
@@ -304,8 +301,6 @@ ioeSetLocation    ioe str      = ioe{ ioe_location = str }
 ioeSetHandle      ioe hdl      = ioe{ ioe_handle = Just hdl }
 ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 
-#endif
-
 -- | Catch any 'IOError' that occurs in the computation and throw a
 -- modified version.
 modifyIOError :: (IOError -> IOError) -> IO a -> IO a
@@ -322,8 +317,6 @@ annotateIOError :: IOError
               -> Maybe Handle 
               -> Maybe FilePath 
               -> IOError 
-
-#if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 annotateIOError ioe loc hdl path = 
   ioe{ ioe_handle = hdl `mplus` ioe_handle ioe,
        ioe_location = loc, ioe_filename = path `mplus` ioe_filename ioe }
@@ -331,7 +324,6 @@ annotateIOError ioe loc hdl path =
     mplus :: Maybe a -> Maybe a -> Maybe a
     Nothing `mplus` ys = ys
     xs      `mplus` _  = xs
-#endif /* __GLASGOW_HASKELL__ || __HUGS__ */
 
 #ifndef __HUGS__
 -- | The 'catchIOError' function establishes a handler that receives any
