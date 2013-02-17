@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, DeriveDataTypeable #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, DeriveDataTypeable, TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -57,7 +57,10 @@ module GHC.Exts
         currentCallStack,
 
         -- * The Constraint kind
-        Constraint
+        Constraint,
+        
+        -- * Overloaded lists
+        IsList(..)
        ) where
 
 import Prelude
@@ -110,7 +113,7 @@ groupByFB c n eq xs0 = groupByFBCore xs0
 
 traceEvent :: String -> IO ()
 traceEvent = Debug.Trace.traceEventIO
-{-# DEPRECATED traceEvent "Use Debug.Trace.traceEvent or Debug.Trace.traceEventIO" #-}
+{-# DEPRECATED traceEvent "Use Debug.Trace.traceEvent or Debug.Trace.traceEventIO" #-} -- deprecated in 7.4
 
 
 {- **********************************************************************
@@ -129,3 +132,37 @@ traceEvent = Debug.Trace.traceEventIO
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
                 deriving( Data, Typeable, Eq )
 
+
+{- **********************************************************************
+*									*
+*              The IsList class                                         *
+*									*
+********************************************************************** -}
+
+-- | The 'IsList' class and its methods are intended to be used in
+--   conjunction with the OverloadedLists extension.
+class IsList l where
+  -- | The 'Item' type function returns the type of items of the structure
+  --   @l@.
+  type Item l
+  
+  -- | The 'fromList' function constructs the structure @l@ from the given
+  --   list of @Item l@
+  fromList  :: [Item l] -> l
+  
+  -- | The 'fromListN' function takes the input list's length as a hint. Its
+  --   behaviour should be equivalent to 'fromList'. The hint can be used to
+  --   construct the structure @l@ more efficiently compared to 'fromList'. If
+  --   the given hint does not equal to the input list's length the behaviour of
+  --   'fromListN' is not specified.
+  fromListN :: Int -> [Item l] -> l
+  fromListN _ = fromList
+  
+  -- | The 'toList' function extracts a list of @Item l@ from the structure @l@.
+  --   It should satisfy fromList . toList = id. 
+  toList :: l -> [Item l]
+
+instance IsList [a] where
+  type (Item [a]) = a
+  fromList = id
+  toList = id

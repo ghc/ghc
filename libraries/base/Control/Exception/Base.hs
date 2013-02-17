@@ -84,13 +84,11 @@ module Control.Exception.Base (
 
         -- ** Asynchronous exception control
         mask,
-#ifndef __NHC__
         mask_,
         uninterruptibleMask,
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
-#endif
 
         -- ** (deprecated) Asynchronous exception control
 
@@ -142,99 +140,6 @@ import qualified Hugs.Exception
 import Data.Dynamic
 import Data.Either
 import Data.Maybe
-
-#ifdef __NHC__
-import qualified IO as H'98 (catch)
-import IO              (bracket,ioError)
-import DIOError         -- defn of IOError type
-import System          (ExitCode())
-import System.IO.Unsafe (unsafePerformIO)
-import Unsafe.Coerce    (unsafeCoerce)
-
--- minimum needed for nhc98 to pretend it has Exceptions
-
-{-
-data Exception   = IOException    IOException
-                 | ArithException ArithException
-                 | ArrayException ArrayException
-                 | AsyncException AsyncException
-                 | ExitException  ExitCode
-                 deriving Show
--}
-class ({-Typeable e,-} Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
-
-data SomeException = forall e . Exception e => SomeException e
-
-INSTANCE_TYPEABLE0(SomeException,someExceptionTc,"SomeException")
-
-instance Show SomeException where
-    showsPrec p (SomeException e) = showsPrec p e
-instance Exception SomeException where
-    toException se = se
-    fromException = Just
-
-type IOException = IOError
-instance Exception IOError where
-    toException                     = SomeException
-    fromException (SomeException e) = Just (unsafeCoerce e)
-
-instance Exception ExitCode where
-    toException                     = SomeException
-    fromException (SomeException e) = Just (unsafeCoerce e)
-
-data ArithException
-data ArrayException
-data AsyncException
-data AssertionFailed
-data PatternMatchFail
-data NoMethodError
-data Deadlock
-data BlockedIndefinitelyOnMVar
-data BlockedIndefinitelyOnSTM
-data ErrorCall
-data RecConError
-data RecSelError
-data RecUpdError
-instance Show ArithException
-instance Show ArrayException
-instance Show AsyncException
-instance Show AssertionFailed
-instance Show PatternMatchFail
-instance Show NoMethodError
-instance Show Deadlock
-instance Show BlockedIndefinitelyOnMVar
-instance Show BlockedIndefinitelyOnSTM
-instance Show ErrorCall
-instance Show RecConError
-instance Show RecSelError
-instance Show RecUpdError
-
-catch   :: Exception e
-        => IO a         -- ^ The computation to run
-        -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
-        -> IO a
-catch io h = H'98.catch  io  (h . fromJust . fromException . toException)
-
-throwIO  :: Exception e => e -> IO a
-throwIO   = ioError . fromJust . fromException . toException
-
-throw    :: Exception e => e -> a
-throw     = unsafePerformIO . throwIO
-
-evaluate :: a -> IO a
-evaluate x = x `seq` return x
-
-assert :: Bool -> a -> a
-assert True  x = x
-assert False _ = throw (toException (UserError "" "Assertion failed"))
-
-mask   :: ((IO a-> IO a) -> IO a) -> IO a
-mask action = action restore
-    where restore act = act
-
-#endif
 
 #ifdef __HUGS__
 class (Typeable e, Show e) => Exception e where
@@ -380,7 +285,6 @@ blocked  = return False
 -- might get a the opposite behaviour. This is ok, because 'catch' is an
 -- 'IO' computation.
 --
-#ifndef __NHC__
 catch   :: Exception e
         => IO a         -- ^ The computation to run
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
@@ -392,7 +296,6 @@ catch m h = Hugs.Exception.catchException m h'
   where h' e = case fromException e of
             Just e' -> h e'
             Nothing -> throwIO e
-#endif
 #endif
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
@@ -497,7 +400,6 @@ onException io what = io `catch` \e -> do _ <- what
 --
 -- > withFile name mode = bracket (openFile name mode) hClose
 --
-#ifndef __NHC__
 bracket
         :: IO a         -- ^ computation to run first (\"acquire resource\")
         -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
@@ -509,7 +411,6 @@ bracket before after thing =
     r <- restore (thing a) `onException` after a
     _ <- after a
     return r
-#endif
 
 -- | A specialised variant of 'bracket' with just a computation to run
 -- afterward.
@@ -541,7 +442,7 @@ bracketOnError before after thing =
     a <- before
     restore (thing a) `onException` after a
 
-#if !(__GLASGOW_HASKELL__ || __NHC__)
+#if !__GLASGOW_HASKELL__
 assert :: Bool -> a -> a
 assert True x = x
 assert False _ = throw (AssertionFailed "")

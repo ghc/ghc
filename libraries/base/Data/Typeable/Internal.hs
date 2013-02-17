@@ -178,7 +178,7 @@ typeRepArgs :: TypeRep -> [TypeRep]
 typeRepArgs (TypeRep _ _ args) = args
 
 -- | Observe string encoding of a type representation
-{-# DEPRECATED tyConString "renamed to tyConName; tyConModule and tyConPackage are also available." #-}
+{-# DEPRECATED tyConString "renamed to tyConName; tyConModule and tyConPackage are also available." #-} -- deprecated in 7.4
 tyConString :: TyCon   -> String
 tyConString = tyConName
 
@@ -324,14 +324,12 @@ INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 INSTANCE_TYPEABLE3(STArray,sTArrayTc,"STArray")
 #endif
 
-#ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,"(,)")
 INSTANCE_TYPEABLE3((,,),tup3Tc,"(,,)")
 INSTANCE_TYPEABLE4((,,,),tup4Tc,"(,,,)")
 INSTANCE_TYPEABLE5((,,,,),tup5Tc,"(,,,,)")
 INSTANCE_TYPEABLE6((,,,,,),tup6Tc,"(,,,,,)")
 INSTANCE_TYPEABLE7((,,,,,,),tup7Tc,"(,,,,,,)")
-#endif /* __NHC__ */
 
 INSTANCE_TYPEABLE1(Ptr,ptrTc,"Ptr")
 INSTANCE_TYPEABLE1(FunPtr,funPtrTc,"FunPtr")
@@ -352,9 +350,7 @@ INSTANCE_TYPEABLE0(Char,charTc,"Char")
 INSTANCE_TYPEABLE0(Float,floatTc,"Float")
 INSTANCE_TYPEABLE0(Double,doubleTc,"Double")
 INSTANCE_TYPEABLE0(Int,intTc,"Int")
-#ifndef __NHC__
 INSTANCE_TYPEABLE0(Word,wordTc,"Word" )
-#endif
 INSTANCE_TYPEABLE0(Integer,integerTc,"Integer")
 INSTANCE_TYPEABLE0(Ordering,orderingTc,"Ordering")
 #ifndef __GLASGOW_HASKELL__

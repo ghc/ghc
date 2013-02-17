@@ -22,10 +22,8 @@ module System.Environment
       getExecutablePath,
       getEnv,
       lookupEnv,
-#ifndef __NHC__
       withArgs,
       withProgName,
-#endif
 #ifdef __GLASGOW_HASKELL__
       getEnvironment,
 #endif
@@ -52,14 +50,6 @@ import Control.Monad
 
 #ifdef __HUGS__
 import Hugs.System
-#endif
-
-#ifdef __NHC__
-import System
-  ( getArgs
-  , getProgName
-  , getEnv
-  )
 #endif
 
 import System.Environment.ExecutablePath

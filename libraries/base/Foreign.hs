@@ -25,14 +25,6 @@ module Foreign
         , module Foreign.StablePtr
         , module Foreign.Storable
         , module Foreign.Marshal
-
-        -- * Unsafe Functions
-
-        -- | 'unsafePerformIO' is exported here for backwards
-        -- compatibility reasons only.  For doing local marshalling in
-        -- the FFI, use 'unsafeLocalState'.  For other uses, see
-        -- 'System.IO.Unsafe.unsafePerformIO'.
-        , unsafePerformIO
         ) where
 
 import Data.Bits
@@ -43,13 +35,4 @@ import Foreign.ForeignPtr
 import Foreign.StablePtr
 import Foreign.Storable
 import Foreign.Marshal
-
-import GHC.IO (IO)
-import qualified GHC.IO (unsafePerformIO)
-
-{-# DEPRECATED unsafePerformIO "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release" #-}
-
-{-# INLINE unsafePerformIO #-}
-unsafePerformIO :: IO a -> a
-unsafePerformIO = GHC.IO.unsafePerformIO
 

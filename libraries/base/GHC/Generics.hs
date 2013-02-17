@@ -105,8 +105,8 @@ data P
 type Rec0  = K1 R
 -- | Type synonym for encoding parameters (other than the last)
 type Par0  = K1 P
-{-# DEPRECATED Par0 "Par0 is no longer used; use Rec0 instead" #-}
-{-# DEPRECATED P "P is no longer used; use R instead" #-}
+{-# DEPRECATED Par0 "Par0 is no longer used; use Rec0 instead" #-} -- deprecated in 7.6
+{-# DEPRECATED P "P is no longer used; use R instead" #-} -- deprecated in 7.6
 
 -- | Tag for M1: datatype
 data D
@@ -131,6 +131,9 @@ class Datatype d where
   datatypeName :: t d (f :: * -> *) a -> [Char]
   -- | The fully-qualified name of the module where the type is declared
   moduleName   :: t d (f :: * -> *) a -> [Char]
+  -- | Marks if the datatype is actually a newtype
+  isNewtype    :: t d (f :: * -> *) a -> Bool
+  isNewtype _ = False
 
 
 -- | Class for datatypes that represent records

@@ -55,29 +55,11 @@ module Foreign.ForeignPtr.Imp
 
 import Foreign.Ptr
 
-#ifdef __NHC__
-import NHC.FFI
-  ( ForeignPtr
-  , FinalizerPtr
-  , newForeignPtr
-  , newForeignPtr_
-  , addForeignPtrFinalizer
-  , withForeignPtr
-  , unsafeForeignPtrToPtr
-  , touchForeignPtr
-  , castForeignPtr
-  , Storable(sizeOf)
-  , malloc, mallocBytes, finalizerFree
-  )
-#endif
-
 #ifdef __HUGS__
 import Hugs.ForeignPtr
 #endif
 
-#ifndef __NHC__
 import Foreign.Storable ( Storable(sizeOf) )
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -86,7 +68,7 @@ import GHC.Err          ( undefined )
 import GHC.ForeignPtr
 #endif
 
-#if !defined(__NHC__) && !defined(__GLASGOW_HASKELL__)
+#if !defined(__GLASGOW_HASKELL__)
 import Foreign.Marshal.Alloc    ( malloc, mallocBytes, finalizerFree )
 
 instance Eq (ForeignPtr a) where 
@@ -100,7 +82,6 @@ instance Show (ForeignPtr a) where
 #endif
 
 
-#ifndef __NHC__
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and
 -- associates a finalizer with the reference.  The finalizer will be
@@ -136,7 +117,6 @@ withForeignPtr fo io
   = do r <- io (unsafeForeignPtrToPtr fo)
        touchForeignPtr fo
        return r
-#endif /* ! __NHC__ */
 
 #if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
 -- | This variant of 'newForeignPtr' adds a finalizer that expects an

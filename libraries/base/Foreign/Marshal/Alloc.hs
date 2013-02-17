@@ -76,9 +76,6 @@ import GHC.Real
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
-#elif defined(__NHC__)
-import NHC.FFI                  ( FinalizerPtr, CInt(..) )
-import IO                       ( bracket )
 #else
 import Control.Exception.Base   ( bracket )
 #endif

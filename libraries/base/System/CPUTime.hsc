@@ -32,10 +32,6 @@ import Data.Ratio
 import Hugs.Time ( getCPUTime, clockTicks )
 #endif
 
-#ifdef __NHC__
-import CPUTime ( getCPUTime, cpuTimePrecision )
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 import Foreign.Safe
 import Foreign.C
@@ -166,10 +162,8 @@ foreign import WINDOWS_CCONV unsafe "GetProcessTimes" getProcessTimes :: Ptr HAN
 -- in CPU time that the implementation can record, and is given as an
 -- integral number of picoseconds.
 
-#ifndef __NHC__
 cpuTimePrecision :: Integer
 cpuTimePrecision = round ((1000000000000::Integer) % fromIntegral (clockTicks))
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 foreign import ccall unsafe clk_tck :: CLong

@@ -1,8 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
-#ifndef __NHC__
 {-# LANGUAGE RankNTypes #-}
-#endif
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}
 #endif
@@ -28,11 +26,7 @@
 module Text.ParserCombinators.ReadP
   ( 
   -- * The 'ReadP' type
-#ifndef __NHC__
   ReadP,
-#else
-  ReadPN,
-#endif
   
   -- * Primitive operations
   get,
@@ -159,12 +153,7 @@ instance MonadPlus P where
 -- ---------------------------------------------------------------------------
 -- The ReadP type
 
-#ifndef __NHC__
 newtype ReadP a = R (forall b . (a -> P b) -> P b)
-#else
-#define ReadP  (ReadPN b)
-newtype ReadPN b a = R ((a -> P b) -> P b)
-#endif
 
 -- Functor, Monad, MonadPlus
 
@@ -216,11 +205,7 @@ pfail = R (\_ -> Fail)
 -- ^ Symmetric choice.
 R f1 +++ R f2 = R (\k -> f1 k `mplus` f2 k)
 
-#ifndef __NHC__
 (<++) :: ReadP a -> ReadP a -> ReadP a
-#else
-(<++) :: ReadPN a a -> ReadPN a a -> ReadPN a a
-#endif
 -- ^ Local, exclusive, left-biased choice: If left parser
 --   locally produces any result at all, then right parser is
 --   not used.
@@ -252,11 +237,7 @@ R f <++ q =
   discard n  = get >> discard (n-1)
 #endif
 
-#ifndef __NHC__
 gather :: ReadP a -> ReadP (String, a)
-#else
--- gather :: ReadPN (String->P b) a -> ReadPN (String->P b) (String, a)
-#endif
 -- ^ Transforms a parser into one that does the same, but
 --   in addition returns the exact characters read.
 --   IMPORTANT NOTE: 'gather' gives a runtime error if its first argument
@@ -421,11 +402,7 @@ chainl1 p op = p >>= rest
                     rest (f x y)
                  +++ return x
 
-#ifndef __NHC__
 manyTill :: ReadP a -> ReadP end -> ReadP [a]
-#else
-manyTill :: ReadPN [a] a -> ReadPN [a] end -> ReadPN [a] [a]
-#endif
 -- ^ @manyTill p end@ parses zero or more occurrences of @p@, until @end@
 --   succeeds. Returns a list of values returned by @p@.
 manyTill p end = scan
@@ -434,11 +411,7 @@ manyTill p end = scan
 -- ---------------------------------------------------------------------------
 -- Converting between ReadP and Read
 
-#ifndef __NHC__
 readP_to_S :: ReadP a -> ReadS a
-#else
-readP_to_S :: ReadPN a a -> ReadS a
-#endif
 -- ^ Converts a parser into a Haskell ReadS-style function.
 --   This is the main way in which you can \"run\" a 'ReadP' parser:
 --   the expanded type is

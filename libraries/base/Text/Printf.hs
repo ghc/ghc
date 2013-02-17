@@ -152,10 +152,8 @@ instance PrintfArg Int32 where
 instance PrintfArg Int64 where
     toUPrintf = uInteger
 
-#ifndef __NHC__
 instance PrintfArg Word where
     toUPrintf = uInteger
-#endif
 
 instance PrintfArg Word8 where
     toUPrintf = uInteger

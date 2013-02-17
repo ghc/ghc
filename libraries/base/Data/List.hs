@@ -17,11 +17,6 @@
 
 module Data.List
    (
-#ifdef __NHC__
-     [] (..)
-   ,
-#endif
-
    -- * Basic functions
 
      (++)
@@ -209,10 +204,6 @@ module Data.List
    , genericReplicate
 
    ) where
-
-#ifdef __NHC__
-import Prelude
-#endif
 
 import Data.Maybe
 import Data.Char        ( isSpace )

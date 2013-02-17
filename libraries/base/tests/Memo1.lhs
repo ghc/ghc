@@ -8,7 +8,6 @@
 {-# LANGUAGE CPP #-}
 
 module Memo1
-	{-# DEPRECATED "This module is unmaintained, and will disappear soon" #-}
 #ifndef __PARALLEL_HASKELL__
 	( memo  	-- :: (a -> b) -> a -> b
 	, memoSized 	-- :: Int -> (a -> b) -> a -> b

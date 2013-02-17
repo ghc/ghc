@@ -69,15 +69,6 @@ import Hugs.Prelude (Ix)
 import Hugs.Char
 #endif
 
-#ifdef __NHC__
-import Prelude
-import Prelude(Char,String)
-import Char
-import Ix
-import NHC.FFI (CInt)
-foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> CInt
-#endif
-
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
 -- This function fails unless its argument satisfies 'isHexDigit',
 -- but recognises both upper and lower-case hexadecimal digits
@@ -133,7 +124,7 @@ data GeneralCategory
 
 -- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
-#if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
+#if defined(__GLASGOW_HASKELL__)
 generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 #endif
 #ifdef __HUGS__
@@ -202,10 +193,4 @@ isSeparator c = case generalCategory c of
         LineSeparator           -> True
         ParagraphSeparator      -> True
         _                       -> False
-
-#ifdef __NHC__
--- dummy implementation
-toTitle :: Char -> Char
-toTitle = toUpper
-#endif
 

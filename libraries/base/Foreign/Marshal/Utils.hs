@@ -57,10 +57,6 @@ import GHC.Num
 import GHC.Base
 #endif
 
-#ifdef __NHC__
-import Foreign.C.Types          ( CInt(..) )
-#endif
-
 -- combined allocation and marshalling
 -- -----------------------------------
 

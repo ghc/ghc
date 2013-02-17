@@ -35,21 +35,6 @@ module Data.Maybe
 import GHC.Base
 #endif
 
-#ifdef __NHC__
-import Prelude
-import Prelude (Maybe(..), maybe)
-import Maybe
-    ( isJust
-    , isNothing
-    , fromJust
-    , fromMaybe
-    , listToMaybe
-    , maybeToList
-    , catMaybes
-    , mapMaybe
-    )
-#else
-
 #ifndef __HUGS__
 -- ---------------------------------------------------------------------------
 -- The Maybe type, and instances
@@ -145,6 +130,4 @@ mapMaybe f (x:xs) =
  case f x of
   Nothing -> rs
   Just r  -> r:rs
-
-#endif /* else not __NHC__ */
 

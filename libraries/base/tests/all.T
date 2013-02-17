@@ -85,15 +85,13 @@ test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
 
 test('memo001',
-     [when(fast(), skip),
-      extra_run_opts('+RTS -A10k -RTS'),
+     [extra_run_opts('+RTS -A10k -RTS'),
       extra_clean(['Memo1.hi', 'Memo1.o'])],
      multimod_compile_and_run,
      ['memo001',''])
 
 test('memo002',
-     [when(fast(), skip),
-      extra_run_opts('20'),
+     [extra_run_opts('20'),
       extra_clean(['Memo2.hi', 'Memo2.o'])],
 	multimod_compile_and_run, ['memo002',''])
 

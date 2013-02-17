@@ -148,22 +148,22 @@ topHandlerFastExit err =
 --  another error, etc.)
 --
 real_handler :: (Int -> IO a) -> SomeException -> IO a
-real_handler exit se@(SomeException exn) = do
+real_handler exit se = do
   flushStdHandles -- before any error output
-  case cast exn of
+  case fromException se of
       Just StackOverflow -> do
            reportStackOverflow
            exit 2
 
       Just UserInterrupt  -> exitInterrupted
 
-      _ -> case cast exn of
+      _ -> case fromException se of
            -- only the main thread gets ExitException exceptions
            Just ExitSuccess     -> exit 0
            Just (ExitFailure n) -> exit n
 
            -- EPIPE errors received for stdout are ignored (#2699)
-           _ -> case cast exn of
+           _ -> case fromException se of
                 Just IOError{ ioe_type = ResourceVanished,
                               ioe_errno = Just ioe,
                               ioe_handle = Just hdl }

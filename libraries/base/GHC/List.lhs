@@ -114,12 +114,25 @@ null (_:_)              =  False
 -- | /O(n)/. 'length' returns the length of a finite list as an 'Int'.
 -- It is an instance of the more general 'Data.List.genericLength',
 -- the result type of which may be any kind of number.
+{-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
-length l                =  len l 0#
-  where
-    len :: [a] -> Int# -> Int
-    len []     a# = I# a#
-    len (_:xs) a# = len xs (a# +# 1#)
+length l                =  lenAcc l 0#
+
+lenAcc :: [a] -> Int# -> Int
+lenAcc []     a# = I# a#
+lenAcc (_:xs) a# = lenAcc xs (a# +# 1#)
+
+incLen :: a -> (Int# -> Int) -> Int# -> Int
+incLen _ g x = g (x +# 1#)
+
+-- These rules make length into a good consumer
+-- Note that we use a higher-order-style use of foldr, so that
+-- the accumulating parameter can be evaluated strictly
+-- See Trac #876 for what goes wrong otherwise
+{-# RULES
+"length"     [~1] forall xs. length xs = foldr incLen I# xs 0#
+"lengthList" [1]  foldr incLen I# = lenAcc
+ #-}
 
 -- | 'filter', applied to a predicate and a list, returns the list of
 -- those elements that satisfy the predicate; i.e.,

@@ -36,11 +36,6 @@ import Hugs.IOExts (unsafePerformIO, unsafeInterleaveIO)
 unsafeDupablePerformIO = unsafePerformIO
 #endif
 
-#ifdef __NHC__
-import NHC.Internal (unsafePerformIO, unsafeInterleaveIO)
-unsafeDupablePerformIO = unsafePerformIO
-#endif
-
 -- | A slightly faster version of `System.IO.fixIO` that may not be
 -- safe to use with multiple threads.  The unsafety arises when used
 -- like this:

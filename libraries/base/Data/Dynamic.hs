@@ -62,10 +62,6 @@ import Hugs.IORef
 import Hugs.IOExts
 #endif
 
-#ifdef __NHC__
-import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
-#endif
-
 #include "Typeable.h"
 
 -------------------------------------------------------------

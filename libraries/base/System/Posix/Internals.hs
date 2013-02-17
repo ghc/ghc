@@ -24,11 +24,7 @@
 -- #hide
 module System.Posix.Internals where
 
-#ifdef __NHC__
-#define HTYPE_TCFLAG_T
-#else
-# include "HsBaseConfig.h"
-#endif
+#include "HsBaseConfig.h"
 
 #if ! (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 import Control.Monad
@@ -60,11 +56,6 @@ import qualified GHC.Foreign as GHC
 #elif __HUGS__
 import Hugs.Prelude (IOException(..), IOErrorType(..))
 import Hugs.IO (IOMode(..))
-#elif __NHC__
-import GHC.IO.Device	-- yes, I know, but its portable, really!
-import System.IO
-import Control.Exception
-import DIOError
 #endif
 
 #ifdef __HUGS__
@@ -152,16 +143,12 @@ statGetType p_stat = do
         | otherwise             -> ioError ioe_unknownfiletype
     
 ioe_unknownfiletype :: IOException
-#ifndef __NHC__
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         "unknown file type"
-#  if __GLASGOW_HASKELL__
+#if __GLASGOW_HASKELL__
                         Nothing
-#  endif
-                        Nothing
-#else
-ioe_unknownfiletype = UserError "fdType" "unknown file type"
 #endif
+                        Nothing
 
 fdGetMode :: FD -> IO IOMode
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
@@ -319,11 +306,7 @@ setCooked fd cooked = do
 
 ioe_unk_error :: String -> String -> IOException
 ioe_unk_error loc msg 
-#ifndef __NHC__
  = ioeSetErrorString (mkIOError OtherError loc Nothing Nothing) msg
-#else
- = UserError loc msg
-#endif
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
 -- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.

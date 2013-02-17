@@ -35,12 +35,6 @@ import GHC.Num
 import GHC.IO
 import {-# SOURCE #-} GHC.IO.Exception ( unsupportedOperation )
 #endif
-#ifdef __NHC__
-import Foreign
-import Ix
-import Control.Exception.Base
-unsupportedOperation = userError "unsupported operation"
-#endif
 
 -- | A low-level I/O provider where the data is bytes in memory.
 class RawIO a where

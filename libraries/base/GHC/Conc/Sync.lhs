@@ -42,11 +42,8 @@ module GHC.Conc.Sync
 
         -- * Forking and suchlike
         , forkIO
-        , forkIOUnmasked
         , forkIOWithUnmask
         , forkOn
-        , forkOnIO    -- DEPRECATED
-        , forkOnIOUnmasked
         , forkOnWithUnmask
         , numCapabilities
         , getNumCapabilities
@@ -97,7 +94,7 @@ module GHC.Conc.Sync
         , sharedCAF
         ) where
 
-import Foreign hiding (unsafePerformIO)
+import Foreign
 import Foreign.C
 
 #ifdef mingw32_HOST_OS
@@ -208,11 +205,6 @@ forkIO action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
-{-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-}
--- | This function is deprecated; use 'forkIOWithUnmask' instead
-forkIOUnmasked :: IO () -> IO ThreadId
-forkIOUnmasked io = forkIO (unsafeUnmask io)
-
 -- | Like 'forkIO', but the child thread is passed a function that can
 -- be used to unmask asynchronous exceptions.  This function is
 -- typically used in the following way
@@ -257,16 +249,6 @@ forkOn (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
-
-{-# DEPRECATED forkOnIO "renamed to forkOn" #-}
--- | This function is deprecated; use 'forkOn' instead
-forkOnIO :: Int -> IO () -> IO ThreadId
-forkOnIO = forkOn
-
-{-# DEPRECATED forkOnIOUnmasked "use forkOnWithUnmask instead" #-}
--- | This function is deprecated; use 'forkOnWIthUnmask' instead
-forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
-forkOnIOUnmasked cpu io = forkOn cpu (unsafeUnmask io)
 
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
 -- given CPU, as with 'forkOn'.
