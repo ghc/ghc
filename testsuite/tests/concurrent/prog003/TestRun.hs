@@ -176,10 +176,10 @@ run_testdata testdata_fname mode = do
 --          ; wait <- atomically (newTVar 0)
           ; wait <- newEmptyMVar
           ; start <- getCurrentTime
-          ; zipWithM (\n work -> forkOnIO n (do { executeTasks nl work
-                                                ; putMVar wait () }))
-                                                --atomically(do counter <- readTVar wait
---                                                                writeTVar wait (counter+1)) }))
+          ; zipWithM (\n work -> forkOn n (do { executeTasks nl work
+                                              ; putMVar wait () }))
+                                              --atomically(do counter <- readTVar wait
+--                                                              writeTVar wait (counter+1)) }))
             [0..] works
           ; replicateM_ (length works) (takeMVar wait)
 --          ; atomically ( do { counter <- readTVar wait
