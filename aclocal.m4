@@ -36,7 +36,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     else
         GHC_CONVERT_CPU([$build_cpu], [BuildArch])
         GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
-        GHC_CONVERT_OS([$build_os], [BuildOS])
+        GHC_CONVERT_OS([$build_os], [$BuildArch], [BuildOS])
     fi
 
     if test "$host_alias" = ""
@@ -56,7 +56,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     else
         GHC_CONVERT_CPU([$host_cpu], [HostArch])
         GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
-        GHC_CONVERT_OS([$host_os], [HostOS])
+        GHC_CONVERT_OS([$host_os], [$HostArch], [HostOS])
     fi
 
     if test "$target_alias" = ""
@@ -65,7 +65,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         then
             GHC_CONVERT_CPU([$host_cpu], [TargetArch])
             GHC_CONVERT_VENDOR([$host_vendor], [TargetVendor])
-            GHC_CONVERT_OS([$host_os], [TargetOS])
+            GHC_CONVERT_OS([$host_os], [$TargetArch],[TargetOS])
         else
             if test "$bootstrap_target" != ""
             then
@@ -83,7 +83,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     else
         GHC_CONVERT_CPU([$target_cpu], [TargetArch])
         GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
-        GHC_CONVERT_OS([$target_os], [TargetOS])
+        GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
     windows=NO
@@ -215,6 +215,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         linux)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
+        ios)
+            test -z "[$]2" || eval "[$]2=OSiOS"
+            ;;
         darwin)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
@@ -302,11 +305,11 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
          HaskellHaveGnuNonexecStack=False])
     CFLAGS="$CFLAGS2"
 
-    checkArch "$BuildArch" ""
+    checkArch "$BuildArch" "HaskellBuildArch"
     checkVendor "$BuildVendor"
     checkOS "$BuildOS" ""
 
-    checkArch "$HostArch" ""
+    checkArch "$HostArch" "HaskellHostArch"
     checkVendor "$HostVendor"
     checkOS "$HostOS" ""
 
@@ -772,6 +775,7 @@ x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
 
     # HACK: Apple doesn't seem to provide nlist in the 64-bit-libraries
 x86_64-apple-darwin*) fptools_cv_leading_underscore=yes;;
+*-apple-ios) fptools_cv_leading_underscore=yes;;
 
 *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
 #include <nlist.h>
@@ -1889,33 +1893,39 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
   esac
 ])
 
-# GHC_CONVERT_OS(os, target_var)
+# GHC_CONVERT_OS(os, converted_cpu, target_var)
 # --------------------------------
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
-case "$1" in
+case "$1-$2" in
+  darwin10-arm)
+    $3="ios"
+    ;;
+  *)
+  case "$1" in
   linux-android*)
-    $2="linux-android"
+    $3="linux-android"
     ;;
   linux-*|linux)
-    $2="linux"
+    $3="linux"
     ;;
   # As far as I'm aware, none of these have relevant variants
   freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
-    $2="$1"
+    $3="$1"
     ;;
   freebsd*) # like i686-gentoo-freebsd7
             #      i686-gentoo-freebsd8
             #      i686-gentoo-freebsd8.2
-    $2="freebsd"
+    $3="freebsd"
     ;;
   nto-qnx*)
-    $2="nto-qnx"
+    $3="nto-qnx"
     ;;
   *)
     echo "Unknown OS $1"
     exit 1
     ;;
+  esac
   esac
 ])
 
