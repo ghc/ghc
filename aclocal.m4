@@ -1926,6 +1926,7 @@ case "$1-$2" in
     exit 1
     ;;
   esac
+  ;;
   esac
 ])
 
