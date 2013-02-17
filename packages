@@ -43,7 +43,6 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #    localpath                tag           remotepath                          VCS
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.                               -           ghc.git                             git
 ghc-tarballs                    -           ghc-tarballs.git                    git
 utils/hsc2hs                    -           hsc2hs.git                          git
 utils/haddock                   -           haddock.git                         git
@@ -83,3 +82,4 @@ libraries/random                dph         -                                   
 libraries/primitive             dph         -                                   git
 libraries/vector                dph         -                                   git
 libraries/dph                   dph         packages/dph.git                    git
+.                               -           ghc.git                             git
