@@ -52,7 +52,7 @@ chaseConstructor :: (GhcMonad m) => HValue -> m ()
 chaseConstructor !hv = do
   dflags <- getDynFlags
   liftIO $ putStrLn "====="
-  closure <- liftIO $ getClosureData hv
+  closure <- liftIO $ getClosureData dflags hv
   case tipe closure  of
     Indirection _ -> chaseConstructor (ptrs closure ! 0)
     Constr -> do
