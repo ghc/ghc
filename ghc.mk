@@ -929,7 +929,6 @@ ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
 endif
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
-	           CROSS_COMPILE="$(CrossCompilePrefix)"              \
 	           "$(GHC_CABAL_INPLACE)" copy                        \
 	                                  "$(STRIP_CMD)"              \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
@@ -940,7 +939,6 @@ endif
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
-	           CROSS_COMPILE="$(CrossCompilePrefix)"              \
 	           "$(GHC_CABAL_INPLACE)" register                    \
 	                                  "$(INSTALLED_GHC_REAL)"     \
 	                                  "$(INSTALLED_GHC_PKG_REAL)" \
