@@ -35,7 +35,7 @@ main = do
       getDataCon (L _ (AbsBinds { abs_binds = bs }))
         = not (isEmptyBag (filterBag getDataCon bs))
       getDataCon (L l (f@FunBind {}))
-        | (MatchGroup (m:_) _)<-fun_matches f,
+        | (MG (m:_) _ _) <- fun_matches f,
           (L _ (c@ConPatOut{}):_)<-hsLMatchPats m,
           (L l _)<-pat_con c
         = isGoodSrcSpan l       -- Check that the source location is a good one
