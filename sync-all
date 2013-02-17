@@ -169,13 +169,14 @@ sub configure_repository {
     if ($scm eq "git") {
         &scm($localpath, $scm, "config", "--local", "core.ignorecase", "true");
 
-        open my $git_autocrlf, '-|', 'git', '--git-dir', $localpath,
-                                            'config', '--get', 'core.autocrlf'
+        chdir($localpath);
+        open my $git_autocrlf, '-|', 'git', 'config', '--get', 'core.autocrlf'
             or die "Executing git config failed: $!";
         my $autocrlf = <$git_autocrlf>;
         $autocrlf = "" unless defined($autocrlf);
         chomp $autocrlf;
         close($git_autocrlf);
+        chdir($initial_working_directory);
         if ($autocrlf eq "true") {
             &scm($localpath, $scm,
                  "config", "--local", "core.autocrlf", "false");
