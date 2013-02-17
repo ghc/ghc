@@ -1728,35 +1728,6 @@ AC_DEFUN([FP_GMP],
   AC_SUBST(GMP_LIB_DIRS)
 ])# FP_GMP
 
-# FP_CHECK_MACOSX_DEPLOYMENT_TARGET
-# ---------------------------------
-AC_DEFUN([FP_CHECK_MACOSX_DEPLOYMENT_TARGET],
-[
-if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple"; then
-  AC_MSG_CHECKING([Mac OS X deployment target])
-  case $FP_MACOSX_DEPLOYMENT_TARGET in
-    none)  ;;
-    10.4)  MACOSX_DEPLOYMENT_VERSION=10.4
-    	   MACOSX_DEPLOYMENT_SDK=/Developer/SDKs/MacOSX10.4u.sdk
-	   ;;
-    10.4u) MACOSX_DEPLOYMENT_VERSION=10.4
-    	   MACOSX_DEPLOYMENT_SDK=/Developer/SDKs/MacOSX10.4u.sdk
-	   ;;
-    *)     MACOSX_DEPLOYMENT_VERSION=$FP_MACOSX_DEPLOYMENT_TARGET
-    	   MACOSX_DEPLOYMENT_SDK=/Developer/SDKs/MacOSX${FP_MACOSX_DEPLOYMENT_TARGET}.sdk
-	   ;;
-  esac
-  if test "x$FP_MACOSX_DEPLOYMENT_TARGET" = "xnone"; then
-    AC_MSG_RESULT(none)
-  else
-    if test ! -d $MACOSX_DEPLOYMENT_SDK; then
-      AC_MSG_ERROR([Unknown deployment target $FP_MACOSX_DEPLOYMENT_TARGET])
-    fi
-    AC_MSG_RESULT([${MACOSX_DEPLOYMENT_VERSION} (${MACOSX_DEPLOYMENT_SDK})])
-  fi
-fi
-])
-
 # --------------------------------------------------------------
 # Calculate absolute path to build tree
 # --------------------------------------------------------------

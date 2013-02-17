@@ -42,27 +42,6 @@ NO_INCLUDE_PKGDATA = NO
 # Should we build latex docs?
 LATEX_DOCS = NO
 
-# Mac OS X deployment target (to cross-compile for older OS versions)
-#
-MACOSX_DEPLOYMENT_VERSION = @MACOSX_DEPLOYMENT_VERSION@
-MACOSX_DEPLOYMENT_SDK = @MACOSX_DEPLOYMENT_SDK@
-
-ifneq "$(MACOSX_DEPLOYMENT_VERSION)" ""
-MACOSX_DEPLOYMENT_CC_OPTS = -mmacosx-version-min=$(MACOSX_DEPLOYMENT_VERSION) \
-			    -isysroot $(MACOSX_DEPLOYMENT_SDK) \
-			    --no-builtin-fprintf
-MACOSX_DEPLOYMENT_LD_OPTS = -mmacosx-version-min=$(MACOSX_DEPLOYMENT_VERSION) \
-			    -Wl,-syslibroot,$(MACOSX_DEPLOYMENT_SDK)
-# We don't extend SRC_CC_OPTS and friends here directly, as (a) they may get
-# overwritten in build.mk and (b) we must not use the deployment options in
-# stage 1 or we get a linker error if the bootstrap compiler is for a more 
-# recent OS version.
-#
-# We need --no-builtin-fprintf, as the use of the builtin function optimisation
-# for fprintf together with #include "PosixSource" in the RTS leads to the
-# use of fwrite$UNIX2003 (with GCC 4.0.1 on Mac OS X 10.5.2).
-endif
-
 ################################################################################
 #
 # Variables that control how the compiler itself is built

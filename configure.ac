@@ -498,23 +498,6 @@ FIND_LLVM_PROG([OPT], [opt], [opt])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
-dnl ** Mac OS X: explicit deployment target
-dnl --------------------------------------------------------------
-AC_ARG_WITH([macosx-deployment-target],
-[AC_HELP_STRING([--with-macosx-deployment-target=VERSION],
-        [Build for Mac OS VERSION and higher  (default= version of build host)])],
-[FP_MACOSX_DEPLOYMENT_TARGET="$withval"
- if test "x$TargetOS_CPP-$TargetVendor_CPP" != "xdarwin-apple"; then
-   # ignore everywhere, but on Mac OS
-   AC_MSG_WARN([--macosx-deployment-target is only available on Mac OS X])
-   FP_MACOSX_DEPLOYMENT_TARGET=none
- fi],
-[FP_MACOSX_DEPLOYMENT_TARGET=none]
-)
-FP_CHECK_MACOSX_DEPLOYMENT_TARGET
-AC_SUBST(MACOSX_DEPLOYMENT_VERSION)
-AC_SUBST(MACOSX_DEPLOYMENT_SDK)
-
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------

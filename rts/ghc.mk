@@ -279,11 +279,6 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
-# Mac OS X: make sure we compile for the right OS version
-rts_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
-rts_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
-rts_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
-
 # We *want* type-checking of hand-written cmm.
 rts_HC_OPTS += -dcmm-lint 
 
