@@ -38,7 +38,7 @@ V = 1
 
 # BootingFromHc - build GHC and the libraries from .hc files?
 # (unregisterised only)
-BootingFromHc = @BootingFromHc@
+BootingFromHc = NO
 
 NO_INCLUDE_DEPS = NO
 NO_INCLUDE_PKGDATA = NO
