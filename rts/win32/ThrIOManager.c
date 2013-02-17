@@ -152,7 +152,7 @@ ioManagerStart (void)
     Capability *cap;
     if (io_manager_event == INVALID_HANDLE_VALUE) {
 	cap = rts_lock();
-        rts_evalIO(&cap,DLL_IMPORT_DATA_REF(base_GHCziConcziIO_ensureIOManagerIsRunning_closure),NULL);
+        rts_evalIO(&cap,ensureIOManagerIsRunning_closure,NULL);
 	rts_unlock(cap);
     }
 }
