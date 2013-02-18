@@ -731,7 +731,7 @@ data CoreReader = CoreReader {
 }
 
 data CoreWriter = CoreWriter {
-        cw_simpl_count :: SimplCount
+        cw_simpl_count :: !SimplCount
 }
 
 emptyWriter :: DynFlags -> CoreWriter
