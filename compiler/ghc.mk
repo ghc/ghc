@@ -34,9 +34,9 @@ compiler/stage1/package-data.mk : compiler/stage1/build/Config.hs
 compiler/stage2/package-data.mk : compiler/stage2/build/Config.hs
 compiler/stage3/package-data.mk : compiler/stage3/build/Config.hs
 
-compiler/stage1/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
-compiler/stage2/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
-compiler/stage3/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
+compiler/stage1/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
+compiler/stage2/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
+compiler/stage3/build/PlatformConstants.o: $(includes_GHCCONSTANTS_HASKELL_TYPE)
 compiler/stage1/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 compiler/stage2/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 compiler/stage3/build/DynFlags.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
