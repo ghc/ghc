@@ -493,11 +493,11 @@ $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STA
 $(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
 $(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)
 
-$(foreach way,$$(compiler_stage1_WAYS),\
+$(foreach way,$(compiler_stage1_WAYS),\
       compiler/stage1/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE1)
-$(foreach way,$$(compiler_stage2_WAYS),\
+$(foreach way,$(compiler_stage2_WAYS),\
       compiler/stage2/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE2)
-$(foreach way,$$(compiler_stage3_WAYS),\
+$(foreach way,$(compiler_stage3_WAYS),\
       compiler/stage3/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE3)
 
 
