@@ -177,10 +177,11 @@ test('T3064',
       compiler_stats_num_field('max_bytes_used',
           [(wordsize(32), 5511604, 20),
         # expected value: 2247016 (x86/Linux) (28/6/2011):
-           (wordsize(64), 8687360, 5)]),
+           (wordsize(64), 9397488, 10)]),
             # (amd64/Linux, intree) (28/06/2011):  4032024
             # (amd64/Linux, intree) (07/02/2013):  9819288
             # (amd64/Linux)         (14/02/2013):  8687360
+            # (amd64/Linux)         (18/02/2013):  9397488
        only_ways(['normal'])
       ],
      compile,
