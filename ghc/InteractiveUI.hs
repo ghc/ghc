@@ -2944,7 +2944,8 @@ showException se =
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
 ghciHandle :: ExceptionMonad m => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = gcatch m $ \e -> gunblock (h e)
+ghciHandle h m = gmask $ \restore ->
+                 gcatch (restore m) $ \e -> restore (h e)
 
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)

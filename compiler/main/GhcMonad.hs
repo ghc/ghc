@@ -110,8 +110,6 @@ instance MonadFix Ghc where
 instance ExceptionMonad Ghc where
   gcatch act handle =
       Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s
-  gblock (Ghc m)   = Ghc $ \s -> gblock (m s)
-  gunblock (Ghc m) = Ghc $ \s -> gunblock (m s)
   gmask f =
       Ghc $ \s -> gmask $ \io_restore ->
                              let
@@ -169,8 +167,6 @@ instance MonadIO m => MonadIO (GhcT m) where
 instance ExceptionMonad m => ExceptionMonad (GhcT m) where
   gcatch act handle =
       GhcT $ \s -> unGhcT act s `gcatch` \e -> unGhcT (handle e) s
-  gblock (GhcT m) = GhcT $ \s -> gblock (m s)
-  gunblock (GhcT m) = GhcT $ \s -> gunblock (m s)
   gmask f =
       GhcT $ \s -> gmask $ \io_restore ->
                            let

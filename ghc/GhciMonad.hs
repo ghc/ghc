@@ -204,8 +204,6 @@ instance GhcMonad (InputT GHCi) where
 
 instance ExceptionMonad GHCi where
   gcatch m h = GHCi $ \r -> unGHCi m r `gcatch` (\e -> unGHCi (h e) r)
-  gblock (GHCi m)   = GHCi $ \r -> gblock (m r)
-  gunblock (GHCi m) = GHCi $ \r -> gunblock (m r)
   gmask f =
       GHCi $ \s -> gmask $ \io_restore ->
                              let
@@ -226,9 +224,6 @@ instance Haskeline.MonadException GHCi where
 instance ExceptionMonad (InputT GHCi) where
   gcatch = Haskeline.catch
   gmask f = Haskeline.liftIOOp gmask (f . Haskeline.liftIOOp_)
-
-  gblock = Haskeline.liftIOOp_ gblock
-  gunblock = Haskeline.liftIOOp_ gunblock
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt
