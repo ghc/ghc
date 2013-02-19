@@ -37,7 +37,7 @@ module GHC.IO (
         catchException, catchAny, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
         MaskingState(..), getMaskingState,
-        blocked, unsafeUnmask,
+        unsafeUnmask,
         onException, bracket, finally, evaluate
     ) where
 
@@ -351,12 +351,6 @@ getMaskingState  = IO $ \s ->
                              0# -> Unmasked
                              1# -> MaskedUninterruptible
                              _  -> MaskedInterruptible #)
-
-{-# DEPRECATED blocked "use Control.Exception.getMaskingState instead" #-} -- deprecated in 7.2
--- | returns True if asynchronous exceptions are blocked in the
--- current thread.
-blocked :: IO Bool
-blocked = fmap (/= Unmasked) getMaskingState
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchException` \e -> do _ <- what

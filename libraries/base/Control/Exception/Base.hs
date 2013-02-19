@@ -90,10 +90,6 @@ module Control.Exception.Base (
         MaskingState(..),
         getMaskingState,
 
-        -- ** (deprecated) Asynchronous exception control
-
-        blocked,
-
         -- * Assertions
 
         assert,
@@ -234,13 +230,6 @@ throw e = Hugs.Exception.throw (toException e)
 
 throwIO :: Exception e => e -> IO a
 throwIO e = Hugs.Exception.throwIO (toException e)
-#endif
-
-#ifndef __GLASGOW_HASKELL__
--- Dummy definitions for implementations lacking asynchonous exceptions
-
-blocked :: IO Bool
-blocked  = return False
 #endif
 
 -----------------------------------------------------------------------------
