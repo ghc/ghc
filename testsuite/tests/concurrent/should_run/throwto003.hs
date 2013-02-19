@@ -12,5 +12,5 @@ main = do
 
 thread m = run
   where 
-    run = (unblock $ forever $ modifyMVar_ m $ \v -> if v `mod` 2 == 1 then return (v*2) else return (v-1))
+    run = (forever $ modifyMVar_ m $ \v -> if v `mod` 2 == 1 then return (v*2) else return (v-1))
              `catch` \(e::SomeException) -> run

@@ -6,11 +6,11 @@ main = do
   m <- newEmptyMVar
   forkIO (do stat; putMVar m ())
   takeMVar m
-  block $ forkIO (do stat; putMVar m ())
+  mask $ \_ -> forkIO (do stat; putMVar m ())
   takeMVar m
   forkOS (do stat; putMVar m ())
   takeMVar m
-  block $ forkOS (do stat; putMVar m ())
+  mask $ \_ -> forkOS (do stat; putMVar m ())
   takeMVar m
 
 stat = do

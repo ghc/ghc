@@ -11,14 +11,14 @@ import Data.IORef
 main = do
   r <- newIORef 0
   rec
-    t1 <- block $ forkIO (thread r t2)
-    t2 <- block $ forkIO (thread r t1)
+    t1 <- mask $ \restore -> forkIO (thread restore r t2)
+    t2 <- mask $ \restore -> forkIO (thread restore r t1)
   threadDelay 1000000
   readIORef r >>= print . (/= 0)
 
-thread r t = run
-  where 
-    run = (unblock $ forever $ do killThread t
+thread restore r t = run
+  where
+    run = (restore $ forever $ do killThread t
                                   i <- atomicModifyIORef r (\i -> (i + 1, i))
                                   evaluate i)
              `catch` \(e::SomeException) -> run
