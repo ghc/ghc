@@ -35,7 +35,7 @@ StgWord64 whitehole_spin = 0;
 #define HEAP_ALLOCED_GC(p) HEAP_ALLOCED(p)
 #endif
 
-#if !defined(PARALLEL_GC)
+#if !defined(PARALLEL_GC) || defined(PROFILING)
 #define copy_tag_nolock(p, info, src, size, stp, tag) \
         copy_tag(p, info, src, size, stp, tag)
 #endif
@@ -113,6 +113,17 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         const StgInfoTable *new_info;
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
+#ifdef PROFILING
+            // We copied this object at the same time as another
+            // thread.  We'll evacuate the object again and the copy
+            // we just made will be discarded at the next GC, but we
+            // may have copied it after the other thread called
+            // SET_EVACUAEE_FOR_LDV(), which would confuse the LDV
+            // profiler when it encounters this closure in
+            // processHeapClosureForDead.  So we reset the LDVW field
+            // here.
+            LDVW(to) = 0;
+#endif
             return evacuate(p); // does the failed_to_evac stuff
         } else {
             *p = TAG_CLOSURE(tag,(StgClosure*)to);
@@ -126,11 +137,13 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #ifdef PROFILING
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
+    // This is safe only if we are sure that no other thread evacuates
+    // the object again, so we cannot use copy_tag_nolock when PROFILING.
     SET_EVACUAEE_FOR_LDV(from, size);
 #endif
 }
 
-#if defined(PARALLEL_GC)
+#if defined(PARALLEL_GC) && !defined(PROFILING)
 STATIC_INLINE void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info, 
          StgClosure *src, nat size, nat gen_no, StgWord tag)
