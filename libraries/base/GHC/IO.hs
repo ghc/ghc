@@ -37,7 +37,7 @@ module GHC.IO (
         catchException, catchAny, throwIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
         MaskingState(..), getMaskingState,
-        block, unblock, blocked, unsafeUnmask,
+        blocked, unsafeUnmask,
         onException, bracket, finally, evaluate
     ) where
 
@@ -302,9 +302,6 @@ throwIO e = IO (raiseIO# (toException e))
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
 
-{-# DEPRECATED block "use Control.Exception.mask instead" #-} -- deprecated in 7.0
--- | Note: this function is deprecated, please use 'mask' instead.
---
 -- Applying 'block' to a computation will
 -- execute that computation with asynchronous exceptions
 -- /blocked/.  That is, any thread which
@@ -322,9 +319,6 @@ throwIO e = IO (raiseIO# (toException e))
 block :: IO a -> IO a
 block (IO io) = IO $ maskAsyncExceptions# io
 
-{-# DEPRECATED unblock "use Control.Exception.mask instead" #-} -- deprecated in 7.0
--- | Note: this function is deprecated, please use 'mask' instead.
---
 -- To re-enable asynchronous exceptions inside the scope of
 -- 'block', 'unblock' can be
 -- used.  It scopes in exactly the same way, so on exit from

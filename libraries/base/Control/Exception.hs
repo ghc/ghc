@@ -117,8 +117,6 @@ module Control.Exception (
 
         -- ** (deprecated) Asynchronous exception control
 
-        block,
-        unblock,
         blocked,
 
         -- *** Applying @mask@ to an exception handler

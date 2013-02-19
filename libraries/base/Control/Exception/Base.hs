@@ -92,8 +92,6 @@ module Control.Exception.Base (
 
         -- ** (deprecated) Asynchronous exception control
 
-        block,
-        unblock,
         blocked,
 
         -- * Assertions
@@ -241,10 +239,6 @@ throwIO e = Hugs.Exception.throwIO (toException e)
 #ifndef __GLASGOW_HASKELL__
 -- Dummy definitions for implementations lacking asynchonous exceptions
 
-block   :: IO a -> IO a
-block    = id
-unblock :: IO a -> IO a
-unblock  = id
 blocked :: IO Bool
 blocked  = return False
 #endif
