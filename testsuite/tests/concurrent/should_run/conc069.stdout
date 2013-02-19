@@ -1,4 +1,4 @@
-(False,False)
-(False,True)
-(True,False)
-(True,True)
+(False,Unmasked)
+(False,MaskedInterruptible)
+(True,Unmasked)
+(True,MaskedInterruptible)

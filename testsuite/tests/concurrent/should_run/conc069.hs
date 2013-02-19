@@ -15,5 +15,5 @@ main = do
 
 stat = do
   x <- isCurrentThreadBound
-  y <- blocked
+  y <- getMaskingState
   print (x,y)
