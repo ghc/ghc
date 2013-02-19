@@ -1211,12 +1211,17 @@ maybeParrTy ty
 maybeParrTy (ForAllTy _ ty) = maybeParrTy ty
 maybeParrTy _               = return False
 
--- Are the types of all variables in the 'Scalar' class?
+-- Are the types of all variables in the 'Scalar' class or toplevel variables?
+--
+-- NB: 'liftSimple' does not abstract over toplevel variables.
 --
 allScalarVarType :: [Var] -> VM Bool
-allScalarVarType vs = and <$> mapM (isScalar . varType) vs
+allScalarVarType vs = and <$> mapM isScalarOrToplevel vs
+  where
+    isScalarOrToplevel v | isToplevel v = return True
+                         | otherwise    = isScalar (varType v)
 
--- Are the types of all variables in the set in the 'Scalar' class?
+-- Are the types of all variables in the set in the 'Scalar' class or toplevel variables?
 --
 allScalarVarTypeSet :: VarSet -> VM Bool
 allScalarVarTypeSet = allScalarVarType . varSetElems
