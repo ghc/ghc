@@ -1,2 +1,2 @@
-["Main.CAF (<entire-module>)","Main.main (callstack001.hs:17:8-21)","Main.mapM (callstack001.hs:10:13-17)","Main.mapM.go (callstack001.hs:13:17-19)","Main.f (callstack001.hs:7:10-35)"]
-["Main.CAF (<entire-module>)","Main.main (callstack001.hs:17:8-21)","Main.mapM (callstack001.hs:10:13-17)","Main.mapM.go (callstack001.hs:13:17-19)","Main.f (callstack001.hs:7:10-35)"]
+["Main.main (callstack001.hs:17:8-21)","Main.mapM (callstack001.hs:10:13-17)","Main.mapM.go (callstack001.hs:13:17-19)","Main.f (callstack001.hs:7:10-35)"]
+["Main.main (callstack001.hs:17:8-21)","Main.mapM (callstack001.hs:10:13-17)","Main.mapM.go (callstack001.hs:13:17-19)","Main.f (callstack001.hs:7:10-35)"]
