@@ -133,7 +133,7 @@ static void scheduleYield (Capability **pcap, Task *task);
 #if defined(THREADED_RTS)
 static nat requestSync (Capability **pcap, Task *task, nat sync_type);
 static void acquireAllCapabilities(Capability *cap, Task *task);
-static void releaseAllCapabilities(Capability *cap, Task *task);
+static void releaseAllCapabilities(nat n, Capability *cap, Task *task);
 static void startWorkerTasks (nat from USED_IF_THREADS, nat to USED_IF_THREADS);
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
@@ -1411,11 +1411,11 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
     task->cap = cap;
 }
 
-static void releaseAllCapabilities(Capability *cap, Task *task)
+static void releaseAllCapabilities(nat n, Capability *cap, Task *task)
 {
     nat i;
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < n; i++) {
         if (cap->no != i) {
             task->cap = &capabilities[i];
             releaseCapability(&capabilities[i]);
@@ -1437,7 +1437,6 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     rtsBool heap_census;
     nat collect_gen;
 #ifdef THREADED_RTS
-    rtsBool idle_cap[n_capabilities];
     rtsBool gc_type;
     nat i, sync;
     StgTSO *tso;
@@ -1498,6 +1497,13 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             return;
         }
     } while (sync);
+
+    // don't declare this until after we have sync'd, because
+    // n_capabilities may change.
+    rtsBool idle_cap[n_capabilities];
+#ifdef DEBUG
+    unsigned int old_n_capabilities = n_capabilities;
+#endif
 
     interruptAllCapabilities();
 
@@ -1686,6 +1692,10 @@ delete_threads_and_gc:
     }
 
 #if defined(THREADED_RTS)
+
+    // If n_capabilities has changed during GC, we're in trouble.
+    ASSERT(n_capabilities == old_n_capabilities);
+
     if (gc_type == SYNC_GC_PAR)
     {
         releaseGCThreads(cap);
@@ -1732,7 +1742,7 @@ delete_threads_and_gc:
 #if defined(THREADED_RTS)
     if (gc_type == SYNC_GC_SEQ) {
         // release our stash of capabilities.
-        releaseAllCapabilities(cap, task);
+        releaseAllCapabilities(n_capabilities, cap, task);
     }
 #endif
 
@@ -1957,6 +1967,7 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
     StgTSO* t;
     nat g, n;
     Capability *old_capabilities = NULL;
+    nat old_n_capabilities = n_capabilities;
 
     if (new_n_capabilities == enabled_capabilities) return;
 
@@ -2050,16 +2061,16 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
         }
     }
 
-    // We're done: release the original Capabilities
-    releaseAllCapabilities(cap,task);
-
-    // Start worker tasks on the new Capabilities
-    startWorkerTasks(n_capabilities, new_n_capabilities);
-
-    // finally, update n_capabilities
+    // update n_capabilities before things start running
     if (new_n_capabilities > n_capabilities) {
         n_capabilities = enabled_capabilities = new_n_capabilities;
     }
+
+    // Start worker tasks on the new Capabilities
+    startWorkerTasks(old_n_capabilities, new_n_capabilities);
+
+    // We're done: release the original Capabilities
+    releaseAllCapabilities(old_n_capabilities, cap,task);
 
     // We can't free the old array until now, because we access it
     // while updating pointers in updateCapabilityRefs().
