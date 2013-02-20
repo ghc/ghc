@@ -1820,6 +1820,8 @@ genCCall32' :: DynFlags
             -> NatM InstrBlock
 genCCall32' dflags target dest_regs args = do
         let
+            prom_args = map (maybePromoteCArg dflags W32) args
+
             -- Align stack to 16n for calls, assuming a starting stack
             -- alignment of 16n - word_size on procedure entry. Which we
             -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
@@ -1831,7 +1833,7 @@ genCCall32' dflags target dest_regs args = do
         setDeltaNat (delta0 - arg_pad_size)
 
         use_sse2 <- sse2Enabled
-        push_codes <- mapM (push_arg use_sse2) (reverse args)
+        push_codes <- mapM (push_arg use_sse2) (reverse prom_args)
         delta <- getDeltaNat
         MASSERT (delta == delta0 - tot_arg_size)
 
@@ -2055,12 +2057,14 @@ genCCall64' :: DynFlags
             -> NatM InstrBlock
 genCCall64' dflags target dest_regs args = do
     -- load up the register arguments
+    let prom_args = map (maybePromoteCArg dflags W32) args
+
     (stack_args, int_regs_used, fp_regs_used, load_args_code)
          <-
         if platformOS platform == OSMinGW32
-        then load_args_win args [] [] (allArgRegs platform) nilOL
+        then load_args_win prom_args [] [] (allArgRegs platform) nilOL
         else do (stack_args, aregs, fregs, load_args_code)
-                    <- load_args args (allIntArgRegs platform) (allFPArgRegs platform) nilOL
+                    <- load_args prom_args (allIntArgRegs platform) (allFPArgRegs platform) nilOL
                 let fp_regs_used  = reverse (drop (length fregs) (reverse (allFPArgRegs platform)))
                     int_regs_used = reverse (drop (length aregs) (reverse (allIntArgRegs platform)))
                 return (stack_args, int_regs_used, fp_regs_used, load_args_code)
@@ -2231,9 +2235,6 @@ genCCall64' dflags target dest_regs args = do
              push_args rest code'
 
            | otherwise = do
-           -- we only ever generate word-sized function arguments.  Promotion
-           -- has already happened: our Int8# type is kept sign-extended
-           -- in an Int#, for example.
              ASSERT(width == W64) return ()
              (arg_op, arg_code) <- getOperand arg
              delta <- getDeltaNat
@@ -2252,6 +2253,13 @@ genCCall64' dflags target dest_regs args = do
              return $ toOL [
                          SUB II64 (OpImm (ImmInt (n * wORD_SIZE dflags))) (OpReg rsp),
                          DELTA (delta - n * arg_size)]
+
+maybePromoteCArg :: DynFlags -> Width -> CmmExpr -> CmmExpr
+maybePromoteCArg dflags wto arg
+ | wfrom < wto = CmmMachOp (MO_UU_Conv wfrom wto) [arg]
+ | otherwise   = arg
+ where
+   wfrom = cmmExprWidth dflags arg
 
 -- | We're willing to inline and unroll memcpy/memset calls that touch
 -- at most these many bytes.  This threshold is the same as the one
