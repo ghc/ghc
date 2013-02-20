@@ -145,12 +145,14 @@ outputAsm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        let filenmDyn = filenm ++ "-dyn"
-           withHandles f = doOutput filenm $ \h ->
-                           ifGeneratingDynamicToo dflags
-                               (doOutput filenmDyn $ \dynH ->
-                                   f [(h, dflags),
-                                      (dynH, doDynamicToo dflags)])
-                               (f [(h, dflags)])
+           withHandles f = do debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
+                              doOutput filenm $ \h ->
+                               ifGeneratingDynamicToo dflags
+                                   (do debugTraceMsg dflags 4 (text "Outputing dynamic-too asm to" <+> text filenmDyn)
+                                       doOutput filenmDyn $ \dynH ->
+                                         f [(h, dflags),
+                                            (dynH, doDynamicToo dflags)])
+                                   (f [(h, dflags)])
 
        _ <- {-# SCC "OutputAsm" #-} withHandles $
            \hs -> {-# SCC "NativeCodeGen" #-}

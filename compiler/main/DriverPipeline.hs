@@ -482,6 +482,7 @@ data PipelineOutput
         -- eg. in "ghc -c Foo.hs" the output goes into ./Foo.o.
   | SpecificFile FilePath
         -- ^ The output must go into the specified file.
+    deriving Show
 
 -- | Run a compilation pipeline, consisting of multiple phases.
 --
@@ -563,8 +564,9 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                            SpecificFile fn -> SpecificFile (replaceExtension fn (objectSuf dflags'))
                            Persistent -> Persistent
                            Temporary -> Temporary
+                 env' = env { output_spec = output' }
              hsc_env' <- newHscEnv dflags'
-             _ <- runPipeline' start_phase stop_phase hsc_env' env input_fn
+             _ <- runPipeline' start_phase stop_phase hsc_env' env' input_fn
                                output' maybe_loc maybe_stub_o
              return ()
          return r
@@ -1023,8 +1025,11 @@ runPhase (Hsc src_flavour) input_fn dflags0
                              setStubO stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot
                     -- stamp file for the benefit of Make
-                    when (isHsBoot src_flavour) $
+                    when (isHsBoot src_flavour) $ do
                         liftIO $ touchObjectFile dflags' o_file
+                        whenGeneratingDynamicToo dflags' $ do
+                            let dyn_o_file = addBootSuffix (replaceExtension o_file (dynObjectSuf dflags'))
+                            liftIO $ touchObjectFile dflags' dyn_o_file
                     return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
@@ -1275,8 +1280,15 @@ runPhase As input_fn dflags
                           , SysTools.FileOption "" outputFilename
                           ])
 
+        liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
         runAssembler input_fn output_fn
-        whenGeneratingDynamicToo dflags $
+        -- If we're compiling a Haskell module (isHaskellishFile), and
+        -- we're doing -dynamic-too, then we also need to assemble the
+        -- -dyn assembly file.
+        env <- getPipeEnv
+        when (pe_isHaskellishFile env) $ whenGeneratingDynamicToo dflags $ do
+            liftIO $ debugTraceMsg dflags 4
+                         (text "Running the assembler again for -dynamic-too")
             runAssembler (input_fn ++ "-dyn")
                          (replaceExtension output_fn (dynObjectSuf dflags))
 
