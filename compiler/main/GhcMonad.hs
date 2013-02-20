@@ -189,7 +189,7 @@ printException err = do
   dflags <- getSessionDynFlags
   liftIO $ printBagOfErrors dflags (srcErrorMessages err)
 
-{-# DEPRECATED printExceptionAndWarnings "use printException instead" #-}
+{-# DEPRECATED printExceptionAndWarnings "use printException instead" #-} -- deprecated in 7.2
 printExceptionAndWarnings :: GhcMonad m => SourceError -> m ()
 printExceptionAndWarnings = printException
 
